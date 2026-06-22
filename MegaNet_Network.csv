@@ -1,0 +1,31 @@
+Radio Mobile
+$Style
+Prop mode,Color 1,Color 2,Color 3
+0,38,40,81
+$Coverage
+AntAzt,Area,Color area,Contour,Color contour,D min,D max,Azt min,Azt max,Azt inc,Threshold mode,Visual color,Sensor h,Target h
+0,1,FFFF,1,0,0.01,50,0,360,1,1,FFFF,2,2
+$Net
+Nbr nets,Nbr units,Nbr systems
+20,97,12
+Net ID,Net name,Visible,Minimum fx,Max Fx,Refractivity,Conductivity,Permittivity,Polarization,Climate,Stat. mode,%Time,%Location,%Situation,Topology,Max Rebro,%Urban or Tree
+1,Amiens Knob,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+2,Ballandean Hill,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+3,Bony Mountain,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+4,Carrs Lookout,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+5,Constitution Hill No1,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+6,Constitution Hill No2,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+7,Hillcrest - Wine Glass,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+8,Kooralbyn,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+9,Laheys Lookout,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+10,Lower Springbrook,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+11,Molendinar,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+12,Mt Tamborine,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+13,O'Reillys,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+14,Round Mt Res,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+15,Tallai,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+16,Tallebudgera Ck Rd,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+17,Tomewin,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+18,Upper Rosenthal,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+19,Warahgai,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0
+20,Wilsons Pk,1,151,152,301,0.005,15,1,2,0,50,50,70,1,0,0

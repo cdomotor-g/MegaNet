@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<GroundOverlay><name>net1.jpg</name><color>88ffffff</color><Icon>
+<href>net1.jpg</href>
+<viewBoundScale>0.75</viewBoundScale></Icon><LatLonBox>
+<north>-27.47148</north>
+<south>-28.73132</south>
+<east> 153.2164</east>
+<west> 150.537</west>
+</LatLonBox></GroundOverlay></kml>

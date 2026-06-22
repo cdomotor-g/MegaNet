@@ -1,0 +1,16 @@
+Radio Mobile
+$Version
+4000
+","
+$Map
+c:\program files (x86)\radio mobile 11.6.6\networks\meganet\net1.map
+$Picture
+c:\program files (x86)\radio mobile 11.6.6\networks\meganet\net1.jpg
+c:\program files (x86)\radio mobile 11.6.6\networks\meganet\picture1.jpg
+$Land
+C:\Program Files (x86)\Radio Mobile 11.6.6\landheight.dat
+$Include
+MegaNet_Network.csv
+MegaNet_Unit.csv
+MegaNet_System.csv
+MegaNet_NetData.csv

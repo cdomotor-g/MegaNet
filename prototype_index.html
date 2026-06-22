@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MegaNet Prototype</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>MegaNet Prototype</h1>
+      <p>CSV-driven, browser-only prototype for BoM radio-network selection, Radio Mobile generation, repeater pass-window matching, and metadata CRUD.</p>
+    </div>
+    <div class="header-actions">
+      <button id="btnTheme" type="button">Dark mode</button>
+      <button id="btnSelectAllNetworks" type="button" disabled>All networks</button>
+      <button id="btnClearNetworks" type="button" disabled>Clear</button>
+      <button class="primary" id="btnExportRMSet" type="button" disabled>Export Radio Mobile set</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel sidebar">
+      <h2>Data</h2>
+      <div class="note compact">
+        <strong>Preferred:</strong> keep the source CSVs in the same folder as this HTML, then click <em>Try auto-load</em>.<br />
+        If your browser blocks local CSV reads, use the file pickers below.
+      </div>
+
+      <div class="button-column">
+        <button id="btnAutoload" type="button">Try auto-load</button>
+      </div>
+
+      <div class="upload-grid">
+        <label>ALL_UNITS.csv<input id="fileUnits" type="file" accept=".csv" /></label>
+        <label>ALL_REPEATERS.csv<input id="fileRepeaters" type="file" accept=".csv" /></label>
+        <label>MegaNet_Network.csv<input id="fileNetworks" type="file" accept=".csv" /></label>
+        <label>MegaNet_System.csv<input id="fileSystems" type="file" accept=".csv" /></label>
+      </div>
+
+      <div class="button-column">
+        <button id="btnLoadFiles" class="primary" type="button">Load selected CSVs</button>
+      </div>
+
+      <div id="loadStatus" class="summary-box small">No data loaded yet.</div>
+
+      <hr />
+
+      <h2>Networks</h2>
+      <input id="networkFilter" type="search" placeholder="Filter networks" disabled />
+      <div id="networkList" class="checklist"></div>
+
+      <hr />
+
+      <div class="stats" id="stats"></div>
+      <div class="note">
+        <strong>Data storage:</strong> loaded CSVs are held in browser memory for the current session only. CRUD edits stay in memory until you export updated CSVs or reload.
+      </div>
+    </aside>
+
+    <section class="content stack">
+      <section class="panel">
+        <div class="panel-header panel-header-wrap">
+          <h2>Network map</h2>
+          <div id="mapLegend" class="map-legend small">
+            <span class="legend-item"><span class="legend-dot repeater"></span>Repeater</span>
+            <span class="legend-item"><span class="legend-dot field"></span>Field station</span>
+            <span class="legend-item"><span class="legend-line"></span>Open pass path</span>
+          </div>
+        </div>
+        <div id="map" class="map-canvas" aria-label="Map of repeaters, field stations and valid radio paths"></div>
+        <div id="mapSummary" class="summary-box small">Load data to view the network map.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Repeaters</h2>
+          <input id="repeaterFilter" type="search" placeholder="Filter repeaters" disabled />
+        </div>
+        <div class="table-wrap tall"><table id="repeaterTable"></table></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Matched units</h2>
+          <input id="unitFilter" type="search" placeholder="Filter units" disabled />
+        </div>
+        <div class="table-wrap tall"><table id="unitsTable"></table></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header panel-header-wrap">
+          <h2>Radio Mobile exports</h2>
+          <div class="button-row">
+            <button data-export="MegaNet" type="button" disabled>MegaNet.csv</button>
+            <button data-export="MegaNet_Network" type="button" disabled>MegaNet_Network.csv</button>
+            <button data-export="MegaNet_System" type="button" disabled>MegaNet_System.csv</button>
+            <button data-export="MegaNet_Unit" type="button" disabled>MegaNet_Unit.csv</button>
+            <button data-export="MegaNet_NetData" type="button" disabled>MegaNet_NetData.csv</button>
+          </div>
+        </div>
+        <div id="exportSummary" class="summary-box">Load data first.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header panel-header-wrap">
+          <h2>Audit exports</h2>
+          <div class="button-row">
+            <button data-export="Selected_Repeaters" type="button" disabled>Selected_Repeaters.csv</button>
+            <button data-export="Unit_Repeater_Matches" type="button" disabled>Unit_Repeater_Matches.csv</button>
+            <button data-export="ALL_UNITS_BASE" type="button" disabled>Current ALL_UNITS.csv</button>
+            <button data-export="ALL_REPEATERS_BASE" type="button" disabled>Current ALL_REPEATERS.csv</button>
+            <button data-export="MegaNet_System_BASE" type="button" disabled>Current MegaNet_System.csv</button>
+          </div>
+        </div>
+        <div class="summary-box small">Audit / working files separated from the Radio Mobile output set.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header panel-header-wrap">
+          <h2>CRUD editor</h2>
+          <div class="button-row tab-row">
+            <button class="tab-btn active" data-entity="units" type="button">Units</button>
+            <button class="tab-btn" data-entity="repeaters" type="button">Repeaters</button>
+            <button class="tab-btn" data-entity="systems" type="button">Systems</button>
+          </div>
+        </div>
+
+        <div class="crud-layout">
+          <div class="crud-list panel-sub">
+            <div class="panel-header">
+              <input id="crudSearch" type="search" placeholder="Search current editor list" disabled />
+              <div class="button-row">
+                <button id="btnCrudNew" type="button" disabled>New</button>
+                <button id="btnCrudDelete" type="button" disabled>Delete selected</button>
+              </div>
+            </div>
+            <div class="table-wrap medium"><table id="crudTable"></table></div>
+          </div>
+
+          <div class="crud-form panel-sub">
+            <div class="panel-header">
+              <h3 id="crudTitle">Editor</h3>
+              <div class="button-row">
+                <button id="btnCrudSave" class="primary" type="button" disabled>Save</button>
+                <button id="btnCrudReset" type="button" disabled>Reset</button>
+              </div>
+            </div>
+            <div id="crudStatus" class="summary-box small">Load data first.</div>
+            <form id="crudForm" class="form-grid"></form>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
