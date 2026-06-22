@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ALERT Address Bit‑Flip & ARRO Graph Tool</title>
+
+  <!-- Favicon -->
+  <link rel="icon" href="image_bitflipper.svg" type="image/svg+xml">
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 20px;
+      position: relative;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: url("image_bitflipper.svg") no-repeat center center;
+      background-size: contain;
+      opacity: 0.2;
+      z-index: -1;
+    }
+
+    /* --- restored table + layout styling --- */
+
+    .section {
+      margin-top: 24px;
+    }
+
+    table {
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.9rem;
+	  background: white
+    }
+
+    th, td {
+      border: 1px solid #bbb;
+      padding: 4px 8px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #f2f2f2;
+      font-weight: 600;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .yes {
+      color: #0a7a00;
+      font-weight: 600;
+    }
+
+    .no {
+      color: #b00000;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>ALERT Address Bit‑Flipper & ARRO Graph Link Tool</h1>
+
+  <div class="section">
+    <label>CSV file <input type="file" id="csvFile" accept=".csv"></label><br><br>
+    <label>ALERT Address <input type="number" id="alertAddr" min="0"></label><br><br>
+    <label>Bits to flip <input type="number" id="bitsToFlip" min="1" value="1"></label><br><br>
+    <label>ARRO base URL
+      <input id="arroBase" size="50"
+        value="https://contrail-bom.onerain.au/graph/">
+    </label><br><br>
+    <button id="runBtn">Run analysis</button>
+  </div>
+
+  <div id="output"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const parseCSV = t => {
+    const l=t.split(/\r?\n/).filter(x=>x.trim());
+    const h=l[0].split(",");
+    return l.slice(1).map(r=>{
+      const c=r.split(",");
+      const o={}; h.forEach((k,i)=>o[k]=c[i]?.trim()||"");
+      return o;
+    });
+  };
+
+  const alertFromSensorId = id => {
+    const p=id.split("."), l=p[p.length-1];
+    return /^\d+$/.test(l)?+l:null;
+  };
+
+  const combos=(a,k)=>{
+    const r=[];(function f(s,c){
+      if(c.length===k) return r.push(c.slice());
+      for(let i=s;i<a.length;i++) f(i+1,c.concat(a[i]));
+    })(0,[]);return r;
+  };
+
+  const bin=n=>n.toString(2);
+
+  const formatLocal=d=>{
+    const p=x=>String(x).padStart(2,"0");
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} `
+         + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  };
+
+  runBtn.onclick=()=>{
+    const f=csvFile.files[0];
+    const addr=+alertAddr.value, n=+bitsToFlip.value;
+    const base=arroBase.value, out=output;
+    out.innerHTML="";
+    if(!f||n<1||addr<0) return out.textContent="Invalid input.";
+
+    const rd=new FileReader();
+    rd.onload=()=>{
+      const rows=parseCSV(rd.result);
+      rows.forEach(r=>r._alert=alertFromSensorId(r["Sensor ID"]||""));
+      const bits=[...Array(bin(addr).length).keys()];
+
+      const map=new Map();
+      combos(bits,n).forEach(b=>{
+        let v=addr; b.forEach(x=>v^=1<<x);
+        if(v!==addr){
+          if(!map.has(v)) map.set(v,[]);
+          map.get(v).push(b);
+        }
+      });
+
+      const results=[];
+      map.forEach((bs,v)=>{
+        const m=rows.filter(r=>r._alert===v);
+        bs.forEach(b=>{
+          if(m.length) m.forEach(x=>results.push({b,v,x}));
+          else results.push({b,v,x:null});
+        });
+      });
+
+      const sensors=[...new Set(results.filter(r=>r.x).map(r=>r.x.Sensor))].sort();
+
+      out.innerHTML+=`
+      <div class="section">
+        <h3>Bit‑Flip Results</h3>
+
+        <label>Filter by Sensor:
+          <select id="sensorFilter">
+            <option value="">All sensors</option>
+            ${sensors.map(s=>`<option>${s}</option>`).join("")}
+          </select>
+        </label>
+
+        <div id="arroFiltered" style="margin-top:8px"></div>
+
+        <table id="flipTable">
+          <thead>
+            <tr>
+              <th>Bits</th><th>Dec</th><th>Bin</th><th>Match</th>
+              <th>Site</th><th>Site ID</th>
+              <th>Sensor</th><th>Sensor ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${results.map(r=>`
+              <tr data-sensor="${r.x?.Sensor||""}"
+                  data-site="${r.x?.site_id||""}"
+                  data-device="${r.x?.device_id||""}"
+                  data-match="${r.x?"1":"0"}">
+                <td class="mono">${r.b.join(",")}</td>
+                <td>${r.v}</td>
+                <td class="mono">${bin(r.v)}</td>
+                <td class="${r.x?"yes":"no"}">${r.x?"YES":"NO"}</td>
+                <td>${r.x?.Site||""}</td>
+                <td>${r.x?.["Site ID"]||""}</td>
+                <td>${r.x?.Sensor||""}</td>
+                <td>${r.x?.["Sensor ID"]||""}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+
+      const updateArro=()=>{
+        const now=new Date(), start=new Date(now-7*86400e3);
+        const p=new URLSearchParams({
+          refresh:"off", markers:"false", legend:"true", bin:"86400",
+          time_zone:"Australia/Brisbane", invalid:"true",
+          has_regular_sensors:"true", has_forecast_sensors:"false",
+          for_forecast:"false", hidden_devices:"none",
+          data_start:formatLocal(start), data_end:formatLocal(now)
+        });
+
+        const seen=new Set();
+        document.querySelectorAll("#flipTable tbody tr").forEach(tr=>{
+          if(tr.style.display==="none"||tr.dataset.match!=="1") return;
+          const k=tr.dataset.site+"|"+tr.dataset.device;
+          if(!seen.has(k)){ seen.add(k); p.append("devices[]",k); }
+        });
+
+        const c=arroFiltered; c.innerHTML="";
+        if(seen.size){
+          const a=document.createElement("a");
+          a.href=base+"?"+p.toString();
+          a.target="_blank";
+          a.textContent=`Open ARRO graph (filtered – ${seen.size} sensors)`;
+          c.appendChild(a);
+        }
+      };
+
+      sensorFilter.onchange=e=>{
+        const v=e.target.value;
+        document.querySelectorAll("#flipTable tbody tr")
+          .forEach(tr=>tr.style.display=!v||tr.dataset.sensor===v?"":"none");
+        updateArro();
+      };
+
+      updateArro();
+    };
+    rd.readAsText(f);
+  };
+})();
+</script>
+</body>
+</html>
