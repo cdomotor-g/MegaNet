@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MegaNet — Migration Tool</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .layout-single { max-width: 1100px; margin: auto; padding: 1rem; display: grid; gap: 1rem; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .warn-text { color: #c7401a; }
+    .ok-text   { color: #107c10; }
+    .unmatched-list { font-size: .85rem; color: var(--muted); max-height: 8rem; overflow: auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>MegaNet Migration Tool</h1>
+      <p>Convert ALL_UNITS.csv + ALL_REPEATERS.csv into stations.json</p>
+    </div>
+    <button id="btn-theme" onclick="toggleTheme()">Dark</button>
+  </header>
+
+  <div class="layout-single">
+
+    <div class="panel">
+      <div class="panel-header"><h2>Source Files</h2></div>
+      <div class="two-col upload-grid" style="margin-top:.75rem">
+        <label>ALL_UNITS.csv
+          <input type="file" id="f-units" accept=".csv" onchange="checkReady()">
+        </label>
+        <label>ALL_REPEATERS.csv
+          <input type="file" id="f-repeaters" accept=".csv" onchange="checkReady()">
+        </label>
+      </div>
+      <div class="note compact" style="margin-top:.75rem">
+        AlertIDs from the <em>Text</em> column are migrated as <code>alert_ids.rainfall</code> — the most common type.
+        Use the Editor in the main tool to reassign to <em>battery</em> or <em>water_level</em> as needed.
+      </div>
+      <div class="button-row" style="margin-top:.75rem">
+        <button class="primary" id="btn-run" onclick="run()" disabled>Convert to stations.json</button>
+        <span id="status" class="small"></span>
+      </div>
+    </div>
+
+    <div class="panel" id="result-panel" style="display:none">
+      <div class="panel-header">
+        <h2>Result</h2>
+        <button class="primary" onclick="dlResult()">Download stations.json</button>
+      </div>
+      <div id="summary" class="stats"></div>
+      <div id="unmatched-wrap" style="display:none; margin-top:.75rem">
+        <strong class="small">Repeater records with no matching unit (no coordinates — excluded):</strong>
+        <div class="unmatched-list" id="unmatched-list"></div>
+      </div>
+      <div class="table-wrap tall" style="margin-top:.75rem">
+        <table>
+          <colgroup>
+            <col style="width:24%"><col style="width:14%"><col style="width:16%">
+            <col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:8%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Name</th><th>Roles</th><th>BoM Network</th>
+              <th>AlertID</th><th>Lat</th><th>Lon</th><th>Elev</th><th>Pass ranges</th>
+            </tr>
+          </thead>
+          <tbody id="preview-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+  // ── Theme ───────────────────────────────────────────────────────────────────
+  (function () {
+    const t = localStorage.getItem('mn-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('btn-theme').textContent = t === 'dark' ? 'Light' : 'Dark';
+    });
+  })();
+
+  function toggleTheme() {
+    const cur  = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('mn-theme', next);
+    document.getElementById('btn-theme').textContent = next === 'dark' ? 'Light' : 'Dark';
+  }
+
+  function checkReady() {
+    const ok = document.getElementById('f-units').files.length > 0
+            && document.getElementById('f-repeaters').files.length > 0;
+    document.getElementById('btn-run').disabled = !ok;
+  }
+
+  // ── CSV parser ──────────────────────────────────────────────────────────────
+  function parseCsv(text) {
+    const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    const rows = [];
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const fields = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (inQ) {
+          if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+          else if (c === '"') inQ = false;
+          else cur += c;
+        } else {
+          if (c === '"') { inQ = true; }
+          else if (c === ',') { fields.push(cur); cur = ''; }
+          else cur += c;
+        }
+      }
+      fields.push(cur);
+      rows.push(fields);
+    }
+    if (rows.length < 2) return [];
+    const headers = rows[0].map(h => h.trim());
+    return rows.slice(1).map(r => {
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (r[i] || '').trim(); });
+      return obj;
+    });
+  }
+
+  function readFile(inputEl) {
+    return new Promise((resolve, reject) => {
+      const f = inputEl.files[0];
+      if (!f) { reject(new Error('No file selected')); return; }
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result);
+      reader.onerror = () => reject(new Error('File read error'));
+      reader.readAsText(f);
+    });
+  }
+
+  // ── Name normalisation + fuzzy match ───────────────────────────────────────
+  function normName(s) {
+    return (s || '').toLowerCase()
+      .replace(/\b(alert|rptr|repeater|aler|no\.?\s*\d+|#\d+|new|test|hill|knob|mountain|mt)\b/gi, ' ')
+      .replace(/\bal\b/gi, ' ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function matchScore(unitName, rptName) {
+    const u = normName(unitName);
+    const r = normName(rptName);
+    if (!u || !r) return 0;
+    if (u === r) return 100;
+    if (u.includes(r) || r.includes(u)) return 60;
+    const uWords = new Set(u.split(' ').filter(w => w.length > 2));
+    const rWords = r.split(' ').filter(w => w.length > 2);
+    let score = 0;
+    for (const w of rWords) if (uWords.has(w)) score += 15;
+    return score;
+  }
+
+  function slug(s) {
+    return (s || '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 64);
+  }
+
+  // ── Conversion ──────────────────────────────────────────────────────────────
+  let result = null;
+
+  async function run() {
+    const status = document.getElementById('status');
+    status.textContent = 'Converting…';
+    result = null;
+
+    try {
+      const [unitsText, repsText] = await Promise.all([
+        readFile(document.getElementById('f-units')),
+        readFile(document.getElementById('f-repeaters')),
+      ]);
+
+      const units = parseCsv(unitsText);
+      const reps  = parseCsv(repsText);
+
+      // ── Radio networks from ALL_REPEATERS ────────────────────────────────
+      const netNames = [...new Set(
+        reps.map(r => (r['BoM Network'] || '').trim()).filter(Boolean)
+      )].sort();
+
+      const radio_networks = netNames.map(name => ({
+        id: slug(name),
+        name,
+        description: '',
+      }));
+      const netNameToId = Object.fromEntries(radio_networks.map(n => [n.name, n.id]));
+
+      // ── Match each repeater record to a unit ─────────────────────────────
+      // rptMatch[rptIndex] = unit object | null
+      const rptMatch = reps.map(r => {
+        let best = null, bestScore = 0;
+        for (const u of units) {
+          const s = matchScore(u['Unit name'], r['Repeater']);
+          if (s > bestScore) { best = u; bestScore = s; }
+        }
+        return bestScore >= 20 ? best : null;
+      });
+
+      // unit_id → repeater record (first match wins)
+      const unitIdToRep = {};
+      reps.forEach((r, i) => {
+        const u = rptMatch[i];
+        if (u && !unitIdToRep[u['Unit ID']]) unitIdToRep[u['Unit ID']] = r;
+      });
+
+      const unmatched = reps.filter((_, i) => !rptMatch[i]).map(r => r['Repeater']);
+
+      // ── Build stations ───────────────────────────────────────────────────
+      const usedIds = new Set();
+      const stations = units.map(u => {
+        const icon    = parseInt(u['Icon']) || 243;
+        const textVal = parseFloat(u['Text']);
+        const hasAid  = !isNaN(textVal) && textVal > 0;
+
+        // Base role from icon
+        let roles;
+        if (icon === 307)       roles = ['repeater'];
+        else if (icon === 39)   roles = ['base'];
+        else                    roles = ['field'];
+
+        // Repeater that also has sensor data → field too
+        if (roles[0] === 'repeater' && hasAid) roles = ['field', 'repeater'];
+
+        // Attach repeater data if this unit has a matching repeater record
+        let repeaterBlock = null;
+        let radioNetIds   = [];
+        const repRecord   = unitIdToRep[u['Unit ID']];
+
+        if (repRecord) {
+          const pass_ranges = [];
+          for (let i = 1; i <= 8; i++) {
+            const lo = parseFloat(repRecord[`Pass low ${i}`]);
+            const hi = parseFloat(repRecord[`Pass high ${i}`]);
+            if (!isNaN(lo) && !isNaN(hi) && lo > 0 && hi > 0) {
+              pass_ranges.push({ low: lo, high: hi });
+            }
+          }
+          const rxRaw = (repRecord['Rx'] || '').replace(/\s*mhz\s*/i, '').trim();
+          const txRaw = (repRecord['Tx'] || '').replace(/\s*mhz\s*/i, '').trim();
+          repeaterBlock = {
+            acma_licence: (repRecord['ACMA Lic.'] || '').trim(),
+            rx_mhz: parseFloat(rxRaw) || null,
+            tx_mhz: parseFloat(txRaw) || null,
+            pass_ranges,
+            exclusions: [],
+            notes: '',
+          };
+          const netName = (repRecord['BoM Network'] || '').trim();
+          if (netName && netNameToId[netName]) radioNetIds = [netNameToId[netName]];
+
+          // Promote to repeater role if icon didn't already flag it
+          if (!roles.includes('repeater')) roles.push('repeater');
+        }
+
+        const alert_ids = hasAid ? { rainfall: Math.round(textVal) } : {};
+
+        // Unique slug ID
+        let id = slug(u['Unit name']) || `unit_${u['Unit ID']}`;
+        let uid = id, n = 2;
+        while (usedIds.has(uid)) uid = `${id}_${n++}`;
+        usedIds.add(uid);
+
+        const lat  = parseFloat(u['Latitude']);
+        const lon  = parseFloat(u['Longitude']);
+        const elev = parseFloat(u['Elevation']);
+
+        const station = {
+          id:             uid,
+          name:           u['Unit name'],
+          station_number: '',
+          lat:            isNaN(lat)  ? null : lat,
+          lon:            isNaN(lon)  ? null : lon,
+          elevation_ahd:  (!isNaN(elev) && elev !== 0) ? elev : null,
+          roles,
+          radio_network_ids: radioNetIds,
+          catchment_ids: [],
+          alert_ids,
+          satcom: { enabled: false, provider: '', terminal_id: '' },
+          rm_system_id:   1,
+          enabled:        u['Enabled'] === '1',
+          notes:          '',
+          legacy_unit_id: parseInt(u['Unit ID']) || null,
+        };
+
+        if (repeaterBlock) station.repeater = repeaterBlock;
+        return station;
+      });
+
+      // ── RM systems (from MegaNet_System defaults) ────────────────────────
+      const rm_systems = [
+        { id: 1, name: 'Field Station 1W',  tx_power_w: 1, line_loss_db: 1, supp_loss_db_m: 0, antenna_type: 'omni.ant', antenna_gain_dbi: 5.15, antenna_height_m: 4, rx_threshold_dbm: -117.001 },
+        { id: 2, name: 'Field Station 5W',  tx_power_w: 5, line_loss_db: 1, supp_loss_db_m: 0, antenna_type: 'omni.ant', antenna_gain_dbi: 5.15, antenna_height_m: 2, rx_threshold_dbm: -117.001 },
+        { id: 3, name: 'System 3',  tx_power_w: null, line_loss_db: null, supp_loss_db_m: 0, antenna_type: 'omni.ant', antenna_gain_dbi: null, antenna_height_m: null, rx_threshold_dbm: null },
+        { id: 4, name: 'System 4',  tx_power_w: null, line_loss_db: null, supp_loss_db_m: 0, antenna_type: 'omni.ant', antenna_gain_dbi: null, antenna_height_m: null, rx_threshold_dbm: null },
+      ];
+
+      result = {
+        meta: {
+          version: '1.0',
+          description: 'MegaNet station database',
+          updated: new Date().toISOString().slice(0, 10),
+          rm_paths: {
+            map:  'c:\\program files (x86)\\radio mobile 11.6.6\\networks\\meganet\\net1.map',
+            jpg:  'c:\\program files (x86)\\radio mobile 11.6.6\\networks\\meganet\\net1.jpg',
+            land: 'C:\\Program Files (x86)\\Radio Mobile 11.6.6\\landheight.dat',
+          },
+        },
+        radio_networks,
+        catchments: [],
+        rm_systems,
+        stations,
+      };
+
+      renderResult(result, unmatched);
+      document.getElementById('result-panel').style.display = '';
+      status.textContent = `Done — ${stations.length} stations converted`;
+
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+      console.error(err);
+    }
+  }
+
+  function renderResult(data, unmatched) {
+    const { stations, radio_networks } = data;
+    const repeaters   = stations.filter(s => s.roles.includes('repeater'));
+    const fieldOnly   = stations.filter(s => s.roles.includes('field') && !s.roles.includes('repeater'));
+    const bases       = stations.filter(s => s.roles.includes('base'));
+    const withAid     = stations.filter(s => Object.keys(s.alert_ids).length > 0);
+    const noCoords    = stations.filter(s => s.lat == null || s.lon == null);
+    const withRanges  = stations.filter(s => s.repeater && s.repeater.pass_ranges.length > 0);
+
+    document.getElementById('summary').innerHTML = `
+      <div>Total stations: <strong>${stations.length}</strong></div>
+      <div>Field stations: <strong>${fieldOnly.length}</strong></div>
+      <div>Repeaters: <strong>${repeaters.length}</strong> (${withRanges.length} with pass ranges)</div>
+      <div>Base stations: <strong>${bases.length}</strong></div>
+      <div>With AlertID: <strong>${withAid.length}</strong></div>
+      <div>Radio networks: <strong>${radio_networks.length}</strong></div>
+      <div class="${noCoords.length ? 'warn-text' : 'ok-text'}">No coordinates: <strong>${noCoords.length}</strong>${noCoords.length ? ' — review recommended' : ''}</div>
+    `;
+
+    if (unmatched.length > 0) {
+      document.getElementById('unmatched-wrap').style.display = '';
+      document.getElementById('unmatched-list').textContent = unmatched.join(', ');
+    }
+
+    document.getElementById('preview-body').innerHTML = stations.map(s => `
+      <tr>
+        <td title="${s.id}">${s.name}</td>
+        <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}</td>
+        <td class="small">${s.radio_network_ids.join(', ')}</td>
+        <td>${Object.values(s.alert_ids).flat().join(', ') || ''}</td>
+        <td>${s.lat != null ? s.lat.toFixed(4) : '<span class="warn-text">—</span>'}</td>
+        <td>${s.lon != null ? s.lon.toFixed(4) : '<span class="warn-text">—</span>'}</td>
+        <td>${s.elevation_ahd != null ? s.elevation_ahd : ''}</td>
+        <td>${s.repeater ? s.repeater.pass_ranges.length : ''}</td>
+      </tr>
+    `).join('');
+  }
+
+  function dlResult() {
+    if (!result) return;
+    const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+    const a = Object.assign(document.createElement('a'), {
+      href:     URL.createObjectURL(blob),
+      download: 'stations.json',
+    });
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  </script>
+</body>
+</html>

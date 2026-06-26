@@ -415,3 +415,43 @@ hr {
     height: 340px;
   }
 }
+
+/* Tab navigation bar */
+#tab-bar {
+  display: flex;
+  gap: .35rem;
+  padding: .55rem 1rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+
+#tab-bar .tab-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Main content area */
+#main-content {
+  min-height: calc(100vh - 120px);
+}
+
+/* Colour tokens used in analysis/editor */
+.warn-text  { color: #c7401a; }
+.ok-text    { color: #107c10; }
+
+/* Leaflet map inside new layout */
+#leaflet-map {
+  border-radius: 6px;
+}
+
+/* Code elements */
+code {
+  font-family: monospace;
+  font-size: .88em;
+  background: var(--subtle);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: .05rem .3rem;
+}
