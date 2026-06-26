@@ -66,6 +66,7 @@ const state = {
   if (btn) btn.textContent = state.theme === 'dark' ? 'Light' : 'Dark';
   renderTabs();
   renderMain();
+  autoLoad();
 })();
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
@@ -80,6 +81,8 @@ function toggleTheme() {
 
 // ── File loading ───────────────────────────────────────────────────────────────
 
+const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/cdomotor-g/MegaNet/main/stations.json';
+
 function onFileLoad(input) {
   const f = input.files[0];
   if (!f) return;
@@ -93,6 +96,35 @@ function onFileLoad(input) {
   };
   reader.readAsText(f);
   input.value = '';
+}
+
+async function loadFromUrl(url) {
+  const btn = document.getElementById('btn-load-gh');
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    loadJson(await res.text());
+  } catch (err) {
+    alert(`Failed to load from URL: ${err.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Load from GitHub'; }
+  }
+}
+
+function loadFromGitHub() {
+  loadFromUrl(GITHUB_RAW_URL);
+}
+
+async function autoLoad() {
+  // When served from a web server (e.g. GitHub Pages), auto-fetch stations.json
+  // from the same origin. Skips in file:// context (no server, no CORS headers).
+  if (location.protocol === 'file:') return;
+  try {
+    const res = await fetch('stations.json');
+    if (!res.ok) return;
+    loadJson(await res.text());
+  } catch (_) {}
 }
 
 function loadJson(text) {
