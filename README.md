@@ -1,1 +1,309 @@
-# MegaNet
+# MegaNet — Radio & Satcom Network Station Tool
+
+MegaNet is a browser-based tool for managing and visualising a radio and satellite communications (satcom) network. It consolidates station data, repeater pass-range analysis, Radio Mobile export, and interactive mapping into a single self-contained HTML application backed by one JSON data file. No server, no build step — just open the file in a browser.
+
+---
+
+## Background
+
+The Bureau of Meteorology operates a network of telemetry field stations that monitor rainfall, water levels, and battery status. Stations transmit their readings via ALERT radio, routed through one or more repeaters before reaching a base station (ingest point). Planning and maintaining these networks requires knowing:
+
+- Which stations a repeater serves (based on its pass ranges)
+- What path a station's signal takes from field to base
+- How to configure Radio Mobile for propagation fade-margin modelling
+- Where everything sits on a map
+
+The existing codebase is a collection of separately-evolved HTML tools with overlapping data and duplicated logic. This project consolidates them.
+
+---
+
+## Current State of the Repository
+
+| File | Purpose |
+|------|---------|
+| `prototype_index.html` | Main network planning tool — loads four CSVs, filters networks, maps repeaters/units, exports Radio Mobile files |
+| `BitFlipper.html` | ALERT address bit-flip analyser + ARRO graph link generator |
+| `BitFlipper2.2 (1).html` | Standalone backup of the BitFlipper (3 MB, data embedded) |
+| `app.js` | Main application logic (1 214 lines, state-driven) |
+| `app_updated.js` | Unrelated flood decision-tree tool (to be removed or separated) |
+| `app_updated (1).js` | Variant of `app.js` |
+| `styles.css` | Shared dark/light theme stylesheet |
+| `ALL_UNITS.csv` | ~1 000 field station records |
+| `ALL_REPEATERS.csv` | ~130 repeater records with pass ranges |
+| `MegaNet_Network.csv` | Radio Mobile network definitions |
+| `MegaNet_System.csv` | Transmitter/receiver system specs |
+| `MegaNet_Unit.csv` | Export-ready unit subset |
+| `MegaNet_NetData.csv` | Network membership matrices |
+| `MegaNet.csv` | Radio Mobile master config |
+| `z_Sensors_…_NATIONAL.csv` | 13 852-row national sensor/device-ID lookup |
+| `net1.*` | Radio Mobile map, elevation, georeference, and KML files |
+
+The goal is to replace all of the above HTML/JS/CSS files with **one** `index.html` + `app.js` + `styles.css` backed by **one** `stations.json` data file.
+
+---
+
+## Target Architecture
+
+```
+MegaNet/
+├── index.html          ← single entry point
+├── app.js              ← all application logic
+├── styles.css          ← theme and layout
+├── stations.json       ← single source of truth (see schema below)
+└── assets/
+    ├── net1.map        ← Radio Mobile elevation data
+    ├── net1.jpg        ← map background
+    ├── net1.geo        ← georeference
+    ├── net1.inf
+    └── net1.kml
+```
+
+---
+
+## Data Schema — `stations.json`
+
+Each entry in the `stations` array represents one node in the network. A node can simultaneously be a field station, a repeater, and/or a base station — the `roles` array defines its capabilities.
+
+### Top-level structure
+
+```json
+{
+  "meta": {
+    "version": "1.0",
+    "description": "MegaNet station database",
+    "updated": "YYYY-MM-DD"
+  },
+  "radio_networks": [
+    {
+      "id": "barcaldine",
+      "name": "Barcaldine",
+      "description": "Stations served by the Barcaldine repeater cluster"
+    }
+  ],
+  "catchments": [
+    {
+      "id": "warrego",
+      "name": "Warrego River"
+    }
+  ],
+  "stations": [ /* see below */ ]
+}
+```
+
+### Station entry
+
+```json
+{
+  "id": "UNIQUE_STATION_ID",
+  "name": "Loudoun Bridge",
+  "station_number": "422001A",
+  "lat": -27.1234,
+  "lon": 150.5678,
+  "elevation_ahd": 312.5,
+
+  "roles": ["field", "repeater", "base"],
+
+  "radio_network_ids": ["barcaldine"],
+  "catchment_ids": ["warrego"],
+
+  "alert_ids": {
+    "battery":     1042,
+    "rainfall":    1043,
+    "water_level": [1044, 1045]
+  },
+
+  "repeater": {
+    "acma_licence": "XXXXXX",
+    "rx_mhz": 151.500,
+    "tx_mhz": 151.625,
+    "pass_ranges": [
+      { "low": 1001, "high": 1199 },
+      { "low": 2400, "high": 2499 }
+    ],
+    "exclusions": [],
+    "notes": ""
+  },
+
+  "satcom": {
+    "enabled": false,
+    "provider": "",
+    "terminal_id": ""
+  },
+
+  "rm_system_id": 1,
+
+  "enabled": true,
+  "notes": ""
+}
+```
+
+#### Field notes
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `roles` | `string[]` | Any combination of `"field"`, `"repeater"`, `"base"` |
+| `alert_ids.water_level` | `number` or `number[]` | Single ID or array for dual-sensor sites |
+| `repeater.pass_ranges` | `object[]` | Unlimited; each has `low` and `high` inclusive bounds |
+| `repeater.exclusions` | `object[]` | Reserved for next-generation equipment; same `low`/`high` structure |
+| `rm_system_id` | `number` | References the Radio Mobile system spec (power, antenna, etc.) |
+| `satcom.enabled` | `boolean` | Marks stations with satellite comms capability |
+
+---
+
+## Planned Features
+
+### 1. Unified Data Management
+- Load `stations.json` from disk or drag-and-drop
+- In-browser CRUD editor for stations with live validation
+- Export edited data back to `stations.json`
+- Import from legacy CSV format (migration path from current files)
+
+### 2. Interactive Map
+- Plot all stations by role using distinct markers:
+  - Field stations (rainfall, water level, or both)
+  - Repeaters
+  - Base stations / ingest points
+  - Satcom terminals
+- Draw signal path lines between field stations and the repeaters/base stations their AlertID passes through
+- Click a station to see its full detail panel
+- Filter map display by role, catchment, radio network, or enabled status
+- Toggle individual link lines on/off
+- Leaflet.js with OpenStreetMap base layer
+
+### 3. Pass-Range Analysis
+- For any station, identify which repeaters have a pass range covering its AlertIDs
+- Show the full hop chain: field → repeater(s) → base station
+- Flag stations with no matching repeater (orphaned)
+- Flag pass-range gaps (AlertIDs that fall between all windows)
+- Display pass-range exclusions (future equipment) alongside inclusions
+
+### 4. Filtering & Exploration
+- Filter stations by:
+  - Role (field / repeater / base / satcom)
+  - Catchment
+  - Radio network cluster
+  - AlertID or AlertID range
+  - Enabled/disabled status
+  - Sensor type (rainfall only, water level only, combined)
+- Search by station name or station number
+- Multi-select filters with AND logic
+
+### 5. Radio Mobile Export
+Generate the complete set of CSV files required by Radio Mobile software from the JSON data:
+
+| File | Contents |
+|------|---------|
+| `MegaNet.csv` | Master config (version, map paths, file includes) |
+| `MegaNet_Network.csv` | One row per repeater with propagation parameters |
+| `MegaNet_Unit.csv` | All selected stations with coordinates and display settings |
+| `MegaNet_System.csv` | Transmitter/receiver system specs |
+| `MegaNet_NetData.csv` | Network membership matrix (antenna heights, system IDs, roles) |
+
+Export is scoped to the current filter selection so users can generate per-catchment or per-network RM projects.
+
+### 6. ALERT Address / BitFlipper Tool (Integrated)
+- Input an ALERT decimal address and see all single-bit-flip variants
+- Cross-reference against the station database to find which variants are live stations
+- Generate ARRO graph links for any matched sensors (date range, timezone, device IDs pre-filled)
+- Sensor type filter (rainfall, water level, battery)
+- Replaces the standalone `BitFlipper.html`
+
+### 7. Dark / Light Theme
+- Toggle between dark and light modes
+- Preference persisted to `localStorage`
+
+### 8. Radio Network Management
+- Named radio network clusters (typically named after the primary repeater or ingest point)
+- Assign stations and repeaters to one or more networks
+- Select networks to scope all views and exports to that cluster
+- "Select all" / "Clear all" shortcuts
+
+### 9. Station Detail Panel
+Side panel or modal showing full station record:
+- Name, number, coordinates, elevation
+- All AlertIDs with sensor type labels
+- Radio network memberships
+- Repeater pass ranges (visual range bars)
+- Matched field stations (if repeater)
+- Matched repeaters (if field station)
+- Satcom details if applicable
+- Direct link to ARRO graphs for each AlertID
+
+---
+
+## Deployment Plan
+
+### Phase 1 — Data Migration (Foundation)
+**Goal:** Single JSON file replaces all CSVs with no loss of information.
+
+1. Write a migration script (standalone HTML or Node.js) that reads `ALL_UNITS.csv`, `ALL_REPEATERS.csv`, `MegaNet_Network.csv`, and `MegaNet_System.csv` and outputs a valid `stations.json`.
+2. Map existing repeater pass-window columns (up to 8) into the flexible `pass_ranges` array.
+3. Map existing `Text` (AlertID) column into `alert_ids.battery` / `.rainfall` / `.water_level` based on naming conventions in the data.
+4. Add `roles` inference: entries in `ALL_REPEATERS.csv` → `"repeater"`, remainder → `"field"`.
+5. Validate output: every station referenced in `MegaNet_NetData.csv` must appear in `stations.json`.
+6. Keep `z_Sensors_…_NATIONAL.csv` as a separate sidecar file (too large to embed; loaded on demand by the BitFlipper panel).
+
+### Phase 2 — Single-Page Application Shell
+**Goal:** One `index.html` with tabbed navigation replacing all three HTML files.
+
+Tabs / panels:
+- **Map** — interactive Leaflet map (always visible as main panel)
+- **Stations** — filterable table of all stations
+- **Networks** — radio network cluster management
+- **Repeater Analysis** — pass-range matching and hop-chain view
+- **Bit Flipper** — ALERT address tool
+- **Export** — Radio Mobile file generation
+- **Editor** — CRUD for stations.json entries
+
+Technology: Vanilla JS (no framework), same stack as current `app.js`.
+
+### Phase 3 — Map & Link Visualisation
+**Goal:** Full interactive map with signal paths.
+
+1. Render markers by role with distinct icons/colours.
+2. Compute pass-range matches at load time; draw polylines for each matched pair.
+3. Click station → open detail panel with full record.
+4. Filter controls update both the station table and the map simultaneously.
+5. Toggle link-line visibility per radio network.
+
+### Phase 4 — Pass-Range Analysis & BitFlipper Integration
+**Goal:** Merge BitFlipper functionality into the main tool.
+
+1. Move bit-flip logic and ARRO URL builder into `app.js`.
+2. Cross-reference against `stations.json` alert IDs instead of loading the national CSV separately (or load it on demand).
+3. Add orphan detection (stations with no matching repeater).
+4. Add gap detection (AlertID ranges not covered by any pass window in a network).
+
+### Phase 5 — Radio Mobile Export
+**Goal:** Generate RM files from filtered JSON data.
+
+1. Port `buildRmFiles()` from current `app.js` to read from `stations.json`.
+2. Add per-catchment and per-network export scoping.
+3. Allow user to set the Windows path prefix for RM config (stored in `meta` section of JSON).
+4. Validate export: warn if any selected station is missing coordinates or system ID.
+
+### Phase 6 — Editor & Import/Export
+**Goal:** Maintain the data without editing JSON by hand.
+
+1. Form-based station editor with validation.
+2. Add / edit / delete stations, repeaters, networks, catchments.
+3. Import CSV (legacy format) with field-mapping wizard.
+4. Export `stations.json` from the browser.
+5. Optional: diff view showing what changed since last export.
+
+---
+
+## Design Principles
+
+- **No build step.** Open `index.html` directly in a browser; no Node, no bundler, no server required.
+- **Single source of truth.** `stations.json` is the only data file the application depends on at runtime.
+- **Flexible schema.** `pass_ranges` and `alert_ids` are arrays/objects, not fixed columns, so new equipment types don't require schema changes.
+- **Additive roles.** A station can be a field station, a repeater, and a base station simultaneously; roles are not mutually exclusive.
+- **Separation of concerns.** Data (`stations.json`) is kept separate from logic (`app.js`) and presentation (`styles.css`, `index.html`).
+- **Progressive enhancement.** Each phase delivers a working tool; later phases add capability without breaking earlier work.
+
+---
+
+## License
+
+MIT © cdomotor-g, 2026
