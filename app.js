@@ -737,6 +737,15 @@ function initBitFlipperMap() {
     stationInfo.get(s.id).isBase = true;
   });
 
+  // Collect repeaters open to the matched field stations
+  const repeaterInfo = new Map(); // repeater id → { station: r, fieldStations: [] }
+  for (const { station: s } of stationInfo.values()) {
+    findRepeaterMatches(s, state.data.stations).forEach(r => {
+      if (!repeaterInfo.has(r.id)) repeaterInfo.set(r.id, { station: r, fieldStations: [] });
+      repeaterInfo.get(r.id).fieldStations.push(s);
+    });
+  }
+
   const mappable = [...stationInfo.values()].filter(({ station: s }) => s.lat != null && s.lon != null);
 
   state.bfMap = L.map('bf-map');
@@ -767,6 +776,40 @@ function initBitFlipperMap() {
       <br><span style="font-size:.82rem">AlertID: ${alertIds.join(', ')}</span>
     `);
     bounds.push([s.lat, s.lon]);
+  }
+
+  // Draw repeaters open to matched field stations, plus lines to those stations
+  for (const { station: r, fieldStations } of repeaterInfo.values()) {
+    if (r.lat == null || r.lon == null) continue;
+
+    // Only add a marker if this repeater isn't already shown as a matched station
+    if (!stationInfo.has(r.id)) {
+      const rMarker = L.circleMarker([r.lat, r.lon], {
+        radius: 9,
+        color: ROLE_COLOR.repeater,
+        fillColor: ROLE_COLOR.repeater,
+        fillOpacity: 0.85,
+        weight: 1.5,
+      }).addTo(state.bfMap);
+      const served = fieldStations.map(fs => esc(fs.name)).join(', ');
+      rMarker.bindPopup(`
+        <strong>${esc(r.name)}</strong><br>
+        <span style="background:${ROLE_COLOR.repeater};color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem">repeater</span>
+        <br><span style="font-size:.82rem;margin-top:4px;display:block">Open to: ${served}</span>
+      `);
+      bounds.push([r.lat, r.lon]);
+    }
+
+    // Draw a dashed line from the repeater to each matched field station it serves
+    for (const fs of fieldStations) {
+      if (fs.lat == null || fs.lon == null) continue;
+      L.polyline([[r.lat, r.lon], [fs.lat, fs.lon]], {
+        color: ROLE_COLOR.repeater,
+        weight: 1.5,
+        opacity: 0.5,
+        dashArray: '5 6',
+      }).addTo(state.bfMap);
+    }
   }
 
   if (bounds.length) {
