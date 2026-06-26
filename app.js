@@ -641,6 +641,10 @@ function renderBitFlipperHtml() {
       if (flipped <= 0 || flipped >= 65536) return '';
       const matches  = aidMap.get(flipped) || [];
       const binary   = flipped.toString(2).padStart(16, '0');
+      const repeaters = matches.length
+        ? matches.flatMap(s => findRepeaterMatches(s, state.data.stations))
+            .filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i)
+        : [];
       return `
         <tr>
           <td class="small">Bit ${bit}</td>
@@ -649,6 +653,9 @@ function renderBitFlipperHtml() {
           <td>${matches.length ? '✓' : ''}</td>
           <td>${matches.length
             ? matches.map(s => `<span class="badge">${esc(s.name)}</span>`).join(' ')
+            : '<span style="color:var(--muted)">—</span>'}</td>
+          <td>${repeaters.length
+            ? repeaters.map(r => `<span class="badge badge--repeater">${esc(r.name)}</span>`).join(' ')
             : '<span style="color:var(--muted)">—</span>'}</td>
         </tr>`;
     }).join('');
@@ -671,10 +678,10 @@ function renderBitFlipperHtml() {
           <div class="table-wrap tall" style="margin-top:.75rem">
             <table>
               <colgroup>
-                <col style="width:10%"><col style="width:10%"><col style="width:22%">
-                <col style="width:8%"><col style="width:50%">
+                <col style="width:8%"><col style="width:9%"><col style="width:20%">
+                <col style="width:7%"><col style="width:28%"><col style="width:28%">
               </colgroup>
-              <thead><tr><th>Bit</th><th>Decimal</th><th>Binary</th><th>Match</th><th>Station(s)</th></tr></thead>
+              <thead><tr><th>Bit</th><th>Decimal</th><th>Binary</th><th>Match</th><th>Station(s)</th><th>Repeater(s)</th></tr></thead>
               <tbody>${flipRows}</tbody>
             </table>
           </div>` : '<p class="small" style="color:var(--muted);margin-top:.75rem">Enter a valid address (1–65535) above.</p>'}
