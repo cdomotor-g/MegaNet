@@ -1,5 +1,7 @@
 # MegaNet — Radio & Satcom Network Station Tool
 
+**Live app:** https://cdomotor-g.github.io/MegaNet/
+
 MegaNet is a browser-based tool for managing and visualising a radio and satellite communications (satcom) network. It consolidates station data, repeater pass-range analysis, Radio Mobile export, and interactive mapping into a single self-contained HTML application backed by one JSON data file. No server, no build step — just open the file in a browser.
 
 ---
