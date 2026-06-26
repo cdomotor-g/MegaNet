@@ -288,6 +288,16 @@ tr.selected td {
   color: #9fd0ff;
 }
 
+.badge--repeater {
+  background: #e8f7ee;
+  color: #1a6b35;
+}
+
+[data-theme="dark"] .badge--repeater {
+  background: #0e3320;
+  color: #7dd6a0;
+}
+
 .small {
   font-size: .82rem;
   color: var(--muted);
