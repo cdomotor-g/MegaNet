@@ -46,16 +46,16 @@ The goal is to replace all of the above HTML/JS/CSS files with **one** `index.ht
 
 ```
 MegaNet/
-├── index.html          ← single entry point
-├── app.js              ← all application logic
-├── styles.css          ← theme and layout
-├── stations.json       ← single source of truth (see schema below)
+├── index.html              ← single entry point
+├── app.js                  ← all application logic
+├── styles.css              ← theme and layout
+├── stations.json           ← single source of truth (see schema below)
 └── assets/
-    ├── net1.map        ← Radio Mobile elevation data
-    ├── net1.jpg        ← map background
-    ├── net1.geo        ← georeference
-    ├── net1.inf
-    └── net1.kml
+    ├── MegaNet.map         ← Radio Mobile elevation/terrain data
+    ├── MegaNet.jpg         ← map background image
+    ├── MegaNet.geo         ← georeference tie-points
+    ├── MegaNet.inf         ← map metadata
+    └── MegaNet.kml         ← Google Earth ground overlay
 ```
 
 ---
