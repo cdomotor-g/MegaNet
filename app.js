@@ -53,6 +53,7 @@ const state = {
   mapShowLinks:   true,
   exportNets:     null,
   bfInput:        '',
+  bfMap:          null,
   editorId:       null,
   editorDraft:    {},
   theme: localStorage.getItem('mn-theme') || 'light',
@@ -240,7 +241,7 @@ function renderMain() {
     case 'stations':   el.innerHTML = renderStationsHtml();               break;
     case 'networks':   el.innerHTML = renderNetworksHtml();               break;
     case 'analysis':   el.innerHTML = renderAnalysisHtml();               break;
-    case 'bitflipper': el.innerHTML = renderBitFlipperHtml();             break;
+    case 'bitflipper': el.innerHTML = renderBitFlipperHtml(); initBitFlipperMap(); break;
     case 'export':     el.innerHTML = renderExportHtml();                 break;
     case 'editor':     el.innerHTML = renderEditorHtml();                 break;
     default:           el.innerHTML = '<p style="padding:1rem">Unknown tab</p>';
@@ -672,7 +673,7 @@ function renderBitFlipperHtml() {
           ALERT decimal address
           <input type="number" min="1" max="65535" value="${esc(state.bfInput)}" placeholder="e.g. 6129"
                  style="width:220px;margin-top:.3rem"
-                 oninput="state.bfInput=this.value;document.getElementById('main-content').innerHTML=renderBitFlipperHtml()">
+                 oninput="state.bfInput=this.value;document.getElementById('main-content').innerHTML=renderBitFlipperHtml();initBitFlipperMap()">
         </label>
         ${valid ? `
           <div class="table-wrap tall" style="margin-top:.75rem">
@@ -692,7 +693,87 @@ function renderBitFlipperHtml() {
           Full ARRO integration (national sensor CSV cross-reference and pre-built graph URLs) is planned for a future release.
         </p>
       </div>
+      ${valid ? `
+      <div class="panel">
+        <div class="panel-header"><h3>Map</h3></div>
+        <div id="bf-map" style="height:420px;border-radius:6px;margin-top:.5rem"></div>
+      </div>` : ''}
     </div>`;
+}
+
+function initBitFlipperMap() {
+  if (state.bfMap) { state.bfMap.remove(); state.bfMap = null; }
+  const el = document.getElementById('bf-map');
+  if (!el || !state.data) return;
+
+  const baseId = parseInt(state.bfInput, 10);
+  if (isNaN(baseId) || baseId <= 0 || baseId >= 65536) return;
+
+  const aidMap = new Map();
+  state.data.stations.forEach(s => {
+    stationAlertIds(s).forEach(id => {
+      if (!aidMap.has(id)) aidMap.set(id, []);
+      aidMap.get(id).push(s);
+    });
+  });
+
+  // Collect stations matching any single-bit-flip variant
+  const stationInfo = new Map(); // station id → { station, bits[], alertIds[] }
+  for (let bit = 0; bit < 16; bit++) {
+    const flipped = baseId ^ (1 << bit);
+    if (flipped <= 0 || flipped >= 65536) continue;
+    (aidMap.get(flipped) || []).forEach(s => {
+      if (!stationInfo.has(s.id)) stationInfo.set(s.id, { station: s, bits: [], alertIds: [] });
+      const info = stationInfo.get(s.id);
+      info.bits.push(bit);
+      info.alertIds.push(flipped);
+    });
+  }
+
+  // Also include the base address's own matching stations (highlighted differently)
+  const baseMatches = aidMap.get(baseId) || [];
+  baseMatches.forEach(s => {
+    if (!stationInfo.has(s.id)) stationInfo.set(s.id, { station: s, bits: [], alertIds: [baseId] });
+    stationInfo.get(s.id).isBase = true;
+  });
+
+  const mappable = [...stationInfo.values()].filter(({ station: s }) => s.lat != null && s.lon != null);
+
+  state.bfMap = L.map('bf-map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors', maxZoom: 18,
+  }).addTo(state.bfMap);
+
+  const bounds = [];
+  for (const { station: s, bits, alertIds, isBase } of mappable) {
+    const role  = primaryRole(s);
+    const color = isBase && !bits.length ? '#ff8c00' : (ROLE_COLOR[role] || ROLE_COLOR.field);
+    const marker = L.circleMarker([s.lat, s.lon], {
+      radius: s.roles.includes('repeater') ? 9 : 6,
+      color, fillColor: color, fillOpacity: 0.85,
+      weight: isBase ? 3 : 1.5,
+    }).addTo(state.bfMap);
+
+    const bitsLabel = bits.length
+      ? `<br><span style="font-size:.82rem">Bit flip: ${bits.map(b => `Bit ${b}`).join(', ')}</span>`
+      : '';
+    const baseLabel = isBase
+      ? `<span style="background:#ff8c00;color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem;margin-left:4px">exact match</span>`
+      : '';
+    marker.bindPopup(`
+      <strong>${esc(s.name)}</strong>${baseLabel}<br>
+      ${s.roles.map(r => `<span style="background:${ROLE_COLOR[r]};color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem;margin-right:2px">${r}</span>`).join('')}
+      ${bitsLabel}
+      <br><span style="font-size:.82rem">AlertID: ${alertIds.join(', ')}</span>
+    `);
+    bounds.push([s.lat, s.lon]);
+  }
+
+  if (bounds.length) {
+    state.bfMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+  } else {
+    state.bfMap.setView([-28, 134], 4);
+  }
 }
 
 // ── EXPORT tab ─────────────────────────────────────────────────────────────────
