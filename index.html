@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MegaNet</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>MegaNet</h1>
+      <p>Radio &amp; Satcom Network Station Tool</p>
+    </div>
+    <div class="header-actions">
+      <span id="hdr-stats" class="small" style="color:rgba(255,255,255,.75)"></span>
+      <input type="file" id="file-input" accept=".json" style="display:none" onchange="onFileLoad(this)">
+      <button onclick="document.getElementById('file-input').click()">Load stations.json</button>
+      <button id="btn-theme" onclick="toggleTheme()">Dark</button>
+    </div>
+  </header>
+
+  <nav id="tab-bar">
+    <!-- rendered by app.js -->
+  </nav>
+
+  <main id="main-content">
+    <!-- rendered by app.js -->
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
