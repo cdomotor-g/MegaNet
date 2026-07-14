@@ -180,16 +180,16 @@ function filteredStations() {
   });
 }
 
+// Every distinct ALERT id for a station, sorted ascending. Derived from the
+// normalized sensor list (the enriched `sensors[]` when present, otherwise
+// synthesized from the legacy `alert_ids` object — see stationSensors) so all
+// of a station's addresses are shown, not just the single legacy value.
 function stationAlertIds(s) {
-  const ids = [];
-  const a = s.alert_ids || {};
-  ['battery', 'rainfall', 'water_level', 'primary'].forEach(k => {
-    if (a[k] == null) return;
-    const v = a[k];
-    if (Array.isArray(v)) v.forEach(x => ids.push(x));
-    else ids.push(v);
+  const ids = new Set();
+  stationSensors(s).forEach(se => {
+    if (se && se.alert_id != null) ids.add(se.alert_id);
   });
-  return ids;
+  return [...ids].sort((a, b) => a - b);
 }
 
 function passRangeCoversId(repeater, alertId) {
@@ -1367,9 +1367,12 @@ function editorNew() {
 }
 
 function editorForm(s) {
-  const aids   = s.alert_ids || {};
-  const hasRep = s.roles.includes('repeater');
-  const wls    = Array.isArray(aids.water_level) ? aids.water_level : (aids.water_level != null ? [aids.water_level] : []);
+  const aids     = s.alert_ids || {};
+  const hasRep   = s.roles.includes('repeater');
+  const wls      = Array.isArray(aids.water_level) ? aids.water_level : (aids.water_level != null ? [aids.water_level] : []);
+  const sensors  = stationSensors(s);
+  const allIds   = stationAlertIds(s);
+  const enriched = Array.isArray(s.sensors) && s.sensors.length > 0;
   return `
     <div class="panel-header" style="margin-bottom:.75rem">
       <h2>${esc(s.name) || 'New Station'}</h2>
@@ -1393,6 +1396,23 @@ function editorForm(s) {
             </label>`).join('')}
         </div>
       </label>
+      <div class="full" style="margin-top:.4rem">
+        <div style="font-weight:600;margin-bottom:.35rem">All ALERT IDs${allIds.length ? ` <span class="small" style="font-weight:400">— ${allIds.length} on record</span>` : ''}</div>
+        ${allIds.length ? `
+          <div style="display:flex;flex-wrap:wrap;gap:.3rem${sensors.length ? ';margin-bottom:.5rem' : ''}">
+            ${allIds.map(id => `<span class="badge">${id}</span>`).join('')}
+          </div>
+          ${sensors.length ? `
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:.14rem .75rem;font-size:.82rem;align-items:baseline">
+              ${sensors.slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0)).map(se => `
+                <div style="font-variant-numeric:tabular-nums;font-weight:600">${se.alert_id ?? '—'}</div>
+                <div style="color:var(--muted)">${esc(se.type || '')}${se.sensor_id ? ` · ${esc(se.sensor_id)}` : ''}</div>`).join('')}
+            </div>` : ''}
+        ` : '<span class="small" style="color:var(--muted)">No ALERT IDs on record.</span>'}
+      </div>
+      <div class="full small" style="color:var(--muted);margin-top:.3rem;margin-bottom:-.15rem">
+        Quick-entry (legacy <code>alert_ids</code>)${enriched ? ' — this station also has a full sensor list from the national export, shown above' : ''}
+      </div>
       <label>AlertID — Rainfall<input type="number" id="ef-aid-rf" value="${aids.rainfall ?? ''}"></label>
       <label>AlertID — Battery<input type="number" id="ef-aid-bat" value="${aids.battery ?? ''}"></label>
       <label>AlertID — Water Level<input type="number" id="ef-aid-wl1" value="${wls[0] ?? ''}"></label>
