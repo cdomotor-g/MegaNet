@@ -192,6 +192,20 @@ function stationAlertIds(s) {
   return [...ids].sort((a, b) => a - b);
 }
 
+// ALERT ids grouped with their sensor type(s), sorted by id — for displays
+// where the reading kind matters (e.g. map popups: "Rainfall — 6128"). Uses the
+// normalized sensor list so battery / rainfall / water-level labels come through.
+function stationAlertIdTypes(s) {
+  const byId = new Map();
+  stationSensors(s).forEach(se => {
+    if (!se || se.alert_id == null) return;
+    if (!byId.has(se.alert_id)) byId.set(se.alert_id, []);
+    const types = byId.get(se.alert_id);
+    if (se.type && !types.includes(se.type)) types.push(se.type);
+  });
+  return [...byId.entries()].sort((a, b) => a[0] - b[0]).map(([id, types]) => ({ id, types }));
+}
+
 function passRangeCoversId(repeater, alertId) {
   if (!repeater || !Array.isArray(repeater.pass_ranges)) return false;
   const excl = repeater.exclusions || [];
@@ -386,12 +400,13 @@ function refreshMapLayers() {
       fillOpacity: 0.8, weight: isRpt ? 2 : 1,
     }).addTo(map);
 
-    const aids = stationAlertIds(s);
+    const idTypes = stationAlertIdTypes(s);
     marker.bindPopup(`
       <strong>${esc(s.name)}</strong><br>
       ${s.roles.map(r => `<span style="background:${ROLE_COLOR[r]};color:#fff;padding:1px 5px;border-radius:999px;font-size:.78rem;margin-right:2px">${r}</span>`).join('')}<br>
       ${s.station_number ? `<span style="font-size:.83rem">Stn #${esc(s.station_number)}</span><br>` : ''}
-      ${aids.length ? `<span style="font-size:.83rem">AlertID: ${aids.join(', ')}</span><br>` : ''}
+      ${idTypes.length ? `<span style="font-size:.83rem">AlertID:</span><br>${idTypes.map(t =>
+        `<span style="font-size:.82rem">&nbsp;&nbsp;${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
       ${s.elevation_ahd != null ? `<span style="font-size:.83rem">Elev: ${s.elevation_ahd} m AHD</span>` : ''}
     `);
     state.mapMarkers.push(marker);
@@ -1367,12 +1382,8 @@ function editorNew() {
 }
 
 function editorForm(s) {
-  const aids     = s.alert_ids || {};
-  const hasRep   = s.roles.includes('repeater');
-  const wls      = Array.isArray(aids.water_level) ? aids.water_level : (aids.water_level != null ? [aids.water_level] : []);
-  const sensors  = stationSensors(s);
-  const allIds   = stationAlertIds(s);
-  const enriched = Array.isArray(s.sensors) && s.sensors.length > 0;
+  const hasRep  = s.roles.includes('repeater');
+  const sensors = stationSensors(s).slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0));
   return `
     <div class="panel-header" style="margin-bottom:.75rem">
       <h2>${esc(s.name) || 'New Station'}</h2>
@@ -1397,26 +1408,20 @@ function editorForm(s) {
         </div>
       </label>
       <div class="full" style="margin-top:.4rem">
-        <div style="font-weight:600;margin-bottom:.35rem">All ALERT IDs${allIds.length ? ` <span class="small" style="font-weight:400">— ${allIds.length} on record</span>` : ''}</div>
-        ${allIds.length ? `
-          <div style="display:flex;flex-wrap:wrap;gap:.3rem${sensors.length ? ';margin-bottom:.5rem' : ''}">
-            ${allIds.map(id => `<span class="badge">${id}</span>`).join('')}
-          </div>
-          ${sensors.length ? `
-            <div style="display:grid;grid-template-columns:auto 1fr;gap:.14rem .75rem;font-size:.82rem;align-items:baseline">
-              ${sensors.slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0)).map(se => `
-                <div style="font-variant-numeric:tabular-nums;font-weight:600">${se.alert_id ?? '—'}</div>
-                <div style="color:var(--muted)">${esc(se.type || '')}${se.sensor_id ? ` · ${esc(se.sensor_id)}` : ''}</div>`).join('')}
-            </div>` : ''}
-        ` : '<span class="small" style="color:var(--muted)">No ALERT IDs on record.</span>'}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.45rem">
+          <div style="font-weight:600">ALERT IDs / Sensors${sensors.length ? ` <span class="small" style="font-weight:400">— ${sensors.length}</span>` : ''}</div>
+          <button type="button" onclick="editorAddSensorRow()">+ Add sensor</button>
+        </div>
+        <div id="ef-sensors">
+          ${sensors.map(sensorRowHtml).join('')}
+        </div>
+        <div class="small" style="color:var(--muted);margin-top:.2rem">
+          One row per ALERT address and what it measures — rainfall, water level, battery, etc.
+        </div>
+        <datalist id="ef-sensor-types">
+          ${['Rainfall', 'Rainfall Increment', 'Water Level', 'Water Level - AHD', 'Battery', 'Air Temperature', 'Relative Humidity', 'Wind Speed', 'Wind Gust', 'Wind Direction', 'pH', 'Conductivity', 'Dissolved Oxygen', 'Water Temperature', 'Turbidity'].map(t => `<option value="${esc(t)}">`).join('')}
+        </datalist>
       </div>
-      <div class="full small" style="color:var(--muted);margin-top:.3rem;margin-bottom:-.15rem">
-        Quick-entry (legacy <code>alert_ids</code>)${enriched ? ' — this station also has a full sensor list from the national export, shown above' : ''}
-      </div>
-      <label>AlertID — Rainfall<input type="number" id="ef-aid-rf" value="${aids.rainfall ?? ''}"></label>
-      <label>AlertID — Battery<input type="number" id="ef-aid-bat" value="${aids.battery ?? ''}"></label>
-      <label>AlertID — Water Level<input type="number" id="ef-aid-wl1" value="${wls[0] ?? ''}"></label>
-      <label>AlertID — Water Level 2<input type="number" id="ef-aid-wl2" value="${wls[1] ?? ''}" placeholder="dual-sensor only"></label>
       <label style="display:flex;gap:.45rem;align-items:center;grid-column:1">
         <input type="checkbox" id="ef-enabled" ${s.enabled ? 'checked' : ''}> Enabled
       </label>
@@ -1438,6 +1443,47 @@ function editorForm(s) {
       </div>` : ''}`;
 }
 
+// One editable sensor row: ALERT id + type, with the national-export metadata
+// (sensor_id, device_id) preserved on data-attributes so a round-trip keeps it.
+function sensorRowHtml(se) {
+  se = se || {};
+  return `
+    <div class="sensor-row" data-sensor-id="${esc(se.sensor_id || '')}" data-device-id="${se.device_id ?? ''}"
+         style="display:flex;gap:.4rem;align-items:center;margin-bottom:.35rem">
+      <input type="number" class="sensor-aid" value="${se.alert_id ?? ''}" placeholder="ALERT ID"
+             style="flex:0 0 7.5rem;width:7.5rem">
+      <input type="text" class="sensor-type" list="ef-sensor-types" value="${esc(se.type || '')}"
+             placeholder="Sensor type (e.g. Rainfall)" style="flex:1 1 auto;width:auto;min-width:0">
+      <button type="button" class="sensor-del" title="Remove this sensor"
+              onclick="this.closest('.sensor-row').remove()"
+              style="flex:0 0 auto;border-color:#c7401a;color:#c7401a;padding:.2rem .55rem;line-height:1">×</button>
+    </div>`;
+}
+
+function editorAddSensorRow() {
+  const box = document.getElementById('ef-sensors');
+  if (!box) return;
+  box.insertAdjacentHTML('beforeend', sensorRowHtml({}));
+  box.querySelector('.sensor-row:last-child .sensor-aid')?.focus();
+}
+
+// Best-effort legacy `alert_ids` object derived from the sensor rows, so exports
+// and any older consumers still get rainfall/battery/water_level values. The
+// `sensors` array is the source of truth for display.
+function deriveLegacyAlertIds(sensors) {
+  const out = {};
+  const wl = [];
+  sensors.forEach(se => {
+    const t = (se.type || '').toLowerCase();
+    if (t.includes('rain'))       { if (out.rainfall == null) out.rainfall = se.alert_id; }
+    else if (t.includes('batt'))  { if (out.battery  == null) out.battery  = se.alert_id; }
+    else if (t.includes('level')) { if (!wl.includes(se.alert_id)) wl.push(se.alert_id); }
+  });
+  if (wl.length === 1) out.water_level = wl[0];
+  else if (wl.length > 1) out.water_level = wl;
+  return out;
+}
+
 function editorSave() {
   const stations = state.data.stations;
   const d = { ...state.editorDraft };
@@ -1452,14 +1498,20 @@ function editorSave() {
   d.notes          = document.getElementById('ef-notes')?.value || '';
   d.roles          = [...document.querySelectorAll('input[name="ef-roles"]:checked')].map(b => b.value);
 
-  const rf  = pInt(document.getElementById('ef-aid-rf')?.value);
-  const bat = pInt(document.getElementById('ef-aid-bat')?.value);
-  const wl1 = pInt(document.getElementById('ef-aid-wl1')?.value);
-  const wl2 = pInt(document.getElementById('ef-aid-wl2')?.value);
-  d.alert_ids = {};
-  if (rf  != null) d.alert_ids.rainfall    = rf;
-  if (bat != null) d.alert_ids.battery     = bat;
-  if (wl1 != null) d.alert_ids.water_level = wl2 != null ? [wl1, wl2] : wl1;
+  // ALERT sensors — read the editable rows, preserving national-export metadata.
+  const sensors = [...document.querySelectorAll('#ef-sensors .sensor-row')].map(row => {
+    const id = pInt(row.querySelector('.sensor-aid')?.value);
+    if (id == null) return null;
+    const rec = { alert_id: id, type: row.querySelector('.sensor-type')?.value.trim() || '' };
+    const sid = row.getAttribute('data-sensor-id');
+    const did = row.getAttribute('data-device-id');
+    if (sid) rec.sensor_id = sid;
+    if (did) rec.device_id = pInt(did);
+    return rec;
+  }).filter(Boolean);
+  if (sensors.length) d.sensors = sensors;
+  else delete d.sensors;
+  d.alert_ids = deriveLegacyAlertIds(sensors);
 
   if (d.roles.includes('repeater')) {
     d.repeater = {
