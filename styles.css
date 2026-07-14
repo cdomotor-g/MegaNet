@@ -250,6 +250,23 @@ td {
   text-overflow: ellipsis;
 }
 
+/* Bit Flipper results — override the global fixed layout so all eight columns
+   (including the 16-char binary and sensor IDs) stay fully visible; the wrapper
+   scrolls horizontally when the viewport is too narrow. */
+.bf-table {
+  table-layout: auto;
+  min-width: 880px;
+}
+.bf-table th,
+.bf-table td {
+  overflow: visible;
+  text-overflow: clip;
+}
+.bf-table .mono {
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 th {
   position: sticky;
   top: 0;

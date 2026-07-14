@@ -54,7 +54,13 @@ const state = {
   mapShowLinks:   true,
   exportNets:     null,
   bfInput:        '',
+  bfBits:         '1',
+  bfOnlyMatches:  false,
+  bfArroBase:     'https://contrail-bom.onerain.au/graph/',
+  bfSensorFilter: '',
   bfMap:          null,
+  bfMapLayer:     null,
+  bfMapTimer:     null,
   pkt: {
     decInput:  '',
     lastDecode: null,   // last decoded input string (for replay after re-render)
@@ -631,117 +637,351 @@ function renderAnalysisHtml() {
 
 // ── BIT FLIPPER tab ────────────────────────────────────────────────────────────
 
-function renderBitFlipperHtml() {
-  const baseId = parseInt(state.bfInput, 10);
-  const valid  = !isNaN(baseId) && baseId > 0 && baseId < 65536;
+const BF_TYPE_LABEL     = { battery: 'Battery', rainfall: 'Rainfall', water_level: 'Water Level', primary: 'Primary' };
+const BF_MAX_RENDER_ROWS = 2000;   // safety cap for very large N-bit expansions
+const ARRO_DEFAULT_BASE  = 'https://contrail-bom.onerain.au/graph/';
 
-  let flipRows = '';
-  if (valid) {
-    const aidMap = new Map();
-    state.data.stations.forEach(s => {
-      stationAlertIds(s).forEach(id => {
-        if (!aidMap.has(id)) aidMap.set(id, []);
-        aidMap.get(id).push(s);
-      });
+// Normalized sensor list for a station. Prefers the enriched `sensors` array
+// (from the national sensor database) and falls back to synthesizing minimal
+// records from legacy `alert_ids` when a station has not been enriched.
+function stationSensors(s) {
+  if (Array.isArray(s.sensors) && s.sensors.length) return s.sensors;
+  const out = [];
+  const a = s.alert_ids || {};
+  ['battery', 'rainfall', 'water_level', 'primary'].forEach(k => {
+    const v = a[k];
+    if (v == null) return;
+    (Array.isArray(v) ? v : [v]).forEach(id =>
+      out.push({ alert_id: id, type: BF_TYPE_LABEL[k] || k, sensor_id: '', device_id: null }));
+  });
+  return out;
+}
+
+// Build an ALERT-address → [{ station, sensor }] index across all stations.
+function buildSensorIndex() {
+  const idx = new Map();
+  state.data.stations.forEach(s => {
+    stationSensors(s).forEach(sensor => {
+      const id = sensor.alert_id;
+      if (id == null) return;
+      if (!idx.has(id)) idx.set(id, []);
+      idx.get(id).push({ station: s, sensor });
     });
+  });
+  return idx;
+}
 
-    flipRows = Array.from({ length: 16 }, (_, bit) => {
-      const flipped  = baseId ^ (1 << bit);
-      if (flipped <= 0 || flipped >= 65536) return '';
-      const matches  = aidMap.get(flipped) || [];
-      const binary   = flipped.toString(2).padStart(16, '0');
-      const repeaters = matches.length
-        ? matches.flatMap(s => findRepeaterMatches(s, state.data.stations))
-            .filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i)
-        : [];
-      return `
-        <tr>
-          <td class="small">Bit ${bit}</td>
-          <td>${flipped}</td>
-          <td class="small" style="font-family:monospace">${binary}</td>
-          <td>${matches.length ? '✓' : ''}</td>
-          <td>${matches.length
-            ? matches.map(s => `<span class="badge">${esc(s.name)}</span>`).join(' ')
-            : '<span style="color:var(--muted)">—</span>'}</td>
-          <td>${repeaters.length
-            ? repeaters.map(r => `<span class="badge badge--repeater">${esc(r.name)}</span>`).join(' ')
-            : '<span style="color:var(--muted)">—</span>'}</td>
-        </tr>`;
-    }).join('');
+// All combinations of `k` bit positions chosen from 0..width-1 (lexicographic).
+function bitCombos(width, k) {
+  const res = [];
+  (function rec(start, combo) {
+    if (combo.length === k) { res.push(combo.slice()); return; }
+    for (let i = start; i < width; i++) { combo.push(i); rec(i + 1, combo); combo.pop(); }
+  })(0, []);
+  return res;
+}
+
+function bfBaseId() {
+  const id = parseInt(state.bfInput, 10);
+  return (!isNaN(id) && id > 0 && id < 65536) ? id : null;
+}
+
+function bfBitsToFlip() {
+  const n = parseInt(state.bfBits, 10);
+  if (isNaN(n) || n < 1) return 1;
+  return Math.min(n, 16);
+}
+
+// Compute flip variants for the current input:
+// [{ bits:[...], value, binary, matches:[{station,sensor}] }] in bit-combo order.
+function bfComputeVariants() {
+  const base = bfBaseId();
+  if (base == null) return [];
+  const idx = buildSensorIndex();
+  const variants = [];
+  for (const combo of bitCombos(16, bfBitsToFlip())) {
+    let v = base;
+    for (const b of combo) v ^= (1 << b);
+    if (v <= 0 || v >= 65536 || v === base) continue;
+    variants.push({ bits: combo, value: v, binary: v.toString(2).padStart(16, '0'), matches: idx.get(v) || [] });
   }
+  return variants;
+}
 
+function formatArroLocal(d) {
+  const p = x => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `
+       + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// Build an ARRO graph URL for the given {station,sensor} pairs. Returns
+// { url, count } or null when no pair carries the site/device ids ARRO needs.
+function buildArroUrl(pairs) {
+  const base = (state.bfArroBase || ARRO_DEFAULT_BASE).trim();
+  const now = new Date(), start = new Date(now.getTime() - 7 * 86400e3);
+  const p = new URLSearchParams({
+    refresh: 'off', markers: 'false', legend: 'true', bin: '86400',
+    time_zone: 'Australia/Brisbane', invalid: 'true',
+    has_regular_sensors: 'true', has_forecast_sensors: 'false',
+    for_forecast: 'false', hidden_devices: 'none',
+    data_start: formatArroLocal(start), data_end: formatArroLocal(now),
+  });
+  const seen = new Set();
+  pairs.forEach(({ station, sensor }) => {
+    const dbId = station.site && station.site.db_id;
+    const dev  = sensor.device_id;
+    if (dbId == null || dev == null) return;
+    const key = `${dbId}|${dev}`;
+    if (!seen.has(key)) { seen.add(key); p.append('devices[]', key); }
+  });
+  if (!seen.size) return null;
+  return { url: base.replace(/\?+$/, '') + '?' + p.toString(), count: seen.size };
+}
+
+// Collapse duplicate matches so a sensor isn't repeated once per duplicate
+// stations.json entry that shares a name (some sites appear twice in the data).
+function dedupeMatches(matches) {
+  const seen = new Set();
+  const out = [];
+  for (const m of matches) {
+    const k = `${m.station.name}|${m.sensor.type}|${m.sensor.sensor_id}|${m.sensor.device_id}|${m.sensor.alert_id}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(m);
+  }
+  return out;
+}
+
+// Static shell — rendered once when the tab opens. Control inputs live here and
+// are NOT re-rendered on keystrokes, so focus is never stolen; only #bf-results
+// updates as the user types.
+function renderBitFlipperHtml() {
   return `
-    <div style="max-width:860px;margin:auto;padding:1rem;display:grid;gap:1rem">
+    <div style="max-width:1000px;margin:auto;padding:1rem;display:grid;gap:1rem">
       <div class="panel">
         <div class="panel-header"><h2>Bit Flipper</h2></div>
         <p class="small" style="color:var(--muted);margin:.5rem 0">
-          Enter an ALERT decimal address to see all single-bit-flip variants and cross-reference them against the station database.
+          Enter an ALERT decimal address to see its bit-flip variants and cross-reference them
+          against the station database. Sensor type, Sensor ID and ARRO graph links are sourced
+          from the enriched station data.
         </p>
-        <label style="font-size:.9rem;color:var(--muted);display:block;margin-top:.75rem">
-          ALERT decimal address
-          <input type="number" min="1" max="65535" value="${esc(state.bfInput)}" placeholder="e.g. 6129"
-                 style="width:220px;margin-top:.3rem"
-                 oninput="state.bfInput=this.value;document.getElementById('main-content').innerHTML=renderBitFlipperHtml();initBitFlipperMap()">
-        </label>
-        ${valid ? `
-          <div class="table-wrap tall" style="margin-top:.75rem">
-            <table>
-              <colgroup>
-                <col style="width:8%"><col style="width:9%"><col style="width:20%">
-                <col style="width:7%"><col style="width:28%"><col style="width:28%">
-              </colgroup>
-              <thead><tr><th>Bit</th><th>Decimal</th><th>Binary</th><th>Match</th><th>Station(s)</th><th>Repeater(s)</th></tr></thead>
-              <tbody>${flipRows}</tbody>
-            </table>
-          </div>` : '<p class="small" style="color:var(--muted);margin-top:.75rem">Enter a valid address (1–65535) above.</p>'}
+        <div id="bf-controls" style="display:flex;flex-wrap:wrap;gap:1rem 1.25rem;align-items:flex-end;margin-top:.5rem">
+          <label style="font-size:.9rem;color:var(--muted)">
+            ALERT decimal address
+            <input id="bf-addr" type="number" min="1" max="65535" value="${esc(state.bfInput)}" placeholder="e.g. 6129"
+                   style="width:170px;margin-top:.3rem;display:block"
+                   oninput="onBfAddrInput(this.value)">
+          </label>
+          <label style="font-size:.9rem;color:var(--muted)">
+            Bits to flip
+            <input id="bf-bits" type="number" min="1" max="16" value="${esc(String(bfBitsToFlip()))}"
+                   style="width:100px;margin-top:.3rem;display:block"
+                   oninput="onBfBitsInput(this.value)">
+          </label>
+          <label style="font-size:.9rem;color:var(--muted);display:flex;gap:.4rem;align-items:center;padding-bottom:.4rem">
+            <input id="bf-only" type="checkbox" ${state.bfOnlyMatches ? 'checked' : ''}
+                   onchange="onBfOnlyMatches(this.checked)">
+            Show only matched addresses
+          </label>
+          <label style="font-size:.9rem;color:var(--muted);flex:1;min-width:240px">
+            ARRO base URL
+            <input id="bf-arro" type="text" value="${esc(state.bfArroBase || ARRO_DEFAULT_BASE)}"
+                   style="width:100%;margin-top:.3rem;display:block"
+                   oninput="onBfArroInput(this.value)">
+          </label>
+        </div>
       </div>
-      <div class="panel">
-        <div class="panel-header"><h3>ARRO Graph Links</h3></div>
-        <p class="small" style="color:var(--muted)">
-          Full ARRO integration (national sensor CSV cross-reference and pre-built graph URLs) is planned for a future release.
-        </p>
-      </div>
-      ${valid ? `
+
+      <div id="bf-results">${renderBitFlipperResults()}</div>
+
       <div class="panel">
         <div class="panel-header"><h3>Map</h3></div>
         <div id="bf-map" style="height:420px;border-radius:6px;margin-top:.5rem"></div>
-      </div>` : ''}
+      </div>
     </div>`;
 }
 
+// Dynamic output — recomputed and re-rendered into #bf-results on every input.
+function renderBitFlipperResults() {
+  const base = bfBaseId();
+  if (base == null) {
+    return `<div class="panel"><p class="small" style="color:var(--muted)">Enter a valid ALERT address (1–65535) above.</p></div>`;
+  }
+
+  const variants = bfComputeVariants();
+  const filter   = state.bfSensorFilter || '';
+  const matchPasses = m => !filter || m.sensor.type === filter;
+  const rowMatches  = v => v.matches.filter(matchPasses);
+
+  // sensor types present among matches (for the filter dropdown)
+  const types = [...new Set(variants.flatMap(v => v.matches.map(m => m.sensor.type)))].sort();
+
+  // rows to display
+  let rows;
+  if (filter)                    rows = variants.filter(v => rowMatches(v).length);
+  else if (state.bfOnlyMatches)  rows = variants.filter(v => v.matches.length);
+  else                           rows = variants;
+
+  const totalToShow = rows.length;
+  const truncated   = rows.length > BF_MAX_RENDER_ROWS;
+  if (truncated) rows = rows.slice(0, BF_MAX_RENDER_ROWS);
+
+  const matchedCount = variants.filter(v => v.matches.length).length;
+
+  // ARRO link across every matched sensor that passes the current filter
+  const arroPairs = variants.flatMap(v => v.matches.filter(matchPasses));
+  const arro = buildArroUrl(arroPairs);
+
+  const rowsHtml = rows.map(v => {
+    const ms  = dedupeMatches(rowMatches(v));
+    const hit = ms.length > 0;
+    const dash = '<span style="color:var(--muted)">—</span>';
+    const stationBadges = hit
+      ? [...new Set(ms.map(m => m.station.name))].map(n => `<span class="badge">${esc(n)}</span>`).join(' ')
+      : dash;
+    const sensorTypes = hit ? ms.map(m => esc(m.sensor.type)).join('<br>') : dash;
+    const sensorIds   = hit ? ms.map(m => esc(m.sensor.sensor_id || '—')).join('<br>') : dash;
+    const reps = hit
+      ? [...new Map(ms.flatMap(m => findRepeaterMatches(m.station, state.data.stations)).map(r => [r.id, r])).values()]
+      : [];
+    const repHtml = reps.length
+      ? reps.map(r => `<span class="badge badge--repeater">${esc(r.name)}</span>`).join(' ')
+      : dash;
+    return `
+      <tr>
+        <td class="small mono">${v.bits.join(', ')}</td>
+        <td>${v.value}</td>
+        <td class="small mono">${v.binary}</td>
+        <td style="text-align:center">${hit ? '✓' : ''}</td>
+        <td>${stationBadges}</td>
+        <td class="small">${sensorTypes}</td>
+        <td class="small mono">${sensorIds}</td>
+        <td>${repHtml}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div class="panel">
+      <div class="panel-header" style="flex-wrap:wrap;gap:.5rem">
+        <h3>Bit-Flip Variants</h3>
+        <span class="small" style="color:var(--muted)">
+          ${variants.length} variant${variants.length === 1 ? '' : 's'} · ${matchedCount} matched
+        </span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;margin:.5rem 0">
+        ${types.length ? `
+          <label class="small" style="color:var(--muted)">Filter by sensor:
+            <select onchange="onBfSensorFilter(this.value)" style="margin-left:.3rem">
+              <option value=""${!filter ? ' selected' : ''}>All sensors</option>
+              ${types.map(t => `<option value="${esc(t)}"${filter === t ? ' selected' : ''}>${esc(t)}</option>`).join('')}
+            </select>
+          </label>` : ''}
+        <span id="bf-arro-link">${arro
+          ? `<a href="${esc(arro.url)}" target="_blank" rel="noopener">Open ARRO graph (${arro.count} sensor${arro.count === 1 ? '' : 's'})</a>`
+          : `<span class="small" style="color:var(--muted)">No ARRO-linkable sensors in current matches</span>`}</span>
+      </div>
+      ${truncated ? `<p class="small" style="color:#b8860b">Showing first ${BF_MAX_RENDER_ROWS} of ${totalToShow} rows — reduce the bit count or use the sensor filter to narrow.</p>` : ''}
+      ${rows.length ? `
+        <div class="table-wrap tall">
+          <table class="bf-table">
+            <thead><tr>
+              <th>Bit(s)</th><th>Decimal</th><th>Binary</th><th>Match</th>
+              <th>Station(s)</th><th>Sensor</th><th>Sensor ID</th><th>Repeater(s)</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>`
+      : `<p class="small" style="color:var(--muted)">No ${filter ? esc(filter) + ' ' : ''}matches for these variants.</p>`}
+    </div>`;
+}
+
+// ── Bit Flipper event handlers ──────────────────────────────────────────────
+// Each handler updates only #bf-results (never the control it fired from), so
+// the focused input keeps focus and the caret while results refresh live.
+
+function refreshBfResults() {
+  const el = document.getElementById('bf-results');
+  if (el) el.innerHTML = renderBitFlipperResults();
+}
+
+function scheduleBfMapRefresh() {
+  if (state.bfMapTimer) clearTimeout(state.bfMapTimer);
+  state.bfMapTimer = setTimeout(() => { state.bfMapTimer = null; refreshBitFlipperMap(); }, 250);
+}
+
+function onBfAddrInput(val) {
+  state.bfInput = val;
+  state.bfSensorFilter = '';
+  refreshBfResults();
+  scheduleBfMapRefresh();
+}
+
+function onBfBitsInput(val) {
+  state.bfBits = val;
+  state.bfSensorFilter = '';
+  refreshBfResults();
+  scheduleBfMapRefresh();
+}
+
+function onBfOnlyMatches(checked) {
+  state.bfOnlyMatches = checked;
+  refreshBfResults();
+}
+
+function onBfArroInput(val) {
+  state.bfArroBase = val;
+  refreshBfResults();
+}
+
+function onBfSensorFilter(val) {
+  state.bfSensorFilter = val;
+  refreshBfResults();
+}
+
+// Create the Leaflet map once per tab render, then draw the current variants.
 function initBitFlipperMap() {
   if (state.bfMap) { state.bfMap.remove(); state.bfMap = null; }
+  state.bfMapLayer = null;
   const el = document.getElementById('bf-map');
-  if (!el || !state.data) return;
+  if (!el || !state.data || typeof L === 'undefined') return;
 
-  const baseId = parseInt(state.bfInput, 10);
-  if (isNaN(baseId) || baseId <= 0 || baseId >= 65536) return;
+  state.bfMap = L.map('bf-map').setView([-28, 134], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors', maxZoom: 18,
+  }).addTo(state.bfMap);
+  state.bfMapLayer = L.layerGroup().addTo(state.bfMap);
+  refreshBitFlipperMap();
+}
 
-  const aidMap = new Map();
-  state.data.stations.forEach(s => {
-    stationAlertIds(s).forEach(id => {
-      if (!aidMap.has(id)) aidMap.set(id, []);
-      aidMap.get(id).push(s);
-    });
-  });
+// Redraw the matched-station markers, repeater markers and links for the
+// current address + bit count. Reuses the existing map (no full rebuild).
+function refreshBitFlipperMap() {
+  if (!state.bfMap || !state.bfMapLayer || !state.data) return;
+  const layer = state.bfMapLayer;
+  layer.clearLayers();
 
-  // Collect stations matching any single-bit-flip variant
-  const stationInfo = new Map(); // station id → { station, bits[], alertIds[] }
-  for (let bit = 0; bit < 16; bit++) {
-    const flipped = baseId ^ (1 << bit);
-    if (flipped <= 0 || flipped >= 65536) continue;
-    (aidMap.get(flipped) || []).forEach(s => {
-      if (!stationInfo.has(s.id)) stationInfo.set(s.id, { station: s, bits: [], alertIds: [] });
+  const base = bfBaseId();
+  if (base == null) return;
+
+  const idx = buildSensorIndex();
+
+  // Collect stations matching any flip variant (across all N-bit combos)
+  const stationInfo = new Map(); // station id → { station, addrs:Set, bits:Set, isBase }
+  for (const combo of bitCombos(16, bfBitsToFlip())) {
+    let v = base;
+    for (const b of combo) v ^= (1 << b);
+    if (v <= 0 || v >= 65536 || v === base) continue;
+    (idx.get(v) || []).forEach(({ station: s }) => {
+      if (!stationInfo.has(s.id)) stationInfo.set(s.id, { station: s, addrs: new Set(), bits: new Set() });
       const info = stationInfo.get(s.id);
-      info.bits.push(bit);
-      info.alertIds.push(flipped);
+      info.addrs.add(v);
+      info.bits.add(combo.join('+'));
     });
   }
 
   // Also include the base address's own matching stations (highlighted differently)
-  const baseMatches = aidMap.get(baseId) || [];
-  baseMatches.forEach(s => {
-    if (!stationInfo.has(s.id)) stationInfo.set(s.id, { station: s, bits: [], alertIds: [baseId] });
+  (idx.get(base) || []).forEach(({ station: s }) => {
+    if (!stationInfo.has(s.id)) stationInfo.set(s.id, { station: s, addrs: new Set([base]), bits: new Set() });
     stationInfo.get(s.id).isBase = true;
   });
 
@@ -754,25 +994,19 @@ function initBitFlipperMap() {
     });
   }
 
-  const mappable = [...stationInfo.values()].filter(({ station: s }) => s.lat != null && s.lon != null);
-
-  state.bfMap = L.map('bf-map');
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors', maxZoom: 18,
-  }).addTo(state.bfMap);
-
   const bounds = [];
-  for (const { station: s, bits, alertIds, isBase } of mappable) {
+  for (const { station: s, addrs, bits, isBase } of stationInfo.values()) {
+    if (s.lat == null || s.lon == null) continue;
     const role  = primaryRole(s);
-    const color = isBase && !bits.length ? '#ff8c00' : (ROLE_COLOR[role] || ROLE_COLOR.field);
+    const color = isBase && !bits.size ? '#ff8c00' : (ROLE_COLOR[role] || ROLE_COLOR.field);
     const marker = L.circleMarker([s.lat, s.lon], {
       radius: s.roles.includes('repeater') ? 9 : 6,
       color, fillColor: color, fillOpacity: 0.85,
       weight: isBase ? 3 : 1.5,
-    }).addTo(state.bfMap);
+    }).addTo(layer);
 
-    const bitsLabel = bits.length
-      ? `<br><span style="font-size:.82rem">Bit flip: ${bits.map(b => `Bit ${b}`).join(', ')}</span>`
+    const bitsLabel = bits.size
+      ? `<br><span style="font-size:.82rem">Flipped bits: ${[...bits].join(', ')}</span>`
       : '';
     const baseLabel = isBase
       ? `<span style="background:#ff8c00;color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem;margin-left:4px">exact match</span>`
@@ -781,7 +1015,7 @@ function initBitFlipperMap() {
       <strong>${esc(s.name)}</strong>${baseLabel}<br>
       ${s.roles.map(r => `<span style="background:${ROLE_COLOR[r]};color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem;margin-right:2px">${r}</span>`).join('')}
       ${bitsLabel}
-      <br><span style="font-size:.82rem">AlertID: ${alertIds.join(', ')}</span>
+      <br><span style="font-size:.82rem">AlertID: ${[...addrs].sort((a, b) => a - b).join(', ')}</span>
     `);
     bounds.push([s.lat, s.lon]);
   }
@@ -798,7 +1032,7 @@ function initBitFlipperMap() {
         fillColor: ROLE_COLOR.repeater,
         fillOpacity: 0.85,
         weight: 1.5,
-      }).addTo(state.bfMap);
+      }).addTo(layer);
       const served = fieldStations.map(fs => esc(fs.name)).join(', ');
       rMarker.bindPopup(`
         <strong>${esc(r.name)}</strong><br>
@@ -816,15 +1050,11 @@ function initBitFlipperMap() {
         weight: 1.5,
         opacity: 0.5,
         dashArray: '5 6',
-      }).addTo(state.bfMap);
+      }).addTo(layer);
     }
   }
 
-  if (bounds.length) {
-    state.bfMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
-  } else {
-    state.bfMap.setView([-28, 134], 4);
-  }
+  if (bounds.length) state.bfMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
 }
 
 // ── EXPORT tab ─────────────────────────────────────────────────────────────────
