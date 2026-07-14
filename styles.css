@@ -267,6 +267,24 @@ td {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* Station-of-interest row (the entered ALERT address) pinned at the top of the
+   Bit Flipper table, tinted to match the map's orange "exact match" marker. */
+.bf-table tr.bf-row-base td {
+  background: color-mix(in srgb, #ff8c00 12%, transparent);
+}
+.bf-table tr.bf-row-base:hover td {
+  background: color-mix(in srgb, #ff8c00 18%, transparent);
+}
+.badge.bf-badge-base {
+  background: #ff8c00;
+  color: #fff;
+  white-space: nowrap;
+}
+[data-theme="dark"] .badge.bf-badge-base {
+  background: #ff8c00;
+  color: #241700;
+}
+
 th {
   position: sticky;
   top: 0;
