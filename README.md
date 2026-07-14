@@ -39,6 +39,8 @@ The existing codebase is a collection of separately-evolved HTML tools with over
 | `MegaNet.csv` | Radio Mobile master config |
 | `z_Sensors_…_NATIONAL.csv` | 13 852-row national sensor/device-ID lookup |
 | `net1.*` | Radio Mobile map, elevation, georeference, and KML files |
+| `All 2021 Working 2.txt` | ALERT address location file (station-name lookup for the ALERT Packets tab) |
+| `BOM spec erts_data_formats_doc.pdf` | BoM *ERTS Data Formats* spec (July 2003) — reference for the ALERT Packets tab |
 
 The goal is to replace all of the above HTML/JS/CSS files with **one** `index.html` + `app.js` + `styles.css` backed by **one** `stations.json` data file.
 
@@ -219,17 +221,34 @@ Export is scoped to the current filter selection so users can generate per-catch
 - Sensor type filter (rainfall, water level, battery)
 - Replaces the standalone `BitFlipper.html`
 
-### 7. Dark / Light Theme
+### 7. ALERT / ERTS Packet Decoder & Encoder (Integrated)
+Ported from the standalone [ALERT_PACKETS](https://github.com/cdomotor-g/ALERT_PACKETS) tool and
+available on the **ALERT Packets** tab. Based on the Bureau of Meteorology *ERTS Data Formats*
+specification (July 2003).
+
+- **Decode** — paste a 40-bit framed message, a 32-bit payload, or 8-digit hex and it is decoded
+  against every known format (ABF, BCC Extended Check, EAF, EIF). Check bits and CRC/FCS are
+  validated, framing polarity is detected, and the format that passes everything is highlighted as
+  the best match. A colour-coded bit map shows which bits belong to which field (hover a field row
+  to highlight its bits).
+- **Encode** — pick a format, enter the sensor ID and raw value(s), and get the message back
+  (40-bit framed, 32-bit payload and hex) with CRC/FCS computed automatically.
+- **Station names** — decoded ALERT addresses are matched against the loaded MegaNet station
+  database first (shown with a *MegaNet* badge), then against the bundled national address file
+  `All 2021 Working 2.txt`.
+- Spec reference: `BOM spec erts_data_formats_doc.pdf` (bundled).
+
+### 8. Dark / Light Theme
 - Toggle between dark and light modes
 - Preference persisted to `localStorage`
 
-### 8. Radio Network Management
+### 9. Radio Network Management
 - Named radio network clusters (typically named after the primary repeater or ingest point)
 - Assign stations and repeaters to one or more networks
 - Select networks to scope all views and exports to that cluster
 - "Select all" / "Clear all" shortcuts
 
-### 9. Station Detail Panel
+### 10. Station Detail Panel
 Side panel or modal showing full station record:
 - Name, number, coordinates, elevation
 - All AlertIDs with sensor type labels
@@ -263,6 +282,7 @@ Tabs / panels:
 - **Networks** — radio network cluster management
 - **Repeater Analysis** — pass-range matching and hop-chain view
 - **Bit Flipper** — ALERT address tool
+- **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF)
 - **Export** — Radio Mobile file generation
 - **Editor** — CRUD for stations.json entries
 
