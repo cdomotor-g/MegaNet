@@ -1,0 +1,1289 @@
+Title,Station Number,Lat,Long,Basin,LGA Name,Location Types
+Augustus Downs Station,29001,-18.51188,139.85338,Leichhardt River,Carpentaria Shire,Rain Gauge / Water Level
+Lorraine,29032,-19.0067,139.8961,Leichhardt River,Carpentaria Shire,Rain Gauge / Water Level
+Burketown Airstrip,29157,-17.7561,139.5283,Nicholson River,Burke Shire,Rain Gauge / Water Level
+Escott Station,29159,-17.7999,139.3605,Nicholson River,Burke Shire,Rain Gauge / Water Level
+Richmond Post Office,30045,-20.7289,143.1425,Flinders River,Richmond Shire,Rain Gauge / Water Level
+Babinda Post Office,31004,-17.3436,145.9217,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge
+Bartle View Alert,31181,-17.545,145.7156,Johnstone River,Tablelands Regional,Rain Gauge
+Greenhaven Alert,31182,-17.5875,145.5997,Johnstone River,Tablelands Regional,Rain Gauge
+Malanda Alert,31183,-17.3594,145.5922,Johnstone River,Tablelands Regional,Rain Gauge
+McKell Road Alert,31184,-17.4442,145.5094,Johnstone River,Tablelands Regional,Rain Gauge
+Millaa Millaa Alert,31185,-17.5175,145.6089,Johnstone River,Tablelands Regional,Rain Gauge / Repeater
+Sutties Creek Alert,31186,-17.6803,145.6603,Johnstone River,Tablelands Regional,Rain Gauge
+Topaz Alert,31187,-17.4694,145.7311,Johnstone River,Tablelands Regional,Rain Gauge
+Murray Springs Alert,31191,-18.1494,145.4803,Herbert River,Tablelands Regional,Rain Gauge / Repeater
+Mt Garnet Alert,31196,-17.7047,145.1461,Herbert River,Tablelands Regional,Rain Gauge
+Upper Rudd Creek Alert,31197,-18.0394,144.8856,Herbert River,Tablelands Regional,Rain Gauge
+Herberton Alert,31198,-17.3769,145.3803,Herbert River,Tablelands Regional,Rain Gauge
+Ravenshoe Alert,31200,-17.591,145.52958,Herbert River,Tablelands Regional,Rain Gauge
+Copperlode Dam Alert,31205,-16.9794,145.6747,Barron River,Cairns Regional,Rain Gauge / Water Level / Reservoir
+Gleneagle,32018,-18.16084,145.3422,Herbert River,Tablelands Regional,Rain Gauge / Water Level
+Marco Street Alert,32020,-17.5556,145.9556,Johnstone River,Cassowary Coast Regional,Rain Gauge / Repeater
+Russell River,32033,-17.4608,145.8822,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge
+Central Mill Tm,32155,-17.6094,145.9786,Johnstone River,Cassowary Coast Regional,Rain Gauge / Water Level
+Central Mill Alert,32160,-17.6089,145.9792,Johnstone River,Cassowary Coast Regional,Rain Gauge / Water Level
+Corsis Alert,32161,-17.5967,145.9014,Johnstone River,Cassowary Coast Regional,Rain Gauge / Water Level
+Crawfords Lookout Alert,32162,-17.615,145.8011,Johnstone River,Cassowary Coast Regional,Rain Gauge
+Innisfail Wharf Alert,32163,-17.5236,146.0325,Johnstone River,Cassowary Coast Regional,Rain Gauge / Water Level
+Menavale Alert,32164,-17.6808,145.8878,Johnstone River,Cassowary Coast Regional,Rain Gauge
+Nerada Alert,32165,-17.5308,145.8464,Johnstone River,Cassowary Coast Regional,Rain Gauge / Water Level
+Tung Oil Alert,32166,-17.5456,145.9325,Johnstone River,Cassowary Coast Regional,Rain Gauge / Water Level
+Gleneagle Alert,32169,-18.1919,145.3325,Herbert River,Tablelands Regional,Rain Gauge / Water Level
+Nash's Crossing Alert,32170,-18.4125,145.7722,Herbert River,Hinchinbrook Shire,Rain Gauge / Water Level
+Ingham Pump Station Al,32171,-18.6347,146.1444,Herbert River,Hinchinbrook Shire,Rain Gauge / Water Level
+Wallaman Alert,32172,-18.4606,145.7383,Herbert River,Charters Towers Regional,Rain Gauge / Repeater
+Peacock Siding Alert,32173,-18.6797,145.9961,Herbert River,Hinchinbrook Shire,Rain Gauge / Water Level
+Abergowrie Alert,32174,-18.4889,145.9364,Herbert River,Hinchinbrook Shire,Rain Gauge / Water Level
+Kirrama Alert,32176,-18.14086,145.610063,Herbert River,Tablelands Regional,Rain Gauge
+Zattas Alert,32184,-18.4506,145.8294,Herbert River,Hinchinbrook Shire,Rain Gauge / Water Level
+Halifax Alert,32185,-18.5789,146.2803,Herbert River,Hinchinbrook Shire,Rain Gauge / Water Level
+Michael Creek Alert,32186,-18.8478,145.9067,Burdekin River,Hinchinbrook Shire,Rain Gauge
+Plane Creek Sugar Mill,33059,-21.427,149.216,Plane Creek,Mackay Regional,Rain Gauge
+Mirani,33152,-21.1583,148.8608,Pioneer River,Mackay Regional,Water Level
+Flora Valley,33207,-19.7581,146.8389,Haughton River,Charters Towers Regional,Rain Gauge / Water Level
+Cressfield,33254,-20.3436,148.5,Proserpine River,Whitsunday Regional,Rain Gauge / Water Level
+Boundary Creek Alert,33263,-20.4186,148.1108,Don River,Whitsunday Regional,Rain Gauge
+Bowen Pump Station Alert,33264,-20.0089,148.2044,Don River,Whitsunday Regional,Rain Gauge / Water Level
+Ida Creek Alert,33265,-20.2886,148.1175,Don River,Whitsunday Regional,Rain Gauge / Water Level
+Moss Vale Alert,33266,-20.2381,148.0311,Don River,Whitsunday Regional,Rain Gauge / Repeater
+Mt Dangar Alert,33267,-20.2197,148.1217,Don River,Whitsunday Regional,Rain Gauge / Water Level
+Reeves Alert,33268,-20.1494,148.1556,Don River,Whitsunday Regional,Rain Gauge / Water Level
+Roma Peak Alert,33269,-20.3078,148.2181,Don River,Whitsunday Regional,Rain Gauge
+Upper Don Alert,33270,-20.2943,148.1142,Don River,Whitsunday Regional,Rain Gauge
+Clare Alert,33286,-19.7586,147.2436,Burdekin River,Burdekin Shire,Rain Gauge / Water Level
+Millaroo Alert,33287,-19.9717,147.2508,Burdekin River,Burdekin Shire,Rain Gauge / Water Level
+Inkerman Bridge Alert,33288,-19.6433,147.3972,Burdekin River,Burdekin Shire,Rain Gauge / Water Level
+Strathbogie Alert,33289,-20.1425,147.5631,Burdekin River,Whitsunday Regional,Rain Gauge / Water Level
+Mt Pleasant Alert,33290,-20.2897,147.9019,Burdekin River,Whitsunday Regional,Rain Gauge
+Dalbeg Alert,33291,-20.3089,147.2961,Burdekin River,Burdekin Shire,Rain Gauge / Water Level
+Myuna Alert,33292,-20.5819,147.5981,Burdekin River,Whitsunday Regional,Rain Gauge / Water Level
+Sarich's Alert,33299,-21.2725,148.8203,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Dumbleton Rocks Alert,33300,-21.1439,149.0753,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Whiteford's Alert,33301,-21.3228,148.835,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Mirani Weir Tw Alert,33302,-21.1772,148.8311,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Mackay Alert,33303,-21.1397,149.1883,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Gargett Alert,33304,-21.1781,148.7442,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Outer Harbour Tide Alert,33305,-21.1083,149.2239,Pioneer River,Mackay Regional,Water Level / Tide Gauge
+Emu Creek Alert,33306,-20.4103,148.2306,Don River,Whitsunday Regional,Rain Gauge
+South Yaamba Tm,33310,-23.2,150.3978,Fitzroy River (Qld),Livingstone Shire,Rain Gauge / Water Level
+Giru North,33319,-19.5144,147.1011,Haughton River,Burdekin Shire,Rain Gauge
+Burdekin Dam Alert,34097,-20.6467,147.1372,Burdekin River,Whitsunday Regional,Rain Gauge / Water Level / Reservoir
+Alpha,35229,-23.64902778,146.6463889,Burdekin River,Barcaldine Regional,Rain Gauge / Water Level
+Winton,37018,-22.4,143.0403,Diamantina River,Winton Shire,Water Level
+Bedourie,38000,-24.3597,139.4714,Georgina River,Diamantina Shire,Rain Gauge / Water Level
+Birdsville Police Station,38002,-25.9003,139.3492,Diamantina River,Diamantina Shire,Rain Gauge / Water Level
+Glengyle,38009,-24.7856,139.5919,Georgina River,Diamantina Shire,Rain Gauge / Water Level
+Marion Downs,38014,-23.365,139.6556,Georgina River,Boulia Shire,Rain Gauge / Water Level
+Mundubbera,39073,-25.5908,151.2986,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Baralaba,39143,-24.1817,149.81,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Gayndah,39191,-25.6283,151.6133,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Walla Alert-B,39258,-25.1358,151.9844,Burnett River,Bundaberg Regional,Rain Gauge / Water Level
+Moura,39296,-24.5917,149.9017,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Laurel Bank Tm,39347,-23.2967,150.435,Fitzroy River (Qld),Rockhampton Regional,Water Level
+Peachester,40169,-26.8425,152.8819,Brisbane River,Sunshine Coast Regional,Rain Gauge
+Kalbar,40440,-27.9233,152.6008,Brisbane River,Scenic Rim Regional,Water Level
+Lowood,40441,-27.4708,152.5894,Brisbane River,Somerset Regional,Water Level
+Gatton,40444,-27.555,152.275,Brisbane River,Lockyer Valley Regional,Water Level
+Brisbane Bar Tide TM,40647,-27.3608,153.1719,Brisbane River,Brisbane City,Water Level / Tide Gauge
+Jindalee (Centenary) Bridge,40713,-27.5283,152.9467,Brisbane River,Brisbane City,Water Level
+Laidley,40716,-27.6514,152.3808,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+New Beith Tm,40719,-27.73,152.9483,Brisbane River,Logan City,Water Level
+Thornton,40751,-27.7956,152.3753,Brisbane River,Lockyer Valley Regional,Water Level
+Wolffdene Alert,40761,-27.7828,153.1889,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Marodian Tm,40825,-25.9,152.3497,Mary River (Qld),Gympie Regional,Rain Gauge / Water Level
+Ipswich Alert,40831,-27.6117,152.7611,Brisbane River,Ipswich City,Rain Gauge / Water Level
+One Mile Bridge Alert,40836,-27.6272,152.7461,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Three Mile Bridge Alert,40838,-27.6322,152.7269,Brisbane River,Ipswich City,Water Level
+Blackstone Bridge Alert,40872,-27.6219,152.7978,Brisbane River,Ipswich City,Water Level
+Harding Street Alert,40873,-27.6375,152.7903,Brisbane River,Ipswich City,Water Level
+Brisbane Road Alert,40874,-27.6078,152.9083,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Bundamba School Alert,40875,-27.6117,152.8064,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Waterford Alert,40878,-27.6947,153.1364,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Teddington Weir Hw Tm,40896,-25.6517,152.6633,Mary River (Qld),Fraser Coast Regional,Rain Gauge / Water Level
+Musket Flat Mt Alert,40902,-25.4969,152.3836,Burrum River,Fraser Coast Regional,Rain Gauge
+Pacific Haven Alert,40903,-25.2386,152.5319,Burrum River,Fraser Coast Regional,Rain Gauge / Water Level
+Railway Bridge Alert,40904,-25.2756,152.5089,Burrum River,Fraser Coast Regional,Rain Gauge / Water Level
+Upper Cherwell Alert,40905,-25.2928,152.4097,Burrum River,Bundaberg Regional,Rain Gauge
+Lenthalls Dam Alert,40906,-25.4019,152.5317,Burrum River,Fraser Coast Regional,Rain Gauge / Water Level / Reservoir
+Howard Alert,40907,-25.3289,152.5619,Burrum River,Fraser Coast Regional,Rain Gauge / Water Level
+Laheys Lookout Alert,40930,-27.9972,153.1825,South Coast,Scenic Rim Regional,Repeater
+O'Reillys Alert,40931,-28.2314,153.1356,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Repeater
+Darlington Alert,40932,-28.2608,153.0917,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge
+Foxley Alert,40933,-28.27,153.0264,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge
+Maclean Bridge Alert,40935,-27.7864,153.0161,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Lumeah Alert,40936,-28.0614,153.0408,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Benobble Alert,40937,-27.9978,153.1575,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Bromfleet Alert,40938,-27.9108,153.1047,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Beaudesert Alert,40939,-27.9681,152.9861,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Yarrahappini Alert,40940,-27.8336,152.9878,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Kooralbyn Alert,40941,-28.0661,152.8532,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge
+Palen Creek Alert,40942,-28.3222,152.7358,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge
+Deickmans Bridge Alert,40943,-28.2453,152.8908,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Rudds Lane Alert,40944,-28.1692,152.9833,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Round Mountain Alert,40945,-28.0708,152.9272,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Rathdowney Alert,40946,-28.2153,152.8681,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Croftby Alert,40947,-28.1481,152.57,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Knapps Peak Alert,40948,-28.1461,152.7358,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge
+Boonah Alert,40949,-28.0033,152.6875,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Bellbird Park (Purser Rd) Al,40985,-27.6692,152.8731,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Giddi Giddi South Tm,41112,-28.4033,150.0517,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+Kilbronae Tm,41124,-28.2817,150.3747,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+Langley Tm,41152,-27.9753,150.9225,Border Rivers,Toowoomba Regional,Rain Gauge
+Bybera Tm,41162,-28.2694,150.8106,Border Rivers,Goondiwindi Regional,Rain Gauge
+Kerimbilla Tm,41169,-28.3911,150.4825,Border Rivers,Goondiwindi Regional,Rain Gauge
+Limevale Tm,41230,-28.725,151.1843,Border Rivers,Goondiwindi Regional,Rain Gauge
+Wyaga Tm,41348,-28.1667,150.6444,Border Rivers,Goondiwindi Regional,Rain Gauge
+Goondiwindi,41350,-28.5514,150.3086,Border Rivers,Moree Plains Shire,Water Level
+Pikedale Tm,41365,-28.6514,151.6336,Border Rivers,Southern Downs Regional,Rain Gauge
+Chinchilla Weir Tw,41411,-26.8,150.5753,Condamine-Culgoa Rivers,Western Downs Regional,Water Level
+Retreat Bridge Tm,41485,-27.9006,150.3486,Border Rivers,Goondiwindi Regional,Water Level
+Ballymena Tm,41488,-28.0522,150.1475,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+Medpark Bridge Tm,41489,-28.3011,150.2936,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+Bengalla Tm,41506,-28.6561,150.6653,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+New Kildonan Tm,41507,-28.6656,150.445,Border Rivers,Moree Plains Shire,Rain Gauge / Water Level
+O'Connor Tm,41508,-27.7267,150.6453,Border Rivers,Western Downs Regional,Rain Gauge / Water Level
+Yangan Alert,41530,-28.2006,152.2156,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Glengallan Creek Alert,41531,-28.1167,152.0642,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Connolly Dam Alert,41532,-28.3558,151.9967,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level / Reservoir
+Emu Vale Alert,41533,-28.2292,152.2269,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Warwick Alert,41534,-28.2111,152.0275,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Elbow Valley Alert,41535,-28.3731,152.14,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Murrays Bridge Alert,41536,-28.2883,152.1053,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Killarney Alert,41537,-28.3394,152.2944,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Dunmore Exchange Tm,41545,-27.6539,150.9136,Border Rivers,Toowoomba Regional,Rain Gauge
+Avoca Tm,41546,-27.9803,150.515,Border Rivers,Goondiwindi Regional,Rain Gauge
+Wallangarra Tm,41547,-28.9236,151.9289,Border Rivers,Southern Downs Regional,Rain Gauge
+Texas Tm,41548,-28.8675,151.1611,Border Rivers,Inverell Shire,Rain Gauge / Water Level
+Belgrae Park Alert,41551,-26.9669,151.4847,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Allora (Dalrymple Creek Alert),41563,-28.034645,151.986998,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Killarney (Spring Ck WTP Alert),41564,-28.352475,152.337323,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Talwood,42066,-28.4983,149.4819,Border Rivers,Goondiwindi Regional,Water Level
+Hartmann Bridge Tm,42097,-28.3706,149.8811,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+Surrey Tm,42104,-28.3839,149.6747,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+Lundavra Tm,42115,-28.0697,149.9794,Border Rivers,Goondiwindi Regional,Rain Gauge
+Arden Downs Tm,42116,-28.23,149.5617,Border Rivers,Goondiwindi Regional,Rain Gauge
+Auburn River (Andrews Road) TM,42123,-25.745254,150.589112,Burnett River,Western Downs Regional,Rain Gauge / Water Level
+Amby,43000,-26.5478,148.185,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge / Water Level
+Tindarra Tm,43033,-26.4689,148.8047,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge / Water Level
+Mitchell,43064,-26.4872,147.9783,Condamine-Culgoa Rivers,Maranoa Regional,Water Level
+Warroo,43107,-27.645,148.7411,Condamine-Culgoa Rivers,Balonne Shire,Rain Gauge / Water Level
+Binnowee Al,44230,-26.4842,146.0861,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Myendetta Al,44231,-26.5458,146.0167,Warrego River,Murweh Shire,Rain Gauge / Repeater
+The 27 Mile Garden Al,44232,-26.0808,146.4172,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Barradeen Al,44234,-26.0419,146.4292,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Neabul Creek,44238,-27.595457,147.792459,Condamine-Culgoa Rivers,Balonne Shire,Rain Gauge / Water Level
+Tamworth Road Bridge (Peel River),55307,-31.0928,150.9267,Namoi River,Tamworth Regional Council,Water Level
+Goonoo Goonoo (Goonoo Goonoo Creek),55313,-31.2717,150.9167,Namoi River,Tamworth Regional Council,Rain Gauge / Water Level
+Piallamore (Peel River),55315,-31.1833,151.065,Namoi River,Tamworth Regional Council,Water Level
+Mulla Crossing (Cockburn River),55321,-31.0625,151.125,Namoi River,Tamworth Regional Council,Rain Gauge / Water Level
+Chillingham,58011,-28.3132,153.2759,Tweed River,Tweed Shire Council,Rain Gauge / Water Level
+The Channon,58147,-28.6792,153.2775,Richmond River,Lismore City Council,Rain Gauge / Water Level
+Nashua (Wilsons River),58162,-28.7278,153.4622,Richmond River,Byron Shire Council,Rain Gauge / Water Level
+Uki (Tweed River),58167,-28.4147,153.3339,Tweed River,Tweed Shire Council,Rain Gauge / Water Level
+Lismore (Wilsons River),58176,-28.81,153.2733,Richmond River,Lismore City Council,Water Level
+Casino Road Bridge (Richmond River),58179,-28.8694,153.0458,Richmond River,Richmond Valley Council,Water Level
+Nimbin (Goolmangar Creek),58180,-28.6069,153.2083,Richmond River,Lismore City Council,Rain Gauge / Water Level
+Copmanhurst (Clarence River),58181,-29.5944,152.7806,Clarence River,Clarence Valley Council,Water Level
+North Murwillumbah (Tweed River),58186,-28.3274,153.402,Tweed River,Tweed Shire Council,Rain Gauge / Water Level
+Eungella (Oxley River),58193,-28.3538,153.293,Tweed River,Tweed Shire Council,Rain Gauge / Water Level
+Rock Valley (Leycester Creek),58199,-28.7364,153.1634,Richmond River,Lismore City Council,Rain Gauge / Water Level
+Eltham (Wilsons Creek),58200,-28.7569,153.3944,Richmond River,Lismore City Council,Water Level
+Tuncester (Leycester Creek),58201,-28.7967,153.2386,Richmond River,Lismore City Council,Rain Gauge / Water Level
+Bentley (Back Creek),58202,-28.7406,153.075,Richmond River,Richmond Valley Council,Rain Gauge / Water Level
+Boat Harbour (Rous River),58204,-28.3217,153.3467,Tweed River,Tweed Shire Council,Rain Gauge / Water Level
+Corndale (Coopers Creek),58206,-28.7231,153.3614,Richmond River,Lismore City Council,Rain Gauge / Water Level
+Murwillumbah (Hartigans Hill),58215,-28.3324,153.3889,Tweed River,Tweed Shire Council,Repeater
+Minnie Water (Pump Shed),58222,-29.7847,153.2639,Bellinger River,Clarence Valley Council,Rain Gauge
+Rocky Creek Dam,58234,-28.632811,153.344161,Richmond River,Lismore City Council,Rain Gauge / Water Level
+Lismore (Ballina St Bridge) ,58235,-28.812779,153.269361,Richmond River,Lismore City Council,Water Level
+Kogal (Nulla Nulla Ck),59056,-30.7333,152.5,Macleay River,Kempsey Shire Council,Water Level
+Thora (Bellinger River),59121,-30.425,152.7806,Bellinger River,Bellingen Shire Council,Water Level
+Bellbrook (Macleay River),59122,-30.8217,152.5067,Macleay River,Kempsey Shire Council,Rain Gauge / Water Level
+Wittitrin (Dungay Creek),59125,-31.0897,152.6217,Macleay River,Kempsey Shire Council,Water Level
+Bellingen (Bellinger River),59126,-30.4517,152.8983,Bellinger River,Bellingen Shire Council,Water Level
+Kempsey Rd Bridge (Macleay River),59127,-31.0833,152.8467,Macleay River,Kempsey Shire Council,Water Level
+Moparrabah (Parrabel Creek),59128,-30.9783,152.5106,Macleay River,Kempsey Shire Council,Rain Gauge / Water Level
+Copeland Tops (Copeland),60154,-31.972341,151.80924,Manning River,Mid-Coast Council,Repeater
+Ellerston (Poitrel),61196,-31.7069,151.2131,Hunter River,Upper Hunter Shire Council,Rain Gauge
+Belmont Wwtp,61299,-33.0464,151.6711,Macquarie-Tuggerah Lakes,Lake Macquarie City Council,Rain Gauge
+Kars Springs (Welldun),61306,-31.8988,150.658,Hunter River,Upper Hunter Shire Council,Rain Gauge
+St Albans (Macdonald River),61353,-33.2944,150.9719,Hawkesbury River,Hawkesbury City Council,Water Level
+Scone (Kingdon Ponds),61360,-32.05,150.8528,Hunter River,Upper Hunter Shire Council,Rain Gauge / Water Level
+Parkville (Kingdon Ponds),61373,-31.9583,150.8567,Hunter River,Upper Hunter Shire Council,Rain Gauge / Water Level
+Gears (Wyong River),61383,-33.2528,151.316,Macquarie-Tuggerah Lakes,Central Coast Council (NSW),Rain Gauge / Water Level
+Kangy Angy (Ourimbah Creek),61384,-33.3319,151.3833,Macquarie-Tuggerah Lakes,Central Coast Council (NSW),Rain Gauge / Water Level
+Wyong Bridge Upstream (Wyong River),61386,-33.291,151.4238,Macquarie-Tuggerah Lakes,Central Coast Council (NSW),Water Level
+Bathurst Stanley Street (Macquarie River),63287,-33.4107,149.5843,Macquarie-Bogan Rivers,Bathurst Regional Council,Rain Gauge / Water Level
+Putty Road (Colo River),63288,-33.432,150.8285,Hawkesbury River,Hawkesbury City Council,Water Level
+Tarana (Fish River),63297,-33.5728,149.9128,Macquarie-Bogan Rivers,Oberon Council,Rain Gauge / Water Level
+Campbells River (Upstream Chifley),63298,-33.6134,149.6987,Macquarie-Bogan Rivers,Bathurst Regional Council,Rain Gauge / Water Level
+Toogong (Glenayr),65084,-33.3711,148.5917,Lachlan River,Cabonne Shire Council,Rain Gauge / Water Level
+Eugowra Town (Mandagery Creek),65086,-33.4333,148.3833,Lachlan River,Cabonne Shire Council,Water Level
+Forbes Iron Bridge (Lachlan River),65088,-33.4,148.0167,Lachlan River,Forbes Shire Council,Water Level
+Wattamolla (Griffiths),68218,-34.7208,150.6491,Shoalhaven River,Shoalhaven City Council,Rain Gauge
+Terara (Shoalhaven River),68221,-34.8708,150.6333,Shoalhaven River,Shoalhaven City Council,Water Level
+Fossickers Flat (Shoalhaven River),68232,-34.8217,150.1817,Shoalhaven River,Shoalhaven City Council,Water Level
+Goulburn (Pomeroy),70071,-34.6514,149.5024,Hawkesbury River,Upper Lachlan Shire Council,Rain Gauge
+Mt Wellington,85304,-37.4967,146.8575,Mitchell River (Vic),Wellington Shire,Rain Gauge
+Emu Creek at Pierces Creek Road,140023,-27.064441,152.004606,Brisbane River,Toowoomba Regional,Rain Gauge / Water Level
+Willowbank,140024,-27.69518,152.6865,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Munna Ck (Glenbar Tiaro Rd) Alert,140025,-25.747439,152.29655,Mary River (Qld),Fraser Coast Regional,Rain Gauge / Water Level
+Doongul Creek (Old Gayndah Rd) TM,140026,-25.394149,152.430947,Burrum River,Fraser Coast Regional,Rain Gauge / Water Level
+Doongul Creek (Wongi State Forest) TM,140027,-25.469355,152.46426,Burrum River,Fraser Coast Regional,Rain Gauge / Water Level
+Widgee Ck (Wide Bay HWY) Alert,140028,-26.091249,152.510311,Mary River (Qld),Gympie Regional,Rain Gauge / Water Level
+Widgee Ck (Pahlow Rd Bridge) TM,140029,-26.19561,152.456846,Mary River (Qld),Gympie Regional,Rain Gauge / Water Level
+BOYNE RIVER (MCLAUGHLINS RD),140030,-26.451376,151.387367,Burnett River,South Burnett Regional,Rain Gauge / Water Level
+Cherwell River (Highway Bridge) Alert,140031,-25.290451,152.416023,Burrum River,Fraser Coast Regional,Rain Gauge / Water Level
+Mount Stanley TM,140843,-26.68206,152.20519,Brisbane River,Somerset Regional,Water Level
+Mount Hallen (Sandy Creek) Alert,140844,-27.31698,152.37626,Brisbane River,Somerset Regional,Rain Gauge
+Purga Creek (Washpool Rd) Alert,140845,-27.818224,152.754859,Brisbane River,Scenic Rim Regional,Rain Gauge / Water Level
+Running Creek (Bells Bridge) Alert,140846,-28.3182534,152.9215987,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+GATTON LVRC ENVIROMON BASESTATION,260122,-27.5588,152.2762,Gatton,Lockyer Valley Regional,Base Station
+Fraser Coast Regional Council Base Station,260127,-25.314916,152.888471,Burrum River,Fraser Coast Regional,Gateway
+Alick Creek Tm,529039,-20.4167,141.9992,Flinders River,McKinlay Shire,Rain Gauge / Water Level
+Punchbowl Road TM,529042,-20.0531,142.0349,Flinders River,McKinlay Shire,Rain Gauge / Water Level
+Flinders Cloncurry Junction Tm,529044,-18.5594,140.7194,Flinders River,Carpentaria Shire,Rain Gauge / Water Level
+Wondoola Tm,529045,-18.5147,140.9097,Flinders River,Carpentaria Shire,Rain Gauge / Water Level
+Yappar Junction Tm,529046,-18.2853,141.2153,Norman River,Croydon Shire,Rain Gauge / Water Level
+Broadwater Tm,529047,-18.0797,141.1331,Norman River,Carpentaria Shire,Rain Gauge / Water Level
+Lower Walker Ck Tm,529048,-17.4725,141.1789,Norman River,Carpentaria Shire,Rain Gauge / Water Level
+Normanton Tm,529049,-17.6647,141.0872,Norman River,Carpentaria Shire,Rain Gauge / Water Level
+Upper Walker Creek Tm,529050,-17.3522,141.6461,Norman River,Carpentaria Shire,Rain Gauge / Water Level
+Iffley Tm,529051,-18.8536,141.1917,Norman River,Carpentaria Shire,Rain Gauge / Water Level
+Archie Creek Tm,529058,-18.5062,138.8551,Nicholson River,Burke Shire,Rain Gauge / Water Level
+Barkly River Wdr Tm,529059,-18.2408,139.2658,Nicholson River,Burke Shire,Rain Gauge / Water Level
+Cartridge Creek Tm,529060,-18.6898,139.4659,Leichhardt River,Burke Shire,Rain Gauge / Water Level
+Doomadgee Tm,529061,-17.959,138.8519,Nicholson River,Doomadgee Aboriginal Shire,Water Level
+Kingfisher Camp Tm,529062,-17.8751,138.2835,Nicholson River,Burke Shire,Rain Gauge / Water Level
+Lower Lawn Hill Creek Tm,529063,-18.2369,138.6428,Nicholson River,Burke Shire,Rain Gauge / Water Level
+Norfolk Station Tm,529064,-19.3151,138.3323,Nicholson River,Mount Isa City,Rain Gauge
+O'Shannassy River Tm,529065,-19.6744,138.4004,Nicholson River,Mount Isa City,Rain Gauge
+Running Creek Tm,529066,-18.322,139.264,Nicholson River,Burke Shire,Rain Gauge / Water Level
+Sandy Creek Tm,529067,-18.6182,139.0627,Nicholson River,Burke Shire,Rain Gauge / Water Level
+Sandy Waterhole Tm,529068,-18.0418,139.1922,Nicholson River,Burke Shire,Water Level
+Thorntonia Tm,529070,-19.503,138.9473,Nicholson River,Mount Isa City,Rain Gauge
+Esmeralda Rr TM,529071,-18.8804,142.5623,Norman River,Croydon Shire,Water Level
+Neumeyer Valley Station Tm,529073,-18.4732,140.2296,Leichhardt River,Carpentaria Shire,Rain Gauge / Water Level
+Oakland Park Tm,529074,-17.9259,142.0255,Norman River,Croydon Shire,Rain Gauge
+Prospect Tm,529075,-18.9155,142.2502,Norman River,Croydon Shire,Rain Gauge
+Fish Hole Creek Tm,529076,-17.6318,141.993,Norman River,Croydon Shire,Rain Gauge
+Claraville Tm,529077,-18.658,141.711,Norman River,Croydon Shire,Rain Gauge
+Mundjuro Tm,529078,-19.2781,141.5907,Norman River,Carpentaria Shire,Rain Gauge
+Savanah Tm,529079,-19.6168,142.2362,Norman River,McKinlay Shire,Rain Gauge
+Saxby River Ldr Tm,529080,-19.4823,141.2343,Flinders River,McKinlay Shire,Water Level
+East Leichardt Dam TM,529082,-20.7797,139.7849,Leichhardt River,Cloncurry Shire,Rain Gauge
+Brennans Knob Tm,529085,-18.4571,142.5626,Norman River,Croydon Shire,Rain Gauge
+Albert River Tm,529086,-17.8615,139.4081,Nicholson River,Burke Shire,Water Level
+McKinlay River Lh TM,529087,-21.2668,141.2827,Flinders River,McKinlay Shire,Water Level
+Seymour Gap TM,529088,-21.6187,141.3328,Flinders River,McKinlay Shire,Rain Gauge
+Toorak Research Station TM,529089,-21.0314,141.8003,Flinders River,McKinlay Shire,Rain Gauge
+Four Ways Wdr Tm,529090,-19.2497,140.3673,Flinders River,Cloncurry Shire,Rain Gauge
+Florence Creek TM,529091,-21.2014,140.5077,Flinders River,Cloncurry Shire,Rain Gauge
+Snake Creek TM,529092,-20.9882,140.6531,Flinders River,Cloncurry Shire,Rain Gauge
+Roxmere Station TM,529093,-20.835,140.5147,Flinders River,Cloncurry Shire,Rain Gauge / Water Level
+Devencourt Station,529094,-21.2149,140.2339,Flinders River,Cloncurry Shire,Rain Gauge
+Porcupine Creek Tm,530030,-20.6936,144.3778,Flinders River,Flinders Shire,Rain Gauge / Water Level
+Whites Mountain Tm,530031,-20.5467,144.6619,Flinders River,Flinders Shire,Rain Gauge / Water Level
+Upper Poison Creek Alert,530036,-17.806,144.9594,Herbert River,Tablelands Regional,Rain Gauge
+Hampstead Tm,530039,-19.8712,143.6155,Flinders River,Richmond Shire,Rain Gauge
+Burleigh Tm,530040,-19.9447,143.1733,Flinders River,Richmond Shire,Rain Gauge
+Dutton River Tm,530041,-20.6284,143.3612,Flinders River,Richmond Shire,Rain Gauge / Water Level
+Glenmoan Station Tm,530042,-20.815,144.4398,Flinders River,Flinders Shire,Rain Gauge / Water Level
+Hughenden Tm,530043,-20.841,144.2011,Flinders River,Flinders Shire,Rain Gauge / Water Level
+Walker Creek (Winton Road) Tm,530044,-21.0647,144.0169,Flinders River,Flinders Shire,Rain Gauge
+Reedy Springs Station Tm,530046,-19.9659,144.6834,Flinders River,Charters Towers Regional,Rain Gauge
+Fog Creek Tm,530050,-19.2463,143.0669,Norman River,Croydon Shire,Rain Gauge
+Strathpark Tm,530051,-19.6049,143.1695,Norman River,Croydon Shire,Rain Gauge
+Carpentaria Bridge TM,530052,-18.7272,144.3125,Gilbert River,Etheridge Shire,Rain Gauge / Water Level
+Basalt River (Gregory Dev Rd) Tm,530053,-19.6306,145.7734,Burdekin River,Charters Towers Regional,Rain Gauge / Water Level
+Fletchervale Rd (Wando Vale) Tm,530054,-19.8319,145.1988,Burdekin River,Charters Towers Regional,Rain Gauge
+Lolworth Creek Tm,530055,-20.2021,145.0248,Burdekin River,Charters Towers Regional,Rain Gauge
+Maryvale Ck (Niall Rd) Tm,530056,-19.4826,145.2713,Burdekin River,Charters Towers Regional,Rain Gauge
+Alick Creek Rwr TM,530058,-21.1832,142.921,Flinders River,Richmond Shire,Rain Gauge / Water Level
+Wyoming Ssdr TM,530059,-21.2566,143.5555,Flinders River,Flinders Shire,Rain Gauge
+Mt Desolation TM,530060,-20.5533,144.1459,Flinders River,Flinders Shire,Rain Gauge
+Dutton River TM,530061,-20.2932,143.8714,Flinders River,Flinders Shire,Rain Gauge
+Villa Dale TM,530062,-20.6077,143.4753,Flinders River,Richmond Shire,Rain Gauge / Water Level
+HulbERRTS Bridge Tm,530163,-20.6419,142.6281,Flinders River,Richmond Shire,Rain Gauge / Water Level
+Marathon Tm,530164,-20.8175,143.5769,Flinders River,Flinders Shire,Rain Gauge / Water Level
+The Boulders Tm,531022,-17.3489,145.8725,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Water Level
+Peets Bridge Tm,531023,-17.1331,145.7625,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Water Level
+Bucklands Tm,531024,-17.3833,145.9667,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Water Level
+Bairds Tm,531029,-16.1817,145.2808,Daintree River,Douglas Shire,Rain Gauge / Water Level
+Bones Knob Alert,531032,-17.2206,145.4469,Barron River,Tablelands Regional,Rain Gauge / Repeater
+Mareeba Alert,531033,-17.0022,145.4292,Barron River,Mareeba Shire,Rain Gauge / Water Level
+Tinaroo Dam Alert,531034,-17.1642,145.5464,Barron River,Tablelands Regional,Rain Gauge / Water Level / Reservoir
+Emerald Crest Alert,531035,-17.0233,145.5183,Barron River,Mareeba Shire,Rain Gauge
+Bilwon Alert,531036,-16.8419,145.4433,Barron River,Mareeba Shire,Rain Gauge / Water Level
+Bolton Road Alert,531037,-16.8911,145.5458,Barron River,Mareeba Shire,Rain Gauge / Water Level
+Mona Mona Alert,531038,-16.7319,145.5111,Barron River,Mareeba Shire,Rain Gauge
+Flaggy Creek Alert,531039,-16.7803,145.5303,Barron River,Mareeba Shire,Rain Gauge / Water Level
+Myola Alert,531040,-16.8,145.6119,Barron River,Mareeba Shire,Rain Gauge / Water Level
+Lake Placid Alert,531041,-16.8683,145.6731,Barron River,Cairns Regional,Water Level
+Brinsmead Alert,531042,-16.8886,145.7108,Barron River,Cairns Regional,Rain Gauge / Repeater
+Saddle Mountain Alert,531043,-16.8183,145.6628,Barron River,Mareeba Shire,Gateway
+The Fisheries Tm,531046,-17.1853,145.7239,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Water Level
+Yourka Alert,531047,-18.0081,145.4706,Herbert River,Tablelands Regional,Rain Gauge
+Kamerunga Bridge Alert,531048,-16.8747,145.6856,Barron River,Cairns Regional,Rain Gauge / Water Level
+Cairns Airport Alert,531049,-16.8622,145.7419,Barron River,Cairns Regional,Rain Gauge / Water Level
+Cairns Harbour Tide Al,531050,-16.9267,145.7808,Mulgrave-Russell Rivers,Cairns Regional,Water Level / Tide Gauge
+Gordonvale Alert,531051,-17.1011,145.7894,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Water Level / Repeater
+Peets Bridge Alert,531052,-17.1336,145.7644,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Water Level
+Boar Pocket ALERT,531054,-17.1967,145.6694,Barron River,Tablelands Regional,Rain Gauge
+Maalan Road Alert,531055,-17.6247,145.5969,Tully River,Tablelands Regional,Rain Gauge / Repeater
+Tully Weir Alert,531056,-17.7772,145.565,Tully River,Tablelands Regional,Rain Gauge
+Bolinda Estate Alert,531057,-17.8311,145.7053,Tully River,Cassowary Coast Regional,Rain Gauge / Water Level
+Koombooloomba Alert,531058,-17.8328,145.6011,Tully River,Tablelands Regional,Rain Gauge
+Redlynch Tm,531061,-16.9422,145.6953,Barron River,Cairns Regional,Water Level
+Whyanbeel Ck Tm,531067,-16.3903,145.3381,Daintree River,Douglas Shire,Rain Gauge / Water Level
+China Camp Tm,531071,-15.985,145.2878,Daintree River,Douglas Shire,Rain Gauge / Water Level
+Redlynch Alert,531072,-16.9422,145.6953,Barron River,Cairns Regional,Water Level
+Clyde Rd Alert,531074,-17.3247,145.9522,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Water Level
+Goldsborough Valley Alert,531075,-17.2464,145.7744,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge
+The Fisheries Alert,531076,-17.1853,145.7239,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Water Level
+Gillies Lookout Alert,531077,-17.1706,145.6886,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Repeater
+Cameron Creek Tm,531078,-18.0669,145.34,Herbert River,Tablelands Regional,Water Level
+Gunnawarra Al (Rudd Ck),531081,-17.9164,145.1503,Herbert River,Tablelands Regional,Rain Gauge / Water Level
+Ben Avon Alert,531082,-17.8072,145.325,Herbert River,Tablelands Regional,Rain Gauge
+Vohland Rd Tm,531092,-17.1372,145.8572,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge
+Peets Bridge Alert-B,531099,-17.1336,145.7644,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Water Level
+Thomatis Creek Alert,531100,-16.8514,145.7171,Barron River,Cairns Regional,Water Level
+Cardstone Alert,531102,-17.7642,145.5936,Tully River,Cassowary Coast Regional,Rain Gauge
+Glen Allyn Alert,531103,-17.3808,145.6508,Johnstone River,Tablelands Regional,Rain Gauge / Water Level
+Tully Gorge Alert,531104,-17.7725,145.6503,Tully River,Cassowary Coast Regional,Rain Gauge / Water Level
+Daintree Village Tm,531110,-16.2497,145.3172,Daintree River,Douglas Shire,Rain Gauge / Water Level
+Extended Range Alert,531116,-17.5512,145.2111,Herbert River,Tablelands Regional,Rain Gauge
+Native Wells Alert,531117,-18.1469,145.0934,Herbert River,Tablelands Regional,Rain Gauge
+Wooroora Alert,531118,-17.9331,145.5249,Herbert River,Tablelands Regional,Rain Gauge
+Wild River Tm,531120,-17.3663,145.4317,Herbert River,Tablelands Regional,Rain Gauge / Water Level
+Wongabel Tm,531121,-17.3379,145.4802,Barron River,Tablelands Regional,Rain Gauge
+Bromfield Swamp Tm,531122,-17.3725,145.5398,Barron River,Tablelands Regional,Rain Gauge
+Malanda Tm,531123,-17.3305,145.6064,Johnstone River,Tablelands Regional,Rain Gauge
+Scrubby Creek Tm,531124,-17.3033,145.4617,Barron River,Tablelands Regional,Rain Gauge
+Wondecla Tm,531125,-17.4364,145.4217,Herbert River,Tablelands Regional,Rain Gauge
+Ryan Weare Park TM,531126,-16.8852,145.7032,Barron River,Cairns Regional,Water Level
+Wonga Park Alert,531127,-17.3441,145.9285,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Water Level
+Glenoma Park Alert,531128,-16.8988,145.7083,Barron River,Cairns Regional,Rain Gauge / Water Level
+Currunda Creek Tm,531129,-16.9347,145.692,Barron River,Cairns Regional,Rain Gauge / Water Level
+Rocks Rd Reserve Tm,531130,-16.9278,145.6975,Barron River,Cairns Regional,Rain Gauge / Water Level
+Mary Parker Drive TM,531131,-16.9427,145.6956,Barron River,Cairns Regional,Rain Gauge / Water Level
+Barratt Creek Tm,531132,-16.2626,145.3371,Daintree River,Douglas Shire,Water Level
+Craiglie Tm,531133,-16.5395,145.474,Mossman River,Douglas Shire,Rain Gauge
+Port Douglas Tm,531134,-16.4938,145.4609,Mossman River,Douglas Shire,Rain Gauge
+Diwan Tm,531135,-16.2031,145.404,Daintree River,Douglas Shire,Rain Gauge
+The Cascades Alert,531136,-16.9546,145.6879,Barron River,Cairns Regional,Rain Gauge
+Mount Mulligan TM,531144,-16.8737,144.893,Mitchell River (Qld),Mareeba Shire,Rain Gauge
+Creb Track Tm,531145,-16.1958,145.2922,Daintree River,Douglas Shire,Water Level
+Yandill Tm,531146,-16.0555,145.3073,Daintree River,Douglas Shire,Rain Gauge
+Mossman Treatment Plant Tm,531147,-16.4509,145.3776,Mossman River,Douglas Shire,Rain Gauge
+Stewart Creek Valley Tm,531148,-16.3166,145.3202,Daintree River,Douglas Shire,Rain Gauge
+Rex Creek Intake TM,531149,-16.4739,145.3228,Daintree River,Douglas Shire,Rain Gauge
+Davies Creek Road Tm,531155,-17.0232,145.5858,Barron River,Mareeba Shire,Rain Gauge / Water Level
+Davies Creek Tm,531156,-16.9416,145.5416,Barron River,Mareeba Shire,Water Level
+Mount Aunt Tm,531157,-17.0753,145.4009,Barron River,Mareeba Shire,Rain Gauge
+Tinaroo Creek Tm,531158,-17.0956,145.5217,Barron River,Mareeba Shire,Rain Gauge
+Biboohra Tm,531159,-16.9159,145.4228,Barron River,Mareeba Shire,Rain Gauge / Water Level
+Upper Spence Creek TM,531160,-16.3165,145.0995,Mitchell River (Qld),Mareeba Shire,Rain Gauge / Repeater
+Ingham Depot Alert,532008,-18.67,146.1539,Herbert River,Hinchinbrook Shire,Rain Gauge
+Sweeney Creek U/S Alert,532009,-17.5261,146.0242,Johnstone River,Cassowary Coast Regional,Rain Gauge / Water Level
+Sweeney Creek D/S Alert,532013,-17.5261,146.0242,Johnstone River,Cassowary Coast Regional,Water Level
+Saltwater Creek Alert,532014,-17.5122,146.0322,Johnstone River,Cassowary Coast Regional,Rain Gauge / Water Level
+Ross River Dam Alert,532020,-19.41,146.7372,Ross River,Townsville City,Rain Gauge / Water Level / Reservoir
+Mcavoy Bridge Alert,532023,-17.5047,145.9928,Johnstone River,Cassowary Coast Regional,Rain Gauge / Water Level
+Mourilyan Harbour Alert,532024,-17.5994,146.125,Johnstone River,Cassowary Coast Regional,Water Level / Tide Gauge
+Mourilyan Mill Alert,532025,-17.5806,146.0297,Johnstone River,Cassowary Coast Regional,Rain Gauge / Water Level
+Paradise Lagoon Alert,532026,-18.9794,146.2711,Herbert River,Townsville City,Rain Gauge
+Gairloch Alert,532027,-18.6178,146.1836,Herbert River,Hinchinbrook Shire,Rain Gauge / Water Level
+Abergowrie Bridge Alert,532028,-18.5144,146.0006,Herbert River,Hinchinbrook Shire,Rain Gauge / Water Level
+Aplin Weir Alert,532029,-19.3039,146.7803,Ross River,Townsville City,Rain Gauge / Water Level
+Black Weir Alert,532030,-19.3164,146.735,Ross River,Townsville City,Rain Gauge / Water Level
+Townsville Airport Alert,532031,-19.2483,146.7661,Ross River,Townsville City,Rain Gauge
+Louisa Creek Alert,532032,-19.2722,146.7544,Ross River,Townsville City,Rain Gauge / Water Level
+Alligator Creek Alert,532034,-19.3869,146.9578,Haughton River,Townsville City,Rain Gauge / Water Level
+Stuart Creek Alert,532035,-19.3219,146.8375,Ross River,Townsville City,Rain Gauge / Water Level
+Stuart Alert,532036,-19.3469,146.8511,Ross River,Townsville City,Rain Gauge
+Gleesons Mill Alert,532040,-19.4347,146.7039,Ross River,Townsville City,Rain Gauge
+The Pinnacles Alert,532041,-19.385,146.6831,Ross River,Townsville City,Rain Gauge
+Mt Margaret Alert,532042,-19.35,146.6042,Ross River,Townsville City,Rain Gauge
+Bohle River Alert,532043,-19.3181,146.7028,Ross River,Townsville City,Rain Gauge / Water Level
+Little Bohle River Alert,532044,-19.3258,146.6767,Ross River,Townsville City,Rain Gauge / Water Level
+Upper Black River Alert,532045,-19.3422,146.5017,Herbert River,Townsville City,Rain Gauge
+Black River Alert,532046,-19.2375,146.6328,Herbert River,Townsville City,Rain Gauge / Water Level
+Upper Bluewater Alert,532047,-19.2386,146.4531,Herbert River,Townsville City,Rain Gauge
+Bluewater Alert,532048,-19.1833,146.5469,Herbert River,Townsville City,Rain Gauge / Water Level
+Paluma Alert,532049,-19.01,146.2156,Herbert River,Townsville City,Rain Gauge / Repeater
+Mt Bohle Alert,532053,-19.2669,146.7044,Ross River,Townsville City,Rain Gauge / Water Level
+Deeragun Alert,532054,-19.2797,146.6486,Ross River,Townsville City,Rain Gauge
+Jarra Creek Alert,532056,-17.8831,145.8428,Tully River,Cassowary Coast Regional,Rain Gauge
+Tully Alert,532057,-17.9353,145.9231,Tully River,Cassowary Coast Regional,Rain Gauge
+Davidson Creek Alert,532058,-17.9608,145.7539,Tully River,Cassowary Coast Regional,Rain Gauge
+Euramo Alert,532059,-17.9922,145.9425,Tully River,Cassowary Coast Regional,Rain Gauge / Water Level / Repeater
+Murray Flats Alert,532060,-18.0297,145.9242,Murray River (Qld),Cassowary Coast Regional,Rain Gauge / Water Level
+Upper Murray Alert,532061,-18.1069,145.8053,Murray River (Qld),Cassowary Coast Regional,Rain Gauge / Water Level
+Bilyana Alert,532062,-18.1181,145.8772,Murray River (Qld),Cassowary Coast Regional,Rain Gauge / Repeater
+Paluma Dam Alert,532063,-18.9536,146.1469,Burdekin River,Townsville City,Rain Gauge / Water Level / Reservoir
+Bulgun Creek Alert,532064,-17.8678,145.9247,Tully River,Cassowary Coast Regional,Rain Gauge
+Meunga Creek Alert,532065,-18.2817,145.8786,Murray River (Qld),Cassowary Coast Regional,Rain Gauge
+Trebonne Al,532067,-18.6181,146.0842,Herbert River,Hinchinbrook Shire,Rain Gauge / Water Level
+South Mission Beach Alert,532074,-17.9506,146.0861,Tully River,Cassowary Coast Regional,Rain Gauge / Repeater
+Castle Hill Alert,532075,-19.2586,146.8031,Ross River,Townsville City,Rain Gauge / Repeater
+South Townsville Alert,532077,-19.2633,146.825,Ross River,Townsville City,Rain Gauge
+Pallarenda Alert,532079,-19.2042,146.7708,Ross River,Townsville City,Rain Gauge
+Bushland Beach Al,532082,-19.1936,146.6808,Ross River,Townsville City,Rain Gauge
+Toolakea Alert,532083,-19.1464,146.5803,Black River,Townsville City,Rain Gauge
+Toomulla Alert,532084,-19.0756,146.4694,Black River,Townsville City,Rain Gauge
+Cardwell Gap Alert,532087,-18.5422,146.1844,Herbert River,Hinchinbrook Shire,Rain Gauge
+Rooney's Bridge Alert,532088,-19.285,146.8153,Ross River,Townsville City,Rain Gauge / Water Level
+Dalrymple Road Alert,532089,-19.2919,146.7108,Ross River,Townsville City,Rain Gauge / Water Level
+Whites Creek Al,532090,-19.3778,146.9242,Haughton River,Townsville City,Rain Gauge / Water Level
+Rollingstone Al,532091,-19.0514,146.3944,Black River,Townsville City,Rain Gauge / Water Level
+Saunders Ck Alert,532105,-19.2517,146.6836,Ross River,Townsville City,Rain Gauge / Water Level
+Annandale Alert,532108,-19.3128,146.7864,Ross River,Townsville City,Rain Gauge / Water Level
+Gordon Creek Alert,532109,-19.3139,146.8094,Ross River,Townsville City,Rain Gauge / Water Level
+Stony Creek Alert,532110,-19.2486,146.6658,Ross River,Townsville City,Rain Gauge / Water Level
+Cardwell Tide  Alert,532113,-18.2633,146.0258,Murray River (Qld),Cassowary Coast Regional,Rain Gauge / Water Level / Tide
+Clump Point Tide Alert,532114,-17.8503,146.1061,Tully River,Cassowary Coast Regional,Rain Gauge / Water Level / Tide
+Garradunga  Alert,532115,-17.4606,145.9922,Johnstone River,Cassowary Coast Regional,Rain Gauge
+Japoonvale Alert,532116,-17.7147,145.9056,Johnstone River,Cassowary Coast Regional,Rain Gauge / Water Level
+Waugh Culvert Tm,532117,-17.4368,145.9437,Mulgrave-Russell Rivers,Cairns Regional,Rain Gauge / Water Level
+Kirrama Range Alert,532126,-18.2086,145.7953,Murray River (Qld),Cassowary Coast Regional,Rain Gauge
+Clarke River Tm,532135,-19.213,145.4408,Burdekin River,Charters Towers Regional,Rain Gauge / Water Level
+Apjohn Street Horseshoe Bay Tm,532136,-19.1247,146.8493,Ross River,Townsville City,Rain Gauge
+Bohle River Kelso Tm,532137,-19.3976,146.7008,Ross River,Townsville City,Water Level
+Chisholm Trail Oak Valley Tm,532138,-19.388,146.8094,Ross River,Townsville City,Rain Gauge
+Mill Rd Black River Tm,532139,-19.2474,146.5738,Black River,Townsville City,Rain Gauge
+Upper Alligator Creek Tm,532140,-19.4356,146.9539,Haughton River,Townsville City,Rain Gauge
+Wallaman Escarpment Tm,532145,-18.648,145.8745,Herbert River,Hinchinbrook Shire,Rain Gauge
+Yammanie Minnamoolka TM,532146,-18.298,145.2726,Herbert River,Tablelands Regional,Rain Gauge
+Kataughal Rd (Black River) Tm,532150,-19.281667,146.592229,Black River,Townsville City,Rain Gauge / Water Level
+Lava Plains Rd Tm,532152,-18.49,144.7976,Burdekin River,Charters Towers Regional,Rain Gauge
+Redbank Creek Tm,532153,-18.769,145.4051,Burdekin River,Charters Towers Regional,Rain Gauge
+Pace Rd Rollingstone Tm,532154,-19.0688,146.3858,Black River,Townsville City,Rain Gauge
+Running River (Hidden Valley) Tm,532155,-18.9803,146.0248,Burdekin River,Charters Towers Regional,Rain Gauge
+Wairuna Rd Tm,532156,-18.4785,145.2966,Burdekin River,Charters Towers Regional,Rain Gauge
+Brabons Alert,533007,-19.4772,146.6314,Ross River,Townsville City,Rain Gauge
+Jacks Creek Alert,533015,-20.7525,147.8819,Burdekin River,Whitsunday Regional,Rain Gauge / Water Level
+Woodlands Alert,533022,-19.4844,146.7694,Ross River,Townsville City,Rain Gauge
+Plevna Alert,533035,-21.2997,148.5444,Pioneer River,Mackay Regional,Rain Gauge
+Dow's Creek Alert,533036,-21.1092,148.7839,Pioneer River,Mackay Regional,Rain Gauge
+Clarke Range Alert,533037,-21.0794,148.5442,Pioneer River,Mackay Regional,Rain Gauge / Repeater
+Ridgelands Alert,533038,-21.2361,148.5503,Pioneer River,Mackay Regional,Rain Gauge
+Eungella Alert,533039,-21.1317,148.4931,Pioneer River,Mackay Regional,Rain Gauge
+Teemburra Dam Alert,533041,-21.2175,148.665,Pioneer River,Mackay Regional,Rain Gauge / Water Level / Reservoir
+Nettlefield Alert,533043,-19.5822,146.6953,Ross River,Townsville City,Rain Gauge
+Mcdonalds Alert,533044,-19.5472,146.8489,Ross River,Townsville City,Rain Gauge
+Cormacks Alert,533045,-19.4392,146.8464,Ross River,Townsville City,Rain Gauge
+Groper Creek Alert,533049,-19.6917,147.5317,Burdekin River,Burdekin Shire,Rain Gauge / Water Level
+Mingela Alert,533050,-19.8789,146.6322,Burdekin River,Charters Towers Regional,Rain Gauge / Repeater
+Giru Alert,533051,-19.5126,147.1115,Haughton River,Burdekin Shire,Rain Gauge / Water Level
+Cameron Hill Alert,533052,-19.7439,146.8592,Haughton River,Townsville City,Rain Gauge / Repeater
+Upper Reid Alert,533053,-19.7303,146.6689,Haughton River,Charters Towers Regional,Rain Gauge
+Donnington Airpark Alert,533054,-19.6017,146.8403,Haughton River,Townsville City,Rain Gauge
+Mt Piccaninny Alert,533055,-19.7733,146.9597,Haughton River,Burdekin Shire,Rain Gauge / Water Level
+Powerline Alert,533056,-19.6331,147.1103,Haughton River,Burdekin Shire,Rain Gauge / Water Level
+Rita Island Alert,533057,-19.6294,147.4817,Burdekin River,Burdekin Shire,Rain Gauge / Water Level
+Finch Hatton Alert,533059,-21.1328,148.6492,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Hospital Bridge Alert,533060,-21.1444,149.1544,Pioneer River,Mackay Regional,Rain Gauge / Water Level / Repeater
+Hurricane Cliff Al,533068,-20.0944,147.7097,Don River,Whitsunday Regional,Rain Gauge / Repeater
+Calcium Alert,533070,-19.655,146.7994,Haughton River,Townsville City,Rain Gauge
+Upper Major Creek Alert,533071,-19.5817,146.9381,Haughton River,Townsville City,Rain Gauge
+Major Creek Alert,533072,-19.6689,147.025,Haughton River,Townsville City,Rain Gauge / Water Level
+Four Mile Alert,533073,-19.8647,146.7831,Haughton River,Charters Towers Regional,Rain Gauge
+Upper Barrattas Alert,533074,-19.885,147.0333,Haughton River,Burdekin Shire,Rain Gauge
+Sellheim Alert,533075,-20.0061,146.4392,Burdekin River,Charters Towers Regional,Rain Gauge / Water Level
+Ravenswood Alert,533076,-20.1011,146.9069,Burdekin River,Charters Towers Regional,Rain Gauge
+Eton Vale Alert,533077,-20.2933,147.6647,Burdekin River,Whitsunday Regional,Rain Gauge
+Upper Bogie Alert,533078,-20.4411,147.9953,Burdekin River,Whitsunday Regional,Rain Gauge
+Sutherland Alert,533079,-20.71486,148.15034,Burdekin River,Whitsunday Regional,Rain Gauge
+The Stonewall Alert,533080,-20.8247,148.0408,Burdekin River,Whitsunday Regional,Rain Gauge / Repeater
+Weetalaba Alert,533081,-21.0428,147.9417,Burdekin River,Whitsunday Regional,Rain Gauge
+Blenheim Alert,533082,-21.1006,148.2169,Burdekin River,Isaac Regional,Rain Gauge
+Eungella Dam Alert,533083,-21.1403,148.3653,Burdekin River,Mackay Regional,Rain Gauge
+Clarke Range2 Alert,533084,-21.0794,148.5442,Pioneer River,Mackay Regional,Rain Gauge / Repeater
+Koonandah TM,533106,-20.0064,148.1289,Don River,Whitsunday Regional,Rain Gauge / Water Level
+Cungulla  Alert,533108,-19.3967,147.1072,Haughton River,Townsville City,Rain Gauge
+Mt Kelly Alert,533109,-19.6619,147.3128,Burdekin River,Burdekin Shire,Rain Gauge / Repeater
+Expedition Pass Alert,533114,-20.1833,147.165,Burdekin River,Burdekin Shire,Rain Gauge
+Landers Creek Alert,533115,-19.9972,147.1056,Burdekin River,Burdekin Shire,Rain Gauge
+East Barrattas Alert,533116,-19.5728,147.2233,Haughton River,Burdekin Shire,Rain Gauge / Water Level
+Brandon Alert,533117,-19.5558,147.3681,Haughton River,Burdekin Shire,Rain Gauge / Water Level
+Ayr Alert,533118,-19.5864,147.3975,Haughton River,Burdekin Shire,Rain Gauge / Water Level
+Mt Pinnacle Alert,533121,-21.1586,148.655,Pioneer River,Mackay Regional,Rain Gauge / Repeater
+Marian Weir Alert,533145,-21.1392,148.9358,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Bowen Wtp Alert,533166,-20.3539,148.4492,Proserpine River,Whitsunday Regional,Rain Gauge / Water Level
+Cannonvale Alert,533167,-20.281459,148.684671,Proserpine River,Whitsunday Regional,Rain Gauge
+Dingo Beach Alert,533168,-20.0997,148.4919,Proserpine River,Whitsunday Regional,Rain Gauge
+Dittmer Alert,533169,-20.4267,148.4758,Proserpine River,Whitsunday Regional,Rain Gauge
+Jubilee Pocket Alert,533170,-20.2803,148.7456,Proserpine River,Whitsunday Regional,Rain Gauge
+Lower Gregory Alert,533171,-20.3006,148.5483,Proserpine River,Whitsunday Regional,Rain Gauge / Water Level
+Peter Faust Dam Hw Alert,533172,-20.3667,148.3822,Proserpine River,Whitsunday Regional,Rain Gauge / Water Level
+Preston Alert,533173,-20.4042,148.6681,Proserpine River,Whitsunday Regional,Rain Gauge
+Proserpine Alert,533174,-20.4017,148.5847,Proserpine River,Whitsunday Regional,Rain Gauge
+Strathdickie Alert,533175,-20.3264,148.5861,Proserpine River,Whitsunday Regional,Rain Gauge / Repeater
+Finch Hatton Dam (Gorge Road) Alert,533176,-21.1119,148.6353,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Mattie O'Neill Br Alert,533177,-21.1569,148.7322,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Mirani Township Alert,533178,-21.1606,148.8597,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Netherdale Alert,533179,-21.1383,148.5286,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Seninis Rd Alert,533180,-21.14,148.5903,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Upper Finch Hatton Alert,533181,-21.09,148.6353,Pioneer River,Mackay Regional,Rain Gauge
+Finch Hatton Showgrounds Alert,533186,-21.1379,148.6344,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Black Mountain (Farleigh) Alert,533200,-21.0642,149.0955,O`Connell River,Mackay Regional,Rain Gauge / Repeater
+Mt Pleasant (Baxter Dv) Alert,533204,-21.1115,149.1574,Pioneer River,Mackay Regional,Rain Gauge / Water Level
+Battery Creek Tm,533210,-19.4375,145.8611,Burdekin River,Charters Towers Regional,Rain Gauge / Water Level
+Sarina (Maguire Rd) Alert,533211,-21.4938,149.1249,Plane Creek,Mackay Regional,Rain Gauge
+West Plane (Creek Rd) Alert,533212,-21.4697,149.1433,Plane Creek,Mackay Regional,Rain Gauge / Water Level
+East Funnel Creek TM,533215,-21.5458,149.1099,Fitzroy River (Qld),Mackay Regional,Rain Gauge / Water Level
+Station Ck Crossing (Koumala) TM,533216,-21.6006,149.2395,Plane Creek,Mackay Regional,Water Level
+Alligator Creek Road Tm,533218,-19.4035,146.946,Haughton River,Townsville City,Rain Gauge / Water Level
+Fanning River (Burdekin Downs Rd) Tm,533219,-19.981,146.4485,Burdekin River,Charters Towers Regional,Water Level
+Fanning River (Dotswood Rd) Tm,533220,-19.7336,146.4278,Burdekin River,Charters Towers Regional,Rain Gauge / Water Level
+Haughton River (Flinders Hwy) Tm,533221,-19.8354,146.6893,Haughton River,Charters Towers Regional,Rain Gauge
+Star River Bridge Tm,533222,-19.4339,145.992,Burdekin River,Charters Towers Regional,Rain Gauge / Water Level
+Suhrs Ck (Sandy Creek Rd) Tm,533223,-20.0931,146.9003,Burdekin River,Charters Towers Regional,Water Level
+BURDEKIN DAM REPEATER ALERT,534009,-20.6414,147.1483,Burdekin River,Charters Towers Regional,Repeater
+Scartwater Alert,534011,-21.1106,146.8856,Burdekin River,Whitsunday Regional,Rain Gauge / Repeater
+St Anns Alert,534012,-21.2289,146.9128,Burdekin River,Charters Towers Regional,Rain Gauge / Water Level
+Logan Creek Tm,534024,-22.1653,147.5628,Burdekin River,Isaac Regional,Rain Gauge / Water Level
+Tartrus Alert,534043,-22.9547,149.4233,Fitzroy River (Qld),Livingstone Shire,Rain Gauge / Water Level
+Burdekin Falls Dam Hw Alert,534045,-20.6407,147.1412,Burdekin River,Charters Towers Regional,Rain Gauge / Water Level
+Broadley Creek (Corea Plains Rd) TM,534046,-20.6863,145.94732,Burdekin River,Charters Towers Regional,Rain Gauge
+Doongarra Rd TM,534047,-20.6176,146.2823,Burdekin River,Charters Towers Regional,Rain Gauge
+Charters Towers Weir Tm,534048,-19.9662,146.3053,Burdekin River,Charters Towers Regional,Rain Gauge / Water Level
+Roddas Lookout Alert,535075,-24.1422,148.1542,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Repeater
+Emerald Alert,535076,-23.5297,148.1664,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Rubyvale Alert,535077,-23.4183,147.6986,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Mt Mayde Al,535080,-23.6872,147.4261,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Repeater
+Glen Rock Al,535083,-24.4636,147.5681,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Repeater
+The Lake Alert,535090,-24.3114,148.6144,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Rileys Crossing Alert,535095,-23.5433,148.6053,Fitzroy River (Qld),Central Highlands Regional,Water Level
+Bedford Weir Tw Alert,535096,-23.3739,148.8408,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Duckponds Alert,535097,-23.4817,148.4728,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Gregory Highway Alert,535098,-23.4292,148.1514,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Raymond Alert,535099,-24.2317,147.645,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Sapphire Al,535100,-23.4694,147.7261,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Upper Belyando Tm,535102,-23.1131,146.785,Burdekin River,Barcaldine Regional,Rain Gauge / Water Level
+Van Dyke Creek Alert,535106,-24.2019,147.8283,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Mt Panorama Alert,535107,-24.5614,148.5372,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+The Crescent Alert,535108,-24.5917,148.6744,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Rolleston Alert,535109,-24.4667,148.6194,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level / Repeater
+Foleyvale  Alert,535113,-23.5272,149.7189,Fitzroy River (Qld),Woorabinda Aboriginal Shire,Rain Gauge / Water Level
+Keilambete Alert,535114,-23.4469,147.5961,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Karamea Alert,535124,-24.52,149.77,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Petrona Alert,535125,-24.4072,147.3225,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Mount Lowe Al,535128,-22.905,148.1497,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Repeater
+Bundi Road Alert,535129,-26.0947,149.6225,Fitzroy River (Qld),Western Downs Regional,Rain Gauge
+Waikola Alert,535130,-26.0003,149.1953,Fitzroy River (Qld),Western Downs Regional,Rain Gauge
+Glenhaughton Rd Alert,535131,-25.4172,149.5236,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Coorada Alert,535132,-25.0114,149.5042,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Ghinghinda Alert,535133,-25.1497,149.7281,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Weringa Creek Alert,535134,-26.1189,150.1108,Fitzroy River (Qld),Western Downs Regional,Rain Gauge
+Bauhinia Downs Alert,535135,-24.5617,149.2853,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge
+Broadmere Alert,535136,-25.5686,149.4142,Fitzroy River (Qld),Banana Shire,Rain Gauge / Repeater
+Cockatoo Road Alert,535137,-25.6811,150.1336,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Krismark Downs Alert,535138,-24.81,149.8247,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Orana Park Alert,535139,-24.8072,149.4481,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge
+Ruined Castle Alert,535140,-25.2317,149.2658,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Sandra Downs Alert,535141,-24.8714,149.1536,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge
+Tarana Crossing Alert,535142,-25.7961,149.5583,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Dawson Range South Alert,535143,-24.5944,149.8133,Fitzroy River (Qld),Banana Shire,Rain Gauge / Repeater
+Bluff Alert,535144,-23.5903,149.0569,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge
+Cooinda Alert,535145,-23.7217,146.9411,Burdekin River,Barcaldine Regional,Rain Gauge / Water Level
+Zeta Alert,535146,-23.7617,146.7225,Burdekin River,Barcaldine Regional,Rain Gauge / Water Level
+Mt Pisgah Alert,535147,-23.6403,147.1922,Burdekin River,Barcaldine Regional,Rain Gauge / Repeater
+Sedgeford Alert,535149,-23.8811,146.6331,Burdekin River,Barcaldine Regional,Rain Gauge / Repeater
+Betanga Alert,535151,-23.6889,146.3425,Burdekin River,Barcaldine Regional,Rain Gauge / Repeater
+Mt Tabor Alert,535171,-25.1925,147.4928,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Coolmaringa Alert,535173,-23.3184,149.5224,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Pindari Alert,535174,-24.6077,148.0694,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge
+Mt Moffatt Alert,535177,-24.9085,148.0423,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Repeater
+Duaringa Alert,535179,-23.718,149.6714,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge
+Consuelo Alert,535180,-24.7387,148.4045,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Sandstone Park Alert,535185,-25.0719,148.2742,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Repeater
+Billabalong Alert,535199,-25.1329,148.5929,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Repeater
+Basalt Creek Alert,535201,-24.6325,148.8711,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Repeater
+Saddler Springs Alert,535203,-25.0469,148.1369,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Repeater
+Mt Pleasant (Rolleston) Alert,535204,-24.6422,148.5412,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Repeater
+Redcliffe (Mimosa Ck) Al,535216,-24.3386,149.5838,Fitzroy River (Qld),Central Highlands Regional,Rain Gauge / Water Level
+Nuga Nuga Alert,535218,-25.067,148.9793,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Baroonbah Crossing,535223,-25.692781,149.213076,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Horse Creek ,535224,-25.890187,149.758117,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Rivington Alert,535296,-23.9606,146.5606,Burdekin River,Barcaldine Regional,Rain Gauge / Water Level
+Clermont Alpha Rd Tm,536012,-22.8949,147.2053,Burdekin River,Isaac Regional,Rain Gauge / Water Level
+Laglan Rd Tm,536013,-22.5625,147.0721,Burdekin River,Isaac Regional,Rain Gauge / Water Level
+Amelia Cr (Yarrowmere Rd) TM,536019,-21.0257,145.7661,Burdekin River,Charters Towers Regional,Rain Gauge
+Raelee Downs Tm,537009,-21.593,143.0356,Diamantina River,Winton Shire,Rain Gauge
+Corfield Tm,537010,-21.7161,143.3742,Diamantina River,Winton Shire,Rain Gauge
+Dagworth Tm,537011,-21.6635,142.199,Diamantina River,Winton Shire,Rain Gauge
+Kirby Tm,537012,-21.9589,141.4817,Diamantina River,Winton Shire,Rain Gauge
+Belmont Tm,537013,-22.1644,143.4504,Diamantina River,Winton Shire,Rain Gauge
+Lanifer Tm,537014,-21.9942,143.2537,Diamantina River,Winton Shire,Rain Gauge
+Leeson Tm,537015,-22.1782,142.758,Diamantina River,Winton Shire,Rain Gauge / Water Level
+Lorraine Tm,537016,-22.5203,143.5011,Diamantina River,Winton Shire,Rain Gauge
+Mahrigong Tm,537017,-22.2322,143.7837,Diamantina River,Winton Shire,Rain Gauge
+Malboona Tm,537018,-21.9332,143.56,Diamantina River,Winton Shire,Rain Gauge
+Mountain View (Mt Landsborough) Tm,537019,-22.7175,143.2982,Diamantina River,Winton Shire,Rain Gauge
+Winton Jundah Rd Tm,537020,-23.6371,142.3299,Diamantina River,Barcoo Shire,Rain Gauge / Water Level
+Bendemeer TM,537037,-21.9143,142.3804,Diamantina River,Winton Shire,Rain Gauge / Water Level
+Dajarra Airport TM,537038,-21.7013,139.5308,Georgina River,Cloncurry Shire,Rain Gauge
+Wills Creek (Selwyn Road) Tm,537039,-22.4118,139.9615,Georgina River,Boulia Shire,Water Level
+Hamilton River Station 1 Tm,537040,-22.7731,140.6198,Georgina River,Boulia Shire,Rain Gauge / Water Level
+Hamilton River Station 2 Tm,537041,-22.7727,140.6373,Georgina River,Boulia Shire,Rain Gauge / Water Level
+Toolebuc Tm,537042,-22.1642,140.8431,Georgina River,Boulia Shire,Rain Gauge
+Urandangi Tm,537043,-21.6236,138.3093,Georgina River,Boulia Shire,Water Level
+Waverly Creek Tm,537044,-21.4219,139.1277,Georgina River,Boulia Shire,Rain Gauge / Water Level
+Wills Creek CDR TM,537045,-21.2698,139.7284,Georgina River,Cloncurry Shire,Rain Gauge
+Windorah (Long Crossing) Tm,538006,-25.3703,142.7258,Cooper Creek,Barcoo Shire,Rain Gauge / Water Level
+Farrars Ck Tm,538007,-25.1642,141.2387,Diamantina River,Barcoo Shire,Rain Gauge / Water Level
+Windorah (Lignum Channel) Tm,538008,-25.44,142.8079,Cooper Creek,Barcoo Shire,Rain Gauge / Water Level
+Windorah (Main Channel) Tm,538010,-25.3702,142.7453,Cooper Creek,Barcoo Shire,Water Level
+Cottonbush Creek Tm,538014,-22.9363,139.1893,Georgina River,Boulia Shire,Rain Gauge / Water Level
+Trinidad Al,538015,-25.6004,143.893,Cooper Creek,Quilpie Shire,Rain Gauge
+Marion Downs Tm,538018,-23.3643,139.6562,Georgina River,Boulia Shire,Rain Gauge / Water Level
+Pitturi Creek Tm,538019,-22.6231,138.5557,Georgina River,Boulia Shire,Water Level
+Monkira TM,538025,-24.8321,140.5536,Diamantina River,Diamantina Shire,Rain Gauge / Water Level
+Stanwell Tm,539078,-23.4836,150.3437,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge / Water Level
+Bundaberg South Alert,539143,-24.8736,152.3636,Burnett River,Bundaberg Regional,Rain Gauge / Water Level
+Coringa Alert,539146,-25.3803,151.9869,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Mt Rawdon Alert,539147,-25.2356,151.7964,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Fig Tree Alert,539148,-25.2839,151.9892,Burnett River,Bundaberg Regional,Rain Gauge / Water Level
+Ned Churchward Weir Hw Alert,539149,-25.0514,152.0997,Burnett River,Bundaberg Regional,Rain Gauge / Water Level
+Mingo Crossing Alert,539150,-25.395,151.7775,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Mt Lawless Alert,539151,-25.545,151.655,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Paradise Dam Alert,539152,-25.3511,151.9197,Burnett River,North Burnett Regional,Rain Gauge / Water Level / Reservoir
+Branyan (Woongarra Ps Alert),539153,-24.93,152.2553,Burnett River,Bundaberg Regional,Rain Gauge / Water Level
+East Booyal Alert,539155,-25.252,152.084,Burnett River,Bundaberg Regional,Rain Gauge
+St Kilda Alert,539156,-25.0492,151.9217,Burnett River,Bundaberg Regional,Rain Gauge
+Didcott Alert,539157,-25.4775,151.865,Burnett River,North Burnett Regional,Rain Gauge
+Mt Perry Alert,539158,-25.1892,151.6267,Burnett River,North Burnett Regional,Rain Gauge / Repeater
+Sunday Ck Rd Alert,539159,-25.3947,151.6678,Burnett River,North Burnett Regional,Rain Gauge
+Camboon Alert,539160,-25.0106,150.3889,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Cracow Alert,539161,-25.246442,150.272331,Fitzroy River (Qld),Banana Shire,Rain Gauge / Repeater
+Downfall Ck Alert,539162,-25.5003,150.2506,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Gyranda Weir Alert,539163,-25.2842,150.1825,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Isla-Delusion Crossing Alert,539164,-25.1803,150.185,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Moura Weir Alert,539165,-24.5903,149.9039,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Mt Hopeful Alert,539167,-23.73,150.5336,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge / Repeater
+Upper Castle Alert,539168,-24.830895,150.577933,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Pheasant Ck Alert,539169,-23.8686,150.1317,Fitzroy River (Qld),Banana Shire,Rain Gauge / Repeater
+Pocket Ck Rd Alert,539170,-23.9442,150.1147,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Upper Lonesome Alert,539171,-24.736848,150.405409,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Castle Creek Alert,539172,-24.8881,150.1992,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Wowan Westwood Rd Alert,539173,-23.8925,150.1569,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Banana Range Alert,539174,-24.4486,150.3156,Fitzroy River (Qld),Banana Shire,Rain Gauge / Repeater
+Lonesome Creek Alert,539175,-24.8167,150.1617,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Caniaview Alert,539176,-24.785,150.9728,Burnett River,North Burnett Regional,Rain Gauge / Repeater
+Mt Fort William Alert,539177,-24.6475,151.3389,Burnett River,North Burnett Regional,Rain Gauge / Repeater
+Hollywell Alert,539178,-25.3319,151.2328,Burnett River,North Burnett Regional,Rain Gauge / Repeater
+Hawkwood Range Alert,539179,-25.7158,150.9753,Burnett River,North Burnett Regional,Rain Gauge / Repeater
+Mt Gayndah Alert,539180,-25.605,151.5403,Burnett River,North Burnett Regional,Rain Gauge / Repeater
+Cania Dam Hw Alert,539182,-24.65,150.9833,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Ceratodus Alert,539183,-25.2831,151.145,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Dakiel Alert,539185,-24.7456,151.2603,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Dalgangal Rd Alert,539186,-25.4194,151.5225,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Derra Alert,539187,-25.6733,151.2436,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Eidsvold Alert,539189,-25.4022,151.1033,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Gayndah Flume Alert,539191,-25.6217,151.6031,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Marriages Alert,539194,-25.56,151.1839,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Monto Alert,539196,-24.8658,151.1086,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Mundubbera Alert,539197,-25.5936,151.3,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Reid Ck Alert,539200,-25.2761,151.5169,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Wuruma Hw Alert,539203,-25.1994,150.9894,Burnett River,North Burnett Regional,Rain Gauge / Water Level / Reservoir
+Yarrol Alert,539204,-24.9925,151.3475,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+St Agnes Ck Alert,539215,-25.1347,151.9742,Burnett River,Bundaberg Regional,Rain Gauge / Water Level
+Abercorn Alert,539218,-25.1292,151.1306,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Bargara Alert,539226,-24.8333,152.4603,Burrum River,Bundaberg Regional,Rain Gauge
+Upper Rainbow Alert,539229,-24.22094,150.701487,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Morganville Alert,539231,-25.1719,151.9725,Burnett River,Bundaberg Regional,Rain Gauge / Water Level
+Biloela Alert,539232,-24.435,150.541,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Blue Hills Alert,539233,-24.532,150.92,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Callide Dam Hw Alert,539235,-24.3689,150.6128,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Callide Dam Inflow Alert,539236,-24.3253,150.6842,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level / Reservoir
+Craiglands Alert,539237,-24.15,150.525,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Folding Hills Alert,539238,-24.575,150.624,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Goovigen Alert,539239,-24.106,150.287,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Jambin Alert,539240,-24.198,150.367,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Kroombit Dam Alert,539241,-24.418,150.774,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level / Reservoir
+Kroombit Repeater Alert,539242,-24.3566,150.94,Fitzroy River (Qld),Gladstone Regional,Rain Gauge / Repeater
+Kroombit Tops Alert,539243,-24.358,150.962,Fitzroy River (Qld),Gladstone Regional,Rain Gauge
+Linkes Causeway Alert,539244,-24.3806,150.5492,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level / Reservoir
+Malakoff Junction Alert,539245,-24.3131,150.7758,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Mid Kroombit Alert,539246,-24.4145,150.885,Fitzroy River (Qld),Gladstone Regional,Rain Gauge
+Red Hill Alert,539247,-24.448,150.425,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+South Kariboe Ck Alert,539248,-24.561,150.747,Fitzroy River (Qld),Banana Shire,Rain Gauge / Water Level
+Upper Bell Ck Alert,539249,-24.15,150.678,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Cordalba Alert,539250,-25.1569,152.2119,Burrum River,Bundaberg Regional,Rain Gauge
+Woodgate Alert,539251,-25.0992,152.5489,Burrum River,Bundaberg Regional,Rain Gauge
+Coonambula Alert,539257,-25.5884,151.1489,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Rockhampton Tm,539258,-23.3811,150.5172,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge / Water Level
+Quay Street East Alert,539259,-24.8625,152.3575,Burnett River,Bundaberg Regional,Water Level
+Barolin St Alert,539260,-24.873,152.35,Burnett River,Bundaberg Regional,Water Level
+Cherry Ck (Lenihans Rd) Al,539261,-25.0118,152.1423,Burnett River,Bundaberg Regional,Rain Gauge / Water Level
+Germanbulyan Ck (Bungadoo) Al,539262,-24.9864,152.0748,Burnett River,Bundaberg Regional,Rain Gauge / Water Level
+Pine Creek (Pine Ck Rd) Al,539263,-25.0041,152.1664,Burnett River,Bundaberg Regional,Rain Gauge / Water Level
+Bald Knob Alert,540026,-26.7789,152.9153,Brisbane River,Sunshine Coast Regional,Rain Gauge / Repeater
+Loamside Alert,540062,-27.6831,152.7297,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Grandchester Alert,540064,-27.6631,152.4611,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Peak Crossing Alert,540065,-27.7806,152.7311,Brisbane River,Scenic Rim Regional,Water Level
+Marsden (First Ave) Al,540078,-27.6686,153.1031,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Slacks Ck Reserve Pk Al,540079,-27.6342,153.1253,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Mapleton Alert,540085,-26.6247,152.8664,Maroochy River,Sunshine Coast Regional,Rain Gauge
+Slacks Ck(Loganlea Rd)Al,540091,-27.6475,153.1475,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+The Summit Alert,540100,-27.4636,152.9472,Brisbane River,Brisbane City,Rain Gauge / Repeater
+MT GRAVATT LOOKOUT ALERT,540108,-27.5423,153.0732,Brisbane River,Brisbane City,Repeater
+EILDON HILL ALERT,540109,-27.4328,153.0242,Brisbane River,Brisbane City,Repeater
+Glenore Grove Alert,540149,-27.5231,152.4092,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Brisbane City Alert,540198,-27.4707,153.0341,Brisbane River,Brisbane City,Rain Gauge / Water Level / Tide
+Moggill (Aitchenson St East) Alert-B,540201,-27.5871,152.8641,Brisbane River,Brisbane City,Water Level
+Stretton (Gowan Rd) Alert,540234,-27.6417,153.0667,Logan-Albert Rivers,Brisbane City,Rain Gauge
+Hillcrest(Wine Glass) Al,540235,-27.6763,153.03,Logan-Albert Rivers,Logan City,Rain Gauge / Repeater
+Carbrook (Riedel Road) Al,540236,-27.7,153.2833,Logan-Albert Rivers,Gold Coast City,Rain Gauge / Water Level
+Bundamba (Barclay St) Al,540247,-27.6203,152.8261,Brisbane River,Ipswich City,Rain Gauge / Repeater
+Churchill Alert,540248,-27.6339,152.7542,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Bundamba (Hanlon St) Al,540249,-27.5914,152.7964,Brisbane River,Ipswich City,Water Level
+Brassall (Hancocks Br) Al,540250,-27.6036,152.7439,Brisbane River,Ipswich City,Water Level
+Carbrook Alert,540255,-27.6547,153.2317,Logan-Albert Rivers,Logan City,Rain Gauge
+Takura Reservoir Alert,540268,-25.3275,152.7061,Burrum River,Fraser Coast Regional,Rain Gauge / Repeater
+Little Oakey Creek Alert,540272,-27.2906,152.1994,Brisbane River,Toowoomba Regional,Water Level
+Upper Cressbrook Alert,540276,-27.2597,152.1525,Brisbane River,Toowoomba Regional,Water Level
+Perseverance Alert,540298,-27.29,152.1228,Brisbane River,Toowoomba Regional,Rain Gauge / Water Level
+Ravensbourne Alert,540299,-27.3627,152.1589,Brisbane River,Toowoomba Regional,Rain Gauge
+Mount Wolvi Alert,540304,-26.1767,152.8675,Mary River (Qld),Gympie Regional,Rain Gauge / Repeater
+Rosewood Wwtp Alert,540313,-27.6475,152.5883,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Spressers Bridge Alert,540314,-27.6631,152.5906,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Grey's Plains Road Alert,540317,-27.8025,152.4361,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Pomona Alert,540324,-26.3672,152.8431,Mary River (Qld),Noosa Shire,Rain Gauge
+Cooroy Alert,540325,-26.4064,152.9211,Mary River (Qld),Noosa Shire,Rain Gauge
+Cooran Alert,540326,-26.3297,152.8136,Mary River (Qld),Noosa Shire,Rain Gauge / Water Level
+Lake Macdonald Drive Alert,540327,-26.3719,152.9242,Mary River (Qld),Noosa Shire,Water Level
+Moy Pocket Alert,540330,-26.5261,152.7439,Mary River (Qld),Gympie Regional,Rain Gauge / Water Level
+Kenilworth H/S Alert,540331,-26.5803,152.7322,Mary River (Qld),Sunshine Coast Regional,Rain Gauge / Water Level
+Bellbird Creek Alert,540332,-26.6274,152.7046,Mary River (Qld),Sunshine Coast Regional,Rain Gauge / Water Level
+Obi Lookout Alert,540333,-26.6883,152.8064,Mary River (Qld),Sunshine Coast Regional,Rain Gauge / Repeater
+Grigor Road Alert,540334,-26.7181,152.6692,Mary River (Qld),Sunshine Coast Regional,Rain Gauge
+Harper Creek Alert,540335,-26.7642,152.7722,Mary River (Qld),Sunshine Coast Regional,Rain Gauge
+Maleny Alert,540336,-26.7631,152.8475,Mary River (Qld),Sunshine Coast Regional,Rain Gauge
+Hume Lane Alert,540341,-26.8419,152.8953,Brisbane River,Sunshine Coast Regional,Rain Gauge / Repeater
+Coolabine Creek Alert,540367,-26.5967,152.7672,Mary River (Qld),Sunshine Coast Regional,Rain Gauge / Repeater
+Upper Sandy Creek Alert,540385,-27.4558,152.1983,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Sandy Creek Road Alert,540386,-27.5711,152.1781,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Torbanlea Alert,540449,-25.3406,152.6058,Burrum River,Fraser Coast Regional,Rain Gauge / Water Level
+Black Swamp Alert,540450,-25.3756,152.7683,Mary River (Qld),Fraser Coast Regional,Rain Gauge / Water Level
+Ghost Hill Alert,540451,-25.3108,152.8319,Mary River (Qld),Fraser Coast Regional,Rain Gauge / Repeater
+Booral Road Alert,540452,-25.3439,152.8269,Mary River (Qld),Fraser Coast Regional,Rain Gauge / Water Level
+Wakerley Alert,540477,-27.4808,153.1628,Brisbane River,Brisbane City,Rain Gauge / Water Level
+Whyte Island Alert,540495,-27.4017,153.1575,Brisbane River,Brisbane City,Water Level / Tide Gauge
+Walloon Alert,540504,-27.6033,152.6928,Brisbane River,Ipswich City,Water Level
+Coulson Crossing Alert,540510,-27.9511,152.7264,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Flagstone Creek Alert,540517,-27.6047,152.1325,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Ma Ma Creek Alert,540518,-27.6539,152.1653,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Upper Tenthill Alert,540519,-27.8094,152.2867,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Gormans Gap Alert,540521,-27.6417,151.9844,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Rockside Mt Alert,540523,-27.7167,152.3106,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Mt Petersen Alert,540525,-27.6517,152.1986,Brisbane River,Lockyer Valley Regional,Rain Gauge / Repeater
+Schultz Lookout Alert,540526,-27.6653,152.3458,Brisbane River,Lockyer Valley Regional,Rain Gauge / Repeater
+Spring Bluff Alert,540527,-27.4692,151.9836,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Mulgowie Alert,540528,-27.7297,152.3644,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Warrego Highway Alert,540529,-27.5533,152.3889,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Paradise Creek Road Alert,540534,-27.4542,152.0789,Brisbane River,Lockyer Valley Regional,Rain Gauge / Repeater
+Upper Lockyer Alert,540566,-27.4922,152.0819,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Moon Road Alert,540567,-27.6619,152.32,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Junction View Alert,540568,-27.8011,152.1875,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Upper Blackfellow Alert,540570,-27.915,152.2736,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Mt Sylvia Alert,540571,-27.72088,152.21938,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Lower Mt Walker Alert,540574,-27.704,152.551,Brisbane River,Ipswich City,Water Level
+Logan Village Alert,540596,-27.7711,153.1019,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Bahrs Scrub Alert,540598,-27.7372,153.1894,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Goltz Road Alert,540600,-27.8658,152.1814,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Fifteen Mile Alert,540601,-27.3986,152.0731,Brisbane River,Toowoomba Regional,Rain Gauge
+Withcott Alert,540602,-27.5658,152.0272,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Conondale Alert,540620,-26.7294,152.7133,Mary River (Qld),Sunshine Coast Regional,Rain Gauge / Water Level
+Bellthorpe (Gap Rd) Alert,540621,-26.8325,152.7431,Mary River (Qld),Moreton Bay Regional,Rain Gauge / Repeater
+Beerburrum-Woodford Rd Alert,540622,-26.9379,152.8509,Brisbane River,Moreton Bay Regional,Rain Gauge
+Churchill Street Alert,540637,-25.5344,152.7067,Mary River (Qld),Fraser Coast Regional,Water Level
+Black Mt. Alert,540638,-26.4075,152.8625,Mary River (Qld),Noosa Shire,Rain Gauge
+Mt Goonaneman Alert,540641,-25.4275,152.1172,Burnett River,North Burnett Regional,Rain Gauge / Repeater
+Beenleigh Alert,540644,-27.7258,153.2192,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Parklands Alert,540645,-27.6989,153.1925,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Oxley Ck Alert,540646,-27.705,152.9714,Brisbane River,Logan City,Rain Gauge / Water Level
+Mt Walsh Alert,540650,-25.5972,152.0936,Burnett River,North Burnett Regional,Rain Gauge
+Delaneys Ck Alert,540657,-27.0019,152.7872,Brisbane River,Moreton Bay Regional,Rain Gauge
+Seven Mile Br Alert,540669,-27.6483,152.6347,Brisbane River,Ipswich City,Rain Gauge / Water Level
+Schmidts Rd Alert,540675,-27.7,153.1203,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Burraburri Creek Al,540676,-26.4092,151.1222,Condamine-Culgoa Rivers,South Burnett Regional,Rain Gauge
+Bidwell Alert,540677,-25.6342,152.6806,Mary River (Qld),Fraser Coast Regional,Rain Gauge / Water Level
+Woodlands Road Alert,540680,-27.6281,152.3299,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Owanyilla Al,540686,-25.6447,152.6242,Mary River (Qld),Fraser Coast Regional,Rain Gauge / Water Level
+Sexton Alert,540687,-25.9725,152.5069,Mary River (Qld),Gympie Regional,Rain Gauge / Water Level
+Lower Quinzeh Alert,540688,-27.7681,153.1211,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Flagstone Ck (Jimboomba) Alert,540689,-27.8042,152.9828,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Kilmoylar Rd Alert,540690,-27.84,152.9347,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Tamborine Alert,540691,-27.8647,153.1211,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Boondooma Rptr Alert,540694,-26.0942,151.4417,Burnett River,South Burnett Regional,Rain Gauge / Repeater
+Ban Ban Alert,540696,-25.7108,151.8083,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Boondooma Hw Al,540698,-26.0956,151.4339,Burnett River,South Burnett Regional,Water Level
+Spring Creek Road Alert,540700,-28.2519,152.4717,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Tiaro Alert,540706,-25.7244,152.5775,Mary River (Qld),Fraser Coast Regional,Rain Gauge / Water Level
+Portside Alert,540708,-25.5392,152.7068,Mary River (Qld),Fraser Coast Regional,Rain Gauge / Water Level
+Harpers Crossing Alert,540713,-28.0278,152.6578,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Kooralbyn Bridge Alert,540714,-28.0925,152.8514,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Double Crossing Rd Alert,540715,-28.0369,153.1417,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Townson Alert,540716,-27.5658,152.0272,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Main Camp Road Alert,540717,-27.8336,152.3144,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Mt Berryman Road Alert,540718,-27.7542,152.3367,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Whiteway Rd Overflow Alert,540719,-27.5972,152.3456,Brisbane River,Lockyer Valley Regional,Water Level
+Whiteway Rd Alert,540720,-27.5972,152.3456,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Narda Lagoon Alert,540721,-27.6489,152.3908,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+McGarrigal Rd Alert,540722,-27.6969,152.3703,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Mulgowie Rd Alert,540723,-27.7142,152.3675,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Henderson Ck Alert,540725,-27.8296,153.0155,Logan-Albert Rivers,Logan City,Water Level
+Upper Quinzeh Alert,540726,-27.8013,153.126,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+North Tamborine Alert,540729,-27.94,153.1917,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge
+Kurrajong Tm,540737,-27.6746,153.1121,Logan-Albert Rivers,Logan City,Rain Gauge
+Kullogum Alert,540763,-25.3308,152.2519,Burrum River,Bundaberg Regional,Rain Gauge
+Glenwood (Mary River) Alert,540766,-25.9358,152.6161,Mary River (Qld),Fraser Coast Regional,Rain Gauge
+Boompa Road Alert,540767,-25.6358,152.1811,Mary River (Qld),Fraser Coast Regional,Rain Gauge
+Yarraman Ck Emmert St Tm,540768,-26.843,151.98,Brisbane River,Toowoomba Regional,Water Level
+Cooyar Ck Cooyar-Kooralgin Rd Tm,540769,-26.969,151.856,Brisbane River,Toowoomba Regional,Rain Gauge / Water Level
+Thornton (School Road) Alert,540789,-27.7983,152.3728,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Cedar Creek (Plunkett Rd) Alert,540790,-27.8324,153.1738,Logan-Albert Rivers,Logan City,Rain Gauge / Water Level
+Walls Camp (Pacific Haven) Alert,540792,-25.24,152.5613,Burrum River,Fraser Coast Regional,Rain Gauge / Water Level
+Darlington School Alert,540796,-28.2059,153.0408,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Innisplain Alert,540797,-28.1704,152.9029,Logan-Albert Rivers,Scenic Rim Regional,Rain Gauge / Water Level
+Munna Creek Alert,540823,-25.6188,152.2336,Mary River (Qld),Fraser Coast Regional,Rain Gauge / Water Level
+Summerholm Al,540828,-27.6116,152.464,Brisbane River,Lockyer Valley Regional,Rain Gauge
+Fords Road Al,540829,-27.529,152.1928,Brisbane River,Lockyer Valley Regional,Rain Gauge / Water Level
+Dalby Alert,541041,-27.1833,151.2661,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Moffatt Alert,541042,-27.0969,151.3978,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Clydesdale Alert,541043,-27.1939,151.4864,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge / Water Level
+Cooringa Alert,541044,-27.0908,151.5961,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge
+Mt Brigalow Alert,541045,-27.2022,151.7861,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge
+Cherrabah Alert,541061,-28.4389,152.0947,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Mosely's Alert,541062,-28.1639,152.2986,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Dalveen Alert,541063,-28.5,151.9706,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Carrs Lookout Alert,541064,-28.2944,152.4156,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Repeater
+Amiens Knob Alert,541079,-28.6061,151.8175,Border Rivers,Southern Downs Regional,Rain Gauge / Repeater
+Warahgai Alert,541080,-28.2269,151.4892,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Repeater
+Mountain Station Creek Alert,541082,-28.7178,151.9847,Border Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Kettle Swamp Creek Al,541084,-28.6608,151.9494,Border Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Dalcouth Alert,541085,-28.6794,151.9831,Border Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Granite Street Alert,541086,-28.6633,151.9367,Border Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Stanthorpe Alert,541087,-28.6544,151.9189,Border Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Broadwater Creek Alert,541088,-28.5986,151.8883,Border Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Ballandean Alert,541089,-28.7847,151.82,Border Rivers,Southern Downs Regional,Water Level
+Accommodation Creek Alert,541090,-28.8081,151.8364,Border Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Ballandean Hill Alert,541091,-28.7978,151.8303,Border Rivers,Southern Downs Regional,Rain Gauge / Repeater
+Bony Mountain Alert,541092,-28.1014,151.8767,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Repeater
+Goomburra Alert,541101,-28.0389,152.1081,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Campbells Gully Alert,541103,-28.1781,152.0594,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Torridon Alert,541104,-28.0522,151.59,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Upper Dalrymple Ck Alert,541105,-27.9839,152.2909,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+West Haldon Alert,541106,-27.7781,152.0803,Brisbane River,Toowoomba Regional,Rain Gauge
+Inglewood Bridge Alert,541107,-28.4133,151.0825,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+Woodspring Alert,541108,-28.3614,151.1381,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+Artunga Alert,541110,-28.4014,151.2925,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+Terraine Alert,541111,-28.4833,151.2761,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+Barongarook Alert,541112,-28.4314,151.4622,Border Rivers,Goondiwindi Regional,Rain Gauge / Water Level
+Upper Bracker Ck Alert,541113,-28.7847,151.4122,Border Rivers,Goondiwindi Regional,Rain Gauge
+Canning Creek Alert,541114,-28.1711,151.1361,Border Rivers,Toowoomba Regional,Rain Gauge
+Nyora Alert,541115,-28.1694,151.3928,Border Rivers,Goondiwindi Regional,Rain Gauge
+Mt Burrabaranga Alert,541116,-28.3614,151.6717,Border Rivers,Goondiwindi Regional,Rain Gauge
+Sengs Road Al,541117,-26.7186,151.2056,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Jandowae Al,541118,-26.7794,151.1086,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Cooranga Al,541119,-26.77,151.4064,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Niagara Al,541120,-26.6967,151.3933,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Diamondy Al,541121,-26.6333,151.2703,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Jandowae-Macalister Road Al,541122,-26.8919,151.0853,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Chinchilla Al,541123,-26.7369,150.6228,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Burncluith Bridge Al,541124,-26.6717,150.7206,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Seven Oaks Al,541125,-26.7042,150.7631,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Beruna Al,541126,-26.6433,150.8542,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Braziers Hill Al,541127,-26.7261,151.1328,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Repeater
+West Creek (Herries St) Tm,541128,-27.5643,151.9492,Condamine-Culgoa Rivers,Toowoomba Regional,Water Level
+West Creek (Alderley St) Tm,541129,-27.5849,151.9456,Condamine-Culgoa Rivers,Toowoomba Regional,Water Level
+East Creek (Alderley St) Tm,541130,-27.5883,151.9732,Condamine-Culgoa Rivers,Toowoomba Regional,Water Level
+East Creek (Long St) Tm,541131,-27.5774,151.9692,Condamine-Culgoa Rivers,Toowoomba Regional,Water Level
+East Creek (South St) Tm,541132,-27.5826,151.971,Condamine-Culgoa Rivers,Toowoomba Regional,Water Level
+West Creek (Margaret St) Tm,541133,-27.5608,151.9508,Condamine-Culgoa Rivers,Toowoomba Regional,Water Level
+Durikai Alert,541134,-28.2767,151.6022,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Cons Plains Alert,541135,-28.2297,152.4164,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Gambubal Rd Alert,541136,-28.2758,152.3447,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Harrisons Road Alert,541137,-28.2583,152.0925,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Killarney (Spring Ck) Alert,541138,-28.3544,152.3319,Condamine-Culgoa Rivers,Southern Downs Regional,Water Level
+Queen Mary Falls Alert,541139,-28.3342,152.3933,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Spicers Peak Alert,541140,-28.1133,152.3722,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Oakey (Oakey-Cooyar Rd) Tm,541141,-27.3969,151.7188,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge / Water Level
+Karara Alert,541142,-28.1342,151.5697,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Strathyre Rd Alert,541143,-28.1239,151.4742,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+The Head Alert,541144,-28.2833,152.4175,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Water Level
+Oakey (Pechey-Maclagan Rd) Tm,541145,-27.289,151.8051,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge / Water Level
+Oakey (Weir Park) Tm,541146,-27.4297,151.7185,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge / Water Level
+Oakey (Kingsthorpe Haden Rd) Tm,541147,-27.401,151.8326,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge / Water Level
+Oakey (Boodua Muniganeen Rd) Tm,541148,-27.3734,151.8594,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge / Water Level
+Kulpi Alert,541153,-27.1897,151.6994,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge
+Warra Alert,541154,-26.9283,150.9181,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Loudoun Bridge Alert,541155,-27.2136,151.1858,Condamine-Culgoa Rivers,Western Downs Regional,Water Level
+Brigalow Bridge Alert,541156,-26.9044,150.7831,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Centenary Bridge Tm,541158,-27.8086,151.3632,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge / Water Level
+Jandowae Dam Alert,541162,-26.7608,151.1372,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Upper Rosenthal Alert,541163,-28.4025,152.0386,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge / Repeater
+Upper Emu Ck Alert,541164,-28.1608,152.3839,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Upper Quart Pot Ck Alert,541165,-28.7768,152.0161,Border Rivers,Southern Downs Regional,Rain Gauge
+Goombungee Pechey-Maclagan Rd Tm,541166,-27.307,151.877,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge
+Quinalow Peranga Rd Tm,541167,-27.106,151.624,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge / Water Level
+Pilton Kings Crk Gatton-Clifton Rd Tm,541168,-27.859,152.056,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge
+Jondaryan Lagoon Crk (Jondaryan Park) Tm,541169,-27.369,151.591,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge
+Cambooya Hodgson Crk (Rolleston Park) Tm,541170,-27.706,151.862,Condamine-Culgoa Rivers,Toowoomba Regional,Water Level
+Hodgson Crk Hodgsonvale Rd At Carroll Rd Tm,541171,-27.666,151.949,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge
+Highfields Tm,541172,-27.443,151.964,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge
+Millmerran Commens St Tm,541173,-27.878,151.264,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge
+Athol Westbrook Crk Newton Rd Tm,541174,-27.613,151.793,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge
+Scottsdale Alert,541190,-28.432,151.8756,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Pikes Creek Alert,541191,-28.69045,151.53888,Border Rivers,Southern Downs Regional,Rain Gauge
+Upper Freestone,541192,-28.1341,152.2217,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Upper Goomburra,541193,-28.0288,152.1891,Condamine-Culgoa Rivers,Southern Downs Regional,Rain Gauge
+Jinghi Jinghi Alert,541194,-26.6941,151.077,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Kingsthorpe (East St) Tm,541195,-27.4792,151.8179,Condamine-Culgoa Rivers,Toowoomba Regional,Rain Gauge / Water Level
+Blaxland Al,541196,-27.1892,151.3378,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Ranges Bridge Al,541197,-27.1215,151.0919,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Macalister Bell Rd Jimbour Ck AL,541203,-26.95943,151.21742,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Niagara Rd Jandowae Ck AL,541204,-26.7139,151.2752,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Tara Lagoon AL,541205,-27.27424211,150.4639146,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Thallon Bridge,542009,-28.6328,148.8564,Moonie River,Balonne Shire,Water Level
+Durah Homestead Al,542010,-26.2839,150.9664,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Upper Durah Creek Al,542011,-26.1708,150.9122,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Canaan Creek Al,542012,-26.3956,150.6767,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Upper Stockyard Creek Al,542013,-26.2514,150.7272,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Turkey Mountain Al,542014,-26.3456,150.87,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Repeater
+Myall Park Road Alert,542016,-26.5667,150.2353,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Pinelands Alert,542017,-26.4342,150.0756,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Upper Dogwood Creek Alert,542018,-26.2033,150.2567,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Condamine Alert,542019,-26.9267,150.1314,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Bedarra Alert,542020,-26.8417,150.3442,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Stillers Road Alert,542021,-26.3642,150.2161,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Barakula Forest Station Alert,542022,-26.4272,150.5044,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Miles Alert,542023,-26.6581,150.1808,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Glenaubyn Alert,542024,-26.5083,149.9483,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Boortkoi Alert,542025,-26.5264,150.3953,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Clovelly Alert,542026,-26.4764,150.0764,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Repeater
+Bottle Tree Alert,542027,-26.8,150.4322,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Repeater
+Mt Driven Tm,542035,-27.9811,149.0973,Moonie River,Balonne Shire,Rain Gauge / Water Level
+Greenswamp Rd Charleys Ck AL,542036,-26.77306,150.54418,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Roma Condamine Road AL,542037,-26.89930751,149.8278811,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Roma Tm,543010,-26.5711,148.795,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge / Water Level
+Homebush Station Tm,543011,-26.393,147.9415,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge / Water Level
+Holmleigh Tm,543014,-26.2999,147.9809,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge
+Upper Amby Ck Tm,543015,-26.4074,148.2638,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge / Water Level
+Begonia Tm,543024,-27.4937,148.3356,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge / Water Level
+Mooga Creek Tm,543026,-26.4132,148.8009,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge
+Charleville(Bradleys Gully),544020,-26.4031,146.2383,Warrego River,Murweh Shire,Water Level
+Lower Bradleys Alert,544027,-26.3736,146.3397,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Raceview Alert,544028,-26.4083,146.4042,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Middle Creek Alert,544032,-26.3242,146.4383,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Tyrconnel Tm,544035,-26.299,147.5501,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge
+Eversfield Tm,544036,-26.6569,147.4481,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge
+Mt Lindsay Alert,544037,-25.325,146.8569,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Bogarella Crossing Alert,544038,-25.3381,147.1006,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Cooks Tank Alert,544039,-25.4964,146.3072,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Willara Alert,544040,-25.5414,146.9117,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Old Tambo Rd Alert,544041,-25.6053,146.5025,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Caroline Crossing Alert,544042,-25.6147,146.7489,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Oakwood Alert,544044,-25.6656,146.1228,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Biddenham Alert,544047,-25.8033,146.4253,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Augathella Rptr Alert,544048,-25.8044,146.5894,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Ward  R Crossing Alert,544049,-25.9497,146.1136,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Dunvegan Alert,544052,-26.1367,146.6942,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Calowrie Alert,544053,-26.1697,146.1981,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Moyallen Alert,544054,-26.2125,147.0797,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Adavale Road Alert,544056,-26.3264,146.0978,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Warilda Alert,544058,-26.1267,145.6694,Warrego River,Murweh Shire,Rain Gauge / Water Level
+Cooladdi Alert,544059,-26.6333,145.4636,Paroo River,Murweh Shire,Rain Gauge / Water Level
+Ravenscourt Alert,544060,-26.0219,145.7233,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Loddon Alert,544061,-26.51,145.6172,Paroo River,Murweh Shire,Rain Gauge / Repeater
+Sommariva Al,544063,-26.5038,146.6662,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Patricia Park Tm,544064,-25.6894,144.7657,Bulloo River,Quilpie Shire,Rain Gauge / Water Level
+Cliffdale Al,544066,-27.2265,145.4986,Paroo River,Paroo Shire,Rain Gauge / Repeater
+Allambie Al,544068,-26.9033,145.3525,Paroo River,Murweh Shire,Rain Gauge / Repeater
+Abbieglassie Al,544070,-27.2919,147.4838,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge
+Westcourt Alert,544071,-27.1313,147.4792,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge / Repeater
+Barta Park Tm,544073,-27.0711,147.8653,Condamine-Culgoa Rivers,Maranoa Regional,Rain Gauge
+Humeburn Al,544075,-27.3984,145.2076,Paroo River,Paroo Shire,Rain Gauge / Water Level
+Glengarry Al,544076,-26.5705,147.0975,Condamine-Culgoa Rivers,Murweh Shire,Rain Gauge / Repeater
+Ularunda Alert,544077,-26.7972,147.1194,Condamine-Culgoa Rivers,Murweh Shire,Rain Gauge / Repeater
+Mariala National Park Tm,544078,-25.9892,145.0188,Bulloo River,Quilpie Shire,Rain Gauge
+Boondoon Tm,544079,-25.702,145.1291,Bulloo River,Quilpie Shire,Rain Gauge
+Alroy Crossing Tm,544080,-27.8055,144.7079,Paroo River,Paroo Shire,Rain Gauge / Water Level
+Ballera Jackson Road Crossing Tm,545003,-27.5006,141.9317,Cooper Creek,Bulloo Shire,Water Level
+South Comongin Tm,545004,-26.8801,144.3289,Bulloo River,Quilpie Shire,Rain Gauge / Water Level
+Soonah Crossing Tm,545005,-27.7078,144.0048,Bulloo River,Bulloo Shire,Rain Gauge / Water Level
+Nockatunga Tm,545006,-27.6983,142.7523,Cooper Creek,Bulloo Shire,Rain Gauge / Water Level
+Winbin Creek Tm,545008,-26.6189,144.5124,Bulloo River,Quilpie Shire,Rain Gauge / Water Level
+Yappi Creek Tm,545009,-27.9039,143.8009,Bulloo River,Bulloo Shire,Rain Gauge / Water Level
+Milroy Tm,545010,-26.0556,144.3533,Bulloo River,Quilpie Shire,Rain Gauge / Water Level
+Congie Tm,545011,-26.8766,143.5853,Cooper Creek,Quilpie Shire,Rain Gauge
+Bellalie Tm,545012,-27.0191,142.9404,Cooper Creek,Quilpie Shire,Rain Gauge / Water Level
+Eromanga Al,545013,-26.6682,143.2668,Cooper Creek,Quilpie Shire,Rain Gauge
+Thylungra Al,545014,-26.0957,143.4404,Cooper Creek,Quilpie Shire,Rain Gauge
+Brunswick Hwy (Old Brunswick River Bridge) Radar WL,551197,-28.531291ÿ,153.539053ÿ,Unknown,Byron Shire Council,Water Level
+Chinook (Mehi River),553011,-29.4752,149.977,Gwydir River,Moree Plains Shire Council,Water Level
+Chaffey Dam D/S (Peel River),555006,-31.3431,151.1422,Namoi River,Tamworth Regional Council,Water Level
+Taroona (Peel River),555009,-31.4333,151.1333,Namoi River,Tamworth Regional Council,Rain Gauge / Water Level
+Chaffey Dam W/L (Peel River),555012,-31.35,151.1375,Namoi River,Tamworth Regional Council,Water Level / Reservoir
+Carroll Village (Namoi River),555024,-30.9833,150.4417,Namoi River,Gunnedah Shire Council,Water Level
+Nundle (Pearly Gates),555033,-31.5,151.093,Namoi River,Tamworth Regional Council,Water Level
+Medows Lane (Goonoo Goonoo Ck),555034,-31.167,150.917,Namoi River,Tamworth Regional Council,Water Level
+Kootingal (Cockburn River),555035,-31.083,151.033,Namoi River,Tamworth Regional Council,Water Level
+Duncans Creek (Duncans Creek),555037,-31.3453,151.1752,Namoi River,Tamworth Regional Council,Rain Gauge / Water Level
+Paradise Weir (Peel River),556005,-31.1022,150.9375,Namoi River,Tamworth Regional Council,Water Level
+Armidale-Stephens Bridge (Dumaresq Creek),556017,-30.5117,151.67,Macleay River,Armidale Regional Council,Water Level
+Newholme (Sandy Creek),556020,-30.43,151.65,Unknown,Armidale Regional Council,Rain Gauge / Water Level
+Dumaresq Dam D/S (Dumaresq Creek),556022,-30.4661,151.6144,Macleay River,Armidale Regional Council,Rain Gauge / Water Level
+South Lismore (Robert White Bridge) (Leycester Creek),556040,-28.804155,153.262469,Richmond River,Lismore City Council,Water Level
+Georges Creek (Macleay River),557001,-30.7533,152.205,Macleay River,Armidale Regional Council,Water Level
+Budds Mare (At The Campground),557014,-30.9847,151.9721,Macleay River,Walcha Council,Rain Gauge
+Jeogla (At East Kunderang Rd),557015,-30.8108,152.071,Macleay River,Armidale Regional Council,Rain Gauge
+Repentance (Coopers Creek),558000,-28.6408,153.4131,Richmond River,Byron Shire Council,Rain Gauge / Water Level
+The Pocket (Marshalls Creek),558004,-28.5047,153.4772,Brunswick River,Byron Shire Council,Water Level
+Lacks Creek (Middle Pocket),558005,-28.4944,153.4847,Brunswick River,Byron Shire Council,Rain Gauge / Water Level
+Mullumbimby (Brunswick River),558006,-28.5528,153.4944,Brunswick River,Byron Shire Council,Water Level
+Durrumbul (Brunswick River),558007,-28.5328,153.4567,Brunswick River,Byron Shire Council,Water Level
+Mullumbimby Creek (Mullumbimby Ck),558008,-28.5542,153.4367,Brunswick River,Byron Shire Council,Rain Gauge / Water Level
+Clarrie Hall Dam D/S,558009,-28.43,153.315,Tweed River,Tweed Shire Council,Water Level
+Chinderah (Tweed River),558010,-28.231,153.555,Tweed River,Tweed Shire Council,Rain Gauge / Water Level
+Tweed Heads (Duranbah),558011,-28.274,153.5267,Tweed River,Tweed Shire Council,Rain Gauge / Repeater
+Woodlawn (Wilsons River),558012,-28.785,153.3036,Richmond River,Lismore City Council,Water Level
+Tumbulgum (Tweed River),558014,-28.2769,153.4608,Tweed River,Tweed Shire Council,Rain Gauge / Water Level
+Palmers Road,558018,-28.434,153.295,Tweed River,Tweed Shire Council,Rain Gauge / Water Level
+Brunswick Heads (Brunswick River),558019,-28.5383,153.5517,Unknown,Byron Shire Council,Water Level
+Billinudgel (Marshalls Creek),558020,-28.5016,153.5268,Brunswick River,Byron Shire Council,Water Level
+Dry Dock (Terranora Inlet),558029,-28.193,153.524,Tweed River,Tweed Shire Council,Water Level
+Goonellabah (Wyreema Rd),558035,-28.8222,153.3175,Richmond River,Lismore City Council,Repeater
+Myocum,558036,-28.59,153.52,Unknown,Byron Shire Council,Rain Gauge
+Letitia 2A,558041,-28.1973,153.56,Unknown,Tweed Shire Council,Water Level
+Byrnes Point,558044,-28.875,153.525,Unknown,Ballina Shire Council,Water Level
+Kynnumboon,558051,-28.3167,153.3833,Tweed River,Tweed Shire Council,Water Level
+Main Arm Rain Gauge,558053,-28.501113,153.430539,Unknown,Byron Shire Council,Rain Gauge
+Caravan Park (Wooli River),558060,-29.8517,153.253,Bellinger River,Clarence Valley Council,Water Level
+Bray Park Weir,558065,-28.3511,153.3681,Tweed River,Tweed Shire Council,Water Level
+Murwillumbah Bridge,558067,-28.3283,153.4,Tweed River,Tweed Shire Council,Water Level
+Wooli (Browns Knob),558068,-29.9125,153.1275,Clarence River,Clarence Valley Council,Rain Gauge / Repeater
+Houghlahan's Creek,558069,-28.784502,153.477255,Richmond River,Ballina Shire Council,Rain Gauge
+Tuckombil,558071,-28.8178,153.4842,Richmond River,Ballina Shire Council,Rain Gauge / Repeater
+Alstonville Stp,558072,-28.8306,153.4444,Richmond River,Ballina Shire Council,Rain Gauge
+Goolmangar (Goolmangar Creek),558075,-28.4788,153.218,Richmond River,Lismore City Council,Rain Gauge / Water Level
+Tuckurimba (Baxter Lane),558076,-28.9619,153.3066,Richmond River,Lismore City Council,Rain Gauge / Water Level
+Terania Creek,558078,-28.588,153.2989,Richmond River,Lismore City Council,Rain Gauge
+Couchy Creek,558079,-28.2662,153.279,Tweed River,Tweed Shire Council,Rain Gauge
+Upper Rous River (Hopkins Creek),558080,-28.2722,153.2134,Tweed River,Tweed Shire Council,Rain Gauge
+Numinbah,558081,-28.2703,153.2483,Tweed River,Tweed Shire Council,Rain Gauge
+Clothiers Creek,558082,-28.336,153.476,Brunswick River,Tweed Shire Council,Rain Gauge
+Burringbar Reservoir,558083,-28.4372,153.4729,Brunswick River,Tweed Shire Council,Rain Gauge / Repeater
+Cudgera Creek (Pottsville Reservoir),558084,-28.402,153.533,Brunswick River,Tweed Shire Council,Rain Gauge
+Bilambil Heights (Marana Reservoir),558085,-28.216,153.478,Tweed River,Tweed Shire Council,Rain Gauge
+Jiggi (Gwynne Rd),558086,-28.676,153.1538,Richmond River,Lismore City Council,Rain Gauge
+Lismore (Dawson Street),558087,-28.8081,153.2818,Richmond River,Lismore City Council,Rain Gauge / Water Level
+Tyalgum Bridge (Tyalgum River),558088,-28.359,153.21,Tweed River,Tweed Shire Council,Rain Gauge / Water Level
+Banora (Sewerage Treatmant Plant),558089,-28.204,153.531,Tweed River,Tweed Shire Council,Rain Gauge
+Kingscliff (Sewerage Treatment Plant),558090,-28.256,153.548,Tweed River,Tweed Shire Council,Rain Gauge
+Hastings (Sewerage Treatment Plant),558091,-28.353,153.56,Brunswick River,Tweed Shire Council,Rain Gauge
+Bray Park (Water Treatment Plant),558092,-28.341,153.378,Tweed River,Tweed Shire Council,Rain Gauge
+Murwillumbah (Sewerage Treatment Plant),558093,-28.323,153.348,Tweed River,Tweed Shire Council,Rain Gauge
+Upper Crabbes Creek (Crabbes Creek Rd),558094,-28.4635,153.4526,Brunswick River,Tweed Shire Council,Rain Gauge
+Lismore (Browns Ck Pump Stn),558100,-28.8058,153.2775,Richmond River,Lismore City Council,Water Level
+Burringbar North Arm (Harwood Rd),558104,-28.405,153.46,Brunswick River,Tweed Shire Council,Rain Gauge
+Crabbes Creek (Crabbes Creek),558105,-28.456,153.489,Brunswick River,Tweed Shire Council,Water Level
+Burringbar Rd (Burringbar Creek),558106,-28.444,153.442,Brunswick River,Tweed Shire Council,Rain Gauge / Water Level
+Upper Burringbar Rd,558107,-28.4531,153.406,Brunswick River,Tweed Shire Council,Rain Gauge
+Coopers Shoot Repeater,558109,-28.6777,153.596,Richmond River,Byron Shire Council,Rain Gauge / Repeater
+Mullumbimby Ck (Azalea St Bridge),558111,-28.5598,153.4933,Brunswick River,Byron Shire Council,Rain Gauge / Water Level
+Findon Creek,558117,-28.388483,152.880316,Richmond River,Kyogle Council,Rain Gauge
+Woolners Arm (Doubtful Creek),558118,-28.705041,152.850222,Richmond River,Kyogle Council,Rain Gauge
+Mummulgum (Bingeebeebra Creek),558119,-28.788307,152.772829,Richmond River,Kyogle Council,Rain Gauge
+Ainsworth Road (Middle Creek),558120,-28.916199,152.884091,Richmond River,Richmond Valley Council,Rain Gauge
+Clearfield (Old Tenterfield Road),558121,-29.174539,152.877515,Richmond River,Richmond Valley Council,Rain Gauge
+Keerrong Bridge Road (Terania Creek),558122,-28.713805,153.258414,Richmond River,Lismore City Council,Water Level
+Gungas Road (Mulgum Creek),558123,-28.573231,153.247044,Richmond River,Lismore City Council,Water Level
+Whiporie (Myall Creek),558124,-29.279701,152.990588,Richmond River,Richmond Valley Council,Water Level
+Tatham Ellangowan Road (Sandy Creek),558125,-28.979784,153.121304,Richmond River,Richmond Valley Council,Water Level
+Broadwater Bridge (Richmond River),558126,-29.013358,153.431075,Richmond River,Richmond Valley Council,Water Level
+Bowraville Lanes Bridge (Nambucca River),559001,-30.6433,152.855,Bellinger River,Nambucca Valley Council,Water Level
+Turners Flat (Macleay River),559002,-31.01,152.7119,Macleay River,Kempsey Shire Council,Rain Gauge / Water Level
+Belmore River Entrance,559003,-31.0333,152.9417,Macleay River,Kempsey Shire Council,Water Level
+Gleniffer (Never Never Creek),559004,-30.3883,152.8817,Bellinger River,Bellingen Shire Council,Rain Gauge / Water Level
+Utungun (Taylors Arm),559005,-30.7306,152.85,Bellinger River,Nambucca Valley Council,Rain Gauge / Water Level
+Macksville (Nambucca River),559006,-30.7078,152.92,Bellinger River,Nambucca Valley Council,Water Level
+Kooroowi (Kalang River),559008,-30.4653,152.8222,Bellinger River,Bellingen Shire Council,Rain Gauge / Water Level
+Kinchela Creek (Macleay River),559010,-30.9933,152.9883,Macleay River,Kempsey Shire Council,Water Level
+Urunga (Kalang River),559011,-30.494,153.012,Bellinger River,Bellingen Shire Council,Water Level
+Newry Island (Kalang River),559020,-30.5067,152.985,Bellinger River,Bellingen Shire Council,Water Level
+Karangi (Orara River),559023,-30.2544,153.0328,Clarence River,Coffs Harbour City Council,Water Level
+Repton (Bellinger River),559024,-30.4417,153.0217,Bellinger River,Bellingen Shire Council,Water Level
+Belmore River U/S Floodgates,559029,-31.07,152.97,Macleay River,Kempsey Shire Council,Water Level
+Seven Oaks (Macleay River),559034,-31,152.932,Macleay River,Kempsey Shire Council,Rain Gauge / Water Level
+Toorooka (Macleay River),559038,-30.91,152.59,Macleay River,Kempsey Shire Council,Water Level
+Fosters (Bellingen River),559047,-30.4417,152.8852,Bellinger River,Bellingen Shire Council,Water Level
+Sherwood Bridge (Macleay River),559067,-31.0583,152.7314,Macleay River,Kempsey Shire Council,Water Level
+Wooli Sportsground,559071,-29.858,153.266,Bellinger River,Clarence Valley Council,Rain Gauge
+South Arm (South Arm Road),559074,-30.6909,152.7192,Bellinger River,Nambucca Valley Council,Rain Gauge
+Thumb Creek (Taylors Arm Road),559075,-30.633,152.579,Bellinger River,Nambucca Valley Council,Rain Gauge
+Upper Missabotti (Missabotti Road),559076,-30.564,152.7869,Bellinger River,Nambucca Valley Council,Rain Gauge
+Kookaburra (at the School Hut),559085,-31.0238,152.3388,Macleay River,Kempsey Shire Council,Rain Gauge
+Third Lane (Macleay River),559086,-31.0465,152.8624,Macleay River,Kempsey Shire Council,Water Level
+Aldavilla D/S (Macleay River),559151,-31.0825,152.7831,Macleay River,Kempsey Shire Council,Rain Gauge / Water Level
+Forbesdale (Barrington River),560001,-32.038,151.8667,Manning River,Mid-Coast Council,Water Level
+Wauchope (Bain St),560009,-31.4522,152.7228,Hastings River,Port Macquarie-Hastings Council,Rain Gauge
+Upsalls Creek Bridge (Upsalls Creek),560010,-31.6247,152.6575,Hastings River,Port Macquarie-Hastings Council,Water Level
+Redoak (Stewarts River),560012,-31.7275,152.6389,Hastings River,Mid-Coast Council,Rain Gauge / Water Level
+Port Macquarie (Water Supply Dam),560013,-31.4631,152.8989,Hastings River,Port Macquarie-Hastings Council,Rain Gauge
+Port Macquarie (Golf Club),560014,-31.4844,152.9161,Hastings River,Port Macquarie-Hastings Council,Rain Gauge
+Port Macquarie (Koala St),560015,-31.4525,152.9017,Hastings River,Port Macquarie-Hastings Council,Rain Gauge
+Long Flat (Hastings River),560016,-31.4369,152.4886,Hastings River,Port Macquarie-Hastings Council,Rain Gauge / Water Level
+Logans Crossing (Camden Haven River),560017,-31.6161,152.6925,Hastings River,Port Macquarie-Hastings Council,Rain Gauge / Water Level
+Lake Cathie (Sewerage Treatment Works),560019,-31.5797,152.8381,Hastings River,Port Macquarie-Hastings Council,Rain Gauge
+Koree Island (Hastings River),560020,-31.4628,152.6789,Hastings River,Port Macquarie-Hastings Council,Rain Gauge / Water Level
+Kerewong (Broken Bago),560021,-31.5372,152.6931,Hastings River,Port Macquarie-Hastings Council,Rain Gauge
+Kendall (Delward),560023,-31.6539,152.5561,Hastings River,Port Macquarie-Hastings Council,Rain Gauge
+Comboyne (Thone River),560024,-31.6097,152.4625,Hastings River,Port Macquarie-Hastings Council,Rain Gauge
+Lorne Bridge (Camden Haven River),560025,-31.6629,152.6108,Hastings River,Port Macquarie-Hastings Council,Water Level
+Avon River Downstream (Waukivory Creek),560060,-32.0439,151.9625,Manning River,Mid-Coast Council,Water Level
+Forbesdale (Gloucester River),560061,-32.059,151.897,Manning River,Mid-Coast Council,Water Level
+Gloucester (Gloucester River),560062,-32.005,151.958,Manning River,Mid-Coast Council,Water Level
+Bellevue (Gloucester River),560063,-32.0564,151.7131,Manning River,Mid-Coast Council,Water Level
+Mundays Lane (Maria River),560067,-31.3253,152.8415,Hastings River,Port Macquarie-Hastings Council,Rain Gauge / Water Level
+The Entrance (Tuggerah Lake),561001,-33.3633,151.5,Macquarie-Tuggerah Lakes,Central Coast Council (NSW),Rain Gauge / Water Level
+Yarrandi Bridge (Dart Brook),561018,-32.0122,150.7828,Hunter River,Upper Hunter Shire Council,Rain Gauge / Water Level
+Kalang Rd (Dora Creek),561062,-33.0842,151.4825,Macquarie-Tuggerah Lakes,Lake Macquarie City Council,Water Level
+Wingen,561100,-31.8906,150.8745,Hunter River,Upper Hunter Shire Council,Rain Gauge / Water Level
+Crystal Brook,561101,-31.945,150.8119,Hunter River,Upper Hunter Shire Council,Rain Gauge / Water Level
+Lookout Rd Reservoir,561105,-32.9321,151.6899,Hunter River,Newcastle City Council,Repeater
+Macquarie College,561111,-32.9209,151.6514,Hunter River,Newcastle City Council,Rain Gauge
+Somersby,561123,-33.3981,151.2956,Hawkesbury River,Central Coast Council (NSW),Repeater
+Kincumber,561124,-33.45,151.4031,Hawkesbury River,Central Coast Council (NSW),Repeater
+Kangy Angy (Orchard Rd),561132,-33.3333,151.3901,Macquarie-Tuggerah Lakes,Central Coast Council (NSW),Rain Gauge
+Woy Woy (Tip),561141,-33.5041,151.2912,Hawkesbury River,Central Coast Council (NSW),Rain Gauge
+Kilcare Heights Reservoir,561143,-33.5216,151.3822,Hawkesbury River,Central Coast Council (NSW),Rain Gauge
+Kariong Reservoir,561146,-33.4451,151.2966,Hawkesbury River,Central Coast Council (NSW),Rain Gauge
+Wamberal Reservoir,561147,-33.4147,151.4431,Hunter River,Central Coast Council (NSW),Rain Gauge
+Kincumber Mountain Reservoir,561148,-33.4632,151.3801,Hawkesbury River,Central Coast Council (NSW),Rain Gauge
+Pearl Beach Reservoir,561151,-33.5364,151.3064,Hawkesbury River,Central Coast Council (NSW),Rain Gauge
+Awaba (Stony Ck),561154,-33.015,151.5397,Macquarie-Tuggerah Lakes,Lake Macquarie City Council,Rain Gauge
+Nords Wharf Oval (Nords Wharf),561155,-33.1301,151.6098,Macquarie-Tuggerah Lakes,Lake Macquarie City Council,Rain Gauge
+Wangi Bowling Club,561156,-33.0666,151.5779,Macquarie-Tuggerah Lakes,Lake Macquarie City Council,Rain Gauge
+Eleebana Reservoir,561158,-32.9956,151.6515,Macquarie-Tuggerah Lakes,Lake Macquarie City Council,Rain Gauge
+Broken Back (Cedar Creek),561163,-32.827,151.151,Hunter River,Cessnock City Council,Rain Gauge
+Bucketty,561164,-33.104,151.1369,Hunter River,Cessnock City Council,Rain Gauge
+Laguna (Wollombi Brook),561166,-32.9901,151.1325,Hunter River,Cessnock City Council,Water Level
+Millfield (Congewai Creek),561167,-32.9783,151.2463,Hunter River,Cessnock City Council,Rain Gauge / Water Level
+Quorrobolong,561168,-32.936,151.352,Hunter River,Cessnock City Council,Rain Gauge
+Wollombi (Wollombi Brook),561169,-32.934,151.134,Hunter River,Cessnock City Council,Water Level
+Yango,561170,-32.962,151.101,Hunter River,Cessnock City Council,Rain Gauge
+Dungog (Myall Creek),561171,-32.4006,151.757,Unknown,Dungog Shire Council,Water Level
+Windale No.2,561172,-32.99,151.6916,Macquarie-Tuggerah Lakes,Lake Macquarie City Council,Rain Gauge
+Swansea  No.8,561174,-33.0797,151.6317,Macquarie-Tuggerah Lakes,Lake Macquarie City Council,Rain Gauge
+Dora Creek,561175,-33.097,151.5038,Macquarie-Tuggerah Lakes,Lake Macquarie City Council,Rain Gauge
+Wyong Pool,561179,-33.2853,151.4282,Macquarie-Tuggerah Lakes,Central Coast Council (NSW),Rain Gauge
+Lake Munmorah  ,561180,-33.194,151.5651,Macquarie-Tuggerah Lakes,Central Coast Council (NSW),Rain Gauge
+Wellington (Bell River),562006,-32.5554,148.9409,Macquarie-Bogan Rivers,Dubbo Regional Council,Water Level
+D/S Borenore Ck (Molong Ck ),563005,-33.1636,148.9597,Macquarie-Bogan Rivers,Cabonne Shire Council,Rain Gauge / Water Level
+Perthville (Queen Charlotte Vale Creek),563027,-33.4917,149.5467,Unknown,Bathurst Regional Council,Rain Gauge / Water Level
+Orange (Kite St),563049,-33.2857,149.0997,Macquarie-Bogan Rivers,Orange City Council,Rain Gauge / Water Level
+Georges Plains (Queen Charlotte Creek),563061,-33.5273,149.5206,Macquarie-Bogan Rivers,Bathurst Regional Council,Rain Gauge / Water Level
+White Rock (Macquarie River),563080,-33.4931,149.6205,Macquarie-Bogan Rivers,Bathurst Regional Council,Water Level
+Orange (Dalton St Bridge),563081,-33.2771,149.1063,Macquarie-Bogan Rivers,Orange City Council,Water Level
+Orange Stp Enviromon Basestation,563082,-33.2646,149.1287,Macquarie-Bogan Rivers,Orange City Council,Rain Gauge
+Canobolas (Hillview),563083,-33.303,149.0474,Macquarie-Bogan Rivers,Orange City Council,Rain Gauge / Repeater
+Orange (Spring Ck WTP),563084,-33.3172,149.1073,Macquarie-Bogan Rivers,Orange City Council,Rain Gauge
+Orange (North Orange WWTP),563085,-33.2551,149.0775,Macquarie-Bogan Rivers,Orange City Council,Rain Gauge
+Rock Forest (Macquarie River),563096,-33.3696,149.4579,Unknown,Bathurst Regional Council,Rain Gauge / Water Level
+Gowan Green (Bell River),565018,-32.8006,148.9803,Macquarie-Bogan Rivers,Dubbo Regional Council,Water Level
+Talbragar River At Gulambul Bridge,565020,-32.1808,148.7389,Unknown,Dubbo Regional Council,Water Level
+Woronora Bridge (Woronora River),566045,-34.0209,151.0499,Sydney Coast-Georges River,Sutherland Shire Council,Water Level
+Liverpool Weir U/S (Georges River),566054,-33.9267,150.9172,Hawkesbury River,Liverpool City Council,Water Level
+Kelso Creek U/S Levee (Georges River),567048,-33.9548,150.9847,Sydney Coast-Georges River,Canterbury-Bankstown Council,Rain Gauge / Water Level
+Kelso Creek D/S Levee (Georges River),567060,-33.9548,150.9847,Sydney Coast-Georges River,Canterbury-Bankstown Council,Water Level
+Tomerong (Eucalypt Lane),568042,-35.0478,150.5378,Clyde River-Jervis Bay,Shoalhaven City Council,Rain Gauge
+Sassafras,568160,-35.1056,150.2583,Shoalhaven River,Shoalhaven City Council,Rain Gauge
+Picton (Stonequarry Ck),568172,-34.1791,150.6111,Hawkesbury River,Wollondilly Shire Council,Rain Gauge / Water Level
+Budawang,568197,-35.4801,149.9957,Clyde River-Jervis Bay,Shoalhaven City Council,Repeater
+Sussex Inlet,568198,-35.1711,150.5933,Clyde River-Jervis Bay,Shoalhaven City Council,Water Level / Tide Gauge
+Island Point Rd (St Georges Basin),568200,-35.0989,150.5935,Clyde River-Jervis Bay,Shoalhaven City Council,Rain Gauge / Water Level / Reservoir
+Tomerong Creek,568202,-35.0598,150.5815,Clyde River-Jervis Bay,Shoalhaven City Council,Rain Gauge / Water Level
+Glennely Ck,568203,-35.0872,150.4563,Clyde River-Jervis Bay,Shoalhaven City Council,Rain Gauge
+Foxground,568224,-34.7203,150.7692,Shoalhaven River,The Council of the Municipality of Kiama,Rain Gauge
+Picton Lakesland Road,568295,-34.1833,150.55,Hawkesbury River,Wollondilly Shire Council,Rain Gauge
+Belowra (Belowra Station),569035,-36.1975,149.7067,Tuross River,Eurobodalla Shire Council,Rain Gauge
+Lobbs Hole (Murrumbidgee River),570003,-35.54,149.1,Murrumbidgee River,ACT,Water Level
+Mt Macdonald (Murrumbidgee River),570017,-35.2917,148.955,Murrumbidgee River,ACT,Water Level
+Cooma (Cherry Tree),570021,-36.3889,149.05,Snowy River,Snowy Monaro Regional Council,Rain Gauge
+Cooma (Bondo),570025,-36.355,149.145,Murrumbidgee River,Snowy Monaro Regional Council,Rain Gauge
+Cooma (Willarney),570028,-36.3083,149.0917,Murrumbidgee River,Snowy Monaro Regional Council,Rain Gauge
+Cooma (Willow Grove),570030,-36.3,149.1417,Murrumbidgee River,Snowy Monaro Regional Council,Rain Gauge
+Cooma Smec (Cooma Back Creek),570031,-36.24,149.1167,Murrumbidgee River,Snowy Monaro Regional Council,Rain Gauge / Water Level
+Cooma (Myalla Lake),570032,-36.4083,149.1183,Murrumbidgee River,Snowy Monaro Regional Council,Rain Gauge
+Koolaroo (Cooma Creek),570035,-36.2633,149.135,Murrumbidgee River,Snowy Monaro Regional Council,Rain Gauge / Water Level
+Cooma (Benefield),570036,-36.265,149.1208,Murrumbidgee River,Snowy Monaro Regional Council,Rain Gauge / Repeater
+Bullamalita,570063,-34.897,149.774,Hawkesbury River,Goulburn Mulwaree Council,Rain Gauge
+U/S Pejar Dam,570064,-34.556,149.583,Hawkesbury River,Upper Lachlan Shire Council,Rain Gauge
+Bumana,570065,-34.677,149.725,Hawkesbury River,Goulburn Mulwaree Council,Rain Gauge
+Lansdowne Bridge (Mulwaree River),570066,-34.7691,149.7234,Hawkesbury River,Goulburn Mulwaree Council,Water Level
+Inveralochy Bridge (Mulwaree Ponds),570067,-34.9584,149.6625,Hawkesbury River,Goulburn Mulwaree Council,Water Level
+Marsden Weir (Wollondilly River),570070,-34.7365,149.7061,Hawkesbury River,Goulburn Mulwaree Council,Water Level
+Alert Gauge #4,900001,0,0,Burnett River,North Burnett Regional,Rain Gauge
+Allambie Lane,900002,-19.363935,146.708949,Ross River,Townsville City,Repeater
+Back Beach Road at Djenghi ,900003,-16.94224,145.88576,Mulgrave-Russell Rivers,Yarrabah Shire,Water Level
+Back Beach Road at Mourigan ,900004,-16.93138,145.8768,Mulgrave-Russell Rivers,Yarrabah Shire,Water Level
+Back Beach Road at Oombunghi ,900005,-16.96726,145.88768,Mulgrave-Russell Rivers,Yarrabah Shire,Water Level
+Back Beach Road at Reeves Creek ,900006,-16.9236,145.87357,Mulgrave-Russell Rivers,Yarrabah Shire,Water Level
+Ballangarry Bridge,900007,-28.4189913,148.812903,Unknown,Balonne Shire,Water Level
+Bloomfield River Bridge TM,900008,-15.951554,145.320164,Bloomfield River,Wujal Wujal Aborginal Shire,Water Level
+Blue Bush Creek,900009,-23.21284,142.8654,Diamantina River,Winton Shire,Rain Gauge
+Bouldercombe Alert,900010,-23.6036,150.4568,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge
+Bukki Road Bridge,900011,-16.924786,145.903,Mulgrave-Russell Rivers,Yarrabah Shire,Water Level
+Bushley Alert,900012,-23.5919,150.2382,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge
+Ewart Creek Alert,900013,-23.7003,150.5483,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge
+Hanrahans Crossing TM,900014,-23.469,150.0296,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge / Water Level
+Kabra Alert,900015,-23.47,150.396,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge / Water Level
+Kogan Condamine Rd AL,900016,-26.89262775,150.3800196,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge / Water Level
+Laidley Alexandre Street,900017,-27.626082,152.385557,Unknown,Lockyer Valley Regional,Water Level
+Mt Archer Alert,900019,-23.337514,150.572536,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge / Repeater
+Mulgowie Western Bank,900020,-27.727242,152.359386,Unknown,Lockyer Valley Regional,Water Level
+Nogo River at Rawbelle,900021,-25.56271,150.839679,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Percy Hindmarsh,900022,-24.89711,150.696552,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Point Road at the Waterfall/Old Cemetery ,900023,-16.90453,145.86284,Mulgrave-Russell Rivers,Yarrabah Shire,Water Level
+Poison Creek Alert,900024,-23.6748,150.5389,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge
+Rocky Crossing,900026,-27.8571185,149.3799619,Unknown,Balonne Shire,Water Level
+Three Moon Ck at Biegogo,900027,-24.562708,151.004785,Burnett River,North Burnett Regional,Rain Gauge / Water Level
+Tirranna Springs Crossing (QRA),900028,-17.891609,139.287044,Unknown,Burke Shire,Water Level
+Upper Dawson TM,900029,-25.4227,148.6355,Fitzroy River (Qld),Banana Shire,Rain Gauge
+Upper Gracemere Alert,900030,-23.5517,150.3987,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge
+Yambuk Alert,900031,-23.114338,149.351147,Fitzroy River (Qld),Rockhampton Regional,Rain Gauge / Repeater
+Barrackdale Choke (South),900032,-27.5322705,148.7355397,Condamine-Culgoa Rivers,Balonne Shire,Rain Gauge / Water Level
+Nash's Crossing Alert (Decoupled RG),900036,-18.415064,145.771796,Herbert River,Hinchinbrook Shire,Rain Gauge
+Flaggy Creek Alert (Decoupled RG),900037,-16.796434,145.554651,Barron River,Mareeba Shire,Rain Gauge
+Emmigrant creek (ballina local),900038,-28.828737,153.526772,Unknown,Ballina Shire Council,Water Level
+North Creek (ballina local),900039,-28.788176,153.56347,Unknown,Ballina Shire Council,Water Level
+Midgen Flat at Newrybar,900040,-28.71145,153.561778,Unknown,Ballina Shire Council,Rain Gauge
+Hinterland Way at Newrybar,900041,-28.760236,153.533939,Unknown,Ballina Shire Council,Rain Gauge
+Kings Creek Bridge Radar WL,900042,-28.562093,153.519963ÿ,Unknown,Byron Shire Council,Water Level
+Suffolk Park (Broken Hd Rd Crossing),900043,-28.688273,153.607998ÿ,Unknown,Byron Shire Council,Water Level
+Waterlily Park (Ocean Shores),900044,-28.519103,153.535551,Unknown,Byron Shire Council,Water Level
+Coral Ave at Mullumbimby (Brunswick River),900045,-28.548502ÿ,153.485368ÿ,Unknown,Byron Shire Council,Water Level
+Iluka Rd (Local flood warning system),900047,-29.353548,153.31786,Unknown,Clarence Valley Council,Water Level
+Ashford Avenue,900048,-33.931139,150.990551,Unknown,Canterbury-Bankstown Council,Water Level
+Como Bridge,900049,-33.997,151.0709,Unknown,Sutherland Shire Council,Rain Gauge
+Mt Hercules (Thurns Rd),900050,-34.145,150.6458,Unknown,Wollondilly Shire Council,Water Level
+Mandagery Creek at Escort Rock,900051,-33.401631,148.408566,Lachlan River,Cabonne Shire Council,Water Level
+Shannon Ck Dam Mt Top RN ,900052,-29.848551,152.774053,Unknown,Clarence Valley Council,Rain Gauge
+Shannon Ck Dam D/S,900053,-29.822862,152.796539,Unknown,Clarence Valley Council,Rain Gauge / Water Level
+Shannon Ck Dam U/S,900054,-29.84973,152.759548,Unknown,Clarence Valley Council,Rain Gauge / Water Level
+Little RIver at Arthurville,900055,-32.571624,148.724746,Unknown,Dubbo Regional Council,Water Level
+Foleyvale Alert (Decoupled RG),900056,-23.51312,149.70927,Fitzroy River (Qld),Woorabinda Aboriginal Shire,Rain Gauge
+Waterhole Creek at Mackeys Creek Road,900057,-33.35505,148.3855,Lachlan River,Cabonne Shire Council,Water Level
+Rathdowney Alert (De-Coupled),900058,-28.2153,152.8681,Unknown,Scenic Rim Regional,Rain Gauge
+Mt Warrnambool Repeater,900059,-38.3056,142.73978,Hopkins River,Moyne Shire Council,Rain Gauge / Repeater
+Prairie (Flinders Highway) (Prairie Creek) ,530057,-20.87,144.6107,Cooper Creek,Flinders Shire,Rain Gauge / Water Level
+Chinbi Tower,537022,-21.382,143.6779,Cooper Creek,Flinders Shire,Rain Gauge
+Torrens Creek Township (Torrens Creek),530045,-20.7676,145.0304,Flinders River,Flinders Shire,Rain Gauge / Water Level
+Loudoun Bridge Alert (Decoupled RG),900060,-27.327824,150.921772,Condamine-Culgoa Rivers,Western Downs Regional,Rain Gauge
+Arabella,544031,-26.4336,146.4586,Warrego River,Murweh Shire,Rain Gauge / Repeater
+Broadwater Creek Alert TBRG Relocation,900061,-28.59599,151.87687,Border Rivers,Southern Downs Regional,Rain Gauge
