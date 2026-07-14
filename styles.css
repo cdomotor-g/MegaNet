@@ -739,15 +739,23 @@ code {
   border-bottom: 1px solid var(--border);
   background: var(--panel-sub);
 }
-.maps-viewer { flex: 1; min-height: 480px; background: var(--subtle); display: flex; }
-.maps-viewer > * { flex: 1; min-width: 0; }
+/* Sized from the opened file's real page proportions (set via --maps-aspect
+   in JS once known) so an A3/A4 map isn't cropped when fit to width; the
+   1:√2 fallback keeps it at least A4-shaped before that's detected. */
+.maps-viewer {
+  width: 100%;
+  aspect-ratio: var(--maps-aspect, 0.70711);
+  min-height: 480px;
+  background: var(--subtle);
+  display: flex;
+}
+.maps-viewer > * { flex: 1; min-width: 0; min-height: 0; }
 .maps-view-frame { width: 100%; height: 100%; border: 0; display: block; }
 .maps-view-img { width: 100%; height: 100%; object-fit: contain; background: #fff; display: block; }
 .maps-empty {
   display: grid;
   place-items: center;
   height: 100%;
-  min-height: 480px;
   text-align: center;
   color: var(--muted);
   padding: 2rem;
@@ -758,4 +766,5 @@ code {
   .maps-layout { grid-template-columns: 1fr; }
   .maps-left { position: static; }
   .maps-viewer-panel { min-height: 70vh; }
+  .maps-viewer { min-height: 480px; }
 }
