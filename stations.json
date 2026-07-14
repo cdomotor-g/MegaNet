@@ -1,7 +1,7 @@
 {
   "meta": {
-    "version": "1.1",
-    "description": "MegaNet station database",
+    "version": "1.2",
+    "description": "MegaNet station database. catchments[] is the Queensland drainage-basin vocabulary used by the Network Maps navigator; per-station catchment_ids are not yet populated (see README).",
     "updated": "2026-07-14",
     "rm_paths": {
       "map": "c:\\program files (x86)\\radio mobile 11.6.6\\networks\\meganet\\net1.map",
@@ -86,7 +86,541 @@
       "description": ""
     }
   ],
-  "catchments": [],
+  "catchments": [
+    {
+      "id": "black",
+      "name": "Black",
+      "basin_no": "117",
+      "area_sqkm": 1060.2,
+      "region": "Burdekin / Townsville"
+    },
+    {
+      "id": "burdekin",
+      "name": "Burdekin",
+      "basin_no": "120",
+      "area_sqkm": 130483.0,
+      "region": "Burdekin / Townsville"
+    },
+    {
+      "id": "haughton",
+      "name": "Haughton",
+      "basin_no": "119",
+      "area_sqkm": 4063.0,
+      "region": "Burdekin / Townsville"
+    },
+    {
+      "id": "hinchinbrook_island",
+      "name": "Hinchinbrook Island",
+      "basin_no": "115",
+      "area_sqkm": 397.4,
+      "region": "Burdekin / Townsville"
+    },
+    {
+      "id": "ross",
+      "name": "Ross",
+      "basin_no": "118",
+      "area_sqkm": 1712.0,
+      "region": "Burdekin / Townsville"
+    },
+    {
+      "id": "baffle",
+      "name": "Baffle",
+      "basin_no": "134",
+      "area_sqkm": 4004.4,
+      "region": "Central QLD"
+    },
+    {
+      "id": "boyne",
+      "name": "Boyne",
+      "basin_no": "133",
+      "area_sqkm": 2595.7,
+      "region": "Central QLD"
+    },
+    {
+      "id": "calliope",
+      "name": "Calliope",
+      "basin_no": "132",
+      "area_sqkm": 2241.2,
+      "region": "Central QLD"
+    },
+    {
+      "id": "curtis_island",
+      "name": "Curtis Island",
+      "basin_no": "131",
+      "area_sqkm": 577.8,
+      "region": "Central QLD"
+    },
+    {
+      "id": "fitzroy",
+      "name": "Fitzroy",
+      "basin_no": "130",
+      "area_sqkm": 142864.5,
+      "region": "Central QLD"
+    },
+    {
+      "id": "shoalwater",
+      "name": "Shoalwater",
+      "basin_no": "128",
+      "area_sqkm": 3614.3,
+      "region": "Central QLD"
+    },
+    {
+      "id": "styx",
+      "name": "Styx",
+      "basin_no": "127",
+      "area_sqkm": 3019.7,
+      "region": "Central QLD"
+    },
+    {
+      "id": "waterpark",
+      "name": "Waterpark",
+      "basin_no": "129",
+      "area_sqkm": 1840.4,
+      "region": "Central QLD"
+    },
+    {
+      "id": "barron",
+      "name": "Barron",
+      "basin_no": "110",
+      "area_sqkm": 2195.3,
+      "region": "Far North"
+    },
+    {
+      "id": "daintree",
+      "name": "Daintree",
+      "basin_no": "108",
+      "area_sqkm": 2114.0,
+      "region": "Far North"
+    },
+    {
+      "id": "endeavour",
+      "name": "Endeavour",
+      "basin_no": "107",
+      "area_sqkm": 2190.1,
+      "region": "Far North"
+    },
+    {
+      "id": "herbert",
+      "name": "Herbert",
+      "basin_no": "116",
+      "area_sqkm": 9874.3,
+      "region": "Far North"
+    },
+    {
+      "id": "jeannie",
+      "name": "Jeannie",
+      "basin_no": "106",
+      "area_sqkm": 3650.7,
+      "region": "Far North"
+    },
+    {
+      "id": "johnstone",
+      "name": "Johnstone",
+      "basin_no": "112",
+      "area_sqkm": 2332.7,
+      "region": "Far North"
+    },
+    {
+      "id": "mossman",
+      "name": "Mossman",
+      "basin_no": "109",
+      "area_sqkm": 474.6,
+      "region": "Far North"
+    },
+    {
+      "id": "mulgrave_russell",
+      "name": "Mulgrave-Russell",
+      "basin_no": "111",
+      "area_sqkm": 1989.3,
+      "region": "Far North"
+    },
+    {
+      "id": "murray",
+      "name": "Murray",
+      "basin_no": "114",
+      "area_sqkm": 1110.1,
+      "region": "Far North"
+    },
+    {
+      "id": "normanby",
+      "name": "Normanby",
+      "basin_no": "105",
+      "area_sqkm": 24495.7,
+      "region": "Far North"
+    },
+    {
+      "id": "tully",
+      "name": "Tully",
+      "basin_no": "113",
+      "area_sqkm": 1688.8,
+      "region": "Far North"
+    },
+    {
+      "id": "don",
+      "name": "Don",
+      "basin_no": "121",
+      "area_sqkm": 3706.0,
+      "region": "Mackay / Whitsundays"
+    },
+    {
+      "id": "o_connell",
+      "name": "O'Connell",
+      "basin_no": "124",
+      "area_sqkm": 2393.6,
+      "region": "Mackay / Whitsundays"
+    },
+    {
+      "id": "pioneer",
+      "name": "Pioneer",
+      "basin_no": "125",
+      "area_sqkm": 1574.4,
+      "region": "Mackay / Whitsundays"
+    },
+    {
+      "id": "plane",
+      "name": "Plane",
+      "basin_no": "126",
+      "area_sqkm": 2545.6,
+      "region": "Mackay / Whitsundays"
+    },
+    {
+      "id": "proserpine",
+      "name": "Proserpine",
+      "basin_no": "122",
+      "area_sqkm": 2541.9,
+      "region": "Mackay / Whitsundays"
+    },
+    {
+      "id": "settlement",
+      "name": "Settlement",
+      "basin_no": "910",
+      "area_sqkm": 17429.4,
+      "region": "Mackay / Whitsundays"
+    },
+    {
+      "id": "whitsunday_island",
+      "name": "Whitsunday Island",
+      "basin_no": "123",
+      "area_sqkm": 108.1,
+      "region": "Mackay / Whitsundays"
+    },
+    {
+      "id": "brisbane",
+      "name": "Brisbane",
+      "basin_no": "143",
+      "area_sqkm": 13574.5,
+      "region": "SE QLD"
+    },
+    {
+      "id": "logan_albert",
+      "name": "Logan-Albert",
+      "basin_no": "145",
+      "area_sqkm": 4158.8,
+      "region": "SE QLD"
+    },
+    {
+      "id": "maroochy",
+      "name": "Maroochy",
+      "basin_no": "141",
+      "area_sqkm": 1541.5,
+      "region": "SE QLD"
+    },
+    {
+      "id": "moreton_island",
+      "name": "Moreton Island",
+      "basin_no": "144",
+      "area_sqkm": 1152.6,
+      "region": "SE QLD"
+    },
+    {
+      "id": "noosa",
+      "name": "Noosa",
+      "basin_no": "140",
+      "area_sqkm": 1952.1,
+      "region": "SE QLD"
+    },
+    {
+      "id": "pine",
+      "name": "Pine",
+      "basin_no": "142",
+      "area_sqkm": 1486.3,
+      "region": "SE QLD"
+    },
+    {
+      "id": "south_coast",
+      "name": "South Coast",
+      "basin_no": "146",
+      "area_sqkm": 1306.0,
+      "region": "SE QLD"
+    },
+    {
+      "id": "balonne_condamine",
+      "name": "Balonne-Condamine",
+      "basin_no": "422",
+      "area_sqkm": 137947.4,
+      "region": "West / South West"
+    },
+    {
+      "id": "border_rivers",
+      "name": "Border Rivers",
+      "basin_no": "416",
+      "area_sqkm": 38743.2,
+      "region": "West / South West",
+      "border": "QLD/NSW"
+    },
+    {
+      "id": "bulloo",
+      "name": "Bulloo",
+      "basin_no": "011",
+      "area_sqkm": 71721.6,
+      "region": "West / South West"
+    },
+    {
+      "id": "coopers_creek",
+      "name": "Coopers Creek",
+      "basin_no": "003",
+      "area_sqkm": 244626.2,
+      "region": "West / South West"
+    },
+    {
+      "id": "diamantina",
+      "name": "Diamantina",
+      "basin_no": "002",
+      "area_sqkm": 119449.5,
+      "region": "West / South West"
+    },
+    {
+      "id": "georgina",
+      "name": "Georgina",
+      "basin_no": "001",
+      "area_sqkm": 244504.8,
+      "region": "West / South West"
+    },
+    {
+      "id": "hay",
+      "name": "Hay",
+      "basin_no": "007",
+      "area_sqkm": 2800.8,
+      "region": "West / South West"
+    },
+    {
+      "id": "lake_frome",
+      "name": "Lake Frome",
+      "basin_no": "004",
+      "area_sqkm": 152.1,
+      "region": "West / South West"
+    },
+    {
+      "id": "moonie",
+      "name": "Moonie",
+      "basin_no": "417",
+      "area_sqkm": 14833.6,
+      "region": "West / South West"
+    },
+    {
+      "id": "paroo",
+      "name": "Paroo",
+      "basin_no": "424",
+      "area_sqkm": 73076.7,
+      "region": "West / South West"
+    },
+    {
+      "id": "warrego",
+      "name": "Warrego",
+      "basin_no": "423",
+      "area_sqkm": 59379.6,
+      "region": "West / South West"
+    },
+    {
+      "id": "burnett",
+      "name": "Burnett",
+      "basin_no": "136",
+      "area_sqkm": 33281.3,
+      "region": "Wide Bay / Burnett"
+    },
+    {
+      "id": "burrum",
+      "name": "Burrum",
+      "basin_no": "137",
+      "area_sqkm": 3365.7,
+      "region": "Wide Bay / Burnett"
+    },
+    {
+      "id": "fraser_island",
+      "name": "Fraser Island",
+      "basin_no": "139",
+      "area_sqkm": 1665.1,
+      "region": "Wide Bay / Burnett"
+    },
+    {
+      "id": "kolan",
+      "name": "Kolan",
+      "basin_no": "135",
+      "area_sqkm": 2906.9,
+      "region": "Wide Bay / Burnett"
+    },
+    {
+      "id": "mary",
+      "name": "Mary",
+      "basin_no": "138",
+      "area_sqkm": 9488.6,
+      "region": "Wide Bay / Burnett"
+    },
+    {
+      "id": "archer",
+      "name": "Archer",
+      "basin_no": "922",
+      "area_sqkm": 13871.5,
+      "region": null
+    },
+    {
+      "id": "coleman",
+      "name": "Coleman",
+      "basin_no": "920",
+      "area_sqkm": 12908.0,
+      "region": null
+    },
+    {
+      "id": "ducie",
+      "name": "Ducie",
+      "basin_no": "926",
+      "area_sqkm": 6771.9,
+      "region": null
+    },
+    {
+      "id": "embley",
+      "name": "Embley",
+      "basin_no": "924",
+      "area_sqkm": 4639.9,
+      "region": null
+    },
+    {
+      "id": "flinders",
+      "name": "Flinders",
+      "basin_no": "915",
+      "area_sqkm": 109690.1,
+      "region": null
+    },
+    {
+      "id": "gilbert",
+      "name": "Gilbert",
+      "basin_no": "917",
+      "area_sqkm": 46552.9,
+      "region": null
+    },
+    {
+      "id": "holroyd",
+      "name": "Holroyd",
+      "basin_no": "921",
+      "area_sqkm": 10324.4,
+      "region": null
+    },
+    {
+      "id": "jacky_jacky",
+      "name": "Jacky Jacky",
+      "basin_no": "101",
+      "area_sqkm": 2975.0,
+      "region": null
+    },
+    {
+      "id": "jardine",
+      "name": "Jardine",
+      "basin_no": "927",
+      "area_sqkm": 3294.7,
+      "region": null
+    },
+    {
+      "id": "leichhardt",
+      "name": "Leichhardt",
+      "basin_no": "913",
+      "area_sqkm": 32976.8,
+      "region": null
+    },
+    {
+      "id": "lockhart",
+      "name": "Lockhart",
+      "basin_no": "103",
+      "area_sqkm": 2894.2,
+      "region": null
+    },
+    {
+      "id": "mitchell",
+      "name": "Mitchell",
+      "basin_no": "919",
+      "area_sqkm": 71715.7,
+      "region": null
+    },
+    {
+      "id": "morning",
+      "name": "Morning",
+      "basin_no": "914",
+      "area_sqkm": 3690.8,
+      "region": null
+    },
+    {
+      "id": "mornington_island",
+      "name": "Mornington Island",
+      "basin_no": "911",
+      "area_sqkm": 1004.8,
+      "region": null
+    },
+    {
+      "id": "nicholson",
+      "name": "Nicholson",
+      "basin_no": "912",
+      "area_sqkm": 51666.3,
+      "region": null
+    },
+    {
+      "id": "norman",
+      "name": "Norman",
+      "basin_no": "916",
+      "area_sqkm": 50580.2,
+      "region": null
+    },
+    {
+      "id": "olive_pascoe",
+      "name": "Olive-Pascoe",
+      "basin_no": "102",
+      "area_sqkm": 4195.6,
+      "region": null
+    },
+    {
+      "id": "staaten",
+      "name": "Staaten",
+      "basin_no": "918",
+      "area_sqkm": 25843.4,
+      "region": null
+    },
+    {
+      "id": "stewart",
+      "name": "Stewart",
+      "basin_no": "104",
+      "area_sqkm": 2752.9,
+      "region": null
+    },
+    {
+      "id": "torres_strait_islands",
+      "name": "Torres Strait Islands",
+      "basin_no": "928",
+      "area_sqkm": 6856.7,
+      "region": null
+    },
+    {
+      "id": "watson",
+      "name": "Watson",
+      "basin_no": "923",
+      "area_sqkm": 4696.9,
+      "region": null
+    },
+    {
+      "id": "wenlock",
+      "name": "Wenlock",
+      "basin_no": "925",
+      "area_sqkm": 7554.3,
+      "region": null
+    }
+  ],
   "rm_systems": [
     {
       "id": 1,
