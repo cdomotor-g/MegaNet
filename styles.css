@@ -16,6 +16,18 @@
   --map-line: #ff6f00;
   --map-repeater: #0b5cab;
   --map-field: #107c10;
+  --accent: #0b5cab;
+  --ok:   #107c10;
+  --bad:  #c7401a;
+  --warn: #a86400;
+  /* ALERT packet bit-field colours (self-contained: mid-tone bg + light text, theme-independent) */
+  --c-frame: #4a5568; --c-frame-t: #eef1f5;
+  --c-addr:  #2f6fb8; --c-addr-t:  #eaf3ff;
+  --c-data:  #2e8b57; --c-data-t:  #e8fbf1;
+  --c-ident: #8a6300; --c-ident-t: #fff3d2;
+  --c-crc:   #6d51ad; --c-crc-t:   #efe8ff;
+  --c-batt:  #b04a5a; --c-batt-t:  #ffe6ea;
+  --c-hd:    #0f8a8a; --c-hd-t:    #e2fafa;
 }
 
 [data-theme="dark"] {
@@ -34,6 +46,10 @@
   --map-line: #ff9f43;
   --map-repeater: #6bb6ff;
   --map-field: #57d657;
+  --accent: #6bb6ff;
+  --ok:   #3ecf8e;
+  --bad:  #ff6b6b;
+  --warn: #ffb347;
 }
 
 body {
@@ -464,4 +480,104 @@ code {
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: .05rem .3rem;
+}
+
+/* ── ALERT Packets tab ──────────────────────────────────────────────────────── */
+.pkt label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 4px; }
+.pkt .sub { color: var(--muted); font-size: .9rem; margin: .1rem 0 .9rem; }
+.pkt .err { color: var(--bad); font-size: .88rem; margin-top: 10px; white-space: pre-wrap; }
+.pkt .framing-note { margin-top: 12px; font-size: .88rem; }
+.pkt .spec { font-size: .8rem; color: var(--muted); margin-top: 8px; }
+
+.pkt button.primary { border-color: #107c10; }
+.pkt button.ghost {
+  background: transparent; color: var(--accent); border: 1px solid var(--accent);
+  font-weight: 500; padding: .4rem .7rem; font-size: .8rem; border-radius: 8px; cursor: pointer;
+}
+.pkt button.ghost:hover { filter: brightness(1.1); }
+
+/* layout rows */
+.pkt .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+.pkt .row > div { flex: 1; min-width: 130px; }
+.pkt .row > .grow2 { flex: 3; min-width: 280px; }
+.pkt .row > .fit { flex: 0 0 auto; min-width: 0; }
+
+/* bit visualisation */
+.pkt .bitwords { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+.pkt .bitword { display: flex; flex-direction: column; gap: 4px; }
+.pkt .bitword .wlabel { font-size: 11px; color: var(--muted); text-align: center; letter-spacing: .4px; }
+.pkt .bitrow { display: flex; }
+.pkt .bit {
+  width: 26px; height: 32px; display: flex; align-items: center; justify-content: center;
+  font: 600 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  border-right: 1px solid rgba(0,0,0,.35); cursor: default;
+}
+.pkt .bit:first-child { border-radius: 6px 0 0 6px; }
+.pkt .bit:last-child { border-radius: 0 6px 6px 0; border-right: 0; }
+.pkt .lblrow { display: flex; }
+.pkt .lblrow span { width: 26px; text-align: center; font: 9.5px ui-monospace, Menlo, monospace; color: var(--muted); }
+.pkt .f-frame { background: var(--c-frame); color: var(--c-frame-t); }
+.pkt .f-A { background: var(--c-addr); color: var(--c-addr-t); }
+.pkt .f-D { background: var(--c-data); color: var(--c-data-t); }
+.pkt .f-K { background: var(--c-ident); color: var(--c-ident-t); }
+.pkt .f-R, .pkt .f-C { background: var(--c-crc); color: var(--c-crc-t); }
+.pkt .f-B, .pkt .f-BS, .pkt .f-VCO, .pkt .f-DE { background: var(--c-batt); color: var(--c-batt-t); }
+.pkt .f-HD { background: var(--c-hd); color: var(--c-hd-t); }
+.pkt .bit.kbad { outline: 2px solid var(--bad); outline-offset: -2px; }
+.pkt .bit.hl { outline: 2px solid var(--text); outline-offset: -2px; filter: brightness(1.15); }
+
+/* legend */
+.pkt .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: .78rem; color: var(--muted); }
+.pkt .legend i { display: inline-block; width: 13px; height: 13px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; }
+
+/* field table */
+.pkt table.fields { border-collapse: collapse; width: 100%; table-layout: auto; margin-top: 14px; font-size: .85rem; }
+.pkt table.fields th {
+  position: static; background: transparent; color: var(--muted); font-weight: 500; text-align: left;
+  padding: 5px 10px; border-bottom: 1px solid var(--border); font-size: 12px; letter-spacing: .4px;
+  overflow: visible; white-space: normal;
+}
+.pkt table.fields td {
+  padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top;
+  overflow: visible; white-space: normal;
+}
+.pkt table.fields tr:hover td { background: transparent; }
+.pkt table.fields tr.frow { cursor: pointer; }
+.pkt table.fields tr.frow:hover td { background: var(--subtle); }
+.pkt table.fields code { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.pkt .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+.pkt .val { font-weight: 700; font-size: 1rem; }
+.pkt .stn { color: var(--ok); font-weight: 600; }
+.pkt .stn.none { color: var(--muted); font-weight: 400; }
+
+/* decode result cards */
+.pkt .fmtcard { border: 1px solid var(--border); border-radius: 10px; margin-top: 16px; overflow: hidden; }
+.pkt .fmtcard.best { border-color: var(--ok); }
+.pkt .fmthead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; background: var(--subtle); cursor: pointer; }
+.pkt .fmthead h3 { margin: 0; font-size: .98rem; flex: 1; }
+.pkt .caret { color: var(--muted); font-size: 12px; }
+.pkt .fmtbody { padding: 6px 16px 18px; display: none; }
+.pkt .fmtcard.open .fmtbody { display: block; }
+
+/* status badges (override the global pill colours within the packet tab) */
+.pkt .badge { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; background: transparent; color: inherit; }
+.pkt .badge.ok   { background: color-mix(in srgb, var(--ok) 16%, transparent);   color: var(--ok); }
+.pkt .badge.bad  { background: color-mix(in srgb, var(--bad) 14%, transparent);  color: var(--bad); }
+.pkt .badge.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+
+/* encoder output */
+.pkt .outbits {
+  background: var(--subtle); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-top: 14px;
+  font: 15px ui-monospace, Menlo, Consolas, monospace; word-break: break-all;
+}
+.pkt .outbits b { color: var(--accent); font-weight: 600; }
+.pkt .copybtn { margin-left: 10px; }
+
+/* cheat-sheet */
+.pkt .pkt-summary { cursor: pointer; color: var(--accent); font-size: .9rem; }
+.pkt .pkt-cheat li { margin: 6px 0; color: var(--muted); }
+
+@media (max-width: 700px) {
+  .pkt .bit { width: 19px; height: 26px; font-size: 11px; }
+  .pkt .lblrow span { width: 19px; font-size: 8px; }
 }
