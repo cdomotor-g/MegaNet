@@ -125,6 +125,18 @@ Each entry in the `stations` array represents one node in the network. A node ca
     "water_level": [1044, 1045]
   },
 
+  "site": {
+    "db_id":  3402,
+    "number": "544070",
+    "name":   "Abbieglassie AL"
+  },
+
+  "sensors": [
+    { "alert_id": 1073, "type": "Rainfall",           "sensor_id": "544070.0.R.1073", "device_id": 1 },
+    { "alert_id": 1073, "type": "Rainfall Increment", "sensor_id": "544070.0.R.1073", "device_id": 3 },
+    { "alert_id": 1074, "type": "Battery",            "sensor_id": "544070.0.B.1074", "device_id": 2 }
+  ],
+
   "repeater": {
     "acma_licence": "XXXXXX",
     "rx_mhz": 151.500,
@@ -156,10 +168,19 @@ Each entry in the `stations` array represents one node in the network. A node ca
 |-------|------|-------|
 | `roles` | `string[]` | Any combination of `"field"`, `"repeater"`, `"base"` |
 | `alert_ids.water_level` | `number` or `number[]` | Single ID or array for dual-sensor sites |
+| `site` | `object` | Contrail/ARRO site the station maps to: `db_id` (internal ARRO site id), `number` (external site number), `name` |
+| `sensors` | `object[]` | Every ALERT-addressable device at the site, sourced from the national sensor export. Each has `alert_id`, `type` (e.g. `"Rainfall"`, `"Water Level"`, `"Battery"`), `sensor_id` and `device_id` |
 | `repeater.pass_ranges` | `object[]` | Unlimited; each has `low` and `high` inclusive bounds |
 | `repeater.exclusions` | `object[]` | Reserved for next-generation equipment; same `low`/`high` structure |
 | `rm_system_id` | `number` | References the Radio Mobile system spec (power, antenna, etc.) |
 | `satcom.enabled` | `boolean` | Marks stations with satellite comms capability |
+
+> **`site` / `sensors`** are the authoritative sensor records — the `alert_ids`
+> labels are kept for backward compatibility but can be mislabelled (an address
+> filed under `rainfall` may actually be a Water Level device). The Bit Flipper
+> reads `sensors` for its Sensor / Sensor ID columns and ARRO links. These fields
+> were imported from `z_Sensors_with_Database_IDs_by_View_NATIONAL.csv`, which is
+> now redundant and can be removed.
 
 ---
 
@@ -215,11 +236,21 @@ Generate the complete set of CSV files required by Radio Mobile software from th
 Export is scoped to the current filter selection so users can generate per-catchment or per-network RM projects.
 
 ### 6. ALERT Address / BitFlipper Tool (Integrated)
-- Input an ALERT decimal address and see all single-bit-flip variants
-- Cross-reference against the station database to find which variants are live stations
-- Generate ARRO graph links for any matched sensors (date range, timezone, device IDs pre-filled)
-- Sensor type filter (rainfall, water level, battery)
-- Replaces the standalone `BitFlipper.html`
+- Input an ALERT decimal address and see its bit-flip variants; the results,
+  table and map update live in the background as you type (the address field
+  keeps focus).
+- **User-selectable bits to flip** — flip 1 bit (16 variants) up to N bits
+  (all `C(16, N)` combinations). Large expansions are guarded with a
+  "show only matched addresses" toggle and a render cap.
+- Cross-references every variant against the station database and shows the
+  matched **Station(s)**, **Sensor** type, **Sensor ID** and open **Repeater(s)**.
+- **Open ARRO graph** link — builds a Contrail/ARRO URL (7-day window,
+  Brisbane timezone, `devices[]=db_id|device_id`) for the matched sensors, with
+  a configurable base URL.
+- **Sensor-type filter** scopes both the results table and the ARRO link.
+- Map of matched field stations, their bit-flip labels and the repeaters open
+  to them.
+- Replaces the standalone `BitFlipper.html`.
 
 ### 7. ALERT / ERTS Packet Decoder & Encoder (Integrated)
 Ported from the standalone [ALERT_PACKETS](https://github.com/cdomotor-g/ALERT_PACKETS) tool and
@@ -271,7 +302,10 @@ Side panel or modal showing full station record:
 3. Map existing `Text` (AlertID) column into `alert_ids.battery` / `.rainfall` / `.water_level` based on naming conventions in the data.
 4. Add `roles` inference: entries in `ALL_REPEATERS.csv` → `"repeater"`, remainder → `"field"`.
 5. Validate output: every station referenced in `MegaNet_NetData.csv` must appear in `stations.json`.
-6. Keep `z_Sensors_…_NATIONAL.csv` as a separate sidecar file (too large to embed; loaded on demand by the BitFlipper panel).
+6. ~~Keep `z_Sensors_…_NATIONAL.csv` as a separate sidecar file.~~ The relevant
+   sensor records (type, Sensor ID, ARRO device IDs) are now baked into each
+   station's `site` / `sensors` fields in `stations.json`, so the CSV is
+   redundant and can be removed.
 
 ### Phase 2 — Single-Page Application Shell
 **Goal:** One `index.html` with tabbed navigation replacing all three HTML files.
