@@ -55042,7 +55042,11 @@
       "catchment_ids": [
         "proserpine"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 7858,
+        "battery": 7860,
+        "water_level": 7859
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -55056,6 +55060,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 1627,
+        "number": "561101",
+        "name": "Cressfield"
+      },
+      "sensors": [
+        {
+          "alert_id": 7859,
+          "type": "Water Level",
+          "sensor_id": "561101.1.H.7859",
+          "device_id": 1
+        },
+        {
+          "alert_id": 7860,
+          "type": "Battery",
+          "sensor_id": "561101.1.B.7860",
+          "device_id": 2
+        },
+        {
+          "alert_id": 7858,
+          "type": "Rainfall",
+          "sensor_id": "561101.1.R.7858",
+          "device_id": 3
+        },
+        {
+          "alert_id": 7858,
+          "type": "Rainfall Increment",
+          "sensor_id": "561101.1.R.7858",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -55483,7 +55518,13 @@
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 7144,
+        "water_level": [
+          7133,
+          7145
+        ]
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -55496,6 +55537,31 @@
       "basin": "Richmond River",
       "location_types": [
         "Water Level"
+      ],
+      "site": {
+        "db_id": 1187,
+        "number": "58176",
+        "name": "Lismore (Wilsons River)"
+      },
+      "sensors": [
+        {
+          "alert_id": 7144,
+          "type": "Battery",
+          "sensor_id": "58176.1.B.7144",
+          "device_id": 1
+        },
+        {
+          "alert_id": 7133,
+          "type": "Water Level - AHD",
+          "sensor_id": "58176.1.H.7133",
+          "device_id": 2
+        },
+        {
+          "alert_id": 7145,
+          "type": "Water Level - AHD",
+          "sensor_id": "58176.2.H.7145",
+          "device_id": 3
+        }
       ]
     },
     {
@@ -55510,7 +55576,11 @@
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 7152,
+        "battery": 7150,
+        "water_level": 7151
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -55524,6 +55594,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 1189,
+        "number": "58186",
+        "name": "Murwillumbah (Tweed River)"
+      },
+      "sensors": [
+        {
+          "alert_id": 7150,
+          "type": "Battery",
+          "sensor_id": "58186.1.B.7150",
+          "device_id": 1
+        },
+        {
+          "alert_id": 7152,
+          "type": "Rainfall",
+          "sensor_id": "58186.1.R.7152",
+          "device_id": 2
+        },
+        {
+          "alert_id": 7151,
+          "type": "Water Level - AHD",
+          "sensor_id": "58186.1.H.7151",
+          "device_id": 3
+        },
+        {
+          "alert_id": 7152,
+          "type": "Rainfall Increment",
+          "sensor_id": "58186.1.R.7152",
+          "device_id": 6
+        }
       ]
     },
     {
@@ -55538,7 +55639,9 @@
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 7184
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -55551,6 +55654,19 @@
       "basin": "Tweed River",
       "location_types": [
         "Repeater"
+      ],
+      "site": {
+        "db_id": 1199,
+        "number": "58215",
+        "name": "Murwillumbah (Hartigans Hill)"
+      },
+      "sensors": [
+        {
+          "alert_id": 7184,
+          "type": "Battery",
+          "sensor_id": "58215.1.B.7184",
+          "device_id": 1
+        }
       ]
     },
     {
@@ -55979,7 +56095,11 @@
       "catchment_ids": [
         "mulgrave_russell"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5116,
+        "battery": 5118,
+        "water_level": 5117
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -55993,6 +56113,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2253,
+        "number": "531099",
+        "name": "Peets Bridge AL-B"
+      },
+      "sensors": [
+        {
+          "alert_id": 5117,
+          "type": "Water Level",
+          "sensor_id": "531099.0.H.5117",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5116,
+          "type": "Rainfall",
+          "sensor_id": "531099.0.R.5116",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5118,
+          "type": "Battery",
+          "sensor_id": "531099.0.B.5118",
+          "device_id": 3
+        },
+        {
+          "alert_id": 5116,
+          "type": "Rainfall Increment",
+          "sensor_id": "531099.0.R.5116",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56009,7 +56160,10 @@
       "catchment_ids": [
         "tully"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5239,
+        "battery": 5240
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56022,6 +56176,31 @@
       "basin": "Tully River",
       "location_types": [
         "Rain Gauge"
+      ],
+      "site": {
+        "db_id": 2255,
+        "number": "531102",
+        "name": "Cardstone AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 5239,
+          "type": "Rainfall",
+          "sensor_id": "531102.0.R.5239",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5240,
+          "type": "Battery",
+          "sensor_id": "531102.0.B.5240",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5239,
+          "type": "Rainfall Increment",
+          "sensor_id": "531102.0.R.5239",
+          "device_id": 3
+        }
       ]
     },
     {
@@ -56097,7 +56276,11 @@
       "catchment_ids": [
         "mulgrave_russell"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5128,
+        "battery": 5130,
+        "water_level": 5129
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56111,6 +56294,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2262,
+        "number": "531127",
+        "name": "Wonga Park AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 5129,
+          "type": "Water Level",
+          "sensor_id": "531127.0.H.5129",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5128,
+          "type": "Rainfall",
+          "sensor_id": "531127.0.R.5128",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5130,
+          "type": "Battery",
+          "sensor_id": "531127.0.B.5130",
+          "device_id": 3
+        },
+        {
+          "alert_id": 5128,
+          "type": "Rainfall Increment",
+          "sensor_id": "531127.0.R.5128",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56127,7 +56341,11 @@
       "catchment_ids": [
         "barron"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5124,
+        "battery": 5127,
+        "water_level": 5126
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56141,6 +56359,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2263,
+        "number": "531128",
+        "name": "Glenoma Park AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 5126,
+          "type": "Water Level",
+          "sensor_id": "531128.0.H.5126",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5124,
+          "type": "Rainfall",
+          "sensor_id": "531128.0.R.5124",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5127,
+          "type": "Battery",
+          "sensor_id": "531128.0.B.5127",
+          "device_id": 3
+        },
+        {
+          "alert_id": 5124,
+          "type": "Rainfall Increment",
+          "sensor_id": "531128.0.R.5124",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56157,7 +56406,11 @@
       "catchment_ids": [
         "barron"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5134,
+        "battery": 5136,
+        "water_level": 5135
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56171,6 +56424,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2264,
+        "number": "531129",
+        "name": "Currunda Ck AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 5135,
+          "type": "Water Level",
+          "sensor_id": "531129.0.H.5135",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5134,
+          "type": "Rainfall",
+          "sensor_id": "531129.0.R.5134",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5136,
+          "type": "Battery",
+          "sensor_id": "531129.0.B.5136",
+          "device_id": 3
+        },
+        {
+          "alert_id": 5134,
+          "type": "Rainfall Increment",
+          "sensor_id": "531129.0.R.5134",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56187,7 +56471,11 @@
       "catchment_ids": [
         "barron"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5137,
+        "battery": 5139,
+        "water_level": 5138
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56201,6 +56489,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2265,
+        "number": "531130",
+        "name": "Rocks Rd Reserve AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 5138,
+          "type": "Water Level",
+          "sensor_id": "531130.0.H.5138",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5137,
+          "type": "Rainfall",
+          "sensor_id": "531130.0.R.5137",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5139,
+          "type": "Battery",
+          "sensor_id": "531130.0.B.5139",
+          "device_id": 3
+        },
+        {
+          "alert_id": 5137,
+          "type": "Rainfall Increment",
+          "sensor_id": "531130.0.R.5137",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56217,7 +56536,11 @@
       "catchment_ids": [
         "barron"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5131,
+        "battery": 5133,
+        "water_level": 5132
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56231,6 +56554,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2266,
+        "number": "531131",
+        "name": "Mary Parker Dv AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 5132,
+          "type": "Water Level",
+          "sensor_id": "531131.0.H.5132",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5131,
+          "type": "Rainfall",
+          "sensor_id": "531131.0.R.5131",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5133,
+          "type": "Battery",
+          "sensor_id": "531131.0.B.5133",
+          "device_id": 3
+        },
+        {
+          "alert_id": 5131,
+          "type": "Rainfall Increment",
+          "sensor_id": "531131.0.R.5131",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56334,7 +56688,11 @@
       "catchment_ids": [
         "johnstone"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 2591,
+        "battery": 2593,
+        "water_level": 2592
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56348,6 +56706,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2271,
+        "number": "532014",
+        "name": "Saltwater Ck AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 2592,
+          "type": "Water Level",
+          "sensor_id": "532014.0.H.2592",
+          "device_id": 1
+        },
+        {
+          "alert_id": 2591,
+          "type": "Rainfall",
+          "sensor_id": "532014.0.R.2591",
+          "device_id": 2
+        },
+        {
+          "alert_id": 2593,
+          "type": "Battery",
+          "sensor_id": "532014.0.B.2593",
+          "device_id": 3
+        },
+        {
+          "alert_id": 2591,
+          "type": "Rainfall Increment",
+          "sensor_id": "532014.0.R.2591",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56364,7 +56753,11 @@
       "catchment_ids": [
         "burdekin"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 2761,
+        "battery": 2763,
+        "water_level": 2762
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56379,6 +56772,37 @@
         "Rain Gauge",
         "Water Level",
         "Reservoir"
+      ],
+      "site": {
+        "db_id": 2309,
+        "number": "532063",
+        "name": "Paluma Dam AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 2762,
+          "type": "Water Level",
+          "sensor_id": "532063.0.H.2762",
+          "device_id": 1
+        },
+        {
+          "alert_id": 2761,
+          "type": "Rainfall",
+          "sensor_id": "532063.0.R.2761",
+          "device_id": 2
+        },
+        {
+          "alert_id": 2763,
+          "type": "Battery",
+          "sensor_id": "532063.0.B.2763",
+          "device_id": 3
+        },
+        {
+          "alert_id": 2761,
+          "type": "Rainfall Increment",
+          "sensor_id": "532063.0.R.2761",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56395,7 +56819,11 @@
       "catchment_ids": [
         "ross"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 2853,
+        "battery": 2855,
+        "water_level": 2854
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56409,6 +56837,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2335,
+        "number": "532108",
+        "name": "Annandale AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 2854,
+          "type": "Water Level",
+          "sensor_id": "532108.0.H.2854",
+          "device_id": 1
+        },
+        {
+          "alert_id": 2853,
+          "type": "Rainfall",
+          "sensor_id": "532108.0.R.2853",
+          "device_id": 2
+        },
+        {
+          "alert_id": 2855,
+          "type": "Battery",
+          "sensor_id": "532108.0.B.2855",
+          "device_id": 3
+        },
+        {
+          "alert_id": 2853,
+          "type": "Rainfall Increment",
+          "sensor_id": "532108.0.R.2853",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56514,7 +56973,11 @@
       "catchment_ids": [
         "proserpine"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 2650,
+        "battery": 2652,
+        "water_level": 2651
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56528,6 +56991,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2409,
+        "number": "533172",
+        "name": "Peter Faust Dam HW AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 2651,
+          "type": "Water Level",
+          "sensor_id": "533172.0.H.2651",
+          "device_id": 1
+        },
+        {
+          "alert_id": 2650,
+          "type": "Rainfall",
+          "sensor_id": "533172.0.R.2650",
+          "device_id": 2
+        },
+        {
+          "alert_id": 2652,
+          "type": "Battery",
+          "sensor_id": "533172.0.B.2652",
+          "device_id": 3
+        },
+        {
+          "alert_id": 2650,
+          "type": "Rainfall Increment",
+          "sensor_id": "533172.0.R.2650",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56544,7 +57038,11 @@
       "catchment_ids": [
         "pioneer"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5069,
+        "battery": 5071,
+        "water_level": 5070
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56558,6 +57056,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2428,
+        "number": "533204",
+        "name": "Mt Pleasant (Baxter Dv) AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 5070,
+          "type": "Water Level",
+          "sensor_id": "533204.0.H.5070",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5069,
+          "type": "Rainfall",
+          "sensor_id": "533204.0.R.5069",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5071,
+          "type": "Battery",
+          "sensor_id": "533204.0.B.5071",
+          "device_id": 3
+        },
+        {
+          "alert_id": 5069,
+          "type": "Rainfall Increment",
+          "sensor_id": "533204.0.R.5069",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56633,7 +57162,9 @@
       "catchment_ids": [
         "burdekin"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 2906
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56646,6 +57177,19 @@
       "basin": "Burdekin River",
       "location_types": [
         "Repeater"
+      ],
+      "site": {
+        "db_id": 2437,
+        "number": "534009",
+        "name": "Burdekin Dam Repeater"
+      },
+      "sensors": [
+        {
+          "alert_id": 2906,
+          "type": "Battery",
+          "sensor_id": "534009.0.B.2906",
+          "device_id": 1
+        }
       ]
     },
     {
@@ -56662,7 +57206,11 @@
       "catchment_ids": [
         "burdekin"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 2993,
+        "battery": 2995,
+        "water_level": 2994
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56676,6 +57224,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 11257,
+        "number": "534045",
+        "name": "Burdekin Falls Dam HW Alert"
+      },
+      "sensors": [
+        {
+          "alert_id": 2994,
+          "type": "Water Level",
+          "sensor_id": "534045.0.H.2994",
+          "device_id": 10
+        },
+        {
+          "alert_id": 2995,
+          "type": "Battery",
+          "sensor_id": "534045.0.B.2995",
+          "device_id": 11
+        },
+        {
+          "alert_id": 2993,
+          "type": "Rainfall",
+          "sensor_id": "534045.0.R.2993",
+          "device_id": 12
+        },
+        {
+          "alert_id": 2993,
+          "type": "Rainfall Increment",
+          "sensor_id": "534045.0.R.2993",
+          "device_id": 13
+        }
       ]
     },
     {
@@ -56692,7 +57271,11 @@
       "catchment_ids": [
         "fitzroy"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 1204,
+        "battery": 1206,
+        "water_level": 1205
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56706,6 +57289,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2537,
+        "number": "535180",
+        "name": "Consuelo AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 1205,
+          "type": "Water Level",
+          "sensor_id": "535180.0.H.1205",
+          "device_id": 1
+        },
+        {
+          "alert_id": 1204,
+          "type": "Rainfall",
+          "sensor_id": "535180.0.R.1204",
+          "device_id": 2
+        },
+        {
+          "alert_id": 1206,
+          "type": "Battery",
+          "sensor_id": "535180.0.B.1206",
+          "device_id": 3
+        },
+        {
+          "alert_id": 1204,
+          "type": "Rainfall Increment",
+          "sensor_id": "535180.0.R.1204",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56722,7 +57336,11 @@
       "catchment_ids": [
         "burnett"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 4749,
+        "battery": 4751,
+        "water_level": 4750
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56736,6 +57354,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2585,
+        "number": "539143",
+        "name": "Bundaberg South AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 4750,
+          "type": "Water Level",
+          "sensor_id": "539143.0.H.4750",
+          "device_id": 1
+        },
+        {
+          "alert_id": 4749,
+          "type": "Rainfall",
+          "sensor_id": "539143.0.R.4749",
+          "device_id": 2
+        },
+        {
+          "alert_id": 4751,
+          "type": "Battery",
+          "sensor_id": "539143.0.B.4751",
+          "device_id": 3
+        },
+        {
+          "alert_id": 4749,
+          "type": "Rainfall Increment",
+          "sensor_id": "539143.0.R.4749",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56752,7 +57401,11 @@
       "catchment_ids": [
         "burnett"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 4728,
+        "battery": 4730,
+        "water_level": 4729
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56767,6 +57420,37 @@
         "Rain Gauge",
         "Water Level",
         "Reservoir"
+      ],
+      "site": {
+        "db_id": 2593,
+        "number": "539152",
+        "name": "Paradise Dam AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 4729,
+          "type": "Water Level",
+          "sensor_id": "539152.0.H.4729",
+          "device_id": 1
+        },
+        {
+          "alert_id": 4728,
+          "type": "Rainfall",
+          "sensor_id": "539152.0.R.4728",
+          "device_id": 2
+        },
+        {
+          "alert_id": 4730,
+          "type": "Battery",
+          "sensor_id": "539152.0.B.4730",
+          "device_id": 3
+        },
+        {
+          "alert_id": 4728,
+          "type": "Rainfall Increment",
+          "sensor_id": "539152.0.R.4728",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56783,7 +57467,11 @@
       "catchment_ids": [
         "burnett"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 705,
+        "battery": 707,
+        "water_level": 706
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56797,6 +57485,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2621,
+        "number": "539182",
+        "name": "Cania Dam HW AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 706,
+          "type": "Water Level",
+          "sensor_id": "539182.0.H.706",
+          "device_id": 1
+        },
+        {
+          "alert_id": 705,
+          "type": "Rainfall",
+          "sensor_id": "539182.0.R.705",
+          "device_id": 2
+        },
+        {
+          "alert_id": 707,
+          "type": "Battery",
+          "sensor_id": "539182.0.B.707",
+          "device_id": 3
+        },
+        {
+          "alert_id": 705,
+          "type": "Rainfall Increment",
+          "sensor_id": "539182.0.R.705",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56813,7 +57532,11 @@
       "catchment_ids": [
         "burnett"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 744,
+        "battery": 746,
+        "water_level": 745
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56828,6 +57551,37 @@
         "Rain Gauge",
         "Water Level",
         "Reservoir"
+      ],
+      "site": {
+        "db_id": 2642,
+        "number": "539203",
+        "name": "Wuruma Dam HW AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 745,
+          "type": "Water Level",
+          "sensor_id": "539203.0.H.745",
+          "device_id": 1
+        },
+        {
+          "alert_id": 744,
+          "type": "Rainfall",
+          "sensor_id": "539203.0.R.744",
+          "device_id": 2
+        },
+        {
+          "alert_id": 746,
+          "type": "Battery",
+          "sensor_id": "539203.0.B.746",
+          "device_id": 3
+        },
+        {
+          "alert_id": 744,
+          "type": "Rainfall Increment",
+          "sensor_id": "539203.0.R.744",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56844,7 +57598,11 @@
       "catchment_ids": [
         "fitzroy"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 933,
+        "battery": 935,
+        "water_level": 934
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56858,6 +57616,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2671,
+        "number": "539235",
+        "name": "Callide Dam HW AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 934,
+          "type": "Water Level",
+          "sensor_id": "539235.0.H.934",
+          "device_id": 1
+        },
+        {
+          "alert_id": 933,
+          "type": "Rainfall",
+          "sensor_id": "539235.0.R.933",
+          "device_id": 2
+        },
+        {
+          "alert_id": 935,
+          "type": "Battery",
+          "sensor_id": "539235.0.B.935",
+          "device_id": 3
+        },
+        {
+          "alert_id": 933,
+          "type": "Rainfall Increment",
+          "sensor_id": "539235.0.R.933",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56874,7 +57663,11 @@
       "catchment_ids": [
         "fitzroy"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 927,
+        "battery": 929,
+        "water_level": 928
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56889,6 +57682,37 @@
         "Rain Gauge",
         "Water Level",
         "Reservoir"
+      ],
+      "site": {
+        "db_id": 2677,
+        "number": "539241",
+        "name": "Kroombit Dam AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 928,
+          "type": "Water Level",
+          "sensor_id": "539241.0.H.928",
+          "device_id": 1
+        },
+        {
+          "alert_id": 927,
+          "type": "Rainfall",
+          "sensor_id": "539241.0.R.927",
+          "device_id": 2
+        },
+        {
+          "alert_id": 929,
+          "type": "Battery",
+          "sensor_id": "539241.0.B.929",
+          "device_id": 3
+        },
+        {
+          "alert_id": 927,
+          "type": "Rainfall Increment",
+          "sensor_id": "539241.0.R.927",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56905,7 +57729,10 @@
       "catchment_ids": [
         "burnett"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 4895,
+        "water_level": 4894
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56918,6 +57745,25 @@
       "basin": "Burnett River",
       "location_types": [
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2690,
+        "number": "539260",
+        "name": "Maryborough St AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 4894,
+          "type": "Water Level",
+          "sensor_id": "539260.0.H.4894",
+          "device_id": 1
+        },
+        {
+          "alert_id": 4895,
+          "type": "Battery",
+          "sensor_id": "539260.0.B.4895",
+          "device_id": 2
+        }
       ]
     },
     {
@@ -56934,7 +57780,11 @@
       "catchment_ids": [
         "burnett"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 4891,
+        "battery": 4893,
+        "water_level": 4892
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56948,6 +57798,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2691,
+        "number": "539261",
+        "name": "Cherry Ck (Lenihans Rd) AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 4892,
+          "type": "Water Level",
+          "sensor_id": "539261.0.H.4892",
+          "device_id": 1
+        },
+        {
+          "alert_id": 4891,
+          "type": "Rainfall",
+          "sensor_id": "539261.0.R.4891",
+          "device_id": 2
+        },
+        {
+          "alert_id": 4893,
+          "type": "Battery",
+          "sensor_id": "539261.0.B.4893",
+          "device_id": 3
+        },
+        {
+          "alert_id": 4891,
+          "type": "Rainfall Increment",
+          "sensor_id": "539261.0.R.4891",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56964,7 +57845,11 @@
       "catchment_ids": [
         "burnett"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 4379,
+        "battery": 4381,
+        "water_level": 4380
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -56978,6 +57863,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2692,
+        "number": "539262",
+        "name": "Bungadoo (Goondoon Rd) AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 4380,
+          "type": "Water Level",
+          "sensor_id": "539262.0.H.4380",
+          "device_id": 1
+        },
+        {
+          "alert_id": 4379,
+          "type": "Rainfall",
+          "sensor_id": "539262.0.R.4379",
+          "device_id": 2
+        },
+        {
+          "alert_id": 4381,
+          "type": "Battery",
+          "sensor_id": "539262.0.B.4381",
+          "device_id": 3
+        },
+        {
+          "alert_id": 4379,
+          "type": "Rainfall Increment",
+          "sensor_id": "539262.0.R.4379",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -56994,7 +57910,11 @@
       "catchment_ids": [
         "burnett"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 4382,
+        "battery": 4384,
+        "water_level": 4383
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57008,6 +57928,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2693,
+        "number": "539263",
+        "name": "Pine Ck Rd AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 4383,
+          "type": "Water Level",
+          "sensor_id": "539263.0.H.4383",
+          "device_id": 1
+        },
+        {
+          "alert_id": 4382,
+          "type": "Rainfall",
+          "sensor_id": "539263.0.R.4382",
+          "device_id": 2
+        },
+        {
+          "alert_id": 4384,
+          "type": "Battery",
+          "sensor_id": "539263.0.B.4384",
+          "device_id": 3
+        },
+        {
+          "alert_id": 4382,
+          "type": "Rainfall Increment",
+          "sensor_id": "539263.0.R.4382",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -57025,7 +57976,9 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 1704
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57039,6 +57992,37 @@
       "location_types": [
         "Rain Gauge",
         "Repeater"
+      ],
+      "site": {
+        "db_id": 2726,
+        "number": "540100",
+        "name": "The Summit AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 1704,
+          "type": "Battery",
+          "sensor_id": "540100.1.B.1704",
+          "device_id": 1
+        },
+        {
+          "alert_id": 1705,
+          "type": "Battery",
+          "sensor_id": "540100.2.B.1705",
+          "device_id": 2
+        },
+        {
+          "alert_id": 1700,
+          "type": "Repeater",
+          "sensor_id": "540100.1.RP.1700",
+          "device_id": 3
+        },
+        {
+          "alert_id": 1701,
+          "type": "Repeater",
+          "sensor_id": "540100.2.RP.1701",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -57055,7 +58039,10 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 6556,
+        "water_level": 6557
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57069,6 +58056,31 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2763,
+        "number": "540149",
+        "name": "Glenore Grove AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 6557,
+          "type": "Water Level",
+          "sensor_id": "540149.0.H.6557",
+          "device_id": 1
+        },
+        {
+          "alert_id": 6556,
+          "type": "Rainfall",
+          "sensor_id": "540149.0.R.6556",
+          "device_id": 2
+        },
+        {
+          "alert_id": 6556,
+          "type": "Rainfall Increment",
+          "sensor_id": "540149.0.R.6556",
+          "device_id": 3
+        }
       ]
     },
     {
@@ -57085,7 +58097,10 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 6789,
+        "water_level": 6788
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57098,6 +58113,25 @@
       "basin": "Brisbane River",
       "location_types": [
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2846,
+        "number": "540272",
+        "name": "Little Oakey Ck AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 6788,
+          "type": "Water Level",
+          "sensor_id": "540272.0.H.6788",
+          "device_id": 1
+        },
+        {
+          "alert_id": 6789,
+          "type": "Battery",
+          "sensor_id": "540272.0.B.6789",
+          "device_id": 2
+        }
       ]
     },
     {
@@ -57114,7 +58148,10 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 6787,
+        "water_level": 6786
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57127,6 +58164,25 @@
       "basin": "Brisbane River",
       "location_types": [
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2849,
+        "number": "540276",
+        "name": "Upper Cressbrook AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 6786,
+          "type": "Water Level",
+          "sensor_id": "540276.0.H.6786",
+          "device_id": 1
+        },
+        {
+          "alert_id": 6787,
+          "type": "Battery",
+          "sensor_id": "540276.0.B.6787",
+          "device_id": 2
+        }
       ]
     },
     {
@@ -57143,7 +58199,10 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 6780,
+        "battery": 6781
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57157,6 +58216,31 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2865,
+        "number": "540298",
+        "name": "Perseverance AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 6780,
+          "type": "Rainfall",
+          "sensor_id": "540298.0.R.6780",
+          "device_id": 2
+        },
+        {
+          "alert_id": 6781,
+          "type": "Battery",
+          "sensor_id": "540298.0.B.6781",
+          "device_id": 3
+        },
+        {
+          "alert_id": 6780,
+          "type": "Rainfall Increment",
+          "sensor_id": "540298.0.R.6780",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -57174,7 +58258,10 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5425,
+        "battery": 5426
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57188,6 +58275,31 @@
       "location_types": [
         "Rain Gauge",
         "Repeater"
+      ],
+      "site": {
+        "db_id": 2903,
+        "number": "540341",
+        "name": "Hume Lane AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 5425,
+          "type": "Rainfall",
+          "sensor_id": "540341.0.R.5425",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5426,
+          "type": "Battery",
+          "sensor_id": "540341.0.B.5426",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5425,
+          "type": "Rainfall Increment",
+          "sensor_id": "540341.0.R.5425",
+          "device_id": 3
+        }
       ]
     },
     {
@@ -57204,7 +58316,11 @@
       "catchment_ids": [
         "burrum"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 6093,
+        "battery": 6095,
+        "water_level": 6094
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57218,6 +58334,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2970,
+        "number": "540449",
+        "name": "Torbanlea AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 6094,
+          "type": "Water Level",
+          "sensor_id": "540449.0.H.6094",
+          "device_id": 1
+        },
+        {
+          "alert_id": 6093,
+          "type": "Rainfall",
+          "sensor_id": "540449.0.R.6093",
+          "device_id": 2
+        },
+        {
+          "alert_id": 6095,
+          "type": "Battery",
+          "sensor_id": "540449.0.B.6095",
+          "device_id": 3
+        },
+        {
+          "alert_id": 6093,
+          "type": "Rainfall Increment",
+          "sensor_id": "540449.0.R.6093",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -57234,7 +58381,11 @@
       "catchment_ids": [
         "mary"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5605,
+        "battery": 5607,
+        "water_level": 5606
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57248,6 +58399,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2971,
+        "number": "540450",
+        "name": "Black Swamp Ck AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 5606,
+          "type": "Water Level",
+          "sensor_id": "540450.0.H.5606",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5605,
+          "type": "Rainfall",
+          "sensor_id": "540450.0.R.5605",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5607,
+          "type": "Battery",
+          "sensor_id": "540450.0.B.5607",
+          "device_id": 3
+        },
+        {
+          "alert_id": 5605,
+          "type": "Rainfall Increment",
+          "sensor_id": "540450.0.R.5605",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -57264,7 +58446,11 @@
       "catchment_ids": [
         "mary"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5602,
+        "battery": 5604,
+        "water_level": 5603
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57278,6 +58464,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2973,
+        "number": "540452",
+        "name": "Booral Rd AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 5603,
+          "type": "Water Level",
+          "sensor_id": "540452.0.H.5603",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5602,
+          "type": "Rainfall",
+          "sensor_id": "540452.0.R.5602",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5604,
+          "type": "Battery",
+          "sensor_id": "540452.0.B.5604",
+          "device_id": 3
+        },
+        {
+          "alert_id": 5602,
+          "type": "Rainfall Increment",
+          "sensor_id": "540452.0.R.5602",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -57294,7 +58511,10 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 1759,
+        "water_level": 1760
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57308,6 +58528,31 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 2996,
+        "number": "540477",
+        "name": "Wakerley AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 1760,
+          "type": "Water Level",
+          "sensor_id": "540477.0.H.1760",
+          "device_id": 1
+        },
+        {
+          "alert_id": 1759,
+          "type": "Rainfall",
+          "sensor_id": "540477.0.R.1759",
+          "device_id": 2
+        },
+        {
+          "alert_id": 1759,
+          "type": "Rainfall Increment",
+          "sensor_id": "540477.0.R.1759",
+          "device_id": 3
+        }
       ]
     },
     {
@@ -57324,7 +58569,9 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "water_level": 6747
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57338,6 +58585,19 @@
       "location_types": [
         "Water Level",
         "Tide Gauge"
+      ],
+      "site": {
+        "db_id": 3013,
+        "number": "540495",
+        "name": "Whyte Island AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 6747,
+          "type": "Water Level",
+          "sensor_id": "540495.0.H.6747",
+          "device_id": 1
+        }
       ]
     },
     {
@@ -57354,7 +58614,9 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "water_level": 6743
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57367,6 +58629,19 @@
       "basin": "Brisbane River",
       "location_types": [
         "Water Level"
+      ],
+      "site": {
+        "db_id": 3021,
+        "number": "540504",
+        "name": "Walloon AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 6743,
+          "type": "Water Level",
+          "sensor_id": "540504.0.H.6743",
+          "device_id": 1
+        }
       ]
     },
     {
@@ -57383,7 +58658,11 @@
       "catchment_ids": [
         "logan_albert"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 6266,
+        "battery": 6268,
+        "water_level": 6267
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57397,6 +58676,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 3073,
+        "number": "540598",
+        "name": "Bahrs Scrub AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 6267,
+          "type": "Water Level",
+          "sensor_id": "540598.0.H.6267",
+          "device_id": 1
+        },
+        {
+          "alert_id": 6266,
+          "type": "Rainfall",
+          "sensor_id": "540598.0.R.6266",
+          "device_id": 2
+        },
+        {
+          "alert_id": 6268,
+          "type": "Battery",
+          "sensor_id": "540598.0.B.6268",
+          "device_id": 3
+        },
+        {
+          "alert_id": 6266,
+          "type": "Rainfall Increment",
+          "sensor_id": "540598.0.R.6266",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -57413,7 +58723,11 @@
       "catchment_ids": [
         "mary"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5611,
+        "battery": 5613,
+        "water_level": 5612
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57427,6 +58741,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 3129,
+        "number": "540677",
+        "name": "Bidwell AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 5612,
+          "type": "Water Level",
+          "sensor_id": "540677.0.H.5612",
+          "device_id": 1
+        },
+        {
+          "alert_id": 5611,
+          "type": "Rainfall",
+          "sensor_id": "540677.0.R.5611",
+          "device_id": 2
+        },
+        {
+          "alert_id": 5613,
+          "type": "Battery",
+          "sensor_id": "540677.0.B.5613",
+          "device_id": 3
+        },
+        {
+          "alert_id": 5611,
+          "type": "Rainfall Increment",
+          "sensor_id": "540677.0.R.5611",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -57443,7 +58788,10 @@
       "catchment_ids": [
         "burnett"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 803,
+        "water_level": 802
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57456,6 +58804,25 @@
       "basin": "Burnett River",
       "location_types": [
         "Water Level"
+      ],
+      "site": {
+        "db_id": 3149,
+        "number": "540698",
+        "name": "Boondooma Dam HW AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 802,
+          "type": "Water Level",
+          "sensor_id": "540698.0.H.802",
+          "device_id": 1
+        },
+        {
+          "alert_id": 803,
+          "type": "Battery",
+          "sensor_id": "540698.0.B.803",
+          "device_id": 2
+        }
       ]
     },
     {
@@ -57884,7 +59251,11 @@
       "catchment_ids": [
         "balonne_condamine"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 4968,
+        "battery": 4970,
+        "water_level": 4969
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -57898,6 +59269,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 3321,
+        "number": "541162",
+        "name": "Jandowae Dam AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 4969,
+          "type": "Water Level",
+          "sensor_id": "541162.0.H.4969",
+          "device_id": 1
+        },
+        {
+          "alert_id": 4968,
+          "type": "Rainfall",
+          "sensor_id": "541162.0.R.4968",
+          "device_id": 2
+        },
+        {
+          "alert_id": 4970,
+          "type": "Battery",
+          "sensor_id": "541162.0.B.4970",
+          "device_id": 3
+        },
+        {
+          "alert_id": 4968,
+          "type": "Rainfall Increment",
+          "sensor_id": "541162.0.R.4968",
+          "device_id": 4
+        }
       ]
     },
     {
@@ -57998,7 +59400,10 @@
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 7555,
+        "water_level": 7554
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -58010,6 +59415,25 @@
       "lga": "Byron Shire Council",
       "location_types": [
         "Water Level"
+      ],
+      "site": {
+        "db_id": 1468,
+        "number": "558019",
+        "name": "Brunswick Heads (Brunswick River)"
+      },
+      "sensors": [
+        {
+          "alert_id": 7554,
+          "type": "Water Level",
+          "sensor_id": "558019.1.H.7554",
+          "device_id": 1
+        },
+        {
+          "alert_id": 7555,
+          "type": "Battery",
+          "sensor_id": "558019.1.B.7555",
+          "device_id": 2
+        }
       ]
     },
     {
@@ -58024,7 +59448,10 @@
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 7584,
+        "battery": 7579
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -58036,6 +59463,31 @@
       "lga": "Byron Shire Council",
       "location_types": [
         "Rain Gauge"
+      ],
+      "site": {
+        "db_id": 1480,
+        "number": "558036",
+        "name": "Myocum"
+      },
+      "sensors": [
+        {
+          "alert_id": 7579,
+          "type": "Battery",
+          "sensor_id": "558036.1.B.7579",
+          "device_id": 1
+        },
+        {
+          "alert_id": 7584,
+          "type": "Rainfall",
+          "sensor_id": "558036.1.R.7584",
+          "device_id": 2
+        },
+        {
+          "alert_id": 7584,
+          "type": "Rainfall Increment",
+          "sensor_id": "558036.1.R.7584",
+          "device_id": 3
+        }
       ]
     },
     {
@@ -58102,7 +59554,10 @@
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 3489,
+        "water_level": 3490
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -58115,6 +59570,25 @@
       "basin": "Brunswick River",
       "location_types": [
         "Water Level"
+      ],
+      "site": {
+        "db_id": 11513,
+        "number": "558105",
+        "name": "Crabbes Creek"
+      },
+      "sensors": [
+        {
+          "alert_id": 3489,
+          "type": "Battery",
+          "sensor_id": "558105.1.B.3489",
+          "device_id": 1
+        },
+        {
+          "alert_id": 3490,
+          "type": "Water Level",
+          "sensor_id": "558105.1.H.3490",
+          "device_id": 2
+        }
       ]
     },
     {
@@ -58129,7 +59603,11 @@
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 3482,
+        "battery": 3480,
+        "water_level": 3481
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -58143,6 +59621,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 1516,
+        "number": "558106",
+        "name": "Burringbar Rd (Burringbar Creek)"
+      },
+      "sensors": [
+        {
+          "alert_id": 3481,
+          "type": "Water Level",
+          "sensor_id": "558106.1.H.3481",
+          "device_id": 1
+        },
+        {
+          "alert_id": 3480,
+          "type": "Battery",
+          "sensor_id": "558106.1.B.3480",
+          "device_id": 2
+        },
+        {
+          "alert_id": 3482,
+          "type": "Rainfall",
+          "sensor_id": "558106.1.R.3482",
+          "device_id": 3
+        },
+        {
+          "alert_id": 3482,
+          "type": "Rainfall Increment",
+          "sensor_id": "558106.1.R.3482",
+          "device_id": 7
+        }
       ]
     },
     {
@@ -58157,7 +59666,10 @@
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 7885,
+        "water_level": 7884
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -58170,6 +59682,25 @@
       "basin": "Macquarie-Tuggerah Lakes",
       "location_types": [
         "Water Level"
+      ],
+      "site": {
+        "db_id": 5735,
+        "number": "561062",
+        "name": "KALANG RD (DORA CREEK)"
+      },
+      "sensors": [
+        {
+          "alert_id": 7884,
+          "type": "Water Level",
+          "sensor_id": "561062.2.H.7884",
+          "device_id": 1
+        },
+        {
+          "alert_id": 7885,
+          "type": "Battery",
+          "sensor_id": "561062.2.B.7885",
+          "device_id": 2
+        }
       ]
     },
     {
@@ -58184,7 +59715,10 @@
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 3572,
+        "battery": 3573
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -58197,6 +59731,31 @@
       "basin": "Hunter River",
       "location_types": [
         "Rain Gauge"
+      ],
+      "site": {
+        "db_id": 1630,
+        "number": "561111",
+        "name": "Macquarie College"
+      },
+      "sensors": [
+        {
+          "alert_id": 3573,
+          "type": "Battery",
+          "sensor_id": "561111.1.B.3573",
+          "device_id": 1
+        },
+        {
+          "alert_id": 3572,
+          "type": "Rainfall",
+          "sensor_id": "561111.1.R.3572",
+          "device_id": 2
+        },
+        {
+          "alert_id": 3572,
+          "type": "Rainfall Increment",
+          "sensor_id": "561111.1.R.3572",
+          "device_id": 3
+        }
       ]
     },
     {
@@ -58211,7 +59770,10 @@
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 3681,
+        "water_level": 3680
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -58223,6 +59785,25 @@
       "lga": "Dungog Shire Council",
       "location_types": [
         "Water Level"
+      ],
+      "site": {
+        "db_id": 1666,
+        "number": "561171",
+        "name": "Dungog (Myall Creek)"
+      },
+      "sensors": [
+        {
+          "alert_id": 3680,
+          "type": "Water Level",
+          "sensor_id": "561171.1.H.3680",
+          "device_id": 1
+        },
+        {
+          "alert_id": 3681,
+          "type": "Battery",
+          "sensor_id": "561171.1.B.3681",
+          "device_id": 2
+        }
       ]
     },
     {
@@ -58237,7 +59818,11 @@
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 7505,
+        "battery": 7504,
+        "water_level": 7506
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -58250,6 +59835,37 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
+      ],
+      "site": {
+        "db_id": 1702,
+        "number": "563096",
+        "name": "Macquarie River at Rock Forest"
+      },
+      "sensors": [
+        {
+          "alert_id": 7506,
+          "type": "Water Level",
+          "sensor_id": "563096.1.H.7506",
+          "device_id": 1
+        },
+        {
+          "alert_id": 7504,
+          "type": "Battery",
+          "sensor_id": "563096.1.B.7504",
+          "device_id": 2
+        },
+        {
+          "alert_id": 7505,
+          "type": "Rainfall",
+          "sensor_id": "563096.1.R.7505",
+          "device_id": 4
+        },
+        {
+          "alert_id": 7505,
+          "type": "Rainfall Increment",
+          "sensor_id": "563096.1.R.7505",
+          "device_id": 5
+        }
       ]
     },
     {
@@ -59352,7 +60968,10 @@
       "catchment_ids": [
         "warrego"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 4213,
+        "battery": 4214
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -59366,6 +60985,31 @@
       "location_types": [
         "Rain Gauge",
         "Repeater"
+      ],
+      "site": {
+        "db_id": 3366,
+        "number": "544031",
+        "name": "Arabella AL"
+      },
+      "sensors": [
+        {
+          "alert_id": 4213,
+          "type": "Rainfall",
+          "sensor_id": "544031.0.R.4213",
+          "device_id": 1
+        },
+        {
+          "alert_id": 4214,
+          "type": "Battery",
+          "sensor_id": "544031.0.B.4214",
+          "device_id": 2
+        },
+        {
+          "alert_id": 4213,
+          "type": "Rainfall Increment",
+          "sensor_id": "544031.0.R.4213",
+          "device_id": 3
+        }
       ]
     },
     {
