@@ -2578,6 +2578,47 @@ const Maps = (function () {
     mstate.query = v;
     renderList(); renderSuggestions();
   }
+  // A4/A3 (and every ISO A-series) page shares a 1:√2 ratio — used as the
+  // viewer's default shape until a file's real page size is known.
+  const A4_RATIO = 1 / Math.SQRT2;
+  const pdfAspectCache = new Map(); // file -> width/height ratio (or null if undetectable)
+
+  function setViewerAspect(ratio) {
+    const host = document.getElementById('maps-viewer');
+    if (!host) return;
+    if (ratio && isFinite(ratio) && ratio > 0) host.style.setProperty('--maps-aspect', String(ratio));
+    else host.style.removeProperty('--maps-aspect');
+  }
+
+  // Reads just enough of the PDF to find its first /MediaBox (and any
+  // /Rotate) so the viewer can be sized to the map's real page proportions
+  // instead of a guessed default.
+  async function loadPdfAspect(file, path) {
+    if (pdfAspectCache.has(file)) return;
+    try {
+      const res = await fetch(path);
+      if (!res.ok) return;
+      const buf = await res.arrayBuffer();
+      const text = new TextDecoder('latin1').decode(buf);
+      const m = text.match(/\/MediaBox\s*\[\s*(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s*\]/);
+      let ratio = null;
+      if (m) {
+        let w = Math.abs(parseFloat(m[3]) - parseFloat(m[1]));
+        let h = Math.abs(parseFloat(m[4]) - parseFloat(m[2]));
+        const rot = text.match(/\/Rotate\s+(-?\d+)/);
+        if (rot) {
+          const deg = ((parseInt(rot[1], 10) % 360) + 360) % 360;
+          if (deg === 90 || deg === 270) [w, h] = [h, w];
+        }
+        if (w > 0 && h > 0) ratio = w / h;
+      }
+      pdfAspectCache.set(file, ratio);
+      if (mstate.file === file) setViewerAspect(ratio || A4_RATIO);
+    } catch (e) {
+      // Fetch/parse failure: the A4 fallback aspect ratio already applied stands.
+    }
+  }
+
   function openFile(file, scroll = true) {
     mstate.file = file;
     localStorage.setItem('mn-maps-file', file);
@@ -2590,9 +2631,20 @@ const Maps = (function () {
     if (pathEl) pathEl.textContent = path;
     if (linkEl) linkEl.href = path;
     if (host) {
-      host.innerHTML = isImage(file)
-        ? `<img class="maps-view-img" alt="${escAttr(file)}" src="${path}">`
-        : `<iframe class="maps-view-frame" src="${path}#view=FitH" title="${escAttr(file)}"></iframe>`;
+      if (isImage(file)) {
+        host.innerHTML = `<img class="maps-view-img" alt="${escAttr(file)}" src="${path}">`;
+        setViewerAspect(null);
+        const img = host.querySelector('img');
+        if (img) img.addEventListener('load', () => {
+          if (mstate.file === file && img.naturalWidth && img.naturalHeight) {
+            setViewerAspect(img.naturalWidth / img.naturalHeight);
+          }
+        }, { once: true });
+      } else {
+        host.innerHTML = `<iframe class="maps-view-frame" src="${path}#view=FitH" title="${escAttr(file)}"></iframe>`;
+        setViewerAspect(pdfAspectCache.get(file) || A4_RATIO);
+        loadPdfAspect(file, path);
+      }
     }
     renderList();
     if (scroll && host) host.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
