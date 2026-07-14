@@ -694,10 +694,10 @@ function bfBitsToFlip() {
 
 // Compute flip variants for the current input:
 // [{ bits:[...], value, binary, matches:[{station,sensor}] }] in bit-combo order.
-function bfComputeVariants() {
+function bfComputeVariants(idx) {
   const base = bfBaseId();
   if (base == null) return [];
-  const idx = buildSensorIndex();
+  idx = idx || buildSensorIndex();
   const variants = [];
   for (const combo of bitCombos(16, bfBitsToFlip())) {
     let v = base;
@@ -808,13 +808,23 @@ function renderBitFlipperResults() {
     return `<div class="panel"><p class="small" style="color:var(--muted)">Enter a valid ALERT address (1–65535) above.</p></div>`;
   }
 
-  const variants = bfComputeVariants();
+  const idx      = buildSensorIndex();
+  const variants = bfComputeVariants(idx);
   const filter   = state.bfSensorFilter || '';
   const matchPasses = m => !filter || m.sensor.type === filter;
   const rowMatches  = v => v.matches.filter(matchPasses);
 
+  // Station of interest: the exact match on the entered address (no bits
+  // flipped). Pinned to the top of the table and always ARRO-linked so the
+  // owning station is shown alongside its bit-flip neighbours.
+  const baseRow = {
+    isBase: true, bits: null, value: base,
+    binary: base.toString(2).padStart(16, '0'),
+    matches: idx.get(base) || [],
+  };
+
   // sensor types present among matches (for the filter dropdown)
-  const types = [...new Set(variants.flatMap(v => v.matches.map(m => m.sensor.type)))].sort();
+  const types = [...new Set([baseRow, ...variants].flatMap(v => v.matches.map(m => m.sensor.type)))].sort();
 
   // rows to display
   let rows;
@@ -826,10 +836,18 @@ function renderBitFlipperResults() {
   const truncated   = rows.length > BF_MAX_RENDER_ROWS;
   if (truncated) rows = rows.slice(0, BF_MAX_RENDER_ROWS);
 
+  // Pin the station-of-interest row at the top, following the same match/filter
+  // rules the variant rows do so it isn't shown emptily under an active filter.
+  const showBase = filter ? rowMatches(baseRow).length
+                 : state.bfOnlyMatches ? baseRow.matches.length
+                 : true;
+  if (showBase) rows = [baseRow, ...rows];
+
   const matchedCount = variants.filter(v => v.matches.length).length;
 
-  // ARRO link across every matched sensor that passes the current filter
-  const arroPairs = variants.flatMap(v => v.matches.filter(matchPasses));
+  // ARRO link across the station of interest plus every matched flip-variant
+  // sensor that passes the current filter.
+  const arroPairs = [baseRow, ...variants].flatMap(v => v.matches.filter(matchPasses));
   const arro = buildArroUrl(arroPairs);
 
   const rowsHtml = rows.map(v => {
@@ -847,9 +865,12 @@ function renderBitFlipperResults() {
     const repHtml = reps.length
       ? reps.map(r => `<span class="badge badge--repeater">${esc(r.name)}</span>`).join(' ')
       : dash;
+    const bitsCell = v.isBase
+      ? `NA <span class="badge bf-badge-base" title="Station of interest — the ALERT address you entered">station of interest</span>`
+      : v.bits.join(', ');
     return `
-      <tr>
-        <td class="small mono">${v.bits.join(', ')}</td>
+      <tr${v.isBase ? ' class="bf-row-base"' : ''}>
+        <td class="small mono">${bitsCell}</td>
         <td>${v.value}</td>
         <td class="small mono">${v.binary}</td>
         <td style="text-align:center">${hit ? '✓' : ''}</td>
