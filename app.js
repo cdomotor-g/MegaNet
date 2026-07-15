@@ -1801,7 +1801,7 @@ const Packets = (function () {
     if (fileStations !== null || fileLoading) return;
     fileLoading = true;
     try {
-      const res = await fetch(encodeURI('All 2021 Working 2.txt'));
+      const res = await fetch(encodeURI('data/All 2021 Working 2.txt'));
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const buf = await res.arrayBuffer();
       const u8 = new Uint8Array(buf);
@@ -2182,8 +2182,8 @@ const Packets = (function () {
         </details>
         <p class="spec" style="margin-top:.75rem">
           Bit-field layouts from BoM <em>ERTS Data Formats</em> v1.0 (July 2003) —
-          <a href="${encodeURI('BOM spec erts_data_formats_doc.pdf')}" target="_blank" rel="noopener">specification PDF</a>.
-          Station names from <a href="${encodeURI('All 2021 Working 2.txt')}" target="_blank" rel="noopener">All 2021 Working 2.txt</a>.
+          <a href="${encodeURI('docs/BOM spec erts_data_formats_doc.pdf')}" target="_blank" rel="noopener">specification PDF</a>.
+          Station names from <a href="${encodeURI('data/All 2021 Working 2.txt')}" target="_blank" rel="noopener">All 2021 Working 2.txt</a>.
           <span id="pkt-stnStatus" class="small"></span>
         </p>
       </div>
@@ -2302,7 +2302,13 @@ const Maps = (function () {
 
   function ext(file)   { return file.split('.').pop().toUpperCase(); }
   function isImage(f)  { return /\.(png|jpe?g|gif|webp|svg)$/i.test(f); }
-  function encPath(f)  { return './' + f.split('/').map(encodeURIComponent).join('/'); }
+  // Resolve a catalogue filename to its on-disk location (files live in
+  // per-region sub-folders under maps/, see maps-data.js FILE_PATH) and
+  // URL-encode each path segment. Falls back to the bare name if unmapped.
+  function encPath(f)  {
+    const rel = (MD && MD.FILE_PATH && MD.FILE_PATH[f]) || f;
+    return './' + rel.split('/').map(encodeURIComponent).join('/');
+  }
   function fileTags(file) {
     const info = (MD && MD.FILE_INFO[file]) || {};
     const out = [ext(file)];
