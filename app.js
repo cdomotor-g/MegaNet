@@ -2792,10 +2792,11 @@ const Serial = (function () {
       parity:      d.parity      || 'none',
       flowControl: d.flowControl || 'none',
       mode:        d.mode        || 'text',
+      alertFraming: d.alertFraming || 'lines',
     };
   }
   function saveDefaults(conn) {
-    const d = Object.assign({}, conn.settings, { mode: conn.mode });
+    const d = Object.assign({}, conn.settings, { mode: conn.mode, alertFraming: conn.alertFraming });
     try { localStorage.setItem(DEFAULTS_KEY, JSON.stringify(d)); } catch (_) {}
   }
 
@@ -2813,6 +2814,7 @@ const Serial = (function () {
       settings: { baudRate: d.baudRate, dataBits: d.dataBits, stopBits: d.stopBits,
                   parity: d.parity, flowControl: d.flowControl },
       mode: d.mode,
+      alertFraming: d.alertFraming,      // 'lines' (ASCII hex/bits) | 'bytes' (4-byte payload)
       entries: [],                       // {ts, cls, body(html), raw(text)}
       bytes: 0,
       count: 0,                          // lines (text) / rows (hex) / frames (alert)
@@ -2973,26 +2975,29 @@ const Serial = (function () {
     conn.bytes += u8.length;
     if      (conn.mode === 'text')  handleText(conn, u8);
     else if (conn.mode === 'hex')   handleHex(conn, u8);
-    else if (conn.mode === 'alert') handleAlert(conn, u8);
+    else if (conn.mode === 'alert') (conn.alertFraming === 'bytes' ? handleAlert : handleAlertLines)(conn, u8);
     scheduleStats(conn);
   }
 
-  function handleText(conn, u8) {
+  // Buffer decoded text and invoke onLine() for each complete CRLF/LF/CR line; a
+  // newline-less stream is flushed once it grows past 8 KB so it can't buffer
+  // forever. Shared by ASCII-text mode and line-framed ALERT decode.
+  function splitLines(conn, u8, onLine) {
     conn.textBuf += conn.decoder.decode(u8, { stream: true });
     let m;
-    // split on CRLF, LF or lone CR
     while ((m = conn.textBuf.search(/\r\n|\r|\n/)) >= 0) {
       const line = conn.textBuf.slice(0, m);
       conn.textBuf = conn.textBuf.slice(m + (conn.textBuf.substr(m, 2) === '\r\n' ? 2 : 1));
+      onLine(line);
+    }
+    if (conn.textBuf.length > 8192) { onLine(conn.textBuf); conn.textBuf = ''; }
+  }
+
+  function handleText(conn, u8) {
+    splitLines(conn, u8, line => {
       conn.count++;
       emit(conn, { ts: Date.now(), cls: 'rx', body: esc(line) || '&nbsp;', raw: line });
-    }
-    // don't let a newline-less stream buffer forever
-    if (conn.textBuf.length > 8192) {
-      conn.count++;
-      emit(conn, { ts: Date.now(), cls: 'rx', body: esc(conn.textBuf), raw: conn.textBuf });
-      conn.textBuf = '';
-    }
+    });
   }
 
   function handleHex(conn, u8) {
@@ -3013,6 +3018,7 @@ const Serial = (function () {
     emit(conn, { ts: Date.now(), cls: 'hex', body, raw: offStr + '  ' + hex + '  ' + ascii });
   }
 
+  // ── ALERT decode: raw-byte framing (4 payload bytes = one 32-bit payload) ─────
   function handleAlert(conn, u8) {
     for (const b of u8) conn.alertBuf.push(b);
     while (conn.alertBuf.length >= 4) emitAlertFrame(conn, conn.alertBuf.splice(0, 4));
@@ -3021,24 +3027,61 @@ const Serial = (function () {
   function emitAlertFrame(conn, bytes) {
     conn.count++;
     const hex = '0x' + bytes.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-    const dec = Packets.decodeMessage(hex);
+    emitAlertRow(conn, hex, hex, Packets.decodeMessage(hex));
+  }
+
+  // ── ALERT decode: line framing (ASCII hex / bits / full 40-bit framed) ────────
+  // Each incoming line is normalised then decoded with the shared Packets codec,
+  // which accepts the full 40-bit framed bit-string (detecting and stripping the
+  // start/stop bits), the 32-bit payload, or 8-digit hex. Undecodable lines are
+  // still shown so an unknown device's output is never hidden.
+  function handleAlertLines(conn, u8) {
+    splitLines(conn, u8, line => emitAlertLine(conn, line));
+  }
+
+  function emitAlertLine(conn, line) {
+    const shown = line.trim();
+    if (!shown) return;
+    conn.count++;
+    const token = normaliseAlertToken(shown);
+    emitAlertRow(conn, shown, token, Packets.decodeMessage(token));
+  }
+
+  // Coax a device's line into a form Packets.decodeMessage accepts: keep 0x-hex
+  // and 32/40-bit binary as-is; treat a bare 8-hex-digit line as hex. Anything
+  // else is passed through and left for the decoder to reject.
+  function normaliseAlertToken(s) {
+    const t = s.replace(/[\s,_.\-]+/g, '');
+    if (/^0x/i.test(t) || /^[01]{32}$/.test(t) || /^[01]{40}$/.test(t)) return t;
+    if (/^[0-9a-fA-F]{8}$/.test(t)) return '0x' + t;
+    return t;
+  }
+
+  // Render one decoded ALERT row, shared by byte- and line-framing. `source` is
+  // the token shown to the user; `linkArg` is what the details/inspect link hands
+  // to the ALERT Packets decoder.
+  function emitAlertRow(conn, source, linkArg, dec) {
+    const src = '<span class="ser-alert-hex">' + esc(source) + '</span>';
+    const link = escAttr(linkArg);
     let body, raw;
     if (dec.ok && dec.best) {
       const r = dec.results.find(x => x.format === dec.best);
       const st = Packets.stationName(r.values.A);
       const val = r.values.D !== undefined ? ' <span class="ser-alert-val">val ' + r.values.D + '</span>' : '';
-      body = '<span class="ser-alert-hex">' + hex + '</span> '
+      const framed = dec.framing && dec.framing.present
+        ? ' <span class="ser-alert-framed">40-bit framed → 32-bit payload</span>' : '';
+      body = src + ' '
         + '<span class="ser-badge ok">' + r.format.toUpperCase() + '</span> '
         + '<span class="ser-alert-id">ID ' + r.values.A + '</span>' + val + ' '
         + '<span class="ser-alert-stn' + (st.none ? ' none' : '') + '">' + esc(st.text) + '</span>'
-        + ' <a class="ser-link" onclick="Serial.openInPackets(\'' + hex + '\')">details ▸</a>';
-      raw = hex + '  ' + r.format.toUpperCase() + '  ID ' + r.values.A
+        + framed
+        + ' <a class="ser-link" onclick="Serial.openInPackets(\'' + link + '\')">details ▸</a>';
+      raw = source + '  ' + r.format.toUpperCase() + '  ID ' + r.values.A
         + (r.values.D !== undefined ? '  val ' + r.values.D : '') + '  ' + st.text;
     } else {
-      body = '<span class="ser-alert-hex">' + hex + '</span> '
-        + '<span class="ser-badge bad">no ALERT match</span>'
-        + ' <a class="ser-link" onclick="Serial.openInPackets(\'' + hex + '\')">inspect ▸</a>';
-      raw = hex + '  no ALERT match';
+      body = src + ' <span class="ser-badge bad">no ALERT match</span>'
+        + ' <a class="ser-link" onclick="Serial.openInPackets(\'' + link + '\')">inspect ▸</a>';
+      raw = source + '  no ALERT match';
     }
     emit(conn, { ts: Date.now(), cls: 'alert', body, raw });
   }
@@ -3053,9 +3096,14 @@ const Serial = (function () {
   function flushPartials(conn) {
     if (conn.hexBuf && conn.hexBuf.length) emitHexRow(conn, conn.hexBuf.splice(0, conn.hexBuf.length));
     if (conn.textBuf) {
-      conn.count++;
-      emit(conn, { ts: Date.now(), cls: 'rx', body: esc(conn.textBuf), raw: conn.textBuf });
+      const partial = conn.textBuf;
       conn.textBuf = '';
+      if (conn.mode === 'alert' && conn.alertFraming === 'lines') {
+        emitAlertLine(conn, partial);
+      } else {
+        conn.count++;
+        emit(conn, { ts: Date.now(), cls: 'rx', body: esc(partial), raw: partial });
+      }
     }
     scheduleStats(conn);
   }
@@ -3187,7 +3235,10 @@ const Serial = (function () {
     c.mode = val;
     const note = document.getElementById('ser-mode-note-' + id);
     if (note) note.textContent = MODE_HINT[val];
+    const fw = document.getElementById('ser-framing-wrap-' + id);
+    if (fw) fw.style.display = val === 'alert' ? '' : 'none';
   }
+  function setAlertFraming(id, val) { const c = byId(id); if (c) c.alertFraming = val; }
 
   // ── disconnect handling ───────────────────────────────────────────────────────
   function hookDisconnect() {
@@ -3210,7 +3261,7 @@ const Serial = (function () {
   const MODE_HINT = {
     text:  'Bytes are decoded as UTF-8/ASCII and split into lines on CR/LF.',
     hex:   'Raw bytes shown as a hex + ASCII dump (16 bytes per row) — best for inspecting binary framing.',
-    alert: 'Every 4 bytes are decoded as a 32-bit ALERT payload (ABF/BCC/EAF/EIF) and matched to the station database. Use “Resync” to shift byte alignment if frames don’t line up. ALERT2 support is planned.',
+    alert: 'A framed ALERT message is 40 bits on the wire — four 10-bit words, each a start bit + 8 data bits + a stop bit — so it carries 32 payload bits, and the ABF/BCC/EAF/EIF field layout (address, data, CRC) is defined over those 32 bits. Two framing options below: “Text lines” decodes each ASCII line and accepts the full 40-bit bit-string, the 32-bit payload, or hex (start/stop bits are stripped automatically); “Raw bytes” treats every 4 bytes as one 32-bit payload, for receivers that emit decoded binary. Not sure which your device sends? Use Hex mode to inspect the raw bytes first. ALERT2 support is planned.',
   };
 
   function statusBadge(conn) {
@@ -3255,6 +3306,9 @@ const Serial = (function () {
       + '  <label>Display mode'
       + '    <select onchange="Serial.setMode(\'' + conn.id + '\',this.value)">'
       +        opt('text', 'ASCII text', conn.mode) + opt('hex', 'Hex dump', conn.mode) + opt('alert', 'ALERT decode', conn.mode) + '</select></label>'
+      + '  <label id="ser-framing-wrap-' + conn.id + '" style="display:' + (conn.mode === 'alert' ? '' : 'none') + '">ALERT framing'
+      + '    <select onchange="Serial.setAlertFraming(\'' + conn.id + '\',this.value)">'
+      +        opt('lines', 'Text lines (ASCII hex or bits)', conn.alertFraming) + opt('bytes', 'Raw bytes (4-byte payload)', conn.alertFraming) + '</select></label>'
       + '</div>'
       + '<p class="ser-mode-note" id="ser-mode-note-' + conn.id + '">' + MODE_HINT[conn.mode] + '</p>'
       + (conn.err ? '<p class="ser-err">Could not open port: ' + esc(conn.err) + '</p>' : '')
@@ -3266,12 +3320,14 @@ const Serial = (function () {
 
   function liveBody(conn) {
     const isOpen = conn.phase === 'open';
+    const modeLabel = MODE_LABEL[conn.mode]
+      + (conn.mode === 'alert' ? ' (' + (conn.alertFraming === 'bytes' ? 'raw bytes' : 'text lines') + ')' : '');
     const cfg = conn.settings.baudRate + ' baud · ' + conn.settings.dataBits + fmtParity(conn.settings.parity)
-      + conn.settings.stopBits + ' · ' + MODE_LABEL[conn.mode];
+      + conn.settings.stopBits + ' · ' + modeLabel;
     let tb = '<div class="ser-toolbar">';
     if (isOpen) {
       tb += '<button class="ghost" onclick="Serial.togglePause(\'' + conn.id + '\')">' + (conn.paused ? 'Resume' : 'Pause') + '</button>';
-      if (conn.mode === 'alert')
+      if (conn.mode === 'alert' && conn.alertFraming === 'bytes')
         tb += '<button class="ghost" onclick="Serial.resync(\'' + conn.id + '\')">Resync</button>';
     } else {
       tb += '<button class="primary" onclick="Serial.reopenConn(\'' + conn.id + '\')">Reopen</button>';
@@ -3367,6 +3423,6 @@ const Serial = (function () {
   return {
     render, init, addConnection, choosePort, openConn, closeConn, removeConn, reopenConn,
     togglePause, clearLog, saveLog, toggleFlag, sendData, resync, openInPackets,
-    setName, setSetting, setMode,
+    setName, setSetting, setMode, setAlertFraming,
   };
 })();

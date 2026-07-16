@@ -855,6 +855,7 @@ code {
 .ser-alert-val  { font-weight: 600; }
 .ser-alert-stn  { color: var(--ok); font-weight: 600; }
 .ser-alert-stn.none { color: var(--muted); font-weight: 400; }
+.ser-alert-framed { color: var(--muted); font-size: .9em; font-style: italic; }
 .ser-link { color: var(--accent); cursor: pointer; text-decoration: underline; font-size: .92em; }
 
 /* inline status/format badges (self-contained, theme independent) */

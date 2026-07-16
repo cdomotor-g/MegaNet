@@ -334,13 +334,22 @@ output live, on the **Serial Monitor** tab. Built on the browser's
   - **ASCII text** — bytes decoded as UTF-8/ASCII and split into lines on CR/LF.
   - **Hex dump** — raw bytes as an offset + hex + ASCII dump (16 bytes/row), for
     inspecting binary framing.
-  - **ALERT decode** — every 4 bytes are decoded as a 32-bit ALERT payload
-    (ABF/BCC/EAF/EIF) using the same codec as the ALERT Packets tab, showing the
-    matched format, sensor ID, value and the station name (cross-referenced to
-    the loaded MegaNet database and the bundled national address file). A
-    *Resync* button drops a byte to shift frame alignment when a stream isn't
-    4-byte aligned, and each decoded frame links through to the full ALERT
-    Packets decoder. *(ALERT2 support is planned.)*
+  - **ALERT decode** — decodes ALERT/ERTS readings (ABF/BCC/EAF/EIF) using the
+    same codec as the ALERT Packets tab, showing the matched format, sensor ID,
+    value and the station name (cross-referenced to the loaded MegaNet database
+    and the bundled national address file); each row links through to the full
+    ALERT Packets decoder. A framed ALERT message is **40 bits** on the wire —
+    four 10-bit words, each a start bit + 8 data bits + a stop bit — carrying
+    **32 payload bits**, over which the field layout is defined. Two framing
+    options handle whatever the receiver emits:
+    - **Text lines** (default) — decodes each ASCII line, accepting the full
+      40-bit framed bit-string (start/stop bits stripped automatically), the
+      32-bit payload, or hex; undecodable lines are still shown.
+    - **Raw bytes** — treats every 4 bytes as one 32-bit payload for receivers
+      that emit decoded binary; a *Resync* button drops a byte to shift frame
+      alignment when the stream isn't 4-byte aligned.
+
+    *(ALERT2 support is planned.)*
 - **Live controls** — Pause/Resume, Clear, Save log (download the scrollback as
   text), optional timestamps and autoscroll, byte/line/frame counters with a
   live throughput reading, and a send box (with selectable line ending) to talk
