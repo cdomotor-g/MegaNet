@@ -2779,13 +2779,14 @@ const Serial = (function () {
   const conns = [];          // live connection objects (module-scoped, not serialised)
   let nextId = 1;
   let disconnectHooked = false;
+  let knownPorts = [];       // ports the browser has already granted us (getPorts)
 
   const supported = typeof navigator !== 'undefined' && 'serial' in navigator;
 
   // Bumped whenever the Serial Monitor changes. Shown in the tab header so it is
   // possible to confirm at a glance which build of app.js the browser actually
   // loaded — a stale, cached app.js is the usual reason a "fixed" bug persists.
-  const SERIAL_BUILD = '2026-07-16c';
+  const SERIAL_BUILD = '2026-07-16d';
 
   function loadDefaults() {
     let d = {};
@@ -2885,6 +2886,7 @@ const Serial = (function () {
       conn.portLabel = portLabel(port);
       conn.err = null;
       hookDisconnect();
+      await refreshKnownPorts();
       renderList();
     } catch (e) {
       console.warn('[Serial] requestPort failed:', e && e.name, '-', e && e.message);
@@ -2892,13 +2894,39 @@ const Serial = (function () {
       // device list was empty). Say so instead of falling silent.
       if (e && e.name === 'NotFoundError') {
         setPortStatus(conn, 'No port selected. Click “Choose COM port…” again and pick your device. '
-          + 'If the list is empty, check the USB cable/driver and that nothing else already has the port open.', 'warn');
+          + 'If the list is empty, the browser can’t see a serial device: check the USB cable/driver, and '
+          + 'that no other program or browser tab already has the COM port open.', 'warn');
         return;
       }
       setPortStatus(conn, 'Could not select a COM port: ' + ((e && e.message) || e), 'err');
       alert('Could not select a COM port: ' + ((e && e.message) || e) + '\n\n'
         + 'If no port picker appeared, check that serial access is allowed for this site.');
     }
+  }
+
+  // Ports the browser has already granted us in a previous pick (persist across
+  // reloads). Surfacing them lets the user reconnect a known device with one
+  // click instead of fighting the picker, and is a live check of what the
+  // browser can actually see.
+  async function refreshKnownPorts() {
+    try {
+      knownPorts = (navigator.serial && navigator.serial.getPorts)
+        ? await navigator.serial.getPorts() : [];
+    } catch (_) { knownPorts = []; }
+  }
+
+  // Attach a previously-granted port (from the "Previously allowed" list) to a
+  // connection without going through the picker.
+  function useKnownPort(id, index) {
+    const conn = byId(id);
+    if (!conn) return;
+    const port = knownPorts[index];
+    if (!port) return;
+    conn.port = port;
+    conn.portLabel = portLabel(port);
+    conn.err = null;
+    hookDisconnect();
+    renderList();
   }
 
   function portLabel(port) {
@@ -2913,14 +2941,44 @@ const Serial = (function () {
     return 'Serial port';
   }
 
+  // Translate a port.open() DOMException into a plain-English cause + remedy.
+  // The raw messages ("Failed to open serial port.") tell the user nothing.
+  function describeOpenError(e) {
+    const name = e && e.name;
+    const msg  = (e && e.message) || String(e);
+    if (name === 'InvalidStateError')
+      return 'The port is already open. Close it in the other browser tab or program that has it, then try again.';
+    if (name === 'NotFoundError')
+      return 'The device is no longer connected. Re-plug it, click “Change…”, pick it again, then Open.';
+    if (name === 'SecurityError')
+      return 'Serial access was blocked. Click “Change…” and pick the port again to re-grant permission, then Open.';
+    if (name === 'NetworkError' || /failed to open|access is denied|access denied/i.test(msg))
+      return 'The operating system refused to open the COM port. It is almost always still held by another '
+        + 'program — a terminal (PuTTY/RealTerm), a logger, or this Serial Monitor in another tab. '
+        + 'Close whatever else has the port open and try again.';
+    return msg;
+  }
+
   async function openConn(id) {
     const conn = byId(id);
     if (!conn) return;
     if (!conn.port) { alert('Choose a COM port first.'); return; }
+    const s = conn.settings;
+    const baudRate = +s.baudRate || 0;
+    if (baudRate < 1) {
+      conn.phase = 'setup';
+      conn.err = 'Baud rate must be a positive number (e.g. 9600).';
+      renderList();
+      return;
+    }
+    // Always start from a clean slate. If a stale handle to this port is still
+    // open — from a previous session, or a device that dropped without being
+    // closed — a fresh open() would throw "The port is already open". Release it
+    // first so re-opening (and re-plug → Reopen) reliably works.
+    await teardown(conn);
     try {
-      const s = conn.settings;
       await conn.port.open({
-        baudRate:    +s.baudRate || 9600,
+        baudRate:    baudRate,
         dataBits:    +s.dataBits || 8,
         stopBits:    +s.stopBits || 1,
         parity:      s.parity || 'none',
@@ -2929,8 +2987,9 @@ const Serial = (function () {
       });
     } catch (e) {
       // keep the setup form up so the user can adjust settings and retry
+      console.warn('[Serial] open failed:', e && e.name, '-', e && e.message);
       conn.phase = 'setup';
-      conn.err = e.message;
+      conn.err = describeOpenError(e);
       renderList();
       return;
     }
@@ -2982,14 +3041,28 @@ const Serial = (function () {
     }
   }
 
+  // Stop reading and release the OS port handle. Best-effort: every step is
+  // guarded so it is safe to call in any state (never opened, open, or already
+  // dropped). Used both by Close and as the clean-slate step before (re)opening.
+  async function teardown(conn) {
+    conn.keepReading = false;
+    try { if (conn.reader) await conn.reader.cancel(); } catch (_) {}
+    try { if (conn.readLoopPromise) await conn.readLoopPromise; } catch (_) {}
+    conn.readLoopPromise = null;
+    conn.reader = null;
+    try { if (conn.writer) await conn.writer.close().catch(() => {}); } catch (_) {}
+    conn.writer = null;
+    // Only close if the port is actually open; closing a never-opened port
+    // throws, and we want teardown to be a safe no-op in that case.
+    try {
+      if (conn.port && (conn.port.readable || conn.port.writable)) await conn.port.close();
+    } catch (_) {}
+  }
+
   async function closeConn(id, opts) {
     const conn = byId(id);
     if (!conn) return;
-    conn.keepReading = false;
-    try { if (conn.reader) await conn.reader.cancel(); } catch (_) {}
-    try { await conn.readLoopPromise; } catch (_) {}
-    try { if (conn.writer) { await conn.writer.close().catch(() => {}); conn.writer = null; } } catch (_) {}
-    try { if (conn.port) await conn.port.close(); } catch (_) {}
+    await teardown(conn);
     flushPartials(conn);
     conn.phase = 'closed';
     emitSys(conn, 'Port closed', 'sys');
@@ -3238,15 +3311,22 @@ const Serial = (function () {
   function hookDisconnect() {
     if (disconnectHooked || !supported) return;
     disconnectHooked = true;
+    // A device being plugged in may newly appear in getPorts(): refresh so it
+    // shows in the "Previously allowed" list ready to reconnect.
+    navigator.serial.addEventListener('connect', () => { refreshKnownPorts().then(renderList); });
     navigator.serial.addEventListener('disconnect', e => {
       const conn = conns.find(c => c.port === e.target);
-      if (conn && conn.phase === 'open') {
-        conn.keepReading = false;
-        conn.phase = 'error';
-        conn.err = 'Device disconnected';
-        emitSys(conn, 'Device disconnected', 'err');
-        renderList();
+      if (conn) {
+        if (conn.phase === 'open') {
+          conn.phase = 'error';
+          conn.err = 'Device disconnected';
+          emitSys(conn, 'Device disconnected', 'err');
+        }
+        // Release our handle so a later reopen (after re-plugging) succeeds
+        // instead of failing with "The port is already open".
+        teardown(conn).then(() => renderList());
       }
+      refreshKnownPorts().then(renderList);
     });
   }
 
@@ -3275,12 +3355,22 @@ const Serial = (function () {
       ? '<span class="ser-port-ok">✓ ' + esc(conn.portLabel) + '</span> '
         + '<button class="ghost" onclick="Serial.choosePort(\'' + conn.id + '\')">Change…</button>'
       : '<button class="ghost" onclick="Serial.choosePort(\'' + conn.id + '\')">Choose COM port…</button>';
+    // Ports already granted in a previous pick — one click to reconnect without
+    // the picker. Shown only before a port is chosen for this connection.
+    const knownHtml = (!conn.port && knownPorts.length)
+      ? '<div class="ser-known" style="margin-top:.4rem;font-size:.8rem">'
+        + '<span style="opacity:.7">Previously allowed:</span> '
+        + knownPorts.map((p, i) => '<button class="ghost" onclick="Serial.useKnownPort(\''
+            + conn.id + '\',' + i + ')">' + esc(portLabel(p)) + '</button>').join(' ')
+        + '</div>'
+      : '';
     return ''
       + '<div class="ser-form">'
       + '  <label class="ser-f-name">Name'
       + '    <input type="text" value="' + esc(conn.name) + '" oninput="Serial.setName(\'' + conn.id + '\',this.value)">'
       + '  </label>'
       + '  <div class="ser-f-port"><label>COM port</label><div class="ser-port-row">' + portBtn + '</div>'
+      + knownHtml
       + '    <div class="ser-port-status" id="ser-port-status-' + conn.id + '" style="font-size:.8rem;margin-top:.35rem"></div></div>'
       + '  <label>Baud rate'
       + '    <input type="number" list="ser-bauds" value="' + esc(s.baudRate) + '" min="1"'
@@ -3409,10 +3499,13 @@ const Serial = (function () {
   function init() {
     hookDisconnect();
     renderList();
+    // Fill in the "Previously allowed" ports once the browser answers; keeps the
+    // first paint instant and non-blocking.
+    refreshKnownPorts().then(renderList);
   }
 
   return {
-    render, init, addConnection, choosePort, openConn, closeConn, removeConn, reopenConn,
+    render, init, addConnection, choosePort, useKnownPort, openConn, closeConn, removeConn, reopenConn,
     togglePause, clearLog, saveLog, toggleFlag, sendData, resync, openInPackets,
     setName, setSetting, setMode,
   };
