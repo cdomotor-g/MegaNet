@@ -60,6 +60,9 @@ MegaNet/
 ├── assets/geo/             ← source geometry (basin SVG is inlined in maps-data.js)
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
+├── tools/                  ← command-line helpers (needs Python; see tools/README.md)
+│   └── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
+│
 └── archive/                ← redundant / superseded / unreferenced (see archive/README.md)
     ├── prototype_index.html, BitFlipper*.html, image_bitflipper.svg, app_updated*.js
     ├── z_Sensors_…_NATIONAL.csv, fred_sites_newfile.csv        (redundant data)
