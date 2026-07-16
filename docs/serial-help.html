@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MegaNet — Serial access on managed computers</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+         max-width: 52rem; margin: 2rem auto; padding: 0 1.25rem; }
+  h1 { font-size: 1.45rem; } h2 { font-size: 1.15rem; margin-top: 2rem; }
+  code, pre { font-family: ui-monospace, Consolas, monospace; font-size: .88em;
+              background: rgba(128,128,128,.14); border-radius: 4px; }
+  code { padding: .1em .35em; }
+  pre { padding: .8rem 1rem; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: .75rem 0; }
+  th, td { border: 1px solid rgba(128,128,128,.35); padding: .45rem .6rem;
+           text-align: left; vertical-align: top; }
+  th { background: rgba(128,128,128,.12); }
+  .note { border-left: 4px solid #b26a00; padding: .5rem .9rem; margin: 1rem 0;
+          background: rgba(178,106,0,.08); }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<h1>Serial Monitor access on managed (work) computers</h1>
+
+<p>The MegaNet Serial Monitor uses the browser's
+<a href="https://developer.mozilla.org/docs/Web/API/Web_Serial_API">Web Serial API</a>.
+On a personal computer, clicking <em>Choose COM port…</em> opens the browser's
+port picker and you select the device. On a <strong>managed work computer</strong>,
+Chrome and Edge enterprise policies can block Web Serial entirely — the browser then
+rejects the request <em>instantly and silently, without ever showing a picker</em>,
+and the app can only report that the picker was suppressed.</p>
+
+<h2>Symptom guide</h2>
+<table>
+  <tr><th>What you see</th><th>What it means</th></tr>
+  <tr><td>"The browser refused to show the port picker" (no dialog ever appeared)</td>
+      <td>Web Serial is blocked — usually by enterprise policy on a managed machine.
+          See the IT request below. Nothing you change in the app can fix this.</td></tr>
+  <tr><td>The picker opens but the list is empty</td>
+      <td>The browser can't see a serial device: cable/driver problem, the device is
+          on a VDI/remote session without USB redirection, or another program holds
+          the port. This is a device/OS issue, not a permissions one.</td></tr>
+  <tr><td>"Web Serial isn't available in this browser"</td>
+      <td>Non-Chromium browser (Firefox/Safari) or the page was opened from a
+          <code>file://</code> path. Use Chrome or Edge over https or localhost.</td></tr>
+  <tr><td>"Failed to open serial port" after picking</td>
+      <td>The OS refused the open — almost always another program (PuTTY, a logger,
+          another browser tab) already has the COM port open.</td></tr>
+</table>
+
+<h2>What to ask IT for</h2>
+<p>Web Serial permission in Chrome and Edge is controlled by group policy. Either of
+the two options below works; option B never shows a picker at all, which some
+security teams prefer because it grants exactly one site access to exactly the
+approved devices.</p>
+
+<p><strong>Option A — allow this site to ask.</strong> Add the app's origin to
+<code>SerialAskForUrls</code> so the normal port picker appears for this site only:</p>
+<pre>Policy:  SerialAskForUrls
+Value:   ["https://cdomotor-g.github.io"]
+
+Chrome registry: HKLM\Software\Policies\Google\Chrome\SerialAskForUrls\1 = "https://cdomotor-g.github.io"
+Edge registry:   HKLM\Software\Policies\Microsoft\Edge\SerialAskForUrls\1 = "https://cdomotor-g.github.io"</pre>
+<p>This overrides a global block from <code>DefaultSerialGuardSetting = 2</code> for
+this one origin. If the site also appears in <code>SerialBlockedForUrls</code>, it
+must be removed from that list.</p>
+
+<p><strong>Option B — pre-approve the device, no picker needed.</strong> Grant the
+site access to specific USB serial adapters by vendor/product ID:</p>
+<pre>Policy:  SerialAllowUsbDevicesForUrls
+Value:   [{"devices": [{"vendor_id": 1027}], "urls": ["https://cdomotor-g.github.io"]}]</pre>
+<p>(<code>1027</code> = 0x0403, FTDI, as an example — use the VID of the actual
+adapter, visible in Windows Device Manager under the port's hardware IDs.)
+Pre-approved ports appear in the Serial Monitor under <em>"Previously allowed"</em>
+and connect with one click; the blocked picker is never involved. For non-USB
+(motherboard/PCIe) COM ports, <code>SerialAllowAllPortsForUrls</code> with the same
+origin is the equivalent.</p>
+
+<div class="note"><strong>Check what's currently applied:</strong> open
+<code>chrome://policy</code> (or <code>edge://policy</code>) and search for
+<em>serial</em>. <code>DefaultSerialGuardSetting</code> of <code>2</code> means
+"block serial on all sites unless a policy above allows it"; <code>3</code> means
+"ask" (the default behaviour). These pages are read-only — only IT can change the
+values, but a screenshot of them is exactly what IT needs to see with the request.</div>
+
+<h2>Notes for the security team</h2>
+<ul>
+  <li>Web Serial only ever grants access <em>per-site, per-device, with an explicit
+      user gesture</em> (or an explicit device allowlist via policy). It cannot
+      enumerate or open ports silently.</li>
+  <li>MegaNet is a static single-page app served from GitHub Pages
+      (<a href="https://cdomotor-g.github.io/MegaNet/">cdomotor-g.github.io/MegaNet</a>);
+      serial data is processed entirely in the browser and never leaves the machine.</li>
+  <li>Policy reference:
+      <a href="https://chromeenterprise.google/policies/#Serial">Chrome serial policies</a> ·
+      <a href="https://learn.microsoft.com/deployedge/microsoft-edge-policies#serialaskforurls">Edge serial policies</a>.</li>
+</ul>
+
+<p><a href="../index.html">← Back to MegaNet</a></p>
+</body>
+</html>

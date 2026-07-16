@@ -2786,7 +2786,7 @@ const Serial = (function () {
   // Bumped whenever the Serial Monitor changes. Shown in the tab header so it is
   // possible to confirm at a glance which build of app.js the browser actually
   // loaded — a stale, cached app.js is the usual reason a "fixed" bug persists.
-  const SERIAL_BUILD = '2026-07-16d';
+  const SERIAL_BUILD = '2026-07-16e';
 
   function loadDefaults() {
     let d = {};
@@ -2856,6 +2856,14 @@ const Serial = (function () {
     el.style.color = kind === 'err' ? '#c7401a' : kind === 'warn' ? '#b26a00' : '';
   }
 
+  // requestPort() rejects with the SAME NotFoundError whether the user cancelled
+  // the picker or the browser refused to show a picker at all (enterprise policy
+  // on a managed computer, kiosk/headless build, chooser UI unavailable). The one
+  // observable difference is time: a human needs well over this many milliseconds
+  // to see and dismiss a dialog, while a suppressed picker rejects almost
+  // instantly after the call.
+  const PICKER_INSTANT_MS = 350;
+
   async function choosePort(id) {
     const conn = byId(id);
     if (!conn) return;
@@ -2878,8 +2886,22 @@ const Serial = (function () {
       alert(m);
       return;
     }
+    // Definite Permissions-Policy block: the picker would be refused before it is
+    // even requested — typically because this page is embedded in an <iframe>
+    // without allow="serial" (a portal, SharePoint or Teams wrapper page).
+    try {
+      const fp = document.featurePolicy;
+      if (fp && fp.features && fp.features().includes('serial') && !fp.allowsFeature('serial')) {
+        setPortStatus(conn, (window.self !== window.top)
+          ? 'Serial access is blocked because this page is embedded inside another page. '
+            + 'Open the app in its own browser tab and try again.'
+          : 'Serial access is disabled for this page by a Permissions-Policy.', 'err');
+        return;
+      }
+    } catch (_) { /* diagnostic only — never blocks the real attempt */ }
     // Proof the handler ran, shown before the (blocking) native chooser opens.
     setPortStatus(conn, 'Opening the browser’s serial-port picker…', '');
+    const t0 = Date.now();
     try {
       const port = await navigator.serial.requestPort();
       conn.port = port;
@@ -2889,19 +2911,75 @@ const Serial = (function () {
       await refreshKnownPorts();
       renderList();
     } catch (e) {
-      console.warn('[Serial] requestPort failed:', e && e.name, '-', e && e.message);
-      // NotFoundError = the picker opened but no port was chosen (dismissed, or the
-      // device list was empty). Say so instead of falling silent.
+      const ms = Date.now() - t0;
+      console.warn('[Serial] requestPort failed after ' + ms + ' ms:', e && e.name, '-', e && e.message);
+      if (e && e.name === 'NotFoundError' && ms < PICKER_INSTANT_MS) {
+        // Rejected faster than any human could close a dialog: the browser never
+        // showed the picker. On managed (work) computers this is nearly always an
+        // enterprise policy blocking Web Serial. Ports pre-approved by IT policy
+        // still surface via getPorts(), so refresh the "Previously allowed" list
+        // before showing the advice.
+        await refreshKnownPorts();
+        renderList();
+        showBlockedPickerHelp(conn);
+        return;
+      }
+      // Slow NotFoundError = the picker really opened and no port was chosen
+      // (dismissed, or the device list was empty).
       if (e && e.name === 'NotFoundError') {
         setPortStatus(conn, 'No port selected. Click “Choose COM port…” again and pick your device. '
           + 'If the list is empty, the browser can’t see a serial device: check the USB cable/driver, and '
           + 'that no other program or browser tab already has the COM port open.', 'warn');
         return;
       }
+      if (e && e.name === 'SecurityError') {
+        setPortStatus(conn, 'The browser blocked the request: ' + ((e && e.message) || 'SecurityError')
+          + ' — if this page is embedded inside another page or portal, open it in its own tab; '
+          + 'otherwise check the padlock menu → Site settings → Serial ports.', 'err');
+        return;
+      }
       setPortStatus(conn, 'Could not select a COM port: ' + ((e && e.message) || e), 'err');
       alert('Could not select a COM port: ' + ((e && e.message) || e) + '\n\n'
         + 'If no port picker appeared, check that serial access is allowed for this site.');
     }
+  }
+
+  // Written into the status line when requestPort() rejected instantly, i.e. the
+  // chooser was suppressed rather than cancelled. All markup here is our own —
+  // the only dynamic value is the count of policy-granted ports.
+  function showBlockedPickerHelp(conn) {
+    const el = document.getElementById('ser-port-status-' + conn.id);
+    if (!el) return;
+    // The advice is long: let the port cell span the whole form row so it does
+    // not squeeze into (and collide with) the narrow settings columns. The next
+    // renderList() rebuilds the DOM and resets this automatically.
+    const cell = el.closest ? el.closest('.ser-f-port') : null;
+    if (cell) cell.style.gridColumn = '1 / -1';
+    const isEdge = /Edg\//.test(navigator.userAgent);
+    const policyPage = isEdge ? 'edge://policy' : 'chrome://policy';
+    const granted = knownPorts.length
+      ? '<p style="margin:.35rem 0 0"><strong>' + knownPorts.length + ' pre-approved port'
+        + (knownPorts.length > 1 ? 's are' : ' is') + ' available</strong> under “Previously allowed” '
+        + 'above — use that button instead of the picker.</p>'
+      : '';
+    el.style.color = '#c7401a';
+    el.innerHTML =
+        '<strong>The browser refused to show the port picker.</strong> It rejected the request instantly, '
+      + 'so no dialog was ever displayed — this is a browser or IT-policy block, not an empty device list. '
+      + '(If you did see a picker and closed it, ignore this and just click the button again.)'
+      + granted
+      + '<ol style="margin:.35rem 0 0 1.1rem;padding:0">'
+      + '<li>Open <code>' + policyPage + '</code> and search for <code>serial</code>. '
+      +   '<code>DefaultSerialGuardSetting = 2</code>, or this site listed under <code>SerialBlockedForUrls</code>, '
+      +   'means your organisation blocks Web Serial — IT must add this site to <code>SerialAskForUrls</code>.</li>'
+      + '<li>Click the padlock by the address bar → <em>Site settings</em> → <em>Serial ports</em> → set to '
+      +   '<em>Ask</em>. If the control is greyed out, it is locked by IT policy.</li>'
+      + '<li>IT can instead pre-approve the device itself (<code>SerialAllowUsbDevicesForUrls</code> or '
+      +   '<code>SerialAllowAllPortsForUrls</code>) — pre-approved ports appear here under “Previously allowed” '
+      +   'and need no picker at all. A ready-to-send request for IT is in '
+      +   '<a href="docs/serial-help.html" target="_blank" rel="noopener">the serial access guide</a>.</li>'
+      + '<li>Try the other browser — if Chrome is blocked, Edge often isn’t (and vice-versa).</li>'
+      + '</ol>';
   }
 
   // Ports the browser has already granted us in a previous pick (persist across
