@@ -2782,6 +2782,11 @@ const Serial = (function () {
 
   const supported = typeof navigator !== 'undefined' && 'serial' in navigator;
 
+  // Bumped whenever the Serial Monitor changes. Shown in the tab header so it is
+  // possible to confirm at a glance which build of app.js the browser actually
+  // loaded — a stale, cached app.js is the usual reason a "fixed" bug persists.
+  const SERIAL_BUILD = '2026-07-16c';
+
   function loadDefaults() {
     let d = {};
     try { d = JSON.parse(localStorage.getItem(DEFAULTS_KEY) || '{}'); } catch (_) {}
@@ -2841,11 +2846,21 @@ const Serial = (function () {
     if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
+  // Write a short status line beneath the "Choose COM port…" button. Colour is
+  // set inline so the message is legible regardless of the stylesheet.
+  function setPortStatus(conn, msg, kind) {
+    const el = document.getElementById('ser-port-status-' + conn.id);
+    if (!el) return;
+    el.textContent = msg || '';
+    el.style.color = kind === 'err' ? '#c7401a' : kind === 'warn' ? '#b26a00' : '';
+  }
+
   async function choosePort(id) {
     const conn = byId(id);
     if (!conn) return;
-    // Guard the click explicitly so it never fails silently: tell the user why
-    // the browser port picker can't be shown instead of appearing to do nothing.
+    // The port picker can never look like a dead click: every path below either
+    // opens the browser chooser, updates the UI, or leaves a visible message.
+    console.log('[Serial] choosePort() invoked for', id, '(build ' + SERIAL_BUILD + ')');
     if (!supported) {
       alert('Web Serial isn’t available in this browser.\n\n'
         + 'Use a Chromium-based browser — Chrome, Edge or Opera — served over https or from localhost.');
@@ -2856,6 +2871,14 @@ const Serial = (function () {
         + 'This page is being served insecurely, so the browser blocks access to serial ports.');
       return;
     }
+    if (!navigator.serial || typeof navigator.serial.requestPort !== 'function') {
+      const m = 'navigator.serial.requestPort is unavailable, so no COM-port picker can be shown.';
+      setPortStatus(conn, m, 'err');
+      alert(m);
+      return;
+    }
+    // Proof the handler ran, shown before the (blocking) native chooser opens.
+    setPortStatus(conn, 'Opening the browser’s serial-port picker…', '');
     try {
       const port = await navigator.serial.requestPort();
       conn.port = port;
@@ -2864,8 +2887,15 @@ const Serial = (function () {
       hookDisconnect();
       renderList();
     } catch (e) {
-      // NotFoundError = the user dismissed the chooser without picking a port; leave the card as-is.
-      if (e && e.name === 'NotFoundError') return;
+      console.warn('[Serial] requestPort failed:', e && e.name, '-', e && e.message);
+      // NotFoundError = the picker opened but no port was chosen (dismissed, or the
+      // device list was empty). Say so instead of falling silent.
+      if (e && e.name === 'NotFoundError') {
+        setPortStatus(conn, 'No port selected. Click “Choose COM port…” again and pick your device. '
+          + 'If the list is empty, check the USB cable/driver and that nothing else already has the port open.', 'warn');
+        return;
+      }
+      setPortStatus(conn, 'Could not select a COM port: ' + ((e && e.message) || e), 'err');
       alert('Could not select a COM port: ' + ((e && e.message) || e) + '\n\n'
         + 'If no port picker appeared, check that serial access is allowed for this site.');
     }
@@ -3250,7 +3280,8 @@ const Serial = (function () {
       + '  <label class="ser-f-name">Name'
       + '    <input type="text" value="' + esc(conn.name) + '" oninput="Serial.setName(\'' + conn.id + '\',this.value)">'
       + '  </label>'
-      + '  <div class="ser-f-port"><label>COM port</label><div class="ser-port-row">' + portBtn + '</div></div>'
+      + '  <div class="ser-f-port"><label>COM port</label><div class="ser-port-row">' + portBtn + '</div>'
+      + '    <div class="ser-port-status" id="ser-port-status-' + conn.id + '" style="font-size:.8rem;margin-top:.35rem"></div></div>'
       + '  <label>Baud rate'
       + '    <input type="number" list="ser-bauds" value="' + esc(s.baudRate) + '" min="1"'
       + '           oninput="Serial.setSetting(\'' + conn.id + '\',\'baudRate\',this.value)">'
@@ -3360,7 +3391,8 @@ const Serial = (function () {
     }
     return '<div class="serial">' + bauds
       + '<div class="panel">'
-      + '  <div class="panel-header"><h2>Serial Monitor</h2>'
+      + '  <div class="panel-header"><h2>Serial Monitor '
+      + '<span class="small" style="opacity:.55;font-weight:normal">build ' + SERIAL_BUILD + '</span></h2>'
       + '    <button class="primary" onclick="Serial.addConnection()"' + (supported ? '' : ' disabled') + '>+ Add connection</button>'
       + '  </div>'
       + '  <p class="sub">Connect physical serial devices to your computer’s COM ports and watch their output live. '
@@ -3386,9 +3418,12 @@ const Serial = (function () {
   };
 })();
 
-// The Web Serial API exposes a built-in `Serial` interface constructor on
-// `window`. In inline onclick handlers (e.g. Serial.choosePort(…)) that global
-// can shadow this module in some browsers/contexts, which makes the buttons —
-// like "Choose COM port…" — appear to do nothing. Bind the module explicitly so
-// `Serial` always resolves to it regardless of how the handler is scoped.
+// Expose the module on `window` for parity with the other tab modules and for
+// debugging from the console. NOTE: the built-in Web Serial `Serial` interface
+// on `window` does NOT actually break the inline onclick handlers — a top-level
+// `const Serial` lives in the global lexical environment, which name resolution
+// consults before the global object, so `Serial.choosePort(…)` resolves to this
+// module with or without this line. (An earlier fix wrongly blamed that global
+// collision; the real "does nothing" reports trace to a silent NotFoundError or
+// a stale, cached app.js — hence the visible status line and build stamp above.)
 if (typeof window !== 'undefined') window.Serial = Serial;
