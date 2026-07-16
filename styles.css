@@ -768,3 +768,103 @@ code {
   .maps-viewer-panel { min-height: 70vh; }
   .maps-viewer { min-height: 480px; }
 }
+
+/* ── Serial Monitor tab ─────────────────────────────────────────────────────── */
+.serial { max-width: 1100px; margin: auto; padding: 1rem; display: grid; gap: 1rem; }
+.serial .sub { color: var(--muted); font-size: .92rem; margin: .35rem 0 0; max-width: 90ch; }
+.serial .panel-header h2 { margin: 0; }
+
+.serial button.ghost {
+  background: transparent; color: var(--accent); border: 1px solid var(--accent);
+  font-weight: 500; padding: .4rem .7rem; font-size: .82rem; border-radius: 8px; cursor: pointer;
+}
+.serial button.ghost:hover { filter: brightness(1.1); }
+
+.ser-warn { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, var(--panel)); }
+.ser-warn h3 { margin: 0 0 .4rem; }
+.ser-warn p { margin: 0; color: var(--muted); font-size: .9rem; }
+
+#serial-conns { display: grid; gap: 1rem; }
+.ser-empty p { margin: 0; color: var(--muted); }
+
+.ser-conn { padding: 1rem; }
+.ser-conn.ser-open   { border-color: var(--ok); }
+.ser-conn.ser-error  { border-color: var(--bad); }
+
+.ser-conn-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.ser-conn-name { font-weight: 700; font-size: 1.02rem; }
+.ser-conn-port { margin-left: auto; }
+
+/* setup form */
+.ser-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: .7rem;
+  align-items: end;
+}
+.ser-form label { display: grid; gap: .3rem; font-size: .85rem; color: var(--muted); }
+.ser-f-name { grid-column: 1 / -1; }
+.ser-f-port { display: grid; gap: .3rem; font-size: .85rem; color: var(--muted); }
+.ser-port-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; min-height: 38px; }
+.ser-port-ok { color: var(--ok); font-weight: 600; font-size: .88rem; }
+.ser-mode-note { margin: .75rem 0 0; font-size: .85rem; color: var(--muted); }
+.ser-err { margin: .6rem 0 0; font-size: .85rem; color: var(--bad); font-weight: 600; }
+.ser-actions { display: flex; gap: .6rem; margin-top: 1rem; flex-wrap: wrap; }
+
+/* live view */
+.ser-toolbar { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.ser-check { display: inline-flex; align-items: center; gap: .3rem; font-size: .82rem; color: var(--muted); }
+.ser-check input { width: auto; }
+.ser-substats { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  margin: .6rem 0; font-size: .82rem; color: var(--muted); }
+.ser-cfg { font-weight: 600; }
+
+.ser-send { display: flex; gap: .5rem; margin-bottom: .6rem; align-items: center; }
+.ser-send input[type="text"] { flex: 1; }
+.ser-send select { width: auto; min-width: 120px; }
+
+.ser-log {
+  font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--subtle);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .5rem .6rem;
+  height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ser-line { display: flex; gap: .6rem; align-items: baseline; padding: .02rem 0; }
+.ser-log-text .ser-line { white-space: pre-wrap; }
+.ser-ts { color: var(--muted); flex: 0 0 auto; opacity: .8; }
+.ser-linebody { flex: 1; min-width: 0; }
+.ser-sys .ser-linebody  { color: var(--accent); font-style: italic; }
+.ser-err .ser-linebody  { color: var(--bad); font-weight: 600; }
+.ser-tx  .ser-linebody  { color: var(--warn); }
+.ser-tx-arrow { font-weight: 700; }
+
+/* hex dump columns */
+.ser-hex .ser-linebody { display: grid; grid-template-columns: auto 1fr auto; gap: 1rem; }
+.ser-hex-off   { color: var(--muted); }
+.ser-hex-bytes { letter-spacing: .02em; }
+.ser-hex-ascii { color: var(--muted); white-space: pre; }
+
+/* alert decode line */
+.ser-alert-hex  { color: var(--muted); }
+.ser-alert-id   { font-weight: 700; color: var(--accent); }
+.ser-alert-val  { font-weight: 600; }
+.ser-alert-stn  { color: var(--ok); font-weight: 600; }
+.ser-alert-stn.none { color: var(--muted); font-weight: 400; }
+.ser-link { color: var(--accent); cursor: pointer; text-decoration: underline; font-size: .92em; }
+
+/* inline status/format badges (self-contained, theme independent) */
+.ser-badge { display: inline-block; padding: 1px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 700;
+  background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--muted); white-space: nowrap; }
+.ser-badge.ok   { background: color-mix(in srgb, var(--ok) 16%, transparent);   color: var(--ok); }
+.ser-badge.bad  { background: color-mix(in srgb, var(--bad) 14%, transparent);  color: var(--bad); }
+.ser-badge.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+
+@media (max-width: 700px) {
+  .ser-conn-port { margin-left: 0; width: 100%; }
+  .ser-hex .ser-linebody { grid-template-columns: 1fr; gap: .1rem; }
+}

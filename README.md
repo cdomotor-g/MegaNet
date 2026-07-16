@@ -317,17 +317,52 @@ by region, and — new — suggests the relevant map(s) for any station.
 > (or from the runtime detection, reviewed near basin edges); (c) backfill
 > `radio_network_ids` for the remaining stations.
 
-### 9. Dark / Light Theme
+### 9. Serial Monitor (Live Serial Ingestion)
+Connect physical serial devices to the computer's COM ports and stream their
+output live, on the **Serial Monitor** tab. Built on the browser's
+[Web Serial API](https://developer.mozilla.org/docs/Web/API/Web_Serial_API).
+
+- **Multiple simultaneous connections** — click *+ Add connection* to spin up as
+  many connections as you have ports. Each is an independent card with its own
+  port, settings and display, all reading at once.
+- **Per-connection serial settings** — choose the COM port (via the browser's
+  native port chooser), then set baud rate (with a datalist of common rates),
+  data bits (7/8), parity (none/even/odd), stop bits (1/2) and flow control
+  (none/hardware). The last-used settings are remembered in `localStorage` and
+  pre-fill the next new connection.
+- **Three display modes** per connection:
+  - **ASCII text** — bytes decoded as UTF-8/ASCII and split into lines on CR/LF.
+  - **Hex dump** — raw bytes as an offset + hex + ASCII dump (16 bytes/row), for
+    inspecting binary framing.
+  - **ALERT decode** — every 4 bytes are decoded as a 32-bit ALERT payload
+    (ABF/BCC/EAF/EIF) using the same codec as the ALERT Packets tab, showing the
+    matched format, sensor ID, value and the station name (cross-referenced to
+    the loaded MegaNet database and the bundled national address file). A
+    *Resync* button drops a byte to shift frame alignment when a stream isn't
+    4-byte aligned, and each decoded frame links through to the full ALERT
+    Packets decoder. *(ALERT2 support is planned.)*
+- **Live controls** — Pause/Resume, Clear, Save log (download the scrollback as
+  text), optional timestamps and autoscroll, byte/line/frame counters with a
+  live throughput reading, and a send box (with selectable line ending) to talk
+  back to the device.
+- **Background capture** — connections live outside the page's re-render cycle,
+  so reads continue while you're on other tabs; the log is repainted from a
+  capped scrollback buffer when you return.
+- **Requirements** — Web Serial needs a Chromium browser (Chrome/Edge/Opera)
+  served over **https** or **localhost**; the tab shows a clear notice in
+  unsupported browsers or insecure contexts.
+
+### 10. Dark / Light Theme
 - Toggle between dark and light modes
 - Preference persisted to `localStorage`
 
-### 10. Radio Network Management
+### 11. Radio Network Management
 - Named radio network clusters (typically named after the primary repeater or ingest point)
 - Assign stations and repeaters to one or more networks
 - Select networks to scope all views and exports to that cluster
 - "Select all" / "Clear all" shortcuts
 
-### 11. Station Detail Panel
+### 12. Station Detail Panel
 Side panel or modal showing full station record:
 - Name, number, coordinates, elevation
 - All AlertIDs with sensor type labels
@@ -366,6 +401,7 @@ Tabs / panels:
 - **Repeater Analysis** — pass-range matching and hop-chain view
 - **Bit Flipper** — ALERT address tool
 - **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF)
+- **Serial Monitor** — live ingestion from physical COM ports (Web Serial), with ASCII / hex / ALERT-decode display
 - **Export** — Radio Mobile file generation
 - **Editor** — CRUD for stations.json entries
 
