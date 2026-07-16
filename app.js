@@ -2843,16 +2843,31 @@ const Serial = (function () {
 
   async function choosePort(id) {
     const conn = byId(id);
-    if (!conn || !supported) return;
+    if (!conn) return;
+    // Guard the click explicitly so it never fails silently: tell the user why
+    // the browser port picker can't be shown instead of appearing to do nothing.
+    if (!supported) {
+      alert('Web Serial isn’t available in this browser.\n\n'
+        + 'Use a Chromium-based browser — Chrome, Edge or Opera — served over https or from localhost.');
+      return;
+    }
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      alert('Choosing a COM port needs a secure context (https or localhost).\n\n'
+        + 'This page is being served insecurely, so the browser blocks access to serial ports.');
+      return;
+    }
     try {
       const port = await navigator.serial.requestPort();
       conn.port = port;
       conn.portLabel = portLabel(port);
+      conn.err = null;
       hookDisconnect();
       renderList();
     } catch (e) {
-      // user dismissed the chooser, or no port selected — leave the card as-is
-      if (e && e.name !== 'NotFoundError') alert('Could not select a port: ' + e.message);
+      // NotFoundError = the user dismissed the chooser without picking a port; leave the card as-is.
+      if (e && e.name === 'NotFoundError') return;
+      alert('Could not select a COM port: ' + ((e && e.message) || e) + '\n\n'
+        + 'If no port picker appeared, check that serial access is allowed for this site.');
     }
   }
 
@@ -3370,3 +3385,10 @@ const Serial = (function () {
     setName, setSetting, setMode,
   };
 })();
+
+// The Web Serial API exposes a built-in `Serial` interface constructor on
+// `window`. In inline onclick handlers (e.g. Serial.choosePort(…)) that global
+// can shadow this module in some browsers/contexts, which makes the buttons —
+// like "Choose COM port…" — appear to do nothing. Bind the module explicitly so
+// `Serial` always resolves to it regardless of how the handler is scoped.
+if (typeof window !== 'undefined') window.Serial = Serial;
