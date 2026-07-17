@@ -354,6 +354,13 @@ output live, on the **Serial Monitor** tab. Built on the browser's
 - **Requirements** — Web Serial needs a Chromium browser (Chrome/Edge/Opera)
   served over **https** or **localhost**; the tab shows a clear notice in
   unsupported browsers or insecure contexts.
+- **Managed / work computers** — enterprise policy can block Web Serial, in which
+  case the browser rejects the port picker *instantly without showing it*. The app
+  detects this (an instant rejection can't be a human cancelling the dialog) and
+  shows targeted advice; [`docs/serial-help.html`](docs/serial-help.html) has a
+  ready-to-send IT request with the exact Chrome/Edge policies
+  (`SerialAskForUrls`, or `SerialAllowUsbDevicesForUrls` to pre-approve a device
+  with no picker at all — pre-approved ports show up under *"Previously allowed"*).
 
 ### 10. Dark / Light Theme
 - Toggle between dark and light modes
