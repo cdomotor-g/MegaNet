@@ -16,6 +16,11 @@
   --map-line: #ff6f00;
   --map-repeater: #0b5cab;
   --map-field: #107c10;
+  /* Station-role colours (mirror ROLE_COLOR in app.js and the map markers). */
+  --role-field: #107c10;
+  --role-repeater: #0b5cab;
+  --role-base: #c7401a;
+  --role-satcom: #7c35a3;
   --accent: #0b5cab;
   --ok:   #107c10;
   --bad:  #c7401a;
@@ -46,6 +51,11 @@
   --map-line: #ff9f43;
   --map-repeater: #6bb6ff;
   --map-field: #57d657;
+  /* Lighter role tints so coloured station names stay legible on dark panels. */
+  --role-field: #57d657;
+  --role-repeater: #6bb6ff;
+  --role-base: #ff8a63;
+  --role-satcom: #c79ae8;
   --accent: #6bb6ff;
   --ok:   #3ecf8e;
   --bad:  #ff6b6b;
@@ -353,6 +363,15 @@ tr.selected td {
   font-size: .82rem;
   color: var(--muted);
 }
+
+/* Station name coloured by primary role, matching the map's colour coding. */
+.stn-name {
+  font-weight: 600;
+  color: var(--role-field);
+}
+.stn-name.role-repeater { color: var(--role-repeater); }
+.stn-name.role-base     { color: var(--role-base); }
+.stn-name.role-satcom   { color: var(--role-satcom); }
 
 .rx-cell {
   background: var(--rx-bg);
