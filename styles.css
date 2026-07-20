@@ -868,3 +868,100 @@ code {
   .ser-conn-port { margin-left: 0; width: 100%; }
   .ser-hex .ser-linebody { grid-template-columns: 1fr; gap: .1rem; }
 }
+
+/* ── Modal (bug reporter) ──────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: none;                 /* toggled to flex when opened */
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4vh 1rem;
+  background: rgba(8, 15, 24, .55);
+  overflow: auto;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 560px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .35);
+  padding: 1.1rem 1.25rem 1.25rem;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.modal-head h2 { margin: 0; font-size: 1.2rem; }
+
+.modal-card .sub {
+  color: var(--muted);
+  font-size: .9rem;
+  margin: .4rem 0 .2rem;
+}
+
+.modal-x {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  padding: 0 .35rem;
+  cursor: pointer;
+}
+.modal-x:hover { color: var(--text); }
+
+.modal-form {
+  display: grid;
+  gap: .8rem;
+  margin-top: .9rem;
+}
+.modal-form label {
+  display: grid;
+  gap: .3rem;
+  font-size: .9rem;
+  color: var(--muted);
+}
+
+.check-inline {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: .5rem;
+}
+.check-inline input { width: auto; margin-top: .15rem; }
+
+.req { color: var(--bad); font-weight: 700; }
+
+.diag-preview summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: .88rem;
+}
+.diag-pre {
+  margin: .55rem 0 0;
+  max-height: 30vh;
+  overflow: auto;
+  padding: .6rem .7rem;
+  background: var(--subtle);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: .78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-top: 1.1rem;
+}

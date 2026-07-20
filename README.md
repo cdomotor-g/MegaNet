@@ -383,6 +383,32 @@ Side panel or modal showing full station record:
 - Satcom details if applicable
 - Direct link to ARRO graphs for each AlertID
 
+### 13. In-App Bug / Idea Reporter
+The **🐞 Report a Bug** button in the header lets any user flag a problem or
+suggestion without leaving the app. Because MegaNet is a static GitHub Pages
+site with no backend (and nowhere safe for an API token), the reporter gathers
+context and opens GitHub's own pre-filled **New Issue** page — the user reviews
+it and clicks *Submit new issue*, so the report lands straight on the project
+repo. Anyone without a GitHub account can use **Copy report** and paste it into
+an email instead.
+
+Each report auto-collects the context that turns a vague "it broke" into
+something reproducible, all shown in a **"Preview exactly what will be shared"**
+panel before anything leaves the browser:
+
+- Which screen (tab) they were on, and the selected station (if any)
+- Whether data is loaded, and the station / network counts
+- App build (read from the `app.js?v=` cache-buster), theme, page URL
+- Browser, platform, language, window/screen size, online state, timestamp
+- **Recent uncaught JavaScript errors** — captured from page load via global
+  `error` / `unhandledrejection` handlers (`app.js`), so the actual failure and
+  its stack travel with the report even when the user only saw a blank panel
+
+Report type (Bug / Idea / Question) maps to the matching GitHub default label
+(`bug` / `enhancement` / `question`). Long reports that would exceed GitHub's
+pre-filled-URL limit are copied to the clipboard automatically so nothing the
+user typed is lost.
+
 ---
 
 ## Deployment Plan
