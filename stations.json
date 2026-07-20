@@ -59949,35 +59949,6 @@
       ]
     },
     {
-      "id": "alert_gauge_4",
-      "name": "Alert Gauge #4",
-      "station_number": "900001",
-      "lat": 0.0,
-      "lon": 0.0,
-      "elevation_ahd": null,
-      "roles": [
-        "field"
-      ],
-      "radio_network_ids": [],
-      "catchment_ids": [
-        "burnett"
-      ],
-      "alert_ids": {},
-      "satcom": {
-        "enabled": false,
-        "provider": "",
-        "terminal_id": ""
-      },
-      "rm_system_id": 1,
-      "enabled": true,
-      "notes": "",
-      "lga": "North Burnett Regional",
-      "basin": "Burnett River",
-      "location_types": [
-        "Rain Gauge"
-      ]
-    },
-    {
       "id": "allambie_lane",
       "name": "Allambie Lane",
       "station_number": "900002",
