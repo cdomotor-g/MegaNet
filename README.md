@@ -432,14 +432,13 @@ user typed is lost.
 Tabs / panels:
 - **Map** — interactive Leaflet map (always visible as main panel)
 - **Network Maps** — Queensland basin explorer + bundled Radio-path PDF maps, with station-aware search
-- **Stations** — filterable table of all stations
+- **Stations** — filterable table of all stations (names colour-coded by role, matching the map) with a built-in CRUD editor card below the list
 - **Networks** — radio network cluster management
 - **Repeater Analysis** — pass-range matching and hop-chain view
 - **Bit Flipper** — ALERT address tool
 - **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF)
 - **Serial Monitor** — live ingestion from physical COM ports (Web Serial), with ASCII / hex / ALERT-decode display
 - **Export** — Radio Mobile file generation
-- **Editor** — CRUD for stations.json entries
 
 Technology: Vanilla JS (no framework), same stack as current `app.js`.
 

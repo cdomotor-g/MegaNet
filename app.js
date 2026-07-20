@@ -12,7 +12,6 @@ const TABS = [
   { id: 'packets',    label: 'ALERT Packets'},
   { id: 'serial',     label: 'Serial Monitor'},
   { id: 'export',     label: 'Export'     },
-  { id: 'editor',     label: 'Editor'     },
 ];
 
 const ROLE_COLOR = {
@@ -331,7 +330,6 @@ function renderMain() {
     case 'packets':    el.innerHTML = Packets.render();       Packets.init();      break;
     case 'serial':     el.innerHTML = Serial.render();        Serial.init();       break;
     case 'export':     el.innerHTML = renderExportHtml();                 break;
-    case 'editor':     el.innerHTML = renderEditorHtml();                 break;
     default:           el.innerHTML = '<p style="padding:1rem">Unknown tab</p>';
   }
 }
@@ -514,12 +512,18 @@ function renderStationsHtml() {
           </div>
         </div>
       </aside>
-      <div>
+      <div class="stack">
         <div class="panel">
-          <div class="panel-header"><h2>Stations</h2></div>
+          <div class="panel-header">
+            <h2>Stations</h2>
+            <button onclick="editorNew()">+ New</button>
+          </div>
           <div class="table-wrap tall" id="stations-table-wrap">
             ${stationsTable(stations)}
           </div>
+        </div>
+        <div class="panel" id="stations-editor-card">
+          ${renderStationEditorCard()}
         </div>
       </div>
     </div>`;
@@ -545,7 +549,7 @@ function stationsTable(stations) {
           return `
             <tr class="${state.selectedId === s.id ? 'selected' : ''}"
                 onclick="selectStation('${s.id}')" style="cursor:pointer">
-              <td title="${esc(s.id)}">${esc(s.name)}</td>
+              <td title="${esc(s.id)}"><span class="stn-name role-${primaryRole(s)}">${esc(s.name)}</span></td>
               <td class="small">${esc(s.station_number || '')}</td>
               <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}</td>
               <td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
@@ -569,8 +573,48 @@ function rerenderStations() {
 }
 
 function selectStation(id) {
-  state.selectedId = state.selectedId === id ? null : id;
+  if (state.selectedId === id) {
+    // Toggle off: clear the highlight and close the editor card below.
+    state.selectedId  = null;
+    state.editorId    = null;
+    state.editorDraft = {};
+  } else {
+    // Select the row and load it into the editor card. A deep copy becomes the
+    // draft so fields not exposed by the form (catchments, satcom, RM metadata)
+    // survive a save.
+    state.selectedId  = id;
+    state.editorId    = id;
+    state.editorDraft = JSON.parse(JSON.stringify(state.data.stations.find(s => s.id === id) || {}));
+  }
   rerenderStations();
+  rerenderStationEditorCard();
+}
+
+// True when the editor card should show a form (an existing station is selected
+// or a new one is being created), rather than the placeholder prompt.
+function editorActive() {
+  return state.editorDraft && Object.keys(state.editorDraft).length > 0;
+}
+
+function renderStationEditorCard() {
+  if (!editorActive()) {
+    return `
+      <div class="panel-header"><h2>Station Editor</h2></div>
+      <p style="color:var(--muted);padding:.5rem 0">
+        Select a station in the list above to view and edit it, or click
+        <em>+ New</em> to add one.
+      </p>`;
+  }
+  // Existing station → render from the live record; new station → from the draft.
+  const s = state.editorId
+    ? (state.data.stations.find(x => x.id === state.editorId) || state.editorDraft)
+    : state.editorDraft;
+  return editorForm(s);
+}
+
+function rerenderStationEditorCard() {
+  const el = document.getElementById('stations-editor-card');
+  if (el) el.innerHTML = renderStationEditorCard();
 }
 
 // ── NETWORKS tab ───────────────────────────────────────────────────────────────
@@ -614,7 +658,7 @@ function renderNetworksHtml() {
           <span class="badge">${(state.data.catchments || []).length}</span>
         </div>
         ${!(state.data.catchments || []).length
-          ? '<p class="small" style="color:var(--muted);margin:.75rem 0">No catchments defined yet. Add them via the Editor tab.</p>'
+          ? '<p class="small" style="color:var(--muted);margin:.75rem 0">No catchments defined yet.</p>'
           : `<div class="table-wrap medium" style="margin-top:.75rem">
                <table>
                  <thead><tr><th>ID</th><th>Name</th></tr></thead>
@@ -1375,60 +1419,13 @@ function runExport() {
   });
 }
 
-// ── EDITOR tab ─────────────────────────────────────────────────────────────────
-
-function renderEditorHtml() {
-  const stations = state.data.stations;
-  const s = state.editorId ? stations.find(x => x.id === state.editorId) : null;
-  return `
-    <div class="layout">
-      <aside class="sidebar stack">
-        <div class="panel">
-          <div class="panel-header">
-            <h3>Stations</h3>
-            <button onclick="editorNew()">+ New</button>
-          </div>
-          <input type="search" id="editor-search" placeholder="Filter…"
-                 oninput="rerenderEditorList()" style="margin-top:.6rem;width:100%">
-          <div class="checklist" id="editor-list" style="margin-top:.5rem">
-            ${editorList(stations, '')}
-          </div>
-        </div>
-      </aside>
-      <div>
-        <div class="panel">
-          ${s ? editorForm(s) : '<p style="color:var(--muted);padding:.5rem 0">Select a station or click <em>+ New</em>.</p>'}
-        </div>
-      </div>
-    </div>`;
-}
-
-function editorList(stations, q) {
-  const lq = q.toLowerCase();
-  return stations
-    .filter(s => !lq || s.name.toLowerCase().includes(lq))
-    .map(s => `
-      <label style="cursor:pointer;display:flex;gap:.4rem;align-items:center;padding:.2rem .1rem">
-        <input type="radio" name="ed-sel" ${state.editorId === s.id ? 'checked' : ''}
-               onchange="editorSelect('${s.id}')">
-        <span style="font-size:.9rem">${esc(s.name)}</span>
-        ${s.roles.slice(0,2).map(r => `<span class="badge">${r[0].toUpperCase()}</span>`).join('')}
-      </label>`).join('');
-}
-
-function rerenderEditorList() {
-  const q  = document.getElementById('editor-search')?.value || '';
-  const el = document.getElementById('editor-list');
-  if (el) el.innerHTML = editorList(state.data.stations, q);
-}
-
-function editorSelect(id) {
-  state.editorId    = id;
-  state.editorDraft = JSON.parse(JSON.stringify(state.data.stations.find(s => s.id === id) || {}));
-  document.getElementById('main-content').innerHTML = renderEditorHtml();
-}
+// ── STATION EDITOR (card on the Stations tab) ────────────────────────────────────
+// The editor lives below the stations list on the Stations tab: selecting a row
+// loads it here (see selectStation / renderStationEditorCard above). "+ New"
+// clears the selection and opens a blank form.
 
 function editorNew() {
+  state.selectedId  = null;
   state.editorId    = null;
   state.editorDraft = {
     id: '', name: '', station_number: '', lat: null, lon: null, elevation_ahd: null,
@@ -1436,7 +1433,8 @@ function editorNew() {
     alert_ids: {}, satcom: { enabled: false, provider: '', terminal_id: '' },
     rm_system_id: 1, enabled: true, notes: '',
   };
-  document.getElementById('main-content').innerHTML = renderEditorHtml();
+  rerenderStations();          // drop any row highlight
+  rerenderStationEditorCard(); // show the blank form
 }
 
 function editorForm(s) {
@@ -1595,8 +1593,10 @@ function editorSave() {
 
   state.editorId    = d.id;
   state.editorDraft = d;
+  state.selectedId  = d.id;
   updateHeaderStats();
-  document.getElementById('main-content').innerHTML = renderEditorHtml();
+  rerenderStations();
+  rerenderStationEditorCard();
 }
 
 function editorDelete() {
@@ -1604,10 +1604,12 @@ function editorDelete() {
   const name = state.data.stations.find(s => s.id === state.editorId)?.name || state.editorId;
   if (!confirm(`Delete "${name}"?`)) return;
   state.data.stations = state.data.stations.filter(s => s.id !== state.editorId);
+  state.selectedId    = null;
   state.editorId      = null;
   state.editorDraft   = {};
   updateHeaderStats();
-  document.getElementById('main-content').innerHTML = renderEditorHtml();
+  rerenderStations();
+  rerenderStationEditorCard();
 }
 
 // ── Filter helpers ─────────────────────────────────────────────────────────────
