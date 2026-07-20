@@ -19,6 +19,7 @@
       <input type="file" id="file-input" accept=".json" style="display:none" onchange="onFileLoad(this)">
       <button onclick="document.getElementById('file-input').click()">Load stations.json</button>
       <button id="btn-load-gh" onclick="loadFromGitHub()">Load from GitHub</button>
+      <button id="btn-report" onclick="BugReport.open()" title="Report a bug or suggest an improvement">🐞 Report a Bug</button>
       <button id="btn-theme" onclick="toggleTheme()">Dark</button>
     </div>
   </header>
@@ -34,7 +35,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- ?v= is a cache-buster: bump it whenever app.js / maps-data.js change so
        browsers and GitHub Pages fetch the new file instead of a stale copy. -->
-  <script src="maps-data.js?v=20260716d"></script>
-  <script src="app.js?v=20260716d"></script>
+  <script src="maps-data.js?v=20260720a"></script>
+  <script src="app.js?v=20260720a"></script>
 </body>
 </html>
