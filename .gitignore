@@ -1,0 +1,6 @@
+# ACMA raw extract cache — the full spectra_rrl.zip is ~68 MB (580 MB unzipped)
+# and must never enter git history. Only the prefiltered subset in data/acma-raw/
+# is committed. See README "ACMA RF interference layer".
+.acma-cache/
+spectra_rrl.zip
+acma_subset/
