@@ -1,0 +1,625 @@
+ANTENNA_ID,GAIN,FRONT_TO_BACK,H_BEAMWIDTH,V_BEAMWIDTH,BAND_MIN_FREQ,BAND_MIN_FREQ_UNIT,BAND_MAX_FREQ,BAND_MAX_FREQ_UNIT,ANTENNA_SIZE,ANTENNA_TYPE,MODEL,MANUFACTURER
+1,0,0,0,,,MHz,,MHz,0,"Unknown antenna type, size or specifications-",UNKNOWN,UNKNOWN
+10,8.7,28,55,,,MHz,,MHz,2,Corner Reflector (Vertical Polarisation)-R,517(V),AEA
+100,11.7,15,40,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,150M(H),NOTIONAL
+101,11.7,15,50,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,150M(V),NOTIONAL
+1012,14.2,17,44,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,Y409(V),SCALAR
+1014,16.2,17,35,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,Y415PT(V),SCALAR
+1038,10.2,12,62,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YU8(V),AEA
+106,13.1,16,35,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,400M(H),NOTIONAL
+107,13.1,16,36,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,400M(V),NOTIONAL
+1077,43.5,70,1.1,,,MHz,,MHz,2.4,Parabolic-P,UHX8-77GD,ANDREW AUSTRALIA
+1091,44,80,1.1,,,MHz,,MHz,1.8,Parabolic-P,UHX6-107H,ANDREW AUSTRALIA
+1136,43.6,75,1,,,MHz,,MHz,3,Parabolic-P,UHX10-65D,ANDREW AUSTRALIA
+1144,38.4,75,1.8,,,MHz,,MHz,1.8,Parabolic-P,UHX6-59H,ANDREW AUSTRALIA
+1153,40,65,1.5,,,MHz,,MHz,1.8,Parabolic-P,HPX6-71E,ANDREW AUSTRALIA
+1180,2.2,0,0,,,MHz,,MHz,0,Broadcasting transmit-,OMNI,BROADCAST NOTIONAL
+1181,0,0,0,,,MHz,,MHz,0,Broadcasting transmit-,DIRECTIONAL,BROADCAST NOTIONAL
+1182,0,0,0,,,MHz,,MHz,0,Inverted V-I,UNKNOWN-I,UNKNOWN
+13058,5.2,0,0,,,MHz,,MHz,0,Vehicle mounted mobile antenna-X,CD28-41,RF INDUSTRIES
+13146,35.9,62,2.9,,,MHz,,MHz,0.6,Parabolic-P,HP2-13,RADIO WAVES
+13148,8.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-D,214-4-IC,POLAR
+13189,8.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COLV6,HI-TEC AERIALS NZ
+13198,19.5,30,63,,,MHz,,MHz,1.94,Panel (1 sector)-R,742213,KATHREIN
+13202,12.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL,UNKNOWN
+13209,2.1,0,0,,,MHz,,MHz,0,Dipole-D,CI 121,UNKNOWN
+13232,5.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-A,SMD2X2,RF INDUSTRIES
+13248,5,0,0,,,MHz,,MHz,0,Dipole-D,DGPS,NOTIONAL
+13250,2.2,0,0,,,MHz,,MHz,0,Dipole-D,297-Ground Ind.,POLAR
+13302,5.2,0,0,,,MHz,,MHz,0,Dipole-D,5.2,NOTIONAL
+13347,14,18,36,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YBSS16-70,RF INDUSTRIES
+13355,2.1,0,0,,,MHz,,MHz,0,Dipole-D,B40,SCALAR
+13363,2.2,0,0,,,MHz,,MHz,0,Dipole-D,314,POLAR
+13374,8.2,0,0,,,MHz,,MHz,0,Dipole-D,214D-P2-ICED,POLAR
+13392,8.3,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL45-70,RF INDUSTRIES
+13395,50.8,63,0.9,,,MHz,,MHz,0,Parabolic-P,HPLP2 - 80,RADIO WAVES
+13404,38.8,57,2,,,MHz,,MHz,0.6,Parabolic-P,HAA1806,COMHAT
+13413,5.2,0,0,,,MHz,,MHz,0,Ground Independent Antenna-U,CD28-41-50,RF INDUSTRIES
+13414,5.2,0,0,,,MHz,,MHz,0,Ground Independent Antenna-U,CD28-41-70,RF INDUSTRIES
+13426,2.2,0,0,,,MHz,,MHz,0,Dipole-D,CAV-2180,JAPAN RADIO CO LTD
+13492,45,40,0.9,,,MHz,,MHz,4.2,Parabolic-P,DWSR 2502,ENTERPRISE ELECTRONICS CORP 
+13552,2.2,0,0,,,MHz,,MHz,0,Dipole-D,214D-P2-ICE/229,POLAR
+13558,12,16,48,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YB809-81,RF INDUSTRIES
+13570,5.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-D,214-2-IC ,POLAR
+13600,3,0,0,,,MHz,,MHz,0,Colinear Vertical-U,TENTA-11,ALLTEK MARINE
+13602,5.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-D,214-2-ICED,POLAR
+13629,8.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-D,214D-4-ICED,POLAR
+13658,28,35,5.5,,,MHz,,MHz,0.6,Parabolic-P,AIRMUX 400,RAD
+13664,9,17,50,,,MHz,,MHz,0,Yagi (Mixed Polarisation)-Y,YU6,ANTENNAE AGENCIES
+13670,16.2,17,33,,,MHz,,MHz,15,Yagi (Horizontal Polarisation)-Y,Y415,ZCG SCALAR
+13679,2.2,0,0,,,MHz,,MHz,0,Dipole-D,CELmar1-1AIS,AC MARINE
+13820,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,G21,ZCG SCALAR
+13825,5.1,0,0,,,MHz,,MHz,0,Colinear Vertical-U,B20G-N,ZCG SCALAR
+16,2.2,0,0,,,MHz,,MHz,0,"Integral antenna, unknown specifications-X",INTEGRAL,UNKNOWN
+20003,38.4,64,1.9,,,MHz,,MHz,0.6,Parabolic-P,HSX2-180,ANDREW AUSTRALIA
+20010,3,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL 28,RF INDUSTRIES
+20019,1.6,0,0,,,MHz,,MHz,0,Ground Plane-C,236-A,POLAR
+20025,11.2,20,45,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YB6-65(V),RF INDUSTRIES
+20031,15,17,30,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,RFS YU15,RFS
+20033,2.1,0,0,,,MHz,,MHz,0,Dipole-D,02525V,BENELEC
+20050,2.1,0,0,,,MHz,,MHz,0,Dipole-D,FM - 814,UNKNOWN
+20082,9.5,20,40,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YV9E ,RFS
+20084,8.2,0,0,,,MHz,,MHz,3.5,Colinear Vertical-U,COL19,RF INDUSTRIES
+20119,37.1,62,2.2,,,MHz,,MHz,1.2,Parabolic-P,VHP4-77,ANDREW AUSTRALIA
+20129,8.2,0,0,,,MHz,,MHz,0,Dipole-D,314-1-1C,POLAR
+208,43.3,68,1.1,,,MHz,,MHz,2.4,Parabolic-P,HP8-77GE,ANDREW AUSTRALIA
+238,26.7,30,7.2,,,MHz,,MHz,2,Parabolic-P,KP6-15,ANDREW AUSTRALIA
+249,30.4,33,4.7,,,MHz,,MHz,3,Parabolic-P,KP10F-15B,ANDREW AUSTRALIA
+258,32.8,40,3.8,,,MHz,,MHz,4,Parabolic-P,KP13F-15,ANDREW AUSTRALIA
+30027,42,75,1.3,,,MHz,,MHz,2.4,Parabolic-P,HSX8-64A,ANDREW AUSTRALIA
+30037,22.7,23,10,,,MHz,,MHz,2,Parabolic-P,KP6F-820B,ANDREW AUSTRALIA
+30051,43.5,77,1.1,,,MHz,,MHz,2.4,Parabolic-P,HSX8-77,ANDREW AUSTRALIA
+30127,36.5,62,2.4,,,MHz,,MHz,1.2,Parabolic-P,VHLP4-71W (7G5),ANDREW AUSTRALIA
+30129,7.2,0,0,,,MHz,,MHz,4,Dipole-D,215-4-IC,POLAR
+30142,44.5,35,0.9,,,MHz,,MHz,0,Parabolic-P,SLP10,ANDREW AUSTRALIA
+36,16,17,30,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,900M(H),NOTIONAL
+373,44.9,66,0.9,,,MHz,,MHz,1.2,Parabolic-P,HP4-180E,ANDREW AUSTRALIA
+40001,11,0,0,,,MHz,,MHz,8,Slot (Vertical Polarisation)-T,124528-2,ANDREW AUSTRALIA
+40006,43.1,71,1.1,,,MHz,,MHz,3,Parabolic-P,HPX10-59E,ANDREW AUSTRALIA
+40013,2.2,0,0,,,MHz,,MHz,0,Dipole-D,Dipole,NOTIONAL
+40016,14.2,16,35,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,RDA9-61,RF INDUSTRIES
+40080,17.5,25,65,,,MHz,,MHz,10,Panel (1 sector)-R,CNNPX310(0.9),ARGUS
+40081,17.5,25,65,,,MHz,,MHz,10,Panel (1 sector)-R,CNNPX310(1.8),ARGUS
+40082,17,25,65,,,MHz,,MHz,10,Panel (1 sector)-R,NNPX310,ARGUS
+40104,18.5,25,65,,,MHz,,MHz,10,Panel (1 sector)-R,742 266(2.1),KATHREIN
+40115,40.8,66,1.5,,,MHz,,MHz,1.8,Parabolic-P,HPX6-77,ANDREW AUSTRALIA
+40117,5.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-D,BA40-67,RF INDUSTRIES
+44013,5.2,0,0,,,MHz,,MHz,0,Dipole-D,BA4141-68,RF INDUSTRIES
+483,41.9,66,1.3,,,MHz,,MHz,2.4,Parabolic-P,HP8-65E,ANDREW AUSTRALIA
+49,8.7,10,50,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,525(H),AEA
+50009,2.2,0,0,,,MHz,,MHz,0,Dipole-D,COD1,RF INDUSTRIES
+50013,8.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-A,SMD24,RF INDUSTRIES
+50014,8.2,15,75,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YH03,RF INDUSTRIES
+50028,2.2,0,0,,,MHz,,MHz,0.56,Coaxial Dipole-D,CXL 70-1/h,PROCOM
+50041,6,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL477-6,RF INDUSTRIES
+50051,8.7,18,50,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YV6(H),RFS
+50056,12.5,0,0,,,MHz,,MHz,10,Colinear Vertical-U,CNA010H-00,ARGUS
+50058,41.3,74,1.4,,,MHz,,MHz,2.4,Parabolic-P,HSX8-59A,ANDREW AUSTRALIA
+50069,8.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,BU6,ANTENNAE AGENCIES
+50079,2.2,0,0,,,MHz,,MHz,0,Coaxial Dipole-D,212,POLAR
+529,42.9,80,1.1,,,MHz,,MHz,3,Parabolic-P,UHX10-59J,ANDREW AUSTRALIA
+558,40.1,48,1.5,,,MHz,,MHz,1.8,Parabolic-P,PL6-71D,ANDREW AUSTRALIA
+569,44.1,52,0.9,,,MHz,,MHz,3,Parabolic-P,PL10-71GE,ANDREW AUSTRALIA
+58,10.2,12,50,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YU8(H),AEA
+6,0,0,0,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YAGI (H),UNKNOWN
+60001,16.2,16.5,30,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YB16(H),RF INDUSTRIES
+60002,2.2,0,0,,,MHz,,MHz,0,Ground Plane-C,GP2,RF INDUSTRIES
+60005,5.2,0,0,,,MHz,,MHz,1.5,Colinear Vertical-U,COL7,RF INDUSTRIES
+60006,2.2,9,0,,,MHz,,MHz,0,Dipole-D,SMD41,RF INDUSTRIES
+60008,2.2,0,0,,,MHz,,MHz,0,Dipole-D,SMD1,RF INDUSTRIES
+60009,16.2,17,31,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,365 (H),POLAR
+60010,2.2,0,0,,,MHz,,MHz,0,Dipole-D,SMD4,RF INDUSTRIES
+60013,2.2,0,0,,,MHz,,MHz,0,Dipole-D,SMD2,RF INDUSTRIES
+60015,16.4,15,33,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YU11-2(H),AEA
+60021,11.7,20,40,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YV9(H),RFS
+60022,8.2,14,57,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,Y303,SCALAR
+60024,15.2,17,35,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YU15,AEA
+60028,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL5,RF INDUSTRIES
+60029,13.2,20,35,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YV11(H),RFS
+60030,15.7,20,35,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YV11-2(H),RFS
+60032,11.2,15,50,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YH06(H),RF INDUSTRIES
+60033,11.2,15,52,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YH06(V),RF INDUSTRIES
+60043,8,13,63,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YB03-99(V),RF INDUSTRIES
+60051,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL15,RF INDUSTRIES
+60055,5.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-A,BA40-68,RF INDUSTRIES
+60056,5.2,0,0,,,MHz,,MHz,5.6,Colinear Vertical-U,G11,SCALAR
+60059,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL17,RF INDUSTRIES
+60066,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL2,RF INDUSTRIES
+60069,27.5,32,9.2,,,MHz,,MHz,1.2,Parabolic-P,MGA12-1721,RFS
+60071,5.2,0,0,,,MHz,,MHz,2,Dipole-D,214-2,POLAR
+60072,5.2,0,0,,,MHz,,MHz,3,Colinear Vertical-U,G21,SCALAR
+60075,6.7,0,0,,,MHz,,MHz,4.3,Colinear Vertical-U,G25,SCALAR
+60079,9.7,15,70,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YH04(V),RF INDUSTRIES
+60081,2.2,0,0,,,MHz,,MHz,0,Dipole-D,SMD4-68,RF INDUSTRIES
+60085,8.2,0,0,,,MHz,,MHz,4,Dipole-D,DU6,RFS
+60106,8.2,16,56,,,MHz,,MHz,,Yagi (Horizontal Polarisation)-Y,Y38(H),INDEPENDENT ANTENNAS
+60125,14.2,16,35,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YB9-61(H),RF INDUSTRIES
+60126,14.2,16,45,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YB9-61(V),RF INDUSTRIES
+60132,2.2,0,0,,,MHz,,MHz,0,Dipole-D,COD2,RF INDUSTRIES
+60140,2.2,0,0,,,MHz,,MHz,0,Ground Plane-C,GA1WS,RFS
+60142,17.8,17,18,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YU15-2(V),AEA
+60218,14.2,16,35,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YB9-65(H),RF INDUSTRIES
+60219,14.2,16,45,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YB9-65(V),RF INDUSTRIES
+60226,2.2,0,0,,,MHz,,MHz,0,Dipole-D,SMD22,RF INDUSTRIES
+60233,2.2,0,0,,,MHz,,MHz,0,Dipole-D,B88,SCALAR
+60235,11.2,16,48,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,325,POLAR
+60239,14.2,16,35,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YBSS9-62(H),RF INDUSTRIES
+60250,8.2,0,0,,,MHz,,MHz,4,Dipole-D,SV1-4C,RFS
+60255,5.2,0,0,,,MHz,,MHz,0,Dipole-D,SV1-2,RFS
+60269,12.2,0,0,,,MHz,,MHz,6.4,Colinear Vertical-U,ASP705,RF INDUSTRIES
+60284,8.2,0,0,,,MHz,,MHz,3,Colinear Vertical-U,G46,SCALAR
+60286,6.7,0,0,,,MHz,,MHz,1.62,Colinear Vertical-U,G44,SCALAR
+60287,14.2,16,45,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YBSS9-65(V),RF INDUSTRIES
+60288,14.2,16,35,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YBSS9-65(H),RF INDUSTRIES
+60290,2.2,0,0,,,MHz,,MHz,0,Dipole-D,SMD4-65,RF INDUSTRIES
+60294,11.2,20,45,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YB6-61(H),RF INDUSTRIES
+60295,11.2,20,55,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YB6-61(V),RF INDUSTRIES
+60305,2.2,0,0,,,MHz,,MHz,0,Dipole-D,SMD41-68,RF INDUSTRIES
+60306,5.2,0,360,,,MHz,,MHz,0,Colinear Vertical-U,COL11,RF INDUSTRIES
+60307,8.2,0,0,,,MHz,,MHz,0,Dipole-D,BA80-41,RF INDUSTRIES
+60308,5.2,0,0,,,MHz,,MHz,0,Dipole-D,BA40-41,RF INDUSTRIES
+60331,2.2,0,0,,,MHz,,MHz,0,Dipole-D,SM3,JBA ANTENNAS
+61,0,0,0,,,MHz,,MHz,0,Parallel array of horizontal dipoles-A,ATV,AMATEUR
+62,3.5,6,136,,,MHz,,MHz,0,Cardioid Ground Plane-B,668,AEA
+63,2.2,0,0,,,MHz,,MHz,0,Ground Plane-C,G1,AEA
+64,5.2,0,0,,,MHz,,MHz,0,Ground Plane-C,G3,AEA
+67,2.2,0,0,,,MHz,,MHz,0,Dipole-D,529,AEA
+70003,11.7,15,40,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YU9(H),AEA
+70018,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,218,POLAR
+70019,14.2,17,36,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,326(H),POLAR
+70021,14.2,17,36,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,Y409(H),SCALAR
+70022,13.2,18,46,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YB9(H),RF INDUSTRIES
+70023,13.2,18,45,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YB9(V),RF INDUSTRIES
+70028,5.2,0,0,,,MHz,,MHz,2,Dipole-D,314-2,POLAR
+70030,8.2,0,0,,,MHz,,MHz,3,Colinear Vertical-U,COL8,RF INDUSTRIES
+70036,6.7,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL4,RF INDUSTRIES
+70038,6.7,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL18,RF INDUSTRIES
+70040,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL3,RF INDUSTRIES
+70044,16.2,16.5,35,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YB16(V),RF INDUSTRIES
+70055,8,0,0,,,MHz,,MHz,4,Slot (Vertical Polarisation)-T,124528-1,ANDREW AUSTRALIA
+70070,2.2,0,0,,,MHz,,MHz,0,Dipole-D,214,POLAR
+70073,16.2,17,30,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,Y415(H),SCALAR
+70085,2.2,0,0,,,MHz,,MHz,0,Dipole-D,COD4,RF INDUSTRIES
+70102,8.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,354,POLAR
+70103,13.2,20,45,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YV11(V),RFS
+70104,11.2,20,55,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YV9(V),RFS
+70105,15.7,20,30,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YV11-2(V),RFS
+70116,22,24,12,,,MHz,,MHz,1.8,Parabolic-P,GK18-08,POLAR
+70130,8.2,0,0,,,MHz,,MHz,3.2,Colinear Vertical-U,COL12,RF INDUSTRIES
+70157,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL16,RF INDUSTRIES
+70193,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,BH3,ANTENNAE AGENCIES
+70223,8.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,BH6,RFS
+70236,2.2,0,0,,,MHz,,MHz,0,Dipole-D,114,POLAR
+70237,43.6,77,1,,,MHz,,MHz,3,Parabolic-P,HSX10-64A,ANDREW AUSTRALIA
+70248,5.2,0,0,,,MHz,,MHz,2,Dipole-D,BA41-68,RF INDUSTRIES
+70249,8.2,0,0,,,MHz,,MHz,4,Dipole-D,BA81-68,RF INDUSTRIES
+70322,33,60,3.6,,,MHz,,MHz,0.3,Parabolic-P,HSX1-180,ANDREW AUSTRALIA
+70358,41.6,68,1.3,,,MHz,,MHz,1.2,Parabolic-P,HSX4-130,ANDREW AUSTRALIA
+70403,38.6,66,1.8,,,MHz,,MHz,0.6,Parabolic-P,HP2-18,RADIO WAVES
+70409,8.2,0,0,,,MHz,,MHz,0,Dipole-D,BA80-67,RF INDUSTRIES
+70410,38.7,67,1.8,,,MHz,,MHz,0.6,Parabolic-P,VHLP2-180,ANDREW AUSTRALIA
+70417,41,67.5,1.4,,,MHz,,MHz,1.2,Parabolic-P,SB4-127,RFS
+70420,34,55,3,,,MHz,,MHz,0.3,Parabolic-P,VHLP1-180,ANDREW AUSTRALIA
+70439,42.5,68,1.2,,,MHz,,MHz,1.2,Parabolic-P,SB4-142,RFS
+70472,38.8,65,1.8,,,MHz,,MHz,1.8,Parabolic-P,HPX6-59G,ANDREW AUSTRALIA
+70473,41.3,69,1.4,,,MHz,,MHz,2.4,Parabolic-P,HPX8-59E,ANDREW AUSTRALIA
+70478,2.2,0,0,,,MHz,,MHz,1,Coaxial Dipole-D,MDHB,MOONRAKER
+70509,7,0,0,,,MHz,,MHz,2.81,Colinear Vertical-U,CA160C2,COMPLETECH
+71,2.2,0,0,,,MHz,,MHz,0,Coaxial Dipole-D,509,AEA
+72,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,G24,SCALAR
+73,6.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,708,AEA
+74,8.2,0,0,,,MHz,,MHz,2.8,Colinear Vertical-U,680,AEA
+76,11.2,0,0,,,MHz,,MHz,6.35,Colinear Vertical-U,539,AEA
+77,0,0,0,,,MHz,,MHz,0,Radiax (Leaky feeder)-Z,RADIAX,UNKNOWN
+80019,5.2,0,0,,,MHz,,MHz,0,Dipole-D,214D-2-IC,POLAR
+80032,42.5,64,1.2,,,MHz,,MHz,1.2,Parabolic-P,HP4-15,RADIO WAVES
+80074,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,CL3,JBA ANTENNAS
+80082,36.8,65,2.5,,,MHz,,MHz,0.6,Parabolic-P,VHLP2-15,ANDREW AUSTRALIA
+80091,2.2,0,0,,,MHz,,MHz,0.3,Dipole-D,SMD41-67,RF INDUSTRIES
+80110,34.2,57,3.3,,,MHz,,MHz,0.3,Parabolic-P,VHLP1-18,ANDREW AUSTRALIA
+80111,38.7,67,2.1,,,MHz,,MHz,0.6,Parabolic-P,VHLP2-18,ANDREW AUSTRALIA
+80116,5.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-A,BA4040-67,RF INDUSTRIES
+80119,34.8,61,2.9,,,MHz,,MHz,0.6,Parabolic-P,VHLP2-107,ANDREW AUSTRALIA
+80120,42.9,67,1.2,,,MHz,,MHz,2.4,Parabolic-P,HPX8-71W,ANDREW AUSTRALIA
+80123,39.6,70,1.7,,,MHz,,MHz,1.8,Parabolic-P,HSX6-64,ANDREW AUSTRALIA
+80125,40.2,64,1.6,,,MHz,,MHz,1.2,Parabolic-P,HSX4-107,ANDREW AUSTRALIA
+80127,33.5,60,4,,,MHz,,MHz,0.8,Parabolic-P,THP 08-071SWB,COMELIT
+80133,37.2,64,2.3,,,MHz,,MHz,1.2,Parabolic-P,HSX4-77,ANDREW AUSTRALIA
+80136,5.2,0,0,,,MHz,,MHz,0,Dipole-D,214D-P2-ICSSXE,POLAR
+80137,14,20,48,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,TM7(H),HILLS
+80145,38.3,65,1.9,,,MHz,,MHz,0.6,Parabolic-P,HRG06-177D,DG CAPITEL
+80151,38.9,66,2,,,MHz,,MHz,0.6,Parabolic-P,THP 06-173SWB,COMELIT
+80154,18.5,30,65,,,MHz,,MHz,1.3,Panel (1 sector)-R,NPX310R,ARGUS
+80178,17,25,65,,,MHz,,MHz,2.1,Panel (1 sector)-R,CPX308R,ARGUS
+80180,18,25,65,,,MHz,,MHz,2.6,Panel (1 sector)-R,CPX310R,ARGUS
+80181,16,25,90,,,MHz,,MHz,2.6,Panel (1 sector)-R,CPX410R,ARGUS
+80207,17,28,0,,,MHz,,MHz,2.52,Coaxial Dipole-D,742 266(0.9),KATHREIN
+80221,19.5,30,33,,,MHz,,MHz,2.35,Panel (1 sector)-R,CPX209R,ARGUS
+80224,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,BU3,ANTENNAE AGENCIES
+80227,2.2,0,0,,,MHz,,MHz,0,Coaxial Dipole-D,B55SS,SCALAR
+80231,35.3,62,3,,,MHz,,MHz,0.3,Parabolic-P,VHLP1-23,ANDREW AUSTRALIA
+80232,17.5,25,65,,,MHz,,MHz,2.6,Panel (1 sector)-R,CNPX310DR-CF_2G,ARGUS
+80241,2.2,0,0,,,MHz,,MHz,0,Dipole-D,SMD2-99,RF INDUSTRIES
+80248,36.9,61,2.2,,,MHz,,MHz,1.2,Parabolic-P,DAX4-W71A,RFS
+80273,43.9,72,1.1,,,MHz,,MHz,1.8,Parabolic-P,HSX6-107,ANDREW AUSTRALIA
+80284,7.2,0,0,,,MHz,,MHz,0,Dipole-D,OA20-67,RF INDUSTRIES
+80285,41.5,62,1.4,,,MHz,,MHz,1.2,Parabolic-P,SDX4-127A,RFS
+80294,40.4,65,1.5,,,MHz,,MHz,1.8,Parabolic-P,HP6-8,RADIO WAVES
+80297,14.2,20,35,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,RDA16-65(H),RF INDUSTRIES
+80301,37.3,62,2.2,,,MHz,,MHz,1.2,Parabolic-P,DA4-W71A,RFS
+80304,37.3,63,2.2,,,MHz,,MHz,1.2,Parabolic-P,VHLP4-7W,ANDREW AUSTRALIA
+80305,44.2,64,1,,,MHz,,MHz,1.2,Parabolic-P,HRG12-177D,DG CAPITEL
+80307,40.1,61,1.6,,,MHz,,MHz,0.3,Parabolic-P,VHLP1-38,ANDREW AUSTRALIA
+80312,40.8,68,1.6,,,MHz,,MHz,1.8,Parabolic-P,VHLP6-7W,ANDREW AUSTRALIA
+80319,35.8,62,2.7,,,MHz,,MHz,0.6,Parabolic-P,VHLP2-13,ANDREW AUSTRALIA
+80325,34.4,60,3.4,,,MHz,,MHz,0.6,Parabolic-P,VHLP2-11,ANDREW AUSTRALIA
+80332,42.9,71,1.2,,,MHz,,MHz,1.2,Parabolic-P,VHLPX4-15,ANDREW AUSTRALIA
+80339,40.6,67,1.5,,,MHz,,MHz,1.8,Parabolic-P,VHLPX6-7W,ANDREW AUSTRALIA
+80340,37.3,63,2.2,,,MHz,,MHz,1.2,Parabolic-P,VHLPX4-7W,ANDREW AUSTRALIA
+80341,37,65,2.3,,,MHz,,MHz,1.2,Parabolic-P,HP4-8,RADIO WAVES
+80342,16,18,27,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YB820-82(H),RF INDUSTRIES
+80343,5.2,0,0,,,MHz,,MHz,0,Dipole-D,214D-2-ICSS,POLAR
+80345,36.9,63,2.3,,,MHz,,MHz,1.2,Parabolic-P,SB4-W71B,RFS
+80349,2.15,0,0,,,MHz,,MHz,1.28,Vehicle mounted mobile antenna-X,TSW1,RF INDUSTRIES
+80351,30.7,57,4.7,,,MHz,,MHz,0.6,Parabolic-P,VHLP2-7W,ANDREW AUSTRALIA
+80360,32.1,54,4.3,,,MHz,,MHz,0.3,Parabolic-P,VHLP1-15,ANDREW AUSTRALIA
+80369,42,68,1.3,,,MHz,,MHz,2.4,Parabolic-P,HPX8-65,ANDREW AUSTRALIA
+80371,30.9,56,4.7,,,MHz,,MHz,0.3,Parabolic-P,VHLP1-13,ANDREW AUSTRALIA
+80375,14.2,17,35,,,MHz,,MHz,9,Yagi (Horizontal Polarisation)-Y,RDA9(H),RF INDUSTRIES
+80388,46.2,74,0.8,,,MHz,,MHz,1.8,Parabolic-P,VHLP6-15,ANDREW AUSTRALIA
+80396,44.7,72,0.9,,,MHz,,MHz,1.2,Parabolic-P,VHLPX4-18,ANDREW AUSTRALIA
+80408,40.4,66,1.5,,,MHz,,MHz,1.2,Parabolic-P,SUX4-107A,RFS
+80413,12,18,43,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,YBS809(V),RF INDUSTRIES
+80416,40.4,67,1.5,,,MHz,,MHz,1.2,Parabolic-P,VHLPX4-11,ANDREW AUSTRALIA
+80420,34.4,60,3.4,,,MHz,,MHz,0.6,Parabolic-P,VHLPX2-11,ANDREW AUSTRALIA
+80431,41.6,66,1.5,,,MHz,,MHz,2.4,Parabolic-P,DA8-59A,RFS
+80442,2.2,0,0,,,MHz,,MHz,0,Dipole-D,SMD4-67,RF INDUSTRIES
+80443,30.2,49.6,5.2,,,MHz,,MHz,0.3,Parabolic-P,HAA1303,COMHAT
+80454,5.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,MME-331,RF INDUSTRIES
+80458,43.8,70,1.1,,,MHz,,MHz,1.8,Parabolic-P,VHLPX6-11,ANDREW AUSTRALIA
+80472,7,0,0,,,MHz,,MHz,0,Dipole-D,OA20-41,RF INDUSTRIES
+80491,41.3,67,1.5,,,MHz,,MHz,2.4,Parabolic-P,DAX8-59A,RFS
+80492,35,61,2.9,,,MHz,,MHz,1.2,Parabolic-P,VHLPX4-6W,ANDREW AUSTRALIA
+80503,2.2,0,0,,,MHz,,MHz,0,Dipole-D,SMD24 (SS),RF INDUSTRIES
+80514,8.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-D,214-4-ICE,POLAR
+80519,39.7,69,1.7,,,MHz,,MHz,1.8,Parabolic-P,UXA6-65B,RFS
+80527,0,0,0,,,MHz,,MHz,0,Dipole-D,TQJ-150Z,KENBOTONG
+80534,35,61,2.9,,,MHz,,MHz,1.2,Parabolic-P,VHLP4-6W,ANDREW AUSTRALIA
+80571,11.2,7,0,,,MHz,,MHz,4,Parallel array of vertical dipoles-D,OA40-41,RF INDUSTRIES
+80575,39.7,68,1.8,,,MHz,,MHz,0.8,Parabolic-P,A-ANT-15G-2.5,DRAGONWAVE
+80592,2.2,0,0,,,MHz,,MHz,1.8,Dipole-D,COD22,RF INDUSTRIES
+80601,17.8,25,67,,,MHz,,MHz,0,Panel (1 sector)-R,742266 (1.8G),KATHREIN
+80623,16.6,28,85,,,MHz,,MHz,0,Panel (1 sector)-R,80010213(0.9),KATHREIN
+80624,17.2,25,65,,,MHz,,MHz,0,Panel (1 sector)-R,739 686,KATHREIN
+80625,18.1,25,60,,,MHz,,MHz,0,Panel (1 sector)-R,PFS1606,ANDREW AUSTRALIA
+80636,39.5,70,1.7,,,MHz,,MHz,1.8,Parabolic-P,UHX6-65,ANDREW AUSTRALIA
+80646,18.2,25,37,,,MHz,,MHz,2.09,Panel (Multi-sector)-R,2CPX208R,ARGUS
+80650,14,18,36,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YB16-65,RF INDUSTRIES
+80659,18,25,65,,,MHz,,MHz,2.6,Panel (1 sector)-R,CNPX310,ARGUS
+80664,14,20,35,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,RDA16-70(H),RF INDUSTRIES
+80680,8.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-D,BA8080-67,RF INDUSTRIES
+80692,13,20,50,,,MHz,,MHz,0,Yagi (Mixed Polarisation)-Y,DUAL LOOP,MIMO MAX
+80699,13,18,39,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YB10-70(H),RF INDUSTRIES
+80706,39,65,1.8,,,MHz,,MHz,1.8,Parabolic-P,VHLP6-6W,ANDREW AUSTRALIA
+80714,13,18,36,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YB10-65(H),RF INDUSTRIES
+80752,38.4,64,2,,,MHz,,MHz,1,Parabolic-P,VHLP3-11W,ANDREW AUSTRALIA
+80783,19,30,32,,,MHz,,MHz,0,Panel (1 sector)-R,NPX210R,ARGUS
+80792,11,23,40,,,MHz,,MHz,0.9,Corner Reflector (Vertical Polarisation)-R,CR4-67(V),RF INDUSTRIES
+80801,2,0,0,,,MHz,,MHz,0,Coaxial Dipole-D,CXL 2-1LW/H,PROCOM
+80807,34.5,60,3.3,,,MHz,,MHz,0.6,Parabolic-P,UKY 220 41/DC15,ERICSSON
+80825,40.8,67,1.5,,,MHz,,MHz,1.8,Parabolic-P,UKY 210 50/DC15,ERICSSON
+80837,40.7,66,1.5,,,MHz,,MHz,1.2,Parabolic-P,UKY 220 17/DC15,ERICSSON
+80840,19,30,32,,,MHz,,MHz,1.33,Panel (Multi-sector)-R,2NPX210R (1.8),ARGUS
+80848,7,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-A,EA40-41,RF INDUSTRIES
+80853,35.5,62,2.6,,,MHz,,MHz,1,Parabolic-P,VHLP3-7W,ANDREW AUSTRALIA
+80854,17.5,25,65,,,MHz,,MHz,1.27,Panel (1 sector)-R,VVPX-310R (2.1),ARGUS
+80855,16.8,25,66,,,MHz,,MHz,1.27,Panel (1 sector)-R,VVPX-310R (1.8),ARGUS
+80881,0,0,0,,,MHz,,MHz,0,"Unknown antenna type, size or specifications-",DAS,NOTIONAL
+80883,41.1,69,1.5,,,MHz,,MHz,1,Parabolic-P,VHLP3-15,ANDREW AUSTRALIA
+80896,39,65,1.8,,,MHz,,MHz,1.8,Parabolic-P,UKY 220 12/DC15,ERICSSON
+809,40,49,1.5,,,MHz,,MHz,1.8,Parabolic-P,7.5G,NOTIONAL
+80901,16,25,88,,,MHz,,MHz,0,Panel (1 sector)-R,LLPX411F-V1,ARGUS
+80905,39,65,1.8,,,MHz,,MHz,1.8,Parabolic-P,VHLPX6-6W,ANDREW AUSTRALIA
+80907,5.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-A,SMD4X2,RF INDUSTRIES
+80920,34.8,60,3.2,,,MHz,,MHz,0.6,Parabolic-P,VHLP2-11W,ANDREW AUSTRALIA
+80922,33,60,3.3,,,MHz,,MHz,1,Parabolic-P,VHLP3-6W,ANDREW AUSTRALIA
+80923,38.5,64,1.8,,,MHz,,MHz,0.9,Parabolic-P,VHLPX3-11W,ANDREW AUSTRALIA
+80946,38.4,64,2,,,MHz,,MHz,0.9,Parabolic-P,UKY 220 26/DC15,ERICSSON
+80953,42,68,1.4,,,MHz,,MHz,2.4,Parabolic-P,UKY 220 13/DC12,ERICSSON
+80959,2.2,0,0,,,MHz,,MHz,0.8,Dipole-D,SMD20-41,RF INDUSTRIES
+80963,5.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-D,IA404040-41-67,RF INDUSTRIES
+80970,14,20,24,,,MHz,,MHz,0,Yagi (Mixed Polarisation)-Y,DUAL LOOP HORIZ,MIMO MAX
+80971,18.5,25,67,,,MHz,,MHz,3.67,Panel (1 sector)-R,CPX314R,ARGUS
+80998,6.3,0,0,,,MHz,,MHz,5.5,Colinear Vertical-U,COL53,RF INDUSTRIES
+81,5.2,0,0,,,MHz,,MHz,2,Dipole-D,595-2,AEA
+81003,40.7,66,1.5,,,MHz,,MHz,1.2,Parabolic-P,VHLP4-11W,ANDREW AUSTRALIA
+81084,18.2,25,60,,,MHz,,MHz,0,Panel (1 sector)-R,RV4PX310R,ARGUS
+81094,40.7,66,1.5,,,MHz,,MHz,1.2,Parabolic-P,VHLPX4-11W,ANDREW AUSTRALIA
+81098,15.6,20,31,,,MHz,,MHz,0,Yagi (Mixed Polarisation)-Y,328X,POLAR
+81102,17.3,30,65,,,MHz,,MHz,1.08,Panel (1 sector)-R,LLPX310F-V1,ARGUS
+81170,16.2,25,65,,,MHz,,MHz,2.53,Panel (1 sector)-R,RVVPX310B2,ARGUS
+81191,16.2,40,62,,,MHz,,MHz,0,Panel (1 sector)-R,RVVPX308.10B2,ARGUS
+81193,16,25,67,,,MHz,,MHz,0,Panel (1 sector)-R,RV4PX310R(700M),ARGUS
+81194,16,25,63,,,MHz,,MHz,0,Panel (1 sector)-R,R2V4PX310R(700),ARGUS
+81198,8.3,0,0,,,MHz,,MHz,3.1,Colinear Vertical-U,COL45-65,RF INDUSTRIES
+81202,16.5,25,62,,,MHz,,MHz,2.53,Panel (1 sector)-R,RVVPX310 (1.8),ARGUS
+81203,17.2,25,62,,,MHz,,MHz,2.53,Panel (1 sector)-R,RVVPX310 (2.1),ARGUS
+81204,18,25,62,,,MHz,,MHz,2.53,Panel (1 sector)-R,RVVPX310 (2.5),ARGUS
+81205,16,25,67,,,MHz,,MHz,2.53,Panel (1 sector)-R,RVVPX310 (700),ARGUS
+81206,33.8,56,3.7,,,MHz,,MHz,0.6,Parabolic-P,VHLP2-10W,ANDREW AUSTRALIA
+81207,17,25,62,,,MHz,,MHz,2.03,Panel (1 sector)-R,RVVPX308 (2.1),ARGUS
+81208,18,25,60,,,MHz,,MHz,2.03,Panel (1 sector)-R,RVVPX308 (2.5),ARGUS
+81209,15,25,68,,,MHz,,MHz,2.03,Panel (1 sector)-R,RVVPX308 (700),ARGUS
+81210,15.5,25,67,,,MHz,,MHz,2.03,Panel (1 sector)-R,RVVPX308 (900),ARGUS
+81268,16.5,25,62,,,MHz,,MHz,0,Panel (1 sector)-R,RV4PX310R(900M),ARGUS
+81269,16.8,25,62,,,MHz,,MHz,0,Panel (1 sector)-R,RV4PX310R(1.8G),ARGUS
+81270,17.2,25,62,,,MHz,,MHz,0,Panel (1 sector)-R,RV4PX310R(2.1G),ARGUS
+81271,8,15,60,,,MHz,,MHz,3,Yagi (Horizontal Polarisation)-Y,YH03(H),RF INDUSTRIES
+81285,16.2,17,33,,,MHz,,MHz,15,Yagi (Mixed Polarisation)-Y,Y415DP,ZCG SCALAR
+81290,34.8,61,2.8,,,MHz,,MHz,1.2,Parabolic-P,SB4-W60A,RFS
+81292,7.2,0,0,,,MHz,,MHz,0,Colinear Vertical-U,COL43-XX,RF INDUSTRIES
+81300,17.2,25,62,,,MHz,,MHz,0,Panel (1 sector)-R,R2V4PX310R(2.1),ARGUS
+81304,16.8,25,65,,,MHz,,MHz,0,Panel (1 sector)-R,R2V4PX310R,ARGUS
+81305,17.5,25,62,,,MHz,,MHz,0,Panel (1 sector)-R,R2V4PX310R,ARGUS
+81315,17.2,30,65,,,MHz,,MHz,1.07,Panel (1 sector)-R,LLPX310R-V1,ARGUS
+81324,18,25,60,,,MHz,,MHz,2.49,Panel (1 sector)-R,R2V4PX310R(2.3),ARGUS
+81345,18,25,60,,,MHz,,MHz,2.5,Panel (1 sector)-R,R2V4PX310R(2.5),ARGUS
+81368,37.3,63,2.2,,,MHz,,MHz,1.2,Parabolic-P,A07D12HS,HUAWEI
+81376,16,25,68,,,MHz,,MHz,2.53,Panel (1 sector)-R,RV4PX310B2(700),ARGUS
+81379,16.8,25,61,,,MHz,,MHz,2.53,Panel (1 sector)-R,RV4PX310B2(1.8),ARGUS
+81380,17.1,25,62,,,MHz,,MHz,,Panel (1 sector)-R,RV4PX310B2(2.1),ARGUS
+81381,18,25,61,,,MHz,,MHz,2.53,Panel (1 sector)-R,RV4PX310B2(2.5),ARGUS
+81397,6,0,0,,,MHz,,MHz,2.09,Colinear Vertical-U,COL6,MOBILE ONE
+814,36,35,2.3,,,MHz,,MHz,0.6,Parabolic-P,15.0G,NOTIONAL
+81403,15.5,25,70,,,MHz,,MHz,2.53,Panel (1 sector)-R,RPX310B1 (700),ARGUS
+81404,16,25,68,,,MHz,,MHz,2.53,Panel (1 sector)-R,RPX310B1 (800),ARGUS
+81408,17.2,25,58,,,MHz,,MHz,1.33,Panel (1 sector)-R,VVPX310B1 (2.5),ARGUS
+81416,10.2,0,0,,,MHz,,MHz,3.3,Colinear Vertical-U,UNA010 (700),ARGUS
+81417,10.7,0,0,,,MHz,,MHz,3.3,Colinear Vertical-U,UNA010 (800),ARGUS
+81418,35.5,62,2.7,,,MHz,,MHz,0.6,Parabolic-P,SC2-127B,RFS
+81423,38.3,64,2,,,MHz,,MHz,0.9,Parabolic-P,SC3-W100A,RFS
+81429,31.5,30,4.5,,,MHz,,MHz,0.3,Parabolic-P,SB 1 - 127C,RFS
+81431,35.2,62,2.6,,,MHz,,MHz,0.9,Parabolic-P,SCX3-W71A,RFS
+81434,34.4,61,2.8,,,MHz,,MHz,1.2,Parabolic-P,SBX4-W60C,RFS
+81438,40.1,66,1.5,,,MHz,,MHz,1.2,Parabolic-P,SB4-W100C,RFS
+81441,38.9,67,2.1,,,MHz,,MHz,0.6,Parabolic-P,D18A60T1K601,SAF
+81446,36.3,62,2.8,,,MHz,,MHz,,Parabolic-P,HAE1306,LEAX AKRIVATOR TELECOM
+81504,30.9,57,4.2,,,MHz,,MHz,0.6,Parabolic-P,VHLP2-71W,ANDREW AUSTRALIA
+81509,5.2,0,0,,,MHz,,MHz,0,Parallel array of vertical dipoles-D,02680S2,BENELEC
+81515,40.6,67,1.5,,,MHz,,MHz,1.8,Parabolic-P,SBX6-W71C,RFS
+81517,40.6,67,1.5,,,MHz,,MHz,1.8,Parabolic-P,SB6-W71C,RFS
+81524,2.2,0,0,,,MHz,,MHz,2.2,Colinear Vertical-U,COL51-160,RF INDUSTRIES
+81535,15.18,43,66,,,MHz,,MHz,2.5,Panel (1 sector)-R,RVVPX310B2(700),ARGUS
+81544,39.4,65,1.7,,,MHz,,MHz,1.8,Parabolic-P,A06D18HS,HUAWEI
+81546,38.9,67,2.1,,,MHz,,MHz,0.6,Parabolic-P,A18D06HS,HUAWEI
+81550,44.7,73,0.9,,,MHz,,MHz,1.2,Parabolic-P,A18D12HS,HUAWEI
+81570,2.15,0,0,,,MHz,,MHz,0,Dipole-D,B43,ZCG SCALAR
+81596,33.2,60,3,,,MHz,,MHz,0.9,Parabolic-P,SCX3-W60A,RFS
+816,44,80,1,,,MHz,,MHz,1.8,Parabolic-P,11.0G,NOTIONAL
+81609,35.6,62,3.3,,,MHz,,MHz,1.2,Parabolic-P,A06D12HS,HUAWEI
+81621,35.2,61,3.1,,,MHz,,MHz,0.6,Parabolic-P,HAE1106_00,LEAX AKRIVATOR TELECOM
+81625,43.3,71,1.1,,,MHz,,MHz,0.9,Parabolic-P,SC3-190A,RFS
+82,8.2,0,0,,,MHz,,MHz,4,Dipole-D,616-4,AEA
+84,11.2,15,40,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,579(H),AEA
+84038,5,9,161,,,MHz,,MHz,2,Yagi (Vertical Polarisation)-Y,YB02-99 (V),RF INDUSTRIES
+84042,2.4,0,360,,,MHz,,MHz,0,Dipole-D,A-337-HD,ROJONE
+84068,8.2,0,360,,,MHz,,MHz,0,Parallel array of vertical dipoles-A,02681Z4,BENELEC
+84071,16,27,67,,,MHz,,MHz,2.7,Panel (1 sector)-R,APE4517R0 (700),HUAWEI
+84072,16.7,27,62,,,MHz,,MHz,2.7,Panel (1 sector)-R,APE4517R0 (900),HUAWEI
+84073,17,28,63,,,MHz,,MHz,2.7,Panel (1 sector)-R,APE4517R0 (1.8),HUAWEI
+84074,17.2,28,62,,,MHz,,MHz,2.7,Panel (1 sector)-R,APE4517R0 (2.1),HUAWEI
+84078,20.1,33,34,,,MHz,,MHz,1.08,Panel (1 sector)-R,LLPX210R-V1,ARGUS
+84085,5.2,0,360,,,MHz,,MHz,0,Dipole-D,FG4063,LAIRD TECHNOLOGIES
+84088,41.5,68,1.4,,,MHz,,MHz,2.4,Parabolic-P,DA8-W57A,RFS
+84090,19.6,30,33,,,MHz,,MHz,0.8,Panel (1 sector)-R,AW3497,ALPHA WIRELESS
+84120,39.4,65,1.7,,,MHz,,MHz,1.8,Parabolic-P,SB6-W60B,RFS
+84136,5.2,0,360,,,MHz,,MHz,3.3,Colinear Vertical-U,CLV3,ZCG SCALAR
+84184,42.9,71,1.2,,,MHz,,MHz,1.2,Parabolic-P,A15S12HAC,HUAWEI
+84186,3.85,0,0,,,MHz,,MHz,0.8,Ground Independent Antenna-U,CD29,RF INDUSTRIES
+844,2.2,0,0,,,MHz,,MHz,0,Coaxial Dipole-D,BA1010,CELWAVE
+848,4.5,0,0,,,MHz,,MHz,0,Colinear Vertical-U,PD344,CELWAVE
+90025,17,27,61,,,MHz,,MHz,,Panel(1 sector),ASI4517R1_2.1,HUAWEI
+90066,33.6,65,3.3,,,MHz,,MHz,,Parabolic,SHP3-6W,ANDREW AUSTRALIA
+9011,15,25,60,,,MHz,,MHz,1.41,Panel (1 sector)-R,H13C-VA,ANDREW AUSTRALIA
+90528,16.5,28,65,,,MHz,,MHz,,Panel(1sector),TQBM-D609017/Q172717DER_1.8,TONGYU
+90626,2.15,0,360,,,MHz,,MHz,,CoaxialDipole,1012,SAAB
+90707,13,18,48,,,MHz,,MHz,,Yagi (vertical polarisation),YB9-99(V),RF Industries
+90737,35.8,61,2.7,,,MHz,,MHz,,Parabolic,HAE0612,LEAX AKRIVATOR TELECOM
+90838,39.6,65,1.8,,,MHz,,MHz,,Parabolic,ANT2 1.8 6 HPX,ERICSSON
+90854,37.3,63,2.2,,,MHz,,MHz,,Parabolic,ANT2 1.2 7/8 HPX,ERICSSON
+90855,38.4,64,2,,,MHz,,MHz,,Parabolic,ANT2 0.9 10/11 HPX,ERICSSON
+90858,40.7,66,1.6,,,MHz,,MHz,,Parabolic,ANT2 1.2 10/11 HPX,ERICSSON
+91057,38.9,67,2.1,,,MHz,,MHz,,Parabolic,AM-2-18-CR,Ceragon
+91058,38.4,64,2,,,MHz,,MHz,,Parabolic,AM-3-11W-CR1,Ceragon
+91062,37.4,63,2.2,,,MHz,,MHz,,Parabolic,VHLP4-7W/E,ANDREW AUSTRALIA
+91102,17.9,34,39,,,MHz,,MHz,,Panel (Multi-sector),2UPX210B-T2 (700),COMMSCOPE
+91103,18.7,40,36,,,MHz,,MHz,,Panel (Multi-sector),2UPX210B-T2 (850),COMMSCOPE
+91401,50,66.7,0.5,,,MHz,,MHz,,Parabolic,EH-ANT-2ft,SIklu
+91505,31.8,57,4,,,MHz,,MHz,,Parabolic,HAE1303,LEAX AKRIVATOR TELECOM
+91518,8.2,0,0,,,MHz,,MHz,,ColinearVertical,G22,ZCG SCALAR
+91522,33.5,60,3.7,,,MHz,,MHz,,Parabolic,HAE0609,LEAX AKRIVATOR TELECOM
+91548,17.6,27,37,,,MHz,,MHz,,Panel (1 sector),TDJ-708019D (700),TONGYU
+91557,14,20,30,,,MHz,,MHz,,Yagi (Mixed Polarisation),YB815-81,RF INDUSTRIES
+91601,31.1,57,4.7,,,MHz,,MHz,,Parabolic,NEC VHLP2-7W-NC3,Andrew
+91722,5.2,0,0,,,MHz,,MHz,,Parallel array of vertical dipoles,BA4040-41,RF INDUSTRIES
+91732,34.6,63,3.2,,,MHz,,MHz,,Parabolic,VHLP1-18/F,ANDREW AUSTRALIA
+91739,37.5,63,2,,,MHz,,MHz,,Parabolic,HAE0812,LEAX AKRIVATOR TELECOM
+91767,35.5,62,3,,,MHz,,MHz,,Parabolic,HAE0809_00,LEAX AKRIVATOR TELECOM
+92,15.7,16,35,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,546-2(H),AEA
+92183,43,55,0.9,,,MHz,,MHz,,Parabolic,EH-ANT-1ft,Siklu
+92189,35.5,61,3,,,MHz,,MHz,,Parabolic,ANT3 A 0.9 7/8 HPX,ERICSSON
+92191,38.4,64,2,,,MHz,,MHz,,Parabolic,ANT3 A 0.9 10/11 HPX,ERICSSON
+92200,17.5,30,59,,,MHz,,MHz,,Panel (1 sector),AIR32 B7AA HBP LBP (2600),ERICSSON
+92216,23.7,30,110,,,MHz,,MHz,,Cellular,AIR 6468 B42 (Traffic),Ericsson
+92222,39.3,66,1.8,,,MHz,,MHz,,Parabolic,ANT3 A 1.8 6 HPX,ERICSSON
+92223,20,25,30,,,MHz,,MHz,,Panel(1sector),T1002M3R011_2500MHz_0dB,Tongyu
+92224,18.6,25,38,,,MHz,,MHz,,Panel(1sector),T1002M3R011_700MHz_0dB,Tongyu
+92237,17.6,27,37,,,MHz,,MHz,,Panel (1 sector),T1000L3R011 (700),TONGYU
+92238,18.8,27,33,,,MHz,,MHz,,Panel (1 sector),T1000L3R011 (850),TONGYU
+92253,3.85,0,360,,,MHz,,MHz,,Ground independent mobile antenna (148-174 MHz),CD29-148174,RF Industries
+92264,19,24,28,,,MHz,,MHz,,Yagi,YBA-2H-818-8085,RFI
+92329,14,18,36,,,MHz,,MHz,,Yagi(VerticalPolarisation),YB16-65(V),RF INDUSTRIES
+92343,34.5,61,3.3,,,MHz,,MHz,,Parabolic,ANT3 A 0.6 10/11 HPX,Ericsson
+92389,16.8,26,62,,,MHz,,MHz,,Panel(1 sector),T2004L6R021(0.9),Tongyu
+92391,17,26,62,,,MHz,,MHz,,Panel(1 sector),T2004L6R021(2.1),Tongyu
+92450,38.9,67,2.1,,,MHz,,MHz,,Parabolic,W1-SLU0618DS,Wave1
+92623,16,24,60,,,MHz,,MHz,,Panel(1sector),T2040L3R011_0.8,TONGYU
+92630,38.8,76,1.8,,,MHz,,MHz,,Parabolic Ultra High Performance,USX6-6W,Andrew
+92666,35.2,61,3.1,,,MHz,,MHz,,Parabolic,Am-2-11W,CERAGON
+92679,18.5,25,36,,,MHz,,MHz,,Panel(1sector),T1002M3R011_1800MHz,Tongyu
+92693,16.3,26,69,,,MHz,,MHz,,"Panel (single sector dual slant, 694-790 MHz)",RVVPX310.11B-T2 (694-790 MHz),CommScope
+92694,16.7,26,67,,,MHz,,MHz,,"Panel (single sector dual slant, 790-890 MHz)",RVVPX310.11B-T2 (790-890 MHz),CommScope
+92696,17.5,27,62,,,MHz,,MHz,,"Panel (single sector dual slant, 1695-1880 MHz)",RVVPX310.11B-T2 (1695-1880 MHz),CommScope
+92698,18.1,27,62,,,MHz,,MHz,,"Panel (single sector dual slant, 1920-2180 MHz)",RVVPX310.11B-T2 (1920-2180 MHz),CommScope
+92699,18.6,29,61,,,MHz,,MHz,,"Panel (single sector dual slant, 2300-2690 MHz)",RVVPX310.11B-T2 (2300-2690 MHz),CommScope
+92720,14,20,30,,,MHz,,MHz,,Yagi,YB815-81(H),RFI
+92827,23.5,30,109.4,,,MHz,,MHz,,Panel,AIR6488_B42F,ERICSSON
+92918,3,0,360,,,MHz,,MHz,,Dipole,MA215L26,Amphenol
+92962,19.5,25,33,,,MHz,,MHz,,Panel(1sector),T1002M3R011_900,TONGYU
+92963,19.5,25,34,,,MHz,,MHz,,Panel(1sector),T1002M3R011_2100,TONGYU
+92964,19.8,25,34,,,MHz,,MHz,,Panel(1sector),T1002M3R011_2300,TONGYU
+93,15.7,16,23,,,MHz,,MHz,0,Yagi (Vertical Polarisation)-Y,546-2(V),AEA
+93020,2.1,0,0,,,MHz,,MHz,,GroundPlane,M21T-GP,SCALAR
+93030,5,0,360,,,MHz,,MHz,,"Dipole (1x 4 dipole array, 136-174 MHz)",BA40-41,RF Industries
+93063,39.3,66,1.8,,,MHz,,MHz,,Parabolic High Performance,VHLPX6-6W/B,Andrew
+93087,34.7,61,3.3,,,MHz,,MHz,,Parabolic High Performance,VHLP2-11W/A,Andrew
+93107,34.7,61,3.3,,,MHz,,MHz,,Parabolic High Performance,VHLPX2-11W/A,Andrew
+93186,15.7,25,66,,,MHz,,MHz,,Panel(1sector),T2040L3R011_0.7,TONGYU
+93189,32.7,60,4.1,,,MHz,,MHz,,Parabolic High Performance,VHLP1-15/C,Andrew
+93202,13.2,20,36,,,MHz,,MHz,,Yagi(MixedPolarisation),YCP4047-13, RF INDUSTRIES
+93318,15.4,31.6,90,,,MHz,,MHz,,Panel (Single-Sector),PMP 450m C050045A101A (5150-5925 MHz),Cambium Networks
+93351,24.8,29,120,,,MHz,,MHz,,Panel,AEQP_3500_120,NOKIA
+93352,2.1,0,0.5,,,MHz,,MHz,,GroundPlane,BMV-118137,RFI
+93364,15.8,32,70,,,MHz,,MHz,,Panel(1sector),RRV4-65D-R6 (694-790),Commscope
+93365,16.4,32,67,,,MHz,,MHz,,Panel(1sector),RRV4-65D-R6 (790-890),Commscope
+93366,16.8,33,62,,,MHz,,MHz,,Panel(1sector),RRV4-65D-R6 (880-960),Commscope
+93367,17,37,59,,,MHz,,MHz,,Panel(1sector),RRV4-65D-R6 (1695-1880),Commscope
+93368,17.6,38,60,,,MHz,,MHz,,Panel(1sector),RRV4-65D-R6 (1850-1990),Commscope
+93369,17.8,36,61,,,MHz,,MHz,,Panel(1sector),RRV4-65D-R6 (1920-2180),Commscope
+93370,18.3,36,61,,,MHz,,MHz,,Panel(1sector),RRV4-65D-R6 (2300-2500),Commscope
+93371,17.7,33,69,,,MHz,,MHz,,Panel(1sector),RRV4-65D-R6 (2500-2690),Commscope
+93372,17.8,26,35,,,MHz,,MHz,,Panel(Multi-sector),T2040L3R011_1800,TONGYU
+93373,18.3,27,32,,,MHz,,MHz,,Panel(Multi-sector),T2040L3R011_2100,TONGYU
+93396,35.7,62,2.7,,,MHz,,MHz,,Parabolic,Am-4-6-CIRC-CR,ceragon
+93400,38.9,65,1.8,,,MHz,,MHz,,Parabolic,DPSA-6-6-CR,ceragon
+93404,37.2,63,2.3,,,MHz,,MHz,,Parabolic,Am-4-7_8-CIRC-CR,ceragon
+93406,40.8,67,1.5,,,MHz,,MHz,,Parabolic,Am-6-7_8-CIRC-CR,ceragon
+93409,34.1,60,3.2,,,MHz,,MHz,,Parabolic,Am-2-11W-CIRC-CR,ceragon
+93410,40.1,67,1.6,,,MHz,,MHz,,Parabolic,Am-4-11W-CIRC-CR,ceragon
+93418,44.8,73,0.9,,,MHz,,MHz,,Parabolic,Am-4-18-CIRC-CR,ceragon
+93433,25.5,29,90,,,MHz,,MHz,,Panel (1 sector),AEQB_3500,NOKIA
+93443,16,23,65,,,MHz,,MHz,,Panel (Single-Sector),JAVV-65C-R3B (850),Commscope
+93460,2.1,0,360,,,MHz,,MHz,,Colinear Vertical,COL51-174,RF Industries
+93480,35.5,62,2.9,,,MHz,,MHz,,Parabolic High Performance,VHLP4-6W/C,Andrew
+93489,17.7,33,64,,,MHz,,MHz,,Cellular,SSPX310R-V2 (3.4),Commscope
+93537,16.7,31,67,,,MHz,,MHz,,Panel,RV4-65D-R5-V6_0.7G,COMMSCOPE
+93539,17.4,36,62,,,MHz,,MHz,,Panel,RV4-65D-R5-V6_0.9G,COMMSCOPE
+93540,16.8,31,62,,,MHz,,MHz,,Panel,RV4-65D-R5-V6_1.8G,COMMSCOPE
+93541,17.4,34,63,,,MHz,,MHz,,Panel,RV4-65D-R5-V6_2.1G,COMMSCOPE
+93543,18.1,34,61,,,MHz,,MHz,,Panel,RV4-65D-R5-V6_2.5G,COMMSCOPE
+93587,18.6,25,65,,,MHz,,MHz,,Panel(Multi-sector),2G4WHF(0.7),Rosenberger
+93588,19.5,25,65,,,MHz,,MHz,,Panel(Multi-sector),2G4WHF(0.9),Rosenberger
+93589,18.5,25,65,,,MHz,,MHz,,Panel(Multi-sector),2G4WHF(1.8),Rosenberger
+93590,19.5,25,65,,,MHz,,MHz,,Panel(Multi-sector),2G4WHF(2.1),Rosenberger
+93630,34.5,61,3.3,,,MHz,,MHz,,Parabolic,TYA06U10WC-BUBT,TONGYU
+93648,24.5,29,120,,,MHz,,MHz,,Panel(1sector),AEQE_3.48-3.8_120,Nokia
+93658,15.7,34,72,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65D-R8 (700),Commscope
+93659,16.1,29,63,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65D-R8 (900),Commscope
+93660,16.8,32,70,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65D-R8 (1800),Commscope
+93661,16.8,32,70,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65D-R8 (2100),Commscope
+93662,16.3,31,90,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65D-R8 (2300),Commscope
+93663,16.3,31,90,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65D-R8 (2600),Commscope
+93664,23,28,105,,,MHz,,MHz,,Panel(1sector),AENB,Nokia
+93725,15.6,30,83,,,MHz,,MHz,,Cellular,NHH-85C-R2B (850),Commscope
+93726,15.5,30,81.5,,,MHz,,MHz,,Cellular,NHH-85C-R2B (700),Commscope
+93737,5.1,0,360,,,MHz,,MHz,,Dipole,BA404040-41-D-ICE,RFI
+93789,21.2,31,90,,,MHz,,MHz,,Panel,RRZZVVT4S4-65D-R8_BF_2350,COMMSCOPE
+93798,34.2,63,3.2,,,MHz,,MHz,,Parabolic High Performance,SLA0318S3S00A20,Shenglu
+93800,39.4,67,1.8,,,MHz,,MHz,,Parabolic High Performance,SLA0618S03S00A20,Shenglu
+93807,52,70,0.38,,,MHz,,MHz,,Parabolic Standard,13001,ViaSat
+93826,20.3,28,87,,,MHz,,MHz,,Panel,RRZZVVT4S4-65D-R8_BF_3500,COMMSCOPE
+93857,40.8,70,1.6,,,MHz,,MHz,,Parabolic High Performance,VHLP4-11W/A,Andrew
+93872,17.7,33,37,,,MHz,,MHz,,Panel(1sector),RVV-33B-R3_700,COMMSCOPE
+93873,18.7,35,30,,,MHz,,MHz,,Panel(1sector),RVV-33B-R3_900,COMMSCOPE
+93874,20,35,35,,,MHz,,MHz,,Panel(1sector),RVV-33B-R3_1800,COMMSCOPE
+93875,20.8,36,33,,,MHz,,MHz,,Panel(1sector),RVV-33B-R3_2100,COMMSCOPE
+93876,21.6,34,28,,,MHz,,MHz,,Panel(1sector),RVV-33B-R3_2300,COMMSCOPE
+93877,21.5,35,26,,,MHz,,MHz,,Panel(1sector),RVV-33B-R3_2600,COMMSCOPE
+93878,35.3,61,3,,,MHz,,MHz,,Parabolic High Performance,VHLP3-7W/A,Andrew
+93907,15.7,29,69,,,MHz,,MHz,,Panel(1sector),RR2VV-6533D-R6_700,cOMMSCOPE
+93908,16.1,28,62,,,MHz,,MHz,,Panel(1sector),RR2VV-6533D-R6_850,Commscope
+93910,19,36,30,,,MHz,,MHz,,Panel(Multi-sector),RR2VV-6533D-R6_1800,Commscope
+93911,19.5,36,30,,,MHz,,MHz,,Panel(Multi-sector),RR2VV-6533D-R6_2100,Commscope
+93965,40.8,67,1.3,,,MHz,,MHz,,Parabolic High Performance,VHLPX6-7W/D,Andrew
+93994,20.2,30,33,,,MHz,,MHz,,Cellular,AW3843 (3.4),Alpha Wireless
+93995,20.2,30,33,,,MHz,,MHz,,Cellular,AW3843 (2.3),Alpha Wireless
+93996,17.7,25,63,,,MHz,,MHz,,Cellular,AW3842 (3.4),Alpha Wireless
+93997,17.6,25,63,,,MHz,,MHz,,Cellular,AW3842 (2.3),Alpha Wireless
+94,18.2,20,18,,,MHz,,MHz,0,Yagi (Horizontal Polarisation)-Y,YV11-4(H),RFS
+94104,43.8,73,1,,,MHz,,MHz,,Parabolic Dual Band,ANT0/0 B 1.8 6/11 HPX/HPX (11 GHz),Ericsson
+94152,5.2,0,360,,,MHz,,MHz,,Parallel array of vertical dipoles,214-P2-ICE,Polar Electronic Industries
+94203,35.8,60,2.2,,,MHz,,MHz,,Parabolic Dual Band,ANT3/3 C 1.2 7/8/18 HPX/HPX (8 GHz),Ericsson
+94204,43.2,70,0.8,,,MHz,,MHz,,Parabolic Dual Band,ANT3/3 C 1.2 7/8/18 HPX/HPX (18 GHz),Ericsson
+94256,22.5,28,13,,,MHz,,MHz,,Lens,MS-MBA-4.4-SH2-SH2-45 (3.4),Matsing
+94257,20.5,28,17,,,MHz,,MHz,,Lens,MS-MBA-4.4-SH2-SH2-45 (2.3),Matsing
+94265,39,67,2.1,,,MHz,,MHz,,Parabolic High Performance,VHLP2-18/D,Andrew
+94327,15.1,30,70,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65B-R8_700,Commscope
+94328,15.7,29,61,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65B-R8_900,Commscope
+94329,16.3,28,68,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65B-R8_1800,Commscope
+94330,16.3,28,68,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65B-R8_2100,Commscope
+94332,17.2,31,63,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65B-R8_2600,Commscope
+94335,20.8,29,90,,,MHz,,MHz,,Panel(1sector),RRZZVVT4S4-65B-R8_BF3500,Commscope
+94339,35.7,62,3,,,MHz,,MHz,,Parabolic High Performance,THP12-059W UNI DC,Faini Telecommunication Systems
+94358,34.1,60,3.4,,,MHz,,MHz,,Parabolic High Performance,THP06-100W UNI DC OMT,Faini Telecommunication Systems
+94387,39.3,68,2,,,MHz,,MHz,,Parabolic High Performance,THP18-059W UNI DC,Faini Telecommunication Systems
+94405,35,61.6,3.2,,,MHz,,MHz,,Parabolic Dual Band,MT1180M50VH/AV (11 GHz),MTI Wireless Edge
+94406,51.06,67,0.5,,,MHz,,MHz,,Parabolic Dual Band,MT1180M50VH/AV (80 GHz),MTI Wireless Edge
+94447,39.3,66,1.8,,,MHz,,MHz,,Parabolic High Performance,VHLP6-6W/B,Andrew
+94456,25.2,25,116,,,MHz,,MHz,,Cellular,AIR 3258_B78V_Traffic,Ericsson
+94460,16.7,30,69,,,MHz,,MHz,,Cellular,RRVV-65D-R6D (2.5),Commscope
+94461,16.7,30,61,,,MHz,,MHz,,Cellular,RRVV-65D-R6D (2.1),Commscope
+94462,16.3,30,60,,,MHz,,MHz,,Cellular,RRVV-65D-R6D (1.8),Commscope
+94464,16.4,30,64,,,MHz,,MHz,,Cellular,RRVV-65D-R6D (850),Commscope
+94465,16.1,30,74,,,MHz,,MHz,,Cellular,RRVV-65D-R6D (700),Commscope
+94503,24,99,122,,,MHz,,MHz,,Panel(1sector),AWEUD,NOKIA
+94519,49.7,68,0.5,,,MHz,,MHz,,Parabolic High Performance,ANT3 A 0.6 80 HPX,Ericsson
+94547,41.4,70,1,,,MHz,,MHz,,Parabolic Dual Band,ANT3/3 C 1.2 7/8/15 HPX/HPX (15 GHz),Ericsson
+94548,35.8,60,2.2,,,MHz,,MHz,,Parabolic Dual Band,ANT3/3 C 1.2 7/8/15 HPX/HPX (8 GHz),Ericsson
+94571,1,0,360,,,MHz,,MHz,,Omni Directional,CD30-148470 (VHF),RF Industries
+94859,24,25,142,,,MHz,,MHz,,Cellular,AIR 3219_Traffic_Beams_Envelope B42,Ericsson
+94889,33.6,60,3.3,,,MHz,,MHz,,Parabolic High Performance,ANT3 C 0.3 18 HPX,Ericsson
+94899,34.4,60,3,,,MHz,,MHz,,Parabolic High Performance,ANT3 C 0.9 7/8 HPX,Ericsson
+94900,39,65,1.7,,,MHz,,MHz,,Parabolic High Performance,ANT3 C 1.8 6 HPX,Ericsson
+94902,33.4,65,3.3,,,MHz,,MHz,,Parabolic High Performance,ANT3 A 0.9 6 SHPX,Ericsson
+94907,34.5,61,3.3,,,MHz,,MHz,,Parabolic Ultra High Performance,SLA0610S3S00A20,Shenglu
+95070,9.1,0,360,,,MHz,,MHz,,ColinearVertical,COL45-420,RF INDUSTRIES
+95091,24.4,27,114,,,,,,,Cellular,AIR 3219_Traffic_Beams_Envelope B42 NR,Ericsson
+95114,31.7,26.9,106,,,,,,,Cellular,AIR 5322 B257 (CM2 Macro5 Envelope),Ericsson
+95119,36,61,2.7,,,,,,,Parabolic Ultra High Performance,SLA0613S3S49A21,Shenglu
+95120,30.9,56,4.7,,,,,,,Parabolic Ultra High Performance,SLA0313S3S49A21,Shenglu
+95123,38.9,66,1.7,,,,,,,Parabolic High Performance,ADC1U1SN40DA (6GHz),Amphenol
+95124,43,69,1,,,,,,,Parabolic High Performance,ADC1U1SN40DA (11GHz),Amphenol
+95134,14.25,20,40,,,,,,,Dipole,149CP22 ANTENNA,M2 Inc
+95171,7,6.9,178,,,,,,,Dipole,OA20-41,RF Industries
+95205,28.7,28.2,106,,,,,,,Cellular,AIR 5322 B257 (CM1 Macro3 Envelope),Ericsson
+95208,35.3,61,3,,,,,,,Parabolic High Performance,ANT3 A 0.9 7/8 HPX (333D02Hb),Ericsson
+95209,37.1,63,2.2,,,,,,,Parabolic High Performance,ANT3 A 1.2 7/8 HPX (343D02Hb),Ericsson
+95477,16.2,18,62,,,,,,,Cellular,F6RHEU01 (814-890 MHz),Kaelus
+95478,15.6,17,69,,,,,,,Cellular,F6RHEU01 (703-788 MHz),Kaelus
+95545,18.2,25,65,,,,,,,Cellular,12052FM02 (824-960 MHz),CellMax Technologies
+95546,16.8,23,74,,,,,,,Cellular,12052FM02 (698-798 MHz),CellMax Technologies
+95626,17.2,22,65,,,,,,,Cellular,P6BTEU02 (790-862 MHz),Kaelus
+95627,16.7,22,69,,,,,,,Cellular,P6BTEU02 (698-790 MHz),Kaelus
+95638,19.5,33,33,,,,,,,Cellular,R-33D-R1VB (790-894 MHz),Commscope
+95639,19.1,36,37,,,,,,,Cellular,R-33D-R1VB (698-806 MHz),Commscope
+95653,24.5,25,120,,,,,,,Panel(1sector),AVQL_3500,Nokia
+95678,15.3,30,70,,,,,,,Panel (1 sector),KRE 101 2568/1_700,Ericsson
+95679,16.3,40,65,,,,,,,Panel (1 sector),KRE 101 2568/1_900,Ericsson
+95744,8,0,360,,,,,,,ColinearVertical,COL44-470,RF INDUSTRIES
+95796,5.2,0,360,,,,,,,ColinearVertical,02520,BENELEC
+95837,2.1,0,360,,,,,,,Omni Directional,CM162-AIS-B-SS,ZCG
+95839,24.5,27.6,108,,,,,,,Cellular,AIR 3284_Traffic_Envelope_NR (2.5),Ericsson
+95840,22.74,22.8,114,,,,,,,Cellular,AIR 3284_Traffic_Envelope_NR (2.1),Ericsson
+95841,21.32,16.6,110,,,,,,,Cellular,AIR 3284_Traffic_Envelope_NR (1.8),Ericsson
+95845,25.7,27.6,116,,,,,,,Cellular,AIR 6428_Traffic_Envelope_NR (3400-3800 MHz),Ericsson
+95912,0,0,360,,,,,,,Omni Directional,AD-25/CW-3512-H Rev.B,Trival
