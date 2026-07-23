@@ -57,7 +57,8 @@ MegaNet/
 │   ├── acma-threats.json … acma-dictionaries.json   (generated RF interference layer)
 │   ├── acma-timeline.json            (authorisation-date timeline for the RF Changes tab)
 │   ├── acma-snapshots.json / acma-changes.json      (snapshot index + precomputed diffs)
-│   └── acma-licence-suggestions.csv  (repeater ↔ ACMA licence review file)
+│   ├── acma-licence-suggestions.csv  (repeater ↔ ACMA licence review file)
+│   └── rf-concepts.json              (RF explainer entries for the Workbench concept drawer)
 │
 ├── radio-mobile/           ← self-contained Radio Mobile desktop project
 │   ├── MegaNet.csv … MegaNet_NetData.csv   (sample export set)
@@ -623,6 +624,85 @@ unsolicited commercial electronic messages (*Spam Act 2003*) or telemarketing
 (*Do Not Call Register Act 2006*) — this tool shows licensee identity for
 interference-coordination purposes only and must not be used as a mailing
 list.
+
+---
+
+## Interference Workbench
+
+A single investigation surface (**Workbench** tab): select the stations you
+believe are affected and MegaNet assembles the evidence spread across Map,
+Networks, Bit Flipper, RF Environment and RF Changes into one argued case. It
+is deliberately not a dashboard — it states what it thinks, shows the evidence,
+says how confident it is, and names the observation most likely to change the
+answer. Every score expands to its inputs and arithmetic.
+
+### The five hypotheses
+
+Five competing explanations are evaluated in parallel and ranked by
+explanatory power — the losing hypotheses stay visible:
+
+| # | Hypothesis | Signature in the selected stations |
+|---|---|---|
+| H1 | Repeater common-mode | affected stations share a repeater path; unaffected ones mostly don't |
+| H2 | Geographic / regional | affected stations cluster spatially regardless of routing |
+| H3 | Channel-wide | affected stations share an RX frequency across different repeaters |
+| H4 | Site-local, independent | no shared path, cluster or channel — separate local sources |
+| H5 | Misattribution artefact | "affected" stations 1 address bit apart — data bleeding across IDs |
+
+**H5 runs first**, before anything else is presented: with 13 unprotected
+address bits, two "affected" stations whose IDs differ by a power of two may
+be one victim and one ghost of the same corrupted packets, which would change
+the entire selection. Flagged pairs deep-link into the existing Bit Flipper.
+
+**H1 scoring**: for each repeater, `coverage` (fraction of affected stations
+through it) and `specificity` (how well it avoids explaining stations that are
+fine) combine as a harmonic mean (F1) into *explanatory power* — so a base
+station that everything routes through is correctly demoted rather than
+topping the list on coverage alone. Repeaters in series are flagged as a
+**chain**, not competing suspects. **H2** uses the same grammar: spatial
+tightness versus a network baseline × the affected fraction of stations inside
+the cluster. H1 and H2 are confounded (repeaters serve areas), so the
+Workbench names the **discriminating stations** — inside the affected area but
+routed differently — whose state most changes the answer. **H3** is scored
+against each channel's base rate (68 of 88 documented repeaters share
+151.5 MHz, so raw sharing is uninformative). **H4** is the residual.
+
+### What it reuses
+
+Bit Flipper address logic (H5), pass-range routing helpers (H1 and the
+matrix), the shared Leaflet base layers, the ACMA threat scoring and
+transmitter card (suspect list, map squares, frequency strip plot) and the RF
+Changes timeline (register events near the candidates around onset). Nothing
+loads until the tab is opened.
+
+### Investigations
+
+Cases (affected/known-good sets, onset, symptom) save to the browser by name
+and share as a URL — the whole investigation is encoded in the hash
+(`#wb&a=…`). Exports: case CSV, a site-visit checklist tailored to the leading
+mechanism, and a draft ACMA interference report with the evidence pre-filled
+and every inference marked as an inference.
+
+### Education layer
+
+Three tiers, aimed at hydrographers as much as RF engineers: dotted-underline
+tooltips on every technical term; a "Why this matters" expander under each
+evidence panel; and a concept drawer (slide-over) of field-oriented RF
+explainers loaded from `data/rf-concepts.json` — a standalone file so entries
+can be extended without touching `app.js`. Every entry states what the
+phenomenon *looks like in your data*, not just what it is physically.
+
+### Honesty rules
+
+The Workbench never says "cause" — always "most consistent with" / "leading
+hypothesis". Confidence is always shown, confounds are stated
+("your affected stations share both a repeater and a location…"), weak or
+empty results are reported as findings with a next step, and the blind-spots
+panel (shared with RF Changes) lists what no register can see. H1 depends on
+pass-range data: 88 of 178 repeaters currently have recorded pass ranges and
+~78 % of stations with ALERT ids fall inside at least one — the Workbench
+reports, per investigation, how many affected stations have no routing and
+degrades honestly when they don't.
 
 ---
 

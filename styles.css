@@ -1120,3 +1120,269 @@ code {
   gap: .5rem;
   margin-top: 1.1rem;
 }
+
+/* ── Interference Workbench tab ────────────────────────────────────────────── */
+
+.wb-page { padding: 1rem; }
+
+.wb-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 320px;
+  gap: 1rem;
+  align-items: start;
+}
+
+.wb-rail { min-width: 0; }
+
+@media (max-width: 1400px) {
+  .wb-layout { grid-template-columns: 300px minmax(0, 1fr); }
+  .wb-layout > aside:last-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 1000px) {
+  .wb-layout { grid-template-columns: 1fr; }
+  .wb-layout > aside:last-child { grid-column: auto; }
+}
+
+/* the Workbench page scrolls, so the transmitter card floats like on RF Changes */
+.wb-page .acma-card {
+  position: fixed;
+  top: 84px;
+  right: 14px;
+  bottom: 14px;
+}
+
+/* H5 warning banner — shown above everything else when address pairs collide */
+.wb-banner {
+  border: 1px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 10%, var(--panel));
+  border-radius: 10px;
+  padding: .8rem .9rem;
+  font-size: .92rem;
+}
+
+.wb-verdict { border-left: 4px solid var(--accent); }
+
+.wb-notes {
+  margin-top: .5rem;
+  border-top: 1px dashed var(--border);
+  padding-top: .4rem;
+}
+.wb-notes p { margin: .2rem 0; }
+
+/* hypothesis ranking rows */
+.wb-hyp { border-bottom: 1px solid var(--border); padding: .3rem 0; }
+.wb-hyp:last-of-type { border-bottom: none; }
+.wb-hyp summary {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(9rem, 1fr) minmax(4rem, 180px) 3.2rem;
+  gap: .6rem;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+.wb-hyp summary::-webkit-details-marker { display: none; }
+.wb-hyp-rank { color: var(--muted); font-size: .82rem; }
+.wb-hyp-name { font-size: .92rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-hyp-score { font-variant-numeric: tabular-nums; text-align: right; font-size: .9rem; }
+.wb-hyp-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 16%, transparent);
+  overflow: hidden;
+}
+.wb-hyp-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+}
+.wb-hyp-body { padding: .2rem 0 .4rem 2.8rem; }
+@media (max-width: 700px) { .wb-hyp-body { padding-left: .5rem; } }
+
+/* expandable arithmetic under each score */
+.wb-arith {
+  margin-top: .3rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--subtle);
+  padding: .45rem .6rem;
+}
+
+/* suspects (right rail) reuse the hypothesis grid */
+.wb-sus { border-bottom: 1px solid var(--border); padding: .25rem 0; }
+.wb-sus:last-of-type { border-bottom: none; }
+.wb-sus summary {
+  display: grid;
+  grid-template-columns: 2rem minmax(7rem, 1fr) minmax(3rem, 90px) 3rem;
+  gap: .5rem;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+.wb-sus summary::-webkit-details-marker { display: none; }
+.wb-sus-name { font-size: .9rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ACMA suspect rows */
+.wb-threat {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) 2.6rem;
+  gap: .5rem;
+  align-items: center;
+  padding: .3rem .2rem;
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: .9rem;
+}
+.wb-threat:hover { background: var(--subtle); }
+.wb-threat-name { min-width: 0; }
+
+/* selection chips */
+.wb-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+.wb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  max-width: 100%;
+  padding: .18rem .5rem;
+  border-radius: 999px;
+  font-size: .8rem;
+  border: 1px solid var(--border);
+}
+.wb-chip a { text-decoration: none; color: inherit; opacity: .7; }
+.wb-chip a:hover { opacity: 1; }
+.wb-chip-name {
+  max-width: 11ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wb-chip-aff  { background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.wb-chip-good { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.wb-chip-miss { border-style: dashed; opacity: .8; }
+
+/* station picker results */
+.wb-pick-list {
+  margin-top: .4rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.wb-pick-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+  padding: .35rem .5rem;
+  font-size: .86rem;
+  border-bottom: 1px solid var(--border);
+}
+.wb-pick-row:last-child { border-bottom: none; }
+.wb-pick-row button { padding: .2rem .45rem; font-size: .76rem; }
+
+/* routing / pass-range matrix */
+.wb-matrix { table-layout: auto; min-width: 520px; }
+.wb-matrix th.wb-m-h {
+  vertical-align: bottom;
+  height: 110px;
+  padding: .3rem .2rem;
+  min-width: 26px;
+  max-width: 34px;
+}
+.wb-matrix th.wb-m-h span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: .76rem;
+  font-weight: 500;
+  max-height: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+.wb-matrix td.wb-m { text-align: center; color: var(--muted); }
+.wb-matrix td.wb-m.hit { color: var(--accent); font-size: 1rem; }
+.wb-matrix tr.wb-row-aff td:first-child { border-left: 3px solid var(--bad); }
+.wb-matrix tr.wb-row-aff td { background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.wb-matrix tr.wb-row-good td:first-child { border-left: 3px solid var(--ok); }
+.wb-matrix tr.wb-row-good td { background: color-mix(in srgb, var(--ok) 6%, transparent); }
+.wb-matrix tfoot td { font-variant-numeric: tabular-nums; }
+
+/* education layer: dotted-underline tooltip terms */
+.wb-term {
+  border-bottom: 1px dotted var(--muted);
+  cursor: help;
+  position: relative;
+}
+.wb-term-link { cursor: pointer; }
+.wb-term:hover::after,
+.wb-term:focus::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  z-index: 1500;
+  width: 270px;
+  max-width: 74vw;
+  padding: .5rem .6rem;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
+  font-size: .8rem;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.wb-why { margin-top: .6rem; }
+.wb-why summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: .85rem;
+}
+
+/* concept drawer (education tier 3) — slide-over on the right edge */
+.wb-drawer {
+  position: fixed;
+  top: 84px;
+  right: 14px;
+  bottom: 14px;
+  width: 400px;
+  max-width: 88vw;
+  overflow-y: auto;
+  z-index: 1300;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .3);
+  font-size: .9rem;
+}
+.wb-drawer-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+  padding: .6rem .7rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.wb-drawer-head button { padding: 0 .5rem; font-size: 1rem; }
+.wb-drawer-body { padding: .6rem .8rem 1rem; }
+.wb-drawer-body p { margin: .5rem 0; }
+.wb-drawer-item {
+  display: block;
+  padding: .4rem .5rem;
+  margin: .15rem 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: .88rem;
+}
+.wb-drawer-item:hover { background: var(--subtle); }
