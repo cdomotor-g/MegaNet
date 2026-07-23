@@ -51,7 +51,10 @@ MegaNet/
 ├── data/                   ← source + bundled data files
 │   ├── ALL_UNITS.csv                 (legacy field-station source for migrate.html)
 │   ├── ALL_REPEATERS.csv             (legacy repeater source for migrate.html)
-│   └── All 2021 Working 2.txt        (national ALERT address lookup, ALERT Packets tab)
+│   ├── All 2021 Working 2.txt        (national ALERT address lookup, ALERT Packets tab)
+│   ├── acma-raw/                     (prefiltered ACMA RRL subset, CC BY 4.0)
+│   ├── acma-threats.json … acma-dictionaries.json   (generated RF interference layer)
+│   └── acma-licence-suggestions.csv  (repeater ↔ ACMA licence review file)
 │
 ├── radio-mobile/           ← self-contained Radio Mobile desktop project
 │   ├── MegaNet.csv … MegaNet_NetData.csv   (sample export set)
@@ -61,7 +64,9 @@ MegaNet/
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
 ├── tools/                  ← command-line helpers (needs Python; see tools/README.md)
-│   └── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
+│   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
+│   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
+│   └── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
 │
 └── archive/                ← redundant / superseded / unreferenced (see archive/README.md)
     ├── prototype_index.html, BitFlipper*.html, image_bitflipper.svg, app_updated*.js
@@ -475,6 +480,94 @@ Technology: Vanilla JS (no framework), same stack as current `app.js`.
 3. Import CSV (legacy format) with field-mapping wizard.
 4. Export `stations.json` from the browser.
 5. Optional: diff view showing what changed since last export.
+
+---
+
+## ACMA RF Interference Layer
+
+The network operates on **151.5 MHz** with the plain ALERT Binary Format, which
+has **no error detection over the payload** — a single flipped bit re-attributes
+a reading to the wrong station or corrupts its value. Corruption appearing
+across many unrelated sites at once points at shared infrastructure — the
+repeaters. This layer maps every licensed transmitter in the **ACMA Register of
+Radiocommunications Licences (RRL)** that could plausibly be responsible, so an
+interference investigation starts from evidence instead of guesswork.
+
+### Using it
+
+- **Map tab → Filters → "ACMA / RF Environment"**: master toggle (off by
+  default — nothing is fetched until first enable, so page load is unchanged),
+  mechanism checkboxes, minimum-score slider, current-licences-only, search
+  radius, antenna beam wedges and threat links. Transmitters render as
+  **squares** (MegaNet stations are circles), coloured by mechanism, capped at
+  the top 500 by score. Click one for a summary popup, then *Full details →*
+  for the complete card: RF parameters, antenna, site (including ACMA's
+  coordinate precision), licence, licensee, advisory notes / special
+  conditions, and co-sited devices with IMD partners cross-linked.
+- **RF Environment tab**: per-repeater threat summary, sortable candidate
+  table with CSV export, a frequency strip plot of every licensed carrier
+  around each RX channel, and a corruption-timestamp correlation helper.
+
+### Interference mechanisms
+
+| Mechanism | Test | Why it matters |
+|---|---|---|
+| Co-channel | within 6.25 kHz of a repeater RX | direct collisions / capture |
+| Adjacent | within 25 / 50 kHz | splatter raises the noise floor → bit flips |
+| Harmonic | transmitter at RX/2 … RX/5 | poorly filtered PA stages |
+| IMD3 / IMD5 | 2f₁−f₂ / 3f₁−2f₂ from devices at the **same site** | the "rusty bolt" — prime suspect for repeater-clustered corruption |
+| Co-site desense | any strong transmitter at the repeater site, any frequency | front-end overload — the only path by which cellular matters |
+
+Each candidate gets a 0–100 score (mechanism weight × distance × power ×
+line-of-sight), with the components shown on the card. Line-of-sight is **not
+yet assessed** (`los: null`, factor 0.7); the honest blind spots — amateur
+radio, unlicensed/faulty emitters, spurious emissions, non-co-sited mixing,
+tropospheric ducting — are documented in the layer's own "?" help panel.
+
+### Data pipeline
+
+```
+ACMA daily bulk extract (spectra_rrl.zip, ~68 MB zipped / ~580 MB CSV)
+  └─ tools/acma_prefilter.py   → data/acma-raw/        (committed, ~7.5 MB)
+       └─ tools/acma_fetch.py  → data/acma-threats.json      (map layer, ~1 MB)
+                                  data/acma-sites.json        (site coordinates)
+                                  data/acma-devices.json      (card detail, lazy-loaded)
+                                  data/acma-dictionaries.json (lookup vocabularies)
+                                  data/acma-licence-suggestions.csv (review file)
+```
+
+The app only ever reads the generated JSON — no live ACMA calls (the RRL API
+requires Digital ID authentication and won't serve CORS). Both tools are
+stdlib-only Python 3.8+:
+
+```bash
+# with a downloaded extract:
+python3 tools/acma_prefilter.py --zip spectra_rrl.zip --stations stations.json --out data/acma-raw
+python3 tools/acma_fetch.py --suggest-licences        # reads data/acma-raw, writes data/acma-*.json
+python3 tools/acma_fetch.py --help                    # all flags (radius, tolerances, mechanisms, dry-run)
+```
+
+A **monthly GitHub Action** (`.github/workflows/acma-refresh.yml`) downloads
+the current extract, reruns both tools and opens a PR. In sandboxed
+environments without ACMA access, attach the extract to a GitHub Release
+(see the `acma-data-*` tags) and fetch it from there instead.
+
+`data/acma-licence-suggestions.csv` matches MegaNet repeater coordinates
+against ACMA sites to help backfill `repeater.acma_licence` (only 40 of 178
+repeaters have it) — it is a review file, never applied automatically. The
+single highest-value data task remains backfilling `repeater.rx_mhz`: the
+analysis can only anchor on the 88 repeaters that have one.
+
+### Attribution and conditions of use
+
+Contains data from the Australian Communications and Media Authority,
+**Register of Radiocommunications Licences**, licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The extract's usage
+conditions additionally prohibit using licensee contact details for
+unsolicited commercial electronic messages (*Spam Act 2003*) or telemarketing
+(*Do Not Call Register Act 2006*) — this tool shows licensee identity for
+interference-coordination purposes only and must not be used as a mailing
+list.
 
 ---
 

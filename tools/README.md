@@ -1,7 +1,26 @@
 # MegaNet tools
 
 Small command-line helpers that sit alongside the browser app. Unlike the app
-itself, these need Python and a network connection.
+itself, these need Python (the ACMA tools are stdlib-only; the agent also
+needs a network connection and the `anthropic` package).
+
+## `acma_prefilter.py` + `acma_fetch.py` — the ACMA RF interference pipeline
+
+See the "ACMA RF Interference Layer" section of the repo README for the full
+picture. In short:
+
+```bash
+# 1. reduce the ~68 MB ACMA RRL daily extract to the MegaNet-relevant subset
+python3 tools/acma_prefilter.py --zip spectra_rrl.zip --stations stations.json --out data/acma-raw
+
+# 2. classify + score interference candidates, emit the JSON the map reads
+python3 tools/acma_fetch.py --suggest-licences
+```
+
+Both are idempotent, stream the big CSVs rather than loading them, and
+document every flag under `--help`. `acma_fetch.py --dry-run` prints the
+per-mechanism candidate counts without writing anything — it doubles as the
+sanity check that frequency units parsed correctly.
 
 ## `meganet_agent.py` — ask questions about the network with the Claude API
 
