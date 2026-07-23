@@ -1,0 +1,113 @@
+{
+  "meta": {
+    "description": "RF concept explainers for the MegaNet education layer (Interference Workbench concept drawer and tooltips). Standalone data so entries can be extended without touching app.js and reused by other tabs.",
+    "updated": "2026-07-23",
+    "writing_standard": "Every entry must state what the phenomenon looks like in MegaNet's data (in_your_data), not just what it is physically. 'IMD is a third-order mixing product' is textbook; 'corruption that is intermittent, worse after rain, and only when two co-sited transmitters key at once' is usable at 2am during a flood event."
+  },
+  "concepts": [
+    {
+      "id": "imd",
+      "title": "Intermodulation (IMD) & the rusty-bolt effect",
+      "what": "When two strong signals meet any non-linear junction — a corroded mast joint, a loose connector, an overloaded receiver front-end — they mix and produce new frequencies at combinations like 2f1−f2 (third order). If a product lands on a repeater's RX channel it is indistinguishable from a real interferer, even though nobody is licensed on that frequency.",
+      "in_your_data": "Corruption that is intermittent, often worse after rain or wind (corrosion and loose joints change with weather), clustered behind one repeater, and present only when two particular co-sited transmitters key at the same time. Steady 24/7 corruption is usually NOT intermod.",
+      "next": "Check the ACMA suspect list for same-site IMD pairs, log the co-tenants' transmit times against your corruption times, and put mast-joint inspection and connector torque on the site visit checklist.",
+      "see_also": ["desense", "harmonics"]
+    },
+    {
+      "id": "desense",
+      "title": "Receiver desensitisation (desense)",
+      "what": "A strong transmitter physically near a receiver overloads its front-end, raising the effective noise floor so the receiver goes partially deaf — regardless of the transmitter's frequency. It is a proximity problem, not a spectrum problem, which is why cellular towers on a shared mast matter here and nowhere else.",
+      "in_your_data": "Weak (distant or low-battery) stations behind one repeater dropping out or corrupting while strong nearby stations stay clean, correlated with the co-sited transmitter's duty cycle. The repeater looks 'deaf to the weak', not 'jammed for everyone'.",
+      "next": "Get the co-sited transmitter's TX log if the operator will share it, and consider a band-pass cavity filter on the repeater RX. Both actions are pre-filled on the desense site-visit checklist.",
+      "see_also": ["imd", "noise_floor"]
+    },
+    {
+      "id": "capture",
+      "title": "Capture effect & packet collisions",
+      "what": "FM receivers lock onto the strongest signal on channel and suppress the rest almost completely. ALERT stations transmit blind (no carrier sense), so when two stations key at once the stronger one is decoded and the weaker one vanishes without trace — no error, no fragment, just a missing report.",
+      "in_your_data": "Dropouts rather than corruption: readings missing entirely, biased toward the more distant/weaker stations, worse during storm events when every station is reporting more often. Corrupted values point elsewhere; clean silence points here.",
+      "next": "Compare dropout rates against event-mode reporting intensity. Collisions rise with traffic; a fault does not care how busy the network is.",
+      "see_also": ["noise_floor", "no_crc"]
+    },
+    {
+      "id": "ducting",
+      "title": "Tropospheric ducting",
+      "what": "Temperature inversions — common ahead of and during the same weather systems that cause floods — form an atmospheric duct that carries VHF signals hundreds of kilometres beyond their normal horizon. A co-channel user who is normally far too distant to matter suddenly arrives at full strength.",
+      "in_your_data": "Interference that appears across a whole region at once (not one repeater), correlates with weather patterns rather than with any local change, and vanishes as suddenly as it came. The ACMA search radius can be misleading here: the offender may be far outside it.",
+      "next": "Check whether onset matches a synoptic weather change, and re-run the ACMA co-channel search at a much larger radius. This is a named blind spot of distance-based scoring.",
+      "see_also": ["cochannel", "acma_register"]
+    },
+    {
+      "id": "noise_floor",
+      "title": "Noise floor & SNR",
+      "what": "The noise floor is the sum of everything a receiver hears that is not the wanted signal. Decoding fails not at zero signal but where signal-to-noise ratio drops below the demodulator's threshold, so anything that raises noise — an interferer, a corroding connector, a new transmitter — silently eats link margin.",
+      "in_your_data": "The most distant and weakest stations fail first while strong ones survive: a rising noise floor removes margin from the bottom up. If your affected list is 'all the far ones', suspect noise at the shared receiver rather than faults at each site.",
+      "next": "Rank affected stations by path length/margin and see if the cut line is a signal-strength line. A spectrum analyser at the repeater during an event gives the ground truth no register can.",
+      "see_also": ["threshold_bits", "desense"]
+    },
+    {
+      "id": "threshold_bits",
+      "title": "Why bit errors cluster at threshold",
+      "what": "Above the decoding threshold, bit error rates are astronomically low; just below it they explode. The transition band is narrow — a couple of dB — so a station teetering at threshold produces bursts of single-bit and double-bit errors rather than a steady trickle.",
+      "in_your_data": "One or two flipped bits per bad packet (values off by exactly a power of two, or readings landing on a neighbouring ALERT address), intermittent, and concentrated in marginal stations. Many random bits wrong in every packet points at something else entirely (framing, equipment fault).",
+      "next": "Run affected addresses through the Bit Flipper: threshold errors show up as single-bit neighbours. Then ask what removed the margin — see noise floor.",
+      "see_also": ["noise_floor", "hamming", "no_crc"]
+    },
+    {
+      "id": "harmonics",
+      "title": "Harmonics",
+      "what": "Every transmitter leaks energy at integer multiples of its carrier. A transmitter at 50.5 MHz has its third harmonic at exactly 151.5 MHz. Harmonic levels are regulated but filters age, and a degraded or modified transmitter can put a real carrier on your RX channel from a licence record that looks completely unrelated.",
+      "in_your_data": "Co-channel-style interference (collisions, capture, raised noise) tracing to a licensee whose recorded frequency is a clean integer fraction (1/2 … 1/5) of the repeater RX. The ACMA layer scores these, but amateur 50 MHz activity is not recorded by location — a named blind spot.",
+      "next": "Check the harmonic candidates in the suspect list; if none fit and the signature is co-channel, a spectrum sweep near the repeater is the only way to find an unrecorded harmonic.",
+      "see_also": ["cochannel", "acma_register"]
+    },
+    {
+      "id": "cochannel",
+      "title": "Co-channel & adjacent-channel interference",
+      "what": "Co-channel: another user transmitting on the same frequency — packets collide and the stronger signal captures the receiver. Adjacent-channel: a neighbour within ~50 kHz whose modulation sidebands splatter into your channel, raising the noise floor without ever being 'on' it.",
+      "in_your_data": "Co-channel looks like dropouts and occasional decoded garbage across every repeater sharing that RX frequency — 68 of MegaNet's 88 documented repeaters share 151.5 MHz, so a channel-wide cause touches many networks at once. Adjacent-channel looks like eroded margin: threshold-style bit errors on weak stations.",
+      "next": "Compare affected fraction on the shared channel against its base rate (the Workbench's H3 does this — near-total sharing is uninformative because nearly everything shares the channel).",
+      "see_also": ["capture", "ducting", "threshold_bits"]
+    },
+    {
+      "id": "no_crc",
+      "title": "Why ALERT Binary Format has no payload protection",
+      "what": "The plain ALERT Binary Format carries a 13-bit station address and an 11-bit value with no checksum or CRC over them. Any bit the radio path flips is accepted as truth by every downstream system. (ALERT2 fixed this; the legacy format cannot.)",
+      "in_your_data": "A flipped address bit re-attributes a genuine reading to a different station — rainfall appearing at a gauge that is bone dry. A flipped data bit changes a value by exactly ±2^n. There is no error indication anywhere; only cross-checking neighbours or the Bit Flipper reveals it.",
+      "next": "Before trusting any multi-station corruption pattern, run the affected addresses through the misattribution check (H5): stations one address-bit apart may be one victim and one ghost.",
+      "see_also": ["hamming", "threshold_bits"]
+    },
+    {
+      "id": "hamming",
+      "title": "Hamming distance & address bit-flips",
+      "what": "The Hamming distance between two addresses is how many bits differ. Addresses at distance 1 are reachable from each other by a single bit error — and with 13 unprotected address bits, every station has 13 single-flip neighbours it can masquerade as.",
+      "in_your_data": "Two 'affected' stations whose ALERT IDs differ by a power of two (e.g. 2316 and 2320, distance 1 at bit 2) may not be two victims: one may simply be receiving the other's corrupted packets. Treating them as independent evidence corrupts every other conclusion, which is why the Workbench checks this first.",
+      "next": "Open the flagged pair in the Bit Flipper and compare the two stations' data series — misattributed readings appear in one series as ghosts of the other.",
+      "see_also": ["no_crc", "threshold_bits"]
+    },
+    {
+      "id": "los_fresnel",
+      "title": "Line of sight & Fresnel clearance",
+      "what": "VHF links need more than a sightline: they need the first Fresnel zone — an ellipsoid around the direct path, tens of metres thick at these distances — mostly clear. Terrain or growing vegetation intruding into it attenuates the signal even though the antennas can 'see' each other.",
+      "in_your_data": "A slow degradation of one path over months (vegetation growth) or a seasonal pattern (foliage, moisture). Also why the ACMA threat scores carry an unknown-LOS discount: a licensed transmitter behind a mountain may be no threat at all, and the register cannot tell.",
+      "next": "For a single degrading path, check the Radio Mobile profile before blaming interference. For threat triage, remember distance-based scores ignore terrain both ways.",
+      "see_also": ["noise_floor", "acma_register"]
+    },
+    {
+      "id": "acma_register",
+      "title": "What the ACMA register does and doesn't record",
+      "what": "The Register of Radiocommunications Licences records authorisations: who is licensed to transmit what, where. It does not record what is actually radiating. Authorisation dates are administrative — equipment goes live months later, or never — and unlicensed, faulty, or amateur emitters never appear at all.",
+      "in_your_data": "A register event near your onset date is a lead, never proof. An empty result is also a finding: strong onset with no ACMA activity nearby points at your own infrastructure (corrosion, equipment fault) or an unlicensed source — the two things the register can never show.",
+      "next": "Treat register hits as a shortlist for correlation (TX logs, timestamps), not conclusions. For register-invisible causes, the site-visit checklist is the tool.",
+      "see_also": ["ducting", "harmonics", "imd"]
+    },
+    {
+      "id": "coverage_specificity",
+      "title": "Coverage, specificity & explanatory power",
+      "what": "Coverage: what fraction of the affected stations pass through this repeater. Specificity: what fraction of the stations through it are actually affected — how well it avoids 'explaining' stations that are fine. Explanatory power is their harmonic mean (F1), which punishes a candidate weak on either.",
+      "in_your_data": "A base station everything routes through scores coverage 1.0 but near-zero specificity — it is on everyone's path, so its involvement is uninformative, and the harmonic mean correctly demotes it. High coverage with poor specificity reads 'on the path, but so is everything'; low coverage with high specificity reads 'explains some of your stations — you may have two problems'.",
+      "next": "Read the two numbers separately before trusting the combined one; the Workbench shows all three plus the raw station counts behind them.",
+      "see_also": ["hamming"]
+    }
+  ]
+}
