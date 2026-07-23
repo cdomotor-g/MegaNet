@@ -211,7 +211,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Click a station to see its full detail panel
 - Filter map display by role, catchment, radio network, or enabled status
 - Toggle individual link lines on/off
-- Leaflet.js with OpenStreetMap base layer
+- Leaflet.js with a base-map picker (top-right): OSM-Topo (default), OpenStreetMap, or Satellite
 
 ### 3. Pass-Range Analysis
 - For any station, identify which repeaters have a pass range covering its AlertIDs
