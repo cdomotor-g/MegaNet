@@ -406,14 +406,42 @@ function renderMapHtml() {
     </div>`;
 }
 
+// ── Base map layers ─────────────────────────────────────────────────────────
+// Fresh tile-layer instances for the shared base-map set. A Leaflet layer can
+// only live on one map at a time, so every map gets its own instances. The
+// first entry (OSM-Topo) is the default base layer.
+function makeBaseLayers() {
+  return {
+    'OSM-Topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map data: © OpenStreetMap contributors, SRTM | Style: © OpenTopoMap (CC-BY-SA)',
+      maxZoom: 17,
+    }),
+    'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 19,
+    }),
+    'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+      maxZoom: 19,
+    }),
+  };
+}
+
+// Add the shared base-layer set to a map, switch it to the default (OSM-Topo)
+// and drop a base-map picker in the top-right corner.
+function addBaseLayers(map) {
+  const layers = makeBaseLayers();
+  const [, defaultLayer] = Object.entries(layers)[0];
+  defaultLayer.addTo(map);
+  L.control.layers(layers, null, { position: 'topright' }).addTo(map);
+  return layers;
+}
+
 function initMap() {
   if (state.map) { state.map.remove(); state.map = null; state.mapMarkers = []; state.mapLines = []; }
   const el = document.getElementById('leaflet-map');
   if (!el) return;
   state.map = L.map('leaflet-map');
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors', maxZoom: 18,
-  }).addTo(state.map);
+  addBaseLayers(state.map);
   refreshMapLayers();
 }
 
@@ -1086,9 +1114,7 @@ function initBitFlipperMap() {
   if (!el || !state.data || typeof L === 'undefined') return;
 
   state.bfMap = L.map('bf-map').setView([-28, 134], 4);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors', maxZoom: 18,
-  }).addTo(state.bfMap);
+  addBaseLayers(state.bfMap);
   state.bfMapLayer = L.layerGroup().addTo(state.bfMap);
   refreshBitFlipperMap();
 }
