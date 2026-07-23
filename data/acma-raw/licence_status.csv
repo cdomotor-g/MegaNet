@@ -1,0 +1,19 @@
+STATUS,STATUS_TEXT
+-1,Revoked
+-2,Canceled
+-3,Modified
+-4,Surrendered
+-5,Prelim. Rejected
+-6,Prelim. Modified
+-7,Not Granted (Modified)
+0,Not Granted
+1,Granted
+10,Expired
+11,Transferred
+12,Completed
+13,On Hold
+14,Suspended
+15,Varied
+2,Prelim. Granted
+3,Granted (Under modification)
+4,Prov. Assigned

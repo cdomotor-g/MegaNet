@@ -1,0 +1,71 @@
+# Monthly refresh of the ACMA RRL interference layer.
+#
+# ACMA republishes the Register of Radiocommunications Licences extract daily
+# (~6am AEST), but licence turnover near MegaNet repeaters is a monthly-scale
+# event, so monthly is the right cadence. Runs the same two tools a human
+# would: prefilter the ~68 MB extract to the MegaNet-relevant subset, then
+# classify/score interference candidates. Opens a PR rather than pushing to
+# main — a sudden swing in threat counts is itself a signal worth eyeballing.
+#
+# If the download step starts failing: ACMA planned to retire the legacy
+# web.acma.gov.au register (announced for mid-2026). Find the new bulk
+# "Radiocomms licence data" download link on acma.gov.au and update
+# ACMA_ZIP_URL below. As a stopgap, the extract can also be attached to a
+# GitHub Release (see the acma-data-* tags) and the URL pointed there.
+#
+# Data licence: CC BY 4.0, attribution in README and data/acma-raw/_manifest.json.
+
+name: Refresh ACMA RRL data
+
+on:
+  schedule:
+    # 20:15 UTC on the 1st = 06:15 AEST on the 2nd, just after ACMA's daily publish
+    - cron: '15 20 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  ACMA_ZIP_URL: https://web.acma.gov.au/rrl-updates/spectra_rrl.zip
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download ACMA extract
+        run: |
+          curl -fSL --retry 3 --retry-delay 15 \
+            -A "MegaNet-flood-telemetry-interference-check (+https://github.com/${{ github.repository }})" \
+            -o /tmp/spectra_rrl.zip "$ACMA_ZIP_URL"
+          ls -l /tmp/spectra_rrl.zip
+
+      - name: Prefilter to MegaNet-relevant subset
+        run: python3 tools/acma_prefilter.py --zip /tmp/spectra_rrl.zip
+             --stations stations.json --out data/acma-raw
+
+      - name: Classify and score interference candidates
+        run: python3 tools/acma_fetch.py --suggest-licences
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: acma-data-refresh
+          commit-message: "Refresh ACMA RRL data (monthly)"
+          title: "Monthly ACMA RRL data refresh"
+          body: |
+            Automated refresh of the ACMA interference layer from the daily
+            RRL bulk extract. Review the diff in `data/acma-threats.json` —
+            a large swing in threat counts means something changed on a mast
+            near a repeater.
+
+            Contains ACMA Register of Radiocommunications Licences data,
+            licensed under CC BY 4.0.
+          add-paths: |
+            data/acma-raw/*
+            data/acma-*.json
+            data/acma-licence-suggestions.csv
+          delete-branch: true

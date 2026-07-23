@@ -455,6 +455,101 @@ hr {
   display: inline-block;
 }
 
+/* ── ACMA RRL interference layer ─────────────────────────────────────────── */
+
+/* square swatch — ACMA transmitters are squares so they never read as
+   MegaNet's circular station markers */
+.legend-sq {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border: 1px solid rgba(0, 0, 0, .35);
+}
+
+.acma-div {
+  background: none;
+  border: none;
+}
+
+.acma-sq {
+  border: 1px solid rgba(0, 0, 0, .55);
+  box-shadow: 0 0 2px rgba(0, 0, 0, .4);
+  box-sizing: border-box;
+}
+
+/* MegaNet's own licensed transmitters get the repeater-blue dashed ring */
+.acma-sq.mn {
+  outline: 2px dashed #0b5cab;
+  outline-offset: 1px;
+}
+
+/* transmitter detail card overlaying the map's right edge */
+.acma-card {
+  position: absolute;
+  top: .9rem;
+  right: .9rem;
+  bottom: .9rem;
+  width: 370px;
+  max-width: 82%;
+  overflow-y: auto;
+  z-index: 1100;            /* above leaflet panes and controls */
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .28);
+  font-size: .88rem;
+}
+
+.acma-card-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+  padding: .55rem .6rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  z-index: 1;
+}
+
+.acma-card-head button {
+  padding: 0 .45rem;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.acma-sect {
+  padding: .45rem .6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.acma-sect h4 {
+  margin: 0 0 .3rem;
+  font-size: .8rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+
+.acma-row {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .12rem 0;
+}
+
+.acma-row > span:first-child {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.acma-row > span:last-child {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
 .leaflet-container {
   background: var(--subtle);
 }
