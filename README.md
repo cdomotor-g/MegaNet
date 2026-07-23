@@ -53,7 +53,10 @@ MegaNet/
 │   ├── ALL_REPEATERS.csv             (legacy repeater source for migrate.html)
 │   ├── All 2021 Working 2.txt        (national ALERT address lookup, ALERT Packets tab)
 │   ├── acma-raw/                     (prefiltered ACMA RRL subset, CC BY 4.0)
+│   │   └── YYYY-MM/                  (archived monthly snapshots — never delete; see RF Changes)
 │   ├── acma-threats.json … acma-dictionaries.json   (generated RF interference layer)
+│   ├── acma-timeline.json            (authorisation-date timeline for the RF Changes tab)
+│   ├── acma-snapshots.json / acma-changes.json      (snapshot index + precomputed diffs)
 │   └── acma-licence-suggestions.csv  (repeater ↔ ACMA licence review file)
 │
 ├── radio-mobile/           ← self-contained Radio Mobile desktop project
@@ -66,7 +69,8 @@ MegaNet/
 ├── tools/                  ← command-line helpers (needs Python; see tools/README.md)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
-│   └── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
+│   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
+│   └── acma_diff.py         (archive monthly snapshots + diff them → data/acma-changes.json)
 │
 └── archive/                ← redundant / superseded / unreferenced (see archive/README.md)
     ├── prototype_index.html, BitFlipper*.html, image_bitflipper.svg, app_updated*.js
@@ -507,6 +511,8 @@ interference investigation starts from evidence instead of guesswork.
 - **RF Environment tab**: per-repeater threat summary, sortable candidate
   table with CSV export, a frequency strip plot of every licensed carrier
   around each RX channel, and a corruption-timestamp correlation helper.
+- **RF Changes tab**: answers *"did something change on the air near this
+  repeater around the date our data went bad?"* — see below.
 
 ### Interference mechanisms
 
@@ -524,16 +530,63 @@ yet assessed** (`los: null`, factor 0.7); the honest blind spots — amateur
 radio, unlicensed/faulty emitters, spurious emissions, non-co-sited mixing,
 tropospheric ducting — are documented in the layer's own "?" help panel.
 
+### RF change detection (RF Changes tab)
+
+The symptom this page investigates: a **sudden step in corruption** at some
+field stations, consistent with a rise in the receiver noise floor tipping a
+marginal-SNR link past the demodulator's decision threshold. The question is
+whether an external transmitter was commissioned, upgraded or re-pointed near
+the serving repeater around that time. Two complementary views:
+
+- **Retrospective timeline** (works from a single extract):
+  `DEVICE_DETAILS.AUTHORISATION_DATE` records when each frequency assignment
+  was approved, and it is 100 % populated in the current subset. Pick a
+  repeater set and an onset date and the page ranks every nearby authorisation
+  in the window by `coincidence = interference score × temporal proximity ×
+  co-site bonus`, with CSV export suitable for attaching to an ACMA
+  interference complaint. Assignments authorised well after their licence was
+  issued are flagged as **variations** — a power increase, added channel or
+  re-point on an existing licence.
+- **Snapshot diffs** (from the second archived month onward): a single extract
+  can never show removals or prior parameter values, so every monthly subset is
+  archived under `data/acma-raw/<YYYY-MM>/` and consecutive months are diffed
+  into `data/acma-changes.json` — added / removed devices, frequency / power /
+  antenna / site / licence-status changes, and new co-tenants at repeater
+  sites. Diffs key on `EFL_ID` / `DEVICE_REGISTRATION_IDENTIFIER` (never
+  `SDD_ID`, which ACMA documents as varying between extract runs). For every
+  added or re-tuned device the tool also recomputes same-site intermodulation
+  and reports **which IMD products are new** — one added carrier forms a new
+  third-order product with every existing carrier on the mast, and the
+  offender is often nowhere near 151.5 MHz itself.
+
+The page also includes a rolling-median **step detector** (paste a per-station
+corruption time series; detected onset dates pre-fill the selector) and flags
+when all affected stations report through the same repeater — corruption
+confined to one repeater's stations is strong evidence for that specific site.
+
+**The archive is irreplaceable.** ACMA publishes a daily snapshot, not a
+back-catalogue: a month that is not captured can never be recovered, and
+nothing before the first archived month (2026-07) is observable. The monthly
+refresh keeps every subset (~7.5 MB each) forever — **never delete a snapshot
+directory**. Register dates are administrative: an authorisation is an upper
+bound on when interference could have begun, not proof that it did, and the
+page words every result as a lead to investigate. The register also cannot see
+unlicensed or faulty emitters — the page's help panel lists its blind spots.
+
 ### Data pipeline
 
 ```
 ACMA daily bulk extract (spectra_rrl.zip, ~68 MB zipped / ~580 MB CSV)
   └─ tools/acma_prefilter.py   → data/acma-raw/        (committed, ~7.5 MB)
-       └─ tools/acma_fetch.py  → data/acma-threats.json      (map layer, ~1 MB)
-                                  data/acma-sites.json        (site coordinates)
-                                  data/acma-devices.json      (card detail, lazy-loaded)
-                                  data/acma-dictionaries.json (lookup vocabularies)
-                                  data/acma-licence-suggestions.csv (review file)
+       ├─ tools/acma_fetch.py  → data/acma-threats.json      (map layer, ~1 MB)
+       │                         data/acma-sites.json        (site coordinates)
+       │                         data/acma-devices.json      (card detail, lazy-loaded)
+       │                         data/acma-dictionaries.json (lookup vocabularies)
+       │                         data/acma-timeline.json     (RF Changes timeline)
+       │                         data/acma-licence-suggestions.csv (review file)
+       └─ tools/acma_diff.py   → data/acma-raw/<YYYY-MM>/    (archived snapshot)
+                                 data/acma-snapshots.json    (archive index)
+                                 data/acma-changes.json      (diffs + new IMD products)
 ```
 
 The app only ever reads the generated JSON — no live ACMA calls (the RRL API
@@ -544,11 +597,13 @@ stdlib-only Python 3.8+:
 # with a downloaded extract:
 python3 tools/acma_prefilter.py --zip spectra_rrl.zip --stations stations.json --out data/acma-raw
 python3 tools/acma_fetch.py --suggest-licences        # reads data/acma-raw, writes data/acma-*.json
+python3 tools/acma_diff.py --archive                  # archive this month's subset + recompute diffs
 python3 tools/acma_fetch.py --help                    # all flags (radius, tolerances, mechanisms, dry-run)
 ```
 
 A **monthly GitHub Action** (`.github/workflows/acma-refresh.yml`) downloads
-the current extract, reruns both tools and opens a PR. In sandboxed
+the current extract, reruns the tools (including the snapshot archive + diff)
+and opens a PR. In sandboxed
 environments without ACMA access, attach the extract to a GitHub Release
 (see the `acma-data-*` tags) and fetch it from there instead.
 

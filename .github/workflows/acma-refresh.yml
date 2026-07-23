@@ -50,6 +50,13 @@ jobs:
       - name: Classify and score interference candidates
         run: python3 tools/acma_fetch.py --suggest-licences
 
+      # Archive this month's subset under data/acma-raw/<YYYY-MM>/ and diff it
+      # against the previous month. The archive is irreplaceable: ACMA publishes
+      # a daily snapshot with no back-catalogue, so a month that is not captured
+      # can never be recovered — snapshots are kept forever, never deleted.
+      - name: Archive snapshot and compute register diffs
+        run: python3 tools/acma_diff.py --archive
+
       - name: Open pull request
         uses: peter-evans/create-pull-request@v6
         with:
@@ -60,12 +67,19 @@ jobs:
             Automated refresh of the ACMA interference layer from the daily
             RRL bulk extract. Review the diff in `data/acma-threats.json` —
             a large swing in threat counts means something changed on a mast
-            near a repeater.
+            near a repeater — and the new entry in `data/acma-changes.json`,
+            which the RF Changes tab renders as added/removed/changed
+            transmitters and new same-site intermod products.
+
+            This PR also archives the month's subset under
+            `data/acma-raw/<YYYY-MM>/`. Never delete archived months: ACMA
+            publishes no back-catalogue, so they are the only record of what
+            the register looked like.
 
             Contains ACMA Register of Radiocommunications Licences data,
             licensed under CC BY 4.0.
           add-paths: |
-            data/acma-raw/*
+            data/acma-raw/**
             data/acma-*.json
             data/acma-licence-suggestions.csv
           delete-branch: true

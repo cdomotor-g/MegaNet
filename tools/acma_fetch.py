@@ -226,6 +226,21 @@ def licence_base(no):
     return (no or '').split('/')[0].strip()
 
 
+def stable_key(d):
+    """Cross-extract identity for a device row. SDD_ID varies between extract
+    runs, so anything that must survive a monthly refresh (snapshot diffs, the
+    change timeline) keys on EFL_ID (apparatus licences) or
+    DEVICE_REGISTRATION_IDENTIFIER (spectrum licences) instead, falling back to
+    a composite fingerprint marked low-confidence. Shared with acma_diff.py."""
+    if d.get('efl_id'):
+        return 'efl:%s' % d['efl_id'], 'high'
+    if d.get('dri'):
+        return 'dri:%s' % d['dri'], 'high'
+    fhz = d.get('f_hz')
+    return ('fp:%s|%s|%s' % (d.get('lic') or '', d.get('site_id') or '',
+                             int(fhz) if fhz else ''), 'low')
+
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def parse_args(argv=None):
@@ -369,6 +384,12 @@ def load_tables(src):
             'station_name': clean(col(r, 'STATION_NAME')),
             'station_type': clean(col(r, 'STATION_TYPE')),
             'authorised': clean(col(r, 'AUTHORISATION_DATE')),
+            # Stable cross-extract identifiers (SDD_ID is documented as varying
+            # between extract runs, so snapshot diffs must never key on it):
+            # EFL_ID for apparatus licences, DEVICE_REGISTRATION_IDENTIFIER for
+            # spectrum licences.
+            'efl_id': clean(col(r, 'EFL_ID')),
+            'dri': clean(col(r, 'DEVICE_REGISTRATION_IDENTIFIER')),
         })
     t['devices'] = devices
 
@@ -673,6 +694,79 @@ def classify(args, tables, anchors):
     return per_anchor, counts, median_w
 
 
+def build_timeline(tables, per_anchor, meta_common):
+    """acma-timeline.json — the retrospective change axis. One event per device
+    that carries at least one threat classification, dated by
+    DEVICE_DETAILS.AUTHORISATION_DATE (when the frequency assignment was
+    approved). Small and sorted by date so the RF Changes tab can render it
+    without pulling the multi-MB devices file.
+
+    An authorisation date is an administrative record: an upper bound on when
+    the transmitter could have come on air, not evidence that it did. The UI
+    carries that caveat; this file just carries the dates."""
+    licences, clients = tables['licences'], tables['clients']
+    dev_by_id = {d['id']: d for d in tables['devices']}
+
+    hits = {}                       # device_id → [(anchor, threat), ...]
+    for a in per_anchor:
+        for t in a['threats']:
+            hits.setdefault(t['device_id'], []).append((a, t))
+
+    events = []
+    for dev_id, pairs in hits.items():
+        d = dev_by_id.get(dev_id)
+        if not d:
+            continue
+        lic = licences.get(d['lic']) or {}
+        cl = clients.get(lic.get('client_no')) or {}
+        key, confidence = stable_key(d)
+        auth, issued = d['authorised'], lic.get('issued')
+        # A device authorised well after its licence was issued is a variation
+        # to an existing licence (added channel, power change, re-point, new
+        # device on an existing site) rather than a brand-new licence.
+        variation = bool(auth and issued and auth > issued and
+                         (datetime.fromisoformat(auth) - datetime.fromisoformat(issued)).days > 30)
+        anchors_out = sorted((drop_nulls({
+            'id': a['station_id'],
+            'mech': t['mechanism'],
+            'score': t['score'],
+            'km': t['distance_km'],
+            'product_mhz': t.get('product_mhz'),
+        }) for a, t in pairs), key=lambda x: -x['score'])
+        events.append(drop_nulls({
+            'date': auth,
+            'device_id': dev_id,
+            'key': key,
+            'confidence': confidence if confidence != 'high' else None,
+            'site_id': d['site_id'],
+            'f_mhz': round(d['f_hz'] / 1e6, 6) if d['f_hz'] else None,
+            'eirp_w': d['eirp_w'],
+            'tx_w': d['tx_w'],
+            'lic': d['lic'],
+            'client': cl.get('trading') or cl.get('name'),
+            'lic_type': lic.get('type'),
+            'lic_issued': issued,
+            'lic_effect': lic.get('effect'),
+            'lic_expiry': lic.get('expiry'),
+            'status': lic.get('status'),
+            'variation': True if variation else None,
+            'anchors': anchors_out,
+        }))
+    events.sort(key=lambda e: (e.get('date') or '9999-99-99', e['device_id']))
+    return {
+        'meta': dict(meta_common,
+                     note='One event per threat-classified device, dated by '
+                          'AUTHORISATION_DATE (Spectrum Access approval — an '
+                          'administrative upper bound on when interference '
+                          'could have begun, not proof of radiation). '
+                          'variation=true means the assignment was authorised '
+                          '>30 days after the licence was issued: a change to '
+                          'an existing licence rather than a new one.',
+                     events=len(events)),
+        'events': events,
+    }
+
+
 def build_outputs(args, tables, anchors, per_anchor, counts, median_w, source_date):
     dicts = tables['dicts']
     sites, devices = tables['sites'], tables['devices']
@@ -794,6 +888,7 @@ def build_outputs(args, tables, anchors, per_anchor, counts, median_w, source_da
         'acma-sites.json': sites_out,
         'acma-devices.json': devices_out,
         'acma-dictionaries.json': dicts_out,
+        'acma-timeline.json': build_timeline(tables, per_anchor, meta_common),
     }
 
 
