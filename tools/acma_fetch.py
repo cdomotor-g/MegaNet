@@ -478,6 +478,8 @@ def power_factor(eirp_w, median_w):
 def classify(args, tables, anchors):
     sites = tables['sites']
     devices = tables['devices']
+    licences, clients = tables['licences'], tables['clients']
+    meganet_bases = {licence_base(a['acma_licence']) for a in anchors if a['acma_licence']}
     band_lo, band_hi = (float(x) * 1e6 for x in args.band.split(':'))
     h_lo, h_hi = (int(x) for x in args.harmonics.split(':'))
     harmonics = range(h_lo, h_hi + 1)
@@ -522,6 +524,8 @@ def classify(args, tables, anchors):
         pf = power_factor(max(dev['eirp_w'] or 0, (partner['eirp_w'] if partner else 0) or 0) or None, median_w)
         lf = LOS_UNKNOWN_FACTOR
         score = w * df * pf * lf
+        lic = licences.get(dev['lic']) or {}
+        cl = clients.get(lic.get('client_no')) or {}
         return {
             'device_id': dev['id'],
             'site_id': dev['site_id'],
@@ -536,6 +540,13 @@ def classify(args, tables, anchors):
             'bearing_deg': round(bearing_deg(a['lat'], a['lon'], s['lat'], s['lon'])),
             'los': None,
             'partner_device_id': partner['id'] if partner else None,
+            # denormalised so tooltips and filters work before the (lazy)
+            # devices file has loaded
+            'lic': dev['lic'],
+            'client': cl.get('trading') or cl.get('name'),
+            'expiry': lic.get('expiry'),
+            'inactive': True if lic.get('status') and lic.get('status') != 'Granted' else None,
+            'meganet': True if licence_base(dev['lic']) in meganet_bases else None,
         }
 
     per_anchor = []
