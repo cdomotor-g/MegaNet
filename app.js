@@ -8,6 +8,7 @@ const TABS = [
   { id: 'stations',   label: 'Stations'   },
   { id: 'networks',   label: 'Networks'   },
   { id: 'analysis',   label: 'Analysis'   },
+  { id: 'rf',         label: 'RF Environment'},
   { id: 'bitflipper', label: 'Bit Flipper'},
   { id: 'packets',    label: 'ALERT Packets'},
   { id: 'serial',     label: 'Serial Monitor'},
@@ -102,6 +103,17 @@ const state = {
     catchments:   new Set(),
     roles:        new Set(),
     enabledOnly:  false,
+    acma: {
+      show:        false,                       // master toggle — nothing is fetched while off
+      mechanisms:  new Set(['co_channel', 'adjacent', 'imd3', 'harmonic', 'cosite_desense']),
+      minScore:    20,   // scores carry a ×0.7 unknown-LOS discount, so they cluster low
+      losOnly:     false,
+      activeOnly:  true,
+      hideMeganet: false,
+      radiusKm:    60,
+      showBeams:   false,
+      showLinks:   true,
+    },
   },
   selectedId:     null,
   map:            null,
@@ -125,6 +137,19 @@ const state = {
   },
   editorId:       null,
   editorDraft:    {},
+  // ACMA RRL interference layer (all lazy — untouched until the toggle is on
+  // or the RF Environment tab is opened)
+  acma: {
+    loaded: false, loading: false, loadPromise: null, error: null,
+    threats: null, dicts: null,
+    flat: [], siteById: {}, anchorById: {}, pairsByDevice: {}, mechCounts: {},
+    devLoaded: false, devPromise: null,
+    deviceById: {}, devicesBySite: {}, licById: {}, clientById: {}, antById: {}, texts: [],
+    layer: null, beamLayer: null, linkLayer: null, hiLayer: null,
+    selectedAnchorId: null, cardDeviceId: null, cardAnchorId: null,
+    uiOpen: false,
+  },
+  rf: { anchorId: '', sortKey: 'score', sortDir: -1, corrText: '' },
   theme: localStorage.getItem('mn-theme') || 'light',
 };
 
@@ -326,6 +351,7 @@ function renderMain() {
     case 'stations':   el.innerHTML = renderStationsHtml();               break;
     case 'networks':   el.innerHTML = renderNetworksHtml();               break;
     case 'analysis':   el.innerHTML = renderAnalysisHtml();               break;
+    case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;
     case 'bitflipper': el.innerHTML = renderBitFlipperHtml(); initBitFlipperMap(); break;
     case 'packets':    el.innerHTML = Packets.render();       Packets.init();      break;
     case 'serial':     el.innerHTML = Serial.render();        Serial.init();       break;
@@ -378,6 +404,7 @@ function renderMapHtml() {
             `).join('')}
           </div>
           ${networkFilterHtml('refreshMapLayers()')}
+          ${acmaFilterBlockHtml()}
           <label style="display:flex;gap:.45rem;align-items:center;font-size:.9rem;margin-top:.75rem">
             <input type="checkbox" ${state.mapShowLinks ? 'checked' : ''}
                    onchange="state.mapShowLinks=this.checked;refreshMapLayers()">
@@ -395,12 +422,19 @@ function renderMapHtml() {
               <span class="legend-line"></span>
               <span class="small">Pass-range link</span>
             </span>
+            ${state.filters.acma.show ? Object.entries(ACMA_MECH).map(([k, m]) => `
+              <span class="legend-item">
+                <span class="legend-sq" style="background:${m.color}"></span>
+                <span class="small">${m.label}</span>
+              </span>`).join('') + `
+            <span class="legend-item"><span class="small" style="color:var(--muted)">ACMA RRL data (CC BY 4.0)${state.acma.threats ? ' · ' + esc(state.acma.threats.meta.source_date) : ''}</span></span>` : ''}
           </div>
         </div>
       </aside>
       <div>
-        <div class="panel" style="padding:.6rem">
+        <div class="panel" style="padding:.6rem;position:relative">
           <div id="leaflet-map" style="height:calc(100vh - 165px);min-height:400px;border-radius:6px"></div>
+          <div id="acma-card" class="acma-card" hidden></div>
         </div>
       </div>
     </div>`;
@@ -438,11 +472,15 @@ function addBaseLayers(map) {
 
 function initMap() {
   if (state.map) { state.map.remove(); state.map = null; state.mapMarkers = []; state.mapLines = []; }
+  // The old map (if any) owned these layer groups — they die with it.
+  state.acma.layer = state.acma.beamLayer = state.acma.linkLayer = state.acma.hiLayer = null;
   const el = document.getElementById('leaflet-map');
   if (!el) return;
   state.map = L.map('leaflet-map');
   addBaseLayers(state.map);
+  state.map.on('click', () => acmaClearHighlight());
   refreshMapLayers();
+  refreshAcmaLayer();
 }
 
 function refreshMapLayers() {
@@ -492,6 +530,7 @@ function refreshMapLayers() {
       ${idTypes.length ? `<span style="font-size:.83rem">AlertID:</span><br>${idTypes.map(t =>
         `<span style="font-size:.82rem">&nbsp;&nbsp;${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
       ${s.elevation_ahd != null ? `<span style="font-size:.83rem">Elev: ${s.elevation_ahd} m AHD</span>` : ''}
+      ${acmaRepeaterPopupExtra(s)}
     `);
     state.mapMarkers.push(marker);
     bounds.push([s.lat, s.lon]);
@@ -1667,12 +1706,18 @@ function networkFilterHtml(onChangeFn) {
 }
 
 function toggleFilter(key, value, checked) {
-  if (checked) state.filters[key].add(value);
-  else         state.filters[key].delete(value);
+  // 'acmaMechanisms' routes to the nested ACMA filter block; everything else
+  // is a top-level station-filter Set.
+  const set = key === 'acmaMechanisms' ? state.filters.acma.mechanisms : state.filters[key];
+  if (checked) set.add(value);
+  else         set.delete(value);
 }
 
 function clearFilters() {
-  state.filters = { search: '', networks: new Set(), catchments: new Set(), roles: new Set(), enabledOnly: false };
+  // The ACMA block keeps its own state — clearing station filters should not
+  // silently drop an RF layer the operator has configured.
+  state.filters = { search: '', networks: new Set(), catchments: new Set(), roles: new Set(),
+                    enabledOnly: false, acma: state.filters.acma };
   renderMain();
 }
 
@@ -1724,6 +1769,894 @@ function dlText(name, content) {
   });
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// ── ACMA RRL interference layer ─────────────────────────────────────────────────
+// Renders licensed transmitters from the ACMA Register of Radiocommunications
+// Licences that could plausibly interfere with MegaNet repeater RX channels.
+// All data is precomputed offline by tools/acma_fetch.py into data/acma-*.json;
+// nothing here fetches until the master toggle is switched on (or the RF
+// Environment tab is opened), so page load is unaffected while the layer is off.
+// Contains ACMA RRL data, CC BY 4.0.
+
+const ACMA_MECH = {
+  co_channel:     { label: 'Co-channel',          color: '#d32f2f' },
+  adjacent:       { label: 'Adjacent channel',    color: '#f57c00' },
+  imd3:           { label: 'Intermod IMD3',       color: '#7b1fa2' },
+  imd5:           { label: 'Intermod IMD5',       color: '#ce93d8' },
+  imd3_triple:    { label: 'Intermod 3-signal',   color: '#9575cd' },
+  harmonic:       { label: 'Harmonic',            color: '#0288d1' },
+  cosite_desense: { label: 'Co-site desense',     color: '#6d4c41' },
+};
+
+// ACMA VHF High Band Frequency Band Plan segments (148–174 MHz). MegaNet's
+// 151.5 MHz sits in Segment F "Miscellaneous Service".
+const VHF_SEGMENTS = [
+  { seg: 'A', lo: 148.00000, hi: 149.25000, alloc: 'Paging Service' },
+  { seg: 'B', lo: 149.25000, hi: 149.75625, alloc: 'Land Mobile (two frequency, base transmit)' },
+  { seg: 'C', lo: 149.75625, hi: 149.90000, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'D', lo: 149.90000, hi: 150.05000, alloc: 'Radionavigation Satellite' },
+  { seg: 'E', lo: 150.05000, hi: 151.39375, alloc: 'Land Mobile (two frequency, base transmit); Fixed (rural)' },
+  { seg: 'F', lo: 151.39375, hi: 152.49375, alloc: 'Miscellaneous Service' },
+  { seg: 'G', lo: 152.49375, hi: 153.85000, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'H', lo: 153.85000, hi: 154.35625, alloc: 'Land Mobile (two frequency, base receive)' },
+  { seg: 'I', lo: 154.35625, hi: 154.65625, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'J', lo: 154.65625, hi: 156.00000, alloc: 'Land Mobile (two frequency, base receive); Fixed (rural)' },
+  { seg: 'K', lo: 156.00000, hi: 157.45000, alloc: 'Maritime Mobile' },
+  { seg: 'L', lo: 157.45000, hi: 158.29375, alloc: 'Land Mobile (two frequency, base receive) or single frequency' },
+  { seg: 'M', lo: 158.29375, hi: 160.60000, alloc: 'Land Mobile (two frequency, base receive)' },
+  { seg: 'N', lo: 160.60000, hi: 160.97500, alloc: 'Maritime Mobile' },
+  { seg: 'O', lo: 160.97500, hi: 161.47500, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'P', lo: 161.47500, hi: 162.05000, alloc: 'Maritime Mobile' },
+  { seg: 'Q', lo: 162.05000, hi: 162.89375, alloc: 'Land Mobile (two frequency, base transmit) or single frequency' },
+  { seg: 'R', lo: 162.89375, hi: 165.19375, alloc: 'Land Mobile (two frequency, base transmit)' },
+  { seg: 'S', lo: 165.19375, hi: 168.19375, alloc: 'Land Mobile (trunked, base transmit)' },
+  { seg: 'T', lo: 168.19375, hi: 169.79375, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'U', lo: 169.79375, hi: 172.79375, alloc: 'Land Mobile (trunked, base receive)' },
+  { seg: 'V', lo: 172.79375, hi: 173.29375, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'W', lo: 173.29375, hi: 174.00000, alloc: 'Miscellaneous Service' },
+];
+
+const ACMA_MARKER_CAP = 500;
+const ACMA_LINK_CAP   = 300;
+
+function vhfSegment(mhz) {
+  return VHF_SEGMENTS.find(s => mhz >= s.lo && mhz < s.hi) || null;
+}
+
+function acmaHaversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371.0088, rad = Math.PI / 180;
+  const dp = (lat2 - lat1) * rad, dl = (lon2 - lon1) * rad;
+  const a = Math.sin(dp / 2) ** 2 +
+            Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dl / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// ── lazy loading ──
+
+function acmaFetchJson(name) {
+  return fetch(`data/${name}`).then(r => {
+    if (!r.ok) throw new Error(`${name}: HTTP ${r.status}`);
+    return r.json();
+  });
+}
+
+function acmaEnsureCore() {
+  const A = state.acma;
+  if (A.loaded) return Promise.resolve();
+  if (A.loadPromise) return A.loadPromise;
+  A.loading = true;
+  A.loadPromise = Promise.all([
+    acmaFetchJson('acma-threats.json'),
+    acmaFetchJson('acma-sites.json'),
+    acmaFetchJson('acma-dictionaries.json').catch(() => null),   // optional
+  ]).then(([threats, sites, dicts]) => {
+    A.threats = threats;
+    A.dicts   = dicts;
+    A.siteById = {};
+    sites.sites.forEach(s => { A.siteById[s.id] = s; });
+    A.anchorById = {};
+    A.flat = [];
+    A.pairsByDevice = {};
+    threats.anchors.forEach(a => {
+      A.anchorById[a.station_id] = a;
+      a.threats.forEach(t =>
+        A.flat.push({ anchor_id: a.station_id, anchor_name: a.name, rx_mhz: a.rx_mhz, ...t }));
+      (a.imd_pairs || []).forEach(p => {
+        (A.pairsByDevice[p.a] = A.pairsByDevice[p.a] || []).push(p);
+        (A.pairsByDevice[p.b] = A.pairsByDevice[p.b] || []).push(p);
+      });
+    });
+    A.mechCounts = {};
+    A.flat.forEach(t => { A.mechCounts[t.mechanism] = (A.mechCounts[t.mechanism] || 0) + 1; });
+    A.loaded = true;
+    A.loading = false;
+    A.error = null;
+  }).catch(err => {
+    A.loading = false;
+    A.loadPromise = null;
+    A.error = `ACMA data unavailable (${err.message}). Generate data/acma-*.json with ` +
+              `tools/acma_fetch.py; note these optional files cannot be fetched over file://.`;
+    state.filters.acma.show = false;
+    throw err;
+  });
+  return A.loadPromise;
+}
+
+// Full device/licence/client detail — several MB, loaded on first card open,
+// beam-wedge draw or RF strip plot, never at page load.
+function acmaEnsureDevices() {
+  const A = state.acma;
+  if (A.devLoaded) return Promise.resolve();
+  if (A.devPromise) return A.devPromise;
+  A.devPromise = acmaFetchJson('acma-devices.json').then(d => {
+    A.deviceById = {}; A.devicesBySite = {};
+    d.devices.forEach(x => {
+      A.deviceById[x.id] = x;
+      (A.devicesBySite[x.site_id] = A.devicesBySite[x.site_id] || []).push(x);
+    });
+    A.licById    = d.licences || {};
+    A.clientById = d.clients  || {};
+    A.antById    = d.antennas || {};
+    A.texts      = d.texts    || [];
+    A.devLoaded  = true;
+  }).catch(err => {
+    A.devPromise = null;
+    throw err;
+  });
+  return A.devPromise;
+}
+
+// ── filtering ──
+
+function acmaVisibleThreats(ignoreAnchorSel) {
+  const A = state.acma, f = state.filters.acma;
+  if (!A.loaded) return [];
+  return A.flat.filter(t =>
+    f.mechanisms.has(t.mechanism) &&
+    t.score >= f.minScore &&
+    t.distance_km <= f.radiusKm &&
+    (!f.losOnly || t.los === true) &&
+    (!f.activeOnly || !t.inactive) &&
+    (!f.hideMeganet || !t.meganet) &&
+    (ignoreAnchorSel || !A.selectedAnchorId || t.anchor_id === A.selectedAnchorId));
+}
+
+// ── filters panel block ──
+
+function acmaFilterBlockHtml() {
+  const A = state.acma, f = state.filters.acma;
+  return `
+    <details id="acma-filter-block" ${A.uiOpen ? 'open' : ''} style="margin-top:.75rem"
+             ontoggle="state.acma.uiOpen=this.open">
+      <summary class="small" style="cursor:pointer;color:var(--muted)">ACMA / RF Environment</summary>
+      <div id="acma-filter-body">${acmaFilterBodyHtml()}</div>
+    </details>`;
+}
+
+function acmaFilterBodyHtml() {
+  const A = state.acma, f = state.filters.acma;
+  const head = `
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.9rem;margin:.4rem 0">
+      <input type="checkbox" ${f.show ? 'checked' : ''} onchange="toggleAcmaShow(this.checked)">
+      Show ACMA licensed transmitters
+    </label>
+    ${A.error ? `<div class="small" style="color:var(--muted)">${esc(A.error)}</div>` : ''}
+    ${A.loading ? `<div class="small" style="color:var(--muted)">Loading ACMA data…</div>` : ''}`;
+  if (!f.show || !A.loaded) return head;
+
+  const meta = A.threats.meta;
+  const anchorChip = A.selectedAnchorId ? `
+    <div class="small" style="margin:.25rem 0">
+      Filtering to <strong>${esc((A.anchorById[A.selectedAnchorId] || {}).name || A.selectedAnchorId)}</strong>
+      <a href="#" onclick="acmaSelectAnchor('');return false">×&nbsp;clear</a>
+    </div>` : '';
+
+  return `${head}
+    <div class="small" style="color:var(--muted);margin:.2rem 0">
+      ACMA data: ${esc(meta.source_date)} · <span id="acma-shown"></span>
+    </div>
+    ${anchorChip}
+    <div style="margin:.4rem 0">
+      ${Object.entries(ACMA_MECH).filter(([k]) => A.mechCounts[k]).map(([k, m]) => `
+        <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.15rem 0">
+          <input type="checkbox" ${f.mechanisms.has(k) ? 'checked' : ''}
+                 onchange="toggleFilter('acmaMechanisms','${k}',this.checked);refreshAcmaLayer()">
+          <span class="legend-sq" style="background:${m.color}"></span>
+          ${m.label} (${A.mechCounts[k]})
+        </label>`).join('')}
+    </div>
+    <label class="small" style="display:block;margin:.4rem 0">
+      Minimum score <strong id="acma-minscore-val">${f.minScore}</strong>
+      <input type="range" min="0" max="100" step="5" value="${f.minScore}" style="width:100%"
+             oninput="state.filters.acma.minScore=+this.value;document.getElementById('acma-minscore-val').textContent=this.value"
+             onchange="refreshAcmaLayer()">
+    </label>
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+      <input type="checkbox" ${f.losOnly ? 'checked' : ''}
+             onchange="state.filters.acma.losOnly=this.checked;refreshAcmaLayer()">
+      Line-of-sight only <span class="small" style="color:var(--muted)">(not yet assessed — hides all)</span>
+    </label>
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+      <input type="checkbox" ${f.activeOnly ? 'checked' : ''}
+             onchange="state.filters.acma.activeOnly=this.checked;refreshAcmaLayer()">
+      Current licences only
+    </label>
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+      <input type="checkbox" ${f.hideMeganet ? 'checked' : ''}
+             onchange="state.filters.acma.hideMeganet=this.checked;refreshAcmaLayer()">
+      Hide MegaNet's own licences
+    </label>
+    <label class="small" style="display:block;margin:.35rem 0">
+      Search radius
+      <select onchange="state.filters.acma.radiusKm=+this.value;refreshAcmaLayer()">
+        ${[10, 25, 50, 100].map(r => `
+          <option value="${r}" ${f.radiusKm === r ? 'selected' : ''}>${r} km</option>`).join('')}
+      </select>
+      <span style="color:var(--muted)">(data extends to ${meta.radius_km} km)</span>
+    </label>
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+      <input type="checkbox" ${f.showBeams ? 'checked' : ''}
+             onchange="state.filters.acma.showBeams=this.checked;refreshAcmaLayer()">
+      Show antenna beam wedges
+    </label>
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+      <input type="checkbox" ${f.showLinks ? 'checked' : ''}
+             onchange="state.filters.acma.showLinks=this.checked;refreshAcmaLayer()">
+      Show threat links
+    </label>
+    <details style="margin:.4rem 0">
+      <summary class="small" style="cursor:pointer">? What the mechanisms mean</summary>
+      <div class="small" style="color:var(--muted);margin-top:.3rem">
+        <p><strong>Co-channel</strong>: transmits on the repeater's RX frequency — direct
+        collisions and capture. <strong>Adjacent</strong>: within 50 kHz — splatter raises the
+        noise floor until marginal packets flip bits. <strong>Harmonic</strong>: a transmitter at
+        1/2…1/5 of the RX frequency whose harmonics land on it. <strong>IMD3/IMD5</strong>:
+        two transmitters at the same ACMA site whose intermod products (2f1−f2, 3f1−2f2)
+        land on the RX channel — the "rusty bolt" effect; the prime suspect when corruption
+        clusters behind one repeater. <strong>Co-site desense</strong>: any strong transmitter
+        physically at the repeater site overloading the receiver front-end, regardless of
+        frequency — the only mechanism where cellular towers matter.</p>
+        <p><strong>Not threats</strong>: mobile phone towers (700 MHz+, no spectral path to
+        151.5 MHz — co-siting only), LoRa/LoRaWAN (915–928 MHz), UHF CB (477 MHz).</p>
+        <p><strong>Blind spots</strong>: amateur radio isn't in the RRL by location (the
+        50.5 MHz × 3 harmonic path needs a spectrum sweep, not this database); unlicensed
+        or faulty emitters (solar controllers, VMS signs, electric fences, powerline arcing)
+        have no licence record; the RRL records what's <em>licensed</em>, not what's
+        <em>radiating</em>; IMD detection only sees devices ACMA records at the same site;
+        line-of-sight is not yet assessed and would be terrain-only — it cannot model the
+        tropospheric ducting that worsens during flood events.</p>
+      </div>
+    </details>`;
+}
+
+function rerenderAcmaFilterBlock() {
+  const el = document.getElementById('acma-filter-body');
+  if (el) el.innerHTML = acmaFilterBodyHtml();
+}
+
+function toggleAcmaShow(checked) {
+  state.filters.acma.show = checked;
+  if (!checked) {
+    closeAcmaCard();
+    refreshAcmaLayer();
+    rerenderAcmaFilterBlock();
+    return;
+  }
+  acmaEnsureCore().then(() => {
+    if (state.activeTab === 'map') renderMain();   // legend + filter body gain the ACMA entries
+  }).catch(() => rerenderAcmaFilterBlock());
+  rerenderAcmaFilterBlock();
+}
+
+function acmaSelectAnchor(id) {
+  state.acma.selectedAnchorId = id || null;
+  refreshAcmaLayer();
+  rerenderAcmaFilterBlock();
+}
+
+// Link appended to MegaNet repeater popups on the map: "N RF threats".
+function acmaRepeaterPopupExtra(s) {
+  const A = state.acma;
+  if (!state.filters.acma.show || !A.loaded) return '';
+  const a = A.anchorById[s.id];
+  if (!a || !a.threats.length) return '';
+  return `<br><a href="#" style="font-size:.83rem"
+    onclick="acmaSelectAnchor('${escAttr(s.id)}');return false">⚠ ${a.threats.length} RF threat candidates — filter map</a>`;
+}
+
+// ── map layer ──
+
+function refreshAcmaLayer() {
+  const A = state.acma, map = state.map;
+  if (!map) return;
+  ['layer', 'beamLayer', 'linkLayer', 'hiLayer'].forEach(k => {
+    if (A[k]) { A[k].remove(); A[k] = null; }
+  });
+  const f = state.filters.acma;
+  if (!f.show || !A.loaded) { acmaUpdateShownNote(0, 0); return; }
+
+  const visible = acmaVisibleThreats();
+
+  // one marker per device, driven by its top-scoring visible threat
+  const byDevice = new Map();
+  for (const t of visible) {
+    const cur = byDevice.get(t.device_id);
+    if (!cur || t.score > cur.top.score) {
+      byDevice.set(t.device_id, { top: t, all: cur ? cur.all : [] });
+    }
+    byDevice.get(t.device_id).all.push(t);
+  }
+  const devices = [...byDevice.values()].sort((a, b) => b.top.score - a.top.score);
+  const shown = devices.slice(0, ACMA_MARKER_CAP);
+  acmaUpdateShownNote(shown.length, devices.length);
+
+  A.layer = L.layerGroup().addTo(map);
+  for (const d of shown) {
+    const t = d.top;
+    const site = A.siteById[t.site_id];
+    if (!site) continue;
+    const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
+    const size = Math.round(9 + t.score / 8);
+    const icon = L.divIcon({
+      className: 'acma-div',
+      html: `<div class="acma-sq${t.meganet ? ' mn' : ''}" style="width:${size}px;height:${size}px;background:${mech.color}"></div>`,
+      iconSize: [size, size], iconAnchor: [size / 2, size / 2],
+    });
+    const m = L.marker([site.lat, site.lon], { icon }).addTo(A.layer);
+    m.bindPopup(acmaPopupHtml(d), { maxWidth: 300 });
+    m.on('click', () => acmaHighlightDevice(t.device_id));
+    m.bindTooltip(`${esc(t.client || 'Unknown licensee')} · ${mech.label} · ${t.score}`);
+  }
+
+  if (f.showLinks) {
+    A.linkLayer = L.layerGroup().addTo(map);
+    const links = visible.slice().sort((a, b) => b.score - a.score).slice(0, ACMA_LINK_CAP);
+    for (const t of links) {
+      const site = A.siteById[t.site_id], a = A.anchorById[t.anchor_id];
+      if (!site || !a) continue;
+      L.polyline([[site.lat, site.lon], [a.lat, a.lon]], {
+        color: (ACMA_MECH[t.mechanism] || {}).color || '#666',
+        weight: 1.2, dashArray: '4 4',
+        opacity: 0.15 + 0.55 * Math.min(1, t.score / 70),
+      }).addTo(A.linkLayer);
+    }
+  }
+
+  if (f.showBeams) {
+    if (!A.devLoaded) {
+      acmaEnsureDevices().then(() => refreshAcmaLayer()).catch(() => {});
+    } else {
+      A.beamLayer = L.layerGroup().addTo(map);
+      for (const d of shown) {
+        const dev = A.deviceById[d.top.device_id];
+        const site = A.siteById[d.top.site_id];
+        const ant = dev && dev.ant ? A.antById[dev.ant] : null;
+        if (!dev || !site || dev.az == null || !ant || !ant.h_bw || ant.h_bw <= 0 || ant.h_bw >= 360) continue;
+        const poly = acmaBeamPolygon(site.lat, site.lon, dev.az, Math.min(ant.h_bw, 120),
+                                     acmaBeamRangeKm(dev.eirp_w));
+        L.polygon(poly, {
+          color: (ACMA_MECH[d.top.mechanism] || {}).color || '#666',
+          weight: 1, fillOpacity: 0.08, opacity: 0.5,
+        }).addTo(A.beamLayer);
+      }
+    }
+  }
+}
+
+function acmaUpdateShownNote(shown, total) {
+  const el = document.getElementById('acma-shown');
+  if (el) el.textContent = total > shown
+    ? `showing ${shown} of ${total} transmitters (top by score)`
+    : `${total} transmitters shown`;
+}
+
+function acmaBeamRangeKm(eirpW) {
+  if (!eirpW || eirpW <= 1) return 1.5;
+  return Math.max(1.5, Math.min(12, 2 + 2.5 * Math.log10(eirpW)));
+}
+
+function acmaBeamPolygon(lat, lon, azDeg, widthDeg, rangeKm) {
+  const pts = [[lat, lon]];
+  const degLat = rangeKm / 110.574;
+  const degLon = rangeKm / (111.320 * Math.cos(lat * Math.PI / 180));
+  for (let a = azDeg - widthDeg / 2; a <= azDeg + widthDeg / 2 + 0.01; a += Math.max(2, widthDeg / 12)) {
+    const rad = a * Math.PI / 180;
+    pts.push([lat + Math.cos(rad) * degLat, lon + Math.sin(rad) * degLon]);
+  }
+  pts.push([lat, lon]);
+  return pts;
+}
+
+// Emphasised links from one device to every repeater it threatens.
+function acmaHighlightDevice(deviceId) {
+  const A = state.acma, map = state.map;
+  if (!map || !A.loaded) return;
+  acmaClearHighlight();
+  A.hiLayer = L.layerGroup().addTo(map);
+  for (const t of acmaVisibleThreats()) {
+    if (t.device_id !== deviceId) continue;
+    const site = A.siteById[t.site_id], a = A.anchorById[t.anchor_id];
+    if (!site || !a) continue;
+    L.polyline([[site.lat, site.lon], [a.lat, a.lon]], {
+      color: (ACMA_MECH[t.mechanism] || {}).color || '#666',
+      weight: 3, opacity: 0.9,
+    }).addTo(A.hiLayer);
+  }
+}
+
+function acmaClearHighlight() {
+  if (state.acma.hiLayer) { state.acma.hiLayer.remove(); state.acma.hiLayer = null; }
+}
+
+// ── popup + transmitter card ──
+
+function acmaPopupHtml(d) {
+  const t = d.top;
+  const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
+  const others = d.all.length - 1;
+  return `
+    <strong>${esc(t.client || 'Unknown licensee')}</strong> · score ${t.score}<br>
+    <span style="background:${mech.color};color:#fff;padding:1px 6px;border-radius:999px;font-size:.78rem">${mech.label}</span>
+    ${t.meganet ? '<span class="badge">MegaNet licence</span>' : ''}<br>
+    <span style="font-size:.83rem">${esc(t.detail)}</span><br>
+    <span style="font-size:.83rem">${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz · ' : ''}${t.distance_km} km @ ${t.bearing_deg}° from ${esc(t.anchor_name)}</span><br>
+    <span style="font-size:.83rem">Licence ${esc(t.lic || '?')}${t.expiry ? ' · expires ' + esc(t.expiry) : ''}${t.inactive ? ' · <strong>not current</strong>' : ''}</span>
+    ${others > 0 ? `<br><span style="font-size:.8rem;color:#888">+${others} more mechanism/repeater match${others > 1 ? 'es' : ''}</span>` : ''}<br>
+    <a href="#" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(t.anchor_id)}');return false">Full details →</a>`;
+}
+
+function showAcmaCard(deviceId, anchorId) {
+  state.acma.cardDeviceId = deviceId;
+  state.acma.cardAnchorId = anchorId || null;
+  const el = document.getElementById('acma-card');
+  if (el) {
+    el.hidden = false;
+    el.innerHTML = '<div class="small" style="padding:1rem;color:var(--muted)">Loading transmitter details…</div>';
+  }
+  acmaEnsureDevices().then(() => renderAcmaCard()).catch(err => {
+    if (el) el.innerHTML = `<div class="small" style="padding:1rem;color:var(--muted)">
+      Device detail unavailable (${esc(err.message)}).</div>`;
+  });
+  acmaHighlightDevice(deviceId);
+}
+
+function closeAcmaCard() {
+  state.acma.cardDeviceId = null;
+  const el = document.getElementById('acma-card');
+  if (el) { el.hidden = true; el.innerHTML = ''; }
+  acmaClearHighlight();
+}
+
+function acmaCardRow(label, value) {
+  return value == null || value === '' ? '' :
+    `<div class="acma-row"><span>${label}</span><span>${value}</span></div>`;
+}
+
+function renderAcmaCard() {
+  const A = state.acma;
+  const el = document.getElementById('acma-card');
+  const dev = A.deviceById[A.cardDeviceId];
+  if (!el || !dev) return;
+  const site   = A.siteById[dev.site_id] || {};
+  const lic    = A.licById[dev.lic] || {};
+  const client = A.clientById[lic.client_no] || {};
+  const ant    = dev.ant ? (A.antById[dev.ant] || {}) : {};
+  const myThreats = A.flat.filter(t => t.device_id === dev.id);
+  const top = myThreats.slice().sort((a, b) => b.score - a.score)[0];
+  const seg = dev.f_mhz != null ? vhfSegment(dev.f_mhz) : null;
+  const noteIdxs = [...new Set([...(dev.notes || []), ...(lic.notes || [])])];
+  const notes = noteIdxs.map(i => A.texts[i]).filter(Boolean);
+  const cosited = (A.devicesBySite[dev.site_id] || []).filter(d => d.id !== dev.id);
+  const partnerIds = new Set();
+  (A.pairsByDevice[dev.id] || []).forEach(p => { partnerIds.add(p.a === dev.id ? p.b : p.a); });
+  const anchor = A.cardAnchorId ? A.anchorById[A.cardAnchorId] : null;
+  const distLine = anchor && top
+    ? `${top.distance_km} km @ ${String(top.bearing_deg).padStart(3, '0')}° from ${esc(anchor.name)}` : null;
+
+  el.hidden = false;
+  el.innerHTML = `
+    <div class="acma-card-head">
+      <strong>${esc(client.trading || client.name || 'Unknown licensee')}</strong>
+      <span>${top ? `score ${top.score}` : ''}
+        <button onclick="closeAcmaCard()" title="Close">×</button></span>
+    </div>
+    ${myThreats.length ? `
+      <div class="acma-sect">
+        ${myThreats.sort((a, b) => b.score - a.score).map(t => {
+          const m = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
+          return `<div class="small" style="margin:.15rem 0">
+            <span class="legend-sq" style="background:${m.color}"></span>
+            <strong>${m.label}</strong> ${t.score} vs ${esc(t.anchor_name)}<br>
+            <span style="color:var(--muted)">${esc(t.detail)} —
+              w ${t.components.mechanism_weight} × dist ${t.components.distance_factor}
+              × pwr ${t.components.power_factor} × LOS ${t.components.los_factor}</span>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
+    <div class="acma-sect"><h4>RF</h4>
+      ${acmaCardRow('Frequency', dev.f_mhz != null ? dev.f_mhz.toFixed(4) + ' MHz' : null)}
+      ${acmaCardRow('Bandwidth', dev.bw_khz != null ? dev.bw_khz + ' kHz' : null)}
+      ${acmaCardRow('Emission', esc(dev.emission))}
+      ${acmaCardRow('TX power', dev.tx_w != null ? dev.tx_w + ' W' : null)}
+      ${acmaCardRow('EIRP', dev.eirp_w != null ? dev.eirp_w + ' W' : null)}
+      ${acmaCardRow('Segment', seg ? `${seg.seg} — ${esc(seg.alloc)}` : null)}
+      ${acmaCardRow('Mode', esc(dev.mode))}
+      ${acmaCardRow('Operation hours', esc(dev.hours === '00:00-23:59' ? 'Continuous' : dev.hours))}
+      ${acmaCardRow('Station class', esc(dev.station_class))}
+      ${acmaCardRow('Authorised', esc(dev.authorised))}
+    </div>
+    ${Object.keys(ant).length ? `
+    <div class="acma-sect"><h4>Antenna</h4>
+      ${acmaCardRow('Type / model', esc([ant.type, ant.manufacturer, ant.model].filter(Boolean).join(' · ')))}
+      ${acmaCardRow('Height', dev.height_m != null ? dev.height_m + ' m' : null)}
+      ${acmaCardRow('Gain', ant.gain_dbi != null ? ant.gain_dbi + ' dBi' : null)}
+      ${acmaCardRow('Azimuth / tilt', dev.az != null ? `${dev.az}° / ${dev.tilt != null ? dev.tilt + '°' : '—'}` : null)}
+      ${acmaCardRow('H-beamwidth', ant.h_bw ? ant.h_bw + '°' : null)}
+      ${acmaCardRow('Polarisation', esc(dev.pol))}
+      ${acmaCardRow('Feeder loss', dev.feeder_db != null ? dev.feeder_db + ' dB' : null)}
+    </div>` : ''}
+    <div class="acma-sect"><h4>Site</h4>
+      ${acmaCardRow('Name', esc(site.name))}
+      ${acmaCardRow('Elevation', site.elevation_m != null ? site.elevation_m + ' m' : null)}
+      ${acmaCardRow('Coordinate precision', esc(site.precision))}
+      ${acmaCardRow('Devices at site', site.device_count)}
+      ${acmaCardRow('Distance', distLine)}
+      ${acmaCardRow('Line of sight', top ? 'not assessed' : null)}
+    </div>
+    <div class="acma-sect"><h4>Licence</h4>
+      ${acmaCardRow('Licence no.', esc(dev.lic))}
+      ${acmaCardRow('Status', esc(lic.status))}
+      ${acmaCardRow('Type', esc(lic.type))}
+      ${acmaCardRow('Category', esc(lic.category))}
+      ${acmaCardRow('Service', esc(dev.service || lic.service))}
+      ${acmaCardRow('Subservice', esc(dev.subservice || lic.subservice))}
+      ${acmaCardRow('Issued', esc(lic.issued))}
+      ${acmaCardRow('Expires', esc(lic.expiry))}
+      ${acmaCardRow('Callsign', esc(dev.callsign))}
+    </div>
+    <div class="acma-sect"><h4>Licensee</h4>
+      ${acmaCardRow('Client', esc(client.name))}
+      ${acmaCardRow('Trading as', esc(client.trading))}
+      ${acmaCardRow('ABN / ACN', esc([client.abn, client.acn].filter(Boolean).join(' / ')))}
+      ${acmaCardRow('Industry', esc(client.industry))}
+      ${acmaCardRow('Client type', esc(client.type))}
+      ${acmaCardRow('Postal', esc(client.postal))}
+    </div>
+    ${notes.length ? `
+    <div class="acma-sect"><h4>Conditions &amp; advisory notes (${notes.length})</h4>
+      ${notes.map(n => `
+        <details class="small" style="margin:.2rem 0">
+          <summary style="cursor:pointer">${esc(n.title || n.cat || 'Note')}</summary>
+          <div style="white-space:pre-wrap;color:var(--muted)">${esc(n.text || '')}</div>
+        </details>`).join('')}
+    </div>` : ''}
+    ${cosited.length ? `
+    <div class="acma-sect">
+      <details>
+        <summary style="cursor:pointer"><h4 style="display:inline">Co-sited devices (${cosited.length})</h4></summary>
+        ${cosited.sort((a, b) => (a.f_mhz || 0) - (b.f_mhz || 0)).map(d => `
+          <div class="small" style="margin:.15rem 0">
+            <a href="#" onclick="showAcmaCard('${escAttr(d.id)}','${escAttr(A.cardAnchorId || '')}');return false">
+              ${d.f_mhz != null ? d.f_mhz.toFixed(4) + ' MHz' : '?'}</a>
+            ${esc(d.emission || '')} ${d.eirp_w != null ? '· ' + d.eirp_w + ' W EIRP' : ''}
+            ${partnerIds.has(d.id) ? '<span class="badge">IMD partner</span>' : ''}
+          </div>`).join('')}
+      </details>
+    </div>` : ''}
+    <div class="small" style="color:var(--muted);padding:.4rem .6rem">
+      ACMA RRL data (CC BY 4.0), extract ${esc((A.threats.meta || {}).source_date || '')}.
+      Not to be used for unsolicited contact (Spam Act 2003 / DNCR Act 2006).
+    </div>`;
+}
+
+// ── RF Environment tab ──
+
+function renderRfHtml() {
+  const A = state.acma;
+  if (!A.loaded) {
+    return `
+      <div style="max-width:640px;margin:2.5rem auto;padding:1rem">
+        <div class="panel" style="text-align:center;padding:2rem">
+          <h2 style="margin:0 0 .6rem">RF Environment</h2>
+          <p class="small" style="color:var(--muted)">
+            ${A.error ? esc(A.error) : 'Loading ACMA interference data…'}</p>
+        </div>
+      </div>`;
+  }
+  const anchors = A.threats.anchors.slice().sort((a, b) => b.threats.length - a.threats.length);
+  const sel = state.rf.anchorId;
+  return `
+    <div class="stack" style="padding:0 .25rem">
+      <div class="panel">
+        <div class="panel-header"><h2>RF Environment — licensed interference candidates</h2>
+          <span class="small" style="color:var(--muted)">ACMA data: ${esc(A.threats.meta.source_date)} · CC BY 4.0</span>
+        </div>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin:.5rem 0">
+          <label class="small">Repeater
+            <select onchange="state.rf.anchorId=this.value;renderMain()">
+              <option value="">All (${A.flat.length} threat candidates)</option>
+              ${anchors.map(a => `
+                <option value="${escAttr(a.station_id)}" ${sel === a.station_id ? 'selected' : ''}>
+                  ${esc(a.name)} (${a.threats.length})</option>`).join('')}
+            </select>
+          </label>
+          <label class="small">Min score
+            <input type="number" min="0" max="100" step="5" value="${state.filters.acma.minScore}"
+                   style="width:4.5rem"
+                   onchange="state.filters.acma.minScore=+this.value;renderMain()">
+          </label>
+          <button onclick="rfExportCsv()">Export CSV</button>
+        </div>
+        ${sel ? rfStripPlotHtml(sel) : rfSummaryHtml(anchors)}
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Threat candidates${sel ? ` — ${esc((A.anchorById[sel] || {}).name || sel)}` : ''}</h3></div>
+        <div class="table-wrap tall" id="rf-table-wrap">${rfTableHtml()}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Corruption-time correlation helper</h3></div>
+        <p class="small" style="color:var(--muted)">Paste corruption timestamps (one per line,
+          any parseable format). Checks whether they cluster in business hours — licensed
+          operators with non-continuous operation tend to transmit 07:00–18:00 weekdays.</p>
+        <textarea id="rf-corr" rows="4" style="width:100%"
+                  placeholder="2026-07-12 09:41&#10;2026-07-12 10:05&#10;…">${esc(state.rf.corrText)}</textarea>
+        <div style="margin:.4rem 0"><button onclick="rfCorrelate()">Analyse</button></div>
+        <div id="rf-corr-out" class="small"></div>
+      </div>
+    </div>`;
+}
+
+function initRf() {
+  const A = state.acma;
+  if (!A.loaded && !A.error) {
+    acmaEnsureCore().then(() => { if (state.activeTab === 'rf') renderMain(); })
+                    .catch(() => { if (state.activeTab === 'rf') renderMain(); });
+  }
+  // strip plot carrier ticks want full device detail; refresh once it lands
+  if (A.loaded && !A.devLoaded) {
+    acmaEnsureDevices().then(() => { if (state.activeTab === 'rf') renderMain(); }).catch(() => {});
+  }
+}
+
+function rfVisibleRows() {
+  const sel = state.rf.anchorId;
+  let rows = acmaVisibleThreats(true).filter(t => !sel || t.anchor_id === sel);
+  const k = state.rf.sortKey, dir = state.rf.sortDir;
+  const val = t => {
+    switch (k) {
+      case 'anchor':    return t.anchor_name || '';
+      case 'mechanism': return t.mechanism;
+      case 'f_mhz':     return t.f_mhz || 0;
+      case 'delta':     return rfDeltaKhz(t) ?? 1e12;
+      case 'distance':  return t.distance_km;
+      case 'client':    return t.client || '';
+      case 'lic':       return t.lic || '';
+      case 'expiry':    return t.expiry || '';
+      default:          return t.score;
+    }
+  };
+  rows.sort((a, b) => {
+    const va = val(a), vb = val(b);
+    return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * dir;
+  });
+  return rows;
+}
+
+function rfDeltaKhz(t) {
+  if (t.rx_mhz == null) return null;
+  const f = t.product_mhz != null ? t.product_mhz : t.f_mhz;
+  if (f == null) return null;
+  return (f - t.rx_mhz) * 1000;
+}
+
+function rfSort(key) {
+  if (state.rf.sortKey === key) state.rf.sortDir *= -1;
+  else { state.rf.sortKey = key; state.rf.sortDir = key === 'score' ? -1 : 1; }
+  const wrap = document.getElementById('rf-table-wrap');
+  if (wrap) wrap.innerHTML = rfTableHtml();
+}
+
+function rfTableHtml() {
+  const rows = rfVisibleRows();
+  if (!rows.length) {
+    return `<p style="padding:.75rem;color:var(--muted)">No threat candidates match the current
+      filters${state.acma.mechCounts.imd3 ? '' : ' — note: no same-site IMD candidates were found in this extract'}.</p>`;
+  }
+  const arrow = k => state.rf.sortKey === k ? (state.rf.sortDir > 0 ? ' ▲' : ' ▼') : '';
+  const th = (k, label) => `<th style="cursor:pointer" onclick="rfSort('${k}')">${label}${arrow(k)}</th>`;
+  return `
+    <table class="bf-table">
+      <thead><tr>
+        ${th('anchor', 'Repeater')}${th('mechanism', 'Mechanism')}${th('score', 'Score')}
+        ${th('f_mhz', 'Freq (MHz)')}${th('delta', 'Δ (kHz)')}${th('distance', 'Dist (km)')}
+        <th>LOS</th>${th('client', 'Licensee')}${th('lic', 'Licence')}${th('expiry', 'Expiry')}<th></th>
+      </tr></thead>
+      <tbody>
+        ${rows.slice(0, 1000).map(t => {
+          const m = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
+          const dk = rfDeltaKhz(t);
+          return `<tr>
+            <td class="small">${esc(t.anchor_name)}</td>
+            <td class="small"><span class="legend-sq" style="background:${m.color}"></span> ${m.label}</td>
+            <td>${t.score}</td>
+            <td class="small">${t.f_mhz != null ? t.f_mhz.toFixed(4) : ''}</td>
+            <td class="small" title="${esc(t.detail)}">${dk != null ? dk.toFixed(1) : ''}</td>
+            <td class="small">${t.distance_km}</td>
+            <td class="small">${t.los === true ? '✓' : t.los === false ? '✗' : '—'}</td>
+            <td class="small">${esc(t.client || '')}${t.meganet ? ' <span class="badge">MegaNet</span>' : ''}</td>
+            <td class="small">${esc(t.lic || '')}</td>
+            <td class="small">${esc(t.expiry || '')}${t.inactive ? ' ⚠' : ''}</td>
+            <td><a href="#" onclick="rfShowOnMap('${escAttr(t.device_id)}','${escAttr(t.anchor_id)}');return false">map</a></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    ${rows.length > 1000 ? `<p class="small" style="color:var(--muted);padding:.4rem">Showing 1000 of ${rows.length} — tighten the filters or export the CSV.</p>` : ''}`;
+}
+
+function rfSummaryHtml(anchors) {
+  const withThreats = anchors.filter(a => a.threats.length);
+  return `
+    <div class="table-wrap medium">
+      <table class="bf-table">
+        <thead><tr><th>Repeater</th><th>RX (MHz)</th><th>Total</th>
+          ${Object.entries(ACMA_MECH).filter(([k]) => state.acma.mechCounts[k]).map(([, m]) => `<th class="small">${m.label}</th>`).join('')}
+          <th>Top score</th></tr></thead>
+        <tbody>
+          ${withThreats.map(a => {
+            const by = {};
+            a.threats.forEach(t => { by[t.mechanism] = (by[t.mechanism] || 0) + 1; });
+            const top = a.threats.length ? Math.max(...a.threats.map(t => t.score)) : '';
+            return `<tr style="cursor:pointer" onclick="state.rf.anchorId='${escAttr(a.station_id)}';renderMain()">
+              <td>${esc(a.name)}</td><td class="small">${a.rx_mhz ?? ''}</td>
+              <td><strong>${a.threats.length}</strong></td>
+              ${Object.keys(ACMA_MECH).filter(k => state.acma.mechCounts[k]).map(k => `<td class="small">${by[k] || ''}</td>`).join('')}
+              <td class="small">${top}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// Frequency-axis strip plot: RX channel centre line, nearby licensed carriers
+// as ticks coloured by band-plan segment (threat mechanisms override).
+function rfStripPlotHtml(anchorId) {
+  const A = state.acma;
+  const a = A.anchorById[anchorId];
+  if (!a || a.rx_mhz == null) return '';
+  const rx = a.rx_mhz, span = 0.6;                     // ±0.6 MHz window
+  const lo = rx - span, hi = rx + span;
+  const W = 900, H = 90, pad = 30;
+  const x = f => pad + (f - lo) / (hi - lo) * (W - 2 * pad);
+
+  const threatsByDev = {};
+  a.threats.forEach(t => { threatsByDev[t.device_id] = t; });
+
+  let carriers = [];
+  if (A.devLoaded) {
+    const seen = new Set();
+    for (const d of Object.values(A.deviceById)) {
+      if (d.f_mhz == null || d.f_mhz < lo || d.f_mhz > hi) continue;
+      const site = A.siteById[d.site_id];
+      if (!site) continue;
+      const dk = acmaHaversineKm(site.lat, site.lon, a.lat, a.lon);
+      if (dk > state.filters.acma.radiusKm) continue;
+      const key = d.f_mhz.toFixed(4) + '|' + d.site_id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      carriers.push({ f: d.f_mhz, id: d.id, dk, client: d.id in threatsByDev ? threatsByDev[d.id].client : null });
+    }
+  } else {
+    carriers = a.threats.filter(t => t.f_mhz != null && t.f_mhz >= lo && t.f_mhz <= hi)
+      .map(t => ({ f: t.f_mhz, id: t.device_id, dk: t.distance_km, client: t.client }));
+  }
+
+  const segBands = VHF_SEGMENTS.filter(s => s.hi > lo && s.lo < hi).map(s => `
+    <rect x="${x(Math.max(s.lo, lo))}" y="20" width="${x(Math.min(s.hi, hi)) - x(Math.max(s.lo, lo))}"
+          height="${H - 40}" fill="${s.seg === 'F' ? 'rgba(2,136,209,.08)' : 'rgba(128,128,128,.05)'}">
+      <title>Segment ${s.seg}: ${esc(s.alloc)}</title></rect>
+    <text x="${x(Math.max(s.lo, lo)) + 3}" y="16" font-size="9" style="fill:var(--muted)">${s.seg}</text>`).join('');
+
+  const ticks = carriers.map(c => {
+    const t = threatsByDev[c.id];
+    const color = t ? (ACMA_MECH[t.mechanism] || {}).color || '#888' : '#9aa7b3';
+    const hgt = t ? 34 : 22;
+    return `<line x1="${x(c.f)}" y1="${H - 20}" x2="${x(c.f)}" y2="${H - 20 - hgt}"
+      stroke="${color}" stroke-width="${t ? 2.5 : 1.2}">
+      <title>${c.f.toFixed(4)} MHz · ${c.dk.toFixed(1)} km${c.client ? ' · ' + esc(c.client) : ''}${t ? ' · ' + (ACMA_MECH[t.mechanism] || {}).label + ' ' + t.score : ''}</title></line>`;
+  }).join('');
+
+  return `
+    <div style="overflow-x:auto">
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:640px;height:auto" role="img"
+           aria-label="Licensed carriers near ${esc(a.name)} RX channel">
+        ${segBands}
+        <line x1="${pad}" y1="${H - 20}" x2="${W - pad}" y2="${H - 20}" style="stroke:var(--muted)" stroke-width="1"/>
+        ${[lo, rx - 0.3, rx, rx + 0.3, hi].map(f => `
+          <text x="${x(f)}" y="${H - 6}" font-size="10" text-anchor="middle" style="fill:var(--muted)">${f.toFixed(3)}</text>`).join('')}
+        ${ticks}
+        <line x1="${x(rx)}" y1="10" x2="${x(rx)}" y2="${H - 20}" stroke="#d32f2f" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <text x="${x(rx)}" y="9" font-size="10" text-anchor="middle" fill="#d32f2f">RX ${rx}</text>
+      </svg>
+      <div class="small" style="color:var(--muted)">${carriers.length} licensed carriers within
+        ±${span} MHz and ${state.filters.acma.radiusKm} km${A.devLoaded ? '' : ' (threat candidates only — full carrier set loads with device detail)'}.
+        Tall coloured ticks are classified threats; grey ticks are other licensed users.</div>
+    </div>`;
+}
+
+function rfShowOnMap(deviceId, anchorId) {
+  state.filters.acma.show = true;
+  acmaEnsureCore().then(() => {
+    switchTab('map');
+    showAcmaCard(deviceId, anchorId);
+  }).catch(() => {});
+}
+
+function rfExportCsv() {
+  const rows = rfVisibleRows();
+  const head = ['repeater', 'rx_mhz', 'mechanism', 'score', 'freq_mhz', 'product_mhz', 'delta_khz',
+                'distance_km', 'bearing_deg', 'los', 'licensee', 'licence', 'expiry', 'current',
+                'meganet_own_licence', 'device_id', 'site_id', 'detail'];
+  const lines = [head.join(',')];
+  for (const t of rows) {
+    const dk = rfDeltaKhz(t);
+    lines.push([
+      csvEscape(t.anchor_name), t.rx_mhz ?? '', t.mechanism, t.score,
+      t.f_mhz ?? '', t.product_mhz ?? '', dk != null ? dk.toFixed(2) : '',
+      t.distance_km, t.bearing_deg, t.los == null ? 'not_assessed' : t.los,
+      csvEscape(t.client || ''), csvEscape(t.lic || ''), t.expiry || '',
+      t.inactive ? 'no' : 'yes', t.meganet ? 'yes' : '',
+      t.device_id, t.site_id, csvEscape(t.detail),
+    ].join(','));
+  }
+  dlText(`acma-threats-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
+}
+
+function rfCorrelate() {
+  const el = document.getElementById('rf-corr-out');
+  const txt = (document.getElementById('rf-corr') || {}).value || '';
+  state.rf.corrText = txt;
+  const stamps = txt.split('\n').map(l => l.trim()).filter(Boolean)
+    .map(l => new Date(l)).filter(d => !isNaN(d));
+  if (!el) return;
+  if (!stamps.length) {
+    el.innerHTML = '<span style="color:var(--muted)">No parseable timestamps.</span>';
+    return;
+  }
+  const isBiz = d => d.getDay() >= 1 && d.getDay() <= 5 && d.getHours() >= 7 && d.getHours() < 18;
+  const biz = stamps.filter(isBiz).length;
+  const pct = Math.round(100 * biz / stamps.length);
+  // Expected share of a uniform 24×7 distribution that falls in Mon–Fri 07–18: ~33%
+  const verdict = pct >= 55
+    ? 'Strongly business-hours weighted — consistent with a licensed commercial operator (check non-continuous-hours candidates below).'
+    : pct >= 40
+      ? 'Mildly business-hours weighted — inconclusive.'
+      : 'Not business-hours weighted — points away from office-hours licensees (consider continuous carriers, faulty equipment, or environmental sources).';
+  const hourly = new Array(24).fill(0);
+  stamps.forEach(d => hourly[d.getHours()]++);
+  const maxH = Math.max(...hourly, 1);
+  const bars = hourly.map((n, h) => `
+    <div title="${String(h).padStart(2, '0')}:00 — ${n}" style="flex:1;display:flex;flex-direction:column;justify-content:end">
+      <div style="height:${Math.round(40 * n / maxH)}px;background:var(--map-line, #ff6f00);opacity:.75"></div>
+    </div>`).join('');
+  const nonCont = acmaVisibleThreats(true).filter(t => {
+    const d = state.acma.deviceById[t.device_id];
+    return d && d.hours && d.hours !== '00:00-23:59';
+  });
+  el.innerHTML = `
+    <p>${stamps.length} timestamps · <strong>${pct}%</strong> in business hours (Mon–Fri 07:00–18:00;
+    a uniform 24×7 source would sit near 33%).<br>${verdict}</p>
+    <div style="display:flex;gap:1px;height:44px;align-items:end;max-width:480px">${bars}</div>
+    <div style="display:flex;justify-content:space-between;max-width:480px" class="small">
+      <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+    ${state.acma.devLoaded
+      ? (nonCont.length
+          ? `<p>Visible threats with recorded non-continuous hours: ${nonCont.map(t =>
+              `${esc(t.client || t.lic)} (${esc((state.acma.deviceById[t.device_id] || {}).hours)})`).join('; ')}</p>`
+          : '<p style="color:var(--muted)">No visible threat has recorded non-continuous operating hours (most ACMA records leave hours blank).</p>')
+      : '<p style="color:var(--muted)">Open a transmitter card once to load device detail, then re-run for per-licensee operating hours.</p>'}`;
 }
 
 // ── ALERT Packets tab ────────────────────────────────────────────────────────────
