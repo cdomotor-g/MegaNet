@@ -285,15 +285,6 @@ td {
 .bf-table tr.bf-row-base:hover td {
   background: color-mix(in srgb, #ff8c00 18%, transparent);
 }
-.badge.bf-badge-base {
-  background: #ff8c00;
-  color: #fff;
-  white-space: nowrap;
-}
-[data-theme="dark"] .badge.bf-badge-base {
-  background: #ff8c00;
-  color: #241700;
-}
 
 th {
   position: sticky;
@@ -799,8 +790,15 @@ code {
 .pkt .row > .fit { flex: 0 0 auto; min-width: 0; }
 
 /* bit visualisation */
-.pkt .bitwords { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
-.pkt .bitword { display: flex; flex-direction: column; gap: 4px; }
+/* The four words read as one message, so they stay on a single row: the tab is
+   wide enough for all four at full size, and anything narrower scrolls sideways
+   rather than folding word 4 onto a second line. */
+.pkt .bitwords { display: flex; flex-wrap: nowrap; gap: 14px; margin-top: 8px; overflow-x: auto; padding-bottom: 4px; }
+.pkt .bitword { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
+/* Grid items are min-width:auto by default, which would let that unwrapped bit
+   row push the whole page wider than the viewport. Let the cards shrink so the
+   bits scroll inside their own card instead. */
+.pkt > .panel { min-width: 0; }
 .pkt .bitword .wlabel { font-size: 11px; color: var(--muted); text-align: center; letter-spacing: .4px; }
 .pkt .bitrow { display: flex; }
 .pkt .bit {

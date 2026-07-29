@@ -3,11 +3,10 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'map',        label: 'Map'        },
-  { id: 'maps',       label: 'Network Maps'},
   { id: 'stations',   label: 'Stations'   },
+  { id: 'maps',       label: 'Network Maps'},
   { id: 'networks',   label: 'Networks'   },
-  { id: 'analysis',   label: 'Analysis'   },
+  { id: 'passranges', label: 'Pass Ranges'},
   { id: 'rf',         label: 'RF Environment'},
   { id: 'rfchanges',  label: 'RF Changes' },
   { id: 'workbench',  label: 'Workbench'  },
@@ -98,7 +97,7 @@ if (typeof window !== 'undefined') {
 
 const state = {
   data:       null,   // parsed stations.json
-  activeTab:  'map',
+  activeTab:  'stations',
   filters: {
     search:       '',
     networks:     new Set(),
@@ -136,6 +135,7 @@ const state = {
   bfMap:          null,
   bfMapLayer:     null,
   bfMapTimer:     null,
+  prFilter:       '',      // Pass Ranges tab: station number / AlertID / name filter
   pkt: {
     decInput:  '',
     lastDecode: null,   // last decoded input string (for replay after re-render)
@@ -377,11 +377,10 @@ function renderMain() {
   const noDataTabs = ['packets', 'maps', 'serial'];
   if (!state.data && !noDataTabs.includes(state.activeTab)) { el.innerHTML = renderEmpty(); return; }
   switch (state.activeTab) {
-    case 'map':        el.innerHTML = renderMapHtml();        initMap();  break;
+    case 'stations':   el.innerHTML = renderStationsHtml();  initMap();   break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
-    case 'stations':   el.innerHTML = renderStationsHtml();               break;
     case 'networks':   el.innerHTML = renderNetworksHtml();               break;
-    case 'analysis':   el.innerHTML = renderAnalysisHtml();               break;
+    case 'passranges': el.innerHTML = renderPassRangesHtml();             break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;
     case 'rfchanges':  el.innerHTML = renderRfcHtml();       initRfc();   break;
     case 'workbench':  el.innerHTML = renderWorkbenchHtml(); initWb();    break;
@@ -412,9 +411,13 @@ function renderEmpty() {
     </div>`;
 }
 
-// ── MAP tab ────────────────────────────────────────────────────────────────────
+// ── STATIONS tab (map + station list + editor) ─────────────────────────────────
+// One page: the filter pane on the left drives both the map at the top and the
+// station table underneath it, so a filter narrows what is plotted and what is
+// listed in the same action.
 
-function renderMapHtml() {
+function renderStationsHtml() {
+  const stations = filteredStations();
   return `
     <div class="layout map-layout">
       <aside class="sidebar stack">
@@ -439,12 +442,12 @@ function renderMapHtml() {
             ${Object.entries(ROLE_LABEL).map(([k, v]) => `
               <label style="display:flex;gap:.45rem;align-items:center;font-size:.9rem;margin:.2rem 0">
                 <input type="checkbox" ${state.filters.roles.has(k) ? 'checked' : ''}
-                       onchange="toggleFilter('roles','${k}',this.checked);refreshMapLayers()">
+                       onchange="toggleFilter('roles','${k}',this.checked);stationsFilterChanged()">
                 <span class="legend-dot" style="background:${ROLE_COLOR[k]}"></span> ${v}
               </label>
             `).join('')}
           </div>
-          ${networkFilterHtml('refreshMapLayers()')}
+          ${networkFilterHtml('stationsFilterChanged()')}
           ${acmaFilterBlockHtml()}
           <label style="display:flex;gap:.45rem;align-items:center;font-size:.9rem;margin-top:.75rem">
             <input type="checkbox" ${state.mapShowLinks ? 'checked' : ''}
@@ -456,11 +459,23 @@ function renderMapHtml() {
           <div class="map-legend" id="map-legend">${mapLegendHtml()}</div>
         </div>
       </aside>
-      <div>
+      <div class="stack">
         <div class="panel" style="padding:.6rem;position:relative">
-          <div id="leaflet-map" style="height:calc(100vh - 165px);min-height:400px;border-radius:6px"></div>
+          <div id="leaflet-map" style="height:min(62vh,720px);min-height:360px;border-radius:6px"></div>
           <div id="map-note" class="map-note" hidden></div>
           <div id="acma-card" class="acma-card" hidden></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Stations <span class="badge" id="st-count">${stations.length}</span></h2>
+            <button onclick="editorNew()">+ New</button>
+          </div>
+          <div class="table-wrap tall" id="stations-table-wrap">
+            ${stationsTable(stations)}
+          </div>
+        </div>
+        <div class="panel" id="stations-editor-card">
+          ${renderStationEditorCard()}
         </div>
       </div>
     </div>`;
@@ -505,12 +520,20 @@ function mapNote(msg, ms) {
   if (ms) mapNote._t = setTimeout(() => { el.hidden = true; el.textContent = ''; }, ms);
 }
 
-// Typing in the search box rebuilds every marker, so hold off until the user
-// pauses. The sidebar is never re-rendered from here — the input keeps focus.
+// A filter change on the Stations tab drives both halves of the page: the map
+// re-highlights (or re-hides) its pins and the table below it re-lists.
+function stationsFilterChanged() {
+  refreshMapLayers();
+  rerenderStations();
+}
+
+// Typing in the search box rebuilds every marker and every table row, so hold
+// off until the user pauses. The sidebar is never re-rendered from here — the
+// input keeps focus.
 function mapSearchInput(value) {
   state.filters.search = value;
   clearTimeout(state.mapSearchTimer);
-  state.mapSearchTimer = setTimeout(refreshMapLayers, 160);
+  state.mapSearchTimer = setTimeout(stationsFilterChanged, 160);
 }
 
 // ── Base map layers ─────────────────────────────────────────────────────────
@@ -563,7 +586,7 @@ function initMap() {
   // rather than by re-rendering the tab, which would throw away the map view.
   if (state.filters.acma.show && !state.acma.loaded && !state.acma.loading) {
     acmaEnsureCore()
-      .then(() => { if (state.activeTab === 'map' && state.map) acmaAfterLoad(); })
+      .then(() => { if (state.activeTab === 'stations' && state.map) acmaAfterLoad(); })
       .catch(() => rerenderAcmaFilterBlock());
   }
 }
@@ -685,6 +708,7 @@ function refreshMapLayers() {
       className:   hit ? 'mn-pin mn-pin-hit' : 'mn-pin',
       bubblingMouseEvents: false,          // a pin click is not an empty-map click
     }).addTo(map);
+    marker.mnStationId = s.id;             // lets the table below find its pin
 
     const idTypes = stationAlertIdTypes(s);
     marker.bindPopup(`
@@ -1077,62 +1101,7 @@ const MapLocate = (function () {
   };
 })();
 
-// ── STATIONS tab ───────────────────────────────────────────────────────────────
-
-function renderStationsHtml() {
-  const stations = filteredStations();
-  return `
-    <div class="layout">
-      <aside class="sidebar stack">
-        <div class="panel">
-          <div class="panel-header"><h3>Filters</h3>
-            <button onclick="clearFilters()">Clear</button>
-          </div>
-          <div class="upload-grid" style="margin-top:.6rem">
-            <label style="font-size:.88rem;color:var(--muted)">Search
-              <input type="search" placeholder="Name or station #…" value="${esc(state.filters.search)}"
-                     oninput="state.filters.search=this.value;rerenderStations()">
-            </label>
-          </div>
-          <div style="margin-top:.75rem">
-            <div class="small" style="margin-bottom:.35rem;color:var(--muted)">Role</div>
-            ${Object.entries(ROLE_LABEL).map(([k, v]) => `
-              <label style="display:flex;gap:.45rem;align-items:center;font-size:.9rem;margin:.2rem 0">
-                <input type="checkbox" ${state.filters.roles.has(k) ? 'checked' : ''}
-                       onchange="toggleFilter('roles','${k}',this.checked);rerenderStations()">
-                ${v}
-              </label>
-            `).join('')}
-          </div>
-          ${networkFilterHtml('rerenderStations()')}
-          <label style="display:flex;gap:.45rem;align-items:center;font-size:.9rem;margin-top:.75rem">
-            <input type="checkbox" ${state.filters.enabledOnly ? 'checked' : ''}
-                   onchange="state.filters.enabledOnly=this.checked;rerenderStations()">
-            Enabled only
-          </label>
-        </div>
-        <div class="panel">
-          <div class="small" style="color:var(--muted)">
-            Showing <strong id="st-count">${stations.length}</strong> of ${state.data.stations.length}
-          </div>
-        </div>
-      </aside>
-      <div class="stack">
-        <div class="panel">
-          <div class="panel-header">
-            <h2>Stations</h2>
-            <button onclick="editorNew()">+ New</button>
-          </div>
-          <div class="table-wrap tall" id="stations-table-wrap">
-            ${stationsTable(stations)}
-          </div>
-        </div>
-        <div class="panel" id="stations-editor-card">
-          ${renderStationEditorCard()}
-        </div>
-      </div>
-    </div>`;
-}
+// ── Station table (lower half of the Stations tab) ─────────────────────────────
 
 function stationsTable(stations) {
   if (!stations.length) return '<p style="padding:.75rem;color:var(--muted)">No stations match current filters.</p>';
@@ -1152,8 +1121,8 @@ function stationsTable(stations) {
         ${stations.map(s => {
           const aids = stationAlertIds(s);
           return `
-            <tr class="${state.selectedId === s.id ? 'selected' : ''}"
-                onclick="selectStation('${s.id}')" style="cursor:pointer">
+            <tr class="${state.selectedId === s.id ? 'selected' : ''}" data-sid="${escAttr(s.id)}"
+                onclick="selectStation('${escAttr(s.id)}')" style="cursor:pointer">
               <td title="${esc(s.id)}"><span class="stn-name role-${primaryRole(s)}">${esc(s.name)}</span></td>
               <td class="small">${esc(s.station_number || '')}</td>
               <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}</td>
@@ -1183,16 +1152,53 @@ function selectStation(id) {
     state.selectedId  = null;
     state.editorId    = null;
     state.editorDraft = {};
-  } else {
-    // Select the row and load it into the editor card. A deep copy becomes the
-    // draft so fields not exposed by the form (catchments, satcom, RM metadata)
-    // survive a save.
-    state.selectedId  = id;
-    state.editorId    = id;
-    state.editorDraft = JSON.parse(JSON.stringify(state.data.stations.find(s => s.id === id) || {}));
+    rerenderStations();
+    rerenderStationEditorCard();
+    return;
   }
+  // Select the row and load it into the editor card. A deep copy becomes the
+  // draft so fields not exposed by the form (catchments, satcom, RM metadata)
+  // survive a save.
+  const s = state.data.stations.find(x => x.id === id);
+  state.selectedId  = id;
+  state.editorId    = id;
+  state.editorDraft = JSON.parse(JSON.stringify(s || {}));
   rerenderStations();
   rerenderStationEditorCard();
+  if (s) focusStationOnMap(s);
+}
+
+// Pan the map above the table to a station and open its pin. Called whenever a
+// row is picked, so the list and the map stay talking about the same site.
+function focusStationOnMap(s) {
+  if (!state.map || s.lat == null || s.lon == null) return;
+  state.map.setView([s.lat, s.lon], Math.max(state.map.getZoom() || 0, 11));
+  const marker = state.mapMarkers.find(m => m.mnStationId === s.id);
+  if (marker) marker.openPopup();
+}
+
+// Scroll a station's row into the middle of the table viewport, so a station
+// arrived at from another tab isn't left somewhere in 1300 rows.
+function scrollStationRowIntoView(id) {
+  const wrap = document.getElementById('stations-table-wrap');
+  if (!wrap) return;
+  const row = [...wrap.querySelectorAll('tr[data-sid]')].find(tr => tr.dataset.sid === id);
+  if (row) row.scrollIntoView({ block: 'center' });
+}
+
+// Open the Stations tab focused on one station. Used by the Pass Ranges tables,
+// where every row names a station the operator will want to look at in full.
+function goToStation(id) {
+  const s = state.data && state.data.stations.find(x => x.id === id);
+  if (!s) return;
+  // A filter left over from an earlier visit must not hide the row we linked to.
+  if (!filteredStations().some(x => x.id === id)) resetStationFilters();
+  state.selectedId  = id;
+  state.editorId    = id;
+  state.editorDraft = JSON.parse(JSON.stringify(s));
+  switchTab('stations');
+  scrollStationRowIntoView(id);
+  focusStationOnMap(s);
 }
 
 // True when the editor card should show a form (an existing station is selected
@@ -1278,28 +1284,44 @@ function renderNetworksHtml() {
     </div>`;
 }
 
-// ── ANALYSIS tab ───────────────────────────────────────────────────────────────
+// ── PASS RANGES tab ────────────────────────────────────────────────────────────
 
-function renderAnalysisHtml() {
-  const all      = state.data.stations;
+// Does a station answer to the page's filter box? The box takes a station
+// number, an ALERT id or part of a station name and does not ask which — an
+// operator holding one of the three shouldn't have to say which one it is.
+function passRangeMatch(s, q) {
+  if (!q) return true;
+  const t = q.trim().toLowerCase();
+  if (!t) return true;
+  if (s.name.toLowerCase().includes(t)) return true;
+  if ((s.station_number || '').toLowerCase().includes(t)) return true;
+  return stationAlertIds(s).some(id => String(id).includes(t));
+}
+
+// A repeater row survives the filter if the repeater itself matches, if one of
+// the stations it serves matches, or if the query is an ALERT id its pass
+// ranges cover — the last one answers "which repeater carries this address?".
+function passRangeRepeaterMatch(r, matched, q) {
+  if (!q) return true;
+  if (passRangeMatch(r, q)) return true;
+  if (matched.some(s => passRangeMatch(s, q))) return true;
+  const n = parseInt(q.trim(), 10);
+  return !isNaN(n) && passRangeCoversId(r.repeater, n);
+}
+
+// Static shell — the filter box lives out here and is never re-rendered on a
+// keystroke, so it keeps focus while only #pr-tables refreshes below it.
+function renderPassRangesHtml() {
+  const all       = state.data.stations;
   const repeaters = all.filter(s => s.roles.includes('repeater') && s.repeater);
   const fields    = all.filter(s => s.roles.includes('field'));
   const noAid     = fields.filter(s => !stationAlertIds(s).length).length;
-
-  const rptData = repeaters.map(r => ({
-    r, matched: findStationMatches(r, all),
-  }));
-
-  const orphans = fields.filter(s => {
-    const ids = stationAlertIds(s);
-    if (!ids.length) return false;
-    return !repeaters.some(r => ids.some(id => passRangeCoversId(r.repeater, id)));
-  });
+  const orphans   = passRangeOrphans();
 
   return `
     <div style="max-width:1100px;margin:auto;padding:1rem;display:grid;gap:1rem">
       <div class="panel">
-        <div class="panel-header"><h2>Pass-Range Analysis</h2></div>
+        <div class="panel-header"><h2>Pass Ranges</h2></div>
         <div class="stats" style="display:flex;flex-wrap:wrap;gap:1.5rem;margin-top:.75rem">
           <div>Repeaters with pass ranges: <strong>${repeaters.length}</strong></div>
           <div>Field stations with AlertID: <strong>${fields.length - noAid}</strong></div>
@@ -1308,11 +1330,57 @@ function renderAnalysisHtml() {
             Orphaned (no matching repeater): <strong>${orphans.length}</strong>
           </div>
         </div>
+        <label style="display:block;font-size:.88rem;color:var(--muted);margin-top:.9rem;max-width:420px">
+          Filter by station number, AlertID or station name
+          <input type="search" id="pr-filter" value="${esc(state.prFilter)}"
+                 placeholder="e.g. 540123, 6128 or Amiens…"
+                 style="width:100%;margin-top:.3rem;display:block"
+                 oninput="onPassRangeFilter(this.value)">
+        </label>
+        <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+          Click any row to open that station on the Stations tab.
+        </p>
       </div>
 
+      <div id="pr-tables" style="display:grid;gap:1rem">${passRangeTablesHtml()}</div>
+    </div>`;
+}
+
+// Field stations carrying an AlertID that no repeater's pass ranges cover.
+function passRangeOrphans() {
+  const all       = state.data.stations;
+  const repeaters = all.filter(s => s.roles.includes('repeater') && s.repeater);
+  return all.filter(s => {
+    if (!s.roles.includes('field')) return false;
+    const ids = stationAlertIds(s);
+    if (!ids.length) return false;
+    return !repeaters.some(r => ids.some(id => passRangeCoversId(r.repeater, id)));
+  });
+}
+
+// Dynamic half — recomputed into #pr-tables on every keystroke in the filter box.
+function passRangeTablesHtml() {
+  const all       = state.data.stations;
+  const q         = state.prFilter;
+  const repeaters = all.filter(s => s.roles.includes('repeater') && s.repeater);
+
+  const rptData = repeaters
+    .map(r => ({ r, matched: findStationMatches(r, all) }))
+    .filter(({ r, matched }) => passRangeRepeaterMatch(r, matched, q));
+
+  const allOrphans = passRangeOrphans();
+  const orphans    = allOrphans.filter(s => passRangeMatch(s, q));
+
+  const of = (shown, total) => shown === total ? `${total}` : `${shown} of ${total}`;
+  const noMatch = msg => `<p class="small" style="color:var(--muted);padding:.75rem">${msg}</p>`;
+
+  return `
       <div class="panel">
-        <div class="panel-header"><h2>By Repeater</h2><span class="badge">${repeaters.length}</span></div>
+        <div class="panel-header"><h2>By Repeater</h2>
+          <span class="badge">${of(rptData.length, repeaters.length)}</span>
+        </div>
         <div class="table-wrap tall">
+          ${!rptData.length ? noMatch('No repeater matches this filter.') : `
           <table>
             <colgroup>
               <col style="width:20%"><col style="width:16%"><col style="width:8%">
@@ -1321,7 +1389,8 @@ function renderAnalysisHtml() {
             <thead><tr><th>Repeater</th><th>Network</th><th>Matched</th><th>Pass ranges</th><th>Stations (first 10)</th></tr></thead>
             <tbody>
               ${rptData.map(({ r, matched }) => `
-                <tr>
+                <tr onclick="goToStation('${escAttr(r.id)}')" style="cursor:pointer"
+                    title="Open ${escAttr(r.name)} on the Stations tab">
                   <td>${esc(r.name)}</td>
                   <td class="small">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
                   <td><span class="badge">${matched.length}</span></td>
@@ -1329,34 +1398,42 @@ function renderAnalysisHtml() {
                   <td class="small">${matched.slice(0, 10).map(s => esc(s.name)).join(', ')}${matched.length > 10 ? ` +${matched.length - 10} more` : ''}</td>
                 </tr>`).join('')}
             </tbody>
-          </table>
+          </table>`}
         </div>
       </div>
 
-      ${orphans.length ? `
+      ${allOrphans.length ? `
         <div class="panel">
           <div class="panel-header">
             <h2 style="color:#c7401a">Orphaned Stations</h2>
-            <span class="badge">${orphans.length}</span>
+            <span class="badge">${of(orphans.length, allOrphans.length)}</span>
           </div>
           <p class="small" style="color:var(--muted);margin:.5rem 0">
             These stations have an AlertID but no repeater's pass ranges cover it.
           </p>
           <div class="table-wrap medium">
+            ${!orphans.length ? noMatch('No orphaned station matches this filter.') : `
             <table>
-              <thead><tr><th>Name</th><th>AlertID(s)</th><th>Network</th></tr></thead>
+              <thead><tr><th>Name</th><th>Stn #</th><th>AlertID(s)</th><th>Network</th></tr></thead>
               <tbody>
                 ${orphans.map(s => `
-                  <tr>
+                  <tr onclick="goToStation('${escAttr(s.id)}')" style="cursor:pointer"
+                      title="Open ${escAttr(s.name)} on the Stations tab">
                     <td>${esc(s.name)}</td>
+                    <td class="small">${esc(s.station_number || '')}</td>
                     <td class="small">${stationAlertIds(s).join(', ')}</td>
                     <td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
                   </tr>`).join('')}
               </tbody>
-            </table>
+            </table>`}
           </div>
-        </div>` : ''}
-    </div>`;
+        </div>` : ''}`;
+}
+
+function onPassRangeFilter(value) {
+  state.prFilter = value;
+  const el = document.getElementById('pr-tables');
+  if (el) el.innerHTML = passRangeTablesHtml();
 }
 
 // ── BIT FLIPPER tab ────────────────────────────────────────────────────────────
@@ -1364,6 +1441,9 @@ function renderAnalysisHtml() {
 const BF_TYPE_LABEL     = { battery: 'Battery', rainfall: 'Rainfall', water_level: 'Water Level', primary: 'Primary' };
 const BF_MAX_RENDER_ROWS = 2000;   // safety cap for very large N-bit expansions
 const ARRO_DEFAULT_BASE  = 'https://contrail-bom.onerain.au/graph/';
+// Station of interest — the entered address. Ties the pinned table row (see
+// .bf-row-base in styles.css) to its highlighted pin on the map below.
+const BF_BASE_COLOR      = '#ff8c00';
 
 // Normalized sensor list for a station. Prefers the enriched `sensors` array
 // (from the national sensor database) and falls back to synthesizing minimal
@@ -1560,22 +1640,26 @@ function renderBitFlipperResults() {
   const truncated   = rows.length > BF_MAX_RENDER_ROWS;
   if (truncated) rows = rows.slice(0, BF_MAX_RENDER_ROWS);
 
-  // Pin the station-of-interest row at the top, following the same match/filter
-  // rules the variant rows do so it isn't shown emptily under an active filter.
-  const showBase = filter ? rowMatches(baseRow).length
-                 : state.bfOnlyMatches ? baseRow.matches.length
-                 : true;
+  // Pin the station-of-interest row at the top. It is exempt from the sensor
+  // filter — that filter narrows the flip variants being compared against the
+  // entered address, not the address itself — so it stays listed, and fully
+  // populated, alongside the ARRO link that always graphs it. With no station
+  // behind the address at all there is nothing to pin but the bits, so the
+  // "only matched" rule still applies.
+  const showBase = baseRow.matches.length ? true : !state.bfOnlyMatches && !filter;
   if (showBase) rows = [baseRow, ...rows];
 
   const matchedCount = variants.filter(v => v.matches.length).length;
 
   // ARRO link across the station of interest plus every matched flip-variant
-  // sensor that passes the current filter.
-  const arroPairs = [baseRow, ...variants].flatMap(v => v.matches.filter(matchPasses));
+  // sensor that passes the current filter. The station of interest is never
+  // filtered out — the sensor filter narrows what you compare it against, not
+  // the address you actually asked about.
+  const arroPairs = [...baseRow.matches, ...variants.flatMap(v => v.matches.filter(matchPasses))];
   const arro = buildArroUrl(arroPairs);
 
   const rowsHtml = rows.map(v => {
-    const ms  = dedupeMatches(rowMatches(v));
+    const ms  = dedupeMatches(v.isBase ? v.matches : rowMatches(v));
     const hit = ms.length > 0;
     const dash = '<span style="color:var(--muted)">—</span>';
     const stationBadges = hit
@@ -1589,8 +1673,11 @@ function renderBitFlipperResults() {
     const repHtml = reps.length
       ? reps.map(r => `<span class="badge badge--repeater">${esc(r.name)}</span>`).join(' ')
       : dash;
+    // The pinned, tinted row is the station of interest — it says so in the
+    // tooltip rather than in the cell, which otherwise steals width from the
+    // station, sensor and repeater columns that need it.
     const bitsCell = v.isBase
-      ? `NA <span class="badge bf-badge-base" title="Station of interest — the ALERT address you entered">station of interest</span>`
+      ? `<span title="Station of interest — the ALERT address you entered">NA</span>`
       : v.bits.join(', ');
     return `
       <tr${v.isBase ? ' class="bf-row-base"' : ''}>
@@ -1629,6 +1716,10 @@ function renderBitFlipperResults() {
       ${rows.length ? `
         <div class="table-wrap tall">
           <table class="bf-table">
+            <colgroup>
+              <col style="width:8%"><col style="width:8%"><col style="width:13%"><col style="width:5%">
+              <col style="width:24%"><col style="width:10%"><col style="width:15%"><col style="width:17%">
+            </colgroup>
             <thead><tr>
               <th>Bit(s)</th><th>Decimal</th><th>Binary</th><th>Match</th>
               <th>Station(s)</th><th>Sensor</th><th>Sensor ID</th><th>Repeater(s)</th>
@@ -1722,10 +1813,14 @@ function refreshBitFlipperMap() {
     });
   }
 
-  // Also include the base address's own matching stations (highlighted differently)
+  // The station of interest — whoever owns the address as entered. Always
+  // plotted and always highlighted, including when it also turns up as a
+  // flip-variant match (which would otherwise paint it like any other hit).
   (idx.get(base) || []).forEach(({ station: s }) => {
-    if (!stationInfo.has(s.id)) stationInfo.set(s.id, { station: s, addrs: new Set([base]), bits: new Set() });
-    stationInfo.get(s.id).isBase = true;
+    if (!stationInfo.has(s.id)) stationInfo.set(s.id, { station: s, addrs: new Set(), bits: new Set() });
+    const info = stationInfo.get(s.id);
+    info.addrs.add(base);
+    info.isBase = true;
   });
 
   // Collect repeaters open to the matched field stations
@@ -1738,13 +1833,25 @@ function refreshBitFlipperMap() {
   }
 
   const bounds = [];
+  const baseMarkers = [];
   for (const { station: s, addrs, bits, isBase } of stationInfo.values()) {
     if (s.lat == null || s.lon == null) continue;
     const role  = primaryRole(s);
-    const color = isBase && !bits.size ? '#ff8c00' : (ROLE_COLOR[role] || ROLE_COLOR.field);
+    const color = isBase ? BF_BASE_COLOR : (ROLE_COLOR[role] || ROLE_COLOR.field);
+
+    // The station of interest gets a halo behind its pin and its name on the
+    // map, so it can be picked out of a scatter of flip matches at a glance.
+    if (isBase) {
+      L.circleMarker([s.lat, s.lon], {
+        radius: 17, color: BF_BASE_COLOR, weight: 2, opacity: 0.9,
+        fillColor: BF_BASE_COLOR, fillOpacity: 0.18, interactive: false,
+      }).addTo(layer);
+    }
+
     const marker = L.circleMarker([s.lat, s.lon], {
-      radius: s.roles.includes('repeater') ? 9 : 6,
-      color, fillColor: color, fillOpacity: 0.85,
+      radius: isBase ? 10 : (s.roles.includes('repeater') ? 9 : 6),
+      color: isBase ? '#ffffff' : color,
+      fillColor: color, fillOpacity: 0.9,
       weight: isBase ? 3 : 1.5,
     }).addTo(layer);
 
@@ -1752,7 +1859,7 @@ function refreshBitFlipperMap() {
       ? `<br><span style="font-size:.82rem">Flipped bits: ${[...bits].join(', ')}</span>`
       : '';
     const baseLabel = isBase
-      ? `<span style="background:#ff8c00;color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem;margin-left:4px">exact match</span>`
+      ? `<span style="background:${BF_BASE_COLOR};color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem;margin-left:4px">station of interest</span>`
       : '';
     marker.bindPopup(`
       <strong>${esc(s.name)}</strong>${baseLabel}<br>
@@ -1760,6 +1867,12 @@ function refreshBitFlipperMap() {
       ${bitsLabel}
       <br><span style="font-size:.82rem">AlertID: ${[...addrs].sort((a, b) => a - b).join(', ')}</span>
     `);
+    if (isBase) {
+      marker.bindTooltip(esc(s.name), {
+        permanent: true, direction: 'top', offset: [0, -12], className: 'mn-pin-label',
+      });
+      baseMarkers.push(marker);
+    }
     bounds.push([s.lat, s.lon]);
   }
 
@@ -1796,6 +1909,10 @@ function refreshBitFlipperMap() {
       }).addTo(layer);
     }
   }
+
+  // Repeater pins and link lines were added after the station pins, so lift the
+  // station of interest back above them.
+  baseMarkers.forEach(m => m.bringToFront());
 
   if (bounds.length) state.bfMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
 }
@@ -2228,7 +2345,7 @@ function networkFilterHtml(onChangeFn) {
           <button style="padding:.2rem .45rem;font-size:.78rem"
                   onclick="state.filters.networks=new Set();${onChangeFn}">All</button>
           <button style="padding:.2rem .45rem;font-size:.78rem"
-                  onclick="state.filters.networks=new Set(${JSON.stringify(nets.map(n => n.id))});${onChangeFn}">None</button>
+                  onclick="state.filters.networks=new Set(${esc(JSON.stringify(nets.map(n => n.id)))});${onChangeFn}">None</button>
         </span>
       </div>
       <div class="checklist" style="max-height:18vh">
@@ -2251,12 +2368,11 @@ function toggleFilter(key, value, checked) {
   else         set.delete(value);
 }
 
-function clearFilters() {
+function resetStationFilters() {
   // The ACMA block keeps its own state — clearing station filters should not
   // silently drop an RF layer the operator has configured.
   state.filters = { search: '', networks: new Set(), catchments: new Set(), roles: new Set(),
                     enabledOnly: false, acma: state.filters.acma };
-  renderMain();
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
@@ -2591,7 +2707,7 @@ function toggleAcmaShow(checked) {
   // Legend and filter body gain the ACMA entries once the data lands; both are
   // patched in place so the operator keeps their pan and zoom.
   acmaEnsureCore().then(() => {
-    if (state.activeTab === 'map' && state.map) acmaAfterLoad();
+    if (state.activeTab === 'stations' && state.map) acmaAfterLoad();
   }).catch(() => rerenderAcmaFilterBlock());
   rerenderAcmaFilterBlock();
 }
@@ -3142,7 +3258,7 @@ function rfStripPlotHtml(anchorId) {
 function rfShowOnMap(deviceId, anchorId) {
   state.filters.acma.show = true;
   acmaEnsureCore().then(() => {
-    switchTab('map');
+    switchTab('stations');
     showAcmaCard(deviceId, anchorId);
   }).catch(() => {});
 }
@@ -6184,7 +6300,7 @@ const Packets = (function () {
     const fmt = e.format;
     const abits = FORMATS[fmt].abits;
     return `
-    <div class="pkt" style="max-width:1000px;margin:auto;padding:1rem;display:grid;gap:1rem">
+    <div class="pkt" style="max-width:1280px;margin:auto;padding:1rem;display:grid;gap:1rem">
 
       <div class="panel">
         <div class="panel-header"><h2>ALERT / ERTS Packet Tool</h2></div>
@@ -7746,7 +7862,7 @@ const BugReport = (function () {
             <select id="br-type">${typeOpts}</select>
           </label>
           <label>What went wrong, or what would you like? <span class="req">*</span>
-            <textarea id="br-desc" placeholder="e.g. Clicking a repeater on the Map tab does nothing…"></textarea>
+            <textarea id="br-desc" placeholder="e.g. Clicking a repeater on the Stations tab does nothing…"></textarea>
           </label>
           <label>What did you expect to happen? <span class="small">(optional)</span>
             <textarea id="br-expected" placeholder="e.g. The station's details should open on the right."></textarea>
