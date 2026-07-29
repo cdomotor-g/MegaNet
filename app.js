@@ -277,13 +277,27 @@ function updateHeaderStats() {
 
 // ── Data helpers ───────────────────────────────────────────────────────────────
 
+// Does the search box's text match this station? Names and station numbers
+// match on any substring; a purely numeric query is also tried against the
+// station's ALERT addresses, so an operator holding an id from a packet or an
+// alarm can type it straight in instead of having to know the site name. Ids
+// match from the start (6128 → 6128, 61 → 6128) — a mid-number substring match
+// would pull in unrelated addresses that merely share a digit run.
+function stationMatchesQuery(s, q) {
+  if (!q) return true;
+  if (s.name.toLowerCase().includes(q)) return true;
+  if ((s.station_number || '').toLowerCase().includes(q)) return true;
+  if (/^\d+$/.test(q) && stationAlertIds(s).some(id => String(id).startsWith(q))) return true;
+  return false;
+}
+
 function filteredStations() {
   if (!state.data) return [];
   const { search, networks, catchments, roles, enabledOnly } = state.filters;
-  const q = search.toLowerCase();
+  const q = search.trim().toLowerCase();
   return state.data.stations.filter(s => {
     if (enabledOnly && !s.enabled) return false;
-    if (q && !s.name.toLowerCase().includes(q) && !(s.station_number || '').toLowerCase().includes(q)) return false;
+    if (!stationMatchesQuery(s, q)) return false;
     if (networks.size   > 0 && !s.radio_network_ids.some(id => networks.has(id)))   return false;
     if (catchments.size > 0 && !s.catchment_ids.some(id => catchments.has(id)))     return false;
     if (roles.size      > 0 && !s.roles.some(r => roles.has(r)))                    return false;
@@ -422,7 +436,7 @@ function renderMapHtml() {
           <div class="panel-header"><h3>Filters</h3></div>
           <div class="upload-grid" style="margin-top:.6rem">
             <label style="font-size:.88rem;color:var(--muted)">Search
-              <input type="search" placeholder="Station name…" value="${esc(state.filters.search)}"
+              <input type="search" placeholder="Name, station # or ALERT id…" value="${esc(state.filters.search)}"
                      oninput="mapSearchInput(this.value)">
             </label>
           </div>
@@ -695,6 +709,10 @@ function refreshMapLayers() {
         `<span style="font-size:.82rem">&nbsp;&nbsp;${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
       ${s.elevation_ahd != null ? `<span style="font-size:.83rem">Elev: ${s.elevation_ahd} m AHD</span>` : ''}
       ${acmaRepeaterPopupExtra(s)}
+      <div class="mn-popup-actions">
+        <a href="#" onclick="openStationInStationsTab('${escAttr(s.id)}');return false"
+           title="Open this station in the Stations tab">Open in Stations tab →</a>
+      </div>
     `);
     if (labelled.has(s.id)) {
       marker.bindTooltip(esc(s.name), {
@@ -1090,7 +1108,7 @@ function renderStationsHtml() {
           </div>
           <div class="upload-grid" style="margin-top:.6rem">
             <label style="font-size:.88rem;color:var(--muted)">Search
-              <input type="search" placeholder="Name or station #…" value="${esc(state.filters.search)}"
+              <input type="search" placeholder="Name, station # or ALERT id…" value="${esc(state.filters.search)}"
                      oninput="state.filters.search=this.value;rerenderStations()">
             </label>
           </div>
@@ -1193,6 +1211,32 @@ function selectStation(id) {
   }
   rerenderStations();
   rerenderStationEditorCard();
+}
+
+// "Open in Stations tab →" from a map popup: switch tabs with the station
+// already selected, loaded into the editor card and scrolled into view.
+// Filter state is shared between the two tabs, so a station the current filter
+// excludes would land on a list it isn't in. In that case the filters are
+// narrowed to the station's own name instead — the table then contains it, and
+// the search box visibly says why the list changed.
+function openStationInStationsTab(id) {
+  const s = state.data && state.data.stations.find(x => x.id === id);
+  if (!s) return;
+  if (!filteredStations().some(x => x.id === id)) {
+    state.filters.search      = s.name;
+    state.filters.networks    = new Set();
+    state.filters.catchments  = new Set();
+    state.filters.roles       = new Set();
+    state.filters.enabledOnly = false;
+  }
+  state.selectedId  = id;
+  state.editorId    = id;
+  // Same deep copy as selectStation: fields the form doesn't expose survive a save.
+  state.editorDraft = JSON.parse(JSON.stringify(s));
+  switchTab('stations');
+  // switchTab built the table synchronously, so the selected row exists now.
+  const row = document.querySelector('#stations-table-wrap tr.selected');
+  if (row) row.scrollIntoView({ block: 'center' });
 }
 
 // True when the editor card should show a form (an existing station is selected
