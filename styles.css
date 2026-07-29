@@ -455,6 +455,104 @@ hr {
   display: inline-block;
 }
 
+/* ── Map pins ────────────────────────────────────────────────────────────── */
+
+/* Every station pin is drawn with a white ring (set in app.js) so it separates
+   from the base map; pins matching the filter box swap it for amber and get a
+   name label. Keep this rule cheap — it applies to ~1300 SVG circles. */
+.mn-pin {
+  cursor: pointer;
+}
+
+/* name labels — only ever drawn for filter-box matches */
+.leaflet-tooltip.mn-pin-label {
+  background: rgba(255, 255, 255, .93);
+  color: #1a1a1a;
+  border: 1px solid rgba(0, 0, 0, .25);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: .72rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.leaflet-tooltip.mn-pin-label::before {
+  display: none;               /* no callout arrow — the pin is right above it */
+}
+
+/* legend swatch for "matches filter" */
+.legend-dot-hit {
+  box-shadow: 0 0 0 2px #ffc400;
+}
+
+/* transient message over the map (locating, GPS errors) */
+.map-note {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1050;               /* above leaflet controls, below the ACMA card */
+  max-width: 80%;
+  padding: .3rem .8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: .82rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+  pointer-events: none;
+}
+
+/* ── My location + heading (mobile only) ─────────────────────────────────── */
+
+.mn-locate a {
+  font-size: 15px;
+  text-align: center;
+}
+
+.mn-locate a.on {
+  color: #1565c0;
+  background: #e3f0fd;
+}
+
+.mn-loc-icon {
+  background: none;
+  border: none;
+}
+
+.mn-loc {
+  position: relative;
+  width: 46px;
+  height: 46px;
+}
+
+.mn-loc-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: #1e88e5;
+  box-shadow: 0 0 0 3px #fff, 0 0 4px 3px rgba(0, 0, 0, .35);
+}
+
+/* compass wedge, rotated to the heading by app.js; masked out over the dot */
+.mn-loc-cone {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  transform-origin: 50% 50%;
+  background: conic-gradient(from -28deg,
+              rgba(30, 136, 229, .75), rgba(30, 136, 229, .05) 56deg);
+  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 9px, #000 10px);
+  mask: radial-gradient(circle at 50% 50%, transparent 9px, #000 10px);
+}
+
 /* ── ACMA RRL interference layer ─────────────────────────────────────────── */
 
 /* square swatch — ACMA transmitters are squares so they never read as
@@ -471,16 +569,18 @@ hr {
   border: none;
 }
 
+/* white ring, matching the station pins, so transmitters read against the base
+   map and against each other */
 .acma-sq {
   border: 1px solid rgba(0, 0, 0, .55);
-  box-shadow: 0 0 2px rgba(0, 0, 0, .4);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .95), 0 0 3px 2px rgba(0, 0, 0, .3);
   box-sizing: border-box;
 }
 
 /* MegaNet's own licensed transmitters get the repeater-blue dashed ring */
 .acma-sq.mn {
   outline: 2px dashed #0b5cab;
-  outline-offset: 1px;
+  outline-offset: 3px;         /* clear of the white ring */
 }
 
 /* ── RF Changes tab ──────────────────────────────────────────────────────── */
@@ -619,6 +719,12 @@ hr {
 
   .sidebar {
     position: static;
+  }
+
+  /* On a phone the map is the point of the map tab — the filter panel and the
+     (long) legend go below it rather than pushing it off the first screen. */
+  .map-layout > .sidebar {
+    order: 2;
   }
 }
 

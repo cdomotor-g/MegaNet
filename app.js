@@ -106,7 +106,9 @@ const state = {
     roles:        new Set(),
     enabledOnly:  false,
     acma: {
-      show:        false,                       // master toggle — nothing is fetched while off
+      show:        true,                        // on by default; the ~1.4 MB core
+                                                // data is fetched the first time
+                                                // the map tab opens, not at page load
       mechanisms:  new Set(['co_channel', 'adjacent', 'imd3', 'harmonic', 'cosite_desense']),
       minScore:    20,   // scores carry a ×0.7 unknown-LOS discount, so they cluster low
       losOnly:     false,
@@ -122,6 +124,9 @@ const state = {
   mapMarkers:     [],
   mapLines:       [],
   mapShowLinks:   true,
+  mapHideOthers:  false,   // filter box: highlight matches (default) vs hide the rest
+  mapFitKey:      null,    // extent the map was last auto-fitted to (re-fit only on change)
+  mapSearchTimer: null,    // debounce for the search box → marker rebuild
   exportNets:     null,
   bfInput:        '',
   bfBits:         '1',
@@ -411,16 +416,24 @@ function renderEmpty() {
 
 function renderMapHtml() {
   return `
-    <div class="layout">
+    <div class="layout map-layout">
       <aside class="sidebar stack">
         <div class="panel">
           <div class="panel-header"><h3>Filters</h3></div>
           <div class="upload-grid" style="margin-top:.6rem">
             <label style="font-size:.88rem;color:var(--muted)">Search
               <input type="search" placeholder="Station name…" value="${esc(state.filters.search)}"
-                     oninput="state.filters.search=this.value;refreshMapLayers()">
+                     oninput="mapSearchInput(this.value)">
             </label>
           </div>
+          <div class="small" id="map-match-note" style="color:var(--muted);margin-top:.35rem">
+            ${mapMatchNoteHtml()}
+          </div>
+          <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin-top:.5rem">
+            <input type="checkbox" ${state.mapHideOthers ? 'checked' : ''}
+                   onchange="state.mapHideOthers=this.checked;refreshMapLayers()">
+            Hide stations that don't match
+          </label>
           <div style="margin-top:.75rem">
             <div class="small" style="margin-bottom:.35rem;color:var(--muted)">Roles</div>
             ${Object.entries(ROLE_LABEL).map(([k, v]) => `
@@ -440,32 +453,64 @@ function renderMapHtml() {
           </label>
         </div>
         <div class="panel">
-          <div class="map-legend">
-            ${Object.entries(ROLE_LABEL).map(([k, v]) => `
-              <span class="legend-item">
-                <span class="legend-dot" style="background:${ROLE_COLOR[k]}"></span>
-                <span class="small">${v}</span>
-              </span>`).join('')}
-            <span class="legend-item">
-              <span class="legend-line"></span>
-              <span class="small">Pass-range link</span>
-            </span>
-            ${state.filters.acma.show ? Object.entries(ACMA_MECH).map(([k, m]) => `
-              <span class="legend-item">
-                <span class="legend-sq" style="background:${m.color}"></span>
-                <span class="small">${m.label}</span>
-              </span>`).join('') + `
-            <span class="legend-item"><span class="small" style="color:var(--muted)">ACMA RRL data (CC BY 4.0)${state.acma.threats ? ' · ' + esc(state.acma.threats.meta.source_date) : ''}</span></span>` : ''}
-          </div>
+          <div class="map-legend" id="map-legend">${mapLegendHtml()}</div>
         </div>
       </aside>
       <div>
         <div class="panel" style="padding:.6rem;position:relative">
           <div id="leaflet-map" style="height:calc(100vh - 165px);min-height:400px;border-radius:6px"></div>
+          <div id="map-note" class="map-note" hidden></div>
           <div id="acma-card" class="acma-card" hidden></div>
         </div>
       </div>
     </div>`;
+}
+
+function mapLegendHtml() {
+  return `
+    ${Object.entries(ROLE_LABEL).map(([k, v]) => `
+      <span class="legend-item">
+        <span class="legend-dot" style="background:${ROLE_COLOR[k]}"></span>
+        <span class="small">${v}</span>
+      </span>`).join('')}
+    <span class="legend-item">
+      <span class="legend-dot legend-dot-hit" style="background:${ROLE_COLOR.field}"></span>
+      <span class="small">Matches filter</span>
+    </span>
+    <span class="legend-item">
+      <span class="legend-line"></span>
+      <span class="small">Pass-range link</span>
+    </span>
+    ${state.filters.acma.show ? Object.entries(ACMA_MECH).map(([k, m]) => `
+      <span class="legend-item">
+        <span class="legend-sq" style="background:${m.color}"></span>
+        <span class="small">${m.label}</span>
+      </span>`).join('') + `
+    <span class="legend-item"><span class="small" style="color:var(--muted)">ACMA RRL data (CC BY 4.0)${state.acma.threats ? ' · ' + esc(state.acma.threats.meta.source_date) : ''}</span></span>` : ''}`;
+}
+
+function rerenderMapLegend() {
+  const el = document.getElementById('map-legend');
+  if (el) el.innerHTML = mapLegendHtml();
+}
+
+// A short-lived note over the map (location errors, label caps). Empty clears it.
+function mapNote(msg, ms) {
+  const el = document.getElementById('map-note');
+  if (!el) return;
+  clearTimeout(mapNote._t);
+  if (!msg) { el.hidden = true; el.textContent = ''; return; }
+  el.textContent = msg;
+  el.hidden = false;
+  if (ms) mapNote._t = setTimeout(() => { el.hidden = true; el.textContent = ''; }, ms);
+}
+
+// Typing in the search box rebuilds every marker, so hold off until the user
+// pauses. The sidebar is never re-rendered from here — the input keeps focus.
+function mapSearchInput(value) {
+  state.filters.search = value;
+  clearTimeout(state.mapSearchTimer);
+  state.mapSearchTimer = setTimeout(refreshMapLayers, 160);
 }
 
 // ── Base map layers ─────────────────────────────────────────────────────────
@@ -502,32 +547,113 @@ function initMap() {
   if (state.map) { state.map.remove(); state.map = null; state.mapMarkers = []; state.mapLines = []; }
   // The old map (if any) owned these layer groups — they die with it.
   state.acma.layer = state.acma.beamLayer = state.acma.linkLayer = state.acma.hiLayer = null;
+  MapLocate.detach();
   const el = document.getElementById('leaflet-map');
   if (!el) return;
   state.map = L.map('leaflet-map');
+  state.mapFitKey = null;              // a fresh map always fits its contents once
   addBaseLayers(state.map);
+  MapSpider.attach(state.map);
+  MapLocate.attach(state.map);
   state.map.on('click', () => acmaClearHighlight());
   refreshMapLayers();
   refreshAcmaLayer();
+  // ACMA transmitters are on by default, so the first visit to the map pulls the
+  // core data in. Panels that gain content once it lands are refreshed in place
+  // rather than by re-rendering the tab, which would throw away the map view.
+  if (state.filters.acma.show && !state.acma.loaded && !state.acma.loading) {
+    acmaEnsureCore()
+      .then(() => { if (state.activeTab === 'map' && state.map) acmaAfterLoad(); })
+      .catch(() => rerenderAcmaFilterBlock());
+  }
+}
+
+// Panels that depend on loaded ACMA data, refreshed without rebuilding the tab.
+function acmaAfterLoad() {
+  refreshAcmaLayer();
+  rerenderAcmaFilterBlock();
+  rerenderMapLegend();
+}
+
+// ── Map filter behaviour ─────────────────────────────────────────────────────
+// The filter box no longer removes anything: every station stays on the map and
+// the ones that match are ringed, labelled and zoomed to. "Hide stations that
+// don't match" puts the old subtractive behaviour back.
+
+const MAP_LABEL_CAP = 60;     // permanent name labels beyond this are unreadable
+const MAP_PIN_RING  = '#ffffff';
+const MAP_PIN_HIT   = '#ffc400';
+
+// Is any station filter narrowing things down? A network set that covers every
+// network (or none) selects everything, so it doesn't count as active.
+function mapFilterActive() {
+  const f = state.filters;
+  const netTotal = (state.data?.radio_networks || []).length;
+  return !!(f.search.trim() || f.roles.size || f.catchments.size || f.enabledOnly ||
+            (f.networks.size && f.networks.size < netTotal));
+}
+
+function mapMatchNoteHtml() {
+  if (!state.data || !mapFilterActive()) return 'All stations shown.';
+  const total   = state.data.stations.filter(s => s.lat != null && s.lon != null).length;
+  const matched = filteredStations().filter(s => s.lat != null && s.lon != null).length;
+  if (!matched) return 'No stations match — all pins shown unhighlighted.';
+  return `<strong>${matched}</strong> of ${total} stations match` +
+         (matched > MAP_LABEL_CAP ? ` · labels shown for the closest ${MAP_LABEL_CAP}` : '');
+}
+
+function updateMapMatchNote() {
+  const el = document.getElementById('map-match-note');
+  if (el) el.innerHTML = mapMatchNoteHtml();
+}
+
+// Signature of the extent last auto-fitted. Refreshes that don't change what
+// the map should be looking at (theme switch, link toggle, ACMA options) leave
+// the operator's pan and zoom alone.
+function mapFitKey(points) {
+  if (!points.length) return 'none';
+  let n = Infinity, s = -Infinity, w = Infinity, e = -Infinity;
+  for (const [lat, lon] of points) {
+    if (lat < n) n = lat; if (lat > s) s = lat;
+    if (lon < w) w = lon; if (lon > e) e = lon;
+  }
+  return [points.length, n, s, w, e].map(v => Number(v).toFixed(4)).join(',');
 }
 
 function refreshMapLayers() {
   const map = state.map;
   if (!map || !state.data) return;
+  MapSpider.reset();                       // pins go home before any are replaced
   state.mapMarkers.forEach(m => m.remove());
   state.mapLines.forEach(l => l.remove());
   state.mapMarkers = [];
   state.mapLines   = [];
 
-  const stations = filteredStations().filter(s => s.lat != null && s.lon != null);
-  if (!stations.length) return;
+  const located  = state.data.stations.filter(s => s.lat != null && s.lon != null);
+  const active   = mapFilterActive();
+  const matchIds = active ? new Set(filteredStations().map(s => s.id)) : null;
+  const matched  = active ? located.filter(s => matchIds.has(s.id)) : [];
+  // Highlight mode keeps every pin on the map; hide mode drops the rest.
+  const stations = (active && state.mapHideOthers) ? matched : located;
+  updateMapMatchNote();
+  if (!stations.length) { MapSpider.setPins('stations', []); return; }
+
+  // Names are only drawn for filter matches, and only while the set is small
+  // enough to read — the nearest ones to the matched extent win.
+  const labelled = new Set(
+    active && matched.length
+      ? (matched.length <= MAP_LABEL_CAP ? matched : mapNearestToCentre(matched, MAP_LABEL_CAP))
+          .map(s => s.id)
+      : []);
 
   const lineColor = getComputedStyle(document.documentElement)
     .getPropertyValue('--map-line').trim() || '#ff6f00';
 
   if (state.mapShowLinks) {
     const allStations = state.data.stations;
-    for (const s of stations) {
+    // Links follow the highlight: with a filter running, only matched stations
+    // draw theirs, so the lines don't bury the pins they're meant to explain.
+    for (const s of (active ? matched : stations)) {
       if (!s.roles.includes('field')) continue;
       for (const r of findRepeaterMatches(s, allStations)) {
         if (!r.lat || !r.lon) continue;
@@ -540,14 +666,24 @@ function refreshMapLayers() {
     }
   }
 
-  const bounds = [];
   for (const s of stations) {
     const role   = primaryRole(s);
     const color  = ROLE_COLOR[role] || ROLE_COLOR.field;
     const isRpt  = s.roles.includes('repeater');
+    const hit    = active && matchIds.has(s.id);
+    const dim    = active && !hit;
+    const radius = (isRpt ? 8 : 5) + (hit ? 1 : 0);
+    // Every pin carries a white ring so it separates from the base map and from
+    // its neighbours; matches swap it for amber.
     const marker = L.circleMarker([s.lat, s.lon], {
-      radius: isRpt ? 8 : 5, color, fillColor: color,
-      fillOpacity: 0.8, weight: isRpt ? 2 : 1,
+      radius,
+      color:       hit ? MAP_PIN_HIT : MAP_PIN_RING,
+      weight:      hit ? 3 : 2,
+      opacity:     dim ? 0.6 : 1,
+      fillColor:   color,
+      fillOpacity: dim ? 0.45 : 1,
+      className:   hit ? 'mn-pin mn-pin-hit' : 'mn-pin',
+      bubblingMouseEvents: false,          // a pin click is not an empty-map click
     }).addTo(map);
 
     const idTypes = stationAlertIdTypes(s);
@@ -560,12 +696,386 @@ function refreshMapLayers() {
       ${s.elevation_ahd != null ? `<span style="font-size:.83rem">Elev: ${s.elevation_ahd} m AHD</span>` : ''}
       ${acmaRepeaterPopupExtra(s)}
     `);
+    if (labelled.has(s.id)) {
+      marker.bindTooltip(esc(s.name), {
+        permanent: true, direction: 'bottom', offset: [0, radius], className: 'mn-pin-label',
+      });
+    }
     state.mapMarkers.push(marker);
-    bounds.push([s.lat, s.lon]);
   }
 
-  if (bounds.length) map.fitBounds(bounds, { padding: [20, 20], maxZoom: 12 });
+  MapSpider.setPins('stations', state.mapMarkers);
+
+  // Zoom to the matches (all of them, not just the first) — or to everything
+  // when no filter is running.
+  const fitTo = (active && matched.length ? matched : stations).map(s => [s.lat, s.lon]);
+  const key   = mapFitKey(fitTo);
+  if (fitTo.length && key !== state.mapFitKey) {
+    state.mapFitKey = key;
+    map.fitBounds(fitTo, { padding: [24, 24], maxZoom: fitTo.length === 1 ? 14 : 12 });
+  }
 }
+
+// The `n` stations closest to the centre of their own bounding box — used to
+// pick which matches get a name label when there are too many to show.
+function mapNearestToCentre(stations, n) {
+  const lat = stations.map(s => s.lat), lon = stations.map(s => s.lon);
+  const cLat = (Math.min(...lat) + Math.max(...lat)) / 2;
+  const cLon = (Math.min(...lon) + Math.max(...lon)) / 2;
+  return stations
+    .map(s => ({ s, d: (s.lat - cLat) ** 2 + (s.lon - cLon) ** 2 }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, n)
+    .map(x => x.s);
+}
+
+// ── Overlapping pins: fan-out ("spiderfy") ───────────────────────────────────
+// Co-sited stations and ACMA sites carrying a dozen licensed devices land on the
+// same few pixels, and whatever is underneath is unreachable. Hovering a stack
+// (mouse) or tapping it (touch) fans its members out around the stack centre on
+// leader lines so each one can be seen and clicked; they snap back when the
+// pointer leaves, the map zooms, or the markers are rebuilt.
+//
+// Works on any marker with getLatLng/setLatLng, so MegaNet station circles and
+// ACMA transmitter squares fan out together.
+const MapSpider = (function () {
+  const NEAR_PX   = 20;  // pins within this screen distance form one stack
+  const MAX_FAN   = 16;  // a fan bigger than this stops being readable
+  const HOVER_MAX = 10;  // bigger stacks need a deliberate click, so that panning
+                         // across a zoomed-out map doesn't fan pins constantly
+  const LEAVE_PX  = 70;  // pointer this far outside the fan closes it
+  const HOVER_MS  = 70;  // settle time, so sweeping across a stack doesn't fan it
+
+  const buckets = { stations: [], acma: [] };
+  let map = null;
+  let open = null;       // { members, centre, radius, legs }
+  let cache = null;      // { list, pts } projected at the current zoom
+  let hoverTimer = null;
+
+  function canHover() {
+    return !L.Browser.mobile && window.matchMedia('(hover: hover)').matches;
+  }
+
+  function pins() { return buckets.stations.concat(buckets.acma); }
+
+  // Where a pin belongs — its own position unless it is currently fanned out.
+  function home(m) { return m._mnHome || m.getLatLng(); }
+
+  function invalidate() { cache = null; }
+
+  function points() {
+    if (cache) return cache;
+    const zoom = map.getZoom();
+    const list = pins();
+    cache = { list, pts: list.map(m => map.project(home(m), zoom)) };
+    return cache;
+  }
+
+  // Every pin sitting within NEAR_PX of the given one, nearest first.
+  function stackFor(marker) {
+    const { list, pts } = points();
+    const i = list.indexOf(marker);
+    if (i < 0) return [];
+    const c = pts[i];
+    return list
+      .map((m, j) => ({ m, d: Math.hypot(pts[j].x - c.x, pts[j].y - c.y) }))
+      .filter(x => x.d <= NEAR_PX)
+      .sort((a, b) => a.d - b.d)
+      .map(x => x.m);
+  }
+
+  // Pixel offsets for n fanned pins: concentric rings at ~26 px spacing, so a
+  // pair sits tight and a 30-device ACMA site still reads.
+  function fanOffsets(n) {
+    const out = [];
+    let placed = 0, ring = 0;
+    while (placed < n) {
+      const r   = 30 + ring * 26;
+      const cap = Math.max(3, Math.floor((2 * Math.PI * r) / 26));
+      const k   = Math.min(cap, n - placed);
+      for (let i = 0; i < k; i++) {
+        const a = -Math.PI / 2 + (2 * Math.PI * i) / k + (ring % 2 ? Math.PI / k : 0);
+        out.push({ x: Math.cos(a) * r, y: Math.sin(a) * r, r });
+      }
+      placed += k;
+      ring++;
+    }
+    return out;
+  }
+
+  function isOpen(marker) { return !!open && open.members.indexOf(marker) >= 0; }
+
+  function spiderfy(marker) {
+    if (!map) return false;
+    const stack = stackFor(marker);
+    if (stack.length < 2) { unspiderfy(); return false; }
+    // Co-located ACMA devices share exact coordinates and never separate by
+    // zooming, so an oversized stack still fans — it just says what it left out.
+    const members = stack.slice(0, MAX_FAN);
+    if (open && open.members.length === members.length &&
+        members.every(m => open.members.indexOf(m) >= 0)) return true;
+    unspiderfy();
+    if (stack.length > MAX_FAN) {
+      mapNote(`${members.length} of ${stack.length} pins fanned out — zoom in for the rest`, 4000);
+    }
+
+    const zoom = map.getZoom();
+    const { list, pts } = points();
+    let sx = 0, sy = 0;
+    members.forEach(m => { const p = pts[list.indexOf(m)]; sx += p.x; sy += p.y; });
+    const centre = map.unproject(L.point(sx / members.length, sy / members.length), zoom);
+    const cLp    = map.latLngToLayerPoint(centre);
+    const offs   = fanOffsets(members.length);
+    const legs   = L.layerGroup().addTo(map);
+    let radius   = 0;
+
+    members.forEach((m, i) => {
+      const o    = offs[i];
+      const from = home(m);
+      const to   = map.layerPointToLatLng(cLp.add(L.point(o.x, o.y)));
+      radius = Math.max(radius, o.r);
+      m._mnHome = from;
+      // White casing under a dark line: legible over topo, imagery and dark mode.
+      L.polyline([from, to], { pane: 'mnSpiderLegs', color: '#fff',     weight: 4,   opacity: .9,  interactive: false }).addTo(legs);
+      L.polyline([from, to], { pane: 'mnSpiderLegs', color: '#4a5560', weight: 1.5, opacity: .95, interactive: false }).addTo(legs);
+      m.setLatLng(to);
+      if (m.setZIndexOffset) m.setZIndexOffset(1000);
+      if (m.bringToFront)    m.bringToFront();
+    });
+    L.circleMarker(centre, {
+      pane: 'mnSpiderLegs', radius: 2.5, color: '#4a5560', weight: 1,
+      fillColor: '#fff', fillOpacity: 1, interactive: false,
+    }).addTo(legs);
+
+    open = { members, centre, radius, legs };
+    map.on('mousemove', onMapMove);
+    return true;
+  }
+
+  function unspiderfy() {
+    clearTimeout(hoverTimer);
+    if (!open) return;
+    open.members.forEach(m => {
+      if (m._mnHome) { m.setLatLng(m._mnHome); delete m._mnHome; }
+      if (m.setZIndexOffset) m.setZIndexOffset(0);
+    });
+    open.legs.remove();
+    if (map) map.off('mousemove', onMapMove);
+    open = null;
+  }
+
+  function onMapMove(e) {
+    if (!open) return;
+    // A popup open on one of the fanned pins is the user reading it — hold.
+    if (open.members.some(m => m.isPopupOpen && m.isPopupOpen())) return;
+    if (e.layerPoint.distanceTo(map.latLngToLayerPoint(open.centre)) > open.radius + LEAVE_PX) {
+      unspiderfy();
+    }
+  }
+
+  function onPinOver(e) {
+    if (!map || isOpen(e.target)) return;
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => {
+      // Hover only opens small stacks; a zoomed-out map where everything
+      // overlaps would otherwise fan pins under every pass of the mouse.
+      if (stackFor(e.target).length <= HOVER_MAX) spiderfy(e.target);
+    }, HOVER_MS);
+  }
+
+  function onPinClick(e) {
+    if (!map || isOpen(e.target)) return;   // already fanned → let the popup open
+    // First tap on a stack fans it instead of opening whichever pin was on top.
+    if (spiderfy(e.target)) e.target.closePopup();
+  }
+
+  return {
+    // Wire a freshly built map. Leader lines get their own pane below the
+    // overlay pane so they never draw over the pins they point at.
+    attach(m) {
+      map = m;
+      open = null; cache = null;
+      buckets.stations = []; buckets.acma = [];
+      clearTimeout(hoverTimer);
+      if (!m.getPane('mnSpiderLegs')) {
+        const pane = m.createPane('mnSpiderLegs');
+        pane.style.zIndex = 350;
+        pane.style.pointerEvents = 'none';
+      }
+      m.on('zoomstart', unspiderfy);
+      m.on('zoomend viewreset', invalidate);
+      m.on('click', unspiderfy);          // pin clicks don't bubble to the map
+    },
+
+    // Hand over a rebuilt set of markers for one layer.
+    setPins(kind, markers) {
+      unspiderfy();
+      buckets[kind] = markers || [];
+      invalidate();
+      (markers || []).forEach(m => {
+        if (m._mnSpiderWired) return;
+        m._mnSpiderWired = true;
+        m.on('click', onPinClick);
+        if (canHover()) m.on('mouseover', onPinOver);
+      });
+    },
+
+    // Send every fanned pin home — call before markers are removed or replaced.
+    reset() { unspiderfy(); invalidate(); },
+
+    detach() { unspiderfy(); map = null; buckets.stations = []; buckets.acma = []; },
+  };
+})();
+
+// ── Where am I? (mobile) ─────────────────────────────────────────────────────
+// Off by default and only offered on touch devices: a button below the zoom
+// control puts a dot at the phone's GPS position with an accuracy ring, plus a
+// cone pointing the way the phone is facing when a compass is available.
+// iOS only hands out orientation events after a permission request made from a
+// user gesture, which is why that request lives in the button's click handler.
+const MapLocate = (function () {
+  let map = null, btn = null;
+  let on = false, watchId = null, marker = null, ring = null;
+  let heading = null, orientEvent = null, gotCompass = false, followed = false;
+
+  function isMobile() {
+    return L.Browser.mobile || window.matchMedia('(pointer: coarse)').matches;
+  }
+
+  function icon() {
+    return L.divIcon({
+      className: 'mn-loc-icon',
+      html: '<div class="mn-loc"><i class="mn-loc-cone"></i><i class="mn-loc-dot"></i></div>',
+      iconSize: [46, 46], iconAnchor: [23, 23],
+    });
+  }
+
+  function applyHeading() {
+    const el   = marker && marker.getElement();
+    const cone = el && el.querySelector('.mn-loc-cone');
+    if (!cone) return;
+    cone.style.display   = heading == null ? 'none' : '';
+    cone.style.transform = `rotate(${heading || 0}deg)`;
+  }
+
+  function onOrient(e) {
+    let h = null;
+    if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
+      h = e.webkitCompassHeading;                                  // iOS: clockwise from north
+    } else if (e.alpha != null && (e.absolute || e.type === 'deviceorientationabsolute')) {
+      h = 360 - e.alpha;                                           // spec alpha runs anticlockwise
+    }
+    if (h == null) return;      // relative-only sensor: no compass, leave it to GPS course
+    // Compass readings are relative to the device's natural orientation; add the
+    // screen rotation so the cone still points the right way in landscape.
+    const screenAngle = (window.screen.orientation && window.screen.orientation.angle) ||
+                        window.orientation || 0;
+    gotCompass = true;
+    heading = (h + screenAngle + 360) % 360;
+    applyHeading();
+  }
+
+  function listenOrientation() {
+    orientEvent = ('ondeviceorientationabsolute' in window)
+      ? 'deviceorientationabsolute' : 'deviceorientation';
+    window.addEventListener(orientEvent, onOrient, true);
+  }
+
+  function startOrientation() {
+    const DOE = window.DeviceOrientationEvent;
+    if (!DOE) return;
+    if (typeof DOE.requestPermission === 'function') {
+      DOE.requestPermission()
+        .then(res => { if (res === 'granted') listenOrientation(); })
+        .catch(() => {});
+    } else {
+      listenOrientation();
+    }
+  }
+
+  function onPos(p) {
+    if (!on || !map) return;
+    const ll  = [p.coords.latitude, p.coords.longitude];
+    const acc = p.coords.accuracy || 0;
+    // No compass readings arriving? Fall back to GPS course, which is only
+    // meaningful on the move.
+    if (!gotCompass && p.coords.heading != null && !isNaN(p.coords.heading) &&
+        p.coords.speed > 0.5) {
+      heading = p.coords.heading;
+    }
+    if (!marker) {
+      ring   = L.circle(ll, { radius: acc, color: '#1e88e5', weight: 1,
+                              fillColor: '#1e88e5', fillOpacity: .12, interactive: false }).addTo(map);
+      marker = L.marker(ll, { icon: icon(), interactive: false, keyboard: false,
+                              zIndexOffset: 2000 }).addTo(map);
+    } else {
+      marker.setLatLng(ll);
+      ring.setLatLng(ll).setRadius(acc);
+    }
+    applyHeading();
+    if (!followed) {                          // centre on the first fix only
+      followed = true;
+      map.setView(ll, Math.max(map.getZoom(), 14));
+      mapNote('', 0);
+    }
+  }
+
+  function onErr(e) {
+    mapNote(`Location unavailable — ${e.message || 'no fix'}`, 6000);
+    if (e.code === 1) stop();                 // permission denied: don't keep trying
+  }
+
+  function stop() {
+    on = false;
+    if (btn) btn.classList.remove('on');
+    if (watchId != null) navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    if (orientEvent) window.removeEventListener(orientEvent, onOrient, true);
+    orientEvent = null;
+    heading = null;
+    gotCompass = false;
+    if (marker) marker.remove();
+    if (ring)   ring.remove();
+    marker = ring = null;
+  }
+
+  function toggle() {
+    if (on) { stop(); mapNote('', 0); return; }
+    on = true;
+    followed = false;
+    if (btn) btn.classList.add('on');
+    mapNote('Locating…', 8000);
+    startOrientation();
+    watchId = navigator.geolocation.watchPosition(onPos, onErr, {
+      enableHighAccuracy: true, maximumAge: 2000, timeout: 20000,
+    });
+  }
+
+  return {
+    attach(m) {
+      map = m;
+      if (!('geolocation' in navigator) || !isMobile()) return;
+      const ctl = L.control({ position: 'topleft' });
+      ctl.onAdd = () => {
+        const div = L.DomUtil.create('div', 'leaflet-bar mn-locate');
+        const a   = L.DomUtil.create('a', '', div);
+        a.href = '#';
+        a.title = 'Show my location and heading';
+        a.setAttribute('role', 'button');
+        a.setAttribute('aria-label', 'Show my location and heading');
+        a.innerHTML = '➤';
+        L.DomEvent.on(a, 'click', L.DomEvent.stop).on(a, 'click', toggle);
+        btn = a;
+        return div;
+      };
+      ctl.addTo(m);
+    },
+
+    // The map is being torn down (tab switch or re-render): drop the GPS watch
+    // and the compass listener rather than leaving them running unseen.
+    detach() { if (on) stop(); map = null; btn = null; },
+  };
+})();
 
 // ── STATIONS tab ───────────────────────────────────────────────────────────────
 
@@ -1952,26 +2462,32 @@ function acmaVisibleThreats(ignoreAnchorSel) {
 
 // ── filters panel block ──
 
+// The master toggle sits outside the collapsible block: ACMA transmitters are
+// drawn by default, so the way to turn them off has to be visible without
+// hunting through a closed twisty.
 function acmaFilterBlockHtml() {
-  const A = state.acma, f = state.filters.acma;
-  return `
-    <details id="acma-filter-block" ${A.uiOpen ? 'open' : ''} style="margin-top:.75rem"
-             ontoggle="state.acma.uiOpen=this.open">
-      <summary class="small" style="cursor:pointer;color:var(--muted)">ACMA / RF Environment</summary>
-      <div id="acma-filter-body">${acmaFilterBodyHtml()}</div>
-    </details>`;
+  return `<div id="acma-filter-block">${acmaFilterHeadHtml()}</div>`;
 }
 
-function acmaFilterBodyHtml() {
+function acmaFilterHeadHtml() {
   const A = state.acma, f = state.filters.acma;
-  const head = `
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.9rem;margin:.4rem 0">
+  return `
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.9rem;margin:.75rem 0 .2rem">
       <input type="checkbox" ${f.show ? 'checked' : ''} onchange="toggleAcmaShow(this.checked)">
       Show ACMA licensed transmitters
     </label>
     ${A.error ? `<div class="small" style="color:var(--muted)">${esc(A.error)}</div>` : ''}
-    ${A.loading ? `<div class="small" style="color:var(--muted)">Loading ACMA data…</div>` : ''}`;
-  if (!f.show || !A.loaded) return head;
+    ${A.loading ? `<div class="small" style="color:var(--muted)">Loading ACMA data…</div>` : ''}
+    ${f.show && A.loaded ? `
+      <details ${A.uiOpen ? 'open' : ''} ontoggle="state.acma.uiOpen=this.open">
+        <summary class="small" style="cursor:pointer;color:var(--muted)">ACMA / RF Environment options</summary>
+        <div id="acma-filter-body">${acmaFilterBodyHtml()}</div>
+      </details>` : ''}`;
+}
+
+function acmaFilterBodyHtml() {
+  const A = state.acma, f = state.filters.acma;
+  if (!f.show || !A.loaded) return '';
 
   const meta = A.threats.meta;
   const anchorChip = A.selectedAnchorId ? `
@@ -1980,7 +2496,7 @@ function acmaFilterBodyHtml() {
       <a href="#" onclick="acmaSelectAnchor('');return false">×&nbsp;clear</a>
     </div>` : '';
 
-  return `${head}
+  return `
     <div class="small" style="color:var(--muted);margin:.2rem 0">
       ACMA data: ${esc(meta.source_date)} · <span id="acma-shown"></span>
     </div>
@@ -2059,8 +2575,8 @@ function acmaFilterBodyHtml() {
 }
 
 function rerenderAcmaFilterBlock() {
-  const el = document.getElementById('acma-filter-body');
-  if (el) el.innerHTML = acmaFilterBodyHtml();
+  const el = document.getElementById('acma-filter-block');
+  if (el) el.innerHTML = acmaFilterHeadHtml();
 }
 
 function toggleAcmaShow(checked) {
@@ -2069,10 +2585,13 @@ function toggleAcmaShow(checked) {
     closeAcmaCard();
     refreshAcmaLayer();
     rerenderAcmaFilterBlock();
+    rerenderMapLegend();
     return;
   }
+  // Legend and filter body gain the ACMA entries once the data lands; both are
+  // patched in place so the operator keeps their pan and zoom.
   acmaEnsureCore().then(() => {
-    if (state.activeTab === 'map') renderMain();   // legend + filter body gain the ACMA entries
+    if (state.activeTab === 'map' && state.map) acmaAfterLoad();
   }).catch(() => rerenderAcmaFilterBlock());
   rerenderAcmaFilterBlock();
 }
@@ -2098,11 +2617,12 @@ function acmaRepeaterPopupExtra(s) {
 function refreshAcmaLayer() {
   const A = state.acma, map = state.map;
   if (!map) return;
+  MapSpider.reset();                 // fanned pins go home before any are removed
   ['layer', 'beamLayer', 'linkLayer', 'hiLayer'].forEach(k => {
     if (A[k]) { A[k].remove(); A[k] = null; }
   });
   const f = state.filters.acma;
-  if (!f.show || !A.loaded) { acmaUpdateShownNote(0, 0); return; }
+  if (!f.show || !A.loaded) { MapSpider.setPins('acma', []); acmaUpdateShownNote(0, 0); return; }
 
   const visible = acmaVisibleThreats();
 
@@ -2120,6 +2640,7 @@ function refreshAcmaLayer() {
   acmaUpdateShownNote(shown.length, devices.length);
 
   A.layer = L.layerGroup().addTo(map);
+  const acmaPins = [];
   for (const d of shown) {
     const t = d.top;
     const site = A.siteById[t.site_id];
@@ -2135,7 +2656,11 @@ function refreshAcmaLayer() {
     m.bindPopup(acmaPopupHtml(d), { maxWidth: 300 });
     m.on('click', () => acmaHighlightDevice(t.device_id));
     m.bindTooltip(`${esc(t.client || 'Unknown licensee')} · ${mech.label} · ${t.score}`);
+    acmaPins.push(m);
   }
+  // Several licensed devices commonly share one site, so these are the pins that
+  // most need fanning out.
+  MapSpider.setPins('acma', acmaPins);
 
   if (f.showLinks) {
     A.linkLayer = L.layerGroup().addTo(map);
