@@ -223,6 +223,30 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Toggle individual link lines on/off
 - Leaflet.js with a base-map picker (top-right): OSM-Topo (default), OpenStreetMap, or Satellite
 
+**Reading the map.** Every pin carries a white ring so it separates from the
+base map and from its neighbours; ACMA transmitter squares carry the same ring.
+The filter box **highlights instead of hiding**: all pins stay on the map,
+matches get an amber ring, their names appear underneath, and the map zooms to
+the extent of the matches so every one of them is on screen. Typing narrows the
+highlight live. Labels are capped at the 60 matches nearest the middle of that
+extent (the sidebar says when the cap is in effect). Tick *Hide stations that
+don't match* for the old subtractive behaviour.
+
+**Stacked pins.** Where pins land on top of each other — co-sited stations, or
+an ACMA site carrying a dozen licensed devices — hovering the stack (mouse) or
+tapping it (touch) fans its members out around the stack centre on leader lines,
+so each one can be seen and clicked. On touch the first tap fans, the second
+opens that pin's popup. Pins snap back when the pointer leaves, the map zooms,
+or the markers are rebuilt. Stacks larger than 16 fan their nearest 16 and say
+how many were left out; hover only opens stacks of 10 or fewer, so panning
+across a zoomed-out map doesn't fan pins constantly.
+
+**My location (mobile).** On touch devices a ➤ button appears under the zoom
+control. It is off by default; switching it on shows the phone's GPS position
+with an accuracy ring and a cone pointing the way the phone is facing, taken
+from the compass where the browser exposes one (iOS asks for permission on the
+first tap) and from GPS course otherwise. Leaving the map tab stops the watch.
+
 ### 3. Pass-Range Analysis
 - For any station, identify which repeaters have a pass range covering its AlertIDs
 - Show the full hop chain: field → repeater(s) → base station
@@ -500,9 +524,11 @@ interference investigation starts from evidence instead of guesswork.
 
 ### Using it
 
-- **Map tab → Filters → "ACMA / RF Environment"**: master toggle (off by
-  default — nothing is fetched until first enable, so page load is unchanged),
-  mechanism checkboxes, minimum-score slider, current-licences-only, search
+- **Map tab → Filters → "Show ACMA licensed transmitters"**: master toggle, **on
+  by default** — the ~1.4 MB core data (threats + sites) is fetched the first
+  time the map tab opens, not at page load, and untick to drop the layer.
+  Under it, *ACMA / RF Environment options* holds the mechanism checkboxes,
+  minimum-score slider, current-licences-only, search
   radius, antenna beam wedges and threat links. Transmitters render as
   **squares** (MegaNet stations are circles), coloured by mechanism, capped at
   the top 500 by score. Click one for a summary popup, then *Full details →*
