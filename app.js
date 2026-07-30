@@ -2774,6 +2774,42 @@ function acmaRepeaterPopupExtra(s) {
 
 // ── map layer ──
 
+// Trim to a marker/line budget without letting one mechanism eat the lot.
+//
+// A flat "top N by score" cut looks fair and isn't: co-site desense outnumbers
+// every other mechanism roughly 8:1 in the RRL extract and its scores sit at the
+// top of the range (same site ⇒ no distance discount), so the first ~1300 devices
+// by score are all co-site. With a 500-pin cap that meant the map only ever drew
+// brown squares — co-channel, IMD and harmonic pins were filtered in, ranked, and
+// then cut, so ticking their boxes did nothing until co-site desense was ticked
+// off. Deal one item per mechanism per round instead, highest score first within
+// each: a crowded mechanism loses its tail rather than erasing the rare ones, and
+// mechanisms with fewer devices than the budget always draw in full.
+//
+// `items` must already be sorted best-first; the returned subset keeps that order.
+function acmaCapByMechanism(items, cap, mechOf) {
+  if (items.length <= cap) return items;
+  const queues = new Map();
+  items.forEach((it, i) => {
+    const k = mechOf(it);
+    if (!queues.has(k)) queues.set(k, []);
+    queues.get(k).push(i);
+  });
+  const lists = [...queues.values()];
+  const picked = [];
+  for (let round = 0; picked.length < cap; round++) {
+    let drew = false;
+    for (const l of lists) {
+      if (round >= l.length) continue;
+      picked.push(l[round]);
+      drew = true;
+      if (picked.length >= cap) break;
+    }
+    if (!drew) break;             // every queue exhausted
+  }
+  return picked.sort((a, b) => a - b).map(i => items[i]);
+}
+
 function refreshAcmaLayer() {
   const A = state.acma, map = state.map;
   if (!map) return;
@@ -2796,7 +2832,7 @@ function refreshAcmaLayer() {
     byDevice.get(t.device_id).all.push(t);
   }
   const devices = [...byDevice.values()].sort((a, b) => b.top.score - a.top.score);
-  const shown = devices.slice(0, ACMA_MARKER_CAP);
+  const shown = acmaCapByMechanism(devices, ACMA_MARKER_CAP, d => d.top.mechanism);
   acmaUpdateShownNote(shown.length, devices.length);
 
   A.layer = L.layerGroup().addTo(map);
@@ -2824,7 +2860,8 @@ function refreshAcmaLayer() {
 
   if (f.showLinks) {
     A.linkLayer = L.layerGroup().addTo(map);
-    const links = visible.slice().sort((a, b) => b.score - a.score).slice(0, ACMA_LINK_CAP);
+    const links = acmaCapByMechanism(
+      visible.slice().sort((a, b) => b.score - a.score), ACMA_LINK_CAP, t => t.mechanism);
     for (const t of links) {
       const site = A.siteById[t.site_id], a = A.anchorById[t.anchor_id];
       if (!site || !a) continue;
@@ -2860,7 +2897,7 @@ function refreshAcmaLayer() {
 function acmaUpdateShownNote(shown, total) {
   const el = document.getElementById('acma-shown');
   if (el) el.textContent = total > shown
-    ? `showing ${shown} of ${total} transmitters (top by score)`
+    ? `showing ${shown} of ${total} transmitters (top by score, shared across mechanisms)`
     : `${total} transmitters shown`;
 }
 
