@@ -2849,7 +2849,7 @@ function refreshAcmaLayer() {
       iconSize: [size, size], iconAnchor: [size / 2, size / 2],
     });
     const m = L.marker([site.lat, site.lon], { icon }).addTo(A.layer);
-    m.bindPopup(acmaPopupHtml(d), { maxWidth: 300 });
+    m.bindPopup(acmaPopupHtml(d, site), { maxWidth: 300 });
     m.on('click', () => acmaHighlightDevice(t.device_id));
     m.bindTooltip(`${esc(t.client || 'Unknown licensee')} · ${mech.label} · ${t.score}`);
     acmaPins.push(m);
@@ -2941,12 +2941,13 @@ function acmaClearHighlight() {
 
 // ── popup + transmitter card ──
 
-function acmaPopupHtml(d) {
+function acmaPopupHtml(d, site) {
   const t = d.top;
   const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
   const others = d.all.length - 1;
   return `
-    <strong>${esc(t.client || 'Unknown licensee')}</strong> · score ${t.score}<br>
+    <strong>${esc((site && site.name) || 'Unknown site')}</strong><br>
+    <span style="font-size:.83rem">${esc(t.client || 'Unknown licensee')} · score ${t.score}</span><br>
     <span style="background:${mech.color};color:#fff;padding:1px 6px;border-radius:999px;font-size:.78rem">${mech.label}</span>
     ${t.meganet ? '<span class="badge">MegaNet licence</span>' : ''}<br>
     <span style="font-size:.83rem">${esc(t.detail)}</span><br>
@@ -3007,7 +3008,10 @@ function renderAcmaCard() {
   el.hidden = false;
   el.innerHTML = `
     <div class="acma-card-head">
-      <strong>${esc(client.trading || client.name || 'Unknown licensee')}</strong>
+      <span>
+        <strong>${esc(site.name || 'Unknown site')}</strong><br>
+        <span class="small" style="color:var(--muted)">${esc(client.trading || client.name || 'Unknown licensee')}</span>
+      </span>
       <span>${top ? `score ${top.score}` : ''}
         <button onclick="closeAcmaCard()" title="Close">×</button></span>
     </div>
@@ -3047,7 +3051,6 @@ function renderAcmaCard() {
       ${acmaCardRow('Feeder loss', dev.feeder_db != null ? dev.feeder_db + ' dB' : null)}
     </div>` : ''}
     <div class="acma-sect"><h4>Site</h4>
-      ${acmaCardRow('Name', esc(site.name))}
       ${acmaCardRow('Elevation', site.elevation_m != null ? site.elevation_m + ' m' : null)}
       ${acmaCardRow('Coordinate precision', esc(site.precision))}
       ${acmaCardRow('Devices at site', site.device_count)}
