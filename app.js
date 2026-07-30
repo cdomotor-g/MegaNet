@@ -277,13 +277,27 @@ function updateHeaderStats() {
 
 // ── Data helpers ───────────────────────────────────────────────────────────────
 
+// Does the search box's text match this station? Names and station numbers
+// match on any substring; a purely numeric query is also tried against the
+// station's ALERT addresses, so an operator holding an id from a packet or an
+// alarm can type it straight in instead of having to know the site name. Ids
+// match from the start (6128 → 6128, 61 → 6128) — a mid-number substring match
+// would pull in unrelated addresses that merely share a digit run.
+function stationMatchesQuery(s, q) {
+  if (!q) return true;
+  if (s.name.toLowerCase().includes(q)) return true;
+  if ((s.station_number || '').toLowerCase().includes(q)) return true;
+  if (/^\d+$/.test(q) && stationAlertIds(s).some(id => String(id).startsWith(q))) return true;
+  return false;
+}
+
 function filteredStations() {
   if (!state.data) return [];
   const { search, networks, catchments, roles, enabledOnly } = state.filters;
-  const q = search.toLowerCase();
+  const q = search.trim().toLowerCase();
   return state.data.stations.filter(s => {
     if (enabledOnly && !s.enabled) return false;
-    if (q && !s.name.toLowerCase().includes(q) && !(s.station_number || '').toLowerCase().includes(q)) return false;
+    if (!stationMatchesQuery(s, q)) return false;
     if (networks.size   > 0 && !s.radio_network_ids.some(id => networks.has(id)))   return false;
     if (catchments.size > 0 && !s.catchment_ids.some(id => catchments.has(id)))     return false;
     if (roles.size      > 0 && !s.roles.some(r => roles.has(r)))                    return false;
@@ -425,7 +439,7 @@ function renderStationsHtml() {
           <div class="panel-header"><h3>Filters</h3></div>
           <div class="upload-grid" style="margin-top:.6rem">
             <label style="font-size:.88rem;color:var(--muted)">Search
-              <input type="search" placeholder="Station name…" value="${esc(state.filters.search)}"
+              <input type="search" placeholder="Name, station # or ALERT id…" value="${esc(state.filters.search)}"
                      oninput="mapSearchInput(this.value)">
             </label>
           </div>
@@ -719,6 +733,10 @@ function refreshMapLayers() {
         `<span style="font-size:.82rem">&nbsp;&nbsp;${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
       ${s.elevation_ahd != null ? `<span style="font-size:.83rem">Elev: ${s.elevation_ahd} m AHD</span>` : ''}
       ${acmaRepeaterPopupExtra(s)}
+      <div class="mn-popup-actions">
+        <a href="#" onclick="focusStation('${escAttr(s.id)}');return false"
+           title="Select this station in the list under the map">Show in the list below ↓</a>
+      </div>
     `);
     if (labelled.has(s.id)) {
       marker.bindTooltip(esc(s.name), {
@@ -1186,17 +1204,46 @@ function scrollStationRowIntoView(id) {
   if (row) row.scrollIntoView({ block: 'center' });
 }
 
+// Select a station and load it into the editor card, without touching the DOM.
+// The filter driving the table is the same one driving the map, so a station
+// the current filter excludes would be selected into a list it isn't in; in
+// that case the filters are narrowed to the station's own name instead — the
+// table then contains it, and the search box visibly says why the list changed.
+// Returns true when the filters moved, so the caller knows the sidebar has to
+// be re-rendered and not just the table.
+function selectStationState(s) {
+  state.selectedId  = s.id;
+  state.editorId    = s.id;
+  // Same deep copy as selectStation: fields the form doesn't expose survive a save.
+  state.editorDraft = JSON.parse(JSON.stringify(s));
+  if (filteredStations().some(x => x.id === s.id)) return false;
+  resetStationFilters();
+  state.filters.search = s.name;
+  return true;
+}
+
+// "Show in the list below ↓" from a map popup. The map and the list share this
+// page, so there is no tab to switch to — the row is selected, scrolled to and
+// loaded into the editor beneath the map the operator is already looking at.
+function focusStation(id) {
+  const s = state.data && state.data.stations.find(x => x.id === id);
+  if (!s) return;
+  if (selectStationState(s)) {
+    renderMain();               // filters moved — the sidebar has to show it
+  } else {
+    rerenderStations();
+    rerenderStationEditorCard();
+  }
+  scrollStationRowIntoView(id);
+}
+
 // Open the Stations tab focused on one station. Used by the Pass Ranges tables,
 // where every row names a station the operator will want to look at in full.
 function goToStation(id) {
   const s = state.data && state.data.stations.find(x => x.id === id);
   if (!s) return;
-  // A filter left over from an earlier visit must not hide the row we linked to.
-  if (!filteredStations().some(x => x.id === id)) resetStationFilters();
-  state.selectedId  = id;
-  state.editorId    = id;
-  state.editorDraft = JSON.parse(JSON.stringify(s));
-  switchTab('stations');
+  selectStationState(s);
+  switchTab('stations');        // renders the page, table and map included
   scrollStationRowIntoView(id);
   focusStationOnMap(s);
 }
@@ -1289,13 +1336,10 @@ function renderNetworksHtml() {
 // Does a station answer to the page's filter box? The box takes a station
 // number, an ALERT id or part of a station name and does not ask which — an
 // operator holding one of the three shouldn't have to say which one it is.
+// Shares the Stations search box's matching rules so the same text typed into
+// either box picks the same stations.
 function passRangeMatch(s, q) {
-  if (!q) return true;
-  const t = q.trim().toLowerCase();
-  if (!t) return true;
-  if (s.name.toLowerCase().includes(t)) return true;
-  if ((s.station_number || '').toLowerCase().includes(t)) return true;
-  return stationAlertIds(s).some(id => String(id).includes(t));
+  return stationMatchesQuery(s, String(q || '').trim().toLowerCase());
 }
 
 // A repeater row survives the filter if the repeater itself matches, if one of
