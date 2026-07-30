@@ -232,6 +232,13 @@ highlight live. Labels are capped at the 60 matches nearest the middle of that
 extent (the sidebar says when the cap is in effect). Tick *Hide stations that
 don't match* for the old subtractive behaviour.
 
+**Map and table together.** The map and the station table share the Stations
+tab and the one filter pane: a search term, role or network narrows the table to
+the matching rows while the map highlights (or, with *Hide stations that don't
+match*, drops) the same set. Picking a row pans the map to that station and
+opens its pin, so the list and the map never disagree about which site is being
+looked at.
+
 **Stacked pins.** Where pins land on top of each other — co-sited stations, or
 an ACMA site carrying a dozen licensed devices — hovering the stack (mouse) or
 tapping it (touch) fans its members out around the stack centre on leader lines,
@@ -245,14 +252,22 @@ across a zoomed-out map doesn't fan pins constantly.
 control. It is off by default; switching it on shows the phone's GPS position
 with an accuracy ring and a cone pointing the way the phone is facing, taken
 from the compass where the browser exposes one (iOS asks for permission on the
-first tap) and from GPS course otherwise. Leaving the map tab stops the watch.
+first tap) and from GPS course otherwise. Leaving the Stations tab stops the watch.
 
-### 3. Pass-Range Analysis
+### 3. Pass Ranges
 - For any station, identify which repeaters have a pass range covering its AlertIDs
 - Show the full hop chain: field → repeater(s) → base station
 - Flag stations with no matching repeater (orphaned)
 - Flag pass-range gaps (AlertIDs that fall between all windows)
 - Display pass-range exclusions (future equipment) alongside inclusions
+- One filter box across both tables, taking a station number, an AlertID or part
+  of a station name — a repeater is kept when it matches, when a station it
+  serves matches, or when its pass ranges cover the AlertID typed
+- Every row links through to that station on the Stations tab
+
+A station is only treated as a repeater when it carries pass ranges saying which
+AlertIDs it forwards; entries flagged `repeater` with no pass-range block at all
+are field stations that were mis-tagged during the metadata import.
 
 ### 4. Filtering & Exploration
 - Filter stations by:
@@ -464,11 +479,14 @@ user typed is lost.
 **Goal:** One `index.html` with tabbed navigation replacing all three HTML files.
 
 Tabs / panels:
-- **Map** — interactive Leaflet map (always visible as main panel)
+- **Stations** — one page holding the interactive Leaflet map, the filterable
+  table of all stations below it (names colour-coded by role, matching the map)
+  and a built-in CRUD editor card below the list. The filter pane on the left
+  drives the map and the table together
 - **Network Maps** — Queensland basin explorer + bundled Radio-path PDF maps, with station-aware search
-- **Stations** — filterable table of all stations (names colour-coded by role, matching the map) with a built-in CRUD editor card below the list
 - **Networks** — radio network cluster management
-- **Repeater Analysis** — pass-range matching and hop-chain view
+- **Pass Ranges** — pass-range matching and hop-chain view; rows link through to
+  the station on the Stations tab
 - **Bit Flipper** — ALERT address tool
 - **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF)
 - **Serial Monitor** — live ingestion from physical COM ports (Web Serial), with ASCII / hex / ALERT-decode display
@@ -524,9 +542,9 @@ interference investigation starts from evidence instead of guesswork.
 
 ### Using it
 
-- **Map tab → Filters → "Show ACMA licensed transmitters"**: master toggle, **on
+- **Stations tab → Filters → "Show ACMA licensed transmitters"**: master toggle, **on
   by default** — the ~1.4 MB core data (threats + sites) is fetched the first
-  time the map tab opens, not at page load, and untick to drop the layer.
+  time the Stations tab opens, not at page load, and untick to drop the layer.
   Under it, *ACMA / RF Environment options* holds the mechanism checkboxes,
   minimum-score slider, current-licences-only, search
   radius, antenna beam wedges and threat links. Transmitters render as

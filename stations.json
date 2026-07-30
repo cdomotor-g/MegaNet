@@ -2,7 +2,7 @@
   "meta": {
     "version": "1.2",
     "description": "MegaNet station database. catchments[] is the Queensland drainage-basin vocabulary used by the Network Maps navigator; per-station catchment_ids are not yet populated (see README).",
-    "updated": "2026-07-14",
+    "updated": "2026-07-29",
     "rm_paths": {
       "map": "c:\\program files (x86)\\radio mobile 11.6.6\\networks\\meganet\\net1.map",
       "jpg": "c:\\program files (x86)\\radio mobile 11.6.6\\networks\\meganet\\net1.jpg",
@@ -1321,7 +1321,7 @@
       "lon": 145.3525,
       "elevation_ahd": 288,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -1921,7 +1921,7 @@
       "lon": 150.5891,
       "elevation_ahd": 300.5,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -2501,7 +2501,7 @@
       "lon": 151.8303,
       "elevation_ahd": 778.6,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -2593,8 +2593,7 @@
       "lon": 151.8083,
       "elevation_ahd": 178,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -2981,7 +2980,7 @@
       "lon": 149.2131,
       "elevation_ahd": 272.5,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -4887,8 +4886,7 @@
       "lon": 148.5929,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -5271,8 +5269,7 @@
       "lon": 149.0955,
       "elevation_ahd": 296,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -7606,7 +7603,7 @@
       "lon": 145.9473,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -8015,7 +8012,7 @@
       "lon": 149.9957,
       "elevation_ahd": 1122.5,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -8240,8 +8237,7 @@
       "lon": 149.725,
       "elevation_ahd": 683.1,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -8296,8 +8292,7 @@
       "lon": 152.8261,
       "elevation_ahd": 97.4,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -8437,8 +8432,7 @@
       "lon": 149.6225,
       "elevation_ahd": 293.1,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -8817,7 +8811,7 @@
       "lon": 153.4729,
       "elevation_ahd": 45,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -9115,8 +9109,7 @@
       "lon": 150.6842,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -10093,7 +10086,7 @@
       "lon": 150.4417,
       "elevation_ahd": 284.4,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -10226,8 +10219,7 @@
       "lon": 150.1992,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -10365,7 +10357,7 @@
       "lon": 153.1738,
       "elevation_ahd": 40.5,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -10630,7 +10622,7 @@
       "lon": 146.3053,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -10718,7 +10710,7 @@
       "lon": 152.416,
       "elevation_ahd": 29.5,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -11149,8 +11141,7 @@
       "lon": 147.2436,
       "elevation_ahd": 28.5,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -11429,7 +11420,7 @@
       "lon": 145.4986,
       "elevation_ahd": 290.5,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -12091,8 +12082,7 @@
       "lon": 146.9411,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -12798,8 +12788,7 @@
       "lon": 151.1489,
       "elevation_ahd": 137.7,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -12863,8 +12852,7 @@
       "lon": 153.596,
       "elevation_ahd": 123,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -13212,8 +13200,7 @@
       "lon": 151.8092,
       "elevation_ahd": 771.6,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -14889,7 +14876,7 @@
       "lon": 145.5416,
       "elevation_ahd": 407.9,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -16616,8 +16603,7 @@
       "lon": 153.0242,
       "elevation_ahd": 40.3,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -17490,8 +17476,7 @@
       "lon": 145.9425,
       "elevation_ahd": 11.9,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -19477,8 +19462,7 @@
       "lon": 149.7281,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -19644,7 +19628,7 @@
       "lon": 145.6886,
       "elevation_ahd": 738.1,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -19796,8 +19780,7 @@
       "lon": 145.6508,
       "elevation_ahd": 707.8,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -20130,7 +20113,7 @@
       "lon": 147.0975,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -20608,7 +20591,7 @@
       "lon": 153.3175,
       "elevation_ahd": 194,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -20762,8 +20745,7 @@
       "lon": 146.8094,
       "elevation_ahd": 4.9,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -21967,7 +21949,7 @@
       "lon": 146.6893,
       "elevation_ahd": 153.5,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -22506,7 +22488,7 @@
       "lon": 149.1544,
       "elevation_ahd": 11.9,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -22659,8 +22641,7 @@
       "lon": 145.2076,
       "elevation_ahd": 197.1,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -25074,7 +25055,7 @@
       "lon": 151.4031,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -25554,8 +25535,7 @@
       "lon": 145.6011,
       "elevation_ahd": 752.5,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -25802,8 +25782,7 @@
       "lon": 149.8247,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -27146,8 +27125,7 @@
       "lon": 152.7297,
       "elevation_ahd": 29.3,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -27520,8 +27498,7 @@
       "lon": 151.6899,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -28233,8 +28210,7 @@
       "lon": 145.5969,
       "elevation_ahd": 971,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -29989,8 +29965,7 @@
       "lon": 150.885,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -30047,8 +30022,7 @@
       "lon": 146.4383,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -31321,7 +31295,7 @@
       "lon": 152.3763,
       "elevation_ahd": 191.5,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -31785,8 +31759,7 @@
       "lon": 152.7439,
       "elevation_ahd": 95.3,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -32450,7 +32423,7 @@
       "lon": 152.7477,
       "elevation_ahd": 764,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -32555,8 +32528,7 @@
       "lon": 153.0732,
       "elevation_ahd": 188.4,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -32779,8 +32751,7 @@
       "lon": 151.655,
       "elevation_ahd": 93,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -33073,8 +33044,7 @@
       "lon": 148.0423,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -33294,8 +33264,7 @@
       "lon": 151.6267,
       "elevation_ahd": 378.8,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -33435,8 +33404,7 @@
       "lon": 146.9597,
       "elevation_ahd": 65.5,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -33650,8 +33618,7 @@
       "lon": 148.5412,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -33830,8 +33797,7 @@
       "lon": 152.2194,
       "elevation_ahd": 179.5,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -33962,8 +33928,7 @@
       "lon": 152.0936,
       "elevation_ahd": 168.6,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -34020,7 +33985,7 @@
       "lon": 142.7398,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -34401,7 +34366,7 @@
       "lon": 153.4723,
       "elevation_ahd": 235.5,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -34664,8 +34629,7 @@
       "lon": 152.2336,
       "elevation_ahd": 101.4,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -34729,8 +34693,7 @@
       "lon": 145.9242,
       "elevation_ahd": 11.7,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -36477,7 +36440,7 @@
       "lon": 138.4004,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -37060,7 +37023,7 @@
       "lon": 149.1287,
       "elevation_ahd": 853.7,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -38234,8 +38197,7 @@
       "lon": 150.1317,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -39768,8 +39730,7 @@
       "lon": 152.1589,
       "elevation_ahd": 624.1,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -40957,7 +40918,7 @@
       "lon": 148.1542,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -41082,8 +41043,7 @@
       "lon": 148.6194,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -42066,8 +42026,7 @@
       "lon": 148.2742,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -42607,8 +42566,7 @@
       "lon": 153.1203,
       "elevation_ahd": 17.5,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -42853,7 +42811,7 @@
       "lon": 145.4617,
       "elevation_ahd": 769.9,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -43487,7 +43445,7 @@
       "lon": 151.2956,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -43515,7 +43473,7 @@
       "lon": 146.6662,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -44555,8 +44513,7 @@
       "lon": 147.5631,
       "elevation_ahd": 90.5,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -45393,8 +45350,7 @@
       "lon": 146.0242,
       "elevation_ahd": 8.9,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -48160,8 +48116,7 @@
       "lon": 153.4842,
       "elevation_ahd": 136.4,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -48686,8 +48641,7 @@
       "lon": 153.5267,
       "elevation_ahd": 85.6,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -48919,7 +48873,7 @@
       "lon": 147.1194,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -49032,7 +48986,7 @@
       "lon": 152.4872,
       "elevation_ahd": 883.3,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -50707,7 +50661,7 @@
       "lon": 144.8856,
       "elevation_ahd": 759.5,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -51169,8 +51123,7 @@
       "lon": 150.68,
       "elevation_ahd": 86.4,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -51337,8 +51290,7 @@
       "lon": 151.9844,
       "elevation_ahd": 43.6,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -52558,7 +52510,7 @@
       "lon": 152.9906,
       "elevation_ahd": 56.1,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -52907,7 +52859,7 @@
       "lon": 152.5103,
       "elevation_ahd": 54.5,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -53012,7 +52964,7 @@
       "lon": 152.6865,
       "elevation_ahd": 36.1,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -55635,7 +55587,7 @@
       "lon": 153.3889,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -57156,7 +57108,7 @@
       "lon": 147.1483,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -57969,8 +57921,7 @@
       "lon": 152.9472,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -58251,8 +58202,7 @@
       "lon": 152.8953,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -59956,7 +59906,7 @@
       "lon": 146.708949,
       "elevation_ahd": null,
       "roles": [
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -60408,8 +60358,7 @@
       "lon": 149.351147,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -60932,8 +60881,7 @@
       "lon": 146.4586,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
