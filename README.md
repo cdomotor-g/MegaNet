@@ -266,9 +266,10 @@ first tap) and from GPS course otherwise. Leaving the Stations tab stops the wat
 - Flag stations with no matching repeater (orphaned)
 - Flag pass-range gaps (AlertIDs that fall between all windows)
 - Display pass-range exclusions (future equipment) alongside inclusions
-- One filter box across both tables, taking a station number, an AlertID or part
-  of a station name — a repeater is kept when it matches, when a station it
-  serves matches, or when its pass ranges cover the AlertID typed
+- One filter box across both tables, taking a station number, an AlertID, part
+  of a station name, or a pasted list of them — a repeater is kept when it
+  matches, when a station it serves matches, or when its pass ranges cover any
+  AlertID in the box
 - Every row links through to that station on the Stations tab
 
 A station is only treated as a repeater when it carries pass ranges saying which
@@ -283,7 +284,7 @@ number of stations behind it and nothing is offered that no station uses:
 
 | Block | Filters on | Control |
 |-------|-----------|---------|
-| Search | name, station number, ALERT address (numeric queries match addresses from the start) | text |
+| Search | name, station number, ALERT address (numeric queries match addresses from the start) — one term or a pasted list | text box that accepts a paste |
 | Station type | `roles[]` — field / repeater / base / satcom | tick boxes |
 | Sensor type | every sensor type present in the file — rainfall, water level, battery, water quality, … | tick boxes, plus *must have all ticked types* for "rain **and** level" |
 | Radio network | `radio_network_ids[]` | tick boxes |
@@ -305,6 +306,22 @@ the list; *Reset* at the top of the pane clears the lot.
 
 Hovering a row reveals **only**, which narrows to that one value in a click
 instead of un-ticking the other fourteen.
+
+**Pasting a list into the search box.** The box takes a list, not just one
+term, so the addresses coming in on a telemetry log can be copied and dropped
+straight in to see where those sites are on the map. Commas, semicolons, pipes,
+tabs and new lines all separate — a spreadsheet column, a CSV row and a log
+excerpt all work as pasted — and a run of bare numbers separated by spaces
+splits too, since `6128 6129` is two addresses while `Mt Stuart` is one name.
+Terms combine with OR. The box is a `<textarea>` (a single-line `<input>`
+strips the line breaks out of a pasted column, gluing `6128` and `6129` into
+`61286129`) that opens one line tall and grows with the paste.
+
+Under it, the pane reports **which pasted terms are in no station on file** —
+"7 search terms · 2 not in this database: 999991, 999992". A list that quietly
+comes back short is not an answer to "where are these stations?". The Pass
+Ranges filter box takes the same lists, and matches a repeater whose pass
+ranges cover **any** of the pasted addresses.
 
 ### 5. Radio Mobile Export
 Generate the complete set of CSV files required by Radio Mobile software from the JSON data:

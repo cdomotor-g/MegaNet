@@ -152,6 +152,7 @@ const state = {
   // station counts) built from the loaded file — rebuilt on load, not per render.
   filterOpen:     { sensors: false, networks: false, regions: false, area: false, data: false },
   filterOpts:     null,
+  searchIdx:      null,    // flat name / number / address corpus, for pasted-list reporting
   selectedId:     null,
   map:            null,
   mapMarkers:     [],
@@ -292,7 +293,8 @@ function loadJson(text) {
   if (!Array.isArray(data.stations)) throw new Error('Missing "stations" array');
   state.data       = data;
   state.exportNets = null;
-  state.filterOpts = null;          // option lists are derived from the file
+  state.filterOpts = null;          // option lists and the search corpus are
+  state.searchIdx  = null;          // both derived from the file
   resetStationFilters();
   state.selectedId = null;
   updateHeaderStats();
@@ -321,6 +323,89 @@ function stationMatchesQuery(s, q) {
   if ((s.station_number || '').toLowerCase().includes(q)) return true;
   if (/^\d+$/.test(q) && stationAlertIds(s).some(id => String(id).startsWith(q))) return true;
   return false;
+}
+
+// The search box takes a list, not just one term: an operator watching a
+// telemetry log copies the addresses coming in, pastes the lot straight into
+// the box and sees where those sites are. Commas, semicolons, pipes, tabs and
+// new lines all separate, so a spreadsheet column, a CSV row and a log excerpt
+// all work as pasted. A run of bare numbers separated by spaces splits too —
+// "6128 6129" is two addresses, while "Mt Stuart" is one name, so spaces only
+// separate when every piece is a number. Terms are matched with OR: a station
+// answering any one of them is in.
+function parseSearchTerms(text) {
+  const terms = [];
+  String(text || '').split(/[,;|\t\r\n]+/).forEach(chunk => {
+    const term  = chunk.trim();
+    if (!term) return;
+    const parts = term.split(/\s+/);
+    if (parts.length > 1 && parts.every(p => /^\d+$/.test(p))) terms.push(...parts);
+    else terms.push(term);
+  });
+  return [...new Set(terms.map(t => t.toLowerCase()))];
+}
+
+// Prepared form of the box's contents: the terms, plus the numeric ones on
+// their own. Splitting and testing them per station per term is what made a
+// 120-address paste take most of a second; this is done once per pass and
+// memoised on the raw text, since a filter pass asks for the same string
+// several times over (table, map, match note).
+let _searchPrep = { text: null, prep: null };
+function prepareSearch(text) {
+  const raw = String(text || '');
+  if (_searchPrep.text !== raw) {
+    const terms = parseSearchTerms(raw);
+    _searchPrep = { text: raw, prep: { terms, nums: terms.filter(t => /^\d+$/.test(t)) } };
+  }
+  return _searchPrep.prep;
+}
+
+// Any one term is enough. A station's ALERT addresses are derived once here,
+// not once per numeric term — deriving them is the expensive part.
+function stationMatchesSearch(s, prep) {
+  const { terms, nums } = prep;
+  if (!terms.length) return true;
+  const name = s.name.toLowerCase();
+  const num  = (s.station_number || '').toLowerCase();
+  if (terms.some(t => name.includes(t) || num.includes(t))) return true;
+  if (!nums.length) return false;
+  const ids = stationAlertIds(s).map(String);
+  return nums.some(t => ids.some(id => id.startsWith(t)));
+}
+
+// Names, station numbers and ALERT addresses as flat strings, built once per
+// load. Used to answer "did this pasted term match anything at all?" without
+// re-deriving every station's sensor list once per term on every keystroke.
+function searchCorpus() {
+  if (state.searchIdx) return state.searchIdx;
+  const names = [], numbers = [], idPrefixes = new Set();
+  (state.data?.stations || []).forEach(s => {
+    names.push(s.name.toLowerCase());
+    if (s.station_number) numbers.push(String(s.station_number).toLowerCase());
+    // Every prefix of every address, so "is any address starting with 61 on
+    // file?" is one lookup instead of a scan — a pasted log is mostly ids that
+    // are on file, and those then cost nothing to confirm.
+    stationAlertIds(s).forEach(id => {
+      const str = String(id);
+      for (let i = 1; i <= str.length; i++) idPrefixes.add(str.slice(0, i));
+    });
+  });
+  state.searchIdx = { names, numbers, idPrefixes };
+  return state.searchIdx;
+}
+
+// Which of the pasted terms are in no station's name, number or addresses?
+// Pasting 40 ids off a log and being told 3 of them aren't in the database is
+// the point of the exercise — a silently shorter list is not an answer. Only
+// asked for an actual list (one term is just a search that found nothing, which
+// the match note already says). Mirrors stationMatchesQuery's rules exactly.
+function unmatchedSearchTerms(terms) {
+  if (terms.length < 2 || !state.data) return [];
+  const { names, numbers, idPrefixes } = searchCorpus();
+  return terms.filter(t =>
+    !(/^\d+$/.test(t) && idPrefixes.has(t)) &&
+    !names.some(n => n.includes(t)) &&
+    !numbers.some(n => n.includes(t)));
 }
 
 // The values a station offers to a grouped filter. A station with nothing
@@ -368,10 +453,10 @@ function valueMatches(want, value) {
 function filteredStations() {
   if (!state.data) return [];
   const f = state.filters;
-  const q = f.search.trim().toLowerCase();
+  const search = prepareSearch(f.search);
   return state.data.stations.filter(s => {
     if (f.enabledOnly && !s.enabled) return false;
-    if (!stationMatchesQuery(s, q)) return false;
+    if (!stationMatchesSearch(s, search)) return false;
     // Each group is skipped outright when it isn't filtering — deriving a
     // station's regions or sensor types is not free across 3000+ stations on
     // every keystroke.
@@ -491,7 +576,7 @@ function renderMain() {
   const noDataTabs = ['packets', 'maps', 'serial'];
   if (!state.data && !noDataTabs.includes(state.activeTab)) { el.innerHTML = renderEmpty(); return; }
   switch (state.activeTab) {
-    case 'stations':   el.innerHTML = renderStationsHtml();  initMap();   break;
+    case 'stations':   el.innerHTML = renderStationsHtml();  initStationFilters(); initMap(); break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
     case 'networks':   el.innerHTML = renderNetworksHtml();               break;
     case 'passranges': el.innerHTML = renderPassRangesHtml();             break;
@@ -1426,10 +1511,10 @@ function renderNetworksHtml() {
 // Does a station answer to the page's filter box? The box takes a station
 // number, an ALERT id or part of a station name and does not ask which — an
 // operator holding one of the three shouldn't have to say which one it is.
-// Shares the Stations search box's matching rules so the same text typed into
-// either box picks the same stations.
+// Shares the Stations search box's matching rules, pasted lists included, so
+// the same text typed into either box picks the same stations.
 function passRangeMatch(s, q) {
-  return stationMatchesQuery(s, String(q || '').trim().toLowerCase());
+  return stationMatchesSearch(s, prepareSearch(q));
 }
 
 // A repeater row survives the filter if the repeater itself matches, if one of
@@ -1439,8 +1524,11 @@ function passRangeRepeaterMatch(r, matched, q) {
   if (!q) return true;
   if (passRangeMatch(r, q)) return true;
   if (matched.some(s => passRangeMatch(s, q))) return true;
-  const n = parseInt(q.trim(), 10);
-  return !isNaN(n) && passRangeCoversId(r.repeater, n);
+  // Every address in the box is tried, not just the first — a pasted list is
+  // the case where "which repeater carries these?" is actually being asked.
+  return parseSearchTerms(q)
+    .filter(t => /^\d+$/.test(t))
+    .some(t => passRangeCoversId(r.repeater, Number(t)));
 }
 
 // Static shell — the filter box lives out here and is never re-rendered on a
@@ -2511,11 +2599,17 @@ function stationFiltersHtml() {
               ${anyStationFilterActive() ? '' : 'disabled'}>Reset</button>
     </div>
     <div class="filter-block">
-      <label class="filter-field">
-        <span>Search</span>
-        <input type="search" placeholder="Name, station # or ALERT id…" value="${esc(state.filters.search)}"
-               oninput="mapSearchInput(this.value)">
-      </label>
+      <div class="filter-head">
+        <span class="filter-title">Search</span>
+        <button class="filter-clear" id="search-clear" onclick="clearSearch()"
+                ${state.filters.search.trim() ? '' : 'hidden'}>clear</button>
+      </div>
+      <p class="filter-hint">Name, station # or ALERT address — or paste a list of them,
+        separated by commas, spaces or new lines.</p>
+      <textarea id="station-search" class="filter-search" rows="1" spellcheck="false"
+                placeholder="e.g. 6128, 6129 — or paste from a telemetry log"
+                oninput="mapSearchInput(this.value);autoGrowSearch(this)">${esc(state.filters.search)}</textarea>
+      <p class="filter-note" id="search-terms-note">${searchTermsNoteHtml()}</p>
       <p class="filter-note" id="map-match-note">${mapMatchNoteHtml()}</p>
     </div>
     ${Object.keys(FILTER_GROUPS).map(filterGroupHtml).join('')}
@@ -2526,12 +2620,52 @@ function stationFiltersHtml() {
 function renderStationFilters() {
   const el = document.getElementById('station-filters');
   if (el) el.innerHTML = stationFiltersHtml();
+  initStationFilters();
+}
+
+// The search box is a <textarea>, not an <input>: a single-line input strips
+// the line breaks out of a pasted column of addresses, gluing 6128 and 6129
+// into 61286129. It opens one line tall and grows to fit what was pasted.
+function initStationFilters() {
+  const el = document.getElementById('station-search');
+  if (el) autoGrowSearch(el);
+}
+
+const SEARCH_MAX_PX = 170;   // ~8 lines; past that the box scrolls instead
+
+function autoGrowSearch(el) {
+  el.style.height = 'auto';
+  // Boxes are border-box here but scrollHeight excludes the border, so the
+  // frame has to be added back or every growth step clips by a couple of pixels.
+  const frame = el.offsetHeight - el.clientHeight;
+  el.style.height = Math.min(el.scrollHeight + frame, SEARCH_MAX_PX) + 'px';
+}
+
+function clearSearch() {
+  state.filters.search = '';
+  const el = document.getElementById('station-search');
+  if (el) { el.value = ''; autoGrowSearch(el); el.focus(); }
+  stationsFilterChanged();
+}
+
+// What a pasted list did: how many terms, and which of them are in no station
+// on file. Silent about a single term — the match note below already covers it.
+function searchTermsNoteHtml() {
+  const terms = parseSearchTerms(state.filters.search);
+  if (terms.length < 2) return '';
+  const missing = unmatchedSearchTerms(terms);
+  if (!missing.length) return `${terms.length} search terms · all found.`;
+  const shown = missing.slice(0, 8).map(esc).join(', ');
+  const rest  = missing.length - 8;
+  return `${terms.length} search terms · <strong>${missing.length}</strong> not in this ` +
+         `database: ${shown}${rest > 0 ? ` +${rest} more` : ''}`;
 }
 
 // Editing or deleting a station moves the per-option counts (and can retire an
 // option outright), so the cached lists are dropped and the panel redrawn.
 function refreshFilterOptions() {
   state.filterOpts = null;
+  state.searchIdx  = null;
   if (state.activeTab === 'stations') renderStationFilters();
 }
 
@@ -2667,6 +2801,10 @@ function valueGroupState(keys) {
 // would take the focus out of whatever the operator is clicking).
 function updateFilterChrome() {
   Object.keys(FILTER_GROUPS).forEach(updateFilterGroupState);
+  const terms = document.getElementById('search-terms-note');
+  if (terms) terms.innerHTML = searchTermsNoteHtml();
+  const clear = document.getElementById('search-clear');
+  if (clear) clear.hidden = !state.filters.search.trim();
   const area = document.getElementById('filter-state-area');
   if (area) area.textContent = valueGroupState(['basin', 'lga']);
   const data = document.getElementById('filter-state-data');

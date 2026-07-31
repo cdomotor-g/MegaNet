@@ -300,6 +300,29 @@ details.filter-block[open] > .filter-head .filter-title::before {
   margin-top: .5rem;
 }
 
+/* Search box. A textarea rather than an input so a pasted column of ALERT
+   addresses keeps its line breaks; it opens one line tall and app.js grows it
+   to fit the paste, up to a cap, after which it scrolls. */
+.filter-search {
+  min-height: 2.4rem;
+  max-height: 170px;
+  padding: .5rem .6rem;
+  font: inherit;
+  font-size: .88rem;
+  line-height: 1.35;
+  resize: vertical;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.filter-clear {
+  padding: .05rem .4rem;
+  font-size: .74rem;
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+}
+
 .filter-actions {
   display: flex;
   gap: .35rem;
