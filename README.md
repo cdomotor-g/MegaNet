@@ -225,7 +225,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
   - Satcom terminals
 - Draw signal path lines between field stations and the repeaters/base stations their AlertID passes through
 - Click a station to see its full detail panel
-- Filter map display by role, catchment, radio network, or enabled status
+- Filter map display by role, sensor type, radio network, region, basin/council or data completeness (see *Filtering & Exploration*)
 - Toggle individual link lines on/off
 - Leaflet.js with a base-map picker (top-right): OSM-Topo (default), OpenStreetMap, or Satellite
 
@@ -235,8 +235,8 @@ The filter box **highlights instead of hiding**: all pins stay on the map,
 matches get an amber ring, their names appear underneath, and the map zooms to
 the extent of the matches so every one of them is on screen. Typing narrows the
 highlight live. Labels are capped at the 60 matches nearest the middle of that
-extent (the sidebar says when the cap is in effect). Tick *Hide stations that
-don't match* for the old subtractive behaviour.
+extent (the filter pane says when the cap is in effect). Tick *Hide stations
+that don't match*, under **Map display**, for the old subtractive behaviour.
 
 **Map and table together.** The map and the station table share the Stations
 tab and the one filter pane: a search term, role or network narrows the table to
@@ -276,15 +276,35 @@ AlertIDs it forwards; entries flagged `repeater` with no pass-range block at all
 are field stations that were mis-tagged during the metadata import.
 
 ### 4. Filtering & Exploration
-- Filter stations by:
-  - Role (field / repeater / base / satcom)
-  - Catchment
-  - Radio network cluster
-  - AlertID or AlertID range
-  - Enabled/disabled status
-  - Sensor type (rainfall only, water level only, combined)
-- Search by station name or station number
-- Multi-select filters with AND logic
+
+The **Filters** pane on the Stations tab drives the map and the table together.
+It is built from whatever `stations.json` holds, so every option carries the
+number of stations behind it and nothing is offered that no station uses:
+
+| Block | Filters on | Control |
+|-------|-----------|---------|
+| Search | name, station number, ALERT address (numeric queries match addresses from the start) | text |
+| Station type | `roles[]` — field / repeater / base / satcom | tick boxes |
+| Sensor type | every sensor type present in the file — rainfall, water level, battery, water quality, … | tick boxes, plus *must have all ticked types* for "rain **and** level" |
+| Radio network | `radio_network_ids[]` | tick boxes |
+| Region | the region of the station's catchment | tick boxes |
+| Basin & council | `basin` and `lga` | dropdowns |
+| Data completeness | missing lat/lon, missing ALERT address, disabled stations | dropdowns |
+
+Blocks combine with AND (a repeater **and** on Mt Stuart **and** measuring
+rainfall); options inside one block combine with OR.
+
+**Partly-populated data is included, not hidden.** Most stations have no radio
+network recorded and two thirds have no catchment, so each tick-box block ends
+with a *Not recorded yet* bucket holding exactly those stations. It is ticked
+like any other option, which means the default view is the whole network — every
+station, every region, mapped or not — and nothing disappears until you
+deliberately untick that bucket. Each block shows its state (*All*, *None*,
+*3 of 15*) in its header, so a collapsed block can never be quietly filtering
+the list; *Reset* at the top of the pane clears the lot.
+
+Hovering a row reveals **only**, which narrows to that one value in a click
+instead of un-ticking the other fourteen.
 
 ### 5. Radio Mobile Export
 Generate the complete set of CSV files required by Radio Mobile software from the JSON data:
@@ -548,7 +568,7 @@ interference investigation starts from evidence instead of guesswork.
 
 ### Using it
 
-- **Stations tab → Filters → "Show ACMA licensed transmitters"**: master toggle, **on
+- **Stations tab → Map display → "Show ACMA licensed transmitters"**: master toggle, **on
   by default** — the ~1.4 MB core data (threats + sites) is fetched the first
   time the Stations tab opens, not at page load, and untick to drop the layer.
   Under it, *ACMA / RF Environment options* holds the mechanism checkboxes,

@@ -30,6 +30,25 @@ const ROLE_LABEL = {
   satcom:   'Satcom',
 };
 
+// ── Station filter vocabulary ─────────────────────────────────────────────────
+// The grouped filters on the Stations tab (role, sensor type, radio network,
+// region…) are built from whatever the loaded stations.json actually contains.
+// That database is only partly populated — at the time of writing 3086 of 3174
+// stations carry no radio_network_ids and 2171 carry no catchment — so a group
+// needs two reserved option values to stay honest about the gaps:
+//
+//   FILTER_NONE   the "not recorded yet" bucket. Every station whose field is
+//                 empty lands here, and it is ticked like any other option, so
+//                 the default (nothing ticked = no constraint) shows the whole
+//                 network rather than only the fraction that has been mapped.
+//   FILTER_EMPTY  the marker for "the operator un-ticked everything". An empty
+//                 Set already means "no constraint", so a group that has been
+//                 emptied by hand holds this instead — it matches no station,
+//                 which is what un-ticking everything should do.
+const FILTER_NONE  = '__none__';
+const FILTER_EMPTY = '__empty__';
+const FILTER_NONE_LABEL = 'Not recorded yet';
+
 const RM_NET_DEFAULTS = {
   Visible: 1, 'Minimum fx': 151, 'Max Fx': 152,
   Refractivity: 301, Conductivity: 0.005, Permittivity: 15,
@@ -100,9 +119,20 @@ const state = {
   activeTab:  'stations',
   filters: {
     search:       '',
-    networks:     new Set(),
-    catchments:   new Set(),
+    // Grouped filters. An empty Set is the default and means "no constraint":
+    // every station passes, including the ones whose field has never been
+    // filled in. See FILTER_NONE / FILTER_EMPTY above.
     roles:        new Set(),
+    sensors:      new Set(),
+    networks:     new Set(),
+    regions:      new Set(),
+    catchments:   new Set(),
+    sensorsAll:   false,   // sensor group: station must carry ALL ticked types, not any
+    // Single-value filters. '' = any; FILTER_NONE = only stations missing the field.
+    basin:        '',
+    lga:          '',
+    hasCoords:    '',      // '' | 'yes' | 'no'
+    hasAlertId:   '',      // '' | 'yes' | 'no'
     enabledOnly:  false,
     acma: {
       show:        true,                        // on by default; the ~1.4 MB core
@@ -118,6 +148,10 @@ const state = {
       showLinks:   true,
     },
   },
+  // Which filter groups are expanded, and the option lists (with per-option
+  // station counts) built from the loaded file — rebuilt on load, not per render.
+  filterOpen:     { sensors: false, networks: false, regions: false, area: false, data: false },
+  filterOpts:     null,
   selectedId:     null,
   map:            null,
   mapMarkers:     [],
@@ -258,11 +292,9 @@ function loadJson(text) {
   if (!Array.isArray(data.stations)) throw new Error('Missing "stations" array');
   state.data       = data;
   state.exportNets = null;
-  state.filters.networks   = new Set();
-  state.filters.catchments = new Set();
-  state.filters.roles      = new Set();
-  state.filters.search     = '';
-  state.selectedId         = null;
+  state.filterOpts = null;          // option lists are derived from the file
+  resetStationFilters();
+  state.selectedId = null;
   updateHeaderStats();
   renderTabs();
   renderMain();
@@ -291,18 +323,86 @@ function stationMatchesQuery(s, q) {
   return false;
 }
 
+// The values a station offers to a grouped filter. A station with nothing
+// recorded for the field answers with the FILTER_NONE bucket rather than an
+// empty list, so "not recorded yet" is something the operator can tick, see a
+// count for and deliberately exclude — instead of a silent disappearance.
+function groupKeys(list) {
+  return (Array.isArray(list) && list.length) ? list : [FILTER_NONE];
+}
+
+function stationRoleKeys(s)    { return groupKeys(s.roles); }
+function stationNetworkKeys(s) { return groupKeys(s.radio_network_ids); }
+
+function stationRegionKeys(s) {
+  const regions = new Set();
+  (s.catchment_ids || []).forEach(id => {
+    const region = catchmentById(id)?.region;
+    if (region) regions.add(region);
+  });
+  return regions.size ? [...regions] : [FILTER_NONE];
+}
+
+function stationSensorTypeKeys(s) {
+  const types = new Set();
+  stationSensors(s).forEach(se => { if (se && se.type) types.add(se.type); });
+  return types.size ? [...types] : [FILTER_NONE];
+}
+
+// Does a station clear one grouped filter? An empty Set is the default and
+// constrains nothing. `matchAll` is the sensor group's "must carry all of
+// these" mode — otherwise any one ticked value is enough. FILTER_EMPTY is never
+// among a station's keys, so a hand-emptied group matches nothing either way.
+function groupMatches(set, keys, matchAll) {
+  if (!set.size) return true;
+  if (matchAll)  return [...set].every(v => keys.includes(v));
+  return keys.some(k => set.has(k));
+}
+
+// A single-value filter ('' = any) against a field that may be blank; blank
+// fields are only matched by the explicit FILTER_NONE option.
+function valueMatches(want, value) {
+  return !want || (value || FILTER_NONE) === want;
+}
+
 function filteredStations() {
   if (!state.data) return [];
-  const { search, networks, catchments, roles, enabledOnly } = state.filters;
-  const q = search.trim().toLowerCase();
+  const f = state.filters;
+  const q = f.search.trim().toLowerCase();
   return state.data.stations.filter(s => {
-    if (enabledOnly && !s.enabled) return false;
+    if (f.enabledOnly && !s.enabled) return false;
     if (!stationMatchesQuery(s, q)) return false;
-    if (networks.size   > 0 && !s.radio_network_ids.some(id => networks.has(id)))   return false;
-    if (catchments.size > 0 && !s.catchment_ids.some(id => catchments.has(id)))     return false;
-    if (roles.size      > 0 && !s.roles.some(r => roles.has(r)))                    return false;
+    // Each group is skipped outright when it isn't filtering — deriving a
+    // station's regions or sensor types is not free across 3000+ stations on
+    // every keystroke.
+    if (f.roles.size      && !groupMatches(f.roles,      stationRoleKeys(s)))         return false;
+    if (f.networks.size   && !groupMatches(f.networks,   stationNetworkKeys(s)))      return false;
+    if (f.regions.size    && !groupMatches(f.regions,    stationRegionKeys(s)))       return false;
+    if (f.catchments.size && !groupMatches(f.catchments, groupKeys(s.catchment_ids))) return false;
+    if (f.sensors.size    && !groupMatches(f.sensors, stationSensorTypeKeys(s), f.sensorsAll)) return false;
+    if (!valueMatches(f.basin, s.basin)) return false;
+    if (!valueMatches(f.lga,   s.lga))   return false;
+    if (f.hasCoords) {
+      const located = s.lat != null && s.lon != null;
+      if (located !== (f.hasCoords === 'yes')) return false;
+    }
+    if (f.hasAlertId) {
+      const addressed = stationAlertIds(s).length > 0;
+      if (addressed !== (f.hasAlertId === 'yes')) return false;
+    }
     return true;
   });
+}
+
+// Catchment lookup, indexed once per loaded file — the region filter asks for
+// one on every station on every keystroke, so a linear scan would show.
+let _catchmentIdx = null, _catchmentIdxFor = null;
+function catchmentById(id) {
+  if (_catchmentIdxFor !== state.data) {
+    _catchmentIdxFor = state.data;
+    _catchmentIdx    = new Map((state.data?.catchments || []).map(c => [c.id, c]));
+  }
+  return _catchmentIdx.get(id);
 }
 
 // Every distinct ALERT id for a station, sorted ascending. Derived from the
@@ -435,39 +535,26 @@ function renderStationsHtml() {
   return `
     <div class="layout map-layout">
       <aside class="sidebar stack">
+        <div class="panel filter-panel" id="station-filters">
+          ${stationFiltersHtml()}
+        </div>
         <div class="panel">
-          <div class="panel-header"><h3>Filters</h3></div>
-          <div class="upload-grid" style="margin-top:.6rem">
-            <label style="font-size:.88rem;color:var(--muted)">Search
-              <input type="search" placeholder="Name, station # or ALERT id…" value="${esc(state.filters.search)}"
-                     oninput="mapSearchInput(this.value)">
+          <div class="panel-header"><h3>Map display</h3></div>
+          <div class="filter-block">
+            <label class="filter-check">
+              <input type="checkbox" ${state.mapHideOthers ? 'checked' : ''}
+                     onchange="state.mapHideOthers=this.checked;refreshMapLayers()">
+              Hide stations that don't match
+            </label>
+            <label class="filter-check">
+              <input type="checkbox" ${state.mapShowLinks ? 'checked' : ''}
+                     onchange="state.mapShowLinks=this.checked;refreshMapLayers()">
+              Show signal links
             </label>
           </div>
-          <div class="small" id="map-match-note" style="color:var(--muted);margin-top:.35rem">
-            ${mapMatchNoteHtml()}
+          <div class="filter-block">
+            ${acmaFilterBlockHtml()}
           </div>
-          <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin-top:.5rem">
-            <input type="checkbox" ${state.mapHideOthers ? 'checked' : ''}
-                   onchange="state.mapHideOthers=this.checked;refreshMapLayers()">
-            Hide stations that don't match
-          </label>
-          <div style="margin-top:.75rem">
-            <div class="small" style="margin-bottom:.35rem;color:var(--muted)">Roles</div>
-            ${Object.entries(ROLE_LABEL).map(([k, v]) => `
-              <label style="display:flex;gap:.45rem;align-items:center;font-size:.9rem;margin:.2rem 0">
-                <input type="checkbox" ${state.filters.roles.has(k) ? 'checked' : ''}
-                       onchange="toggleFilter('roles','${k}',this.checked);stationsFilterChanged()">
-                <span class="legend-dot" style="background:${ROLE_COLOR[k]}"></span> ${v}
-              </label>
-            `).join('')}
-          </div>
-          ${networkFilterHtml('stationsFilterChanged()')}
-          ${acmaFilterBlockHtml()}
-          <label style="display:flex;gap:.45rem;align-items:center;font-size:.9rem;margin-top:.75rem">
-            <input type="checkbox" ${state.mapShowLinks ? 'checked' : ''}
-                   onchange="state.mapShowLinks=this.checked;refreshMapLayers()">
-            Show signal links
-          </label>
         </div>
         <div class="panel">
           <div class="map-legend" id="map-legend">${mapLegendHtml()}</div>
@@ -535,10 +622,12 @@ function mapNote(msg, ms) {
 }
 
 // A filter change on the Stations tab drives both halves of the page: the map
-// re-highlights (or re-hides) its pins and the table below it re-lists.
+// re-highlights (or re-hides) its pins and the table below it re-lists. The
+// filter panel's own summaries follow, so it always says what it is doing.
 function stationsFilterChanged() {
   refreshMapLayers();
   rerenderStations();
+  updateFilterChrome();
 }
 
 // Typing in the search box rebuilds every marker and every table row, so hold
@@ -621,22 +710,23 @@ const MAP_LABEL_CAP = 60;     // permanent name labels beyond this are unreadabl
 const MAP_PIN_RING  = '#ffffff';
 const MAP_PIN_HIT   = '#ffc400';
 
-// Is any station filter narrowing things down? A network set that covers every
-// network (or none) selects everything, so it doesn't count as active.
+// Is any station filter narrowing things down? Every grouped filter keeps its
+// Set canonical (empty when everything is ticked), so "not empty" already means
+// "narrowing" — see toggleGroupFilter.
 function mapFilterActive() {
-  const f = state.filters;
-  const netTotal = (state.data?.radio_networks || []).length;
-  return !!(f.search.trim() || f.roles.size || f.catchments.size || f.enabledOnly ||
-            (f.networks.size && f.networks.size < netTotal));
+  return anyStationFilterActive();
 }
 
 function mapMatchNoteHtml() {
-  if (!state.data || !mapFilterActive()) return 'All stations shown.';
-  const total   = state.data.stations.filter(s => s.lat != null && s.lon != null).length;
-  const matched = filteredStations().filter(s => s.lat != null && s.lon != null).length;
-  if (!matched) return 'No stations match — all pins shown unhighlighted.';
-  return `<strong>${matched}</strong> of ${total} stations match` +
-         (matched > MAP_LABEL_CAP ? ` · labels shown for the closest ${MAP_LABEL_CAP}` : '');
+  if (!state.data) return '';
+  const total = state.data.stations.length;
+  if (!mapFilterActive()) return `Showing all <strong>${total}</strong> stations.`;
+  const matched = filteredStations();
+  if (!matched.length) return 'No stations match — all pins shown unhighlighted.';
+  const located = matched.filter(s => s.lat != null && s.lon != null).length;
+  return `<strong>${matched.length}</strong> of ${total} stations match` +
+         (located < matched.length ? ` · ${matched.length - located} without a position` : '') +
+         (located > MAP_LABEL_CAP ? ` · labels on the closest ${MAP_LABEL_CAP}` : '');
 }
 
 function updateMapMatchNote() {
@@ -2359,6 +2449,7 @@ function editorSave() {
   state.editorDraft = d;
   state.selectedId  = d.id;
   updateHeaderStats();
+  refreshFilterOptions();      // an edited role / network changes the option counts
   rerenderStations();
   rerenderStationEditorCard();
 }
@@ -2372,51 +2463,362 @@ function editorDelete() {
   state.editorId      = null;
   state.editorDraft   = {};
   updateHeaderStats();
+  refreshFilterOptions();
   rerenderStations();
   rerenderStationEditorCard();
 }
 
 // ── Filter helpers ─────────────────────────────────────────────────────────────
 
-function networkFilterHtml(onChangeFn) {
-  const nets = state.data?.radio_networks || [];
-  if (!nets.length) return '';
+// The grouped filters, in panel order. `alwaysOpen` groups are short enough to
+// leave expanded; the rest collapse to a one-line "All / None / 3 of 15" summary
+// so the panel stays readable with a dozen networks and twenty sensor types in it.
+const FILTER_GROUPS = {
+  roles: {
+    title: 'Station type',
+    alwaysOpen: true,
+    dots: true,
+  },
+  sensors: {
+    title: 'Sensor type',
+    hint: 'Not every site measures everything — tick the readings you care about.',
+    extra: () => `
+      <label class="filter-check">
+        <input type="checkbox" ${state.filters.sensorsAll ? 'checked' : ''}
+               onchange="setSensorsAll(this.checked)">
+        Must have <em>all</em> ticked types (not just one)
+      </label>`,
+  },
+  networks: {
+    title: 'Radio network',
+    hint: `Networks are still being mapped, so most stations sit in "${FILTER_NONE_LABEL}" — ` +
+          'they stay visible unless you untick that bucket.',
+  },
+  regions: {
+    title: 'Region',
+    hint: 'From the station\'s catchment. Regions are still being assigned.',
+  },
+};
+
+// Contents of the Filters panel. Search on top, then one block per question the
+// operator is actually asking (what kind of site, what does it measure, whose
+// network, where), then the data-completeness block for finding gaps.
+function stationFiltersHtml() {
   return `
-    <div style="margin-top:.75rem">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
-        <span class="small" style="color:var(--muted)">BoM Network</span>
-        <span>
-          <button style="padding:.2rem .45rem;font-size:.78rem"
-                  onclick="state.filters.networks=new Set();${onChangeFn}">All</button>
-          <button style="padding:.2rem .45rem;font-size:.78rem"
-                  onclick="state.filters.networks=new Set(${esc(JSON.stringify(nets.map(n => n.id)))});${onChangeFn}">None</button>
-        </span>
-      </div>
-      <div class="checklist" style="max-height:18vh">
-        ${nets.map(n => `
-          <label>
-            <input type="checkbox"
-                   ${state.filters.networks.size === 0 || state.filters.networks.has(n.id) ? 'checked' : ''}
-                   onchange="toggleFilter('networks','${n.id}',this.checked);${onChangeFn}">
-            ${esc(n.name)}
-          </label>`).join('')}
-      </div>
+    <div class="panel-header">
+      <h3>Filters</h3>
+      <button class="filter-reset" onclick="clearStationFilters()"
+              ${anyStationFilterActive() ? '' : 'disabled'}>Reset</button>
+    </div>
+    <div class="filter-block">
+      <label class="filter-field">
+        <span>Search</span>
+        <input type="search" placeholder="Name, station # or ALERT id…" value="${esc(state.filters.search)}"
+               oninput="mapSearchInput(this.value)">
+      </label>
+      <p class="filter-note" id="map-match-note">${mapMatchNoteHtml()}</p>
+    </div>
+    ${Object.keys(FILTER_GROUPS).map(filterGroupHtml).join('')}
+    ${filterAreaHtml()}
+    ${filterDataHtml()}`;
+}
+
+function renderStationFilters() {
+  const el = document.getElementById('station-filters');
+  if (el) el.innerHTML = stationFiltersHtml();
+}
+
+// Editing or deleting a station moves the per-option counts (and can retire an
+// option outright), so the cached lists are dropped and the panel redrawn.
+function refreshFilterOptions() {
+  state.filterOpts = null;
+  if (state.activeTab === 'stations') renderStationFilters();
+}
+
+function filterGroupHtml(key) {
+  const cfg  = FILTER_GROUPS[key];
+  const opts = filterOptions()[key];
+  if (!opts.length) return '';
+  const head = `
+    <span class="filter-title">${esc(cfg.title)}</span>
+    <span class="filter-state" id="filter-state-${key}">${filterGroupState(key)}</span>`;
+  const body = `
+    ${cfg.hint ? `<p class="filter-hint">${cfg.hint}</p>` : ''}
+    <div class="filter-actions">
+      <button onclick="setGroupFilter('${key}','all')">All</button>
+      <button onclick="setGroupFilter('${key}','none')">None</button>
+    </div>
+    ${cfg.extra ? cfg.extra() : ''}
+    <div class="filter-list">${opts.map(o => filterRowHtml(key, o, cfg)).join('')}</div>`;
+  return cfg.alwaysOpen
+    ? `<div class="filter-block filter-group" id="filter-group-${key}">
+         <div class="filter-head">${head}</div>${body}
+       </div>`
+    : `<details class="filter-block filter-group" id="filter-group-${key}"
+                ${state.filterOpen[key] ? 'open' : ''} ontoggle="state.filterOpen['${key}']=this.open">
+         <summary class="filter-head">${head}</summary>${body}
+       </details>`;
+}
+
+// One option row: tick box + label + how many stations it covers, plus "only"
+// — one click to narrow to that value alone, which beats un-ticking fourteen.
+function filterRowHtml(key, o, cfg) {
+  const set  = state.filters[key];
+  const on   = !set.size || set.has(o.value);
+  const dot  = cfg.dots && ROLE_COLOR[o.value]
+    ? `<span class="legend-dot" style="background:${ROLE_COLOR[o.value]}"></span>` : '';
+  const none = o.value === FILTER_NONE ? ' filter-row-none' : '';
+  return `
+    <div class="filter-row">
+      <label class="filter-row-label${none}">
+        <input type="checkbox" ${on ? 'checked' : ''}
+               onchange="toggleGroupFilter('${key}','${escAttr(o.value)}',this.checked)">
+        ${dot}<span>${esc(o.label)}</span>
+      </label>
+      <span class="filter-row-side">
+        <span class="filter-count">${o.count}</span>
+        <button class="filter-only" title="Show only ${esc(o.label)}"
+                onclick="setGroupFilter('${key}','only','${escAttr(o.value)}')">only</button>
+      </span>
     </div>`;
 }
 
-function toggleFilter(key, value, checked) {
-  // 'acmaMechanisms' routes to the nested ACMA filter block; everything else
-  // is a top-level station-filter Set.
-  const set = key === 'acmaMechanisms' ? state.filters.acma.mechanisms : state.filters[key];
+// Basin and council are long lists (65 basins, 100+ LGAs) and a station has at
+// most one of each — a dropdown reads better than a hundred tick boxes.
+function filterAreaHtml() {
+  const opts = filterOptions();
+  if (!opts.basins.length && !opts.lgas.length) return '';
+  return `
+    <details class="filter-block" id="filter-group-area" ${state.filterOpen.area ? 'open' : ''}
+             ontoggle="state.filterOpen.area=this.open">
+      <summary class="filter-head">
+        <span class="filter-title">Basin &amp; council</span>
+        <span class="filter-state" id="filter-state-area">${valueGroupState(['basin', 'lga'])}</span>
+      </summary>
+      ${filterSelectHtml('basin', 'Drainage basin', opts.basins)}
+      ${filterSelectHtml('lga',   'Local government area', opts.lgas)}
+    </details>`;
+}
+
+// Gap-hunting rather than day-to-day filtering: which sites have no position,
+// no ALERT address, or are switched off.
+function filterDataHtml() {
+  return `
+    <details class="filter-block" id="filter-group-data" ${state.filterOpen.data ? 'open' : ''}
+             ontoggle="state.filterOpen.data=this.open">
+      <summary class="filter-head">
+        <span class="filter-title">Data completeness</span>
+        <span class="filter-state" id="filter-state-data">${valueGroupState(['hasCoords', 'hasAlertId', 'enabledOnly'])}</span>
+      </summary>
+      <p class="filter-hint">For finding what still needs filling in.</p>
+      ${filterChoiceHtml('hasCoords', 'Position', [
+        ['',    'Any'],
+        ['yes', 'Has lat/lon'],
+        ['no',  'Missing lat/lon'],
+      ])}
+      ${filterChoiceHtml('hasAlertId', 'ALERT address', [
+        ['',    'Any'],
+        ['yes', 'Has an address'],
+        ['no',  'No address on file'],
+      ])}
+      <label class="filter-check">
+        <input type="checkbox" ${state.filters.enabledOnly ? 'checked' : ''}
+               onchange="setValueFilter('enabledOnly',this.checked)">
+        Enabled stations only
+      </label>
+    </details>`;
+}
+
+function filterSelectHtml(key, label, opts) {
+  if (!opts.length) return '';
+  const cur = state.filters[key];
+  return `
+    <label class="filter-field">
+      <span>${esc(label)}</span>
+      <select onchange="setValueFilter('${key}',this.value)">
+        <option value="">Any</option>
+        ${opts.map(o => `
+          <option value="${escAttr(o.value)}" ${cur === o.value ? 'selected' : ''}>
+            ${esc(o.label)} (${o.count})
+          </option>`).join('')}
+      </select>
+    </label>`;
+}
+
+function filterChoiceHtml(key, label, choices) {
+  return `
+    <label class="filter-field">
+      <span>${esc(label)}</span>
+      <select onchange="setValueFilter('${key}',this.value)">
+        ${choices.map(([v, l]) => `
+          <option value="${escAttr(v)}" ${state.filters[key] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+      </select>
+    </label>`;
+}
+
+// Summary for the blocks made of single-value controls: how many are set.
+function valueGroupState(keys) {
+  const set = keys.filter(k => state.filters[k]).length;
+  return set ? `${set} set` : 'Any';
+}
+
+// Keep the panel's live bits — group summaries, the match note and the Reset
+// button — in step with the filters without rebuilding the whole panel (which
+// would take the focus out of whatever the operator is clicking).
+function updateFilterChrome() {
+  Object.keys(FILTER_GROUPS).forEach(updateFilterGroupState);
+  const area = document.getElementById('filter-state-area');
+  if (area) area.textContent = valueGroupState(['basin', 'lga']);
+  const data = document.getElementById('filter-state-data');
+  if (data) data.textContent = valueGroupState(['hasCoords', 'hasAlertId', 'enabledOnly']);
+  const reset = document.querySelector('#station-filters .filter-reset');
+  if (reset) reset.disabled = !anyStationFilterActive();
+  updateMapMatchNote();
+}
+
+// Option lists for the grouped filters, each entry { value, label, count }.
+// Built from the loaded file (so a station.json with different networks, sensor
+// types or regions filters itself correctly) and cached until the next load —
+// counting sensor types across 3000+ stations on every keystroke would not be.
+// Every group ends with the FILTER_NONE bucket when the file has stations that
+// leave the field blank, and options nobody uses are dropped.
+function filterOptions() {
+  if (state.filterOpts) return state.filterOpts;
+  const stations = state.data?.stations || [];
+
+  // key → number of stations offering that key
+  const tally = keyFn => {
+    const counts = new Map();
+    stations.forEach(s => keyFn(s).forEach(k => counts.set(k, (counts.get(k) || 0) + 1)));
+    return counts;
+  };
+  // Named options first (in the order the file lists them), then whatever the
+  // stations mention that the file never declared, then the "not recorded" bucket.
+  const build = (counts, named, { sort } = {}) => {
+    const out  = [];
+    const seen = new Set();
+    named.forEach(({ value, label }) => {
+      seen.add(value);
+      out.push({ value, label, count: counts.get(value) || 0 });
+    });
+    const extra = [...counts.keys()].filter(k => !seen.has(k) && k !== FILTER_NONE)
+      .map(value => ({ value, label: value, count: counts.get(value) }));
+    if (sort === 'count') extra.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    else                  extra.sort((a, b) => a.label.localeCompare(b.label));
+    out.push(...extra);
+    if (counts.get(FILTER_NONE)) {
+      out.push({ value: FILTER_NONE, label: FILTER_NONE_LABEL, count: counts.get(FILTER_NONE) });
+    }
+    return out.filter(o => o.count > 0);
+  };
+
+  const regionNames = [...new Set((state.data?.catchments || []).map(c => c.region).filter(Boolean))].sort();
+
+  state.filterOpts = {
+    roles:    build(tally(stationRoleKeys),
+                    Object.entries(ROLE_LABEL).map(([value, label]) => ({ value, label }))),
+    sensors:  build(tally(stationSensorTypeKeys), [], { sort: 'count' }),
+    networks: build(tally(stationNetworkKeys),
+                    (state.data?.radio_networks || []).map(n => ({ value: n.id, label: n.name }))),
+    regions:  build(tally(stationRegionKeys), regionNames.map(r => ({ value: r, label: r }))),
+    basins:   build(tally(s => groupKeys(s.basin ? [s.basin] : [])), []),
+    lgas:     build(tally(s => groupKeys(s.lga   ? [s.lga]   : [])), []),
+  };
+  return state.filterOpts;
+}
+
+function filterGroupValues(key) {
+  return filterOptions()[key].map(o => o.value);
+}
+
+// One checkbox in a grouped filter. The Set is kept canonical: empty when
+// everything is ticked (the default, "no constraint") and holding FILTER_EMPTY
+// when nothing is — so what the boxes show and what the filter does can never
+// drift apart, which is what made un-ticking a network a no-op before.
+function toggleGroupFilter(key, value, checked) {
+  const set    = state.filters[key];
+  const values = filterGroupValues(key);
+  if (!set.size && !checked) values.forEach(v => set.add(v));   // "all" → the real list, minus one
+  set.delete(FILTER_EMPTY);
   if (checked) set.add(value);
   else         set.delete(value);
+  if (!set.size)                    set.add(FILTER_EMPTY);      // hand-emptied ≠ show everything
+  else if (set.size === values.length) set.clear();             // back to the full list → "all"
+  stationsFilterChanged();
+}
+
+// "All" / "None" / a row's "only" — the whole group re-renders, since these
+// move every checkbox at once.
+function setGroupFilter(key, mode, value) {
+  state.filters[key] = mode === 'all'  ? new Set()
+                     : mode === 'none' ? new Set([FILTER_EMPTY])
+                     :                   new Set([value]);
+  rerenderFilterGroup(key);
+  stationsFilterChanged();
+}
+
+function setValueFilter(key, value) {
+  state.filters[key] = value;
+  stationsFilterChanged();
+}
+
+function setSensorsAll(checked) {
+  state.filters.sensorsAll = checked;
+  stationsFilterChanged();
+}
+
+// "All" / "None" / "3 of 15" — the at-a-glance state of a collapsed group.
+function filterGroupState(key) {
+  const set = state.filters[key];
+  if (!set.size)              return 'All';
+  if (set.has(FILTER_EMPTY))  return 'None';
+  return `${set.size} of ${filterGroupValues(key).length}`;
+}
+
+function updateFilterGroupState(key) {
+  const el = document.getElementById(`filter-state-${key}`);
+  if (el) el.textContent = filterGroupState(key);
+}
+
+function rerenderFilterGroup(key) {
+  const el = document.getElementById(`filter-group-${key}`);
+  if (el) el.outerHTML = filterGroupHtml(key, el.dataset.title, el.dataset.hint);
+}
+
+// Anything narrowing the station list? Every group is canonical, so a non-empty
+// Set is by definition a real constraint.
+function anyStationFilterActive() {
+  const f = state.filters;
+  return !!(f.search.trim() || f.roles.size || f.sensors.size || f.networks.size ||
+            f.regions.size || f.catchments.size || f.basin || f.lga ||
+            f.hasCoords || f.hasAlertId || f.enabledOnly);
 }
 
 function resetStationFilters() {
   // The ACMA block keeps its own state — clearing station filters should not
   // silently drop an RF layer the operator has configured.
-  state.filters = { search: '', networks: new Set(), catchments: new Set(), roles: new Set(),
-                    enabledOnly: false, acma: state.filters.acma };
+  state.filters = {
+    search: '', roles: new Set(), sensors: new Set(), networks: new Set(),
+    regions: new Set(), catchments: new Set(), sensorsAll: false,
+    basin: '', lga: '', hasCoords: '', hasAlertId: '', enabledOnly: false,
+    acma: state.filters.acma,
+  };
+}
+
+// Reset button on the Stations tab: clear everything and redraw the panel with
+// it (the boxes, the selects and the summaries all move at once).
+function clearStationFilters() {
+  resetStationFilters();
+  renderStationFilters();
+  stationsFilterChanged();
+}
+
+function toggleFilter(key, value, checked) {
+  // The ACMA block's mechanism list is a plain Set with no "empty means all"
+  // convention — the station groups go through toggleGroupFilter instead.
+  const set = key === 'acmaMechanisms' ? state.filters.acma.mechanisms : state.filters[key];
+  if (checked) set.add(value);
+  else         set.delete(value);
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
@@ -2632,7 +3034,7 @@ function acmaFilterBlockHtml() {
 function acmaFilterHeadHtml() {
   const A = state.acma, f = state.filters.acma;
   return `
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.9rem;margin:.75rem 0 .2rem">
+    <label class="filter-check">
       <input type="checkbox" ${f.show ? 'checked' : ''} onchange="toggleAcmaShow(this.checked)">
       Show ACMA licensed transmitters
     </label>
