@@ -114,6 +114,10 @@ if (typeof window !== 'undefined') {
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
+// Bounds on the Stations tab's column split. Up here because the opening
+// render reads a stored width through setSplitWidth before the map code runs.
+const SPLIT_MIN = 240, SPLIT_MAX = 720;
+
 const state = {
   data:       null,   // parsed stations.json
   activeTab:  'stations',
@@ -159,8 +163,22 @@ const state = {
   mapLines:       [],
   mapShowLinks:   true,
   mapHideOthers:  false,   // filter box: highlight matches (default) vs hide the rest
+  mapKillSpaghetti: true,  // drop pass-range links longer than mapMaxLinkKm
+  mapMaxLinkKm:   250,     // km; about as far as a VHF hop plausibly reaches
+  mapLinkCount:   { drawn: 0, culled: 0 },   // last refresh, for the sidebar note
   mapFitKey:      null,    // extent the map was last auto-fitted to (re-fit only on change)
   mapSearchTimer: null,    // debounce for the search box → marker rebuild
+  splitW:         +(localStorage.getItem('mn-split') || 0) || 320,  // Stations tab column split, px
+  // Draw & measure overlay (Stations map). Plain geometry only — the Leaflet
+  // layers are rebuilt from it whenever the map is, so a tab switch doesn't
+  // throw the sketch away. Deliberately not persisted: see MapDraw.
+  draw: {
+    tool:       '',        // '' | 'pin' | 'line' | 'circle' | 'rect' | 'text'
+    shapes:     [],
+    seq:        0,
+    selectedId: null,
+    showLabels: true,
+  },
   exportNets:     null,
   bfInput:        '',
   bfBits:         '1',
@@ -225,8 +243,10 @@ const state = {
   document.documentElement.setAttribute('data-theme', state.theme);
   const btn = document.getElementById('btn-theme');
   if (btn) btn.textContent = state.theme === 'dark' ? 'Light' : 'Dark';
+  setSplitWidth(state.splitW);          // also clamps whatever was stored
   renderTabs();
   renderMain();
+  window.addEventListener('resize', updateChromeHeight);
   autoLoad();
 })();
 
@@ -237,7 +257,7 @@ function toggleTheme() {
   document.documentElement.setAttribute('data-theme', state.theme);
   localStorage.setItem('mn-theme', state.theme);
   document.getElementById('btn-theme').textContent = state.theme === 'dark' ? 'Light' : 'Dark';
-  if (state.map) refreshMapLayers();
+  if (state.map) { refreshMapLayers(); MapDraw.render(); }
 }
 
 // ── File loading ───────────────────────────────────────────────────────────────
@@ -371,6 +391,60 @@ function stationMatchesSearch(s, prep) {
   if (!nums.length) return false;
   const ids = stationAlertIds(s).map(String);
   return nums.some(t => ids.some(id => id.startsWith(t)));
+}
+
+// ── Marking where a search term landed ───────────────────────────────────────
+// Which stations matched is only half the answer: a filter of "491" hits a
+// station number, an ALERT address and a name three different ways, and the
+// row on its own doesn't say which. The table marks the exact characters that
+// matched, following stationMatchesSearch's rules to the letter — substring
+// for names and station numbers, leading digits for ALERT addresses — so the
+// highlight can never claim a match the filter didn't make.
+
+// Every place a term occurs in an already-lowercased string, as merged
+// [start, end) pairs. Overlapping terms ("61" and "6128") become one run
+// rather than nested markup.
+function searchHitRanges(lower, terms) {
+  const spans = [];
+  for (const t of terms) {
+    if (!t) continue;
+    for (let i = lower.indexOf(t); i !== -1; i = lower.indexOf(t, i + 1)) {
+      spans.push([i, i + t.length]);
+    }
+  }
+  if (spans.length < 2) return spans;
+  spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const merged = [spans[0]];
+  for (let i = 1; i < spans.length; i++) {
+    const last = merged[merged.length - 1];
+    if (spans[i][0] <= last[1]) last[1] = Math.max(last[1], spans[i][1]);
+    else merged.push(spans[i]);
+  }
+  return merged;
+}
+
+// HTML for a field with its matched runs wrapped in <mark>. Escaping happens
+// per slice, so the markup can't be spoofed by a station name containing tags.
+function markHits(text, terms) {
+  const str = String(text ?? '');
+  if (!str || !terms || !terms.length) return esc(str);
+  const spans = searchHitRanges(str.toLowerCase(), terms);
+  if (!spans.length) return esc(str);
+  let out = '', at = 0;
+  for (const [a, b] of spans) {
+    out += esc(str.slice(at, a)) + `<mark class="hit">${esc(str.slice(a, b))}</mark>`;
+    at = b;
+  }
+  return out + esc(str.slice(at));
+}
+
+// ALERT addresses are matched from the start (6128 is found by "61", not by
+// "12"), so only that leading run is marked — the longest one that matches.
+function markAlertId(id, nums) {
+  const str = String(id);
+  let len = 0;
+  for (const t of nums) if (t.length > len && str.startsWith(t)) len = t.length;
+  return len ? `<mark class="hit">${str.slice(0, len)}</mark>${str.slice(len)}` : str;
 }
 
 // Names, station numbers and ALERT addresses as flat strings, built once per
@@ -542,6 +616,23 @@ function findRepeaterMatches(station, allStations) {
   );
 }
 
+// Every pass-range path out of a set of field stations, with the length of each
+// one. The map needs the same list twice — to draw the paths, and to work out
+// which repeaters have to stay visible when the rest are hidden — and resolving
+// a station's repeaters is the expensive part, so it is done once here.
+// Stations without a position are skipped: a path needs two ends.
+function passRangeLinks(sources, allStations) {
+  const pairs = [];
+  for (const s of sources) {
+    if (!s.roles.includes('field') || s.lat == null || s.lon == null) continue;
+    for (const r of findRepeaterMatches(s, allStations)) {
+      if (r.lat == null || r.lon == null) continue;
+      pairs.push({ s, r, km: acmaHaversineKm(s.lat, s.lon, r.lat, r.lon) });
+    }
+  }
+  return pairs;
+}
+
 function findStationMatches(repeater, allStations) {
   if (!repeater.repeater) return [];
   return allStations.filter(s =>
@@ -589,6 +680,7 @@ function renderMain() {
     case 'export':     el.innerHTML = renderExportHtml();                 break;
     default:           el.innerHTML = '<p style="padding:1rem">Unknown tab</p>';
   }
+  updateChromeHeight();     // the Stations panes size themselves off it
 }
 
 // ── Empty state ────────────────────────────────────────────────────────────────
@@ -619,33 +711,31 @@ function renderStationsHtml() {
   const stations = filteredStations();
   return `
     <div class="layout map-layout">
-      <aside class="sidebar stack">
+      <aside class="sidebar stack map-pane" id="stations-left">
         <div class="panel filter-panel" id="station-filters">
           ${stationFiltersHtml()}
         </div>
         <div class="panel">
           <div class="panel-header"><h3>Map display</h3></div>
-          <div class="filter-block">
-            <label class="filter-check">
-              <input type="checkbox" ${state.mapHideOthers ? 'checked' : ''}
-                     onchange="state.mapHideOthers=this.checked;refreshMapLayers()">
-              Hide stations that don't match
-            </label>
-            <label class="filter-check">
-              <input type="checkbox" ${state.mapShowLinks ? 'checked' : ''}
-                     onchange="state.mapShowLinks=this.checked;refreshMapLayers()">
-              Show signal links
-            </label>
+          <div class="filter-block" id="map-display-block">
+            ${mapDisplayControlsHtml()}
           </div>
           <div class="filter-block">
             ${acmaFilterBlockHtml()}
           </div>
         </div>
+        <div class="panel" id="map-draw-panel">
+          ${MapDraw.panelHtml()}
+        </div>
         <div class="panel">
           <div class="map-legend" id="map-legend">${mapLegendHtml()}</div>
         </div>
       </aside>
-      <div class="stack">
+      <div class="map-split" id="stations-split" role="separator" aria-orientation="vertical"
+           aria-label="Resize the filter pane" tabindex="0" title="Drag to resize · double-click to reset"
+           onpointerdown="splitDragStart(event)" ondblclick="setSplitWidth(320,true)"
+           onkeydown="splitKey(event)"></div>
+      <div class="stack map-pane" id="stations-right">
         <div class="panel" style="padding:.6rem;position:relative">
           <div id="leaflet-map" style="height:min(62vh,720px);min-height:360px;border-radius:6px"></div>
           <div id="map-note" class="map-note" hidden></div>
@@ -665,6 +755,116 @@ function renderStationsHtml() {
         </div>
       </div>
     </div>`;
+}
+
+// ── Stations tab: the two panes ──────────────────────────────────────────────
+// The filter pane and the map/table column are both taller than the screen, and
+// while the page scrolled as one piece, reaching a filter at the bottom of the
+// sidebar scrolled the map out of sight. Each column now fills the space under
+// the header and scrolls inside itself, and the divider between them drags to
+// re-split the width.
+
+// How much vertical room the header and tab bar take. Measured rather than
+// assumed: both wrap to a second line on a narrow window, and the panes size
+// themselves off what's left.
+function updateChromeHeight() {
+  const hdr = document.querySelector('header');
+  const nav = document.getElementById('tab-bar');
+  const h   = (hdr ? hdr.offsetHeight : 0) + (nav ? nav.offsetHeight : 0);
+  document.documentElement.style.setProperty('--mn-chrome', `${h}px`);
+}
+
+// `save` is left off while a drag is in flight — the width is written once the
+// operator lets go, not sixty times a second.
+function setSplitWidth(px, save) {
+  state.splitW = Math.round(Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, px)));
+  document.documentElement.style.setProperty('--mn-split', `${state.splitW}px`);
+  if (save) localStorage.setItem('mn-split', state.splitW);
+}
+
+function splitDragStart(e) {
+  const bar    = e.currentTarget;
+  const layout = bar.parentElement;
+  if (!layout) return;
+  const left = layout.getBoundingClientRect().left;
+  bar.classList.add('dragging');
+  bar.setPointerCapture(e.pointerId);
+  const move = ev => setSplitWidth(ev.clientX - left);
+  const done = () => {
+    bar.classList.remove('dragging');
+    bar.removeEventListener('pointermove', move);
+    bar.removeEventListener('pointerup', done);
+    bar.removeEventListener('pointercancel', done);
+    setSplitWidth(state.splitW, true);
+    // The map just changed width underneath Leaflet, which only watches the window.
+    if (state.map) state.map.invalidateSize();
+  };
+  bar.addEventListener('pointermove', move);
+  bar.addEventListener('pointerup', done);
+  bar.addEventListener('pointercancel', done);
+  e.preventDefault();
+}
+
+// Keyboard equivalent of the drag, so the split isn't mouse-only.
+function splitKey(e) {
+  const step = e.shiftKey ? 48 : 16;
+  if (e.key === 'ArrowLeft')       setSplitWidth(state.splitW - step, true);
+  else if (e.key === 'ArrowRight') setSplitWidth(state.splitW + step, true);
+  else if (e.key === 'Home')       setSplitWidth(320, true);
+  else return;
+  e.preventDefault();
+  if (state.map) state.map.invalidateSize();
+}
+
+// ── Map display block ────────────────────────────────────────────────────────
+
+const MAX_LINK_KM_CAP = 5000;
+
+function mapDisplayControlsHtml() {
+  const on = state.mapKillSpaghetti;
+  return `
+    <label class="filter-check">
+      <input type="checkbox" ${state.mapHideOthers ? 'checked' : ''}
+             onchange="state.mapHideOthers=this.checked;refreshMapLayers()">
+      Hide stations that don't match
+    </label>
+    <label class="filter-check">
+      <input type="checkbox" ${state.mapShowLinks ? 'checked' : ''}
+             onchange="state.mapShowLinks=this.checked;refreshMapLayers()">
+      Show signal links
+    </label>
+    <label class="filter-check">
+      <input type="checkbox" ${on ? 'checked' : ''}
+             onchange="state.mapKillSpaghetti=this.checked;rerenderMapDisplayControls();refreshMapLayers()">
+      Kill spaghetti
+    </label>
+    <label class="filter-range${on ? '' : ' is-off'}">
+      <span>Max TX distance <strong id="max-tx-val">${state.mapMaxLinkKm} km</strong></span>
+      <input type="range" min="0" max="${MAX_LINK_KM_CAP}" step="10" value="${state.mapMaxLinkKm}"
+             ${on ? '' : 'disabled'}
+             oninput="document.getElementById('max-tx-val').textContent=this.value+' km'"
+             onchange="state.mapMaxLinkKm=+this.value;refreshMapLayers()">
+    </label>
+    <p class="filter-note" id="map-link-note">${mapLinkNoteHtml()}</p>`;
+}
+
+function rerenderMapDisplayControls() {
+  const el = document.getElementById('map-display-block');
+  if (el) el.innerHTML = mapDisplayControlsHtml();
+}
+
+// What the link controls are actually doing. Counted on the last refresh so the
+// note survives a re-render of the pane.
+function mapLinkNoteHtml() {
+  const { drawn, culled } = state.mapLinkCount;
+  if (!state.mapShowLinks) return 'Signal links are hidden.';
+  const links = n => `${n} link${n === 1 ? '' : 's'}`;
+  if (!state.mapKillSpaghetti) {
+    return `${links(drawn)} drawn — every pass-range path, however long.`;
+  }
+  return culled
+    ? `${links(drawn)} drawn · <strong>${culled}</strong> over ${state.mapMaxLinkKm} km hidden.`
+    : `${links(drawn)} drawn · none over ${state.mapMaxLinkKm} km.`;
 }
 
 function mapLegendHtml() {
@@ -759,13 +959,21 @@ function initMap() {
   // The old map (if any) owned these layer groups — they die with it.
   state.acma.layer = state.acma.beamLayer = state.acma.linkLayer = state.acma.hiLayer = null;
   MapLocate.detach();
+  MapDraw.detach();
   const el = document.getElementById('leaflet-map');
   if (!el) return;
   state.map = L.map('leaflet-map');
+  // A view before anything is added to the map. Leaflet defers every layer add
+  // until the map has one, and the deferred adds then run in an order nothing
+  // controls: a path registers the shared SVG renderer as it is queued, so a
+  // layer group queued earlier can be drawn against a renderer that has not
+  // been set up yet. It is replaced by the fit below on the same tick.
+  state.map.setView(MAP_HOME, 4);
   state.mapFitKey = null;              // a fresh map always fits its contents once
   addBaseLayers(state.map);
   MapSpider.attach(state.map);
   MapLocate.attach(state.map);
+  MapDraw.attach(state.map);
   state.map.on('click', () => acmaClearHighlight());
   refreshMapLayers();
   refreshAcmaLayer();
@@ -794,6 +1002,8 @@ function acmaAfterLoad() {
 const MAP_LABEL_CAP = 60;     // permanent name labels beyond this are unreadable
 const MAP_PIN_RING  = '#ffffff';
 const MAP_PIN_HIT   = '#ffc400';
+const MAP_HOME      = [-25.6, 134.3];   // middle of Australia — the opening view,
+                                        // replaced by a fit to whatever is plotted
 
 // Is any station filter narrowing things down? Every grouped filter keeps its
 // Set canonical (empty when everything is ticked), so "not empty" already means
@@ -817,6 +1027,11 @@ function mapMatchNoteHtml() {
 function updateMapMatchNote() {
   const el = document.getElementById('map-match-note');
   if (el) el.innerHTML = mapMatchNoteHtml();
+}
+
+function updateMapLinkNote() {
+  const el = document.getElementById('map-link-note');
+  if (el) el.innerHTML = mapLinkNoteHtml();
 }
 
 // Signature of the extent last auto-fitted. Refreshes that don't change what
@@ -845,8 +1060,29 @@ function refreshMapLayers() {
   const active   = mapFilterActive();
   const matchIds = active ? new Set(filteredStations().map(s => s.id)) : null;
   const matched  = active ? located.filter(s => matchIds.has(s.id)) : [];
-  // Highlight mode keeps every pin on the map; hide mode drops the rest.
-  const stations = (active && state.mapHideOthers) ? matched : located;
+
+  // Links follow the highlight: with a filter running, only matched stations
+  // draw theirs, so the lines don't bury the pins they're meant to explain.
+  // They are resolved before the pins because in hide mode they decide which
+  // repeaters have to stay on the map.
+  const allLinks = state.mapShowLinks
+    ? passRangeLinks(active ? matched : located, state.data.stations) : [];
+  const maxKm = state.mapKillSpaghetti ? state.mapMaxLinkKm : Infinity;
+  const links = allLinks.filter(l => l.km <= maxKm);
+  state.mapLinkCount = { drawn: links.length, culled: allLinks.length - links.length };
+  updateMapLinkNote();
+
+  // Highlight mode keeps every pin on the map; hide mode drops the rest —
+  // except the repeaters at the far end of a drawn path. Hiding those left the
+  // TX path on screen with nothing at the end of it: the one station the
+  // operator most wants to see is the one the signal is going to.
+  let stations = (active && state.mapHideOthers) ? matched : located;
+  if (active && state.mapHideOthers && links.length) {
+    const shown = new Set(stations.map(s => s.id));
+    const kept  = [];
+    for (const l of links) if (!shown.has(l.r.id)) { shown.add(l.r.id); kept.push(l.r); }
+    if (kept.length) stations = stations.concat(kept);
+  }
   updateMapMatchNote();
   if (!stations.length) { MapSpider.setPins('stations', []); return; }
 
@@ -861,21 +1097,12 @@ function refreshMapLayers() {
   const lineColor = getComputedStyle(document.documentElement)
     .getPropertyValue('--map-line').trim() || '#ff6f00';
 
-  if (state.mapShowLinks) {
-    const allStations = state.data.stations;
-    // Links follow the highlight: with a filter running, only matched stations
-    // draw theirs, so the lines don't bury the pins they're meant to explain.
-    for (const s of (active ? matched : stations)) {
-      if (!s.roles.includes('field')) continue;
-      for (const r of findRepeaterMatches(s, allStations)) {
-        if (!r.lat || !r.lon) continue;
-        state.mapLines.push(
-          L.polyline([[s.lat, s.lon], [r.lat, r.lon]], {
-            color: lineColor, weight: 1.5, opacity: 0.5,
-          }).addTo(map)
-        );
-      }
-    }
+  for (const l of links) {
+    state.mapLines.push(
+      L.polyline([[l.s.lat, l.s.lon], [l.r.lat, l.r.lon]], {
+        color: lineColor, weight: 1.5, opacity: 0.5,
+      }).addTo(map)
+    );
   }
 
   for (const s of stations) {
@@ -1294,10 +1521,591 @@ const MapLocate = (function () {
   };
 })();
 
+// ── Draw & measure ───────────────────────────────────────────────────────────
+// Sketching over the network map: a coverage circle round a repeater, a
+// proposed path, a box round the part of a catchment that went quiet, and a
+// note saying what the picture is about. Every shape can be drawn by clicking
+// on the map *or* typed in as coordinates and real-world dimensions, and
+// either way it reduces to the same few numbers — which the pane then shows,
+// and lets you edit. So a circle dropped roughly by hand becomes exactly
+// 25.0 km by typing over its radius.
+//
+// Shapes carry their own measurements (length, radius, area) on the map, which
+// is the "measure" half: drop a two-point line between two sites and it says
+// how far apart they are and on what bearing.
+//
+// Nothing is saved. The shapes live as long as the page does — a tab switch
+// rebuilds them from state.draw.shapes, a reload clears them — and the export
+// is the operating system's screen-clipping tool.
+
+const DRAW_TOOLS = {
+  pin:    { icon: '📍', label: 'Pin',       hint: 'Click the map to drop a pin. Keeps going until you pick another tool.' },
+  line:   { icon: '╱',  label: 'Line',      hint: 'Click each corner; double-click (or Finish) to end. Shows length and bearing.' },
+  circle: { icon: '◯',  label: 'Circle',    hint: 'Click the centre, then click again at the radius.' },
+  rect:   { icon: '▭',  label: 'Rectangle', hint: 'Click one corner, then the opposite one.' },
+  text:   { icon: 'T',  label: 'Text',      hint: 'Click where the note goes, then type it.' },
+};
+
+const KM_PER_DEG_LAT = 110.574;                                  // as in acmaBeamPolygon
+function kmPerDegLon(lat) { return 111.320 * Math.cos(lat * Math.PI / 180); }
+
+function bearingDeg(lat1, lon1, lat2, lon2) {
+  const rad = Math.PI / 180;
+  const y = Math.sin((lon2 - lon1) * rad) * Math.cos(lat2 * rad);
+  const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) -
+            Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos((lon2 - lon1) * rad);
+  return (Math.atan2(y, x) / rad + 360) % 360;
+}
+
+// Where you end up starting at a point and travelling a distance on a bearing —
+// the "from this repeater, 12 km on 045°" form of drawing a line.
+function destPoint(lat, lon, brg, km) {
+  const R = 6371.0088, rad = Math.PI / 180;
+  const d = km / R, b = brg * rad, p1 = lat * rad, l1 = lon * rad;
+  const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(b));
+  const l2 = l1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(p1),
+                             Math.cos(d) - Math.sin(p1) * Math.sin(p2));
+  return [p2 / rad, ((l2 / rad + 540) % 360) - 180];
+}
+
+function fmtKm(km) {
+  if (!isFinite(km)) return '—';
+  if (km < 1)   return `${Math.round(km * 1000)} m`;
+  if (km < 10)  return `${km.toFixed(2)} km`;
+  if (km < 100) return `${km.toFixed(1)} km`;
+  return `${Math.round(km)} km`;
+}
+
+function fmtArea(km2) {
+  if (!isFinite(km2)) return '—';
+  if (km2 < 10)   return `${km2.toFixed(2)} km²`;
+  if (km2 < 1000) return `${km2.toFixed(1)} km²`;
+  return `${Math.round(km2).toLocaleString()} km²`;
+}
+
+const MapDraw = (function () {
+  let map = null, group = null, ghost = null;
+  let pending = null;      // shape being clicked out: { kind, pts: [[lat,lon], …] }
+  let keyHandler = null;
+
+  const D = () => state.draw;
+
+  function colour() {
+    return getComputedStyle(document.documentElement).getPropertyValue('--draw').trim() || '#c2185b';
+  }
+
+  // ── geometry → numbers ──
+  // Rectangles are held as a centre plus real-world width and height, not as a
+  // pair of corners: "8 km across" is the thing being asked for, and it is what
+  // survives being typed over.
+  function rectBounds(sh) {
+    const dLat = (sh.heightKm / 2) / KM_PER_DEG_LAT;
+    const dLon = (sh.widthKm  / 2) / kmPerDegLon(sh.lat);
+    return [[sh.lat - dLat, sh.lon - dLon], [sh.lat + dLat, sh.lon + dLon]];
+  }
+
+  function rectFromCorners(a, b) {
+    const lat = (a[0] + b[0]) / 2, lon = (a[1] + b[1]) / 2;
+    return {
+      kind: 'rect', lat, lon,
+      widthKm:  Math.abs(a[1] - b[1]) * kmPerDegLon(lat),
+      heightKm: Math.abs(a[0] - b[0]) * KM_PER_DEG_LAT,
+    };
+  }
+
+  function lineKm(pts) {
+    let km = 0;
+    for (let i = 1; i < pts.length; i++) {
+      km += acmaHaversineKm(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
+    }
+    return km;
+  }
+
+  // The one-line measurement a shape carries, on the map and in the list.
+  function measure(sh) {
+    switch (sh.kind) {
+      case 'pin':  return `${sh.lat.toFixed(4)}, ${sh.lon.toFixed(4)}`;
+      case 'text': return sh.text;
+      case 'circle': {
+        const a = Math.PI * sh.radiusKm ** 2;
+        return `r ${fmtKm(sh.radiusKm)} · ${fmtArea(a)}`;
+      }
+      case 'rect':
+        return `${fmtKm(sh.widthKm)} × ${fmtKm(sh.heightKm)} · ${fmtArea(sh.widthKm * sh.heightKm)}`;
+      case 'line': {
+        const km = lineKm(sh.pts);
+        if (sh.pts.length === 2) {
+          const b = bearingDeg(sh.pts[0][0], sh.pts[0][1], sh.pts[1][0], sh.pts[1][1]);
+          return `${fmtKm(km)} @ ${String(Math.round(b)).padStart(3, '0')}°`;
+        }
+        return `${fmtKm(km)} over ${sh.pts.length - 1} legs`;
+      }
+      default: return '';
+    }
+  }
+
+  function centreOf(sh) {
+    if (sh.kind === 'line') {
+      const lat = sh.pts.reduce((a, p) => a + p[0], 0) / sh.pts.length;
+      const lon = sh.pts.reduce((a, p) => a + p[1], 0) / sh.pts.length;
+      return [lat, lon];
+    }
+    return [sh.lat, sh.lon];
+  }
+
+  // ── layers ──
+
+  function layerFor(sh) {
+    const c   = colour();
+    const sel = sh.id === D().selectedId;
+    const path = { color: c, weight: sel ? 4 : 2.5, opacity: 1, fillColor: c, fillOpacity: .12 };
+    switch (sh.kind) {
+      case 'pin':
+        return L.marker([sh.lat, sh.lon], {
+          icon: L.divIcon({ className: `mn-draw-pin${sel ? ' sel' : ''}`, html: '<i></i>',
+                            iconSize: [16, 16], iconAnchor: [8, 16] }),
+        });
+      case 'text':
+        return L.marker([sh.lat, sh.lon], {
+          icon: L.divIcon({ className: `mn-draw-textbox${sel ? ' sel' : ''}`,
+                            html: `<span>${esc(sh.text)}</span>`, iconSize: null }),
+        });
+      case 'line':   return L.polyline(sh.pts, { ...path, fill: false });
+      case 'circle': return L.circle([sh.lat, sh.lon], { ...path, radius: sh.radiusKm * 1000 });
+      case 'rect':   return L.rectangle(rectBounds(sh), path);
+      default:       return null;
+    }
+  }
+
+  function draw(sh) {
+    const layer = layerFor(sh);
+    if (!layer) return;
+    sh._layer = layer;
+    layer.addTo(group);
+    // Text annotations already read as their own label; everything else gets
+    // its measurement written next to it.
+    if (D().showLabels && sh.kind !== 'text') {
+      const anchor = sh.kind === 'pin' ? 'top' : 'center';
+      layer.bindTooltip(measure(sh), {
+        permanent: true, direction: anchor, className: 'mn-draw-label',
+        offset: sh.kind === 'pin' ? [0, -18] : [0, 0],
+      });
+    }
+    layer.on('click', e => {
+      if (D().tool) return;                 // a tool is armed: the click is a draw click
+      L.DomEvent.stop(e);
+      select(sh.id);
+    });
+  }
+
+  function render() {
+    if (!group) return;
+    group.clearLayers();
+    D().shapes.forEach(draw);
+  }
+
+  function clearGhost() { if (ghost) { ghost.remove(); ghost = null; } }
+
+  // Dashed preview of the shape being clicked out, following the cursor.
+  function showGhost(to) {
+    clearGhost();
+    if (!pending || !map) return;
+    const c = colour(), a = pending.pts[0];
+    const opts = { color: c, weight: 2, dashArray: '5,5', fill: false, interactive: false };
+    if (pending.kind === 'line') {
+      const pts = to ? pending.pts.concat([to]) : pending.pts;
+      if (pts.length < 2) return;
+      ghost = L.polyline(pts, opts);
+    } else if (to && pending.kind === 'circle') {
+      ghost = L.circle(a, { ...opts, radius: acmaHaversineKm(a[0], a[1], to[0], to[1]) * 1000 });
+    } else if (to && pending.kind === 'rect') {
+      ghost = L.rectangle([a, to], opts);
+    }
+    if (ghost) ghost.addTo(map);
+  }
+
+  // ── shape list ──
+
+  function add(shape) {
+    shape.id = `d${++D().seq}`;
+    D().shapes.push(shape);
+    D().selectedId = shape.id;
+    render();
+    rerenderPanel();
+    return shape;
+  }
+
+  function select(id) {
+    D().selectedId = D().selectedId === id ? null : id;
+    render();
+    rerenderPanel();
+    const sh = D().shapes.find(s => s.id === D().selectedId);
+    if (sh && map) map.panTo(centreOf(sh));
+  }
+
+  function remove(id) {
+    D().shapes = D().shapes.filter(s => s.id !== id);
+    if (D().selectedId === id) D().selectedId = null;
+    render();
+    rerenderPanel();
+  }
+
+  function clearAll() {
+    if (D().shapes.length > 1 &&
+        !confirm(`Remove all ${D().shapes.length} drawings?`)) return;
+    D().shapes = [];
+    D().selectedId = null;
+    cancelPending();
+    render();
+    rerenderPanel();
+  }
+
+  // ── click-to-draw ──
+
+  function cancelPending() {
+    pending = null;
+    clearGhost();
+    updateFinishButton();
+  }
+
+  function finishLine() {
+    if (pending && pending.kind === 'line' && pending.pts.length >= 2) {
+      add({ kind: 'line', pts: pending.pts });
+    }
+    cancelPending();
+  }
+
+  function onClick(e) {
+    const tool = D().tool;
+    if (!tool || !map) return;
+    const ll = [e.latlng.lat, e.latlng.lng];
+    if (tool === 'pin') { add({ kind: 'pin', lat: ll[0], lon: ll[1] }); return; }
+    if (tool === 'text') {
+      const t = prompt('Annotation text');
+      if (t && t.trim()) add({ kind: 'text', lat: ll[0], lon: ll[1], text: t.trim() });
+      return;
+    }
+    if (!pending || pending.kind !== tool) {
+      pending = { kind: tool, pts: [ll] };
+      updateFinishButton();
+      showGhost(null);
+      return;
+    }
+    if (tool === 'line') { pending.pts.push(ll); showGhost(null); updateFinishButton(); return; }
+    const a = pending.pts[0];
+    if (tool === 'circle') {
+      const r = acmaHaversineKm(a[0], a[1], ll[0], ll[1]);
+      if (r > 0) add({ kind: 'circle', lat: a[0], lon: a[1], radiusKm: r });
+    } else if (tool === 'rect') {
+      const rect = rectFromCorners(a, ll);
+      if (rect.widthKm > 0 && rect.heightKm > 0) add(rect);
+    }
+    cancelPending();
+  }
+
+  function onMove(e) {
+    if (pending && map) showGhost([e.latlng.lat, e.latlng.lng]);
+  }
+
+  function onDblClick(e) {
+    if (D().tool === 'line' && pending) { L.DomEvent.stop(e); finishLine(); }
+  }
+
+  function onKey(e) {
+    if (e.key === 'Escape') { if (pending) cancelPending(); else setTool(''); }
+    else if (e.key === 'Enter' && pending && pending.kind === 'line') finishLine();
+  }
+
+  function setTool(tool) {
+    const D_ = D();
+    cancelPending();
+    D_.tool = D_.tool === tool ? '' : tool;
+    if (map) {
+      // While a tool is armed, clicks have to reach the map: station pins and
+      // ACMA squares would otherwise swallow the one near the site you are
+      // trying to draw around.
+      map.getContainer().classList.toggle('mn-drawing', !!D_.tool);
+      if (D_.tool === 'line') map.doubleClickZoom.disable();
+      else                    map.doubleClickZoom.enable();
+    }
+    if (D_.tool && !keyHandler) {
+      keyHandler = onKey;
+      document.addEventListener('keydown', keyHandler);
+    } else if (!D_.tool && keyHandler) {
+      document.removeEventListener('keydown', keyHandler);
+      keyHandler = null;
+    }
+    mapNote(D_.tool ? DRAW_TOOLS[D_.tool].hint : '', 0);
+    rerenderPanel();
+  }
+
+  // ── typed-in shapes ──
+
+  function num(id) {
+    const el = document.getElementById(id);
+    if (!el || el.value.trim() === '') return null;
+    const v = Number(el.value);
+    return isFinite(v) ? v : null;
+  }
+
+  function centreLatLon() {
+    return map ? [map.getCenter().lat, map.getCenter().lng] : [0, 0];
+  }
+
+  // Fill the lat/lon boxes of whichever form is on screen with the middle of
+  // the current view — the usual starting point for "about here, 20 km across".
+  function useMapCentre(prefix) {
+    const [lat, lon] = centreLatLon();
+    const a = document.getElementById(`${prefix}-lat`);
+    const b = document.getElementById(`${prefix}-lon`);
+    if (a) a.value = lat.toFixed(5);
+    if (b) b.value = lon.toFixed(5);
+  }
+
+  // Build a shape from the "place by numbers" form for the armed tool. Returns
+  // null (with a note over the map) when the numbers don't describe anything.
+  function shapeFromForm(kind) {
+    const lat = num('dr-lat'), lon = num('dr-lon');
+    if (lat == null || lon == null) { mapNote('Enter a latitude and longitude first', 3500); return null; }
+    if (kind === 'pin')  return { kind: 'pin', lat, lon };
+    if (kind === 'text') {
+      const el = document.getElementById('dr-text');
+      const t  = el ? el.value.trim() : '';
+      if (!t) { mapNote('Enter the text of the annotation', 3500); return null; }
+      return { kind: 'text', lat, lon, text: t };
+    }
+    if (kind === 'circle') {
+      const r = num('dr-radius');
+      if (!r || r <= 0) { mapNote('Enter a radius in km', 3500); return null; }
+      return { kind: 'circle', lat, lon, radiusKm: r };
+    }
+    if (kind === 'rect') {
+      const w = num('dr-width'), h = num('dr-height');
+      if (!w || !h || w <= 0 || h <= 0) { mapNote('Enter a width and height in km', 3500); return null; }
+      return { kind: 'rect', lat, lon, widthKm: w, heightKm: h };
+    }
+    // A line's far end can be given either way round: a second coordinate, or
+    // a bearing and a distance from the first.
+    const lat2 = num('dr-lat2'), lon2 = num('dr-lon2');
+    if (lat2 != null && lon2 != null) return { kind: 'line', pts: [[lat, lon], [lat2, lon2]] };
+    const brg = num('dr-bearing'), dist = num('dr-dist');
+    if (dist != null && dist > 0) {
+      return { kind: 'line', pts: [[lat, lon], destPoint(lat, lon, brg || 0, dist)] };
+    }
+    mapNote('Give the far end as a lat/lon, or as a bearing and distance', 4000);
+    return null;
+  }
+
+  function addFromForm() {
+    const kind  = D().tool || 'pin';
+    const shape = shapeFromForm(kind);
+    if (!shape) return;
+    add(shape);
+    if (map) map.panTo(centreOf(shape));
+  }
+
+  // Typing over a drawn shape's numbers — the other half of "draw it roughly,
+  // then make it exact".
+  function applyEdit(id) {
+    const sh = D().shapes.find(s => s.id === id);
+    if (!sh) return;
+    const v = k => {
+      const el = document.getElementById(`de-${k}`);
+      if (!el) return null;
+      if (k === 'text') return el.value.trim();
+      const n = Number(el.value);
+      return el.value.trim() === '' || !isFinite(n) ? null : n;
+    };
+    if (sh.kind === 'line') {
+      const a = [v('lat'), v('lon')], b = [v('lat2'), v('lon2')];
+      if (a.some(x => x == null) || b.some(x => x == null)) { mapNote('Both ends need a lat and lon', 3500); return; }
+      sh.pts = [a, b];
+    } else {
+      const lat = v('lat'), lon = v('lon');
+      if (lat == null || lon == null) { mapNote('Enter a latitude and longitude', 3500); return; }
+      sh.lat = lat; sh.lon = lon;
+      if (sh.kind === 'circle') sh.radiusKm = Math.max(v('radius') || 0, 0.001);
+      if (sh.kind === 'rect')   { sh.widthKm = Math.max(v('width') || 0, 0.001);
+                                  sh.heightKm = Math.max(v('height') || 0, 0.001); }
+      if (sh.kind === 'text')   sh.text = v('text') || sh.text;
+    }
+    render();
+    rerenderPanel();
+  }
+
+  function toggleLabels(on) {
+    D().showLabels = on;
+    render();
+  }
+
+  function updateFinishButton() {
+    const btn = document.getElementById('draw-finish');
+    if (btn) btn.hidden = !(pending && pending.kind === 'line' && pending.pts.length >= 2);
+  }
+
+  // ── the pane ──
+
+  function field(id, label, value, step, placeholder) {
+    return `
+      <label class="draw-field">
+        <span>${esc(label)}</span>
+        <input type="number" id="${id}" step="${step}" value="${value ?? ''}"
+               placeholder="${placeholder || ''}" inputmode="decimal">
+      </label>`;
+  }
+
+  function newFormHtml(kind) {
+    const rows = [field('dr-lat', kind === 'line' ? 'From lat' : 'Latitude', '', 'any'),
+                  field('dr-lon', kind === 'line' ? 'From lon' : 'Longitude', '', 'any')];
+    if (kind === 'circle') rows.push(field('dr-radius', 'Radius (km)', '', '0.1'));
+    if (kind === 'rect')   rows.push(field('dr-width', 'Width (km)', '', '0.1'),
+                                     field('dr-height', 'Height (km)', '', '0.1'));
+    if (kind === 'line')   rows.push(field('dr-lat2', 'To lat', '', 'any'),
+                                     field('dr-lon2', 'To lon', '', 'any'),
+                                     field('dr-bearing', 'or bearing (°)', '', '1'),
+                                     field('dr-dist', 'and distance (km)', '', '0.1'));
+    return `
+      <div class="draw-form">${rows.join('')}</div>
+      ${kind === 'text' ? `
+        <label class="draw-field draw-field-wide">
+          <span>Text</span>
+          <input type="text" id="dr-text" placeholder="e.g. flood watch area">
+        </label>` : ''}
+      <div class="draw-actions">
+        <button onclick="MapDraw.useMapCentre('dr')">Map centre</button>
+        <button class="primary" onclick="MapDraw.addFromForm()">Add ${esc(DRAW_TOOLS[kind].label.toLowerCase())}</button>
+      </div>`;
+  }
+
+  function editFormHtml(sh) {
+    const rows = [];
+    if (sh.kind === 'line') {
+      rows.push(field('de-lat', 'From lat', sh.pts[0][0].toFixed(5), 'any'),
+                field('de-lon', 'From lon', sh.pts[0][1].toFixed(5), 'any'),
+                field('de-lat2', 'To lat', sh.pts[1][0].toFixed(5), 'any'),
+                field('de-lon2', 'To lon', sh.pts[1][1].toFixed(5), 'any'));
+    } else {
+      rows.push(field('de-lat', 'Latitude',  sh.lat.toFixed(5), 'any'),
+                field('de-lon', 'Longitude', sh.lon.toFixed(5), 'any'));
+      if (sh.kind === 'circle') rows.push(field('de-radius', 'Radius (km)', +sh.radiusKm.toFixed(3), '0.1'));
+      if (sh.kind === 'rect')   rows.push(field('de-width', 'Width (km)',  +sh.widthKm.toFixed(3), '0.1'),
+                                          field('de-height', 'Height (km)', +sh.heightKm.toFixed(3), '0.1'));
+    }
+    return `
+      <div class="draw-edit">
+        <div class="draw-form">${rows.join('')}</div>
+        ${sh.kind === 'text' ? `
+          <label class="draw-field draw-field-wide">
+            <span>Text</span>
+            <input type="text" id="de-text" value="${esc(sh.text)}">
+          </label>` : ''}
+        <div class="draw-actions">
+          <button onclick="MapDraw.applyEdit('${escAttr(sh.id)}')">Apply</button>
+        </div>
+      </div>`;
+  }
+
+  function listHtml() {
+    const D_ = D();
+    if (!D_.shapes.length) return '<p class="filter-note">Nothing drawn yet.</p>';
+    return `<div class="draw-list">${D_.shapes.map(sh => {
+      const sel = sh.id === D_.selectedId;
+      // A hand-drawn multi-leg line has no small set of numbers to type over,
+      // so it lists its length and leaves it there; everything else opens its
+      // measurements for editing when picked.
+      const editable = sel && (sh.kind !== 'line' || sh.pts.length === 2);
+      return `
+        <div class="draw-row${sel ? ' sel' : ''}">
+          <button class="draw-row-main" onclick="MapDraw.select('${escAttr(sh.id)}')"
+                  title="Select and centre on it">
+            <span class="draw-row-icon">${DRAW_TOOLS[sh.kind].icon}</span>
+            <span class="draw-row-text">${esc(measure(sh))}</span>
+          </button>
+          <button class="draw-del" title="Delete"
+                  onclick="MapDraw.remove('${escAttr(sh.id)}')">✕</button>
+        </div>
+        ${editable ? editFormHtml(sh) : ''}`;
+    }).join('')}</div>`;
+  }
+
+  function panelHtml() {
+    const D_ = D();
+    return `
+      <div class="panel-header">
+        <h3>Draw &amp; measure</h3>
+        <button class="filter-reset" onclick="MapDraw.clearAll()"
+                ${D_.shapes.length ? '' : 'disabled'}>Clear all</button>
+      </div>
+      <div class="draw-tools">
+        ${Object.entries(DRAW_TOOLS).map(([k, t]) => `
+          <button class="draw-tool${D_.tool === k ? ' on' : ''}" title="${esc(t.hint)}"
+                  onclick="MapDraw.setTool('${k}')">
+            <span class="draw-tool-icon">${t.icon}</span>${esc(t.label)}
+          </button>`).join('')}
+      </div>
+      <p class="filter-hint">${D_.tool
+        ? esc(DRAW_TOOLS[D_.tool].hint) + ' Esc stops.'
+        : 'Pick a tool, then draw on the map or type the numbers in. Nothing is saved — clip the screen to keep it.'}</p>
+      <button id="draw-finish" hidden onclick="MapDraw.finishLine()">Finish line</button>
+      ${D_.tool ? `
+        <details class="draw-numeric" open>
+          <summary class="small">Place by numbers</summary>
+          ${newFormHtml(D_.tool)}
+        </details>` : ''}
+      <label class="filter-check">
+        <input type="checkbox" ${D_.showLabels ? 'checked' : ''}
+               onchange="MapDraw.toggleLabels(this.checked)">
+        Show measurements on the map
+      </label>
+      ${listHtml()}`;
+  }
+
+  function rerenderPanel() {
+    const el = document.getElementById('map-draw-panel');
+    if (el) { el.innerHTML = panelHtml(); updateFinishButton(); }
+  }
+
+  return {
+    attach(m) {
+      map   = m;
+      group = L.layerGroup().addTo(m);
+      pending = null; ghost = null;
+      m.on('click', onClick);
+      m.on('mousemove', onMove);
+      m.on('dblclick', onDblClick);
+      // A tool left armed from a previous visit to the tab stays armed, so the
+      // new map has to be put back into drawing mode — including the hint,
+      // which went with the old map's note strip.
+      if (D().tool) {
+        m.getContainer().classList.add('mn-drawing');
+        if (D().tool === 'line') m.doubleClickZoom.disable();
+        if (!keyHandler) { keyHandler = onKey; document.addEventListener('keydown', keyHandler); }
+        mapNote(DRAW_TOOLS[D().tool].hint, 0);
+      }
+      render();
+    },
+
+    // The map is going away (tab switch, re-render). The shapes themselves are
+    // plain numbers in state and are redrawn on the next attach.
+    detach() {
+      if (keyHandler) { document.removeEventListener('keydown', keyHandler); keyHandler = null; }
+      clearGhost();
+      pending = null;
+      map = null; group = null;
+    },
+
+    panelHtml, rerenderPanel, render, setTool, select, remove, clearAll,
+    finishLine, addFromForm, applyEdit, useMapCentre, toggleLabels, measure,
+  };
+})();
+
 // ── Station table (lower half of the Stations tab) ─────────────────────────────
 
 function stationsTable(stations) {
   if (!stations.length) return '<p style="padding:.75rem;color:var(--muted)">No stations match current filters.</p>';
+  // Same prepared terms the filter itself ran on, so the marks land exactly
+  // where the match was made.
+  const { terms, nums } = prepareSearch(state.filters.search);
   return `
     <table>
       <colgroup>
@@ -1316,11 +2124,11 @@ function stationsTable(stations) {
           return `
             <tr class="${state.selectedId === s.id ? 'selected' : ''}" data-sid="${escAttr(s.id)}"
                 onclick="selectStation('${escAttr(s.id)}')" style="cursor:pointer">
-              <td title="${esc(s.id)}"><span class="stn-name role-${primaryRole(s)}">${esc(s.name)}</span></td>
-              <td class="small">${esc(s.station_number || '')}</td>
+              <td title="${esc(s.id)}"><span class="stn-name role-${primaryRole(s)}">${markHits(s.name, terms)}</span></td>
+              <td class="small">${markHits(s.station_number || '', terms)}</td>
               <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}</td>
               <td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
-              <td class="small">${aids.join(', ')}</td>
+              <td class="small">${aids.map(id => markAlertId(id, nums)).join(', ')}</td>
               <td class="small">${s.lat != null ? s.lat.toFixed(4) : ''}</td>
               <td class="small">${s.lon != null ? s.lon.toFixed(4) : ''}</td>
               <td class="small">${s.elevation_ahd != null ? s.elevation_ahd : ''}</td>
