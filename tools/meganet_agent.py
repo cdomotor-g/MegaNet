@@ -5,7 +5,7 @@ This is a reference implementation of an *agentic* Claude API loop that uses
 **code execution with tools** (programmatic tool calling): Claude runs Python in
 an Anthropic-hosted sandbox and, from inside that sandbox, calls a custom
 `query_stations` tool that reads the local ``stations.json``. Because the
-dataset is large (1,300+ stations), this keeps the raw records out of the model
+dataset is large (3,000+ stations), this keeps the raw records out of the model
 context — Claude filters and aggregates in code and only the answer comes back.
 
 --------------------------------------------------------------------------------
