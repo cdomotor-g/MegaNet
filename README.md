@@ -187,7 +187,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 | `roles` | `string[]` | Any combination of `"field"`, `"repeater"`, `"base"` |
 | `alert_ids.water_level` | `number` or `number[]` | Single ID or array for dual-sensor sites |
 | `site` | `object` | Contrail/ARRO site the station maps to: `db_id` (internal ARRO site id), `number` (external site number), `name` |
-| `sensors` | `object[]` | Every ALERT-addressable device at the site, sourced from the national sensor export. Each has `alert_id`, `type` (e.g. `"Rainfall"`, `"Water Level"`, `"Battery"`), `sensor_id` and `device_id` |
+| `sensors` | `object[]` | Every ALERT-addressable device at the site, sourced from the ARRO sensor exports. Each has `alert_id`, `type` (e.g. `"Rainfall"`, `"Water Level"`, `"Battery"`), `sensor_id` and `device_id`. `alert_id` is `null` for sensors ARRO has not given an ALERT address; `device_id` (and `site.db_id`) are `null` when the ARRO-internal ids are unknown, which only costs the sensor its ARRO graph link |
 | `repeater.pass_ranges` | `object[]` | Unlimited; each has `low` and `high` inclusive bounds |
 | `repeater.exclusions` | `object[]` | Reserved for next-generation equipment; same `low`/`high` structure |
 | `rm_system_id` | `number` | References the Radio Mobile system spec (power, antenna, etc.) |
@@ -197,9 +197,15 @@ Each entry in the `stations` array represents one node in the network. A node ca
 > **`site` / `sensors`** are the authoritative sensor records — the `alert_ids`
 > labels are kept for backward compatibility but can be mislabelled (an address
 > filed under `rainfall` may actually be a Water Level device). The Bit Flipper
-> reads `sensors` for its Sensor / Sensor ID columns and ARRO links. These fields
-> were imported from `z_Sensors_with_Database_IDs_by_View_NATIONAL.csv`, which is
-> now redundant and has been moved to `archive/`.
+> reads `sensors` for its Sensor / Sensor ID columns and ARRO links.
+>
+> **Provenance.** `site` / `sensors` come from ARRO's *Sensors — List by System*
+> exports, one workbook per state, loaded with `tools/import_arro_sensors.py`.
+> The `Site` column of those exports is the authoritative station name: an early
+> import truncated names at 20 characters, and the importer repairs them. ARRO's
+> internal `db_id` / `device_id` are not in the workbooks, so they are looked up
+> in `archive/z_Sensors_with_Database_IDs_by_View_NATIONAL.csv` — the earlier
+> national export, kept for exactly that reason.
 
 ---
 

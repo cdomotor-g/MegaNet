@@ -22,12 +22,43 @@ document every flag under `--help`. `acma_fetch.py --dry-run` prints the
 per-mechanism candidate counts without writing anything — it doubles as the
 sanity check that frequency units parsed correctly.
 
+## `import_arro_sensors.py` — fold ARRO sensor exports into `stations.json`
+
+ARRO's **Sensors — List by System** report exports one workbook per state with
+every sensor it knows about. This script merges those workbooks into
+`stations.json`: it repairs station names (the `Site` column is authoritative —
+an early import truncated names at 20 characters), fills in missing station
+numbers, adds sensors to stations that already exist, and appends the sites that
+were missing entirely with their sensors and coordinates.
+
+```bash
+pip install xlrd        # the exports are BIFF .xls, not .xlsx
+
+# see what would change without touching stations.json
+python3 tools/import_arro_sensors.py --dry-run --report import.md Sensors_*_List_by_System.xls
+
+# apply it
+python3 tools/import_arro_sensors.py --report import.md Sensors_*_List_by_System.xls
+```
+
+Sites are matched on `station_number` first, then — only for stations that have
+no number — on an exact name, then on a name that is a clean 20-character
+truncation of exactly one unclaimed site. Everything else is imported as a new
+station, so a near-miss never silently overwrites an existing record. The
+`--report` file lists every rename, every added sensor, every new station, the
+near-matches left for a human to judge, and the names still truncated because
+nothing in the inputs can expand them.
+
+`device_id` and `site.db_id` are ARRO-internal ids that the workbooks omit;
+they are looked up in `archive/z_Sensors_with_Database_IDs_by_View_NATIONAL.csv`
+(override with `--national`). Re-running over the same workbooks is a no-op.
+
 ## `meganet_agent.py` — ask questions about the network with the Claude API
 
 An agentic Claude API loop that answers natural-language questions about the
 station network. Claude runs Python in an Anthropic-hosted **code-execution
 sandbox** and, from inside that sandbox, calls a `query_stations` tool that
-reads the local `stations.json`. Because the dataset is large (1,300+ stations),
+reads the local `stations.json`. Because the dataset is large (3,000+ stations),
 this keeps the raw records out of the model's context — Claude filters and
 aggregates in code and only the answer comes back.
 
