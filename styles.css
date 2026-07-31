@@ -25,6 +25,16 @@
   --ok:   #107c10;
   --bad:  #c7401a;
   --warn: #a86400;
+  /* Search hits in the station table. Amber, to match the map's "matches
+     filter" pin ring, so the same match reads the same way in both halves of
+     the Stations tab. */
+  --hit-bg:   #ffe08a;
+  --hit-text: #3a2600;
+  --hit-ring: #e8a000;
+  --hit-glow: rgba(255, 183, 0, .85);
+  /* Draw & measure overlay — magenta, which is not a station role, not an ACMA
+     mechanism and not the orange of a pass-range link. */
+  --draw: #c2185b;
   /* ALERT packet bit-field colours (self-contained: mid-tone bg + light text, theme-independent) */
   --c-frame: #4a5568; --c-frame-t: #eef1f5;
   --c-addr:  #2f6fb8; --c-addr-t:  #eaf3ff;
@@ -60,6 +70,13 @@
   --ok:   #3ecf8e;
   --bad:  #ff6b6b;
   --warn: #ffb347;
+  /* A pale wash disappears on a dark panel, so the hit goes the other way:
+     deep amber block, light text, and the glow doing most of the work. */
+  --hit-bg:   #7a5200;
+  --hit-text: #ffeab4;
+  --hit-ring: #ffc400;
+  --hit-glow: rgba(255, 196, 0, .55);
+  --draw: #ff6fb0;
 }
 
 body {
@@ -117,6 +134,68 @@ header p {
   position: sticky;
   top: 1rem;
   height: fit-content;
+}
+
+/* ── Stations tab: two panes that scroll on their own ──────────────────────
+   The filter pane and the map/table column are each taller than the screen,
+   and while the page scrolled as one piece, reaching a filter at the bottom
+   of the sidebar dragged the map off the top. Each column now fills the space
+   under the header and scrolls inside itself; the divider between them drags
+   to re-split the width (--mn-split, kept in localStorage), and --mn-chrome is
+   the measured height of the header plus tab bar, set by app.js because both
+   wrap on a narrow window. */
+
+.map-layout {
+  grid-template-columns: var(--mn-split, 320px) 14px minmax(0, 1fr);
+  gap: 0;
+  align-items: start;
+}
+
+.map-layout > .map-pane {
+  height: calc(100dvh - var(--mn-chrome, 150px) - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-width: 0;
+  padding-bottom: .25rem;
+}
+
+/* The left pane owns its own scrolling now, so the sticky trick it used to
+   need would only pin it inside its own scroller. */
+.map-layout > .sidebar.map-pane {
+  position: static;
+  height: calc(100dvh - var(--mn-chrome, 150px) - 2rem);
+  padding-right: .4rem;      /* clear of the scrollbar */
+}
+
+.map-split {
+  align-self: stretch;
+  height: calc(100dvh - var(--mn-chrome, 150px) - 2rem);
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;        /* the pointer drag owns the gesture */
+}
+
+.map-split::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background .12s ease;
+}
+
+.map-split:hover::before,
+.map-split:focus-visible::before,
+.map-split.dragging::before {
+  background: var(--accent);
+}
+
+.map-split:focus-visible {
+  outline: none;
 }
 
 .stack {
@@ -420,6 +499,47 @@ details.filter-block[open] > .filter-head .filter-title::before {
 
 .filter-check input {
   flex-shrink: 0;
+}
+
+/* Slider with its value in the label above it (max TX distance, and anything
+   else that wants the same shape). */
+.filter-range {
+  display: block;
+  margin: .45rem 0 .2rem;
+  font-size: .87rem;
+}
+
+.filter-range > span {
+  display: block;
+  margin-bottom: .15rem;
+}
+
+.filter-range input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.filter-range.is-off {
+  opacity: .5;
+}
+
+/* ── Where the filter text was found ──────────────────────────────────────
+   Knowing that a row matched is half an answer — "491" can land in a station
+   number, an ALERT address or a name, and the row alone doesn't say which.
+   The marked run is tinted and given an amber glow, which is what carries it
+   in dark mode where a pale highlight would vanish into the panel. */
+mark.hit {
+  background: var(--hit-bg);
+  color: var(--hit-text);
+  border-radius: 3px;
+  padding: 0 .14em;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px var(--hit-ring), 0 0 6px 1px var(--hit-glow);
+}
+
+/* Inside a selected (tinted) row the glow would smear, so it tightens up. */
+tr.selected mark.hit {
+  box-shadow: 0 0 0 1px var(--hit-ring);
 }
 
 .table-wrap {
@@ -738,6 +858,213 @@ hr {
   mask: radial-gradient(circle at 50% 50%, transparent 9px, #000 10px);
 }
 
+/* ── Draw & measure ──────────────────────────────────────────────────────── */
+
+/* While a tool is armed the click has to reach the map: station pins and ACMA
+   squares would otherwise swallow the one near the site being drawn around. */
+.leaflet-container.mn-drawing {
+  cursor: crosshair;
+}
+
+/* Every interactive layer has to be named, not just the panes they sit in:
+   Leaflet puts pointer-events:auto back on each one, and a descendant saying
+   "auto" beats an ancestor saying "none". */
+.leaflet-container.mn-drawing .leaflet-marker-pane,
+.leaflet-container.mn-drawing .leaflet-overlay-pane,
+.leaflet-container.mn-drawing .leaflet-interactive,
+.leaflet-container.mn-drawing .leaflet-marker-icon {
+  pointer-events: none;
+}
+
+.mn-draw-pin {
+  background: none;
+  border: none;
+}
+
+/* teardrop: a rounded square with one square corner, rotated onto its point */
+.mn-draw-pin i {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--draw);
+  box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0, 0, 0, .45);
+}
+
+.mn-draw-pin.sel i,
+.mn-draw-textbox.sel span {
+  outline: 2px solid var(--draw);
+  outline-offset: 3px;
+}
+
+/* free text annotation — its own label, so it carries no measurement */
+.mn-draw-textbox {
+  background: none;
+  border: none;
+  width: auto !important;
+  height: auto !important;
+}
+
+.mn-draw-textbox span {
+  display: inline-block;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--draw);
+  background: rgba(255, 255, 255, .94);
+  color: #1a1a1a;
+  font-size: .8rem;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+}
+
+/* the length / radius / area a shape carries on the map */
+.leaflet-tooltip.mn-draw-label {
+  background: rgba(255, 255, 255, .92);
+  color: #1a1a1a;
+  border: 1px solid var(--draw);
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: .72rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+  pointer-events: none;
+}
+
+.leaflet-tooltip.mn-draw-label::before { display: none; }
+
+/* tool picker */
+.draw-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  margin: .5rem 0 .1rem;
+}
+
+.draw-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .32rem .5rem;
+  font-size: .8rem;
+}
+
+.draw-tool.on {
+  background: var(--draw);
+  border-color: var(--draw);
+  color: #fff;
+}
+
+.draw-tool-icon {
+  font-size: .95rem;
+  line-height: 1;
+}
+
+.draw-numeric {
+  margin: .4rem 0;
+}
+
+.draw-numeric > summary {
+  cursor: pointer;
+  color: var(--muted);
+  margin-bottom: .3rem;
+}
+
+.draw-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .35rem;
+}
+
+.draw-field {
+  display: block;
+  font-size: .76rem;
+  color: var(--muted);
+}
+
+.draw-field-wide {
+  grid-column: 1 / -1;
+  margin-top: .35rem;
+}
+
+.draw-field input {
+  padding: .3rem .4rem;
+  font-size: .82rem;
+}
+
+.draw-actions {
+  display: flex;
+  gap: .35rem;
+  margin: .45rem 0 .1rem;
+}
+
+.draw-actions button {
+  padding: .35rem .6rem;
+  font-size: .8rem;
+}
+
+/* what has been drawn, with each shape's measurement */
+.draw-list {
+  margin-top: .5rem;
+  border-top: 1px solid var(--border);
+}
+
+.draw-row {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.draw-row.sel {
+  background: var(--subtle);
+}
+
+.draw-row-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  min-width: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  padding: .35rem .2rem;
+  font-size: .8rem;
+}
+
+.draw-row-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draw-row-icon {
+  color: var(--draw);
+  flex-shrink: 0;
+}
+
+.draw-del {
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: .2rem .35rem;
+  font-size: .85rem;
+}
+
+.draw-del:hover {
+  color: var(--bad);
+}
+
+.draw-edit {
+  padding: .1rem .2rem .5rem;
+  border-bottom: 1px solid var(--border);
+}
+
 /* ── ACMA RRL interference layer ─────────────────────────────────────────── */
 
 /* square swatch — ACMA transmitters are squares so they never read as
@@ -920,6 +1247,25 @@ hr {
     position: static;
   }
 
+  /* One column: the panes stack and the page scrolls as a whole again — two
+     scrollers inside a phone screen is worse than one. The divider has nothing
+     left to split. */
+  .map-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .map-split {
+    display: none;
+  }
+
+  .map-layout > .map-pane,
+  .map-layout > .sidebar.map-pane {
+    height: auto;
+    overflow: visible;
+    padding-right: 0;
+  }
+
   /* On a phone the map is the point of the map tab — the filter panel and the
      (long) legend go below it rather than pushing it off the first screen. */
   .map-layout > .sidebar {
@@ -956,6 +1302,13 @@ hr {
 /* Main content area */
 #main-content {
   min-height: calc(100vh - 120px);
+}
+
+/* …except on the Stations tab, whose two panes already size themselves to the
+   screen — the fill-the-screen minimum would only put a second scrollbar on
+   the page behind them. */
+#main-content:has(> .map-layout) {
+  min-height: 0;
 }
 
 /* Colour tokens used in analysis/editor */

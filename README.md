@@ -226,7 +226,8 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Draw signal path lines between field stations and the repeaters/base stations their AlertID passes through
 - Click a station to see its full detail panel
 - Filter map display by role, sensor type, radio network, region, basin/council or data completeness (see *Filtering & Exploration*)
-- Toggle individual link lines on/off
+- Toggle individual link lines on/off, and cap how long a link may be before it is dropped (*Kill spaghetti*)
+- Draw and measure over the map: pins, lines, circles, rectangles and text, placed by hand or by coordinates and km
 - Leaflet.js with a base-map picker (top-right): OSM-Topo (default), OpenStreetMap, or Satellite
 
 **Reading the map.** Every pin carries a white ring so it separates from the
@@ -236,7 +237,10 @@ matches get an amber ring, their names appear underneath, and the map zooms to
 the extent of the matches so every one of them is on screen. Typing narrows the
 highlight live. Labels are capped at the 60 matches nearest the middle of that
 extent (the filter pane says when the cap is in effect). Tick *Hide stations
-that don't match*, under **Map display**, for the old subtractive behaviour.
+that don't match*, under **Map display**, for the old subtractive behaviour —
+which still keeps the repeater at the far end of any drawn signal link, since a
+TX path with its destination receiver hidden is the one station you most wanted
+to see.
 
 **Map and table together.** The map and the station table share the Stations
 tab and the one filter pane: a search term, role or network narrows the table to
@@ -244,6 +248,46 @@ the matching rows while the map highlights (or, with *Hide stations that don't
 match*, drops) the same set. Picking a row pans the map to that station and
 opens its pin, so the list and the map never disagree about which site is being
 looked at.
+
+**Two panes, two scrollbars.** The filter pane and the map/table column are
+each taller than the screen. They scroll separately — reaching a filter at the
+bottom of the sidebar no longer drags the map off the top — and the divider
+between them drags (or takes ←/→, Home to reset) to re-split the width, which
+is remembered between visits. On a phone the two stack and the page scrolls as
+one again.
+
+**Signal links and *Kill spaghetti*.** Links are drawn from each field station
+to every repeater whose pass ranges cover one of its ALERT addresses, which
+across the whole network is 3000-plus lines, many of them running the length of
+the country because two distant sites happen to share an address window.
+*Kill spaghetti* (on by default) drops any link longer than **Max TX distance**
+— 250 km by default, adjustable from 0 to 5000 km. The pane says what it is
+removing ("2162 links drawn · 979 over 250 km hidden"), so a link that vanished
+is never a mystery. Untick it to see every path however long.
+
+**Draw & measure.** A sketching layer over the network map, for the picture
+that goes into an email or an incident note: **pins**, **lines**, **circles**,
+**rectangles** and free **text annotations**. Every shape can be drawn by
+clicking on the map — click the circle's centre then its radius, click opposite
+corners of a rectangle, click each corner of a line and double-click (or
+*Finish*) to end it — *or* typed in as coordinates and real-world dimensions:
+a centre and a radius in km, a centre and a width × height in km, a start point
+and either a second coordinate or a bearing and distance. Either way it reduces
+to the same few numbers, which the pane lists and lets you edit, so a circle
+dropped roughly by hand becomes exactly 25.0 km by typing over its radius.
+
+Shapes carry their own measurements on the map — length and bearing for a
+two-point line, radius and area for a circle, width × height and area for a
+rectangle — which is the measuring half of the tool: drop a line between two
+sites to read off how far apart they are and on what bearing. *Show
+measurements on the map* turns the labels off for a cleaner clipping. While a
+tool is armed the cursor is a crosshair and clicks pass through the station
+pins to the map underneath; Esc cancels the shape in progress, and Esc again
+puts the tool away.
+
+**Nothing is saved.** The drawings survive switching tabs and filtering, and
+are cleared by reloading the page. There is no export — take a screen clipping
+with the operating system's own tool.
 
 **Stacked pins.** Where pins land on top of each other — co-sited stations, or
 an ACMA site carrying a dozen licensed devices — hovering the stack (mouse) or
@@ -306,6 +350,16 @@ the list; *Reset* at the top of the pane clears the lot.
 
 Hovering a row reveals **only**, which narrows to that one value in a click
 instead of un-ticking the other fourteen.
+
+**The table says where the term landed.** Which rows matched is only half an
+answer — "491" can be part of a station number, the start of an ALERT address
+or a run inside a name, and the row on its own doesn't say which. The matched
+characters are marked in amber, the same colour the map rings a matching pin
+with, and follow the search's own rules exactly: a substring anywhere in the
+name or station number, and only the *leading* digits of an ALERT address
+(6128 is found by "61", never by "12"). So a station listed with
+`54`**`491`**`3` under Stn # and nothing marked under AlertID is there for its
+number, not its addressing.
 
 **Pasting a list into the search box.** The box takes a list, not just one
 term, so the addresses coming in on a telemetry log can be copied and dropped
