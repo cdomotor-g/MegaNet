@@ -226,7 +226,9 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Draw signal path lines between field stations and the repeaters/base stations their AlertID passes through
 - Click a station to see its full detail panel
 - Filter map display by role, sensor type, radio network, region, basin/council or data completeness (see *Filtering & Exploration*)
-- Toggle individual link lines on/off, and cap how long a link may be before it is dropped (*Kill spaghetti*)
+- Pull the repeaters that carry a matched station onto the map and into the table with it (*Include related repeaters*)
+- Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Kill spaghetti*)
+- Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
 - Draw and measure over the map: pins, lines, circles, rectangles and text, placed by hand or by coordinates and km
 - Leaflet.js with a base-map picker (top-right): OSM-Topo (default), OpenStreetMap, or Satellite
 
@@ -241,6 +243,30 @@ that don't match*, under **Map display**, for the old subtractive behaviour —
 which still keeps the repeater at the far end of any drawn signal link, since a
 TX path with its destination receiver hidden is the one station you most wanted
 to see.
+
+**Who carries this station?** Finding a station on the map is half the
+question; the other half is which repeaters carry it. *Include related
+repeaters* (under **Map display**, on by default) answers both at once: filter
+for a station and every repeater whose pass ranges cover one of its ALERT
+addresses comes with it — drawn at full opacity with a **dashed cyan ring**,
+listed in the table below with a *via pass range* badge, linked to the station
+by a drawn path, and held inside the map extent so none of them is off-screen.
+It works the other way round too: filter for a repeater and the field stations
+it serves are pulled in the same way. The dashed ring is what separates the two
+kinds of result — amber means the filter named it, cyan means a pass range did.
+Untick the box for literal matches only.
+
+**Clearing a filter, twice over.** *Clear filters* puts every station back at
+full opacity **without moving the map** — you were looking at a region and you
+still are. *Clear & zoom out* does the same and re-fits to the whole network.
+
+**Station names.** Names are capped at 60 on screen, because past that they
+overlap into noise. The **Station names** control decides when they appear:
+*Auto* (the default) draws them once the current view holds few enough to read,
+so the national view is clean and zooming into a region brings them in; *On*
+forces them for whatever is in view, keeping the 60 nearest the centre and
+saying so over the map; *Off* draws none at all. Filter matches are always
+named in Auto and On.
 
 **Map and table together.** The map and the station table share the Stations
 tab and the one filter pane: a search term, role or network narrows the table to
@@ -261,9 +287,15 @@ to every repeater whose pass ranges cover one of its ALERT addresses, which
 across the whole network is 3000-plus lines, many of them running the length of
 the country because two distant sites happen to share an address window.
 *Kill spaghetti* (on by default) drops any link longer than **Max TX distance**
-— 250 km by default, adjustable from 0 to 5000 km. The pane says what it is
-removing ("2162 links drawn · 979 over 250 km hidden"), so a link that vanished
-is never a mystery. Untick it to see every path however long.
+— 120 km by default, adjustable from 0 to 600 km, which is the range a VHF hop
+plausibly covers. The pane says what it is removing ("1938 links drawn · 1203
+over 120 km hidden"), so a link that vanished is never a mystery. Untick it to
+see every path however long, at any distance.
+
+Each link is drawn twice — a wide white casing underneath and the coloured line
+on top — so it stays legible over satellite imagery and topo shading, where a
+single thin orange line disappears. **Link opacity** fades the pair together
+when the lines are burying the pins they are meant to explain.
 
 **Draw & measure.** A sketching layer over the network map, for the picture
 that goes into an email or an incident note: **pins**, **lines**, **circles**,

@@ -166,10 +166,15 @@ const state = {
   mapShowLinks:   true,
   mapHideOthers:  false,   // filter box: highlight matches (default) vs hide the rest
   mapKillSpaghetti: true,  // drop pass-range links longer than mapMaxLinkKm
-  mapMaxLinkKm:   250,     // km; about as far as a VHF hop plausibly reaches
+  mapMaxLinkKm:   120,     // km; about as far as a VHF hop plausibly reaches
+  mapLinkOpacity: 0.8,     // pass-range lines: 0.1–1.0, applied over their casing
+  mapLabelMode:   'auto',  // station name labels: 'auto' (fit the viewport) | 'on' | 'off'
+  mapRelated:     true,    // pull pass-range-related repeaters in with the matches
+  mapMatchLabels: new Set(),  // ids the current filter earned a label (see mapLabelIds)
   mapLinkCount:   { drawn: 0, culled: 0 },   // last refresh, for the sidebar note
   mapFitKey:      null,    // extent the map was last auto-fitted to (re-fit only on change)
   mapSearchTimer: null,    // debounce for the search box → marker rebuild
+  passRelIdx:     null,    // both directions of the pass-range relation, per loaded file
   splitW:         +(localStorage.getItem('mn-split') || 0) || 320,  // Stations tab column split, px
   // Draw & measure overlay (Stations map). Plain geometry only — the Leaflet
   // layers are rebuilt from it whenever the map is, so a tab switch doesn't
@@ -318,6 +323,7 @@ function loadJson(text) {
   state.filterOpts  = null;         // option lists and the search corpus are
   state.searchIdx   = null;         // both derived from the file
   state.repeaterIdx = null;         // so is the cached repeater-only subset
+  state.passRelIdx  = null;         // and so is the pass-range relation
   resetStationFilters();
   state.selectedId = null;
   updateHeaderStats();
@@ -646,39 +652,132 @@ function repeaterList(allStations) {
   return state.repeaterIdx;
 }
 
-function findRepeaterMatches(station, allStations) {
-  const ids = stationAlertIds(station);
-  if (!ids.length) return [];
-  return repeaterList(allStations).filter(s =>
-    s.id !== station.id &&
-    ids.some(id => passRangeCoversId(s.repeater, id))
-  );
+// Both directions of the pass-range relation, resolved in one pass over the
+// station list and cached until the file changes (see refreshFilterOptions).
+//
+// Every caller used to rescan for itself: "which repeaters carry this station"
+// was an O(repeaters) scan run once per station, and "which stations does this
+// repeater carry" an O(stations) scan run once per repeater. Both walk the same
+// AlertID-against-pass-range comparison, so one pass builds both lookups and
+// every later question is a Map hit.
+function passRelationIndex() {
+  if (state.passRelIdx) return state.passRelIdx;
+  // Nothing loaded yet: answer empty without caching, so the index (and the
+  // repeater subset it builds on) is still built from the real file later.
+  if (!state.data) return { byStation: new Map(), byRepeater: new Map() };
+  const stations  = state.data.stations;
+  const repeaters = repeaterList(stations);
+  const byStation  = new Map();   // station id  → repeaters carrying it
+  const byRepeater = new Map();   // repeater id → field stations it carries
+  for (const r of repeaters) byRepeater.set(r.id, []);
+  for (const s of stations) {
+    const ids = stationAlertIds(s);
+    if (!ids.length) continue;
+    const isField = s.roles.includes('field');
+    let carriers = null;
+    for (const r of repeaters) {
+      if (r.id === s.id) continue;
+      if (!ids.some(id => passRangeCoversId(r.repeater, id))) continue;
+      (carriers || (carriers = [])).push(r);
+      if (isField) byRepeater.get(r.id).push(s);
+    }
+    if (carriers) byStation.set(s.id, carriers);
+  }
+  state.passRelIdx = { byStation, byRepeater };
+  return state.passRelIdx;
+}
+
+// The lists handed out below are the index's own arrays. Callers only read
+// them, and copying ~3,100 of them per map refresh is exactly the cost the
+// index exists to remove — so they are shared, not cloned.
+function findRepeaterMatches(station) {
+  return passRelationIndex().byStation.get(station.id) || [];
 }
 
 // Every pass-range path out of a set of field stations, with the length of each
 // one. The map needs the same list twice — to draw the paths, and to work out
-// which repeaters have to stay visible when the rest are hidden — and resolving
-// a station's repeaters is the expensive part, so it is done once here.
-// Stations without a position are skipped: a path needs two ends.
-function passRangeLinks(sources, allStations) {
+// which repeaters have to stay visible when the rest are hidden — so it is
+// resolved once here. Stations without a position are skipped: a path needs two
+// ends, and the same pair is never emitted twice however the sources overlap.
+function passRangeLinks(sources) {
   const pairs = [];
+  const seen  = new Set();
   for (const s of sources) {
     if (!s.roles.includes('field') || s.lat == null || s.lon == null) continue;
-    for (const r of findRepeaterMatches(s, allStations)) {
+    for (const r of findRepeaterMatches(s)) {
       if (r.lat == null || r.lon == null) continue;
+      const key = `${s.id}|${r.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       pairs.push({ s, r, km: acmaHaversineKm(s.lat, s.lon, r.lat, r.lon) });
     }
   }
   return pairs;
 }
 
-function findStationMatches(repeater, allStations) {
+function findStationMatches(repeater) {
   if (!repeater.repeater) return [];
-  return allStations.filter(s =>
-    s.roles.includes('field') &&
-    s.id !== repeater.id &&
-    stationAlertIds(s).some(id => passRangeCoversId(repeater.repeater, id))
-  );
+  return passRelationIndex().byRepeater.get(repeater.id) || [];
+}
+
+// ── Related-by-pass-range stations ───────────────────────────────────────────
+// Filtering for a station answers "where is it"; the question behind it is
+// usually "who carries it". So while a filter is running the result set is
+// extended with everything on the other end of a pass range: the repeaters
+// carrying a matched field station, and the field stations carried by a matched
+// repeater. The map and the table below it both read this one list, or they
+// would disagree about what is on screen.
+//
+// Cached on the same terms as filteredStations(), plus the identity of the
+// relation index — so an edited pass range drops it too.
+const NO_RELATED = [];
+let _relatedCache = null, _relatedCacheSig = null, _relatedCacheIdx = null;
+
+function relatedStations() {
+  if (!state.data || !state.mapRelated || !mapFilterActive()) return NO_RELATED;
+  const idx = passRelationIndex();
+  const sig = filtersSignature(state.filters);
+  if (_relatedCache && _relatedCacheIdx === idx && _relatedCacheSig === sig) {
+    return _relatedCache;
+  }
+  const matches = filteredStations();
+  const already = new Set(matches.map(s => s.id));
+  const out = [];
+  for (const s of matches) {
+    const related = s.roles.includes('repeater')
+      ? findStationMatches(s).concat(findRepeaterMatches(s))
+      : findRepeaterMatches(s);
+    for (const r of related) {
+      if (already.has(r.id)) continue;
+      already.add(r.id);
+      out.push(r);
+    }
+  }
+  _relatedCache    = out;
+  _relatedCacheSig = sig;
+  _relatedCacheIdx = idx;
+  return out;
+}
+
+// The same list as a Set, for the "is this row/pin related?" question the table
+// and the map both ask per station. Rebuilt only when the list itself changes.
+const _relatedIdSet = { list: null, ids: new Set() };
+
+function relatedIdSet() {
+  const related = relatedStations();
+  if (_relatedIdSet.list !== related) {
+    _relatedIdSet.list = related;
+    _relatedIdSet.ids  = new Set(related.map(s => s.id));
+  }
+  return _relatedIdSet.ids;
+}
+
+// The list under the map: the filter's own matches, then what the pass ranges
+// pulled in behind them.
+function tableStations() {
+  const matches = filteredStations();
+  const related = relatedStations();
+  return related.length ? matches.concat(related) : matches;
 }
 
 // ── Tab bar ────────────────────────────────────────────────────────────────────
@@ -747,7 +846,7 @@ function renderEmpty() {
 // listed in the same action.
 
 function renderStationsHtml() {
-  const stations = filteredStations();
+  const stations = tableStations();
   return `
     <div class="layout map-layout">
       <aside class="sidebar stack map-pane" id="stations-left">
@@ -857,7 +956,10 @@ function splitKey(e) {
 
 // ── Map display block ────────────────────────────────────────────────────────
 
-const MAX_LINK_KM_CAP = 5000;
+// Past this the slider is measuring nothing real — no pass-range hop on this
+// network reaches it. "Kill spaghetti" off is the escape hatch for the operator
+// who wants every path drawn however absurd, so the cap can stay this tight.
+const MAX_LINK_KM_CAP = 600;
 
 function mapDisplayControlsHtml() {
   const on = state.mapKillSpaghetti;
@@ -868,9 +970,21 @@ function mapDisplayControlsHtml() {
       Hide stations that don't match
     </label>
     <label class="filter-check">
+      <input type="checkbox" ${state.mapRelated ? 'checked' : ''}
+             onchange="state.mapRelated=this.checked;stationsFilterChanged()">
+      Include related repeaters
+    </label>
+    <label class="filter-check">
       <input type="checkbox" ${state.mapShowLinks ? 'checked' : ''}
-             onchange="state.mapShowLinks=this.checked;refreshMapLayers()">
+             onchange="state.mapShowLinks=this.checked;rerenderMapDisplayControls();refreshMapLayers()">
       Show signal links
+    </label>
+    <label class="filter-range${state.mapShowLinks ? '' : ' is-off'}">
+      <span>Link opacity <strong id="link-opacity-val">${Math.round(state.mapLinkOpacity * 100)}%</strong></span>
+      <input type="range" min="0.1" max="1" step="0.05" value="${state.mapLinkOpacity}"
+             ${state.mapShowLinks ? '' : 'disabled'}
+             oninput="document.getElementById('link-opacity-val').textContent=Math.round(this.value*100)+'%'"
+             onchange="setMapLinkOpacity(+this.value)">
     </label>
     <label class="filter-check">
       <input type="checkbox" ${on ? 'checked' : ''}
@@ -883,6 +997,15 @@ function mapDisplayControlsHtml() {
              ${on ? '' : 'disabled'}
              oninput="document.getElementById('max-tx-val').textContent=this.value+' km'"
              onchange="state.mapMaxLinkKm=+this.value;refreshMapLayers()">
+    </label>
+    <label class="filter-field" style="margin-top:.5rem">
+      <span>Station names</span>
+      <select onchange="setMapLabelMode(this.value)">
+        ${[['auto', 'Auto — when few enough are in view'],
+           ['on',   'On'],
+           ['off',  'Off']].map(([v, l]) =>
+          `<option value="${v}" ${state.mapLabelMode === v ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
     </label>
     <p class="filter-note" id="map-link-note">${mapLinkNoteHtml()}</p>`;
 }
@@ -916,6 +1039,10 @@ function mapLegendHtml() {
     <span class="legend-item">
       <span class="legend-dot legend-dot-hit" style="background:${ROLE_COLOR.field}"></span>
       <span class="small">Matches filter</span>
+    </span>
+    <span class="legend-item">
+      <span class="legend-dot legend-dot-rel" style="background:${ROLE_COLOR.repeater}"></span>
+      <span class="small">Related by pass range</span>
     </span>
     <span class="legend-item">
       <span class="legend-line"></span>
@@ -1018,6 +1145,9 @@ function initMap() {
   MapLocate.attach(state.map);
   MapDraw.attach(state.map);
   state.map.on('click', () => acmaClearHighlight());
+  // Auto/On name labels are picked from what is in view, so they are re-picked
+  // whenever the view changes rather than only when the layers are rebuilt.
+  state.map.on('moveend zoomend', applyMapLabels);
   refreshMapLayers();
   refreshAcmaLayer();
   // ACMA transmitters are on by default, so the first visit to the map pulls the
@@ -1045,6 +1175,7 @@ function acmaAfterLoad() {
 const MAP_LABEL_CAP = 60;     // permanent name labels beyond this are unreadable
 const MAP_PIN_RING  = '#ffffff';
 const MAP_PIN_HIT   = '#ffc400';
+const MAP_PIN_REL   = '#00b8d4';   // dashed ring: on the map by relation, not by name
 const MAP_HOME      = [-25.6, 134.3];   // middle of Australia — the opening view,
                                         // replaced by a fit to whatever is plotted
 
@@ -1062,7 +1193,9 @@ function mapMatchNoteHtml() {
   const matched = filteredStations();
   if (!matched.length) return 'No stations match — all pins shown unhighlighted.';
   const located = matched.filter(s => s.lat != null && s.lon != null).length;
+  const related = relatedStations().length;
   return `<strong>${matched.length}</strong> of ${total} stations match` +
+         (related ? ` · <strong>${related}</strong> more via pass range` : '') +
          (located < matched.length ? ` · ${matched.length - located} without a position` : '') +
          (located > MAP_LABEL_CAP ? ` · labels on the closest ${MAP_LABEL_CAP}` : '');
 }
@@ -1090,7 +1223,17 @@ function mapFitKey(points) {
   return [points.length, n, s, w, e].map(v => Number(v).toFixed(4)).join(',');
 }
 
-function refreshMapLayers() {
+// A pass-range line is drawn twice: a wide white casing underneath and the
+// coloured line on top. On satellite and topo tiles a single 1.5 px orange line
+// disappears into the imagery; the casing is what carries it on every basemap.
+const MAP_LINK_CASING_W  = 3.5;
+const MAP_LINK_CORE_W    = 1.5;
+const MAP_LINK_CASING_MIX = 0.75;   // casing opacity, as a fraction of the core's
+
+// `skipFit` clears the fit for this refresh while still recording the extent it
+// would have fitted, so the map holds the operator's pan and zoom and the next
+// genuine change still moves it. See clearStationFilters.
+function refreshMapLayers({ skipFit = false } = {}) {
   const map = state.map;
   if (!map || !state.data) return;
   MapSpider.reset();                       // pins go home before any are replaced
@@ -1103,13 +1246,17 @@ function refreshMapLayers() {
   const active   = mapFilterActive();
   const matchIds = active ? new Set(filteredStations().map(s => s.id)) : null;
   const matched  = active ? located.filter(s => matchIds.has(s.id)) : [];
+  // Stations on the map because a pass range links them to a match, not because
+  // they matched the filter themselves. Drawn as hits, ringed differently.
+  const relIds   = active ? relatedIdSet() : null;
+  const related  = active ? located.filter(s => relIds.has(s.id)) : [];
 
-  // Links follow the highlight: with a filter running, only matched stations
-  // draw theirs, so the lines don't bury the pins they're meant to explain.
-  // They are resolved before the pins because in hide mode they decide which
-  // repeaters have to stay on the map.
+  // Links follow the highlight: with a filter running, only the matched and
+  // related stations draw theirs, so the lines don't bury the pins they're meant
+  // to explain. They are resolved before the pins because in hide mode they
+  // decide which repeaters have to stay on the map.
   const allLinks = state.mapShowLinks
-    ? passRangeLinks(active ? matched : located, state.data.stations) : [];
+    ? passRangeLinks(active ? matched.concat(related) : located) : [];
   const maxKm = state.mapKillSpaghetti ? state.mapMaxLinkKm : Infinity;
   const links = allLinks.filter(l => l.km <= maxKm);
   state.mapLinkCount = { drawn: links.length, culled: allLinks.length - links.length };
@@ -1119,7 +1266,7 @@ function refreshMapLayers() {
   // except the repeaters at the far end of a drawn path. Hiding those left the
   // TX path on screen with nothing at the end of it: the one station the
   // operator most wants to see is the one the signal is going to.
-  let stations = (active && state.mapHideOthers) ? matched : located;
+  let stations = (active && state.mapHideOthers) ? matched.concat(related) : located;
   if (active && state.mapHideOthers && links.length) {
     const shown = new Set(stations.map(s => s.id));
     const kept  = [];
@@ -1127,11 +1274,12 @@ function refreshMapLayers() {
     if (kept.length) stations = stations.concat(kept);
   }
   updateMapMatchNote();
-  if (!stations.length) { MapSpider.setPins('stations', []); return; }
+  if (!stations.length) { MapSpider.setPins('stations', []); state.mapMatchLabels = new Set(); return; }
 
-  // Names are only drawn for filter matches, and only while the set is small
-  // enough to read — the nearest ones to the matched extent win.
-  const labelled = new Set(
+  // A filter's matches are always named — that is what the filter was for —
+  // while the set is small enough to read; the nearest to the matched extent
+  // win. Everything else is named off the viewport, in applyMapLabels.
+  state.mapMatchLabels = new Set(
     active && matched.length
       ? (matched.length <= MAP_LABEL_CAP ? matched : mapNearestToCentre(matched, MAP_LABEL_CAP))
           .map(s => s.id)
@@ -1139,13 +1287,22 @@ function refreshMapLayers() {
 
   const lineColor = getComputedStyle(document.documentElement)
     .getPropertyValue('--map-line').trim() || '#ff6f00';
+  const coreOp   = state.mapLinkOpacity;
+  const casingOp = coreOp * MAP_LINK_CASING_MIX;
 
-  for (const l of links) {
-    state.mapLines.push(
-      L.polyline([[l.s.lat, l.s.lon], [l.r.lat, l.r.lon]], {
-        color: lineColor, weight: 1.5, opacity: 0.5,
-      }).addTo(map)
-    );
+  // Every casing first, then every core: pairing them per link would let one
+  // link's white casing paint over another link's coloured line where they cross.
+  for (const pass of ['casing', 'core']) {
+    const casing = pass === 'casing';
+    for (const l of links) {
+      const line = L.polyline([[l.s.lat, l.s.lon], [l.r.lat, l.r.lon]], {
+        color:   casing ? '#ffffff' : lineColor,
+        weight:  casing ? MAP_LINK_CASING_W : MAP_LINK_CORE_W,
+        opacity: casing ? casingOp : coreOp,
+      }).addTo(map);
+      line.mnLinkRole = pass;              // lets the opacity slider restyle in place
+      state.mapLines.push(line);
+    }
   }
 
   for (const s of stations) {
@@ -1153,21 +1310,27 @@ function refreshMapLayers() {
     const color  = ROLE_COLOR[role] || ROLE_COLOR.field;
     const isRpt  = s.roles.includes('repeater');
     const hit    = active && matchIds.has(s.id);
-    const dim    = active && !hit;
-    const radius = (isRpt ? 8 : 5) + (hit ? 1 : 0);
+    const rel    = active && !hit && relIds.has(s.id);
+    const dim    = active && !hit && !rel;
+    const radius = (isRpt ? 8 : 5) + (hit || rel ? 1 : 0);
     // Every pin carries a white ring so it separates from the base map and from
-    // its neighbours; matches swap it for amber.
+    // its neighbours; matches swap it for amber, and stations pulled in by a
+    // pass range for a dashed cyan one — full opacity either way, but you can
+    // still tell which of them the filter actually named.
     const marker = L.circleMarker([s.lat, s.lon], {
       radius,
-      color:       hit ? MAP_PIN_HIT : MAP_PIN_RING,
-      weight:      hit ? 3 : 2,
+      color:       hit ? MAP_PIN_HIT : rel ? MAP_PIN_REL : MAP_PIN_RING,
+      weight:      hit || rel ? 3 : 2,
+      dashArray:   rel ? '4,3' : null,
       opacity:     dim ? 0.6 : 1,
       fillColor:   color,
       fillOpacity: dim ? 0.45 : 1,
-      className:   hit ? 'mn-pin mn-pin-hit' : 'mn-pin',
+      className:   hit ? 'mn-pin mn-pin-hit' : rel ? 'mn-pin mn-pin-rel' : 'mn-pin',
       bubblingMouseEvents: false,          // a pin click is not an empty-map click
     }).addTo(map);
     marker.mnStationId = s.id;             // lets the table below find its pin
+    marker.mnStation   = s;                // and lets labels be re-picked on pan
+    marker.mnRadius    = radius;
 
     // bindPopup takes a function so the HTML is built when the popup opens,
     // not for all ~3,174 markers on every refresh.
@@ -1187,23 +1350,102 @@ function refreshMapLayers() {
       </div>
     `;
     });
-    if (labelled.has(s.id)) {
-      marker.bindTooltip(esc(s.name), {
-        permanent: true, direction: 'bottom', offset: [0, radius], className: 'mn-pin-label',
-      });
-    }
     state.mapMarkers.push(marker);
   }
 
   MapSpider.setPins('stations', state.mapMarkers);
 
-  // Zoom to the matches (all of them, not just the first) — or to everything
-  // when no filter is running.
-  const fitTo = (active && matched.length ? matched : stations).map(s => [s.lat, s.lon]);
-  const key   = mapFitKey(fitTo);
+  // Zoom to the matches (all of them, not just the first) and to the repeaters
+  // pulled in behind them — a path with its far end off-screen explains
+  // nothing. Or to everything, when no filter is running.
+  const fitSet = active && matched.length ? matched.concat(related) : stations;
+  const fitTo  = fitSet.map(s => [s.lat, s.lon]);
+  const key    = mapFitKey(fitTo);
   if (fitTo.length && key !== state.mapFitKey) {
     state.mapFitKey = key;
-    map.fitBounds(fitTo, { padding: [24, 24], maxZoom: fitTo.length === 1 ? 14 : 12 });
+    // The extent is recorded either way, so a suppressed fit is skipped once
+    // rather than deferred to the next refresh that happens along.
+    if (!skipFit) map.fitBounds(fitTo, { padding: [24, 24], maxZoom: fitTo.length === 1 ? 14 : 12 });
+  }
+  applyMapLabels();
+}
+
+// ── Station name labels ──────────────────────────────────────────────────────
+// Which pins carry a permanent name, for the current mode and viewport. Auto
+// shows them once the view holds few enough to read — at the national view that
+// is ~3,100 stations, so they stay off until you zoom into a region.
+
+// Whether the cap was reported last time, so panning around a dense region
+// doesn't re-announce it on every moveend.
+let _labelCapNoted = false;
+
+function mapLabelIds() {
+  const wanted = new Set();
+  // Off means off: the operator asked for a clean map, and a filter's matches
+  // are still ringed and still zoomed to without a name hanging off them.
+  if (state.mapLabelMode === 'off') return wanted;
+  for (const id of state.mapMatchLabels) wanted.add(id);
+
+  const map = state.map;
+  if (!map || !state.mapMarkers.length) return wanted;
+  const bounds = map.getBounds();
+  const inView = [];
+  for (const m of state.mapMarkers) {
+    if (m.mnStation && bounds.contains(m.getLatLng())) inView.push(m.mnStation);
+  }
+
+  let capped = false, pick;
+  if (state.mapLabelMode === 'on') {
+    capped = inView.length > MAP_LABEL_CAP;
+    pick   = capped ? mapNearestToCentre(inView, MAP_LABEL_CAP) : inView;
+  } else {
+    pick = inView.length <= MAP_LABEL_CAP ? inView : [];
+  }
+  if (capped && !_labelCapNoted) {
+    mapNote(`${inView.length} stations in view — naming the ${MAP_LABEL_CAP} closest to the centre.`, 3500);
+  }
+  _labelCapNoted = capped;
+
+  for (const s of pick) wanted.add(s.id);
+  return wanted;
+}
+
+// Bind or unbind the name tooltips in place. Called after a rebuild and on
+// every pan and zoom, so it only touches the pins whose label actually changed
+// — rebuilding ~3,100 markers to add a name is not a pan.
+function applyMapLabels() {
+  if (!state.map) return;
+  const wanted = mapLabelIds();
+  for (const m of state.mapMarkers) {
+    const s = m.mnStation;
+    if (!s) continue;
+    const want = wanted.has(s.id);
+    const has  = !!m.getTooltip();
+    if (want && !has) {
+      m.bindTooltip(esc(s.name), {
+        permanent: true, direction: 'bottom', offset: [0, m.mnRadius || 6], className: 'mn-pin-label',
+      });
+    } else if (!want && has) {
+      m.unbindTooltip();
+    }
+  }
+}
+
+function setMapLabelMode(mode) {
+  state.mapLabelMode = mode;
+  _labelCapNoted = false;      // a mode change is worth re-reporting the cap for
+  applyMapLabels();
+}
+
+// Restyling the polylines already on the map beats rebuilding every layer to
+// change one number.
+function setMapLinkOpacity(v) {
+  state.mapLinkOpacity = v;
+  const label = document.getElementById('link-opacity-val');
+  if (label) label.textContent = `${Math.round(v * 100)}%`;
+  for (const l of state.mapLines) {
+    if (l.mnLinkRole === 'casing')    l.setStyle({ opacity: v * MAP_LINK_CASING_MIX });
+    else if (l.mnLinkRole === 'core') l.setStyle({ opacity: v });
   }
 }
 
@@ -2160,6 +2402,9 @@ function stationsTable(allStations) {
   // Same prepared terms the filter itself ran on, so the marks land exactly
   // where the match was made.
   const { terms, nums } = prepareSearch(state.filters.search);
+  // Rows the filter didn't name — they are here because a pass range ties them
+  // to one that did, and the badge is what says so.
+  const relIds = relatedIdSet();
   return `
     ${capped ? `
       <p class="filter-note">Showing ${STATIONS_ROW_CAP} of ${allStations.length} —
@@ -2184,7 +2429,10 @@ function stationsTable(allStations) {
                 onclick="selectStation('${escAttr(s.id)}')" style="cursor:pointer">
               <td title="${esc(s.id)}"><span class="stn-name role-${primaryRole(s)}">${markHits(s.name, terms)}</span></td>
               <td class="small">${markHits(s.station_number || '', terms)}</td>
-              <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}</td>
+              <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}${
+                relIds.has(s.id)
+                  ? ' <span class="badge badge--rel" title="Not a filter match — a pass range ties it to one">via pass range</span>'
+                  : ''}</td>
               <td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
               <td class="small">${aids.map(id => markAlertId(id, nums)).join(', ')}</td>
               <td class="small">${s.lat != null ? s.lat.toFixed(4) : ''}</td>
@@ -2198,7 +2446,7 @@ function stationsTable(allStations) {
 }
 
 function rerenderStations() {
-  const stations = filteredStations();
+  const stations = tableStations();
   const wrap = document.getElementById('stations-table-wrap');
   if (wrap) wrap.innerHTML = stationsTable(stations);
   const cnt = document.getElementById('st-count');
@@ -2250,6 +2498,8 @@ function scrollStationRowIntoView(id) {
 // the current filter excludes would be selected into a list it isn't in; in
 // that case the filters are narrowed to the station's own name instead — the
 // table then contains it, and the search box visibly says why the list changed.
+// A repeater the pass ranges pulled in is already a row, so it counts as listed
+// even though the filter never named it.
 // Returns true when the filters moved, so the caller knows the sidebar has to
 // be re-rendered and not just the table.
 function selectStationState(s) {
@@ -2257,6 +2507,7 @@ function selectStationState(s) {
   state.editorId    = s.id;
   // Same deep copy as selectStation: fields the form doesn't expose survive a save.
   state.editorDraft = JSON.parse(JSON.stringify(s));
+  if (relatedIdSet().has(s.id)) return false;
   if (filteredStations().some(x => x.id === s.id)) return false;
   resetStationFilters();
   state.filters.search = s.name;
@@ -2453,7 +2704,7 @@ function passRangeTablesHtml() {
   const repeaters = all.filter(s => s.roles.includes('repeater') && s.repeater);
 
   const rptData = repeaters
-    .map(r => ({ r, matched: findStationMatches(r, all) }))
+    .map(r => ({ r, matched: findStationMatches(r) }))
     .filter(({ r, matched }) => passRangeRepeaterMatch(r, matched, q));
 
   const allOrphans = passRangeOrphans();
@@ -2756,7 +3007,7 @@ function renderBitFlipperResults() {
     const sensorTypes = hit ? ms.map(m => esc(m.sensor.type)).join('<br>') : dash;
     const sensorIds   = hit ? ms.map(m => esc(m.sensor.sensor_id || '—')).join('<br>') : dash;
     const reps = hit
-      ? [...new Map(ms.flatMap(m => findRepeaterMatches(m.station, state.data.stations)).map(r => [r.id, r])).values()]
+      ? [...new Map(ms.flatMap(m => findRepeaterMatches(m.station)).map(r => [r.id, r])).values()]
       : [];
     const repHtml = reps.length
       ? reps.map(r => `<span class="badge badge--repeater">${esc(r.name)}</span>`).join(' ')
@@ -2914,7 +3165,7 @@ function refreshBitFlipperMap() {
   // Collect repeaters open to the matched field stations
   const repeaterInfo = new Map(); // repeater id → { station: r, fieldStations: [] }
   for (const { station: s } of stationInfo.values()) {
-    findRepeaterMatches(s, state.data.stations).forEach(r => {
+    findRepeaterMatches(s).forEach(r => {
       if (!repeaterInfo.has(r.id)) repeaterInfo.set(r.id, { station: r, fieldStations: [] });
       repeaterInfo.get(r.id).fieldStations.push(s);
     });
@@ -3112,9 +3363,8 @@ function countExportUnits(selectedNets) {
     s.roles.includes('repeater') && s.repeater &&
     s.radio_network_ids.some(id => selectedNets.has(id))
   );
-  const all = state.data.stations;
   const ids = new Set(rpts.map(s => s.id));
-  rpts.forEach(r => findStationMatches(r, all).forEach(s => ids.add(s.id)));
+  rpts.forEach(r => findStationMatches(r).forEach(s => ids.add(s.id)));
   return ids.size;
 }
 
@@ -3133,7 +3383,7 @@ function runExport() {
   const unitMap = new Map();
   repeaters.forEach(r => {
     unitMap.set(r.id, r);
-    findStationMatches(r, all).forEach(s => unitMap.set(s.id, s));
+    findStationMatches(r).forEach(s => unitMap.set(s.id, s));
   });
   const units    = [...unitMap.values()];
   const unitRmId = new Map(units.map((u, i) => [u.id, i + 1]));
@@ -3198,7 +3448,7 @@ function runExport() {
   function netSection(tag, cellFn) {
     const header = ['', ...units.map(u => csvEscape(u.name))].join(',');
     const rows   = repeaters.map(r => {
-      const matched = new Set(findStationMatches(r, all).map(s => s.id));
+      const matched = new Set(findStationMatches(r).map(s => s.id));
       return [csvEscape(r.name), ...unitIds.map(uid => {
         if (uid === r.id)      return cellFn(true,  false);
         if (matched.has(uid))  return cellFn(false, true);
@@ -3461,8 +3711,14 @@ function stationFiltersHtml() {
   return `
     <div class="panel-header">
       <h3>Filters</h3>
-      <button class="filter-reset" onclick="clearStationFilters()"
-              ${anyStationFilterActive() ? '' : 'disabled'}>Reset</button>
+      <span class="filter-resets">
+        <button class="filter-reset" onclick="clearStationFilters(false)"
+                title="Put every station back at full opacity, without moving the map"
+                ${anyStationFilterActive() ? '' : 'disabled'}>Clear filters</button>
+        <button class="filter-reset" onclick="clearStationFilters(true)"
+                title="Clear the filters and zoom back out to the whole network"
+                ${anyStationFilterActive() ? '' : 'disabled'}>Clear &amp; zoom out</button>
+      </span>
     </div>
     <div class="filter-block">
       <div class="filter-head">
@@ -3533,6 +3789,7 @@ function refreshFilterOptions() {
   state.filterOpts  = null;
   state.searchIdx   = null;
   state.repeaterIdx = null;
+  state.passRelIdx  = null;   // an edited pass range re-wires the relation
   if (state.activeTab === 'stations') renderStationFilters();
 }
 
@@ -3676,8 +3933,8 @@ function updateFilterChrome() {
   if (area) area.textContent = valueGroupState(['basin', 'lga']);
   const data = document.getElementById('filter-state-data');
   if (data) data.textContent = valueGroupState(['hasCoords', 'hasAlertId', 'enabledOnly']);
-  const reset = document.querySelector('#station-filters .filter-reset');
-  if (reset) reset.disabled = !anyStationFilterActive();
+  const idle = !anyStationFilterActive();
+  document.querySelectorAll('#station-filters .filter-reset').forEach(b => { b.disabled = idle; });
   updateMapMatchNote();
 }
 
@@ -3810,12 +4067,21 @@ function resetStationFilters() {
   };
 }
 
-// Reset button on the Stations tab: clear everything and redraw the panel with
+// Reset buttons on the Stations tab: clear everything and redraw the panel with
 // it (the boxes, the selects and the summaries all move at once).
-function clearStationFilters() {
+//
+// Clearing a filter is usually the operator saying "put the rest of the network
+// back at full opacity" while they carry on looking at the region they had
+// zoomed into — springing the map back to the national view throws away the
+// thing they were doing. So the default holds the view, and the second button
+// is there for when they do want to zoom back out.
+function clearStationFilters(zoomOut) {
   resetStationFilters();
   renderStationFilters();
-  stationsFilterChanged();
+  state.stationsShowAll = false;
+  refreshMapLayers({ skipFit: !zoomOut });
+  rerenderStations();
+  updateFilterChrome();
 }
 
 function toggleFilter(key, value, checked) {
@@ -5646,7 +5912,7 @@ function rfcGroupingHtml() {
   if (!names.length || !state.data) return '';
   const rows = names.map(n => {
     const st = rfcMatchStation(n);
-    const reps = st ? findRepeaterMatches(st, state.data.stations) : [];
+    const reps = st ? findRepeaterMatches(st) : [];
     return { n, st, reps };
   });
   const matched = rows.filter(r => r.st && r.reps.length);
