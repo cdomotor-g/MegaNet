@@ -414,9 +414,19 @@ details.filter-block[open] > .filter-head .filter-title::before {
   border-radius: 6px;
 }
 
+/* Two ways to clear: hold the current view (the default) or zoom back out.
+   They wrap onto their own line rather than squeezing the "Filters" heading. */
+.filter-resets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  justify-content: flex-end;
+}
+
 .filter-reset {
   padding: .25rem .6rem;
   font-size: .78rem;
+  white-space: nowrap;
 }
 
 .filter-list {
@@ -664,6 +674,19 @@ tr.selected td {
   color: #7dd6a0;
 }
 
+/* "via pass range" — a row that is in the table by relation, not because the
+   filter named it. Cyan to match the dashed ring its pin gets on the map. */
+.badge--rel {
+  background: #e0f7fa;
+  color: #00646f;
+  font-size: .72rem;
+}
+
+[data-theme="dark"] .badge--rel {
+  background: #06333a;
+  color: #6fe3f2;
+}
+
 .small {
   font-size: .82rem;
   color: var(--muted);
@@ -791,6 +814,13 @@ hr {
 /* legend swatch for "matches filter" */
 .legend-dot-hit {
   box-shadow: 0 0 0 2px #ffc400;
+}
+
+/* legend swatch for "related by pass range" — a dashed ring, matching the one
+   the map draws on pins pulled in by the relation rather than by the filter. */
+.legend-dot-rel {
+  outline: 2px dashed #00b8d4;
+  outline-offset: 1px;
 }
 
 /* transient message over the map (locating, GPS errors) */
