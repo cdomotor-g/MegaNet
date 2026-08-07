@@ -25,6 +25,11 @@
   --ok:   #107c10;
   --bad:  #c7401a;
   --warn: #a86400;
+  /* Side nav: expanded, and collapsed to an icon rail. The expanded width is
+     set by the longest label, "Interference Workbench" — a nav that ellipsises
+     its own tab names is worse than a wider one. */
+  --mn-nav: 236px;
+  --mn-nav-rail: 56px;
   /* Search hits in the station table. Amber, to match the map's "matches
      filter" pin ring, so the same match reads the same way in both halves of
      the Stations tab. */
@@ -240,17 +245,6 @@ button.primary {
   background: #107c10;
   color: white;
   border-color: #107c10;
-}
-
-button.tab-btn.active {
-  background: #0b5cab;
-  color: #fff;
-  border-color: #0b5cab;
-}
-
-[data-theme="dark"] button.tab-btn.active {
-  background: #2a6fb0;
-  border-color: #2a6fb0;
 }
 
 input[type="search"],
@@ -1313,25 +1307,197 @@ hr {
   }
 }
 
-/* Tab navigation bar */
-#tab-bar {
+/* ── Side navigation ────────────────────────────────────────────────────────
+   Eleven tabs in one flat row said nothing about how they relate, and wrapped
+   to a second line on a narrow window. They are a left rail now, grouped under
+   headings, and collapsible to icons alone (--mn-nav / 'mn-nav' in
+   localStorage). The rail is a column of the page rather than a band above it,
+   so it costs the Stations panes no height — --mn-chrome counts the header
+   only. Collapsing changes the width of every map on the page; app.js calls
+   invalidateSize() once the transition below has finished. */
+
+#app-shell {
   display: flex;
-  gap: .35rem;
-  padding: .55rem 1rem;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  flex-wrap: nowrap;
+  align-items: stretch;
 }
 
-#tab-bar .tab-btn {
+#tab-nav {
+  flex: 0 0 auto;
+  width: var(--mn-nav, 214px);
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+}
+
+/* Added by app.js once the first render has settled — the opening paint must
+   land at its final width, or the map built alongside it caches a container
+   size measured mid-slide. */
+#tab-nav.nav-ready {
+  transition: width .16s ease;
+}
+
+#tab-nav.collapsed {
+  width: var(--mn-nav-rail, 56px);
+}
+
+/* The nav itself stretches so its border runs the full height of the page;
+   only the contents stick, and only as far as one screen. */
+.nav-inner {
+  position: sticky;
+  top: 0;
+  max-height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: .5rem .45rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+}
+
+.nav-group + .nav-group {
+  margin-top: .55rem;
+  padding-top: .55rem;
+  border-top: 1px solid var(--border);
+}
+
+.nav-heading {
+  margin: 0 0 .25rem;
+  padding: 0 .45rem;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
   white-space: nowrap;
-  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+}
+
+#tab-nav .tab-btn,
+#tab-nav .nav-toggle {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  width: 100%;
+  padding: .42rem .45rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: .92rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+#tab-nav .tab-btn:hover,
+#tab-nav .nav-toggle:hover {
+  background: var(--subtle);
+  border-color: var(--border);
+}
+
+#tab-nav .nav-toggle {
+  margin-bottom: .35rem;
+  color: var(--muted);
+  font-size: .85rem;
+}
+
+/* The icon holds the rail's width on its own, so a label appearing or
+   disappearing never shifts it sideways. */
+.nav-icon {
+  flex: 0 0 1.4rem;
+  width: 1.4rem;
+  text-align: center;
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapsed: labels and headings are clipped rather than removed, so every
+   button keeps its accessible name and the title attribute does the rest. */
+#tab-nav.collapsed .nav-label,
+#tab-nav.collapsed .nav-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+#tab-nav.collapsed .nav-inner {
+  padding-left: .3rem;
+  padding-right: .3rem;
+}
+
+#tab-nav.collapsed .tab-btn,
+#tab-nav.collapsed .nav-toggle {
+  justify-content: center;
+  gap: 0;
+  padding-left: .2rem;
+  padding-right: .2rem;
+}
+
+/* The active tab is the one piece of the nav that has to survive a glance.
+   After the :hover rule deliberately — the two are the same specificity, and
+   an active tab that pales on hover reads as though it had been left. */
+#tab-nav .tab-btn.active {
+  background: #0b5cab;
+  color: #fff;
+  border-color: #0b5cab;
+}
+
+[data-theme="dark"] #tab-nav .tab-btn.active {
+  background: #2a6fb0;
+  border-color: #2a6fb0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #tab-nav.nav-ready { transition: none; }
+}
+
+/* A phone has no width to give away: 236 px of nav plus a filter pane that
+   won't go below ~225 px does not fit in 390 px, whatever the two are set to.
+   So past this breakpoint the expanded nav floats over the content as a drawer
+   instead of squeezing it. The rail keeps its place in the layout, which means
+   the map underneath never changes width and never needs re-measuring —
+   switchTab() closes the drawer once a tab has been picked. */
+@media (max-width: 560px) {
+  #tab-nav,
+  #tab-nav.collapsed {
+    width: var(--mn-nav-rail, 56px);
+  }
+
+  #tab-nav:not(.collapsed) .nav-inner {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: var(--mn-nav, 236px);
+    max-height: none;
+    background: var(--panel);   /* out of flow — the rail behind it is 56 px */
+    border-right: 1px solid var(--border);
+    box-shadow: 0 0 24px rgba(0, 0, 0, .3);
+    z-index: 1200;
+  }
 }
 
 /* Main content area */
 #main-content {
-  min-height: calc(100vh - 120px);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: calc(100dvh - var(--mn-chrome, 96px));
 }
 
 /* …except on the Stations tab, whose two panes already size themselves to the

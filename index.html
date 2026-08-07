@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
   <meta name="theme-color" content="#0b5cab">
-  <link rel="stylesheet" href="styles.css?v=20260807a">
+  <link rel="stylesheet" href="styles.css?v=20260807b">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -28,19 +28,21 @@
     </div>
   </header>
 
-  <nav id="tab-bar">
-    <!-- rendered by app.js -->
-  </nav>
+  <div id="app-shell">
+    <nav id="tab-nav" aria-label="Sections">
+      <!-- rendered by app.js -->
+    </nav>
 
-  <main id="main-content">
-    <!-- rendered by app.js -->
-  </main>
+    <main id="main-content">
+      <!-- rendered by app.js -->
+    </main>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- ?v= is a cache-buster: bump it whenever app.js / maps-data.js / styles.css
        change so browsers and GitHub Pages fetch the new file instead of a stale
        copy. -->
   <script src="maps-data.js?v=20260723a"></script>
-  <script src="app.js?v=20260807a"></script>
+  <script src="app.js?v=20260807b"></script>
 </body>
 </html>

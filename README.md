@@ -593,6 +593,44 @@ Report type (Bug / Idea / Question) maps to the matching GitHub default label
 pre-filled-URL limit are copied to the clipboard automatically so nothing the
 user typed is lost.
 
+### 14. Collapsible Side Navigation
+The tabs are a left-hand rail, grouped under headings, because a flat row of
+eleven buttons said nothing about how they relate — and wrapped to a second line
+on a narrow window.
+
+| Group | Tabs |
+| --- | --- |
+| **Network** | Stations · Network Maps · Networks · Pass Ranges |
+| **Radio investigation** | RF Environment · RF Changes · Interference Workbench · Bit Flipper |
+| **Live tools** | ALERT Packets · Serial Monitor |
+| **Data & admin** | Export |
+
+The grouping is the point of the second row: RF Environment, RF Changes, the
+Workbench and Bit Flipper are one investigation approached four ways, and
+nothing in a flat bar ever said so.
+
+- **Collapses to an icon rail**, not to nothing — icons and tooltips stay, only
+  the labels go. The state is kept in `localStorage` under `mn-nav`, alongside
+  `mn-theme` and `mn-split`.
+- **Starts collapsed under 900 px**, on a first visit only. The Stations tab
+  already gives a permanent column to its resizable filter pane; a second
+  permanent column on a laptop is one too many. A stored preference always wins.
+- **Under 560 px it opens as a drawer over the content**, not as a column beside
+  it. 236 px of nav plus a filter pane that won't compress below ~225 px does
+  not fit in a 390 px phone at any setting, so the rail keeps its place in the
+  layout and the expanded nav floats above — then closes itself once a tab has
+  been picked.
+- Keyboard-driven: ↑/↓ walk the tabs, and the active one carries `aria-current`.
+- `TABS` in `app.js` is the single description of the nav — groups, labels and
+  icons — and both the rail and its headings are rendered from it.
+
+Two pieces of geometry hang off this. `--mn-chrome` (which the Stations panes
+size themselves against) now measures the header alone, because the nav no
+longer sits above the content. And collapsing changes the width of every Leaflet
+map on the page, so `invalidateSize()` runs once the width transition has
+finished — without it the tiles grey out and click coordinates drift by however
+far the rail moved.
+
 ---
 
 ## Deployment Plan
