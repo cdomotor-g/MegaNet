@@ -346,6 +346,12 @@ first tap) and from GPS course otherwise. Leaving the Stations tab stops the wat
   of a station name, or a pasted list of them — a repeater is kept when it
   matches, when a station it serves matches, or when its pass ranges cover any
   AlertID in the box
+- Matches are marked in place, the same way the Stations tab marks them: the
+  repeater name, the station names it serves, and — on an AlertID search — the
+  one pass range that actually covers the address, which is what answers *which
+  range picked this station up*. Stations that matched are pulled to the front
+  of the "first 10" so the mark is visible on rows that were kept because of a
+  station 80-odd names down the list
 - Every row links through to that station on the Stations tab
 
 A station is only treated as a repeater when it carries pass ranges saying which

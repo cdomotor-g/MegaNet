@@ -626,6 +626,11 @@ function stationAlertIdTypes(s) {
   return [...byId.entries()].sort((a, b) => a[0] - b[0]).map(([id, types]) => ({ id, types }));
 }
 
+// Kept as one fused loop on purpose: passRangeOrphans() runs this over every
+// station × repeater × address on each keystroke of the Pass Ranges filter, and
+// splitting the per-range test into its own function — however tidy — costs the
+// tab ~70% more render time at this call volume. See passRangesHtml() for how
+// the table names a single range without a second copy of this rule.
 function passRangeCoversId(repeater, alertId) {
   if (!repeater || !Array.isArray(repeater.pass_ranges)) return false;
   const excl = repeater.exclusions || [];
@@ -2697,11 +2702,36 @@ function passRangeOrphans() {
   });
 }
 
+// The repeater's ranges, with any range carrying a searched address marked.
+// That mark answers "which range picked this station up?" — the question the
+// tab is usually open for.
+//
+// The rule is passRangeRepeaterMatch's own, not a second one: passRangeCoversId
+// still decides whether the repeater carries the address, and the bounds test
+// only says which of its ranges is the one to point at. The two compose exactly
+// because exclusions belong to the repeater rather than to a range — so an
+// address inside this range that survives passRangeCoversId cannot have been
+// excluded, and one that was excluded fails it everywhere. Range bounds are
+// numbers, so there is nothing here to escape.
+function passRangesHtml(repeater, searchIds) {
+  return (repeater.pass_ranges || []).map(p => {
+    const label = `${p.low}–${p.high}`;
+    return searchIds.some(id => id >= p.low && id <= p.high && passRangeCoversId(repeater, id))
+      ? `<mark class="hit">${label}</mark>` : label;
+  }).join(', ');
+}
+
 // Dynamic half — recomputed into #pr-tables on every keystroke in the filter box.
 function passRangeTablesHtml() {
   const all       = state.data.stations;
   const q         = state.prFilter;
   const repeaters = all.filter(s => s.roles.includes('repeater') && s.repeater);
+  // The same prepared terms the filter itself ran on, so every mark below sits
+  // where the match was actually made — as on the Stations tab. The numeric
+  // terms are the addresses the range column is asked about, so they are
+  // converted once here rather than once per range per repeater.
+  const { terms, nums } = prepareSearch(q);
+  const searchIds = nums.map(Number);
 
   const rptData = repeaters
     .map(r => ({ r, matched: findStationMatches(r) }))
@@ -2712,6 +2742,18 @@ function passRangeTablesHtml() {
 
   const of = (shown, total) => shown === total ? `${total}` : `${shown} of ${total}`;
   const noMatch = msg => `<p class="small" style="color:var(--muted);padding:.75rem">${msg}</p>`;
+
+  // A repeater usually survives the filter because one of the ~100 stations it
+  // carries matched — and that station is as likely to be 84th in the list as
+  // 4th, so a cell showing the first ten would mark nothing and the row would
+  // look like it matched for no reason. The matches go to the front; the order
+  // is otherwise untouched, and the "+N more" count behind it is unchanged.
+  const firstTen = matched => {
+    if (!q) return matched;
+    const hit = [], rest = [];
+    for (const s of matched) (passRangeMatch(s, q) ? hit : rest).push(s);
+    return hit.concat(rest);
+  };
 
   return `
       <div class="panel">
@@ -2730,11 +2772,11 @@ function passRangeTablesHtml() {
               ${rptData.map(({ r, matched }) => `
                 <tr onclick="goToStation('${escAttr(r.id)}')" style="cursor:pointer"
                     title="Open ${escAttr(r.name)} on the Stations tab">
-                  <td>${esc(r.name)}</td>
+                  <td>${markHits(r.name, terms)}</td>
                   <td class="small">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
                   <td><span class="badge">${matched.length}</span></td>
-                  <td class="small">${(r.repeater.pass_ranges || []).map(p => `${p.low}–${p.high}`).join(', ')}</td>
-                  <td class="small">${matched.slice(0, 10).map(s => esc(s.name)).join(', ')}${matched.length > 10 ? ` +${matched.length - 10} more` : ''}</td>
+                  <td class="small">${passRangesHtml(r.repeater, searchIds)}</td>
+                  <td class="small">${firstTen(matched).slice(0, 10).map(s => markHits(s.name, terms)).join(', ')}${matched.length > 10 ? ` +${matched.length - 10} more` : ''}</td>
                 </tr>`).join('')}
             </tbody>
           </table>`}
@@ -2758,9 +2800,9 @@ function passRangeTablesHtml() {
                 ${orphans.map(s => `
                   <tr onclick="goToStation('${escAttr(s.id)}')" style="cursor:pointer"
                       title="Open ${escAttr(s.name)} on the Stations tab">
-                    <td>${esc(s.name)}</td>
-                    <td class="small">${esc(s.station_number || '')}</td>
-                    <td class="small">${stationAlertIds(s).join(', ')}</td>
+                    <td>${markHits(s.name, terms)}</td>
+                    <td class="small">${markHits(s.station_number || '', terms)}</td>
+                    <td class="small">${stationAlertIds(s).map(id => markAlertId(id, nums)).join(', ')}</td>
                     <td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
                   </tr>`).join('')}
               </tbody>
