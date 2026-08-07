@@ -2,19 +2,46 @@
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+// The left-hand nav, and the only description of it. Grouped so the sidebar can
+// say what a flat row of eleven buttons never did — that RF Environment, RF
+// Changes, the Workbench and Bit Flipper are one investigation approached four
+// ways. Each tab carries an icon because the nav collapses to an icon rail, and
+// a rail with nothing but tooltips is a guessing game.
 const TABS = [
-  { id: 'stations',   label: 'Stations'   },
-  { id: 'maps',       label: 'Network Maps'},
-  { id: 'networks',   label: 'Networks'   },
-  { id: 'passranges', label: 'Pass Ranges'},
-  { id: 'rf',         label: 'RF Environment'},
-  { id: 'rfchanges',  label: 'RF Changes' },
-  { id: 'workbench',  label: 'Workbench'  },
-  { id: 'bitflipper', label: 'Bit Flipper'},
-  { id: 'packets',    label: 'ALERT Packets'},
-  { id: 'serial',     label: 'Serial Monitor'},
-  { id: 'export',     label: 'Export'     },
+  { group: 'Network', tabs: [
+    { id: 'stations',   label: 'Stations',               icon: '📡' },
+    { id: 'maps',       label: 'Network Maps',           icon: '🗺️' },
+    { id: 'networks',   label: 'Networks',               icon: '🕸️' },
+    { id: 'passranges', label: 'Pass Ranges',            icon: '🔗' },
+  ] },
+  { group: 'Radio investigation', tabs: [
+    { id: 'rf',         label: 'RF Environment',         icon: '📶' },
+    { id: 'rfchanges',  label: 'RF Changes',             icon: '📈' },
+    { id: 'workbench',  label: 'Interference Workbench', icon: '🔬' },
+    { id: 'bitflipper', label: 'Bit Flipper',            icon: '🔀' },
+  ] },
+  { group: 'Live tools', tabs: [
+    { id: 'packets',    label: 'ALERT Packets',          icon: '📦' },
+    { id: 'serial',     label: 'Serial Monitor',         icon: '🔌' },
+  ] },
+  { group: 'Data & admin', tabs: [
+    { id: 'export',     label: 'Export',                 icon: '📤' },
+  ] },
 ];
+
+// Flattened, for the lookups that only care which tab is open (the bug
+// reporter) and don't want to know how the nav happens to be grouped.
+const TAB_LIST = TABS.flatMap(g => g.tabs);
+
+// Matches the width transition in styles.css. Measuring a map mid-slide is
+// worse than not measuring it at all, so the invalidate that follows a collapse
+// waits the transition out rather than racing it.
+const NAV_TRANSITION_MS = 160;
+
+// Below this the nav starts collapsed, on first visit only. The Stations tab
+// already gives a permanent column to its resizable filter pane, and on a
+// laptop a second permanent column is one too many.
+const NAV_AUTO_COLLAPSE_PX = 900;
 
 const ROLE_COLOR = {
   field:    '#107c10',
@@ -176,6 +203,11 @@ const state = {
   mapSearchTimer: null,    // debounce for the search box → marker rebuild
   passRelIdx:     null,    // both directions of the pass-range relation, per loaded file
   splitW:         +(localStorage.getItem('mn-split') || 0) || 320,  // Stations tab column split, px
+  // Left nav: an icon rail, or icons plus labels. Kept under 'mn-nav' the same
+  // way the theme and the split width are. With nothing stored the window's
+  // width decides, so a first visit on a laptop isn't handed two sidebars.
+  navCollapsed:   (localStorage.getItem('mn-nav')
+                   || (window.innerWidth < NAV_AUTO_COLLAPSE_PX ? 'collapsed' : 'expanded')) === 'collapsed',
   // Draw & measure overlay (Stations map). Plain geometry only — the Leaflet
   // layers are rebuilt from it whenever the map is, so a tab switch doesn't
   // throw the sketch away. Deliberately not persisted: see MapDraw.
@@ -785,21 +817,113 @@ function tableStations() {
   return related.length ? matches.concat(related) : matches;
 }
 
-// ── Tab bar ────────────────────────────────────────────────────────────────────
+// ── Side nav ───────────────────────────────────────────────────────────────────
+// Everything that touches the nav lives here: the render, the tab switch, the
+// collapse and its keyboard equivalent. Nothing else in the file reaches into
+// #tab-nav.
 
 function renderTabs() {
-  const nav = document.getElementById('tab-bar');
+  const nav = document.getElementById('tab-nav');
   if (!nav) return;
-  nav.innerHTML = TABS.map(t => `
-    <button class="tab-btn${state.activeTab === t.id ? ' active' : ''}"
-            onclick="switchTab('${t.id}')">${t.label}</button>
-  `).join('');
+  const collapsed = state.navCollapsed;
+  nav.classList.toggle('collapsed', collapsed);
+
+  // The width transition must not run on the opening render. A tab builds its
+  // Leaflet map the moment it renders, and a nav still sliding in from its
+  // expanded default hands the map a container width that is wrong by however
+  // far the slide had got — which Leaflet then caches. So the nav starts with
+  // no transition, the collapsed width is forced to settle, and only then is
+  // the animation allowed for the toggles that follow. The class is its own
+  // flag — it survives every re-render, and needs no state of its own.
+  if (!nav.classList.contains('nav-ready')) {
+    void nav.offsetWidth;
+    nav.classList.add('nav-ready');
+  }
+
+  // Collapsed, the labels are clipped rather than removed: the button keeps its
+  // accessible name, and the title attribute gives the sighted user a tooltip.
+  const groups = TABS.map(g => `
+    <div class="nav-group">
+      <h2 class="nav-heading">${esc(g.group)}</h2>
+      <ul class="nav-list">
+        ${g.tabs.map(t => {
+          const on = state.activeTab === t.id;
+          return `
+        <li>
+          <button class="tab-btn${on ? ' active' : ''}" onclick="switchTab('${t.id}')"
+                  ${on ? 'aria-current="page"' : ''} title="${esc(t.label)}">
+            <span class="nav-icon" aria-hidden="true">${t.icon}</span>
+            <span class="nav-label">${esc(t.label)}</span>
+          </button>
+        </li>`;
+        }).join('')}
+      </ul>
+    </div>`).join('');
+
+  nav.innerHTML = `
+    <div class="nav-inner" onkeydown="navKey(event)">
+      <button class="nav-toggle" onclick="toggleNav()" aria-controls="tab-nav"
+              aria-expanded="${collapsed ? 'false' : 'true'}"
+              title="${collapsed ? 'Expand the navigation' : 'Collapse the navigation'}">
+        <span class="nav-icon" aria-hidden="true">${collapsed ? '»' : '«'}</span>
+        <span class="nav-label">${collapsed ? 'Expand' : 'Collapse'}</span>
+      </button>
+      ${groups}
+    </div>`;
 }
 
 function switchTab(id) {
   state.activeTab = id;
+  // On a phone the expanded nav is a drawer laid over the content rather than
+  // a column beside it (see styles.css). Picking a tab is the end of that
+  // errand, so the drawer closes behind you instead of covering what you came
+  // for. No map to re-measure: the drawer never took the width in the first
+  // place.
+  if (!state.navCollapsed && window.matchMedia('(max-width: 560px)').matches) {
+    state.navCollapsed = true;
+    localStorage.setItem('mn-nav', 'collapsed');
+  }
   renderTabs();
   renderMain();
+}
+
+function toggleNav() {
+  setNavCollapsed(!state.navCollapsed);
+}
+
+function setNavCollapsed(collapsed) {
+  state.navCollapsed = !!collapsed;
+  localStorage.setItem('mn-nav', state.navCollapsed ? 'collapsed' : 'expanded');
+  renderTabs();
+  // The nav just took a column from the main area, or gave one back. Leaflet
+  // only watches the window, so a map left unmeasured renders grey tiles and
+  // hands back click coordinates offset by however much the width moved.
+  invalidateMapSizes(NAV_TRANSITION_MS + 40);
+  // Focus follows the button through the re-render, or a keyboard collapse
+  // drops the user back at the top of the page.
+  const btn = document.querySelector('#tab-nav .nav-toggle');
+  if (btn) btn.focus();
+}
+
+// Every Leaflet map the app holds open. They are created lazily per tab, so
+// most of these are null most of the time.
+function invalidateMapSizes(delay) {
+  setTimeout(() => {
+    [state.map, state.bfMap, state.wb && state.wb.map].forEach(m => {
+      if (m) { try { m.invalidateSize(); } catch (_) {} }
+    });
+  }, delay || 0);
+}
+
+// Up and down walk the tabs, ignoring the group headings — the list reads as
+// one column, so it should drive as one column.
+function navKey(e) {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const btns = [...document.querySelectorAll('#tab-nav .tab-btn')];
+  const i    = btns.indexOf(document.activeElement);
+  if (i < 0) return;
+  const next = btns[(i + (e.key === 'ArrowDown' ? 1 : btns.length - 1)) % btns.length];
+  if (next) { next.focus(); e.preventDefault(); }
 }
 
 // ── Main content dispatcher ────────────────────────────────────────────────────
@@ -907,14 +1031,13 @@ function renderStationsHtml() {
 // the header and scrolls inside itself, and the divider between them drags to
 // re-split the width.
 
-// How much vertical room the header and tab bar take. Measured rather than
-// assumed: both wrap to a second line on a narrow window, and the panes size
-// themselves off what's left.
+// How much vertical room the header takes. Measured rather than assumed: its
+// title and its row of buttons wrap on a narrow window, and the panes size
+// themselves off what's left. The nav used to be counted here too; it sits
+// beside the main area now, so it costs the panes no height at all.
 function updateChromeHeight() {
   const hdr = document.querySelector('header');
-  const nav = document.getElementById('tab-bar');
-  const h   = (hdr ? hdr.offsetHeight : 0) + (nav ? nav.offsetHeight : 0);
-  document.documentElement.style.setProperty('--mn-chrome', `${h}px`);
+  document.documentElement.style.setProperty('--mn-chrome', `${hdr ? hdr.offsetHeight : 0}px`);
 }
 
 // `save` is left off while a drag is in flight — the width is written once the
@@ -9607,7 +9730,7 @@ const BugReport = (function () {
   // Snapshot of the user's current context. Ordered for readability in the issue.
   function collect() {
     const d   = state.data;
-    const tab = TABS.find(t => t.id === state.activeTab);
+    const tab = TAB_LIST.find(t => t.id === state.activeTab);
     const sel = (d && state.selectedId) ? d.stations.find(s => s.id === state.selectedId) : null;
     return {
       'Screen':           tab ? `${tab.label} (${tab.id})` : state.activeTab,
@@ -9716,7 +9839,7 @@ const BugReport = (function () {
     const expected = ((document.getElementById('br-expected') || {}).value   || '').trim();
     const include  = (document.getElementById('br-include')   || {}).checked;
     const t        = TYPES.find(x => x.id === type) || TYPES[0];
-    const tab      = TABS.find(x => x.id === state.activeTab);
+    const tab      = TAB_LIST.find(x => x.id === state.activeTab);
     const screen   = tab ? tab.label : state.activeTab;
 
     const firstLine = desc.split('\n')[0].slice(0, 80);
