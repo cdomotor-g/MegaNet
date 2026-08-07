@@ -25,6 +25,7 @@ const TABS = [
     { id: 'serial',     label: 'Serial Monitor',         icon: '🔌' },
   ] },
   { group: 'Data & admin', tabs: [
+    { id: 'arro',       label: 'ARRO Launcher',          icon: '🚀' },
     { id: 'export',     label: 'Export',                 icon: '📤' },
   ] },
 ];
@@ -56,6 +57,49 @@ const ROLE_LABEL = {
   base:     'Base Station',
   satcom:   'Satcom',
 };
+
+// ── ARRO ──────────────────────────────────────────────────────────────────────
+// ARRO (Contrail) is where a station's telemetry actually lives, and the only
+// key it accepts is `site.db_id` — an arbitrary database index, *not* the BoM
+// station number in `site.number`. Every link the app builds is assembled from
+// the constants below, in one place, because three hard-coded copies of a host
+// drift the moment one of them is edited.
+const ARRO_HOST         = 'https://contrail-bom.onerain.au';
+const ARRO_PATH_GRAPH   = '/graph/';
+const ARRO_PATH_SITE    = '/administration/site/details/';
+const ARRO_PATH_SENSOR  = '/administration/sensor/details/';
+const ARRO_DEFAULT_BASE = ARRO_HOST + ARRO_PATH_GRAPH;
+
+// The host every ARRO link is hung off. The Bit Flipper's "ARRO base URL" box
+// writes a full graph URL into state.bfArroBase; that override is taken to mean
+// "this whole app talks to that ARRO", so the admin links follow it too — one
+// box, not one per placement. A base that won't parse falls back to the default
+// rather than producing a broken link.
+function arroHost() {
+  const raw = (state.bfArroBase || '').trim();
+  if (!raw) return ARRO_HOST;
+  try { return new URL(raw).origin; } catch (_) { return ARRO_HOST; }
+}
+
+// Admin page for a site. `dbId` is site.db_id; null/undefined means the station
+// has no ARRO record and callers must render nothing rather than a dead link.
+function arroSiteUrl(dbId) {
+  return dbId == null ? null : `${arroHost()}${ARRO_PATH_SITE}?site_id=${encodeURIComponent(dbId)}`;
+}
+
+// Admin page for one sensor. ARRO needs both keys — the site and the device
+// within it — so a sensor with no device_id has no admin page.
+function arroSensorUrl(dbId, deviceId) {
+  if (dbId == null || deviceId == null || deviceId === '') return null;
+  return `${arroHost()}${ARRO_PATH_SENSOR}?site_id=${encodeURIComponent(dbId)}`
+       + `&device_id=${encodeURIComponent(deviceId)}`;
+}
+
+// A station's ARRO site id, or null. 2,784 of 3,174 stations carry one.
+function arroSiteId(s) {
+  const id = s && s.site && s.site.db_id;
+  return id == null ? null : id;
+}
 
 // ── Station filter vocabulary ─────────────────────────────────────────────────
 // The grouped filters on the Stations tab (role, sensor type, radio network,
@@ -222,12 +266,16 @@ const state = {
   bfInput:        '',
   bfBits:         '1',
   bfOnlyMatches:  false,
-  bfArroBase:     'https://contrail-bom.onerain.au/graph/',
+  bfArroBase:     ARRO_DEFAULT_BASE,   // graph base; its host drives every ARRO link (see arroHost)
   bfSensorFilter: '',
   bfMap:          null,
   bfMapLayer:     null,
   bfMapTimer:     null,
   prFilter:       '',      // Pass Ranges tab: station number / AlertID / name filter
+  // ARRO launcher. `search` drives the station lookup, `siteId`/`deviceId` are
+  // the ids actually opened — a search result writes into them rather than
+  // opening straight away, so a mis-click is visible before it costs a tab.
+  arro: { search: '', siteId: '', deviceId: '', note: '' },
   pkt: {
     decInput:  '',
     lastDecode: null,   // last decoded input string (for replay after re-render)
@@ -931,7 +979,9 @@ function navKey(e) {
 function renderMain() {
   const el = document.getElementById('main-content');
   if (!el) return;
-  const noDataTabs = ['packets', 'maps', 'serial'];
+  // The ARRO launcher joins these because its raw-id box works with no file
+  // loaded at all — only the station search needs stations.json, and it says so.
+  const noDataTabs = ['packets', 'maps', 'serial', 'arro'];
   if (!state.data && !noDataTabs.includes(state.activeTab)) { el.innerHTML = renderEmpty(); return; }
   switch (state.activeTab) {
     case 'stations':   el.innerHTML = renderStationsHtml();  initStationFilters(); initMap(); break;
@@ -944,6 +994,7 @@ function renderMain() {
     case 'bitflipper': el.innerHTML = renderBitFlipperHtml(); initBitFlipperMap(); break;
     case 'packets':    el.innerHTML = Packets.render();       Packets.init();      break;
     case 'serial':     el.innerHTML = Serial.render();        Serial.init();       break;
+    case 'arro':       el.innerHTML = renderArroHtml();      initArro();  break;
     case 'export':     el.innerHTML = renderExportHtml();                 break;
     default:           el.innerHTML = '<p style="padding:1rem">Unknown tab</p>';
   }
@@ -1464,6 +1515,7 @@ function refreshMapLayers({ skipFit = false } = {}) {
     // not for all ~3,174 markers on every refresh.
     marker.bindPopup(() => {
       const idTypes = stationAlertIdTypes(s);
+      const arroUrl = arroSiteUrl(arroSiteId(s));
       return `
       <strong>${esc(s.name)}</strong><br>
       ${s.roles.map(r => `<span style="background:${ROLE_COLOR[r]};color:#fff;padding:1px 5px;border-radius:999px;font-size:.78rem;margin-right:2px">${r}</span>`).join('')}<br>
@@ -1475,6 +1527,9 @@ function refreshMapLayers({ skipFit = false } = {}) {
       <div class="mn-popup-actions">
         <a href="#" onclick="focusStation('${escAttr(s.id)}');return false"
            title="Select this station in the list under the map">Show in the list below ↓</a>
+        ${arroUrl ? `<a href="${esc(arroUrl)}" target="_blank" rel="noopener"
+           title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
+           >Open in ARRO admin ↗</a>` : ''}
       </div>
     `;
     });
@@ -2944,7 +2999,6 @@ function onPassRangeFilter(value) {
 
 const BF_TYPE_LABEL     = { battery: 'Battery', rainfall: 'Rainfall', water_level: 'Water Level', primary: 'Primary' };
 const BF_MAX_RENDER_ROWS = 2000;   // safety cap for very large N-bit expansions
-const ARRO_DEFAULT_BASE  = 'https://contrail-bom.onerain.au/graph/';
 // Station of interest — the entered address. Ties the pinned table row (see
 // .bf-row-base in styles.css) to its highlighted pin on the map below.
 const BF_BASE_COLOR      = '#ff8c00';
@@ -3091,8 +3145,9 @@ function renderBitFlipperHtml() {
                    onchange="onBfOnlyMatches(this.checked)">
             Show only matched addresses
           </label>
-          <label style="font-size:.9rem;color:var(--muted);flex:1;min-width:240px">
-            ARRO base URL
+          <label style="font-size:.9rem;color:var(--muted);flex:1;min-width:240px"
+                 title="Its host is what every ARRO link in the app is built on — map popups, the station editor and the ARRO Launcher tab included">
+            ARRO base URL <span style="font-weight:400">— sets the host app-wide</span>
             <input id="bf-arro" type="text" value="${esc(state.bfArroBase || ARRO_DEFAULT_BASE)}"
                    style="width:100%;margin-top:.3rem;display:block"
                    oninput="onBfArroInput(this.value)">
@@ -3421,6 +3476,362 @@ function refreshBitFlipperMap() {
   if (bounds.length) state.bfMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
 }
 
+// ── ARRO LAUNCHER tab ──────────────────────────────────────────────────────────
+// A jump box for ARRO's administration pages. The standalone launcher this
+// replaces could only take an id you already knew; the whole reason to bring it
+// in-app is the station search — `site.db_id` is an arbitrary database index and
+// nobody carries 2,784 of them in their head, but everybody knows the station by
+// name, by number or by one of its ALERT addresses.
+
+const ARRO_RECENT_KEY = 'mn-arro-recent';
+const ARRO_RECENT_MAX = 12;
+const ARRO_RESULT_MAX = 40;   // station search results shown before "narrow it down"
+
+function arroRecents() {
+  try {
+    const v = JSON.parse(localStorage.getItem(ARRO_RECENT_KEY) || '[]');
+    return Array.isArray(v) ? v : [];
+  } catch (_) { return []; }
+}
+
+// Most recent first, deduped on the (site, device) pair the entry actually opens
+// so re-opening the same page reorders rather than accumulates.
+function arroSaveRecent(site, device, label) {
+  const key  = `${site}|${device || ''}`;
+  const list = arroRecents().filter(r => `${r.site}|${r.device || ''}` !== key);
+  list.unshift({ site, device: device || '', label: label || '', ts: Date.now() });
+  try { localStorage.setItem(ARRO_RECENT_KEY, JSON.stringify(list.slice(0, ARRO_RECENT_MAX))); }
+  catch (_) { /* private mode, or the quota — recents are a convenience, not state */ }
+}
+
+function arroClearRecents() {
+  try { localStorage.removeItem(ARRO_RECENT_KEY); } catch (_) {}
+  rerenderArroRecents();
+}
+
+// Pull the ids out of whatever was pasted. Handles a full ARRO URL of either
+// shape, the `devices[]=site|device` pair the graph pages use, and a bare id.
+// Returns { site, device } with either field null when it isn't there.
+function arroParseIds(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return { site: null, device: null };
+
+  const num = s => (s != null && /^\d+$/.test(String(s).trim()) ? String(s).trim() : null);
+
+  // `site_id=…` / `device_id=…`, whether or not the rest parses as a URL.
+  const site   = num((raw.match(/[?&]site_id=(\d+)/i)   || [])[1]);
+  const device = num((raw.match(/[?&]device_id=(\d+)/i) || [])[1]);
+  if (site) return { site, device };
+
+  // Graph form: devices[]=3318|2 (URL-encoded or not).
+  const pair = raw.match(/devices(?:\[\]|%5B%5D)=(\d+)(?:\||%7C)(\d+)/i);
+  if (pair) return { site: pair[1], device: pair[2] };
+
+  // Bare "3318|2", or a lone id.
+  const bare = raw.match(/^(\d+)\s*[|/,\s]\s*(\d+)$/);
+  if (bare) return { site: bare[1], device: bare[2] };
+  return { site: num(raw), device: device };
+}
+
+// Stations matching the search box, resolved to their ARRO site id. Stations
+// with no db_id are still listed — saying "this one has no ARRO record" is more
+// use than silently dropping it and leaving the operator to wonder.
+function arroSearchResults() {
+  if (!state.data) return [];
+  const text = state.arro.search.trim();
+  if (!text) return [];
+  const prep = prepareSearch(text);
+  if (!prep.terms.length) return [];
+  const out = [];
+  for (const s of state.data.stations) {
+    if (!stationMatchesSearch(s, prep)) continue;
+    out.push(s);
+    if (out.length > ARRO_RESULT_MAX) break;
+  }
+  return out;
+}
+
+function renderArroHtml() {
+  const a = state.arro;
+  return `
+    <div style="max-width:1000px;margin:auto;padding:1rem;display:grid;gap:1rem">
+      <div class="panel">
+        <div class="panel-header"><h2>ARRO Launcher</h2></div>
+        <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+          Opens ARRO's <strong>administration</strong> pages. Find the station by name, number or
+          ALERT address and the site id is filled in for you — or paste an ARRO URL and the ids are
+          read out of it. Everything opens in a new tab.
+        </p>
+        <p class="small" style="color:var(--muted);margin:.35rem 0 0">
+          Host: <code>${esc(arroHost())}</code> — set by the ARRO base URL on the Bit Flipper tab.
+        </p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h3>Find a station</h3></div>
+        ${state.data ? `
+          <input type="search" id="arro-search" value="${esc(a.search)}"
+                 placeholder="Station name, station number or ALERT address — e.g. Loudoun, 541155, 6128"
+                 style="margin-top:.6rem" oninput="onArroSearch(this.value)">
+          <div id="arro-results" style="margin-top:.6rem">${arroResultsHtml()}</div>
+        ` : `
+          <p class="small" style="color:var(--muted);margin:.6rem 0 0">
+            No <strong>stations.json</strong> loaded, so there is nothing to search. The raw id box
+            below still works — load a file to look site ids up by name instead.
+          </p>`}
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h3>Open by id</h3></div>
+        <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:.6rem">
+          <label style="font-size:.9rem;color:var(--muted);flex:0 0 12rem">
+            ARRO site id
+            <input type="text" id="arro-site" value="${esc(a.siteId)}" placeholder="e.g. 3318"
+                   style="margin-top:.3rem" oninput="onArroIdInput('siteId',this.value)"
+                   onkeydown="onArroKey(event)">
+          </label>
+          <label style="font-size:.9rem;color:var(--muted);flex:0 0 12rem">
+            Device id <span style="font-weight:400">(optional)</span>
+            <input type="text" id="arro-device" value="${esc(a.deviceId)}" placeholder="e.g. 2"
+                   style="margin-top:.3rem" oninput="onArroIdInput('deviceId',this.value)"
+                   onkeydown="onArroKey(event)">
+          </label>
+          <label style="font-size:.9rem;color:var(--muted);flex:1 1 18rem;min-width:14rem">
+            …or paste an ARRO URL
+            <input type="text" id="arro-paste" placeholder="https://…/administration/site/details/?site_id=3318"
+                   style="margin-top:.3rem" oninput="onArroPaste(this.value)"
+                   onkeydown="onArroKey(event)">
+          </label>
+        </div>
+        <div id="arro-actions" style="margin-top:.75rem">${arroActionsHtml()}</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Recent</h3>
+          <button onclick="arroClearRecents()" style="padding:.25rem .5rem;font-size:.8rem">Clear</button>
+        </div>
+        <div id="arro-recents" style="margin-top:.6rem">${arroRecentsHtml()}</div>
+      </div>
+    </div>`;
+}
+
+// The action row: what the ids currently in the boxes would open.
+function arroActionsHtml() {
+  const a       = state.arro;
+  const site    = a.siteId.trim();
+  const device  = a.deviceId.trim();
+  const siteUrl = /^\d+$/.test(site) ? arroSiteUrl(site) : null;
+  const devUrl  = /^\d+$/.test(device) ? arroSensorUrl(site, device) : null;
+
+  if (!siteUrl) {
+    return `<p class="small" style="color:var(--muted);margin:0">
+      Enter a numeric site id — or pick a station above — to open its ARRO pages.
+      ${a.note ? `<br>${esc(a.note)}` : ''}</p>`;
+  }
+  return `
+    <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
+      <a class="btn-link" href="${esc(siteUrl)}" target="_blank" rel="noopener"
+         onclick="arroRemember()">Open site admin ↗</a>
+      ${devUrl
+        ? `<a class="btn-link" href="${esc(devUrl)}" target="_blank" rel="noopener"
+             onclick="arroRemember()">Open sensor admin ↗</a>`
+        : `<span class="btn-link disabled" title="Add a device id to open a sensor page">Open sensor admin ↗</span>`}
+      <span class="small" style="color:var(--muted)">
+        site <code>${esc(site)}</code>${device ? ` · device <code>${esc(device)}</code>` : ''}
+        ${a.note ? ` · ${esc(a.note)}` : ''}
+        · press <kbd>Enter</kbd> in any box above
+      </span>
+    </div>`;
+}
+
+function arroResultsHtml() {
+  if (!state.data) return '';
+  const text = state.arro.search.trim();
+  if (!text) {
+    return `<p class="small" style="color:var(--muted);margin:0">
+      Type to search ${state.data.stations.length.toLocaleString()} stations.</p>`;
+  }
+  const hits = arroSearchResults();
+  if (!hits.length) {
+    return `<p class="small" style="color:var(--muted);margin:0">No station matches that.</p>`;
+  }
+  const more  = hits.length > ARRO_RESULT_MAX;
+  const shown = more ? hits.slice(0, ARRO_RESULT_MAX) : hits;
+  return `
+    <div class="table-wrap" style="max-height:320px">
+      <table>
+        <thead><tr>
+          <th style="width:40%">Station</th><th style="width:13%">Stn #</th>
+          <th style="width:16%">ARRO site id</th><th style="width:11%">Sensors</th>
+          <th style="width:20%"></th>
+        </tr></thead>
+        <tbody>
+          ${shown.map(s => {
+            const dbId = arroSiteId(s);
+            const url  = arroSiteUrl(dbId);
+            const devs = stationSensors(s).filter(se => se.device_id != null).length;
+            return `
+              <tr>
+                <td>${esc(s.name)}</td>
+                <td class="small">${esc(s.station_number || '—')}</td>
+                <td class="small">${dbId == null
+                  ? `<span style="color:var(--muted)">none recorded</span>`
+                  : `<code>${esc(dbId)}</code>`}</td>
+                <td class="small">${devs || '—'}</td>
+                <td class="small" style="white-space:nowrap">${dbId == null ? '' : `
+                  <button onclick="arroPickStation('${escAttr(s.id)}')"
+                          style="padding:.2rem .5rem;font-size:.8rem">Use</button>
+                  <a href="${esc(url)}" target="_blank" rel="noopener"
+                     onclick="arroRememberStation('${escAttr(s.id)}')">admin ↗</a>`}</td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${more ? `<p class="small" style="color:var(--muted);margin:.4rem 0 0">
+      Showing the first ${ARRO_RESULT_MAX} — narrow the search to see the rest.</p>` : ''}`;
+}
+
+function arroRecentsHtml() {
+  const list = arroRecents();
+  if (!list.length) {
+    return `<p class="small" style="color:var(--muted);margin:0">
+      Nothing yet. Pages you open from here are listed for next time.</p>`;
+  }
+  return `
+    <div style="display:grid;gap:.3rem">
+      ${list.map(r => {
+        const url = r.device ? arroSensorUrl(r.site, r.device) : arroSiteUrl(r.site);
+        return `
+          <div style="display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap">
+            <a href="${esc(url)}" target="_blank" rel="noopener" style="font-weight:600">
+              ${esc(r.label || `Site ${r.site}`)}</a>
+            <span class="small" style="color:var(--muted)">
+              site <code>${esc(r.site)}</code>${r.device ? ` · device <code>${esc(r.device)}</code>` : ''}
+              · ${esc(r.device ? 'sensor admin' : 'site admin')}</span>
+            <button onclick="arroUseRecent('${escAttr(r.site)}','${escAttr(r.device || '')}')"
+                    style="padding:.1rem .45rem;font-size:.78rem">Use</button>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function initArro() {
+  const el = document.getElementById(state.data ? 'arro-search' : 'arro-site');
+  if (el) el.focus();
+}
+
+function rerenderArroResults() {
+  const el = document.getElementById('arro-results');
+  if (el) el.innerHTML = arroResultsHtml();
+}
+
+function rerenderArroActions() {
+  const el = document.getElementById('arro-actions');
+  if (el) el.innerHTML = arroActionsHtml();
+}
+
+function rerenderArroRecents() {
+  const el = document.getElementById('arro-recents');
+  if (el) el.innerHTML = arroRecentsHtml();
+}
+
+function onArroSearch(v) {
+  state.arro.search = v;
+  rerenderArroResults();
+}
+
+function onArroIdInput(field, v) {
+  state.arro[field] = v;
+  state.arro.note = '';
+  rerenderArroActions();
+}
+
+// Pasting a URL fills the id boxes rather than navigating: the ids are the thing
+// worth keeping, and seeing them land is what tells you the paste was understood.
+function onArroPaste(v) {
+  if (!v.trim()) return;
+  const { site, device } = arroParseIds(v);
+  if (!site && !device) { state.arro.note = 'No site id found in that.'; rerenderArroActions(); return; }
+  if (site)   state.arro.siteId   = site;
+  if (device) state.arro.deviceId = device;
+  state.arro.note = 'read from the pasted URL';
+  const siteEl = document.getElementById('arro-site');
+  const devEl  = document.getElementById('arro-device');
+  if (siteEl) siteEl.value = state.arro.siteId;
+  if (devEl)  devEl.value  = state.arro.deviceId;
+  rerenderArroActions();
+}
+
+// Enter opens the most specific page the boxes describe — the sensor if a device
+// id is there, the site otherwise.
+function onArroKey(ev) {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  const site   = state.arro.siteId.trim();
+  const device = state.arro.deviceId.trim();
+  if (!/^\d+$/.test(site)) return;
+  const url = /^\d+$/.test(device) ? arroSensorUrl(site, device) : arroSiteUrl(site);
+  arroRemember();
+  window.open(url, '_blank', 'noopener');
+}
+
+// Record whatever the boxes currently point at. Called from the anchors' onclick
+// as well as from Enter, so a middle-click that never fires it simply isn't
+// remembered — better than remembering a page that was never opened.
+function arroRemember() {
+  const site   = state.arro.siteId.trim();
+  const device = state.arro.deviceId.trim();
+  if (!/^\d+$/.test(site)) return;
+  arroSaveRecent(site, /^\d+$/.test(device) ? device : '', arroLabelForSite(site));
+  rerenderArroRecents();
+}
+
+// The station name behind a site id, when we happen to know it, so the recents
+// list reads as stations rather than as a column of database keys.
+function arroLabelForSite(site) {
+  if (!state.data) return '';
+  const n = parseInt(site, 10);
+  const s = state.data.stations.find(x => arroSiteId(x) === n);
+  return s ? s.name : '';
+}
+
+function arroPickStation(id) {
+  const s = state.data && state.data.stations.find(x => x.id === id);
+  if (!s) return;
+  const dbId = arroSiteId(s);
+  if (dbId == null) return;
+  state.arro.siteId   = String(dbId);
+  state.arro.deviceId = '';
+  state.arro.note     = s.name;
+  const siteEl = document.getElementById('arro-site');
+  const devEl  = document.getElementById('arro-device');
+  if (siteEl) siteEl.value = state.arro.siteId;
+  if (devEl)  devEl.value  = '';
+  rerenderArroActions();
+  document.getElementById('arro-actions')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function arroRememberStation(id) {
+  const s = state.data && state.data.stations.find(x => x.id === id);
+  const dbId = s && arroSiteId(s);
+  if (dbId == null) return;
+  arroSaveRecent(String(dbId), '', s.name);
+  rerenderArroRecents();
+}
+
+function arroUseRecent(site, device) {
+  state.arro.siteId   = String(site || '');
+  state.arro.deviceId = String(device || '');
+  state.arro.note     = arroLabelForSite(site);
+  const siteEl = document.getElementById('arro-site');
+  const devEl  = document.getElementById('arro-device');
+  if (siteEl) siteEl.value = state.arro.siteId;
+  if (devEl)  devEl.value  = state.arro.deviceId;
+  rerenderArroActions();
+}
+
 // ── EXPORT tab ─────────────────────────────────────────────────────────────────
 
 function renderExportHtml() {
@@ -3663,6 +4074,7 @@ function editorNew() {
 function editorForm(s) {
   const hasRep  = s.roles.includes('repeater');
   const sensors = stationSensors(s).slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0));
+  const dbId    = arroSiteId(s);
   return `
     <div class="panel-header" style="margin-bottom:.75rem">
       <h2>${esc(s.name) || 'New Station'}</h2>
@@ -3692,10 +4104,11 @@ function editorForm(s) {
           <button type="button" onclick="editorAddSensorRow()">+ Add sensor</button>
         </div>
         <div id="ef-sensors">
-          ${sensors.map(sensorRowHtml).join('')}
+          ${sensors.map(se => sensorRowHtml(se, dbId)).join('')}
         </div>
         <div class="small" style="color:var(--muted);margin-top:.2rem">
-          One row per ALERT address and what it measures — rainfall, water level, battery, etc.
+          One row per ALERT address and what it measures — rainfall, water level, battery, etc.${
+            dbId != null ? ' Rows whose sensor carries an ARRO device id link straight to its admin page.' : ''}
         </div>
         <datalist id="ef-sensor-types">
           ${['Rainfall', 'Rainfall Increment', 'Water Level', 'Water Level - AHD', 'Battery', 'Air Temperature', 'Relative Humidity', 'Wind Speed', 'Wind Gust', 'Wind Direction', 'pH', 'Conductivity', 'Dissolved Oxygen', 'Water Temperature', 'Turbidity'].map(t => `<option value="${esc(t)}">`).join('')}
@@ -3719,13 +4132,72 @@ function editorForm(s) {
         <label class="full">Exclusions (one per line: <em>low-high</em>)
           <textarea id="ef-excl" rows="3">${(s.repeater?.exclusions || []).map(r => `${r.low}-${r.high}`).join('\n')}</textarea>
         </label>
-      </div>` : ''}`;
+      </div>` : ''}
+    ${editorArroSection(s, sensors)}`;
+}
+
+// The ARRO block at the foot of the editor. Read-only throughout: these ids come
+// from ARRO's own export and editing them here would only desynchronise us from
+// it. The site id is spelled out next to the station number precisely because
+// the two get confused — the number is BoM's, the site id is ARRO's index, and
+// only the latter opens a page.
+function editorArroSection(s, sensors) {
+  const dbId  = arroSiteId(s);
+  const site  = s.site || {};
+  const admin = arroSiteUrl(dbId);
+  const graph = buildArroUrl(sensors.map(se => ({ station: s, sensor: se })));
+  const withDev = sensors.filter(se => se.device_id != null).length;
+
+  if (dbId == null) {
+    return `
+      <hr>
+      <h3 style="margin:.5rem 0 .75rem">ARRO</h3>
+      <p class="small" style="color:var(--muted);margin:0">
+        <strong>No ARRO site id recorded</strong> for this station, so there is no admin page to
+        link to. 390 of 3,174 stations are in the same position — the site id arrives with the
+        ARRO sensor export (<code>tools/import_arro_sensors.py</code>) and a station missing from
+        that export has no <code>site.db_id</code> here either.
+      </p>`;
+  }
+
+  return `
+    <hr>
+    <h3 style="margin:.5rem 0 .75rem">ARRO</h3>
+    <div class="form-grid">
+      <label>ARRO site id <span class="small" style="font-weight:400">— ARRO's key, not BoM's</span>
+        <input type="text" readonly value="${esc(dbId)}" title="site.db_id — the id every ARRO URL takes">
+      </label>
+      <label>Station number <span class="small" style="font-weight:400">— BoM's</span>
+        <input type="text" readonly value="${esc(site.number || s.station_number || '—')}">
+      </label>
+      <label class="full">Site name in ARRO
+        <input type="text" readonly value="${esc(site.name || '—')}">
+      </label>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.6rem">
+      <a class="btn-link" href="${esc(admin)}" target="_blank" rel="noopener"
+         title="Site administration page in ARRO">Open site in ARRO admin ↗</a>
+      ${graph ? `<a class="btn-link" href="${esc(graph.url)}" target="_blank" rel="noopener"
+         title="Last 7 days for ${graph.count} sensor${graph.count !== 1 ? 's' : ''}">Graph last 7 days ↗</a>` : ''}
+    </div>
+    <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+      ${withDev
+        ? `${withDev} of ${sensors.length} sensor${sensors.length !== 1 ? 's' : ''} carry an ARRO device id —
+           each of those rows above links to its own sensor admin page.`
+        : `None of this station's sensors carry an ARRO device id, so there are no per-sensor
+           admin pages to link to.`}
+    </p>`;
 }
 
 // One editable sensor row: ALERT id + type, with the national-export metadata
 // (sensor_id, device_id) preserved on data-attributes so a round-trip keeps it.
-function sensorRowHtml(se) {
+//
+// `dbId` is the station's ARRO site id, passed in because a sensor record has
+// only half of what an ARRO sensor page needs. When both keys are present the
+// row carries its own admin link rather than a second list of them below.
+function sensorRowHtml(se, dbId) {
   se = se || {};
+  const url = arroSensorUrl(dbId, se.device_id);
   return `
     <div class="sensor-row" data-sensor-id="${esc(se.sensor_id || '')}" data-device-id="${se.device_id ?? ''}"
          style="display:flex;gap:.4rem;align-items:center;margin-bottom:.35rem">
@@ -3733,6 +4205,10 @@ function sensorRowHtml(se) {
              style="flex:0 0 7.5rem;width:7.5rem">
       <input type="text" class="sensor-type" list="ef-sensor-types" value="${esc(se.type || '')}"
              placeholder="Sensor type (e.g. Rainfall)" style="flex:1 1 auto;width:auto;min-width:0">
+      <span class="sensor-arro small" style="flex:0 0 4.2rem;text-align:right">${url
+        ? `<a href="${esc(url)}" target="_blank" rel="noopener"
+             title="ARRO admin for device ${esc(se.device_id)} on site ${esc(dbId)}">ARRO ↗</a>`
+        : ''}</span>
       <button type="button" class="sensor-del" title="Remove this sensor"
               onclick="this.closest('.sensor-row').remove()"
               style="flex:0 0 auto;border-color:#c7401a;color:#c7401a;padding:.2rem .55rem;line-height:1">×</button>

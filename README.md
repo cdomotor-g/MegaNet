@@ -603,7 +603,7 @@ on a narrow window.
 | **Network** | Stations · Network Maps · Networks · Pass Ranges |
 | **Radio investigation** | RF Environment · RF Changes · Interference Workbench · Bit Flipper |
 | **Live tools** | ALERT Packets · Serial Monitor |
-| **Data & admin** | Export |
+| **Data & admin** | ARRO Launcher · Export |
 
 The grouping is the point of the second row: RF Environment, RF Changes, the
 Workbench and Bit Flipper are one investigation approached four ways, and
@@ -630,6 +630,64 @@ longer sits above the content. And collapsing changes the width of every Leaflet
 map on the page, so `invalidateSize()` runs once the width transition has
 finished — without it the tiles grey out and click coordinates drift by however
 far the rail moved.
+
+### 15. ARRO Deep Links & Launcher
+ARRO (Contrail) is where a station's telemetry actually lives. Getting to a
+station's admin page used to mean knowing its ARRO site id, and that id is the
+one number nobody can guess.
+
+**The two ids, which are not the same number.** Every enriched station carries a
+`site` block:
+
+```json
+"site": { "db_id": 3318, "number": "541155", "name": "Loudoun Br AL" }
+```
+
+`site.db_id` is ARRO's own database index and the only key its URLs accept.
+`site.number` is the BoM station number. Confusing the two is the most common
+way to end up on the wrong page, which is why the editor labels them *"ARRO's
+key, not BoM's"* and *"BoM's"* side by side rather than just printing both.
+2,784 of 3,174 stations have a `db_id`; 8,759 sensors carry the `device_id` that
+a sensor page also needs.
+
+**Three places the link appears**, all built from the same constants:
+
+- **Map pin popups** — *Open in ARRO admin ↗* under the existing *Show in the
+  list below ↓*. Built inside the lazy popup function, so it costs nothing for
+  the ~3,174 markers whose popup is never opened.
+- **The station editor** — an ARRO block at the foot of the form with the site
+  id, station number and ARRO site name as read-only fields, a site admin link,
+  and a *Graph last 7 days* link. Per-sensor admin links hang off the existing
+  sensor rows rather than forming a second list beside them.
+- **The ARRO Launcher tab** — a jump box, grouped under **Data & admin**.
+
+**The launcher's one addition over a standalone bookmarklet is the station
+search.** Type a name, a station number or an ALERT address and it resolves to
+the site id for you, reusing the same `prepareSearch` / `stationMatchesSearch`
+helpers as the Stations tab. It also takes a raw site id for ids not in our
+data, an optional device id for the sensor page, and a pasted ARRO URL of any
+shape — admin, `devices[]=site|device` graph form, or a bare `3318|2` pair — from
+which it reads the ids and shows what it found before you commit to it. Enter
+opens the most specific page the boxes describe. Recents live in `localStorage`
+under `mn-arro-recent`, deduped on the (site, device) pair so re-opening a page
+reorders rather than accumulates.
+
+- **Stations without a `db_id` degrade explicitly.** The popup omits the link
+  rather than rendering a dead one; the editor says *"No ARRO site id
+  recorded"* and explains where the id comes from; the launcher's search lists
+  the station with *"none recorded"* in the site-id column instead of silently
+  dropping it.
+- **One host, set in one place.** `ARRO_HOST` and the three path constants live
+  together at the top of `app.js`. The Bit Flipper's *ARRO base URL* box is
+  still the only control, and its host now drives every ARRO link in the app —
+  the box says so, and a base that won't parse falls back to the default rather
+  than producing a broken link.
+- The launcher works with no `stations.json` loaded — only the search needs it,
+  and it says as much instead of showing an empty box.
+
+One thing this shook out: the app had **no `a` rule at all**, so every link fell
+back to the browser's `#0000EE` and, once followed, `#551A8B` — two shades of
+near-black on a dark panel. Links are now `var(--accent)`, visited included.
 
 ---
 

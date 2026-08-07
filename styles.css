@@ -91,6 +91,16 @@ body {
   color: var(--text);
 }
 
+/* Links had no rule at all, so they fell back to the browser's #0000EE and, once
+   followed, #551A8B — two shades of near-black against a dark panel. Visited
+   keeps the accent: which ARRO page you have already opened is not worth a
+   colour, and losing the link entirely is. Leaflet scopes its own
+   `.leaflet-container a`, so map controls and popups are unaffected. */
+a,
+a:visited {
+  color: var(--accent);
+}
+
 header {
   display: flex;
   justify-content: space-between;
@@ -247,6 +257,43 @@ button.primary {
   border-color: #107c10;
 }
 
+/* A real <a> that reads as a button. Used where the action is "leave for another
+   site" — an anchor keeps middle-click, ctrl-click and "copy link address",
+   which a button with a window.open handler throws away. */
+.btn-link {
+  display: inline-block;
+  border: 1px solid #b9c7d6;
+  background: var(--panel);
+  color: var(--accent);
+  padding: .5rem .8rem;
+  border-radius: 8px;
+  font-size: .9rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  border-color: var(--accent);
+  text-decoration: underline;
+}
+
+.btn-link.disabled {
+  color: var(--muted);
+  opacity: .55;
+  pointer-events: none;
+}
+
+kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .85em;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 .25em;
+  background: var(--subtle);
+}
+
 input[type="search"],
 input[type="file"],
 input[type="text"],
@@ -263,6 +310,14 @@ select {
 
 textarea {
   min-height: 90px;
+}
+
+/* Read-only fields are still fields — they hold a value worth copying — but
+   they must not look like somewhere to type. */
+input[readonly] {
+  background: var(--subtle);
+  color: var(--muted);
+  cursor: default;
 }
 
 .upload-grid {
@@ -1239,10 +1294,17 @@ hr {
 
 /* Footer action row on a station popup ("Show in the list below"), ruled off
    from the station detail above it. */
+/* One action per line. Both are nowrap, and side by side they would stretch the
+   popup past Leaflet's 300 px to fit "Show in the list below ↓  Open in ARRO
+   admin ↗" on one row. */
 .mn-popup-actions {
   margin-top: .45rem;
   padding-top: .4rem;
   border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .25rem;
 }
 
 .mn-popup-actions a {
