@@ -157,6 +157,8 @@ const state = {
   filterOpen:     { sensors: false, networks: false, regions: false, area: false, data: false },
   filterOpts:     null,
   searchIdx:      null,    // flat name / number / address corpus, for pasted-list reporting
+  repeaterIdx:    null,    // cached repeater-only subset, for pass-range matching
+  stationsShowAll: false,  // operator opted past the station-table row cap
   selectedId:     null,
   map:            null,
   mapMarkers:     [],
@@ -313,8 +315,9 @@ function loadJson(text) {
   if (!Array.isArray(data.stations)) throw new Error('Missing "stations" array');
   state.data       = data;
   state.exportNets = null;
-  state.filterOpts = null;          // option lists and the search corpus are
-  state.searchIdx  = null;          // both derived from the file
+  state.filterOpts  = null;         // option lists and the search corpus are
+  state.searchIdx   = null;         // both derived from the file
+  state.repeaterIdx = null;         // so is the cached repeater-only subset
   resetStationFilters();
   state.selectedId = null;
   updateHeaderStats();
@@ -524,8 +527,35 @@ function valueMatches(want, value) {
   return !want || (value || FILTER_NONE) === want;
 }
 
+// filteredStations() is called several times per refresh (map layers, the
+// table, the match-note chrome) — cheap to re-run once, wasteful across
+// 3,000+ stations three times over. Cached against a signature of the
+// filter selections themselves (not the stations), so the cache is only as
+// large as what the operator has ticked, and stays correct across whichever
+// function happens to mutate state.filters next.
+let _filteredCache = null, _filteredCacheSig = null, _filteredCacheData = null;
+
+function filtersSignature(f) {
+  return JSON.stringify([
+    f.search, f.enabledOnly, f.sensorsAll, f.basin, f.lga, f.hasCoords, f.hasAlertId,
+    [...f.roles].sort(), [...f.networks].sort(), [...f.regions].sort(),
+    [...f.catchments].sort(), [...f.sensors].sort(),
+  ]);
+}
+
 function filteredStations() {
   if (!state.data) return [];
+  const sig = filtersSignature(state.filters);
+  if (_filteredCache && _filteredCacheData === state.data && _filteredCacheSig === sig) {
+    return _filteredCache;
+  }
+  _filteredCache    = computeFilteredStations();
+  _filteredCacheSig = sig;
+  _filteredCacheData = state.data;
+  return _filteredCache;
+}
+
+function computeFilteredStations() {
   const f = state.filters;
   const search = prepareSearch(f.search);
   return state.data.stations.filter(s => {
@@ -605,13 +635,22 @@ function primaryRole(s) {
   return 'field';
 }
 
+// Repeaters are ~2-3% of the station list, but findRepeaterMatches used to be
+// called once per field station and rescan every station each time. Caching
+// the repeater-only subset (invalidated everywhere state.filterOpts is)
+// turns that O(stations) scan into an O(repeaters) one.
+function repeaterList(allStations) {
+  if (!state.repeaterIdx) {
+    state.repeaterIdx = allStations.filter(s => s.roles.includes('repeater') && s.repeater);
+  }
+  return state.repeaterIdx;
+}
+
 function findRepeaterMatches(station, allStations) {
   const ids = stationAlertIds(station);
   if (!ids.length) return [];
-  return allStations.filter(s =>
-    s.roles.includes('repeater') &&
+  return repeaterList(allStations).filter(s =>
     s.id !== station.id &&
-    s.repeater &&
     ids.some(id => passRangeCoversId(s.repeater, id))
   );
 }
@@ -910,6 +949,7 @@ function mapNote(msg, ms) {
 // re-highlights (or re-hides) its pins and the table below it re-lists. The
 // filter panel's own summaries follow, so it always says what it is doing.
 function stationsFilterChanged() {
+  state.stationsShowAll = false;   // a changed filter earns a fresh row cap
   refreshMapLayers();
   rerenderStations();
   updateFilterChrome();
@@ -962,7 +1002,10 @@ function initMap() {
   MapDraw.detach();
   const el = document.getElementById('leaflet-map');
   if (!el) return;
-  state.map = L.map('leaflet-map');
+  // preferCanvas: with ~3,174 station pins and ~3,141 pass-range link lines,
+  // the default SVG renderer means ~6,300 SVG nodes rebuilt on every refresh.
+  // A single canvas element instead.
+  state.map = L.map('leaflet-map', { preferCanvas: true });
   // A view before anything is added to the map. Leaflet defers every layer add
   // until the map has one, and the deferred adds then run in an order nothing
   // controls: a path registers the shared SVG renderer as it is queued, so a
@@ -1126,8 +1169,11 @@ function refreshMapLayers() {
     }).addTo(map);
     marker.mnStationId = s.id;             // lets the table below find its pin
 
-    const idTypes = stationAlertIdTypes(s);
-    marker.bindPopup(`
+    // bindPopup takes a function so the HTML is built when the popup opens,
+    // not for all ~3,174 markers on every refresh.
+    marker.bindPopup(() => {
+      const idTypes = stationAlertIdTypes(s);
+      return `
       <strong>${esc(s.name)}</strong><br>
       ${s.roles.map(r => `<span style="background:${ROLE_COLOR[r]};color:#fff;padding:1px 5px;border-radius:999px;font-size:.78rem;margin-right:2px">${r}</span>`).join('')}<br>
       ${s.station_number ? `<span style="font-size:.83rem">Stn #${esc(s.station_number)}</span><br>` : ''}
@@ -1139,7 +1185,8 @@ function refreshMapLayers() {
         <a href="#" onclick="focusStation('${escAttr(s.id)}');return false"
            title="Select this station in the list under the map">Show in the list below ↓</a>
       </div>
-    `);
+    `;
+    });
     if (labelled.has(s.id)) {
       marker.bindTooltip(esc(s.name), {
         permanent: true, direction: 'bottom', offset: [0, radius], className: 'mn-pin-label',
@@ -2101,12 +2148,23 @@ const MapDraw = (function () {
 
 // ── Station table (lower half of the Stations tab) ─────────────────────────────
 
-function stationsTable(stations) {
-  if (!stations.length) return '<p style="padding:.75rem;color:var(--muted)">No stations match current filters.</p>';
+// Unfiltered, the table would emit ~28,500 cells (3,174 rows × 9) as one
+// innerHTML string on every keystroke. Cap what's rendered; the footer link
+// lets the operator pull the rest in when they actually want it.
+const STATIONS_ROW_CAP = 500;
+
+function stationsTable(allStations) {
+  if (!allStations.length) return '<p style="padding:.75rem;color:var(--muted)">No stations match current filters.</p>';
+  const capped    = !state.stationsShowAll && allStations.length > STATIONS_ROW_CAP;
+  const stations  = capped ? allStations.slice(0, STATIONS_ROW_CAP) : allStations;
   // Same prepared terms the filter itself ran on, so the marks land exactly
   // where the match was made.
   const { terms, nums } = prepareSearch(state.filters.search);
   return `
+    ${capped ? `
+      <p class="filter-note">Showing ${STATIONS_ROW_CAP} of ${allStations.length} —
+        narrow the filter or <a href="#" onclick="state.stationsShowAll=true;rerenderStations();return false">show all</a>.</p>
+    ` : ''}
     <table>
       <colgroup>
         <col style="width:22%"><col style="width:8%"><col style="width:13%"><col style="width:13%">
@@ -3472,8 +3530,9 @@ function searchTermsNoteHtml() {
 // Editing or deleting a station moves the per-option counts (and can retire an
 // option outright), so the cached lists are dropped and the panel redrawn.
 function refreshFilterOptions() {
-  state.filterOpts = null;
-  state.searchIdx  = null;
+  state.filterOpts  = null;
+  state.searchIdx   = null;
+  state.repeaterIdx = null;
   if (state.activeTab === 'stations') renderStationFilters();
 }
 
