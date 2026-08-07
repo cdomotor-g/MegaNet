@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARRO admin launcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --plate:#E4E9E6; --plate-2:#F2F5F3; --ink:#101E24; --slate:#3F5A63;
+    --water:#1F6E8C; --signal:#D8841B;
+    --line:rgba(16,30,36,.16); --line-soft:rgba(16,30,36,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--plate); color:var(--ink);
+    font-family:"IBM Plex Sans",-apple-system,Segoe UI,sans-serif;
+    font-size:16px; line-height:1.55;
+    padding:clamp(22px,4vw,54px) clamp(18px,5vw,32px) 70px;
+    background-image:linear-gradient(var(--line-soft) 1px,transparent 1px);
+    background-size:100% 34px;
+  }
+  .wrap{max-width:660px;margin:0 auto}
+
+  .eyebrow{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--water);margin:0 0 10px;
+  }
+  h1{
+    font-family:"Barlow Condensed","Arial Narrow",sans-serif;
+    font-weight:600;font-size:clamp(46px,9vw,78px);line-height:.92;
+    text-transform:uppercase;margin:0 0 12px;
+  }
+  h1 em{font-style:normal;color:var(--water);display:block}
+  .lede{max-width:50ch;color:var(--slate);margin:0 0 32px;font-size:17px}
+
+  section{
+    background:var(--plate-2); border:1px solid var(--line);
+    border-left:3px solid var(--water); border-radius:2px;
+    padding:clamp(20px,4vw,28px); margin-bottom:20px;
+  }
+  section.accent{border-left-color:var(--signal)}
+  h2{
+    font-family:"Barlow Condensed","Arial Narrow",sans-serif;
+    font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+    font-size:24px;margin:0 0 4px;
+  }
+  .sub{font-size:14px;color:var(--slate);margin:0 0 18px}
+
+  label{
+    display:block;
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--slate);margin-bottom:6px;
+  }
+  .fields{display:flex;gap:14px;flex-wrap:wrap}
+  .f-site{flex:2 1 200px}
+  .f-dev{flex:1 1 120px}
+  input[type=text]{
+    width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:2px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:16px;
+    background:#fff;color:var(--ink);
+  }
+  input:focus-visible,button:focus-visible,a:focus-visible{
+    outline:2px solid var(--signal);outline-offset:2px;
+  }
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:18px}
+  button.go{
+    font-family:"Barlow Condensed","Arial Narrow",sans-serif;
+    font-size:23px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
+    background:var(--ink);color:#fff;border:1px solid var(--ink);border-radius:2px;
+    padding:10px 26px 9px;cursor:pointer;
+  }
+  button.go:hover{background:var(--water);border-color:var(--water)}
+  button.go:disabled{background:transparent;color:rgba(16,30,36,.35);border-color:var(--line);cursor:default}
+  .clear{
+    background:none;border:none;cursor:pointer;color:var(--slate);
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;padding:6px 2px;
+  }
+  .clear:hover{color:var(--signal)}
+
+  .preview{
+    margin-top:18px;padding:11px 13px;background:#fff;
+    border:1px solid var(--line);border-radius:2px;
+    font-family:"IBM Plex Mono",monospace;font-size:12.5px;
+    overflow-wrap:anywhere;color:var(--slate);min-height:44px;
+  }
+  .preview b{color:var(--ink);font-weight:500}
+  .preview .hi{background:var(--signal);color:#fff;padding:1px 4px;border-radius:2px}
+  .preview.empty{color:rgba(16,30,36,.4)}
+
+  .mode{
+    display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11px;
+    letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--water);
+    padding:2px 8px;border-radius:2px;margin-bottom:9px;
+  }
+  .mode.sensor{background:var(--signal)}
+
+  ul.recents{list-style:none;padding:0;margin:0}
+  ul.recents li{
+    display:flex;align-items:center;gap:10px;
+    border-bottom:1px solid var(--line-soft);padding:7px 0;
+  }
+  ul.recents a{
+    font-family:"IBM Plex Mono",monospace;font-size:13.5px;
+    color:var(--ink);text-decoration:none;flex:1;
+  }
+  ul.recents a:hover{color:var(--water);text-decoration:underline}
+  ul.recents .tag{
+    font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--slate);
+  }
+  ul.recents .del{
+    background:none;border:none;cursor:pointer;color:rgba(16,30,36,.3);
+    font-size:15px;line-height:1;padding:2px 4px;
+  }
+  ul.recents .del:hover{color:var(--signal)}
+  .none{font-size:13px;color:rgba(16,30,36,.45);margin:0}
+
+  kbd{
+    font-family:"IBM Plex Mono",monospace;font-size:12px;
+    border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;
+    padding:1px 5px;background:#fff;
+  }
+  code{font-family:"IBM Plex Mono",monospace;font-size:13px;background:rgba(63,90,99,.1);padding:1px 5px;border-radius:2px}
+  .hint{font-size:13.5px;color:var(--slate)}
+  footer{
+    margin-top:30px;padding-top:14px;border-top:1px solid var(--line);
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--slate);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Contrail · contrail-bom.onerain.au</p>
+  <h1>ARRO<em>admin launcher</em></h1>
+  <p class="lede">Type a site ID and go straight to its administration page in a new tab. Add a device ID to land on the sensor instead.</p>
+
+  <section>
+    <h2>Open a page</h2>
+    <p class="sub">You can also paste a whole ARRO address into the first box — the IDs get pulled out for you.</p>
+
+    <div class="fields">
+      <div class="f-site">
+        <label for="site">Site ID &nbsp;/&nbsp; paste a URL</label>
+        <input type="text" id="site" spellcheck="false" autocomplete="off" placeholder="3238" autofocus>
+      </div>
+      <div class="f-dev">
+        <label for="dev">Device ID <span style="text-transform:none;letter-spacing:0">(optional)</span></label>
+        <input type="text" id="dev" spellcheck="false" autocomplete="off" placeholder="1">
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="go" id="go" disabled>Open in administration</button>
+      <button class="clear" id="clear">Clear</button>
+      <span class="hint"><kbd>Enter</kbd> works too</span>
+    </div>
+
+    <div class="preview empty" id="preview">Nothing to open yet.</div>
+  </section>
+
+  <section class="accent">
+    <h2>Recent</h2>
+    <p class="sub">Kept on this machine only. Click to reopen.</p>
+    <ul class="recents" id="recents"></ul>
+    <p class="none" id="noRecents">Nothing yet — the last 12 you open will land here.</p>
+  </section>
+
+  <footer>Save to your desktop · works offline · nothing leaves this machine</footer>
+</div>
+
+<script>
+const BASE = 'https://contrail-bom.onerain.au';
+const SITE_PATH = '/administration/site/details/';
+const SENSOR_PATH = '/administration/sensor/details/';
+const KEY = 'arro-launcher-recents';
+
+const siteEl = document.getElementById('site');
+const devEl = document.getElementById('dev');
+const goEl = document.getElementById('go');
+const prevEl = document.getElementById('preview');
+const listEl = document.getElementById('recents');
+const noneEl = document.getElementById('noRecents');
+
+/* localStorage is unreliable on file:// — degrade to memory silently */
+let memStore = null;
+function load() {
+  if (memStore) return memStore;
+  try { memStore = JSON.parse(localStorage.getItem(KEY)) || []; }
+  catch { memStore = []; }
+  return memStore;
+}
+function save(list) {
+  memStore = list;
+  try { localStorage.setItem(KEY, JSON.stringify(list)); } catch {}
+}
+
+/* Pull IDs out of whatever got typed or pasted */
+function parseSite(raw) {
+  const v = raw.trim();
+  if (!v) return { site: '', dev: null };
+  const m = v.match(/[?&]site_id=(\d+)/i);
+  if (m) {
+    const d = v.match(/[?&]device_id=(\d+)/i);
+    return { site: m[1], dev: d ? d[1] : null };
+  }
+  const pair = v.match(/^(\d+)[\s,;\/\-]+(\d+)$/);
+  if (pair) return { site: pair[1], dev: pair[2] };
+  const digits = v.match(/^(\d+)$/);
+  if (digits) return { site: digits[1], dev: null };
+  return { site: '', dev: null };
+}
+
+function current() {
+  const p = parseSite(siteEl.value);
+  const dev = (devEl.value.trim().match(/^\d+$/) || [])[0] || p.dev || '';
+  return { site: p.site, dev };
+}
+
+function buildUrl(site, dev) {
+  if (!site) return '';
+  return dev
+    ? BASE + SENSOR_PATH + '?site_id=' + site + '&device_id=' + dev
+    : BASE + SITE_PATH + '?site_id=' + site;
+}
+
+function render() {
+  const { site, dev } = current();
+  const url = buildUrl(site, dev);
+  goEl.disabled = !url;
+
+  if (!url) {
+    prevEl.className = 'preview empty';
+    prevEl.textContent = siteEl.value.trim()
+      ? 'No site ID found in that — expecting digits, or an address containing site_id='
+      : 'Nothing to open yet.';
+    return;
+  }
+  prevEl.className = 'preview';
+  prevEl.innerHTML =
+    '<span class="mode' + (dev ? ' sensor' : '') + '">' + (dev ? 'Sensor' : 'Site') + '</span><br>' +
+    BASE + (dev ? SENSOR_PATH : SITE_PATH) +
+    '?site_id=<span class="hi">' + site + '</span>' +
+    (dev ? '&device_id=<span class="hi">' + dev + '</span>' : '');
+}
+
+function open_(site, dev) {
+  const url = buildUrl(site, dev);
+  if (!url) return;
+  remember(site, dev);
+  window.open(url, '_blank', 'noopener');
+}
+
+function remember(site, dev) {
+  const list = load().filter(r => !(r.site === site && (r.dev || '') === (dev || '')));
+  list.unshift({ site, dev: dev || '', at: Date.now() });
+  save(list.slice(0, 12));
+  paintRecents();
+}
+
+function paintRecents() {
+  const list = load();
+  listEl.innerHTML = '';
+  noneEl.style.display = list.length ? 'none' : 'block';
+  list.forEach((r, i) => {
+    const li = document.createElement('li');
+
+    const a = document.createElement('a');
+    a.href = buildUrl(r.site, r.dev);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = r.dev ? r.site + ' · device ' + r.dev : r.site;
+    a.addEventListener('click', () => { remember(r.site, r.dev); });
+
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = r.dev ? 'sensor' : 'site';
+
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.type = 'button';
+    del.textContent = '×';
+    del.title = 'Remove';
+    del.addEventListener('click', () => {
+      const l = load(); l.splice(i, 1); save(l); paintRecents();
+    });
+
+    li.append(a, tag, del);
+    listEl.appendChild(li);
+  });
+}
+
+/* If a pasted URL carried a device_id, move it into its own box */
+function spill() {
+  const p = parseSite(siteEl.value);
+  if (p.site && /site_id=/i.test(siteEl.value)) {
+    siteEl.value = p.site;
+    if (p.dev) devEl.value = p.dev;
+  }
+  render();
+}
+
+siteEl.addEventListener('input', render);
+devEl.addEventListener('input', render);
+siteEl.addEventListener('paste', () => setTimeout(spill, 0));
+siteEl.addEventListener('blur', spill);
+
+[siteEl, devEl].forEach(el => el.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); const c = current(); open_(c.site, c.dev); }
+}));
+
+goEl.addEventListener('click', () => { const c = current(); open_(c.site, c.dev); });
+
+document.getElementById('clear').addEventListener('click', () => {
+  siteEl.value = ''; devEl.value = ''; siteEl.focus(); render();
+});
+
+render();
+paintRecents();
+</script>
+</body>
+</html>
