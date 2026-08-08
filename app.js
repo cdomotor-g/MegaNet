@@ -234,6 +234,9 @@ const state = {
   map:            null,
   mapMarkers:     [],
   mapLines:       [],
+  // Stations picked off the map (by shape or by modifier-click). A third thing
+  // alongside `filters` and `selectedId`: see the Map selection section below.
+  mapSelection:   new Set(),
   mapShowLinks:   true,
   mapHideOthers:  false,   // filter box: highlight matches (default) vs hide the rest
   mapKillSpaghetti: true,  // drop pass-range links longer than mapMaxLinkKm
@@ -261,6 +264,11 @@ const state = {
     seq:        0,
     selectedId: null,
     showLabels: true,
+    snap:       true,      // land clicks on the station pin under the cursor
+    // The picked colour for new shapes. Empty means "whatever the theme's
+    // --draw is". The choice is worth keeping across a reload even though the
+    // shapes themselves deliberately are not.
+    colour:     localStorage.getItem('mn-draw-colour') || '',
   },
   exportNets:     null,
   bfInput:        '',
@@ -406,6 +414,7 @@ function loadJson(text) {
   state.passRelIdx  = null;         // and so is the pass-range relation
   resetStationFilters();
   state.selectedId = null;
+  state.mapSelection.clear();       // the picked ids belonged to the old file
   updateHeaderStats();
   renderTabs();
   renderMain();
@@ -858,8 +867,10 @@ function relatedIdSet() {
 }
 
 // The list under the map: the filter's own matches, then what the pass ranges
-// pulled in behind them.
+// pulled in behind them — unless stations have been picked off the map, which
+// overrides the lot until it is cleared (see the Map selection section).
 function tableStations() {
+  if (state.mapSelection.size) return selectedStations();
   const matches = filteredStations();
   const related = relatedStations();
   return related.length ? matches.concat(related) : matches;
@@ -1355,6 +1366,10 @@ const MAP_LABEL_CAP = 60;     // permanent name labels beyond this are unreadabl
 const MAP_PIN_RING  = '#ffffff';
 const MAP_PIN_HIT   = '#ffc400';
 const MAP_PIN_REL   = '#00b8d4';   // dashed ring: on the map by relation, not by name
+const MAP_PIN_SEL   = '#7c4dff';   // heavy ring: hand-picked into the map selection.
+                                   // Violet is none of the role fills, none of the
+                                   // ACMA colours, and neither the amber of a filter
+                                   // match nor the cyan of a pass-range relation.
 const MAP_HOME      = [-25.6, 134.3];   // middle of Australia — the opening view,
                                         // replaced by a fit to whatever is plotted
 
@@ -1496,20 +1511,29 @@ function refreshMapLayers({ skipFit = false } = {}) {
     // its neighbours; matches swap it for amber, and stations pulled in by a
     // pass range for a dashed cyan one — full opacity either way, but you can
     // still tell which of them the filter actually named.
-    const marker = L.circleMarker([s.lat, s.lon], {
+    //
+    // That style is kept on the marker as well, so the map selection's own ring
+    // can be put on and taken off with setStyle rather than by rebuilding
+    // ~3,174 markers — and so it survives the canvas renderer, which draws no
+    // DOM node for a className to land on.
+    const base = {
       radius,
       color:       hit ? MAP_PIN_HIT : rel ? MAP_PIN_REL : MAP_PIN_RING,
       weight:      hit || rel ? 3 : 2,
       dashArray:   rel ? '4,3' : null,
       opacity:     dim ? 0.6 : 1,
-      fillColor:   color,
       fillOpacity: dim ? 0.45 : 1,
+    };
+    const marker = L.circleMarker([s.lat, s.lon], {
+      ...base,
+      fillColor:   color,
       className:   hit ? 'mn-pin mn-pin-hit' : rel ? 'mn-pin mn-pin-rel' : 'mn-pin',
       bubblingMouseEvents: false,          // a pin click is not an empty-map click
     }).addTo(map);
     marker.mnStationId = s.id;             // lets the table below find its pin
     marker.mnStation   = s;                // and lets labels be re-picked on pan
     marker.mnRadius    = radius;
+    marker.mnBaseStyle = base;
 
     // bindPopup takes a function so the HTML is built when the popup opens,
     // not for all ~3,174 markers on every refresh.
@@ -1533,9 +1557,18 @@ function refreshMapLayers({ skipFit = false } = {}) {
       </div>
     `;
     });
+    // Leaflet opens a bound popup on every click of its layer. Take that over,
+    // so a modifier-click can mean "put this in the selection" without a popup
+    // opening and closing again — a closed popup leaves its container fading
+    // over the map for another 200 ms, which is long enough to swallow the next
+    // click. Removing the handler leaves the binding itself intact, so
+    // openPopup() and isPopupOpen() go on working everywhere else.
+    marker.off('click', marker._openPopup);
+    marker.on('click', onStationPinClick);
     state.mapMarkers.push(marker);
   }
 
+  applyMapSelectionStyles();
   MapSpider.setPins('stations', state.mapMarkers);
 
   // Zoom to the matches (all of them, not just the first) and to the repeaters
@@ -1551,6 +1584,102 @@ function refreshMapLayers({ skipFit = false } = {}) {
     if (!skipFit) map.fitBounds(fitTo, { padding: [24, 24], maxZoom: fitTo.length === 1 ? 14 : 12 });
   }
   applyMapLabels();
+}
+
+// ── Map selection ────────────────────────────────────────────────────────────
+// A set of stations picked off the map, by drawing a shape around them or by
+// modifier-clicking their pins. It is a third thing alongside the filters and
+// `state.selectedId`: the filters decide what the map highlights, `selectedId`
+// is the single station the editor card is on, and this is the operator's own
+// pick. While it is non-empty it overrides what the table lists — a display
+// override, not a filter mutation, so clearing it hands the list straight back
+// to the filter.
+//
+// Session state, like the drawings: nothing is saved and nothing goes in the URL.
+
+function selectedStations() {
+  if (!state.data || !state.mapSelection.size) return [];
+  return state.data.stations.filter(s => state.mapSelection.has(s.id));
+}
+
+// Put the selected ring on, or take it off, in place. Only the pins whose
+// membership actually changed are restyled.
+function applyMapSelectionStyles() {
+  for (const m of state.mapMarkers) {
+    const base = m.mnBaseStyle;
+    if (!base) continue;
+    const on = state.mapSelection.has(m.mnStationId);
+    if (on === !!m.mnSelected) continue;
+    m.mnSelected = on;
+    m.mnRadius   = on ? base.radius + 3 : base.radius;
+    m.setStyle(on
+      ? { radius: m.mnRadius, color: MAP_PIN_SEL, weight: 4,
+          dashArray: null, opacity: 1, fillOpacity: 1 }
+      : { ...base });
+  }
+}
+
+// Everything that changes the selection ends here: the pins, the list under the
+// map and its header all move together.
+function mapSelectionChanged() {
+  applyMapSelectionStyles();
+  rerenderStations();
+}
+
+function toggleMapSelection(id) {
+  if (state.mapSelection.has(id)) state.mapSelection.delete(id);
+  else                            state.mapSelection.add(id);
+  mapSelectionChanged();
+}
+
+// Additive: two boxes drawn over two regions give one selection holding both.
+// Returns how many ids were new, which is what the caller reports.
+function addToMapSelection(ids) {
+  let added = 0;
+  for (const id of ids) if (!state.mapSelection.has(id)) { state.mapSelection.add(id); added++; }
+  mapSelectionChanged();
+  return added;
+}
+
+function clearMapSelection() {
+  if (!state.mapSelection.size) return;
+  state.mapSelection.clear();
+  mapSelectionChanged();
+}
+
+// Every click on a station pin: shift / ctrl / ⌘ adds or removes it from the
+// selection, and a plain click opens the popup, as it always did. Both live
+// here because refreshMapLayers takes Leaflet's own click-to-open off the
+// marker — see the note there.
+function onStationPinClick(e) {
+  const oe = e.originalEvent;
+  if (oe && (oe.shiftKey || oe.ctrlKey || oe.metaKey)) {
+    L.DomEvent.stop(e);
+    toggleMapSelection(e.target.mnStationId);
+    return;
+  }
+  L.DomEvent.stopPropagation(e);      // as Leaflet's own handler did
+  e.target.openPopup(e.latlng);
+}
+
+// The selection as a file — the same columns the table shows, plus the station
+// id, so the picked set can leave the page for a spreadsheet.
+function exportMapSelection() {
+  const rows = selectedStations();
+  if (!rows.length) return;
+  const lines = ['id,name,station_number,roles,networks,alert_ids,lat,lon,elevation_ahd,enabled'];
+  for (const s of rows) {
+    lines.push([
+      csvEscape(s.id),
+      csvEscape(s.name),
+      csvEscape(s.station_number || ''),
+      csvEscape(s.roles.join(' ')),
+      csvEscape((s.radio_network_ids || []).map(id => netName(id)).join(' | ')),
+      csvEscape(stationAlertIds(s).join(' ')),
+      s.lat ?? '', s.lon ?? '', s.elevation_ahd ?? '', s.enabled ? 1 : 0,
+    ].join(','));
+  }
+  dlText(`meganet-selection-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
 }
 
 // ── Station name labels ──────────────────────────────────────────────────────
@@ -1801,6 +1930,9 @@ const MapSpider = (function () {
 
   function onPinClick(e) {
     if (!map || isOpen(e.target)) return;   // already fanned → let the popup open
+    // A modifier-click is the map selection talking, not "show me this stack".
+    const oe = e.originalEvent;
+    if (oe && (oe.shiftKey || oe.ctrlKey || oe.metaKey)) return;
     // First tap on a stack fans it instead of opening whichever pin was on top.
     if (spiderfy(e.target)) e.target.closePopup();
   }
@@ -2055,15 +2187,56 @@ function fmtArea(km2) {
   return `${Math.round(km2).toLocaleString()} km²`;
 }
 
+// Six presets that stay legible on street, topo and satellite tiles alike, plus
+// a native picker behind them for anything else.
+const DRAW_COLOURS = [
+  ['#e91e63', 'Pink'],  ['#ff6d00', 'Orange'], ['#ffd600', 'Yellow'],
+  ['#00c853', 'Green'], ['#00b0ff', 'Blue'],   ['#aa00ff', 'Purple'],
+];
+
 const MapDraw = (function () {
   let map = null, group = null, ghost = null;
-  let pending = null;      // shape being clicked out: { kind, pts: [[lat,lon], …] }
+  let pending = null;      // shape being clicked out: { kind, pts: [[lat,lon], …], sids: […] }
   let keyHandler = null;
+  let snapHint = null;     // ring round the station the next click would land on
+  let snapCache = null;    // station pins projected once per zoom (see snapPoints)
+
+  // How close to a station pin a click has to be to land on it. Screen pixels,
+  // not kilometres: a km threshold would snap wildly at the national view and
+  // never at street level.
+  const SNAP_PX = 15;
 
   const D = () => state.draw;
 
-  function colour() {
+  // ── colour ──
+  // The theme's own drawing colour: the fallback for shapes drawn before a
+  // colour was ever picked, and what "no choice" means in the picker.
+  function themeColour() {
     return getComputedStyle(document.documentElement).getPropertyValue('--draw').trim() || '#c2185b';
+  }
+
+  // Only a hex literal is ever let through: these values go into inline style
+  // attributes on the divIcon markers.
+  function safeColour(c) {
+    const v = String(c || '').trim();
+    return /^#[0-9a-f]{3}([0-9a-f]{3}([0-9a-f]{2})?)?$/i.test(v) ? v : '';
+  }
+
+  // What new shapes get.
+  function colour() { return safeColour(D().colour) || themeColour(); }
+
+  // What an existing shape is drawn in — its own colour, or the theme's.
+  function colourOf(sh) { return safeColour(sh.colour) || themeColour(); }
+
+  function setColour(c) {
+    const v = safeColour(c);
+    D().colour = v;
+    try { localStorage.setItem('mn-draw-colour', v); } catch (_) {}
+    // With a shape picked, the control is colouring that shape — the natural
+    // reading, and it saves needing a separate "edit colour" affordance.
+    const sh = D().shapes.find(s => s.id === D().selectedId);
+    if (sh) { sh.colour = v; render(); }
+    rerenderPanel();
   }
 
   // ── geometry → numbers ──
@@ -2096,7 +2269,9 @@ const MapDraw = (function () {
   // The one-line measurement a shape carries, on the map and in the list.
   function measure(sh) {
     switch (sh.kind) {
-      case 'pin':  return `${sh.lat.toFixed(4)}, ${sh.lon.toFixed(4)}`;
+      // A pin dropped on a site is that site — the name beats the coordinates
+      // both in the list and on the map.
+      case 'pin':  return snapLabel(sh) || `${sh.lat.toFixed(4)}, ${sh.lon.toFixed(4)}`;
       case 'text': return sh.text;
       case 'circle': {
         const a = Math.PI * sh.radiusKm ** 2;
@@ -2116,6 +2291,90 @@ const MapDraw = (function () {
     }
   }
 
+  // ── snap to stations ──
+  // Station pins projected at the current zoom. Comparing projected pixels is
+  // the same comparison as container pixels, and doing it from a cache keeps
+  // ~3,174 projections off every mousemove.
+  function snapPoints() {
+    const zoom = map.getZoom();
+    if (snapCache && snapCache.zoom === zoom && snapCache.list === state.mapMarkers) return snapCache;
+    snapCache = {
+      zoom,
+      list: state.mapMarkers,
+      // A fanned-out pin's own latlng is where it was flung to, not where the
+      // station is; mnStation is the real position.
+      pts:  state.mapMarkers.map(m => map.project([m.mnStation.lat, m.mnStation.lon], zoom)),
+    };
+    return snapCache;
+  }
+
+  // The station pin a click at this position would land on, or null.
+  function snapTarget(latlng) {
+    if (!D().snap || !map || !state.mapMarkers.length) return null;
+    const { list, pts } = snapPoints();
+    const c = map.project(latlng, map.getZoom());
+    let best = null, bestD = SNAP_PX;
+    for (let i = 0; i < pts.length; i++) {
+      const d = Math.hypot(pts[i].x - c.x, pts[i].y - c.y);
+      if (d <= bestD) { bestD = d; best = list[i]; }
+    }
+    return best;
+  }
+
+  // Without this the operator cannot tell whether a click snapped or not.
+  function showSnapHint(marker) {
+    if (snapHint && snapHint._mnFor === marker) return;
+    clearSnapHint();
+    if (!marker || !map) return;
+    const s = marker.mnStation;
+    snapHint = L.circleMarker([s.lat, s.lon], {
+      radius: (marker.mnBaseStyle ? marker.mnBaseStyle.radius : 6) + 5,
+      color: colour(), weight: 2, dashArray: '4,3', fill: false, interactive: false,
+    }).addTo(map);
+    snapHint._mnFor = marker;
+    snapHint.bindTooltip(esc(s.name), {
+      permanent: true, direction: 'top', className: 'mn-draw-label', offset: [0, -6],
+    }).openTooltip();
+  }
+
+  function clearSnapHint() {
+    if (snapHint) { snapHint.remove(); snapHint = null; }
+  }
+
+  // Resolve a map click to the point the shape should actually use, and to the
+  // station it came from when it snapped.
+  function resolve(latlng) {
+    const t = snapTarget(latlng);
+    return t
+      ? { ll: [t.mnStation.lat, t.mnStation.lon], sid: t.mnStationId }
+      : { ll: [latlng.lat, latlng.lng], sid: null };
+  }
+
+  function stationName(id) {
+    if (!id || !state.data) return '';
+    const s = state.data.stations.find(x => x.id === id);
+    return s ? s.name : '';
+  }
+
+  // What a shape's snapped ends are called. "Mt Stuart → Durikai" is the thing
+  // a drawn path means; two lat/lon pairs are not. Points are held in the same
+  // order the shape defines them, so a line's ends are the first and the last.
+  function snapLabel(sh) {
+    const t = sh.snappedTo;
+    if (!t || !t.length) return '';
+    if (sh.kind !== 'line') return stationName(t[0]);
+    const a = stationName(t[0]), b = stationName(t[t.length - 1]);
+    if (a && b) return `${a} → ${b}`;
+    return a ? `from ${a}` : b ? `to ${b}` : '';
+  }
+
+  // The shape's line in the draw list: its measurement, led by the sites it was
+  // snapped to. A pin's measurement is already its name when it has one.
+  function rowText(sh) {
+    const nm = snapLabel(sh);
+    return (!nm || sh.kind === 'pin') ? measure(sh) : `${nm} · ${measure(sh)}`;
+  }
+
   function centreOf(sh) {
     if (sh.kind === 'line') {
       const lat = sh.pts.reduce((a, p) => a + p[0], 0) / sh.pts.length;
@@ -2128,19 +2387,24 @@ const MapDraw = (function () {
   // ── layers ──
 
   function layerFor(sh) {
-    const c   = colour();
+    const c   = colourOf(sh);
     const sel = sh.id === D().selectedId;
     const path = { color: c, weight: sel ? 4 : 2.5, opacity: 1, fillColor: c, fillOpacity: .12 };
     switch (sh.kind) {
+      // The divIcon shapes are styled in CSS off --draw, so a per-shape colour
+      // has to be written onto the element itself. safeColour has already
+      // established that `c` is a hex literal.
       case 'pin':
         return L.marker([sh.lat, sh.lon], {
-          icon: L.divIcon({ className: `mn-draw-pin${sel ? ' sel' : ''}`, html: '<i></i>',
+          icon: L.divIcon({ className: `mn-draw-pin${sel ? ' sel' : ''}`,
+                            html: `<i style="background:${c};outline-color:${c}"></i>`,
                             iconSize: [16, 16], iconAnchor: [8, 16] }),
         });
       case 'text':
         return L.marker([sh.lat, sh.lon], {
           icon: L.divIcon({ className: `mn-draw-textbox${sel ? ' sel' : ''}`,
-                            html: `<span>${esc(sh.text)}</span>`, iconSize: null }),
+                            html: `<span style="border-color:${c}">${esc(sh.text)}</span>`,
+                            iconSize: null }),
         });
       case 'line':   return L.polyline(sh.pts, { ...path, fill: false });
       case 'circle': return L.circle([sh.lat, sh.lon], { ...path, radius: sh.radiusKm * 1000 });
@@ -2162,6 +2426,11 @@ const MapDraw = (function () {
         permanent: true, direction: anchor, className: 'mn-draw-label',
         offset: sh.kind === 'pin' ? [0, -18] : [0, 0],
       });
+      // A permanent tooltip on a layer already added to the map is open right
+      // away, so its element exists to be given the shape's own colour.
+      const tt = layer.getTooltip();
+      const el = tt && tt.getElement();
+      if (el) el.style.borderColor = colourOf(sh);
     }
     layer.on('click', e => {
       if (D().tool) return;                 // a tool is armed: the click is a draw click
@@ -2200,6 +2469,9 @@ const MapDraw = (function () {
 
   function add(shape) {
     shape.id = `d${++D().seq}`;
+    // Stamped at birth: changing the picker later moves what comes next, not
+    // what is already on the map.
+    shape.colour = safeColour(D().colour);
     D().shapes.push(shape);
     D().selectedId = shape.id;
     render();
@@ -2237,12 +2509,13 @@ const MapDraw = (function () {
   function cancelPending() {
     pending = null;
     clearGhost();
+    clearSnapHint();
     updateFinishButton();
   }
 
   function finishLine() {
     if (pending && pending.kind === 'line' && pending.pts.length >= 2) {
-      add({ kind: 'line', pts: pending.pts });
+      add({ kind: 'line', pts: pending.pts, snappedTo: pending.sids.slice() });
     }
     cancelPending();
   }
@@ -2250,33 +2523,41 @@ const MapDraw = (function () {
   function onClick(e) {
     const tool = D().tool;
     if (!tool || !map) return;
-    const ll = [e.latlng.lat, e.latlng.lng];
-    if (tool === 'pin') { add({ kind: 'pin', lat: ll[0], lon: ll[1] }); return; }
+    const { ll, sid } = resolve(e.latlng);
+    if (tool === 'pin') { add({ kind: 'pin', lat: ll[0], lon: ll[1], snappedTo: [sid] }); return; }
     if (tool === 'text') {
       const t = prompt('Annotation text');
-      if (t && t.trim()) add({ kind: 'text', lat: ll[0], lon: ll[1], text: t.trim() });
+      if (t && t.trim()) add({ kind: 'text', lat: ll[0], lon: ll[1], text: t.trim(), snappedTo: [sid] });
       return;
     }
     if (!pending || pending.kind !== tool) {
-      pending = { kind: tool, pts: [ll] };
+      pending = { kind: tool, pts: [ll], sids: [sid] };
       updateFinishButton();
       showGhost(null);
       return;
     }
-    if (tool === 'line') { pending.pts.push(ll); showGhost(null); updateFinishButton(); return; }
-    const a = pending.pts[0];
+    if (tool === 'line') {
+      pending.pts.push(ll); pending.sids.push(sid);
+      showGhost(null); updateFinishButton(); return;
+    }
+    const a = pending.pts[0], aSid = pending.sids[0];
     if (tool === 'circle') {
       const r = acmaHaversineKm(a[0], a[1], ll[0], ll[1]);
-      if (r > 0) add({ kind: 'circle', lat: a[0], lon: a[1], radiusKm: r });
+      if (r > 0) add({ kind: 'circle', lat: a[0], lon: a[1], radiusKm: r, snappedTo: [aSid, sid] });
     } else if (tool === 'rect') {
       const rect = rectFromCorners(a, ll);
-      if (rect.widthKm > 0 && rect.heightKm > 0) add(rect);
+      if (rect.widthKm > 0 && rect.heightKm > 0) add({ ...rect, snappedTo: [aSid, sid] });
     }
     cancelPending();
   }
 
   function onMove(e) {
-    if (pending && map) showGhost([e.latlng.lat, e.latlng.lng]);
+    if (!map) return;
+    // The ghost follows the point the click would actually use, so the preview
+    // and the result are the same thing.
+    const t = D().tool ? snapTarget(e.latlng) : null;
+    showSnapHint(t);
+    if (pending) showGhost(t ? [t.mnStation.lat, t.mnStation.lon] : [e.latlng.lat, e.latlng.lng]);
   }
 
   function onDblClick(e) {
@@ -2291,6 +2572,7 @@ const MapDraw = (function () {
   function setTool(tool) {
     const D_ = D();
     cancelPending();
+    snapCache = null;                 // the pins may have been rebuilt since
     D_.tool = D_.tool === tool ? '' : tool;
     if (map) {
       // While a tool is armed, clicks have to reach the map: station pins and
@@ -2401,6 +2683,10 @@ const MapDraw = (function () {
                                   sh.heightKm = Math.max(v('height') || 0, 0.001); }
       if (sh.kind === 'text')   sh.text = v('text') || sh.text;
     }
+    // Numbers typed over a snapped point are the operator overruling the snap:
+    // whatever station it used to sit on, it does not any more. Cleared only
+    // once the edit has actually been taken — a rejected one changes nothing.
+    sh.snappedTo = null;
     render();
     rerenderPanel();
   }
@@ -2408,6 +2694,50 @@ const MapDraw = (function () {
   function toggleLabels(on) {
     D().showLabels = on;
     render();
+  }
+
+  // Sometimes the pin is the correct location and the station is not, so this
+  // has to be switchable rather than always on.
+  function toggleSnap(on) {
+    D().snap = on;
+    if (!on) clearSnapHint();
+    rerenderPanel();
+  }
+
+  // ── shape → station selection ──
+  // The candidates are the markers actually on the map, so "the stations inside
+  // this shape" means the ones the operator can see inside it: with "hide
+  // stations that don't match" on, the hidden ones are not in the box.
+  function stationsInside(sh) {
+    const out = [];
+    if (sh.kind === 'circle') {
+      for (const m of state.mapMarkers) {
+        const s = m.mnStation;
+        if (s && acmaHaversineKm(sh.lat, sh.lon, s.lat, s.lon) <= sh.radiusKm) out.push(s.id);
+      }
+    } else if (sh.kind === 'rect') {
+      const [[latMin, lonMin], [latMax, lonMax]] = rectBounds(sh);
+      for (const m of state.mapMarkers) {
+        const s = m.mnStation;
+        if (s && s.lat >= latMin && s.lat <= latMax && s.lon >= lonMin && s.lon <= lonMax) out.push(s.id);
+      }
+    }
+    return out;
+  }
+
+  // Additive, so two boxes combine; shift replaces instead, for starting again
+  // without going via Clear.
+  function selectInside(id, ev) {
+    const sh = D().shapes.find(s => s.id === id);
+    if (!sh) return;
+    const ids = stationsInside(sh);
+    if (!ids.length) { mapNote('No stations inside that shape', 3000); return; }
+    if (ev && ev.shiftKey) state.mapSelection.clear();
+    const added = addToMapSelection(ids);
+    const total = state.mapSelection.size;
+    mapNote(added
+      ? `${added} station${added === 1 ? '' : 's'} added — ${total} selected`
+      : `Already in the selection — ${total} selected`, 3500);
   }
 
   function updateFinishButton() {
@@ -2486,18 +2816,45 @@ const MapDraw = (function () {
       // so it lists its length and leaves it there; everything else opens its
       // measurements for editing when picked.
       const editable = sel && (sh.kind !== 'line' || sh.pts.length === 2);
+      // Circles and rectangles have an inside, so they can hand it to the map
+      // selection. Reusing the drawn shape rather than a separate "selection
+      // tool" means a selection box can be typed to exact dimensions like
+      // everything else in this panel.
+      const canPick = sh.kind === 'circle' || sh.kind === 'rect';
       return `
         <div class="draw-row${sel ? ' sel' : ''}">
           <button class="draw-row-main" onclick="MapDraw.select('${escAttr(sh.id)}')"
                   title="Select and centre on it">
-            <span class="draw-row-icon">${DRAW_TOOLS[sh.kind].icon}</span>
-            <span class="draw-row-text">${esc(measure(sh))}</span>
+            <span class="draw-row-icon" style="color:${colourOf(sh)}">${DRAW_TOOLS[sh.kind].icon}</span>
+            <span class="draw-row-text">${esc(rowText(sh))}</span>
           </button>
+          ${canPick ? `
+            <button class="draw-pick"
+                    title="Select the stations inside this shape into the list below the map (shift-click to replace the current selection)"
+                    onclick="MapDraw.selectInside('${escAttr(sh.id)}',event)">Select inside</button>` : ''}
           <button class="draw-del" title="Delete"
                   onclick="MapDraw.remove('${escAttr(sh.id)}')">✕</button>
         </div>
         ${editable ? editFormHtml(sh) : ''}`;
     }).join('')}</div>`;
+  }
+
+  function colourHtml() {
+    const cur = colour();
+    const picked = safeColour(D().colour).toLowerCase();
+    return `
+      <div class="draw-colour">
+        <span class="draw-colour-label">Colour</span>
+        <div class="draw-swatches">
+          ${DRAW_COLOURS.map(([c, name]) => `
+            <button class="draw-swatch${picked === c ? ' on' : ''}" style="--sw:${c}"
+                    title="${esc(name)}" aria-label="${esc(name)}"
+                    onclick="MapDraw.setColour('${c}')"></button>`).join('')}
+          <input type="color" class="draw-colour-input" value="${escAttr(cur)}"
+                 title="Any other colour" aria-label="Pick any colour"
+                 onchange="MapDraw.setColour(this.value)">
+        </div>
+      </div>`;
   }
 
   function panelHtml() {
@@ -2519,11 +2876,20 @@ const MapDraw = (function () {
         ? esc(DRAW_TOOLS[D_.tool].hint) + ' Esc stops.'
         : 'Pick a tool, then draw on the map or type the numbers in. Nothing is saved — clip the screen to keep it.'}</p>
       <button id="draw-finish" hidden onclick="MapDraw.finishLine()">Finish line</button>
+      ${colourHtml()}
       ${D_.tool ? `
         <details class="draw-numeric" open>
           <summary class="small">Place by numbers</summary>
           ${newFormHtml(D_.tool)}
         </details>` : ''}
+      <label class="filter-check">
+        <input type="checkbox" ${D_.snap ? 'checked' : ''}
+               onchange="MapDraw.toggleSnap(this.checked)">
+        Snap to stations
+      </label>
+      <p class="filter-hint">${D_.snap
+        ? 'Clicks within about 15 px of a station pin land on that station, and the shape is named after it.'
+        : 'Points land exactly where you click.'}</p>
       <label class="filter-check">
         <input type="checkbox" ${D_.showLabels ? 'checked' : ''}
                onchange="MapDraw.toggleLabels(this.checked)">
@@ -2541,7 +2907,7 @@ const MapDraw = (function () {
     attach(m) {
       map   = m;
       group = L.layerGroup().addTo(m);
-      pending = null; ghost = null;
+      pending = null; ghost = null; snapHint = null; snapCache = null;
       m.on('click', onClick);
       m.on('mousemove', onMove);
       m.on('dblclick', onDblClick);
@@ -2562,12 +2928,14 @@ const MapDraw = (function () {
     detach() {
       if (keyHandler) { document.removeEventListener('keydown', keyHandler); keyHandler = null; }
       clearGhost();
-      pending = null;
+      clearSnapHint();
+      pending = null; snapCache = null;
       map = null; group = null;
     },
 
     panelHtml, rerenderPanel, render, setTool, select, remove, clearAll,
     finishLine, addFromForm, applyEdit, useMapCentre, toggleLabels, measure,
+    setColour, toggleSnap, selectInside,
   };
 })();
 
@@ -2578,8 +2946,30 @@ const MapDraw = (function () {
 // lets the operator pull the rest in when they actually want it.
 const STATIONS_ROW_CAP = 500;
 
+// What the table says when it is listing a map selection rather than a filter
+// result — including the way back to the filter, which is the only way back.
+function selectionBarHtml() {
+  const n = state.mapSelection.size;
+  if (!n) return '';
+  return `
+    <div class="sel-bar">
+      <span class="sel-bar-count"><strong>${n}</strong> station${n === 1 ? '' : 's'} selected</span>
+      <span class="sel-bar-note">Picked off the map — not saved, and not part of the filter.</span>
+      <span class="sel-bar-actions">
+        <button onclick="exportMapSelection()" title="Download these stations as a CSV">Export CSV</button>
+        <button class="filter-reset" onclick="clearMapSelection()"
+                title="Go back to listing the filter result">Clear selection</button>
+      </span>
+    </div>`;
+}
+
 function stationsTable(allStations) {
-  if (!allStations.length) return '<p style="padding:.75rem;color:var(--muted)">No stations match current filters.</p>';
+  const selBar = selectionBarHtml();
+  if (!allStations.length) {
+    return selBar + `<p style="padding:.75rem;color:var(--muted)">${selBar
+      ? 'None of the selected stations are in the loaded file.'
+      : 'No stations match current filters.'}</p>`;
+  }
   const capped    = !state.stationsShowAll && allStations.length > STATIONS_ROW_CAP;
   const stations  = capped ? allStations.slice(0, STATIONS_ROW_CAP) : allStations;
   // Same prepared terms the filter itself ran on, so the marks land exactly
@@ -2589,6 +2979,7 @@ function stationsTable(allStations) {
   // to one that did, and the badge is what says so.
   const relIds = relatedIdSet();
   return `
+    ${selBar}
     ${capped ? `
       <p class="filter-note">Showing ${STATIONS_ROW_CAP} of ${allStations.length} —
         narrow the filter or <a href="#" onclick="state.stationsShowAll=true;rerenderStations();return false">show all</a>.</p>
@@ -2690,6 +3081,16 @@ function selectStationState(s) {
   state.editorId    = s.id;
   // Same deep copy as selectStation: fields the form doesn't expose survive a save.
   state.editorDraft = JSON.parse(JSON.stringify(s));
+  // A map selection is what the table is listing, so a station asked for from
+  // outside it has no row to be scrolled to. Adding it is the least destructive
+  // answer — the picked set survives, and the count in the header says it grew.
+  if (state.mapSelection.size) {
+    if (!state.mapSelection.has(s.id)) {
+      state.mapSelection.add(s.id);
+      applyMapSelectionStyles();
+    }
+    return false;
+  }
   if (relatedIdSet().has(s.id)) return false;
   if (filteredStations().some(x => x.id === s.id)) return false;
   resetStationFilters();

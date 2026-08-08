@@ -229,7 +229,9 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Pull the repeaters that carry a matched station onto the map and into the table with it (*Include related repeaters*)
 - Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Kill spaghetti*)
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
-- Draw and measure over the map: pins, lines, circles, rectangles and text, placed by hand or by coordinates and km
+- Draw and measure over the map: pins, lines, circles, rectangles and text, placed by hand or by coordinates and km, in a colour of your choosing
+- Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
+- Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
 - Leaflet.js with a base-map picker (top-right): OSM-Topo (default), OpenStreetMap, or Satellite
 
 **Reading the map.** Every pin carries a white ring so it separates from the
@@ -317,9 +319,45 @@ tool is armed the cursor is a crosshair and clicks pass through the station
 pins to the map underneath; Esc cancels the shape in progress, and Esc again
 puts the tool away.
 
+**Snap to stations.** On by default. A click within about 15 px of a station
+pin lands on that station's exact coordinates rather than wherever the cursor
+happened to be, so a path drawn between two sites really does start and end on
+them. The station under the cursor is ringed while a tool is armed, so you can
+see whether the next click will snap. A snapped shape is named after its
+stations in the draw list — *Mt Stuart → Durikai · 42.1 km @ 073°* rather than
+two lat/lon pairs — and remembers which stations they were. The threshold is in
+screen pixels, not kilometres, so snapping behaves the same at the national
+view and at street level. Untick *Snap to stations* for the times when the pin
+is the correct location and the station is not; typing over a shape's numbers
+also releases it from whatever it was snapped to.
+
+**Colour.** Six presets that stay legible on street, topo and satellite tiles,
+plus the browser's own colour picker for anything else. The chosen colour
+applies to new shapes, and each shape keeps the colour it was drawn in.
+Changing the colour while a shape is selected recolours that shape. The choice
+is remembered across reloads; the shapes are not.
+
 **Nothing is saved.** The drawings survive switching tabs and filtering, and
 are cleared by reloading the page. There is no export — take a screen clipping
 with the operating system's own tool.
+
+**Selecting stations off the map.** Separate from the filters and from the
+single station the editor is on: a set you pick by hand. A circle or rectangle
+in the draw list carries a **Select inside** button that hands the stations
+within it to the selection, so a selection box can be typed to exact dimensions
+like everything else in that pane. **Shift-click** (or ctrl / ⌘-click) a pin to
+add or remove it one at a time; a plain click still opens the popup. Selection
+is additive, so two boxes over two regions give one selection holding both —
+shift-click *Select inside* to replace instead of add.
+
+Selected pins take a heavy violet ring, which is neither the amber of a filter
+match nor the cyan of a station pulled in by a pass range. While the selection
+is non-empty **the table under the map lists exactly the selected stations**,
+under a bar saying how many there are. That is a display override, not a change
+to the filter: **Clear selection** hands the list straight back to the filter
+result. **Export CSV** writes the selected stations out with the columns the
+table shows plus their ids. Like the drawings, the selection is session state —
+it is not saved, and it is not in the URL.
 
 **Stacked pins.** Where pins land on top of each other — co-sited stations, or
 an ACMA site carrying a dozen licensed devices — hovering the stack (mouse) or
