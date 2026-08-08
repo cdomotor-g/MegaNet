@@ -58,6 +58,7 @@ MegaNet/
 │   ├── acma-timeline.json            (authorisation-date timeline for the RF Changes tab)
 │   ├── acma-snapshots.json / acma-changes.json      (snapshot index + precomputed diffs)
 │   ├── acma-licence-suggestions.csv  (repeater ↔ ACMA licence review file)
+│   ├── ghosting-links.json           (observed candidate → target ghosting links, Network View)
 │   └── rf-concepts.json              (RF explainer entries for the Workbench concept drawer)
 │
 ├── radio-mobile/           ← self-contained Radio Mobile desktop project
@@ -639,7 +640,7 @@ on a narrow window.
 | Group | Tabs |
 | --- | --- |
 | **Network** | Stations · Network Maps · Networks · Pass Ranges |
-| **Radio investigation** | RF Environment · RF Changes · Interference Workbench · Bit Flipper |
+| **Radio investigation** | RF Environment · RF Changes · Interference Workbench · Bit Flipper · Network View |
 | **Live tools** | ALERT Packets · Serial Monitor |
 | **Data & admin** | ARRO Launcher · Export |
 
@@ -727,6 +728,80 @@ One thing this shook out: the app had **no `a` rule at all**, so every link fell
 back to the browser's `#0000EE` and, once followed, `#551A8B` — two shades of
 near-black on a dark panel. Links are now `var(--accent)`, visited included.
 
+
+### 16. Network View (Ghosting Knowledge Graph)
+The Bit Flipper answers "what else could this address be?" one address at a
+time. The Network View asks it of the whole file at once and draws the answer:
+**ALERT addresses are nodes, and a relationship between two of them is an edge.**
+Grouped under **Radio investigation**, next to the Bit Flipper it generalises.
+
+Ported from a standalone `BitFlipper_Network_View` page — a hand-rolled SVG force
+layout with no dependencies, its own palette, a full-viewport grid and its
+relationships baked into the HTML. Everything about how it *feels* survived the
+port; everything about where its data comes from changed.
+
+**Two kinds of edge, deliberately in one graph.**
+
+| | Where it comes from | Direction |
+| --- | --- | --- |
+| **Computed** | arithmetic — the two addresses are one bit apart | none; XOR is symmetric, so no arrowhead |
+| **Confirmed** | observed, with an evidence file behind it | candidate → target, drawn with an arrow |
+
+Keeping them apart in two views would have hidden the only question worth
+asking, which is *which bit-adjacent pairs were ever actually seen ghosting*.
+An edge can be both, and the export says which. Worth noting: **every one of the
+154 shipped confirmed relationships is exactly one bit apart** — the observed set
+is a subset of the arithmetic one, which is the bit-flip theory holding up.
+
+**The graph is built from `stations.json`.** `buildSensorIndex()` and the Bit
+Flipper's variant logic generalise into a full-file graph: 5,791 nodes over 5,122
+distinct addresses, and ~23,700 one-bit-adjacent pairs. A node is one address as
+transmitted by *one station* — not one sensor (a site reporting rainfall and
+rainfall-increment on the same address transmits one thing) and not one address
+(614 addresses are claimed by more than one station, and merging those would
+invent a relationship between unrelated sites). The seven duplicated site records
+in the file fold together the same way `dedupeMatches()` folds them.
+
+**The confirmed relationships ship as data**, in `data/ghosting-links.json`,
+lazily fetched like the ACMA layer rather than baked into `app.js` — they are a
+snapshot of an evidence review that happens outside the app. Dropping a links CSV
+adds to them; station names and sensor types still come from `stations.json`, so
+the CSV only has to say which addresses were observed ghosting into which.
+
+**Filters are generated, not fixed.** The original had four sensor-type
+checkboxes; the shipped file has 22 sensor types. `NV_FACETS` is now the single
+description of what can be filtered and coloured by — sensor type, station role,
+radio network, basin, confirmed cluster — and adding an attribute means adding
+one entry, which gives both a filter group and a *Colour by* option.
+
+**Two ways out to the map**, both reusing what the Stations tab already has:
+
+- **One node → *Show on map*** calls `goToStation()`, exactly as the Pass Ranges
+  rows do.
+- **The visible set → *Show these on the map*** resolves the nodes to station
+  ids and hands them to `state.mapSelection` — the selection mechanism the map
+  gained for picking stations off it — rather than inventing a second one.
+
+A node that does not resolve to a station in the loaded file is **reported, not
+dropped**: it draws grey and dashed, the note under the graph counts it, and its
+card says it cannot be mapped. A confirmed relationship pointing at an address
+the station file has never heard of is a finding, not noise. Where several
+stations claim an address and the link names none of them, the end is left
+unresolved rather than attributed to whichever came first.
+
+**It stops when you leave.** The layout runs on `requestAnimationFrame` with a
+cooling alpha, so it settles and then stops on its own; `switchTab()` stops it
+outright, and the loop re-checks every frame that its tab is still the open one.
+
+**Caps, in the spirit of `MAP_LABEL_CAP` and `BF_MAX_RENDER_ROWS`.** 400 rendered
+nodes, and the note says how many matched. The number is set by drawing cost, not
+by arithmetic: the force loop measures ~1.3 ms a frame even at several hundred
+nodes, while rasterising the edges costs an order of magnitude more. (A spatial
+grid was tried for the repulsion and measured *slower* — the Map lookups cost
+more than the square roots they save at this size.) Labels are capped by stage
+area rather than by a constant, because they hold a fixed size on screen at any
+zoom, so what they collide with is the room the pane has.
+
 ---
 
 ## Deployment Plan
@@ -757,6 +832,9 @@ Tabs / panels:
 - **Pass Ranges** — pass-range matching and hop-chain view; rows link through to
   the station on the Stations tab
 - **Bit Flipper** — ALERT address tool
+- **Network View** — the ghosting graph: ALERT addresses as nodes, bit-flip
+  adjacency and observed ghosting as edges; hands its visible set to the
+  Stations map as a selection
 - **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF)
 - **Serial Monitor** — live ingestion from physical COM ports (Web Serial), with ASCII / hex / ALERT-decode display
 - **Export** — Radio Mobile file generation
