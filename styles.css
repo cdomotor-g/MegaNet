@@ -2405,3 +2405,354 @@ code {
   font-size: .88rem;
 }
 .wb-drawer-item:hover { background: var(--subtle); }
+
+/* ── Network View tab ──────────────────────────────────────────────────────
+   The ghosting graph. Ported from a standalone page that owned the whole
+   viewport and shipped its own palette; everything below is expressed in the
+   app's theme tokens instead, so the graph flips with the rest of the app and
+   the sidebar reads like every other sidebar. The stage sizes itself off
+   --mn-chrome the same way the Stations panes do — app.js measures the header,
+   and the SVG's viewBox is set to the stage's own pixel size so a nav collapse
+   widens the window onto the graph rather than stretching it. */
+
+.nv-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1rem;
+  align-items: start;
+}
+
+.nv-side {
+  height: calc(100dvh - var(--mn-chrome, 150px) - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: .4rem;
+  min-width: 0;
+}
+
+.nv-stage {
+  position: relative;
+  height: calc(100dvh - var(--mn-chrome, 150px) - 2rem);
+  padding: 0;
+  overflow: hidden;
+  min-width: 0;
+  background:
+    radial-gradient(circle at 22% 12%, color-mix(in srgb, var(--panel) 92%, transparent) 0, transparent 34%),
+    var(--panel-sub);
+}
+
+.nv-stage svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;        /* the pointer drag owns pan and node dragging */
+  cursor: grab;
+}
+
+.nv-stage svg:active { cursor: grabbing; }
+
+/* ── graph marks ── */
+
+/* Strokes are held to a screen width rather than a world one, so zooming out to
+   frame a large graph thins the lines to nothing no longer. --nv-scale is set by
+   applyView on every view change. */
+.nv-edge,
+.nv-conf { vector-effect: non-scaling-stroke; }
+
+.nv-edge {
+  fill: none;
+  stroke: color-mix(in srgb, var(--muted) 55%, transparent);
+  stroke-width: 1;
+}
+
+.nv-edge--same {
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 3;
+}
+
+/* Observed relationships are the point of the graph, so they are the only
+   thing drawn at full strength — and the only thing with an arrowhead, because
+   they are the only edges with a direction. */
+.nv-conf {
+  stroke: var(--map-line);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.nv-conf--recip { stroke-width: 3; }
+.nv-conf--same  { stroke-dasharray: 6 4; }
+.nv-arrowhead   { fill: var(--map-line); }
+
+.nv-node { cursor: grab; }
+.nv-node:active { cursor: grabbing; }
+
+.nv-node circle {
+  stroke: var(--panel);
+  stroke-width: 1.5;
+  transition: stroke-width .12s ease;
+}
+
+.nv-node:hover circle { stroke: var(--text); stroke-width: 2.5; }
+.nv-node:focus-visible { outline: none; }
+.nv-node:focus-visible circle { stroke: var(--accent); stroke-width: 3; }
+
+/* A search hit wears the same amber ring a filter match wears on the Stations
+   map, so "the thing you asked for" looks the same everywhere in the app. */
+.nv-node--hit circle {
+  stroke: var(--hit-ring);
+  stroke-width: 3;
+}
+
+.nv-node--unresolved circle { stroke-dasharray: 3 2; }
+
+.nv-label {
+  font-size: calc(10px / var(--nv-scale, 1));
+  fill: var(--muted);
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: var(--panel-sub);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.nv-hide-labels .nv-label { display: none; }
+
+/* ── stage furniture ── */
+
+.nv-top {
+  position: absolute;
+  top: .6rem;
+  left: .7rem;
+  right: .7rem;
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.nv-pill {
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: .2rem .7rem;
+  font-size: .78rem;
+  color: var(--text);
+  backdrop-filter: blur(6px);
+}
+
+.nv-pill--quiet { color: var(--muted); }
+
+.nv-cap {
+  position: absolute;
+  left: .7rem;
+  right: .7rem;
+  bottom: .6rem;
+  margin: 0;
+  padding: .4rem .7rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.nv-tip {
+  position: absolute;
+  z-index: 4;
+  max-width: 240px;
+  padding: .45rem .6rem;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .22);
+  font-size: .82rem;
+  pointer-events: none;
+}
+
+.nv-detail {
+  position: absolute;
+  top: 2.6rem;
+  right: .7rem;
+  bottom: .7rem;
+  width: min(330px, 62%);
+  z-index: 3;
+  overflow-y: auto;
+  padding: .8rem .9rem 1rem;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .24);
+}
+
+.nv-detail h3 { margin: 0 1.4rem .2rem 0; font-size: 1rem; }
+.nv-detail h4 {
+  margin: .9rem 0 .3rem;
+  font-size: .72rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.nv-close {
+  position: absolute;
+  top: .4rem;
+  right: .4rem;
+  padding: 0 .45rem;
+  font-size: 1.1rem;
+  line-height: 1.4;
+}
+
+.nv-rel {
+  padding: .35rem .5rem;
+  margin: .25rem 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-sub);
+  font-size: .84rem;
+}
+
+.nv-rel span { display: block; color: var(--muted); }
+.nv-ev { font-style: italic; }
+
+.nv-warn {
+  padding: .45rem .6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  color: var(--text);
+  margin: .2rem 0 .6rem;
+}
+
+.nv-link {
+  display: inline-block;
+  padding: .35rem .6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: .85rem;
+}
+
+.nv-link:hover { background: var(--subtle); }
+
+.nv-neigh { display: flex; flex-wrap: wrap; gap: .3rem; }
+
+.nv-chip {
+  width: auto;
+  padding: .2rem .5rem;
+  font-size: .78rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-sub);
+  cursor: pointer;
+}
+
+.nv-chip span {
+  color: var(--muted);
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: bottom;
+}
+
+/* ── sidebar controls ── */
+
+.nv-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: .4rem;
+  margin-top: .7rem;
+}
+
+.nv-stat {
+  background: var(--panel-sub);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: .4rem .5rem;
+}
+
+.nv-stat b    { display: block; font-size: 1.05rem; }
+.nv-stat span { font-size: .68rem; color: var(--muted); }
+.nv-src       { color: var(--muted); margin: .5rem 0 0; }
+
+.nv-check {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin: .35rem 0;
+  font-size: .87rem;
+}
+
+.nv-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.nv-check span:last-child:not(:first-of-type) { margin-left: auto; color: var(--muted); }
+
+.nv-facet { border-top: 1px solid var(--border); padding: .4rem 0; }
+.nv-facet:first-of-type { border-top: 0; }
+
+.nv-facet > summary {
+  cursor: pointer;
+  font-size: .8rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: .2rem 0;
+}
+
+.nv-range {
+  display: grid;
+  grid-template-columns: 1fr 3.2rem;
+  gap: .5rem;
+  align-items: center;
+  margin: .6rem 0 .4rem;
+}
+
+.nv-range input { padding: 0; accent-color: var(--accent); }
+.nv-val { text-align: right; font-size: .8rem; font-weight: 600; }
+
+.nv-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .25rem .5rem;
+  margin-top: .5rem;
+  font-size: .76rem;
+  color: var(--muted);
+}
+
+.nv-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: .35rem;
+}
+
+.nv-drop {
+  border: 1.5px dashed var(--border);
+  border-radius: 9px;
+  background: var(--panel-sub);
+  padding: .9rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: .85rem;
+  margin-bottom: .5rem;
+}
+
+.nv-drop--active { border-color: var(--accent); color: var(--accent); }
+
+/* Below this the sidebar stops being a column and becomes a block above the
+   graph, which then takes a fixed slice of the viewport rather than all of it —
+   a graph pinned to full height on a phone leaves no way to scroll to the
+   controls that drive it. */
+@media (max-width: 900px) {
+  .nv-layout { grid-template-columns: 1fr; }
+  .nv-side   { height: auto; overflow: visible; }
+  .nv-stage  { height: 68dvh; }
+  .nv-detail { width: min(330px, 86%); }
+}

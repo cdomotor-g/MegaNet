@@ -1,0 +1,3357 @@
+{
+ "meta": {
+  "description": "Observed (confirmed) ALERT ghosting relationships, candidate -> target. Extracted from the standalone BitFlipper Network View build; every link here was corroborated by an evidence file, not derived by bit arithmetic.",
+  "source_files": 50,
+  "relationships": 154,
+  "sensors": 147,
+  "sites": 109
+ },
+ "sensors": [
+  {
+   "sensor_id": "540529.0.R.4012",
+   "site_id": "540529",
+   "site_name": "Warrego Highway AL",
+   "type": "Rainfall",
+   "alert": 4012
+  },
+  {
+   "sensor_id": "540529.0.B.4014",
+   "site_id": "540529",
+   "site_name": "Warrego Highway AL",
+   "type": "Battery",
+   "alert": 4014
+  },
+  {
+   "sensor_id": "540528.0.H.4010",
+   "site_id": "540528",
+   "site_name": "Mulgowie AL",
+   "type": "Water Level",
+   "alert": 4010
+  },
+  {
+   "sensor_id": "540527.0.R.4006",
+   "site_id": "540527",
+   "site_name": "Spring Bluff AL",
+   "type": "Rainfall",
+   "alert": 4006
+  },
+  {
+   "sensor_id": "540718.0.R.4068",
+   "site_id": "540718",
+   "site_name": "Mt Berryman Rd AL",
+   "type": "Rainfall",
+   "alert": 4068
+  },
+  {
+   "sensor_id": "540718.0.B.4069",
+   "site_id": "540718",
+   "site_name": "Mt Berryman Rd AL",
+   "type": "Battery",
+   "alert": 4069
+  },
+  {
+   "sensor_id": "540723.0.R.4065",
+   "site_id": "540723",
+   "site_name": "Mulgowie Rd AL",
+   "type": "Rainfall",
+   "alert": 4065
+  },
+  {
+   "sensor_id": "540828.0.R.4077",
+   "site_id": "540828",
+   "site_name": "Summerholm AL",
+   "type": "Rainfall",
+   "alert": 4077
+  },
+  {
+   "sensor_id": "540680.0.R.4051",
+   "site_id": "540680",
+   "site_name": "Woodlands Rd AL",
+   "type": "Rainfall",
+   "alert": 4051
+  },
+  {
+   "sensor_id": "540570.0.B.4050",
+   "site_id": "540570",
+   "site_name": "Upper Blackfellow AL",
+   "type": "Battery",
+   "alert": 4050
+  },
+  {
+   "sensor_id": "585047.1.B.4900",
+   "site_id": "585047",
+   "site_name": "Merrimans Creek at Stradbroke West",
+   "type": "Battery",
+   "alert": 4900
+  },
+  {
+   "sensor_id": "542012.0.R.4908",
+   "site_id": "542012",
+   "site_name": "Canaan Creek AL",
+   "type": "Rainfall",
+   "alert": 4908
+  },
+  {
+   "sensor_id": "541044.0.B.4972",
+   "site_id": "541044",
+   "site_name": "Cooringa AL",
+   "type": "Battery",
+   "alert": 4972
+  },
+  {
+   "sensor_id": "539180.0.R.812",
+   "site_id": "539180",
+   "site_name": "Mt Gayndah AL",
+   "type": "Rainfall",
+   "alert": 812
+  },
+  {
+   "sensor_id": "541063.0.R.6876",
+   "site_id": "541063",
+   "site_name": "Dalveen AL",
+   "type": "Rainfall",
+   "alert": 6876
+  },
+  {
+   "sensor_id": "541063.0.B.6877",
+   "site_id": "541063",
+   "site_name": "Dalveen AL",
+   "type": "Battery",
+   "alert": 6877
+  },
+  {
+   "sensor_id": "41533.0.R.6873",
+   "site_id": "41533",
+   "site_name": "Emu Vale AL",
+   "type": "Rainfall",
+   "alert": 6873
+  },
+  {
+   "sensor_id": "41531.0.B.6869",
+   "site_id": "41531",
+   "site_name": "Glengallan Ck AL",
+   "type": "Battery",
+   "alert": 6869
+  },
+  {
+   "sensor_id": "41537.0.R.6861",
+   "site_id": "41537",
+   "site_name": "Killarney AL",
+   "type": "Rainfall",
+   "alert": 6861
+  },
+  {
+   "sensor_id": "540667.0.R.4816",
+   "site_id": "540667",
+   "site_name": "Upper Western Ck AL",
+   "type": "Rainfall",
+   "alert": 4816
+  },
+  {
+   "sensor_id": "140024.0.B.4848",
+   "site_id": "140024",
+   "site_name": "Willowbank Alert",
+   "type": "Battery",
+   "alert": 4848
+  },
+  {
+   "sensor_id": "531051.0.R.5104",
+   "site_id": "531051",
+   "site_name": "Gordonvale AL",
+   "type": "Rainfall",
+   "alert": 5104
+  },
+  {
+   "sensor_id": "540824.0.B.4842",
+   "site_id": "540824",
+   "site_name": "Springfield Lakes HL Dam AL",
+   "type": "Battery",
+   "alert": 4842
+  },
+  {
+   "sensor_id": "140024.0.R.4846",
+   "site_id": "140024",
+   "site_name": "Willowbank Alert",
+   "type": "Rainfall",
+   "alert": 4846
+  },
+  {
+   "sensor_id": "585033.1.B.4846",
+   "site_id": "585033",
+   "site_name": "Wonnangatta River at Crooked River",
+   "type": "Battery",
+   "alert": 4846
+  },
+  {
+   "sensor_id": "539214.0.B.4782",
+   "site_id": "539214",
+   "site_name": "Springfield AL",
+   "type": "Battery",
+   "alert": 4782
+  },
+  {
+   "sensor_id": "540722.0.B.4064",
+   "site_id": "540722",
+   "site_name": "McGarrigal Rd AL",
+   "type": "Battery",
+   "alert": 4064
+  },
+  {
+   "sensor_id": "540825.0.B.4845",
+   "site_id": "540825",
+   "site_name": "Springfield Lakes LL Dam AL",
+   "type": "Battery",
+   "alert": 4845
+  },
+  {
+   "sensor_id": "140024.0.H.4847",
+   "site_id": "140024",
+   "site_name": "Willowbank Alert",
+   "type": "Water Level",
+   "alert": 4847
+  },
+  {
+   "sensor_id": "540825.0.R.4843",
+   "site_id": "540825",
+   "site_name": "Springfield Lakes LL Dam AL",
+   "type": "Rainfall",
+   "alert": 4843
+  },
+  {
+   "sensor_id": "540806.0.B.4839",
+   "site_id": "540806",
+   "site_name": "Meadow Flat Rd Bridge AL",
+   "type": "Battery",
+   "alert": 4839
+  },
+  {
+   "sensor_id": "540666.0.B.4815",
+   "site_id": "540666",
+   "site_name": "South Ripley (Wards Rd) AL",
+   "type": "Battery",
+   "alert": 4815
+  },
+  {
+   "sensor_id": "515004.1.R.4815",
+   "site_id": "515004",
+   "site_name": "Wigley Gorge",
+   "type": "Rainfall",
+   "alert": 4815
+  },
+  {
+   "sensor_id": "539212.0.R.4783",
+   "site_id": "539212",
+   "site_name": "Mt Beatrice AL",
+   "type": "Rainfall",
+   "alert": 4783
+  },
+  {
+   "sensor_id": "539150.0.R.4719",
+   "site_id": "539150",
+   "site_name": "Mingo Crossing AL",
+   "type": "Rainfall",
+   "alert": 4719
+  },
+  {
+   "sensor_id": "539222.0.B.4335",
+   "site_id": "539222",
+   "site_name": "Table Tops AL",
+   "type": "Battery",
+   "alert": 4335
+  },
+  {
+   "sensor_id": "541119.0.B.4958",
+   "site_id": "541119",
+   "site_name": "Cooranga AL",
+   "type": "Battery",
+   "alert": 4958
+  },
+  {
+   "sensor_id": "541120.0.R.4959",
+   "site_id": "541120",
+   "site_name": "Niagara AL",
+   "type": "Rainfall",
+   "alert": 4959
+  },
+  {
+   "sensor_id": "541119.0.R.4957",
+   "site_id": "541119",
+   "site_name": "Cooranga AL",
+   "type": "Rainfall",
+   "alert": 4957
+  },
+  {
+   "sensor_id": "541117.0.R.4951",
+   "site_id": "541117",
+   "site_name": "Sengs Rd AL",
+   "type": "Rainfall",
+   "alert": 4951
+  },
+  {
+   "sensor_id": "84144.1.B.4943",
+   "site_id": "84144",
+   "site_name": "Mt Nowa Nowa",
+   "type": "Battery",
+   "alert": 4943
+  },
+  {
+   "sensor_id": "540641.0.B.4703",
+   "site_id": "540641",
+   "site_name": "Mt Goonaneman AL",
+   "type": "Battery",
+   "alert": 4703
+  },
+  {
+   "sensor_id": "541041.0.B.6122",
+   "site_id": "541041",
+   "site_name": "Dalby AL",
+   "type": "Battery",
+   "alert": 6122
+  },
+  {
+   "sensor_id": "41551.0.R.6123",
+   "site_id": "41551",
+   "site_name": "Belgrae Park AL",
+   "type": "Rainfall",
+   "alert": 6123
+  },
+  {
+   "sensor_id": "40906.0.B.6091",
+   "site_id": "40906",
+   "site_name": "Lenthalls Dam AL",
+   "type": "Battery",
+   "alert": 6091
+  },
+  {
+   "sensor_id": "535092.0.B.5867",
+   "site_id": "535092",
+   "site_name": "Avocet AL",
+   "type": "Battery",
+   "alert": 5867
+  },
+  {
+   "sensor_id": "540677.0.R.5611",
+   "site_id": "540677",
+   "site_name": "Bidwell AL",
+   "type": "Rainfall",
+   "alert": 5611
+  },
+  {
+   "sensor_id": "540528.0.R.4009",
+   "site_id": "540528",
+   "site_name": "Mulgowie AL",
+   "type": "Rainfall",
+   "alert": 4009
+  },
+  {
+   "sensor_id": "540529.0.H.4013",
+   "site_id": "540529",
+   "site_name": "Warrego Highway AL",
+   "type": "Water Level",
+   "alert": 4013
+  },
+  {
+   "sensor_id": "540519.0.R.4024",
+   "site_id": "540519",
+   "site_name": "Upper Tenthill AL",
+   "type": "Rainfall",
+   "alert": 4024
+  },
+  {
+   "sensor_id": "540519.0.B.4025",
+   "site_id": "540519",
+   "site_name": "Upper Tenthill AL",
+   "type": "Battery",
+   "alert": 4025
+  },
+  {
+   "sensor_id": "41535.0.B.6872",
+   "site_id": "41535",
+   "site_name": "Elbow Valley AL",
+   "type": "Battery",
+   "alert": 6872
+  },
+  {
+   "sensor_id": "41532.0.B.6860",
+   "site_id": "41532",
+   "site_name": "Connolly Dam AL",
+   "type": "Battery",
+   "alert": 6860
+  },
+  {
+   "sensor_id": "31205.0.R.6812",
+   "site_id": "31205",
+   "site_name": "Copperlode AL",
+   "type": "Rainfall",
+   "alert": 6812
+  },
+  {
+   "sensor_id": "540795.0.R.4828",
+   "site_id": "540795",
+   "site_name": "Limestone Park (Dentention Basin) AL",
+   "type": "Rainfall",
+   "alert": 4828
+  },
+  {
+   "sensor_id": "540521.0.R.4026",
+   "site_id": "540521",
+   "site_name": "Gormans Gap AL",
+   "type": "Rainfall",
+   "alert": 4026
+  },
+  {
+   "sensor_id": "540523.0.R.4028",
+   "site_id": "540523",
+   "site_name": "Rockside Mt AL",
+   "type": "Rainfall",
+   "alert": 4028
+  },
+  {
+   "sensor_id": "540527.0.B.4008",
+   "site_id": "540527",
+   "site_name": "Spring Bluff AL",
+   "type": "Battery",
+   "alert": 4008
+  },
+  {
+   "sensor_id": "540439.0.R.1976",
+   "site_id": "540439",
+   "site_name": "Lawnton AL",
+   "type": "Rainfall",
+   "alert": 1976
+  },
+  {
+   "sensor_id": "540571.0.B.4040",
+   "site_id": "540571",
+   "site_name": "Mt Sylvia AL",
+   "type": "Battery",
+   "alert": 4040
+  },
+  {
+   "sensor_id": "541106.0.R.4041",
+   "site_id": "541106",
+   "site_name": "West Haldon AL",
+   "type": "Rainfall",
+   "alert": 4041
+  },
+  {
+   "sensor_id": "540601.0.R.4043",
+   "site_id": "540601",
+   "site_name": "Fifteen Mile AL",
+   "type": "Rainfall",
+   "alert": 4043
+  },
+  {
+   "sensor_id": "540602.0.R.4045",
+   "site_id": "540602",
+   "site_name": "Withcott AL",
+   "type": "Rainfall",
+   "alert": 4045
+  },
+  {
+   "sensor_id": "540567.0.R.4033",
+   "site_id": "540567",
+   "site_name": "Moon Road AL",
+   "type": "Rainfall",
+   "alert": 4033
+  },
+  {
+   "sensor_id": "540716.0.B.4073",
+   "site_id": "540716",
+   "site_name": "Townson AL",
+   "type": "Battery",
+   "alert": 4073
+  },
+  {
+   "sensor_id": "541116.0.R.4504",
+   "site_id": "541116",
+   "site_name": "Mt Burrabaranga AL",
+   "type": "Rainfall",
+   "alert": 4504
+  },
+  {
+   "sensor_id": "541116.0.B.4505",
+   "site_id": "541116",
+   "site_name": "Mt Burrabaranga AL",
+   "type": "Battery",
+   "alert": 4505
+  },
+  {
+   "sensor_id": "540148.0.R.6553",
+   "site_id": "540148",
+   "site_name": "Rosentretters Br AL",
+   "type": "Rainfall",
+   "alert": 6553
+  },
+  {
+   "sensor_id": "539146.0.R.4704",
+   "site_id": "539146",
+   "site_name": "Coringa AL",
+   "type": "Rainfall",
+   "alert": 4704
+  },
+  {
+   "sensor_id": "541120.0.B.4960",
+   "site_id": "541120",
+   "site_name": "Niagara AL",
+   "type": "Battery",
+   "alert": 4960
+  },
+  {
+   "sensor_id": "540534.0.R.4004",
+   "site_id": "540534",
+   "site_name": "Paradise Ck Rd AL",
+   "type": "Rainfall",
+   "alert": 4004
+  },
+  {
+   "sensor_id": "540789.0.B.4076",
+   "site_id": "540789",
+   "site_name": "Thornton (School Rd) AL",
+   "type": "Battery",
+   "alert": 4076
+  },
+  {
+   "sensor_id": "540739.0.B.1964",
+   "site_id": "540739",
+   "site_name": "Samford Valley AL",
+   "type": "Battery",
+   "alert": 1964
+  },
+  {
+   "sensor_id": "542016.0.B.4928",
+   "site_id": "542016",
+   "site_name": "Myall Park Rd AL",
+   "type": "Battery",
+   "alert": 4928
+  },
+  {
+   "sensor_id": "542024.0.B.4930",
+   "site_id": "542024",
+   "site_name": "Glenaubyn AL",
+   "type": "Battery",
+   "alert": 4930
+  },
+  {
+   "sensor_id": "41090.0.R.4938",
+   "site_id": "41090",
+   "site_name": "Darr Creek AL",
+   "type": "Rainfall",
+   "alert": 4938
+  },
+  {
+   "sensor_id": "540708.0.B.5630",
+   "site_id": "540708",
+   "site_name": "Portside AL",
+   "type": "Battery",
+   "alert": 5630
+  },
+  {
+   "sensor_id": "540767.0.R.5631",
+   "site_id": "540767",
+   "site_name": "Boompa Road AL",
+   "type": "Rainfall",
+   "alert": 5631
+  },
+  {
+   "sensor_id": "540706.0.B.5627",
+   "site_id": "540706",
+   "site_name": "Tiaro AL",
+   "type": "Battery",
+   "alert": 5627
+  },
+  {
+   "sensor_id": "540536.0.B.5599",
+   "site_id": "540536",
+   "site_name": "Glasshouse Mountains AL",
+   "type": "Battery",
+   "alert": 5599
+  },
+  {
+   "sensor_id": "540425.0.B.5567",
+   "site_id": "540425",
+   "site_name": "Baroon Boat Ramp AL",
+   "type": "Battery",
+   "alert": 5567
+  },
+  {
+   "sensor_id": "541042.0.B.6116",
+   "site_id": "541042",
+   "site_name": "Moffatt AL",
+   "type": "Battery",
+   "alert": 6116
+  },
+  {
+   "sensor_id": "542022.0.B.6132",
+   "site_id": "542022",
+   "site_name": "Barakula Forest Station AL",
+   "type": "Battery",
+   "alert": 6132
+  },
+  {
+   "sensor_id": "541046.0.R.6100",
+   "site_id": "541046",
+   "site_name": "Mt Mowbullan AL",
+   "type": "Rainfall",
+   "alert": 6100
+  },
+  {
+   "sensor_id": "540687.0.R.5620",
+   "site_id": "540687",
+   "site_name": "Sexton AL",
+   "type": "Rainfall",
+   "alert": 5620
+  },
+  {
+   "sensor_id": "540523.0.B.4029",
+   "site_id": "540523",
+   "site_name": "Rockside Mt AL",
+   "type": "Battery",
+   "alert": 4029
+  },
+  {
+   "sensor_id": "540518.0.R.4021",
+   "site_id": "540518",
+   "site_name": "Ma Ma Ck AL",
+   "type": "Rainfall",
+   "alert": 4021
+  },
+  {
+   "sensor_id": "542019.0.B.6141",
+   "site_id": "542019",
+   "site_name": "Condamine AL",
+   "type": "Battery",
+   "alert": 6141
+  },
+  {
+   "sensor_id": "542025.0.B.6143",
+   "site_id": "542025",
+   "site_name": "Boortkoi AL",
+   "type": "Battery",
+   "alert": 6143
+  },
+  {
+   "sensor_id": "542020.0.B.6135",
+   "site_id": "542020",
+   "site_name": "Bedarra AL",
+   "type": "Battery",
+   "alert": 6135
+  },
+  {
+   "sensor_id": "40902.0.B.6079",
+   "site_id": "40902",
+   "site_name": "Musket Flat AL",
+   "type": "Battery",
+   "alert": 6079
+  },
+  {
+   "sensor_id": "542024.0.R.4929",
+   "site_id": "542024",
+   "site_name": "Glenaubyn AL",
+   "type": "Rainfall",
+   "alert": 4929
+  },
+  {
+   "sensor_id": "541121.0.R.4961",
+   "site_id": "541121",
+   "site_name": "Diamondy AL",
+   "type": "Rainfall",
+   "alert": 4961
+  },
+  {
+   "sensor_id": "535088.0.B.5953",
+   "site_id": "535088",
+   "site_name": "Sunny Park AL",
+   "type": "Battery",
+   "alert": 5953
+  },
+  {
+   "sensor_id": "540602.0.B.4046",
+   "site_id": "540602",
+   "site_name": "Withcott AL",
+   "type": "Battery",
+   "alert": 4046
+  },
+  {
+   "sensor_id": "540600.0.R.4047",
+   "site_id": "540600",
+   "site_name": "Goltz Rd AL",
+   "type": "Rainfall",
+   "alert": 4047
+  },
+  {
+   "sensor_id": "540571.0.R.4039",
+   "site_id": "540571",
+   "site_name": "Mt Sylvia AL",
+   "type": "Rainfall",
+   "alert": 4039
+  },
+  {
+   "sensor_id": "540829.0.R.4079",
+   "site_id": "540829",
+   "site_name": "Fords Rd AL",
+   "type": "Rainfall",
+   "alert": 4079
+  },
+  {
+   "sensor_id": "40902.0.R.6078",
+   "site_id": "40902",
+   "site_name": "Musket Flat AL",
+   "type": "Rainfall",
+   "alert": 6078
+  },
+  {
+   "sensor_id": "542025.0.R.6142",
+   "site_id": "542025",
+   "site_name": "Boortkoi AL",
+   "type": "Rainfall",
+   "alert": 6142
+  },
+  {
+   "sensor_id": "32170.0.B.6014",
+   "site_id": "32170",
+   "site_name": "Nashs Crossing AL",
+   "type": "Battery",
+   "alert": 6014
+  },
+  {
+   "sensor_id": "541113.0.R.4506",
+   "site_id": "541113",
+   "site_name": "Upper Bracker Ck AL",
+   "type": "Rainfall",
+   "alert": 4506
+  },
+  {
+   "sensor_id": "540627.0.B.5528",
+   "site_id": "540627",
+   "site_name": "Caboolture (Bribie Island Rd) AL",
+   "type": "Battery",
+   "alert": 5528
+  },
+  {
+   "sensor_id": "540570.0.R.4049",
+   "site_id": "540570",
+   "site_name": "Upper Blackfellow AL",
+   "type": "Rainfall",
+   "alert": 4049
+  },
+  {
+   "sensor_id": "540600.0.B.4048",
+   "site_id": "540600",
+   "site_name": "Goltz Rd AL",
+   "type": "Battery",
+   "alert": 4048
+  },
+  {
+   "sensor_id": "540567.0.B.4035",
+   "site_id": "540567",
+   "site_name": "Moon Road AL",
+   "type": "Battery",
+   "alert": 4035
+  },
+  {
+   "sensor_id": "540720.0.H.4055",
+   "site_id": "540720",
+   "site_name": "Whiteway Rd AL",
+   "type": "Water Level",
+   "alert": 4055
+  },
+  {
+   "sensor_id": "540717.0.B.4071",
+   "site_id": "540717",
+   "site_name": "Main Camp Ck AL",
+   "type": "Battery",
+   "alert": 4071
+  },
+  {
+   "sensor_id": "558081.1.B.3451",
+   "site_id": "558081",
+   "site_name": "Numinbah",
+   "type": "Battery",
+   "alert": 3451
+  },
+  {
+   "sensor_id": "558081.1.R.3450",
+   "site_id": "558081",
+   "site_name": "Numinbah",
+   "type": "Rainfall",
+   "alert": 3450
+  },
+  {
+   "sensor_id": "540835.0.B.2426",
+   "site_id": "540835",
+   "site_name": "Currumbin Ck (Robert Neumann Pk) AL",
+   "type": "Battery",
+   "alert": 2426
+  },
+  {
+   "sensor_id": "540766.0.R.5633",
+   "site_id": "540766",
+   "site_name": "Glenwood AL",
+   "type": "Rainfall",
+   "alert": 5633
+  },
+  {
+   "sensor_id": "540767.0.B.5632",
+   "site_id": "540767",
+   "site_name": "Boompa Road AL",
+   "type": "Battery",
+   "alert": 5632
+  },
+  {
+   "sensor_id": "541143.0.R.5760",
+   "site_id": "541143",
+   "site_name": "Strathyre Rd AL",
+   "type": "Rainfall",
+   "alert": 5760
+  },
+  {
+   "sensor_id": "540521.0.B.4027",
+   "site_id": "540521",
+   "site_name": "Gormans Gap AL",
+   "type": "Battery",
+   "alert": 4027
+  },
+  {
+   "sensor_id": "540445.0.R.1979",
+   "site_id": "540445",
+   "site_name": "Lipscombe Rd AL",
+   "type": "Rainfall",
+   "alert": 1979
+  },
+  {
+   "sensor_id": "540828.0.B.4078",
+   "site_id": "540828",
+   "site_name": "Summerholm AL",
+   "type": "Battery",
+   "alert": 4078
+  },
+  {
+   "sensor_id": "540789.0.R.4074",
+   "site_id": "540789",
+   "site_name": "Thornton (School Rd) AL",
+   "type": "Rainfall",
+   "alert": 4074
+  },
+  {
+   "sensor_id": "540717.0.R.4070",
+   "site_id": "540717",
+   "site_name": "Main Camp Ck AL",
+   "type": "Rainfall",
+   "alert": 4070
+  },
+  {
+   "sensor_id": "541106.0.B.4042",
+   "site_id": "541106",
+   "site_name": "West Haldon AL",
+   "type": "Battery",
+   "alert": 4042
+  },
+  {
+   "sensor_id": "540567.0.H.4034",
+   "site_id": "540567",
+   "site_name": "Moon Road AL",
+   "type": "Water Level",
+   "alert": 4034
+  },
+  {
+   "sensor_id": "541155.0.B.6130",
+   "site_id": "541155",
+   "site_name": "Loudoun Br AL",
+   "type": "Battery",
+   "alert": 6130
+  },
+  {
+   "sensor_id": "542022.0.R.6131",
+   "site_id": "542022",
+   "site_name": "Barakula Forest Station AL",
+   "type": "Rainfall",
+   "alert": 6131
+  },
+  {
+   "sensor_id": "32172.2.B.6003",
+   "site_id": "32172",
+   "site_name": "Wallaman AL",
+   "type": "Battery",
+   "alert": 6003
+  },
+  {
+   "sensor_id": "540686.0.B.5619",
+   "site_id": "540686",
+   "site_name": "Owanyilla AL",
+   "type": "Battery",
+   "alert": 5619
+  },
+  {
+   "sensor_id": "531052.0.R.5107",
+   "site_id": "531052",
+   "site_name": "Peets Bridge AL",
+   "type": "Rainfall",
+   "alert": 5107
+  },
+  {
+   "sensor_id": "540250.0.R.2035",
+   "site_id": "540250",
+   "site_name": "Brassall AL (Hancocks Br)",
+   "type": "Rainfall",
+   "alert": 2035
+  },
+  {
+   "sensor_id": "541153.0.R.6102",
+   "site_id": "541153",
+   "site_name": "Kulpi AL",
+   "type": "Rainfall",
+   "alert": 6102
+  },
+  {
+   "sensor_id": "541153.0.B.6103",
+   "site_id": "541153",
+   "site_name": "Kulpi AL",
+   "type": "Battery",
+   "alert": 6103
+  },
+  {
+   "sensor_id": "541046.0.B.6101",
+   "site_id": "541046",
+   "site_name": "Mt Mowbullan AL",
+   "type": "Battery",
+   "alert": 6101
+  },
+  {
+   "sensor_id": "540499.0.B.5591",
+   "site_id": "540499",
+   "site_name": "Coolum West AL",
+   "type": "Battery",
+   "alert": 5591
+  },
+  {
+   "sensor_id": "540566.0.R.4030",
+   "site_id": "540566",
+   "site_name": "Upper Lockyer AL",
+   "type": "Rainfall",
+   "alert": 4030
+  },
+  {
+   "sensor_id": "540517.0.B.4020",
+   "site_id": "540517",
+   "site_name": "Flagstone Ck AL",
+   "type": "Battery",
+   "alert": 4020
+  },
+  {
+   "sensor_id": "540517.0.R.4018",
+   "site_id": "540517",
+   "site_name": "Flagstone Ck AL",
+   "type": "Rainfall",
+   "alert": 4018
+  },
+  {
+   "sensor_id": "540439.0.B.1978",
+   "site_id": "540439",
+   "site_name": "Lawnton AL",
+   "type": "Battery",
+   "alert": 1978
+  },
+  {
+   "sensor_id": "541122.0.B.4965",
+   "site_id": "541122",
+   "site_name": "Jandowae-MacAlister Rd AL",
+   "type": "Battery",
+   "alert": 4965
+  },
+  {
+   "sensor_id": "541196.0.B.4977",
+   "site_id": "541196",
+   "site_name": "Blaxland AL",
+   "type": "Battery",
+   "alert": 4977
+  },
+  {
+   "sensor_id": "9988.1.R.5985",
+   "site_id": "9988",
+   "site_name": "Happy Valley",
+   "type": "Rainfall",
+   "alert": 5985
+  },
+  {
+   "sensor_id": "540680.0.B.4053",
+   "site_id": "540680",
+   "site_name": "Woodlands Rd AL",
+   "type": "Battery",
+   "alert": 4053
+  },
+  {
+   "sensor_id": "540829.0.B.4081",
+   "site_id": "540829",
+   "site_name": "Fords Rd AL",
+   "type": "Battery",
+   "alert": 4081
+  },
+  {
+   "sensor_id": "540273.1.B.2001",
+   "site_id": "540273",
+   "site_name": "Constitution Hill AL",
+   "type": "Battery",
+   "alert": 2001
+  },
+  {
+   "sensor_id": "570910.1.B.3328",
+   "site_id": "570910",
+   "site_name": "Rossi (Sawmill)",
+   "type": "Battery",
+   "alert": 3328
+  },
+  {
+   "sensor_id": "558085.1.R.3456",
+   "site_id": "558085",
+   "site_name": "Marana St Reservoir",
+   "type": "Rainfall",
+   "alert": 3456
+  },
+  {
+   "sensor_id": "540840.0.B.2432",
+   "site_id": "540840",
+   "site_name": "Schuster Park South AL",
+   "type": "Battery",
+   "alert": 2432
+  },
+  {
+   "sensor_id": "540716.0.R.4072",
+   "site_id": "540716",
+   "site_name": "Townson AL",
+   "type": "Rainfall",
+   "alert": 4072
+  },
+  {
+   "sensor_id": "540792.0.B.6098",
+   "site_id": "540792",
+   "site_name": "Walls Camp AL (Pacific Haven)",
+   "type": "Battery",
+   "alert": 6098
+  },
+  {
+   "sensor_id": "40907.0.R.6086",
+   "site_id": "40907",
+   "site_name": "Howard PS AL",
+   "type": "Rainfall",
+   "alert": 6086
+  }
+ ],
+ "links": [
+  {
+   "source": "540529.0.R.4012",
+   "target": "540529.0.B.4014",
+   "source_site": "540529",
+   "target_site": "540529",
+   "source_alert": 4012,
+   "target_alert": 4014,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": true,
+   "evidence": [
+    "BF_540529.0.B.4014.md"
+   ]
+  },
+  {
+   "source": "540528.0.H.4010",
+   "target": "540529.0.B.4014",
+   "source_site": "540528",
+   "target_site": "540529",
+   "source_alert": 4010,
+   "target_alert": 4014,
+   "source_type": "Water Level",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540529.0.B.4014.md"
+   ]
+  },
+  {
+   "source": "540527.0.R.4006",
+   "target": "540529.0.B.4014",
+   "source_site": "540527",
+   "target_site": "540529",
+   "source_alert": 4006,
+   "target_alert": 4014,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540529.0.B.4014.md"
+   ]
+  },
+  {
+   "source": "540718.0.R.4068",
+   "target": "540718.0.B.4069",
+   "source_site": "540718",
+   "target_site": "540718",
+   "source_alert": 4068,
+   "target_alert": 4069,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": true,
+   "same_site": true,
+   "evidence": [
+    "BF_540718.0.B.4069.md"
+   ]
+  },
+  {
+   "source": "540723.0.R.4065",
+   "target": "540718.0.B.4069",
+   "source_site": "540723",
+   "target_site": "540718",
+   "source_alert": 4065,
+   "target_alert": 4069,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540718.0.B.4069.md"
+   ]
+  },
+  {
+   "source": "540828.0.R.4077",
+   "target": "540718.0.B.4069",
+   "source_site": "540828",
+   "target_site": "540718",
+   "source_alert": 4077,
+   "target_alert": 4069,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540718.0.B.4069.md"
+   ]
+  },
+  {
+   "source": "540680.0.R.4051",
+   "target": "540570.0.B.4050",
+   "source_site": "540680",
+   "target_site": "540570",
+   "source_alert": 4051,
+   "target_alert": 4050,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540570.0.B.4050.md"
+   ]
+  },
+  {
+   "source": "585047.1.B.4900",
+   "target": "542012.0.R.4908",
+   "source_site": "585047",
+   "target_site": "542012",
+   "source_alert": 4900,
+   "target_alert": 4908,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542012.0.R.4908.md"
+   ]
+  },
+  {
+   "source": "541044.0.B.4972",
+   "target": "542012.0.R.4908",
+   "source_site": "541044",
+   "target_site": "542012",
+   "source_alert": 4972,
+   "target_alert": 4908,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542012.0.R.4908.md"
+   ]
+  },
+  {
+   "source": "539180.0.R.812",
+   "target": "542012.0.R.4908",
+   "source_site": "539180",
+   "target_site": "542012",
+   "source_alert": 812,
+   "target_alert": 4908,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542012.0.R.4908.md"
+   ]
+  },
+  {
+   "source": "541063.0.R.6876",
+   "target": "541063.0.B.6877",
+   "source_site": "541063",
+   "target_site": "541063",
+   "source_alert": 6876,
+   "target_alert": 6877,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": true,
+   "same_site": true,
+   "evidence": [
+    "BF_541063.0.B.6877.md"
+   ]
+  },
+  {
+   "source": "41533.0.R.6873",
+   "target": "541063.0.B.6877",
+   "source_site": "41533",
+   "target_site": "541063",
+   "source_alert": 6873,
+   "target_alert": 6877,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541063.0.B.6877.md"
+   ]
+  },
+  {
+   "source": "41531.0.B.6869",
+   "target": "541063.0.B.6877",
+   "source_site": "41531",
+   "target_site": "541063",
+   "source_alert": 6869,
+   "target_alert": 6877,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541063.0.B.6877.md"
+   ]
+  },
+  {
+   "source": "41537.0.R.6861",
+   "target": "541063.0.B.6877",
+   "source_site": "41537",
+   "target_site": "541063",
+   "source_alert": 6861,
+   "target_alert": 6877,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541063.0.B.6877.md"
+   ]
+  },
+  {
+   "source": "540667.0.R.4816",
+   "target": "140024.0.B.4848",
+   "source_site": "540667",
+   "target_site": "140024",
+   "source_alert": 4816,
+   "target_alert": 4848,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.B.4848.md"
+   ]
+  },
+  {
+   "source": "531051.0.R.5104",
+   "target": "140024.0.B.4848",
+   "source_site": "531051",
+   "target_site": "140024",
+   "source_alert": 5104,
+   "target_alert": 4848,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.B.4848.md"
+   ]
+  },
+  {
+   "source": "540824.0.B.4842",
+   "target": "140024.0.R.4846",
+   "source_site": "540824",
+   "target_site": "140024",
+   "source_alert": 4842,
+   "target_alert": 4846,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.R.4846.md"
+   ]
+  },
+  {
+   "source": "540824.0.B.4842",
+   "target": "585033.1.B.4846",
+   "source_site": "540824",
+   "target_site": "585033",
+   "source_alert": 4842,
+   "target_alert": 4846,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.R.4846.md"
+   ]
+  },
+  {
+   "source": "539214.0.B.4782",
+   "target": "140024.0.R.4846",
+   "source_site": "539214",
+   "target_site": "140024",
+   "source_alert": 4782,
+   "target_alert": 4846,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.R.4846.md"
+   ]
+  },
+  {
+   "source": "539214.0.B.4782",
+   "target": "585033.1.B.4846",
+   "source_site": "539214",
+   "target_site": "585033",
+   "source_alert": 4782,
+   "target_alert": 4846,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.R.4846.md"
+   ]
+  },
+  {
+   "source": "540718.0.B.4069",
+   "target": "540718.0.R.4068",
+   "source_site": "540718",
+   "target_site": "540718",
+   "source_alert": 4069,
+   "target_alert": 4068,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": true,
+   "evidence": [
+    "BF_540718.0.R.4068.md"
+   ]
+  },
+  {
+   "source": "540722.0.B.4064",
+   "target": "540718.0.R.4068",
+   "source_site": "540722",
+   "target_site": "540718",
+   "source_alert": 4064,
+   "target_alert": 4068,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540718.0.R.4068.md"
+   ]
+  },
+  {
+   "source": "540825.0.B.4845",
+   "target": "140024.0.H.4847",
+   "source_site": "540825",
+   "target_site": "140024",
+   "source_alert": 4845,
+   "target_alert": 4847,
+   "source_type": "Battery",
+   "target_type": "Water Level",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.H.4847.md"
+   ]
+  },
+  {
+   "source": "540825.0.R.4843",
+   "target": "140024.0.H.4847",
+   "source_site": "540825",
+   "target_site": "140024",
+   "source_alert": 4843,
+   "target_alert": 4847,
+   "source_type": "Rainfall",
+   "target_type": "Water Level",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.H.4847.md"
+   ]
+  },
+  {
+   "source": "540806.0.B.4839",
+   "target": "140024.0.H.4847",
+   "source_site": "540806",
+   "target_site": "140024",
+   "source_alert": 4839,
+   "target_alert": 4847,
+   "source_type": "Battery",
+   "target_type": "Water Level",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.H.4847.md"
+   ]
+  },
+  {
+   "source": "540666.0.B.4815",
+   "target": "140024.0.H.4847",
+   "source_site": "540666",
+   "target_site": "140024",
+   "source_alert": 4815,
+   "target_alert": 4847,
+   "source_type": "Battery",
+   "target_type": "Water Level",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.H.4847.md"
+   ]
+  },
+  {
+   "source": "515004.1.R.4815",
+   "target": "140024.0.H.4847",
+   "source_site": "515004",
+   "target_site": "140024",
+   "source_alert": 4815,
+   "target_alert": 4847,
+   "source_type": "Rainfall",
+   "target_type": "Water Level",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.H.4847.md"
+   ]
+  },
+  {
+   "source": "539212.0.R.4783",
+   "target": "140024.0.H.4847",
+   "source_site": "539212",
+   "target_site": "140024",
+   "source_alert": 4783,
+   "target_alert": 4847,
+   "source_type": "Rainfall",
+   "target_type": "Water Level",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.H.4847.md"
+   ]
+  },
+  {
+   "source": "539150.0.R.4719",
+   "target": "140024.0.H.4847",
+   "source_site": "539150",
+   "target_site": "140024",
+   "source_alert": 4719,
+   "target_alert": 4847,
+   "source_type": "Rainfall",
+   "target_type": "Water Level",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.H.4847.md"
+   ]
+  },
+  {
+   "source": "539222.0.B.4335",
+   "target": "140024.0.H.4847",
+   "source_site": "539222",
+   "target_site": "140024",
+   "source_alert": 4335,
+   "target_alert": 4847,
+   "source_type": "Battery",
+   "target_type": "Water Level",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_140024.0.H.4847.md"
+   ]
+  },
+  {
+   "source": "541119.0.B.4958",
+   "target": "541120.0.R.4959",
+   "source_site": "541119",
+   "target_site": "541120",
+   "source_alert": 4958,
+   "target_alert": 4959,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541120.0.R.4959.md"
+   ]
+  },
+  {
+   "source": "541119.0.R.4957",
+   "target": "541120.0.R.4959",
+   "source_site": "541119",
+   "target_site": "541120",
+   "source_alert": 4957,
+   "target_alert": 4959,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541120.0.R.4959.md"
+   ]
+  },
+  {
+   "source": "541117.0.R.4951",
+   "target": "541120.0.R.4959",
+   "source_site": "541117",
+   "target_site": "541120",
+   "source_alert": 4951,
+   "target_alert": 4959,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541120.0.R.4959.md"
+   ]
+  },
+  {
+   "source": "84144.1.B.4943",
+   "target": "541120.0.R.4959",
+   "source_site": "84144",
+   "target_site": "541120",
+   "source_alert": 4943,
+   "target_alert": 4959,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541120.0.R.4959.md"
+   ]
+  },
+  {
+   "source": "540641.0.B.4703",
+   "target": "541120.0.R.4959",
+   "source_site": "540641",
+   "target_site": "541120",
+   "source_alert": 4703,
+   "target_alert": 4959,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541120.0.R.4959.md"
+   ]
+  },
+  {
+   "source": "541041.0.B.6122",
+   "target": "41551.0.R.6123",
+   "source_site": "541041",
+   "target_site": "41551",
+   "source_alert": 6122,
+   "target_alert": 6123,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_41551.0.R.6123.md"
+   ]
+  },
+  {
+   "source": "40906.0.B.6091",
+   "target": "41551.0.R.6123",
+   "source_site": "40906",
+   "target_site": "41551",
+   "source_alert": 6091,
+   "target_alert": 6123,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_41551.0.R.6123.md"
+   ]
+  },
+  {
+   "source": "535092.0.B.5867",
+   "target": "41551.0.R.6123",
+   "source_site": "535092",
+   "target_site": "41551",
+   "source_alert": 5867,
+   "target_alert": 6123,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_41551.0.R.6123.md"
+   ]
+  },
+  {
+   "source": "540677.0.R.5611",
+   "target": "41551.0.R.6123",
+   "source_site": "540677",
+   "target_site": "41551",
+   "source_alert": 5611,
+   "target_alert": 6123,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_41551.0.R.6123.md"
+   ]
+  },
+  {
+   "source": "540528.0.R.4009",
+   "target": "540529.0.H.4013",
+   "source_site": "540528",
+   "target_site": "540529",
+   "source_alert": 4009,
+   "target_alert": 4013,
+   "source_type": "Rainfall",
+   "target_type": "Water Level",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540529.0.H.4013.md"
+   ]
+  },
+  {
+   "source": "540519.0.R.4024",
+   "target": "540519.0.B.4025",
+   "source_site": "540519",
+   "target_site": "540519",
+   "source_alert": 4024,
+   "target_alert": 4025,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": true,
+   "same_site": true,
+   "evidence": [
+    "BF_540519.0.B.4025.md"
+   ]
+  },
+  {
+   "source": "540528.0.R.4009",
+   "target": "540519.0.B.4025",
+   "source_site": "540528",
+   "target_site": "540519",
+   "source_alert": 4009,
+   "target_alert": 4025,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540519.0.B.4025.md"
+   ]
+  },
+  {
+   "source": "541063.0.B.6877",
+   "target": "541063.0.R.6876",
+   "source_site": "541063",
+   "target_site": "541063",
+   "source_alert": 6877,
+   "target_alert": 6876,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": true,
+   "evidence": [
+    "BF_541063.0.R.6876.md"
+   ]
+  },
+  {
+   "source": "41535.0.B.6872",
+   "target": "541063.0.R.6876",
+   "source_site": "41535",
+   "target_site": "541063",
+   "source_alert": 6872,
+   "target_alert": 6876,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541063.0.R.6876.md"
+   ]
+  },
+  {
+   "source": "41532.0.B.6860",
+   "target": "541063.0.R.6876",
+   "source_site": "41532",
+   "target_site": "541063",
+   "source_alert": 6860,
+   "target_alert": 6876,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541063.0.R.6876.md"
+   ]
+  },
+  {
+   "source": "31205.0.R.6812",
+   "target": "541063.0.R.6876",
+   "source_site": "31205",
+   "target_site": "541063",
+   "source_alert": 6812,
+   "target_alert": 6876,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541063.0.R.6876.md"
+   ]
+  },
+  {
+   "source": "540795.0.R.4828",
+   "target": "541063.0.R.6876",
+   "source_site": "540795",
+   "target_site": "541063",
+   "source_alert": 4828,
+   "target_alert": 6876,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541063.0.R.6876.md"
+   ]
+  },
+  {
+   "source": "540519.0.B.4025",
+   "target": "540519.0.R.4024",
+   "source_site": "540519",
+   "target_site": "540519",
+   "source_alert": 4025,
+   "target_alert": 4024,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": true,
+   "evidence": [
+    "BF_540519.0.R.4024.md"
+   ]
+  },
+  {
+   "source": "540521.0.R.4026",
+   "target": "540519.0.R.4024",
+   "source_site": "540521",
+   "target_site": "540519",
+   "source_alert": 4026,
+   "target_alert": 4024,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540519.0.R.4024.md"
+   ]
+  },
+  {
+   "source": "540523.0.R.4028",
+   "target": "540519.0.R.4024",
+   "source_site": "540523",
+   "target_site": "540519",
+   "source_alert": 4028,
+   "target_alert": 4024,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540519.0.R.4024.md"
+   ]
+  },
+  {
+   "source": "540527.0.B.4008",
+   "target": "540519.0.R.4024",
+   "source_site": "540527",
+   "target_site": "540519",
+   "source_alert": 4008,
+   "target_alert": 4024,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540519.0.R.4024.md"
+   ]
+  },
+  {
+   "source": "540439.0.R.1976",
+   "target": "540519.0.R.4024",
+   "source_site": "540439",
+   "target_site": "540519",
+   "source_alert": 1976,
+   "target_alert": 4024,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540519.0.R.4024.md"
+   ]
+  },
+  {
+   "source": "540571.0.B.4040",
+   "target": "541106.0.R.4041",
+   "source_site": "540571",
+   "target_site": "541106",
+   "source_alert": 4040,
+   "target_alert": 4041,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541106.0.R.4041.md"
+   ]
+  },
+  {
+   "source": "540601.0.R.4043",
+   "target": "541106.0.R.4041",
+   "source_site": "540601",
+   "target_site": "541106",
+   "source_alert": 4043,
+   "target_alert": 4041,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541106.0.R.4041.md"
+   ]
+  },
+  {
+   "source": "540602.0.R.4045",
+   "target": "541106.0.R.4041",
+   "source_site": "540602",
+   "target_site": "541106",
+   "source_alert": 4045,
+   "target_alert": 4041,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541106.0.R.4041.md"
+   ]
+  },
+  {
+   "source": "540567.0.R.4033",
+   "target": "541106.0.R.4041",
+   "source_site": "540567",
+   "target_site": "541106",
+   "source_alert": 4033,
+   "target_alert": 4041,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541106.0.R.4041.md"
+   ]
+  },
+  {
+   "source": "540716.0.B.4073",
+   "target": "541106.0.R.4041",
+   "source_site": "540716",
+   "target_site": "541106",
+   "source_alert": 4073,
+   "target_alert": 4041,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_541106.0.R.4041.md"
+   ]
+  },
+  {
+   "source": "541116.0.R.4504",
+   "target": "541116.0.B.4505",
+   "source_site": "541116",
+   "target_site": "541116",
+   "source_alert": 4504,
+   "target_alert": 4505,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": true,
+   "evidence": [
+    "BF_541116.0.B.4505.md"
+   ]
+  },
+  {
+   "source": "540148.0.R.6553",
+   "target": "541116.0.B.4505",
+   "source_site": "540148",
+   "target_site": "541116",
+   "source_alert": 6553,
+   "target_alert": 4505,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541116.0.B.4505.md"
+   ]
+  },
+  {
+   "source": "539146.0.R.4704",
+   "target": "541120.0.B.4960",
+   "source_site": "539146",
+   "target_site": "541120",
+   "source_alert": 4704,
+   "target_alert": 4960,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541120.0.B.4960.md"
+   ]
+  },
+  {
+   "source": "540527.0.B.4008",
+   "target": "540529.0.R.4012",
+   "source_site": "540527",
+   "target_site": "540529",
+   "source_alert": 4008,
+   "target_alert": 4012,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540529.0.R.4012.md"
+   ]
+  },
+  {
+   "source": "540534.0.R.4004",
+   "target": "540529.0.R.4012",
+   "source_site": "540534",
+   "target_site": "540529",
+   "source_alert": 4004,
+   "target_alert": 4012,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540529.0.R.4012.md"
+   ]
+  },
+  {
+   "source": "540523.0.R.4028",
+   "target": "540529.0.R.4012",
+   "source_site": "540523",
+   "target_site": "540529",
+   "source_alert": 4028,
+   "target_alert": 4012,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540529.0.R.4012.md"
+   ]
+  },
+  {
+   "source": "540789.0.B.4076",
+   "target": "540529.0.R.4012",
+   "source_site": "540789",
+   "target_site": "540529",
+   "source_alert": 4076,
+   "target_alert": 4012,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540529.0.R.4012.md"
+   ]
+  },
+  {
+   "source": "540739.0.B.1964",
+   "target": "540529.0.R.4012",
+   "source_site": "540739",
+   "target_site": "540529",
+   "source_alert": 1964,
+   "target_alert": 4012,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540529.0.R.4012.md"
+   ]
+  },
+  {
+   "source": "542016.0.B.4928",
+   "target": "542024.0.B.4930",
+   "source_site": "542016",
+   "target_site": "542024",
+   "source_alert": 4928,
+   "target_alert": 4930,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542024.0.B.4930.md"
+   ]
+  },
+  {
+   "source": "41090.0.R.4938",
+   "target": "542024.0.B.4930",
+   "source_site": "41090",
+   "target_site": "542024",
+   "source_alert": 4938,
+   "target_alert": 4930,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542024.0.B.4930.md"
+   ]
+  },
+  {
+   "source": "540708.0.B.5630",
+   "target": "540767.0.R.5631",
+   "source_site": "540708",
+   "target_site": "540767",
+   "source_alert": 5630,
+   "target_alert": 5631,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540767.0.R.5631.md"
+   ]
+  },
+  {
+   "source": "540706.0.B.5627",
+   "target": "540767.0.R.5631",
+   "source_site": "540706",
+   "target_site": "540767",
+   "source_alert": 5627,
+   "target_alert": 5631,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540767.0.R.5631.md"
+   ]
+  },
+  {
+   "source": "540536.0.B.5599",
+   "target": "540767.0.R.5631",
+   "source_site": "540536",
+   "target_site": "540767",
+   "source_alert": 5599,
+   "target_alert": 5631,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540767.0.R.5631.md"
+   ]
+  },
+  {
+   "source": "540425.0.B.5567",
+   "target": "540767.0.R.5631",
+   "source_site": "540425",
+   "target_site": "540767",
+   "source_alert": 5567,
+   "target_alert": 5631,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540767.0.R.5631.md"
+   ]
+  },
+  {
+   "source": "541042.0.B.6116",
+   "target": "542022.0.B.6132",
+   "source_site": "541042",
+   "target_site": "542022",
+   "source_alert": 6116,
+   "target_alert": 6132,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542022.0.B.6132.md"
+   ]
+  },
+  {
+   "source": "541046.0.R.6100",
+   "target": "542022.0.B.6132",
+   "source_site": "541046",
+   "target_site": "542022",
+   "source_alert": 6100,
+   "target_alert": 6132,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542022.0.B.6132.md"
+   ]
+  },
+  {
+   "source": "540687.0.R.5620",
+   "target": "542022.0.B.6132",
+   "source_site": "540687",
+   "target_site": "542022",
+   "source_alert": 5620,
+   "target_alert": 6132,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542022.0.B.6132.md"
+   ]
+  },
+  {
+   "source": "540523.0.R.4028",
+   "target": "540523.0.B.4029",
+   "source_site": "540523",
+   "target_site": "540523",
+   "source_alert": 4028,
+   "target_alert": 4029,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": true,
+   "evidence": [
+    "BF_540523.0.B.4029.md"
+   ]
+  },
+  {
+   "source": "540518.0.R.4021",
+   "target": "540523.0.B.4029",
+   "source_site": "540518",
+   "target_site": "540523",
+   "source_alert": 4021,
+   "target_alert": 4029,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540523.0.B.4029.md"
+   ]
+  },
+  {
+   "source": "540529.0.H.4013",
+   "target": "540523.0.B.4029",
+   "source_site": "540529",
+   "target_site": "540523",
+   "source_alert": 4013,
+   "target_alert": 4029,
+   "source_type": "Water Level",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540523.0.B.4029.md"
+   ]
+  },
+  {
+   "source": "542019.0.B.6141",
+   "target": "542025.0.B.6143",
+   "source_site": "542019",
+   "target_site": "542025",
+   "source_alert": 6141,
+   "target_alert": 6143,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542025.0.B.6143.md"
+   ]
+  },
+  {
+   "source": "542020.0.B.6135",
+   "target": "542025.0.B.6143",
+   "source_site": "542020",
+   "target_site": "542025",
+   "source_alert": 6135,
+   "target_alert": 6143,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542025.0.B.6143.md"
+   ]
+  },
+  {
+   "source": "40902.0.B.6079",
+   "target": "542025.0.B.6143",
+   "source_site": "40902",
+   "target_site": "542025",
+   "source_alert": 6079,
+   "target_alert": 6143,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542025.0.B.6143.md"
+   ]
+  },
+  {
+   "source": "540767.0.R.5631",
+   "target": "542025.0.B.6143",
+   "source_site": "540767",
+   "target_site": "542025",
+   "source_alert": 5631,
+   "target_alert": 6143,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542025.0.B.6143.md"
+   ]
+  },
+  {
+   "source": "542016.0.B.4928",
+   "target": "542024.0.R.4929",
+   "source_site": "542016",
+   "target_site": "542024",
+   "source_alert": 4928,
+   "target_alert": 4929,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542024.0.R.4929.md"
+   ]
+  },
+  {
+   "source": "541121.0.R.4961",
+   "target": "542024.0.R.4929",
+   "source_site": "541121",
+   "target_site": "542024",
+   "source_alert": 4961,
+   "target_alert": 4929,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_542024.0.R.4929.md"
+   ]
+  },
+  {
+   "source": "535088.0.B.5953",
+   "target": "542024.0.R.4929",
+   "source_site": "535088",
+   "target_site": "542024",
+   "source_alert": 5953,
+   "target_alert": 4929,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542024.0.R.4929.md"
+   ]
+  },
+  {
+   "source": "540602.0.B.4046",
+   "target": "540600.0.R.4047",
+   "source_site": "540602",
+   "target_site": "540600",
+   "source_alert": 4046,
+   "target_alert": 4047,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540600.0.R.4047.md"
+   ]
+  },
+  {
+   "source": "540602.0.R.4045",
+   "target": "540600.0.R.4047",
+   "source_site": "540602",
+   "target_site": "540600",
+   "source_alert": 4045,
+   "target_alert": 4047,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540600.0.R.4047.md"
+   ]
+  },
+  {
+   "source": "540601.0.R.4043",
+   "target": "540600.0.R.4047",
+   "source_site": "540601",
+   "target_site": "540600",
+   "source_alert": 4043,
+   "target_alert": 4047,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540600.0.R.4047.md"
+   ]
+  },
+  {
+   "source": "540571.0.R.4039",
+   "target": "540600.0.R.4047",
+   "source_site": "540571",
+   "target_site": "540600",
+   "source_alert": 4039,
+   "target_alert": 4047,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540600.0.R.4047.md"
+   ]
+  },
+  {
+   "source": "540829.0.R.4079",
+   "target": "540600.0.R.4047",
+   "source_site": "540829",
+   "target_site": "540600",
+   "source_alert": 4079,
+   "target_alert": 4047,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540600.0.R.4047.md"
+   ]
+  },
+  {
+   "source": "540789.0.B.4076",
+   "target": "540828.0.R.4077",
+   "source_site": "540789",
+   "target_site": "540828",
+   "source_alert": 4076,
+   "target_alert": 4077,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540828.0.R.4077.md"
+   ]
+  },
+  {
+   "source": "540829.0.R.4079",
+   "target": "540828.0.R.4077",
+   "source_site": "540829",
+   "target_site": "540828",
+   "source_alert": 4079,
+   "target_alert": 4077,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540828.0.R.4077.md"
+   ]
+  },
+  {
+   "source": "540716.0.B.4073",
+   "target": "540828.0.R.4077",
+   "source_site": "540716",
+   "target_site": "540828",
+   "source_alert": 4073,
+   "target_alert": 4077,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540828.0.R.4077.md"
+   ]
+  },
+  {
+   "source": "540718.0.B.4069",
+   "target": "540828.0.R.4077",
+   "source_site": "540718",
+   "target_site": "540828",
+   "source_alert": 4069,
+   "target_alert": 4077,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540828.0.R.4077.md"
+   ]
+  },
+  {
+   "source": "540602.0.R.4045",
+   "target": "540828.0.R.4077",
+   "source_site": "540602",
+   "target_site": "540828",
+   "source_alert": 4045,
+   "target_alert": 4077,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540828.0.R.4077.md"
+   ]
+  },
+  {
+   "source": "40902.0.R.6078",
+   "target": "542025.0.R.6142",
+   "source_site": "40902",
+   "target_site": "542025",
+   "source_alert": 6078,
+   "target_alert": 6142,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542025.0.R.6142.md"
+   ]
+  },
+  {
+   "source": "32170.0.B.6014",
+   "target": "542025.0.R.6142",
+   "source_site": "32170",
+   "target_site": "542025",
+   "source_alert": 6014,
+   "target_alert": 6142,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542025.0.R.6142.md"
+   ]
+  },
+  {
+   "source": "540708.0.B.5630",
+   "target": "542025.0.R.6142",
+   "source_site": "540708",
+   "target_site": "542025",
+   "source_alert": 5630,
+   "target_alert": 6142,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542025.0.R.6142.md"
+   ]
+  },
+  {
+   "source": "541113.0.R.4506",
+   "target": "541116.0.R.4504",
+   "source_site": "541113",
+   "target_site": "541116",
+   "source_alert": 4506,
+   "target_alert": 4504,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541116.0.R.4504.md"
+   ]
+  },
+  {
+   "source": "540627.0.B.5528",
+   "target": "541116.0.R.4504",
+   "source_site": "540627",
+   "target_site": "541116",
+   "source_alert": 5528,
+   "target_alert": 4504,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541116.0.R.4504.md"
+   ]
+  },
+  {
+   "source": "540570.0.R.4049",
+   "target": "540600.0.B.4048",
+   "source_site": "540570",
+   "target_site": "540600",
+   "source_alert": 4049,
+   "target_alert": 4048,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540600.0.B.4048.md"
+   ]
+  },
+  {
+   "source": "540567.0.B.4035",
+   "target": "540571.0.R.4039",
+   "source_site": "540567",
+   "target_site": "540571",
+   "source_alert": 4035,
+   "target_alert": 4039,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540571.0.R.4039.md"
+   ]
+  },
+  {
+   "source": "540600.0.R.4047",
+   "target": "540571.0.R.4039",
+   "source_site": "540600",
+   "target_site": "540571",
+   "source_alert": 4047,
+   "target_alert": 4039,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540571.0.R.4039.md"
+   ]
+  },
+  {
+   "source": "540720.0.H.4055",
+   "target": "540571.0.R.4039",
+   "source_site": "540720",
+   "target_site": "540571",
+   "source_alert": 4055,
+   "target_alert": 4039,
+   "source_type": "Water Level",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540571.0.R.4039.md"
+   ]
+  },
+  {
+   "source": "540717.0.B.4071",
+   "target": "540571.0.R.4039",
+   "source_site": "540717",
+   "target_site": "540571",
+   "source_alert": 4071,
+   "target_alert": 4039,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540571.0.R.4039.md"
+   ]
+  },
+  {
+   "source": "558081.1.B.3451",
+   "target": "558081.1.R.3450",
+   "source_site": "558081",
+   "target_site": "558081",
+   "source_alert": 3451,
+   "target_alert": 3450,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": true,
+   "evidence": [
+    "BF_558081.1.R.3450.md"
+   ]
+  },
+  {
+   "source": "540835.0.B.2426",
+   "target": "558081.1.R.3450",
+   "source_site": "540835",
+   "target_site": "558081",
+   "source_alert": 2426,
+   "target_alert": 3450,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_558081.1.R.3450.md"
+   ]
+  },
+  {
+   "source": "540766.0.R.5633",
+   "target": "540767.0.B.5632",
+   "source_site": "540766",
+   "target_site": "540767",
+   "source_alert": 5633,
+   "target_alert": 5632,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540767.0.B.5632.md"
+   ]
+  },
+  {
+   "source": "541143.0.R.5760",
+   "target": "540767.0.B.5632",
+   "source_site": "541143",
+   "target_site": "540767",
+   "source_alert": 5760,
+   "target_alert": 5632,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540767.0.B.5632.md"
+   ]
+  },
+  {
+   "source": "540521.0.R.4026",
+   "target": "540521.0.B.4027",
+   "source_site": "540521",
+   "target_site": "540521",
+   "source_alert": 4026,
+   "target_alert": 4027,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": true,
+   "evidence": [
+    "BF_540521.0.B.4027.md"
+   ]
+  },
+  {
+   "source": "540445.0.R.1979",
+   "target": "540521.0.B.4027",
+   "source_site": "540445",
+   "target_site": "540521",
+   "source_alert": 1979,
+   "target_alert": 4027,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540521.0.B.4027.md"
+   ]
+  },
+  {
+   "source": "540829.0.R.4079",
+   "target": "540828.0.B.4078",
+   "source_site": "540829",
+   "target_site": "540828",
+   "source_alert": 4079,
+   "target_alert": 4078,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540828.0.B.4078.md"
+   ]
+  },
+  {
+   "source": "540789.0.B.4076",
+   "target": "540828.0.B.4078",
+   "source_site": "540789",
+   "target_site": "540828",
+   "source_alert": 4076,
+   "target_alert": 4078,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540828.0.B.4078.md"
+   ]
+  },
+  {
+   "source": "540789.0.R.4074",
+   "target": "540828.0.B.4078",
+   "source_site": "540789",
+   "target_site": "540828",
+   "source_alert": 4074,
+   "target_alert": 4078,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540828.0.B.4078.md"
+   ]
+  },
+  {
+   "source": "540717.0.R.4070",
+   "target": "540828.0.B.4078",
+   "source_site": "540717",
+   "target_site": "540828",
+   "source_alert": 4070,
+   "target_alert": 4078,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540828.0.B.4078.md"
+   ]
+  },
+  {
+   "source": "540602.0.B.4046",
+   "target": "540828.0.B.4078",
+   "source_site": "540602",
+   "target_site": "540828",
+   "source_alert": 4046,
+   "target_alert": 4078,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540828.0.B.4078.md"
+   ]
+  },
+  {
+   "source": "540601.0.R.4043",
+   "target": "541106.0.B.4042",
+   "source_site": "540601",
+   "target_site": "541106",
+   "source_alert": 4043,
+   "target_alert": 4042,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541106.0.B.4042.md"
+   ]
+  },
+  {
+   "source": "540567.0.H.4034",
+   "target": "541106.0.B.4042",
+   "source_site": "540567",
+   "target_site": "541106",
+   "source_alert": 4034,
+   "target_alert": 4042,
+   "source_type": "Water Level",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541106.0.B.4042.md"
+   ]
+  },
+  {
+   "source": "540789.0.R.4074",
+   "target": "541106.0.B.4042",
+   "source_site": "540789",
+   "target_site": "541106",
+   "source_alert": 4074,
+   "target_alert": 4042,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541106.0.B.4042.md"
+   ]
+  },
+  {
+   "source": "541155.0.B.6130",
+   "target": "542022.0.R.6131",
+   "source_site": "541155",
+   "target_site": "542022",
+   "source_alert": 6130,
+   "target_alert": 6131,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542022.0.R.6131.md"
+   ]
+  },
+  {
+   "source": "32172.2.B.6003",
+   "target": "542022.0.R.6131",
+   "source_site": "32172",
+   "target_site": "542022",
+   "source_alert": 6003,
+   "target_alert": 6131,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542022.0.R.6131.md"
+   ]
+  },
+  {
+   "source": "540686.0.B.5619",
+   "target": "542022.0.R.6131",
+   "source_site": "540686",
+   "target_site": "542022",
+   "source_alert": 5619,
+   "target_alert": 6131,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542022.0.R.6131.md"
+   ]
+  },
+  {
+   "source": "531052.0.R.5107",
+   "target": "542022.0.R.6131",
+   "source_site": "531052",
+   "target_site": "542022",
+   "source_alert": 5107,
+   "target_alert": 6131,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542022.0.R.6131.md"
+   ]
+  },
+  {
+   "source": "540250.0.R.2035",
+   "target": "542022.0.R.6131",
+   "source_site": "540250",
+   "target_site": "542022",
+   "source_alert": 2035,
+   "target_alert": 6131,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_542022.0.R.6131.md"
+   ]
+  },
+  {
+   "source": "541153.0.R.6102",
+   "target": "541153.0.B.6103",
+   "source_site": "541153",
+   "target_site": "541153",
+   "source_alert": 6102,
+   "target_alert": 6103,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": true,
+   "evidence": [
+    "BF_541153.0.B.6103.md"
+   ]
+  },
+  {
+   "source": "541046.0.B.6101",
+   "target": "541153.0.B.6103",
+   "source_site": "541046",
+   "target_site": "541153",
+   "source_alert": 6101,
+   "target_alert": 6103,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541153.0.B.6103.md"
+   ]
+  },
+  {
+   "source": "540499.0.B.5591",
+   "target": "541153.0.B.6103",
+   "source_site": "540499",
+   "target_site": "541153",
+   "source_alert": 5591,
+   "target_alert": 6103,
+   "source_type": "Battery",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541153.0.B.6103.md"
+   ]
+  },
+  {
+   "source": "540566.0.R.4030",
+   "target": "540523.0.R.4028",
+   "source_site": "540566",
+   "target_site": "540523",
+   "source_alert": 4030,
+   "target_alert": 4028,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540523.0.R.4028.md"
+   ]
+  },
+  {
+   "source": "540519.0.R.4024",
+   "target": "540523.0.R.4028",
+   "source_site": "540519",
+   "target_site": "540523",
+   "source_alert": 4024,
+   "target_alert": 4028,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540523.0.R.4028.md"
+   ]
+  },
+  {
+   "source": "540517.0.B.4020",
+   "target": "540523.0.R.4028",
+   "source_site": "540517",
+   "target_site": "540523",
+   "source_alert": 4020,
+   "target_alert": 4028,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540523.0.R.4028.md"
+   ]
+  },
+  {
+   "source": "540529.0.R.4012",
+   "target": "540523.0.R.4028",
+   "source_site": "540529",
+   "target_site": "540523",
+   "source_alert": 4012,
+   "target_alert": 4028,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540523.0.R.4028.md"
+   ]
+  },
+  {
+   "source": "540519.0.R.4024",
+   "target": "540521.0.R.4026",
+   "source_site": "540519",
+   "target_site": "540521",
+   "source_alert": 4024,
+   "target_alert": 4026,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540521.0.R.4026.md"
+   ]
+  },
+  {
+   "source": "540517.0.R.4018",
+   "target": "540521.0.R.4026",
+   "source_site": "540517",
+   "target_site": "540521",
+   "source_alert": 4018,
+   "target_alert": 4026,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540521.0.R.4026.md"
+   ]
+  },
+  {
+   "source": "540439.0.B.1978",
+   "target": "540521.0.R.4026",
+   "source_site": "540439",
+   "target_site": "540521",
+   "source_alert": 1978,
+   "target_alert": 4026,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540521.0.R.4026.md"
+   ]
+  },
+  {
+   "source": "541120.0.B.4960",
+   "target": "541121.0.R.4961",
+   "source_site": "541120",
+   "target_site": "541121",
+   "source_alert": 4960,
+   "target_alert": 4961,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541121.0.R.4961.md"
+   ]
+  },
+  {
+   "source": "541122.0.B.4965",
+   "target": "541121.0.R.4961",
+   "source_site": "541122",
+   "target_site": "541121",
+   "source_alert": 4965,
+   "target_alert": 4961,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541121.0.R.4961.md"
+   ]
+  },
+  {
+   "source": "541196.0.B.4977",
+   "target": "541121.0.R.4961",
+   "source_site": "541196",
+   "target_site": "541121",
+   "source_alert": 4977,
+   "target_alert": 4961,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541121.0.R.4961.md"
+   ]
+  },
+  {
+   "source": "542024.0.R.4929",
+   "target": "541121.0.R.4961",
+   "source_site": "542024",
+   "target_site": "541121",
+   "source_alert": 4929,
+   "target_alert": 4961,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_541121.0.R.4961.md"
+   ]
+  },
+  {
+   "source": "9988.1.R.5985",
+   "target": "541121.0.R.4961",
+   "source_site": "9988",
+   "target_site": "541121",
+   "source_alert": 5985,
+   "target_alert": 4961,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541121.0.R.4961.md"
+   ]
+  },
+  {
+   "source": "540600.0.B.4048",
+   "target": "540570.0.R.4049",
+   "source_site": "540600",
+   "target_site": "540570",
+   "source_alert": 4048,
+   "target_alert": 4049,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540570.0.R.4049.md"
+   ]
+  },
+  {
+   "source": "540680.0.R.4051",
+   "target": "540570.0.R.4049",
+   "source_site": "540680",
+   "target_site": "540570",
+   "source_alert": 4051,
+   "target_alert": 4049,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540570.0.R.4049.md"
+   ]
+  },
+  {
+   "source": "540680.0.B.4053",
+   "target": "540570.0.R.4049",
+   "source_site": "540680",
+   "target_site": "540570",
+   "source_alert": 4053,
+   "target_alert": 4049,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540570.0.R.4049.md"
+   ]
+  },
+  {
+   "source": "540567.0.R.4033",
+   "target": "540570.0.R.4049",
+   "source_site": "540567",
+   "target_site": "540570",
+   "source_alert": 4033,
+   "target_alert": 4049,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540570.0.R.4049.md"
+   ]
+  },
+  {
+   "source": "540829.0.B.4081",
+   "target": "540570.0.R.4049",
+   "source_site": "540829",
+   "target_site": "540570",
+   "source_alert": 4081,
+   "target_alert": 4049,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540570.0.R.4049.md"
+   ]
+  },
+  {
+   "source": "540273.1.B.2001",
+   "target": "540570.0.R.4049",
+   "source_site": "540273",
+   "target_site": "540570",
+   "source_alert": 2001,
+   "target_alert": 4049,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540570.0.R.4049.md"
+   ]
+  },
+  {
+   "source": "570910.1.B.3328",
+   "target": "558085.1.R.3456",
+   "source_site": "570910",
+   "target_site": "558085",
+   "source_alert": 3328,
+   "target_alert": 3456,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_558085.1.R.3456.md"
+   ]
+  },
+  {
+   "source": "540840.0.B.2432",
+   "target": "558085.1.R.3456",
+   "source_site": "540840",
+   "target_site": "558085",
+   "source_alert": 2432,
+   "target_alert": 3456,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_558085.1.R.3456.md"
+   ]
+  },
+  {
+   "source": "540716.0.R.4072",
+   "target": "540716.0.B.4073",
+   "source_site": "540716",
+   "target_site": "540716",
+   "source_alert": 4072,
+   "target_alert": 4073,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": true,
+   "evidence": [
+    "BF_540716.0.B.4073.md",
+    "SOURCE~4.MD"
+   ]
+  },
+  {
+   "source": "540828.0.R.4077",
+   "target": "540716.0.B.4073",
+   "source_site": "540828",
+   "target_site": "540716",
+   "source_alert": 4077,
+   "target_alert": 4073,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540716.0.B.4073.md",
+    "SOURCE~3.MD"
+   ]
+  },
+  {
+   "source": "540723.0.R.4065",
+   "target": "540716.0.B.4073",
+   "source_site": "540723",
+   "target_site": "540716",
+   "source_alert": 4065,
+   "target_alert": 4073,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540716.0.B.4073.md",
+    "SOURCE~2.MD"
+   ]
+  },
+  {
+   "source": "541106.0.R.4041",
+   "target": "540716.0.B.4073",
+   "source_site": "541106",
+   "target_site": "540716",
+   "source_alert": 4041,
+   "target_alert": 4073,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": true,
+   "same_site": false,
+   "evidence": [
+    "BF_540716.0.B.4073.md",
+    "SOB07D~1.MD"
+   ]
+  },
+  {
+   "source": "540528.0.R.4009",
+   "target": "540716.0.B.4073",
+   "source_site": "540528",
+   "target_site": "540716",
+   "source_alert": 4009,
+   "target_alert": 4073,
+   "source_type": "Rainfall",
+   "target_type": "Battery",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_540716.0.B.4073.md",
+    "SOURCE~1.MD"
+   ]
+  },
+  {
+   "source": "541046.0.R.6100",
+   "target": "541153.0.R.6102",
+   "source_site": "541046",
+   "target_site": "541153",
+   "source_alert": 6100,
+   "target_alert": 6102,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541153.0.R.6102.md"
+   ]
+  },
+  {
+   "source": "540792.0.B.6098",
+   "target": "541153.0.R.6102",
+   "source_site": "540792",
+   "target_site": "541153",
+   "source_alert": 6098,
+   "target_alert": 6102,
+   "source_type": "Battery",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541153.0.R.6102.md"
+   ]
+  },
+  {
+   "source": "40907.0.R.6086",
+   "target": "541153.0.R.6102",
+   "source_site": "40907",
+   "target_site": "541153",
+   "source_alert": 6086,
+   "target_alert": 6102,
+   "source_type": "Rainfall",
+   "target_type": "Rainfall",
+   "reciprocal": false,
+   "same_site": false,
+   "evidence": [
+    "BF_541153.0.R.6102.md"
+   ]
+  }
+ ]
+}
