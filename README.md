@@ -46,7 +46,10 @@ MegaNet/
 │   └── nsw-border/         │  NSW North Coast repeater maps
 │
 ├── docs/                   ← reference documents
-│   └── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
+│   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
+│   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
+│   ├── 357 Filter doco.doc                  (the 1998 first edition of the same spec)
+│   └── aem_Durikai_AL_541134_Rainfall_541134_0_R_5758.csv  (sample ARRO export)
 │
 ├── data/                   ← source + bundled data files
 │   ├── ALL_UNITS.csv                 (legacy field-station source for migrate.html)
@@ -642,7 +645,7 @@ on a narrow window.
 | **Network** | Stations · Network Maps · Networks · Pass Ranges |
 | **Radio investigation** | RF Environment · RF Changes · Interference Workbench · Bit Flipper · Network View |
 | **Live tools** | ALERT Packets · Serial Monitor |
-| **Data & admin** | ARRO Launcher · Export |
+| **Data & admin** | ARRO Launcher · ARRO Data · Export |
 
 The grouping is the point of the second row: RF Environment, RF Changes, the
 Workbench and Bit Flipper are one investigation approached four ways, and
@@ -903,6 +906,95 @@ clutter, climate and refractivity, statistical reliability, real antenna
 patterns, multipath, polarisation, noise floor. Nearly all of those *reduce*
 real-world margin, which is why "indicative" here mostly means **optimistic**:
 a good margin is permission to model the path properly, never a result.
+
+---
+
+### 18. ARRO Data (CSV Import, 357 Filter & Plotting)
+
+A tab for looking at what the sensors actually sent. ARRO exports one CSV per
+sensor; this reads them in the browser, links each one back to its station, runs
+the Bureau's **3-5-7 continuity filter** over it, and draws the result with a
+chart built for finding noise rather than presenting a trend.
+
+Nothing is uploaded. Files are read with `FileReader` and stay in the tab.
+
+**The import knows what it is.** ARRO names its exports
+`aem_Durikai_AL_541134_Rainfall_541134_0_R_5758.csv`, and the last four
+underscore-separated fields are the sensor id `541134.0.R.5758` — the same id
+already carried in `stations.json`. Parsing it links the import to its station
+without anybody choosing one from a list, and the panel then offers the station
+and its ARRO admin page directly. Failing that it falls back to the station
+number, and failing that it says plainly that it is not linked.
+
+**Two things in the sample export are worth knowing about**, because both are
+silent corruption if you assume them away:
+
+- **Rows are newest-first.** The 357 algorithm is defined over an ascending
+  list, so the import sorts — stably, so equal timestamps keep file order.
+- **Values over 999 carry an unquoted thousands separator.** `1,613.0` arrives
+  as two fields and the row is one wider than the header. The columns either
+  side of `Value` are fixed, so the parser anchors head and tail and glues the
+  middle back together. 395 of the sample's 14,942 rows need this; a naive
+  split silently shifts `Unit` into `Data Quality` for every one of them.
+
+**The filter is the spec's, and its parameters are yours.** Steps 3/5/7, the
+2048 rollover ceiling, the four-failure continuity break and the start-continuity
+window are all editable and default to the specification. Both components are
+implemented as written — Establish Start Continuity and Establish Continuity,
+walking the list backwards from the newest reading, with Good / Suspect / Bad
+states and suspects promoted or rejected by what comes after them.
+
+**Order matters more than the spec lets on.** A rain accumulator that wraps and
+one hit by a corrupt packet both look like a long fall, and the sample is full
+of the second kind: 72 mm jumps to 1234 for a single reading and drops straight
+back. Detecting rollovers on the raw series reads all 82 of those spikes as
+wraps and shifts everything after them by 2048 apiece — an annual total of
+6,392 mm at a gauge that actually moved 248. So the spikes go first: the 357
+walk removes them with no rollover help, and only then is a fall between two
+*surviving* readings trustworthy enough to judge. What makes a fall a rollover
+is not its size but the step it leaves behind — `2045 → 2` is a wrap because it
+is really a step of 5, while `1976 → 125` would be a step of 197 and is not.
+With the offsets known the walk runs once more, so continuity carries across the
+seam. On the sample this is the difference between 82 rollovers and none.
+
+**Repeats are not readings.** ARRO re-sends an observation several times — the
+sample carries 14,942 rows across 6,111 distinct timestamps. Anything that does
+not advance the clock is set aside before filtering (`filterOutOfSyncDate()`).
+That leaves one spec-inherent artifact: four re-sends of *one* corrupt packet
+satisfy "any four consecutive data form a continuous set" and survive as a
+series of their own — twelve readings above 1000 mm do exactly this. A
+configurable **minimum gap** collapses them, off by default because it is a
+departure from the spec rather than part of it. At 60 s the sample's kept series
+becomes a strictly monotone accumulation, with the same 248 mm net.
+
+**Raw is never overwritten.** The parsed arrays are written once at import and
+never again; filtering only ever produces a parallel status array. Raw and
+filtered are two views of one import, shown separately or overlaid, because a
+filter you cannot inspect is worse than no filter. Every rejected reading can be
+clicked for its full row and the reason it failed.
+
+**The chart is hand-rolled SVG**, like the rest of the app's charts — no
+library. It carries wheel zoom, drag to pan, drag-to-select zoom, an overview
+strip of the whole record with the visible window on it, a crosshair with a
+hover readout, keyboard pan/zoom, per-series colour and visibility, solo and
+fit, light/dark repaint, and SVG/PNG download. Three readings of the data
+(value, increment, rate per hour), three chart styles (line, step, points) and
+four vertical scales — including **Kept**, which scales to the surviving
+readings so a single 2014 mm spike stops flattening a 300 mm trace, and draws
+the removals that fall outside as triangles on the top edge rather than hiding
+them.
+
+**Scale is handled by drawing pixels, not points.** Each pixel column keeps its
+first, minimum, maximum and last value, so a spike survives at any zoom while
+the drawn point count stays bounded by the width of the chart. The full series
+is kept for filtering and export. Filtering the 14,942-row sample takes ~6 ms.
+
+Exports reuse `csvEscape()` / `dlText()`: **kept** writes the filtered series,
+**verdict** writes every row with the filter's decision against it — which is
+the artifact to keep when the question is what was thrown away and why.
+
+> The specification is in `docs/` (v2.1, May 2009, and the 1998 first edition),
+> along with the sample export used to develop this.
 
 ---
 

@@ -3152,3 +3152,162 @@ code {
   .nv-stage  { height: 68dvh; }
   .nv-detail { width: min(330px, 86%); }
 }
+
+/* ── ARRO Data tab ────────────────────────────────────────────────────────────
+   Same two-column shape as the Network View: a column of controls that stays
+   put, and a chart that takes whatever is left. The chart is the point, so it
+   gets the height and the sidebar scrolls independently. */
+
+.ad-wrap   { padding: .75rem; }
+.ad-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: .75rem;
+  align-items: start;
+}
+.ad-side {
+  height: calc(100dvh - var(--mn-chrome, 150px) - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: .3rem;
+  min-width: 0;
+}
+.ad-main { min-width: 0; }
+
+.ad-drop {
+  border: 1.5px dashed var(--border);
+  border-radius: 9px;
+  background: var(--panel-sub);
+  padding: 1rem .9rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: .85rem;
+}
+.ad-drop--active { border-color: var(--accent); color: var(--accent); background: var(--subtle); }
+
+.ad-note { min-height: 1.1rem; margin: .35rem 0 .1rem; color: var(--muted); }
+.ad-note--bad { color: var(--bad); }
+
+.ad-panel { margin-top: .6rem; padding: .6rem .7rem .7rem; }
+.ad-panel .panel-header { margin-bottom: .35rem; }
+
+/* One import. The colour swatch doubles as the legend key, so it sits with the
+   name rather than in a legend of its own. */
+.ad-series {
+  border-top: 1px solid var(--border);
+  padding: .45rem 0 .5rem;
+}
+.ad-series:first-of-type { border-top: 0; }
+.ad-series--sel { background: var(--subtle); }
+.ad-series-top { display: flex; align-items: center; gap: .35rem; }
+.ad-series-name {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: .87rem;
+}
+.ad-series-meta { color: var(--muted); margin-top: .18rem; display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
+.ad-series-meta select { font-size: .75rem; padding: 0 .15rem; }
+.ad-swatch {
+  width: 20px; height: 20px; padding: 0;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: none; cursor: pointer; flex: none;
+}
+.ad-x {
+  border: 0; background: none; color: var(--muted);
+  cursor: pointer; padding: 0 .25rem; font-size: .9rem; line-height: 1;
+}
+.ad-x:hover { color: var(--bad); }
+.ad-bad-txt { color: var(--bad); }
+.ad-unlinked { color: var(--warn); }
+.ad-warn { color: var(--warn); margin-top: .2rem; }
+
+.ad-cfg-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .5rem; margin: .2rem 0; font-size: .8rem;
+}
+.ad-cfg-row input { width: 84px; }
+.ad-cfg-chk { display: flex; align-items: center; gap: .35rem; font-size: .8rem; margin: .25rem 0; }
+.ad-cfg-note { color: var(--muted); margin: .45rem 0 0; }
+
+.ad-toolbar {
+  display: flex; flex-wrap: wrap; gap: .4rem .5rem;
+  align-items: center; margin-bottom: .5rem;
+}
+.ad-tool-grp { display: flex; gap: .25rem; align-items: center; flex-wrap: wrap; }
+.ad-num { width: 76px; }
+.ad-chk { display: flex; align-items: center; gap: .25rem; font-size: .78rem; color: var(--muted); }
+
+/* Segmented control: one choice out of a few, reading as a single object. */
+.ad-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.ad-seg button {
+  border: 0; border-radius: 0; margin: 0;
+  padding: .26rem .55rem; font-size: .78rem;
+  background: var(--panel); color: var(--muted);
+  border-left: 1px solid var(--border);
+}
+.ad-seg button:first-child { border-left: 0; }
+.ad-seg button.on { background: var(--accent); color: #fff; }
+
+.ad-stage {
+  position: relative;
+  height: clamp(280px, 52dvh, 620px);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  overflow: hidden;
+  touch-action: none;      /* the chart handles its own pan and zoom */
+}
+.ad-stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ad-stage svg { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+.ad-ov {
+  display: block; width: 100%; height: 56px;
+  margin-top: .4rem;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--panel); cursor: ew-resize;
+}
+
+.ad-tip {
+  position: absolute; z-index: 5; pointer-events: none;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 7px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.14);
+  padding: .35rem .5rem; font-size: .76rem; max-width: 300px;
+}
+.ad-tip-t { color: var(--muted); margin-bottom: .15rem; }
+.ad-tip-r { display: flex; align-items: center; gap: .3rem; white-space: nowrap; }
+
+.ad-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+
+.ad-readout {
+  margin-top: .5rem; min-height: 2.6rem;
+  border: 1px solid var(--border); border-radius: 9px;
+  background: var(--panel-sub); padding: .5rem .6rem;
+}
+.ad-read-hover, .ad-stats { display: flex; flex-wrap: wrap; gap: .35rem .9rem; align-items: center; font-size: .8rem; }
+.ad-read-item, .ad-stat { display: flex; align-items: center; gap: .3rem; }
+
+/* The pinned reading: everything the export said about one row, plus why the
+   filter reached the verdict it did. */
+.ad-pin-head { display: flex; align-items: center; gap: .4rem; }
+.ad-pin-head b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ad-pin-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: .1rem .8rem; margin: .35rem 0 .2rem;
+}
+.ad-pin-grid div { display: flex; gap: .35rem; font-size: .8rem; }
+.ad-pin-grid span { color: var(--muted); min-width: 66px; }
+.ad-pin-why { color: var(--muted); }
+.ad-badge { font-size: .7rem; padding: .05rem .4rem; border-radius: 20px; border: 1px solid var(--border); }
+.ad-badge--ok  { color: var(--ok);  border-color: var(--ok); }
+.ad-badge--bad { color: var(--bad); border-color: var(--bad); }
+.ad-badge--dup { color: var(--muted); }
+
+.ad-empty { max-width: 620px; margin: 2rem auto; padding: 1.5rem; }
+.ad-empty h2 { margin: 0 0 .6rem; }
+.ad-empty p { color: var(--muted); margin: .5rem 0; }
+
+@media (max-width: 900px) {
+  .ad-layout { grid-template-columns: 1fr; }
+  .ad-side   { height: auto; overflow: visible; }
+  .ad-stage  { height: 54dvh; }
+}

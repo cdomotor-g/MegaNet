@@ -27,6 +27,7 @@ const TABS = [
   ] },
   { group: 'Data & admin', tabs: [
     { id: 'arro',       label: 'ARRO Launcher',          icon: '🚀' },
+    { id: 'arrodata',   label: 'ARRO Data',              icon: '📊' },
     { id: 'export',     label: 'Export',                 icon: '📤' },
   ] },
 ];
@@ -372,6 +373,10 @@ function toggleTheme() {
   localStorage.setItem('mn-theme', state.theme);
   document.getElementById('btn-theme').textContent = state.theme === 'dark' ? 'Light' : 'Dark';
   if (state.map) { refreshMapLayers(); MapDraw.render(); }
+  // The ARRO chart writes real colour values into its SVG rather than `var(…)`,
+  // so that the PNG export has something to resolve. That is the trade: the
+  // chart has to be told the palette moved.
+  if (state.activeTab === 'arrodata') ArroData.repaint();
 }
 
 // ── File loading ───────────────────────────────────────────────────────────────
@@ -957,6 +962,10 @@ function switchTab(id) {
   // tab is invisible, useless and costs a frame's work every frame. Its own init
   // starts it again when the tab comes back, so this is unconditional.
   NetworkView.stop();
+  // The ARRO Data chart keeps a ResizeObserver on its stage, which the next
+  // render replaces wholesale. Dropping it here stops the observer outliving
+  // the element it was watching.
+  ArroData.stop();
   state.activeTab = id;
   // On a phone the expanded nav is a drawer laid over the content rather than
   // a column beside it (see styles.css). Picking a tab is the end of that
@@ -1017,7 +1026,9 @@ function renderMain() {
   if (!el) return;
   // The ARRO launcher joins these because its raw-id box works with no file
   // loaded at all — only the station search needs stations.json, and it says so.
-  const noDataTabs = ['packets', 'maps', 'serial', 'arro'];
+  // ARRO Data joins them too: a dropped CSV parses and plots on its own, and
+  // only the link back to a station needs the station file.
+  const noDataTabs = ['packets', 'maps', 'serial', 'arro', 'arrodata'];
   if (!state.data && !noDataTabs.includes(state.activeTab)) { el.innerHTML = renderEmpty(); return; }
   switch (state.activeTab) {
     case 'stations':   el.innerHTML = renderStationsHtml();  initStationFilters(); initMap(); break;
@@ -1032,6 +1043,7 @@ function renderMain() {
     case 'packets':    el.innerHTML = Packets.render();       Packets.init();      break;
     case 'serial':     el.innerHTML = Serial.render();        Serial.init();       break;
     case 'arro':       el.innerHTML = renderArroHtml();      initArro();  break;
+    case 'arrodata':   el.innerHTML = ArroData.render();     ArroData.init();     break;
     case 'export':     el.innerHTML = renderExportHtml();                 break;
     default:           el.innerHTML = '<p style="padding:1rem">Unknown tab</p>';
   }
@@ -7085,6 +7097,1703 @@ function arroUseRecent(site, device) {
   if (devEl)  devEl.value  = state.arro.deviceId;
   rerenderArroActions();
 }
+
+// ── ARRO DATA tab (CSV import, 357 filter, plotting) ───────────────────────────
+// ARRO exports one CSV per sensor. This tab reads them in the browser — nothing
+// is uploaded — links each file back to the station that produced it, runs the
+// Bureau's 3-5-7 continuity filter over it, and draws the result.
+//
+// The whole point is *seeing what the filter removed*, so raw and filtered are
+// kept as two views of one immutable import: the parsed arrays are never
+// written to after import, and filtering only ever produces a parallel status
+// array. A filter you cannot inspect is worse than no filter.
+//
+// Reference: "Hydrology Raw Data Filtering Program Specification" v2.1,
+// Commonwealth Bureau of Meteorology, May 2009 (and the 1998 first edition).
+
+const AD_COLORS = ['#0b5cab', '#c7401a', '#107c10', '#7c35a3',
+                   '#b8860b', '#00838f', '#ad1457', '#5d4037',
+                   '#3949ab', '#ef6c00', '#2e7d32', '#6a1b9a'];
+
+// Point status. Ordered so that "kept" is < BAD and the drawing code can test
+// with a single comparison.
+const AD_UNKNOWN = 0, AD_GOOD = 1, AD_SUSPECT = 2, AD_BAD = 3, AD_OOS = 4;
+
+const AD_STATUS_LABEL = {
+  [AD_UNKNOWN]: 'untested',
+  [AD_GOOD]:    'good',
+  [AD_SUSPECT]: 'suspect',
+  [AD_BAD]:     'bad',
+  [AD_OOS]:     'out of sequence',
+};
+
+// Spec defaults, all overridable from the panel — the ticket asks for the steps,
+// the rollover ceiling and the continuity break to be configurable.
+const AD_CFG_DEFAULT = {
+  small:      3,      // <= 3 against the next data
+  medium:     5,      // <= 5 against the next-next
+  large:      7,      // <= 7 against the next-next-next
+  cycle:      2048,   // accumulator counts 0..2047, so it wraps at 2048
+  breakCount: 4,      // four consecutive failures break continuity
+  startTests: 4,      // start-continuity test budget (spec flowchart: testCount > 4)
+  rolloverOn: true,
+  oosOn:      true,   // drop out-of-sequence / duplicate timestamps
+  dedupeOn:   true,
+  minGapSec:  0,      // collapse readings closer together than this (0 = off)
+};
+
+const AD_DAY = 86400000;
+
+// ── module ──
+
+const ArroData = (function () {
+
+  const ad = {
+    series:    [],
+    seq:       0,
+    cfg:       { ...AD_CFG_DEFAULT },
+    view:      null,           // {t0,t1} visible window, ms; null = full extent
+    mode:      'both',         // raw | filtered | both
+    transform: 'value',        // value | increment | rate
+    chartType: 'line',
+    yMode:     'auto',         // auto | zero | manual
+    yMin:      '', yMax: '',
+    showRemoved:  true,
+    showRollover: true,
+    showPoints:   'auto',      // auto | on | off
+    normalise:    false,
+    hover:     null,           // {x,y,t,rows:[]}
+    pin:       null,           // clicked point: {key,i}
+    drag:      null,
+    brush:     false,          // brush-to-zoom armed (else drag pans)
+    ovDrag:    null,
+    w: 900, h: 380,
+    ro:        null,
+    sensorIdx: null,
+    sensorIdxFor: null,
+    busy:      0,
+  };
+
+  // ── CSV parsing ────────────────────────────────────────────────────────────
+
+  // Splits one CSV line, honouring quotes. ARRO does not quote anything, but a
+  // hand-edited file might, and mis-parsing a quoted field is silent corruption.
+  function splitLine(line) {
+    if (line.indexOf('"') < 0) return line.split(',');
+    const out = [];
+    let cur = '', q = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (q) {
+        if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+        else cur += c;
+      } else if (c === '"') q = true;
+      else if (c === ',')  { out.push(cur); cur = ''; }
+      else cur += c;
+    }
+    out.push(cur);
+    return out;
+  }
+
+  // ARRO writes thousands separators into Value without quoting them, so
+  // `1,613.0` arrives as two fields and the row is one wider than the header.
+  // The columns either side of Value are fixed-width, so the surplus can only
+  // belong to Value: anchor the head and the tail, and glue the middle back
+  // together. 395 of the 14,942 rows in the sample export need this.
+  function reconcile(fields, nHead, valueIdx) {
+    if (fields.length === nHead) return fields;
+    if (fields.length < nHead || valueIdx < 0) return null;
+    const tail = nHead - valueIdx - 1;
+    const glued = fields.slice(valueIdx, fields.length - tail).join('').replace(/,/g, '');
+    return [...fields.slice(0, valueIdx), glued, ...fields.slice(fields.length - tail)];
+  }
+
+  // "2026-08-07 15:38:13" — ARRO exports station local time with no zone, and
+  // reads it back the same way, so it is parsed as local rather than shifted
+  // into UTC. Also accepts ISO with a T, and dd/mm/yyyy.
+  function parseTs(s) {
+    s = (s || '').trim();
+    if (!s) return NaN;
+    let m = s.match(/^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d)(?::(\d\d))?/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)).getTime();
+    m = s.match(/^(\d\d?)\/(\d\d?)\/(\d{4})[ T](\d\d):(\d\d)(?::(\d\d))?/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0)).getTime();
+    const t = Date.parse(s);
+    return isNaN(t) ? NaN : t;
+  }
+
+  function parseCsv(text) {
+    const warn = [];
+    const lines = text.split(/\r?\n/);
+    let h = 0;
+    while (h < lines.length && !lines[h].trim()) h++;
+    if (h >= lines.length) return { error: 'The file is empty.' };
+
+    const head  = splitLine(lines[h]).map(s => s.trim().toLowerCase().replace(/^﻿/, ''));
+    const col   = name => head.findIndex(c => c === name);
+    const iRead = col('reading'), iVal = col('value');
+    if (iRead < 0 || iVal < 0) {
+      return { error: 'Not an ARRO sensor export — expected "Reading" and "Value" columns, '
+                    + `got: ${head.join(', ') || '(no header)'}` };
+    }
+    const iRecv = col('receive'), iUnit = col('unit');
+    const iQual = col('data quality'), iRaw = col('raw value');
+
+    const n0 = lines.length - h - 1;
+    const t = new Float64Array(n0), tr = new Float64Array(n0);
+    const v = new Float64Array(n0), raw = new Float64Array(n0);
+    const q = new Uint8Array(n0);
+    const qcodes = [], qmap = new Map();
+    const units = new Map();
+    let n = 0, skipped = 0, ragged = 0;
+
+    for (let li = h + 1; li < lines.length; li++) {
+      const line = lines[li];
+      if (!line.trim()) continue;
+      let f = splitLine(line);
+      if (f.length !== head.length) {
+        const fixed = reconcile(f, head.length, iVal);
+        if (!fixed) { skipped++; continue; }
+        ragged++; f = fixed;
+      }
+      const ts = parseTs(f[iRead]);
+      const val = parseFloat(f[iVal]);
+      if (isNaN(ts) || isNaN(val)) { skipped++; continue; }
+
+      t[n]  = ts;
+      tr[n] = iRecv >= 0 ? (parseTs(f[iRecv]) || ts) : ts;
+      v[n]  = val;
+      raw[n] = iRaw >= 0 ? (parseFloat(String(f[iRaw]).replace(/,/g, '')) ?? val) : val;
+      if (isNaN(raw[n])) raw[n] = val;
+
+      const code = iQual >= 0 ? (f[iQual] || '').trim() : '';
+      let qi = qmap.get(code);
+      if (qi === undefined) { qi = qcodes.length; qcodes.push(code); qmap.set(code, qi); }
+      q[n] = qi;
+
+      if (iUnit >= 0) {
+        const u = (f[iUnit] || '').trim();
+        if (u) units.set(u, (units.get(u) || 0) + 1);
+      }
+      n++;
+    }
+
+    if (!n) return { error: 'No readable rows — every line failed to parse.' };
+    if (ragged)  warn.push(`${ragged} row${ragged === 1 ? '' : 's'} carried an unquoted thousands separator in Value and were re-joined.`);
+    if (skipped) warn.push(`${skipped} row${skipped === 1 ? '' : 's'} could not be parsed and were dropped.`);
+
+    // Ascending in time, latest last — the 357 algorithm depends on it, and
+    // ARRO exports newest-first. A stable sort keeps same-timestamp rows in
+    // file order so the duplicate that survives de-duplication is predictable.
+    const ord = Array.from({ length: n }, (_, i) => i)
+      .sort((a, b) => t[a] - t[b] || a - b);
+    const desc = n > 1 && t[ord[0]] !== t[0];
+
+    const T = new Float64Array(n), TR = new Float64Array(n);
+    const V = new Float64Array(n), RAW = new Float64Array(n), Q = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      const j = ord[i];
+      T[i] = t[j]; TR[i] = tr[j]; V[i] = v[j]; RAW[i] = raw[j]; Q[i] = q[j];
+    }
+
+    let unit = '';
+    let best = 0;
+    for (const [u, c] of units) if (c > best) { best = c; unit = u; }
+
+    return { n, t: T, tr: TR, v: V, raw: RAW, q: Q, qcodes, unit, warn, desc };
+  }
+
+  // ── filename → sensor id → station ─────────────────────────────────────────
+
+  // `aem_Durikai_AL_541134_Rainfall_541134_0_R_5758.csv`
+  //  └ prefix └ site name  └ number └ sensor  └── sensor id, dots as underscores
+  //
+  // The tail is the thing worth having: `541134_0_R_5758` is `541134.0.R.5758`,
+  // which is exactly the `sensor_id` already carried in stations.json. Parse it
+  // and the station is known without anyone choosing it from a list.
+  function parseName(fileName) {
+    const base = fileName.replace(/\.csv$/i, '');
+    const out = { fileName, siteName: '', siteNumber: '', sensorLabel: '', sensorId: null };
+
+    const m = base.match(/^(.*?)_(\d+)_(\d+)_([A-Za-z]+)_(\d+)$/);
+    if (m) {
+      out.sensorId = `${m[2]}.${m[3]}.${m[4].toUpperCase()}.${m[5]}`;
+      let headPart = m[1];
+      const m2 = headPart.match(/^(.*)_(\d+)_([^_]+)$/);
+      if (m2) { headPart = m2[1]; out.siteNumber = m2[2]; out.sensorLabel = m2[3].replace(/_/g, ' '); }
+      out.siteName = headPart.replace(/^aem_/i, '').replace(/_/g, ' ').trim();
+    } else {
+      out.siteName = base.replace(/^aem_/i, '').replace(/_/g, ' ').trim();
+    }
+    return out;
+  }
+
+  // sensor_id → {station, sensor}, rebuilt whenever a different station file is
+  // loaded. 3,174 stations is a linear scan worth doing once, not per import.
+  function sensorIndex() {
+    if (ad.sensorIdx && ad.sensorIdxFor === state.data) return ad.sensorIdx;
+    const idx = new Map();
+    for (const s of (state.data?.stations || [])) {
+      for (const sen of (s.sensors || [])) {
+        if (sen.sensor_id && !idx.has(sen.sensor_id)) idx.set(sen.sensor_id, { station: s, sensor: sen });
+      }
+    }
+    ad.sensorIdx = idx;
+    ad.sensorIdxFor = state.data;
+    return idx;
+  }
+
+  function linkStation(meta) {
+    if (!state.data) return { station: null, sensor: null, how: 'no station file loaded' };
+    if (meta.sensorId) {
+      const hit = sensorIndex().get(meta.sensorId);
+      if (hit) return { ...hit, how: 'sensor id' };
+    }
+    const num = meta.siteNumber || (meta.sensorId || '').split('.')[0];
+    if (num) {
+      const st = state.data.stations.find(s => String(s.station_number) === String(num)
+                                            || String(s.site?.number) === String(num));
+      if (st) {
+        const sen = (st.sensors || []).find(x => x.sensor_id === meta.sensorId)
+                 || (st.sensors || []).find(x => (x.type || '').toLowerCase() === (meta.sensorLabel || '').toLowerCase());
+        return { station: st, sensor: sen || null, how: 'station number' };
+      }
+    }
+    return { station: null, sensor: null, how: 'no match' };
+  }
+
+  // RainAccum and WaterLevel differ only in how diff() compares two readings, so
+  // the guess only has to pick between two rules — and the series list lets it
+  // be corrected when the guess is wrong.
+  function guessKind(meta, sensor) {
+    const s = `${sensor?.type || ''} ${meta.sensorLabel || ''}`.toLowerCase();
+    if (/rain|precip|accum/.test(s)) return 'RA';
+    if (/level|height|stage|water|depth/.test(s)) return 'WL';
+    return 'RA';
+  }
+
+  // ── the 3-5-7 filter ───────────────────────────────────────────────────────
+  // Faithful to the spec's two components. Nothing here writes to the imported
+  // arrays: the result is a parallel status array plus the rollover-adjusted
+  // values, so raw and filtered stay side by side for as long as the import
+  // lives.
+
+  function cfgKey(cfg, kind) {
+    return [kind, cfg.small, cfg.medium, cfg.large, cfg.cycle, cfg.breakCount,
+            cfg.startTests, cfg.rolloverOn ? 1 : 0, cfg.oosOn ? 1 : 0, cfg.dedupeOn ? 1 : 0,
+            cfg.minGapSec].join('|');
+  }
+
+  // The 357 walk itself, over the `live` positions of one series against one
+  // set of values. Returns a fresh status array; it reads `adj` and writes
+  // nothing else, so it can be run twice with different rollover offsets.
+  function walk357(live, adj, n, isRA, cfg) {
+    const status = new Uint8Array(n);          // AD_UNKNOWN everywhere
+
+    // diff() — "calculate different value of the two data according to data
+    // type". `a` is the earlier reading (current), `b` the later one (next).
+    // A rain accumulator only ever climbs, so its difference is signed and a
+    // fall is a failure by construction; a water level may move either way.
+    const diff = (a, b) => isRA ? (adj[live[b]] - adj[live[a]]) : Math.abs(adj[live[b]] - adj[live[a]]);
+    const verify = (d, step) => isRA ? (d >= 0 && d <= step) : (d <= step);
+
+    // Cursors walk `live` positions, skipping anything already marked Bad —
+    // getPreviousCursor()/getNextCursor() in the spec.
+    const prevCur = p => { for (let k = p - 1; k >= 0; k--) if (status[live[k]] !== AD_BAD) return k; return -1; };
+    const nextCur = p => { for (let k = p + 1; k < live.length; k++) if (status[live[k]] !== AD_BAD) return k; return -1; };
+
+    const mark   = (p, st) => { status[live[p]] = st; };
+    // reject() — everything still Suspect between two positions failed for good.
+    const reject = (from, to) => {
+      for (let k = Math.max(0, from); k <= Math.min(live.length - 1, to); k++) {
+        if (status[live[k]] === AD_SUSPECT) status[live[k]] = AD_BAD;
+      }
+    };
+
+    const L = live.length;
+    // Continuity needs four readings to exist at all. A series shorter than
+    // that cannot be tested, and deleting it outright — which is where the
+    // algorithm lands if it is allowed to run — would be an answer the data
+    // does not support. It is kept, and the panel says it went untested.
+    if (L < 4) {
+      for (let k = 0; k < L; k++) status[live[k]] = AD_GOOD;
+      return status;
+    }
+
+    let guard = L * 8 + 1000;    // the walk only ever moves backwards; this is
+                                 // belt and braces against a malformed series
+    if (L >= 2) {
+      let phase = 'start';
+      let start = L - 1;                       // Establish Start Continuity begins at the end
+      let cur = start - 1;
+      let testCount = 0, passCount = 0, lastDiff = 0;
+      let lastGood = -1, next = -1, contTest = 0, restart = -1;
+
+      while (guard-- > 0) {
+        if (phase === 'start') {
+          if (cur < 0) { mark(start, AD_GOOD); break; }
+          const step = passCount === 0 ? cfg.small : passCount === 1 ? cfg.medium : cfg.large;
+          const d = diff(cur, start);
+          // For a rain accumulator the comparison is against a fixed start
+          // while `cur` walks backwards, so each difference must be at least
+          // the last — the `diffVal >= lastDiffVal` arm of the spec flowchart.
+          const ok = verify(d, step) && (!isRA || d >= lastDiff);
+          if (ok) {
+            mark(cur, AD_GOOD);
+            passCount++; lastDiff = d;
+            if (passCount > 2) {
+              // Four consecutive good readings: the series has begun.
+              mark(start, AD_GOOD);
+              lastGood = cur; next = lastGood;
+              cur = prevCur(cur); testCount = 0; contTest = 0; restart = -1;
+              phase = 'cont';
+              continue;
+            }
+            cur = prevCur(cur);
+          } else {
+            mark(cur, AD_SUSPECT);
+            cur = prevCur(cur);
+          }
+          testCount++;
+          if (testCount > cfg.startTests || cur < 0) {
+            // The window could not be filled. The start itself is the problem:
+            // discard it, step back one, and try to begin the series there.
+            mark(start, AD_BAD);
+            for (let k = start - 1; k >= 0 && k > start - cfg.startTests - 3; k--) {
+              if (status[live[k]] === AD_SUSPECT) status[live[k]] = AD_UNKNOWN;
+            }
+            start = prevCur(start);
+            if (start < 0) break;
+            cur = prevCur(start);
+            testCount = 0; passCount = 0; lastDiff = 0;
+            if (cur < 0) { mark(start, AD_GOOD); break; }
+          }
+          continue;
+        }
+
+        // Establish Continuity.
+        if (cur < 0) { reject(0, lastGood); break; }
+        const step = testCount === 0 ? cfg.small : testCount === 1 ? cfg.medium : cfg.large;
+        const d = next < 0 ? Infinity : diff(cur, next);
+        if (next >= 0 && verify(d, step)) {
+          // fil357Pass() — the reading stands, and everything left hanging
+          // between it and the last good reading is settled as Bad.
+          mark(cur, AD_GOOD);
+          reject(cur + 1, lastGood - 1);
+          lastGood = cur; next = lastGood;
+          cur = prevCur(cur);
+          testCount = 0; contTest = 0; restart = -1;
+        } else if (testCount < 2) {
+          // Retest the same reading against the next-next, then next-next-next.
+          testCount++;
+          const nn = next < 0 ? -1 : nextCur(next);
+          next = nn;
+        } else {
+          mark(cur, AD_SUSPECT);
+          if (restart < 0) restart = cur;
+          contTest++;
+          testCount = 0;
+          next = lastGood;
+          cur = prevCur(cur);
+          if (contTest >= cfg.breakCount) {
+            // Four in a row failed: this is not noise, it is a break. The
+            // suspects become the opening of a new series rather than casualties
+            // of the old one.
+            for (let k = Math.max(0, cur + 1); k <= restart; k++) {
+              if (status[live[k]] === AD_SUSPECT) status[live[k]] = AD_UNKNOWN;
+            }
+            start = restart;
+            cur = prevCur(start);
+            testCount = 0; passCount = 0; lastDiff = 0;
+            contTest = 0; restart = -1;
+            phase = 'start';
+            if (cur < 0) { mark(start, AD_GOOD); break; }
+          }
+        }
+      }
+    }
+
+    // Anything still Suspect or never reached failed to earn its place.
+    for (let k = 0; k < L; k++) {
+      const i = live[k];
+      if (status[i] === AD_SUSPECT || status[i] === AD_UNKNOWN) status[i] = AD_BAD;
+    }
+    return status;
+  }
+
+  function runFilter(s, cfg) {
+    const key = cfgKey(cfg, s.kind);
+    if (s.filt && s.filt.key === key) return s.filt;
+
+    const n = s.n, t = s.t, v = s.v;
+    const isRA = s.kind === 'RA';
+
+    // 1. filterOutOfSyncDate() — the list must be strictly ascending. After the
+    //    import sort the only offenders left are repeats of a timestamp, which
+    //    the sample export is full of (6,111 distinct stamps across 14,942
+    //    rows): the same reading re-sent, or re-graded, on a later packet.
+    //    `minGapSec` widens that from "same second" to "same observation".
+    //    ARRO re-sends a reading several times — the sample export carries the
+    //    same value at :12, :13, :14 and :18 past the minute — and four
+    //    re-sends of one corrupt packet are enough to satisfy the spec's "any
+    //    four consecutive data form a continuous set" and survive as a series
+    //    of their own. Off by default, because collapsing them is a departure
+    //    from the spec rather than part of it.
+    const gapMs = Math.max(0, +cfg.minGapSec || 0) * 1000;
+    const live = [];
+    const oosFlag = new Uint8Array(n);
+    let lastT = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const tooClose = gapMs ? (t[i] - lastT < gapMs) : (t[i] <= lastT);
+      if (tooClose && (cfg.oosOn || cfg.dedupeOn)) { oosFlag[i] = 1; continue; }
+      lastT = t[i];
+      live.push(i);
+    }
+
+    // 2. The walk, then adjustRolloverData(), then the walk again.
+    //
+    //    Order matters more than the spec lets on. A rain accumulator that
+    //    wraps and a rain accumulator hit by a corrupt packet both look like a
+    //    long fall, and the sample export is full of the second kind: 72 mm
+    //    jumps to 1234 for one reading and drops straight back. Detecting
+    //    rollovers on the raw series reads all 82 of those spikes as wraps and
+    //    shifts every later reading by 2048 apiece.
+    //
+    //    So the spikes go first. The 357 walk removes them without any rollover
+    //    help — a wrap simply breaks continuity, which is the spec's own
+    //    behaviour — and only then is a fall between two *surviving* readings
+    //    trustworthy enough to call a rollover. With the offsets known, the
+    //    walk runs once more so continuity carries across the wrap and the
+    //    output is a single climbing accumulation rather than two series.
+    const adj = new Float64Array(n);
+    for (let i = 0; i < n; i++) adj[i] = v[i];
+
+    let status = walk357(live, adj, n, isRA, cfg);
+    const rolls = [];
+
+    if (cfg.rolloverOn) {
+      // What makes a fall a rollover is not its size but what it leaves behind:
+      // wrap the counter once and the step across the seam should be an
+      // ordinary one. So the test is the 357 test itself, applied to the
+      // wrapped difference — 2045 → 2 is a rollover because it is really a
+      // step of 5, while 1976 → 125 is not, because it would be a step of 197.
+      // Size alone cannot tell the two apart: a corrupt packet reading 1976
+      // sits just as close to the ceiling as a genuine wrap does.
+      const kept = live.filter(i => status[i] === AD_GOOD);
+      for (let k = 1; k < kept.length; k++) {
+        const prev = v[kept[k - 1]], now = v[kept[k]];
+        if (now >= prev) continue;
+        const wrapped = now + cfg.cycle - prev;
+        if (wrapped >= 0 && wrapped <= cfg.large) rolls.push(kept[k]);
+      }
+      if (rolls.length) {
+        // Re-lay the offsets over every reading, so a point removed inside a
+        // wrapped stretch still reports a sensible adjusted value when it is
+        // inspected.
+        const rollSet = new Set(rolls);
+        let offset = 0;
+        for (const i of live) {
+          if (rollSet.has(i)) offset += cfg.cycle;
+          adj[i] = v[i] + offset;
+        }
+        for (let i = 0; i < n; i++) if (oosFlag[i]) adj[i] = v[i];
+        status = walk357(live, adj, n, isRA, cfg);
+      }
+    }
+
+    for (let i = 0; i < n; i++) if (oosFlag[i]) status[i] = AD_OOS;
+
+    let good = 0, bad = 0, oos = 0;
+    for (let i = 0; i < n; i++) {
+      if (status[i] === AD_GOOD) good++;
+      else if (status[i] === AD_OOS) oos++;
+      else bad++;
+    }
+
+    s.filt = { key, status, adj, rolls, stats: { good, bad, oos, rollovers: rolls.length, total: n } };
+    return s.filt;
+  }
+
+  // ── tracks: what actually gets drawn ───────────────────────────────────────
+  // One import feeds two curves — everything as recorded, and what survived the
+  // filter — and three readings of each: the accumulator itself, the step
+  // between readings, and that step as a rate. Building them once per change
+  // and caching keeps the draw path down to arithmetic on typed arrays.
+
+  function trackKey(s, cfg) {
+    return `${cfgKey(cfg, s.kind)}|${ad.transform}`;
+  }
+
+  function buildTrack(s, idx, vals) {
+    const m = idx.length;
+    const t = new Float64Array(m), y = new Float64Array(m);
+    const ref = new Int32Array(m);
+    for (let k = 0; k < m; k++) { ref[k] = idx[k]; t[k] = s.t[idx[k]]; y[k] = vals[idx[k]]; }
+
+    if (ad.transform !== 'value') {
+      const d = new Float64Array(m);
+      for (let k = 1; k < m; k++) {
+        const step = y[k] - y[k - 1];
+        if (ad.transform === 'rate') {
+          const hrs = (t[k] - t[k - 1]) / 3600000;
+          d[k] = hrs > 0 ? step / hrs : 0;
+        } else d[k] = step;
+      }
+      d[0] = 0;
+      return { n: m, t, y: d, ref };
+    }
+    return { n: m, t, y, ref };
+  }
+
+  function tracks(s) {
+    const key = trackKey(s, ad.cfg);
+    if (s.tracks && s.tracks.key === key) return s.tracks;
+    const f = runFilter(s, ad.cfg);
+    const all = new Int32Array(s.n);
+    for (let i = 0; i < s.n; i++) all[i] = i;
+    const kept = [];
+    for (let i = 0; i < s.n; i++) if (f.status[i] === AD_GOOD) kept.push(i);
+    s.tracks = { key, raw: buildTrack(s, all, s.v), filt: buildTrack(s, kept, f.adj), f };
+    return s.tracks;
+  }
+
+  const shown = () => ad.series.filter(s => s.visible);
+
+  function extent() {
+    let t0 = Infinity, t1 = -Infinity;
+    for (const s of ad.series) {
+      if (!s.n) continue;
+      if (s.t[0] < t0) t0 = s.t[0];
+      if (s.t[s.n - 1] > t1) t1 = s.t[s.n - 1];
+    }
+    if (!isFinite(t0)) return null;
+    if (t1 <= t0) t1 = t0 + 3600000;
+    return { t0, t1 };
+  }
+
+  function view() {
+    const ex = extent();
+    if (!ex) return null;
+    if (!ad.view) return ex;
+    const t0 = Math.max(ex.t0 - (ex.t1 - ex.t0), ad.view.t0);
+    const t1 = Math.min(ex.t1 + (ex.t1 - ex.t0), ad.view.t1);
+    return t1 - t0 < 1000 ? { t0, t1: t0 + 1000 } : { t0, t1 };
+  }
+
+  // first index with t >= target
+  function lower(arr, n, target) {
+    let lo = 0, hi = n;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < target) lo = m + 1; else hi = m; }
+    return lo;
+  }
+
+  // Which curves are live given the raw/filtered/both switch.
+  function layers(s) {
+    const tr = tracks(s);
+    if (ad.mode === 'raw')      return [{ track: tr.raw,  kind: 'raw' }];
+    if (ad.mode === 'filtered') return [{ track: tr.filt, kind: 'filt' }];
+    return [{ track: tr.raw, kind: 'raw' }, { track: tr.filt, kind: 'filt' }];
+  }
+
+  function yRange(v) {
+    let lo = Infinity, hi = -Infinity;
+    for (const s of shown()) {
+      // "Kept" scales to the surviving readings alone. A single corrupt packet
+      // reading 2014 mm against a gauge sitting at 300 flattens the real trace
+      // into the bottom eighth of the chart, and the removals are still drawn —
+      // they simply run off the top, which is a fair description of them.
+      const ls = ad.yMode === 'kept' ? [{ track: tracks(s).filt, kind: 'filt' }] : layers(s);
+      for (const { track } of ls) {
+        const i0 = Math.max(0, lower(track.t, track.n, v.t0) - 1);
+        const i1 = Math.min(track.n, lower(track.t, track.n, v.t1) + 1);
+        for (let k = i0; k < i1; k++) {
+          const y = track.y[k];
+          if (y < lo) lo = y;
+          if (y > hi) hi = y;
+        }
+      }
+    }
+    if (!isFinite(lo)) return { lo: 0, hi: 1 };
+    if (ad.yMode === 'manual') {
+      const a = parseFloat(ad.yMin), b = parseFloat(ad.yMax);
+      if (!isNaN(a) && !isNaN(b) && b > a) return { lo: a, hi: b };
+    }
+    if (ad.yMode === 'zero' && lo > 0) lo = 0;
+    if (hi === lo) { hi = lo + 1; lo -= 1; }
+    const pad = (hi - lo) * 0.06;
+    return { lo: lo - pad, hi: hi + pad };
+  }
+
+  // ── axes ──
+
+  const TIME_STEPS = [1e3, 5e3, 15e3, 30e3, 6e4, 3e5, 9e5, 18e5, 36e5, 108e5, 216e5, 432e5,
+                      AD_DAY, 2 * AD_DAY, 7 * AD_DAY, 14 * AD_DAY, 30 * AD_DAY, 91 * AD_DAY,
+                      182 * AD_DAY, 365 * AD_DAY];
+
+  function timeTicks(t0, t1, want) {
+    const span = t1 - t0;
+    let step = TIME_STEPS[TIME_STEPS.length - 1];
+    for (const s of TIME_STEPS) if (span / s <= want) { step = s; break; }
+    const out = [];
+    if (step >= 30 * AD_DAY) {
+      // Month-aligned, so a long window labels the first of the month rather
+      // than an arbitrary 30-day drift.
+      const months = Math.max(1, Math.round(step / (30 * AD_DAY)));
+      const d = new Date(t0);
+      let y = d.getFullYear(), m = d.getMonth();
+      for (let i = 0; i < 400; i++) {
+        const tt = new Date(y, m, 1).getTime();
+        if (tt > t1) break;
+        if (tt >= t0) out.push(tt);
+        m += months; while (m > 11) { m -= 12; y++; }
+      }
+    } else {
+      const first = Math.ceil(t0 / step) * step;
+      for (let tt = first; tt <= t1 && out.length < 400; tt += step) out.push(tt);
+    }
+    return { ticks: out, step };
+  }
+
+  const P2 = n => String(n).padStart(2, '0');
+
+  function fmtTick(t, step) {
+    const d = new Date(t);
+    if (step < 6e4)          return `${P2(d.getHours())}:${P2(d.getMinutes())}:${P2(d.getSeconds())}`;
+    if (step < 36e5)         return `${P2(d.getHours())}:${P2(d.getMinutes())}`;
+    if (step < AD_DAY)       return `${d.getDate()}/${d.getMonth() + 1} ${P2(d.getHours())}:${P2(d.getMinutes())}`;
+    if (step < 30 * AD_DAY)  return `${d.getDate()}/${d.getMonth() + 1}`;
+    if (step < 365 * AD_DAY) return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+    return String(d.getFullYear());
+  }
+
+  function fmtFull(t) {
+    const d = new Date(t);
+    return `${d.getFullYear()}-${P2(d.getMonth() + 1)}-${P2(d.getDate())} `
+         + `${P2(d.getHours())}:${P2(d.getMinutes())}:${P2(d.getSeconds())}`;
+  }
+
+  function niceTicks(lo, hi, want) {
+    const span = hi - lo;
+    if (!(span > 0)) return [lo];
+    const raw = span / want;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / mag;
+    const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+    const out = [];
+    for (let v = Math.ceil(lo / step) * step; v <= hi && out.length < 40; v += step) out.push(v);
+    return out;
+  }
+
+  function fmtVal(v) {
+    const a = Math.abs(v);
+    if (a >= 1000) return v.toFixed(0);
+    if (a >= 10)   return v.toFixed(1);
+    if (a >= 1)    return v.toFixed(2);
+    return v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+  }
+
+  // ── downsampling ───────────────────────────────────────────────────────────
+  // Hundreds of thousands of readings cannot each become an SVG coordinate, and
+  // averaging them away would hide exactly what this tool exists to find. So
+  // each pixel column keeps its first, min, max and last value: the spike that
+  // the filter is hunting survives at any zoom level, and the point count stops
+  // growing with the data.
+
+  function densify(track, i0, i1, x, xw) {
+    const m = i1 - i0;
+    const pts = [];
+    if (m <= 0) return pts;
+    if (m <= xw * 2) {
+      for (let k = i0; k < i1; k++) pts.push([x(track.t[k]), track.y[k], k]);
+      return pts;
+    }
+    let col = -1, first = 0, last = 0, min = 0, max = 0, fk = 0, mnk = 0, mxk = 0, lk = 0;
+    const flush = () => {
+      if (col < 0) return;
+      pts.push([col, first, fk]);
+      if (min !== first) pts.push([col, min, mnk]);
+      if (max !== min)   pts.push([col, max, mxk]);
+      if (last !== max)  pts.push([col, last, lk]);
+    };
+    for (let k = i0; k < i1; k++) {
+      const px = Math.round(x(track.t[k]));
+      const y = track.y[k];
+      if (px !== col) { flush(); col = px; first = min = max = last = y; fk = mnk = mxk = lk = k; }
+      else {
+        if (y < min) { min = y; mnk = k; }
+        if (y > max) { max = y; mxk = k; }
+        last = y; lk = k;
+      }
+    }
+    flush();
+    return pts;
+  }
+
+  function pathFrom(pts, y, step) {
+    if (!pts.length) return '';
+    let d = '';
+    for (let i = 0; i < pts.length; i++) {
+      const px = pts[i][0].toFixed(1), py = y(pts[i][1]).toFixed(1);
+      if (i === 0) d += `M${px} ${py}`;
+      else if (step) d += `H${px}V${py}`;
+      else d += `L${px} ${py}`;
+    }
+    return d;
+  }
+
+  // ── import ─────────────────────────────────────────────────────────────────
+
+  function importFiles(files) {
+    const list = [...(files || [])].filter(f => /\.csv$/i.test(f.name));
+    if (!list.length) { note('Nothing to import — ARRO exports are .csv files.', true); return; }
+    ad.busy += list.length;
+    renderSide();
+    let done = 0;
+    const problems = [];
+    for (const file of list) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        try { addSeries(file.name, String(e.target.result), problems); }
+        catch (err) { problems.push(`${file.name}: ${err.message}`); }
+        finally { if (++done === list.length) finish(); }
+      };
+      reader.onerror = () => { problems.push(`${file.name}: could not be read.`); if (++done === list.length) finish(); };
+      reader.readAsText(file);
+    }
+    function finish() {
+      ad.busy = Math.max(0, ad.busy - list.length);
+      ad.view = null;
+      renderAll();
+      note(problems.length ? problems.join(' ') : `Imported ${list.length} file${list.length === 1 ? '' : 's'}.`, !!problems.length);
+    }
+  }
+
+  function addSeries(fileName, text, problems) {
+    const parsed = parseCsv(text);
+    if (parsed.error) { problems.push(`${fileName}: ${parsed.error}`); return; }
+    const meta = parseName(fileName);
+    const link = linkStation(meta);
+    const sensor = link.sensor;
+    const label = [link.station?.name || meta.siteName || fileName,
+                   sensor?.type || meta.sensorLabel].filter(Boolean).join(' · ');
+
+    ad.series.push({
+      key:      `ad${++ad.seq}`,
+      fileName, meta, label,
+      station:  link.station, sensor, linkHow: link.how,
+      sensorId: meta.sensorId || sensor?.sensor_id || null,
+      kind:     guessKind(meta, sensor),
+      unit:     parsed.unit,
+      color:    AD_COLORS[(ad.series.length) % AD_COLORS.length],
+      visible:  true,
+      n: parsed.n, t: parsed.t, tr: parsed.tr, v: parsed.v, raw: parsed.raw,
+      q: parsed.q, qcodes: parsed.qcodes,
+      warn:     parsed.warn, wasDescending: parsed.desc,
+      filt: null, tracks: null,
+    });
+  }
+
+  function note(msg, bad) {
+    const el = document.getElementById('ad-note');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'small ad-note' + (bad ? ' ad-note--bad' : '');
+    clearTimeout(ad.noteTimer);
+    ad.noteTimer = setTimeout(() => { if (el) { el.textContent = ''; el.className = 'small ad-note'; } }, 9000);
+  }
+
+  // ── render ─────────────────────────────────────────────────────────────────
+
+  function render() {
+    return `
+      <div class="ad-wrap">
+        <div class="ad-layout">
+          <aside class="ad-side" id="ad-side">${sideHtml()}</aside>
+          <section class="ad-main">${mainHtml()}</section>
+        </div>
+      </div>`;
+  }
+
+  function sideHtml() {
+    return `
+      <div class="ad-drop" id="ad-drop">
+        <input type="file" id="ad-file" accept=".csv,text/csv" multiple hidden
+               onchange="ArroData.pick(this)">
+        <div><strong>Drop ARRO sensor CSVs here</strong></div>
+        <div class="small" style="margin:.3rem 0 .5rem">
+          Read in your browser — nothing is uploaded.</div>
+        <button onclick="document.getElementById('ad-file').click()">Choose files…</button>
+        ${ad.busy ? `<div class="small" style="margin-top:.4rem">Reading ${ad.busy} file${ad.busy === 1 ? '' : 's'}…</div>` : ''}
+      </div>
+      <div id="ad-note" class="small ad-note"></div>
+      ${seriesHtml()}
+      ${cfgHtml()}`;
+  }
+
+  function seriesHtml() {
+    if (!ad.series.length) return '';
+    const rows = ad.series.map(s => {
+      const f = runFilter(s, ad.cfg);
+      const st = f.stats;
+      const linkTxt = s.station
+        ? `<a class="btn-link" href="#" onclick="ArroData.showStation('${escAttr(s.station.id)}');return false"
+             title="Open this station on the Stations tab">${esc(s.station.name)}</a>`
+        : `<span class="ad-unlinked" title="${escAttr(s.meta.sensorId
+              ? 'No station in the loaded file carries sensor ' + s.meta.sensorId
+              : 'The filename did not contain a sensor id')}">not linked</span>`;
+      const arro = s.station && arroSensorUrl(arroSiteId(s.station), s.sensor?.device_id);
+      return `
+        <div class="ad-series${ad.sel === s.key ? ' ad-series--sel' : ''}">
+          <div class="ad-series-top">
+            <input type="checkbox" ${s.visible ? 'checked' : ''} title="Show on the chart"
+                   onchange="ArroData.toggle('${s.key}')">
+            <input type="color" class="ad-swatch" value="${escAttr(s.color)}" title="Series colour"
+                   onchange="ArroData.setColor('${s.key}', this.value)">
+            <b class="ad-series-name" title="${escAttr(s.fileName)}">${esc(s.label)}</b>
+            <button class="ad-x" title="Remove this import" onclick="ArroData.remove('${s.key}')">✕</button>
+          </div>
+          <div class="small ad-series-meta">
+            ${linkTxt}
+            ${s.sensorId ? ` · <span class="mono">${esc(s.sensorId)}</span>` : ''}
+            ${arro ? ` · <a class="btn-link" href="${escAttr(arro)}" target="_blank" rel="noopener">ARRO ↗</a>` : ''}
+          </div>
+          <div class="small ad-series-meta">
+            <span title="Readings kept by the filter">${st.good.toLocaleString()} kept</span> ·
+            <span class="ad-bad-txt" title="Readings the 357 test rejected">${st.bad.toLocaleString()} removed</span> ·
+            <span title="Repeat or out-of-sequence timestamps, excluded before filtering">${st.oos.toLocaleString()} repeats</span>
+            ${st.rollovers ? ` · <span title="Accumulator wraps corrected">${st.rollovers} rollover${st.rollovers === 1 ? '' : 's'}</span>` : ''}
+          </div>
+          <div class="small ad-series-meta">
+            <label title="How diff() compares two readings. A rain accumulator only climbs; a water level may move either way.">reads as
+              <select onchange="ArroData.setKind('${s.key}', this.value)">
+                <option value="RA" ${s.kind === 'RA' ? 'selected' : ''}>RainAccum</option>
+                <option value="WL" ${s.kind === 'WL' ? 'selected' : ''}>WaterLevel</option>
+              </select></label>
+            <button class="btn-link" onclick="ArroData.solo('${s.key}')" title="Show only this series">solo</button>
+            <button class="btn-link" onclick="ArroData.zoomTo('${s.key}')" title="Zoom the chart to this series">fit</button>
+          </div>
+          ${(s.warn || []).map(w => `<div class="small ad-warn">${esc(w)}</div>`).join('')}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="panel ad-panel">
+        <div class="panel-header"><h3>Imports</h3>
+          <button class="btn-link" onclick="ArroData.clearAll()">clear all</button></div>
+        ${rows}
+      </div>`;
+  }
+
+  function cfgHtml() {
+    if (!ad.series.length) return '';
+    const c = ad.cfg;
+    const num = (k, label, tip, min, max) => `
+      <label class="ad-cfg-row" title="${escAttr(tip)}">
+        <span>${label}</span>
+        <input type="number" value="${c[k]}" min="${min}" max="${max}"
+               onchange="ArroData.setCfg('${k}', this.value)">
+      </label>`;
+    const chk = (k, label, tip) => `
+      <label class="ad-cfg-chk" title="${escAttr(tip)}">
+        <input type="checkbox" ${c[k] ? 'checked' : ''} onchange="ArroData.setCfg('${k}', this.checked)">
+        <span>${label}</span></label>`;
+
+    return `
+      <div class="panel ad-panel">
+        <div class="panel-header"><h3>357 filter</h3>
+          <button class="btn-link" onclick="ArroData.resetCfg()">defaults</button></div>
+        <p class="small" style="color:var(--muted);margin:.1rem 0 .5rem">
+          A reading passes if it is within <b>${c.small}</b> of the next, or <b>${c.medium}</b> of the
+          next-next, or <b>${c.large}</b> of the one after that. Bureau spec, May 2009.</p>
+        ${num('small', 'Small step', 'Difference allowed against the next reading (spec: 3)', 0, 10000)}
+        ${num('medium', 'Medium step', 'Difference allowed against the next-next reading (spec: 5)', 0, 10000)}
+        ${num('large', 'Large step', 'Difference allowed against the next-next-next reading (spec: 7)', 0, 10000)}
+        ${num('breakCount', 'Break after', 'Consecutive failures that break continuity and start a new series (spec: 4)', 1, 100)}
+        ${num('startTests', 'Start window', 'Tests allowed to establish the start of a series (spec flowchart: 4)', 1, 100)}
+        ${num('cycle', 'Rollover at', 'Accumulator cycle size — the device counts 0 to cycle−1 (spec: 2048)', 2, 1e9)}
+        ${num('minGapSec', 'Min gap (s)', 'Collapse readings closer together than this. 0 keeps the spec behaviour.', 0, 86400)}
+        ${chk('rolloverOn', 'Correct rollovers', 'Detect accumulator wraps and carry the count across them')}
+        ${chk('oosOn', 'Drop repeat timestamps', 'Remove readings that do not advance the clock, before filtering')}
+        <p class="small ad-cfg-note">
+          Repeats are ARRO re-sending one observation. Four re-sends of a corrupt
+          packet satisfy the spec's "four consecutive readings make a series" and
+          survive as one — set a minimum gap to collapse them.</p>
+      </div>`;
+  }
+
+  function mainHtml() {
+    if (!ad.series.length) return emptyHtml();
+    return `
+      ${toolbarHtml()}
+      <div class="ad-stage" id="ad-stage" tabindex="0"
+           aria-label="Sensor readings over time. Drag to pan, scroll to zoom, arrow keys to step.">
+        <svg id="ad-svg" role="img"></svg>
+        <div class="ad-tip" id="ad-tip" hidden></div>
+      </div>
+      <svg id="ad-ov" class="ad-ov" role="img"
+           aria-label="Whole record, with the visible window shaded"></svg>
+      <div id="ad-readout" class="ad-readout">${readoutHtml()}</div>`;
+  }
+
+  function emptyHtml() {
+    return `
+      <div class="ad-empty">
+        <h2>Sensor data, filtered and drawn</h2>
+        <p>Export a sensor from ARRO as CSV and drop it here. The filename carries
+           the sensor id, so the import links itself back to the station without
+           you choosing one.</p>
+        <p>Every reading is kept exactly as exported. The Bureau's 3-5-7 continuity
+           filter runs alongside it, never over it, so you can switch between what
+           the gauge sent and what survives the test — and look at whatever it threw
+           away.</p>
+        <p class="small" style="color:var(--muted)">
+          Expected columns: Reading, Receive, Value, Unit, Data Quality, Raw Value.</p>
+      </div>`;
+  }
+
+  const seg = (group, cur, opts, fn) => `
+    <div class="ad-seg" role="group" aria-label="${escAttr(group)}">
+      ${opts.map(([v, label, tip]) => `
+        <button class="${cur === v ? 'on' : ''}" title="${escAttr(tip || label)}"
+                onclick="ArroData.${fn}('${v}')">${esc(label)}</button>`).join('')}
+    </div>`;
+
+  function toolbarHtml() {
+    const anyFilt = ad.mode !== 'raw';
+    return `
+      <div class="ad-toolbar">
+        ${seg('Which series', ad.mode, [
+          ['raw', 'Raw', 'Everything as exported'],
+          ['filtered', 'Filtered', 'Only what passed the 357 test'],
+          ['both', 'Both', 'Filtered over raw, so removals show'],
+        ], 'setMode')}
+        ${seg('Reading', ad.transform, [
+          ['value', 'Value', 'The reading itself'],
+          ['increment', 'Increment', 'Step between consecutive readings'],
+          ['rate', 'Rate/h', 'Step divided by the hours between readings'],
+        ], 'setTransform')}
+        ${seg('Chart style', ad.chartType, [
+          ['line', 'Line', 'Straight between readings'],
+          ['step', 'Step', 'Hold each reading until the next — how an accumulator behaves'],
+          ['dots', 'Points', 'One mark per reading, nothing joined'],
+        ], 'setChart')}
+        ${seg('Vertical axis', ad.yMode, [
+          ['auto', 'Auto', 'Fit everything on screen, spikes included'],
+          ['kept', 'Kept', 'Fit the readings that passed the filter — removals run off the top'],
+          ['zero', 'Zero', 'Always include zero'],
+          ['manual', 'Fixed', 'Type your own range'],
+        ], 'setY')}
+        ${ad.yMode === 'manual' ? `
+          <span class="ad-tool-grp">
+            <input type="number" class="ad-num" value="${escAttr(ad.yMin)}" placeholder="min"
+                   onchange="ArroData.setYRange('min', this.value)">
+            <input type="number" class="ad-num" value="${escAttr(ad.yMax)}" placeholder="max"
+                   onchange="ArroData.setYRange('max', this.value)">
+          </span>` : ''}
+        <span class="ad-tool-grp">
+          <label class="ad-chk" title="Mark every reading the filter rejected"
+                 style="${anyFilt ? '' : 'opacity:.45'}">
+            <input type="checkbox" ${ad.showRemoved ? 'checked' : ''} ${anyFilt ? '' : 'disabled'}
+                   onchange="ArroData.setFlag('showRemoved', this.checked)"> removed</label>
+          <label class="ad-chk" title="Mark repeat timestamps dropped before filtering">
+            <input type="checkbox" ${ad.showDupes ? 'checked' : ''}
+                   onchange="ArroData.setFlag('showDupes', this.checked)"> repeats</label>
+          <label class="ad-chk" title="Mark where an accumulator wrap was corrected">
+            <input type="checkbox" ${ad.showRollover ? 'checked' : ''}
+                   onchange="ArroData.setFlag('showRollover', this.checked)"> rollovers</label>
+          <label class="ad-chk" title="Drag to select a time range instead of panning">
+            <input type="checkbox" ${ad.brush ? 'checked' : ''}
+                   onchange="ArroData.setFlag('brush', this.checked)"> drag zooms</label>
+        </span>
+        <span class="ad-tool-grp">
+          ${[['all', 'All'], ['24h', '24h'], ['7d', '7d'], ['30d', '30d'], ['90d', '90d']]
+            .map(([k, l]) => `<button onclick="ArroData.preset('${k}')" title="Show the last ${l === 'All' ? 'of everything' : l}">${l}</button>`).join('')}
+        </span>
+        <span class="ad-tool-grp">
+          <button onclick="ArroData.exportCsv('kept')" title="The filtered series, as CSV">Export kept</button>
+          <button onclick="ArroData.exportCsv('all')" title="Every reading with the filter's verdict against it">Export + verdict</button>
+          <button onclick="ArroData.exportImg('svg')" title="Download the chart as SVG">SVG</button>
+          <button onclick="ArroData.exportImg('png')" title="Download the chart as PNG">PNG</button>
+        </span>
+      </div>`;
+  }
+
+  // ── readout / inspector ────────────────────────────────────────────────────
+
+  function statusOf(s, i) {
+    const f = runFilter(s, ad.cfg);
+    return f.status[i];
+  }
+
+  function readoutHtml() {
+    if (ad.pin) {
+      const s = ad.series.find(x => x.key === ad.pin.key);
+      if (s) return pinHtml(s, ad.pin.i);
+    }
+    if (ad.hover && ad.hover.rows.length) {
+      return `
+        <div class="ad-read-hover">
+          <b>${esc(fmtFull(ad.hover.t))}</b>
+          ${ad.hover.rows.map(r => `
+            <span class="ad-read-item">
+              <span class="ad-dot" style="background:${escAttr(r.color)}"></span>
+              ${esc(r.label)} <b>${esc(fmtVal(r.y))}</b>${r.unit ? ' ' + esc(r.unit) : ''}
+              <span class="small" style="color:var(--muted)">${esc(r.kindLabel)}${r.q ? ' · ' + esc(r.q) : ''}</span>
+            </span>`).join('')}
+          <span class="small" style="color:var(--muted)">click to pin a reading</span>
+        </div>`;
+    }
+    return statsHtml();
+  }
+
+  function pinHtml(s, i) {
+    const f = runFilter(s, ad.cfg);
+    const st = f.status[i];
+    const why = st === AD_GOOD ? 'Passed the 357 test.'
+      : st === AD_OOS ? 'Dropped before filtering — this timestamp does not advance the clock, so it is a repeat of an earlier reading rather than a new observation.'
+      : `Failed the 357 test against the readings that follow it — not within ${ad.cfg.small} of the next, ${ad.cfg.medium} of the next-next, or ${ad.cfg.large} of the one after that.`;
+    const rolled = f.rolls.includes(i);
+    return `
+      <div class="ad-pin">
+        <div class="ad-pin-head">
+          <span class="ad-dot" style="background:${escAttr(s.color)}"></span>
+          <b>${esc(s.label)}</b>
+          <span class="ad-badge ad-badge--${st === AD_GOOD ? 'ok' : st === AD_OOS ? 'dup' : 'bad'}">${esc(AD_STATUS_LABEL[st])}</span>
+          <button class="ad-x" onclick="ArroData.unpin()" title="Close">✕</button>
+        </div>
+        <div class="ad-pin-grid">
+          <div><span>Reading</span><b>${esc(fmtFull(s.t[i]))}</b></div>
+          <div><span>Received</span><b>${esc(fmtFull(s.tr[i]))}${s.tr[i] !== s.t[i]
+              ? ` <span class="small" style="color:var(--warn)">+${Math.round((s.tr[i] - s.t[i]) / 1000)}s</span>` : ''}</b></div>
+          <div><span>Value</span><b>${esc(fmtVal(s.v[i]))} ${esc(s.unit)}</b></div>
+          <div><span>Raw</span><b>${esc(fmtVal(s.raw[i]))}</b></div>
+          <div><span>Adjusted</span><b>${esc(fmtVal(f.adj[i]))}${rolled ? ' <span class="small">(wrap here)</span>' : ''}</b></div>
+          <div><span>Quality</span><b>${esc(s.qcodes[s.q[i]] || '—')}</b></div>
+        </div>
+        <div class="small ad-pin-why">${esc(why)}</div>
+      </div>`;
+  }
+
+  function statsHtml() {
+    const vis = shown();
+    if (!vis.length) return '<span class="small" style="color:var(--muted)">No series shown — tick one on the left.</span>';
+    const v = view();
+    return `<div class="ad-stats">${vis.map(s => {
+      const tr = tracks(s);
+      const track = ad.mode === 'raw' ? tr.raw : tr.filt;
+      const i0 = lower(track.t, track.n, v.t0), i1 = lower(track.t, track.n, v.t1);
+      let lo = Infinity, hi = -Infinity, sum = 0, cnt = 0;
+      for (let k = i0; k < i1; k++) { const y = track.y[k]; if (y < lo) lo = y; if (y > hi) hi = y; sum += y; cnt++; }
+      const net = cnt && ad.transform === 'value' ? track.y[i1 - 1] - track.y[i0] : sum;
+      return `
+        <span class="ad-stat">
+          <span class="ad-dot" style="background:${escAttr(s.color)}"></span>
+          <b>${esc(s.label)}</b>
+          <span class="small">${cnt.toLocaleString()} in view${cnt ? ` · ${fmtVal(lo)}–${fmtVal(hi)} ${esc(s.unit)}
+            · ${ad.transform === 'value' ? 'net' : 'total'} ${fmtVal(net)}` : ''}</span>
+        </span>`;
+    }).join('')}</div>`;
+  }
+
+  // ── drawing ────────────────────────────────────────────────────────────────
+  // Theme colours are read from the document rather than written as `var(...)`
+  // into the markup, because the SVG has to survive being pulled out of the
+  // page and turned into a PNG, where nothing would resolve them.
+
+  function theme() {
+    const cs = getComputedStyle(document.documentElement);
+    const pick = (n, fb) => (cs.getPropertyValue(n) || '').trim() || fb;
+    return {
+      text:   pick('--text', '#16202a'),
+      muted:  pick('--muted', '#4f6478'),
+      border: pick('--border', '#dde5ee'),
+      panel:  pick('--panel', '#ffffff'),
+      bad:    pick('--bad', '#c7401a'),
+      warn:   pick('--warn', '#a86400'),
+      accent: pick('--accent', '#0b5cab'),
+    };
+  }
+
+  const PADL = 64, PADR = 18, PADT = 14, PADB = 30;
+  const MARK_CAP = 2500;      // removed-point markers drawn before we stop
+
+  function measure() {
+    const stage = document.getElementById('ad-stage');
+    if (!stage) return false;
+    const r = stage.getBoundingClientRect();
+    const w = Math.max(360, Math.round(r.width));
+    const h = Math.max(240, Math.round(r.height));
+    const same = w === ad.w && h === ad.h;
+    ad.w = w; ad.h = h;
+    return !same;
+  }
+
+  function geom() {
+    const v = view();
+    if (!v) return null;
+    const w = ad.w, h = ad.h;
+    const pw = w - PADL - PADR, ph = h - PADT - PADB;
+    const yr = yRange(v);
+    const x = t => PADL + (t - v.t0) / (v.t1 - v.t0) * pw;
+    const y = val => PADT + (1 - (val - yr.lo) / (yr.hi - yr.lo)) * ph;
+    const tOf = px => v.t0 + (px - PADL) / pw * (v.t1 - v.t0);
+    return { v, w, h, pw, ph, yr, x, y, tOf };
+  }
+
+  function draw() {
+    const svg = document.getElementById('ad-svg');
+    if (!svg) return;
+    const g = geom();
+    if (!g) { svg.innerHTML = ''; return; }
+    const c = theme();
+    svg.setAttribute('viewBox', `0 0 ${g.w} ${g.h}`);
+    svg.setAttribute('width', g.w);
+    svg.setAttribute('height', g.h);
+
+    const { ticks, step } = timeTicks(g.v.t0, g.v.t1, Math.max(3, Math.round(g.pw / 110)));
+    const yt = niceTicks(g.yr.lo, g.yr.hi, Math.max(2, Math.round(g.ph / 46)));
+
+    // Everything data-driven is clipped to the plot rectangle. Without it a
+    // fixed or kept-only vertical range lets curves run across the axis labels.
+    let out = `<defs><clipPath id="ad-clip"><rect x="${PADL}" y="${PADT}"
+                 width="${g.pw}" height="${g.ph}"/></clipPath></defs>
+               <rect x="0" y="0" width="${g.w}" height="${g.h}" fill="${c.panel}"/>`;
+
+    out += yt.map(val => `
+      <line x1="${PADL}" y1="${g.y(val).toFixed(1)}" x2="${g.w - PADR}" y2="${g.y(val).toFixed(1)}"
+            stroke="${c.border}" stroke-width="1"/>
+      <text x="${PADL - 6}" y="${(g.y(val) + 3.5).toFixed(1)}" font-size="10" text-anchor="end"
+            fill="${c.muted}">${esc(fmtVal(val))}</text>`).join('');
+
+    out += ticks.map(t => `
+      <line x1="${g.x(t).toFixed(1)}" y1="${PADT}" x2="${g.x(t).toFixed(1)}" y2="${g.h - PADB}"
+            stroke="${c.border}" stroke-width="1" opacity=".7"/>
+      <text x="${g.x(t).toFixed(1)}" y="${g.h - PADB + 14}" font-size="10" text-anchor="middle"
+            fill="${c.muted}">${esc(fmtTick(t, step))}</text>`).join('');
+
+    // Rollover seams sit under the curves — they explain a step, they are not
+    // a reading in their own right.
+    if (ad.showRollover) {
+      for (const s of shown()) {
+        const f = runFilter(s, ad.cfg);
+        for (const i of f.rolls) {
+          if (s.t[i] < g.v.t0 || s.t[i] > g.v.t1) continue;
+          out += `<line x1="${g.x(s.t[i]).toFixed(1)}" y1="${PADT}" x2="${g.x(s.t[i]).toFixed(1)}"
+                        y2="${g.h - PADB}" stroke="${c.warn}" stroke-width="1.2" stroke-dasharray="4 3"
+                        opacity=".8"><title>Accumulator wrap corrected · ${esc(fmtFull(s.t[i]))}</title></line>`;
+        }
+      }
+    }
+
+    const stepped = ad.chartType === 'step';
+    const dots = ad.chartType === 'dots';
+    let markers = '', nMark = 0;
+    let series = '';
+
+    for (const s of shown()) {
+      for (const { track, kind } of layers(s)) {
+        const i0 = Math.max(0, lower(track.t, track.n, g.v.t0) - 1);
+        const i1 = Math.min(track.n, lower(track.t, track.n, g.v.t1) + 1);
+        const pts = densify(track, i0, i1, g.x, g.pw);
+        if (!pts.length) continue;
+        // In "both", raw sits underneath as a ghost so that what the filter took
+        // out reads as a gap in the solid line rather than a second chart.
+        const ghost = ad.mode === 'both' && kind === 'raw';
+        if (dots) {
+          markers += pts.slice(0, 4000).map(p =>
+            `<circle cx="${p[0].toFixed(1)}" cy="${g.y(p[1]).toFixed(1)}" r="${ghost ? 1.1 : 1.8}"
+                     fill="${escAttr(s.color)}" opacity="${ghost ? .3 : .9}"/>`).join('');
+        } else {
+          series += `<path d="${pathFrom(pts, g.y, stepped)}" fill="none" stroke="${escAttr(s.color)}"
+                        stroke-width="${ghost ? 1 : 1.7}" opacity="${ghost ? .34 : 1}"
+                        stroke-linejoin="round" stroke-linecap="round"/>`;
+        }
+        // Few enough points on screen that each one is a real reading: show them.
+        if (!dots && ad.showPoints !== 'off' && (i1 - i0) <= Math.max(40, g.pw / 12) && !ghost) {
+          for (let k = i0; k < i1; k++) {
+            markers += `<circle cx="${g.x(track.t[k]).toFixed(1)}" cy="${g.y(track.y[k]).toFixed(1)}"
+                                r="2.2" fill="${escAttr(s.color)}"/>`;
+          }
+        }
+      }
+
+      // What the filter took out, and what never made it in.
+      const f = runFilter(s, ad.cfg);
+      const wantBad = ad.showRemoved && ad.mode !== 'raw';
+      if (wantBad || ad.showDupes) {
+        const i0 = lower(s.t, s.n, g.v.t0), i1 = lower(s.t, s.n, g.v.t1);
+        for (let i = i0; i < i1 && nMark < MARK_CAP; i++) {
+          const st = f.status[i];
+          const isBad = st === AD_BAD, isDup = st === AD_OOS;
+          if (!(isBad && wantBad) && !(isDup && ad.showDupes)) continue;
+          if (ad.transform !== 'value') continue;   // a removed step has no meaningful height
+          const px = g.x(s.t[i]), py = g.y(s.v[i]);
+          nMark++;
+          // A removal above the top of the scale still has to be visible, or
+          // "Kept" would quietly hide the very readings it is scaled to exclude.
+          if (py < PADT) {
+            markers += `<path d="M${px.toFixed(1)} ${PADT}l-4 7h8Z" fill="${isBad ? c.bad : c.muted}"
+                              opacity=".9"><title>${esc(fmtVal(s.v[i]))} ${esc(s.unit)} — above the scale</title></path>`;
+            continue;
+          }
+          if (py > g.h - PADB) continue;
+          markers += isBad
+            ? `<path d="M${(px - 3).toFixed(1)} ${(py - 3).toFixed(1)}l6 6M${(px + 3).toFixed(1)} ${(py - 3).toFixed(1)}l-6 6"
+                     stroke="${c.bad}" stroke-width="1.4" opacity=".92"/>`
+            : `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="1.6" fill="${c.muted}" opacity=".5"/>`;
+        }
+      }
+    }
+    out += `<g clip-path="url(#ad-clip)">${series}${markers}</g>`;
+
+    // Crosshair and the nearest-reading halo.
+    if (ad.hover) {
+      const hx = g.x(ad.hover.t);
+      out += `<line x1="${hx.toFixed(1)}" y1="${PADT}" x2="${hx.toFixed(1)}" y2="${g.h - PADB}"
+                    stroke="${c.accent}" stroke-width="1" opacity=".55"/>`;
+      for (const r of ad.hover.rows) {
+        out += `<circle cx="${g.x(r.t).toFixed(1)}" cy="${g.y(r.y).toFixed(1)}" r="3.6"
+                        fill="none" stroke="${escAttr(r.color)}" stroke-width="2"/>`;
+      }
+    }
+    if (ad.pin) {
+      const s = ad.series.find(x => x.key === ad.pin.key);
+      if (s && ad.transform === 'value') {
+        const px = g.x(s.t[ad.pin.i]), py = g.y(s.v[ad.pin.i]);
+        out += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="6" fill="none"
+                        stroke="${c.accent}" stroke-width="2"/>`;
+      }
+    }
+    if (ad.drag && ad.drag.brush) {
+      const a = Math.min(ad.drag.x0, ad.drag.x1), b = Math.max(ad.drag.x0, ad.drag.x1);
+      out += `<rect x="${a.toFixed(1)}" y="${PADT}" width="${(b - a).toFixed(1)}" height="${g.ph}"
+                    fill="${c.accent}" opacity=".14"/>`;
+    }
+
+    out += `<line x1="${PADL}" y1="${g.h - PADB}" x2="${g.w - PADR}" y2="${g.h - PADB}"
+                  stroke="${c.muted}" stroke-width="1"/>
+            <line x1="${PADL}" y1="${PADT}" x2="${PADL}" y2="${g.h - PADB}"
+                  stroke="${c.muted}" stroke-width="1"/>`;
+
+    const unit = shown()[0]?.unit || '';
+    const yLabel = ad.transform === 'value' ? unit
+                 : ad.transform === 'increment' ? `${unit}/reading` : `${unit}/h`;
+    if (yLabel) {
+      out += `<text x="6" y="${PADT + 8}" font-size="10" fill="${c.muted}">${esc(yLabel)}</text>`;
+    }
+    if (nMark >= MARK_CAP) {
+      out += `<text x="${g.w - PADR}" y="${PADT + 10}" font-size="10" text-anchor="end" fill="${c.muted}">
+                marks capped at ${MARK_CAP} — zoom in for the rest</text>`;
+    }
+    svg.innerHTML = out;
+  }
+
+  // The overview is the whole record at a glance, with the visible window over
+  // it — the thing that stops a deep zoom from feeling lost.
+  function drawOv() {
+    const svg = document.getElementById('ad-ov');
+    if (!svg) return;
+    const ex = extent();
+    if (!ex) { svg.innerHTML = ''; return; }
+    const c = theme();
+    const w = ad.w, h = 56;
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    const pw = w - PADL - PADR;
+    const x = t => PADL + (t - ex.t0) / (ex.t1 - ex.t0) * pw;
+
+    let lo = Infinity, hi = -Infinity;
+    const vis = shown();
+    for (const s of vis) {
+      const track = tracks(s)[ad.mode === 'raw' ? 'raw' : 'filt'];
+      for (let k = 0; k < track.n; k++) { const y = track.y[k]; if (y < lo) lo = y; if (y > hi) hi = y; }
+    }
+    if (!isFinite(lo)) { lo = 0; hi = 1; }
+    if (hi === lo) hi = lo + 1;
+    const y = val => 6 + (1 - (val - lo) / (hi - lo)) * (h - 18);
+
+    let out = `<rect x="0" y="0" width="${w}" height="${h}" fill="${c.panel}"/>`;
+    for (const s of vis) {
+      const track = tracks(s)[ad.mode === 'raw' ? 'raw' : 'filt'];
+      const pts = densify(track, 0, track.n, x, pw);
+      if (pts.length) {
+        out += `<path d="${pathFrom(pts, y, false)}" fill="none" stroke="${escAttr(s.color)}"
+                      stroke-width="1" opacity=".85"/>`;
+      }
+    }
+    const v = view();
+    const a = x(v.t0), b = x(v.t1);
+    out += `<rect x="${PADL}" y="4" width="${Math.max(0, a - PADL).toFixed(1)}" height="${h - 16}"
+                  fill="${c.muted}" opacity=".22"/>
+            <rect x="${b.toFixed(1)}" y="4" width="${Math.max(0, w - PADR - b).toFixed(1)}" height="${h - 16}"
+                  fill="${c.muted}" opacity=".22"/>
+            <rect x="${a.toFixed(1)}" y="4" width="${Math.max(1, b - a).toFixed(1)}" height="${h - 16}"
+                  fill="none" stroke="${c.accent}" stroke-width="1.4"/>
+            <text x="${PADL - 6}" y="${h - 5}" font-size="9" text-anchor="end" fill="${c.muted}">whole record</text>
+            <text x="${PADL}" y="${h - 5}" font-size="9" fill="${c.muted}">${esc(fmtFull(ex.t0).slice(0, 10))}</text>
+            <text x="${w - PADR}" y="${h - 5}" font-size="9" text-anchor="end" fill="${c.muted}">${esc(fmtFull(ex.t1).slice(0, 10))}</text>`;
+    svg.innerHTML = out;
+  }
+
+  // ── interaction ────────────────────────────────────────────────────────────
+
+  function localX(ev, el) {
+    const r = el.getBoundingClientRect();
+    return (ev.clientX - r.left) * (ad.w / r.width);
+  }
+
+  function hoverAt(px, py) {
+    const g = geom();
+    if (!g) return null;
+    const t = g.tOf(px);
+    const rows = [];
+    for (const s of shown()) {
+      for (const { track, kind } of layers(s)) {
+        if (ad.mode === 'both' && kind === 'raw') continue;   // one row per series
+        if (!track.n) continue;
+        let k = lower(track.t, track.n, t);
+        if (k >= track.n) k = track.n - 1;
+        if (k > 0 && Math.abs(track.t[k - 1] - t) < Math.abs(track.t[k] - t)) k--;
+        const i = track.ref[k];
+        rows.push({
+          key: s.key, label: s.label, color: s.color, unit: s.unit,
+          t: track.t[k], y: track.y[k], i, k,
+          q: s.qcodes[s.q[i]] || '',
+          kindLabel: ad.mode === 'raw' ? 'raw' : 'kept',
+          dist: Math.abs(g.x(track.t[k]) - px) + Math.abs(g.y(track.y[k]) - py) * 0.35,
+        });
+      }
+    }
+    rows.sort((a, b) => a.dist - b.dist);
+    return { t, x: px, y: py, rows };
+  }
+
+  function showTip(ev) {
+    const tip = document.getElementById('ad-tip');
+    const stage = document.getElementById('ad-stage');
+    if (!tip || !stage || !ad.hover || !ad.hover.rows.length) { if (tip) tip.hidden = true; return; }
+    tip.innerHTML = `<div class="ad-tip-t">${esc(fmtFull(ad.hover.t))}</div>`
+      + ad.hover.rows.slice(0, 6).map(r => `
+        <div class="ad-tip-r"><span class="ad-dot" style="background:${escAttr(r.color)}"></span>
+          ${esc(r.label)} <b>${esc(fmtVal(r.y))}</b> ${esc(r.unit)}</div>`).join('');
+    const r = stage.getBoundingClientRect();
+    const lx = ev.clientX - r.left, ly = ev.clientY - r.top;
+    tip.hidden = false;
+    tip.style.left = Math.min(r.width - tip.offsetWidth - 8, lx + 14) + 'px';
+    tip.style.top  = Math.min(r.height - tip.offsetHeight - 8, ly + 14) + 'px';
+  }
+
+  function bind() {
+    const stage = document.getElementById('ad-stage');
+    const svg = document.getElementById('ad-svg');
+    if (!stage || !svg) return;
+
+    svg.onpointermove = ev => {
+      const px = localX(ev, svg);
+      const r = svg.getBoundingClientRect();
+      const py = (ev.clientY - r.top) * (ad.h / r.height);
+      if (ad.drag) {
+        if (ad.drag.brush) { ad.drag.x1 = px; draw(); return; }
+        const g = geom();
+        if (!g) return;
+        const dt = (ad.drag.px - px) / g.pw * (ad.drag.t1 - ad.drag.t0);
+        ad.view = { t0: ad.drag.t0 + dt, t1: ad.drag.t1 + dt };
+        draw(); drawOv();
+        return;
+      }
+      ad.hover = hoverAt(px, py);
+      draw();
+      showTip(ev);
+      renderReadout();
+    };
+    svg.onpointerleave = () => {
+      ad.hover = null;
+      const tip = document.getElementById('ad-tip');
+      if (tip) tip.hidden = true;
+      draw(); renderReadout();
+    };
+    svg.onpointerdown = ev => {
+      const g = geom();
+      if (!g) return;
+      svg.setPointerCapture?.(ev.pointerId);
+      const px = localX(ev, svg);
+      ad.drag = { px, x0: px, x1: px, t0: g.v.t0, t1: g.v.t1, brush: ad.brush || ev.shiftKey, moved: false };
+    };
+    svg.onpointerup = ev => {
+      const d = ad.drag;
+      ad.drag = null;
+      if (!d) return;
+      const px = localX(ev, svg);
+      const moved = Math.abs(px - d.x0) > 3;
+      if (d.brush && moved) {
+        const g = geom();
+        const a = g.v.t0 + (Math.min(d.x0, px) - PADL) / g.pw * (g.v.t1 - g.v.t0);
+        const b = g.v.t0 + (Math.max(d.x0, px) - PADL) / g.pw * (g.v.t1 - g.v.t0);
+        if (b - a > 1000) ad.view = { t0: a, t1: b };
+      } else if (!moved) {
+        // A click pins the nearest reading, so it can be read in full and
+        // its verdict explained.
+        const r = svg.getBoundingClientRect();
+        const py = (ev.clientY - r.top) * (ad.h / r.height);
+        const h = hoverAt(px, py);
+        if (h && h.rows.length) ad.pin = { key: h.rows[0].key, i: h.rows[0].i };
+        else ad.pin = null;
+      }
+      draw(); drawOv(); renderReadout();
+    };
+    svg.addEventListener('wheel', ev => {
+      ev.preventDefault();
+      const g = geom();
+      if (!g) return;
+      const t = g.tOf(localX(ev, svg));
+      const z = Math.exp(ev.deltaY * 0.0014);
+      ad.view = { t0: t - (t - g.v.t0) * z, t1: t + (g.v.t1 - t) * z };
+      draw(); drawOv(); renderReadout();
+    }, { passive: false });
+    svg.ondblclick = () => { ad.view = null; ad.pin = null; draw(); drawOv(); renderReadout(); };
+
+    stage.onkeydown = ev => {
+      const g = geom();
+      if (!g) return;
+      const span = g.v.t1 - g.v.t0;
+      const pan = d => { ad.view = { t0: g.v.t0 + d, t1: g.v.t1 + d }; };
+      const zoom = f => {
+        const mid = (g.v.t0 + g.v.t1) / 2;
+        ad.view = { t0: mid - span * f / 2, t1: mid + span * f / 2 };
+      };
+      switch (ev.key) {
+        case 'ArrowLeft':  pan(-span * 0.2); break;
+        case 'ArrowRight': pan(span * 0.2);  break;
+        case '+': case '=': zoom(0.6); break;
+        case '-': case '_': zoom(1.7); break;
+        case '0': ad.view = null; break;
+        case 'Escape': ad.pin = null; break;
+        default: return;
+      }
+      ev.preventDefault();
+      draw(); drawOv(); renderReadout();
+    };
+
+    // Overview: drag anywhere on it to centre the window there.
+    const ov = document.getElementById('ad-ov');
+    if (ov) {
+      const jump = ev => {
+        const ex = extent();
+        if (!ex) return;
+        const r = ov.getBoundingClientRect();
+        const px = (ev.clientX - r.left) * (ad.w / r.width);
+        const t = ex.t0 + (px - PADL) / (ad.w - PADL - PADR) * (ex.t1 - ex.t0);
+        const v = view();
+        const half = (v.t1 - v.t0) / 2;
+        ad.view = { t0: t - half, t1: t + half };
+        draw(); drawOv(); renderReadout();
+      };
+      ov.onpointerdown = ev => { ov.setPointerCapture?.(ev.pointerId); ad.ovDrag = true; jump(ev); };
+      ov.onpointermove = ev => { if (ad.ovDrag) jump(ev); };
+      ov.onpointerup = () => { ad.ovDrag = false; };
+      ov.onpointerleave = () => { ad.ovDrag = false; };
+    }
+
+    const drop = document.getElementById('ad-drop');
+    if (drop) {
+      for (const e of ['dragover', 'dragenter']) {
+        drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('ad-drop--active'); });
+      }
+      for (const e of ['dragleave', 'drop']) {
+        drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('ad-drop--active'); });
+      }
+      drop.addEventListener('drop', ev => importFiles(ev.dataTransfer && ev.dataTransfer.files));
+    }
+  }
+
+  function init() {
+    if (ad.ro) { ad.ro.disconnect(); ad.ro = null; }
+    measure();
+    bind();
+    draw();
+    drawOv();
+    const stage = document.getElementById('ad-stage');
+    if (stage && typeof ResizeObserver !== 'undefined') {
+      ad.ro = new ResizeObserver(() => { if (measure()) { draw(); drawOv(); } });
+      ad.ro.observe(stage);
+    }
+  }
+
+  function stop() { if (ad.ro) { ad.ro.disconnect(); ad.ro = null; } }
+
+  function renderAll() {
+    const side = document.getElementById('ad-side');
+    const main = document.querySelector('.ad-main');
+    if (!side || !main) { renderMain(); return; }
+    side.innerHTML = sideHtml();
+    main.innerHTML = mainHtml();
+    init();
+  }
+  function renderSide() {
+    const side = document.getElementById('ad-side');
+    if (side) side.innerHTML = sideHtml();
+    bind();
+  }
+  function renderReadout() {
+    const el = document.getElementById('ad-readout');
+    if (el) el.innerHTML = readoutHtml();
+  }
+  // Config and visibility changes invalidate the drawn curves but not the page.
+  function redraw(sideToo) {
+    for (const s of ad.series) s.tracks = null;
+    if (sideToo) renderSide();
+    draw(); drawOv(); renderReadout();
+  }
+
+  // ── handlers ───────────────────────────────────────────────────────────────
+
+  const find = key => ad.series.find(s => s.key === key);
+
+  function pick(input) { importFiles(input.files); input.value = ''; }
+
+  function toggle(key) { const s = find(key); if (s) { s.visible = !s.visible; redraw(true); } }
+  function setColor(key, v) { const s = find(key); if (s) { s.color = v; draw(); drawOv(); } }
+  function setKind(key, v) { const s = find(key); if (s) { s.kind = v; s.filt = null; s.tracks = null; redraw(true); } }
+  function solo(key) { ad.series.forEach(s => { s.visible = s.key === key; }); redraw(true); }
+  function zoomTo(key) {
+    const s = find(key);
+    if (!s || !s.n) return;
+    ad.view = { t0: s.t[0], t1: s.t[s.n - 1] };
+    draw(); drawOv(); renderReadout();
+  }
+  function remove(key) {
+    ad.series = ad.series.filter(s => s.key !== key);
+    if (ad.pin && ad.pin.key === key) ad.pin = null;
+    ad.view = null;
+    renderAll();
+  }
+  function clearAll() {
+    if (ad.series.length > 1 && !confirm(`Remove all ${ad.series.length} imports?`)) return;
+    ad.series = []; ad.pin = null; ad.hover = null; ad.view = null;
+    renderAll();
+  }
+  function showStation(id) {
+    state.selectedId = id;
+    state.activeTab = 'stations';
+    renderTabs();
+    renderMain();
+  }
+
+  function setCfg(k, v) {
+    ad.cfg[k] = typeof v === 'boolean' ? v : (parseFloat(v) || 0);
+    for (const s of ad.series) { s.filt = null; s.tracks = null; }
+    redraw(true);
+  }
+  function resetCfg() {
+    ad.cfg = { ...AD_CFG_DEFAULT };
+    for (const s of ad.series) { s.filt = null; s.tracks = null; }
+    redraw(true);
+  }
+
+  function setMode(v)      { ad.mode = v; renderMainOnly(); }
+  function setTransform(v) { ad.transform = v; for (const s of ad.series) s.tracks = null; renderMainOnly(); }
+  function setChart(v)     { ad.chartType = v; renderMainOnly(); }
+  function setY(v)         { ad.yMode = v; renderMainOnly(); }
+  function setYRange(which, v) { if (which === 'min') ad.yMin = v; else ad.yMax = v; draw(); }
+  function setFlag(k, v)   { ad[k] = v; renderMainOnly(); }
+  function unpin()         { ad.pin = null; draw(); renderReadout(); }
+
+  function renderMainOnly() {
+    const main = document.querySelector('.ad-main');
+    if (!main) return;
+    main.innerHTML = mainHtml();
+    init();
+  }
+
+  function preset(k) {
+    const ex = extent();
+    if (!ex) return;
+    if (k === 'all') ad.view = null;
+    else {
+      const days = { '24h': 1, '7d': 7, '30d': 30, '90d': 90 }[k] || 1;
+      ad.view = { t0: ex.t1 - days * AD_DAY, t1: ex.t1 };
+    }
+    draw(); drawOv(); renderReadout();
+  }
+
+  // ── export ─────────────────────────────────────────────────────────────────
+
+  function exportCsv(which) {
+    const vis = shown();
+    if (!vis.length) { note('Nothing to export — no series is shown.', true); return; }
+    const multi = vis.length > 1;
+    const head = ['Reading', 'Receive', 'Value', 'Unit', 'Data Quality', 'Raw Value', 'Adjusted Value'];
+    if (which === 'all') head.push('Filter Status');
+    if (multi) head.unshift('Series', 'Sensor Id');
+
+    const lines = [head.join(',')];
+    let rows = 0;
+    for (const s of vis) {
+      const f = runFilter(s, ad.cfg);
+      for (let i = 0; i < s.n; i++) {
+        if (which === 'kept' && f.status[i] !== AD_GOOD) continue;
+        const r = [fmtFull(s.t[i]), fmtFull(s.tr[i]), s.v[i], s.unit,
+                   s.qcodes[s.q[i]] || '', s.raw[i], f.adj[i]];
+        if (which === 'all') r.push(AD_STATUS_LABEL[f.status[i]]);
+        if (multi) r.unshift(s.label, s.sensorId || '');
+        lines.push(r.map(csvEscape).join(','));
+        rows++;
+      }
+    }
+    const base = multi ? 'arro_export' : slug(vis[0].label) || 'arro_export';
+    dlText(`${base}_${which === 'kept' ? '357filtered' : 'verdict'}.csv`, lines.join('\n'));
+    note(`Exported ${rows.toLocaleString()} rows.`);
+  }
+
+  function exportImg(fmt) {
+    const svg = document.getElementById('ad-svg');
+    if (!svg) return;
+    const clone = svg.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const text = new XMLSerializer().serializeToString(clone);
+    if (fmt === 'svg') {
+      const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' })),
+        download: 'arro-chart.svg',
+      });
+      a.click();
+      URL.revokeObjectURL(a.href);
+      return;
+    }
+    const scale = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = ad.w * scale; canvas.height = ad.h * scale;
+    const img = new Image();
+    img.onload = () => {
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(b => {
+        if (!b) { note('The browser would not render the chart to PNG — the SVG download works.', true); return; }
+        const a = Object.assign(document.createElement('a'), {
+          href: URL.createObjectURL(b), download: 'arro-chart.png',
+        });
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+    };
+    img.onerror = () => note('The browser would not render the chart to PNG — the SVG download works.', true);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
+  }
+
+  function repaint() { draw(); drawOv(); }
+
+  return {
+    ad, render, init, stop, repaint, importFiles, pick,
+    toggle, setColor, setKind, solo, zoomTo, remove, clearAll, showStation,
+    setCfg, resetCfg, setMode, setTransform, setChart, setY, setYRange, setFlag,
+    preset, unpin, exportCsv, exportImg,
+    // exposed for reasoning about the filter outside the UI
+    parseCsv, parseName, linkStation, guessKind, runFilter, walk357,
+  };
+})();
+if (typeof window !== 'undefined') window.ArroData = ArroData;
 
 // ── EXPORT tab ─────────────────────────────────────────────────────────────────
 
