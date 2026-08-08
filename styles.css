@@ -548,6 +548,39 @@ details.filter-block[open] > .filter-head .filter-title::before {
   .filter-only:focus { visibility: visible; }
 }
 
+/* The table under the map is listing stations picked off the map, not the
+   filter result. The bar says so, and carries the only way back. */
+.sel-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .4rem .7rem;
+  padding: .45rem .6rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--subtle);
+}
+
+.sel-bar-count {
+  font-size: .87rem;
+}
+
+.sel-bar-note {
+  font-size: .76rem;
+  color: var(--muted);
+}
+
+.sel-bar-actions {
+  display: flex;
+  gap: .35rem;
+  margin-left: auto;
+}
+
+.sel-bar-actions button {
+  padding: .25rem .6rem;
+  font-size: .78rem;
+  white-space: nowrap;
+}
+
 .filter-check {
   display: flex;
   align-items: center;
@@ -1142,6 +1175,69 @@ hr {
 .draw-edit {
   padding: .1rem .2rem .5rem;
   border-bottom: 1px solid var(--border);
+}
+
+/* hand the stations inside a circle or rectangle to the list below the map */
+.draw-pick {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  padding: .15rem .35rem;
+  font-size: .7rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.draw-pick:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* colour picker: six presets that hold up on street, topo and satellite tiles,
+   with the native control behind them for anything else */
+.draw-colour {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin: .45rem 0 .1rem;
+}
+
+.draw-colour-label {
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+.draw-swatches {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  flex-wrap: wrap;
+}
+
+.draw-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--sw);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+}
+
+/* The ring sits outside the swatch so the colour itself is never covered. */
+.draw-swatch.on {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.draw-colour-input {
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
 }
 
 /* ── ACMA RRL interference layer ─────────────────────────────────────────── */
