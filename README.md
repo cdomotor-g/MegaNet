@@ -802,6 +802,108 @@ more than the square roots they save at this size.) Labels are capped by stage
 area rather than by a constant, because they hold a fixed size on screen at any
 zoom, so what they collide with is the room the pane has.
 
+### 17. Terrain Path Tools (Elevation Profile & Indicative Link Budget)
+Two features under the Stations map that both answer *"will this radio path
+work?"*, and one module underneath them that neither could exist without:
+**ground elevation along a line**, which MegaNet previously had no way to get.
+
+**Terrain, with no backend.** MegaNet is a static page on GitHub Pages, so an
+elevation API with a key was never available. Instead `Terrain` fetches
+**terrarium-encoded PNG elevation tiles** from AWS Terrain Tiles
+(`elevation-tiles-prod`) — open data, no key, `Access-Control-Allow-Origin: *`,
+~30 m SRTM over Australia — and decodes them in a canvas:
+
+```
+elevation_m = (R * 256 + G + B / 256) - 32768
+```
+
+It is the same XYZ scheme `makeBaseLayers()` already fetches base maps on, so the
+lat/lon → tile maths is the standard Web Mercator pair and nothing more. Tiles
+are cached **decoded**, as `Int16Array` metres rather than RGBA (128 KB a tile
+instead of 256 KB, and metre resolution is far finer than the ~30 m the source
+actually resolves), under an LRU bounded at 128 tiles ≈ 16 MB. A second profile
+over the same country costs no network at all — which is the case for tiles over
+an API, since an API would be one rate-limited request per profile with nothing
+kept between them.
+
+**Zoom is chosen, not fixed:** the coarsest zoom whose pixels are still finer
+than the gap between samples, then backed off if the path won't fit in a 48-tile
+budget. Going coarser is the expensive mistake — adjacent samples start landing
+on the same pixel, and a ridge narrower than a pixel stops existing. A ridge that
+stops existing is a path that reports clear. A 5 km hop lands on z12, a 120 km
+hop on z9, and neither pulls hundreds of tiles.
+
+**Failure is loud, and that is the point.** Offline, blocked, rate-limited and
+withdrawn-CORS all surface as an explicit failure state, and the profile panel
+draws *nothing* rather than a flat line. A flat profile reads as a clear path,
+which is the one wrong answer that costs someone a site visit. A single missing
+tile leaves a **gap** in the profile rather than being bridged through.
+
+**Datum, declared rather than hidden.** Terrarium heights are above the EGM96
+geoid; a station's `elevation_ahd` is Australian Height Datum. Over Australia the
+two agree to about a metre — well inside the ~30 m sampling error — but they are
+not the same datum and neither is ellipsoidal height. So a snapped station's own
+`elevation_ahd` wins for that **endpoint**, tiles only ever supply the ground
+*between* the ends, and the panel says so under every profile it draws.
+
+**The elevation profile** appears under the map once a line exists in *Draw &
+measure*, and plots ground (with a fixed k = 4/3 curvature bulge folded in so the
+line of sight can be drawn straight), the LOS between the two antennas, the **60%
+Fresnel zone**, and the stretches where terrain intrudes into it — plus a
+plain-English verdict, *clear / marginal / obstructed*. Antenna heights default
+from the station's `rm_systems[].antenna_height_m` and the frequency from the
+repeater's `rx_mhz`; both are editable, and each box says whether it is showing a
+default or an edit. The chart is inline SVG in the manner of `rfStripPlotHtml()`
+and `rfcChartHtml()` — no charting library, nothing fetched to draw it.
+
+> **On the Fresnel coefficient.** The first-zone radius here is
+> `r1 = 17.32·√(d1·d2 / (f·D))` (km, GHz, metres), not the `8.657` the original
+> ticket quoted. `8.657` is the same formula already specialised to the path
+> *midpoint* with the total distance as its argument (17.32/2). Using it against
+> `d1·d2/(f·D)` would halve the zone everywhere, and a half-size Fresnel zone
+> reports clearance that is not there — the one direction this must never err in.
+
+A **multi-leg line is a distance profile only** — no LOS, no Fresnel, and a note
+saying why. A dog-leg is not a radio path, and drawing a line of sight across a
+corner would describe a path nobody drew.
+
+**The link budget card** takes two points — each independently a station or an
+arbitrary point on the map — and itemises the path:
+
+```
+EIRP         = tx_power_dbm + tx_gain_dbi − tx_losses_db
+FSPL(dB)     = 32.44 + 20·log10(f_MHz) + 20·log10(d_km)
+RX predicted = EIRP − FSPL − obstruction_db + rx_gain_dbi − rx_losses_db
+Fade margin  = RX predicted − rx_sensitivity_dbm
+```
+
+Every term is its own row, signed, and visibly adds up to the received level —
+never a single number. Station ends auto-populate from `rm_systems[]` via
+`rm_system_id`; **arbitrary ends make relocation studies work**, which is the
+reason both ends are independently either kind: drop an end on a hilltop nobody
+has been to and see what the path would do. Auto-filled values are all editable
+and marked `default` (from the station data), `assumed` (a hypothetical site's
+starting figures, which came from nowhere but this code) or `edited`. The
+obstruction term is a **single knife-edge diffraction proxy** (ITU-R P.526)
+derived from the same profile, shown on its own line and labelled as a proxy; with
+no profile for those two points the card says the result is **free-space only**
+rather than quietly reporting a clear path. Margin classes are good ≥ 20 dB ·
+marginal 10–20 · poor < 10.
+
+**Where the two features disagree, the terrain wins.** A blocked path can still
+show a fat margin — one knife edge is the most optimistic diffraction model there
+is, and here it is standing in for a ridge *above* the line of sight. So when the
+profile says obstructed, the margin row is forced red and reads **Obstructed**
+however good the number looks, instead of "Good".
+
+**The disclaimer is part of the feature, not decoration.** A red banner sits at
+the top of the card, always visible and never dismissible, and a collapsible table
+one click below it lists exactly what this leaves out that Radio Mobile models —
+clutter, climate and refractivity, statistical reliability, real antenna
+patterns, multipath, polarisation, noise floor. Nearly all of those *reduce*
+real-world margin, which is why "indicative" here mostly means **optimistic**:
+a good margin is permission to model the path properly, never a result.
+
 ---
 
 ## Deployment Plan

@@ -271,6 +271,24 @@ const state = {
     // shapes themselves deliberately are not.
     colour:     localStorage.getItem('mn-draw-colour') || '',
   },
+  // Elevation profile under the map. Only the operator's overrides live here —
+  // the terrain itself is cached in Terrain, and the profile is recomputed from
+  // whichever line is current rather than stored.
+  path: {
+    open:    false,
+    aglA:    null,   // m AGL override; null = the station's rm_systems height
+    aglB:    null,
+    freqMhz: null,   // null = the repeater on either end, else PATH_DEFAULT_MHZ
+  },
+  // Link budget card. The endpoints have to outlive a tab switch — half an hour
+  // of what-ifs should not be thrown away by looking at the Pass Ranges tab.
+  link: {
+    open:    false,
+    picking: false,  // map clicks are setting endpoints
+    a:       null,   // { kind:'station'|'point', …, def:{}, over:{} } — see LinkBudget
+    b:       null,
+    freqMhz: null,
+  },
   exportNets:     null,
   bfInput:        '',
   bfBits:         '1',
@@ -1078,6 +1096,8 @@ function renderStationsHtml() {
           <div id="map-note" class="map-note" hidden></div>
           <div id="acma-card" class="acma-card" hidden></div>
         </div>
+        <div class="panel" id="path-profile-panel" hidden></div>
+        <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
         <div class="panel">
           <div class="panel-header">
             <h2>Stations <span class="badge" id="st-count">${stations.length}</span></h2>
@@ -1325,6 +1345,7 @@ function initMap() {
   state.acma.layer = state.acma.beamLayer = state.acma.linkLayer = state.acma.hiLayer = null;
   MapLocate.detach();
   MapDraw.detach();
+  LinkBudget.detach();
   const el = document.getElementById('leaflet-map');
   if (!el) return;
   // preferCanvas: with ~3,174 station pins and ~3,141 pass-range link lines,
@@ -1342,6 +1363,10 @@ function initMap() {
   MapSpider.attach(state.map);
   MapLocate.attach(state.map);
   MapDraw.attach(state.map);
+  LinkBudget.attach(state.map);
+  // Shapes survive a tab switch, so a line drawn earlier still has a profile to
+  // show on the map that has just been rebuilt.
+  PathProfile.sync();
   state.map.on('click', () => acmaClearHighlight());
   // Auto/On name labels are picked from what is in view, so they are re-picked
   // whenever the view changes rather than only when the layers are rebuilt.
@@ -2133,6 +2158,272 @@ const MapLocate = (function () {
   };
 })();
 
+// ── Terrain elevation ────────────────────────────────────────────────────────
+// Ground height along a line — what both the elevation profile and the link
+// budget are built on. MegaNet is a static page: there is no backend to ask and
+// no key can live in the repo, so elevation comes from open terrarium-encoded
+// PNG tiles, decoded in a canvas here in the browser.
+//
+// AWS Terrain Tiles (elevation-tiles-prod) is the source: open data, no key,
+// `Access-Control-Allow-Origin: *`, and ~30 m SRTM over Australia. It rides the
+// same XYZ scheme Leaflet already fetches base maps on (see makeBaseLayers), so
+// the lat/lon → tile maths is the standard Web Mercator pair and nothing more.
+//
+//   elevation_m = (R * 256 + G + B / 256) - 32768
+//
+// Tiles are cached decoded, so a second profile over the same country costs no
+// network at all. That is the reason for tiles over an elevation API: the API
+// would be one rate-limited request per profile with nothing kept between them,
+// and a handful of tiles already covers a whole VHF hop.
+//
+// DATUM — terrarium heights are above the EGM96 geoid; a station's
+// `elevation_ahd` is Australian Height Datum. Over Australia the two agree to
+// about a metre, well inside the ~30 m sampling error, but they are not the
+// same datum and neither one is ellipsoidal height. So where a station's own
+// elevation_ahd exists it wins for that *endpoint*, and tiles only ever supply
+// the ground *between* the ends. Everything drawn from this says so on screen.
+//
+// Every failure here is loud. A caller that cannot get terrain has to say so:
+// a flat profile reads as a clear path, which is the one wrong answer that
+// actually costs someone a site visit.
+
+const Terrain = (function () {
+  const TILE_URL  = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+  const TILE_PX   = 256;
+  // The source is ~30 m SRTM. Past z12 (~33 m/px at Queensland latitudes) the
+  // tiles are resampling their own pixels — four times the tiles for no more
+  // terrain.
+  const MAX_ZOOM  = 12;
+  const MIN_ZOOM  = 7;
+  const MAX_TILES = 48;      // per profile; the zoom drops until the path fits
+  const CACHE_MAX = 128;     // × 128 KB decoded ≈ 16 MB — the bound on a long session
+  const FETCH_MS  = 12000;   // a tile that hasn't arrived by now has failed
+  const FAIL_TTL  = 60000;   // how long a failed tile is remembered before a retry
+
+  // Decoded tiles, oldest first: a Map iterates in insertion order, so re-inserting
+  // on read is the whole of the LRU.
+  const cache    = new Map();   // 'z/x/y' → Int16Array(65536) of metres
+  const failedAt = new Map();   // 'z/x/y' → timestamp of the last failure
+  const inflight = new Map();   // 'z/x/y' → Promise<Int16Array|null>
+  let canvas = null;
+
+  const ATTRIB = 'Elevation: AWS Terrain Tiles (SRTM/GMTED, ~30 m), height above the EGM96 geoid';
+
+  // ── Web Mercator ──
+  // Fractional tile coordinates: the integer part is the tile, the fraction
+  // times 256 is the pixel inside it.
+  function tileX(lon, z) { return (lon + 180) / 360 * Math.pow(2, z); }
+
+  function tileY(lat, z) {
+    const r = Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI / 180;
+    return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z);
+  }
+
+  // Ground distance one tile pixel covers, which is what picks the zoom.
+  function metresPerPixel(lat, z) {
+    return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z);
+  }
+
+  // ── tiles ──
+
+  function sharedCanvas() {
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.width = canvas.height = TILE_PX;
+    }
+    return canvas;
+  }
+
+  // RGB → metres, once per tile, into an Int16Array. Holding the raw RGBA
+  // instead would be 256 KB a tile; metre resolution is far finer than the
+  // ~30 m the source actually resolves, and it halves the cache.
+  function decode(img) {
+    const cv = sharedCanvas();
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    cx.clearRect(0, 0, TILE_PX, TILE_PX);
+    cx.drawImage(img, 0, 0, TILE_PX, TILE_PX);
+    // Throws if the image tainted the canvas — i.e. the CORS headers went away.
+    // That is a failure like any other, and the caller turns it into one.
+    const d = cx.getImageData(0, 0, TILE_PX, TILE_PX).data;
+    const out = new Int16Array(TILE_PX * TILE_PX);
+    for (let i = 0, j = 0; i < out.length; i++, j += 4) {
+      out[i] = Math.round(d[j] * 256 + d[j + 1] + d[j + 2] / 256 - 32768);
+    }
+    return out;
+  }
+
+  function remember(key, px) {
+    cache.set(key, px);
+    while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+  }
+
+  // Resolves to the decoded tile, or to null for every kind of failure there is
+  // — offline, blocked, rate-limited, 404 over the ocean, CORS withdrawn. It
+  // never rejects: one missing tile is a gap in a profile, not a dead panel.
+  function loadTile(z, x, y) {
+    const key = `${z}/${x}/${y}`;
+    if (cache.has(key)) {
+      const px = cache.get(key);
+      cache.delete(key); cache.set(key, px);        // most recently used
+      return Promise.resolve(px);
+    }
+    if (inflight.has(key)) return inflight.get(key);
+    // A tile that just failed is not retried on every mouse-driven re-profile;
+    // after the TTL it gets another chance, so a dropped connection heals.
+    const fa = failedAt.get(key);
+    if (fa != null && Date.now() - fa < FAIL_TTL) return Promise.resolve(null);
+
+    const url = TILE_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+    const p = new Promise(resolve => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';               // required before getImageData
+      let settled = false;
+      const finish = v => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(v);
+      };
+      const timer = setTimeout(() => finish(null), FETCH_MS);
+      img.onload  = () => { try { finish(decode(img)); } catch (_) { finish(null); } };
+      img.onerror = () => finish(null);
+      img.src = url;
+    }).then(px => {
+      inflight.delete(key);
+      if (px) { failedAt.delete(key); remember(key, px); }
+      else    { failedAt.set(key, Date.now()); }
+      return px;
+    });
+    inflight.set(key, p);
+    return p;
+  }
+
+  // Nearest pixel, deliberately: interpolating between samples of a ~30 m grid
+  // invents detail the source does not have, and across a tile edge it would
+  // need the neighbour fetched as well.
+  function readTile(px, fx, fy, tx, ty) {
+    const ix = Math.min(TILE_PX - 1, Math.max(0, Math.floor((fx - tx) * TILE_PX)));
+    const iy = Math.min(TILE_PX - 1, Math.max(0, Math.floor((fy - ty) * TILE_PX)));
+    return px[iy * TILE_PX + ix];
+  }
+
+  // ── path sampling ──
+
+  // n points evenly spaced by distance along the polyline, each carried back as
+  // a real lat/lon so the caller can name and re-use them. Great-circle within
+  // each leg, via the geodesy the map already uses.
+  function walk(pts, n) {
+    const legs = [];
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const km = acmaHaversineKm(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
+      legs.push({ from: pts[i - 1], to: pts[i], km, at: total,
+                  brg: bearingDeg(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]) });
+      total += km;
+    }
+    const out = [];
+    let leg = 0;
+    for (let i = 0; i < n; i++) {
+      const km = total * i / (n - 1);
+      while (leg < legs.length - 1 && km > legs[leg].at + legs[leg].km) leg++;
+      const L = legs[leg];
+      // The ends are the vertices themselves, not a destPoint approximation of
+      // them — a snapped endpoint has to stay exactly on its station.
+      const ll = i === 0 ? pts[0]
+               : i === n - 1 ? pts[pts.length - 1]
+               : destPoint(L.from[0], L.from[1], L.brg, Math.max(0, km - L.at));
+      out.push({ km, lat: ll[0], lon: ll[1] });
+    }
+    return { samples: out, totalKm: total };
+  }
+
+  // The coarsest zoom whose pixels are still finer than the gap between
+  // samples, then backed off further if the path won't fit in the tile budget.
+  //
+  // Going coarser than the sample spacing is the expensive mistake: adjacent
+  // samples start landing on the same pixel and a ridge narrower than a pixel
+  // simply stops existing — and a ridge that stops existing is a path that
+  // reports clear. Going finer only costs tiles. So: fine enough that no sample
+  // is wasted, and no finer. A 5 km hop lands on z12, a 120 km hop on z9.
+  function pickZoom(samples, totalKm, n) {
+    const midLat = samples[Math.floor(samples.length / 2)].lat;
+    const spacing = Math.max(1, totalKm * 1000 / Math.max(1, n - 1));
+    let z = MIN_ZOOM;
+    while (z < MAX_ZOOM && metresPerPixel(midLat, z) > spacing) z++;
+    let capped = false;
+    for (;;) {
+      const keys = new Set();
+      for (const s of samples) keys.add(`${Math.floor(tileX(s.lon, z))}/${Math.floor(tileY(s.lat, z))}`);
+      if (keys.size <= MAX_TILES || z <= MIN_ZOOM) return { z, tiles: keys.size, capped };
+      z--; capped = true;
+    }
+  }
+
+  return {
+    // Ground height at one point, or null if the tile for it can't be had.
+    sample(lat, lon, zoom) {
+      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom || MAX_ZOOM));
+      const fx = tileX(lon, z), fy = tileY(lat, z);
+      const tx = Math.floor(fx), ty = Math.floor(fy);
+      return loadTile(z, tx, ty).then(px => (px ? readTile(px, fx, fy, tx, ty) : null));
+    },
+
+    // n evenly-spaced ground samples along a polyline.
+    //
+    // Resolves — never rejects — to one of two shapes, so a caller has to look
+    // at `ok` before it can draw anything:
+    //   { ok: false, error }                      nothing usable; say so
+    //   { ok: true, distance_m[], terrain_m[], …} terrain_m holds null wherever
+    //                                             a tile was missing, and
+    //                                             `partial` says it happened
+    profile(pts, n) {
+      const count = Math.max(2, Math.min(1024, n || 256));
+      if (!pts || pts.length < 2) {
+        return Promise.resolve({ ok: false, error: 'A path needs at least two points.' });
+      }
+      const { samples, totalKm } = walk(pts, count);
+      if (!(totalKm > 0)) {
+        return Promise.resolve({ ok: false, error: 'The two ends are in the same place.' });
+      }
+      const { z, tiles, capped } = pickZoom(samples, totalKm, count);
+
+      const need = new Map();
+      for (const s of samples) {
+        s.fx = tileX(s.lon, z); s.fy = tileY(s.lat, z);
+        s.tx = Math.floor(s.fx); s.ty = Math.floor(s.fy);
+        need.set(`${s.tx}/${s.ty}`, [s.tx, s.ty]);
+      }
+      const keys = [...need.keys()];
+      return Promise.all([...need.values()].map(([x, y]) => loadTile(z, x, y))).then(got => {
+        const byKey = {};
+        keys.forEach((k, i) => { byKey[k] = got[i]; });
+        const distance_m = [], terrain_m = [], lat = [], lon = [];
+        let missing = 0;
+        for (const s of samples) {
+          const px = byKey[`${s.tx}/${s.ty}`];
+          distance_m.push(s.km * 1000);
+          lat.push(s.lat); lon.push(s.lon);
+          if (px) terrain_m.push(readTile(px, s.fx, s.fy, s.tx, s.ty));
+          else { terrain_m.push(null); missing++; }
+        }
+        if (missing === samples.length) {
+          return { ok: false,
+                   error: 'Terrain tiles could not be fetched — offline, blocked, or the tile service is unavailable.' };
+        }
+        return { ok: true, distance_m, terrain_m, lat, lon,
+                 totalKm, zoom: z, tiles, capped, missing, partial: missing > 0,
+                 resolution_m: Math.round(metresPerPixel(samples[Math.floor(samples.length / 2)].lat, z)),
+                 attribution: ATTRIB };
+      });
+    },
+
+    attribution: ATTRIB,
+    maxTiles: MAX_TILES,
+    // For the panel footer: how much of a session's terrain is already in hand.
+    cached() { return cache.size; },
+  };
+})();
+
 // ── Draw & measure ───────────────────────────────────────────────────────────
 // Sketching over the network map: a coverage circle round a repeater, a
 // proposed path, a box round the part of a catchment that went quiet, and a
@@ -2909,6 +3200,11 @@ const MapDraw = (function () {
   function rerenderPanel() {
     const el = document.getElementById('map-draw-panel');
     if (el) { el.innerHTML = panelHtml(); updateFinishButton(); }
+    // The elevation profile hangs off whichever line is current, and this is the
+    // one place that changes: a shape added, selected, edited or deleted. A line
+    // being dragged out never gets here, which is the debounce — PathProfile
+    // compares the geometry itself and only fetches when it actually moved.
+    PathProfile.sync();
   }
 
   return {
@@ -2943,7 +3239,995 @@ const MapDraw = (function () {
 
     panelHtml, rerenderPanel, render, setTool, select, remove, clearAll,
     finishLine, addFromForm, applyEdit, useMapCentre, toggleLabels, measure,
-    setColour, toggleSnap, selectInside,
+    setColour, toggleSnap, selectInside, lineKm,
+
+    // Where a map click actually lands, snapping included — so the link budget
+    // picks endpoints by the same rule the draw tools do rather than growing a
+    // second, subtly different one.
+    resolveClick(latlng) { return resolve(latlng); },
+
+    // Drop a two-point line in programmatically (the link budget asking for a
+    // profile of its own path). Same shape, same list, same everything.
+    addLine(pts, sids) {
+      return add({ kind: 'line', pts: pts.map(p => p.slice()), snappedTo: (sids || []).slice() });
+    },
+  };
+})();
+
+// ── Path physics ─────────────────────────────────────────────────────────────
+// The maths shared by the elevation profile and the link budget. Deliberately
+// small and deliberately visible: every term below turns up as its own line in
+// the budget table, because a single predicted number is exactly the thing this
+// feature must not become.
+
+const PATH_DEFAULT_MHZ = 151.5;   // the network's own VHF band — RM_NET_DEFAULTS is 151–152
+const PATH_DEFAULT_AGL = 4;       // m, the Field Station 1W antenna height in rm_systems
+const EARTH_R_M        = 6371008.8;
+// Standard-atmosphere effective earth radius. "Simplified" in the comparison
+// table against Radio Mobile means exactly this: one fixed k, no climate.
+const PATH_K_FACTOR    = 4 / 3;
+
+// First Fresnel zone radius at a point d1 from one end and d2 from the other.
+//
+//   r1 = sqrt(λ·d1·d2 / (d1 + d2))
+//
+// which in the field units is r1 = 17.32·sqrt(d1_km·d2_km / (f_GHz·D_km)). Note
+// that this is *not* the 8.657 coefficient quoted in the ticket: 8.657 is the
+// same formula already specialised to the path midpoint with the total distance
+// as its argument (17.32/2 = 8.66). Using 8.657 against d1·d2/(f·D) would halve
+// the zone everywhere, and a half-size Fresnel zone reports clearance that is
+// not there — the one direction this must never err in.
+function fresnelR1(d1_m, d2_m, fMhz) {
+  const d = d1_m + d2_m;
+  if (!(d > 0) || !(fMhz > 0) || d1_m < 0 || d2_m < 0) return 0;
+  const lambda = 299.792458 / fMhz;                 // metres
+  return Math.sqrt(lambda * d1_m * d2_m / d);
+}
+
+// How much the earth rises between the two ends. Added to the ground rather
+// than bent into the line of sight, so the plot keeps a straight LOS and reads
+// the way a Radio Mobile profile does.
+function earthBulge(d1_m, d2_m) {
+  return (d1_m * d2_m) / (2 * PATH_K_FACTOR * EARTH_R_M);
+}
+
+// Fresnel-Kirchhoff diffraction parameter. h is the obstruction height above
+// the line of sight — positive when terrain is actually blocking.
+function fresnelV(h_m, d1_m, d2_m, fMhz) {
+  const r1 = fresnelR1(d1_m, d2_m, fMhz);
+  return r1 > 0 ? Math.SQRT2 * h_m / r1 : 0;
+}
+
+// Single knife-edge diffraction loss, the ITU-R P.526 approximation. ~6 dB at
+// grazing (v = 0), which is the number that makes a "just touching" path read
+// as already costing something.
+function knifeEdgeDb(v) {
+  if (v <= -0.78) return 0;
+  return 6.9 + 20 * Math.log10(Math.sqrt((v - 0.1) ** 2 + 1) + v - 0.1);
+}
+
+function fsplDb(dKm, fMhz) {
+  if (!(dKm > 0) || !(fMhz > 0)) return 0;
+  return 32.44 + 20 * Math.log10(fMhz) + 20 * Math.log10(dKm);
+}
+
+function wattsToDbm(w) { return w > 0 ? 10 * Math.log10(w * 1000) : null; }
+
+// The Radio Mobile system a station is configured with — where its transmit
+// power, feeder loss, antenna gain and height, and receiver threshold all
+// already live. Every station carries an rm_system_id, so a link budget between
+// two stations needs nothing typed in at all.
+function rmSystemOf(st) {
+  if (!st || st.rm_system_id == null || !state.data) return null;
+  return (state.data.rm_systems || []).find(r => r.id === st.rm_system_id) || null;
+}
+
+// Turn a terrain profile into the geometry both features read off: line of
+// sight from antenna to antenna, the 60% Fresnel envelope around it, and where
+// the ground gets into that envelope.
+//
+// `elevA`/`elevB` override the sampled ground at the ends — a snapped station's
+// own elevation_ahd beats a tile pixel, and mixing them is the datum compromise
+// the UI declares rather than hides.
+function pathAnalyse(prof, opt) {
+  const o = opt || {};
+  const fMhz = o.freqMhz > 0 ? o.freqMhz : PATH_DEFAULT_MHZ;
+  const D    = prof.distance_m[prof.distance_m.length - 1];
+  const g    = prof.terrain_m.slice();
+  const last = g.length - 1;
+
+  // The ends: a station's surveyed height where we have one, the tile otherwise.
+  const groundA = o.elevA != null ? o.elevA : g[0];
+  const groundB = o.elevB != null ? o.elevB : g[last];
+  if (groundA != null) g[0] = groundA;
+  if (groundB != null) g[last] = groundB;
+  if (groundA == null || groundB == null) {
+    return { ok: false, error: 'No ground height at one or both ends of the path.' };
+  }
+
+  const aglA = o.aglA != null ? o.aglA : PATH_DEFAULT_AGL;
+  const aglB = o.aglB != null ? o.aglB : PATH_DEFAULT_AGL;
+  const txZ  = groundA + aglA, rxZ = groundB + aglB;
+
+  const pts = [];
+  let worst = null, maxIntrusion = 0, maxV = -Infinity;
+  for (let i = 0; i < g.length; i++) {
+    const d1 = prof.distance_m[i], d2 = D - d1;
+    const los = txZ + (rxZ - txZ) * (D > 0 ? d1 / D : 0);
+    const r1  = fresnelR1(d1, d2, fMhz);
+    const bulge = earthBulge(d1, d2);
+    const ground = g[i];
+    const p = { d1, los, r1, bulge, ground,
+                bulged: ground == null ? null : ground + bulge,
+                clearance: null, ratio: null };
+    if (ground != null) {
+      p.clearance = los - p.bulged;                  // metres of air under the line
+      if (r1 > 0) {
+        p.ratio = p.clearance / r1;                  // in first-Fresnel radii
+        if (worst == null || p.ratio < worst.ratio) worst = { ...p, i };
+        const intrusion = 0.6 * r1 - p.clearance;    // into the 60% zone
+        if (intrusion > maxIntrusion) maxIntrusion = intrusion;
+        const v = fresnelV(-p.clearance, d1, d2, fMhz);
+        if (v > maxV) maxV = v;
+      }
+    }
+    pts.push(p);
+  }
+  if (!worst) return { ok: false, error: 'No usable terrain samples along this path.' };
+
+  // The dominant edge, treated as a single knife edge. A proxy, and labelled as
+  // one wherever it is shown.
+  const diffractionDb = isFinite(maxV) ? knifeEdgeDb(maxV) : 0;
+  const verdict = worst.ratio >= 0.6 ? 'clear' : worst.ratio >= 0 ? 'marginal' : 'obstructed';
+
+  return {
+    ok: true, pts, worst, verdict, fMhz,
+    D, txZ, rxZ, groundA, groundB, aglA, aglB,
+    intrusion_m: Math.max(0, maxIntrusion),
+    diffraction_db: diffractionDb,
+    v: isFinite(maxV) ? maxV : null,
+    partial: !!prof.partial,
+  };
+}
+
+const PATH_VERDICT = {
+  clear:      { label: 'Clear',      cls: 'ok',
+                note: 'Ground stays clear of the 60% Fresnel zone the whole way.' },
+  marginal:   { label: 'Marginal',   cls: 'warn',
+                note: 'Ground intrudes into the 60% Fresnel zone but stays below line of sight.' },
+  obstructed: { label: 'Obstructed', cls: 'bad',
+                note: 'Ground rises above the line of sight — this path is blocked.' },
+};
+
+// ── Elevation profile (Stations map) ─────────────────────────────────────────
+// Draw a line on the map and see the ground under it. The quickest read there
+// is on whether a path is plausible, before anyone opens Radio Mobile.
+//
+// The chart is inline SVG built the same way rfStripPlotHtml and rfcChartHtml
+// build theirs — no charting library, and nothing fetched to draw it.
+//
+// The profile is recomputed when the line is finished, selected or typed over,
+// never while it is being dragged out: MapDraw.rerenderPanel is the one hook,
+// and a geometry signature stops a repeat of the same path re-fetching.
+
+const PathProfile = (function () {
+  const SAMPLES = 256;
+  let cur = { sig: null, status: 'idle', prof: null, error: '' };
+
+  const P = () => state.path;
+
+  // The line being profiled: the selected one, or failing that the last one
+  // drawn — drawing a line selects it, so in practice this is "the line you
+  // just made" without the panel going blank the moment you click elsewhere.
+  function target() {
+    const lines = state.draw.shapes.filter(s => s.kind === 'line');
+    if (!lines.length) return null;
+    const sel = lines.find(s => s.id === state.draw.selectedId);
+    return sel || lines[lines.length - 1];
+  }
+
+  function sigOf(sh) {
+    return sh ? sh.id + ':' + sh.pts.map(p => p[0].toFixed(5) + ',' + p[1].toFixed(5)).join(';') : null;
+  }
+
+  function stationOf(sh, end) {
+    const t = sh.snappedTo;
+    if (!t || !t.length || !state.data) return null;
+    const id = end === 0 ? t[0] : t[t.length - 1];
+    return id ? state.data.stations.find(s => s.id === id) || null : null;
+  }
+
+  // What each end of the line is: a station (with its surveyed height and its
+  // radio system) or just a point on the ground.
+  function endpoint(sh, end) {
+    const i = end === 0 ? 0 : sh.pts.length - 1;
+    const st = stationOf(sh, end);
+    const sys = st ? rmSystemOf(st) : null;
+    return {
+      station: st, sys,
+      name: st ? st.name : `${sh.pts[i][0].toFixed(4)}, ${sh.pts[i][1].toFixed(4)}`,
+      isStation: !!st,
+      elev: st && st.elevation_ahd != null ? st.elevation_ahd : null,
+      agl: sys && sys.antenna_height_m != null ? sys.antenna_height_m : PATH_DEFAULT_AGL,
+    };
+  }
+
+  // The frequency to run the Fresnel maths at: whatever repeater is on either
+  // end of this path, else the band the network lives in.
+  function freqFor(a, b) {
+    if (P().freqMhz > 0) return P().freqMhz;
+    for (const e of [a, b]) {
+      const r = e.station && e.station.repeater;
+      if (r && r.rx_mhz > 0) return r.rx_mhz;
+    }
+    return PATH_DEFAULT_MHZ;
+  }
+
+  // Called on every draw-panel re-render. Cheap when nothing moved: the
+  // signature is the debounce, so dragging a line out costs nothing and only a
+  // finished (or edited, or re-selected) line fetches terrain.
+  function sync() {
+    const sh = target();
+    const sig = sigOf(sh);
+    if (sig === cur.sig) { rerender(); return; }
+    cur = { sig, status: sh ? 'loading' : 'idle', prof: null, error: '' };
+    rerender();
+    if (!sh) return;
+    const mine = sig;
+    Terrain.profile(sh.pts, SAMPLES).then(res => {
+      if (cur.sig !== mine) return;                 // the line moved on while we fetched
+      cur.status = res.ok ? 'ready' : 'failed';
+      cur.prof   = res.ok ? res : null;
+      cur.error  = res.ok ? '' : res.error;
+      rerender();
+      // The budget quotes this profile's diffraction term, so it follows it.
+      LinkBudget.profileChanged();
+    });
+  }
+
+  // ── the chart ──
+
+  // `flat` draws the ground and nothing else — the multi-leg case, where there
+  // is a distance profile but no single radio path to put a line of sight on.
+  function chartSvg(an, prof, flat) {
+    const W = 920, H = 300;
+    const L = 52, R = 14, T = 14, B = 30;
+    const iw = W - L - R, ih = H - T - B;
+    const D  = an.D;
+
+    // Everything that has to fit: ground with its curvature bulge, both
+    // antennas, and the top of the Fresnel envelope.
+    let lo = Infinity, hi = -Infinity;
+    for (const p of an.pts) {
+      if (p.bulged != null) { lo = Math.min(lo, p.bulged); hi = Math.max(hi, p.bulged); }
+      if (!flat) {
+        hi = Math.max(hi, p.los + 0.6 * p.r1);
+        lo = Math.min(lo, p.los - 0.6 * p.r1);
+      }
+    }
+    if (!isFinite(lo) || !isFinite(hi)) return '';
+    const pad = Math.max(20, (hi - lo) * 0.1);
+    lo -= pad; hi += pad;
+
+    const x = d => L + (D > 0 ? d / D : 0) * iw;
+    const y = m => T + (1 - (m - lo) / (hi - lo)) * ih;
+
+    // Ground, as an area down to the axis. Gaps where a tile was missing are
+    // left as gaps — a bridged gap would be invented ground.
+    const runs = [];
+    let run = [];
+    for (const p of an.pts) {
+      if (p.bulged == null) { if (run.length) runs.push(run); run = []; }
+      else run.push(p);
+    }
+    if (run.length) runs.push(run);
+    const ground = runs.map(r => {
+      const top = r.map(p => `${x(p.d1).toFixed(1)},${y(p.bulged).toFixed(1)}`).join(' L');
+      return `<path d="M${x(r[0].d1).toFixed(1)},${(T + ih).toFixed(1)} L${top} L${x(r[r.length - 1].d1).toFixed(1)},${(T + ih).toFixed(1)} Z"
+                    fill="var(--terrain-fill)" stroke="var(--terrain-line)" stroke-width="1"/>`;
+    }).join('');
+
+    // Where the ground is inside the 60% zone, drawn over the top of it.
+    const bad = [];
+    let seg = [];
+    for (const p of an.pts) {
+      const intruding = p.bulged != null && p.clearance != null && p.clearance < 0.6 * p.r1;
+      if (intruding) seg.push(p);
+      else if (seg.length) { bad.push(seg); seg = []; }
+    }
+    if (seg.length) bad.push(seg);
+    const obstruction = bad.map(r => `<polyline points="${
+      r.map(p => `${x(p.d1).toFixed(1)},${y(p.bulged).toFixed(1)}`).join(' ')
+    }" fill="none" stroke="var(--bad)" stroke-width="2.5"/>`).join('');
+
+    const radio = flat ? '' : `
+      <polyline points="${an.pts.map(p => `${x(p.d1).toFixed(1)},${y(p.los + 0.6 * p.r1).toFixed(1)}`).join(' ')}"
+                fill="none" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3" opacity=".7"/>
+      <polyline points="${an.pts.map(p => `${x(p.d1).toFixed(1)},${y(p.los - 0.6 * p.r1).toFixed(1)}`).join(' ')}"
+                fill="none" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3" opacity=".7"/>
+      <line x1="${x(0)}" y1="${y(an.txZ).toFixed(1)}" x2="${x(D).toFixed(1)}" y2="${y(an.rxZ).toFixed(1)}"
+            stroke="var(--accent)" stroke-width="1.8"/>`;
+
+    // The masts themselves, so an antenna height reads as a height.
+    const masts = flat ? '' : `
+      <line x1="${x(0)}" y1="${y(an.groundA).toFixed(1)}" x2="${x(0)}" y2="${y(an.txZ).toFixed(1)}"
+            stroke="var(--map-repeater)" stroke-width="2"/>
+      <line x1="${x(D).toFixed(1)}" y1="${y(an.groundB).toFixed(1)}" x2="${x(D).toFixed(1)}" y2="${y(an.rxZ).toFixed(1)}"
+            stroke="var(--map-repeater)" stroke-width="2"/>`;
+
+    // Elevation gridlines on rounded values, so the axis reads in whole metres.
+    const span = hi - lo;
+    const stepM = span > 1600 ? 400 : span > 800 ? 200 : span > 400 ? 100 : span > 160 ? 50 : 20;
+    const grid = [];
+    for (let m = Math.ceil(lo / stepM) * stepM; m <= hi; m += stepM) {
+      grid.push(`<line x1="${L}" y1="${y(m).toFixed(1)}" x2="${W - R}" y2="${y(m).toFixed(1)}"
+                       stroke="var(--border)" stroke-width="1"/>
+                 <text x="${L - 6}" y="${(y(m) + 3.5).toFixed(1)}" font-size="10" text-anchor="end"
+                       style="fill:var(--muted)">${m}</text>`);
+    }
+    // The end labels are anchored inwards so neither runs off the viewBox.
+    const xticks = [0, .25, .5, .75, 1].map(f => `
+      <text x="${x(D * f).toFixed(1)}" y="${H - 10}" font-size="10"
+            text-anchor="${f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}"
+            style="fill:var(--muted)">${fmtKm(D * f / 1000)}</text>`).join('');
+
+    const w = an.worst;
+    const marker = !flat && w && w.ratio < 0.6 ? `
+      <line x1="${x(w.d1).toFixed(1)}" y1="${y(w.bulged).toFixed(1)}"
+            x2="${x(w.d1).toFixed(1)}" y2="${y(w.los).toFixed(1)}"
+            stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <circle cx="${x(w.d1).toFixed(1)}" cy="${y(w.bulged).toFixed(1)}" r="3.5" fill="var(--bad)"/>` : '';
+
+    return `
+      <div class="path-chart-wrap">
+        <svg viewBox="0 0 ${W} ${H}" class="path-chart" role="img"
+             aria-label="Terrain profile with line of sight and 60% Fresnel zone">
+          ${grid.join('')}
+          ${radio}
+          ${ground}
+          ${flat ? '' : obstruction}
+          ${marker}
+          ${masts}
+          <line x1="${L}" y1="${T + ih}" x2="${W - R}" y2="${T + ih}" stroke="var(--muted)" stroke-width="1"/>
+          ${xticks}
+        </svg>
+        <div class="path-key small">
+          ${flat ? '' : `
+            <span><i class="path-key-los"></i> Line of sight</span>
+            <span><i class="path-key-fres"></i> 60% Fresnel zone</span>`}
+          <span><i class="path-key-gnd"></i> Ground (curvature k=4/3 included)</span>
+          ${flat ? '' : '<span><i class="path-key-obs"></i> Inside the Fresnel zone</span>'}
+        </div>
+        <p class="filter-hint">${esc(prof.attribution)} · sampled every
+          ~${prof.resolution_m} m at zoom ${prof.zoom} over ${prof.tiles} tile${prof.tiles === 1 ? '' : 's'}${
+          prof.capped ? ', zoom reduced to stay inside the tile budget for a path this long' : ''}.</p>
+      </div>`;
+  }
+
+  // ── the panel ──
+
+  function readoutHtml(an, a, b) {
+    const v = PATH_VERDICT[an.verdict];
+    const w = an.worst;
+    return `
+      <div class="path-readout">
+        <div class="path-verdict ${v.cls}">
+          <strong>${v.label}</strong>
+          <span class="small">${esc(v.note)}</span>
+        </div>
+        <dl class="path-stats">
+          <div><dt>Path</dt><dd>${esc(a.name)} → ${esc(b.name)}</dd></div>
+          <div><dt>Distance</dt><dd>${fmtKm(an.D / 1000)}</dd></div>
+          <div><dt>Frequency</dt><dd>${an.fMhz.toFixed(3)} MHz</dd></div>
+          <div><dt>Worst clearance</dt><dd>${w.clearance >= 0
+            ? `${Math.round(w.clearance)} m under the line · ${w.ratio.toFixed(2)}&nbsp;F1`
+            : `<span style="color:var(--bad)">${Math.round(-w.clearance)} m above the line</span>`}
+            <span class="small" style="color:var(--muted)">at ${fmtKm(w.d1 / 1000)}</span></dd></div>
+          <div><dt>Into 60% zone</dt><dd>${an.intrusion_m > 0
+            ? `${Math.round(an.intrusion_m)} m` : 'nothing'}</dd></div>
+          <div><dt>Diffraction proxy</dt><dd>${an.diffraction_db > 0.05
+            ? `${an.diffraction_db.toFixed(1)} dB` : '0 dB'}</dd></div>
+        </dl>
+      </div>`;
+  }
+
+  function endsFormHtml(a, b, an) {
+    // Where a value came from, under the box it is in — so an antenna height
+    // that arrived from the station's own system says so, and one that was
+    // typed doesn't pretend to have.
+    const src = (e, over) => `<b class="path-src">${
+      over != null ? 'edited'
+        : e.isStation && e.sys ? `default · ${esc(e.sys.name)}`
+        : 'default'}</b>`;
+    return `
+      <div class="path-form">
+        <label class="draw-field">
+          <span>${esc(a.name)} antenna (m AGL)</span>
+          <input type="number" step="0.5" min="0" value="${an.aglA}"
+                 onchange="PathProfile.setAgl('A', this.value)">
+          ${src(a, P().aglA)}
+        </label>
+        <label class="draw-field">
+          <span>${esc(b.name)} antenna (m AGL)</span>
+          <input type="number" step="0.5" min="0" value="${an.aglB}"
+                 onchange="PathProfile.setAgl('B', this.value)">
+          ${src(b, P().aglB)}
+        </label>
+        <label class="draw-field">
+          <span>Frequency (MHz)</span>
+          <input type="number" step="0.1" min="1" value="${an.fMhz}"
+                 onchange="PathProfile.setFreq(this.value)">
+          <b class="path-src">${P().freqMhz != null ? 'edited'
+            : (a.station && a.station.repeater) || (b.station && b.station.repeater)
+              ? 'default · repeater channel' : 'default · network band'}</b>
+        </label>
+      </div>`;
+  }
+
+  function bodyHtml() {
+    const sh = target();
+    if (!sh) return '';
+    const a = endpoint(sh, 0), b = endpoint(sh, 1);
+    const multi = sh.pts.length > 2;
+
+    if (cur.status === 'loading') {
+      return `<p class="filter-note">Sampling terrain along ${fmtKm(MapDraw.lineKm(sh.pts))} of path…</p>`;
+    }
+    if (cur.status === 'failed') {
+      return `
+        <div class="path-fail">
+          <strong>Terrain data unavailable.</strong>
+          <span class="small">${esc(cur.error)}</span>
+          <span class="small">No profile is drawn rather than a flat one — flat ground would read as a clear path.</span>
+          <button onclick="PathProfile.refresh()">Try again</button>
+        </div>`;
+    }
+    if (cur.status !== 'ready' || !cur.prof) return '';
+
+    const prof = cur.prof;
+    const warn = prof.partial ? `
+      <p class="path-warn small">${prof.missing} of ${prof.terrain_m.length} samples had no tile —
+        the profile is drawn with gaps rather than guessed through them.</p>` : '';
+
+    // A dog-leg is a distance profile and nothing more. Drawing a line of sight
+    // end to end across a corner would be describing a radio path that isn't
+    // the one drawn.
+    if (multi) {
+      const an = pathAnalyse(prof, { elevA: a.elev, elevB: b.elev, aglA: 0, aglB: 0 });
+      return `
+        <p class="path-warn small">This line has ${sh.pts.length - 1} legs, so it is a
+          <strong>distance profile only</strong> — no line of sight and no Fresnel zone.
+          A dog-leg is not a radio path. Draw a two-point line to analyse a hop.</p>
+        ${warn}
+        ${an.ok ? chartSvg(an, prof, true) : `<p class="filter-note">${esc(an.error)}</p>`}`;
+    }
+
+    const an = pathAnalyse(prof, {
+      elevA: a.elev, elevB: b.elev,
+      aglA: P().aglA != null ? P().aglA : a.agl,
+      aglB: P().aglB != null ? P().aglB : b.agl,
+      freqMhz: freqFor(a, b),
+    });
+    if (!an.ok) return `<p class="filter-note">${esc(an.error)}</p>`;
+
+    const datum = (a.elev != null || b.elev != null) ? `
+      <p class="filter-hint">Ends use the station's surveyed <code>elevation_ahd</code> (AHD);
+        the ground between comes from tiles referenced to the EGM96 geoid. The two agree to
+        about a metre over Australia — inside the ~${prof.resolution_m} m sampling error, but not the
+        same datum. Treat every height here as indicative.</p>` : `
+      <p class="filter-hint">All heights are sampled from tiles (EGM96 geoid, not AHD) — neither
+        end is snapped to a station with a surveyed elevation.</p>`;
+
+    return `
+      ${readoutHtml(an, a, b)}
+      ${warn}
+      ${chartSvg(an, prof)}
+      ${endsFormHtml(a, b, an)}
+      ${datum}
+      <div class="path-actions">
+        <button onclick="LinkBudget.fromProfile()">Link budget for this path →</button>
+      </div>`;
+  }
+
+  function panelHtml() {
+    const sh = target();
+    if (!sh) return '';
+    return `
+      <details class="path-panel" ${P().open ? 'open' : ''}
+               ontoggle="PathProfile.setOpen(this.open)">
+        <summary>
+          <h3>Elevation profile</h3>
+          <span class="small">${esc(MapDraw.measure(sh))}</span>
+        </summary>
+        <div class="path-body">${bodyHtml()}</div>
+      </details>`;
+  }
+
+  function rerender() {
+    const el = document.getElementById('path-profile-panel');
+    if (!el) return;
+    const sh = target();
+    el.hidden = !sh;                       // no line drawn: the panel isn't there at all
+    el.innerHTML = sh ? panelHtml() : '';
+  }
+
+  return {
+    sync, rerender,
+    setOpen(v) { P().open = !!v; },
+    setAgl(which, v) {
+      const n = v.trim() === '' ? null : Number(v);
+      P()[which === 'A' ? 'aglA' : 'aglB'] = isFinite(n) ? n : null;
+      rerender();
+      LinkBudget.profileChanged();
+    },
+    setFreq(v) {
+      const n = Number(v);
+      P().freqMhz = isFinite(n) && n > 0 ? n : null;
+      rerender();
+      LinkBudget.profileChanged();
+    },
+    refresh() { cur.sig = null; sync(); },
+    // What the link budget quotes for its diffraction line: the analysis of the
+    // same two points, or null when there isn't one.
+    analysisFor(latA, lonA, latB, lonB, opt) {
+      if (cur.status !== 'ready' || !cur.prof) return null;
+      const sh = target();
+      if (!sh || sh.pts.length !== 2) return null;
+      const near = (p, lat, lon) => Math.abs(p[0] - lat) < 1e-4 && Math.abs(p[1] - lon) < 1e-4;
+      const same = near(sh.pts[0], latA, lonA) && near(sh.pts[1], latB, lonB);
+      // The line may have been drawn the other way round to the way the budget
+      // named its ends; the profile runs along the line, so the ends' heights
+      // and antennas swap with it rather than being applied to the wrong end.
+      const flipped = near(sh.pts[0], latB, lonB) && near(sh.pts[1], latA, lonA);
+      if (!same && !flipped) return null;
+      const an = pathAnalyse(cur.prof, flipped
+        ? { ...opt, elevA: opt.elevB, elevB: opt.elevA, aglA: opt.aglB, aglB: opt.aglA }
+        : opt);
+      return an.ok ? an : null;
+    },
+    target,
+  };
+})();
+
+// ── Link budget ──────────────────────────────────────────────────────────────
+// Pick two points on the map, get a fade margin. Either end can be a station —
+// which fills itself in from rm_systems — or an arbitrary point on the ground,
+// which is what makes this useful for a proposed relocation: drop an end on a
+// hilltop nobody has been to yet and see what the path would do.
+//
+// The number this produces is INDICATIVE and mostly OPTIMISTIC. Free-space path
+// loss plus a single knife-edge diffraction proxy leaves out clutter, climate,
+// multipath, real antenna patterns and every statistical allowance Radio Mobile
+// makes — and nearly all of those *reduce* real margin. Hence the red banner
+// that cannot be dismissed and the comparison table underneath it: the card is
+// built so the figure cannot be read as more than it is.
+
+const LB_MARGIN = [
+  { min: 20,       label: 'Good',     cls: 'ok',   note: 'Comfortable margin — still confirm in Radio Mobile.' },
+  { min: 10,       label: 'Marginal', cls: 'warn', note: 'Would not survive much rain, growth or a bad day.' },
+  { min: -Infinity, label: 'Poor',    cls: 'bad',  note: 'Not a link you would build on this figure.' },
+];
+
+function lbMarginClass(db) { return LB_MARGIN.find(m => db >= m.min); }
+
+const LinkBudget = (function () {
+  let map = null, layer = null, clickHandler = null;
+
+  const S = () => state.link;
+
+  // ── endpoints ──
+
+  function stationEndpoint(st) {
+    const sys = rmSystemOf(st);
+    const rep = st.repeater || null;
+    return {
+      kind: 'station', sid: st.id, name: st.name,
+      lat: st.lat, lon: st.lon,
+      ground: st.elevation_ahd != null ? st.elevation_ahd : null,
+      groundSrc: st.elevation_ahd != null ? 'elevation_ahd (AHD)' : null,
+      sysName: sys ? sys.name : null,
+      freq: rep && rep.rx_mhz > 0 ? rep.rx_mhz : null,
+      def: {
+        tx_w:     sys && sys.tx_power_w != null ? sys.tx_power_w : null,
+        loss_db:  sys && sys.line_loss_db != null ? sys.line_loss_db : null,
+        gain_dbi: sys && sys.antenna_gain_dbi != null ? sys.antenna_gain_dbi : null,
+        agl_m:    sys && sys.antenna_height_m != null ? sys.antenna_height_m : PATH_DEFAULT_AGL,
+        rx_dbm:   sys && sys.rx_threshold_dbm != null ? sys.rx_threshold_dbm : null,
+      },
+      over: {},
+    };
+  }
+
+  function pointEndpoint(lat, lon) {
+    return {
+      kind: 'point', sid: null,
+      name: `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+      lat, lon, ground: null, groundSrc: null, sysName: null, freq: null,
+      // A hypothetical site has to start from something; the 1 W field station
+      // is what most of this network actually is.
+      def: { tx_w: 1, loss_db: 1, gain_dbi: 5.15, agl_m: PATH_DEFAULT_AGL, rx_dbm: -117 },
+      over: {},
+    };
+  }
+
+  // The value in play, and whether the operator put it there.
+  function val(e, k) { return e.over[k] != null ? e.over[k] : e.def[k]; }
+  function isOver(e, k) { return e.over[k] != null; }
+
+  // A hypothetical point has no surveyed height, so its ground comes from the
+  // terrain tiles — asynchronously, and the card redraws when it lands.
+  function fillGround(e) {
+    if (e.ground != null || e.kind !== 'point' || e._pending) return;
+    e._pending = true;
+    Terrain.sample(e.lat, e.lon).then(m => {
+      e._pending = false;
+      if (m != null) { e.ground = m; e.groundSrc = 'terrain tile (EGM96 geoid)'; }
+      else e.groundSrc = 'unavailable';
+      rerender();
+    });
+  }
+
+  // ── map pick ──
+
+  function setEnd(which, e) {
+    S()[which] = e;
+    fillGround(e);
+    drawMarkers();
+    rerender();
+  }
+
+  function onMapClick(ev) {
+    // A draw tool owns its own clicks; this only takes the ones nothing else
+    // wanted.
+    if (!S().picking || state.draw.tool) return;
+    const { ll, sid } = MapDraw.resolveClick(ev.latlng);
+    const st = sid && state.data ? state.data.stations.find(s => s.id === sid) : null;
+    const e = st ? stationEndpoint(st) : pointEndpoint(ll[0], ll[1]);
+    // Fill whichever end is empty; once both are set, start again from A.
+    const which = !S().a ? 'a' : !S().b ? 'b' : 'a';
+    if (which === 'a' && S().a && S().b) S().b = null;
+    setEnd(which, e);
+    mapNote(S().a && S().b
+      ? 'Both ends set — click again to start a new path.'
+      : 'Now click the other end of the path.', 3000);
+  }
+
+  function drawMarkers() {
+    if (!layer) return;
+    layer.clearLayers();
+    const { a, b } = S();
+    [['A', a], ['B', b]].forEach(([tag, e]) => {
+      if (!e) return;
+      L.circleMarker([e.lat, e.lon], {
+        radius: 8, color: '#c62828', weight: 3, fillColor: '#fff', fillOpacity: 1,
+      }).addTo(layer).bindTooltip(`${tag} · ${esc(e.name)}`, {
+        permanent: true, direction: 'top', className: 'mn-draw-label', offset: [0, -8],
+      });
+    });
+    if (a && b) {
+      L.polyline([[a.lat, a.lon], [b.lat, b.lon]],
+                 { color: '#c62828', weight: 2.5, dashArray: '6 4' }).addTo(layer);
+    }
+  }
+
+  // ── the budget ──
+
+  // The profile for exactly these two ends, when the elevation panel happens to
+  // be showing it. It is the evidence for the diffraction term, so the card
+  // only claims one when it can point at the profile it came from.
+  function analysisFor(a, b) {
+    return PathProfile.analysisFor(a.lat, a.lon, b.lat, b.lon, {
+      elevA: a.ground, elevB: b.ground,
+      aglA: val(a, 'agl_m'), aglB: val(b, 'agl_m'),
+      freqMhz: freqOf(),
+    });
+  }
+
+  function freqOf() {
+    const S_ = S();
+    if (S_.freqMhz > 0) return S_.freqMhz;
+    for (const e of [S_.a, S_.b]) if (e && e.freq > 0) return e.freq;
+    return PATH_DEFAULT_MHZ;
+  }
+
+  function compute() {
+    const { a, b } = S();
+    if (!a || !b) return null;
+    const dKm  = acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
+    const fMhz = freqOf();
+    const txW  = val(a, 'tx_w');
+    const txDbm = wattsToDbm(txW);
+    const an = analysisFor(a, b);
+
+    const eirp = txDbm == null ? null : txDbm + (val(a, 'gain_dbi') || 0) - (val(a, 'loss_db') || 0);
+    const fspl = fsplDb(dKm, fMhz);
+    const diff = an ? an.diffraction_db : null;
+    const rxDbm = eirp == null ? null
+      : eirp - fspl - (diff || 0) + (val(b, 'gain_dbi') || 0) - (val(b, 'loss_db') || 0);
+    const thr = val(b, 'rx_dbm');
+    const margin = rxDbm == null || thr == null ? null : rxDbm - thr;
+
+    return { dKm, fMhz, txW, txDbm, eirp, fspl, diff, rxDbm, thr, margin, an,
+             fsplOnly: an == null };
+  }
+
+  // ── rendering ──
+
+  function endpointCard(which, e) {
+    const tag = which === 'a' ? 'A' : 'B';
+    if (!e) {
+      return `
+        <div class="lb-end lb-end-empty">
+          <div class="lb-end-head"><span class="lb-tag">${tag}</span> <em>not set</em></div>
+          <p class="small">${S().picking
+            ? 'Click a station or any point on the map.'
+            : 'Turn on “Pick two points” and click the map.'}</p>
+        </div>`;
+    }
+    const f = (k, label, step, unit) => {
+      const over = isOver(e, k);
+      const v = val(e, k);
+      return `
+        <label class="lb-field${over ? ' is-over' : ''}">
+          <span>${esc(label)}${unit ? ` <em>${esc(unit)}</em>` : ''}</span>
+          <input type="number" step="${step}" value="${v == null ? '' : v}"
+                 placeholder="not set"
+                 onchange="LinkBudget.setField('${which}','${k}',this.value)">
+          <b class="lb-flag">${over ? 'edited'
+            : e.def[k] == null ? ''
+            : e.kind === 'station' ? 'default'
+            // A hypothetical site's figures came from nowhere but this code, so
+            // they are marked as the guesses they are rather than borrowing the
+            // authority of a "default" read out of the station data.
+            : 'assumed'}</b>
+        </label>`;
+    };
+    return `
+      <div class="lb-end">
+        <div class="lb-end-head">
+          <span class="lb-tag">${tag}</span>
+          <strong>${esc(e.name)}</strong>
+          <button class="draw-del" title="Clear this end"
+                  onclick="LinkBudget.clearEnd('${which}')">✕</button>
+        </div>
+        <p class="small lb-src">${e.kind === 'station'
+          ? `Station${e.sysName ? ` · ${esc(e.sysName)}` : ''}${e.freq ? ` · repeater ${e.freq} MHz` : ''}`
+          : 'Hypothetical point — nothing is written back to the station data'}</p>
+        <p class="small lb-src">Ground ${e.ground != null
+          ? `${e.ground.toFixed(1)} m <span style="color:var(--muted)">${esc(e.groundSrc || '')}</span>`
+          : (e.groundSrc === 'unavailable'
+              ? '<span style="color:var(--bad)">unavailable — no terrain tile for this point</span>'
+              : '<span style="color:var(--muted)">sampling…</span>')}</p>
+        <div class="lb-fields">
+          ${f('tx_w',     'TX power',        '0.1',  'W')}
+          ${f('gain_dbi', 'Antenna gain',    '0.05', 'dBi')}
+          ${f('loss_db',  'Line loss',       '0.1',  'dB')}
+          ${f('agl_m',    'Antenna height',  '0.5',  'm AGL')}
+          ${f('rx_dbm',   'RX threshold',    '0.1',  'dBm')}
+        </div>
+      </div>`;
+  }
+
+  // Every term is signed, so the column reads as an addition that visibly comes
+  // out at the received level — subtotals excepted, which are the running
+  // result rather than something being added.
+  function budgetRow(label, value, unit, note, cls) {
+    const sub = /^=/.test(label);
+    return `
+      <tr class="${cls || ''}">
+        <th>${esc(label)}</th>
+        <td class="lb-num">${value == null ? '—'
+          : (value > 0 && !sub ? '+' : '') + value.toFixed(2)}</td>
+        <td class="lb-unit">${esc(unit || '')}</td>
+        <td class="small lb-note">${note || ''}</td>
+      </tr>`;
+  }
+
+  function budgetHtml(r) {
+    const a = S().a, b = S().b;
+    const m = r.margin == null ? null : lbMarginClass(r.margin);
+    // A blocked path can still show a fat margin: the single knife edge that
+    // stands in for the terrain is the most optimistic diffraction model there
+    // is, and it is standing in for a ridge above the line of sight. The number
+    // stays as computed — but it does not get to read "Good".
+    const blocked = !!(r.an && r.an.verdict === 'obstructed') && r.margin != null;
+    return `
+      <table class="lb-table">
+        <tbody>
+          ${budgetRow('TX power', r.txDbm, 'dBm', r.txW != null ? `${r.txW} W at ${esc(a.name)}` : 'no TX power set')}
+          ${budgetRow('TX antenna gain', val(a, 'gain_dbi'), 'dBi', '')}
+          ${budgetRow('TX line loss', val(a, 'loss_db') == null ? null : -val(a, 'loss_db'), 'dB', '')}
+          ${budgetRow('= EIRP', r.eirp, 'dBm', '', 'lb-sub')}
+          ${budgetRow('Free-space path loss', -r.fspl, 'dB',
+            `${r.fMhz.toFixed(3)} MHz over ${fmtKm(r.dKm)}`)}
+          ${r.diff == null
+            ? `<tr class="lb-missing"><th>Diffraction proxy</th><td class="lb-num">—</td><td class="lb-unit">dB</td>
+                 <td class="small lb-note">No terrain profile for these two points —
+                 <strong>this result is free-space only</strong> and ignores the ground entirely.
+                 ${S().a && S().b ? '<button class="lb-link" onclick="LinkBudget.profileThis()">Profile this path</button>' : ''}</td></tr>`
+            : budgetRow('Diffraction proxy', -r.diff, 'dB',
+                `single knife edge${r.an.v != null ? `, v=${r.an.v.toFixed(2)}` : ''} — a proxy, not a propagation model`)}
+          ${budgetRow('RX antenna gain', val(b, 'gain_dbi'), 'dBi', '')}
+          ${budgetRow('RX line loss', val(b, 'loss_db') == null ? null : -val(b, 'loss_db'), 'dB', '')}
+          ${budgetRow('= Received signal', r.rxDbm, 'dBm', `at ${esc(b.name)}`, 'lb-sub')}
+          ${budgetRow('RX threshold', r.thr, 'dBm', 'receiver sensitivity')}
+        </tbody>
+        <tfoot>
+          <tr class="lb-margin ${blocked ? 'bad' : (m ? m.cls : '')}">
+            <th>Fade margin</th>
+            <td class="lb-num">${r.margin == null ? '—' : (r.margin > 0 ? '+' : '') + r.margin.toFixed(1)}</td>
+            <td class="lb-unit">dB</td>
+            <td class="lb-note"><strong>${blocked ? 'Obstructed' : (m ? m.label : '')}</strong>
+              <span class="small">${r.margin == null
+                ? 'Fill in TX power and RX threshold for a margin.'
+                : blocked
+                  ? `Terrain rises above the line of sight, so this margin is not trustworthy${
+                      m ? ` however “${m.label.toLowerCase()}” it looks` : ''}: one knife edge stands in for a
+                      blocked path, and it understates it badly. Model this one properly before going near it.`
+                  : esc(m.note)}</span></td>
+          </tr>
+        </tfoot>
+      </table>
+      ${r.an ? `
+        <p class="small lb-eval">Terrain says <strong>${PATH_VERDICT[r.an.verdict].label.toLowerCase()}</strong>:
+          ${esc(PATH_VERDICT[r.an.verdict].note)}
+          ${r.an.intrusion_m > 0 ? `Worst intrusion ${Math.round(r.an.intrusion_m)} m into the 60% zone.` : ''}</p>` : ''}`;
+  }
+
+  function comparisonHtml() {
+    const N = RM_NET_DEFAULTS;
+    const rows = [
+      ['Propagation model', 'FSPL + single knife-edge diffraction proxy', 'Longley–Rice ITM over irregular terrain'],
+      ['Terrain', `Direct line sampled from ~30 m tiles`, 'Full DEM (landheight.dat), terrain-following'],
+      ['Land cover / clutter', '<em>Not modelled</em>', `Urban / tree percentage (${N['%Urban or Tree']}%)`],
+      ['Climate &amp; refractivity', '<em>Not modelled</em>',
+       `Climate class ${N.Climate}, refractivity ${N.Refractivity}, permittivity ${N.Permittivity}, conductivity ${N.Conductivity}`],
+      ['Statistical reliability', 'One deterministic figure',
+       `%time ${N['%Time']} / %location ${N['%Location']} / %situation ${N['%Situation']}`],
+      ['Antenna patterns', 'One gain figure, isotropic', 'Real .ant patterns, azimuth and downtilt'],
+      ['Earth curvature', `Simplified — fixed k = 4/3`, 'Modelled'],
+      ['Multipath, ducting, fading', '<em>Not modelled</em>', 'Statistical allowance'],
+      ['Polarisation', 'Ignored', `Modelled (polarization ${N.Polarization})`],
+      ['Interference / noise floor', '<em>Not modelled</em>', '— see the RF Environment tab for ACMA co-channel risk'],
+    ];
+    return `
+      <details class="lb-compare">
+        <summary>Why this is not a propagation study — what it leaves out</summary>
+        <p class="small">Almost everything in the left column that is missing would <strong>reduce</strong>
+          real-world margin. That is why “indicative” here mostly means <strong>optimistic</strong>:
+          treat a good margin as permission to model the path properly, never as a result.</p>
+        <div class="table-wrap">
+          <table class="lb-compare-table">
+            <thead><tr><th></th><th>MegaNet indicative</th><th>Radio Mobile (ITM / Longley–Rice)</th></tr></thead>
+            <tbody>${rows.map(([k, mine, rm]) =>
+              `<tr><th>${k}</th><td>${mine}</td><td>${rm}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+      </details>`;
+  }
+
+  function bodyHtml() {
+    const S_ = S();
+    const r = compute();
+    return `
+      <div class="lb-disclaimer" role="alert">
+        ⚠️ <strong>Indicative only.</strong> This is a first-pass sanity check, not a propagation
+        study. Always confirm against Radio Mobile before making a decision.
+      </div>
+      <div class="lb-controls">
+        <label class="filter-check">
+          <input type="checkbox" ${S_.picking ? 'checked' : ''}
+                 onchange="LinkBudget.setPicking(this.checked)">
+          Pick two points on the map
+        </label>
+        <label class="draw-field">
+          <span>Frequency (MHz)</span>
+          <input type="number" step="0.1" min="1" value="${freqOf()}"
+                 onchange="LinkBudget.setFreq(this.value)">
+        </label>
+        <button onclick="LinkBudget.reset()">Clear both ends</button>
+      </div>
+      <p class="filter-hint">${S_.picking
+        ? 'Click a station to fill it in from its Radio Mobile system, or click empty ground for a hypothetical site. Every value below can be overridden.'
+        : 'Ends can also be set from a line drawn in Draw &amp; measure.'}</p>
+      <div class="lb-ends">
+        ${endpointCard('a', S_.a)}
+        ${endpointCard('b', S_.b)}
+      </div>
+      ${r ? budgetHtml(r) : '<p class="filter-note">Set both ends to see a budget.</p>'}
+      ${comparisonHtml()}`;
+  }
+
+  function panelHtml() {
+    return `
+      <details class="lb-panel" ${S().open ? 'open' : ''}
+               ontoggle="LinkBudget.setOpen(this.open)">
+        <summary>
+          <h3>Link budget <span class="lb-badge">indicative</span></h3>
+          <span class="small">Fade margin between two points</span>
+        </summary>
+        <div class="lb-body">${S().open ? bodyHtml() : ''}</div>
+      </details>`;
+  }
+
+  function rerender() {
+    const el = document.getElementById('link-budget-panel');
+    if (el) el.innerHTML = panelHtml();
+  }
+
+  return {
+    attach(m) {
+      map = m;
+      layer = L.layerGroup().addTo(m);
+      clickHandler = onMapClick;
+      m.on('click', clickHandler);
+      drawMarkers();
+    },
+    detach() {
+      if (map && clickHandler) map.off('click', clickHandler);
+      map = null; layer = null; clickHandler = null;
+    },
+
+    panelHtml, rerender,
+
+    setOpen(v) {
+      S().open = !!v;
+      // Expanding the card arms the pick; collapsing it disarms, so a stray map
+      // click doesn't quietly move an endpoint on a card nobody is looking at.
+      S().picking = !!v;
+      rerender();
+    },
+    setPicking(v) { S().picking = !!v; rerender(); },
+    setFreq(v) {
+      const n = Number(v);
+      S().freqMhz = isFinite(n) && n > 0 ? n : null;
+      rerender();
+    },
+    setField(which, k, v) {
+      const e = S()[which];
+      if (!e) return;
+      const n = v.trim() === '' ? null : Number(v);
+      // Blanking a box puts the default back rather than leaving a hole.
+      e.over[k] = n != null && isFinite(n) ? n : null;
+      if (e.over[k] == null) delete e.over[k];
+      rerender();
+    },
+    clearEnd(which) { S()[which] = null; drawMarkers(); rerender(); },
+    reset() { S().a = null; S().b = null; drawMarkers(); rerender(); },
+
+    // The profile panel finished (or failed) — the diffraction line follows it.
+    profileChanged() { if (S().open) rerender(); },
+
+    // "Link budget for this path →" on the profile panel: take the drawn line's
+    // two ends as the budget's endpoints.
+    fromProfile() {
+      const sh = PathProfile.target();
+      if (!sh || sh.pts.length !== 2) { mapNote('Draw a two-point line first', 3000); return; }
+      const pick = i => {
+        const ids = sh.snappedTo || [];
+        const sid = i === 0 ? ids[0] : ids[ids.length - 1];
+        const st = sid && state.data ? state.data.stations.find(s => s.id === sid) : null;
+        return st ? stationEndpoint(st) : pointEndpoint(sh.pts[i][0], sh.pts[i][1]);
+      };
+      S().open = true;
+      S().a = pick(0); S().b = pick(1);
+      fillGround(S().a); fillGround(S().b);
+      drawMarkers();
+      rerender();
+      const el = document.getElementById('link-budget-panel');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    },
+
+    // The other direction: draw the budget's two ends as a line so the profile
+    // panel picks them up and the diffraction term can be filled in.
+    profileThis() {
+      const { a, b } = S();
+      if (!a || !b) return;
+      MapDraw.addLine([[a.lat, a.lon], [b.lat, b.lon]], [a.sid || null, b.sid || null]);
+      state.path.open = true;
+      const el = document.getElementById('path-profile-panel');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    },
   };
 })();
 
