@@ -356,14 +356,38 @@ const state = {
 
 (function init() {
   document.documentElement.setAttribute('data-theme', state.theme);
-  const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = state.theme === 'dark' ? 'Light' : 'Dark';
+  setHeaderLabel('btn-theme', state.theme === 'dark' ? 'Light' : 'Dark');
   setSplitWidth(state.splitW);          // also clamps whatever was stored
   renderTabs();
   renderMain();
-  window.addEventListener('resize', updateChromeHeight);
+  // The header's height and the nav's shape both depend on the width, so both
+  // are re-checked when it changes — crossing the phone breakpoint with the
+  // drawer open would otherwise leave the backdrop behind.
+  window.addEventListener('resize', () => {
+    updateChromeHeight();
+    syncNavChrome(state.navCollapsed);
+  });
+  // Crossing the phone breakpoint changes what the nav *is* — a rail or a
+  // drawer — and so what its toggle should say. Re-rendered on the crossing
+  // itself rather than on every resize event: the nav is rebuilt wholesale.
+  window.matchMedia('(max-width: 560px)').addEventListener('change', renderTabs);
+  // On a phone the nav is a drawer laid over the page, and a drawer that only
+  // closes by picking a tab is a trap — Escape backs out of it too.
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !state.navCollapsed && isPhoneNav()) setNavCollapsed(true);
+  });
   autoLoad();
 })();
+
+// Header buttons are icon + label, so the label is a span inside the button and
+// not the button's own text. Writing textContent would throw the icon away.
+function setHeaderLabel(id, text) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  const label = btn.querySelector('.hdr-label');
+  if (label) label.textContent = text;
+  else btn.textContent = text;
+}
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
 
@@ -371,7 +395,7 @@ function toggleTheme() {
   state.theme = state.theme === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', state.theme);
   localStorage.setItem('mn-theme', state.theme);
-  document.getElementById('btn-theme').textContent = state.theme === 'dark' ? 'Light' : 'Dark';
+  setHeaderLabel('btn-theme', state.theme === 'dark' ? 'Light' : 'Dark');
   if (state.map) { refreshMapLayers(); MapDraw.render(); }
   // The ARRO chart writes real colour values into its SVG rather than `var(…)`,
   // so that the PNG export has something to resolve. That is the trade: the
@@ -400,7 +424,8 @@ function onFileLoad(input) {
 
 async function loadFromUrl(url) {
   const btn = document.getElementById('btn-load-gh');
-  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+  if (btn) btn.disabled = true;
+  setHeaderLabel('btn-load-gh', 'Loading…');
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -408,7 +433,8 @@ async function loadFromUrl(url) {
   } catch (err) {
     alert(`Failed to load from URL: ${err.message}`);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Load from GitHub'; }
+    if (btn) btn.disabled = false;
+    setHeaderLabel('btn-load-gh', 'Load from GitHub');
   }
 }
 
@@ -911,6 +937,7 @@ function renderTabs() {
   if (!nav) return;
   const collapsed = state.navCollapsed;
   nav.classList.toggle('collapsed', collapsed);
+  syncNavChrome(collapsed);
 
   // The width transition must not run on the opening render. A tab builds its
   // Leaflet map the moment it renders, and a nav still sliding in from its
@@ -923,6 +950,16 @@ function renderTabs() {
     void nav.offsetWidth;
     nav.classList.add('nav-ready');
   }
+
+  // On a phone the nav is a drawer over the page, not a column beside it, so
+  // the toggle at its top closes a menu rather than narrowing a rail — and has
+  // to say so. Collapsed it is never seen there at all: the rail is gone and
+  // the header's ☰ is what re-opens the drawer.
+  const toggleWord = isPhoneNav()
+    ? { icon: '✕', label: 'Close',                title: 'Close the menu' }
+    : collapsed
+      ? { icon: '»', label: 'Expand',   title: 'Expand the navigation' }
+      : { icon: '«', label: 'Collapse', title: 'Collapse the navigation' };
 
   // Collapsed, the labels are clipped rather than removed: the button keeps its
   // accessible name, and the title attribute gives the sighted user a tooltip.
@@ -948,9 +985,9 @@ function renderTabs() {
     <div class="nav-inner" onkeydown="navKey(event)">
       <button class="nav-toggle" onclick="toggleNav()" aria-controls="tab-nav"
               aria-expanded="${collapsed ? 'false' : 'true'}"
-              title="${collapsed ? 'Expand the navigation' : 'Collapse the navigation'}">
-        <span class="nav-icon" aria-hidden="true">${collapsed ? '»' : '«'}</span>
-        <span class="nav-label">${collapsed ? 'Expand' : 'Collapse'}</span>
+              title="${toggleWord.title}">
+        <span class="nav-icon" aria-hidden="true">${toggleWord.icon}</span>
+        <span class="nav-label">${toggleWord.label}</span>
       </button>
       ${groups}
     </div>`;
@@ -972,12 +1009,33 @@ function switchTab(id) {
   // errand, so the drawer closes behind you instead of covering what you came
   // for. No map to re-measure: the drawer never took the width in the first
   // place.
-  if (!state.navCollapsed && window.matchMedia('(max-width: 560px)').matches) {
+  if (!state.navCollapsed && isPhoneNav()) {
     state.navCollapsed = true;
     localStorage.setItem('mn-nav', 'collapsed');
   }
   renderTabs();
   renderMain();
+}
+
+// Below this width the icon rail is gone from the layout entirely and the nav
+// is a drawer opened from the header — 56 px of permanent rail is a seventh of
+// a 390 px screen, and the tables and maps need it more than the icons do.
+// Kept in step with the matching breakpoint in styles.css.
+function isPhoneNav() {
+  return window.matchMedia('(max-width: 560px)').matches;
+}
+
+// The two bits of chrome that live outside #tab-nav and have to agree with it:
+// the header's hamburger (the only way to open the drawer once the rail is
+// gone) and the backdrop that closes it again.
+function syncNavChrome(collapsed) {
+  const burger = document.getElementById('btn-nav');
+  if (burger) {
+    burger.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    burger.classList.toggle('on', !collapsed);
+  }
+  const backdrop = document.getElementById('nav-backdrop');
+  if (backdrop) backdrop.hidden = collapsed || !isPhoneNav();
 }
 
 function toggleNav() {
@@ -991,10 +1049,15 @@ function setNavCollapsed(collapsed) {
   // The nav just took a column from the main area, or gave one back. Leaflet
   // only watches the window, so a map left unmeasured renders grey tiles and
   // hands back click coordinates offset by however much the width moved.
-  invalidateMapSizes(NAV_TRANSITION_MS + 40);
+  // (Not on a phone — there the drawer floats and the main area never moves.)
+  if (!isPhoneNav()) invalidateMapSizes(NAV_TRANSITION_MS + 40);
   // Focus follows the button through the re-render, or a keyboard collapse
-  // drops the user back at the top of the page.
-  const btn = document.querySelector('#tab-nav .nav-toggle');
+  // drops the user back at the top of the page. Closing the phone drawer sends
+  // focus back to the hamburger that opened it — the drawer's own toggle has
+  // just gone off-screen with the rail.
+  const btn = (isPhoneNav() && state.navCollapsed)
+    ? document.getElementById('btn-nav')
+    : document.querySelector('#tab-nav .nav-toggle');
   if (btn) btn.focus();
 }
 
@@ -1104,7 +1167,7 @@ function renderStationsHtml() {
            onkeydown="splitKey(event)"></div>
       <div class="stack map-pane" id="stations-right">
         <div class="panel" style="padding:.6rem;position:relative">
-          <div id="leaflet-map" style="height:min(62vh,720px);min-height:360px;border-radius:6px"></div>
+          <div id="leaflet-map"></div>
           <div id="map-note" class="map-note" hidden></div>
           <div id="acma-card" class="acma-card" hidden></div>
         </div>

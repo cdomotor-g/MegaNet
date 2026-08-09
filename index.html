@@ -8,25 +8,48 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
   <meta name="theme-color" content="#0b5cab">
-  <link rel="stylesheet" href="styles.css?v=20260808d">
+  <link rel="stylesheet" href="styles.css?v=20260809a">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 
+  <!-- Every header button is icon + label. Once the window is narrow enough that
+       the labels would wrap the banner onto a second row, styles.css hides them
+       and the icons stand alone — which is what folds three rows into one.
+       Anything that rewrites a label from app.js writes into .hdr-label, never
+       the button's own textContent, or the icon goes with it. -->
   <header>
-    <div>
+    <button id="btn-nav" class="hdr-nav" onclick="toggleNav()"
+            aria-controls="tab-nav" aria-expanded="false" aria-label="Sections"
+            title="Sections">☰</button>
+    <div class="header-id">
       <h1>MegaNet</h1>
-      <p>Network Tool</p>
+      <p class="header-sub">
+        <span class="header-tag">Network Tool</span>
+        <span id="hdr-stats" class="header-stats"></span>
+      </p>
     </div>
     <div class="header-actions">
-      <span id="hdr-stats" class="small" style="color:rgba(255,255,255,.75)"></span>
       <input type="file" id="file-input" accept=".json" style="display:none" onchange="onFileLoad(this)">
-      <button onclick="document.getElementById('file-input').click()">Load stations.json</button>
-      <button id="btn-load-gh" onclick="loadFromGitHub()">Load from GitHub</button>
-      <button id="btn-report" onclick="BugReport.open()" title="Report a bug or suggest an improvement">🐞 Report a Bug</button>
-      <button id="btn-theme" onclick="toggleTheme()">Dark</button>
+      <button class="hdr-btn" onclick="document.getElementById('file-input').click()"
+              title="Load stations.json from this device">
+        <span class="hdr-ico" aria-hidden="true">📂</span><span class="hdr-label">Load stations.json</span>
+      </button>
+      <button id="btn-load-gh" class="hdr-btn" onclick="loadFromGitHub()" title="Load stations.json from GitHub">
+        <span class="hdr-ico" aria-hidden="true">⬇️</span><span class="hdr-label">Load from GitHub</span>
+      </button>
+      <button id="btn-report" class="hdr-btn" onclick="BugReport.open()" title="Report a bug or suggest an improvement">
+        <span class="hdr-ico" aria-hidden="true">🐞</span><span class="hdr-label">Report a Bug</span>
+      </button>
+      <button id="btn-theme" class="hdr-btn" onclick="toggleTheme()" title="Switch theme">
+        <span class="hdr-ico" aria-hidden="true">🌗</span><span class="hdr-label">Dark</span>
+      </button>
     </div>
   </header>
+
+  <!-- Tapping the page behind the phone nav drawer closes it. Inert and
+       invisible until #tab-nav is open. -->
+  <div id="nav-backdrop" onclick="setNavCollapsed(true)" hidden></div>
 
   <div id="app-shell">
     <nav id="tab-nav" aria-label="Sections">
@@ -43,6 +66,6 @@
        change so browsers and GitHub Pages fetch the new file instead of a stale
        copy. -->
   <script src="maps-data.js?v=20260723a"></script>
-  <script src="app.js?v=20260808d"></script>
+  <script src="app.js?v=20260809a"></script>
 </body>
 </html>
