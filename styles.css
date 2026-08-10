@@ -101,19 +101,32 @@ a:visited {
   color: var(--accent);
 }
 
+/* ── Page header ─────────────────────────────────────────────────────────────
+   The banner is the same three things at every width — who this is, what is
+   loaded, and the four global actions — but on a phone it has to say them in
+   one row rather than four. What gives, in order: the button labels (the icons
+   carry them), then the "Network Tool" tagline, then the title's size. The
+   station count stays: it is the one line that changes, and the one that tells
+   you the file actually loaded. */
+
 header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 1rem;
-  padding: 1rem 1.25rem;
+  padding: .8rem 1.25rem;
   background: var(--header);
   color: white;
 }
 
+.header-id {
+  min-width: 0;                 /* the title may ellipsise before the buttons wrap */
+}
+
 header h1 {
-  margin: 0 0 .2rem 0;
+  margin: 0 0 .15rem 0;
   font-size: 1.45rem;
+  line-height: 1.15;
 }
 
 header p {
@@ -121,6 +134,76 @@ header p {
   opacity: .95;
   font-size: .95rem;
   max-width: 70ch;
+}
+
+/* Tagline and station count share one line — two stacked lines of 0.85 rem
+   text under the title bought nothing that one line does not. */
+.header-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .1rem .5rem;
+  font-size: .85rem;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, .82);
+}
+
+.header-stats:not(:empty)::before {
+  content: '·';
+  margin-right: .5rem;
+  opacity: .6;
+}
+
+/* The shared .panel-header rule spaces its two ends apart, which is wrong here:
+   these are one cluster pinned to the right of the title, and the title is what
+   gives when the row runs short. */
+.header-actions {
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.hdr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  white-space: nowrap;
+}
+
+/* The icon is decoration while the label is showing, and the whole button once
+   the label is gone — it grows to match at the breakpoint below. */
+.hdr-ico {
+  font-size: .95rem;
+  line-height: 1;
+}
+
+/* Opens the nav drawer. Only ever visible on a phone, where the icon rail has
+   been taken out of the layout and this is the one way back to the tabs. */
+.hdr-nav {
+  display: none;
+  flex: 0 0 auto;
+  padding: 0;
+  width: 2.4rem;
+  height: 2.4rem;
+  font-size: 1.15rem;
+  line-height: 1;
+  background: rgba(255, 255, 255, .14);
+  border-color: rgba(255, 255, 255, .35);
+  color: #fff;
+}
+
+.hdr-nav.on {
+  background: rgba(255, 255, 255, .3);
+}
+
+#nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1150;               /* under the drawer (1200), over everything else */
+  background: rgba(8, 15, 24, .45);
+}
+
+#nav-backdrop[hidden] {
+  display: none;
 }
 
 .layout {
@@ -216,6 +299,23 @@ header p {
 .stack {
   display: grid;
   gap: 1rem;
+}
+
+/* A grid item is min-width:auto by default, which means "never narrower than
+   my content". So a panel holding a min-width:880px table (.bf-table, the
+   RF tables) grew its column to 880 px, the column grew the page, and the
+   whole document — header, nav and all — scrolled sideways on a phone while
+   the .table-wrap that was supposed to scroll sat there with nothing to do.
+   A panel is never the thing that should decide the page is wider than the
+   screen; whatever is too wide inside it has its own scroller. Stated on the
+   panels rather than on each grid that holds them, because several tabs lay
+   themselves out with an inline `display:grid` and no class to hang this on. */
+.panel,
+.panel-sub,
+.stack > *,
+.layout > *,
+.crud-layout > * {
+  min-width: 0;
 }
 
 .panel-header,
@@ -2025,25 +2125,38 @@ hr {
 
 /* A phone has no width to give away: 236 px of nav plus a filter pane that
    won't go below ~225 px does not fit in 390 px, whatever the two are set to.
-   So past this breakpoint the expanded nav floats over the content as a drawer
-   instead of squeezing it. The rail keeps its place in the layout, which means
-   the map underneath never changes width and never needs re-measuring —
-   switchTab() closes the drawer once a tab has been picked. */
+   So past this breakpoint the nav stops being a column of the page at all —
+   the rail comes out of the layout, giving the tables and maps back their 56 px,
+   and the tab list opens as a drawer over the content from the header's ☰. The
+   main area never changes width, so no map ever needs re-measuring; switchTab()
+   and the backdrop both close the drawer again. */
 @media (max-width: 560px) {
   #tab-nav,
   #tab-nav.collapsed {
-    width: var(--mn-nav-rail, 56px);
+    width: 0;
+    border-right: 0;
+    overflow: visible;          /* the drawer is a fixed child of a 0-wide box */
+  }
+
+  #tab-nav.collapsed .nav-inner {
+    display: none;              /* nothing left to show once the rail is gone */
   }
 
   #tab-nav:not(.collapsed) .nav-inner {
     position: fixed;
     inset: 0 auto 0 0;
-    width: var(--mn-nav, 236px);
+    width: min(var(--mn-nav, 236px), 78vw);
     max-height: none;
-    background: var(--panel);   /* out of flow — the rail behind it is 56 px */
+    background: var(--panel);
     border-right: 1px solid var(--border);
     box-shadow: 0 0 24px rgba(0, 0, 0, .3);
     z-index: 1200;
+  }
+
+  .hdr-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
@@ -2065,8 +2178,12 @@ hr {
 .warn-text  { color: #c7401a; }
 .ok-text    { color: #107c10; }
 
-/* Leaflet map inside new layout */
+/* The Stations map. Sized here rather than inline on the element, so that the
+   phone breakpoint can have an opinion about it — 62vh of map plus a 360 px
+   floor left a 664 px screen with barely a band of page under it. */
 #leaflet-map {
+  height: min(62vh, 720px);
+  min-height: 360px;
   border-radius: 6px;
 }
 
@@ -2500,7 +2617,11 @@ code {
   color: var(--muted);
 }
 
-.check-inline {
+/* Every other label in the form stacks its caption over its field; this one is
+   a tick with its caption beside it. Written as `.modal-form .check-inline` to
+   out-weigh the `.modal-form label` grid above — as a bare class it lost, and
+   the box sat on a line of its own above the words it belonged to. */
+.modal-form .check-inline {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
@@ -3310,4 +3431,257 @@ code {
   .ad-layout { grid-template-columns: 1fr; }
   .ad-side   { height: auto; overflow: visible; }
   .ad-stage  { height: 54dvh; }
+}
+
+/* ══ Mobile pass ═══════════════════════════════════════════════════════════
+   Everything below is width- or pointer-conditional and deliberately lives at
+   the end of the file, so it lands after the component rules it tunes without
+   any of them needing to be written twice. Three separate questions are being
+   answered, and they are not the same question:
+
+     · ≤ 900 px  — a tablet held upright. The width at which the header's
+                   button labels stop fitting on one row, and at which a table
+                   is better scrolled than squeezed. The layout above already
+                   stacks its columns by itself around here.
+     · ≤ 560 px  — a phone. Where the nav rail leaves the layout (see the nav
+                   section above) and the banner folds down to a single row.
+     · coarse    — a finger rather than a mouse, whatever the width. Hit areas,
+                   not layout.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* iOS Safari zooms the page when a field smaller than 16 px takes focus, and
+   never zooms back out. Every text-entry control in the app is .9 rem or less,
+   so on a touch device they are all bumped to exactly 16 px — the one number
+   that buys the zoom off. */
+@media (pointer: coarse) {
+  input[type="search"],
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  input[type="password"],
+  input[type="email"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* A 13 px checkbox is a coin toss with a fingertip. These are the whole
+     interaction on the filter, RF-changes and export panels, so they get the
+     platform's own minimum and the rows around them room to breathe. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 1.15rem;
+    height: 1.15rem;
+    flex: 0 0 auto;
+  }
+
+  /* The box is only the visible part of the target — the label around it is
+     what actually gets tapped, and at 24 px it clears WCAG's minimum by 0.
+     Any label wrapping a box gets a finger-sized row instead. */
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]) {
+    min-height: 2rem;
+    align-items: center;
+  }
+
+  .filter-row  { padding: .3rem .15rem; }
+  .checklist label { padding: .35rem 0; }
+
+  /* Fields sized for a dense desktop row — the RF Changes date picker, the
+     inline filter boxes — get a floor too. Checkboxes, radios and sliders are
+     excluded: they are sized above, and a min-height would only stretch them
+     out of shape. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select {
+    min-height: 2rem;
+  }
+
+  input[type="color"] { min-height: 1.75rem; }
+
+  /* Network View sets its own 16 px boxes; the finger does not care which
+     panel it is in. */
+  .nv-check input[type="checkbox"] { width: 1.15rem; height: 1.15rem; }
+
+  /* Buttons that were sized to sit inside a dense row still have to be hit.
+     The visual size is unchanged where it already cleared the bar; these only
+     raise the floor. */
+  button,
+  .btn-link {
+    min-height: 2rem;
+  }
+
+  /* …and the smallest ones, which are text-sized by design, get a hit area
+     rather than a bigger box: padding is cheaper than a redesign. */
+  .filter-only,
+  .filter-reset,
+  .filter-actions button,
+  .maps-chip,
+  .maps-reset {
+    min-height: 2rem;
+    padding-top: .3rem;
+    padding-bottom: .3rem;
+  }
+
+  /* The "only" shortcut hides until hover where there is a pointer. There is
+     no hover here, and the rule above it already says so — this just makes
+     sure the row leaves it space. */
+  .filter-row-side { gap: .4rem; }
+
+  /* A range slider is a 16 px-tall target dragged sideways. Give the thumb
+     something to hold onto. */
+  input[type="range"] { height: 1.75rem; }
+}
+
+@media (max-width: 900px) {
+  /* The four action labels run to about 520 px, which is what makes the banner
+     wrap to a second and third row — a tablet in portrait was giving it 109 px.
+     Icons alone from here down; the title attribute keeps the tooltip and the
+     button keeps its accessible name, since the label is hidden, not removed
+     from the accessibility tree. */
+  .hdr-btn {
+    justify-content: center;
+    padding: 0;
+    width: 2.4rem;
+    height: 2.4rem;
+  }
+
+  .hdr-label { display: none; }
+  .hdr-ico   { font-size: 1.15rem; }
+
+  /* 1 rem of page padding on every side of every panel, on a screen that is
+     itself only 26 rem wide, is most of a column of text given to margins. */
+  .layout,
+  .wb-page { padding: .75rem; }
+
+  .panel     { padding: .75rem; }
+  .panel-sub { padding: .65rem; }
+  .stack     { gap: .75rem; }
+
+  /* Panel headings inherit the browser's h1/h2 sizes, which are set for a
+     document and not for a 340 px column — "RF Environment — licensed
+     transmitters" was running to three lines before the tab had said anything.
+     A tighter scale, and one that keeps the steps between levels. */
+  #main-content h1 { font-size: 1.3rem; }
+  #main-content h2 { font-size: 1.12rem; }
+  #main-content h3 { font-size: 1rem; }
+  #main-content h1,
+  #main-content h2,
+  #main-content h3 { line-height: 1.25; }
+
+  /* Tables are the densest thing in the app and the first to run out of room.
+     Trimming the cell padding and a step of type is worth roughly one extra
+     column before anything has to scroll sideways. */
+  table { font-size: .84rem; }
+  th, td { padding: .38rem .4rem; }
+
+  /* The global `table-layout: fixed` divides whatever width there is between
+     the columns and ellipsises the rest, which is right on a laptop and
+     useless on a phone: the nine-column Stations table came out as "S…  Ro…
+     Ne…  Al…" over values reading "5…  61…  -…". Automatic layout instead —
+     each column takes what it needs, and the table scrolls inside its wrapper
+     when the total does not fit. `min-width: 100%` keeps the narrow tables
+     filling the panel rather than huddling at the left. */
+  .table-wrap table {
+    table-layout: auto;
+    min-width: 100%;
+  }
+
+  .table-wrap th,
+  .table-wrap td {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  /* Sideways scroll is invisible until you try it, so the wrapper says it is
+     there: the shadow only paints while there is more table to the right. */
+  .table-wrap {
+    background:
+      linear-gradient(to right, var(--panel) 30%, transparent) left / 24px 100% no-repeat,
+      linear-gradient(to left,  var(--panel) 30%, transparent) right / 24px 100% no-repeat,
+      radial-gradient(farthest-side at 0 50%,   rgba(0,0,0,.16), transparent) left / 9px 100% no-repeat,
+      radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,.16), transparent) right / 9px 100% no-repeat;
+    background-attachment: local, local, scroll, scroll;
+  }
+
+  /* A map that is 420 px tall on a 660 px screen leaves no page under it.
+     Sized against the viewport instead, so it still reads as a map on a phone
+     and still fills a tablet. The Stations map is the same trade at 62vh with
+     a 360 px floor — the floor is what actually bites, so it goes. */
+  .map-canvas  { height: min(420px, 52dvh); }
+  #leaflet-map { height: 52dvh; min-height: 260px; }
+
+  /* The scroll-capped tables were capped against the viewport already, but at
+     a fraction picked for a laptop; on a phone 42vh of a table is a sliver. */
+  .table-wrap.tall   { max-height: 60vh; }
+  .table-wrap.medium { max-height: 50vh; }
+}
+
+@media (max-width: 560px) {
+  /* The banner, folded. The buttons keep their icons and drop their labels,
+     the tagline goes, and what is left is one row about 3 rem tall instead of
+     the three wrapped rows (≈175 px, a quarter of the screen) it was. */
+  header {
+    align-items: center;
+    gap: .5rem;
+    padding: .5rem .6rem;
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: 1.05rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-sub { font-size: .72rem; }
+
+  /* The tagline is the only line here that never changes, so it is the one
+     that goes. The station count stays and loses its separator with it. */
+  .header-tag { display: none; }
+  .header-stats:not(:empty)::before { content: none; }
+
+  /* Four square buttons plus the ☰ and the title fit a 390 px row exactly once
+     nothing is allowed to wrap. */
+  .header-actions {
+    gap: .3rem;
+    flex-wrap: nowrap;
+  }
+
+  .layout,
+  .wb-page { padding: .5rem; }
+
+  .panel     { padding: .6rem; }
+  .panel-sub { padding: .55rem; }
+
+  /* The bug reporter was a card floating in 4vh of dimmed page. On a phone it
+     is the page: full width, and tall enough that the form does not open
+     already scrolled. */
+  .modal-overlay { padding: 0; }
+
+  .modal-card {
+    max-width: none;
+    min-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    padding: 1rem .85rem 1.5rem;
+  }
+
+  .modal-foot { justify-content: stretch; }
+  .modal-foot button { flex: 1 1 auto; }
+
+  /* .button-row spaces its buttons to both ends, which on a phone wraps them
+     and then strands the last one alone against the right edge. Packed to the
+     left, a wrapped row still reads as a list. */
+  .button-row { justify-content: flex-start; }
+}
+
+/* Below ~380 px (an iPhone SE, a folded phone) the title is competing with the
+   actions for the same row, and losing that contest helps nobody — the title
+   shrinks rather than pushing a button off the edge. */
+@media (max-width: 380px) {
+  header h1 { font-size: .95rem; }
+  .hdr-btn,
+  .hdr-nav { width: 2.15rem; height: 2.15rem; }
+  .hdr-ico { font-size: 1.05rem; }
 }
