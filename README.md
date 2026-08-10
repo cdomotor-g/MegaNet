@@ -497,8 +497,13 @@ specification (July 2003).
   validated, framing polarity is detected, and the format that passes everything is highlighted as
   the best match. A colour-coded bit map shows which bits belong to which field (hover a field row
   to highlight its bits).
+- **A2C** — a fifth layout, offered for 32-bit input only: the four-byte form the same address and
+  value take inside an ALERT2 concentration payload, as delivered by an ELPRO ERT-A2. No framing and
+  no CRC — its integrity claim is a status byte that reads 0 on every valid record. Whole serial
+  lines are decoded on the ALERT2 / ERT-A2 tab; this page decodes one reading at a time.
 - **Encode** — pick a format, enter the sensor ID and raw value(s), and get the message back
-  (40-bit framed, 32-bit payload and hex) with CRC/FCS computed automatically.
+  (40-bit framed, 32-bit payload and hex) with CRC/FCS computed automatically. ABF, BCC, EAF and EIF
+  only; A2C is a decode-side layout.
 - **Station names** — decoded ALERT addresses are matched against the loaded MegaNet station
   database first (shown with a *MegaNet* badge), then against the bundled national address file
   `data/All 2021 Working 2.txt`.
@@ -643,13 +648,15 @@ on a narrow window.
 | Group | Tabs |
 | --- | --- |
 | **Network** | Stations · Network Maps · Networks · Pass Ranges |
-| **Radio investigation** | RF Environment · RF Changes · Interference Workbench · Bit Flipper · Network View |
-| **Live tools** | ALERT Packets · Serial Monitor |
+| **Radio investigation** | RF Environment · RF Changes · Interference Workbench · Bit Flipper · Network View · ALERT Packets · ALERT2 / ERT-A2 · Serial Monitor |
 | **Data & admin** | ARRO Launcher · ARRO Data · Export |
 
 The grouping is the point of the second row: RF Environment, RF Changes, the
 Workbench and Bit Flipper are one investigation approached four ways, and
-nothing in a flat bar ever said so.
+nothing in a flat bar ever said so. The packet tools joined them rather than
+keeping a "Live tools" heading of their own — reading what a station actually
+transmitted is part of that same investigation, and the split only ever cost a
+second scan of the sidebar to find the decoder.
 
 - **Collapses to an icon rail**, not to nothing — icons and tooltips stay, only
   the labels go. The state is kept in `localStorage` under `mn-nav`, alongside
@@ -996,6 +1003,63 @@ the artifact to keep when the question is what was thrown away and why.
 > The specification is in `docs/` (v2.1, May 2009, and the 1998 first edition),
 > along with the sample export used to develop this.
 
+### 19. ALERT2 / ERT-A2 Serial Decoder
+
+Decodes the **ALERT2 ASCII protocol** an ELPRO ERT-A2 writes to its RS232 port,
+on the **ALERT2 / ERT-A2** tab. One line per received ALERT2 frame: 24 fixed
+fields of receiver metadata, then the frame payload as hex bytes.
+
+```
+ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00
+```
+
+The payload is an ALERT2 *ALERT concentration* element: type byte `0x74`, two
+bytes of seconds-since-midnight, then four bytes per reading. Each reading is
+the same 13-bit ALERT address and 11-bit value a legacy sensor transmits, packed
+into bytes rather than async words:
+
+| Byte | Contents |
+| --- | --- |
+| 0 | address bits 7–0 |
+| 1 | `DDDAAAAA` — value bits 10–8, then address bits 12–8 |
+| 2 | value bits 7–0 |
+| 3 | status; `0` on every valid record observed |
+
+That last packed byte is the only part of the encoding that is not obvious by
+eye — a byte that looks like address is carrying the top of the value too — so
+the **Frame anatomy** view draws it bit by bit with the arithmetic spelled out
+beside it, above the reading it produced.
+
+**Ingest.** Web Serial is closed off on managed machines, so this reads what an
+operator can get today: text pasted from PuTTY, or a session log picked off
+disk. PuTTY session banners (including one landing mid-line), terminal
+timestamps in front of the frame, lines a narrow terminal wrapped, and a log cut
+off mid-frame are all handled and accounted for in the summary rather than
+silently dropped. On a Chromium browser the **Watch** button re-opens the same
+log on a timer through the File System Access API, which is as close to live as
+this gets without a serial port — and the case for opening one.
+
+**Shared ALERT addresses.** An ALERT address is only unique within a region, and
+604 of the database's 5,122 addresses belong to more than one station. Every
+frame in a capture came through one receiver, so addresses matching exactly one
+station fix where that capture is, and an ambiguous address resolves to whichever
+candidate is near it — 96 of the 101 shared addresses in the reference capture,
+against candidates 1,200 km away. The rest are reported as ambiguous with a pin
+to record the answer, because two stations 6 km apart carrying the same addresses
+cannot be told apart by anything in the frame, and guessing would be worse than
+saying so.
+
+**Clock skew.** The header time is the receiver's own RTC; the payload time comes
+from the transmitting network. The summary reports the difference — 12 h 00 m 01 s
+on the reference capture, an AM/PM error on the unit — and distinguishes a couple
+of seconds of receive latency from a clock that drifted mid-capture.
+
+> Field meanings were established by decoding a 444-frame capture and checking it
+> against the same traffic decoded by ELPRO's Ranger software: payload lengths,
+> record boundaries, addresses, values and frame times all matched, and 339 of
+> the 348 addresses heard matched a station. Fields with no such evidence are
+> marked *constant only* in the tab's own field reference rather than guessed at.
+
 ---
 
 ## Deployment Plan
@@ -1029,7 +1093,8 @@ Tabs / panels:
 - **Network View** — the ghosting graph: ALERT addresses as nodes, bit-flip
   adjacency and observed ghosting as edges; hands its visible set to the
   Stations map as a selection
-- **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF)
+- **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF, A2C)
+- **ALERT2 / ERT-A2** — decode ELPRO ERT-A2 serial captures (ALERT2 ASCII protocol)
 - **Serial Monitor** — live ingestion from physical COM ports (Web Serial), with ASCII / hex / ALERT-decode display
 - **Export** — Radio Mobile file generation
 
