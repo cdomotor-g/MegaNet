@@ -1005,13 +1005,49 @@ the artifact to keep when the question is what was thrown away and why.
 
 ### 19. ALERT2 / ERT-A2 Serial Decoder
 
-Decodes the **ALERT2 ASCII protocol** an ELPRO ERT-A2 writes to its RS232 port,
-on the **ALERT2 / ERT-A2** tab. One line per received ALERT2 frame: 24 fixed
-fields of receiver metadata, then the frame payload as hex bytes.
+Decodes what an ELPRO ERT-A2 puts on its serial ports, on the **ALERT2 / ERT-A2**
+tab. The unit emits two different things on two different ports, and they do not
+carry the same information — so the tab reads both, and sniffs which one it has
+been given.
+
+#### Two ways in
+
+**1 · ALERT2 ASCII protocol — secondary RS232 port.** One comma-delimited line
+per received frame: 24 fixed fields of receiver metadata, including the unit's
+own real-time clock, then the frame payload as hex bytes.
 
 ```
 ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00
 ```
+
+**2 · ELPRO binary framing — USB port.** What Ranger's own *Serial Data* pane
+shows over USB, and **the one that carries RSSI**. The word `ALERT2` as six
+bytes, a length, then tag/length/value elements:
+
+```
+41 4C 45 52 54 32 4D 75 01 01 18 02 27 0F 77 05 45 4C 50 52 4F …  9C 2F 01 94
+                                                                  └── RSSI, −108 dBm
+```
+
+| | ASCII (RS232) | Binary (USB) |
+| --- | --- | --- |
+| RSSI | — | **yes**, element `9C2F`, signed byte, dBm |
+| Receiver clock | yes | — (no date or time of day in the framing at all) |
+| Frame time | payload, seconds since midnight | same |
+| Source, agency, payload | yes | yes |
+
+The binary frame nests two containers: `15` holds the air-link PDU as it landed
+(a length, the PDU, `A1` fill to a fixed 24-byte buffer), and `14` holds the same
+bytes split into a six-byte MANT header and the payload, with the RSSI appended.
+Both copies were byte-identical on every frame checked; the decoder reads the
+split one and reports it when they disagree.
+
+The capture is receive-only, so it shows what the USB port *emits*, not what (if
+anything) Ranger sent to turn it on. Nothing was needed to read it back, so the
+working answer is that the two ports simply speak different protocols — the tab's
+own reference says exactly that rather than claiming a secret command was found.
+
+#### The payload, on both
 
 The payload is an ALERT2 *ALERT concentration* element: type byte `0x74`, two
 bytes of seconds-since-midnight, then four bytes per reading. Each reading is
@@ -1031,13 +1067,30 @@ the **Frame anatomy** view draws it bit by bit with the arithmetic spelled out
 beside it, above the reading it produced.
 
 **Ingest.** Web Serial is closed off on managed machines, so this reads what an
-operator can get today: text pasted from PuTTY, or a session log picked off
-disk. PuTTY session banners (including one landing mid-line), terminal
-timestamps in front of the frame, lines a narrow terminal wrapped, and a log cut
-off mid-frame are all handled and accounted for in the summary rather than
-silently dropped. On a Chromium browser the **Watch** button re-opens the same
-log on a timer through the File System Access API, which is as close to live as
-this gets without a serial port — and the case for opening one.
+operator can get today: text pasted from a terminal, hex copied out of Ranger, or
+a session log picked off disk. On the ASCII side, PuTTY session banners (including
+one landing mid-line), terminal timestamps in front of the frame, lines a narrow
+terminal wrapped, and a log cut off mid-frame are all handled and accounted for in
+the summary rather than silently dropped. On the hex side, a bracketed timestamp
+or a hex-dump offset column is stripped off each line first — their digits are hex
+too, and would otherwise be read as data — and everything left is treated as one
+byte stream, with the frames found by their `ALERT2` sync rather than by the line
+breaks. That is what makes Ranger's pane usable as-is: it wraps mid-frame at
+whatever width the window happens to be. Space-delimited, run together, `0x`
+prefixed, upper or lower case all work.
+
+On a Chromium browser the **Watch** button re-opens the same log on a timer
+through the File System Access API, which is as close to live as this gets
+without a serial port — and the case for opening one. A machine whose policy
+blocks that API now says so, with the policy name, instead of the button doing
+nothing.
+
+**Map.** One pin per station heard in the capture, sized by how many readings it
+sent and coloured by RSSI where the format carries it. The pins and the readings
+table are one selection: clicking a pin lights up every row that station sent
+(they carry three or four ALERT addresses each), and clicking a row lights up its
+pin. Station names in both places are links through to the Stations tab, which
+opens with that station selected, scrolled to and focused on its map.
 
 **Shared ALERT addresses.** An ALERT address is only unique within a region, and
 604 of the database's 5,122 addresses belong to more than one station. Every
@@ -1049,16 +1102,28 @@ to record the answer, because two stations 6 km apart carrying the same addresse
 cannot be told apart by anything in the frame, and guessing would be worse than
 saying so.
 
-**Clock skew.** The header time is the receiver's own RTC; the payload time comes
-from the transmitting network. The summary reports the difference — 12 h 00 m 01 s
-on the reference capture, an AM/PM error on the unit — and distinguishes a couple
-of seconds of receive latency from a clock that drifted mid-capture.
+**Clock skew.** On an ASCII capture the header time is the receiver's own RTC and
+the payload time comes from the transmitting network, so the summary reports the
+difference — 12 h 00 m 01 s on the reference capture, an AM/PM error on the unit —
+and distinguishes a couple of seconds of receive latency from a clock that drifted
+mid-capture. A binary capture has no receiver clock in it to compare, and the
+summary says so rather than inventing one.
 
-> Field meanings were established by decoding a 444-frame capture and checking it
-> against the same traffic decoded by ELPRO's Ranger software: payload lengths,
-> record boundaries, addresses, values and frame times all matched, and 339 of
-> the 348 addresses heard matched a station. Fields with no such evidence are
-> marked *constant only* in the tab's own field reference rather than guessed at.
+> **ASCII.** Field meanings were established by decoding a 444-frame capture and
+> checking it against the same traffic decoded by ELPRO's Ranger software: payload
+> lengths, record boundaries, addresses, values and frame times all matched, and
+> 339 of the 348 addresses heard matched a station.
+>
+> **Binary.** 44 frames from Ranger's Serial Data pane were decoded here and
+> compared against Ranger's own decode of the same packets. Source, agency, frame
+> time, every ALERT address, every value and every RSSI matched on all 44 —
+> including multi-reading frames, where Ranger lists the readings in a different
+> order. A second capture of 78 frames then parsed to the same structure with
+> every byte accounted for: nothing stray between frames, no unrecognised element,
+> no warning raised.
+>
+> Fields and elements with no such evidence behind them are marked *constant only*
+> in the tab's own reference rather than guessed at.
 
 ---
 
@@ -1094,7 +1159,7 @@ Tabs / panels:
   adjacency and observed ghosting as edges; hands its visible set to the
   Stations map as a selection
 - **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF, A2C)
-- **ALERT2 / ERT-A2** — decode ELPRO ERT-A2 serial captures (ALERT2 ASCII protocol)
+- **ALERT2 / ERT-A2** — decode ELPRO ERT-A2 serial captures, either wire format (ALERT2 ASCII on RS232, or the USB binary framing that carries RSSI), mapped and matched to stations
 - **Serial Monitor** — live ingestion from physical COM ports (Web Serial), with ASCII / hex / ALERT-decode display
 - **Export** — Radio Mobile file generation
 

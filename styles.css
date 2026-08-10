@@ -2345,12 +2345,62 @@ code {
 .a2 .a2-cb { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; margin: 0; }
 .a2 .a2-num input { width: 62px; margin-left: 5px; padding: .2rem .3rem; }
 
+/* which wire format the capture is read as — same chip as the view switcher,
+   so the two rows of buttons read as the same kind of control */
+.a2 .a2-modes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+
 /* result tables — wide, so they scroll inside the panel rather than the page */
 .a2 .a2-tablewrap { overflow-x: auto; }
 .a2 table.a2-table { min-width: 640px; }
 .a2 table.a2-table td { white-space: nowrap; }
 .a2 tr.a2-badrow td { background: color-mix(in srgb, var(--bad) 8%, transparent); }
 .a2 .a2-link { color: var(--accent); cursor: pointer; font-size: .8rem; }
+
+/* a row is a selection shared with the map, so it has to look clickable and it
+   has to show which one is picked from anywhere in the table's width */
+.a2 tr.a2-row { cursor: pointer; }
+.a2 tr.a2-row:hover td { background: var(--subtle); }
+.a2 tr.a2-row.sel td {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 0 1px 0 var(--accent), inset 0 -1px 0 var(--accent);
+}
+.a2 tr.a2-row.sel td:first-child { box-shadow: inset 1px 1px 0 var(--accent), inset 0 -1px 0 var(--accent); }
+.a2 tr.a2-row.sel td:last-child  { box-shadow: inset -1px 1px 0 var(--accent), inset 0 -1px 0 var(--accent); }
+.a2 a.a2-stlink { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; cursor: pointer; }
+.a2 a.a2-stlink:hover { text-decoration: none; border-bottom-style: solid; }
+
+/* RSSI, coloured on the same scale as the map pins */
+.a2 .a2-rssi {
+  display: inline-flex; align-items: baseline; gap: 3px;
+  font: 600 .85rem ui-monospace, Menlo, Consolas, monospace;
+  border-left: 3px solid var(--rssi, var(--border)); padding-left: 6px;
+}
+.a2 .a2-rssi i { font-size: .68rem; font-style: normal; font-weight: 400; opacity: .7; }
+
+/* coverage map */
+.a2 .a2-map { height: 420px; border-radius: 8px; border: 1px solid var(--border); }
+.a2 .a2-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 8px; font-size: .78rem; }
+.a2 .a2-lkey { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+.a2 .a2-lkey i { width: 11px; height: 11px; border-radius: 50%; border: 1px solid #fff; display: inline-block; }
+
+/* the two capture methods, side by side at the top of the reference */
+.a2 .a2-methods { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin: 4px 0 14px; }
+/* min-width:0 — a grid item defaults to min-content, and the sample frame inside
+   each card is one long unbreakable line. Without this the card grows to fit it
+   and takes the page sideways with it instead of letting .a2-raw scroll. */
+.a2 .a2-method { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; background: var(--subtle); min-width: 0; }
+.a2 .a2-method h4 { margin: 0 0 8px; font-size: .95rem; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.a2 .a2-method .a2-raw { background: var(--bg); }
+.a2 .a2-method ul.pkt-cheat { margin-bottom: 0; }
+
+/* binary frame anatomy: one row per TLV element, indented by nesting */
+.a2 .a2-tlv { display: grid; gap: 4px; margin: 8px 0; }
+.a2 .a2-tlvrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .82rem; }
+.a2 .a2-tlvrow .a2-chip { min-width: 58px; }
+.a2 .a2-tlvlen { font-size: .72rem; color: var(--muted); min-width: 34px; }
+.a2 .a2-tlvval { min-width: 0; overflow-x: auto; }
+.a2 .a2-tlvval code { font-size: .76rem; white-space: pre; }
+.a2 .r-rssi { background: var(--ok); color: #fff; }
 
 /* frame anatomy: header field chips */
 .a2 .a2-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
@@ -2407,6 +2457,10 @@ code {
 @media (max-width: 700px) {
   .a2 .a2-stat { flex: 1 1 40%; min-width: 0; }
   .a2 .a2-rec-body { gap: 10px; }
+  /* Same trade as the other maps on a small screen: sized against the viewport
+     so there is still page left underneath it. */
+  .a2 .a2-map { height: min(420px, 48dvh); min-height: 240px; }
+  .a2 .a2-methods { grid-template-columns: 1fr; }
 }
 
 /* ── Network Maps tab (Network Maps Navigator) ──────────────────────────────── */
