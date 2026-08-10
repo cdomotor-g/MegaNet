@@ -48,6 +48,8 @@
   --c-crc:   #6d51ad; --c-crc-t:   #efe8ff;
   --c-batt:  #b04a5a; --c-batt-t:  #ffe6ea;
   --c-hd:    #0f8a8a; --c-hd-t:    #e2fafa;
+  --c-time:   #a8562a; --c-time-t:   #fff0e6;
+  --c-status: #5a6b7d; --c-status-t: #eef3f8;
 }
 
 [data-theme="dark"] {
@@ -2245,6 +2247,7 @@ code {
 .pkt .f-R, .pkt .f-C { background: var(--c-crc); color: var(--c-crc-t); }
 .pkt .f-B, .pkt .f-BS, .pkt .f-VCO, .pkt .f-DE { background: var(--c-batt); color: var(--c-batt-t); }
 .pkt .f-HD { background: var(--c-hd); color: var(--c-hd-t); }
+.pkt .f-S { background: var(--c-status); color: var(--c-status-t); }
 .pkt .bit.kbad { outline: 2px solid var(--bad); outline-offset: -2px; }
 .pkt .bit.hl { outline: 2px solid var(--text); outline-offset: -2px; filter: brightness(1.15); }
 
@@ -2303,6 +2306,109 @@ code {
   .pkt .bit { width: 19px; height: 26px; font-size: 11px; }
   .pkt .lblrow span { width: 19px; font-size: 8px; }
 }
+
+/* ── ALERT2 / ERT-A2 tab ────────────────────────────────────────────────────── */
+/* Shares the .pkt shell — same panels, buttons, badges, field tables and bit
+   cells. Everything below is what a whole serial line needs that a single 32-bit
+   message did not: a capture box, a summary, and the byte-by-byte anatomy. */
+
+.a2 .a2-input {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 110px;
+  font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre; overflow-wrap: normal; overflow-x: auto;
+}
+.a2 button.ghost.on { background: var(--accent); color: #fff; }
+
+/* summary chips */
+.a2 .a2-stats { display: flex; flex-wrap: wrap; gap: 10px; }
+.a2 .a2-stat {
+  border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px;
+  background: var(--subtle); min-width: 92px;
+}
+.a2 .a2-stat b { display: block; font-size: 1.25rem; line-height: 1.1; }
+.a2 .a2-stat span { font-size: .72rem; color: var(--muted); letter-spacing: .3px; }
+.a2 .a2-stat.warn { border-color: var(--warn); }
+.a2 .a2-stat.bad  { border-color: var(--bad); }
+
+/* view switcher + options */
+.a2 .a2-vtabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.a2 .a2-vspacer { flex: 1 1 auto; }
+.a2 .a2-vtab {
+  background: transparent; border: 1px solid var(--border); color: var(--text);
+  padding: .4rem .9rem; border-radius: 8px; cursor: pointer; font-size: .85rem;
+}
+.a2 .a2-vtab.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.a2 .a2-opts {
+  display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  font-size: .82rem; color: var(--muted); padding: 8px 0 12px; border-bottom: 1px solid var(--border);
+}
+.a2 .a2-cb { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; margin: 0; }
+.a2 .a2-num input { width: 62px; margin-left: 5px; padding: .2rem .3rem; }
+
+/* result tables — wide, so they scroll inside the panel rather than the page */
+.a2 .a2-tablewrap { overflow-x: auto; }
+.a2 table.a2-table { min-width: 640px; }
+.a2 table.a2-table td { white-space: nowrap; }
+.a2 tr.a2-badrow td { background: color-mix(in srgb, var(--bad) 8%, transparent); }
+.a2 .a2-link { color: var(--accent); cursor: pointer; font-size: .8rem; }
+
+/* frame anatomy: header field chips */
+.a2 .a2-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.a2 .a2-chip {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  border-radius: 6px; padding: 3px 7px; min-width: 34px; color: #fff;
+}
+.a2 .a2-chip b { font: 600 12px ui-monospace, Menlo, Consolas, monospace; }
+.a2 .a2-chip i { font-size: 8.5px; font-style: normal; opacity: .85; letter-spacing: .2px; white-space: nowrap; }
+.a2 .a2-chip.unsure { opacity: .55; }
+.a2 .r-ident  { background: var(--c-ident);  color: var(--c-ident-t); }
+.a2 .r-addr   { background: var(--c-addr);   color: var(--c-addr-t); }
+.a2 .r-time   { background: var(--c-time);   color: var(--c-time-t); }
+.a2 .r-status { background: var(--c-status); color: var(--c-status-t); }
+.a2 .r-len    { background: var(--c-hd);     color: var(--c-hd-t); }
+.a2 .r-data   { background: var(--c-data);   color: var(--c-data-t); }
+.a2 .r-pack   { background: linear-gradient(160deg, var(--c-data) 0 45%, var(--c-addr) 45% 100%); color: #fff; }
+.a2 .r-bad    { background: var(--bad); color: #fff; }
+.a2 .r-status.bad { background: var(--bad); color: #fff; }
+
+/* frame anatomy: payload bytes, grouped one reading at a time */
+.a2 .a2-bytes { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 4px; }
+.a2 .a2-bgroup { display: inline-flex; gap: 2px; padding: 3px; border-radius: 8px; border: 1px solid transparent; }
+.a2 .a2-bgroup.hl { border-color: var(--text); background: var(--subtle); }
+.a2 .a2-byte {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  border-radius: 5px; padding: 4px 6px; min-width: 30px;
+}
+.a2 .a2-byte b { font: 700 13px ui-monospace, Menlo, Consolas, monospace; }
+.a2 .a2-byte i { font-size: 8px; font-style: normal; opacity: .85; white-space: nowrap; }
+.a2 .a2-byte.hl { outline: 2px solid var(--text); outline-offset: -2px; }
+
+/* frame anatomy: one reading, spelled out */
+.a2 .a2-rec { border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; overflow: hidden; }
+.a2 .a2-rec.bad { border-color: var(--bad); }
+.a2 .a2-rec.hl  { border-color: var(--text); }
+.a2 .a2-rec-head { background: var(--subtle); padding: 6px 12px; font-size: .85rem; font-weight: 600; }
+.a2 .a2-rec-head .spec { display: inline; font-weight: 400; margin-left: 6px; }
+.a2 .a2-rec-body { display: flex; flex-wrap: wrap; gap: 18px; padding: 10px 12px; align-items: flex-start; }
+.a2 .a2-rec-bits { text-align: center; flex: 0 0 auto; }
+.a2 .a2-rec-maths { flex: 1 1 320px; min-width: 0; font-size: .85rem; display: grid; gap: 6px; }
+.a2 .a2-rec-maths code { font-size: .8rem; color: var(--muted); }
+
+.a2 .a2-raw { background: var(--subtle); border-radius: 8px; padding: 8px 12px; margin-top: 10px; overflow-x: auto; }
+.a2 .a2-raw code { font-size: .78rem; white-space: pre; }
+.a2 .a2-warn { margin: 8px 0 0; padding-left: 18px; font-size: .82rem; color: var(--warn); }
+.a2 h4.a2-h { margin: 16px 0 0; font-size: .82rem; letter-spacing: .4px; color: var(--muted); text-transform: uppercase; }
+
+/* ambiguous-address picker */
+.a2 .a2-ambig { display: flex; gap: 14px; padding: 10px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.a2 .a2-ambig-id { font: 700 1rem ui-monospace, Menlo, Consolas, monospace; min-width: 90px; }
+.a2 .a2-ambig button { margin: 2px 6px 2px 0; }
+
+@media (max-width: 700px) {
+  .a2 .a2-stat { flex: 1 1 40%; min-width: 0; }
+  .a2 .a2-rec-body { gap: 10px; }
+}
+
 /* ── Network Maps tab (Network Maps Navigator) ──────────────────────────────── */
 .maps-layout {
   display: grid;
