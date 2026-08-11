@@ -107,6 +107,33 @@ function arroSiteId(s) {
   return id == null ? null : id;
 }
 
+// Street View / Apple Maps links for a station's coordinates, or null when it
+// has none. Google's Maps URLs API drops the viewer on the nearest available
+// panorama — on farm tracks and hilltops with no coverage it lands on the map
+// instead, which is why the link's title spells that out. Apple publishes no
+// URL scheme for opening Look Around at a coordinate, so the Apple link is a
+// map pin, not a panorama, and is labelled "Apple Maps" rather than
+// "Apple Street View" because it isn't one.
+function stationMapLinkUrls(s) {
+  if (s == null || s.lat == null || s.lon == null) return null;
+  const coord = `${s.lat},${s.lon}`;
+  return {
+    google: `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${encodeURIComponent(coord)}`,
+    apple:  `https://maps.apple.com/?ll=${encodeURIComponent(coord)}&q=${encodeURIComponent(s.name || '')}`,
+  };
+}
+
+// The two links above, rendered as the anchors used in both the map popup
+// and the station editor card — one place a URL shape is written, not two.
+function mapLinksHtml(s) {
+  const urls = stationMapLinkUrls(s);
+  if (!urls) return '';
+  return `<a href="${esc(urls.google)}" target="_blank" rel="noopener"
+       title="Opens the nearest Google Street View panorama; sites with no coverage open the map at this location instead">Google Street View ↗</a>
+    <a href="${esc(urls.apple)}" target="_blank" rel="noopener"
+       title="Opens Apple Maps at this location; Look Around is one tap away where Apple has coverage">Apple Maps ↗</a>`;
+}
+
 // ── Datastore ─────────────────────────────────────────────────────────────────
 // Postgres on Supabase, reached over PostgREST — which is plain HTTP, so this
 // costs no library and index.html gains no <script> tag. One constants block for
@@ -1741,6 +1768,7 @@ function refreshMapLayers({ skipFit = false } = {}) {
         ${arroUrl ? `<a href="${esc(arroUrl)}" target="_blank" rel="noopener"
            title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
            >Open in ARRO admin ↗</a>` : ''}
+        ${mapLinksHtml(s)}
       </div>
     `;
     });
@@ -9321,6 +9349,7 @@ function editorForm(s) {
       <label>Station Number<input type="text" id="ef-stnno" value="${esc(s.station_number || '')}"></label>
       <label>Latitude<input type="number" step="any" id="ef-lat" value="${s.lat ?? ''}"></label>
       <label>Longitude<input type="number" step="any" id="ef-lon" value="${s.lon ?? ''}"></label>
+      ${stationMapLinkUrls(s) ? `<div class="full small" style="display:flex;gap:1rem;margin-top:-.35rem">${mapLinksHtml(s)}</div>` : ''}
       <label>Elevation AHD (m)<input type="number" step="any" id="ef-elev" value="${s.elevation_ahd ?? ''}"></label>
       <label>RM System ID<input type="number" id="ef-rmsys" value="${s.rm_system_id || 1}"></label>
       <label class="full">Roles
