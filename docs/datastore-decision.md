@@ -48,10 +48,13 @@ so a paused database degrades to "yesterday's data" rather than "no data".
 
 ### Room in the org
 
-`cdomotor-g's Org` (Free) holds `MegaNet` and `SoRT` active, with `F-TIDE` and the
-retired Singapore project not counting against the cap. That is **2 of 2 active
-projects used**. Not a problem for this ticket, but worth knowing before anyone
-reaches for a third: it would mean pausing one, or paying.
+`cdomotor-g's Org` (Free) holds `MegaNet` and `SoRT` active, with `F-TIDE` paused
+and so not counting. That is **2 of 2 active projects used**. Not a problem for
+this ticket, but worth knowing before anyone reaches for a third: it would mean
+pausing one, or paying.
+
+The Singapore project was deleted outright rather than left paused, so it occupies
+neither a slot nor a restore window.
 
 ## The decisions
 
@@ -125,6 +128,7 @@ table — which is why that rule is a hard one in `db/README.md` — and it is w
 advisor will keep reporting a warning against this project that is not ours to
 fix.
 
-Observed on the Singapore project this one replaced. It ships with new Supabase
-projects rather than being something either project was configured into, so expect
-it here as well; the advisor will say either way.
+Present on the Singapore project this one replaced and, checked after the move, on
+this one too — it ships with new Supabase projects rather than being something
+either was configured into. The two warnings the advisor reports against this
+project are both this function, and both are expected.
