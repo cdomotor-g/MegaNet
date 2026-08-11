@@ -910,15 +910,17 @@ function passRelationIndex() {
   if (state.passRelIdx) return state.passRelIdx;
   // Nothing loaded yet: answer empty without caching, so the index (and the
   // repeater subset it builds on) is still built from the real file later.
-  if (!state.data) return { byStation: new Map(), byRepeater: new Map() };
+  if (!state.data) return { byStation: new Map(), byRepeater: new Map(), addresses: [], passingAddr: new Map() };
   const stations  = state.data.stations;
   const repeaters = repeaterList(stations);
   const byStation  = new Map();   // station id  → repeaters carrying it
   const byRepeater = new Map();   // repeater id → field stations it carries
+  const addrSet    = new Set();   // every distinct ALERT address in the network
   for (const r of repeaters) byRepeater.set(r.id, []);
   for (const s of stations) {
     const ids = stationAlertIds(s);
     if (!ids.length) continue;
+    ids.forEach(id => addrSet.add(id));
     const isField = s.roles.includes('field');
     let carriers = null;
     for (const r of repeaters) {
@@ -929,8 +931,40 @@ function passRelationIndex() {
     }
     if (carriers) byStation.set(s.id, carriers);
   }
-  state.passRelIdx = { byStation, byRepeater };
+  const addresses = [...addrSet].sort((a, b) => a - b);
+  // Addresses carried per repeater: how many of the network's addresses fall
+  // inside its open pass ranges (post-exclusion), regardless of which station
+  // role owns the address. Distinct from byRepeater above, which counts field
+  // *stations* — a station can own several addresses, so the two numbers
+  // legitimately differ. Built here, once per file, for the same reason the
+  // rest of this index exists (see the comment above).
+  const passingAddr = new Map();
+  for (const r of repeaters) {
+    let n = 0;
+    for (const id of addresses) if (passRangeCoversId(r.repeater, id)) n++;
+    passingAddr.set(r.id, n);
+  }
+  state.passRelIdx = { byStation, byRepeater, addresses, passingAddr };
   return state.passRelIdx;
+}
+
+// Addresses a repeater carries — the primary "passing N" count shown wherever
+// a repeater appears (see #83). Null when the repeater has no pass ranges
+// recorded at all, so callers can tell "nothing configured" (show nothing)
+// from "configured but carrying nothing" (show "passing 0" — a finding).
+function repeaterPassingCount(station) {
+  if (!station || !station.repeater) return null;
+  const ranges = station.repeater.pass_ranges;
+  if (!Array.isArray(ranges) || !ranges.length) return null;
+  return passRelationIndex().passingAddr.get(station.id) ?? 0;
+}
+
+// Total addresses the repeater's ranges could carry (Σ high − low + 1), before
+// exclusions and before any overlap with other repeaters — the denominator for
+// the "how full is this repeater" utilisation figure on its editor card.
+function repeaterPassRangeSpan(station) {
+  return (station?.repeater?.pass_ranges || [])
+    .reduce((sum, r) => sum + Math.max(0, r.high - r.low + 1), 0);
 }
 
 // The lists handed out below are the index's own arrays. Callers only read
@@ -1757,6 +1791,8 @@ function refreshMapLayers({ skipFit = false } = {}) {
       return `
       <strong>${esc(s.name)}</strong><br>
       ${s.roles.map(r => `<span style="background:${ROLE_COLOR[r]};color:#fff;padding:1px 5px;border-radius:999px;font-size:.78rem;margin-right:2px">${r}</span>`).join('')}<br>
+      ${s.roles.includes('repeater') && repeaterPassingCount(s) != null
+        ? `<span style="font-size:.83rem">passing ${repeaterPassingCount(s)}</span><br>` : ''}
       ${s.station_number ? `<span style="font-size:.83rem">Stn #${esc(s.station_number)}</span><br>` : ''}
       ${idTypes.length ? `<span style="font-size:.83rem">AlertID:</span><br>${idTypes.map(t =>
         `<span style="font-size:.82rem">&nbsp;&nbsp;${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
@@ -4478,6 +4514,9 @@ function stationsTable(allStations) {
               <td title="${esc(s.id)}"><span class="stn-name role-${primaryRole(s)}">${markHits(s.name, terms)}</span></td>
               <td class="small">${markHits(s.station_number || '', terms)}</td>
               <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}${
+                s.roles.includes('repeater') && repeaterPassingCount(s) != null
+                  ? ` <span class="badge" title="ALERT addresses carried, in this repeater's open pass ranges">passing ${repeaterPassingCount(s)}</span>`
+                  : ''}${
                 relIds.has(s.id)
                   ? ' <span class="badge badge--rel" title="Not a filter match — a pass range ties it to one">via pass range</span>'
                   : ''}</td>
@@ -4824,17 +4863,18 @@ function passRangeTablesHtml() {
           ${!rptData.length ? noMatch('No repeater matches this filter.') : `
           <table>
             <colgroup>
-              <col style="width:20%"><col style="width:16%"><col style="width:8%">
-              <col style="width:16%"><col style="width:40%">
+              <col style="width:18%"><col style="width:14%"><col style="width:10%"><col style="width:8%">
+              <col style="width:16%"><col style="width:34%">
             </colgroup>
-            <thead><tr><th>Repeater</th><th>Network</th><th>Matched</th><th>Pass ranges</th><th>Stations (first 10)</th></tr></thead>
+            <thead><tr><th>Repeater</th><th>Network</th><th>Addresses</th><th>Matched</th><th>Pass ranges</th><th>Stations (first 10)</th></tr></thead>
             <tbody>
               ${rptData.map(({ r, matched }) => `
                 <tr onclick="goToStation('${escAttr(r.id)}')" style="cursor:pointer"
                     title="Open ${escAttr(r.name)} on the Stations tab">
                   <td>${markHits(r.name, terms)}</td>
                   <td class="small">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
-                  <td><span class="badge">${matched.length}</span></td>
+                  <td><span class="badge" title="ALERT addresses carried, post-exclusion">${repeaterPassingCount(r) ?? 0}</span></td>
+                  <td><span class="badge" title="Field stations matched">${matched.length}</span></td>
                   <td class="small">${passRangesHtml(r.repeater, searchIds)}</td>
                   <td class="small">${firstTen(matched).slice(0, 10).map(s => markHits(s.name, terms)).join(', ')}${matched.length > 10 ? ` +${matched.length - 10} more` : ''}</td>
                 </tr>`).join('')}
@@ -5112,7 +5152,10 @@ function renderBitFlipperResults() {
       ? [...new Map(ms.flatMap(m => findRepeaterMatches(m.station)).map(r => [r.id, r])).values()]
       : [];
     const repHtml = reps.length
-      ? reps.map(r => `<span class="badge badge--repeater">${esc(r.name)}</span>`).join(' ')
+      ? reps.map(r => {
+          const n = repeaterPassingCount(r);
+          return `<span class="badge badge--repeater" title="${n != null ? `passing ${n} ALERT addresses` : 'no pass ranges recorded'}">${esc(r.name)}</span>`;
+        }).join(' ')
       : dash;
     // The pinned, tinted row is the station of interest — it says so in the
     // tooltip rather than in the cell, which otherwise steals width from the
@@ -9173,7 +9216,10 @@ function renderExportHtml() {
                     <td class="small">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
                     <td class="rx-cell small">${r.repeater.rx_mhz || ''}</td>
                     <td class="tx-cell small">${r.repeater.tx_mhz || ''}</td>
-                    <td class="small">${(r.repeater.pass_ranges || []).map(p => `${p.low}–${p.high}`).join(', ')}</td>
+                    <td class="small">${(r.repeater.pass_ranges || []).map(p => `${p.low}–${p.high}`).join(', ')}${
+                      repeaterPassingCount(r) != null
+                        ? ` <span class="badge" title="ALERT addresses carried, post-exclusion">passing ${repeaterPassingCount(r)}</span>`
+                        : ''}</td>
                   </tr>`).join('')}
               </tbody>
             </table>
@@ -9332,6 +9378,25 @@ function editorNew() {
   rerenderStationEditorCard(); // show the blank form
 }
 
+// Spelled-out "Passing N ALERT addresses across M stations, in R ranges
+// spanning S addresses (P% used)." above the Pass Ranges textarea (see #83).
+// Empty string when the repeater has no ranges recorded — nothing to spell
+// out yet, and the blank textarea below already says so.
+function repeaterPassingSummaryHtml(s) {
+  const ranges = s.repeater?.pass_ranges || [];
+  if (!ranges.length) return '';
+  const addr = repeaterPassingCount(s) ?? 0;
+  const stns = findStationMatches(s).length;
+  const span = repeaterPassRangeSpan(s);
+  const pct  = span ? Math.round((addr / span) * 100) : 0;
+  return `
+        <p class="full small" style="margin:.1rem 0 .5rem">
+          <strong>Passing ${addr} ALERT address${addr === 1 ? '' : 'es'} across ${stns} station${stns === 1 ? '' : 's'}</strong>,
+          in ${ranges.length} range${ranges.length === 1 ? '' : 's'} spanning ${span.toLocaleString()} address${span === 1 ? '' : 'es'}
+          (${pct}% used).
+        </p>`;
+}
+
 function editorForm(s) {
   const hasRep  = s.roles.includes('repeater');
   const sensors = stationSensors(s).slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0));
@@ -9388,6 +9453,7 @@ function editorForm(s) {
         <label>ACMA Licence<input type="text" id="ef-acma" value="${esc(s.repeater?.acma_licence || '')}"></label>
         <label>RX (MHz)<input type="number" step="any" id="ef-rx" value="${s.repeater?.rx_mhz ?? ''}"></label>
         <label>TX (MHz)<input type="number" step="any" id="ef-tx" value="${s.repeater?.tx_mhz ?? ''}"></label>
+        ${repeaterPassingSummaryHtml(s)}
         <label class="full">Pass Ranges (one per line: <em>low-high</em>)
           <textarea id="ef-pass" rows="5">${(s.repeater?.pass_ranges || []).map(r => `${r.low}-${r.high}`).join('\n')}</textarea>
         </label>
