@@ -107,6 +107,26 @@ function arroSiteId(s) {
   return id == null ? null : id;
 }
 
+// mm per tip for a station, and whether it is a recorded fact or our default.
+// No station carries TBRGbucketSize today and there is no authoritative source
+// to backfill from, so 0.2 mm/tip is a fallback, not a measurement — every
+// consumer of the result must say which one it got via `recorded`.
+function bucketSizeMm(s) {
+  const v = s && s.TBRGbucketSize;
+  return (typeof v === 'number' && v > 0)
+    ? { mm: v,   recorded: true }
+    : { mm: 0.2, recorded: false };
+}
+
+// "2,784 of 3,174 stations carry one" — same honesty as arroSiteId's gap, for
+// an empty field with no authoritative source to backfill it from.
+function bucketSizeGapNote() {
+  const all = state.data?.stations || [];
+  if (!all.length) return '';
+  const missing = all.filter(s => !bucketSizeMm(s).recorded).length;
+  return `${missing.toLocaleString()} of ${all.length.toLocaleString()} stations carry no recorded bucket size.`;
+}
+
 // Street View / Apple Maps links for a station's coordinates, or null when it
 // has none. Google's Maps URLs API drops the viewer on the nearest available
 // panorama — on farm tracks and hilltops with no coverage it lands on the map
@@ -396,7 +416,7 @@ const state = {
     onlyErrors: false,
     hideUnknown: false,     // drop records whose ALERT id matches no station
     eng:       true,        // show engineering values beside the raw counts
-    mmPerTip:  0.2,
+    mmPerTip:  bucketSizeMm(null).mm, // fallback only — a resolved station's TBRGbucketSize wins (see engValue)
     battDiv:   10,
     picks:     {},          // alert id -> chosen station id, when the capture can't tell
     limit:     400,         // rows drawn before "show more"; a day's log is ~15k readings
@@ -7520,7 +7540,7 @@ const ArroData = (function () {
     let best = 0;
     for (const [u, c] of units) if (c > best) { best = c; unit = u; }
 
-    return { n, t: T, tr: TR, v: V, raw: RAW, q: Q, qcodes, unit, warn, desc };
+    return { n, t: T, tr: TR, v: V, raw: RAW, q: Q, qcodes, unit, warn, desc, hasRaw: iRaw >= 0 };
   }
 
   // ── filename → sensor id → station ─────────────────────────────────────────
@@ -7745,6 +7765,14 @@ const ArroData = (function () {
     const key = cfgKey(cfg, s.kind);
     if (s.filt && s.filt.key === key) return s.filt;
 
+    // `v` is ARRO's own "Value" column, filtered exactly as exported. The
+    // 3/5/7 steps and the 2048 rollover ceiling below are counts-domain
+    // constants from the Bureau's spec — never multiply this by
+    // bucketSizeMm() (or anything else per-station) before it reaches
+    // walk357(). That would rescale every threshold by the bucket size and
+    // the failure mode is silent: a filter that still runs, still looks
+    // right, and quietly keeps or drops the wrong readings. Bucket size is a
+    // display-time conversion only — see pinHtml()'s Raw row.
     const n = s.n, t = s.t, v = s.v;
     const isRA = s.kind === 'RA';
 
@@ -8106,7 +8134,7 @@ const ArroData = (function () {
       unit:     parsed.unit,
       color:    AD_COLORS[(ad.series.length) % AD_COLORS.length],
       visible:  true,
-      n: parsed.n, t: parsed.t, tr: parsed.tr, v: parsed.v, raw: parsed.raw,
+      n: parsed.n, t: parsed.t, tr: parsed.tr, v: parsed.v, raw: parsed.raw, hasRaw: parsed.hasRaw,
       q: parsed.q, qcodes: parsed.qcodes,
       warn:     parsed.warn, wasDescending: parsed.desc,
       filt: null, tracks: null,
@@ -8366,6 +8394,19 @@ const ArroData = (function () {
     return statsHtml();
   }
 
+  // What a raw tip count converts to in mm, for display next to it — never
+  // fed back into runFilter/walk357, which stay in the count/Value domain
+  // ARRO exported (see the comment on runFilter()). Only offered for a
+  // rainfall accumulator with a real "Raw Value" column and a linked
+  // station; a water level's raw count isn't a tip count at all.
+  function rawBucketNote(s, i) {
+    if (s.kind !== 'RA' || !s.hasRaw || !s.station) return '';
+    const b = bucketSizeMm(s.station);
+    const mm = s.raw[i] * b.mm;
+    const note = b.recorded ? `recorded, ${b.mm} mm/tip` : `assumed ${b.mm} mm/tip — not recorded for this site`;
+    return ` <span class="small" style="color:var(--muted)">= ${esc(fmtVal(mm))} mm (${esc(note)})</span>`;
+  }
+
   function pinHtml(s, i) {
     const f = runFilter(s, ad.cfg);
     const st = f.status[i];
@@ -8386,7 +8427,7 @@ const ArroData = (function () {
           <div><span>Received</span><b>${esc(fmtFull(s.tr[i]))}${s.tr[i] !== s.t[i]
               ? ` <span class="small" style="color:var(--warn)">+${Math.round((s.tr[i] - s.t[i]) / 1000)}s</span>` : ''}</b></div>
           <div><span>Value</span><b>${esc(fmtVal(s.v[i]))} ${esc(s.unit)}</b></div>
-          <div><span>Raw</span><b>${esc(fmtVal(s.raw[i]))}</b></div>
+          <div><span>Raw</span><b>${esc(fmtVal(s.raw[i]))}</b>${rawBucketNote(s, i)}</div>
           <div><span>Adjusted</span><b>${esc(fmtVal(f.adj[i]))}${rolled ? ' <span class="small">(wrap here)</span>' : ''}</b></div>
           <div><span>Quality</span><b>${esc(s.qcodes[s.q[i]] || '—')}</b></div>
         </div>
@@ -9417,6 +9458,13 @@ function editorForm(s) {
       ${stationMapLinkUrls(s) ? `<div class="full small" style="display:flex;gap:1rem;margin-top:-.35rem">${mapLinksHtml(s)}</div>` : ''}
       <label>Elevation AHD (m)<input type="number" step="any" id="ef-elev" value="${s.elevation_ahd ?? ''}"></label>
       <label>RM System ID<input type="number" id="ef-rmsys" value="${s.rm_system_id || 1}"></label>
+      <label>TBRG bucket size (mm/tip)
+        <input type="number" step="0.1" min="0" id="ef-bucket" value="${s.TBRGbucketSize ?? ''}" placeholder="not recorded">
+      </label>
+      <div class="full small" style="color:var(--muted);margin-top:-.35rem">
+        Blank means not recorded, not zero — the app falls back to an assumed 0.2 mm/tip wherever it
+        converts a rain gauge count and says so. ${bucketSizeGapNote()}
+      </div>
       <label class="full">Roles
         <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:.35rem">
           ${Object.keys(ROLE_LABEL).map(r => `
@@ -9577,6 +9625,8 @@ function editorSave() {
   d.lon            = pFloat(document.getElementById('ef-lon')?.value);
   d.elevation_ahd  = pFloat(document.getElementById('ef-elev')?.value);
   d.rm_system_id   = parseInt(document.getElementById('ef-rmsys')?.value) || 1;
+  const bucket = pFloat(document.getElementById('ef-bucket')?.value);
+  if (bucket != null && bucket > 0) d.TBRGbucketSize = bucket; else delete d.TBRGbucketSize;
   d.enabled        = document.getElementById('ef-enabled')?.checked ?? true;
   d.notes          = document.getElementById('ef-notes')?.value || '';
   d.roles          = [...document.querySelectorAll('input[name="ef-roles"]:checked')].map(b => b.value);
@@ -14943,13 +14993,27 @@ const Alert2 = (function () {
   // bucket. Water level is left as raw counts because its scale is set per site
   // and the capture gives no way to tell which — a number invented here would
   // read like a measurement.
-  function engValue(kind, raw) {
+  //
+  // `st` is the station the address resolved to, if any (see rowsFor /
+  // stationRollup). When it carries a recorded TBRGbucketSize that wins; the
+  // per-capture "mm per tip" box (a.mmPerTip, default 0.2) is a fallback for
+  // everything else, not the only source any more. Either way the rule text
+  // says which one was used — a converted millimetre value that doesn't say
+  // that is exactly the kind of number that ends up in a report.
+  function engValue(kind, raw, st) {
     const a = state.a2;
     if (!a.eng) return null;
     if (kind === 'battery' && a.battDiv > 0) return { text: (raw / a.battDiv).toFixed(1) + ' V',  rule: 'raw ÷ ' + a.battDiv };
-    if (kind === 'rain'    && a.mmPerTip > 0) {
-      const mm = raw * a.mmPerTip;
-      return { text: (Math.round(mm * 100) / 100) + ' mm', rule: 'raw × ' + a.mmPerTip + ' mm per tip, cumulative' };
+    if (kind === 'rain') {
+      const bucket = bucketSizeMm(st);
+      const mmPerTip = bucket.recorded ? bucket.mm : a.mmPerTip;
+      if (!(mmPerTip > 0)) return null;
+      const mm = raw * mmPerTip;
+      const source = bucket.recorded ? `recorded for ${st.name}`
+                   : st ? `assumed — not recorded for ${st.name}`
+                        : 'assumed — no station resolved';
+      return { text: (Math.round(mm * 100) / 100) + ' mm',
+               rule: 'raw × ' + mmPerTip + ' mm per tip (' + source + '), cumulative' };
     }
     return null;
   }
@@ -15023,7 +15087,7 @@ const Alert2 = (function () {
         const kind = info ? info.kind : null;
         if (a.onlyErrors && r.ok && !f.warn.length) return;
         if (a.hideUnknown && !st) return;
-        rows.push({ r, f, info, st, kind, key: selKey(st, r.alertId), eng: engValue(kind, r.value) });
+        rows.push({ r, f, info, st, kind, key: selKey(st, r.alertId), eng: engValue(kind, r.value, st) });
       });
     });
     return rows;
@@ -15057,7 +15121,7 @@ const Alert2 = (function () {
       const info = res.byAlertId.get(e.aid);
       const st = info && info.chosen ? info.chosen.station : null;
       return Object.assign(e, { info, st, key: selKey(st, e.aid),
-                                kind: info ? info.kind : null, eng: engValue(info ? info.kind : null, e.lastVal),
+                                kind: info ? info.kind : null, eng: engValue(info ? info.kind : null, e.lastVal, st),
                                 rssiMed: median(e.rssi), rssiBest: e.rssi.length ? Math.max(...e.rssi) : null,
                                 rssiWorst: e.rssi.length ? Math.min(...e.rssi) : null });
     }).sort((x, y) => x.aid - y.aid);
@@ -15237,7 +15301,8 @@ const Alert2 = (function () {
 
   function recordBlock(r, i, res) {
     const info = res.byAlertId.get(r.alertId);
-    const eng = engValue(info ? info.kind : null, r.value);
+    const st   = info && info.chosen ? info.chosen.station : null;
+    const eng = engValue(info ? info.kind : null, r.value, st);
     const [b0, b1, b2, b3] = r.bytes;
     return '<div class="a2-rec' + (r.ok ? '' : ' bad') + '" data-rec="' + i + '">'
       + '<div class="a2-rec-head">Reading ' + (i + 1) + ' <span class="spec">payload bytes ' + r.off + '–' + (r.off + 3)
@@ -15864,9 +15929,11 @@ const Alert2 = (function () {
           <ul class="pkt-cheat">
             <li><b>Battery</b> — raw ÷ 10 volts. 213 battery readings in the reference capture fell between 130
               and 142, which is 13.0–14.2 V and nothing else plausible.</li>
-            <li><b>Rainfall</b> — a cumulative tip count, ×&nbsp;0.2 mm per tip by default. Counts step up one
-              at a time in the capture, which is a tipping bucket; the millimetres per tip is a site
-              configuration, so it is an input above rather than a constant.</li>
+            <li><b>Rainfall</b> — a cumulative tip count, ×&nbsp;mm per tip. Counts step up one at a time
+              in the capture, which is a tipping bucket; the millimetres per tip is a site configuration
+              (<code>TBRGbucketSize</code>) and wins when the address resolves to a station that carries
+              one. Otherwise it falls back to the input below, 0.2&nbsp;mm by default — either way the
+              value shown says whether it was recorded for that site or assumed.</li>
             <li><b>Water level</b> — left as raw counts. The scale is set per site and nothing in the capture
               reveals it, so no conversion is offered.</li>
             <li><b>2047</b> on any sensor is all eleven bits set: over-range, or a sensor reading nothing.</li>
@@ -16004,7 +16071,8 @@ const Alert2 = (function () {
       + cb('onlyErrors', 'Only problems', 'Show just the frames and readings something is wrong with')
       + cb('hideUnknown', 'Hide unmatched addresses', 'Drop readings whose ALERT address matches no station in the database')
       + cb('eng', 'Engineering values', 'Convert battery and rainfall counts, using the scales below')
-      + '<span class="a2-num">mm per tip <input type="number" step="0.1" min="0" value="' + a.mmPerTip
+      + '<span class="a2-num" title="Fallback only — a station carrying a recorded TBRGbucketSize uses that instead">'
+      + 'mm per tip (fallback) <input type="number" step="0.1" min="0" value="' + a.mmPerTip
       + '" oninput="Alert2.setOpt(\'mmPerTip\',this.value)"></span>'
       + '<span class="a2-num">battery ÷ <input type="number" step="1" min="1" value="' + a.battDiv
       + '" oninput="Alert2.setOpt(\'battDiv\',this.value)"></span>'
@@ -16275,7 +16343,7 @@ const Alert2 = (function () {
       f.records.forEach(r => {
         const info = res.byAlertId.get(r.alertId);
         const st = info && info.chosen ? info.chosen.station : null;
-        const eng = engValue(info ? info.kind : null, r.value);
+        const eng = engValue(info ? info.kind : null, r.value, st);
         out.push({
           format: f.kind === 'bin' ? 'usb-binary' : 'rs232-ascii',
           line: f.lineNo,

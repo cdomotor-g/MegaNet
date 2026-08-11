@@ -183,6 +183,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
   },
 
   "rm_system_id": 1,
+  "TBRGbucketSize": 0.2,
 
   "enabled": true,
   "notes": ""
@@ -202,6 +203,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 | `rm_system_id` | `number` | References the Radio Mobile system spec (power, antenna, etc.) |
 | `satcom.enabled` | `boolean` | Marks stations with satellite comms capability |
 | `catchment_ids` | `string[]` | References `catchments[].id`. **Not yet populated** — the Network Maps tab derives a station's catchment at runtime from its coordinates (see feature 8). Populate this to make map suggestions exact. |
+| `TBRGbucketSize` | `number` | Millimetres per tip for this station's tipping-bucket rain gauge. **Absent, not `null`, when not recorded** — most stations today. Every consumer that converts a tip count to millimetres falls back to an assumed 0.2 mm/tip and says so (`bucketSizeMm()` in `app.js`) when this is missing. Named as the ticket that introduced it asked, so it doesn't match this schema's usual snake_case (`tbrg_bucket_size_mm`) — flag it if that should change before more call sites depend on the name. |
 
 > **`site` / `sensors`** are the authoritative sensor records — the `alert_ids`
 > labels are kept for backward compatibility but can be mislabelled (an address
