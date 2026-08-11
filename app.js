@@ -119,8 +119,13 @@ function arroSiteId(s) {
 // in the same migration that creates it (see db/README.md). The rule that keeps
 // that true is worth stating plainly: nothing goes in a table that its policy
 // would not hand to a stranger.
-const DB_URL      = 'https://thiwbqfunyemrbxvmsra.supabase.co/rest/v1';
-const DB_ANON_KEY = 'sb_publishable_O1v0BmFCIbK57OINjTxs0A_FUKWbO9C';
+const DB_URL      = 'https://jjprlritvhdqpvphfrnu.supabase.co/rest/v1';
+// TODO(#71): empty pending the Sydney project's publishable key — Project
+// Settings → API Keys, the sb_publishable_… one. Deliberately blank rather than
+// carrying the retired Singapore project's key over: a real-looking key pointed
+// at the wrong project fails identically to no key at all, and costs an hour to
+// work out. Blank fails immediately and says why. Do not merge until it is set.
+const DB_ANON_KEY = '';
 
 // MegaNet's tables live in their own schema rather than in `public`, so every
 // request has to name it. Reads carry Accept-Profile; writes, when there are

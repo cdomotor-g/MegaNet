@@ -3,8 +3,9 @@
 **Decided:** 11 August 2026 · **Ticket:** [#71](https://github.com/cdomotor-g/MegaNet/issues/71), under epic [#70](https://github.com/cdomotor-g/MegaNet/issues/70) · **Status:** in force
 
 MegaNet's datastore is **Postgres, hosted on Supabase**, in a **dedicated free-tier
-project** (`MegaNet`, ref `thiwbqfunyemrbxvmsra`), with all schema kept as plain
-SQL in [`db/migrations/`](../db/migrations/) and applied with `psql`.
+project** (`MegaNet`, ref `jjprlritvhdqpvphfrnu`) in **`ap-southeast-2` (Sydney)**,
+with all schema kept as plain SQL in [`db/migrations/`](../db/migrations/) and
+applied with `psql`.
 
 This note exists so the next person does not re-litigate the choice from scratch —
 the same job the README's terrain and ACMA notes do. If you are about to change
@@ -47,10 +48,10 @@ so a paused database degrades to "yesterday's data" rather than "no data".
 
 ### Room in the org
 
-`cdomotor-g's Org` (Free) holds `MegaNet` and `SoRT` active, and `F-TIDE` paused.
-That is **2 of 2 active projects used** — at the cap. Not a problem for this
-ticket, but worth knowing before anyone reaches for a third: it would mean pausing
-one, or paying.
+`cdomotor-g's Org` (Free) holds `MegaNet` and `SoRT` active, with `F-TIDE` and the
+retired Singapore project not counting against the cap. That is **2 of 2 active
+projects used**. Not a problem for this ticket, but worth knowing before anyone
+reaches for a third: it would mean pausing one, or paying.
 
 ## The decisions
 
@@ -68,25 +69,21 @@ default. Keeping our tables out of it means "what belongs to MegaNet" is
 answerable by listing one schema, and nothing arrives there by accident. It costs
 one line of config (see `db/README.md`) and an `Accept-Profile` header per request.
 
-**Region: `ap-southeast-1` (Singapore) — a known compromise.** #71 asked for the
-nearest Australian region, which is `ap-southeast-2` (Sydney). The project was
-already created in Singapore, and region is fixed at creation: changing it means
-destroying and recreating the project. Two reasons not to, today:
+**Region: `ap-southeast-2` (Sydney).** The nearest region to Queensland, which is
+what #71 asked for and what every read from a browser here pays for. Brisbane→Sydney
+is roughly 15–25 ms round trip against roughly 110–130 ms to Singapore.
 
-- Nothing is lost by waiting. The whole database is one migration and one row;
-  recreating it in Sydney is a ten-minute job right up until #B2 moves real data
-  in. **That is the moment to decide for good**, and it should be decided
-  deliberately rather than by drift.
-- The org is at its 2-project cap, so a rebuild is a destroy-then-create, not a
-  create-then-migrate — a worse operation to attempt casually.
+The first project was created in `ap-southeast-1` (Singapore) and moved before any
+station data existed. That timing was the whole point: region is fixed at creation,
+so changing it means destroying and recreating the project, and the window in which
+that costs ten minutes rather than a data migration closes the moment #B2 lands.
+Recorded here because the *next* region question — a read replica, a second
+environment — will face the same one-way door.
 
-The cost is real: Brisbane→Singapore is roughly 110–130 ms round trip against
-roughly 15–25 ms to Sydney, and every read from a browser in Queensland pays it.
-Those are estimates, not measurements — nobody has yet loaded the app from
-Queensland against this project. **The Data source panel now prints the true
-figure**, so whoever picks this up next can decide from a number instead of an
-estimate. If it lands where the estimates suggest, moving to Sydney before #B2 is
-worth the ten minutes.
+Because the org sits at its 2-project cap the move was a destroy-then-create rather
+than a create-then-migrate, which is the more anxious order to do it in. Worth
+knowing if it ever has to happen again: pause the old project first, so it stops
+counting against the cap while remaining restorable for 90 days.
 
 **Schema as plain SQL, applied with `psql`.** No ORM, no migration framework, no
 `npm`. This repo has no build step and gains nothing by growing one for five
@@ -127,3 +124,7 @@ its enforced list is `public` only, so it will never enable RLS on a `meganet`
 table — which is why that rule is a hard one in `db/README.md` — and it is why the
 advisor will keep reporting a warning against this project that is not ours to
 fix.
+
+Observed on the Singapore project this one replaced. It ships with new Supabase
+projects rather than being something either project was configured into, so expect
+it here as well; the advisor will say either way.
