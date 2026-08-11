@@ -107,6 +107,38 @@ function arroSiteId(s) {
   return id == null ? null : id;
 }
 
+// ── Datastore ─────────────────────────────────────────────────────────────────
+// Postgres on Supabase, reached over PostgREST — which is plain HTTP, so this
+// costs no library and index.html gains no <script> tag. One constants block for
+// the same reason as the ARRO one above: three copies of a host drift the moment
+// one of them is edited.
+//
+// DB_ANON_KEY is public and committed on purpose. It names the project, it does
+// not authorise anything — row level security is what decides what an anonymous
+// caller may read, and every table is created with RLS on and an explicit policy
+// in the same migration that creates it (see db/README.md). The rule that keeps
+// that true is worth stating plainly: nothing goes in a table that its policy
+// would not hand to a stranger.
+const DB_URL      = 'https://thiwbqfunyemrbxvmsra.supabase.co/rest/v1';
+const DB_ANON_KEY = 'sb_publishable_O1v0BmFCIbK57OINjTxs0A_FUKWbO9C';
+
+// MegaNet's tables live in their own schema rather than in `public`, so every
+// request has to name it. Reads carry Accept-Profile; writes, when there are
+// any, carry Content-Profile.
+const DB_SCHEMA = 'meganet';
+
+// The schema this build of the app is written against, checked on connect
+// against meganet.app_meta.schema_version. Bump it in the same commit as the
+// migration that raises the database's. A mismatch is reported rather than
+// papered over — an app newer than its database is the failure that otherwise
+// shows up as columns quietly reading as undefined.
+const DB_SCHEMA_VERSION = 1;
+
+// Host without the /rest/v1, for showing the operator where they are pointed.
+function dbHostLabel() {
+  try { return new URL(DB_URL).host; } catch (_) { return DB_URL; }
+}
+
 // ── Station filter vocabulary ─────────────────────────────────────────────────
 // The grouped filters on the Stations tab (role, sensor type, radio network,
 // region…) are built from whatever the loaded stations.json actually contains.
@@ -295,6 +327,11 @@ const state = {
     freqMhz: null,
   },
   exportNets:     null,
+  // Last datastore round trip, as returned by dbPing(): null before the first
+  // one, { checking:true } while one is in flight. Kept here rather than in the
+  // panel so that re-rendering the Export tab — which every checkbox on it does
+  // — redraws the last result instead of firing another request.
+  dbStatus:       null,
   bfInput:        '',
   bfBits:         '1',
   bfOnlyMatches:  false,
@@ -1149,7 +1186,7 @@ function renderMain() {
     case 'serial':     el.innerHTML = Serial.render();        Serial.init();       break;
     case 'arro':       el.innerHTML = renderArroHtml();      initArro();  break;
     case 'arrodata':   el.innerHTML = ArroData.render();     ArroData.init();     break;
-    case 'export':     el.innerHTML = renderExportHtml();                 break;
+    case 'export':     el.innerHTML = renderExportHtml();     initExport();     break;
     default:           el.innerHTML = '<p style="padding:1rem">Unknown tab</p>';
   }
   updateChromeHeight();     // the Stations panes size themselves off it
@@ -8907,6 +8944,116 @@ const ArroData = (function () {
 })();
 if (typeof window !== 'undefined') window.ArroData = ArroData;
 
+// ── Datastore status ───────────────────────────────────────────────────────────
+// The whole client, for now: one timed GET of the smallest row in the database,
+// so "is the datastore reachable from a browser, and is it the shape this app
+// expects" has an answer on screen rather than in somebody's head.
+
+const _dbClock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+// Reads meganet.app_meta.schema_version. Returns a result object rather than
+// throwing, because every caller wants to render the failure, not catch it:
+//   { ok:true,  ms, version }
+//   { ok:false, ms, error }
+async function dbPing() {
+  const t0 = _dbClock();
+  const url = `${DB_URL}/app_meta?select=value&key=eq.schema_version`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        apikey: DB_ANON_KEY,
+        'Accept-Profile': DB_SCHEMA,
+        // Exactly one row, as an object rather than a one-element array. If the
+        // version row is missing or duplicated PostgREST says so with a 406,
+        // which is a better answer than quietly reading undefined.
+        Accept: 'application/vnd.pgrst.object+json',
+      },
+      cache: 'no-store',
+    });
+    const ms = Math.round(_dbClock() - t0);
+
+    if (!res.ok) {
+      // PostgREST reports failures as JSON — {message, hint, code}. A proxy, or
+      // a project paused for inactivity, may answer with something else, so the
+      // status line is the fallback rather than the parse being assumed.
+      let detail = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (body && body.message) {
+          detail = body.message + (body.hint ? ` — ${body.hint}` : '');
+        }
+      } catch (_) { /* not JSON; the status line stands */ }
+      return { ok: false, ms, error: detail };
+    }
+
+    const row = await res.json();
+    const version = Number(row && row.value);
+    return { ok: true, ms, version: Number.isFinite(version) ? version : null };
+  } catch (e) {
+    // fetch() rejects the same way for DNS failure, TLS failure, CORS refusal
+    // and no network at all, and the browser deliberately does not say which.
+    // So report what is actually known rather than guessing a cause.
+    return { ok: false, ms: Math.round(_dbClock() - t0), error: `unreachable — ${e && e.message || e}` };
+  }
+}
+
+// Run a check and repaint the panel around it — once for "checking", once for
+// the result. Repaints the status node alone, not the tab: the Export tab's
+// checkboxes are DOM state, and redrawing them under the operator would reset
+// the very selection they had just made.
+async function dbCheck() {
+  state.dbStatus = { checking: true };
+  dbRepaintStatus();
+  state.dbStatus = await dbPing();
+  dbRepaintStatus();
+}
+
+function dbRepaintStatus() {
+  const el = document.getElementById('db-status');
+  if (el) el.innerHTML = renderDbStatusHtml();
+}
+
+function renderDbStatusHtml() {
+  const s = state.dbStatus;
+  const host = `<div class="small" style="margin-top:.35rem">${esc(dbHostLabel())}</div>`;
+
+  if (!s || s.checking) {
+    return `<div class="small">Checking…</div>${host}`;
+  }
+
+  if (!s.ok) {
+    return `
+      <div style="color:var(--bad)"><strong>Not connected</strong></div>
+      <div class="small" style="margin-top:.25rem;color:var(--bad)">${esc(s.error)}</div>
+      ${host}`;
+  }
+
+  // Connected, but against a database that is not the one this build was written
+  // against. Worth its own colour: everything still reads, and will keep reading
+  // wrongly, until one side or the other is brought up to date.
+  if (s.version !== DB_SCHEMA_VERSION) {
+    const older = s.version != null && s.version < DB_SCHEMA_VERSION;
+    return `
+      <div style="color:var(--warn)"><strong>Connected · schema mismatch</strong></div>
+      <div class="small" style="margin-top:.25rem;color:var(--warn)">
+        database is v${esc(s.version ?? '?')}, this app expects v${DB_SCHEMA_VERSION} —
+        ${older ? 'apply the newer migrations in db/migrations/' : 'this copy of the app is out of date'}
+      </div>
+      <div class="small" style="margin-top:.25rem">${s.ms} ms round trip</div>
+      ${host}`;
+  }
+
+  return `
+    <div style="color:var(--ok)"><strong>Connected · schema v${s.version} · ${s.ms} ms</strong></div>
+    ${host}`;
+}
+
+// First visit to the tab checks; after that the panel holds what it found until
+// Re-test is pressed, so flipping between tabs is not a stream of requests.
+function initExport() {
+  if (!state.dbStatus) dbCheck();
+}
+
 // ── EXPORT tab ─────────────────────────────────────────────────────────────────
 
 function renderExportHtml() {
@@ -8944,6 +9091,17 @@ function renderExportHtml() {
             <strong>${selRpts.length}</strong> repeater${selRpts.length !== 1 ? 's' : ''} selected<br>
             <strong>${unitCount}</strong> total units in export
           </div>
+        </div>
+
+        <!-- Nothing on this tab reads from the datastore yet. The panel is here
+             because it is the one place in the app that talks to it at all, and
+             a connection nobody can see the state of is one that fails silently. -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Data source</h3>
+            <button onclick="dbCheck()" style="padding:.25rem .5rem;font-size:.8rem">Re-test</button>
+          </div>
+          <div id="db-status">${renderDbStatusHtml()}</div>
         </div>
       </aside>
 

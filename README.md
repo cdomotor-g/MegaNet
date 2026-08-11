@@ -46,10 +46,15 @@ MegaNet/
 │   └── nsw-border/         │  NSW North Coast repeater maps
 │
 ├── docs/                   ← reference documents
+│   ├── datastore-decision.md               (why Postgres on Supabase, and where)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
 │   ├── 357 Filter doco.doc                  (the 1998 first edition of the same spec)
 │   └── aem_Durikai_AL_541134_Rainfall_541134_0_R_5758.csv  (sample ARRO export)
+│
+├── db/                     ← the datastore's schema, as plain SQL
+│   ├── README.md                           (how to apply, and the rules — read first)
+│   └── migrations/                         (numbered, forward-only, run with psql)
 │
 ├── data/                   ← source + bundled data files
 │   ├── ALL_UNITS.csv                 (legacy field-station source for migrate.html)
