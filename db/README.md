@@ -144,10 +144,26 @@ its cache at all (`PGRST002`).
 | `meganet.auth_user_sync()` | `AFTER INSERT/UPDATE` on `auth.users`: keeps `app_user` in step. Never writes `role`. |
 | `meganet.email_may_sign_in(text)` | Yes/no for one address, callable anonymously so the sign-in panel can refuse before emailing. Deliberately an oracle — see `docs/access.md`. |
 | `meganet.whoami()` | Identity and write permission as the database sees them. What the app shows in the header and the Data source panel. |
+| `meganet.reading` | Every field-station reading. `addr` is the identity and the primary key is the deduplication — see **Telemetry**, below. |
+| `meganet.reading_raw` | One row per `ingest()` call, holding the payload exactly as submitted. Ages out in 30 days. **The one table `anon` cannot read.** |
+| `meganet.reading_hourly`, `meganet.reading_daily` | The rollups, kept forever. Sums rather than means, so a day re-aggregates from its hours exactly — and goes on being right after the readings are gone. |
+| `meganet.ingest_source`, `meganet.protocol`, `meganet.quality`, `meganet.unit` | The four vocabularies a reading is validated against. A new transport or protocol is an `insert` here, not a migration. |
+| `meganet.ingest(jsonb)` | The one way in. A batch, validated per row, deduplicated, partially accepted. `EXECUTE` revoked from `public` and never granted to `anon`. |
+| `meganet.resolve_station(int, text)` | Which station is this address, when exactly one answer exists? Null otherwise. |
+| `meganet.resolve_readings(int)` | The backfill: fill `station_id` on readings whose address has since become unambiguous. |
+| `meganet.roll_up(timestamptz)` | Rebuild the rollups for every bucket touched since the watermark. Idempotent. |
+| `meganet.retain(int)` | Roll up, then age out. The one retention job. |
+| `meganet.as_ts()`, `meganet.as_num()`, `meganet.code_for()` | `ingest()`'s validators, split out so "be liberal in what you accept" is written once and a bad field produces a sentence rather than a cast error. |
 
-Everything is readable by `anon`. Nothing is *writable* by `anon` or by
-`authenticated`: no table grants either of them a write verb, and the only way in
-is the two functions above — see **Writing** below.
+Everything is readable by `anon` **except `meganet.reading_raw`**, which holds
+whatever a device or an adapter actually sent, unread — a debugging artefact
+rather than a publication, and the day an adapter puts a header or a device key
+in its payload is the day the difference matters. Editors and `service_role` can
+read it.
+
+Nothing is *writable* by `anon` or by `authenticated`: no table grants either of
+them a write verb, and the only ways in are the functions above — see **Writing**
+and **Telemetry** below.
 
 ### Two conventions worth knowing before you read the SQL
 
@@ -361,6 +377,100 @@ rollback;
 
 That last one is option (a) in three lines: anonymous is a state the database
 answers politely, not one it errors at.
+
+## Telemetry
+
+Added by `0006_telemetry.sql`. Four tables, four vocabularies and one entry point.
+The operational half — what a reading is, what retention costs — is in the main
+[`README.md`](../README.md#field-station-telemetry); what follows is the part that
+only matters if you are reading or changing the SQL.
+
+**There is exactly one write path, and it is `meganet.ingest(jsonb)`.** Same
+reasoning as `save_station()`: HTTP POST, MQTT, backfill and manual entry are four
+adapters, and four adapters each doing their own validation is four subtly
+different ideas about what a timestamp is. It is a plain Postgres function rather
+than an Edge Function so that it travels with a `pg_dump`.
+
+```sql
+select meganet.ingest('[{"alert_id": 6128, "reading_ts": "2026-08-12T04:15:00Z",
+                         "value_raw": 12, "source": "manual"}]'::jsonb);
+```
+
+An array, an object with a `readings` array, or a single reading object are all
+accepted. Envelope keys — `source`, `protocol`, `path`, `received_at`, `keep_raw`
+— are defaults that any row may override, so one batch can carry a mixed archive.
+
+**A bad row and a bad envelope get different answers, on purpose.** A row that
+fails validation comes back as `{"i": 4, "why": "…"}` with the rest of the batch
+stored — a station sending one bad reading must not cost the other 287. A payload
+that is not a readings array at all raises SQLSTATE `22023`, which PostgREST
+returns as HTTP 400, because that is the caller misunderstanding the contract.
+
+**`addr` is generated, and it is the identity.** `a:6128` for an ALERT address;
+`s:541155/level` for a satellite or cellular station, which has no ALERT address
+and reports under its station number with a channel naming the sensor. It is a
+stored generated column rather than something the caller supplies so that it
+cannot disagree with the columns it is built from, and the primary key
+`(addr, reading_ts, value_raw)` hangs off it. That key **is** the deduplication:
+`insert … on conflict do nothing`, and the copy that lost bumps `dup_count` and
+appends its path to `dup_paths`.
+
+A station that transmits both ways has two addresses, and they do not deduplicate
+against each other. That is correct — they are two transmissions — and it is the
+thing `path` and `dup_count` exist to make visible.
+
+**`station_id` is never taken from the payload.** It is resolved by
+`meganet.resolve_station()`, which answers only when exactly one live station
+carries the address. 604 of 5,122 ALERT addresses are shared; guessing between
+them would invent a fact. There is deliberately no foreign key on the column
+either: a reading from a station MegaNet has not been told about yet is precisely
+the reading that must not be dropped.
+
+**`value_raw` is `numeric`, not the `int` #75 sketched.** A satellite or cellular
+station has no counts to send and posts an engineering value directly; an integer
+column would mean either losing the decimals or inventing a scale factor. An ALERT
+count stored as numeric is still exactly that count, and `numeric` equality is
+what makes `1.0` and `1.00` deduplicate.
+
+**Rollups store sums, not means.** A mean cannot be re-aggregated — averaging
+twelve hourly means gives the wrong day whenever the hours have different counts —
+so `raw_mean` is a generated column over `raw_sum / n`, the day is built from the
+hours, and the daily rollup stays exact after the readings behind it are deleted.
+
+**`roll_up()` will not touch a bucket past the retention horizon.** Recomputing a
+bucket whose readings have been half-deleted would overwrite a rollup that was
+correct when it was made. It reports how many it skipped. A backfill older than
+the window still lands in `meganet.reading` and is queryable until the next
+`retain()`; it just does not rewrite history it can no longer see whole.
+
+**Indexes, because they are a real fraction of the free tier.** The primary key
+covers `(addr, reading_ts)`. `received_at` and `reading_ts` get BRIN indexes —
+both are effectively insert-ordered, and both are only ever used for the whole-
+range scans `roll_up()` and `retain()` do, so BRIN is kilobytes where a btree
+would be tens of megabytes. Two partial btrees finish it: `(station_id,
+reading_ts)` for "what did that site report last night", and one over the
+unresolved rows for the backfill, which is tiny by construction because resolving
+a row removes it from the index.
+
+**Who may call it.** `meganet.is_editor()` — the same allowlist as the station
+editor, deliberately, because the README already argues against two lists to
+remove somebody from. `anon` holds no `EXECUTE`: a grant there would make a table
+heading for millions of rows writable by anyone holding a key that is committed to
+a public repo. Giving a *device* its own credential is #B5's problem and wants a
+per-device key scoped narrower than "editor", not a loosened grant here.
+
+### Proving it
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_ingest.sql
+```
+
+48 checks, one per line of #75's acceptance, in a transaction that rolls back — so
+it is safe against the live database, including the rollups and the retention
+watermark it moves. It prints a row per check and exits non-zero if any fail,
+which makes it usable from a workflow as well as by hand.
+
+Run it after applying `0006`, and again after touching anything in it.
 
 ## Checking it from outside
 

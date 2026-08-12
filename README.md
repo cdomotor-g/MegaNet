@@ -85,6 +85,7 @@ MegaNet/
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
 ├── tools/                  ← command-line helpers (needs Python; see tools/README.md)
+│   ├── check_ingest.sql     (psql: prove the telemetry contract — 48 checks, rolls back)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
 │   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
@@ -237,6 +238,93 @@ time per page load is the real cost, and if that ever bites, a materialised view
 refreshed on write is the fix — worth knowing before the write path lands.
 
 #40's conclusion still holds: the JSON is not the bottleneck, rendering is.
+
+---
+
+## Field-station telemetry
+
+The station list is what the network *is*. This is what it *reports*, and it is a
+completely separate source of truth from ARRO — same charting machinery later
+(#B7), different data.
+
+Everything that will ever write a reading goes through **one function**:
+
+```sql
+select meganet.ingest('{
+  "source": "mqtt", "protocol": "alert2", "path": "MOUNT_TABLETOP",
+  "readings": [
+    {"alert_id": 6128, "reading_ts": "2026-08-12T04:15:00Z",
+     "value_raw": 12, "value": 2.4, "unit": "mm",
+     "conversion": "raw x 0.2 mm per tip"},
+    {"station_number": "541155", "channel": "level",
+     "reading_ts": 1786000500, "value_raw": 1.842, "unit": "m"}
+  ]}'::jsonb);
+
+-- {"accepted": 2, "duplicates": 0, "rejected": [], "raw_id": 1}
+```
+
+HTTP POST (#B5), the MQTT bridge (#B6), a backfill from an ARRO export and a
+person typing one in are all adapters onto that call, which is why each of them
+is thin and why none of them gets to disagree with the others about timestamps.
+It is a plain Postgres function, so the whole thing moves inside the corporate
+network with a `pg_dump`.
+
+Four facts about this network are in the schema rather than left to be discovered:
+
+* **The address is the identity, not the station.** A packet carries an address;
+  which station that is may be unknown. 604 of 5,122 ALERT addresses belong to
+  more than one station, and a new site reports before anyone adds it to MegaNet.
+  A reading is *never* dropped for an unresolved address — `station_id` is filled
+  in where it is unambiguous and backfilled later where it is not.
+* **Not every station has an ALERT address.** Satellite and cellular sites are not
+  radio, and report under their station number with a channel naming the sensor.
+  Both kinds of address live in the same table; `addr` is `a:6128` for one and
+  `s:541155/level` for the other. Likewise `protocol` (ALERT, ALERT2, …) and
+  `source` (HTTP, MQTT, …) are lookup tables — the next protocol is an `insert`,
+  not a migration.
+* **The same reading arrives more than once.** One transmission heard direct and
+  via two repeaters is three copies. The primary key is the deduplication, and the
+  copies are counted rather than thrown away: `dup_count` and `dup_paths` are the
+  only place the network's real path redundancy is visible.
+* **Raw values are the truth.** `value_raw` is what was transmitted, `value` is the
+  conversion if there was one, and `conversion` says which rule produced it — a
+  rainfall count means nothing without the bucket size, and the 357 filter's 3/5/7
+  thresholds are in counts, not millimetres.
+
+### Retention, and why it exists before the first row
+
+The whole network at 15-minute reporting is ~914,000 rows a day, which fills the
+500 MB free tier in under a week. So raw readings age out and the rollups are kept:
+
+```sql
+select meganet.retain();   -- rolls up, then deletes. In that order, always.
+```
+
+| | Kept for | Set by |
+| --- | --- | --- |
+| `meganet.reading` | 90 days | `app_meta.retain_reading_days` |
+| `meganet.reading_raw` (submissions as received) | 30 days | `app_meta.retain_reading_raw_days` |
+| `meganet.reading_hourly`, `meganet.reading_daily` | forever | — |
+
+Both knobs are rows, so changing them needs no migration. Run `retain()` daily —
+by hand for the pilot, from `pg_cron` or a scheduled workflow once there is enough
+data to matter. The order is not optional: a reading deleted before it is rolled
+up is gone from both places.
+
+### Proving it
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_ingest.sql
+```
+
+48 checks, one per line of the contract — deduplication, partial accept with a
+reason per bad row, unresolved addresses stored and backfilled, non-radio
+addressing, rollups reconciled against the readings they came from, and the
+readings ageing out while the rollups survive. It runs in a transaction and rolls
+back, so it is safe against the live database.
+
+The full schema, the reasoning and the security posture are in
+[`db/README.md`](db/README.md) and `db/migrations/0006_telemetry.sql`.
 
 ---
 
