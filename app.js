@@ -3126,6 +3126,8 @@ function refreshMapLayers({ skipFit = false } = {}) {
       <div class="mn-popup-actions">
         <a href="#" onclick="focusStation('${escAttr(s.id)}');return false"
            title="Select this station in the list under the map">Show in the list below ↓</a>
+        <a href="#" onclick="zoomToStation('${escAttr(s.id)}');return false"
+           title="Zoom the map to the ~80 km area around this station">Zoom to station</a>
         ${arroUrl ? `<a href="${esc(arroUrl)}" target="_blank" rel="noopener"
            title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
            >Open in ARRO admin ↗</a>` : ''}
@@ -6179,6 +6181,25 @@ function focusStationOnMap(s) {
   state.map.setView([s.lat, s.lon], Math.max(state.map.getZoom() || 0, 11));
   const marker = state.mapMarkers.find(m => m.mnStationId === s.id);
   if (marker) marker.openPopup();
+}
+
+// A bounding box roughly radiusKm around a point, for map.fitBounds() — a
+// real-world distance rather than a Leaflet zoom level, which covers different
+// ground at different latitudes. One degree of latitude is ~111 km everywhere;
+// a degree of longitude shrinks by cos(latitude) as it closes in toward the poles.
+function boundsForRadiusKm(lat, lon, radiusKm) {
+  const dLat = radiusKm / 111;
+  const dLon = radiusKm / (111 * Math.cos(lat * Math.PI / 180));
+  return [[lat - dLat, lon - dLon], [lat + dLat, lon + dLon]];
+}
+
+// "Zoom to station" from a map popup — centers the station with roughly an
+// 80 km radius of surrounding context visible, regardless of the map's
+// current extent when clicked.
+function zoomToStation(id) {
+  const s = state.data && state.data.stations.find(x => x.id === id);
+  if (!state.map || !s || s.lat == null || s.lon == null) return;
+  state.map.fitBounds(boundsForRadiusKm(s.lat, s.lon, 80));
 }
 
 // Scroll a station's row into the middle of the table viewport, so a station
