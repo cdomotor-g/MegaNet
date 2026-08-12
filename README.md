@@ -240,6 +240,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Pull the repeaters that carry a matched station onto the map and into the table with it (*Include related repeaters*)
 - Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Kill spaghetti*)
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
+- Light up the watercourses whose names match the filter box, drawn beneath the pins from OpenStreetMap (*Highlight matching rivers*)
 - Draw and measure over the map: pins, lines, circles, rectangles and text, placed by hand or by coordinates and km, in a colour of your choosing
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
@@ -309,6 +310,36 @@ Each link is drawn twice — a wide white casing underneath and the coloured lin
 on top — so it stays legible over satellite imagery and topo shading, where a
 single thin orange line disappears. **Link opacity** fades the pair together
 when the lines are burying the pins they are meant to explain.
+
+**Highlighting rivers.** Half this network is named after the river it sits on,
+so typing `burdekin` into the filter box lights up the Burdekin and its named
+tributaries as well as the stations on it. *Highlight matching rivers* (under
+**Map display**, on by default, and the one map switch remembered between
+visits) is the control. The rivers are **context, not matches**: they draw
+beneath the pins and the signal links in their own blue, they carry the river
+name as a hover label, they never move the map's zoom or centre, and they have
+no say whatever in which stations the filter selects — untick the box and the
+Stations tab behaves exactly as it did before the layer existed.
+
+The geometry comes live from **OpenStreetMap** via the Overpass API, bounded by
+whatever the map is currently looking at. Overpass is a free public service, so
+each lookup has to earn itself: it needs a name-ish term of three characters or
+more (a bare number in that box is an ALERT address, and is treated as one), it
+waits for your typing to pause, it is capped at 250 river segments per view, and
+answers are cached by term and rounded map extent — so retyping the same word,
+or nudging the map, costs no request at all. Zoom out past a 12° view and it
+stops asking rather than pull half a continent of geometry. The filter pane says
+what happened each time: how many segments were drawn, how many were over the
+cap, or that OpenStreetMap could not be reached. That last case is the whole
+failure mode — no network means no rivers, and nothing else on the tab changes.
+
+> The bundled `assets/geo/Qld Major Streams_reduced.svg` is deliberately **not**
+> the source here. Inverting `BASIN_GEOREF` puts its features 100–150 km from the
+> actual watercourse, consistently west and south — accurate enough for its own
+> job, point-in-polygon against 65 basins the size of small countries, and
+> useless for drawing a line over a topographic basemap. Re-exporting it with
+> real coordinates would make it a good offline layer; until then it stays out of
+> this. See issue #84.
 
 **Draw & measure.** A sketching layer over the network map, for the picture
 that goes into an email or an incident note: **pins**, **lines**, **circles**,
