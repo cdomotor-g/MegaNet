@@ -1,0 +1,70 @@
+# Weekly refresh of the committed stations.json from the database.
+#
+# Since #B3 the station editor writes to Postgres, so this file is a copy. A copy
+# nobody refreshes becomes a lie — and this one is not decoration: it is what the
+# app falls back to when the datastore cannot be reached (a free-tier Supabase
+# project pauses after about a week of inactivity), it is the offline copy, and
+# it is what gets handed to whoever inherits this.
+#
+# So the file is refreshed on a schedule rather than marked in the README as a
+# dated snapshot. That is the choice #B3 asked to be made explicitly: a dated
+# note tells you how stale the file is, a schedule stops it being stale, and the
+# fallback is only worth having if it is close to current.
+#
+# Opens a pull request rather than pushing to main, for the same reason
+# acma-refresh.yml does: a sudden swing in the station count is itself a signal
+# worth eyeballing.
+#
+# Reads only, with the published anon key — the same request the browser makes.
+# No secret is involved and none should be added: this workflow has no business
+# being able to write to the database.
+
+name: Snapshot stations.json from the database
+
+on:
+  schedule:
+    # 19:00 UTC Sunday = 05:00 AEST Monday — a fresh file before the week starts
+    - cron: '0 19 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the document and write stations.json
+        run: python3 tools/snapshot_stations_json.py
+
+      # The claim the whole read path rests on: what comes out of the database is
+      # what app.js has always parsed. Checking it here means a schema change
+      # that breaks the document is caught by a failing workflow rather than by
+      # somebody's browser.
+      - name: Check the file against the database's document
+        run: python3 tools/check_stations_doc.py stations.json
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: stations-snapshot
+          commit-message: "Refresh stations.json from the datastore (weekly)"
+          title: "Weekly stations.json snapshot"
+          body: |
+            The committed `stations.json`, refreshed from the database by
+            `tools/snapshot_stations_json.py`.
+
+            Everything in this diff is an edit somebody made in the station
+            editor since the last snapshot. Key order and number formatting are
+            fixed by the tool, so a line that moved is a line that changed.
+
+            Worth a look before merging: the station count in the workflow log,
+            and any station that has *disappeared* — a deletion in the editor is
+            soft, and the row is still in the database, but it leaves the
+            document and therefore this file.
+          add-paths: |
+            stations.json
+          delete-branch: true

@@ -179,7 +179,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 3;
+const DB_SCHEMA_VERSION = 4;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 function dbHostLabel() {
@@ -460,6 +460,19 @@ const state = {
   },
   editorId:       null,
   editorDraft:    {},
+  // The `updated_at` the open station was loaded with, fetched from the database
+  // when it is selected and sent back with the save. The database refuses the
+  // write if the row has moved since — see meganet.save_station() in
+  // db/migrations/0004_station_writes.sql. Null means "not known", which is
+  // itself a refusal for an existing station: an editor that cannot say which
+  // version it started from has no business overwriting one.
+  editorStamp:    null,
+  editorStampFor: null,      // which id the stamp above belongs to
+  editorBusy:     false,     // a save or delete is in flight; the buttons are disabled
+  // What the editor is currently saying about itself: { kind:'ok'|'error'|'busy', text }.
+  // Held in state rather than written straight to the DOM so it survives the
+  // re-render a successful save causes.
+  editorMsg:      null,
   // ACMA RRL interference layer (all lazy — untouched until the toggle is on
   // or the RF Environment tab is opened)
   acma: {
@@ -5271,6 +5284,8 @@ function selectStation(id) {
     state.selectedId  = null;
     state.editorId    = null;
     state.editorDraft = {};
+    state.editorMsg   = null;
+    fetchEditorStamp(null);
     rerenderStations();
     rerenderStationEditorCard();
     return;
@@ -5282,6 +5297,8 @@ function selectStation(id) {
   state.selectedId  = id;
   state.editorId    = id;
   state.editorDraft = JSON.parse(JSON.stringify(s || {}));
+  state.editorMsg   = null;
+  fetchEditorStamp(id);        // the version this edit starts from — see #B3
   rerenderStations();
   rerenderStationEditorCard();
   if (s) focusStationOnMap(s);
@@ -5319,6 +5336,8 @@ function selectStationState(s) {
   state.editorId    = s.id;
   // Same deep copy as selectStation: fields the form doesn't expose survive a save.
   state.editorDraft = JSON.parse(JSON.stringify(s));
+  state.editorMsg   = null;
+  fetchEditorStamp(s.id);
   // A map selection is what the table is listing, so a station asked for from
   // outside it has no row to be scrolled to. Adding it is the least destructive
   // answer — the picked set survives, and the count in the header says it grew.
@@ -10550,6 +10569,54 @@ function initExport() {
   if (!state.dbStatus) dbCheck();
 }
 
+// ── stations.json, from the database ───────────────────────────────────────────
+// The escape hatch, kept deliberately. stations.json is the offline copy, the
+// backup, and the thing that gets handed to whoever inherits this — and since
+// #B3 the database is where edits land, so the file has to be refreshable from
+// it rather than left to drift into fiction.
+//
+// This fetches the document fresh rather than serialising what is in memory: the
+// point is a snapshot of the database as it is now, which is not necessarily
+// what this tab loaded twenty minutes and three edits ago.
+//
+// The file committed in the repo is refreshed by .github/workflows/
+// stations-snapshot.yml, which runs tools/snapshot_stations_json.py weekly and
+// opens a PR. This button is the same snapshot by hand, for the operator who
+// wants a copy on a USB stick before going somewhere without a network.
+async function snapshotStationsJson() {
+  const btn = document.getElementById('btn-snapshot');
+  const say = (text, colour) => {
+    const el = document.getElementById('snapshot-note');
+    if (el) el.innerHTML = `<span style="color:${colour || 'var(--muted)'}">${esc(text)}</span>`;
+  };
+
+  if (btn) btn.disabled = true;
+  say('Fetching the current document…');
+  try {
+    const res = await fetch(`${DB_URL}/rpc/stations_doc`, {
+      headers: {
+        apikey: DB_ANON_KEY,
+        'Accept-Profile': DB_SCHEMA,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const doc  = JSON.parse(text);
+    if (!Array.isArray(doc.stations)) throw new Error('that is not a stations document');
+    // Indented, because a 3.6 MB single line is not something a human can read
+    // or a diff can show. The committed file is produced the same way.
+    dlText('stations.json', JSON.stringify(doc, null, 2) + '\n');
+    say(`Downloaded ${doc.stations.length.toLocaleString()} stations, as at ${new Date().toLocaleString()}.`,
+        'var(--ok)');
+  } catch (err) {
+    say(`Could not snapshot the database — ${err && err.message || err}`, 'var(--bad)');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 // ── EXPORT tab ─────────────────────────────────────────────────────────────────
 
 function renderExportHtml() {
@@ -10600,6 +10667,23 @@ function renderExportHtml() {
             <button onclick="dbCheck()" style="padding:.25rem .5rem;font-size:.8rem">Re-test</button>
           </div>
           <div id="db-status">${renderDbStatusHtml()}</div>
+        </div>
+
+        <!-- The JSON escape hatch. Edits land in the database now, so the file
+             has to be refreshable from it — see snapshotStationsJson(). -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>stations.json</h3>
+            <button id="btn-snapshot" onclick="snapshotStationsJson()"
+                    style="padding:.25rem .5rem;font-size:.8rem"
+                    title="Download the database's current station list as stations.json">Snapshot</button>
+          </div>
+          <div class="small" style="color:var(--muted)">
+            The whole station list as a file — the offline copy, and what this app
+            falls back to when the datastore cannot be reached. Taken from the
+            database as it is right now, not from what this tab has loaded.
+          </div>
+          <div id="snapshot-note" class="small" style="margin-top:.35rem"></div>
         </div>
       </aside>
 
@@ -10787,6 +10871,185 @@ function runExport() {
   });
 }
 
+// ── Datastore writes ───────────────────────────────────────────────────────────
+// The other direction. Reads are a GET anyone may make; a write has to say who
+// is making it, arrives at exactly two functions, and can be refused — so this
+// is a little more than fetch().
+//
+// Everything goes through meganet.save_station() and meganet.delete_station()
+// rather than at the tables, because a station is a row plus its sensors plus
+// its repeater plus that repeater's pass ranges, and those have to land together
+// or not at all. The database enforces that by being the only thing granted the
+// write verbs; see db/migrations/0004_station_writes.sql.
+
+// The access token for the signed-in session, when there is one. #B8 owns
+// getting one — verified @bom.gov.au, allowlist for everyone else — and calls
+// dbSetAccessToken() with it. Until that lands this is null, every write goes
+// out as `anon`, and the database refuses it. That is the write path working
+// correctly, not a bug: the gate is server-side, so it does not matter that the
+// browser has no sign-in screen yet.
+//
+// sessionStorage rather than localStorage: a token outliving the tab it was
+// obtained in is a token left on a shared machine.
+const DB_TOKEN_KEY = 'meganet.access_token';
+
+let _dbToken = (() => {
+  try { return sessionStorage.getItem(DB_TOKEN_KEY) || null; } catch (_) { return null; }
+})();
+
+function dbSetAccessToken(token) {
+  _dbToken = token || null;
+  try {
+    if (_dbToken) sessionStorage.setItem(DB_TOKEN_KEY, _dbToken);
+    else sessionStorage.removeItem(DB_TOKEN_KEY);
+  } catch (_) { /* private mode; the token stays in memory for this page */ }
+  return dbCanWrite();
+}
+
+// Whether this browser holds anything worth sending. Deliberately not a
+// permission check — the database decides that, and this only decides whether
+// the editor says "sign in first" before spending a round trip finding out.
+function dbCanWrite() { return !!_dbToken; }
+
+if (typeof window !== 'undefined') window.dbSetAccessToken = dbSetAccessToken;
+
+// POST to a PostgREST function, with the errors turned into something the caller
+// can branch on rather than a string to be pattern-matched:
+//
+//   err.conflict  somebody else changed the row first (HTTP 409, SQLSTATE PT409)
+//   err.denied    not signed in, or signed in as somebody who may not write
+//
+// PostgREST answers 404 for a function the current role has no EXECUTE on, which
+// reads as "no such thing" but means "not for you" — anon holds no grant on
+// either of these, so that is the shape a signed-out save comes back in.
+async function dbRpc(fn, args) {
+  const res = await fetch(`${DB_URL}/rpc/${fn}`, {
+    method: 'POST',
+    headers: {
+      apikey: DB_ANON_KEY,
+      // Only when there is one. The publishable key is not a token, and offering
+      // it as a bearer would get "invalid JWT" back instead of the honest
+      // answer, which is that this request is anonymous.
+      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
+      'Content-Profile': DB_SCHEMA,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(args),
+    cache: 'no-store',
+  });
+
+  const text = await res.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch (_) { /* not JSON */ }
+
+  if (!res.ok) {
+    const message = (body && (body.message || body.error_description))
+      || `HTTP ${res.status}`;
+    const err = new Error(body && body.hint ? `${message} — ${body.hint}` : message);
+    err.status   = res.status;
+    err.conflict = res.status === 409;
+    err.denied   = res.status === 401 || res.status === 403 || res.status === 404;
+    throw err;
+  }
+  return body;
+}
+
+// The version stamp the editor is holding. Two columns rather than one because
+// "deleted while you had it open" is worth telling the operator before they type
+// for ten minutes into a form that cannot be saved.
+async function dbStationStamp(id) {
+  const url = `${DB_URL}/station?id=eq.${encodeURIComponent(id)}&select=updated_at,deleted_at`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: DB_ANON_KEY,
+      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
+      'Accept-Profile': DB_SCHEMA,
+      Accept: 'application/vnd.pgrst.object+json',
+    },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function dbSaveStation(doc, expectedUpdatedAt) {
+  return dbRpc('save_station', {
+    p_doc: doc,
+    p_expected_updated_at: expectedUpdatedAt || null,
+  });
+}
+
+function dbDeleteStation(id, expectedUpdatedAt) {
+  return dbRpc('delete_station', {
+    p_id: id,
+    p_expected_updated_at: expectedUpdatedAt || null,
+  });
+}
+
+// Pull the stamp for the station just opened, in the background. Nothing waits
+// on it — the operator starts typing immediately — but a save that arrives
+// before it does is refused by the database rather than guessed at, which is the
+// safe half of that race.
+async function fetchEditorStamp(id) {
+  state.editorStamp    = null;
+  state.editorStampFor = id;
+  if (!id) return;
+  try {
+    const row = await dbStationStamp(id);
+    if (state.editorStampFor !== id) return;   // the operator moved on
+    state.editorStamp = row && row.updated_at;
+    if (row && row.deleted_at) {
+      setEditorStatus({ kind: 'error', text: 'This station has been deleted in the database. Saving will bring it back.' });
+    }
+  } catch (_) {
+    // Left null. The save will be refused with a message that says to reload,
+    // which is the truthful answer: this editor cannot prove what it started
+    // from.
+    if (state.editorStampFor === id) state.editorStamp = null;
+  }
+}
+
+// The editor's own status line. Repainted on its own so a failed save can say
+// why without redrawing the form underneath it and throwing away the typing
+// that is the entire thing being protected.
+function setEditorStatus(msg) {
+  state.editorMsg = msg;
+  const el = document.getElementById('ef-status');
+  if (el) el.innerHTML = editorStatusHtml();
+}
+
+function editorStatusHtml() {
+  const m = state.editorMsg;
+  if (m) {
+    const colour = m.kind === 'error' ? 'var(--bad)'
+                 : m.kind === 'ok'    ? 'var(--ok)'
+                 : 'var(--muted)';
+    return `<span style="color:${colour}">${esc(m.text)}</span>`;
+  }
+  // Nothing has happened yet, so say what will happen when Save is pressed —
+  // which is different depending on where the list on screen came from and
+  // whether this browser holds a session.
+  if (!editorWritesGoToDatabase()) {
+    return `<span style="color:var(--warn)">Showing ${esc(SOURCE_LABELS[state.dataSource?.kind] || 'a file')} rather than the datastore —
+      <a href="#" onclick="reloadFromDatastore();return false">load from the datastore</a> before editing,
+      or Save would write what is on screen over whatever the database now holds.</span>`;
+  }
+  if (!dbCanWrite()) {
+    return `<span style="color:var(--muted)">Not signed in — the database refuses anonymous writes (see #B8).
+      Save will tell you the same thing, from the server.</span>`;
+  }
+  return '';
+}
+
+// Saving is only safe when the station on screen came out of the database this
+// session. On the file fallback the form holds values that may be older than the
+// row it would overwrite — and the version stamp would not catch it, because the
+// stamp is read live and would match.
+function editorWritesGoToDatabase() {
+  return state.dataSource && state.dataSource.kind === 'api';
+}
+
 // ── STATION EDITOR (card on the Stations tab) ────────────────────────────────────
 // The editor lives below the stations list on the Stations tab: selecting a row
 // loads it here (see selectStation / renderStationEditorCard above). "+ New"
@@ -10801,6 +11064,11 @@ function editorNew() {
     alert_ids: {}, satcom: { enabled: false, provider: '', terminal_id: '' },
     rm_system_id: 1, enabled: true, notes: '',
   };
+  // A station that does not exist yet has no version to have started from, and
+  // save_station() requires the stamp to be absent for an insert.
+  state.editorStamp    = null;
+  state.editorStampFor = null;
+  state.editorMsg      = null;
   rerenderStations();          // drop any row highlight
   rerenderStationEditorCard(); // show the blank form
 }
@@ -10829,13 +11097,18 @@ function editorForm(s) {
   const sensors = stationSensors(s).slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0));
   const dbId    = arroSiteId(s);
   return `
-    <div class="panel-header" style="margin-bottom:.75rem">
+    <div class="panel-header" style="margin-bottom:.35rem">
       <h2>${esc(s.name) || 'New Station'}</h2>
       <div style="display:flex;gap:.5rem">
-        <button class="primary" onclick="editorSave()">Save</button>
-        ${s.id ? `<button onclick="editorDelete()" style="border-color:#c7401a;color:#c7401a">Delete</button>` : ''}
+        <button class="primary" id="ef-save" onclick="editorSave()" ${state.editorBusy ? 'disabled' : ''}>Save</button>
+        ${s.id ? `<button id="ef-delete" onclick="editorDelete()" ${state.editorBusy ? 'disabled' : ''}
+                          style="border-color:#c7401a;color:#c7401a">Delete</button>` : ''}
       </div>
     </div>
+    <!-- Save writes to the database and waits for it, so this line is where the
+         answer arrives: saved and when, refused and why. A failed save leaves
+         everything below untouched — the typing is the thing being protected. -->
+    <div id="ef-status" class="small" style="margin-bottom:.6rem">${editorStatusHtml()}</div>
     <div class="form-grid">
       <label>Name<input type="text" id="ef-name" value="${esc(s.name)}"></label>
       <label>Station Number<input type="text" id="ef-stnno" value="${esc(s.station_number || '')}"></label>
@@ -11001,7 +11274,10 @@ function deriveLegacyAlertIds(sensors) {
   return out;
 }
 
-function editorSave() {
+// Read the form into a station record. Split out of editorSave() because the
+// save now happens between reading the form and touching anything else, and a
+// function that reads the DOM is worth being able to point at.
+function editorReadForm() {
   const stations = state.data.stations;
   const d = { ...state.editorDraft };
 
@@ -11043,34 +11319,142 @@ function editorSave() {
     };
   }
 
+  // A new station needs an id before it can be saved: it is the primary key, it
+  // is what the URL and state.selectedId carry, and the database will not mint
+  // one. Uniqueness is checked against what is on screen and again, properly, by
+  // the primary key at the other end — two people creating the same slug at the
+  // same time is refused there rather than raced here.
   if (!d.id) {
     d.id = slug(d.name) || `stn_${Date.now()}`;
     let uid = d.id, n = 2;
     while (stations.some(s => s.id === uid)) uid = `${d.id}_${n++}`;
     d.id = uid;
-    stations.push(d);
-  } else {
-    const i = stations.findIndex(s => s.id === d.id);
-    if (i >= 0) stations[i] = d; else stations.push(d);
+  }
+  return d;
+}
+
+// Save. The order matters and is the whole point of #B3: read the form, write to
+// the database, wait, and only then touch what is on screen — updating memory
+// from what came back rather than from what was sent, because the server owns
+// updated_at and the round trip is what proves the write happened.
+//
+// Nothing here clears the form on a failure. Somebody has just typed for ten
+// minutes; a save that fails and takes the work with it is worse than no save at
+// all.
+async function editorSave() {
+  if (state.editorBusy) return;
+
+  if (!editorWritesGoToDatabase()) {
+    setEditorStatus({
+      kind: 'error',
+      text: 'The station list on screen did not come from the datastore, so saving it would'
+          + ' overwrite the database with a copy that may be older. Load from the datastore first.',
+    });
+    return;
   }
 
-  state.editorId    = d.id;
-  state.editorDraft = d;
-  state.selectedId  = d.id;
+  const d        = editorReadForm();
+  const isNew    = !state.editorId;
+  const expected = isNew ? null : state.editorStamp;
+
+  state.editorBusy = true;
+  setEditorStatus({ kind: 'busy', text: 'Saving…' });
+  rerenderEditorButtons();
+
+  let result;
+  try {
+    result = await dbSaveStation(d, expected);
+  } catch (err) {
+    state.editorBusy = false;
+    rerenderEditorButtons();
+    setEditorStatus({ kind: 'error', text: editorSaveErrorText(err) });
+    return;                      // the form, and everything typed into it, stands
+  }
+
+  state.editorBusy = false;
+
+  // Memory from what came back. The saved record carries whatever the database
+  // made of the write — a minted sensor_id, a normalised range list, a
+  // repeater dropped because the role went away.
+  const saved    = result.station;
+  const stations = state.data.stations;
+  const i = stations.findIndex(s => s.id === saved.id);
+  if (i >= 0) stations[i] = saved; else stations.push(saved);
+
+  state.editorId       = saved.id;
+  state.editorDraft    = saved;
+  state.selectedId     = saved.id;
+  state.editorStamp    = result.updated_at;
+  state.editorStampFor = saved.id;
+
   updateHeaderStats();
   refreshFilterOptions();      // an edited role / network changes the option counts
   rerenderStations();
   rerenderStationEditorCard();
+  setEditorStatus({
+    kind: 'ok',
+    text: `${result.created ? 'Created' : 'Saved'} at ${new Date().toLocaleTimeString()}`
+        + ` as ${result.updated_by || 'you'} — in the database, not just this tab.`,
+  });
 }
 
-function editorDelete() {
-  if (!state.editorId) return;
-  const name = state.data.stations.find(s => s.id === state.editorId)?.name || state.editorId;
-  if (!confirm(`Delete "${name}"?`)) return;
-  state.data.stations = state.data.stations.filter(s => s.id !== state.editorId);
-  state.selectedId    = null;
-  state.editorId      = null;
-  state.editorDraft   = {};
+// One message per way a save can fail, because "Error" is not an instruction.
+function editorSaveErrorText(err) {
+  if (err.conflict) return `${err.message} Your edits are still on screen — copy anything you need, then reload from the datastore.`;
+  if (err.denied)   return `Refused: this browser has no signed-in session that may edit stations (see #B8). Nothing was changed, and your edits are still here.`;
+  return `Not saved — ${err.message}. Your edits are still here; try again when the datastore is reachable.`;
+}
+
+// Repaint just the two buttons, so their disabled state follows a save in flight
+// without redrawing the form they sit above.
+function rerenderEditorButtons() {
+  const save = document.getElementById('ef-save');
+  const del  = document.getElementById('ef-delete');
+  if (save) save.disabled = state.editorBusy;
+  if (del)  del.disabled  = state.editorBusy;
+}
+
+// Delete, which is a soft delete at the other end: the row, its sensors, its
+// repeater and its ranges all stay, and only the document stops carrying it. The
+// confirm still says "delete" because that is what it means to the operator —
+// the recoverability is the database's business, and is spelled out in
+// db/migrations/0004_station_writes.sql for whoever needs to undo one.
+async function editorDelete() {
+  if (!state.editorId || state.editorBusy) return;
+
+  const id   = state.editorId;
+  const name = state.data.stations.find(s => s.id === id)?.name || id;
+
+  if (!editorWritesGoToDatabase()) {
+    setEditorStatus({
+      kind: 'error',
+      text: 'The station list on screen did not come from the datastore. Load from the datastore before deleting.',
+    });
+    return;
+  }
+  if (!confirm(`Delete "${name}"?\n\nIt is removed from the station list. The record is kept and can be restored by whoever administers the database.`)) return;
+
+  state.editorBusy = true;
+  setEditorStatus({ kind: 'busy', text: 'Deleting…' });
+  rerenderEditorButtons();
+
+  try {
+    await dbDeleteStation(id, state.editorStamp);
+  } catch (err) {
+    state.editorBusy = false;
+    rerenderEditorButtons();
+    setEditorStatus({ kind: 'error', text: editorSaveErrorText(err) });
+    return;
+  }
+
+  state.editorBusy     = false;
+  state.data.stations  = state.data.stations.filter(s => s.id !== id);
+  state.selectedId     = null;
+  state.editorId       = null;
+  state.editorDraft    = {};
+  state.editorStamp    = null;
+  state.editorStampFor = null;
+  state.editorMsg      = null;
   updateHeaderStats();
   refreshFilterOptions();
   rerenderStations();
