@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
   <meta name="theme-color" content="#0b5cab">
-  <link rel="stylesheet" href="styles.css?v=20260810a">
+  <link rel="stylesheet" href="styles.css?v=20260812a">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -47,6 +47,15 @@
     </div>
   </header>
 
+  <!-- How much this page is holding, and a way to give it back — see issue #79.
+       Hidden until stations.json has loaded (nothing to report before then);
+       app.js fills it in and keeps it live. -->
+  <div id="mem-bar" class="mem-bar" role="button" tabindex="0"
+       aria-label="Memory usage — click for details"
+       onclick="MemMeter.togglePanel()"
+       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();MemMeter.togglePanel();}"
+       hidden></div>
+
   <!-- Tapping the page behind the phone nav drawer closes it. Inert and
        invisible until #tab-nav is open. -->
   <div id="nav-backdrop" onclick="setNavCollapsed(true)" hidden></div>
@@ -66,6 +75,6 @@
        change so browsers and GitHub Pages fetch the new file instead of a stale
        copy. -->
   <script src="maps-data.js?v=20260723a"></script>
-  <script src="app.js?v=20260811d"></script>
+  <script src="app.js?v=20260812a"></script>
 </body>
 </html>
