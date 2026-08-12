@@ -160,6 +160,41 @@ into any database, and running it twice changes nothing.
 `tools/import_stations_json.py` does the same job as plain SQL for a database
 that cannot reach GitHub. Both go through `meganet.load_stations_doc()`.
 
+### Editing it
+
+Save in the station editor writes to the database and waits for it, then updates
+what is on screen from what came back. The rules that matter to whoever is using
+it:
+
+* **A failed save keeps your typing.** The form is never cleared by a failure —
+  it says why, and everything you entered is still there.
+* **Two people editing the same station is refused, not merged.** The save
+  carries the version the editor opened, and the database rejects it if the row
+  has moved since. You are told to reload rather than quietly overwriting
+  somebody's afternoon.
+* **Delete is recoverable.** It is a soft delete: the station leaves the list,
+  and the record — with its sensors, repeater and pass ranges — stays in the
+  database until somebody with SQL access says otherwise.
+* **Saving needs a signed-in session.** The database refuses anonymous writes,
+  and the sign-in that produces a session is [#B8](https://github.com/cdomotor-g/MegaNet/issues/72).
+  Until that ships the editor still opens and still says exactly why a save was
+  refused — from the server, not from a check the browser could be talked out of.
+* **Saving is refused while the app is on the file fallback.** If the header says
+  the list came from `stations.json` rather than the datastore, load from the
+  datastore before editing: otherwise Save would write what is on screen over
+  whatever the database has since been told.
+
+The contract, the SQL and the `curl` proof that a stranger cannot write are in
+[`db/README.md`](db/README.md) under **Writing**.
+
+### Keeping `stations.json` current
+
+The file is a copy now, so it is refreshed on a schedule rather than left to
+drift: `.github/workflows/stations-snapshot.yml` runs
+`tools/snapshot_stations_json.py` weekly and opens a pull request when the
+document has moved. The Export tab has the same snapshot as a button, for a copy
+to take somewhere without a network.
+
 ### Cost of the full document
 
 Measured against Postgres 16 with the whole list loaded — 3,174 stations, 8,815

@@ -97,6 +97,32 @@ endpoint too.
 
 Both are standard library only.
 
+## `snapshot_stations_json.py` — the station list, back out to the file
+
+The other direction from `import_stations_json.py`, and the one that matters now
+that the editor writes to the database: `stations.json` in this repo is a copy,
+and a copy nobody refreshes becomes a lie. This fetches the current document and
+writes the file.
+
+```bash
+python3 tools/snapshot_stations_json.py            # fetch, write stations.json
+python3 tools/snapshot_stations_json.py --check    # exit 1 if it would change
+python3 tools/snapshot_stations_json.py --from -   # from a document on stdin
+```
+
+Two things it does that `curl … > stations.json` would not, and they are the
+reason it exists. **Key order**: jsonb sorts an object's keys by length and then
+by bytes, so a raw dump reorders every key in a 160,000-line file and buries the
+change that actually happened; this writes the file's own order, so a line that
+moved is a line that changed. **Numbers**: parsed as `Decimal` and written back as
+the literal that arrived, so `151.5` does not come back as `151.49999999999997`.
+
+Reads with the published anon key — the same request the browser makes, no secret
+involved. `.github/workflows/stations-snapshot.yml` runs it weekly and opens a
+pull request; the Export tab has the same snapshot as a button.
+
+Standard library only.
+
 ## `meganet_agent.py` — ask questions about the network with the Claude API
 
 An agentic Claude API loop that answers natural-language questions about the

@@ -103,20 +103,25 @@ its cache at all (`PGRST002`).
 | `meganet` | The schema. Everything MegaNet owns lives here, not in `public`. |
 | `meganet.touch_updated_at()` | `BEFORE UPDATE` trigger function stamping `updated_at`. Every table with that column hangs it off this one. |
 | `meganet.app_meta` | Key/value facts about the database itself. `schema_version` is the number of the highest migration applied. Readable by anyone, writable by no one holding the anon key. |
-| `meganet.station` | One row per station, 3,174 of them. `id` is the `stations.json` slug — also the app's `selectedId`, and in URLs. |
+| `meganet.station` | One row per station, 3,174 of them. `id` is the `stations.json` slug — also the app's `selectedId`, and in URLs. `deleted_at` is the soft delete: null means live. |
 | `meganet.sensor` | 8,815 rows. Natural key `(station_id, sensor_id, type)`: one SSR carries several measurements. Indexed on `alert_id`, which is what the search box matches. |
 | `meganet.repeater` | Repeater detail for the 88 stations carrying the role. One-to-one with `station`. |
 | `meganet.pass_range` | The ALERT ranges a repeater passes or excludes, as rows with an `int4range` and a GiST index — so "which repeaters cover address N" is a lookup, not 88 × 10 ranges walked in JavaScript. |
 | `meganet.radio_network`, `meganet.catchment`, `meganet.rm_system` | The reference vocabularies from the top of `stations.json`. |
 | `meganet.doc_meta` | The document's `meta` header. Exactly one row, enforced. |
-| `meganet.stations_json` | View: the whole `stations.json` document, rebuilt. `security_invoker`, so RLS on the base tables applies. |
+| `meganet.station_json` | View: one row per *live* station — its id, its `ord`, its `updated_at`, and its `stations.json` fragment. Deleted stations are filtered out here, which is what makes the soft delete work everywhere at once. |
+| `meganet.stations_json` | View: the whole `stations.json` document, rebuilt — the reference lists plus an aggregate of the view above. `security_invoker`, so RLS on the base tables applies. |
 | `meganet.stations_doc()` | The same document as a `stable` function, so `GET /rest/v1/rpc/stations_doc` returns it as the response body rather than wrapped in `{"doc": …}`. This is what the app calls. |
 | `meganet.load_stations_doc(jsonb)` | The reverse: makes the tables match a document. Idempotent. `EXECUTE` revoked from `public`. |
 | `meganet.load_stations_from_url(text)` | Fetches `stations.json` over HTTP and hands it to the above. Defaults to the copy on `main`. Needs the `http` extension; says so plainly if it is missing. |
+| `meganet.save_station(jsonb, timestamptz)` | The write path. One station and everything hanging off it, in one transaction. Refuses a stale write. Returns the saved fragment and its new `updated_at`. |
+| `meganet.delete_station(text, timestamptz)` | Soft delete: stamps `deleted_at`, keeps every row. |
+| `meganet.editor_allow` | Who may write — an email, or a domain with its at-sign. No policy and no grant to any role a browser can reach; readable only through the function below. |
+| `meganet.is_editor()`, `meganet.email_allowed(text)`, `meganet.actor()` | The gate, the list lookup behind it, and who a write gets attributed to. |
 
-Everything is readable by `anon` and writable by nobody holding the anon key —
-there is deliberately no insert/update/delete policy on any of it. The write path
-is a later ticket, and it lands after the access gate, not before it.
+Everything is readable by `anon`. Nothing is *writable* by `anon` or by
+`authenticated`: no table grants either of them a write verb, and the only way in
+is the two functions above — see **Writing** below.
 
 ### Two conventions worth knowing before you read the SQL
 
@@ -172,6 +177,114 @@ python3 tools/check_stations_doc.py /tmp/doc.json
 That check is the one that matters. The whole read path rests on the database's
 document being indistinguishable from the file, because ~17,700 lines of `app.js`
 assume that shape.
+
+## Writing
+
+Added by `0004_station_writes.sql`, for the station editor. Four things about it
+are worth knowing before touching any of it.
+
+**There are exactly two ways in, and they are functions.** `save_station()` and
+`delete_station()`. No table grants `anon` or `authenticated` an insert, update or
+delete, so there is no `PATCH /station?id=eq.x` to be had. That is deliberate: a
+station is a row *plus* its sensors *plus* its repeater *plus* that repeater's
+pass ranges, and a repeater whose ranges half-saved is worse than one that did not
+save at all. One function call is one transaction.
+
+**A stale write is refused, never merged.** Every call carries the `updated_at`
+the editor loaded the station with, and the function rejects it if the row has
+moved since:
+
+```sql
+select meganet.save_station(
+         '{"id":"my_station","name":"…","roles":["field"]}'::jsonb,
+         '2026-08-11T02:31:07.221Z'::timestamptz);
+```
+
+Omit that second argument and an *existing* station is refused too — an editor
+that cannot say which version it started from has no business overwriting one. A
+new station is the opposite: it must be omitted, because there is nothing to have
+started from. The refusal carries SQLSTATE `PT409`, which PostgREST returns as
+HTTP 409, so the app can tell "somebody got there first" from "the network is
+down" without reading the message.
+
+**Delete is soft, and undone with one line.**
+
+```sql
+update meganet.station set deleted_at = null where id = 'the_station';
+```
+
+The row, its sensors, its repeater and its ranges are all still there —
+`meganet.station_json` simply stops carrying it. Note that a *full reload* is a
+sync, so loading a document that no longer mentions a soft-deleted station
+removes it for real; take a snapshot before reloading if that matters.
+
+**Who may write is the database's decision, not the browser's.** `is_editor()`
+answers it: never for `anon`, always for `service_role`, and for `authenticated`
+only when the verified email on the request's token matches
+`meganet.editor_allow`. `updated_by` is stamped from the same token, server-side —
+a field the client fills in is a field the client can forge. The sign-in itself is
+#B8; until it ships, `authenticated` never happens and every write from the app is
+refused, which is the correct behaviour for a write path that landed ahead of its
+gate.
+
+Maintaining the list needs the service key, or psql:
+
+```sql
+insert into meganet.editor_allow (entry, note)
+values ('contractor@example.org', 'Bruce, until the Mitchell survey is done');
+```
+
+### Proving it is refused
+
+The claim that matters is that a browser holding only the anon key cannot write.
+Ask it directly — no token, and then a made-up one:
+
+```sh
+curl -sS -X POST 'https://<ref>.supabase.co/rest/v1/rpc/save_station' \
+     -H 'apikey: <publishable key>' \
+     -H 'Content-Profile: meganet' -H 'Content-Type: application/json' \
+     -d '{"p_doc":{"id":"probe","name":"Probe","roles":[]}}' -w '\n%{http_code}\n'
+```
+
+`anon` holds no `EXECUTE` on either function, so PostgREST answers 404 — "no such
+function", which is what it looks like from outside to a caller who may not run
+it. A valid session for an address that is not on the list gets 403 and the
+message `not authorised to write to the station list`. Either way the station is
+not there afterwards:
+
+```sh
+curl -sS 'https://<ref>.supabase.co/rest/v1/station?id=eq.probe&select=id' \
+     -H 'apikey: <publishable key>' -H 'Accept-Profile: meganet'   # => []
+```
+
+The same checks against a local Postgres, where `set local role` stands in for
+what PostgREST does per request:
+
+```sql
+begin; set local role anon;
+  select meganet.save_station('{"id":"probe","name":"Probe","roles":[]}'::jsonb);
+rollback;   -- ERROR: permission denied for function save_station
+
+begin; set local role authenticated;
+  set local request.jwt.claims = '{"role":"authenticated","email":"someone@gmail.com"}';
+  select meganet.save_station('{"id":"probe","name":"Probe","roles":[]}'::jsonb);
+rollback;   -- ERROR: not authorised to write to the station list
+```
+
+### Keeping stations.json honest
+
+The file in this repo is a copy now, and a copy nobody refreshes becomes a lie.
+It is refreshed on a schedule rather than annotated as a dated snapshot —
+`.github/workflows/stations-snapshot.yml` runs `tools/snapshot_stations_json.py`
+weekly and opens a pull request when the document has moved. By hand:
+
+```sh
+python3 tools/snapshot_stations_json.py           # fetch and write stations.json
+python3 tools/snapshot_stations_json.py --check   # exit 1 if it would change
+```
+
+The Export tab has the same thing as a button, for the operator who wants a copy
+before going somewhere without a network.
 
 ## Checking it from outside
 
