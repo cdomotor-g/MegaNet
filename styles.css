@@ -14,6 +14,10 @@
   --rx-bg: #eef4fb;
   --tx-bg: #eef8f1;
   --map-line: #ff6f00;
+  /* Watercourses matching the filter box. Deliberately not the orange of a
+     pass-range link nor any station-role fill, and a deeper blue than the water
+     the topo tiles already draw, so a highlighted river reads as highlighted. */
+  --map-river: #0d47a1;
   --map-repeater: #0b5cab;
   --map-field: #107c10;
   /* Station-role colours (mirror ROLE_COLOR in app.js and the map markers). */
@@ -66,6 +70,7 @@
   --rx-bg: #1d3242;
   --tx-bg: #19362a;
   --map-line: #ff9f43;
+  --map-river: #4fc3f7;
   --map-repeater: #6bb6ff;
   --map-field: #57d657;
   /* Lighter role tints so coloured station names stay legible on dark panels. */
@@ -1020,6 +1025,17 @@ hr {
   height: 0;
   border-top: 3px solid var(--map-line);
   display: inline-block;
+}
+
+.legend-line-river { border-top-color: var(--map-river); }
+
+/* River name on hover. Follows the cursor along the line (sticky tooltip), so it
+   stays small and out of the way of the pins it sits under. */
+.mn-river-label {
+  font-size: .72rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  color: var(--map-river);
 }
 
 /* ── Map pins ────────────────────────────────────────────────────────────── */
