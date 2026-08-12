@@ -54,6 +54,7 @@ MegaNet/
 ├── docs/                   ← reference documents
 │   ├── datastore-decision.md               (why Postgres on Supabase, and where)
 │   ├── access.md                           (who gets in, who may edit, and recovery)
+│   ├── ingest-http.md                      (posting readings from a field station — #B5)
 │   ├── floodwarning-net.md                 (moving the domain to MegaNet — runbook)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
@@ -325,6 +326,14 @@ back, so it is safe against the live database.
 
 The full schema, the reasoning and the security posture are in
 [`db/README.md`](db/README.md) and `db/migrations/0006_telemetry.sql`.
+
+### Posting readings over HTTP
+
+A field station can push its own readings without an editor session, via
+`POST /rest/v1/rpc/ingest_http` and a per-device token — [`docs/ingest-http.md`](docs/ingest-http.md)
+is written for whoever is configuring the logger, with the curl that works, the
+payload shape, and how to mint and revoke a token. `db/migrations/0007_ingest_http.sql`
+is the database side.
 
 ---
 
