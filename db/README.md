@@ -154,6 +154,9 @@ its cache at all (`PGRST002`).
 | `meganet.roll_up(timestamptz)` | Rebuild the rollups for every bucket touched since the watermark. Idempotent. |
 | `meganet.retain(int)` | Roll up, then age out. The one retention job. |
 | `meganet.as_ts()`, `meganet.as_num()`, `meganet.code_for()` | `ingest()`'s validators, split out so "be liberal in what you accept" is written once and a bad field produces a sentence rather than a cast error. |
+| `meganet.ingest_token` | Per-device credentials for the HTTP ingest endpoint (#B5). Only `token_hash` is stored. RLS on, no policy — reachable with the service key or a direct connection, same trade as `editor_allow`. |
+| `meganet.create_ingest_token(text, text, int, int)` | Mints a device token and returns it once. `EXECUTE` revoked from `public`, granted only to `service_role`. |
+| `meganet.ingest_http(jsonb)` | The HTTP endpoint — `POST /rest/v1/rpc/ingest_http`. Checks `X-Ingest-Token` against `ingest_token`, then hands the batch to `ingest()`. The only function `anon` is granted here. |
 
 Everything is readable by `anon` **except `meganet.reading_raw`**, which holds
 whatever a device or an adapter actually sent, unread — a debugging artefact
@@ -456,8 +459,8 @@ a row removes it from the index.
 editor, deliberately, because the README already argues against two lists to
 remove somebody from. `anon` holds no `EXECUTE`: a grant there would make a table
 heading for millions of rows writable by anyone holding a key that is committed to
-a public repo. Giving a *device* its own credential is #B5's problem and wants a
-per-device key scoped narrower than "editor", not a loosened grant here.
+a public repo. `ingest_http()`, added by `0007_ingest_http.sql`, is the one
+narrow exception — see below.
 
 ### Proving it
 
@@ -471,6 +474,61 @@ watermark it moves. It prints a row per check and exits non-zero if any fail,
 which makes it usable from a workflow as well as by hand.
 
 Run it after applying `0006`, and again after touching anything in it.
+
+## HTTP ingest
+
+Added by `0007_ingest_http.sql`. A field station posts its own readings without
+holding an editor session — the operational side, with a working `curl` and how
+to mint and revoke a token, is [`docs/ingest-http.md`](../docs/ingest-http.md);
+what follows is only the part that lives in the database.
+
+**`POST /rest/v1/rpc/ingest_http`, not `/rest/v1/rpc/ingest`.** `ingest()` stays
+exactly as `0006` left it — `anon` holds no `EXECUTE` on it, ever.
+`ingest_http()` is a separate, narrower door: it is the only function this
+migration grants to `anon`, and calling it does not hand out any other
+capability. It checks a device token, then makes the one `ingest()` call the
+token authorised.
+
+**Not `Authorization: Bearer`.** PostgREST verifies that header as a JWT and
+answers 401 for anything that fails to parse as one — before a request ever
+reaches Postgres. A per-device opaque token sent that way would be refused
+unconditionally, valid or not, and there is no Edge Function in front to
+intercept it (same choice `0006` already made for `ingest()`). The token travels
+in `X-Ingest-Token` instead, a plain header PostgREST passes straight through.
+
+**The token is checked in SQL, not by switching Postgres role.** A literal
+per-device role needs PostgREST to `SET ROLE` from a JWT's `role` claim, and
+minting real per-device JWTs means holding this project's JWT secret in the
+database — a bigger and riskier thing than this ticket's effort budget. Instead,
+`ingest_http()` checks the token against `meganet.ingest_token` and, only if it
+is live, sets a transaction-local flag (`meganet.ingest_authorized`) that
+`meganet.is_editor()` now also accepts from `anon`. Nothing else can set that
+flag — it is set inside a `security definer` function `anon` has no other way
+to reach into — and it cannot outlive the request, because PostgREST runs each
+call in its own transaction. The practical result is the same as a scoped role:
+a device token opens exactly one door and nothing selectable behind it.
+
+**Only the hash is stored.** `meganet.create_ingest_token()` generates the
+token from `gen_random_uuid()` (core since PostgreSQL 13, drawn from the OS's
+CSPRNG), stores `sha256(token)` hex-encoded, and returns the plaintext exactly
+once. There is no second copy anywhere; a lost token is a new one, not a lookup.
+
+**Revoking is one `update`, and takes effect on the very next call** —
+`ingest_http()` checks `revoked_at` fresh every time, so there is no cache or
+token lifetime to wait out:
+
+```sql
+update meganet.ingest_token set revoked_at = now() where label = 'Mount Stuart logger';
+```
+
+**`station_id` and the ALERT range are recorded, not enforced.** Same trade
+`0005_auth.sql` made with `app_user.role`: a token minted today already carries
+whichever station or address range its logger is for, so enforcing it later is
+an `update` to `ingest_http()`, not a migration that touches a device in the
+field.
+
+**Batch size is capped at 1,000** readings per call, returned as a clear `22023`
+(HTTP 400) rather than a request that times out instead.
 
 ## Checking it from outside
 
