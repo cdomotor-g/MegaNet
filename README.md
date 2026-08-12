@@ -958,6 +958,39 @@ implemented as written — Establish Start Continuity and Establish Continuity,
 walking the list backwards from the newest reading, with Good / Suspect / Bad
 states and suspects promoted or rejected by what comes after them.
 
+**And the panel says what the test is.** *How the 357 filter works* opens an
+explainer with the test itself, the direction it walks, the three states, the
+four-failure break, rollovers, repeats, and why the numbers are counts rather
+than millimetres — reachable from the panel header, from the removed count, and
+from any rejected reading you click. It carries two drawings: the spec's two
+components as a flowchart, and a worked example of fourteen readings with a
+spike and a dropout in it. The example's colours are not illustrative — they are
+what `walk357()` returns when handed exactly those numbers, so the diagram
+cannot drift away from the code that made it.
+
+**Every filter has a switch, and not every filter is the spec's.** The 3-5-7
+test, rollover correction, repeat timestamps, a **rate-of-rise** limit and
+**minimum / maximum** limits each have their own on/off, so any of them can be
+taken out of the pipeline and the difference read straight off the counts. Only
+the first two come from the specification; the other three are gates this app
+adds, and they run *before* the continuity walk so a reading nothing could have
+produced never gets a vote on its neighbours:
+
+- **Rate of rise** compares each reading with the one before it, and claims the
+  step and nothing more. Anchoring to the last *surviving* reading is the
+  obvious-looking alternative and it is a trap — a gauge that genuinely steps up
+  and stays there is then measured against a value it will never return to, and
+  the whole record after the step is lost. A corrupt plateau costs its first
+  reading here and the rest is the 357 walk's business, which is what breaking
+  and re-establishing continuity is for. An accumulator is only tested upwards;
+  a water level is tested both ways, so a single dropout costs two readings.
+- **Minimum / maximum** bound the exported `Value`, either end blank for
+  unbounded.
+
+Each removal keeps the name of the filter that made it: a cross for the 357
+test, a square for out of range, a triangle for too fast, on the chart and in
+the CSV verdict export alike.
+
 **Order matters more than the spec lets on.** A rain accumulator that wraps and
 one hit by a corrupt packet both look like a long fall, and the sample is full
 of the second kind: 72 mm jumps to 1234 for a single reading and drops straight
@@ -986,6 +1019,16 @@ never again; filtering only ever produces a parallel status array. Raw and
 filtered are two views of one import, shown separately or overlaid, because a
 filter you cannot inspect is worse than no filter. Every rejected reading can be
 clicked for its full row and the reason it failed.
+
+**Side by side, when overlaid is the wrong question.** Raw and filtered on one
+chart answers *what was removed*; two charts of the same window answers *what
+shape did the record have before, and after*, which is the question somebody
+asks when deciding whether the settings are right. A collapsible pane under the
+chart draws both, sharing the time window and one vertical scale — let each fit
+its own data and the filtered pane comes out looking exactly like the raw one,
+which is the opposite of the point. Which scale is the toolbar's existing
+**vertical axis** control rather than a second one here: with a 2014 mm spike in
+the record, **Kept** is what stops it flattening the filtered pane.
 
 **The chart is hand-rolled SVG**, like the rest of the app's charts — no
 library. It carries wheel zoom, drag to pan, drag-to-select zoom, an overview

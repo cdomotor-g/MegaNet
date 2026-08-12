@@ -7610,8 +7610,12 @@ const AD_COLORS = ['#0b5cab', '#c7401a', '#107c10', '#7c35a3',
                    '#3949ab', '#ef6c00', '#2e7d32', '#6a1b9a'];
 
 // Point status. Ordered so that "kept" is < BAD and the drawing code can test
-// with a single comparison.
-const AD_UNKNOWN = 0, AD_GOOD = 1, AD_SUSPECT = 2, AD_BAD = 3, AD_OOS = 4;
+// with a single comparison. RANGE and RATE are removals by the two limit
+// filters, which run before the 357 walk and are not part of the spec — they
+// are kept distinct from BAD so a rejected reading can always say which filter
+// rejected it.
+const AD_UNKNOWN = 0, AD_GOOD = 1, AD_SUSPECT = 2, AD_BAD = 3, AD_OOS = 4,
+      AD_RANGE = 5, AD_RATE = 6;
 
 const AD_STATUS_LABEL = {
   [AD_UNKNOWN]: 'untested',
@@ -7619,11 +7623,22 @@ const AD_STATUS_LABEL = {
   [AD_SUSPECT]: 'suspect',
   [AD_BAD]:     'bad',
   [AD_OOS]:     'out of sequence',
+  [AD_RANGE]:   'out of range',
+  [AD_RATE]:    'rose too fast',
 };
+
+// Every status that means "this reading is not in the filtered series".
+const adCut = st => st === AD_BAD || st === AD_OOS || st === AD_RANGE || st === AD_RATE;
 
 // Spec defaults, all overridable from the panel — the ticket asks for the steps,
 // the rollover ceiling and the continuity break to be configurable.
+//
+// Each filter also carries its own on/off flag, so any of them can be taken out
+// of the pipeline and the effect seen immediately. The 357 test is one of them:
+// `use357` off leaves the pre-filters running and nothing tested for continuity,
+// which is the honest way to ask "how much of this is the 357 test's doing?"
 const AD_CFG_DEFAULT = {
+  use357:     true,   // the 3-5-7 continuity walk itself
   small:      3,      // <= 3 against the next data
   medium:     5,      // <= 5 against the next-next
   large:      7,      // <= 7 against the next-next-next
@@ -7634,6 +7649,11 @@ const AD_CFG_DEFAULT = {
   oosOn:      true,   // drop out-of-sequence / duplicate timestamps
   dedupeOn:   true,
   minGapSec:  0,      // collapse readings closer together than this (0 = off)
+  rateOn:     false,  // rate-of-rise limit
+  rateMax:    50,     // fastest believable rise, in Value units per hour
+  rangeOn:    false,  // minimum / maximum limits
+  rangeMin:   '',     // blank = no floor
+  rangeMax:   '',     // blank = no ceiling
 };
 
 const AD_DAY = 86400000;
@@ -7654,6 +7674,7 @@ const ArroData = (function () {
     yMin:      '', yMax: '',
     showRemoved:  true,
     showRollover: true,
+    compare:      false,       // side-by-side raw/filtered panes, folded away
     showPoints:   'auto',      // auto | on | off
     normalise:    false,
     hover:     null,           // {x,y,t,rows:[]}
@@ -7873,10 +7894,15 @@ const ArroData = (function () {
   // lives.
 
   function cfgKey(cfg, kind) {
-    return [kind, cfg.small, cfg.medium, cfg.large, cfg.cycle, cfg.breakCount,
+    return [kind, cfg.use357 ? 1 : 0, cfg.small, cfg.medium, cfg.large, cfg.cycle, cfg.breakCount,
             cfg.startTests, cfg.rolloverOn ? 1 : 0, cfg.oosOn ? 1 : 0, cfg.dedupeOn ? 1 : 0,
-            cfg.minGapSec].join('|');
+            cfg.minGapSec, cfg.rateOn ? 1 : 0, cfg.rateMax,
+            cfg.rangeOn ? 1 : 0, cfg.rangeMin, cfg.rangeMax].join('|');
   }
+
+  // A blank limit means "no limit". Parsed here rather than at the input, so a
+  // range with only one end filled in still works.
+  const bound = x => { const f = parseFloat(x); return isFinite(f) ? f : null; };
 
   // The 357 walk itself, over the `live` positions of one series against one
   // set of values. Returns a fresh status array; it reads `adj` and writes
@@ -8042,14 +8068,65 @@ const ArroData = (function () {
     //    of their own. Off by default, because collapsing them is a departure
     //    from the spec rather than part of it.
     const gapMs = Math.max(0, +cfg.minGapSec || 0) * 1000;
-    const live = [];
     const oosFlag = new Uint8Array(n);
+    const cutFlag = new Uint8Array(n);      // AD_RANGE / AD_RATE, or 0
+    let live = [];
     let lastT = -Infinity;
     for (let i = 0; i < n; i++) {
       const tooClose = gapMs ? (t[i] - lastT < gapMs) : (t[i] <= lastT);
       if (tooClose && (cfg.oosOn || cfg.dedupeOn)) { oosFlag[i] = 1; continue; }
       lastT = t[i];
       live.push(i);
+    }
+
+    // 1a. Limits. Neither of these is in the Bureau's spec: they are gates on
+    //     what a sensor can physically report, and they run *before* the 357
+    //     walk so that a reading nothing could have produced never gets a vote
+    //     on continuity. A single 2014 mm packet is enough to be tested against
+    //     — and to drag three neighbours down with it — long before the walk
+    //     decides it is noise.
+    if (cfg.rangeOn) {
+      const lo = bound(cfg.rangeMin), hi = bound(cfg.rangeMax);
+      if (lo !== null || hi !== null) {
+        live = live.filter(i => {
+          if ((lo !== null && v[i] < lo) || (hi !== null && v[i] > hi)) { cutFlag[i] = AD_RANGE; return false; }
+          return true;
+        });
+      }
+    }
+
+    // 1b. Rate of rise: is the *step* between two readings one this sensor could
+    //     have made? Each reading is compared with the one before it in the
+    //     list, and the comparison holds whether or not that neighbour was
+    //     itself rejected. Anchoring to the last *surviving* reading instead is
+    //     the obvious-looking alternative and it is a trap: a gauge that
+    //     genuinely steps up and stays there is then measured against a value
+    //     it will never return to, and the whole record after the step is lost.
+    //
+    //     So this filter only ever claims the step. A corrupt plateau costs its
+    //     first reading here and the rest is the 357 walk's business — which is
+    //     the right division of labour, because breaking and re-establishing
+    //     continuity is exactly what that walk is for.
+    //
+    //     A rain accumulator is only tested upwards. It cannot fall except by
+    //     wrapping or by corruption, and both of those already have an owner. A
+    //     water level is tested in both directions, so a single dropout costs
+    //     two readings: the fall into it and the climb back out.
+    if (cfg.rateOn && +cfg.rateMax > 0) {
+      const max = +cfg.rateMax;
+      const kept = [];
+      for (let k = 0; k < live.length; k++) {
+        const i = live[k];
+        if (k > 0) {
+          const p = live[k - 1];
+          const hrs = (t[i] - t[p]) / 3600000;
+          const d = v[i] - v[p];
+          const move = isRA ? d : Math.abs(d);
+          if (hrs > 0 && move / hrs > max) { cutFlag[i] = AD_RATE; continue; }
+        }
+        kept.push(i);
+      }
+      live = kept;
     }
 
     // 2. The walk, then adjustRolloverData(), then the walk again.
@@ -8070,7 +8147,16 @@ const ArroData = (function () {
     const adj = new Float64Array(n);
     for (let i = 0; i < n; i++) adj[i] = v[i];
 
-    let status = walk357(live, adj, n, isRA, cfg);
+    // With the 357 test switched off the pre-filters still run and nothing is
+    // tested for continuity, so everything they left standing is kept.
+    const walk = () => {
+      if (cfg.use357) return walk357(live, adj, n, isRA, cfg);
+      const st = new Uint8Array(n);
+      for (const i of live) st[i] = AD_GOOD;
+      return st;
+    };
+
+    let status = walk();
     const rolls = [];
 
     if (cfg.rolloverOn) {
@@ -8091,28 +8177,38 @@ const ArroData = (function () {
       if (rolls.length) {
         // Re-lay the offsets over every reading, so a point removed inside a
         // wrapped stretch still reports a sensible adjusted value when it is
-        // inspected.
+        // inspected. Repeats keep their raw value: they were never part of the
+        // sequence the offsets were counted along.
         const rollSet = new Set(rolls);
         let offset = 0;
-        for (const i of live) {
+        for (let i = 0; i < n; i++) {
+          if (oosFlag[i]) { adj[i] = v[i]; continue; }
           if (rollSet.has(i)) offset += cfg.cycle;
           adj[i] = v[i] + offset;
         }
-        for (let i = 0; i < n; i++) if (oosFlag[i]) adj[i] = v[i];
-        status = walk357(live, adj, n, isRA, cfg);
+        status = walk();
       }
     }
 
-    for (let i = 0; i < n; i++) if (oosFlag[i]) status[i] = AD_OOS;
-
-    let good = 0, bad = 0, oos = 0;
+    // The pre-filter verdicts go on last so they survive the walk, which knows
+    // nothing about them — it was only ever handed what they left behind.
     for (let i = 0; i < n; i++) {
-      if (status[i] === AD_GOOD) good++;
-      else if (status[i] === AD_OOS) oos++;
+      if (oosFlag[i]) status[i] = AD_OOS;
+      else if (cutFlag[i]) status[i] = cutFlag[i];
+    }
+
+    let good = 0, bad = 0, oos = 0, range = 0, rate = 0;
+    for (let i = 0; i < n; i++) {
+      const st = status[i];
+      if (st === AD_GOOD)       good++;
+      else if (st === AD_OOS)   oos++;
+      else if (st === AD_RANGE) range++;
+      else if (st === AD_RATE)  rate++;
       else bad++;
     }
 
-    s.filt = { key, status, adj, rolls, stats: { good, bad, oos, rollovers: rolls.length, total: n } };
+    s.filt = { key, status, adj, rolls,
+               stats: { good, bad, oos, range, rate, rollovers: rolls.length, total: n } };
     return s.filt;
   }
 
@@ -8460,9 +8556,12 @@ const ArroData = (function () {
             ${arro ? ` · <a class="btn-link" href="${escAttr(arro)}" target="_blank" rel="noopener">ARRO ↗</a>` : ''}
           </div>
           <div class="small ad-series-meta">
-            <span title="Readings kept by the filter">${st.good.toLocaleString()} kept</span> ·
-            <span class="ad-bad-txt" title="Readings the 357 test rejected">${st.bad.toLocaleString()} removed</span> ·
+            <span title="Readings kept by the filters">${st.good.toLocaleString()} kept</span> ·
+            <button class="ad-inline-link ad-bad-txt" onclick="ArroData.explain()"
+                    title="Readings the 357 test rejected — click for what the test does">${st.bad.toLocaleString()} removed</button> ·
             <span title="Repeat or out-of-sequence timestamps, excluded before filtering">${st.oos.toLocaleString()} repeats</span>
+            ${st.range ? ` · <span class="ad-warn-txt" title="Readings outside the minimum / maximum you set">${st.range.toLocaleString()} out of range</span>` : ''}
+            ${st.rate ? ` · <span class="ad-warn-txt" title="Readings that climbed faster than the rate limit">${st.rate.toLocaleString()} too fast</span>` : ''}
             ${st.rollovers ? ` · <span title="Accumulator wraps corrected">${st.rollovers} rollover${st.rollovers === 1 ? '' : 's'}</span>` : ''}
           </div>
           <div class="small ad-series-meta">
@@ -8486,41 +8585,377 @@ const ArroData = (function () {
       </div>`;
   }
 
+  // Every filter is a block with its own switch. Turning one off greys and
+  // disables its settings rather than hiding them, so the panel reads the same
+  // whichever way the switches are set — and so "what would this look like
+  // without the rate limit?" is one click and one click back.
   function cfgHtml() {
     if (!ad.series.length) return '';
     const c = ad.cfg;
-    const num = (k, label, tip, min, max) => `
+    const num = (k, label, tip, min, max, on) => `
       <label class="ad-cfg-row" title="${escAttr(tip)}">
         <span>${label}</span>
-        <input type="number" value="${c[k]}" min="${min}" max="${max}"
+        <input type="number" value="${escAttr(c[k])}" min="${min}" max="${max}" ${on ? '' : 'disabled'}
                onchange="ArroData.setCfg('${k}', this.value)">
       </label>`;
-    const chk = (k, label, tip) => `
-      <label class="ad-cfg-chk" title="${escAttr(tip)}">
-        <input type="checkbox" ${c[k] ? 'checked' : ''} onchange="ArroData.setCfg('${k}', this.checked)">
-        <span>${label}</span></label>`;
+    // Blank means "no limit", so this one must not be a number input with a
+    // forced value — an empty string has to survive the round trip.
+    const lim = (k, label, tip, on) => `
+      <label class="ad-cfg-row" title="${escAttr(tip)}">
+        <span>${label}</span>
+        <input type="number" value="${escAttr(c[k])}" placeholder="none" ${on ? '' : 'disabled'}
+               onchange="ArroData.setCfg('${k}', this.value)">
+      </label>`;
+    // A filter's own switch, and the body it governs.
+    const block = (k, label, tip, body, note) => `
+      <div class="ad-filt${c[k] ? '' : ' ad-filt--off'}">
+        <label class="ad-filt-head" title="${escAttr(tip)}">
+          <input type="checkbox" ${c[k] ? 'checked' : ''}
+                 onchange="ArroData.setCfg('${k}', this.checked)">
+          <span>${esc(label)}</span></label>
+        <div class="ad-filt-body">${body}${note ? `<p class="small ad-cfg-note">${note}</p>` : ''}</div>
+      </div>`;
+
+    const unit = ad.series[0]?.unit || 'units';
 
     return `
       <div class="panel ad-panel">
-        <div class="panel-header"><h3>357 filter</h3>
-          <button class="btn-link" onclick="ArroData.resetCfg()">defaults</button></div>
-        <p class="small" style="color:var(--muted);margin:.1rem 0 .5rem">
-          A reading passes if it is within <b>${c.small}</b> of the next, or <b>${c.medium}</b> of the
-          next-next, or <b>${c.large}</b> of the one after that. Bureau spec, May 2009.</p>
-        ${num('small', 'Small step', 'Difference allowed against the next reading (spec: 3)', 0, 10000)}
-        ${num('medium', 'Medium step', 'Difference allowed against the next-next reading (spec: 5)', 0, 10000)}
-        ${num('large', 'Large step', 'Difference allowed against the next-next-next reading (spec: 7)', 0, 10000)}
-        ${num('breakCount', 'Break after', 'Consecutive failures that break continuity and start a new series (spec: 4)', 1, 100)}
-        ${num('startTests', 'Start window', 'Tests allowed to establish the start of a series (spec flowchart: 4)', 1, 100)}
-        ${num('cycle', 'Rollover at', 'Accumulator cycle size — the device counts 0 to cycle−1 (spec: 2048)', 2, 1e9)}
-        ${num('minGapSec', 'Min gap (s)', 'Collapse readings closer together than this. 0 keeps the spec behaviour.', 0, 86400)}
-        ${chk('rolloverOn', 'Correct rollovers', 'Detect accumulator wraps and carry the count across them')}
-        ${chk('oosOn', 'Drop repeat timestamps', 'Remove readings that do not advance the clock, before filtering')}
-        <p class="small ad-cfg-note">
-          Repeats are ARRO re-sending one observation. Four re-sends of a corrupt
-          packet satisfy the spec's "four consecutive readings make a series" and
-          survive as one — set a minimum gap to collapse them.</p>
+        <div class="panel-header"><h3>Filters</h3>
+          <span class="ad-panel-acts">
+            <button class="btn-link" onclick="ArroData.explain()"
+                    title="What the 3-5-7 continuity test does, and why it removed what it did">How the 357 filter works</button>
+            <button class="btn-link" onclick="ArroData.resetCfg()">defaults</button>
+          </span></div>
+
+        ${block('use357', '3-5-7 continuity test',
+          'The Bureau\'s continuity filter. Off leaves every reading the other filters kept.',
+          `<p class="small" style="color:var(--muted);margin:.1rem 0 .4rem">
+             A reading passes if it is within <b>${esc(c.small)}</b> of the next, or <b>${esc(c.medium)}</b> of the
+             next-next, or <b>${esc(c.large)}</b> of the one after that. Bureau spec, May 2009.</p>
+           ${num('small', 'Small step', 'Difference allowed against the next reading (spec: 3)', 0, 10000, c.use357)}
+           ${num('medium', 'Medium step', 'Difference allowed against the next-next reading (spec: 5)', 0, 10000, c.use357)}
+           ${num('large', 'Large step', 'Difference allowed against the next-next-next reading (spec: 7)', 0, 10000, c.use357)}
+           ${num('breakCount', 'Break after', 'Consecutive failures that break continuity and start a new series (spec: 4)', 1, 100, c.use357)}
+           ${num('startTests', 'Start window', 'Tests allowed to establish the start of a series (spec flowchart: 4)', 1, 100, c.use357)}`)}
+
+        ${block('rolloverOn', 'Correct rollovers',
+          'Detect accumulator wraps and carry the count across them',
+          num('cycle', 'Rollover at', 'Accumulator cycle size — the device counts 0 to cycle−1 (spec: 2048)', 2, 1e9, c.rolloverOn),
+          c.use357 ? '' : 'With the 357 test off, nothing has removed the corrupt packets a wrap is '
+                        + 'easily confused with — expect spikes to be read as rollovers.')}
+
+        ${block('oosOn', 'Drop repeat timestamps',
+          'Remove readings that do not advance the clock, before filtering',
+          num('minGapSec', 'Min gap (s)', 'Collapse readings closer together than this. 0 keeps the spec behaviour.', 0, 86400, c.oosOn),
+          'Repeats are ARRO re-sending one observation. Four re-sends of a corrupt '
+          + 'packet satisfy the spec\'s "four consecutive readings make a series" and '
+          + 'survive as one — set a minimum gap to collapse them.')}
+
+        ${block('rateOn', 'Rate of rise',
+          'Remove readings that climb faster than a gauge plausibly can',
+          num('rateMax', `Max rise (${esc(unit)}/h)`,
+              'Fastest believable change per hour between one reading and the next', 0, 1e9, c.rateOn),
+          `Each reading against the one before it, so this filter only ever claims the
+           step — a corrupt plateau costs its first reading here and the rest is the 357
+           test's business.
+           ${ad.series.some(s => s.kind === 'RA')
+              ? 'An accumulator is only tested upwards; falls belong to the rollover and 357 tests.' : ''}`)}
+
+        ${block('rangeOn', 'Minimum / maximum',
+          'Remove readings outside what this sensor can physically report',
+          `${lim('rangeMin', 'Minimum', 'Readings below this are removed. Blank for no floor.', c.rangeOn)}
+           ${lim('rangeMax', 'Maximum', 'Readings above this are removed. Blank for no ceiling.', c.rangeOn)}`,
+          `Compared against <b>Value</b> as exported, in ${esc(unit)}, before any rollover
+           correction. Leave an end blank to bound only the other one.`)}
       </div>`;
+  }
+
+  // ── the filter, explained (issue #80) ──────────────────────────────────────
+  // The panel could say what it removed and never what the test was, which
+  // leaves "why did that reading go?" answerable only by opening a PDF. This is
+  // the answer in the app: the spec's two components as a flowchart, and a
+  // worked example whose verdicts come out of the same walk357() every import
+  // goes through — so the diagram cannot drift away from the code.
+  //
+  // Both drawings use the theme's custom properties rather than hex, so they
+  // follow light and dark without being redrawn.
+
+  const F357_ARROW = `
+    <defs>
+      <marker id="f357-arr" viewBox="0 0 8 8" refX="7.5" refY="4"
+              markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0 0 L8 4 L0 8 Z" fill="var(--muted)"/>
+      </marker>
+    </defs>`;
+
+  // Centred lines inside a shape. A plain string is a heading line; ['x', 1] is
+  // a smaller muted one.
+  function f357Lines(cx, y, h, lines) {
+    const lh = 13;
+    const top = y + h / 2 - (lines.length - 1) * lh / 2 + 4;
+    return lines.map((ln, i) => {
+      const [txt, small] = Array.isArray(ln) ? ln : [ln, false];
+      return `<text x="${cx}" y="${(top + i * lh).toFixed(1)}" text-anchor="middle"
+                    font-size="${small ? 10 : 11.5}" fill="var(--${small ? 'muted' : 'text'})"
+                    ${small ? '' : 'font-weight="600"'}>${esc(txt)}</text>`;
+    }).join('');
+  }
+
+  const f357Box = (x, y, w, h, lines, strong) => `
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="var(--panel-sub)"
+          stroke="var(--${strong ? 'accent' : 'border'})" stroke-width="${strong ? 1.6 : 1}"/>
+    ${f357Lines(x + w / 2, y, h, lines)}`;
+
+  const f357Pill = (x, y, w, h, lines) => `
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="var(--subtle)"
+          stroke="var(--border)"/>
+    ${f357Lines(x + w / 2, y, h, lines)}`;
+
+  const f357Diamond = (cx, cy, rx, ry, lines) => `
+    <polygon points="${cx},${cy - ry} ${cx + rx},${cy} ${cx},${cy + ry} ${cx - rx},${cy}"
+             fill="var(--panel-sub)" stroke="var(--border)"/>
+    ${f357Lines(cx, cy - ry, ry * 2, lines)}`;
+
+  const f357Arrow = (d, dashed) => `
+    <path d="${d}" fill="none" stroke="var(--muted)" stroke-width="1.3"
+          ${dashed ? 'stroke-dasharray="4 3"' : ''} marker-end="url(#f357-arr)"/>`;
+
+  const f357Tag = (x, y, txt, anchor) => `
+    <text x="${x}" y="${y}" font-size="9.5" fill="var(--muted)"
+          text-anchor="${anchor || 'start'}">${esc(txt)}</text>`;
+
+  // Figures 2, 6 and 9 of the spec, boiled down to the shape of the thing: get
+  // a series started, walk it, and start a new one when it breaks.
+  function flowSvg() {
+    return `
+      <svg class="f357-fig" viewBox="0 0 720 660" role="img"
+           aria-label="Flowchart: establish start continuity, then establish continuity, restarting a new series when four readings in a row fail">
+        ${F357_ARROW}
+        ${f357Pill(170, 12, 300, 32, ['Start at the newest reading'])}
+        ${f357Arrow('M320 44 V60')}
+        ${f357Box(170, 62, 300, 54,
+          ['Establish Start Continuity', ['current against a fixed start:', 1], ['≤ 3, then ≤ 5, then ≤ 7', 1]], true)}
+        ${f357Arrow('M320 116 V134')}
+        ${f357Diamond(320, 170, 118, 34, ['four good in a row?'])}
+        ${f357Arrow('M438 170 H498')}
+        ${f357Tag(462, 163, 'no')}
+        ${f357Box(500, 146, 170, 48, [['drop the start,', 1], ['begin one reading earlier', 1]])}
+        ${f357Arrow('M585 146 V88 H474')}
+        ${f357Arrow('M320 204 V230')}
+        ${f357Tag(328, 222, 'yes')}
+        ${f357Box(170, 232, 300, 54,
+          ['Establish Continuity', ['current against next ≤ 3,', 1], ['next-next ≤ 5, the third ≤ 7', 1]], true)}
+        ${f357Arrow('M320 286 V304')}
+        ${f357Diamond(320, 340, 118, 34, ['passes the test?'])}
+        ${f357Arrow('M438 340 H498')}
+        ${f357Tag(462, 333, 'yes')}
+        ${f357Box(500, 312, 170, 56,
+          ['mark it Good', ['every Suspect back to the', 1], ['last good becomes Bad', 1]])}
+        ${f357Arrow('M585 312 V258 H474')}
+        ${f357Arrow('M320 374 V398')}
+        ${f357Tag(328, 390, 'no')}
+        ${f357Box(170, 400, 300, 40, ['mark Suspect · step back one'])}
+        ${f357Arrow('M320 440 V464')}
+        ${f357Diamond(320, 500, 118, 34, ['four failures in a row?'])}
+        ${f357Arrow('M202 500 H130 V272 H168')}
+        ${f357Tag(196, 492, 'no', 'end')}
+        ${f357Arrow('M320 534 V564')}
+        ${f357Tag(328, 552, 'yes')}
+        ${f357Box(170, 566, 300, 44,
+          ['continuity broken', ['restart the series at the first failure', 1]])}
+        ${f357Arrow('M470 588 H695 V100 H474')}
+        ${f357Tag(688, 440, 'and start again there', 'end')}
+        ${f357Arrow('M170 244 H85 V594', true)}
+        ${f357Pill(20, 596, 130, 40, [['no more data —', 1], ['suspects become Bad', 1]])}
+      </svg>`;
+  }
+
+  // The same fourteen readings the code sees, with the colours coming back out
+  // of walk357() rather than being chosen to look convincing.
+  const F357_EX = [12, 14, 15, 17, 18, 60, 20, 21, 0, 23, 24, 26, 27, 29];
+  const F357_SPEC = { small: 3, medium: 5, large: 7, cycle: 2048, breakCount: 4, startTests: 4 };
+
+  function exampleSvg() {
+    const n = F357_EX.length;
+    const st = walk357(F357_EX.map((_, i) => i), Float64Array.from(F357_EX), n, true, F357_SPEC);
+
+    const x  = i => 44 + i * 48;
+    const hi = Math.max(...F357_EX), lo = Math.min(...F357_EX);
+    const y  = v => 168 - (v - lo) / (hi - lo) * 118;
+
+    // The cursors skip anything already Bad, which is why the third comparison
+    // below reaches past the dropout rather than into it.
+    const nextLive = k => { for (let j = k + 1; j < n; j++) if (st[j] !== AD_BAD) return j; return -1; };
+    const cur = 5;                                     // the spike
+    const tgt = [];
+    for (let k = 0, at = cur; k < 3; k++) { at = nextLive(at); if (at < 0) break; tgt.push(at); }
+    const steps = [F357_SPEC.small, F357_SPEC.medium, F357_SPEC.large];
+    const tests = tgt.map((j, k) => {
+      const d = F357_EX[j] - F357_EX[cur];
+      return { j, d, step: steps[k], ok: d >= 0 && d <= steps[k],
+               name: ['the next reading', 'the next-next', 'the one after that'][k] };
+    });
+
+    const kept = F357_EX.map((_, i) => i).filter(i => st[i] !== AD_BAD);
+    const line = idx => idx.map((i, k) => `${k ? 'L' : 'M'}${x(i)} ${y(F357_EX[i]).toFixed(1)}`).join(' ');
+
+    const dots = F357_EX.map((v, i) => {
+      const bad = st[i] === AD_BAD;
+      return `<circle cx="${x(i)}" cy="${y(v).toFixed(1)}" r="${i === cur ? 6 : 4.5}"
+                      fill="var(--${bad ? 'bad' : 'ok'})"
+                      stroke="var(--panel)" stroke-width="${i === cur ? 2 : 1}"/>
+              <text x="${x(i)}" y="${(y(v) - 9).toFixed(1)}" font-size="9.5" text-anchor="middle"
+                    fill="var(--${bad ? 'bad' : 'muted'})">${v}</text>`;
+    }).join('');
+
+    const links = tests.map((t, k) => `
+      <path d="M${x(cur)} ${y(F357_EX[cur]).toFixed(1)} L${x(t.j)} ${y(F357_EX[t.j]).toFixed(1)}"
+            stroke="var(--bad)" stroke-width="1.1" stroke-dasharray="3 3" opacity=".75" fill="none"/>
+      <circle cx="${x(t.j)}" cy="${(y(F357_EX[t.j]) + 15).toFixed(1)}" r="7.5"
+              fill="var(--panel)" stroke="var(--bad)"/>
+      <text x="${x(t.j)}" y="${(y(F357_EX[t.j]) + 18.5).toFixed(1)}" font-size="9.5"
+            text-anchor="middle" fill="var(--bad)">${k + 1}</text>`).join('');
+
+    const rows = tests.map((t, k) => `
+      <text x="44" y="${216 + k * 18}" font-size="10.5" fill="var(--text)">
+        <tspan fill="var(--bad)">${k + 1}</tspan>
+        <tspan dx="6">vs ${esc(t.name)}: ${t.d < 0 ? '−' : ''}${Math.abs(t.d)}, ${
+          t.ok ? `inside 0 to ${t.step} — passes` : `outside 0 to ${t.step} — fails`}</tspan>
+      </text>`).join('');
+
+    const verdict = tests.every(t => !t.ok)
+      ? ['All three fail, so the 60 is marked Suspect — and Bad as soon as a reading behind it passes.',
+         'The 0 goes the same way; everything else is within 3 of its neighbour and survives untouched.']
+      : ['The comparisons above use the specification\'s own 3, 5 and 7.', ''];
+
+    return `
+      <svg class="f357-fig" viewBox="0 0 720 300" role="img"
+           aria-label="Fourteen readings: a spike of 60 and a dropout of 0 are removed, the rest kept">
+        ${F357_ARROW}
+        <circle cx="48" cy="17" r="4.5" fill="var(--ok)"/>
+        ${f357Tag(58, 21, 'kept')}
+        <circle cx="100" cy="17" r="4.5" fill="var(--bad)"/>
+        ${f357Tag(110, 21, 'removed')}
+        ${f357Arrow('M668 36 H472')}
+        ${f357Tag(464, 40, 'the walk runs this way', 'end')}
+        <path d="${line(F357_EX.map((_, i) => i))}" fill="none" stroke="var(--muted)"
+              stroke-width="1" opacity=".45" stroke-dasharray="3 3"/>
+        <path d="${line(kept)}" fill="none" stroke="var(--ok)" stroke-width="1.8"/>
+        ${links}
+        ${dots}
+        <line x1="34" y1="182" x2="686" y2="182" stroke="var(--border)"/>
+        ${f357Tag(44, 196, 'older')}
+        ${f357Tag(676, 196, 'newest', 'end')}
+        ${rows}
+        <text x="44" y="272" font-size="10.5" fill="var(--muted)">
+          <tspan x="44">${esc(verdict[0])}</tspan>
+          <tspan x="44" dy="14">${esc(verdict[1])}</tspan>
+        </text>
+      </svg>`;
+  }
+
+  function explain() {
+    const c = ad.cfg;
+    const tweaked = c.small !== 3 || c.medium !== 5 || c.large !== 7;
+    Modal.open({
+      title: 'How the 357 filter works',
+      wide: true,
+      html: `
+      <div class="f357">
+        <p>ERTS packets arrive over radio, and radio loses and mangles them. The Bureau's
+           <b>3-5-7 filter</b> does not ask whether a reading looks reasonable on its own — a
+           corrupt packet can read 300 mm perfectly plausibly. It asks whether a reading is
+           <em>continuous with the ones around it</em>, and throws out what is not.</p>
+
+        <h3>The test</h3>
+        <p>A reading passes if it is within <b>3</b> of the next reading, or within <b>5</b> of the
+           next-next, or within <b>7</b> of the one after that. Three chances, widening as they
+           reach further ahead, so a single lost packet does not condemn its neighbours.
+           ${tweaked ? `Your panel is currently set to <b>${esc(c.small)}</b>, <b>${esc(c.medium)}</b>
+             and <b>${esc(c.large)}</b> — the diagrams below use the spec's own numbers.` : ''}</p>
+        <p>The comparison depends on what the sensor is. A <b>rain accumulator</b> only ever climbs,
+           so its difference is signed and any fall is a failure by construction. A <b>water level</b>
+           moves both ways, so the size of the change is what counts. That is the one thing the
+           <em>reads as</em> selector on each import changes.</p>
+
+        <h3>It walks backwards</h3>
+        <p>The list is in ascending time order and the filter starts at the <b>newest</b> reading,
+           testing each one against what comes <em>after</em> it. That is not an implementation
+           detail: the newest reading is the one you have the most reason to trust as a starting
+           point, and it means a reading is judged by the record that followed it rather than the
+           one that led up to it.</p>
+
+        <h3>Good, Suspect, Bad</h3>
+        <p>Nothing is thrown away on first failure. A reading that fails all three comparisons is
+           <b>Suspect</b>, and stays that way until something behind it passes — at which point
+           every Suspect between the two is settled as <b>Bad</b>. A reading that passes is
+           <b>Good</b>. Suspects that never get resolved are Bad at the end of the walk.</p>
+
+        <h3>Two components</h3>
+        <p>Getting a series started is a different problem from keeping it going, so the spec has
+           two parts. <b>Establish Start Continuity</b> needs four good readings in a row before it
+           will believe a series exists at all; if it cannot find them, the start reading itself is
+           the problem and it steps back and tries again. <b>Establish Continuity</b> then walks the
+           rest of the record.</p>
+        ${flowSvg()}
+
+        <h3>Breaking, and starting again</h3>
+        <p>Four consecutive failures are not noise — they are a gap. A dead radio link, a flat
+           battery, a site visit. Rather than delete everything that follows, the filter declares
+           the continuity broken and hands the run back to Start Continuity to begin a new series at
+           the first failure. This is why a record with a week-long outage in it comes through as two
+           good series rather than one good one and a week of casualties.</p>
+
+        <h3>A worked example</h3>
+        <p>Fourteen readings from an accumulator, with one corrupt spike and one dropout. The
+           colours below are not illustrative — they are what <code>walk357()</code> returns when it
+           is handed exactly these numbers, from the same code the imports go through.</p>
+        ${exampleSvg()}
+
+        <h3>Rollovers</h3>
+        <p>The counter in the field only counts to ${esc(c.cycle - 1)}, then wraps to zero. A wrap
+           looks exactly like a huge fall, and so does a corrupt packet — so this app removes the
+           noise <em>first</em>, and only then treats a fall between two surviving readings as a
+           possible wrap. What makes a fall a rollover is not its size but the step it leaves
+           behind: 2045 → 2 is a wrap because it is really a step of 5, while 1976 → 125 would be a
+           step of 197 and is not.</p>
+
+        <h3>Repeats are not readings</h3>
+        <p>ARRO re-sends an observation several times, so the same reading arrives at :12, :13, :14
+           and :18 past the minute. Anything that does not advance the clock is set aside before the
+           filter runs. Four re-sends of one corrupt packet otherwise satisfy "any four consecutive
+           data form a continuous set" and survive as a series of their own — which is what the
+           <b>minimum gap</b> setting exists to collapse.</p>
+
+        <h3>The numbers are counts, not millimetres</h3>
+        <p>3, 5, 7 and ${esc(c.cycle)} are all in the units ARRO exported in the <b>Value</b> column.
+           They are not rescaled by a station's bucket size — doing that would quietly move every
+           threshold. Bucket size is a display conversion only, shown against the raw tip count when
+           you click a reading.</p>
+
+        <h3>The other filters in this panel</h3>
+        <p>Only the 3-5-7 test and the rollover correction come from the spec. The rest are gates
+           this app adds, each with its own switch so you can see what it is doing by turning it
+           off:</p>
+        <ul>
+          <li><b>Rate of rise</b> — removes readings that climb faster than a gauge plausibly can,
+              each compared with the one before it. It claims the step and nothing more: a corrupt
+              plateau costs its first reading here, and the rest is the continuity test's business.
+              An accumulator is only tested upwards, since a fall belongs to the rollover and 357
+              tests.</li>
+          <li><b>Minimum / maximum</b> — removes readings outside what the sensor can physically
+              report, before the continuity test runs, so a value nothing could have produced never
+              gets a vote on its neighbours.</li>
+        </ul>
+        <p>Both run before the 357 walk and are marked separately on the chart — a square for out of
+           range, a triangle for too fast, a cross for the 357 test itself — so a removal always says
+           which filter made the call.</p>
+
+        <p class="f357-src">Hydrology Raw Data Filtering Program Specification v2.1, Commonwealth
+           Bureau of Meteorology, May 2009, with the 1998 first edition. Both are in
+           <code>docs/</code>.</p>
+      </div>`,
+    });
   }
 
   function mainHtml() {
@@ -8534,7 +8969,40 @@ const ArroData = (function () {
       </div>
       <svg id="ad-ov" class="ad-ov" role="img"
            aria-label="Whole record, with the visible window shaded"></svg>
-      <div id="ad-readout" class="ad-readout">${readoutHtml()}</div>`;
+      <div id="ad-readout" class="ad-readout">${readoutHtml()}</div>
+      ${compareHtml()}`;
+  }
+
+  // Raw and filtered on one chart answers "what was removed". Raw and filtered
+  // as two charts answers "what shape did the record have before, and after" —
+  // which is a different question, and the one somebody asks when deciding
+  // whether the settings are right. Folded away by default: it is a second
+  // look, not the main one.
+  function compareHtml() {
+    const vis = shown();
+    const tot  = vis.reduce((a, s) => a + s.n, 0);
+    const kept = vis.reduce((a, s) => a + runFilter(s, ad.cfg).stats.good, 0);
+    return `
+      <details class="ad-compare" id="ad-compare" ${ad.compare ? 'open' : ''}
+               ontoggle="ArroData.compareToggle(this)">
+        <summary>Side by side <span class="small">— as recorded against what the filters kept</span></summary>
+        <div class="ad-compare-grid">
+          <figure>
+            <figcaption>As recorded <span class="small">${tot.toLocaleString()} readings</span></figcaption>
+            <svg id="ad-cmp-raw" role="img"
+                 aria-label="Every reading as exported, over the visible window"></svg>
+          </figure>
+          <figure>
+            <figcaption>Filtered <span class="small">${kept.toLocaleString()} kept</span></figcaption>
+            <svg id="ad-cmp-filt" role="img"
+                 aria-label="The readings that survived the filters, over the same window"></svg>
+          </figure>
+        </div>
+        <p class="small ad-cfg-note">Both panes hold the same time window and the same vertical
+           scale, so the only difference between them is the filters. Removals are marked on the
+           left-hand pane. The scale follows the toolbar's <b>vertical axis</b> setting — with a
+           spike in the record, <b>Kept</b> is what stops it flattening the right-hand pane.</p>
+      </details>`;
   }
 
   function emptyHtml() {
@@ -8664,16 +9132,24 @@ const ArroData = (function () {
   function pinHtml(s, i) {
     const f = runFilter(s, ad.cfg);
     const st = f.status[i];
-    const why = st === AD_GOOD ? 'Passed the 357 test.'
+    const lim = [bound(ad.cfg.rangeMin) !== null ? `below ${ad.cfg.rangeMin}` : '',
+                 bound(ad.cfg.rangeMax) !== null ? `above ${ad.cfg.rangeMax}` : ''].filter(Boolean).join(' or ');
+    const why = st === AD_GOOD
+        ? (ad.cfg.use357 ? 'Passed the 357 test.'
+                         : 'Kept — the 357 test is switched off, so nothing here was tested for continuity.')
       : st === AD_OOS ? 'Dropped before filtering — this timestamp does not advance the clock, so it is a repeat of an earlier reading rather than a new observation.'
+      : st === AD_RANGE ? `Outside the limits you set — anything ${lim || 'outside the range'} is removed before the 357 test runs.`
+      : st === AD_RATE ? `Moved faster than ${ad.cfg.rateMax} ${s.unit}/h from the reading before it, so it was removed before the 357 test ran.`
       : `Failed the 357 test against the readings that follow it — not within ${ad.cfg.small} of the next, ${ad.cfg.medium} of the next-next, or ${ad.cfg.large} of the one after that.`;
+    const badge = st === AD_GOOD ? 'ok' : st === AD_OOS ? 'dup'
+                : (st === AD_RANGE || st === AD_RATE) ? 'warn' : 'bad';
     const rolled = f.rolls.includes(i);
     return `
       <div class="ad-pin">
         <div class="ad-pin-head">
           <span class="ad-dot" style="background:${escAttr(s.color)}"></span>
           <b>${esc(s.label)}</b>
-          <span class="ad-badge ad-badge--${st === AD_GOOD ? 'ok' : st === AD_OOS ? 'dup' : 'bad'}">${esc(AD_STATUS_LABEL[st])}</span>
+          <span class="ad-badge ad-badge--${badge}">${esc(AD_STATUS_LABEL[st])}</span>
           <button class="ad-x" onclick="ArroData.unpin()" title="Close">✕</button>
         </div>
         <div class="ad-pin-grid">
@@ -8685,7 +9161,10 @@ const ArroData = (function () {
           <div><span>Adjusted</span><b>${esc(fmtVal(f.adj[i]))}${rolled ? ' <span class="small">(wrap here)</span>' : ''}</b></div>
           <div><span>Quality</span><b>${esc(s.qcodes[s.q[i]] || '—')}</b></div>
         </div>
-        <div class="small ad-pin-why">${esc(why)}</div>
+        <div class="small ad-pin-why">${esc(why)}
+          <button class="ad-inline-link" onclick="ArroData.explain()"
+                  title="The whole test, with the spec's own diagrams">How the 357 filter works</button>
+        </div>
       </div>`;
   }
 
@@ -8839,22 +9318,32 @@ const ArroData = (function () {
         const i0 = lower(s.t, s.n, g.v.t0), i1 = lower(s.t, s.n, g.v.t1);
         for (let i = i0; i < i1 && nMark < MARK_CAP; i++) {
           const st = f.status[i];
-          const isBad = st === AD_BAD, isDup = st === AD_OOS;
-          if (!(isBad && wantBad) && !(isDup && ad.showDupes)) continue;
+          const isDup = st === AD_OOS;
+          const isCut = st === AD_BAD || st === AD_RANGE || st === AD_RATE;
+          if (!(isCut && wantBad) && !(isDup && ad.showDupes)) continue;
           if (ad.transform !== 'value') continue;   // a removed step has no meaningful height
           const px = g.x(s.t[i]), py = g.y(s.v[i]);
+          // Which filter took it out, told apart by shape as well as colour —
+          // at four pixels a colour alone is a guess.
+          const col = st === AD_BAD ? c.bad : isDup ? c.muted : c.warn;
           nMark++;
           // A removal above the top of the scale still has to be visible, or
           // "Kept" would quietly hide the very readings it is scaled to exclude.
           if (py < PADT) {
-            markers += `<path d="M${px.toFixed(1)} ${PADT}l-4 7h8Z" fill="${isBad ? c.bad : c.muted}"
-                              opacity=".9"><title>${esc(fmtVal(s.v[i]))} ${esc(s.unit)} — above the scale</title></path>`;
+            markers += `<path d="M${px.toFixed(1)} ${PADT}l-4 7h8Z" fill="${col}"
+                              opacity=".9"><title>${esc(fmtVal(s.v[i]))} ${esc(s.unit)} — ${esc(AD_STATUS_LABEL[st])}, above the scale</title></path>`;
             continue;
           }
           if (py > g.h - PADB) continue;
-          markers += isBad
+          markers += st === AD_BAD
             ? `<path d="M${(px - 3).toFixed(1)} ${(py - 3).toFixed(1)}l6 6M${(px + 3).toFixed(1)} ${(py - 3).toFixed(1)}l-6 6"
-                     stroke="${c.bad}" stroke-width="1.4" opacity=".92"/>`
+                     stroke="${c.bad}" stroke-width="1.4" opacity=".92"><title>failed the 357 test</title></path>`
+            : st === AD_RANGE
+            ? `<rect x="${(px - 2.8).toFixed(1)}" y="${(py - 2.8).toFixed(1)}" width="5.6" height="5.6"
+                     fill="none" stroke="${c.warn}" stroke-width="1.4"><title>outside the range limits</title></rect>`
+            : st === AD_RATE
+            ? `<path d="M${px.toFixed(1)} ${(py - 3.6).toFixed(1)}l3.4 5.8h-6.8Z" fill="${c.warn}"
+                     opacity=".92"><title>rose faster than the rate limit</title></path>`
             : `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="1.6" fill="${c.muted}" opacity=".5"/>`;
         }
       }
@@ -8949,6 +9438,137 @@ const ArroData = (function () {
             <text x="${PADL}" y="${h - 5}" font-size="9" fill="${c.muted}">${esc(fmtFull(ex.t0).slice(0, 10))}</text>
             <text x="${w - PADR}" y="${h - 5}" font-size="9" text-anchor="end" fill="${c.muted}">${esc(fmtFull(ex.t1).slice(0, 10))}</text>`;
     svg.innerHTML = out;
+
+    // Every view change redraws the overview, and nothing else does — which
+    // makes this the one place the comparison panes can follow the window
+    // without also being rebuilt on every mouse move.
+    drawCompare();
+  }
+
+  // ── side-by-side comparison ────────────────────────────────────────────────
+
+  const CMP_PADL = 46, CMP_PADR = 10, CMP_PADT = 10, CMP_PADB = 20;
+
+  // Redrawing both panes on every mouse move would be work for nothing — the
+  // crosshair does not reach them. This is what they actually depend on.
+  let cmpSig = '';
+
+  function drawCompare(force) {
+    const box = document.getElementById('ad-compare');
+    const a = document.getElementById('ad-cmp-raw');
+    const b = document.getElementById('ad-cmp-filt');
+    if (!box || !box.open || !a || !b) return;
+    const vis = shown(), v = view();
+    if (!vis.length || !v) { a.innerHTML = ''; b.innerHTML = ''; return; }
+
+    const w = Math.max(240, Math.round(a.parentElement.getBoundingClientRect().width));
+    const h = Math.round(Math.max(160, Math.min(300, w * 0.62)));
+    const sig = [v.t0, v.t1, w, h, ad.transform, ad.chartType, ad.showRemoved, ad.showDupes,
+                 ad.yMode, ad.yMin, ad.yMax,
+                 cfgKey(ad.cfg, 'cmp'), vis.map(s => `${s.key}${s.color}${s.kind}`).join(',')].join('|');
+    // The childNodes test matters: re-rendering the main column hands back a
+    // pair of empty <svg>s whose inputs have not changed, and a signature check
+    // on its own would leave them empty.
+    if (!force && sig === cmpSig && a.childNodes.length) return;
+    cmpSig = sig;
+
+    // One scale across both panes. Let each pane fit its own data and the
+    // filtered one would come out looking exactly like the raw one, which is
+    // the opposite of what a comparison is for.
+    //
+    // Which scale is the toolbar's business, not a second control here: fitting
+    // everything means one 2014 mm spike flattens the filtered pane into a
+    // line, and "Kept" is already how you ask to see its shape instead — the
+    // spikes then run off the top of the left-hand pane, which is a fair
+    // description of them.
+    let lo = Infinity, hi = -Infinity;
+    for (const s of vis) {
+      const tr = tracks(s);
+      for (const track of ad.yMode === 'kept' ? [tr.filt] : [tr.raw, tr.filt]) {
+        const i0 = Math.max(0, lower(track.t, track.n, v.t0) - 1);
+        const i1 = Math.min(track.n, lower(track.t, track.n, v.t1) + 1);
+        for (let k = i0; k < i1; k++) { const y = track.y[k]; if (y < lo) lo = y; if (y > hi) hi = y; }
+      }
+    }
+    if (!isFinite(lo)) { lo = 0; hi = 1; }
+    if (ad.yMode === 'zero' && lo > 0) lo = 0;
+    if (hi === lo) { hi = lo + 1; lo -= 1; }
+    const pad = (hi - lo) * 0.06;
+    let yr = { lo: lo - pad, hi: hi + pad };
+    if (ad.yMode === 'manual') {
+      const a = parseFloat(ad.yMin), b = parseFloat(ad.yMax);
+      if (!isNaN(a) && !isNaN(b) && b > a) yr = { lo: a, hi: b };
+    }
+
+    const c = theme();
+    for (const [svg, kind] of [[a, 'raw'], [b, 'filt']]) {
+      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      svg.setAttribute('width', w);
+      svg.setAttribute('height', h);
+      svg.innerHTML = cmpPane(kind, w, h, v, yr, c);
+    }
+  }
+
+  function cmpPane(kind, w, h, v, yr, c) {
+    const pw = w - CMP_PADL - CMP_PADR, ph = h - CMP_PADT - CMP_PADB;
+    const x = t => CMP_PADL + (t - v.t0) / (v.t1 - v.t0) * pw;
+    const y = val => CMP_PADT + (1 - (val - yr.lo) / (yr.hi - yr.lo)) * ph;
+    const { ticks, step } = timeTicks(v.t0, v.t1, Math.max(2, Math.round(pw / 120)));
+    const yt = niceTicks(yr.lo, yr.hi, Math.max(2, Math.round(ph / 44)));
+    const clip = `ad-cmp-clip-${kind}`;
+
+    let out = `<defs><clipPath id="${clip}"><rect x="${CMP_PADL}" y="${CMP_PADT}"
+                 width="${pw}" height="${ph}"/></clipPath></defs>
+               <rect x="0" y="0" width="${w}" height="${h}" fill="${c.panel}"/>`;
+
+    out += yt.map(val => `
+      <line x1="${CMP_PADL}" y1="${y(val).toFixed(1)}" x2="${w - CMP_PADR}" y2="${y(val).toFixed(1)}"
+            stroke="${c.border}" stroke-width="1"/>
+      <text x="${CMP_PADL - 5}" y="${(y(val) + 3.2).toFixed(1)}" font-size="9" text-anchor="end"
+            fill="${c.muted}">${esc(fmtVal(val))}</text>`).join('');
+
+    out += ticks.map(t => `
+      <line x1="${x(t).toFixed(1)}" y1="${CMP_PADT}" x2="${x(t).toFixed(1)}" y2="${h - CMP_PADB}"
+            stroke="${c.border}" stroke-width="1" opacity=".6"/>
+      <text x="${x(t).toFixed(1)}" y="${h - CMP_PADB + 12}" font-size="9" text-anchor="middle"
+            fill="${c.muted}">${esc(fmtTick(t, step))}</text>`).join('');
+
+    let body = '';
+    for (const s of shown()) {
+      const track = kind === 'raw' ? tracks(s).raw : tracks(s).filt;
+      const i0 = Math.max(0, lower(track.t, track.n, v.t0) - 1);
+      const i1 = Math.min(track.n, lower(track.t, track.n, v.t1) + 1);
+      const pts = densify(track, i0, i1, x, pw);
+      if (pts.length) {
+        body += `<path d="${pathFrom(pts, y, ad.chartType === 'step')}" fill="none"
+                       stroke="${escAttr(s.color)}" stroke-width="1.4"
+                       stroke-linejoin="round" stroke-linecap="round"/>`;
+      }
+      // The removals belong on the "as recorded" side: that pane is the record
+      // they were removed from.
+      if (kind === 'raw' && ad.transform === 'value') {
+        const f = runFilter(s, ad.cfg);
+        const j0 = lower(s.t, s.n, v.t0), j1 = lower(s.t, s.n, v.t1);
+        let n = 0;
+        for (let i = j0; i < j1 && n < 900; i++) {
+          const st = f.status[i];
+          if (st === AD_GOOD || (st === AD_OOS && !ad.showDupes)) continue;
+          const px = x(s.t[i]), py = y(s.v[i]);
+          if (py < CMP_PADT - 4 || py > h - CMP_PADB + 4) continue;
+          n++;
+          const col = st === AD_BAD ? c.bad : st === AD_OOS ? c.muted : c.warn;
+          body += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2.4" fill="none"
+                           stroke="${col}" stroke-width="1.3" opacity=".9"><title>${esc(AD_STATUS_LABEL[st])}
+                           · ${esc(fmtVal(s.v[i]))} ${esc(s.unit)}</title></circle>`;
+        }
+      }
+    }
+    out += `<g clip-path="url(#${clip})">${body}</g>`;
+    out += `<line x1="${CMP_PADL}" y1="${h - CMP_PADB}" x2="${w - CMP_PADR}" y2="${h - CMP_PADB}"
+                  stroke="${c.muted}" stroke-width="1"/>
+            <line x1="${CMP_PADL}" y1="${CMP_PADT}" x2="${CMP_PADL}" y2="${h - CMP_PADB}"
+                  stroke="${c.muted}" stroke-width="1"/>`;
+    return out;
   }
 
   // ── interaction ────────────────────────────────────────────────────────────
@@ -9130,6 +9750,8 @@ const ArroData = (function () {
     drawOv();
     const stage = document.getElementById('ad-stage');
     if (stage && typeof ResizeObserver !== 'undefined') {
+      // The comparison panes size themselves off their own column, which the
+      // stage's width tracks, so one observer serves both.
       ad.ro = new ResizeObserver(() => { if (measure()) { draw(); drawOv(); } });
       ad.ro.observe(stage);
     }
@@ -9195,8 +9817,14 @@ const ArroData = (function () {
     renderMain();
   }
 
+  // The two range limits are the only settings where blank is itself a value —
+  // "no limit" — so they are kept as typed instead of being coerced to 0.
+  const AD_BLANKABLE = new Set(['rangeMin', 'rangeMax']);
+
   function setCfg(k, v) {
-    ad.cfg[k] = typeof v === 'boolean' ? v : (parseFloat(v) || 0);
+    ad.cfg[k] = typeof v === 'boolean' ? v
+      : AD_BLANKABLE.has(k) ? (isFinite(parseFloat(v)) ? parseFloat(v) : '')
+      : (parseFloat(v) || 0);
     for (const s of ad.series) { s.filt = null; s.tracks = null; }
     redraw(true);
   }
@@ -9213,6 +9841,13 @@ const ArroData = (function () {
   function setYRange(which, v) { if (which === 'min') ad.yMin = v; else ad.yMax = v; draw(); }
   function setFlag(k, v)   { ad[k] = v; renderMainOnly(); }
   function unpin()         { ad.pin = null; draw(); renderReadout(); }
+
+  // <details> reports its own state, so this only has to remember it across
+  // re-renders and draw the panes the first time they are actually on screen.
+  function compareToggle(el) {
+    ad.compare = !!el.open;
+    if (ad.compare) drawCompare(true);
+  }
 
   function renderMainOnly() {
     const main = document.querySelector('.ad-main');
@@ -9297,13 +9932,15 @@ const ArroData = (function () {
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
   }
 
-  function repaint() { draw(); drawOv(); }
+  // Called on a theme change, where every colour in both panes is now wrong —
+  // so the comparison redraws whether or not its inputs moved.
+  function repaint() { draw(); drawOv(); drawCompare(true); }
 
   return {
     ad, render, init, stop, repaint, importFiles, pick,
     toggle, setColor, setKind, solo, zoomTo, remove, clearAll, showStation,
     setCfg, resetCfg, setMode, setTransform, setChart, setY, setYRange, setFlag,
-    preset, unpin, exportCsv, exportImg,
+    preset, unpin, exportCsv, exportImg, explain, compareToggle,
     // exposed for reasoning about the filter outside the UI
     parseCsv, parseName, linkStation, guessKind, runFilter, walk357,
   };
@@ -10414,6 +11051,73 @@ function dlText(name, content) {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+// ── Modal shell ────────────────────────────────────────────────────────────────
+// One dialog, borrowed by whoever needs one: a title, arbitrary HTML, Esc or ×
+// to close, Tab kept inside it, and focus handed back to whatever opened it.
+//
+// The bug reporter has its own copy of this markup and keeps it. It is the one
+// thing people reach for when the app is already misbehaving, so it does not
+// get to depend on anything newer than itself.
+
+const Modal = (function () {
+  let lastFocus = null;
+
+  const root = () => document.getElementById('app-modal');
+  const isOpen = () => { const el = root(); return el && el.style.display !== 'none'; };
+
+  function open({ title, html, wide }) {
+    let el = root();
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'app-modal';
+      el.className = 'modal-overlay';
+      // Only the backdrop closes — a click that started inside the card and
+      // drifted out (selecting text, say) is not a request to close it.
+      el.onclick = ev => { if (ev.target === el) close(); };
+      document.body.appendChild(el);
+    }
+    lastFocus = document.activeElement;
+    el.innerHTML = `
+      <div class="modal-card${wide ? ' modal-card--wide' : ''}" role="dialog" aria-modal="true"
+           aria-labelledby="app-modal-title" tabindex="-1">
+        <div class="modal-head">
+          <h2 id="app-modal-title">${esc(title)}</h2>
+          <button class="modal-x" title="Close (Esc)" aria-label="Close" onclick="Modal.close()">×</button>
+        </div>
+        <div class="modal-body">${html}</div>
+      </div>`;
+    el.style.display = 'flex';
+    document.addEventListener('keydown', onKey, true);
+    el.querySelector('.modal-card')?.focus();
+  }
+
+  function onKey(e) {
+    if (!isOpen()) return;
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    // Tab cycles within the dialog. Without this it walks off into the page
+    // behind, which for a keyboard user is a dialog with no walls.
+    const items = [...root().querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])')]
+      .filter(n => n.offsetParent !== null);
+    if (!items.length) return;
+    const at = items.indexOf(document.activeElement);
+    if (e.shiftKey) { if (at <= 0) { e.preventDefault(); items[items.length - 1].focus(); } }
+    else if (at < 0 || at === items.length - 1) { e.preventDefault(); items[0].focus(); }
+  }
+
+  function close() {
+    const el = root();
+    if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+    document.removeEventListener('keydown', onKey, true);
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+    lastFocus = null;
+  }
+
+  return { open, close };
+})();
+if (typeof window !== 'undefined') window.Modal = Modal;
 
 // ── ACMA RRL interference layer ─────────────────────────────────────────────────
 // Renders licensed transmitters from the ACMA Register of Radiocommunications
