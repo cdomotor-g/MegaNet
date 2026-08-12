@@ -1,8 +1,9 @@
 # MegaNet tools
 
 Small command-line helpers that sit alongside the browser app. Unlike the app
-itself, these need Python (the ACMA tools are stdlib-only; the agent also
-needs a network connection and the `anthropic` package).
+itself, most of these need Python (the ACMA tools are stdlib-only; the agent also
+needs a network connection and the `anthropic` package). `check_ingest.sql` needs
+nothing but `psql`.
 
 ## `acma_prefilter.py` + `acma_fetch.py` — the ACMA RF interference pipeline
 
@@ -122,6 +123,31 @@ involved. `.github/workflows/stations-snapshot.yml` runs it weekly and opens a
 pull request; the Export tab has the same snapshot as a button.
 
 Standard library only.
+
+## `check_ingest.sql` — prove the telemetry contract
+
+Not Python: a psql script, so it runs anywhere the database does and needs
+nothing installed.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_ingest.sql
+```
+
+48 checks, one per line of #75's acceptance — deduplication counted rather than
+discarded, a batch with bad rows storing the good ones and reporting each bad one
+with a reason, unresolved addresses stored and backfilled later, satellite and
+cellular stations addressed by station number instead of an ALERT address,
+rollups reconciled against the readings they came from, and the readings ageing
+out while the rollups survive.
+
+It prints a row per check and exits non-zero if any failed, so it works from a
+workflow as well as by hand. The whole thing runs in a transaction and rolls back:
+nothing it writes survives, including the rollups and the retention watermark it
+moves, so it is safe against the live database. It has to be run as a role
+`meganet.is_editor()` says yes to — a direct psql connection, or the service key.
+
+Run it after applying `db/migrations/0006_telemetry.sql`, and again after touching
+anything in it.
 
 ## `meganet_agent.py` — ask questions about the network with the Claude API
 
