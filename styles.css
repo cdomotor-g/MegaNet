@@ -34,6 +34,11 @@
      its own tab names is worse than a wider one. */
   --mn-nav: 236px;
   --mn-nav-rail: 56px;
+  /* The help panel opposite it. Narrower than the nav expanded — it holds prose
+     at a readable measure, not a column of buttons — and narrower collapsed,
+     because its strip carries one control where the nav's carries fifteen. */
+  --mn-help: 300px;
+  --mn-help-rail: 44px;
   /* Search hits in the station table. Amber, to match the map's "matches
      filter" pin ring, so the same match reads the same way in both halves of
      the Stations tab. */
@@ -211,14 +216,16 @@ header p {
   background: rgba(255, 255, 255, .3);
 }
 
-#nav-backdrop {
+#nav-backdrop,
+#help-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1150;               /* under the drawer (1200), over everything else */
   background: rgba(8, 15, 24, .45);
 }
 
-#nav-backdrop[hidden] {
+#nav-backdrop[hidden],
+#help-backdrop[hidden] {
   display: none;
 }
 
@@ -2163,7 +2170,8 @@ hr {
 /* Collapsed: labels and headings are clipped rather than removed, so every
    button keeps its accessible name and the title attribute does the rest. */
 #tab-nav.collapsed .nav-label,
-#tab-nav.collapsed .nav-heading {
+#tab-nav.collapsed .nav-heading,
+#help-panel.collapsed .nav-label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -2239,6 +2247,235 @@ hr {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+}
+
+/* ── Help panel ─────────────────────────────────────────────────────────────
+   The right-hand counterpart to the nav rail — see issue #104 and README §20.
+   It borrows the nav's interaction contract on purpose (collapse to a strip and
+   never to nothing; --mn-help / 'mn-help' in localStorage; re-measure the maps
+   once the width transition has finished, not during it), and differs only
+   where a reference surface should:
+
+   * Collapsed is the default at every width, not just under 900 px.
+   * Under 560 px it becomes a drawer, as the nav does — but app.js closes one
+     when the other opens, so a phone never carries two.
+
+   The widths in between need no special case: the Stations tab already drops to
+   a single column at 1100 px, so nav + filter pane + help only ever hold width
+   together above that, where there is width to hold. --mn-help narrows once on
+   the way down all the same, so the map keeps a usable share of a 1200 px
+   laptop with everything open. */
+
+#help-panel {
+  flex: 0 0 auto;
+  width: var(--mn-help-rail, 44px);
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+}
+
+/* Expanded is the exception, because collapsed is the default the markup ships
+   with — the pre-JS paint then matches what app.js will almost always settle
+   on, and a stored "expanded" is applied before .help-ready allows the slide. */
+#help-panel:not(.collapsed) {
+  width: var(--mn-help, 300px);
+}
+
+#help-panel.help-ready {
+  transition: width .16s ease;
+}
+
+/* Stretches so the border runs the page's full height; only the contents stick,
+   and only as far as one screen. As .nav-inner. */
+.help-inner {
+  position: sticky;
+  top: 0;
+  max-height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: .5rem .4rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+}
+
+#help-panel .help-toggle {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  width: 100%;
+  margin-bottom: .35rem;
+  padding: .42rem .45rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .85rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+#help-panel .help-toggle:hover {
+  background: var(--subtle);
+  border-color: var(--border);
+}
+
+#help-panel.collapsed .help-toggle {
+  justify-content: center;
+  gap: 0;
+  padding-left: .2rem;
+  padding-right: .2rem;
+}
+
+/* Unlike the nav's labels, this is removed rather than clipped when collapsed.
+   A clipped label keeps a button's accessible name, which is why the nav does
+   it; several hundred words of prose left in the accessibility tree behind a
+   closed panel is not the same trade. */
+#help-panel.collapsed .help-body {
+  display: none;
+}
+
+.help-body {
+  padding: 0 .35rem;
+  font-size: .86rem;
+  line-height: 1.5;
+}
+
+.help-tab {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin: .1rem 0 .55rem;
+  font-size: .98rem;
+  line-height: 1.25;
+}
+
+.help-summary {
+  margin: 0;
+  color: var(--text);
+}
+
+.help-empty {
+  color: var(--muted);
+}
+
+.help-h {
+  margin: .95rem 0 .35rem;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.help-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+
+/* The prose lists read as prose and take a bullet; the "See also" list is a
+   column of buttons and would look punctured by one. */
+.help-list.help-bullets {
+  list-style: disc;
+  padding-left: 1.05rem;
+  gap: .45rem;
+}
+
+.help-body a {
+  color: var(--accent);
+}
+
+.help-link {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  width: 100%;
+  padding: .32rem .4rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: .84rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.help-link:hover {
+  background: var(--subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #help-panel.help-ready { transition: none; }
+}
+
+/* Everything open on a 1200 px laptop is 236 px of nav plus a 320 px filter pane
+   plus this; 300 px of help would leave the Stations map under a third of the
+   window. The panel gives up the width rather than the map. */
+@media (max-width: 1400px) {
+  :root { --mn-help: 260px; }
+}
+
+/* Past here the panel gives up its column, for the reason the nav gives up its
+   rail: 44 px of it is a ninth of a 390 px screen and the tables and maps need
+   it more. Expanded it becomes a drawer from the right, exactly as the nav's
+   becomes one from the left, and app.js closes whichever was open when the
+   other opens.
+
+   Collapsed is where the two part company. The nav could move its toggle into
+   the header because ☰ already had the slot on the left; there is no slot on
+   the right, and measuring a seventh header button at 390 px put the banner on
+   another row — 30 px of chrome, permanently, to save a control that only
+   matters when you go looking for it. So the strip stays visible and stops
+   taking layout width instead: a fixed tab on the screen edge. Either way the
+   main area never changes width, so no map needs re-measuring here. */
+@media (max-width: 560px) {
+  #help-panel,
+  #help-panel.collapsed,
+  #help-panel:not(.collapsed) {
+    width: 0;
+    border-left: 0;
+    overflow: visible;          /* both forms are fixed children of a 0-wide box */
+  }
+
+  /* The edge tab. Vertically centred to stay clear of Leaflet's zoom and layer
+     controls, which sit in the map's top corners, and below the backdrop's
+     1150 so the nav drawer dims it along with everything else. */
+  #help-panel.collapsed .help-inner {
+    position: fixed;
+    inset: 50% 0 auto auto;
+    transform: translateY(-50%);
+    max-height: none;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-right: 0;
+    border-radius: 10px 0 0 10px;
+    background: var(--panel);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .18);
+    z-index: 1100;
+  }
+
+  #help-panel.collapsed .help-toggle {
+    width: 2rem;
+    height: 2.9rem;
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  #help-panel:not(.collapsed) .help-inner {
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: min(var(--mn-help, 300px), 86vw);
+    max-height: none;
+    padding: .6rem .7rem 1.5rem;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    box-shadow: 0 0 24px rgba(0, 0, 0, .3);
+    z-index: 1200;
   }
 }
 

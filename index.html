@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
   <meta name="theme-color" content="#0b5cab">
-  <link rel="stylesheet" href="styles.css?v=20260812d">
+  <link rel="stylesheet" href="styles.css?v=20260812f">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -64,6 +64,11 @@
   <!-- Tapping the page behind the phone nav drawer closes it. Inert and
        invisible until #tab-nav is open. -->
   <div id="nav-backdrop" onclick="setNavCollapsed(true)" hidden></div>
+  <!-- The same, for the help drawer. Two backdrops rather than one shared
+       between them because only one drawer is ever open on a phone — app.js
+       closes whichever was open when the other opens — and a backdrop that has
+       to work out which one it is dismissing is a bug waiting to be written. -->
+  <div id="help-backdrop" onclick="setHelpCollapsed(true)" hidden></div>
 
   <div id="app-shell">
     <nav id="tab-nav" aria-label="Sections">
@@ -73,6 +78,20 @@
     <main id="main-content">
       <!-- rendered by app.js -->
     </main>
+
+    <!-- Starts collapsed in the markup so the paint before app.js runs matches
+         the default it will almost always settle on. A stored "expanded" is
+         applied by the first renderHelp(), before the width transition is
+         allowed — see .help-ready.
+
+         No header button pairs with this the way ☰ pairs with the nav: the
+         header had a slot on the left for ☰ and has none on the right, and a
+         seventh button there wrapped the banner onto another row on a phone.
+         Below 560 px the strip becomes a fixed tab on the screen edge instead
+         — still always present, but costing no layout width. See styles.css. -->
+    <aside id="help-panel" class="collapsed" aria-label="Help">
+      <!-- rendered by app.js -->
+    </aside>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -80,6 +99,6 @@
        change so browsers and GitHub Pages fetch the new file instead of a stale
        copy. -->
   <script src="maps-data.js?v=20260723a"></script>
-  <script src="app.js?v=20260812e"></script>
+  <script src="app.js?v=20260812f"></script>
 </body>
 </html>

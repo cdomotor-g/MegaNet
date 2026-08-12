@@ -1494,6 +1494,52 @@ summary says so rather than inventing one.
 > Fields and elements with no such evidence behind them are marked *constant only*
 > in the tab's own reference rather than guessed at.
 
+### 20. Help Panel (Contextual, Right-Hand)
+A right-hand rail that says what the open tab is for and what to watch out for
+on it. It exists because a real amount of explanation was already scattered
+through the app — the 357 filter modal, `docs/serial-help.html`, the ARRO id
+disambiguation copy in the station editor, the hints in the Stations filter pane
+— with no single surface a first-time user could open to find any of it.
+
+`HELP` in `app.js` is the single description of its content, keyed by the same
+tab ids `TABS` uses, and the panel is rendered from it the way the nav is
+rendered from `TABS`. Each entry carries a summary, optional *watch out for*
+lines, optional links to `docs/`, and the ids of related tabs — which is how the
+panel says out loud that Bit Flipper, ALERT Packets, ALERT2 and the Serial
+Monitor are one investigation approached four ways, and lets you walk between
+them.
+
+It borrows the nav's interaction contract on purpose (§14): it collapses to a
+strip rather than to nothing, keeps its state in `localStorage` under `mn-help`
+beside `mn-nav` / `mn-theme` / `mn-split`, and re-measures every Leaflet map
+once its width transition has finished rather than during it. Three places it
+deliberately differs, because a reference surface is not a navigation one:
+
+- **It starts collapsed at every width**, not just under 900 px. The nav is used
+  on every interaction and earns its column; this is read once and closed. A
+  stored preference always wins, as it does for the nav.
+- **Under 560 px it becomes a drawer, and the two are mutually exclusive.**
+  Opening either closes the other, so a 390 px screen is never asked to hold two
+  drawers at once.
+- **Its phone toggle stays on the panel, not in the header.** The nav could move
+  ☰ into the header because the header already had a slot on the left. There is
+  none on the right, and a seventh header button measured 30 px taller at 390 px
+  — a permanent cost to the banner for a control that only matters when you go
+  looking for it. So the strip becomes a fixed tab on the screen edge instead:
+  still always present, costing no layout width.
+
+The widths in between need no special case. The Stations tab already drops to a
+single column at 1100 px (§4), so the nav, the filter pane and this panel only
+hold width together above that — where there is width to hold. `--mn-help`
+narrows from 300 px to 260 px below 1400 px all the same, so the map keeps a
+usable share of a laptop with everything open.
+
+What the panel *says* is deliberately a separate job from the shell it says it
+in — see issue #105, which finishes the per-tab content, adds visual
+walkthroughs where a picture beats a sentence, and decides case by case which of
+the existing embedded explanations should move into the panel rather than be
+linked from it.
+
 ---
 
 ## Deployment Plan

@@ -40,6 +40,172 @@ const TABS = [
 // reporter) and don't want to know how the nav happens to be grouped.
 const TAB_LIST = TABS.flatMap(g => g.tabs);
 
+// What the help panel says, keyed by the same tab ids TABS uses. Kept beside
+// TABS rather than folded into it: TABS is the nav's description and reads as
+// one screen of icons and labels, which prose would bury.
+//
+// Every field is optional but `summary`, and the renderer omits the heading for
+// anything absent — so this can be filled in a tab at a time.
+//
+//   summary  a sentence or two: what this tab is for
+//   watch    the things found out the hard way otherwise
+//   related  other tab ids, for the "one investigation, four ways" groupings
+//   links    { label, href } out to docs/ — href through docUrl()
+//
+// `summary` and `watch` are authored HTML, not user input: they are written
+// here and nowhere else, so they may carry <code>, <strong> and links, and the
+// renderer deliberately does not escape them. Anything read from stations.json
+// or typed by a user must not be interpolated into them.
+//
+// Issue #105 owns finishing this — the "watch out for" lines beyond the three
+// the README already names as traps, the visual walkthroughs, and the decision
+// about which existing embedded help moves in here versus stays where it is.
+const HELP = {
+  stations: {
+    summary: 'The station list and the map, side by side. The <strong>Filters</strong> pane on the '
+           + 'left drives both at once, and is built from whatever <code>stations.json</code> holds '
+           + '— every option carries the number of stations behind it, and nothing is offered that '
+           + 'no station uses. Draw, measure and terrain tools sit under the map.',
+    watch: [
+      '<strong>Kill spaghetti</strong> caps how long a signal link may be before it stops being '
+      + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
+      + 'cannot may simply be past the <em>Max TX distance</em> slider; the sidebar says how many '
+      + 'links were drawn and how many were culled, so check that before concluding the path '
+      + 'isn\'t there.',
+      '<strong>Include related repeaters</strong> widens the match itself rather than the drawing: '
+      + 'repeaters whose pass ranges cover a matched station are pulled in even though they don\'t '
+      + 'match the filter text. That is why the station count can exceed the number of rows your '
+      + 'search would explain.',
+    ],
+    related: ['passranges', 'maps'],
+  },
+
+  maps: {
+    summary: 'Browses the bundled Radio-path PDF maps by region, and suggests the relevant map for '
+           + 'a given station. The Queensland basin drawing is clickable — pick a basin, or a '
+           + 'region chip, to filter the list down to it.',
+    related: ['stations'],
+  },
+
+  networks: {
+    summary: 'The named radio-network clusters in the loaded file — usually named after their '
+           + 'primary repeater or ingest point — with the repeater and field-station counts behind '
+           + 'each one. Ticking networks here is what scopes the Export tab.',
+    related: ['export'],
+  },
+
+  passranges: {
+    summary: 'Which repeaters have a pass range covering a station\'s AlertIDs, and the hop chain '
+           + 'that follows: field → repeater(s) → base. Stations no repeater covers are flagged as '
+           + 'orphans, and AlertIDs that fall between every window are flagged as gaps.',
+    related: ['stations', 'bitflipper'],
+  },
+
+  rf: {
+    summary: 'Licensed transmitters near each repeater that could be stepping on it, read out of '
+           + 'the ACMA register. Pick a repeater and the candidates are ranked against it.',
+    related: ['rfchanges', 'workbench'],
+  },
+
+  rfchanges: {
+    summary: 'What changed on the air, and when, from the same ACMA register. Use it to line a '
+           + 'station going bad up against something new appearing near it.',
+    watch: [
+      'Register dates are <strong>administrative</strong>. An authorisation date is an upper bound '
+      + 'on when a transmitter could have come on air, not the day it did — licences are often '
+      + 'authorised well before anything is switched on.',
+    ],
+    related: ['rf', 'workbench'],
+  },
+
+  workbench: {
+    summary: 'Works one interference case end to end. Name the affected stations and the analysis, '
+           + 'the candidate transmitters and a suggested next check are assembled around them.',
+    related: ['rf', 'rfchanges'],
+  },
+
+  bitflipper: {
+    summary: 'What else could this ALERT address have been? Flips one bit up to N bits of a decimal '
+           + 'address and cross-references every variant against the station file, live as you type.',
+    watch: [
+      'Flipping more bits is combinatorial — <code>C(16, N)</code> variants. Past two or three bits '
+      + 'the useful view is <em>show only matched addresses</em>; the render cap is there to stop '
+      + 'the table, not to tell you the search finished.',
+    ],
+    related: ['network', 'packets', 'passranges'],
+  },
+
+  network: {
+    summary: 'The Bit Flipper\'s question asked of the whole file at once: ALERT addresses are '
+           + 'nodes, a ghosting relationship between two of them is an edge, and the answer is '
+           + 'drawn as a force layout with a geographical map beside it.',
+    related: ['bitflipper', 'stations'],
+  },
+
+  packets: {
+    summary: 'Decodes and encodes ALERT / ERTS messages against the Bureau\'s <em>ERTS Data '
+           + 'Formats</em> specification. Paste a 40-bit framed message, a 32-bit payload or eight '
+           + 'hex digits and it is tried against every known format, with check bits and CRC '
+           + 'validated and framing polarity detected.',
+    related: ['bitflipper', 'alert2', 'serial'],
+  },
+
+  alert2: {
+    summary: 'Decodes what an ELPRO ERT-A2 puts on its serial ports. The unit emits two different '
+           + 'things on two different ports and they do not carry the same information, so the tab '
+           + 'sniffs which of the two it has been handed rather than asking.',
+    watch: [
+      'Rainfall in millimetres is <code>raw × mm per tip</code>. A station\'s recorded '
+      + '<code>TBRGbucketSize</code> wins where there is one, and the per-capture <em>mm per '
+      + 'tip</em> box (0.2 by default) is the fallback everywhere else — which today is '
+      + 'everywhere, since no station carries a recorded bucket size yet. The rule beside each '
+      + 'converted value says which of the two it used; a millimetre figure headed for a report '
+      + 'should be read with that.',
+    ],
+    related: ['serial', 'packets'],
+  },
+
+  serial: {
+    summary: 'Streams live output from serial devices over the browser\'s Web Serial API — as many '
+           + 'ports at once as the machine has, each an independent card with its own settings.',
+    watch: [
+      'Web Serial is a Chromium-only API, and it is refused outright on a page that is not '
+      + 'HTTPS or localhost. A managed browser can also have it switched off by policy, in which '
+      + 'case nothing on this tab will work until IT changes that — the linked page is written to '
+      + 'be forwarded to them.',
+    ],
+    links: [{ label: 'Serial Monitor — what to ask IT for', href: 'docs/serial-help.html' }],
+    related: ['alert2', 'packets'],
+  },
+
+  arro: {
+    summary: 'Opens a station\'s page in ARRO (Contrail), where its telemetry actually lives. '
+           + 'Search by name or number, or paste a raw id if you already have one.',
+    watch: [
+      'The two ids are not the same number. ARRO only accepts <code>site.db_id</code>, an arbitrary '
+      + 'database index; <code>site.number</code> is the BoM station number. Handing ARRO the '
+      + 'station number is the most common mistake here, and it fails by opening somebody else\'s '
+      + 'station rather than by erroring.',
+    ],
+    related: ['arrodata', 'stations'],
+  },
+
+  arrodata: {
+    summary: 'Reads ARRO\'s per-sensor CSV exports in the browser, links each one back to its '
+           + 'station, runs the Bureau\'s 3-5-7 continuity filter over it and plots the result with '
+           + 'a chart built for finding noise rather than presenting a trend. Nothing is uploaded — '
+           + 'files are read in the tab and stay there.',
+    related: ['arro', 'stations'],
+  },
+
+  export: {
+    summary: 'Builds the full set of CSV files Radio Mobile needs, scoped to the networks ticked in '
+           + 'the sidebar. The station file itself can also be exported here as the escape hatch '
+           + 'from the database.',
+    related: ['networks'],
+  },
+};
+
 // Matches the width transition in styles.css. Measuring a map mid-slide is
 // worse than not measuring it at all, so the invalidate that follows a collapse
 // waits the transition out rather than racing it.
@@ -49,6 +215,11 @@ const NAV_TRANSITION_MS = 160;
 // already gives a permanent column to its resizable filter pane, and on a
 // laptop a second permanent column is one too many.
 const NAV_AUTO_COLLAPSE_PX = 900;
+
+// The help panel's own width transition, and it plays exactly the role
+// NAV_TRANSITION_MS does: the maps are re-measured once the slide has finished
+// rather than part-way through it. Kept in step with styles.css.
+const HELP_TRANSITION_MS = 160;
 
 const ROLE_COLOR = {
   field:    '#107c10',
@@ -365,6 +536,14 @@ const state = {
   // width decides, so a first visit on a laptop isn't handed two sidebars.
   navCollapsed:   (localStorage.getItem('mn-nav')
                    || (window.innerWidth < NAV_AUTO_COLLAPSE_PX ? 'collapsed' : 'expanded')) === 'collapsed',
+  // Right-hand help panel: a strip, or a strip plus what it has to say about
+  // the open tab. Kept under 'mn-help', in the same family as the three above.
+  // Deliberately *not* given the nav's width test: it starts collapsed at every
+  // width, because a reference surface that opens itself on every load is one
+  // people learn to close rather than read, and because it is the third column
+  // on a page that already budgets carefully for two. A stored preference wins,
+  // exactly as it does for the nav.
+  helpCollapsed:  (localStorage.getItem('mn-help') || 'collapsed') === 'collapsed',
   // Draw & measure overlay (Stations map). Plain geometry only — the Leaflet
   // layers are rebuilt from it whenever the map is, so a tab switch doesn't
   // throw the sketch away. Deliberately not persisted: see MapDraw.
@@ -1272,22 +1451,29 @@ if (typeof window !== 'undefined') window.Auth = Auth;
   setHeaderLabel('btn-theme', state.theme === 'dark' ? 'Light' : 'Dark');
   setSplitWidth(state.splitW);          // also clamps whatever was stored
   renderTabs();
+  renderHelp();
   renderMain();
-  // The header's height and the nav's shape both depend on the width, so both
-  // are re-checked when it changes — crossing the phone breakpoint with the
-  // drawer open would otherwise leave the backdrop behind.
+  // The header's height and the shape of both rails depend on the width, so all
+  // three are re-checked when it changes — crossing the phone breakpoint with a
+  // drawer open would otherwise leave its backdrop behind.
   window.addEventListener('resize', () => {
     updateChromeHeight();
     syncNavChrome(state.navCollapsed);
+    syncHelpChrome(state.helpCollapsed);
   });
-  // Crossing the phone breakpoint changes what the nav *is* — a rail or a
-  // drawer — and so what its toggle should say. Re-rendered on the crossing
-  // itself rather than on every resize event: the nav is rebuilt wholesale.
-  window.matchMedia('(max-width: 560px)').addEventListener('change', renderTabs);
-  // On a phone the nav is a drawer laid over the page, and a drawer that only
-  // closes by picking a tab is a trap — Escape backs out of it too.
+  // Crossing the phone breakpoint changes what the two rails *are* — columns or
+  // drawers — and so what their toggles should say. Re-rendered on the crossing
+  // itself rather than on every resize event: both are rebuilt wholesale.
+  window.matchMedia('(max-width: 560px)').addEventListener('change', () => {
+    renderTabs();
+    renderHelp();
+  });
+  // On a phone both rails are drawers laid over the page, and a drawer that
+  // only closes by picking a tab is a trap — Escape backs out of either.
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !state.navCollapsed && isPhoneNav()) setNavCollapsed(true);
+    if (e.key !== 'Escape' || !isPhoneNav()) return;
+    if (!state.navCollapsed)  setNavCollapsed(true);
+    if (!state.helpCollapsed) setHelpCollapsed(true);
   });
   MemMeter.start();
   // Before autoLoad(), so that a tab returning from a magic link has taken the
@@ -2108,7 +2294,16 @@ function switchTab(id) {
     state.navCollapsed = true;
     localStorage.setItem('mn-nav', 'collapsed');
   }
+  // Same errand, same ending: the help drawer's "See also" links switch tabs,
+  // and a drawer left over the tab you were sent to is in the way. The panel
+  // itself stays open above the breakpoint, where it is a column and not a
+  // drawer — it is meant to be read alongside the tab it describes.
+  if (!state.helpCollapsed && isPhoneNav()) {
+    state.helpCollapsed = true;
+    localStorage.setItem('mn-help', 'collapsed');
+  }
   renderTabs();
+  renderHelp();
   renderMain();
 }
 
@@ -2140,6 +2335,12 @@ function toggleNav() {
 function setNavCollapsed(collapsed) {
   state.navCollapsed = !!collapsed;
   localStorage.setItem('mn-nav', state.navCollapsed ? 'collapsed' : 'expanded');
+  // The other half of the one-drawer-at-a-time rule — see setHelpCollapsed().
+  if (!state.navCollapsed && isPhoneNav() && !state.helpCollapsed) {
+    state.helpCollapsed = true;
+    localStorage.setItem('mn-help', 'collapsed');
+    renderHelp();
+  }
   renderTabs();
   // The nav just took a column from the main area, or gave one back. Leaflet
   // only watches the window, so a map left unmeasured renders grey tiles and
@@ -2164,6 +2365,156 @@ function invalidateMapSizes(delay) {
       if (m) { try { m.invalidateSize(); } catch (_) {} }
     });
   }, delay || 0);
+}
+
+// ── Help panel ────────────────────────────────────────────────────────────────
+// A right-hand rail carrying whatever HELP has to say about the open tab. It
+// borrows the left nav's interaction contract wholesale (#47 / README §14): it
+// collapses to a strip rather than to nothing, it remembers which it was, and
+// it re-measures the maps after the width transition instead of during it.
+//
+// Where it deliberately differs, and why — a reference surface is not a
+// navigation one, and this is the third column on a page that already budgets
+// for two:
+//
+//  * It starts collapsed at every width (see state.helpCollapsed), not just
+//    under 900 px the way the nav does.
+//  * Under 560 px, where the nav leaves the layout and opens as a drawer, this
+//    does the same — but the two are mutually exclusive. Opening either closes
+//    the other, so a 390 px screen is never asked to hold two drawers at once.
+//  * The nav's phone answer was to move its toggle into the header, which works
+//    because ☰ already had the slot on the left. There is no matching slot on
+//    the right, and a seventh header button cost the banner a whole extra row
+//    at 390 px. So the strip stays — it just stops taking a column and becomes
+//    a fixed tab on the screen edge instead, which is what "collapses to a
+//    strip, never to nothing" was supposed to mean anyway.
+//
+// Above 560 px both are ordinary columns and may be open together: the Stations
+// tab drops to a single column at 1100 px, so the only widths where nav + filter
+// pane + help all take width at once are the ones with width to give.
+
+// Where a help link into docs/ should point. Markdown served off GitHub Pages
+// is a download rather than a page, so .md goes to GitHub's renderer while
+// anything already HTML is served from the site itself. Derived from the raw
+// URL the loader already carries, so the owner/repo is written once.
+function docUrl(path) {
+  if (!/\.md$/i.test(path)) return path;
+  return GITHUB_RAW_URL.replace('https://raw.githubusercontent.com/', 'https://github.com/')
+                       .replace(/\/main\/.*$/, '/blob/main/') + path;
+}
+
+// The one piece of chrome that lives outside #help-panel and has to agree with
+// it: the backdrop that dismisses the phone drawer. (The nav needs syncNavChrome
+// to keep the header's ☰ in step as well; this panel keeps its only toggle
+// inside itself at every width, so there is nothing else to sync.)
+function syncHelpChrome(collapsed) {
+  const backdrop = document.getElementById('help-backdrop');
+  if (backdrop) backdrop.hidden = collapsed || !isPhoneNav();
+}
+
+function toggleHelp() {
+  setHelpCollapsed(!state.helpCollapsed);
+}
+
+function setHelpCollapsed(collapsed) {
+  state.helpCollapsed = !!collapsed;
+  localStorage.setItem('mn-help', state.helpCollapsed ? 'collapsed' : 'expanded');
+  // One drawer at a time on a phone. Written out here rather than by calling
+  // setNavCollapsed(), which would call straight back into this one.
+  if (!state.helpCollapsed && isPhoneNav() && !state.navCollapsed) {
+    state.navCollapsed = true;
+    localStorage.setItem('mn-nav', 'collapsed');
+    renderTabs();
+  }
+  renderHelp();
+  // The panel just took a column from the main area or gave one back, and
+  // Leaflet only watches the window — the same trap the nav documents. Not on a
+  // phone, where the drawer floats and the main area never moves.
+  if (!isPhoneNav()) invalidateMapSizes(HELP_TRANSITION_MS + 40);
+  // Focus follows the button through the re-render, or a keyboard collapse
+  // drops the user back at the top of the page. One target at every width: the
+  // toggle is inside the panel whether the panel is a column, a strip or an
+  // edge tab.
+  const btn = document.querySelector('#help-panel .help-toggle');
+  if (btn) btn.focus();
+}
+
+function renderHelp() {
+  const panel = document.getElementById('help-panel');
+  if (!panel) return;
+  const collapsed = state.helpCollapsed;
+  panel.classList.toggle('collapsed', collapsed);
+  syncHelpChrome(collapsed);
+
+  // Same reason renderTabs() does this — a map built on the opening render must
+  // not measure itself against a rail that is still sliding. The class is its
+  // own flag and survives every re-render.
+  if (!panel.classList.contains('help-ready')) {
+    void panel.offsetWidth;
+    panel.classList.add('help-ready');
+  }
+
+  const toggle = collapsed
+    ? { icon: '?', label: 'Help',  title: 'Open help for this tab' }
+    : isPhoneNav()
+      ? { icon: '✕', label: 'Close', title: 'Close help' }
+      : { icon: '»', label: 'Hide',  title: 'Collapse help' };
+
+  const tab = TAB_LIST.find(t => t.id === state.activeTab);
+  const h   = HELP[state.activeTab];
+
+  // HELP's prose is authored in this file and may carry markup, so it is not
+  // escaped — see the note on HELP. Everything drawn from TABS is escaped the
+  // same way renderTabs() escapes it.
+  const section = (heading, body) => body ? `<h3 class="help-h">${heading}</h3>${body}` : '';
+
+  const watch = h && h.watch && h.watch.length
+    ? `<ul class="help-list help-bullets">${h.watch.map(w => `<li>${w}</li>`).join('')}</ul>`
+    : '';
+
+  const related = h && h.related && h.related.length
+    ? `<ul class="help-list">${h.related.map(id => {
+        const r = TAB_LIST.find(t => t.id === id);
+        return r ? `<li>
+          <button class="help-link" onclick="switchTab('${r.id}')" title="Go to ${esc(r.label)}">
+            <span class="nav-icon" aria-hidden="true">${r.icon}</span>
+            <span>${esc(r.label)}</span>
+          </button></li>` : '';
+      }).join('')}</ul>`
+    : '';
+
+  const links = h && h.links && h.links.length
+    ? `<ul class="help-list help-bullets">${h.links.map(l =>
+        `<li><a href="${esc(docUrl(l.href))}" target="_blank" rel="noopener">${esc(l.label)}</a></li>`
+      ).join('')}</ul>`
+    : '';
+
+  // A tab with no HELP entry says so rather than rendering an empty panel — the
+  // panel is always present, so an empty one reads as broken rather than as
+  // unwritten.
+  const body = h
+    ? `<p class="help-summary">${h.summary}</p>
+       ${section('Watch out for', watch)}
+       ${section('See also', related)}
+       ${section('Read more', links)}`
+    : `<p class="help-summary help-empty">Nothing written for this tab yet.</p>`;
+
+  panel.innerHTML = `
+    <div class="help-inner">
+      <button class="help-toggle" onclick="toggleHelp()" aria-controls="help-panel"
+              aria-expanded="${collapsed ? 'false' : 'true'}"
+              title="${toggle.title}">
+        <span class="nav-icon" aria-hidden="true">${toggle.icon}</span>
+        <span class="nav-label">${toggle.label}</span>
+      </button>
+      <div class="help-body">
+        <h2 class="help-tab">
+          <span class="nav-icon" aria-hidden="true">${tab ? tab.icon : '❔'}</span>
+          <span>${esc(tab ? tab.label : 'Help')}</span>
+        </h2>
+        ${body}
+      </div>
+    </div>`;
 }
 
 // Up and down walk the tabs, ignoring the group headings — the list reads as
