@@ -63,6 +63,13 @@ deliberately no `alter default privileges` for the `meganet` schema, because a
 blanket default hands `anon` the *next* table the moment it is created — exactly
 the accident the rule above exists to prevent.
 
+**A function that writes has its EXECUTE revoked from `public`, in the same
+file.** Postgres grants EXECUTE on every new function to `PUBLIC` by default,
+which is the same shape of quiet, expensive mistake as a table created without
+RLS — and there is no event trigger watching for this one either. Any function
+that changes data is followed by `revoke all on function … from public` and an
+explicit grant to the roles that should have it.
+
 **Forward-only.** Once a migration has been applied anywhere it is never edited,
 only followed by the next number. There are no down migrations: undoing something
 is a new numbered file that says what it undoes.
@@ -104,6 +111,8 @@ its cache at all (`PGRST002`).
 | `meganet.doc_meta` | The document's `meta` header. Exactly one row, enforced. |
 | `meganet.stations_json` | View: the whole `stations.json` document, rebuilt. `security_invoker`, so RLS on the base tables applies. |
 | `meganet.stations_doc()` | The same document as a `stable` function, so `GET /rest/v1/rpc/stations_doc` returns it as the response body rather than wrapped in `{"doc": …}`. This is what the app calls. |
+| `meganet.load_stations_doc(jsonb)` | The reverse: makes the tables match a document. Idempotent. `EXECUTE` revoked from `public`. |
+| `meganet.load_stations_from_url(text)` | Fetches `stations.json` over HTTP and hands it to the above. Defaults to the copy on `main`. Needs the `http` extension; says so plainly if it is missing. |
 
 Everything is readable by `anon` and writable by nobody holding the anon key —
 there is deliberately no insert/update/delete policy on any of it. The write path
@@ -124,10 +133,29 @@ arithmetic in the database, so the usual reason to prefer float does not apply.
 
 ### Loading the station list
 
-`tools/import_stations_json.py` emits SQL that syncs the schema to
-`stations.json` — upserting every row in the file and deleting every row that is
-not in it. It is idempotent down to `updated_at`: a second run over the same file
-changes nothing and restamps nothing.
+Two roads, same destination — both end at `meganet.load_stations_doc()`, both are
+a *sync* rather than an append (every row in the document upserted, every row not
+in it deleted), and both are idempotent down to `updated_at`: a second run over
+the same document changes nothing and restamps nothing.
+
+**From the SQL editor, with nothing installed.** The database fetches
+`stations.json` from the repo itself, so the 3.5 MB never goes near a browser:
+
+```sql
+select meganet.load_stations_from_url();
+```
+
+That needs the `http` extension. If it is not enabled the function says so and
+gives you the line that fixes it:
+
+```sql
+create extension if not exists http with schema extensions;
+```
+
+**From a workstation with the repo.** `tools/import_stations_json.py` emits the
+same sync as plain SQL — no database connection of its own, so you can read it
+before you run it. This is also the path for a database that cannot reach
+`raw.githubusercontent.com`, which is the one inside the corporate network:
 
 ```sh
 python3 tools/import_stations_json.py \

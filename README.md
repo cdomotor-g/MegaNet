@@ -144,6 +144,22 @@ Every key, every array element and every value, compared against `stations.json`
 — including the difference between a key that is absent and one that is present
 and null, which the app tests for. See `db/migrations/0002_stations.sql`.
 
+### Getting the data in
+
+The database can load itself from the repo — one line in the Supabase SQL editor,
+with nothing installed locally:
+
+```sql
+select meganet.load_stations_from_url();
+```
+
+It fetches `stations.json` from `main` and syncs the tables to it, so the 3.5 MB
+never passes through the browser. Re-runnable: it is the way to reload a snapshot
+into any database, and running it twice changes nothing.
+
+`tools/import_stations_json.py` does the same job as plain SQL for a database
+that cannot reach GitHub. Both go through `meganet.load_stations_doc()`.
+
 ### Cost of the full document
 
 Measured against Postgres 16 with the whole list loaded — 3,174 stations, 8,815
