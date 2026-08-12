@@ -179,12 +179,19 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 1;
+const DB_SCHEMA_VERSION = 2;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 function dbHostLabel() {
   try { return new URL(DB_URL).host; } catch (_) { return DB_URL; }
 }
+
+// Round-trip timing, for the Data source panel and the load path. Defined up
+// here with the rest of the datastore's furniture rather than next to dbPing()
+// nine thousand lines below, because init() runs autoLoad() while this file is
+// still being evaluated — a `const` further down is in its temporal dead zone at
+// that point, and the first load of the app would throw before drawing anything.
+const _dbClock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
 // ── Station filter vocabulary ─────────────────────────────────────────────────
 // The grouped filters on the Stations tab (role, sensor type, radio network,
@@ -391,6 +398,14 @@ const state = {
   // panel so that re-rendering the Export tab — which every checkbox on it does
   // — redraws the last result instead of firing another request.
   dbStatus:       null,
+  // Where the station list on screen actually came from — see loadJson(). Null
+  // until something loads. The one failure this exists to prevent is the quiet
+  // one: a fallback to yesterday's committed file, looking exactly like the
+  // database, with nobody told.
+  dataSource:     null,
+  // Why the datastore was not used, when it was not. Kept after a fallback so
+  // the Export tab can say what went wrong rather than only that something did.
+  loadError:      null,
   bfInput:        '',
   bfBits:         '1',
   bfOnlyMatches:  false,
@@ -779,13 +794,23 @@ function toggleTheme() {
 
 const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/cdomotor-g/MegaNet/main/stations.json';
 
+// Where a station list can come from, worst-to-best-understood. The label is
+// what the operator reads in the header and on the Export tab; being able to
+// answer "is this the database or a file?" at a glance is the whole point.
+const SOURCE_LABELS = {
+  api:     'the datastore',
+  bundled: 'stations.json (this site)',
+  github:  'stations.json (GitHub)',
+  file:    'a file on this device',
+};
+
 function onFileLoad(input) {
   const f = input.files[0];
   if (!f) return;
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      loadJson(e.target.result);
+      loadJson(e.target.result, { kind: 'file', detail: f.name });
     } catch (err) {
       alert(`Failed to load stations.json: ${err.message}`);
     }
@@ -794,41 +819,135 @@ function onFileLoad(input) {
   input.value = '';
 }
 
-async function loadFromUrl(url) {
+// Returns true when the load succeeded. `announce` is what separates a button
+// press — where silence would be baffling — from a step in the automatic
+// fallback chain, where an alert for each source that did not answer would be
+// three dialogs before the app has drawn anything.
+async function loadFromUrl(url, { kind = 'github', announce = true } = {}) {
   const btn = document.getElementById('btn-load-gh');
-  if (btn) btn.disabled = true;
-  setHeaderLabel('btn-load-gh', 'Loading…');
+  if (announce && btn) btn.disabled = true;
+  if (announce) setHeaderLabel('btn-load-gh', 'Loading…');
+  const t0 = _dbClock();
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    loadJson(await res.text());
+    const text = await res.text();
+    applyStationDoc(text, { kind, ms: Math.round(_dbClock() - t0) });
   } catch (err) {
-    alert(`Failed to load from URL: ${err.message}`);
+    if (announce) alert(`Failed to load from URL: ${err.message}`);
+    state.loadError = `${SOURCE_LABELS[kind] || url}: ${err && err.message || err}`;
+    return false;
   } finally {
-    if (btn) btn.disabled = false;
-    setHeaderLabel('btn-load-gh', 'Load from GitHub');
+    if (announce && btn) btn.disabled = false;
+    if (announce) setHeaderLabel('btn-load-gh', 'Load from GitHub');
   }
+  // Outside the catch on purpose: the data has landed, so this call succeeded.
+  // A failure in here is a rendering bug and belongs in the console as one.
+  renderAfterLoad();
+  return true;
 }
 
 function loadFromGitHub() {
-  loadFromUrl(GITHUB_RAW_URL);
+  loadFromUrl(GITHUB_RAW_URL, { kind: 'github' });
 }
 
-async function autoLoad() {
-  // When served from a web server (e.g. GitHub Pages), auto-fetch stations.json
-  // from the same origin. Skips in file:// context (no server, no CORS headers).
-  if (location.protocol === 'file:') return;
+// The station list out of Postgres, assembled by meganet.stations_doc() into the
+// exact document this app has always parsed — see db/migrations/0002_stations.sql
+// and tools/check_stations_doc.py, which is what makes "exact" a checked claim
+// rather than a hopeful one. Nothing downstream of loadJson() knows the
+// difference, which is the design: the API returns the file's shape, so the
+// other ~17,000 lines never had to care.
+//
+// It is an RPC rather than a select on the view because PostgREST returns a
+// scalar function's result as the response body itself. Selecting the view would
+// wrap it as {"doc": …} and cost a 2.3 MB parse-and-restringify in the browser
+// purely to unwrap it.
+//
+// Compression is not negotiated here on purpose: Accept-Encoding is a forbidden
+// header name, so fetch() will not let this code set it. Every browser sends it
+// anyway and PostgREST honours it, so the document arrives gzipped without
+// anyone asking — roughly 2.3 MB becoming a few hundred KB.
+async function loadFromApi({ announce = true } = {}) {
+  const t0 = _dbClock();
   try {
-    const res = await fetch('stations.json');
-    if (!res.ok) return;
-    loadJson(await res.text());
-  } catch (_) {}
+    const res = await fetch(`${DB_URL}/rpc/stations_doc`, {
+      headers: {
+        apikey: DB_ANON_KEY,
+        'Accept-Profile': DB_SCHEMA,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (body && body.message) detail = body.message;
+      } catch (_) { /* not JSON; the status line stands */ }
+      throw new Error(detail);
+    }
+    const text = await res.text();
+    applyStationDoc(text, { kind: 'api', ms: Math.round(_dbClock() - t0) });
+  } catch (err) {
+    // Same rejection for DNS failure, CORS refusal, no network, and a project
+    // paused for inactivity — the browser deliberately does not distinguish
+    // them. Record what is known and let the caller fall back.
+    state.loadError = `the datastore: ${err && err.message || err}`;
+    if (announce) alert(`Failed to load from the datastore: ${err && err.message || err}`);
+    return false;
+  }
+  renderAfterLoad();
+  return true;
 }
 
-function loadJson(text) {
+// The datastore first, then the file — in that order, and saying which one won.
+//
+// The fallback is not defensive padding. A free-tier Supabase project pauses
+// after about a week of inactivity, and a paused project *fails* the read rather
+// than slowing it down; MegaNet is exactly the burst-shaped tool that gets
+// paused. Falling back to the committed stations.json turns that from "no data"
+// into "yesterday's data" — which is only acceptable because the header then
+// says so rather than letting a stale file pass for the database.
+async function autoLoad() {
+  if (await loadFromApi({ announce: false })) return;
+
+  // The copy committed next to the app. Same file as GitHub raw, one less hop,
+  // and it is what this app loaded from before there was a datastore. No such
+  // thing over file://, where there is no server to ask.
+  if (location.protocol !== 'file:'
+      && await loadFromUrl('stations.json', { kind: 'bundled', announce: false })) return;
+
+  await loadFromUrl(GITHUB_RAW_URL, { kind: 'github', announce: false });
+}
+
+// Loading and drawing are deliberately two functions, and the seam between them
+// is where "did this work?" gets decided.
+//
+// Everything here can fail only because the *document* is bad. Drawing it is a
+// separate step that can fail for its own reasons — a tab with a bug in it, a
+// map library that did not load — and those must not be reported as the source
+// having failed. Folded together, a render that threw would send the loader down
+// its fallback chain: replacing the database's data with an older file, blaming
+// the datastore for a fault in the browser, and then throwing again on the way
+// back out. The data being in hand is the success condition.
+function applyStationDoc(text, source) {
   const data = JSON.parse(text);
   if (!Array.isArray(data.stations)) throw new Error('Missing "stations" array');
   state.data       = data;
+  state.dataSource = {
+    kind:  (source && source.kind) || 'file',
+    detail: source && source.detail,
+    ms:    source && source.ms,
+    at:    new Date(),
+    // The document's own date, which is the one that answers "how old is this
+    // data?" — as opposed to `at`, which only says when it was fetched. A file
+    // from GitHub is fresh and its contents may be a month old.
+    dated: (data.meta && data.meta.updated) || null,
+  };
+  // Cleared on success: whatever failed on the way to here has been superseded
+  // by something that worked, and a stale error under a good load reads as a
+  // current problem.
+  if (source && source.kind === 'api') state.loadError = null;
   state.memBytes.stationsJson = text.length;
   state.exportNets = null;
   state.filterOpts  = null;         // option lists and the search corpus are
@@ -839,17 +958,51 @@ function loadJson(text) {
   resetStationFilters();
   state.selectedId = null;
   state.mapSelection.clear();       // the picked ids belonged to the old file
+}
+
+// Draw whatever was just loaded. Kept separate from applyStationDoc() — see the
+// note there — and called after it in every path.
+function renderAfterLoad() {
   updateHeaderStats();
   MemMeter.render();
   renderTabs();
   renderMain();
 }
 
+// Parse-and-draw, as it always was. onFileLoad() and anything outside this file
+// still get one call that does the whole job.
+function loadJson(text, source) {
+  applyStationDoc(text, source);
+  renderAfterLoad();
+}
+
 function updateHeaderStats() {
   const el = document.getElementById('hdr-stats');
   if (!el || !state.data) return;
   const s = state.data.stations;
-  el.textContent = `${s.length} stations · ${s.filter(x => x.roles.includes('repeater')).length} repeaters`;
+  const src = state.dataSource;
+  // The source rides along with the counts because this line is on screen on
+  // every tab. "3174 stations · 88 repeaters" is identical whether it came from
+  // the database or from a file committed a month ago, and telling those apart
+  // should not require opening a tab and pressing a button.
+  const from = src ? ` · from ${SOURCE_LABELS[src.kind] || src.kind}` : '';
+  el.textContent =
+    `${s.length} stations · ${s.filter(x => x.roles.includes('repeater')).length} repeaters${from}`;
+  el.title = src ? dataSourceSummary() : '';
+}
+
+// One line of plain English about the loaded document: where it came from, when
+// it was fetched, and the date the data itself carries. That last one is the
+// number that matters — a file fetched a second ago can hold month-old data.
+function dataSourceSummary() {
+  const src = state.dataSource;
+  if (!src) return 'Nothing loaded yet.';
+  const bits = [`Loaded from ${SOURCE_LABELS[src.kind] || src.kind}`];
+  if (src.detail) bits.push(src.detail);
+  if (src.ms != null) bits.push(`${src.ms} ms`);
+  bits.push(`at ${src.at.toLocaleTimeString()}`);
+  if (src.dated) bits.push(`data dated ${src.dated}`);
+  return bits.join(' · ');
 }
 
 // ── Data helpers ───────────────────────────────────────────────────────────────
@@ -10250,8 +10403,6 @@ if (typeof window !== 'undefined') window.ArroData = ArroData;
 // so "is the datastore reachable from a browser, and is it the shape this app
 // expects" has an answer on screen rather than in somebody's head.
 
-const _dbClock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
-
 // Reads meganet.app_meta.schema_version. Returns a result object rather than
 // throwing, because every caller wants to render the failure, not catch it:
 //   { ok:true,  ms, version }
@@ -10314,16 +10465,60 @@ function dbRepaintStatus() {
   if (el) el.innerHTML = renderDbStatusHtml();
 }
 
+// What is loaded, as opposed to what is reachable. These are different questions
+// and conflating them is how a stale file passes for the database: the
+// connection can be perfectly healthy while the station list on screen came from
+// a file, because the fallback ran before the project woke up.
+function renderLoadedSourceHtml() {
+  const src = state.dataSource;
+  if (!src) return '';
+
+  const live = src.kind === 'api';
+  const colour = live ? 'var(--ok)' : 'var(--warn)';
+  const bits = [];
+  if (src.ms != null) bits.push(`${src.ms} ms`);
+  if (src.dated) bits.push(`data dated ${esc(src.dated)}`);
+  bits.push(`loaded ${src.at.toLocaleTimeString()}`);
+
+  return `
+    <div style="margin-bottom:.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--line)">
+      <div style="color:${colour}">
+        <strong>Showing ${esc(SOURCE_LABELS[src.kind] || src.kind)}</strong>
+      </div>
+      <div class="small" style="margin-top:.25rem">${bits.join(' · ')}</div>
+      ${!live && state.loadError
+        ? `<div class="small" style="margin-top:.25rem;color:var(--warn)">
+             fell back — ${esc(state.loadError)}
+           </div>`
+        : ''}
+      ${!live
+        ? `<button onclick="reloadFromDatastore()" style="padding:.25rem .5rem;font-size:.8rem;margin-top:.4rem">
+             Load from the datastore
+           </button>`
+        : ''}
+    </div>`;
+}
+
+// Retry the datastore by hand after a fallback — the obvious thing to want when
+// the panel has just told you it is showing a file. Announces its failure,
+// unlike the automatic attempt: this one was asked for.
+async function reloadFromDatastore() {
+  if (await loadFromApi({ announce: true })) dbCheck();
+  else dbRepaintStatus();
+}
+
 function renderDbStatusHtml() {
   const s = state.dbStatus;
+  const loaded = renderLoadedSourceHtml();
   const host = `<div class="small" style="margin-top:.35rem">${esc(dbHostLabel())}</div>`;
 
   if (!s || s.checking) {
-    return `<div class="small">Checking…</div>${host}`;
+    return `${loaded}<div class="small">Checking…</div>${host}`;
   }
 
   if (!s.ok) {
     return `
+      ${loaded}
       <div style="color:var(--bad)"><strong>Not connected</strong></div>
       <div class="small" style="margin-top:.25rem;color:var(--bad)">${esc(s.error)}</div>
       ${host}`;
@@ -10394,9 +10589,11 @@ function renderExportHtml() {
           </div>
         </div>
 
-        <!-- Nothing on this tab reads from the datastore yet. The panel is here
-             because it is the one place in the app that talks to it at all, and
-             a connection nobody can see the state of is one that fails silently. -->
+        <!-- The station list itself now comes from the datastore, so this panel
+             answers two questions rather than one: what is on screen, and
+             whether the database is reachable. They can disagree — a healthy
+             connection under a station list that fell back to a file is exactly
+             the case worth being able to see. -->
         <div class="panel">
           <div class="panel-header">
             <h3>Data source</h3>

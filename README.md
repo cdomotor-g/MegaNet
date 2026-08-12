@@ -25,13 +25,19 @@ The consolidation to a single-page app is done: the live tool is **`index.html`*
 (loads `styles.css`, `maps-data.js`, `app.js`) backed by the one **`stations.json`**
 data file. Everything else is organised into folders so the root stays clean.
 
+The station list now lives in Postgres as well, and that is where the app reads
+it from by default — `stations.json` is the export, the offline fallback, and
+still the schema this document describes. The database returns *the same
+document*, so nothing below changes: see
+[**Where the station list comes from**](#where-the-station-list-comes-from).
+
 ```
 MegaNet/
 ├── index.html              ← single entry point
 ├── app.js                  ← all application logic
 ├── maps-data.js            ← Network Maps catalogue, QLD basin SVG + georeference
 ├── styles.css              ← theme and layout
-├── stations.json           ← single source of truth (see schema below)
+├── stations.json           ← the document schema (see below); export + offline fallback
 ├── migrate.html            ← legacy-CSV → stations.json converter (linked from the app)
 ├── .nojekyll               ← serve every file verbatim on GitHub Pages
 │
@@ -97,9 +103,74 @@ MegaNet/
 
 ---
 
+## Where the station list comes from
+
+The app tries three sources, in order, and **says on screen which one it used** —
+the counts in the header are followed by `· from the datastore` or
+`· from stations.json (GitHub)`, and the Export tab's **Data source** panel gives
+the detail: round-trip time, the date the data itself carries, and — after a
+fallback — what went wrong and a button to retry the database.
+
+| | Source | When |
+| --- | --- | --- |
+| 1 | **The datastore** — `GET /rest/v1/rpc/stations_doc` | Always tried first |
+| 2 | **`stations.json` from this site** | The datastore did not answer |
+| 3 | **`stations.json` from GitHub raw** | Neither of the above (e.g. the app is served from somewhere without the file) |
+
+**Load stations.json from this device** is untouched and always available. Working
+from a laptop with no network is a real part of this job.
+
+The fallback is not padding. A free-tier Supabase project pauses after about a
+week of inactivity, and a paused project *fails* the read rather than slowing it
+down — MegaNet is exactly the burst-shaped tool that gets paused. Falling back
+turns that into "yesterday's data" instead of "no data", which is only acceptable
+because the header then says so.
+
+### It is the same document either way
+
+`meganet.stations_doc()` returns the JSON described below — not tables, not a
+different shape. Everything downstream of `loadJson()` in `app.js` is unchanged
+and cannot tell the difference, which is the entire design: the database is
+normalised properly, and a view reassembles the document the app already parses.
+
+That claim is checked rather than asserted:
+
+```bash
+psql "$MEGANET_DB_URL" -tAc 'select doc from meganet.stations_json' > /tmp/doc.json
+python3 tools/check_stations_doc.py /tmp/doc.json
+```
+
+Every key, every array element and every value, compared against `stations.json`
+— including the difference between a key that is absent and one that is present
+and null, which the app tests for. See `db/migrations/0002_stations.sql`.
+
+### Cost of the full document
+
+Measured against Postgres 16 with the whole list loaded — 3,174 stations, 8,815
+sensors, 88 repeaters:
+
+| | |
+| --- | --- |
+| Building the document in Postgres | ~200 ms warm, ~500 ms cold |
+| Over the wire, gzipped | **273 KB** (PostgREST compresses; the file is 294 KB gzipped) |
+| Uncompressed | 2.3 MB, against the file's 3.5 MB — the same data without the indenting |
+
+So the 3.6 MB the ticket worried about does not materialise: compressed, the
+database's document is *smaller* than the committed file. The ~200 ms of database
+time per page load is the real cost, and if that ever bites, a materialised view
+refreshed on write is the fix — worth knowing before the write path lands.
+
+#40's conclusion still holds: the JSON is not the bottleneck, rendering is.
+
+---
+
 ## Data Schema — `stations.json`
 
 Each entry in the `stations` array represents one node in the network. A node can simultaneously be a field station, a repeater, and/or a base station — the `roles` array defines its capabilities.
+
+> This is also the shape the database returns. The tables behind it are
+> normalised (`meganet.station`, `meganet.sensor`, `meganet.repeater`,
+> `meganet.pass_range`, …); the document below is what the view rebuilds.
 
 ### Top-level structure
 
