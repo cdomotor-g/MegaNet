@@ -1,0 +1,45 @@
+# aclfile — one station, one credential, one topic prefix.
+#
+# The rule this file exists to enforce: **a station can publish as itself and as
+# nothing else.** Without it, one logger's credentials — sitting in a box on a
+# pole, reachable by anyone with a screwdriver and a serial cable — can publish
+# readings for every site in the network, and MegaNet will store them, because
+# the bridge trusts what the broker delivers. Per-station credentials with no
+# ACL are per-station credentials in name only.
+#
+# Same reasoning as #B5's per-station HTTP tokens, and the same shape: the
+# credential names the station, the scope is a prefix, and revoking one station
+# never touches another.
+#
+# Managed brokers express this in their own console rather than in a file —
+# HiveMQ Cloud and EMQX both have per-credential topic permissions — but the
+# rules are the same three lines. Write them there.
+
+# ── The bridge ───────────────────────────────────────────────────────────────
+# Reads everything under the scheme, writes nothing. A bridge that can publish
+# is a bridge that can fabricate a reading, and it has no reason to.
+user meganet-bridge
+topic read meganet/v1/#
+
+# ── A station ────────────────────────────────────────────────────────────────
+# One block per station, generated rather than hand-written once there are more
+# than a handful of them:
+#
+#   for id in $(psql -tAc "select id from meganet.station where enabled"); do
+#     printf 'user station-%s\ntopic write meganet/v1/%s/#\n\n' "$id" "$id"
+#   done > /etc/mosquitto/aclfile
+#
+# `write`, not `readwrite`: a logger has nothing to read here. If a future
+# ticket adds commands to stations — a request to re-send yesterday, a
+# configuration change — that is a second topic branch and a second, explicit
+# `topic read` line, not a widening of this one.
+user station-loudoun_br_al
+topic write meganet/v1/loudoun_br_al/#
+
+user station-abercorn_al
+topic write meganet/v1/abercorn_al/#
+
+# ── Nothing else ─────────────────────────────────────────────────────────────
+# Mosquitto denies by default once an ACL file is in place, so there is no
+# catch-all to remove. $SYS is left unreadable on purpose: broker internals are
+# not a station's business, and the bridge does not read them either.

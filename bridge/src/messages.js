@@ -1,0 +1,170 @@
+// messages.js — Turning a received MQTT payload into something the ingest
+// contract accepts, and deciding which failures are the message's fault.
+//
+// The validation here is deliberately thin. #B4 built one validator, in SQL, and
+// a second one in this process with its own opinion about what a timestamp is
+// would be exactly the drift that having a single ingest contract was meant to
+// prevent. So the bridge checks only what it must to build a well-formed request
+// — is this JSON, is it the right *shape*, is it a sane size — and lets
+// meganet.ingest() judge every reading on its merits. A reading this process
+// waved through and the database rejected comes back in `rejected` with a reason,
+// which is a better outcome than one this process rejected on its own authority
+// and nobody can see.
+//
+// The one distinction that matters here is **poison versus unlucky**:
+//
+//   - Poison: this payload will never be accepted, however many times it is
+//     redelivered. Not JSON, not a readings shape, too big. Acked and counted,
+//     because a message that cannot succeed must not be retried forever — that
+//     is a bridge that never makes progress, and the broker's queue grows behind
+//     it until the station's messages start being dropped.
+//   - Unlucky: the payload is fine and *we* failed — the database was down, the
+//     network dropped. Not acked, so the broker redelivers.
+//
+// Getting that backwards in either direction is a data-loss bug, so it is one
+// decision made in one place rather than an `if` in the middle of the client.
+
+// The database refuses a batch over 1,000 (0007) — matching it here means a
+// station gets a clear answer from the bridge rather than a 400 relayed back to
+// nobody, since MQTT has no reply channel.
+const MAX_READINGS = 1000;
+// 256 KiB. Larger than any plausible batch of 1,000 readings and small enough
+// that a device with a stuck loop cannot make the bridge hold a megabyte per
+// unacked message.
+const MAX_BYTES = 256 * 1024;
+
+class PoisonMessage extends Error {
+  constructor(why) {
+    super(why);
+    this.name = 'PoisonMessage';
+    this.poison = true;
+  }
+}
+
+/**
+ * Parse a reading-topic payload into an array of reading objects.
+ *
+ * Accepts the same three shapes `meganet.ingest()` does — a single reading, an
+ * array, or an object with a `readings` array — because a logger author reading
+ * docs/ingest-http.md should not have to discover that MQTT is different.
+ *
+ * Throws PoisonMessage for anything that will never be storable.
+ */
+function parseReadings(payload) {
+  if (payload == null || payload.length === 0) {
+    throw new PoisonMessage('empty payload');
+  }
+  if (payload.length > MAX_BYTES) {
+    throw new PoisonMessage(`payload is ${payload.length} bytes, over the ${MAX_BYTES}-byte limit`);
+  }
+
+  let body;
+  try {
+    body = JSON.parse(payload.toString('utf8'));
+  } catch (err) {
+    throw new PoisonMessage(`not JSON: ${err.message}`);
+  }
+
+  let readings;
+  if (Array.isArray(body)) {
+    readings = body;
+  } else if (body && typeof body === 'object') {
+    readings = Array.isArray(body.readings) ? body.readings : [body];
+  } else {
+    throw new PoisonMessage(`expected an object or an array, got ${typeof body}`);
+  }
+
+  if (readings.length === 0) {
+    throw new PoisonMessage('no readings in the payload');
+  }
+  if (readings.length > MAX_READINGS) {
+    throw new PoisonMessage(
+      `batch of ${readings.length} exceeds the ${MAX_READINGS}-reading limit`,
+    );
+  }
+  for (const r of readings) {
+    if (!r || typeof r !== 'object' || Array.isArray(r)) {
+      throw new PoisonMessage('every reading must be an object');
+    }
+  }
+
+  // If the payload was an envelope, its keys other than `readings` are the
+  // batch defaults ingest() already understands (`path`, `protocol`,
+  // `received_at`). They are carried through untouched — the bridge has no
+  // opinion about them.
+  const envelope = !Array.isArray(body) && Array.isArray(body.readings)
+    ? omit(body, 'readings')
+    : {};
+
+  return { readings, envelope };
+}
+
+/**
+ * Parse a status-topic payload into what meganet.mqtt_status() wants.
+ *
+ * A station's status message says at minimum whether it is up; anything else it
+ * chooses to send — battery, firmware, signal — is kept verbatim in
+ * `station_status.last_status`, so a logger can start reporting a new field
+ * without a migration or a bridge release.
+ *
+ * An empty payload is how a broker clears a retained message. It means "forget
+ * what I said", not "the station is down", and it is not an error.
+ */
+function parseStatus(station, payload) {
+  if (payload == null || payload.length === 0) {
+    return { cleared: true };
+  }
+  if (payload.length > MAX_BYTES) {
+    throw new PoisonMessage(`status payload is ${payload.length} bytes, over the limit`);
+  }
+
+  const text = payload.toString('utf8').trim();
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = text;
+  }
+
+  // A logger with three lines of firmware publishes `online` or `offline` as
+  // plain text, or a bare 1/0, and refusing that would be pedantry: the LWT is
+  // the single most useful thing MQTT gives this project and it should be as
+  // easy to send as the firmware allows.
+  if (typeof body === 'boolean') body = { online: body };
+  else if (typeof body === 'number') body = { online: body !== 0 };
+  else if (typeof body === 'string') {
+    const word = body.trim().toLowerCase();
+    if (word === 'online' || word === 'up') body = { online: true };
+    else if (word === 'offline' || word === 'down') body = { online: false };
+    else throw new PoisonMessage(`status is neither JSON nor online/offline: ${truncate(text, 40)}`);
+  }
+
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new PoisonMessage('status must be an object');
+  }
+
+  // Absent `online` means the station said something about itself without
+  // claiming to be down — which is only ever published by a station that is, at
+  // that moment, connected.
+  const online = typeof body.online === 'boolean' ? body.online : true;
+
+  return {
+    cleared: false,
+    station,
+    online,
+    at: typeof body.at === 'string' || typeof body.at === 'number' ? body.at : undefined,
+    status: omit(body, 'online', 'at'),
+  };
+}
+
+function omit(obj, ...keys) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) if (!keys.includes(k)) out[k] = v;
+  return out;
+}
+
+function truncate(text, n) {
+  return text.length <= n ? text : `${text.slice(0, n)}…`;
+}
+
+module.exports = { MAX_READINGS, MAX_BYTES, PoisonMessage, parseReadings, parseStatus };

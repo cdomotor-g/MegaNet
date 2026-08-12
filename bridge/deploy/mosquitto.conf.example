@@ -1,0 +1,50 @@
+# mosquitto.conf — a starting point for the self-hosted case.
+#
+# The recommendation for the pilot is a managed free tier (see
+# docs/ingest-mqtt.md, "The broker"), because the bridge has to exist either way
+# and running one process beats running two. This file is here for the other
+# case: the network moves inside a corporate boundary and the broker comes with
+# it. Brokers are the easy part to run on-prem, which is why choosing a managed
+# one now creates no lock-in.
+#
+#   /etc/mosquitto/mosquitto.conf, with the ACL in mosquitto.acl.example.
+
+# ── Nothing anonymous, ever ──────────────────────────────────────────────────
+# A broker with anonymous access is a broker anybody can publish readings to,
+# and MegaNet would store them: the bridge trusts what the broker delivers.
+allow_anonymous false
+password_file /etc/mosquitto/passwd
+acl_file /etc/mosquitto/aclfile
+
+# ── TLS ──────────────────────────────────────────────────────────────────────
+# 8883 only. The plain 1883 listener is deliberately absent: the credentials
+# below travel in the CONNECT packet, in clear text, on a listener without TLS.
+listener 8883
+certfile /etc/letsencrypt/live/broker.example/fullchain.pem
+keyfile  /etc/letsencrypt/live/broker.example/privkey.pem
+# TLS 1.2 is the floor. Some field loggers cannot do 1.3 yet; none of them
+# should be doing 1.0.
+tls_version tlsv1.2
+
+# ── Sessions ─────────────────────────────────────────────────────────────────
+# The bridge connects with clean_session false, which is what makes "no acked
+# message is lost" true across a bridge restart. These two decide how much of a
+# backlog the broker will hold on its behalf.
+persistence true
+persistence_location /var/lib/mosquitto/
+# How long a disconnected session's queue is kept. A day is a bridge that can be
+# down overnight without losing a reading; raise it if the host is less reliable
+# than that, and watch the disk if you do.
+persistent_client_expiration 1d
+max_queued_messages 100000
+
+# ── Limits ───────────────────────────────────────────────────────────────────
+# A reading batch is under 256 KiB by the bridge's own rule; this stops a device
+# with a stuck loop from making the broker hold megabytes per message.
+message_size_limit 262144
+max_keepalive 300
+
+log_dest stderr
+log_type warning
+log_type error
+connection_messages true

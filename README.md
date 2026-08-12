@@ -55,6 +55,7 @@ MegaNet/
 │   ├── datastore-decision.md               (why Postgres on Supabase, and where)
 │   ├── access.md                           (who gets in, who may edit, and recovery)
 │   ├── ingest-http.md                      (posting readings from a field station — #B5)
+│   ├── ingest-mqtt.md                      (topic scheme, broker choice, station credentials — #B6)
 │   ├── floodwarning-net.md                 (moving the domain to MegaNet — runbook)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
@@ -64,6 +65,13 @@ MegaNet/
 ├── db/                     ← the datastore's schema, as plain SQL
 │   ├── README.md                           (how to apply, and the rules — read first)
 │   └── migrations/                         (numbered, forward-only, run with psql)
+│
+├── bridge/                 ← the MQTT → MegaNet subscriber (#B6; Node, one dependency)
+│   ├── README.md                           (running it, its config, and what its logs mean)
+│   ├── index.js, src/                      (topics, payload rules, batching + acking, health)
+│   ├── test/                               (npm test — unit, plus a real broker end to end)
+│   ├── deploy/                             (mosquitto.conf + ACL examples for the self-hosted case)
+│   └── tools/publish-sample.js             (a test client, for proving the path from a laptop)
 │
 ├── data/                   ← source + bundled data files
 │   ├── ALL_UNITS.csv                 (legacy field-station source for migrate.html)
@@ -87,6 +95,7 @@ MegaNet/
 │
 ├── tools/                  ← command-line helpers (needs Python; see tools/README.md)
 │   ├── check_ingest.sql     (psql: prove the telemetry contract — 48 checks, rolls back)
+│   ├── check_mqtt.sql       (psql: prove the MQTT bridge's database half — 39 checks)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
 │   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
@@ -334,6 +343,41 @@ A field station can push its own readings without an editor session, via
 is written for whoever is configuring the logger, with the curl that works, the
 payload shape, and how to mint and revoke a token. `db/migrations/0007_ingest_http.sql`
 is the database side.
+
+### Posting readings over MQTT, and knowing which stations went quiet
+
+Same reading object, same contract, one broker in between:
+
+```
+meganet/v1/<station>/<device>/reading      QoS 1
+meganet/v1/<station>/status                retained, and the Last Will topic
+```
+
+**Postgres cannot subscribe to MQTT**, and Supabase does not host a broker, so
+this is the first piece of MegaNet that needs a process running somewhere
+permanently: [`bridge/`](bridge/README.md), a small Node subscriber that
+validates what arrives and posts it to the same `ingest_http()` endpoint an HTTP
+logger uses. It holds a device token and no service key, and it acknowledges
+nothing to the broker until the database has stored it — so a bridge that dies
+mid-flight costs a redelivery, not a reading.
+
+The reason to bother, beyond the readings: a station's **retained status and Last
+Will** give station-offline detection for free, with no polling and one field in
+the logger's CONNECT packet. "Which sites stopped talking overnight" becomes a
+query:
+
+```sql
+select station_key, station_name, online, round(minutes_since_seen) as quiet_for
+  from meganet.station_health
+ where minutes_since_seen > 180 order by minutes_since_seen desc;
+```
+
+[`docs/ingest-mqtt.md`](docs/ingest-mqtt.md) is the page for whoever is
+configuring a logger or choosing a broker — the topic scheme and why it is shaped
+that way, per-station credentials and ACLs, and how to prove the whole path from
+a laptop. [`bridge/README.md`](bridge/README.md) is for whoever runs the process;
+`db/migrations/0008_mqtt_bridge.sql` and `tools/check_mqtt.sql` are the database
+side.
 
 ---
 
