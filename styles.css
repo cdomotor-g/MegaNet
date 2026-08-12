@@ -3255,6 +3255,15 @@ code {
   height: 100%;
 }
 
+/* Direction markers on confirmed links (see refreshNvMap). A plain divIcon
+   with no leaflet-div-icon class already drops Leaflet's default white box —
+   this just keeps it from swallowing pointer events the pins and lines under
+   it want. */
+.nv-map-arrow {
+  pointer-events: none;
+  line-height: 0;
+}
+
 .nv-stage svg {
   display: block;
   width: 100%;

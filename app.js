@@ -425,6 +425,7 @@ const state = {
   nvMap:          null,
   nvMapMarkers:   [],
   nvMapLines:     [],
+  nvMapArrows:    [],   // direction markers on confirmed links — see refreshNvMap
   prFilter:       '',      // Pass Ranges tab: station number / AlertID / name filter
   // ARRO launcher. `search` drives the station lookup, `siteId`/`deviceId` are
   // the ids actually opened — a search result writes into them rather than
@@ -7768,6 +7769,7 @@ const NetworkView = (function () {
     if (state.nvMap) { state.nvMap.remove(); state.nvMap = null; }
     state.nvMapMarkers = [];
     state.nvMapLines   = [];
+    state.nvMapArrows  = [];
   }
 
   // Redrawn whenever refresh(true) rebuilds the graph's own visible set — not on
@@ -7779,8 +7781,10 @@ const NetworkView = (function () {
     if (!map || !state.data) return;
     state.nvMapMarkers.forEach(m => m.remove());
     state.nvMapLines.forEach(l => l.remove());
+    state.nvMapArrows.forEach(a => a.remove());
     state.nvMapMarkers = [];
     state.nvMapLines   = [];
+    state.nvMapArrows  = [];
 
     const V = nv.vis || computeVisible();
 
@@ -7820,6 +7824,34 @@ const NetworkView = (function () {
         dashArray: e.confirmed ? null : '4,3',
       }).addTo(map);
       state.nvMapLines.push(line);
+
+      // Direction only exists for confirmed relationships — a computed one-bit
+      // pair has none to show. One arrowhead per recorded candidate → target
+      // direction (two, opposite ways, for a genuinely reciprocal pair), dropped
+      // at the midpoint so it reads against the line rather than hiding behind
+      // a pin at either end.
+      if (!e.confirmed) continue;
+      const seen = new Set();
+      for (const dir of e.dirs) {
+        const fromS = byId.get(dir.from.stationId), toS = byId.get(dir.to.stationId);
+        if (!fromS || !toS || fromS.id === toS.id) continue;
+        const dk = fromS.id + '>' + toS.id;
+        if (seen.has(dk)) continue;
+        seen.add(dk);
+        const brg = bearingDeg(fromS.lat, fromS.lon, toS.lat, toS.lon);
+        const mid = [(fromS.lat + toS.lat) / 2, (fromS.lon + toS.lon) / 2];
+        const arrow = L.marker(mid, {
+          icon: L.divIcon({
+            className: 'nv-map-arrow',
+            html: `<svg width="14" height="14" viewBox="0 0 14 14" style="transform:rotate(${(brg - 90).toFixed(1)}deg)"><path d="M1,1 L13,7 L1,13 Z" fill="${lineColor}"/></svg>`,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+          }),
+          interactive: false,
+          keyboard: false,
+        }).addTo(map);
+        state.nvMapArrows.push(arrow);
+      }
     }
 
     for (const s of stations) {
@@ -8269,6 +8301,7 @@ const NetworkView = (function () {
           <div class="panel nv-map" id="nv-map-wrap">
             <div class="nv-top">
               <span class="nv-pill" id="nv-map-note"></span>
+              <span class="nv-pill nv-pill--quiet">Arrows point candidate → target</span>
             </div>
             <div id="nv-map-canvas"></div>
           </div>
