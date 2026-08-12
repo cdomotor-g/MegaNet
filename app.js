@@ -426,6 +426,7 @@ const state = {
   nvMapMarkers:   [],
   nvMapLines:     [],
   nvMapArrows:    [],   // direction markers on confirmed links — see refreshNvMap
+  nvMapRepeaters: [],   // pass-range repeater pins + their lines — see refreshNvMap
   prFilter:       '',      // Pass Ranges tab: station number / AlertID / name filter
   // ARRO launcher. `search` drives the station lookup, `siteId`/`deviceId` are
   // the ids actually opened — a search result writes into them rather than
@@ -6742,6 +6743,15 @@ const NetworkView = (function () {
     'Repeater':    '#7c35a3',
   };
 
+  // The map's third relationship (see visibleRepeaterInfo): a repeater whose
+  // pass ranges carry an address in view, drawn as a diamond joined by a dotted
+  // line. Deliberately not ROLE_COLOR.repeater (already a *station* colour on
+  // this same map, for a repeater that is itself a graph node) and not
+  // --map-line or the computed-edge grey (both already mean "this is an edge
+  // of the ghosting graph"). A colour and a shape neither of those uses, so a
+  // pass-range line can't be misread as a relationship the graph is claiming.
+  const NV_REPEATER_COLOR = '#0d9488';
+
   // Categorical palette for every other facet value. Chosen to stay legible on
   // both themes — the graph background follows --panel, which flips.
   const NV_PALETTE = [
@@ -7744,6 +7754,72 @@ const NetworkView = (function () {
       + '.', 6000);
   }
 
+  // ── repeaters open to the visible stations ──────────────────────────────────
+  // A third relationship, alongside the graph's computed and confirmed edges:
+  // which repeaters' pass ranges carry an address currently in view (the same
+  // passRangeCoversId test the Bit Flipper and Pass Ranges tabs use). It has
+  // nothing to do with bit-adjacency or observed ghosting — a repeater here is
+  // a candidate carrier for a station in view, not a party to any edge on this
+  // graph. One lookup feeds both the card below the graph and the map overlay,
+  // so the two are provably listing the same set (same reasoning as nv.vis
+  // feeding both the graph and refreshNvMap).
+  function visibleRepeaterInfo() {
+    const info = new Map(); // repeater id → { station, stations:Set(station), addrs:Set(number) }
+    if (!state.data) return info;
+    const V = nv.vis;
+    if (!V) return info;
+    const stationsById = new Map(state.data.stations.map(s => [s.id, s]));
+    const seen = new Set();
+    for (const n of V.nodes) {
+      if (!n.stationId || seen.has(n.stationId)) continue;
+      seen.add(n.stationId);
+      const s = stationsById.get(n.stationId);
+      if (!s) continue;
+      for (const r of findRepeaterMatches(s)) {
+        if (!info.has(r.id)) info.set(r.id, { station: r, stations: new Set(), addrs: new Set() });
+        const rec = info.get(r.id);
+        rec.stations.add(s);
+        stationAlertIds(s).forEach(id => { if (passRangeCoversId(r.repeater, id)) rec.addrs.add(id); });
+      }
+    }
+    return info;
+  }
+
+  function repeatersHtml() {
+    const info = [...visibleRepeaterInfo().values()]
+      .sort((a, b) => a.station.name.localeCompare(b.station.name));
+    if (!info.length) {
+      return `<p class="small" style="color:var(--muted)">
+        No repeater's pass ranges cover an ALERT address currently in view.
+      </p>`;
+    }
+    return `
+      <div class="table-wrap medium">
+        <table>
+          <thead><tr><th>Repeater</th><th>Open to (in view)</th><th>Addresses carried</th></tr></thead>
+          <tbody>
+            ${info.map(({ station: r, stations, addrs }) => {
+              const served = [...stations].sort((a, b) => a.name.localeCompare(b.name));
+              return `
+              <tr onclick="goToStation('${escAttr(r.id)}')" style="cursor:pointer"
+                  title="Open ${escAttr(r.name)} on the Stations tab">
+                <td>${esc(r.name)}</td>
+                <td class="small">${served.map(s => esc(s.name)).join(', ')}</td>
+                <td class="small">${[...addrs].sort((a, b) => a - b).join(', ')}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // Called wherever nv.vis changes — see updateChrome, which every path that
+  // rebuilds the visible set already runs through.
+  function updateRepeaterCard() {
+    const el = document.getElementById('nv-repeaters');
+    if (el) el.innerHTML = repeatersHtml();
+  }
+
   // ── the map panel ────────────────────────────────────────────────────────────
   // A second, geographic view of the same visible set the graph is drawing, side
   // by side with it. It reads nv.vis rather than re-querying state.data, so the
@@ -7767,9 +7843,10 @@ const NetworkView = (function () {
   // every init() (so a stale instance never leaks behind a fresh one).
   function stopNvMap() {
     if (state.nvMap) { state.nvMap.remove(); state.nvMap = null; }
-    state.nvMapMarkers = [];
-    state.nvMapLines   = [];
-    state.nvMapArrows  = [];
+    state.nvMapMarkers   = [];
+    state.nvMapLines     = [];
+    state.nvMapArrows    = [];
+    state.nvMapRepeaters = [];
   }
 
   // Redrawn whenever refresh(true) rebuilds the graph's own visible set — not on
@@ -7782,9 +7859,11 @@ const NetworkView = (function () {
     state.nvMapMarkers.forEach(m => m.remove());
     state.nvMapLines.forEach(l => l.remove());
     state.nvMapArrows.forEach(a => a.remove());
-    state.nvMapMarkers = [];
-    state.nvMapLines   = [];
-    state.nvMapArrows  = [];
+    state.nvMapRepeaters.forEach(x => x.remove());
+    state.nvMapMarkers   = [];
+    state.nvMapLines     = [];
+    state.nvMapArrows    = [];
+    state.nvMapRepeaters = [];
 
     const V = nv.vis || computeVisible();
 
@@ -7854,6 +7933,57 @@ const NetworkView = (function () {
       }
     }
 
+    // Repeaters open to the stations in view, by pass range (see
+    // visibleRepeaterInfo) — not a ghosting relationship, so drawn with a
+    // colour and a shape neither edge style above uses: a diamond joined by a
+    // fine dotted line, rather than the solid/dashed lines that mean "this is
+    // an edge of the graph". Drawn before the station pins below so a station
+    // circle always ends up on top of a repeater diamond sharing its spot.
+    const repeaterCoords = [];
+    for (const { station: r, stations: served } of visibleRepeaterInfo().values()) {
+      if (r.lat == null || r.lon == null) continue;
+      const servedLocated = [...served].filter(s => located.has(s.id));
+      if (!servedLocated.length) continue;
+      repeaterCoords.push([r.lat, r.lon]);
+
+      // Only pin the repeater itself if it is not already on the map as one of
+      // the stations in view — a repeater that is itself a graph node keeps its
+      // one pin rather than getting a second, different-shaped one on top of it.
+      if (!located.has(r.id)) {
+        const marker = L.marker([r.lat, r.lon], {
+          icon: L.divIcon({
+            className: 'nv-repeater-pin',
+            html: `<span style="background:${NV_REPEATER_COLOR}"></span>`,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+          }),
+        }).addTo(map);
+        marker.bindTooltip(`${esc(r.name)} — pass-range coverage, not a link`, {
+          direction: 'top', offset: [0, -8],
+        });
+        marker.bindPopup(`
+          <strong>${esc(r.name)}</strong>
+          <span style="background:${NV_REPEATER_COLOR};color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem;margin-left:4px">pass range</span>
+          <br><span style="font-size:.82rem;margin-top:4px;display:block">
+            Open to ${servedLocated.map(s => esc(s.name)).join(', ')} by pass range —
+            not a ghosting relationship.
+          </span>
+        `);
+        marker.on('click', () => goToStation(r.id));
+        state.nvMapRepeaters.push(marker);
+      }
+
+      for (const s of servedLocated) {
+        const line = L.polyline([[r.lat, r.lon], [s.lat, s.lon]], {
+          color:     NV_REPEATER_COLOR,
+          weight:    1.4,
+          opacity:   0.55,
+          dashArray: '1,6',
+        }).addTo(map);
+        state.nvMapRepeaters.push(line);
+      }
+    }
+
     for (const s of stations) {
       const role  = primaryRole(s);
       const color = ROLE_COLOR[role] || ROLE_COLOR.field;
@@ -7888,7 +8018,7 @@ const NetworkView = (function () {
     }
 
     if (stations.length) {
-      map.fitBounds(stations.map(s => [s.lat, s.lon]), { padding: [24, 24], maxZoom: 13 });
+      map.fitBounds(stations.map(s => [s.lat, s.lon]).concat(repeaterCoords), { padding: [24, 24], maxZoom: 13 });
     }
   }
 
@@ -8173,6 +8303,7 @@ const NetworkView = (function () {
     }
     const st = document.getElementById('nv-stats');
     if (st) st.innerHTML = statsHtml();
+    updateRepeaterCard();
     const src = document.getElementById('nv-source-note');
     if (src) {
       src.innerHTML = nv.confState === 'loading' ? 'Loading confirmed relationships…'
@@ -8302,10 +8433,25 @@ const NetworkView = (function () {
             <div class="nv-top">
               <span class="nv-pill" id="nv-map-note"></span>
               <span class="nv-pill nv-pill--quiet">Arrows point candidate → target</span>
+              <span class="nv-pill nv-pill--quiet">
+                <i class="nv-repeater-pin nv-repeater-pin--legend"><span style="background:${NV_REPEATER_COLOR}"></span></i>
+                Repeater pass-range coverage — not a ghosting link
+              </span>
             </div>
             <div id="nv-map-canvas"></div>
           </div>
         </div>
+      </div>
+
+      <div class="panel" id="nv-repeaters-panel">
+        <div class="panel-header"><h3>Repeaters open to the stations in view</h3></div>
+        <p class="small" style="color:var(--muted);margin:.4rem 0 .6rem">
+          Every repeater whose pass ranges carry an ALERT address currently in view above,
+          per the same test the Pass Ranges and Bit Flipper tabs use. This is a pass-range
+          relationship, not a ghosting one — these repeaters are candidate carriers for the
+          stations shown, not parties to any computed or confirmed edge on the graph or map.
+        </p>
+        <div id="nv-repeaters">${repeatersHtml()}</div>
       </div>`;
   }
 
