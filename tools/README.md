@@ -55,10 +55,17 @@ they are looked up in `archive/z_Sensors_with_Database_IDs_by_View_NATIONAL.csv`
 
 ## `import_stations_json.py` + `check_stations_doc.py` — the station list, into Postgres and back out
 
+> **If you just want the data loaded and you have a browser, you do not need
+> this.** `select meganet.load_stations_from_url();` in the Supabase SQL editor
+> makes the database fetch `stations.json` and load it itself — see `db/README.md`.
+> This script is for a database that cannot reach GitHub, or for when you want to
+> read the SQL before it runs.
+
 `import_stations_json.py` emits SQL that syncs the `meganet` schema to
 `stations.json`. Nothing in it talks to a database, which is deliberate: the
-output can be piped into `psql`, pasted into Supabase's SQL editor, attached to a
-ticket, or simply read before it is run.
+output can be piped into `psql`, attached to a ticket, or simply read before it
+is run. (It is ~2.7 MB — too big to paste into a browser SQL editor, which is
+what the one-liner above exists for.)
 
 ```bash
 python3 tools/import_stations_json.py \
