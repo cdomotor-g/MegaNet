@@ -420,6 +420,11 @@ const state = {
   bfMap:          null,
   bfMapLayer:     null,
   bfMapTimer:     null,
+  // Network View's geo panel — a Leaflet instance of its own, in the same
+  // lazily-created, torn-down-on-tab-away shape as bfMap/a2.map/wb.map.
+  nvMap:          null,
+  nvMapMarkers:   [],
+  nvMapLines:     [],
   prFilter:       '',      // Pass Ranges tab: station number / AlertID / name filter
   // ARRO launcher. `search` drives the station lookup, `siteId`/`deviceId` are
   // the ids actually opened — a search result writes into them rather than
@@ -2153,7 +2158,7 @@ function setNavCollapsed(collapsed) {
 // most of these are null most of the time.
 function invalidateMapSizes(delay) {
   setTimeout(() => {
-    [state.map, state.bfMap, state.a2.map, state.wb && state.wb.map].forEach(m => {
+    [state.map, state.bfMap, state.a2.map, state.wb && state.wb.map, state.nvMap].forEach(m => {
       if (m) { try { m.invalidateSize(); } catch (_) {} }
     });
   }, delay || 0);
@@ -7369,6 +7374,7 @@ const NetworkView = (function () {
     if (nv.raf) cancelAnimationFrame(nv.raf);
     nv.raf = null;
     nv.alpha = 0;
+    stopNvMap();
   }
 
   function frame() {
@@ -7737,6 +7743,123 @@ const NetworkView = (function () {
       + '.', 6000);
   }
 
+  // ── the map panel ────────────────────────────────────────────────────────────
+  // A second, geographic view of the same visible set the graph is drawing, side
+  // by side with it. It reads nv.vis rather than re-querying state.data, so the
+  // two panels are provably showing the same nodes and edges — there is only one
+  // filter, one cap (NV_MAX_NODES, already applied before either panel draws) and
+  // one place that decides what is "in view". Reuses the Stations map's own
+  // rendering approach (circleMarker pins, polyline links, addBaseLayers) rather
+  // than building a second map stack from scratch.
+
+  function initNvMap() {
+    stopNvMap();
+    const el = document.getElementById('nv-map-canvas');
+    if (!el) return;
+    state.nvMap = L.map('nv-map-canvas', { preferCanvas: true }).setView(MAP_HOME, 4);
+    addBaseLayers(state.nvMap);
+    refreshNvMap();
+  }
+
+  // Mirrors NetworkView.stop(): called on the way out of the tab (so a hidden map
+  // is not holding tile requests and pan/zoom listeners open) and at the top of
+  // every init() (so a stale instance never leaks behind a fresh one).
+  function stopNvMap() {
+    if (state.nvMap) { state.nvMap.remove(); state.nvMap = null; }
+    state.nvMapMarkers = [];
+    state.nvMapLines   = [];
+  }
+
+  // Redrawn whenever refresh(true) rebuilds the graph's own visible set — not on
+  // every animation frame the force layout ticks, since the map has no layout of
+  // its own to settle: a station's pin sits at its real coordinates regardless of
+  // where the force simulation currently has its graph node.
+  function refreshNvMap() {
+    const map = state.nvMap;
+    if (!map || !state.data) return;
+    state.nvMapMarkers.forEach(m => m.remove());
+    state.nvMapLines.forEach(l => l.remove());
+    state.nvMapMarkers = [];
+    state.nvMapLines   = [];
+
+    const V = nv.vis || computeVisible();
+
+    // The graph has one node per (station, address); the map plots stations, so
+    // several graph nodes can fold onto the same pin.
+    const byStation = new Map();
+    for (const n of V.nodes) {
+      if (!n.stationId) continue;
+      if (!byStation.has(n.stationId)) byStation.set(n.stationId, []);
+      byStation.get(n.stationId).push(n);
+    }
+    const stationsById = new Map(state.data.stations.map(s => [s.id, s]));
+    const stations = [...byStation.keys()]
+      .map(id => stationsById.get(id))
+      .filter(s => s && s.lat != null && s.lon != null);
+    const located = new Set(stations.map(s => s.id));
+    const byId = new Map(stations.map(s => [s.id, s]));
+
+    const lineColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--map-line').trim() || '#ff6f00';
+    const muted = getComputedStyle(document.documentElement)
+      .getPropertyValue('--muted').trim() || '#8b98a8';
+
+    // Same distinction the graph draws: confirmed relationships solid and at
+    // full strength, computed ones dashed and quieter (nv-conf vs nv-edge).
+    // Computed first, so a confirmed line drawn between the same two stations
+    // is not painted over by it.
+    const ordered = [...V.edges].sort((a, b) => (a.confirmed === b.confirmed) ? 0 : a.confirmed ? 1 : -1);
+    for (const e of ordered) {
+      const sa = e.a.stationId, sb = e.b.stationId;
+      if (!sa || !sb || sa === sb || !located.has(sa) || !located.has(sb)) continue;
+      const A = byId.get(sa), B = byId.get(sb);
+      const line = L.polyline([[A.lat, A.lon], [B.lat, B.lon]], {
+        color:     e.confirmed ? lineColor : muted,
+        weight:    e.confirmed ? (e.reciprocal ? 3 : 2.2) : 1.3,
+        opacity:   e.confirmed ? 0.9 : 0.55,
+        dashArray: e.confirmed ? null : '4,3',
+      }).addTo(map);
+      state.nvMapLines.push(line);
+    }
+
+    for (const s of stations) {
+      const role  = primaryRole(s);
+      const color = ROLE_COLOR[role] || ROLE_COLOR.field;
+      // A search hit wears the amber ring on the map the same way it does on the
+      // graph — the one highlight the two panels already agree on, so spotting a
+      // cluster in one and finding it in the other needs no second mechanism.
+      const hit = byStation.get(s.id).some(n => V.hits.has(n));
+      const marker = L.circleMarker([s.lat, s.lon], {
+        radius:      (s.roles.includes('repeater') ? 8 : 5) + (hit ? 1 : 0),
+        color:       hit ? MAP_PIN_HIT : MAP_PIN_RING,
+        weight:      hit ? 3 : 2,
+        fillColor:   color,
+        fillOpacity: 1,
+        opacity:     1,
+        className:   hit ? 'mn-pin mn-pin-hit' : 'mn-pin',
+      }).addTo(map);
+      marker.bindTooltip(esc(s.name), { direction: 'top', offset: [0, -6] });
+      // goToStation already selects, scrolls and pans on the Stations tab; there
+      // is no second way to do this and this panel should not invent one.
+      marker.on('click', () => goToStation(s.id));
+      state.nvMapMarkers.push(marker);
+    }
+
+    const note = document.getElementById('nv-map-note');
+    if (note) {
+      const missing = byStation.size - stations.length;
+      const bits = [stations.length
+        ? `${stations.length} station${stations.length === 1 ? '' : 's'} mapped`
+        : 'Nothing in view has coordinates to plot.'];
+      if (missing) bits.push(`${missing} in view ${missing === 1 ? 'has' : 'have'} no coordinates`);
+      note.textContent = bits.join(' · ');
+    }
+
+    if (stations.length) {
+      map.fitBounds(stations.map(s => [s.lat, s.lon]), { padding: [24, 24], maxZoom: 13 });
+    }
+  }
+
   // ── import / export ───────────────────────────────────────────────────────────
 
   function parseCsv(text) {
@@ -7843,6 +7966,7 @@ const NetworkView = (function () {
       nv.userMoved = false;
       computeVisible();
       draw();
+      refreshNvMap();
       start(0.8);
     } else {
       draw();
@@ -8119,26 +8243,35 @@ const NetworkView = (function () {
           </div>
         </aside>
 
-        <div class="panel nv-stage" id="nv-stage">
-          <div class="nv-top">
-            <span class="nv-pill" id="nv-visible"></span>
-            <span class="nv-pill nv-pill--quiet">Arrows point candidate → target</span>
+        <div class="nv-main">
+          <div class="panel nv-stage" id="nv-stage">
+            <div class="nv-top">
+              <span class="nv-pill" id="nv-visible"></span>
+              <span class="nv-pill nv-pill--quiet">Arrows point candidate → target</span>
+            </div>
+            <svg id="nv-svg" role="img" aria-label="Ghosting relationship graph">
+              <defs>
+                <marker id="nv-arrow" viewBox="0 -5 10 10" refX="4" markerWidth="5" markerHeight="5" orient="auto">
+                  <path d="M0,-5L10,0L0,5" class="nv-arrowhead"/>
+                </marker>
+              </defs>
+              <g id="nv-world">
+                <g id="nv-edges"></g>
+                <g id="nv-confirmed"></g>
+                <g id="nv-nodes"></g>
+              </g>
+            </svg>
+            <div class="nv-tip" id="nv-tip" hidden></div>
+            <aside class="nv-detail" id="nv-detail" hidden></aside>
+            <p class="nv-cap small" id="nv-cap" hidden></p>
           </div>
-          <svg id="nv-svg" role="img" aria-label="Ghosting relationship graph">
-            <defs>
-              <marker id="nv-arrow" viewBox="0 -5 10 10" refX="4" markerWidth="5" markerHeight="5" orient="auto">
-                <path d="M0,-5L10,0L0,5" class="nv-arrowhead"/>
-              </marker>
-            </defs>
-            <g id="nv-world">
-              <g id="nv-edges"></g>
-              <g id="nv-confirmed"></g>
-              <g id="nv-nodes"></g>
-            </g>
-          </svg>
-          <div class="nv-tip" id="nv-tip" hidden></div>
-          <aside class="nv-detail" id="nv-detail" hidden></aside>
-          <p class="nv-cap small" id="nv-cap" hidden></p>
+
+          <div class="panel nv-map" id="nv-map-wrap">
+            <div class="nv-top">
+              <span class="nv-pill" id="nv-map-note"></span>
+            </div>
+            <div id="nv-map-canvas"></div>
+          </div>
         </div>
       </div>`;
   }
@@ -8171,6 +8304,7 @@ const NetworkView = (function () {
     measure();
     computeVisible();
     draw();
+    initNvMap();
     renderLegend();
     stageBind();
     dropBind();

@@ -3226,15 +3226,33 @@ code {
   min-width: 0;
 }
 
-.nv-stage {
-  position: relative;
+/* Graph and map side by side, both live at once — the two panels answer
+   different questions (relationship structure vs. physical location) off the
+   same filtered node set, so both stay on screen together rather than one
+   replacing the other behind a toggle. */
+.nv-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  min-width: 0;
   height: calc(100dvh - var(--mn-chrome, 150px) - 2rem);
+}
+
+.nv-stage,
+.nv-map {
+  position: relative;
+  height: 100%;
   padding: 0;
   overflow: hidden;
   min-width: 0;
   background:
     radial-gradient(circle at 22% 12%, color-mix(in srgb, var(--panel) 92%, transparent) 0, transparent 34%),
     var(--panel-sub);
+}
+
+#nv-map-canvas {
+  width: 100%;
+  height: 100%;
 }
 
 .nv-stage svg {
@@ -3548,7 +3566,9 @@ code {
 @media (max-width: 900px) {
   .nv-layout { grid-template-columns: 1fr; }
   .nv-side   { height: auto; overflow: visible; }
-  .nv-stage  { height: 68dvh; }
+  .nv-main   { grid-template-columns: 1fr; height: auto; gap: .75rem; }
+  .nv-stage,
+  .nv-map    { height: 52dvh; }
   .nv-detail { width: min(330px, 86%); }
 }
 
