@@ -1,0 +1,22 @@
+{
+  "name": "meganet-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MQTT → MegaNet ingest bridge: subscribes to meganet/v1/…, validates, and posts readings to the one ingest contract (#B6).",
+  "license": "MIT",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test",
+    "publish-sample": "node tools/publish-sample.js"
+  },
+  "dependencies": {
+    "mqtt": "^5.15.2"
+  },
+  "devDependencies": {
+    "aedes": "^1.1.1"
+  }
+}

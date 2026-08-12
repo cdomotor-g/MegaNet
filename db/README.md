@@ -157,6 +157,11 @@ its cache at all (`PGRST002`).
 | `meganet.ingest_token` | Per-device credentials for the HTTP ingest endpoint (#B5). Only `token_hash` is stored. RLS on, no policy — reachable with the service key or a direct connection, same trade as `editor_allow`. |
 | `meganet.create_ingest_token(text, text, int, int)` | Mints a device token and returns it once. `EXECUTE` revoked from `public`, granted only to `service_role`. |
 | `meganet.ingest_http(jsonb)` | The HTTP endpoint — `POST /rest/v1/rpc/ingest_http`. Checks `X-Ingest-Token` against `ingest_token`, then hands the batch to `ingest()`. The only function `anon` is granted here. |
+| `meganet.station_status` | What the broker last said about each station: its retained status, and the LWT published when its connection drops (#B6). Keyed by the topic segment, not `station.id`. |
+| `meganet.station_health` | View: `station_status` plus the minutes since each station last spoke and last sent a reading. Applies no staleness threshold — the caller picks, per station. `security_invoker`. |
+| `meganet.bridge_health` | One row per running MQTT bridge. Exists so "no readings since Tuesday" can be told apart from "the relay died on Tuesday". |
+| `meganet.ingest_token_id()` | The `X-Ingest-Token` check `0007` does inline, factored out for `0008`'s endpoints. Raises PT401. Not granted to `anon` — directly reachable it would be a guessing oracle. |
+| `meganet.mqtt_status(jsonb)`, `meganet.mqtt_seen(text, timestamptz)`, `meganet.bridge_heartbeat(jsonb)` | What the bridge reports that is not a reading: a station's status or LWT, when its reading last arrived, and the bridge's own pulse. Token-checked, like `ingest_http()`. |
 
 Everything is readable by `anon` **except `meganet.reading_raw`**, which holds
 whatever a device or an adapter actually sent, unread — a debugging artefact
@@ -529,6 +534,60 @@ field.
 
 **Batch size is capped at 1,000** readings per call, returned as a clear `22023`
 (HTTP 400) rather than a request that times out instead.
+
+## MQTT ingest
+
+Added by `0008_mqtt_bridge.sql`. The topic scheme, the broker choice and how a
+logger publishes are [`docs/ingest-mqtt.md`](../docs/ingest-mqtt.md); running the
+subscriber is [`bridge/README.md`](../bridge/README.md). What follows is only the
+database's share.
+
+**No new write path for readings.** Postgres cannot subscribe to MQTT, so there
+is a process — `bridge/` — that holds the subscription and posts what it receives
+to `ingest_http()`, exactly as an HTTP logger does. It holds an ordinary
+`meganet.ingest_token` and no service key: three RPCs, and `revoked_at` turns all
+three off at once. The bridge is not more trusted than the loggers it relays for.
+
+**`meganet.station_status` is keyed by the topic segment, not `station.id`.**
+Same reasoning as `reading.station_id` having no foreign key: a station that
+starts publishing before MegaNet has been told about it is exactly the one whose
+silence matters, and a foreign key would refuse to record it. `station_id` is
+resolved where the key names a live station and left null where it does not.
+
+**`online` is what the broker last said; staleness is computed, not stored.** The
+LWT says a station's connection dropped, which is not the same as a station
+having stopped reporting — a logger that publishes hourly is offline between
+transmissions and perfectly well. So the column records the last thing the broker
+told us, `since` moves only on a real state change (a retained message replayed
+on every reconnect must not reset "down since 03:14"), and
+`meganet.station_health` exposes the minutes since each station last spoke
+without picking a threshold. Every station's reporting interval is different; a
+constant here would be wrong for most of the network and invisible when it was.
+
+**`meganet.bridge_health` exists so two silences can be told apart.** "No
+readings since Tuesday" and "the relay died on Tuesday" look identical from the
+front end and need different people out of bed. Counters are absolute totals
+since the bridge started, never increments, so a lost heartbeat costs nothing.
+
+**Both tables are world-readable** — #B7 will read them with the publishable key,
+the same trade `0002` made for the station list — and the corollary is a rule the
+bridge keeps: `detail` carries a short reason string, never a URL, token or
+connection string.
+
+**`meganet.ingest_token_id()` is the token check `0007` does inline, factored
+out** so the three new endpoints share it rather than growing three opinions
+about what a valid token is. It is *not* granted to `anon`: reachable directly,
+it would be an oracle for guessing tokens one call at a time. The functions that
+call it are `security definer`.
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_mqtt.sql
+```
+
+39 checks, one per line of #B6's acceptance that can be answered in SQL, in a
+transaction that rolls back. The half that cannot — reconnects, acknowledgement,
+no message lost — is `bridge/test/integration.test.js`, which runs a real broker
+against the real client with a database that fails on demand.
 
 ## Checking it from outside
 

@@ -2,8 +2,14 @@
 
 Small command-line helpers that sit alongside the browser app. Unlike the app
 itself, most of these need Python (the ACMA tools are stdlib-only; the agent also
-needs a network connection and the `anthropic` package). `check_ingest.sql` needs
-nothing but `psql`.
+needs a network connection and the `anthropic` package). `check_ingest.sql` and
+`check_mqtt.sql` need nothing but `psql`.
+
+`check_mqtt.sql` is the companion to `check_ingest.sql` for the MQTT bridge
+(#B6): 39 checks over `meganet.station_status`, `meganet.bridge_health` and the
+token-checked endpoints the bridge calls, in a transaction that rolls back. The
+half of that acceptance which is about a client and a broker rather than about
+Postgres is `bridge/test/integration.test.js`.
 
 ## `acma_prefilter.py` + `acma_fetch.py` — the ACMA RF interference pipeline
 
