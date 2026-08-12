@@ -2872,6 +2872,44 @@ code {
   margin-top: 1.1rem;
 }
 
+/* The generic shell (Modal.open) — a card with a scrolling body, for the times
+   the content is longer than the window rather than a form the height of one. */
+/* Wide enough for a 720-wide figure and its padding, and no wider — prose in a
+   card broader than that is a paragraph with a margin of empty card beside it. */
+.modal-card--wide { max-width: 762px; }
+.modal-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.modal-body {
+  margin-top: .7rem;
+  max-height: 76vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* ── "How the 357 filter works" ──────────────────────────────────────────────
+   Prose narrower than the figures: a paragraph is unreadable at the width a
+   flowchart needs, so the figures are allowed the full card and the text is
+   not. */
+.f357 { font-size: .9rem; line-height: 1.55; }
+.f357 p  { margin: .5rem 0; max-width: 68ch; color: var(--text); }
+.f357 ul { margin: .5rem 0; padding-left: 1.1rem; max-width: 68ch; }
+.f357 li { margin: .3rem 0; }
+.f357 h3 {
+  margin: 1.15rem 0 .2rem;
+  font-size: .98rem;
+  padding-bottom: .2rem;
+  border-bottom: 1px solid var(--border);
+}
+.f357 code { font-size: .85em; background: var(--subtle); padding: .05rem .25rem; border-radius: 4px; }
+.f357-fig {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 720px;
+  margin: .7rem auto .3rem;
+  background: var(--panel);
+}
+.f357-src { color: var(--muted); font-size: .82rem; margin-top: 1.2rem !important; }
+
 /* ── Interference Workbench tab ────────────────────────────────────────────── */
 
 .wb-page { padding: 1rem; }
@@ -3564,6 +3602,58 @@ code {
 .ad-cfg-row input { width: 84px; }
 .ad-cfg-chk { display: flex; align-items: center; gap: .35rem; font-size: .8rem; margin: .25rem 0; }
 .ad-cfg-note { color: var(--muted); margin: .45rem 0 0; }
+.ad-panel-acts { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+
+/* One filter, one switch, and the settings it governs. A filter that is off
+   keeps its settings on screen — greyed, not gone — so the panel does not
+   reflow every time a switch is flicked and "what did that one do?" stays a
+   click away from being answered. */
+.ad-filt { border-top: 1px solid var(--border); padding: .45rem 0 .3rem; }
+.ad-filt:first-of-type { border-top: 0; padding-top: .15rem; }
+.ad-filt-head {
+  display: flex; align-items: center; gap: .4rem;
+  font-size: .82rem; font-weight: 600; cursor: pointer;
+}
+.ad-filt-body { padding-left: 1.35rem; }
+.ad-filt--off .ad-filt-head { color: var(--muted); font-weight: 500; }
+.ad-filt--off .ad-filt-body { opacity: .5; }
+.ad-warn-txt { color: var(--warn); }
+
+/* A link that has to read as part of a sentence. .btn-link is a bordered
+   button, which inside a run of stats or a paragraph shoulders the words apart
+   and announces itself as a control it is not. */
+.ad-inline-link {
+  display: inline; border: 0; background: none; padding: 0;
+  font: inherit; color: var(--accent);
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.ad-inline-link.ad-bad-txt { color: var(--bad); }
+.ad-inline-link:hover { text-decoration-thickness: 2px; }
+
+/* Two charts of the same window, folded away until asked for. */
+.ad-compare { margin-top: .6rem; border-top: 1px solid var(--border); padding-top: .4rem; }
+.ad-compare > summary {
+  cursor: pointer; font-size: .85rem; font-weight: 600;
+  padding: .2rem 0; list-style-position: outside;
+}
+.ad-compare > summary .small { font-weight: 400; color: var(--muted); }
+.ad-compare-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .6rem; margin-top: .5rem;
+}
+.ad-compare-grid figure { margin: 0; min-width: 0; }
+.ad-compare-grid figcaption {
+  font-size: .8rem; font-weight: 600; margin-bottom: .25rem;
+  display: flex; gap: .35rem; align-items: baseline;
+}
+.ad-compare-grid figcaption .small { font-weight: 400; color: var(--muted); }
+.ad-compare-grid svg {
+  display: block; width: 100%; height: auto;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--panel);
+}
+@media (max-width: 700px) {
+  .ad-compare-grid { grid-template-columns: 1fr; }
+}
 
 .ad-toolbar {
   display: flex; flex-wrap: wrap; gap: .4rem .5rem;
@@ -3634,9 +3724,10 @@ code {
 .ad-pin-grid span { color: var(--muted); min-width: 66px; }
 .ad-pin-why { color: var(--muted); }
 .ad-badge { font-size: .7rem; padding: .05rem .4rem; border-radius: 20px; border: 1px solid var(--border); }
-.ad-badge--ok  { color: var(--ok);  border-color: var(--ok); }
-.ad-badge--bad { color: var(--bad); border-color: var(--bad); }
-.ad-badge--dup { color: var(--muted); }
+.ad-badge--ok   { color: var(--ok);   border-color: var(--ok); }
+.ad-badge--bad  { color: var(--bad);  border-color: var(--bad); }
+.ad-badge--warn { color: var(--warn); border-color: var(--warn); }
+.ad-badge--dup  { color: var(--muted); }
 
 .ad-empty { max-width: 620px; margin: 2rem auto; padding: 1.5rem; }
 .ad-empty h2 { margin: 0 0 .6rem; }
@@ -3884,6 +3975,10 @@ code {
 
   .modal-foot { justify-content: stretch; }
   .modal-foot button { flex: 1 1 auto; }
+
+  /* The card is already the whole screen here, so the body scrolls with the
+     page rather than inside a box of its own. */
+  .modal-body { max-height: none; overflow: visible; }
 
   /* .button-row spaces its buttons to both ends, which on a phone wraps them
      and then strands the last one alone against the right edge. Packed to the
