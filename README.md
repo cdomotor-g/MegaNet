@@ -53,6 +53,8 @@ MegaNet/
 │
 ├── docs/                   ← reference documents
 │   ├── datastore-decision.md               (why Postgres on Supabase, and where)
+│   ├── access.md                           (who gets in, who may edit, and recovery)
+│   ├── floodwarning-net.md                 (moving the domain to MegaNet — runbook)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
 │   ├── 357 Filter doco.doc                  (the 1998 first edition of the same spec)
@@ -175,10 +177,10 @@ it:
 * **Delete is recoverable.** It is a soft delete: the station leaves the list,
   and the record — with its sensors, repeater and pass ranges — stays in the
   database until somebody with SQL access says otherwise.
-* **Saving needs a signed-in session.** The database refuses anonymous writes,
-  and the sign-in that produces a session is [#B8](https://github.com/cdomotor-g/MegaNet/issues/72).
-  Until that ships the editor still opens and still says exactly why a save was
-  refused — from the server, not from a check the browser could be talked out of.
+* **Saving needs a signed-in session.** The database refuses anonymous writes.
+  Signed out, the editor still opens and still shows everything — the Save button
+  reads **Sign in to save** and opens the sign-in panel rather than failing at the
+  network. See [**Signing in**](#signing-in) below.
 * **Saving is refused while the app is on the file fallback.** If the header says
   the list came from `stations.json` rather than the datastore, load from the
   datastore before editing: otherwise Save would write what is on screen over
@@ -186,6 +188,29 @@ it:
 
 The contract, the SQL and the `curl` proof that a stranger cannot write are in
 [`db/README.md`](db/README.md) under **Writing**.
+
+### Signing in
+
+**Reading needs no account.** The station list, the maps, the ARRO tools and the
+ACMA layer all work signed out, and that is a decision rather than an oversight —
+`stations.json` and every line that reads it are in a public repository, so a
+login in front of them would be a sign on a door in a field. The gate exists to
+protect *writing*, and to say who made a change.
+
+There is no password. The sign-in panel emails a link and a six-digit code;
+either one produces a session, which lasts until the tab is closed.
+
+Two independent locks, and it is worth knowing which is which:
+
+* **Cloudflare Access** decides who may load the site. It is dashboard
+  configuration, it protects the hostnames it is put in front of, and it is what
+  an organisation's IT department eventually replaces with its own.
+* **The database** decides who may change a station. Any verified `@bom.gov.au`
+  address may; anyone else has to be added to `meganet.editor_allow`, which is one
+  `insert` and needs no deploy. This is the lock that holds against `curl`.
+
+Adding a domain, adding one person, and what to do when nobody can get in are all
+in [`docs/access.md`](docs/access.md).
 
 ### Keeping `stations.json` current
 
