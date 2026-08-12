@@ -18,3 +18,12 @@
   - Example: `[Sonnet5/Med] Fix flaky login test`
 - Also restate the recommendation on the first line of the issue body (e.g. `Recommended: Sonnet5 / Med`), with a short reason if the choice isn't obvious.
 - Issues tagged red label `human` (per the rule above) don't need a model/effort tag — they're not meant for an AI agent.
+
+## Issue title structure indicator
+- Every issue title must also indicate whether it's a standalone issue, an epic, or a sub-issue of an epic, so it's visible at a glance in issue lists which issues can be picked off on their own versus which are part of a larger group.
+- Add this as a tag at the very start of the title (before the model/effort tag, if both apply):
+  - `[Standalone]` — self-contained, can be picked up and completed on its own.
+  - `[Epic]` — a larger issue that groups multiple sub-issues.
+  - `[Sub-issue of #<parent-issue-number>]` — part of a larger epic; reference the parent issue number.
+- When combined with the AI-agent recommendation tag, order as: `[<Structure>] [<Model>/<Effort>] <title>`.
+- Example: `[Sub-issue of #42] [Sonnet5/Med] Fix flaky login test`
