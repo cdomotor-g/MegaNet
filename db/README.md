@@ -96,19 +96,71 @@ its cache at all (`PGRST002`).
 | `meganet` | The schema. Everything MegaNet owns lives here, not in `public`. |
 | `meganet.touch_updated_at()` | `BEFORE UPDATE` trigger function stamping `updated_at`. Every table with that column hangs it off this one. |
 | `meganet.app_meta` | Key/value facts about the database itself. `schema_version` is the number of the highest migration applied. Readable by anyone, writable by no one holding the anon key. |
+| `meganet.station` | One row per station, 3,174 of them. `id` is the `stations.json` slug — also the app's `selectedId`, and in URLs. |
+| `meganet.sensor` | 8,815 rows. Natural key `(station_id, sensor_id, type)`: one SSR carries several measurements. Indexed on `alert_id`, which is what the search box matches. |
+| `meganet.repeater` | Repeater detail for the 88 stations carrying the role. One-to-one with `station`. |
+| `meganet.pass_range` | The ALERT ranges a repeater passes or excludes, as rows with an `int4range` and a GiST index — so "which repeaters cover address N" is a lookup, not 88 × 10 ranges walked in JavaScript. |
+| `meganet.radio_network`, `meganet.catchment`, `meganet.rm_system` | The reference vocabularies from the top of `stations.json`. |
+| `meganet.doc_meta` | The document's `meta` header. Exactly one row, enforced. |
+| `meganet.stations_json` | View: the whole `stations.json` document, rebuilt. `security_invoker`, so RLS on the base tables applies. |
+| `meganet.stations_doc()` | The same document as a `stable` function, so `GET /rest/v1/rpc/stations_doc` returns it as the response body rather than wrapped in `{"doc": …}`. This is what the app calls. |
 
-No station data is in the database yet — that is a separate ticket. The app reads
-`app_meta` and nothing else.
+Everything is readable by `anon` and writable by nobody holding the anon key —
+there is deliberately no insert/update/delete policy on any of it. The write path
+is a later ticket, and it lands after the access gate, not before it.
+
+### Two conventions worth knowing before you read the SQL
+
+**`ord` columns.** Every table whose rows become a JSON *array* carries one. The
+arrays in `stations.json` are in no natural order — stations are not sorted by
+id, sensors are not sorted by `sensor_id`, pass ranges are not sorted by `low` —
+so reproducing the document exactly means recording the order rather than
+inventing one. `ord` is presentation order, never identity.
+
+**`numeric`, not `double precision`.** A JSON number round-tripped through a
+float comes back as `151.49999999999997`, or as `109.0` where the file said
+`109`. `numeric` preserves the literal digit for digit. Nothing here does
+arithmetic in the database, so the usual reason to prefer float does not apply.
+
+### Loading the station list
+
+`tools/import_stations_json.py` emits SQL that syncs the schema to
+`stations.json` — upserting every row in the file and deleting every row that is
+not in it. It is idempotent down to `updated_at`: a second run over the same file
+changes nothing and restamps nothing.
+
+```sh
+python3 tools/import_stations_json.py \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+Then check that what comes back out is what went in:
+
+```sh
+psql "$MEGANET_DB_URL" -tAc 'select doc from meganet.stations_json' > /tmp/doc.json
+python3 tools/check_stations_doc.py /tmp/doc.json
+```
+
+That check is the one that matters. The whole read path rests on the database's
+document being indistinguishable from the file, because ~17,700 lines of `app.js`
+assume that shape.
 
 ## Checking it from outside
 
 The Export tab's **Data source** panel does exactly this on first open, and shows
-the result. By hand:
+the result — along with which source the station list on screen actually came
+from, which is a different question and can have a different answer. By hand:
 
 ```sh
 curl -sS 'https://<ref>.supabase.co/rest/v1/app_meta?select=key,value' \
      -H 'apikey: <publishable key>' \
      -H 'Accept-Profile: meganet'
+
+# and the station list itself, exactly as the browser fetches it
+curl -sS 'https://<ref>.supabase.co/rest/v1/rpc/stations_doc' \
+     -H 'apikey: <publishable key>' \
+     -H 'Accept-Profile: meganet' > /tmp/doc.json
+python3 tools/check_stations_doc.py /tmp/doc.json
 ```
 
 `Accept-Profile` is not optional — without it PostgREST looks in `public`, finds

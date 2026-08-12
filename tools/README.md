@@ -53,6 +53,43 @@ nothing in the inputs can expand them.
 they are looked up in `archive/z_Sensors_with_Database_IDs_by_View_NATIONAL.csv`
 (override with `--national`). Re-running over the same workbooks is a no-op.
 
+## `import_stations_json.py` + `check_stations_doc.py` — the station list, into Postgres and back out
+
+`import_stations_json.py` emits SQL that syncs the `meganet` schema to
+`stations.json`. Nothing in it talks to a database, which is deliberate: the
+output can be piped into `psql`, pasted into Supabase's SQL editor, attached to a
+ticket, or simply read before it is run.
+
+```bash
+python3 tools/import_stations_json.py \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+It is a *sync*, not an append — every row in the file is upserted and every row
+not in the file is deleted — and it is idempotent down to `updated_at`: a second
+run over the same file changes nothing and restamps nothing, so "when did this
+station last change" keeps meaning something. It refuses to emit anything for a
+file that does not hang together (a station pointing at a radio network or
+catchment that is not defined), and warns about ranges that are inverted and
+therefore match no address.
+
+`check_stations_doc.py` is the other half, and the more important one: it proves
+the document the database hands back is `stations.json`.
+
+```bash
+psql "$MEGANET_DB_URL" -tAc 'select doc from meganet.stations_json' > /tmp/doc.json
+python3 tools/check_stations_doc.py /tmp/doc.json      # exit 0 = identical
+```
+
+It compares every key, array element and value, treating a key that is *absent*
+as different from one that is present and null — because `app.js` tests both
+`'lga' in s` and `s.site.db_id`, and those behave differently. Numbers are
+compared as decimals, so float drift is caught rather than rounded away. It takes
+the API's response as happily as psql's output, so it checks the deployed
+endpoint too.
+
+Both are standard library only.
+
 ## `meganet_agent.py` — ask questions about the network with the Claude API
 
 An agentic Claude API loop that answers natural-language questions about the
