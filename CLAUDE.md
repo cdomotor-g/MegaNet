@@ -7,7 +7,7 @@
 ## Git workflow
 - Push straight to `main` after a patch. Do not ask for permission and do not open a pull request.
 - Never create branches unless explicitly asked to.
-- If human tasks remain, or fall out of scope, at the end of your work: ask whether to create a new issue tagged red label `human`, with explicit, click-by-click instructions for what the human needs to do.
+- If human tasks remain, or fall out of scope, at the end of your work: ask whether to create a new issue tagged `[Human]` in place of a model/effort recommendation (see below), with explicit, click-by-click instructions for what the human needs to do.
 - When you finish work that closes an issue, close it with a comment summarizing what was done.
 
 ## Raising issues for AI agents
@@ -17,7 +17,7 @@
   - Effort abbreviations: `Low`, `Med`, `High`, `XHigh`, `Max`
   - Example: `[Sonnet5/Med] Fix flaky login test`
 - Also restate the recommendation on the first line of the issue body (e.g. `Recommended: Sonnet5 / Med`), with a short reason if the choice isn't obvious.
-- Issues tagged red label `human` (per the rule above) don't need a model/effort tag — they're not meant for an AI agent.
+- If the issue isn't something an AI agent could pick up — it needs credentials, physical access, or a judgment call only a person can make — put `[Human]` in that same tag position instead of a `<Model>/<Effort>` pair. There's no separate GitHub label for this; the title tag is the single source of truth. Format: `[Human] <title>`.
 
 ## Issue title structure indicator
 - Every issue title must also indicate whether it's a standalone issue, an epic, or a sub-issue of an epic, so it's visible at a glance in issue lists which issues can be picked off on their own versus which are part of a larger group.
@@ -25,5 +25,6 @@
   - `[Standalone]` — self-contained, can be picked up and completed on its own.
   - `[Epic]` — a larger issue that groups multiple sub-issues.
   - `[Sub-issue of #<parent-issue-number>]` — part of a larger epic; reference the parent issue number.
-- When combined with the AI-agent recommendation tag, order as: `[<Structure>] [<Model>/<Effort>] <title>`.
+- When combined with the AI-agent recommendation tag (or the `[Human]` tag), order as: `[<Structure>] [<Model>/<Effort>] <title>` or `[<Structure>] [Human] <title>`.
 - Example: `[Sub-issue of #42] [Sonnet5/Med] Fix flaky login test`
+- Example: `[Standalone] [Human] Confirm CORS headers on contrail-bom.onerain.au`
