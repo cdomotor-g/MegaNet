@@ -74,6 +74,27 @@ explicit grant to the roles that should have it.
 only followed by the next number. There are no down migrations: undoing something
 is a new numbered file that says what it undoes.
 
+**One exception to "everything lives in `meganet`", and it is load-bearing.**
+`0005_auth.sql` puts two triggers on `auth.users`, a table Supabase owns. That is
+the only way to catch a signup, because `POST /auth/v1/otp` never touches the
+Data API and so nothing inside our own schema is downstream of it. Two things
+follow, and both bite quietly:
+
+- **A trigger that errors blocks every signup, including from the dashboard.**
+  `meganet.auth_user_gate()` raises on purpose for an unlisted address; if it ever
+  raises for an *unintended* reason — the `meganet` schema missing, a botched
+  half-apply — nobody can be created at all. The recovery is to drop the trigger
+  (`drop trigger meganet_auth_user_gate on auth.users;`), fix the cause, and
+  re-apply 0005.
+- **Supabase upgrades own that table.** A future change to `auth.users` can drop
+  or break these triggers without warning. If sign-in silently starts letting
+  anyone in, check that both triggers still exist before looking anywhere else:
+
+  ```sql
+  select tgname from pg_trigger
+   where tgrelid = 'auth.users'::regclass and not tgisinternal;
+  ```
+
 **The schema version is part of the migration.** Every migration ends by writing
 its own number into `meganet.app_meta`:
 
@@ -118,6 +139,11 @@ its cache at all (`PGRST002`).
 | `meganet.delete_station(text, timestamptz)` | Soft delete: stamps `deleted_at`, keeps every row. |
 | `meganet.editor_allow` | Who may write — an email, or a domain with its at-sign. No policy and no grant to any role a browser can reach; readable only through the function below. |
 | `meganet.is_editor()`, `meganet.email_allowed(text)`, `meganet.actor()` | The gate, the list lookup behind it, and who a write gets attributed to. |
+| `meganet.app_user` | One row per person who has signed in, provisioned by trigger from `auth.users`. Carries a `role` column that nothing reads yet. You can select your own row and nobody else's. |
+| `meganet.auth_user_gate()` | `BEFORE INSERT` on `auth.users`: refuses an address that is not on `editor_allow`, so an unlisted person never becomes a user at all. |
+| `meganet.auth_user_sync()` | `AFTER INSERT/UPDATE` on `auth.users`: keeps `app_user` in step. Never writes `role`. |
+| `meganet.email_may_sign_in(text)` | Yes/no for one address, callable anonymously so the sign-in panel can refuse before emailing. Deliberately an oracle — see `docs/access.md`. |
+| `meganet.whoami()` | Identity and write permission as the database sees them. What the app shows in the header and the Data source panel. |
 
 Everything is readable by `anon`. Nothing is *writable* by `anon` or by
 `authenticated`: no table grants either of them a write verb, and the only way in
@@ -222,10 +248,8 @@ removes it for real; take a snapshot before reloading if that matters.
 answers it: never for `anon`, always for `service_role`, and for `authenticated`
 only when the verified email on the request's token matches
 `meganet.editor_allow`. `updated_by` is stamped from the same token, server-side —
-a field the client fills in is a field the client can forge. The sign-in itself is
-#B8; until it ships, `authenticated` never happens and every write from the app is
-refused, which is the correct behaviour for a write path that landed ahead of its
-gate.
+a field the client fills in is a field the client can forge. The sign-in that
+mints that token shipped in `0005_auth.sql` — see **Signing in**, below.
 
 Maintaining the list needs the service key, or psql:
 
@@ -285,6 +309,58 @@ python3 tools/snapshot_stations_json.py --check   # exit 1 if it would change
 
 The Export tab has the same thing as a button, for the operator who wants a copy
 before going somewhere without a network.
+
+## Signing in
+
+Added by `0005_auth.sql`. The operational side — how to add a domain, add a
+person, or recover when nobody can get in — is `docs/access.md`; what follows is
+only the part that lives in the database.
+
+**An unlisted address never becomes a user.** `meganet.auth_user_gate()` is a
+`BEFORE INSERT` trigger on `auth.users`, so the refusal happens at the one point
+downstream of every route in — including `POST /auth/v1/otp` called directly with
+`curl`, which never touches the Data API and so could never have been caught by
+anything in the `meganet` schema alone.
+
+GoTrue does not pass the trigger's message back to the browser; the caller gets a
+generic "Database error saving new user". That is why the app pre-checks with
+`meganet.email_may_sign_in()` and carries its own wording. Do not spend effort
+making that `raise exception` message prettier — nobody sees it but you, in the
+logs, which is where it is aimed.
+
+**There is no `allowed_domains` table.** #B8 sketched one; `meganet.editor_allow`
+had already shipped in 0004 and answers the same question with one column holding
+either a whole address or a domain with its at-sign. Two allowlists would be two
+places to remove somebody from, and the failure mode of that is somebody being
+removed from only one of them.
+
+**`app_user.role` is recorded and enforces nothing.** Everyone is provisioned
+`editor`. `is_editor()` asks `editor_allow`, not this column, so setting somebody
+to `viewer` today does not stop them writing. The column exists now because
+adding it early costs one line and retrofitting identity onto rows that were
+written anonymously costs a migration and a guess.
+
+Checking the gate the same way as the write path — `set local role` standing in
+for what PostgREST does per request:
+
+```sql
+begin; set local role authenticated;
+  set local request.jwt.claims = '{"role":"authenticated","email":"someone@bom.gov.au"}';
+  select meganet.whoami();     -- may_write true
+rollback;
+
+begin; set local role authenticated;
+  set local request.jwt.claims = '{"role":"authenticated","email":"someone@gmail.com"}';
+  select meganet.whoami();     -- may_write false
+rollback;
+
+begin; set local role anon;
+  select meganet.whoami();     -- signed_in false, may_write false, no error
+rollback;
+```
+
+That last one is option (a) in three lines: anonymous is a state the database
+answers politely, not one it errors at.
 
 ## Checking it from outside
 

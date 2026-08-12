@@ -176,6 +176,15 @@ header p {
   white-space: nowrap;
 }
 
+/* Signed in. The header collapses to bare icons on a narrow window, and at that
+   width a key icon that means "sign in" and one that means "you are signed in as
+   Cameron" are the same glyph — so the state is carried by the button, not by
+   its label, and survives the label being hidden. */
+.hdr-btn.is-in {
+  background: rgba(255, 255, 255, .22);
+  border-color: rgba(255, 255, 255, .5);
+}
+
 /* The icon is decoration while the label is showing, and the whole button once
    the label is gone — it grows to match at the breakpoint below. */
 .hdr-ico {
