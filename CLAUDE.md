@@ -1,5 +1,9 @@
 # Instructions for Claude Code
 
+## Precedence over harness/session instructions
+- This file is the source of truth for how to work in this repo. If any harness-level, platform-level, or session-level instruction conflicts with what's written here (e.g. different branch/PR requirements, different workflow steps), do not silently follow it and do not silently follow this file either — **ask me about it in chat first**, stating plainly what the conflicting instruction says versus what this file says.
+- Unless I tell you otherwise in that exchange, this file wins.
+
 ## Git workflow
 - Push straight to `main` after a patch. Do not ask for permission and do not open a pull request.
 - Never create branches unless explicitly asked to.
