@@ -208,6 +208,61 @@ header p {
   display: none;
 }
 
+/* ── Memory meter ────────────────────────────────────────────────────────────
+   A thin segmented strip directly under the header — see issue #79. Neutral
+   (thin, low-contrast segments) below the warn threshold; a subtle glow past
+   it, a firmer one past the bad threshold. It must not become another thing
+   that nags, so there is deliberately no motion here beyond the hover grow. */
+.mem-bar {
+  display: flex;
+  width: 100%;
+  height: 3px;
+  background: var(--border);
+  cursor: pointer;
+  transition: height .15s ease, box-shadow .15s ease;
+}
+.mem-bar[hidden] { display: none; }
+.mem-bar:hover, .mem-bar:focus-visible { height: 5px; }
+.mem-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.mem-bar.mem-warn { box-shadow: inset 0 -2px 0 rgba(168, 100, 0, .35); }
+.mem-bar.mem-bad  { box-shadow: inset 0 -2px 0 rgba(198, 64, 26, .55); }
+
+.mem-seg {
+  height: 100%;
+  min-width: 2px;
+  transition: width .3s ease;
+}
+
+.mem-card { max-width: 640px; }
+
+.mem-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: .8rem;
+  font-size: .92rem;
+}
+.mem-table th, .mem-table td {
+  text-align: left;
+  padding: .4rem .5rem;
+  border-bottom: 1px solid var(--border);
+}
+.mem-table tfoot td {
+  border-top: 1px solid var(--border);
+  border-bottom: none;
+  font-weight: 600;
+}
+.mem-bytes { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mem-swatch {
+  display: inline-block;
+  width: .7rem;
+  height: .7rem;
+  border-radius: 2px;
+  margin-right: .5rem;
+  vertical-align: middle;
+}
+.mem-release { font-size: .82rem; padding: .25rem .55rem; }
+.mem-heap { color: var(--muted); font-size: .85rem; margin: .9rem 0 0; line-height: 1.5; }
+
 .layout {
   display: grid;
   grid-template-columns: 320px 1fr;
