@@ -7,7 +7,15 @@
     },
     {
       "file": "app.js",
-      "bytes": 303099
+      "bytes": 174754
+    },
+    {
+      "file": "rf-changes.js",
+      "bytes": 47636
+    },
+    {
+      "file": "workbench.js",
+      "bytes": 85975
     },
     {
       "file": "mem-meter.js",
@@ -110,7 +118,7 @@
       "bytes": 3714
     }
   ],
-  "bytes": 1116348,
-  "sha256": "42f323ff7a3cc8e044b0618cf9b2ee1a1b35174b399c53f8aa7077cb5803eeb7",
+  "bytes": 1121614,
+  "sha256": "33652e799b684ad96327652a45518d37808e544f6318ffbd63c6dc1c1130ebed",
   "nulBytes": 4
 }

@@ -1,3 +1,48 @@
+// MegaNet — workbench.js
+//
+//   Workbench   the Interference Workbench tab: pick the stations you believe
+//               are affected and it assembles the evidence, scores five
+//               competing explanations against each other and names what to
+//               check next. It argues a case rather than showing numbers.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// The widest reach of any module in the epic, which is what a tab that exists
+// to correlate five other tabs costs:
+//
+//   core.js       ACMA_MECH, acmaHaversineKm, buildSensorIndex, csvEscape,
+//                 dlText, esc, escAttr, slug, state
+//   app.js        acmaEnsureCore, acmaEnsureDevices, acmaFetchJson,
+//                 addBaseLayers, passRangeCoversId, renderMain, renderTabs,
+//                 rfStripPlotHtml, stationAlertIds, switchTab — and
+//                 showAcmaCard, which it reaches *only* from two inline
+//                 onclick strings, so no AST walk over this file will find it
+//   rf-changes.js RfChanges, for its data loader, its repeater names and its
+//                 blind-spots copy
+//   Leaflet       the case map, via addBaseLayers
+//
+// Two of those are worth flagging for whoever picks up #138: rfStripPlotHtml
+// and the acma* loaders are the RF Environment / ACMA RRL layer, still in
+// app.js. And Bit Flipper is reached without naming anything in bit-flipper.js
+// — openBf sets three fields on state and calls switchTab, which is the loosest
+// coupling of the lot and worth keeping that way.
+//
+// The IIFE body declares and calls nothing at load — 72 statements, 62 function
+// declarations and 9 constants and the return — so this file's position among
+// the modules is free, including relative to rf-changes.js.
+//
+// 21 of the 71 names inside are public. Three are called from code (render and
+// init from renderMain, restoreFromUrl from init.js); the other eighteen exist
+// only to be named by an inline on*= attribute, and the note in rf-changes.js
+// about what that costs applies here eighteen times over. What is *not* public
+// is the more useful list: wbAnalyse, the 257-line scoring core, the five
+// wbArithH* explainers behind it and every wb*Html builder are private. Nothing
+// outside this file scores a case or draws a panel.
+//
+// Not indented into the IIFE — see the note in rf-changes.js.
+//
+// Wrapped in an IIFE and moved out of app.js by M4 (#135) of #129 — the last
+// child of that epic, and the only one that was a refactor rather than a move.
+
 // ── INTERFERENCE WORKBENCH tab ───────────────────────────────────────────────────
 // A single investigation surface: select the stations you believe are affected and
 // the Workbench assembles the evidence, scores five competing explanations and

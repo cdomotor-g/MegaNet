@@ -4,6 +4,8 @@
     "maps-data.js",
     "core.js",
     "app.js",
+    "rf-changes.js",
+    "workbench.js",
     "mem-meter.js",
     "auth.js",
     "map-draw.js",
@@ -30,6 +32,6 @@
     "bug-report.js",
     "init.js"
   ],
-  "total": 528,
-  "distinct": 528
+  "total": 419,
+  "distinct": 419
 }

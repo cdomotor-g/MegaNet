@@ -1,3 +1,42 @@
+// MegaNet — rf-changes.js
+//
+//   RfChanges   the RF Changes tab: what changed on the air near this repeater
+//               around the date the data went bad. A timeline of ACMA
+//               authorisation dates, diffs between archived monthly snapshots,
+//               an intermod screen and a step detector for a pasted corruption
+//               series.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for ACMA_MECH, csvEscape, dlText, esc, escAttr and
+// state; and across to app.js for acmaEnsureCore, acmaFetchJson,
+// findRepeaterMatches, renderMain and showAcmaCard. Four of those five are the
+// ACMA RRL layer, which is still in app.js and belongs to #138 — so this file
+// is not independent of that work, and whoever picks up #138 should read this
+// list before moving anything.
+//
+// The IIFE body declares and calls nothing at load — 41 statements, 35 function
+// declarations and 5 constants and the return — so this file's position among
+// the modules is free. Workbench holds a reference to RfChanges and never
+// dereferences one until a tab renders, so it may load either side of this.
+//
+// 13 of the 40 names inside are public. Five are called from code (render and
+// init from renderMain, and ensureData / anchorName / helpHtml from the
+// Workbench); the other eight exist only to be named by an inline on*=
+// attribute. Those eight resolve against the *global* scope at click time, so
+// renaming one means rewriting the template string that names it in the same
+// edit — otherwise the control goes quiet with nothing thrown until someone
+// presses it. test/lib/controls.mjs presses all of them but focusAnchor, and
+// says why that one is left.
+//
+// Not indented into the IIFE. Nearly all of these lines are inside multi-line
+// template literals, so shifting them by two spaces would rewrite the HTML this
+// file emits — a change to what the app produces dressed as formatting. The
+// other fifteen module IIFEs indent because they were written that way, not
+// because they were re-indented.
+//
+// Wrapped in an IIFE and moved out of app.js by M4 (#135) of #129 — the last
+// child of that epic, and the only one that was a refactor rather than a move.
+
 // ── RF Changes tab ──────────────────────────────────────────────────────────────
 // "Did something change on the air near this repeater around the date our data
 // went bad?" Two views: a retrospective timeline of AUTHORISATION_DATEs (works

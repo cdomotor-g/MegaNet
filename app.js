@@ -14,17 +14,23 @@
 //   own names are consumed by 20 other sections, and it is the hub the rest of
 //   the app hangs off. #136 (U1) owns the tab.
 //
-//   the filter helpers, the ACMA RRL layer and RF Environment   #138 (U3).
-//
-//   RF Changes and the Interference Workbench   111 flat top-level functions
-//   between them and no IIFE, so they need wrapping before they can move.
-//   That is M4, #135, and it is the last of this epic.
+//   the filter helpers, the ACMA RRL layer and RF Environment   #138 (U3), and
+//   the last thing in this file with more than one issue interested in it —
+//   rf-changes.js and workbench.js both reach back into the ACMA loaders.
 //
 // It is down from 22,458 lines before M1 (#132) to 21,536 after it, 16,160
-// after M2 (#133) and 6,221 now — M3 (#134) took fourteen modules out in one
-// go. Still the largest file in the app and still the one most likely to be
-// edited by two agents at once, but 72% of the monolith now lives somewhere
-// with an owner.
+// after M2 (#133), 6,221 after M3 (#134) and 3,724 now. M4 (#135) took RF
+// Changes and the Interference Workbench, which closes #129: **83% of the
+// monolith has an owner, and what is left is three things rather than
+// twenty-seven.**
+//
+// The epic is finished, so the thing to know about this file has changed. It is
+// no longer "the monolith, being drained". It is the app shell plus the two
+// features nobody has cut yet, and both of those are somebody's issue — #109
+// for the shell, #136 for the Stations core, #138 for RF Environment. Two
+// agents editing this file at once is now a much narrower risk than it was, but
+// it is not gone: read the band table in #113 before assuming a change here is
+// yours alone.
 //
 // Two things to know before editing it:
 //

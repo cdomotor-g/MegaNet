@@ -24,7 +24,7 @@ npm run all                       # syntax + duplicate names + smoke
 |---|---|
 | `npm run check` | `node --check` over every script `index.html` loads |
 | `npm run names` | no duplicate top-level declarations across those scripts |
-| `npm run smoke` | loads the page in Chromium, opens all 16 tabs, asserts a clean console |
+| `npm run smoke` | loads the page in Chromium, opens all 16 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
 | `npm run all` | the three that run in CI |
 
@@ -33,11 +33,12 @@ npm run all                       # syntax + duplicate names + smoke
 CI runs `check`, `names` and `smoke` on every push that touches a root `*.js`,
 `index.html`, `styles.css`, `stations.json` or `test/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's
-script list grows as `app.js` is split up — `core.js` and `init.js` in M1, ten
-module files in M2, fourteen more in M3 — and a filter naming each file would
-have to be edited by every milestone. M2 added ten scripts and M3 added fourteen,
-and neither changed a line in this directory except the two baselines, which is
-the claim the glob was put there to make good.
+script list grew as `app.js` was split up — `core.js` and `init.js` in M1, ten
+module files in M2, fourteen more in M3, `rf-changes.js` and `workbench.js` in
+M4 — and a filter naming each file would have to have been edited by every
+milestone. Twenty-six scripts were added across those four and not one of them
+changed a line in this directory except the two baselines, which is the claim
+the glob was put there to make good.
 
 ## Why this is not at the repo root
 
@@ -92,6 +93,59 @@ The single most important line in `smoke.mjs`. An uncaught `ReferenceError`
 during script evaluation never reaches `console.error` — it surfaces as
 `pageerror`. A test watching only the console would miss the entire class of bug
 this exists to catch. `pageerror` is never filtered.
+
+### Opening a tab is not enough — the handler audit and the click phase
+
+Added by [#135](https://github.com/cdomotor-g/MegaNet/issues/135), which pulled
+111 top-level names inside two namespaces and needed something that could tell
+whether it had broken anything.
+
+An inline `on*=` attribute is a string. The browser compiles it and resolves its
+identifiers against the **global** scope, and it does that **at click time**. So
+a function moved inside an IIFE stops being reachable from `onclick="foo()"`
+with no error at load, no error at render, and nothing thrown until a person
+presses the button. `node --check` cannot see it. The duplicate-name check
+cannot see it. Neither could this smoke test, which opened every tab and clicked
+nothing inside one. `lib/controls.mjs` closes that, two ways:
+
+**`auditHandlers()`** reads every `on*=` attribute the tab rendered, pulls the
+callee paths out of it and asks the page whether each resolves to a function.
+One `evaluate()` per tab, so it runs on all sixteen — 313 distinct handler calls
+across 5,578 attributes on a full pass. It is exhaustive over whatever is on
+screen, which is its advantage and also its limit: a control that did not render
+is a control it did not check.
+
+Two false positives are filtered, and both are worth knowing about before you
+add a third: `document.getElementById('x').click()` reads as a call to a global
+`click`, so a match preceded by `)`, `]` or `.` is skipped; and a station called
+`Fitzroy River (Qld)` sitting in a handler argument reads as a call to `River`,
+so string literals are blanked (to the same length, keeping offsets) before
+scanning. It is a reachability check, not a JavaScript parser.
+
+**`exerciseSurface()`** clicks. The script is keyed by the handler each control
+names — `Workbench.saveCase`, not `.wb-case-bar button:nth-child(2)` — which
+makes it a direct statement about a module's public surface rather than about
+its markup, and means a renamed member fails loudly instead of silently
+matching nothing. It reports what it could not reach rather than skipping it, so
+a control that quietly stopped rendering shows up in the run.
+
+Both were confirmed to go red before being trusted, and they catch different
+things:
+
+| Break | audit | click |
+|---|---|---|
+| a member dropped from the namespace's return object | ✓ `RfChanges.sort()` does not resolve | ✓ `TypeError: RfChanges.sort is not a function` |
+| a handler string left naming the now-private function | ✓ `rfcCardFor()` does not resolve | ✓ no control names the member any more |
+
+**Adding to the click script.** Each entry is `{ member, how, note }` plus
+optional `needs` (a member that must fire first for this one to be on screen),
+`prep` (a field to type into before pressing), and `soft` (the control may
+legitimately not render — reported as "not reached" rather than failed). Use
+`soft` sparingly: it is the escape hatch that lets a genuinely broken control
+pass. Exactly one entry uses it, `RfChanges.focusAnchor`, which only renders when
+two or more pasted series resolve to real stations that share one repeater which
+is itself in the ACMA threat layer — driving that would pin the test to whichever
+stations are in `stations.json` this month.
 
 ### The duplicate-name check is separate from the smoke test on purpose
 
@@ -150,15 +204,22 @@ without looking, and a verifier nobody looks at verifies nothing.
   bump `EXPECTED_TABS`.
 - **A script was added to `index.html`.** Nothing to do. Every check reads the
   script list out of `index.html`, so the split milestones are picked up
-  automatically — M1 added `core.js` and `init.js`, M2 added ten module files and
-  M3 added fourteen, none of them touching a line of test code. A file added to
-  the repo but not wired into `index.html` is invisible to the tests exactly as
-  it is invisible to the app. The two baselines under `baseline/` do have to be
-  re-recorded, since both name the script list they were taken over.
+  automatically — M1 added `core.js` and `init.js`, M2 added ten module files, M3
+  added fourteen and M4 added two, none of them touching a line of test code. A
+  file added to the repo but not wired into `index.html` is invisible to the
+  tests exactly as it is invisible to the app. The two baselines under
+  `baseline/` do have to be re-recorded, since both name the script list they
+  were taken over.
 - **The top-level declaration count moved.** Reported, never enforced — a check
   that goes red for ordinary work gets switched off. Re-record with
   `npm run names -- --update` when it drifts. A *drop* of a hundred in a split
-  commit means a file stopped being loaded.
+  commit means a file stopped being loaded — or, as in M4, that a hundred names
+  went private on purpose, which is why it reports rather than enforces.
+- **A member was added to `RfChanges` or `Workbench` that an `on*=` attribute
+  names.** Add it to `CONTROL_SCRIPT` in `lib/controls.mjs`. Nothing forces you
+  to; the coverage line at the end of the run (`controls: workbench — 18/18
+  fired`) is what makes the omission visible. The same applies to any module that
+  grows a click script later.
 
 ## What this found on the way in
 

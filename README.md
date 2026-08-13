@@ -31,10 +31,12 @@ The application logic was one 22,500-line `app.js` until
 the entry point out of it,
 [#133](https://github.com/cdomotor-g/MegaNet/issues/133) took ten self-contained
 modules out into a file each, and
-[#134](https://github.com/cdomotor-g/MegaNet/issues/134) took fourteen more.
-`app.js` is 6,221 lines now, and what is left in it is the app shell, the
-Stations tab, RF Environment, and the two sections that still need wrapping
-before they can move ([#135](https://github.com/cdomotor-g/MegaNet/issues/135)).
+[#134](https://github.com/cdomotor-g/MegaNet/issues/134) took fourteen more, and
+[#135](https://github.com/cdomotor-g/MegaNet/issues/135) finished the job by
+wrapping RF Changes and the Interference Workbench — 111 loose top-level
+functions between them — in namespaces first, then moving those out too.
+`app.js` is 3,724 lines now, and what is left in it is the app shell, the
+Stations tab and RF Environment.
 They are still plain classic scripts sharing one global scope — no modules, no
 bundler, no build step — so the split is a question of which file a function
 sits in and nothing else. **The order they load in is the contract**, stated at
@@ -55,9 +57,12 @@ document*, so nothing below changes: see
 MegaNet/
 ├── index.html              ← single entry point; its script order is the contract
 ├── core.js                 ← constants, TABS/HELP, state, shared utilities
-├── app.js                  ← the app shell, the Stations tab, and what is not split out yet
-│                             ↓ the fourteen modules #134 lifted out of it, one each,
-│                               loaded immediately after app.js
+├── app.js                  ← the app shell, the Stations tab, RF Environment
+│                             ↓ the two #135 wrapped and lifted out, loaded
+│                               immediately after app.js
+├── rf-changes.js           ← RfChanges — RF Changes tab (ACMA register timeline & diffs)
+├── workbench.js            ← Workbench — Interference Workbench tab (the case, argued)
+│                             ↓ the fourteen modules #134 lifted out, one each
 ├── mem-meter.js            ← MemMeter  — the memory bar, and giving memory back
 ├── auth.js                 ← Auth      — Supabase sign-in, and the access token
 ├── map-draw.js             ← MapDraw   — draw & measure over the Stations map
@@ -1931,7 +1936,7 @@ Three checks, in ascending order of cost:
 |---|---|
 | `npm run check` | a broken brace, in under a second, before a browser is launched |
 | `npm run names` | a second `function esc()` in another file silently overwriting the first |
-| `npm run smoke` | the page loading and all 16 tabs opening with nothing on the console |
+| `npm run smoke` | the page loading and all 16 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and
@@ -1939,9 +1944,19 @@ then opens each tab in turn watching for `pageerror` as well as `console.error`
 — an uncaught `ReferenceError` during script evaluation never reaches the
 console, and that is exactly the failure a moved function produces.
 
+Since #135 it does two further things, because opening a tab was never going to
+catch the failure that milestone risked. An inline `onclick=` resolves its
+identifiers against the *global* scope **at click time**, so a function pulled
+inside a namespace breaks its button with nothing thrown until a person presses
+it. So the test now reads every `on*=` attribute each tab rendered and checks the
+name in it resolves — 313 distinct handler calls across 5,578 attributes — and
+then clicks its way through the RF Changes and Interference Workbench controls,
+keyed by the handler each one names rather than by its label. See
+`test/lib/controls.mjs`.
+
 CI runs all three on any push touching a root `*.js`, `index.html`, `styles.css`,
 `stations.json` or `test/`. The filter is a glob rather than a list of filenames
-because the app's script list is still growing as `app.js` is split up — a named
+because the app's script list grew with every milestone of the split — a named
 list would have to be edited by every milestone, and the one that forgot would
 quietly stop being tested.
 
@@ -1949,7 +1964,8 @@ There is a fourth, `npm run concat`, which is not in CI: it concatenates the
 scripts `index.html` loads and compares the bytes against a recorded snapshot.
 That is the check that proves an `app.js` split moved code without changing it,
 and the only one that catches the four literal NUL bytes the app carries inside
-string literals — three in `app.js`, one in `alert2.js` since #133 — because a
+string literals — three in `network-view.js` since #134, one in `alert2.js`
+since #133, and none left in `app.js` — because a
 tool that rewrites a file as text normalises those away and silently breaks the
 compound keys built from them.
 
