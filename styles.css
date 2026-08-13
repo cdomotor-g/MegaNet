@@ -4138,6 +4138,255 @@ code {
                    not layout.
    ────────────────────────────────────────────────────────────────────────── */
 
+/* ── Inspections tab (#116) ──────────────────────────────────────────────────
+   The six paper sheets, digitised. The layout is doing one job that is not
+   ordinary form styling: a person who has filled these in on paper has to
+   recognise the thing on screen. So the banner-headed block is the unit — a
+   shaded strip with the section's printed name, its print-order number, and
+   the sheet's own variant note under it — and the boxes inside one sit in a
+   dense grid rather than a column, the way a fine merged-cell grid reads on
+   A4.
+
+   Nothing here touches a shared rule or a token; every selector is `insp-`
+   and scoped to this tab, which is what #113's constraint 2 asks of a tab
+   that is not #109. */
+
+.insp-page {
+  padding: 1rem;
+  display: grid;
+  gap: .75rem;
+  max-width: 1180px;      /* an A4 page is not 2000 px wide, and neither is a form */
+  margin: 0 auto;
+}
+
+.insp-sub { color: var(--muted); margin: .2rem 0 .4rem; }
+
+.insp-head-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+.insp-note { padding: 1rem; }
+.insp-bad  { border-left: 3px solid var(--bad); }
+
+/* The picker: search on the left, drafts and recent visits on the right. */
+.insp-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: .75rem;
+  align-items: start;
+}
+
+.insp-search { display: grid; gap: .3rem; font-size: .9rem; color: var(--muted); }
+
+.insp-hits {
+  display: grid;
+  gap: .2rem;
+  margin: .6rem 0;
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.insp-hit {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .75rem;
+  text-align: left;
+  width: 100%;
+  padding: .35rem .5rem;
+}
+
+.insp-hit-name { font-weight: 600; }
+.insp-muted    { color: var(--muted); }
+
+.insp-list { display: grid; gap: .1rem; }
+
+.insp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .5rem;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.insp-row:last-child { border-bottom: 0; }
+
+.insp-drop {
+  margin-left: auto;
+  padding: .1rem .4rem;
+  font-size: .78rem;
+  border-color: #c7401a;
+  color: #c7401a;
+}
+
+/* ── The form ── */
+
+.insp-form-head .insp-cfg {
+  display: grid;
+  gap: .3rem;
+  font-size: .9rem;
+  color: var(--muted);
+  max-width: 26rem;
+}
+
+.insp-sheet { display: block; margin-top: .25rem; }
+
+.insp-section { padding: 0 .9rem .9rem; }
+
+/* The shaded banner cell the sheets print above every block. Full-bleed inside
+   the panel, because on paper it spans the section's width. */
+.insp-banner {
+  display: flex;
+  align-items: baseline;
+  gap: .6rem;
+  margin: 0 -.9rem .6rem;
+  padding: .45rem .9rem;
+  background: var(--subtle);
+  border-bottom: 1px solid var(--border);
+  border-radius: 10px 10px 0 0;
+  font-weight: 700;
+}
+
+.insp-banner-ord {
+  font-weight: 400;
+  font-size: .75rem;
+  color: var(--muted);
+  min-width: 1.2rem;
+}
+
+.insp-banner-label { font-size: 1rem; }
+
+/* The sheet's own words about what this configuration does differently, straight
+   off meganet.inspection_config_section.variant_note. */
+.insp-variant {
+  margin: -.3rem 0 .6rem;
+  padding-left: 1.8rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.insp-block {
+  margin: .9rem 0 .35rem;
+  font-size: .85rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+
+.insp-subblock { margin: .6rem 0 .3rem; font-size: .85rem; }
+
+.insp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: .5rem .7rem;
+}
+
+.insp-field { display: grid; gap: .2rem; align-content: start; }
+.insp-field.full { grid-column: 1 / -1; }
+
+.insp-label {
+  display: block;
+  font-size: .82rem;
+  color: var(--muted);
+  line-height: 1.25;
+}
+
+.insp-hint {
+  display: block;
+  font-size: .72rem;
+  font-style: italic;
+  opacity: .85;
+}
+
+.insp-field input,
+.insp-field select,
+.insp-field textarea { width: 100%; }
+
+/* Calibration grids and the serial-number panel. A printed grid is wide and
+   stays wide; it scrolls inside its own box rather than stretching the page. */
+.insp-scroll { overflow-x: auto; margin: .3rem 0 .5rem; }
+
+.insp-table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+
+.insp-table th,
+.insp-table td {
+  border: 1px solid var(--border);
+  padding: .2rem .3rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.insp-table thead th {
+  background: var(--subtle);
+  font-size: .75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.insp-table input,
+.insp-table select { width: 100%; min-width: 5.5rem; }
+
+.insp-table .insp-ord    { width: 2rem; color: var(--muted); text-align: center; }
+.insp-table .insp-rowhead { background: var(--subtle); white-space: nowrap; }
+
+/* The printed 6% rule, read against what has actually been typed. */
+.insp-rule {
+  margin: .3rem 0 0;
+  padding: .35rem .5rem;
+  border-left: 3px solid var(--border);
+  background: var(--subtle);
+  border-radius: 0 6px 6px 0;
+}
+
+.insp-rule-on { border-left-color: var(--warn); }
+
+/* The instruction at the foot of every inspection sheet, and the live version
+   of it once a departure rating has been given. */
+.insp-footnote { margin: .6rem 0 0; color: var(--muted); font-style: italic; }
+
+.insp-prompt {
+  margin-top: .6rem;
+  padding: .6rem .7rem;
+  border: 1px solid var(--warn);
+  border-left-width: 3px;
+  border-radius: 6px;
+  background: var(--subtle);
+}
+
+.insp-prompt p { margin: .3rem 0 0; }
+
+/* A box the sheet prints and the schema cannot yet hold. Visible on purpose. */
+.insp-gap {
+  margin-top: .7rem;
+  padding: .5rem .7rem;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+.insp-gap ul { margin: .3rem 0 .3rem 1.1rem; }
+
+/* What this form does not print, listed rather than left as an absence. */
+.insp-absent { border-style: dashed; }
+.insp-absent-list { margin: .3rem 0 0 1.1rem; color: var(--muted); }
+.insp-absent-list li { margin-bottom: .2rem; }
+
+.insp-foot { display: grid; gap: .5rem; }
+
+/* A tablet in the field is the primary device for this tab, so the two-column
+   picker folds well before the phone breakpoint and the field grid gets wider
+   cells rather than more of them. */
+@media (max-width: 900px) {
+  .insp-cols { grid-template-columns: minmax(0, 1fr); }
+  .insp-page { padding: .6rem; }
+}
+
+@media (max-width: 560px) {
+  .insp-grid { grid-template-columns: minmax(0, 1fr); }
+  .insp-banner { margin-left: -.6rem; margin-right: -.6rem; padding-left: .6rem; }
+  .insp-section { padding: 0 .6rem .6rem; }
+  .insp-variant { padding-left: 0; }
+}
+
+
 /* iOS Safari zooms the page when a field smaller than 16 px takes focus, and
    never zooms back out. Every text-entry control in the app is .9 rem or less,
    so on a touch device they are all bumped to exactly 16 px — the one number

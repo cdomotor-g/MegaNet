@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the five that run in CI
+npm run all                       # the six that run in CI
 ```
 
 | Command | What it does |
@@ -25,17 +25,18 @@ npm run all                       # the five that run in CI
 | `npm run check` | `node --check` over every script `index.html` loads |
 | `npm run names` | no duplicate top-level declarations across those scripts |
 | `npm run toplevel` | `init.js` is still the only file that executes at load |
-| `npm run smoke` | loads the page in Chromium, opens all 16 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
+| `npm run smoke` | loads the page in Chromium, opens all 17 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
+| `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the five that run in CI |
+| `npm run all` | the six that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
 `toplevel` and `registry` take `-v` too, to list what passed as well as what did
 not.
 
-CI runs `check`, `names`, `toplevel`, `smoke` and `registry` on every push that touches a root `*.js`,
-`index.html`, `styles.css`, `stations.json` or `test/` — see
+CI runs `check`, `names`, `toplevel`, `smoke`, `registry` and `insp` on every push that touches a root `*.js`,
+`index.html`, `styles.css`, `stations.json`, `db/migrations/` or `test/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's
 script list grew as `app.js` was split up — `core.js` and `init.js` in M1, ten
 module files in M2, fourteen more in M3, `rf-changes.js` and `workbench.js` in
@@ -63,7 +64,7 @@ directory would not change what a browser loads.
 tool, and someone opening `index.html` off a laptop with no server is
 anticipated. But it is a bad mode to *test* in: over `file://` the bundled
 `stations.json` is unreachable (`autoLoad()` says so at `app.js:188`), so
-`state.data` stays null and eleven of the sixteen tabs render the empty state
+`state.data` stays null and twelve of the seventeen tabs render the empty state
 instead of themselves. A smoke test that never draws a station table proves very
 little.
 
@@ -186,7 +187,7 @@ something, so say why.
 
 ### `registry.mjs` — the half smoke cannot see
 
-Smoke opens all sixteen tabs. It never *leaves* one, so a tab that forgot to
+Smoke opens all seventeen tabs. It never *leaves* one, so a tab that forgot to
 register its Leaflet map or its teardown passes: the tab itself is fine. It is
 the leaving that isn't, and it fails in silence — a map missing from the
 re-measure list renders at the wrong size after a nav collapse, a module missing
@@ -214,6 +215,46 @@ See #142 for why the two registries were inverted in the first place, and #143
 for why `removeMap()` exists rather than a bare `map.remove()` — a zoom in
 flight when the map goes throws from a timer, where no `try`/`catch` at the call
 site can reach it.
+
+### `inspections.mjs` — the half the network policy hides
+
+`registry.mjs` exists because smoke opens every tab and never leaves one. This
+one exists because of the opposite problem: smoke *blocks* the datastore, and
+the Inspections tab renders **from** it.
+
+Which sections each of the six inspection forms prints comes out of
+`meganet.inspection_form`, and every pick-list on the form comes out of a lookup
+table (#115). Under smoke's policy those reads are aborted, the tab correctly
+renders "the form itself could not be loaded", the handler audit finds six
+handlers on an error panel, and a form of some 1,500 lines that nobody drew
+passes. That is a true result about the failure path and says nothing at all
+about the form.
+
+So this check answers the datastore instead of blocking it — installing its
+route *after* `applyNetworkPolicy`, so Playwright reaches it first, and serving
+only the paths this tab asks for. Everything else still falls through to the
+abort, which is what stops the test quietly depending on a request nobody meant
+to make.
+
+**The fixture is parsed out of `db/migrations/0009_inspections.sql`, not copied
+from it.** That is the part worth keeping if this file is ever rewritten. The
+form's whole claim is that it renders what the database says; a test that
+renders it against a hand-written copy of what the database says is testing the
+copy. Parse the migration, and a matrix the form cannot render fails here. It is
+also why `db/migrations/**` is in the workflow's `paths:` filter.
+
+What it asserts, for each of the six configurations: the sections on screen are
+the matrix's, in the matrix's order; the ones it does not print are *named*
+under "Not on this form"; every rendered handler resolves; no calibration block
+is offered that the section guard in 0009 would refuse; the Serial Numbers panel
+is that sheet's own after a configuration change; and the printed tip-test
+reference values are filled in. Then, once: the printed 6% rule computes and
+reads the right way either side of the threshold, and a save sends a document
+with no section the form does not print and with the untouched grids pruned out.
+
+Confirmed red on three deliberate breaks before being trusted — offering a
+calibration block the guard would refuse, dropping a section from the render,
+and sending the document unpruned.
 
 ## Using `concat-verify.mjs` across a split
 
@@ -255,7 +296,7 @@ without looking, and a verifier nobody looks at verifies nothing.
 
 ## When the tests need updating
 
-- **A tab was added or removed.** `smoke.mjs` asserts `TABS` holds 16 entries, so
+- **A tab was added or removed.** `smoke.mjs` asserts `TABS` holds 17 entries, so
   that a tab added without a `renderMain()` case fails here rather than in front
   of an operator. Give the new tab a `renderMain()` case and a `HELP` entry, then
   bump `EXPECTED_TABS`.

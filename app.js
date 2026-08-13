@@ -1124,6 +1124,7 @@ function renderMain() {
     case 'arrodata':   el.innerHTML = ArroData.render();      ArroData.init();     break;
     // Same module, second instance — see the comment at the top of ArroData.
     case 'field':      el.innerHTML = ArroData.render('field'); ArroData.init();  break;
+    case 'inspections': el.innerHTML = Inspections.render();  Inspections.init(); break;
     case 'export':     el.innerHTML = renderExportHtml();     initExport();     break;
     default:           el.innerHTML = '<p style="padding:1rem">Unknown tab</p>';
   }

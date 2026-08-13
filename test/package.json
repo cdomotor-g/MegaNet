@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Test harness for the MegaNet web app. Deliberately NOT at the repo root — see test/README.md.",
+  "description": "Test harness for the MegaNet web app. Deliberately NOT at the repo root \u2014 see test/README.md.",
   "scripts": {
     "test": "node --test",
     "check": "node syntax-check.mjs",
@@ -12,7 +12,8 @@
     "toplevel": "node toplevel.mjs",
     "registry": "node registry.mjs",
     "concat": "node concat-verify.mjs",
-    "all": "npm run check && npm run names && npm run toplevel && npm run smoke && npm run registry"
+    "all": "npm run check && npm run names && npm run toplevel && npm run smoke && npm run registry && npm run insp",
+    "insp": "node inspections.mjs"
   },
   "devDependencies": {
     "acorn": "8.15.0",

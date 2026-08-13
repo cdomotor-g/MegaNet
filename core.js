@@ -65,6 +65,7 @@ const TABS = [
     { id: 'arro',       label: 'ARRO Launcher',          icon: '🚀' },
     { id: 'arrodata',   label: 'ARRO Data',              icon: '📊' },
     { id: 'field',      label: 'Field Data',             icon: '🌡️' },
+    { id: 'inspections', label: 'Inspections',           icon: '🩺' },
     { id: 'export',     label: 'Export',                 icon: '📤' },
   ] },
 ];
@@ -261,6 +262,32 @@ const HELP = {
       + 'of zeroes are different claims.',
     ],
     related: ['arrodata', 'stations', 'alert2'],
+  },
+
+  inspections: {
+    summary: 'The six paper station-inspection sheets, digitised — pick a station, pick which of the '
+           + 'six forms its configuration prints, and fill it in. There is <strong>one</strong> form '
+           + 'rather than six: which sections a configuration prints comes from '
+           + '<code>meganet.inspection_form</code> in the database, so "this site has no gas bubbler" '
+           + 'is a fact the schema holds rather than a section somebody left blank. Drafts save to '
+           + 'this device, which is the point — the form is meant to be filled in on a tablet at a '
+           + 'site with no signal.',
+    watch: [
+      'A section a form does not print is listed under <strong>Not on this form</strong> at the '
+      + 'bottom rather than hidden. That is deliberate: a missing row in a section table means '
+      + '<em>nobody recorded it</em>, a section missing from the form means <em>this site has no '
+      + 'such thing</em>, and the database refuses the first dressed up as the second.',
+      'Past visits are <strong>editors-only</strong> — an inspection\'s remarks carry site access '
+      + 'notes, and the key this app ships with is published. The form itself, and every pick-list '
+      + 'on it, renders signed out; the recent-visits list and Save do not.',
+      'A <strong>draft is only on this device</strong>. It is never uploaded on its own, and it is '
+      + 'cleared once the visit it holds saves — so a draft that is still in the list is a visit '
+      + 'that has not reached the database.',
+      'The <strong>6% rule</strong> printed on four of the sheets is computed here rather than left '
+      + 'to whoever reads the numbers later, and the threshold is stored per visit — changing it '
+      + 'never rewrites what a past visit was judged against.',
+    ],
+    related: ['stations', 'export'],
   },
 
   export: {
@@ -770,6 +797,24 @@ const state = {
     map: null,
     lastAnalysis: null,
     concepts: null, conceptsPromise: null, drawerId: null,
+  },
+  // Inspections (#116 — lazy; the form matrix and the pick-lists are fetched
+  // the first time the tab is opened, and kept for the session)
+  insp: {
+    refs: null,          // the matrix, the fourteen sections, the vocabularies
+    refsLoading: false,
+    refsError: null,
+    query: '',           // the station picker's search box
+    doc: null,           // the visit on screen, shaped as inspection_doc() returns it
+    stamp: null,         // updated_at the form loaded it with; the 409 contract
+    draftKey: null,      // which localStorage draft this form writes to
+    suggestion: null,    // why a configuration was pre-selected, or null
+    dirty: false,
+    busy: false,
+    msg: null,
+    recent: null,        // last 25 visits, editors only
+    recentBusy: false,
+    recentError: null,
   },
   theme: localStorage.getItem('mn-theme') || 'light',
 };

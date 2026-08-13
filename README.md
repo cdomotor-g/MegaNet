@@ -77,6 +77,7 @@ MegaNet/
 ├── datastore.js            ← the browser's PostgREST client: ping, reads, writes, snapshot
 ├── export.js               ← Export tab
 ├── station-editor.js       ← the station editor card on the Stations tab
+├── inspections.js          ← Inspections — the six paper inspection sheets, digitised
 │                             ↓ the ten modules #133 lifted out of it, one each
 ├── map-rivers.js           ← MapRivers — OSM watercourses under the station pins
 ├── map-spider.js           ← MapSpider — fans overlapping pins out on leader lines
@@ -149,7 +150,7 @@ MegaNet/
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
 ├── test/                   ← the web app's safety net (see test/README.md, and Testing below)
-│   ├── smoke.mjs            (headless Chromium: load, open all 16 tabs, clean console)
+│   ├── smoke.mjs            (headless Chromium: load, open all 17 tabs, clean console)
 │   ├── dup-names.mjs        (no duplicate top-level names across the loaded scripts)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
 │   ├── syntax-check.mjs     (node --check over every script index.html loads)
@@ -1091,7 +1092,7 @@ on a narrow window.
 | --- | --- |
 | **Network** | Stations · Network Maps · Networks · Pass Ranges |
 | **Radio investigation** | RF Environment · RF Changes · Interference Workbench · Bit Flipper · Network View · ALERT Packets · ALERT2 / ERT-A2 · Serial Monitor |
-| **Data & admin** | ARRO Launcher · ARRO Data · Export |
+| **Data & admin** | ARRO Launcher · ARRO Data · Field Data · Inspections · Export |
 
 The grouping is the point of the second row: RF Environment, RF Changes, the
 Workbench and Bit Flipper are one investigation approached four ways, and
@@ -1718,6 +1719,9 @@ Tabs / panels:
 - **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF, A2C)
 - **ALERT2 / ERT-A2** — decode ELPRO ERT-A2 serial captures, either wire format (ALERT2 ASCII on RS232, or the USB binary framing that carries RSSI), mapped and matched to stations
 - **Serial Monitor** — live ingestion from physical COM ports (Web Serial), with ASCII / hex / ALERT-decode display
+- **Inspections** — the six paper station-inspection sheets, digitised: one form
+  driven by `meganet.inspection_form`, drafts on the device, and the printed 6%
+  tip-test rule computed rather than read
 - **Export** — Radio Mobile file generation
 
 Technology: Vanilla JS (no framework), same stack as current `app.js`.
@@ -1984,13 +1988,16 @@ degrades honestly when they don't.
 cd test && npm install && npm run all
 ```
 
-Three checks, in ascending order of cost:
+Six checks, in ascending order of cost:
 
 | | Catches |
 |---|---|
 | `npm run check` | a broken brace, in under a second, before a browser is launched |
 | `npm run names` | a second `function esc()` in another file silently overwriting the first |
-| `npm run smoke` | the page loading and all 16 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
+| `npm run toplevel` | a statement that executes at load in a file that should only declare — the property the load order in `index.html` rests on |
+| `npm run smoke` | the page loading and all 17 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
+| `npm run registry` | a Leaflet map or a tab teardown no file registered — and, at runtime, one that was registered and does not fire |
+| `npm run insp` | the Inspections form drawn against the schema's own seed data, on all six sheets. Smoke cannot see this one: it blocks the datastore, and this tab renders from it |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and

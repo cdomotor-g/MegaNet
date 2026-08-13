@@ -1,6 +1,6 @@
 // Exercising the controls inside a tab, rather than only opening it (#135).
 //
-// The smoke test opens all sixteen tabs and asserts nothing threw. That catches
+// The smoke test opens all seventeen tabs and asserts nothing threw. That catches
 // a module that failed to load and a render path that blew up, and it is blind
 // to the failure M4 risks: an inline `on*=` attribute naming an identifier that
 // no longer resolves. Those attributes are evaluated by the browser against the

@@ -1,7 +1,7 @@
 // M0 — the headless smoke test (#130), extended by M4 (#135).
 //
 // Loads index.html in a real Chromium, waits for a real stations.json, then
-// opens all sixteen tabs one at a time and asserts that nothing threw. Since
+// opens all seventeen tabs one at a time and asserts that nothing threw. Since
 // M4 it also audits every rendered on*= handler for a name that no longer
 // resolves, and clicks its way through the RF Changes and Interference
 // Workbench controls — see lib/controls.mjs for why those two checks exist and
@@ -140,7 +140,7 @@ async function main() {
     // ── The tab registry ─────────────────────────────────────────────────
     // #130 asks for the count to be asserted, so that a tab added to TABS
     // without a renderMain() case fails here rather than in front of a user.
-    const EXPECTED_TABS = 16;
+    const EXPECTED_TABS = 17;
     check(`TABS holds ${EXPECTED_TABS} tabs`, boot.tabs.length === EXPECTED_TABS ? []
       : [{ kind: 'assert', text: `TABS holds ${boot.tabs.length} tabs, expected ${EXPECTED_TABS}. `
           + `If a tab was added on purpose: give it a renderMain() case, a HELP entry, and bump `

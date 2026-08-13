@@ -27,6 +27,9 @@ on:
       - 'styles.css'
       - 'stations.json'
       - 'test/**'
+      # The Inspections check reads its fixture out of the migration, so a
+      # change to the matrix has to re-run it (#116).
+      - 'db/migrations/**'
       - '.github/workflows/web-smoke.yml'
   pull_request:
     paths:
@@ -35,6 +38,9 @@ on:
       - 'styles.css'
       - 'stations.json'
       - 'test/**'
+      # The Inspections check reads its fixture out of the migration, so a
+      # change to the matrix has to re-run it (#116).
+      - 'db/migrations/**'
       - '.github/workflows/web-smoke.yml'
   workflow_dispatch:
 
@@ -102,6 +108,16 @@ jobs:
       - name: Module registries — maps re-measure, teardowns run
         working-directory: test
         run: npm run registry
+
+      # The other half smoke cannot see, for the opposite reason: the
+      # Inspections tab renders *from* the datastore, and smoke's network policy
+      # aborts every off-origin request — so under smoke the tab correctly says
+      # it could not load the form, and the form itself is never drawn. This one
+      # answers the datastore out of db/migrations/0009_inspections.sql instead
+      # (#116).
+      - name: Inspections — the form renders what the matrix says
+        working-directory: test
+        run: npm run insp
 
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —

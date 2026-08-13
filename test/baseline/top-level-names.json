@@ -20,6 +20,7 @@
     "datastore.js",
     "export.js",
     "station-editor.js",
+    "inspections.js",
     "map-rivers.js",
     "map-spider.js",
     "map-locate.js",
@@ -32,6 +33,6 @@
     "bug-report.js",
     "init.js"
   ],
-  "total": 428,
-  "distinct": 428
+  "total": 429,
+  "distinct": 429
 }
