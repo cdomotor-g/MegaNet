@@ -12309,6 +12309,37 @@ function repeaterPassingSummaryHtml(s) {
         </p>`;
 }
 
+// The Pass Ranges textarea below is just numbers — this translates them into
+// the station names they actually mean, so the person configuring a repeater
+// can tell at a glance who they'd be dropping if a range shrank. Reuses
+// findStationMatches/passRangeCoversId, the same carried-station set the
+// "Passing N stations" summary above counts from, so the two never disagree.
+// Empty string when there are no ranges (nothing to translate) or a listed
+// station's ALERT ids happen to all sit outside them despite matching some
+// other way (shouldn't happen, but the filter guards against a blank row).
+function repeaterCarriedStationsHtml(s) {
+  const ranges = s.repeater?.pass_ranges || [];
+  if (!ranges.length) return '';
+  const rows = findStationMatches(s)
+    .map(st => ({ st, ids: stationAlertIds(st).filter(id => passRangeCoversId(s.repeater, id)) }))
+    .filter(r => r.ids.length)
+    .sort((a, b) => a.ids[0] - b.ids[0]);
+  if (!rows.length) {
+    return `<p class="full small" style="color:var(--muted);margin:0 0 .6rem">No stations currently fall inside these pass ranges.</p>`;
+  }
+  return `
+        <div class="full small" style="margin:0 0 .6rem">
+          <div style="font-weight:600;margin-bottom:.3rem">ALERT IDs in range → stations</div>
+          <div style="max-height:11rem;overflow:auto;border:1px solid var(--border);border-radius:4px;padding:.4rem .6rem">
+            ${rows.map(({ st, ids }) => `
+              <div style="cursor:pointer;padding:.1rem 0" onclick="goToStation('${escAttr(st.id)}')"
+                   title="Open ${escAttr(st.name)} on the Stations tab">
+                <strong>${ids.join(', ')}</strong> — ${esc(st.name)}
+              </div>`).join('')}
+          </div>
+        </div>`;
+}
+
 function editorForm(s) {
   const hasRep  = s.roles.includes('repeater');
   const sensors = stationSensors(s).slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0));
@@ -12384,6 +12415,7 @@ function editorForm(s) {
         <label>RX (MHz)<input type="number" step="any" id="ef-rx" value="${s.repeater?.rx_mhz ?? ''}"></label>
         <label>TX (MHz)<input type="number" step="any" id="ef-tx" value="${s.repeater?.tx_mhz ?? ''}"></label>
         ${repeaterPassingSummaryHtml(s)}
+        ${repeaterCarriedStationsHtml(s)}
         <label class="full">Pass Ranges (one per line: <em>low-high</em>)
           <textarea id="ef-pass" rows="5">${(s.repeater?.pass_ranges || []).map(r => `${r.low}-${r.high}`).join('\n')}</textarea>
         </label>
