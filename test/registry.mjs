@@ -17,13 +17,22 @@
 // So this check does the two things a person would otherwise have to do by hand
 // on every tab, every time:
 //
-//   Static   — no file creates a Leaflet map without also registering one. This
-//              is the one that catches the *next* tab, the one nobody has
-//              written yet, because it never has to be told the tab exists.
+//   Static   — no file creates a Leaflet map without also registering one, a
+//              teardown for it, and taking it down through removeMap(). This is
+//              the one that catches the *next* tab, the one nobody has written
+//              yet, because it never has to be told the tab exists.
 //   Runtime  — open the map tabs in a real browser, collapse the nav, and assert
 //              invalidateSize() was actually called on each live map; then leave
 //              each stateful tab and assert the thing it started actually
-//              stopped.
+//              stopped — and come back, and assert it works again.
+//
+// The teardown half of the static check and the re-entry half of the runtime one
+// are #143. Three of the five map tabs registered no teardown, so their maps
+// outlived the div they were built on and stayed live behind whatever tab
+// replaced them; #142 built the registry that made that visible and this is
+// where it stops being possible to reintroduce. Re-entry is asserted because a
+// teardown that runs too eagerly breaks the tab rather than leaking memory,
+// which is the worse failure of the two.
 //
 // Run:  npm run registry
 //       npm run registry -- -v    also print what passed
@@ -84,14 +93,31 @@ function staticPhase() {
     }
     const calls = [];
     callsIn(ast.body, calls);
-    const builds  = calls.filter(c => c.name === 'L.map');
+    const builds    = calls.filter(c => c.name === 'L.map');
     const registers = calls.filter(c => c.name === 'registerLiveMap');
+    const teardowns = calls.filter(c => c.name === 'registerTabTeardown');
+    const removes   = calls.filter(c => c.name === 'removeMap');
     if (!builds.length) continue;
     const rel = path.relative(REPO_ROOT, s.path);
     check(`${rel} registers the map(s) it builds`,
       registers.length >= builds.length,
       `${builds.length} L.map() call(s) at line(s) ${builds.map(b => b.line).join(', ')}, `
       + `${registers.length} registerLiveMap() call(s)`);
+    // #143 — the same argument one step further on. A map that is registered
+    // but never taken down still outlives its container: the div goes with the
+    // tab, the map object does not, and it keeps its window listeners and tile
+    // requests behind whatever replaced it. Three of the five tabs were in that
+    // state, and none of the three was a decision. Like the check above, this
+    // one never has to be told the next tab exists.
+    check(`${rel} registers a teardown for the map(s) it builds`,
+      teardowns.length > 0,
+      `${builds.length} L.map() call(s), ${teardowns.length} registerTabTeardown() call(s)`);
+    // And takes it down the one way that survives a zoom in flight — see the
+    // comment on removeMap() in core.js for what a bare map.remove() leaves
+    // behind and why no try/catch can catch it.
+    check(`${rel} takes its map(s) down through removeMap()`,
+      removes.length > 0,
+      `${removes.length} removeMap() call(s)`);
   }
 }
 
@@ -127,10 +153,14 @@ async function runtimePhase() {
     // init.js renders the Stations tab at load, so its map is already up.
     check('Stations map registered at load',
       await eq(page, `_liveMaps.has('Stations') && !!_liveMaps.get('Stations')()`));
+    check('Stations teardown registered',
+      await eq(page, `_tabTeardowns.has('Stations')`));
 
     await go('bitflipper');
     check('BitFlipper map registered when the tab builds it',
       await eq(page, `_liveMaps.has('BitFlipper') && !!_liveMaps.get('BitFlipper')()`));
+    check('BitFlipper teardown registered',
+      await eq(page, `_tabTeardowns.has('BitFlipper')`));
 
     await go('network');
     check('NetworkView map registered when the tab builds it',
@@ -151,6 +181,8 @@ async function runtimePhase() {
       await eq(page, `_tabTeardowns.has('ArroData')`));
 
     await go('workbench');
+    check('Workbench teardown registered before the tab has a map to take down',
+      await eq(page, `_tabTeardowns.has('Workbench')`));
     await page.evaluate(() => Workbench.loadExample());
     await sleep(SETTLE * 4);
     check('Workbench map registered once a case is analysed',
@@ -163,6 +195,8 @@ async function runtimePhase() {
     await go('stations');
     const nav = await page.evaluate(async () => {
       const maps = liveMaps();
+      const names = [];
+      _liveMaps.forEach((get, name) => { try { if (get()) names.push(name); } catch (_) {} });
       let calls = 0;
       const undo = maps.map(m => {
         const orig = m.invalidateSize.bind(m);
@@ -173,16 +207,21 @@ async function runtimePhase() {
       await new Promise(r => setTimeout(r, 800));
       undo.forEach(f => f());
       setNavCollapsed(false);
-      return { maps: maps.length, calls };
+      return { maps: maps.length, calls, names };
     });
-    // Three, not five: Network View and ALERT2 take their maps down when the
-    // tab is left, so what is live here is Stations, Bit Flipper and Workbench
-    // — the three that build a map and register no teardown. That is
-    // pre-existing behaviour, unchanged by #142 and the same set the hardcoded
-    // list re-measured; the assertion is that *every* live one gets the call.
     check('every live map re-measured on nav collapse',
-      nav.maps >= 3 && nav.calls === nav.maps,
+      nav.maps >= 1 && nav.calls === nav.maps,
       `${nav.calls} invalidateSize() call(s) across ${nav.maps} live map(s)`);
+    // One, not three, and not the five the hardcoded list used to name. Until
+    // #143 the three tabs that registered no teardown — Stations, Bit Flipper
+    // and Workbench — left their maps up behind whatever tab replaced them, so
+    // all three were still live here and all three were being re-measured on a
+    // gesture that could not affect two of them. Now every map belongs to the
+    // tab you are looking at, which is what makes the count above meaningful:
+    // one live map, one call, and nothing being re-measured in absentia.
+    check('and the only live map on the Stations tab is the Stations map',
+      nav.names.length === 1 && nav.names[0] === 'Stations',
+      `live: ${nav.names.join(', ') || 'none'}`);
     await sleep(SETTLE);
 
     // Leaving a tab has to stop what it started — the half no smoke test that
@@ -201,6 +240,69 @@ async function runtimePhase() {
     await go('stations');
     check('Alert2 coverage map torn down on leave',
       a2Up && await eq(page, `state.a2.map === null`));
+
+    // #143 — the three that used to leave their map up. The teardown half is
+    // the cheap one to assert; the half that matters is re-entry, because a
+    // teardown that runs too eagerly breaks the tab rather than leaking memory,
+    // which is the worse failure. So each of these leaves, checks the map is
+    // gone, comes back, and checks it is both rebuilt and still usable.
+    await go('bitflipper');
+    const bfUp = await eq(page, `!!state.bfMap`);
+    await go('stations');
+    check('BitFlipper map torn down on leave',
+      bfUp && await eq(page, `state.bfMap === null`));
+    await go('bitflipper');
+    check('BitFlipper map rebuilt on re-entry, and still zooms',
+      await eq(page, `(() => {
+        if (!state.bfMap || !state.bfMapLayer) return false;
+        const z = state.bfMap.getZoom();
+        // animate:false so the new zoom is readable on this tick — an animated
+        // one only lands in getZoom() when the transition ends.
+        state.bfMap.setZoom(z + 1, { animate: false });
+        return state.bfMap.getZoom() === z + 1;
+      })()`));
+
+    await go('workbench');
+    await page.evaluate(() => Workbench.loadExample());
+    await sleep(SETTLE * 4);
+    const wbUp = await eq(page, `!!state.wb.map`);
+    await go('stations');
+    check('Workbench case map torn down on leave',
+      wbUp && await eq(page, `state.wb.map === null`));
+    await go('workbench');
+    await sleep(SETTLE * 2);
+    check('Workbench case map rebuilt on re-entry, and still zooms',
+      await eq(page, `(() => {
+        if (!state.wb.map) return false;
+        const z = state.wb.map.getZoom();
+        state.wb.map.setZoom(z + 1, { animate: false });
+        return state.wb.map.getZoom() === z + 1;
+      })()`));
+
+    // The one with attach/detach machinery behind it: five modules wire
+    // themselves to this map, so the teardown has to unwire them and the
+    // rebuild has to wire them back. Panning is what proves MapSpider and
+    // MapRivers reattached — both hang off map events.
+    await go('stations');
+    const stUp = await eq(page, `!!state.map`);
+    await go('networks');
+    check('Stations map torn down on leave',
+      stUp && await eq(page, `state.map === null`));
+    check('and its markers and ACMA layer groups go with it',
+      await eq(page, `state.mapMarkers.length === 0 && state.mapLines.length === 0
+                      && !state.acma.layer && !state.acma.beamLayer
+                      && !state.acma.linkLayer && !state.acma.hiLayer`));
+    await go('stations');
+    check('Stations map rebuilt on re-entry, with its pins back',
+      await eq(page, `!!state.map && state.mapMarkers.length > 0`));
+    check('and still pans and zooms',
+      await eq(page, `(() => {
+        const z = state.map.getZoom();
+        state.map.setView([-27.5, 153], z + 1, { animate: false });
+        const c = state.map.getCenter();
+        return state.map.getZoom() === z + 1 && Math.abs(c.lat + 27.5) < 0.5;
+      })()`));
+    await sleep(SETTLE);
 
     const fired = await page.evaluate(`(() => {
       const seen = [], saved = new Map();

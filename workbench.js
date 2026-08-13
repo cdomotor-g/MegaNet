@@ -11,7 +11,8 @@
 //
 //   core.js       ACMA_MECH, acmaHaversineKm, buildSensorIndex, csvEscape,
 //                 dlText, esc, escAttr, registerLiveMap (#142 — the case map
-//                 says so itself now), slug, state
+//                 says so itself now), registerTabTeardown, removeMap (#143 —
+//                 and takes itself down on the way out), slug, state
 //   app.js        acmaEnsureCore, acmaEnsureDevices, acmaFetchJson,
 //                 addBaseLayers, passRangeCoversId, renderMain, renderTabs,
 //                 rfStripPlotHtml, stationAlertIds, switchTab — and
@@ -27,11 +28,12 @@
 // — openBf sets three fields on state and calls switchTab, which is the loosest
 // coupling of the lot and worth keeping that way.
 //
-// The IIFE body declares and calls nothing at load — 72 statements, 62 function
+// The IIFE body declares and calls nothing at load — 73 statements, 63 function
 // declarations and 9 constants and the return — so this file's position among
-// the modules is free, including relative to rf-changes.js.
+// the modules is free, including relative to rf-changes.js. (72/62 before #143
+// added stopWbMap; `npm run toplevel` is what checks the claim, not this note.)
 //
-// 21 of the 71 names inside are public. Three are called from code (render and
+// 21 of the 72 names inside are public. Three are called from code (render and
 // init from renderMain, restoreFromUrl from init.js); the other eighteen exist
 // only to be named by an inline on*= attribute, and the note in rf-changes.js
 // about what that costs applies here eighteen times over. What is *not* public
@@ -701,6 +703,10 @@ function renderWorkbenchHtml() {
 }
 
 function initWb() {
+  // Here rather than in initWbMap(), which returns before building anything
+  // until a case has been analysed — the teardown has to be registered whether
+  // or not this render produced a map. Keyed by name and safe to repeat (#142).
+  registerTabTeardown('Workbench', stopWbMap);
   wbSyncUrl();
   const A = state.acma, R = state.rfc;
   const rerender = () => { if (state.activeTab === 'workbench') renderMain(); };
@@ -1381,10 +1387,21 @@ function wbActionsHtml(an) {
 
 // ── map ──
 
+// Leaving the tab takes the map with it (#143). The div it was built on goes
+// when renderMain() replaces #main-content; without this the map object stayed,
+// keeping its window listeners and tile requests alive behind the next tab.
+// Free on re-entry — initWbMap() rebuilt this map on every render already.
+//
+// removeMap() carries the swallow this used to do inline: remove() can be
+// mid-animation when a lazy data load re-renders the tab and detaches the old
+// container, and Leaflet throws harmlessly there. See core.js for the half of
+// that hazard a try/catch could never catch.
+function stopWbMap() {
+  state.wb.map = removeMap(state.wb.map);
+}
+
 function initWbMap() {
-  // remove() can be mid-animation when a lazy data load re-renders the tab and
-  // detaches the old container — Leaflet throws harmlessly there; swallow it.
-  if (state.wb.map) { try { state.wb.map.remove(); } catch (_) {} state.wb.map = null; }
+  stopWbMap();
   const el = document.getElementById('wb-map');
   const an = state.wb.lastAnalysis;
   if (!el || !an || !state.data || typeof L === 'undefined') return;

@@ -3,11 +3,11 @@
   "recordedFrom": [
     {
       "file": "core.js",
-      "bytes": 51344
+      "bytes": 56851
     },
     {
       "file": "app.js",
-      "bytes": 174754
+      "bytes": 176773
     },
     {
       "file": "rf-changes.js",
@@ -15,11 +15,11 @@
     },
     {
       "file": "workbench.js",
-      "bytes": 85975
+      "bytes": 87183
     },
     {
       "file": "mem-meter.js",
-      "bytes": 11615
+      "bytes": 12078
     },
     {
       "file": "auth.js",
@@ -47,11 +47,11 @@
     },
     {
       "file": "bit-flipper.js",
-      "bytes": 19429
+      "bytes": 20617
     },
     {
       "file": "network-view.js",
-      "bytes": 87285
+      "bytes": 88012
     },
     {
       "file": "arro-launcher.js",
@@ -59,7 +59,7 @@
     },
     {
       "file": "arro-data.js",
-      "bytes": 158765
+      "bytes": 159244
     },
     {
       "file": "datastore.js",
@@ -99,7 +99,7 @@
     },
     {
       "file": "alert2.js",
-      "bytes": 125735
+      "bytes": 126442
     },
     {
       "file": "network-maps.js",
@@ -118,7 +118,7 @@
       "bytes": 3714
     }
   ],
-  "bytes": 1121614,
-  "sha256": "33652e799b684ad96327652a45518d37808e544f6318ffbd63c6dc1c1130ebed",
+  "bytes": 1133912,
+  "sha256": "e9ec0d148c655651fb6ba9ce87191839b5f30fcdce6b7d90dc115eeadbf31ead",
   "nulBytes": 4
 }

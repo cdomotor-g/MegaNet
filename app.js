@@ -1451,14 +1451,46 @@ function addBaseLayers(map) {
   return layers;
 }
 
-function initMap() {
-  if (state.map) { state.map.remove(); state.map = null; state.mapMarkers = []; state.mapLines = []; }
-  // The old map (if any) owned these layer groups — they die with it.
-  state.acma.layer = state.acma.beamLayer = state.acma.linkLayer = state.acma.hiLayer = null;
+// Take the Stations map down: on the way out of the tab, and again at the top
+// of every render of it.
+//
+// renderMain() replaces #main-content wholesale, so the div this map was built
+// on is discarded on a tab switch — but the Leaflet map object was not, until
+// #143. It kept its window listeners, its tile requests, its layer groups and
+// its reference to the now-detached container for as long as the app was open.
+// That is the reasoning alert2.js has always given for its own stop(); it
+// applies here identically, and the difference was never a decision anyone made.
+//
+// It costs nothing on re-entry. initMap() removed and rebuilt this map on every
+// render of the tab already — this relocates that rebuild to leave-time rather
+// than adding one.
+//
+// The five modules go first, while the map they were attached to is still
+// alive: each detach() is written against a live map (MapRivers and LinkBudget
+// call map.off(), MapDraw clears a ghost layer), and each is self-contained, so
+// they may run in any order and twice over.
+function stopStationsMap() {
+  MapSpider.detach();
   MapLocate.detach();
   MapDraw.detach();
   LinkBudget.detach();
   MapRivers.detach();
+  state.map = removeMap(state.map);
+  state.mapMarkers = [];
+  state.mapLines   = [];
+  // The old map (if any) owned these layer groups — they die with it.
+  state.acma.layer = state.acma.beamLayer = state.acma.linkLayer = state.acma.hiLayer = null;
+}
+
+function initMap() {
+  // Before the early return below, so a render that finds no container still
+  // leaves a teardown registered for the render that built one. Keyed by name
+  // and safe to repeat — this runs on every render of the tab (#142).
+  registerTabTeardown('Stations', stopStationsMap);
+  // Belt and braces: a re-render *inside* the tab never goes through
+  // switchTab(), so it never sees the teardown, and this map is rebuilt on
+  // every one of them.
+  stopStationsMap();
   const el = document.getElementById('leaflet-map');
   if (!el) return;
   // preferCanvas: with ~3,174 station pins and ~3,141 pass-range link lines,

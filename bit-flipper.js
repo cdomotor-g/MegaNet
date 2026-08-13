@@ -8,7 +8,9 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, ROLE_COLOR, ARRO_DEFAULT_BASE,
 // registerLiveMap (#142 — this file now says its map exists, instead of being
-// named in app.js's list of them), buildArroUrl and buildSensorIndex — the last three hosted here for five other
+// named in app.js's list of them), registerTabTeardown and removeMap (#143 —
+// and now says when to take it down, and takes it down the one way that
+// survives a zoom in flight), buildArroUrl and buildSensorIndex — the last three hosted here for five other
 // sections until M1 (#132) moved them out, which is what let this module leave
 // on its own. Across to app.js for addBaseLayers, primaryRole,
 // findRepeaterMatches and repeaterPassingCount.
@@ -300,10 +302,24 @@ function onBfSensorFilter(val) {
   refreshBfResults();
 }
 
+// Leaving the tab takes the map with it (#143). renderMain() is about to
+// replace #main-content and the div this map was built on with it; the map
+// object itself used to survive that, holding its window listeners and tile
+// requests behind whatever tab replaced this one. Free on re-entry, because
+// initBitFlipperMap() below removed and rebuilt the map on every render anyway.
+function stopBitFlipperMap() {
+  state.bfMap = removeMap(state.bfMap);
+  state.bfMapLayer = null;
+}
+
 // Create the Leaflet map once per tab render, then draw the current variants.
 function initBitFlipperMap() {
-  if (state.bfMap) { state.bfMap.remove(); state.bfMap = null; }
-  state.bfMapLayer = null;
+  // Before the early return below, and safe to repeat — this runs on every
+  // render of the tab (#142).
+  registerTabTeardown('BitFlipper', stopBitFlipperMap);
+  // A re-render inside the tab doesn't go through switchTab(), so it never sees
+  // the teardown; the rebuild still has to start from nothing.
+  stopBitFlipperMap();
   const el = document.getElementById('bf-map');
   if (!el || !state.data || typeof L === 'undefined') return;
 

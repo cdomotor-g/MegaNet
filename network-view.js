@@ -10,7 +10,9 @@
 // bearingDeg, arroSiteId, arroSiteUrl, stationSensors, ROLE_COLOR,
 // ROLE_LABEL, registerTabTeardown and registerLiveMap (#142 — this file says
 // itself that it has a loop and a map to stop, rather than app.js saying it on
-// its behalf); and across to app.js for MAP_HOME, MAP_LABEL_CAP, MAP_PIN_HIT,
+// its behalf) and removeMap (#143 — the one way to take a map down that
+// survives a zoom still in flight when it goes); and across to app.js for
+// MAP_HOME, MAP_LABEL_CAP, MAP_PIN_HIT,
 // MAP_PIN_RING, addBaseLayers, addToMapSelection, findRepeaterMatches,
 // goToStation, mapNote, passRangeCoversId, primaryRole, renderMain,
 // stationAlertIds and switchTab. The widest reach of the fourteen, which is
@@ -1208,7 +1210,7 @@ const NetworkView = (function () {
   // is not holding tile requests and pan/zoom listeners open) and at the top of
   // every init() (so a stale instance never leaks behind a fresh one).
   function stopNvMap() {
-    if (state.nvMap) { state.nvMap.remove(); state.nvMap = null; }
+    state.nvMap = removeMap(state.nvMap);
     state.nvMapMarkers   = [];
     state.nvMapLines     = [];
     state.nvMapArrows    = [];

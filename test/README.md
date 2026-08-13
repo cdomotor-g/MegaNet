@@ -194,14 +194,26 @@ from the stop-list keeps its frame loop or its `ResizeObserver` running behind
 whatever tab replaced it. Nothing throws.
 
 Two phases. **Static**: parse every script and require that a file calling
-`L.map()` also calls `registerLiveMap()`. This is the one that catches the next
-tab, the one nobody has written yet, because it never has to be told the tab
-exists. **Runtime**: open the map tabs, spy on `invalidateSize`, collapse the
-nav and assert every live map got the call; then leave Network View and ALERT2
-and assert their maps are actually gone. Both phases were confirmed to go red by
+`L.map()` also calls `registerLiveMap()`, `registerTabTeardown()` and
+`removeMap()`. This is the one that catches the next tab, the one nobody has
+written yet, because it never has to be told the tab exists. **Runtime**: open
+the map tabs, spy on `invalidateSize`, collapse the nav and assert every live map
+got the call; then leave each map tab and assert its map is actually gone, and
+come back and assert it works again. Both phases were confirmed to go red by
 deleting `bit-flipper.js`'s registration.
 
-See #142 for why the two registries were inverted in the first place.
+The teardown clause and the re-entry assertions are #143. Until then, three of
+the five map tabs — Stations, Bit Flipper and the Workbench — registered no
+teardown at all, so their maps outlived the div they were built on and were
+still being re-measured on a nav collapse from tabs that could not show them.
+`registry.mjs` is what made that legible and is now what keeps it fixed. The
+re-entry half is asserted deliberately: a teardown that runs too eagerly breaks
+the tab rather than leaking memory, which is the worse of the two failures.
+
+See #142 for why the two registries were inverted in the first place, and #143
+for why `removeMap()` exists rather than a bare `map.remove()` — a zoom in
+flight when the map goes throws from a timer, where no `try`/`catch` at the call
+site can reach it.
 
 ## Using `concat-verify.mjs` across a split
 
@@ -263,9 +275,12 @@ without looking, and a verifier nobody looks at verifies nothing.
 - **A tab grew a Leaflet map, or something that has to stop when you leave it.**
   Call `registerLiveMap(name, () => …)` where the map is built, and
   `registerTabTeardown(name, stop)` from the module's `init()`. Both are in
-  `core.js`; `npm run registry` fails if a file builds a map and registers none.
-  Register the *getter*, not the map — a teardown that nulls the slot has to be
-  visible to the shell.
+  `core.js`; `npm run registry` fails if a file builds a map and does not do
+  all three. Register the *getter*, not the map — a teardown that nulls the slot
+  has to be visible to the shell. Take the map down with `removeMap()` rather
+  than `map.remove()`, and register the teardown *before* the early return that
+  skips building a map, so a render that finds no container still leaves one
+  behind for the render that does.
 - **A module needs something to happen at load.** It goes in `init.js`. Anywhere
   else and `npm run toplevel` goes red, which is the point: everything else
   declares, and that is what makes the load order safe to add to.

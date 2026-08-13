@@ -7,7 +7,9 @@
 // The most connected of the ten modules M2 moved. It reaches back to core.js for
 // state, esc, escAttr, csvEscape, dlText, stationSensors, bucketSizeMm and —
 // since #142, so the stop-list is not a name in someone else's file —
-// registerTabTeardown and registerLiveMap;
+// registerTabTeardown and registerLiveMap, plus removeMap (#143 — which now
+// carries the try/catch stopMap() used to spell out, and the half of that
+// hazard a try/catch could never have caught);
 // across to app.js for renderMain, addBaseLayers, MAP_HOME and stationAlertIds,
 // plus switchTab and goToStation from inline handlers; and sideways to Packets
 // for the shared codec. All of it from inside functions this module exports —
@@ -1520,8 +1522,8 @@ const Alert2 = (function () {
 
   function stopMap() {
     const a = state.a2;
-    if (a.map) { try { a.map.remove(); } catch (_) {} }
-    a.map = null; a.mapLayer = null; a.mapMarks = null;
+    a.map = removeMap(a.map);
+    a.mapLayer = null; a.mapMarks = null;
   }
 
   // Selection is a highlight, not a filter, so it never re-renders: the rows and

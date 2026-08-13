@@ -20,6 +20,9 @@
 //   KM_PER_DEG_LAT, kmPerDegLon, bearingDeg, destPoint, fmtKm, acmaHaversineKm
 //   ACMA_MECH           interference-mechanism labels and colours
 //   stationSensors, buildSensorIndex, buildArroUrl   ALERT address ↔ sensor lookup
+//   registerTabTeardown, runTabTeardowns, registerLiveMap, liveMaps, removeMap
+//                       the module registries (#142) and the one correct way to
+//                       take a Leaflet map down (#143)
 //
 // The last three groups are the six helpers #129 found misfiled — each defined
 // inside one feature and read by five to seven others. They live here now
@@ -826,6 +829,37 @@ function runTabTeardowns() {
       });
     }
   });
+}
+
+// Take a Leaflet map down. Always this, never `map.remove()` on its own.
+//
+// A zoom is a 250 ms CSS transition that Leaflet finishes from a timer, and
+// that callback reads `this._mapPane` — which `remove()` has already deleted.
+// It throws, uncaught, because a timer is nobody's call stack: no try/catch
+// around remove() can see it, and runTabTeardowns() below cannot either. Only
+// the console shows it, which is why it went unnoticed for as long as it did.
+//
+// It needs a zoom in flight at the moment the map goes, which used to mean a
+// re-render inside the tab and now also means leaving it (#143 moved the
+// removal onto that path — zoom, change your mind, click another tab). There
+// is no public API for cancelling a zoom mid-transition; `map.stop()` covers
+// pan and fly and stops short of it. What does work is the callback's own first
+// line, which returns early unless `_animatingZoom` is set — so clearing the
+// flag turns the pending call into the no-op it should have been.
+//
+// Returns null, so the caller reads `state.map = removeMap(state.map)` and the
+// slot cannot be left pointing at a dead map.
+function removeMap(map) {
+  if (!map) return null;
+  try {
+    map.stop();                  // pan and fly, the half with an API
+    map._animatingZoom = false;  // and the zoom transition, the half without one
+    map.remove();
+  } catch (_) {
+    // remove() can also throw when the container went first — a lazy data load
+    // that re-rendered the tab out from under it. Nothing left to clean up.
+  }
+  return null;
 }
 
 // Every Leaflet map currently on the page. They are created lazily per tab, so

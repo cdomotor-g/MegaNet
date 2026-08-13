@@ -233,7 +233,14 @@ const MemMeter = (function () {
       timeline: null, changes: null, snapshots: null,
     });
     ACMA_FILES.forEach(k => delete state.memBytes.files[k]);
-    if (state.map) refreshAcmaLayer();   // drops the map markers rather than leaving them orphaned
+    // Drops the map markers rather than leaving them orphaned. Since #143 the
+    // Stations map only exists while its tab is open, so this guard is now
+    // "Stations is the tab you are looking at" rather than "Stations has been
+    // opened at some point" — and releasing from any other tab skips it. That
+    // is the more correct of the two: from another tab there is no map and so
+    // no markers to orphan, and re-entering Stations rebuilds the ACMA layer
+    // from scratch off the now-empty state anyway.
+    if (state.map) refreshAcmaLayer();
     renderMain();                        // RF Environment / RF Changes, if open, show "not loaded"
   }
 
