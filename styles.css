@@ -1795,6 +1795,17 @@ hr {
   font-size: inherit;
 }
 
+/* The chart above and the table are on different assumptions — a warning, not
+   an error: both figures are real, they just are not the same figure. */
+.lb-diverge {
+  margin: .4rem 0 0;
+  padding: .45rem .6rem;
+  border-left: 3px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border-radius: 0 4px 4px 0;
+  color: var(--text);
+}
+
 .lb-eval {
   color: var(--muted);
   margin: .4rem 0 0;

@@ -1179,8 +1179,10 @@ tile leaves a **gap** in the profile rather than being bridged through.
 geoid; a station's `elevation_ahd` is Australian Height Datum. Over Australia the
 two agree to about a metre — well inside the ~30 m sampling error — but they are
 not the same datum and neither is ellipsoidal height. So a snapped station's own
-`elevation_ahd` wins for that **endpoint**, tiles only ever supply the ground
-*between* the ends, and the panel says so under every profile it draws.
+`elevation_ahd` wins for that **endpoint** and tiles supply everything else —
+the ground between the ends, and an end that has no surveyed height of its own.
+Which of the two an end is using is named on the card, and the panel says so
+under every profile it draws.
 
 **The elevation profile** appears under the map once a line exists in *Draw &
 measure*, and plots ground (with a fixed k = 4/3 curvature bulge folded in so the
@@ -1223,8 +1225,29 @@ starting figures, which came from nowhere but this code) or `edited`. The
 obstruction term is a **single knife-edge diffraction proxy** (ITU-R P.526)
 derived from the same profile, shown on its own line and labelled as a proxy; with
 no profile for those two points the card says the result is **free-space only**
-rather than quietly reporting a clear path. Margin classes are good ≥ 20 dB ·
-marginal 10–20 · poor < 10.
+rather than quietly reporting a clear path — and offers *Profile this path*,
+which draws the two ends as a line in *Draw & measure* so the elevation panel
+picks it up and the diffraction term can be filled in. Pressing it again lands
+back on the same line rather than stacking another one at the same coordinates.
+Margin classes are good ≥ 20 dB · marginal 10–20 · poor < 10.
+
+**Each end shows the ground it is standing on**, and where that height came
+from: a station's surveyed `elevation_ahd` where there is one, and a terrain-tile
+sample (EGM96, and labelled as such) where there is not — which is most stations,
+since only 840 of 3,174 carry an `elevation_ahd` at all. An end whose tile cannot
+be fetched says *unavailable* rather than defaulting to sea level.
+
+**The two cards can be set to different assumptions, and the budget says when
+they are.** The elevation profile carries its own antenna heights and frequency;
+the budget carries a height per end and a frequency of its own, and computes its
+diffraction term at *those*. So the chart can show a clear path while the table
+quotes a loss from an obstructed one. Neither figure is wrong, but saying nothing
+about the gap would be, so the diffraction row names the frequency and the two
+antenna heights behind it, and a note under the table spells out what the chart
+above is drawn at whenever it differs — with a button that redraws the chart on
+the budget's figures. That is a button rather than something the budget does by
+itself: the profile's overrides apply to *every* line drawn on the map, so
+writing to them would silently re-height the next hand-drawn path too.
 
 **Where the two features disagree, the terrain wins.** A blocked path can still
 show a fat margin — one knife edge is the most optimistic diffraction model there

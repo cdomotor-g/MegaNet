@@ -5160,6 +5160,27 @@ const MapDraw = (function () {
     addLine(pts, sids) {
       return add({ kind: 'line', pts: pts.map(p => p.slice()), snappedTo: (sids || []).slice() });
     },
+
+    // The two-point line already drawn between these exact ends, either way
+    // round. Its caller is the link budget: pressing "Profile this path" twice
+    // has to land back on the same line rather than stack a second one on top
+    // of the first, invisibly, at the same coordinates.
+    findLine(a, b) {
+      const same = (p, q) => Math.abs(p[0] - q[0]) < 1e-9 && Math.abs(p[1] - q[1]) < 1e-9;
+      return D().shapes.find(s => s.kind === 'line' && s.pts.length === 2 &&
+        ((same(s.pts[0], a) && same(s.pts[1], b)) ||
+         (same(s.pts[0], b) && same(s.pts[1], a)))) || null;
+    },
+
+    // Make a shape the selected one. select() is the click behaviour and
+    // toggles, which would *de*select a shape that is already current — not
+    // what a caller asking for this shape specifically wants.
+    focus(id) {
+      if (!D().shapes.some(s => s.id === id)) return;
+      D().selectedId = id;
+      render();
+      rerenderPanel();
+    },
   };
 })();
 
@@ -5692,7 +5713,22 @@ const PathProfile = (function () {
       const an = pathAnalyse(cur.prof, flipped
         ? { ...opt, elevA: opt.elevB, elevB: opt.elevA, aglA: opt.aglB, aglB: opt.aglA }
         : opt);
-      return an.ok ? an : null;
+      if (!an.ok) return null;
+      // The caller gets its *own* analysis back — its frequency, its antenna
+      // heights — which is the point of passing them in. But the chart on
+      // screen is drawn from this panel's form, and the two can disagree about
+      // the same hop. So the settings behind the picture ride along, in the
+      // caller's A→B order, and a card quoting this can say when they differ
+      // rather than printing a verdict the chart above it contradicts.
+      const ea = endpoint(sh, 0), eb = endpoint(sh, 1);
+      const drawn = {
+        fMhz: freqFor(ea, eb),
+        aglA: P().aglA != null ? P().aglA : ea.agl,
+        aglB: P().aglB != null ? P().aglB : eb.agl,
+      };
+      an.chart = flipped ? { fMhz: drawn.fMhz, aglA: drawn.aglB, aglB: drawn.aglA } : drawn;
+      an.chartFlipped = flipped;
+      return an;
     },
     target,
   };
@@ -5763,10 +5799,17 @@ const LinkBudget = (function () {
   function val(e, k) { return e.over[k] != null ? e.over[k] : e.def[k]; }
   function isOver(e, k) { return e.over[k] != null; }
 
-  // A hypothetical point has no surveyed height, so its ground comes from the
-  // terrain tiles — asynchronously, and the card redraws when it lands.
+  // An endpoint with no surveyed height gets one from the terrain tiles —
+  // asynchronously, and the card redraws when it lands.
+  //
+  // Not only hypothetical points: most stations carry no elevation_ahd at all
+  // (2,334 of 3,174 at the time of writing), and those were left reading
+  // "sampling…" for the life of the card, because nothing was ever going to
+  // sample them. A tile height is not AHD and the card says so, but it beats a
+  // permanent lie about work in progress — and it gives pathAnalyse a real
+  // height for that end instead of nothing.
   function fillGround(e) {
-    if (e.ground != null || e.kind !== 'point' || e._pending) return;
+    if (!e || e.ground != null || e._pending) return;
     e._pending = true;
     Terrain.sample(e.lat, e.lon).then(m => {
       e._pending = false;
@@ -5955,7 +5998,9 @@ const LinkBudget = (function () {
                  <strong>this result is free-space only</strong> and ignores the ground entirely.
                  ${S().a && S().b ? '<button class="lb-link" onclick="LinkBudget.profileThis()">Profile this path</button>' : ''}</td></tr>`
             : budgetRow('Diffraction proxy', -r.diff, 'dB',
-                `single knife edge${r.an.v != null ? `, v=${r.an.v.toFixed(2)}` : ''} — a proxy, not a propagation model`)}
+                `single knife edge${r.an.v != null ? `, v=${r.an.v.toFixed(2)}` : ''} at
+                 ${r.fMhz.toFixed(3)} MHz over ${fmtAglPair(val(a, 'agl_m'), val(b, 'agl_m'))}
+                 — a proxy, not a propagation model`)}
           ${budgetRow('RX antenna gain', val(b, 'gain_dbi'), 'dBi', '')}
           ${budgetRow('RX line loss', val(b, 'loss_db') == null ? null : -val(b, 'loss_db'), 'dB', '')}
           ${budgetRow('= Received signal', r.rxDbm, 'dBm', `at ${esc(b.name)}`, 'lb-sub')}
@@ -5980,7 +6025,35 @@ const LinkBudget = (function () {
       ${r.an ? `
         <p class="small lb-eval">Terrain says <strong>${PATH_VERDICT[r.an.verdict].label.toLowerCase()}</strong>:
           ${esc(PATH_VERDICT[r.an.verdict].note)}
-          ${r.an.intrusion_m > 0 ? `Worst intrusion ${Math.round(r.an.intrusion_m)} m into the 60% zone.` : ''}</p>` : ''}`;
+          ${r.an.intrusion_m > 0 ? `Worst intrusion ${Math.round(r.an.intrusion_m)} m into the 60% zone.` : ''}</p>` : ''}
+      ${divergenceHtml(r)}`;
+  }
+
+  // The pair of antenna heights an analysis was run on, as one phrase.
+  function fmtAglPair(x, y) {
+    const n = v => (v == null ? '?' : String(Math.round(v * 10) / 10));
+    return `${n(x)} / ${n(y)} m antennas`;
+  }
+
+  // Whether the elevation profile above is drawn on the same assumptions this
+  // table is computed on. It is the same path over the same terrain, but each
+  // card carries its own frequency and antenna heights, so the chart can show a
+  // clear path while this table quotes a diffraction loss off an obstructed
+  // one. Neither figure is wrong; saying nothing about the gap is.
+  function divergenceHtml(r) {
+    const c = r.an && r.an.chart;
+    if (!c) return '';
+    const a = S().a, b = S().b;
+    const same = (x, y) => x != null && y != null && Math.abs(x - y) < 0.05;
+    if (same(c.fMhz, r.fMhz) &&
+        same(c.aglA, val(a, 'agl_m')) && same(c.aglB, val(b, 'agl_m'))) return '';
+    return `
+      <p class="small lb-diverge">
+        The elevation profile above is drawn at <strong>${c.fMhz.toFixed(3)} MHz</strong> over
+        <strong>${fmtAglPair(c.aglA, c.aglB)}</strong> — not the figures in this table. Same path,
+        same terrain, different assumptions, so the chart and the diffraction line above need not agree.
+        <button class="lb-link" onclick="LinkBudget.matchProfile()">Redraw the chart on these figures</button>
+      </p>`;
   }
 
   function comparisonHtml() {
@@ -6070,6 +6143,10 @@ const LinkBudget = (function () {
       layer = L.layerGroup().addTo(m);
       clickHandler = onMapClick;
       m.on('click', clickHandler);
+      // Endpoints outlive the map they were picked on. A ground sample that was
+      // still in flight when the tab changed resolved against a dead panel, so
+      // the card came back reading "sampling…" with nothing sampling it.
+      fillGround(S().a); fillGround(S().b);
       drawMarkers();
     },
     detach() {
@@ -6132,10 +6209,45 @@ const LinkBudget = (function () {
     profileThis() {
       const { a, b } = S();
       if (!a || !b) return;
-      MapDraw.addLine([[a.lat, a.lon], [b.lat, b.lon]], [a.sid || null, b.sid || null]);
+      // Open the panel BEFORE the line goes in, not after. Adding a shape
+      // re-renders the profile panel synchronously and terrain then takes
+      // seconds to arrive, so setting `open` afterwards left the operator
+      // scrolled to a collapsed, empty card for the whole fetch — the button
+      // looking like it had done nothing at all, which is what it was reported
+      // as. The panel now opens on the same tick as the press and shows its own
+      // "sampling terrain…" line while the tiles come in.
       state.path.open = true;
+      // A second press must land back on the first line rather than stack an
+      // identical one underneath it. Nothing on screen distinguishes two lines
+      // between the same two points, so they only ever turn up as a Draw &
+      // measure list that grows every time this button is pressed.
+      const [pa, pb] = [[a.lat, a.lon], [b.lat, b.lon]];
+      const existing = MapDraw.findLine(pa, pb);
+      if (existing) MapDraw.focus(existing.id);
+      else MapDraw.addLine([pa, pb], [a.sid || null, b.sid || null]);
       const el = document.getElementById('path-profile-panel');
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    },
+
+    // The chart and this table are describing the same hop with different
+    // antenna heights or a different frequency. Put the budget's figures into
+    // the profile panel so the picture matches the numbers.
+    //
+    // A button rather than something profileThis() does silently: state.path
+    // holds one set of overrides for *every* line drawn on the map, so writing
+    // to it would quietly re-height the next hand-drawn path as well. That is
+    // the operator's call to make, once, with the divergence in front of them.
+    matchProfile() {
+      const { a, b } = S();
+      if (!a || !b) return;
+      const an = analysisFor(a, b);
+      if (!an) return;
+      const A = val(a, 'agl_m'), B = val(b, 'agl_m');
+      state.path.freqMhz = freqOf();
+      state.path.aglA = an.chartFlipped ? B : A;
+      state.path.aglB = an.chartFlipped ? A : B;
+      PathProfile.rerender();
+      rerender();
     },
   };
 })();
