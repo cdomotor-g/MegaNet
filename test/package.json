@@ -9,8 +9,10 @@
     "check": "node syntax-check.mjs",
     "smoke": "node smoke.mjs",
     "names": "node dup-names.mjs",
+    "toplevel": "node toplevel.mjs",
+    "registry": "node registry.mjs",
     "concat": "node concat-verify.mjs",
-    "all": "npm run check && npm run names && npm run smoke"
+    "all": "npm run check && npm run names && npm run toplevel && npm run smoke && npm run registry"
   },
   "devDependencies": {
     "acorn": "8.15.0",

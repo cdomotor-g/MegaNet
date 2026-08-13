@@ -17,20 +17,24 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # syntax + duplicate names + smoke
+npm run all                       # the five that run in CI
 ```
 
 | Command | What it does |
 |---|---|
 | `npm run check` | `node --check` over every script `index.html` loads |
 | `npm run names` | no duplicate top-level declarations across those scripts |
+| `npm run toplevel` | `init.js` is still the only file that executes at load |
 | `npm run smoke` | loads the page in Chromium, opens all 16 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
+| `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the three that run in CI |
+| `npm run all` | the five that run in CI |
 
-`npm run smoke -- -v` also prints which off-origin hosts were blocked.
+`npm run smoke -- -v` also prints which off-origin hosts were blocked;
+`toplevel` and `registry` take `-v` too, to list what passed as well as what did
+not.
 
-CI runs `check`, `names` and `smoke` on every push that touches a root `*.js`,
+CI runs `check`, `names`, `toplevel`, `smoke` and `registry` on every push that touches a root `*.js`,
 `index.html`, `styles.css`, `stations.json` or `test/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's
 script list grew as `app.js` was split up — `core.js` and `init.js` in M1, ten
@@ -158,6 +162,47 @@ leaves the smoke test fully green and only `npm run names` goes red.
 With several agents adding helpers to different files during #129, this is the
 one genuinely new failure mode the split introduces.
 
+### `toplevel.mjs` — the load order, made checkable
+
+`index.html` loads thirty classic scripts in a fixed order, and the only reason
+that order is safe to add to is that **`init.js` is the only file that executes
+at load**. A file that merely declares can sit anywhere, because nothing it does
+is observable until something calls it. One top-level statement that runs on
+sight takes that back — silently, with every other check still green.
+
+Three milestones raised an ordering worry that measuring dissolved in minutes
+(`Alert2` ↔ `Serial`, `PathProfile` ↔ `LinkBudget`, `RfChanges` ↔ `Workbench`),
+each time by writing this check by hand and throwing it away. #142 needed it a
+fourth time, so it is a script.
+
+Inert means: declarations (initialisers are not inspected), `return` inside a
+module IIFE, and `window.X = X` exports. The check **descends into module
+IIFEs**, which is where every module in this app lives and where a stray
+registration would hide. Three statements in the app do run at load; each is
+listed in `ACCEPTED` at the top of the file with the reason it has to, and one
+of them — core.js's Leaflet canvas patch — genuinely is load-bearing and says so
+in its own comment. Adding an entry there makes that file's position mean
+something, so say why.
+
+### `registry.mjs` — the half smoke cannot see
+
+Smoke opens all sixteen tabs. It never *leaves* one, so a tab that forgot to
+register its Leaflet map or its teardown passes: the tab itself is fine. It is
+the leaving that isn't, and it fails in silence — a map missing from the
+re-measure list renders at the wrong size after a nav collapse, a module missing
+from the stop-list keeps its frame loop or its `ResizeObserver` running behind
+whatever tab replaced it. Nothing throws.
+
+Two phases. **Static**: parse every script and require that a file calling
+`L.map()` also calls `registerLiveMap()`. This is the one that catches the next
+tab, the one nobody has written yet, because it never has to be told the tab
+exists. **Runtime**: open the map tabs, spy on `invalidateSize`, collapse the
+nav and assert every live map got the call; then leave Network View and ALERT2
+and assert their maps are actually gone. Both phases were confirmed to go red by
+deleting `bit-flipper.js`'s registration.
+
+See #142 for why the two registries were inverted in the first place.
+
 ## Using `concat-verify.mjs` across a split
 
 The only claim that matters when a milestone cuts `app.js` is *the split lost
@@ -215,6 +260,15 @@ without looking, and a verifier nobody looks at verifies nothing.
   `npm run names -- --update` when it drifts. A *drop* of a hundred in a split
   commit means a file stopped being loaded — or, as in M4, that a hundred names
   went private on purpose, which is why it reports rather than enforces.
+- **A tab grew a Leaflet map, or something that has to stop when you leave it.**
+  Call `registerLiveMap(name, () => …)` where the map is built, and
+  `registerTabTeardown(name, stop)` from the module's `init()`. Both are in
+  `core.js`; `npm run registry` fails if a file builds a map and registers none.
+  Register the *getter*, not the map — a teardown that nulls the slot has to be
+  visible to the shell.
+- **A module needs something to happen at load.** It goes in `init.js`. Anywhere
+  else and `npm run toplevel` goes red, which is the point: everything else
+  declares, and that is what makes the load order safe to add to.
 - **A member was added to `RfChanges` or `Workbench` that an `on*=` attribute
   names.** Add it to `CONTROL_SCRIPT` in `lib/controls.mjs`. Nothing forces you
   to; the coverage line at the end of the run (`controls: workbench — 18/18

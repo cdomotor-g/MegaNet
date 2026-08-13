@@ -86,9 +86,22 @@ jobs:
         working-directory: test
         run: npm run names
 
+      # Also parse-only, also seconds: the load order in index.html is only safe
+      # to add to while init.js is the only file that executes at load (#132).
+      - name: Only init.js executes at load
+        working-directory: test
+        run: npm run toplevel
+
       - name: Smoke — every tab, clean console
         working-directory: test
         run: npm run smoke
+
+      # The half smoke cannot see: it opens every tab, so a tab that never
+      # registered its map or its teardown still passes. This one leaves them
+      # again (#142).
+      - name: Module registries — maps re-measure, teardowns run
+        working-directory: test
+        run: npm run registry
 
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —
