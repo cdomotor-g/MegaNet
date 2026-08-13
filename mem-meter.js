@@ -4,7 +4,7 @@
 //              page is holding, and a way to give some of it back (#79).
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state and esc; across to app.js for renderMain,
+// Reaches back to core.js for state, esc and liveMaps; across to app.js for renderMain,
 // updateChromeHeight and refreshAcmaLayer; and into arro-data.js and terrain.js
 // for the two caches it can drop. All of it from inside MemMeter's own
 // functions — the IIFE body builds tables and nothing else — so this file's
@@ -23,6 +23,9 @@
 // this page holding, and can I give some back" — see issue #79. This is our
 // own accounting, not a walk of the object graph: array/string lengths and
 // byte counts recorded at load time (loadJson, acmaFetchJson), which is free.
+// The one holder that counts rather than reads — the Leaflet layers added by
+// #144 — counts a registry the map already keeps, and is timed on the file's
+// heaviest map rather than assumed to be cheap.
 // performance.memory (Chromium-only) and navigator.storage.estimate() are
 // shown alongside where the browser actually offers them.
 //
@@ -40,6 +43,12 @@ const MemMeter = (function () {
   // the issue judges safe to drop and re-lazy-load or re-fetch.
   const HOLDERS = [
     { key: 'stations', label: 'stations.json',           color: '--role-repeater', releasable: false },
+    // Not releasable, and that is a decision rather than an omission (#144).
+    // The three releasable holders below drop a cache the app re-fetches on
+    // demand; a map is not a cache. The only sensible way to drop one is to
+    // leave its tab, and since #143 that happens on its own — so a Release
+    // button here would either do nothing or break the tab you are looking at.
+    { key: 'maps',      label: 'Leaflet map layers',      color: '--map-line',      releasable: false },
     { key: 'acma',      label: 'ACMA / RF Changes data',  color: '--role-satcom',   releasable: true  },
     { key: 'terrain',   label: 'Terrain tile cache',      color: '--role-base',     releasable: true  },
     { key: 'arro',      label: 'ARRO Data series',        color: '--role-field',    releasable: true  },
@@ -57,6 +66,25 @@ const MemMeter = (function () {
   // own bytesPerRow; this is the floor every series shares.
   const ARRO_BYTES_PER_ROW = 8 * 4 + 1;
   const TERRAIN_TILE_BYTES = 65536 * 2;   // Int16Array(65536), 2 B/element
+
+  // Bytes per Leaflet layer, and per vertex on top of it. Measured, not picked
+  // — 5,000 to 20,000 of each kind built into a real map in headless Chromium
+  // with --enable-precise-memory-info and --js-flags=--expose-gc, gc'd either
+  // side of the build, heap delta over the count, median of three trials:
+  //
+  //   circleMarker exactly as initMap() builds one — mn* properties, a bound
+  //     popup, a click handler, one vertex ............... 1,183 B
+  //   polyline, two vertices, as the link lines are ...... 1,472 B
+  //   polyline, a hundred vertices ...................... 11,005 B
+  //   marker with a divIcon, one vertex .................. 1,042 B
+  //
+  // The middle two give the split: (11,005 − 1,472) / 98 ≈ 97 B a vertex, and
+  // a ~1,200 B base per layer then covers all four to within 10%. Vertices are
+  // counted separately rather than folded into the base because a station pin
+  // has one and a river outline has thousands — one constant would be wrong by
+  // an order of magnitude at whichever end it was fitted to.
+  const LEAFLET_BYTES_PER_LAYER  = 1200;
+  const LEAFLET_BYTES_PER_VERTEX = 100;
 
   const WARN_BYTES = 60  * 1024 * 1024;
   const BAD_BYTES  = 100 * 1024 * 1024;
@@ -93,14 +121,60 @@ const MemMeter = (function () {
     return sum;
   }
 
+  // A path's _latlngs is a LatLng, an array of them, or an array of arrays of
+  // them (a polygon, a multi-polyline). Recursion is the whole difference.
+  function countVertices(ll) {
+    if (!ll) return 0;
+    if (Array.isArray(ll)) return ll.reduce((n, x) => n + countVertices(x), 0);
+    return 1;
+  }
+
+  // What the open tab's maps are holding. Still not a walk of the object graph:
+  // eachLayer() iterates the registry the map already keeps, and _latlngs is a
+  // length, not a traversal of anything the layer points at. It is the one
+  // holder here that counts rather than reads a number recorded at load, so it
+  // was timed rather than assumed — on Stations, the heaviest map in the app at
+  // 7,855 layers and 12,025 vertices, a whole render() is 0.9 ms median /
+  // 2.6 ms worst of twenty, once every five seconds and never while hidden.
+  //
+  // liveMaps() (core.js) returns the maps that exist right now, which since
+  // #143 is the open tab's and nothing else — so this needs no per-tab list of
+  // its own, and a tab added later is counted without being told about (#142).
+  //
+  // Tiles are counted but deliberately kept out of `bytes`: a decoded 256×256
+  // tile is ~256 KB in the browser's image cache and not on the JS heap, and
+  // none of the other five holders count anything of that kind. Folding ~3 MB
+  // of bitmap into the total would make the total mean two things at once. The
+  // panel shows the count as context instead.
+  function mapsReport() {
+    let maps = 0, layers = 0, vertices = 0, tiles = 0;
+    liveMaps().forEach(map => {
+      maps++;
+      try {
+        map.eachLayer(l => {
+          layers++;
+          if (l._latlngs)     vertices += countVertices(l._latlngs);
+          else if (l._latlng) vertices += 1;
+          if (l._tiles)       tiles += Object.keys(l._tiles).length;
+        });
+      } catch (_) { /* a map mid-teardown counts for what it managed */ }
+    });
+    return {
+      maps, layers, vertices, tiles,
+      bytes: layers * LEAFLET_BYTES_PER_LAYER + vertices * LEAFLET_BYTES_PER_VERTEX,
+    };
+  }
+
   function heapInfo() {
     const m = performance && performance.memory;
     return m ? { used: m.usedJSHeapSize, limit: m.jsHeapSizeLimit } : null;
   }
 
   function memoryReport() {
+    const maps = mapsReport();
     const bytes = {
       stations: state.memBytes.stationsJson,
+      maps:     maps.bytes,
       acma:     acmaFileBytes(),
       terrain:  Terrain.cached() * TERRAIN_TILE_BYTES,
       arro:     arroBytes(),
@@ -108,7 +182,7 @@ const MemMeter = (function () {
       storage:  localStorageBytes(),
     };
     const holders = HOLDERS.map(h => ({ ...h, bytes: bytes[h.key] }));
-    return { holders, total: holders.reduce((s, h) => s + h.bytes, 0), heap: heapInfo() };
+    return { holders, total: holders.reduce((s, h) => s + h.bytes, 0), heap: heapInfo(), maps };
   }
 
   // ── the bar ──
@@ -177,7 +251,8 @@ const MemMeter = (function () {
   function renderPanel() {
     const root = document.getElementById('mem-modal');
     if (!root || !panelOpen) return;
-    const { holders, total, heap } = memoryReport();
+    const { holders, total, heap, maps } = memoryReport();
+    const n = x => x.toLocaleString();
     const rows = holders.map(h => `
       <tr>
         <td><span class="mem-swatch" style="background:var(${h.color})"></span>${esc(h.label)}</td>
@@ -194,14 +269,21 @@ const MemMeter = (function () {
           <button class="modal-x" title="Close (Esc)" onclick="MemMeter.closePanel()">×</button>
         </div>
         <p class="sub">Our own accounting of what MegaNet is keeping in memory — cheap to compute
-           (lengths recorded when each piece loaded), not a walk of the object graph. Estimates,
-           not exact byte counts.</p>
+           (lengths recorded when each piece loaded, map layers counted off the registry the map
+           already keeps), not a walk of the object graph. Estimates, not exact byte counts.</p>
         <table class="mem-table">
           <thead><tr><th>Holder</th><th>Estimate</th><th></th></tr></thead>
           <tbody>${rows}</tbody>
           <tfoot><tr><td>Total (our accounting)</td><td class="mem-bytes">${fmtBytes(total)}</td><td></td></tr></tfoot>
         </table>
         <p class="mem-heap">
+          ${maps.maps
+              ? `Leaflet: ${n(maps.maps)} map${maps.maps === 1 ? '' : 's'} open, holding
+                 ${n(maps.layers)} layer${maps.layers === 1 ? '' : 's'} and ${n(maps.vertices)}
+                 vertices — plus ${n(maps.tiles)} decoded tile${maps.tiles === 1 ? '' : 's'},
+                 which are <em>not</em> in the total above: those sit in the browser's image
+                 cache rather than on the JS heap.`
+              : `Leaflet: no map open. A map exists only while its own tab does.`}<br>
           ${heap ? `Browser JS heap: ${fmtBytes(heap.used)} of ${fmtBytes(heap.limit)} limit.`
                  : `Browser JS heap: not available in this browser.`}<br>
           ${storageEstimate
@@ -253,6 +335,10 @@ const MemMeter = (function () {
     ArroData.dropAll();   // both data tabs; confirms before dropping more than one
   }
 
+  // The third of the three lists constraint 3 on #113 is about — HOLDERS, the
+  // byte map in memoryReport() and this switch. There is no 'maps' case here on
+  // purpose, and the reason is on the HOLDERS entry: the map goes when its tab
+  // does, so the gesture already exists and it is not a button.
   function release(key) {
     if (key === 'acma') releaseAcma();
     else if (key === 'terrain') releaseTerrain();
