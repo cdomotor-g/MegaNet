@@ -58,13 +58,13 @@
   autoLoad();
 })();
 
-// Restore a shared investigation from the URL hash. Defined in app.js, called
-// from here because it has to run after init's first render — it switches to
-// the Workbench and renders it, and doing that before init has set the theme
-// and the split width renders the tab into a page that isn't ready for it.
-// While init() ran from partway down app.js this call sat at its own position
-// further down and got that ordering for free; now it has to say so.
+// Restore a shared investigation from the URL hash. Defined in workbench.js,
+// called from here because it has to run after init's first render — it
+// switches to the Workbench and renders it, and doing that before init has set
+// the theme and the split width renders the tab into a page that isn't ready
+// for it. While init() ran from partway down app.js this call sat at its own
+// position further down and got that ordering for free; now it has to say so.
 // Station data arrives later via autoLoad → loadJson, which re-renders the
 // restored tab.
-if (typeof window !== 'undefined') wbRestoreFromUrl();
+if (typeof window !== 'undefined') Workbench.restoreFromUrl();
 

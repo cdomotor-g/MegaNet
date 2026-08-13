@@ -1106,8 +1106,8 @@ function renderMain() {
     case 'networks':   el.innerHTML = renderNetworksHtml();               break;
     case 'passranges': el.innerHTML = renderPassRangesHtml();             break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;
-    case 'rfchanges':  el.innerHTML = renderRfcHtml();       initRfc();   break;
-    case 'workbench':  el.innerHTML = renderWorkbenchHtml(); initWb();    break;
+    case 'rfchanges':  el.innerHTML = RfChanges.render();    RfChanges.init();    break;
+    case 'workbench':  el.innerHTML = Workbench.render();    Workbench.init();    break;
     case 'bitflipper': el.innerHTML = renderBitFlipperHtml(); initBitFlipperMap(); break;
     case 'network':    el.innerHTML = NetworkView.render();  NetworkView.init();  break;
     case 'packets':    el.innerHTML = Packets.render();       Packets.init();      break;
@@ -3750,6 +3750,8 @@ function rfCorrelate() {
 // have begun, never proof that it did. Every string in this tab is worded as
 // "lead", not conclusion — keep it that way.
 
+const RfChanges = (function () {
+
 const RFC_CLASS = {
   cotenant: { label: 'New co-tenant at a repeater site', color: '#d32f2f',
               blurb: 'A transmitter added at a site co-located with a repeater — the highest-severity change: front-end desense plus a new intermod pair with every existing carrier on the mast.' },
@@ -3963,7 +3965,7 @@ function renderRfcHtml() {
             <span class="small" style="color:var(--muted)"
                   title="coincidence = interference score × temporal proximity × co-site bonus. Proximity decays linearly from 1 at the onset date to 0 at the window edge; ×1.5 bonus when the transmitter shares the repeater's site (≤250 m).">
               ${R.onset ? 'ranking formula ⓘ' : ''}</span>
-            <button onclick="rfcExportCsv()">Export CSV</button>
+            <button onclick="RfChanges.exportCsv()">Export CSV</button>
           </span>
         </div>
         ${R.onset ? '' : `<p class="small" style="color:var(--muted);margin:.2rem 0">
@@ -4000,11 +4002,11 @@ function rfcSelectorHtml() {
         <div class="rfc-picker-list">
           <label style="display:flex;gap:.4rem;align-items:center">
             <input type="checkbox" ${R.anchorSel.size ? '' : 'checked'}
-                   onchange="rfcSelectAllAnchors()"> <em>All repeaters</em></label>
+                   onchange="RfChanges.selectAllAnchors()"> <em>All repeaters</em></label>
           ${anchors.map(a => `
             <label style="display:flex;gap:.4rem;align-items:center">
               <input type="checkbox" ${R.anchorSel.has(a.station_id) ? 'checked' : ''}
-                     onchange="rfcToggleAnchor('${escAttr(a.station_id)}',this.checked)">
+                     onchange="RfChanges.toggleAnchor('${escAttr(a.station_id)}',this.checked)">
               ${esc(a.name)}${a.rx_mhz ? ` <span class="small" style="color:var(--muted)">${a.rx_mhz}</span>` : ''}
             </label>`).join('')}
         </div>
@@ -4102,7 +4104,7 @@ function rfcChartHtml() {
     const c = (ACMA_MECH[r.a.mech] || {}).color || '#666';
     return `<circle cx="${x(t).toFixed(1)}" cy="${laneY(r.a.mech) + laneH / 2}" r="${rad.toFixed(1)}"
       fill="${c}" opacity=".75" style="cursor:pointer"
-      onclick="rfcCardFor('${escAttr(r.e.device_id)}','${escAttr(r.a.id)}')">
+      onclick="RfChanges.cardFor('${escAttr(r.e.device_id)}','${escAttr(r.a.id)}')">
       <title>${esc(r.e.date)} · ${esc(r.e.client || r.e.lic || '?')} · ${r.e.f_mhz != null ? r.e.f_mhz.toFixed(4) + ' MHz · ' : ''}${esc((ACMA_MECH[r.a.mech] || {}).label || r.a.mech)} ${r.a.score} vs ${esc(rfcAnchorName(r.a.id))} · ${r.a.km} km${r.e.variation ? ' · variation to existing licence' : ''}</title>
     </circle>`;
   }).join('');
@@ -4200,7 +4202,7 @@ function rfcTableInnerHtml() {
   }
   const arrow = k => R.sortKey === k ? (R.sortDir > 0 ? ' ▲' : ' ▼') : '';
   const th = (k, label, tip) => `<th style="cursor:pointer" ${tip ? `title="${escAttr(tip)}"` : ''}
-    onclick="rfcSort('${k}')">${label}${arrow(k)}</th>`;
+    onclick="RfChanges.sort('${k}')">${label}${arrow(k)}</th>`;
   return `
     <table class="bf-table">
       <thead><tr>
@@ -4216,7 +4218,7 @@ function rfcTableInnerHtml() {
           const m = ACMA_MECH[r.a.mech] || { label: r.a.mech, color: '#666' };
           const dk = rfcDeltaKhz(r);
           return `<tr style="cursor:pointer"
-                      onclick="rfcCardFor('${escAttr(r.e.device_id)}','${escAttr(r.a.id)}')">
+                      onclick="RfChanges.cardFor('${escAttr(r.e.device_id)}','${escAttr(r.a.id)}')">
             <td class="small">${esc(r.e.date)}${r.e.variation ? ' <span class="badge" title="Authorised >30 days after the licence was issued — a variation to an existing licence (added channel, power change, re-point), not a new licence">var</span>' : ''}</td>
             ${R.onset ? `<td class="small">${r.coin.days > 0 ? '+' : ''}${r.coin.days}</td>` : ''}
             <td class="small">${esc(r.e.client || '')}</td>
@@ -4366,7 +4368,7 @@ function rfcChangeRowHtml(c, cls, linkable) {
       <s style="color:var(--muted)">${esc(a ?? '—')}</s> → <strong>${esc(b ?? '—')}</strong></span>`)
     .join(' · ') : '';
   const link = linkable && c.device_id
-    ? ` <a href="#" onclick="rfcCardFor('${escAttr(c.device_id)}','${escAttr(c.anchor || '')}');return false">details →</a>`
+    ? ` <a href="#" onclick="RfChanges.cardFor('${escAttr(c.device_id)}','${escAttr(c.anchor || '')}');return false">details →</a>`
     : '';
   return `
     <div class="small" style="margin:.25rem 0;padding-left:.9rem">
@@ -4423,11 +4425,11 @@ function rfcImdHtml() {
               <td class="small">${esc(rfcAnchorName(i.anchor))} (RX ${i.rx_mhz})</td>
               <td class="small">${esc(i.site_name || i.site_id)}</td>
               <td class="small">${linkable && i.device_id
-                ? `<a href="#" onclick="rfcCardFor('${escAttr(i.device_id)}','${escAttr(i.anchor)}');return false">${esc(i.client || i.trigger_key)}</a>`
+                ? `<a href="#" onclick="RfChanges.cardFor('${escAttr(i.device_id)}','${escAttr(i.anchor)}');return false">${esc(i.client || i.trigger_key)}</a>`
                 : esc(i.client || i.trigger_key)}
                 <span class="badge">${i.trigger_class === 'added' ? 'added' : 're-tuned'}</span></td>
               <td class="small">${linkable && i.partner_device_id
-                ? `<a href="#" onclick="rfcCardFor('${escAttr(i.partner_device_id)}','${escAttr(i.anchor)}');return false">${esc(i.partner_client || i.partner_key)}</a>`
+                ? `<a href="#" onclick="RfChanges.cardFor('${escAttr(i.partner_device_id)}','${escAttr(i.anchor)}');return false">${esc(i.partner_client || i.partner_key)}</a>`
                 : esc(i.partner_client || i.partner_key)}</td>
             </tr>`).join('')}
         </tbody>
@@ -4531,7 +4533,7 @@ function rfcOnsetHelperHtml() {
       band above.</p>
     <textarea id="rfc-corr" rows="5" style="width:100%"
       placeholder="Bluff Ck, 2026-04-01, 0&#10;Bluff Ck, 2026-04-02, 1&#10;Bluff Ck, 2026-04-03, 14&#10;…">${esc(R.corrText)}</textarea>
-    <div style="margin:.4rem 0"><button onclick="rfcAnalyseCorr()">Detect steps</button></div>
+    <div style="margin:.4rem 0"><button onclick="RfChanges.analyseCorr()">Detect steps</button></div>
     ${R.corrSteps === null ? '' : rfcStepsHtml()}`;
 }
 
@@ -4545,7 +4547,7 @@ function rfcStepsHtml() {
     <div class="small" style="margin:.3rem 0">Detected steps (largest first — click to set as onset):</div>
     <div style="display:flex;gap:.4rem;flex-wrap:wrap">
       ${R.corrSteps.map(s => `
-        <button class="small" onclick="rfcUseOnset('${escAttr(s.date)}')"
+        <button class="small" onclick="RfChanges.useOnset('${escAttr(s.date)}')"
                 title="Rolling-median shift of ${s.jump > 0 ? '+' : ''}${s.jump.toFixed(1)} at ${escAttr(s.station)}">
           ${esc(s.date)} · ${esc(s.station)} ${s.jump > 0 ? '▲' : '▼'}${Math.abs(s.jump).toFixed(1)}</button>`).join('')}
     </div>` : `
@@ -4580,7 +4582,7 @@ function rfcGroupingHtml() {
           ⚑ <strong>All ${matched.length} matched stations report through
           ${esc(c.name)}</strong> — corruption confined to one repeater's stations is strong
           evidence for something at or near that specific site.
-          ${isAnchor ? `<button class="small" onclick="rfcFocusAnchor('${escAttr(c.id)}')">Focus ${esc(c.name)}</button>`
+          ${isAnchor ? `<button class="small" onclick="RfChanges.focusAnchor('${escAttr(c.id)}')">Focus ${esc(c.name)}</button>`
                      : `<span style="color:var(--muted)">(${esc(c.name)} has no RX frequency recorded, so it is not in the ACMA threat layer — record repeater.rx_mhz to include it.)</span>`}
         </p>`;
     } else {
@@ -4640,6 +4642,35 @@ function rfcHelpHtml() {
     </details>`;
 }
 
+// ── public surface ─────────────────────────────────────────────────────────────
+// Thirteen of the forty names above. The other twenty-seven are private to this
+// IIFE, which is the point of M4 (#135) — 111 globals across this file and the
+// Workbench became two.
+//
+// Left column is what the rest of the app says; right column is the name it has
+// in here. Anything reached from an inline on*= attribute is marked, because
+// those resolve against the *global* scope at click time: rename one of those
+// members and the template string naming it has to change in the same edit, or
+// the button goes quiet with nothing thrown until someone presses it.
+return {
+  render:           renderRfcHtml,        // renderMain()
+  init:             initRfc,              // renderMain()
+  ensureData:       rfcEnsureData,        // Workbench.init()
+  anchorName:       rfcAnchorName,        // Workbench, in its ACMA suspects table
+  helpHtml:         rfcHelpHtml,          // Workbench, in its blind-spots panel
+  // ── inline on*= handlers ──
+  sort:             rfcSort,              // table header
+  selectAllAnchors: rfcSelectAllAnchors,  // repeater selector
+  toggleAnchor:     rfcToggleAnchor,      // repeater selector
+  focusAnchor:      rfcFocusAnchor,       // grouping panel
+  useOnset:         rfcUseOnset,          // step-detector suggestion
+  cardFor:          rfcCardFor,           // chart marks, table rows, IMD pairs
+  exportCsv:        rfcExportCsv,         // toolbar
+  analyseCorr:      rfcAnalyseCorr,       // onset helper
+};
+
+})();
+
 // ── INTERFERENCE WORKBENCH tab ───────────────────────────────────────────────────
 // A single investigation surface: select the stations you believe are affected and
 // the Workbench assembles the evidence, scores five competing explanations and
@@ -4652,6 +4683,8 @@ function rfcHelpHtml() {
 // helpers (H1), the ACMA threat data (suspect list, strip plot, map squares) and
 // the RF Changes timeline. Nothing is fetched until the tab is opened, and the
 // ACMA/RFC files only load once an investigation has a leading candidate.
+
+const Workbench = (function () {
 
 const WB_HYP = {
   h1: { short: 'H1', label: 'Repeater common-mode' },
@@ -5196,7 +5229,7 @@ function wbRestoreFromUrl() {
 // Tier 1: dotted-underline tooltip; clicking through opens the concept drawer
 // (tier 3) when a concept id is given.
 function wbT(text, tip, conceptId) {
-  const click = conceptId ? ` onclick="wbOpenConcept('${escAttr(conceptId)}')"` : '';
+  const click = conceptId ? ` onclick="Workbench.openConcept('${escAttr(conceptId)}')"` : '';
   return `<span class="wb-term${conceptId ? ' wb-term-link' : ''}" tabindex="0"` +
          ` data-tip="${esc(tip)}"${click}>${esc(text)}</span>`;
 }
@@ -5225,7 +5258,7 @@ function wbOpenConcept(id) {
   el.innerHTML = '<div class="small" style="padding:1rem;color:var(--muted)">Loading concept notes…</div>';
   wbEnsureConcepts().then(() => wbRenderDrawer()).catch(err => {
     el.innerHTML = `<div style="padding:1rem">
-      <button onclick="wbCloseDrawer()" style="float:right">×</button>
+      <button onclick="Workbench.closeDrawer()" style="float:right">×</button>
       <p class="small" style="color:var(--muted)">Concept notes unavailable (${esc(err.message)}) —
       data/rf-concepts.json cannot be fetched over file://.</p></div>`;
   });
@@ -5247,8 +5280,8 @@ function wbRenderDrawer() {
     <div class="wb-drawer-head">
       <strong>${cur ? esc(cur.title) : 'RF concepts'}</strong>
       <span>
-        ${cur ? `<button onclick="wbOpenConcept('')" title="All concepts">≡</button>` : ''}
-        <button onclick="wbCloseDrawer()" title="Close">×</button>
+        ${cur ? `<button onclick="Workbench.openConcept('')" title="All concepts">≡</button>` : ''}
+        <button onclick="Workbench.closeDrawer()" title="Close">×</button>
       </span>
     </div>`;
   if (!cur) {
@@ -5257,13 +5290,13 @@ function wbRenderDrawer() {
         <p class="small" style="color:var(--muted)">Short, field-oriented explainers. Every entry
         says what the phenomenon looks like <em>in your data</em>, not just what it is.</p>
         ${list.map(c => `<a href="#" class="wb-drawer-item"
-            onclick="wbOpenConcept('${escAttr(c.id)}');return false">${esc(c.title)}</a>`).join('')}
+            onclick="Workbench.openConcept('${escAttr(c.id)}');return false">${esc(c.title)}</a>`).join('')}
       </div>`;
     return;
   }
   const also = (cur.see_also || []).map(id => {
     const t = list.find(c => c.id === id);
-    return t ? `<a href="#" onclick="wbOpenConcept('${escAttr(id)}');return false">${esc(t.title)}</a>` : '';
+    return t ? `<a href="#" onclick="Workbench.openConcept('${escAttr(id)}');return false">${esc(t.title)}</a>` : '';
   }).filter(Boolean).join(' · ');
   el.innerHTML = `${head}
     <div class="wb-drawer-body">
@@ -5303,7 +5336,7 @@ function initWb() {
   if (state.wb.affected.length) {
     if (!A.loaded && !A.loadPromise && !A.error) acmaEnsureCore().then(rerender).catch(rerender);
     if (A.loaded && !A.devLoaded && !A.devPromise) acmaEnsureDevices().then(rerender).catch(() => {});
-    if (!R.loaded && !R.loadPromise && !R.error) rfcEnsureData().then(rerender).catch(rerender);
+    if (!R.loaded && !R.loadPromise && !R.error) RfChanges.ensureData().then(rerender).catch(rerender);
   }
   initWbMap();
 }
@@ -5320,20 +5353,20 @@ function wbSetupHtml(an) {
   return `
     <div class="panel">
       <div class="panel-header"><h3>Investigation</h3>
-        ${(wbs.affected.length || wbs.good.length) ? '<button onclick="wbClearCase()">Clear</button>' : ''}
+        ${(wbs.affected.length || wbs.good.length) ? '<button onclick="Workbench.clearCase()">Clear</button>' : ''}
       </div>
       <label class="small" style="display:block;margin-top:.5rem">Paste ALERT IDs
         <textarea id="wb-paste" rows="2" style="margin-top:.3rem"
           placeholder="6129, 6130 2316&#10;2320 — space, comma or newline separated"></textarea>
       </label>
       <div class="button-row" style="justify-content:flex-start;margin:.4rem 0">
-        <button class="primary" onclick="wbAddFromPaste('affected')">Add as affected</button>
-        <button onclick="wbAddFromPaste('good')">Add as known-good</button>
+        <button class="primary" onclick="Workbench.addFromPaste('affected')">Add as affected</button>
+        <button onclick="Workbench.addFromPaste('good')">Add as known-good</button>
       </div>
       <label class="small" style="display:block;margin-top:.4rem">Or search stations
         <input type="search" id="wb-pick" placeholder="Station name or number…"
                value="${esc(wbs.pickQuery)}" style="margin-top:.3rem"
-               oninput="state.wb.pickQuery=this.value;wbRefreshPick()">
+               oninput="state.wb.pickQuery=this.value;Workbench.refreshPick()">
       </label>
       <div id="wb-pick-out">${wbPickResultsHtml()}</div>
       ${wbChipsHtml('affected', 'Affected stations')}
@@ -5375,16 +5408,16 @@ function wbSetupHtml(an) {
         </label>
       </div>
       <div class="button-row" style="justify-content:flex-start;margin-top:.5rem">
-        <button onclick="wbSaveCase()">Save</button>
-        <button onclick="wbShareLink(this)" ${wbs.affected.length ? '' : 'disabled'}>Copy share link</button>
+        <button onclick="Workbench.saveCase()">Save</button>
+        <button onclick="Workbench.shareLink(this)" ${wbs.affected.length ? '' : 'disabled'}>Copy share link</button>
       </div>
       ${caseNames.length ? `
         <div style="display:flex;gap:.4rem;align-items:center;margin-top:.6rem">
-          <select id="wb-case-sel" onchange="wbLoadCase(this.value)">
+          <select id="wb-case-sel" onchange="Workbench.loadCase(this.value)">
             <option value="">Load saved case…</option>
             ${caseNames.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}
           </select>
-          <button onclick="wbDeleteCase()" title="Delete the case selected above">🗑</button>
+          <button onclick="Workbench.deleteCase()" title="Delete the case selected above">🗑</button>
         </div>` : ''}
       <p class="small" style="color:var(--muted);margin:.5rem 0 0">Cases save to this browser;
         the share link carries the whole investigation in the URL.</p>
@@ -5416,8 +5449,8 @@ function wbChipsHtml(list, label) {
           const name = hits.length ? hits[0].station.name : 'not in database';
           return `<span class="wb-chip ${cls}${hits.length ? '' : ' wb-chip-miss'}" title="${esc(name)}">
             <strong>${id}</strong> <span class="wb-chip-name">${esc(name)}</span>
-            <a href="#" title="${swapTitle}" onclick="wbSwapId('${list}',${id});return false">⇄</a>
-            <a href="#" title="Remove" onclick="wbRemoveId('${list}',${id});return false">×</a>
+            <a href="#" title="${swapTitle}" onclick="Workbench.swapId('${list}',${id});return false">⇄</a>
+            <a href="#" title="Remove" onclick="Workbench.removeId('${list}',${id});return false">×</a>
           </span>`;
         }).join('')}
       </div>
@@ -5441,8 +5474,8 @@ function wbPickResultsHtml() {
         <div class="wb-pick-row">
           <span>${esc(s.name)} <span class="small" style="color:var(--muted)">${stationAlertIds(s).join(', ')}</span></span>
           <span>
-            <button onclick="wbAddStation('${escAttr(s.id)}','affected')" title="Add as affected">+ aff</button>
-            <button onclick="wbAddStation('${escAttr(s.id)}','good')" title="Add as known-good">+ good</button>
+            <button onclick="Workbench.addStation('${escAttr(s.id)}','affected')" title="Add as affected">+ aff</button>
+            <button onclick="Workbench.addStation('${escAttr(s.id)}','good')" title="Add as known-good">+ good</button>
           </span>
         </div>`).join('')}
     </div>`;
@@ -5471,8 +5504,8 @@ function wbIntroHtml() {
         </table>
       </div>
       <div class="button-row" style="justify-content:flex-start;margin-top:.75rem">
-        <button class="primary" onclick="wbLoadExample()">Load a worked example</button>
-        <button onclick="wbOpenConcept('')">Open the RF concept notes</button>
+        <button class="primary" onclick="Workbench.loadExample()">Load a worked example</button>
+        <button onclick="Workbench.openConcept('')">Open the RF concept notes</button>
       </div>
       <p class="small" style="color:var(--muted);margin-top:.6rem">The Workbench never claims a
         cause. It ranks explanations by how well they fit, states its confidence, and tells you
@@ -5507,7 +5540,7 @@ function wbH5BannerHtml(an) {
       ${wbT('payload protection', 'The plain ALERT Binary Format has no checksum over address or data — any flipped bit is accepted as truth.', 'no_crc')}
       in ALERT Binary Format, one may be the victim of the other's corrupted packets rather than
       independently affected — which would change this entire selection.
-      <button style="margin-left:.5rem" onclick="wbOpenBf(${p.a})">Open ${p.a} in Bit Flipper</button>
+      <button style="margin-left:.5rem" onclick="Workbench.openBf(${p.a})">Open ${p.a} in Bit Flipper</button>
     </div>`;
 }
 
@@ -5664,7 +5697,7 @@ function wbH5PanelHtml(an) {
                 <td>${p.b} <span class="small" style="color:var(--muted)">${esc(nameOf(p.b))}</span></td>
                 <td>${p.d}</td>
                 <td class="small mono">bit ${p.bits.join(', bit ')}</td>
-                <td><button onclick="wbOpenBf(${p.a})">Bit Flipper →</button></td>
+                <td><button onclick="Workbench.openBf(${p.a})">Bit Flipper →</button></td>
               </tr>`;
             }).join('')}</tbody>
           </table>
@@ -5817,7 +5850,7 @@ function wbTimelineHtml(an) {
             <td class="small"><span class="legend-sq" style="background:${(ACMA_MECH[r.a.mech] || {}).color || '#666'}"></span> ${(ACMA_MECH[r.a.mech] || {}).label || esc(r.a.mech)}</td>
             <td class="small">${r.a.score}</td>
             <td class="small">${r.a.km}</td>
-            <td class="small">${esc(rfcAnchorName(r.a.id))}</td>
+            <td class="small">${esc(RfChanges.anchorName(r.a.id))}</td>
           </tr>`).join('')}</tbody></table>
       </div>
       <p class="small" style="color:var(--muted);margin:.4rem 0 0">${onsetMid != null
@@ -5829,7 +5862,7 @@ function wbTimelineHtml(an) {
         register-invisible sources — your own infrastructure (corrosion, equipment fault) or
         unlicensed emitters. The site-visit checklist covers those.</p>`;
     body += `<div class="button-row" style="justify-content:flex-start;margin-top:.5rem">
-      <button onclick="wbOpenRfc()">Open in RF Changes →</button></div>`;
+      <button onclick="Workbench.openRfc()">Open in RF Changes →</button></div>`;
   }
   return `
     <div class="panel">
@@ -5877,7 +5910,7 @@ function wbStripHtml(an) {
 function wbBlindSpotsHtml() {
   return `
     <div class="panel">
-      ${rfcHelpHtml()}
+      ${RfChanges.helpHtml()}
     </div>`;
 }
 
@@ -5963,9 +5996,9 @@ function wbActionsHtml(an) {
     <div class="panel">
       <div class="panel-header"><h3>Actions</h3></div>
       <div class="button-column">
-        <button onclick="wbExportCsv()">Export case (CSV)</button>
-        <button onclick="wbExportChecklist()">Site-visit checklist</button>
-        <button onclick="wbExportComplaint()">Draft ACMA complaint</button>
+        <button onclick="Workbench.exportCsv()">Export case (CSV)</button>
+        <button onclick="Workbench.exportChecklist()">Site-visit checklist</button>
+        <button onclick="Workbench.exportComplaint()">Draft ACMA complaint</button>
       </div>
       <p class="small" style="color:var(--muted);margin:.5rem 0 0">The checklist is tailored to the
         leading mechanism; the complaint draft pre-fills the evidence and marks every inference as
@@ -6233,4 +6266,40 @@ function wbExportComplaint() {
   out.push('- Site-visit observations (once completed)');
   dlText(`${wbCaseStamp()}-acma-draft.md`, out.join('\n'));
 }
+
+// ── public surface ─────────────────────────────────────────────────────────────
+// Twenty-one of the seventy-one names above; the other fifty are private. Read
+// the note on RfChanges' surface first — the same rule about on*= attributes
+// binds here, and eighteen of these twenty-one exist only to be named by one.
+//
+// What is *not* here is the more useful list: wbAnalyse, the 257-line scoring
+// core, and the five wbArithH* explainers behind it are private, and so is
+// every wb*Html builder. Nothing outside this file scores a case or draws a
+// panel; it asks for the tab's HTML and gets it.
+return {
+  render:          renderWorkbenchHtml,  // renderMain()
+  init:            initWb,               // renderMain()
+  restoreFromUrl:  wbRestoreFromUrl,     // init.js, after the first render
+  // ── inline on*= handlers ──
+  addFromPaste:    wbAddFromPaste,       // setup rail, paste box
+  addStation:      wbAddStation,         // setup rail, station search results
+  removeId:        wbRemoveId,           // station chip
+  swapId:          wbSwapId,             // station chip (affected ⇄ known-good)
+  clearCase:       wbClearCase,          // setup rail
+  loadExample:     wbLoadExample,        // intro panel
+  openBf:          wbOpenBf,             // H5 banner and panel → Bit Flipper
+  saveCase:        wbSaveCase,           // case bar
+  loadCase:        wbLoadCase,           // case bar
+  deleteCase:      wbDeleteCase,         // case bar
+  shareLink:       wbShareLink,          // case bar
+  openConcept:     wbOpenConcept,        // concept links, throughout
+  closeDrawer:     wbCloseDrawer,        // concept drawer
+  refreshPick:     wbRefreshPick,        // setup rail, station search box
+  openRfc:         wbOpenRfc,            // timeline → RF Changes
+  exportCsv:       wbExportCsv,          // actions panel
+  exportChecklist: wbExportChecklist,    // actions panel
+  exportComplaint: wbExportComplaint,    // actions panel
+};
+
+})();
 
