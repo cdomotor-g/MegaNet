@@ -1957,7 +1957,7 @@ environments without ACMA access, attach the extract to a GitHub Release
 (see the `acma-data-*` tags) and fetch it from there instead.
 
 `data/acma-licence-suggestions.csv` matches MegaNet repeater coordinates
-against ACMA sites to help backfill `repeater.acma_licence` (only 40 of 178
+against ACMA sites to help backfill `repeater.acma_licence` (only 40 of the 88
 repeaters have it) — it is a review file, never applied automatically. The
 single highest-value data task remains backfilling `repeater.rx_mhz`: the
 analysis can only anchor on the 88 repeaters that have one.
@@ -2047,10 +2047,17 @@ hypothesis". Confidence is always shown, confounds are stated
 ("your affected stations share both a repeater and a location…"), weak or
 empty results are reported as findings with a next step, and the blind-spots
 panel (shared with RF Changes) lists what no register can see. H1 depends on
-pass-range data: 88 of 178 repeaters currently have recorded pass ranges and
-~78 % of stations with ALERT ids fall inside at least one — the Workbench
-reports, per investigation, how many affected stations have no routing and
-degrades honestly when they don't.
+pass-range data, and there is less of it than this paragraph used to claim.
+Re-measured against the committed `stations.json` while #105 was writing the
+Pass Ranges help: the file holds **88 repeaters**, every one of them with pass
+ranges and an `rx_mhz` — the "178 repeaters, 88 of them with pass ranges" this
+said before is stale, and the mis-tagged entries §3 describes are no longer in
+the file. What is worse than that sentence implied is the coverage: **1,075 of
+the 2,479 field stations carrying an ALERT id fall outside every recorded
+window — 43 %, not the ~22 % "~78 % fall inside" claimed.** So the Workbench
+reports, per investigation, how many affected stations have no routing at all,
+and degrades honestly when they don't — which matters more at 43 % than it did
+at 22 %.
 
 ---
 
