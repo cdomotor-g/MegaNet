@@ -28,3 +28,11 @@
 - When combined with the AI-agent recommendation tag (or the `[Human]` tag), order as: `[<Structure>] [<Model>/<Effort>] <title>` or `[<Structure>] [Human] <title>`.
 - Example: `[Sub-issue of #42] [Sonnet5/Med] Fix flaky login test`
 - Example: `[Standalone] [Human] Confirm CORS headers on contrail-bom.onerain.au`
+
+## Roadmap issue — keep it current
+- Issue #113 ("Roadmap — resource allocation & sequencing for all issues") is the single point of truth for what's open, its agent/human allocation and model/effort setting, and how work sequences. It aggregates info out of other issues; it never replaces or closes them.
+- Whenever you open, close, or edit any other issue in this repo, update issue #113 in the same piece of work so it stays accurate — don't let it drift:
+  - **Opening an issue**: add it to the appropriate epic/standalone section, with its structure tag, model/effort or `[Human]` tag, and any sequencing notes (what it depends on, what depends on it).
+  - **Closing an issue**: remove it from the open lists (move epics to "children closed" notes where relevant, as already done for shipped sub-issues), and re-check whether closing it unblocks anything else noted in the sequencing snapshot.
+  - **Editing an issue** (retitling, re-scoping, changing its model/effort recommendation, re-parenting it): update the corresponding entry in #113 to match.
+- If a change touches several issues at once, make one edit to #113 covering all of them rather than several small edits.
