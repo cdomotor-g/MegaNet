@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the seven that run in CI
+npm run all                       # the eight that run in CI
 ```
 
 | Command | What it does |
@@ -25,18 +25,19 @@ npm run all                       # the seven that run in CI
 | `npm run check` | `node --check` over every script `index.html` loads |
 | `npm run names` | no duplicate top-level declarations across those scripts |
 | `npm run toplevel` | `init.js` is still the only file that executes at load |
-| `npm run smoke` | loads the page in Chromium, opens all 18 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
+| `npm run smoke` | loads the page in Chromium, opens all 19 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
 | `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
 | `npm run maint` | the Council Maintenance Tasks form renders what the workbook's own filled sheet says — with the fixture read out of the `.xlsx` |
+| `npm run history` | a saved record reads back as the sheet it was written on, and exports as it reads — with the records written by the app during the run |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the seven that run in CI |
+| `npm run all` | the eight that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
 `toplevel` and `registry` take `-v` too, to list what passed as well as what did
 not.
 
-CI runs `check`, `names`, `toplevel`, `smoke`, `registry`, `insp` and `maint` on every push that touches a root `*.js`,
+CI runs `check`, `names`, `toplevel`, `smoke`, `registry`, `insp`, `maint` and `history` on every push that touches a root `*.js`,
 `index.html`, `styles.css`, `stations.json`, `db/migrations/`, `test/` or the
 inspection workbook in `archive/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's
@@ -317,6 +318,67 @@ uncaptured note on the panel.
 the text Excel would show, no styles, no formulas, no dates. It fails loudly on
 anything else, which is the right failure for a fixture reader.
 
+### `history.mjs` — the fixture the app writes itself
+
+The Inspection History tab is invisible to smoke twice over: it renders from the
+datastore *and* every record it renders is editors-only, so under smoke's policy
+it correctly shows "sign in to read them" and a whole reader passes untested.
+
+What is different about this check is where the fixture comes from. `insp` takes
+its reference data out of `0009` rather than out of a copy of it; this takes the
+**records** out of the app rather than out of a file:
+
+1. It opens the Inspections tab, sweeps every box the Alert sheet renders and
+   fills it in, and presses Save.
+2. The fixture's `save_inspection` files the document it was sent.
+3. The fixture's `inspection_doc` hands that same document back.
+
+So what is under test is the round trip a person makes — fill in, save, come
+back later and read it — rather than a reader agreeing with a fixture somebody
+wrote to match the reader. It does the same with the Council sheet.
+
+The assertion the design rests on is the first one: **a saved visit reads back
+with exactly the sections the editable form printed, in the same order.** The
+read-only view is one walk over the same `FIELDS`/`SECTIONS` tables the form
+renders from, and a section in one and not the other means it is not. The CSV is
+written from that same walk, and the check asserts that too, as a superset:
+every (section, label) pair on screen has a row in the file.
+
+Three things it covers that are specific to reading a record back rather than
+writing one:
+
+- **A printed section with no row saved against it says so** rather than
+  printing a grid of empty boxes that reads as unfilled. That is 0009's
+  decision 2 one level down — "nobody filled this in" is no row — and it is why
+  the check leaves the gas section untouched before saving.
+- **Pick-list values read back as their labels, not their keys.** Every select on
+  the sheet is set by the sweep, so a model that skipped the lookup puts keys on
+  screen; the check collects every value from the boxes *and* the grids and
+  fails on any that is a known key.
+- **The CSV names a photo by its object path and never by a signed URL.** #149's
+  rule only bites in an export, because an export outlives the session that made
+  it — a signed URL in a file somebody mails around is a private bucket with the
+  door propped open.
+
+The Council half asserts that the Comms and Power panel reads back as three
+titled sub-blocks with three Conditions. #148 repaired that as a *writer* bug;
+this is the reader not quietly re-creating it, which it could do while passing
+every other assertion in the file.
+
+Seven deliberate breaks were confirmed red before any of it was trusted: dropping
+a section from the model, returning a key instead of a label, printing boxes for
+an unrecorded section, dropping blank boxes from the CSV, putting the signed URL
+in the CSV, collapsing the comms panel to one block, and sorting the timeline
+oldest first.
+
+**One of those seven did not go red the first time, and that is the part worth
+carrying forward.** Dropping blank boxes from the CSV passed, because the sweep
+had filled every box on the sheet — so there were no blank boxes on screen for
+the superset assertion to miss. The fixture now leaves every fourth box blank on
+purpose, and asserts that it did. *A check whose fixture is uniform cannot see a
+rule about the non-uniform case*, which is the same shape as `maint`'s finding
+that a cell map is not a coverage measure when both sheets agree on a cell.
+
 ### `lib/storage.mjs` — the upload path, faked, and what it refuses to fake
 
 Both form checks grew an attachments section at #149, and neither owns the
@@ -398,7 +460,7 @@ without looking, and a verifier nobody looks at verifies nothing.
 
 ## When the tests need updating
 
-- **A tab was added or removed.** `smoke.mjs` asserts `TABS` holds 18 entries, so
+- **A tab was added or removed.** `smoke.mjs` asserts `TABS` holds 19 entries, so
   that a tab added without a `renderMain()` case fails here rather than in front
   of an operator. Give the new tab a `renderMain()` case and a `HELP` entry, then
   bump `EXPECTED_TABS`.
@@ -438,6 +500,14 @@ without looking, and a verifier nobody looks at verifies nothing.
   some of the six sheets print belongs in the per-configuration box assertion in
   `inspections.mjs`, which checks both that the sheets printing it show it and
   that the others do not.
+- **A form tab grew a section, or a section grew a box, and you want to know
+  whether the history view followed.** Nothing to do — that is what
+  `npm run history` is for. It compares the read-only record against the
+  *editable* form's own section list, and the CSV against the read-only record,
+  so a section added to either sheet turns up in all three or the check goes red.
+  What does need an edit is the fixture's skip list, if the new section must be
+  left unrecorded to keep the "nothing was recorded in this section" assertion
+  meaningful.
 - **A section grew an attachment panel.** `Attachments.sectionHtml()` is the
   whole of it, and `lib/storage.mjs` already serves the routes — but the panel
   list assertion in `maintenance.mjs` is exact, so a third panel on that tab is

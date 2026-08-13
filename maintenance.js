@@ -11,9 +11,12 @@
 // auth.js for Auth; to datastore.js for dbSelect, dbRpc and dbCanWrite; and to
 // attachments.js for the two panels on this sheet that are images rather than
 // field sets.
-// One thing reaches into this file: inspections.js calls startFrom() from the
+// Two things reach into this file: inspections.js calls startFrom() from the
 // prompt at the foot of an inspection whose departure rating asks for one of
-// these — which is the printed cross-reference, made into a button.
+// these — which is the printed cross-reference, made into a button — and
+// history.js (#118) calls ensureRefs() and recordModel() to read a saved form
+// back, because a saved form is this sheet and reading one back should not be a
+// second copy of it.
 //
 // The IIFE body builds its field tables and calls nothing, so this file's
 // position among the modules is free — checked, not reasoned about
@@ -330,6 +333,7 @@ const Maintenance = (function () {
         s.refs = refs;
         s.refsLoading = false;
         repaint();
+        wake();
       })
       .catch(err => {
         s.refsLoading = false;
@@ -337,7 +341,30 @@ const Maintenance = (function () {
         // blocked or sleeping datastore is a state this tab renders.
         s.refsError = (err && err.message) || String(err);
         repaint();
+        wake();
       });
+  }
+
+  // The same arrangement #116 grew for #118, and for the same reason: repaint()
+  // paints this tab only, so the history view — which renders this sheet without
+  // owning it — has to be told when the vocabularies arrive rather than poll.
+  const refsWaiting = [];
+
+  function ensureRefs(done) {
+    const s = S();
+    // Only ever called back when the data has to be *fetched*. Answering
+    // synchronously when it is already here would put the caller's repaint
+    // inside its own render — renderMain() calls init(), init() calls this, and
+    // a synchronous callback makes that a loop. Found by `npm run smoke`.
+    if (s.refs || s.refsError) return;
+    if (done) refsWaiting.push(done);
+    loadRefs();
+  }
+
+  function wake() {
+    refsWaiting.splice(0).forEach(fn => {
+      try { fn(); } catch (e) { console.error(e); }
+    });
   }
 
   function lookup(name) { return (S().refs && S().refs[name]) || []; }
@@ -967,6 +994,148 @@ const Maintenance = (function () {
       </div>`;
   }
 
+  // ── Reading one back (#118) ────────────────────────────────────────────────
+  //
+  // The same record model #116 builds, for this sheet. See the long note in
+  // inspections.js for why a model rather than a read-only flag: the editable
+  // form is untouched, the screen and the CSV are one walk, and the walk is over
+  // the same PANELS/BLOCKS/SECTIONS tables the form renders from.
+  //
+  // One difference from #116's, and it is the same difference that runs through
+  // both files: there is no matrix here, so there is no "not on this form" list.
+  // The Council sheet prints nine sections and prints them for every site. A
+  // section with nothing recorded in it says so; a section this sheet does not
+  // print does not exist.
+
+  function pluck(doc, path) {
+    let node = doc;
+    for (const key of path.split('.')) {
+      if (node == null) return null;
+      if (key === 'top') continue;
+      node = node[/^\d+$/.test(key) ? Number(key) : key];
+    }
+    return node === undefined ? null : node;
+  }
+
+  function boolLabel(v) {
+    if (v == null || v === '') return '';
+    const row = lookup('yes_no').find(o => !!o.value === !!v);
+    return row ? row.label : (v ? 'Yes' : 'No');
+  }
+
+  function shown(f, v) {
+    if (v == null || v === '') return '';
+    if (f.t === 'bool')   return boolLabel(v);
+    if (f.t === 'select') return labelIn(f.opts, v);
+    return String(v);
+  }
+
+  function recordModel(doc) {
+    if (!doc) return null;
+    return {
+      kind: 'maintenance',
+      id: doc.id || null,
+      station_id: doc.station_id || null,
+      title: doc.station_name || 'Unnamed site',
+      form: 'Council Site Maintenance Tasks',
+      sheet: 'Council Maintenance Tasks',
+      formNote: 'The council-liaison and site-stewardship sheet — a different form family from '
+              + 'the six inspection sheets, and the only one in the workbook with pick-lists.',
+      dated: doc.visited_on || '',
+      by: doc.recorded_by || '',
+      heading: [
+        { label: 'Station name', value: doc.station_name || '' },
+        { label: 'CBM No',       value: doc.cbm_no || '' },
+        { label: 'Date of visit', value: doc.visited_on || '' },
+        { label: 'Recorded by',  value: doc.recorded_by || '' },
+        ...(doc.trigger_reason
+          ? [{ label: 'Why this form was raised', value: doc.trigger_reason }] : []),
+      ],
+      sections: SECTIONS.map((sec, i) => sectionModel(doc, sec, i + 1)),
+      absent: [],
+      linkedInspection: doc.inspection_id || null,
+      origin: doc.origin || 'form',
+      updated_at: doc.updated_at || null,
+    };
+  }
+
+  function sectionModel(doc, sec, ord) {
+    const out = { key: sec.key, ord, label: sec.label, note: '',
+                  blocks: [], tables: [], lines: [], files: [] };
+
+    if (sec.kind === 'panel') {
+      const i = (doc.assets || []).findIndex(r => r.asset === sec.asset);
+      const panel = PANELS.find(p => p.asset === sec.asset);
+      if (i < 0 || !panel) { out.empty = true; return out; }
+      panel.blocks.forEach(block => out.blocks.push({
+        title: block.title || '', note: block.note || '',
+        fields: block.fields.map(f => ({
+          label: f.label, note: f.note || '',
+          value: shown(f, pluck(doc, `assets.${i}.${f.k}`)),
+        })),
+      }));
+      return out;
+    }
+
+    if (sec.kind === 'data_quality') {
+      const LABEL = Object.fromEntries(PARAMETERS);
+      const rows = doc.data_quality || [];
+      if (!rows.length) { out.empty = true; return out; }
+      out.tables.push({
+        columns: ['', 'On arrival', 'On Departure', 'Comments'],
+        rows: rows.map(r => [
+          LABEL[r.parameter] || r.parameter,
+          labelIn('data_quality_rating', r.on_arrival_key),
+          labelIn('data_quality_rating', r.on_departure_key),
+          r.comments || '',
+        ]),
+      });
+      const ratings = lookup('data_quality_rating');
+      const flagged = rows.map(r => {
+        const rating = ratings.find(x => x.key === r.on_departure_key);
+        return rating && rating.needs_maintenance
+          ? `${LABEL[r.parameter] || r.parameter} left at ${rating.label}` : null;
+      }).filter(Boolean);
+      if (flagged.length) {
+        out.lines.push({ kind: 'flag',
+          text: `${flagged.join(' · ')} — this site was still rated as needing work when the `
+              + 'crew left.' });
+      }
+      return out;
+    }
+
+    if (sec.kind === 'attachments') {
+      out.files.push({ role: 'canister_config', label: 'Canister configuration',
+        note: 'Top right of the printed sheet — a pasted screenshot of the canister’s raw '
+            + 'terminal config dump in the one filled example.',
+        items: filesFor(doc, 'canister_config') });
+      if (!out.files[0].items.length) out.empty = true;
+      return out;
+    }
+
+    (BLOCKS[sec.key] || []).forEach(block => out.blocks.push({
+      title: block.title || '', note: block.note || '',
+      fields: block.fields.map(f => ({
+        label: f.label, note: f.note || '', value: shown(f, pluck(doc, `top.${f.k}`)),
+      })),
+    }));
+    if (sec.key === 'gauge_boards') {
+      out.files.push({ role: 'gauge_board', label: 'Gauge board and benchmark photos',
+        note: 'The sheet prints “(if yes take photo)” beside Bench Mark present.',
+        items: filesFor(doc, 'gauge_board') });
+    }
+    return out;
+  }
+
+  function filesFor(doc, role) {
+    return (doc.attachments || []).filter(a => a.role_key === role)
+      .map(a => ({
+        id: a.id, title: a.title || '', caption: a.caption || '',
+        bucket: a.storage_bucket || 'inspections', path: a.storage_path,
+        content_type: a.content_type || '', byte_size: a.byte_size,
+      }));
+  }
+
   // ── Repainting ─────────────────────────────────────────────────────────────
   // A whole-tab repaint is for a structural change — a record loaded, a form
   // opened or closed. A keystroke never triggers one.
@@ -1293,5 +1462,9 @@ const Maintenance = (function () {
     saveDraft: () => writeDraft(true),
     open, resume, discard, retry, refresh,
     fromInspection, startFrom,
+    // #118: the history view renders this sheet without owning it.
+    ensureRefs, recordModel,
+    refsReady: () => !!S().refs,
+    refsError: () => S().refsError,
   };
 })();

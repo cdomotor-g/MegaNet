@@ -4951,3 +4951,392 @@ code {
   .hdr-nav { width: 2.15rem; height: 2.15rem; }
   .hdr-ico { font-size: 1.05rem; }
 }
+
+
+/* ── Inspection History tab (#118) ───────────────────────────────────────────
+   Reading a saved visit back, and printing it.
+
+   Its own set of selectors, like the two form tabs it reads for and for the
+   same reason (#113's constraint 2): a tab that is not #109 owns its region and
+   nothing else. It looks like both of them on purpose — the same banner-headed
+   block, the same dense grid — because it is the same workbook, printed with
+   the same conventions.
+
+   The one thing it does differently is the box itself. A value on this tab is a
+   `<span>` with a rule under it, not a disabled input: a disabled input prints
+   as whatever the browser thinks a dead form control looks like, and on screen
+   it reads as something a person could have typed in and did not. A value under
+   its printed label, with a line under it, is what the paper is. */
+
+.hist-page {
+  padding: 1rem;
+  display: grid;
+  gap: .75rem;
+  max-width: 1180px;      /* an A4 page is not 2000 px wide, and neither is a form */
+  margin: 0 auto;
+}
+
+.hist-sub { color: var(--muted); margin: .2rem 0 .4rem; }
+
+.hist-head-actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+
+.hist-note { padding: 1rem; }
+.hist-bad  { border-left: 3px solid var(--bad); }
+.hist-bad-text:empty { display: none; }
+.hist-bad-text { color: var(--bad); margin: .4rem 0 0; }
+.hist-muted { color: var(--muted); }
+
+.hist-search { display: grid; gap: .3rem; font-size: .9rem; color: var(--muted); }
+
+.hist-hits {
+  display: grid;
+  gap: .2rem;
+  margin: .6rem 0;
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.hist-hit {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .75rem;
+  text-align: left;
+  width: 100%;
+  padding: .35rem .5rem;
+}
+
+.hist-hit-name { font-weight: 600; }
+
+/* ── The list ── */
+
+.hist-scroll { overflow-x: auto; margin: .3rem 0 .5rem; }
+
+.hist-table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+
+.hist-table th,
+.hist-table td {
+  border: 1px solid var(--border);
+  padding: .3rem .4rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.hist-table thead th {
+  background: var(--subtle);
+  font-size: .75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hist-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hist-actions { white-space: nowrap; }
+
+/* A visit the printed instruction at the foot of the sheet applies to. The
+   marker is on the rating rather than the whole row, because the row is
+   otherwise unremarkable and a wash of colour down the table would say
+   "something is wrong here" about a site that was simply visited. */
+.hist-row-flagged .hist-date { font-weight: 600; }
+
+.hist-flag {
+  display: inline-block;
+  padding: .05rem .35rem;
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  font-size: .74rem;
+  white-space: nowrap;
+}
+
+/* ── One record ── */
+
+.hist-doc { display: grid; gap: .75rem; }
+
+.hist-doc-head { padding: .9rem; }
+
+/* The Bureau's lockup sits top-left of every sheet in the workbook. The logo
+   image is not in this repository, so this is a wordmark in its place — the
+   right shape and position, and no invented artwork. */
+.hist-brand {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  padding-bottom: .4rem;
+  border-bottom: 2px solid var(--accent, #0b5cab);
+  margin-bottom: .5rem;
+}
+
+.hist-brand-mark {
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: var(--accent, #0b5cab);
+}
+
+.hist-brand-sub {
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--muted);
+}
+
+.hist-doc-title { margin: 0; font-size: 1.1rem; }
+.hist-doc-form  { margin: .1rem 0 .5rem; font-weight: 600; }
+.hist-heading   { margin-top: .5rem; }
+.hist-import    { color: var(--warn); }
+
+.hist-section { padding: 0 .9rem .9rem; }
+
+.hist-banner {
+  display: flex;
+  align-items: baseline;
+  gap: .6rem;
+  margin: 0 -.9rem .6rem;
+  padding: .45rem .9rem;
+  background: var(--subtle);
+  border-bottom: 1px solid var(--border);
+  border-radius: 10px 10px 0 0;
+  font-weight: 700;
+}
+
+.hist-banner-ord   { font-weight: 400; color: var(--muted); }
+.hist-banner-label { font-size: 1rem; }
+
+.hist-variant {
+  margin: -.3rem 0 .6rem;
+  padding-left: 1.8rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.hist-block {
+  margin: .9rem 0 .35rem;
+  font-size: .85rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+
+.hist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: .5rem .7rem;
+}
+
+.hist-field { display: grid; gap: .1rem; align-content: start; min-width: 0; }
+
+.hist-label {
+  display: block;
+  font-size: .82rem;
+  color: var(--muted);
+  line-height: 1.25;
+}
+
+.hist-hint {
+  display: block;
+  font-size: .72rem;
+  font-style: italic;
+  opacity: .85;
+}
+
+/* The line under a value is the line the box is drawn on. A box nobody filled
+   in keeps its line and shows an em dash — which is what a blank box on paper
+   is, and is not the same thing as a section that was never printed. */
+.hist-value {
+  display: block;
+  min-height: 1.35rem;
+  padding: .1rem .15rem;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.hist-field-blank .hist-value { color: var(--muted); }
+
+.hist-empty {
+  margin: .2rem 0 0;
+  padding: .4rem .6rem;
+  border-left: 3px solid var(--border);
+  background: var(--subtle);
+  border-radius: 0 6px 6px 0;
+  color: var(--muted);
+}
+
+.hist-flagline {
+  margin: .5rem 0 0;
+  padding: .4rem .6rem;
+  border: 1px solid var(--warn);
+  border-left-width: 3px;
+  border-radius: 6px;
+  background: var(--subtle);
+}
+
+.hist-footnote { margin: .6rem 0 0; color: var(--muted); font-style: italic; }
+
+.hist-absent { border-style: dashed; }
+.hist-absent-list { margin: .3rem 0 0 1.1rem; color: var(--muted); }
+.hist-absent-list li { margin-bottom: .2rem; }
+
+.hist-doc-foot { padding: .6rem .9rem; }
+
+/* Photos. A fixed box so the layout does not reflow as each signed URL arrives
+   — the same reasoning as .att-thumb, at reading size rather than thumbnail
+   size, because this is the copy somebody prints and files. */
+.hist-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+  margin: .3rem 0 .2rem;
+}
+
+.hist-file { margin: 0; max-width: 15rem; }
+
+.hist-file img {
+  width: 15rem;
+  height: 11rem;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--subtle);
+}
+
+.hist-file-cap { display: block; color: var(--muted); overflow-wrap: anywhere; }
+.hist-file-doc { padding: .3rem 0; }
+
+@media (max-width: 900px) {
+  .hist-page { padding: .6rem; }
+}
+
+@media (max-width: 560px) {
+  .hist-grid { grid-template-columns: minmax(0, 1fr); }
+  .hist-banner { margin-left: -.6rem; margin-right: -.6rem; padding-left: .6rem; }
+  .hist-section { padding: 0 .6rem .6rem; }
+  .hist-variant { padding-left: 0; }
+  .hist-file, .hist-file img { max-width: 100%; width: 100%; }
+}
+
+
+/* ── Print (#118) ────────────────────────────────────────────────────────────
+   The workbook's own print setup is A4 portrait, one page per station visit,
+   Arial with 8pt labels and 10pt bold banner headings, and an explicit print
+   area on most sheets. This is that, applied to the read-only record — which is
+   the whole reason #118 renders a record as values under labels rather than as
+   a form full of controls.
+
+   Everything but the record is removed rather than hidden behind a wrapper
+   class: printing any other tab of this app was never a designed act, and a
+   page of nav rail and map controls is not a useful default for any of them.
+   So the shell goes, and what is left is whatever #main-content is showing.
+
+   `print-color-adjust: exact` is on the banners and nothing else. A section
+   banner is a shaded strip on the paper form and reads as a heading because of
+   it; the rest of the page is black on white either way, and forcing colour
+   across a whole document is how a printer ends up laying down ink for a
+   background nobody asked for. */
+
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@media print {
+  html, body {
+    background: #fff;
+    color: #000;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 8pt;
+  }
+
+  /* The shell. None of it is part of a form. */
+  header,
+  #tab-nav,
+  #help-panel,
+  #mem-bar,
+  #nav-backdrop,
+  #help-backdrop,
+  .modal-backdrop,
+  .hist-head,
+  .hist-tools,
+  .hist-picker,
+  .hist-head-actions,
+  .panel-header button { display: none !important; }
+
+  /* The list panel is deliberately *not* hidden. Printing the timeline for a
+     station is a useful thing to do — it is the "what has happened here" page —
+     and a Ctrl-P on the list that produced a blank sheet would be a bug rather
+     than a decision. Its heading carries the station name for exactly that
+     reason. */
+
+  /* The layout is a flex row sized against the viewport, which means nothing on
+     paper. Let the content set the height and let the pages fall where they
+     fall. */
+  #app-shell { display: block; }
+
+  #main-content {
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .hist-page {
+    max-width: none;
+    padding: 0;
+    gap: 4mm;
+  }
+
+  .hist-doc { gap: 4mm; }
+
+  /* A panel is a card on screen and a region of a page here. */
+  .panel {
+    border: 1px solid #999;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .hist-banner {
+    background: #e8eef4;
+    border-bottom: 1px solid #999;
+    border-radius: 0;
+    font-size: 10pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .hist-banner-label { font-size: 10pt; }
+
+  .hist-brand { border-bottom: 2px solid #0b5cab; }
+  .hist-brand-mark { color: #0b5cab; }
+
+  .hist-label, .hist-hint, .hist-muted, .hist-empty, .hist-block { color: #444; }
+  .hist-value { border-bottom: 1px solid #999; }
+
+  /* The Open button is the one cell in the timeline that means nothing on
+     paper. Its column stays, so the header row and the body still line up. */
+  .hist-actions button { display: none; }
+
+  .hist-table { font-size: 7.5pt; }
+  .hist-table th, .hist-table td { border: 1px solid #999; }
+  .hist-table thead th { background: #f0f0f0;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* A grid wider than the page scrolls on screen and cannot on paper, so it
+     shrinks its type instead of being cut off at the margin. */
+  .hist-scroll { overflow: visible !important; }
+
+  .hist-file img { width: 60mm; height: 45mm; }
+
+  /* A file that is not an image is a button on screen and a name on paper. */
+  .hist-file-doc button {
+    border: 0;
+    padding: 0;
+    background: none;
+    color: #000;
+    text-decoration: none;
+  }
+
+  .hist-flagline, .hist-empty { background: #fff; }
+
+  /* A link's href printed after it is noise here: every link on this page is an
+     in-app button. */
+  a[href]::after { content: none !important; }
+}

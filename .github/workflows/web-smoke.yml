@@ -134,6 +134,15 @@ jobs:
         working-directory: test
         run: npm run maint
 
+      # The same blind spot again, and worse: the Inspection History tab renders
+      # from the datastore *and* every record it shows is editors-only, so under
+      # smoke it correctly renders "sign in to read them" and a whole reader goes
+      # untested. This one has the app write the records itself — fill the sheet
+      # in, save, read it back — so the round trip is the thing under test (#118).
+      - name: Inspection History — a record reads back as the sheet it was written on
+        working-directory: test
+        run: npm run history
+
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —
 # as a per-push gate it would train everyone to re-record the baseline without

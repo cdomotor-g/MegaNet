@@ -12,8 +12,9 @@
 // datastore.js for dbSelect, dbRpc and dbCanWrite; to attachments.js for the
 // photo panel in the admin section; and to maintenance.js for
 // Maintenance.startFrom(), from the prompt at the foot of a visit that departed
-// poor — the printed cross-reference, followed. Nothing reaches into this file:
-// the tab is rendered from renderMain()'s one case and nothing else calls in.
+// poor — the printed cross-reference, followed. One file reaches into this one:
+// history.js (#118) calls ensureRefs() and recordModel(), because a saved visit
+// is this file's sheet and reading one back should not be a second copy of it.
 //
 // The IIFE body builds its field tables and calls nothing, so this file's
 // position among the modules is free — checked, not reasoned about
@@ -715,6 +716,7 @@ const Inspections = (function () {
         s.refs = refs;
         s.refsLoading = false;
         repaint();
+        wake();
       })
       .catch(err => {
         s.refsLoading = false;
@@ -722,7 +724,31 @@ const Inspections = (function () {
         // state this tab renders, not a fault to shout about.
         s.refsError = (err && err.message) || String(err);
         repaint();
+        wake();
       });
+  }
+
+  // Whoever asked for the same reference data from another tab. repaint() only
+  // paints the Inspections tab, so a second reader — the history view (#118),
+  // which renders this file's sheets and needs this file's vocabularies — has to
+  // be told separately rather than left to poll.
+  const refsWaiting = [];
+
+  function ensureRefs(done) {
+    const s = S();
+    // Only ever called back when the data has to be *fetched*. Answering
+    // synchronously when it is already here would put the caller's repaint
+    // inside its own render — renderMain() calls init(), init() calls this, and
+    // a synchronous callback makes that a loop. Found by `npm run smoke`.
+    if (s.refs || s.refsError) return;
+    if (done) refsWaiting.push(done);
+    loadRefs();
+  }
+
+  function wake() {
+    refsWaiting.splice(0).forEach(fn => {
+      try { fn(); } catch (e) { console.error(e); }
+    });
   }
 
   function lookup(name) { return (S().refs && S().refs[name]) || []; }
@@ -1735,6 +1761,298 @@ const Inspections = (function () {
       </div>`;
   }
 
+  // ── Reading one back (#118) ────────────────────────────────────────────────
+  //
+  // The history tab shows a saved visit read-only, and exports it. Neither is a
+  // second layout: this builds a **record model** — the sheet walked once, in
+  // its printed order, with every box resolved to the words a person would read
+  // — and history.js renders that model to the screen, to A4 and to CSV.
+  //
+  // Why a model rather than a read-only flag threaded through the renderers
+  // above. Three reasons, in the order they mattered:
+  //
+  //   1. The editable form is not touched at all, so the 66 assertions in
+  //      `npm run insp` still cover exactly what they covered. A read-only flag
+  //      inside fieldHtml() would have put every one of them on the far side of
+  //      a branch.
+  //   2. The screen and the CSV are then the same walk. A column that appears in
+  //      one and not the other is not possible, which is the failure a separate
+  //      export function has every time the form gains a box.
+  //   3. It is the same walk *this* file already does to render the form, over
+  //      the same FIELDS and CALIBRATIONS tables and the same matrix, so a
+  //      section added to the sheet is in the history view and the export
+  //      without either being told.
+  //
+  // What it deliberately does not do is materialise blank rows. `ensureRows()`
+  // is for a form somebody is about to fill in; a saved record is what was
+  // recorded, and 0009 spells "nobody filled this in" as no row. So a printed
+  // section with no row says so in one line rather than printing a grid of empty
+  // boxes — which is #118's third acceptance criterion applied one level down
+  // from the sections the form does not print at all.
+
+  // Read a path out of a document that is not necessarily the one on screen.
+  // Same addressing as container()/get(), without the assumption that the
+  // document is state's.
+  function pluck(doc, path) {
+    let node = doc;
+    for (const key of path.split('.')) {
+      if (node == null) return null;
+      if (key === 'top') continue;
+      node = node[/^\d+$/.test(key) ? Number(key) : key];
+    }
+    return node === undefined ? null : node;
+  }
+
+  function labelIn(table, key) {
+    if (key == null || key === '') return '';
+    const row = lookup(table).find(o => o.key === key);
+    return row ? row.label : String(key);
+  }
+
+  // The three-state pick-list, read back. `null` prints as nothing, which is
+  // what an uncircled YES/NO on paper looks like.
+  function boolLabel(v) {
+    if (v == null || v === '') return '';
+    const row = lookup('yes_no').find(o => !!o.value === !!v);
+    return row ? row.label : (v ? 'Yes' : 'No');
+  }
+
+  function shown(f, v) {
+    if (v == null || v === '') return '';
+    if (f.t === 'bool')   return boolLabel(v);
+    if (f.t === 'select') return labelIn(f.opts, v);
+    if (f.t === 'time')   return hhmm(v);
+    return String(v);
+  }
+
+  function num(v) { return v == null || v === '' ? '' : String(v); }
+
+  function recordModel(doc) {
+    if (!doc) return null;
+    const cfg = doc.config_key;
+    const c = configs().find(x => x.key === cfg) || {};
+    return {
+      kind: 'inspection',
+      id: doc.id || null,
+      station_id: doc.station_id || null,
+      title: doc.station_name || 'Unnamed site',
+      form: configLabel(cfg),
+      sheet: c.sheet || '',
+      formNote: c.note || '',
+      dated: doc.inspected_on || '',
+      by: doc.inspector || '',
+      heading: [
+        { label: cfg === 'base_station' ? 'Base Station Name' : 'Station Name',
+          value: doc.station_name || '' },
+        { label: 'CBM No',  value: doc.cbm_no || '' },
+        { label: 'Date',    value: doc.inspected_on || '' },
+        ...(doc.inspected_at_time ? [{ label: 'Time', value: hhmm(doc.inspected_at_time) }] : []),
+        { label: 'Initials', value: doc.inspector || '' },
+      ],
+      sections: sectionsFor(cfg).map(row => sectionModel(doc, row)),
+      absent: sectionsNotOnForm(cfg).map(s => ({ label: s.label, note: s.note || '' })),
+      // Where it came from, for a reader who wants to know whether a person
+      // typed this or an import wrote it (#122 will fill this column in).
+      origin: doc.origin || 'form',
+      updated_at: doc.updated_at || null,
+    };
+  }
+
+  function sectionModel(doc, row) {
+    const cfg = row.config_key;
+    const key = row.section_key;
+    const sec = {
+      key, ord: row.ord, label: sectionLabel(row), note: row.variant_note || '',
+      blocks: [], tables: [], lines: [], files: [],
+    };
+
+    if (key === 'serial_numbers') {
+      const rows = (doc.serials || []);
+      if (rows.length) {
+        sec.tables.push({
+          columns: ['Equipment', 'As printed', 'Model', 'Serial No', 'Version', 'Comments'],
+          rows: rows.map(r => [
+            labelIn('equipment_kind', r.equipment_key), r.label || '',
+            r.model || '', r.serial_no || '', r.version || '', r.comments || '',
+          ]),
+        });
+      } else {
+        sec.empty = true;
+      }
+      return sec;
+    }
+
+    if (key === 'data_quality') {
+      const LABEL = { rain: 'Rain', water_level: 'Water Level' };
+      const rows = (doc.data_quality || []);
+      if (rows.length) {
+        sec.tables.push({
+          columns: ['', 'On Arrival', 'On Departure', 'Comments'],
+          rows: rows.map(r => [
+            LABEL[r.parameter] || r.parameter,
+            labelIn('data_quality_rating', r.on_arrival_key),
+            labelIn('data_quality_rating', r.on_departure_key),
+            r.comments || '',
+          ]),
+        });
+        const flagged = flaggedIn(doc);
+        if (flagged.length) {
+          sec.lines.push({ kind: 'flag',
+            text: `${flagged.map(f => `${LABEL[f.parameter] || f.parameter} left at ${f.label}`)
+              .join(' · ')} — the sheet asks for a Flood Warning Council Maintenance Project form `
+              + 'for a site that departs like this.' });
+        }
+      } else {
+        sec.empty = true;
+      }
+      return sec;
+    }
+
+    if (key === 'base_tests') {
+      calibrationTables(doc, cfg, key).forEach(t => sec.tables.push(t));
+      if (!sec.tables.length) sec.empty = true;
+      return sec;
+    }
+
+    // Everything else: the section's own boxes first, then whatever the sheet
+    // prints under them — in the same order sectionHtml() prints it.
+    const base = SECTION_DOC_KEY[key];
+    if (base && base !== 'top' && pluck(doc, base) == null) {
+      sec.empty = true;
+    } else if (base) {
+      (FIELDS[key] || []).filter(b => applies(b, cfg)).forEach(block => {
+        const fields = block.fields.filter(f => applies(f, cfg));
+        if (!fields.length) return;
+        sec.blocks.push({
+          title: block.title || '', note: block.note || '',
+          fields: fields.map(f => ({
+            label: labelOf(f, cfg), note: f.note || '',
+            value: shown(f, pluck(doc, `${base}.${f.k}`)),
+          })),
+        });
+      });
+    }
+
+    if (key === 'radio' && fadeMarginOn(cfg)) fadeMarginTables(doc).forEach(t => sec.tables.push(t));
+    calibrationTables(doc, cfg, key).forEach(t => sec.tables.push(t));
+    if (key === 'initial_data' || key === 'final_data') {
+      const t = dataValuesTable(doc, key === 'initial_data' ? 'initial' : 'final');
+      if (t) sec.tables.push(t);
+    }
+    if (key === 'rain_gauge') {
+      const line = tipRuleLine(doc);
+      if (line) sec.lines.push(line);
+    }
+    if (key === 'admin_checklist') {
+      sec.files.push({
+        role: 'photo', label: 'Photos',
+        note: 'The tick above records that photos were taken. These are the photos.',
+        items: filesFor(doc, 'photo'),
+      });
+      sec.lines.push({ kind: 'note',
+        text: '* sites on departure that are poor or have issues please complete Flood Warning '
+            + 'Council Maintenance Project form' });
+    }
+
+    // A section whose row exists but that prints nothing at all is still a
+    // section — say so rather than leaving a bare banner.
+    if (!sec.empty && !sec.blocks.length && !sec.tables.length
+        && !sec.lines.length && !sec.files.length) sec.empty = true;
+    return sec;
+  }
+
+  // The departure ratings the database marks as needing a maintenance visit,
+  // read off a document rather than off the form on screen. Same answer
+  // needsMaintenance() gives, asked of a record.
+  function flaggedIn(doc) {
+    const ratings = lookup('data_quality_rating');
+    return (doc.data_quality || []).map(r => {
+      const rating = ratings.find(x => x.key === r.on_departure_key);
+      return rating && rating.needs_maintenance
+        ? { parameter: r.parameter, label: rating.label } : null;
+    }).filter(Boolean);
+  }
+
+  function calibrationTables(doc, cfg, sectionKey) {
+    const out = [];
+    plannedCalibrations(cfg).filter(b => calSection(b.kind) === sectionKey).forEach(block => {
+      block.phases.forEach(phase => {
+        const rows = (doc.calibrations || [])
+          .filter(r => r.kind_key === block.kind && (r.phase || 'none') === phase)
+          .sort((a, b) => (a.ord || 0) - (b.ord || 0));
+        if (!rows.length) return;
+        const cols = (phase === 'final' && block.finalCols) || block.cols;
+        const title = block.phases.length > 1
+          ? `${phase === 'initial' ? 'Initial' : 'Final'} ${block.title}` : block.title;
+        out.push({
+          title, note: block.note || '',
+          columns: [
+            ...(block.rows > 1 ? ['#'] : []),
+            ...cols.map(c => (block.labels && block.labels[c]) || CAL_COLS[c]),
+            ...(block.extra || []).map(([, l]) => l),
+            'Notes',
+          ],
+          rows: rows.map(r => [
+            ...(block.rows > 1 ? [String(r.ord)] : []),
+            ...cols.map(c => c === 'passed' ? boolLabel(r.passed) : num(r[c])),
+            ...(block.extra || []).map(([k]) => num(r.extra && r.extra[k])),
+            r.notes || '',
+          ]),
+        });
+      });
+    });
+    return out;
+  }
+
+  function fadeMarginTables(doc) {
+    return ['original', 'this_visit'].map(phase => {
+      const rows = (doc.fade_margin || []).filter(r => r.phase === phase)
+        .sort((a, b) => (a.ord || 0) - (b.ord || 0));
+      if (!rows.length) return null;
+      return {
+        title: `Path Margin (dB) — ${phase === 'original' ? 'Original' : 'This visit'}`,
+        columns: ['Time', 'Load (dB)', 'Tips (TBRG)', 'Received at base', 'Comments'],
+        rows: rows.map(r => [
+          hhmm(r.at_time), num(r.load_db), num(r.tips),
+          boolLabel(r.received_at_base), r.comments || '',
+        ]),
+      };
+    }).filter(Boolean);
+  }
+
+  function dataValuesTable(doc, phase) {
+    const block = doc.data && doc.data[phase];
+    const rows = (block && block.values) || [];
+    if (!rows.length) return null;
+    return {
+      title: "ALERT ID's / Accumulator Values",
+      columns: ['ALERT ID', 'Label', 'Accumulator', 'Value'],
+      rows: rows.map(v => [num(v.alert_id), v.label || '', num(v.accumulator), num(v.value)]),
+    };
+  }
+
+  // The printed 6% rule, read against what was recorded. The threshold is the
+  // one this visit was judged against, not today's — which is why 0009 stores
+  // it per visit.
+  function tipRuleLine(doc) {
+    const rg = doc.rain_gauge;
+    if (!rg || rg.mean_pct_error == null) return null;
+    const th = rg.adjustment_threshold_pct == null ? 6 : rg.adjustment_threshold_pct;
+    const over = Math.abs(Number(rg.mean_pct_error)) > th;
+    return { kind: over ? 'flag' : 'note',
+      text: `Mean % error ${Number(rg.mean_pct_error).toFixed(2)}% against a ${th}% threshold — `
+          + `${over ? 'adjustment indicated' : 'no adjustment indicated'}.` };
+  }
+
+  function filesFor(doc, role) {
+    return (doc.attachments || []).filter(a => a.role_key === role)
+      .map(a => ({
+        id: a.id, title: a.title || '', caption: a.caption || '',
+        bucket: a.storage_bucket || 'inspections', path: a.storage_path,
+        content_type: a.content_type || '', byte_size: a.byte_size,
+      }));
+  }
+
   // ── Repainting ─────────────────────────────────────────────────────────────
   // A whole-tab repaint is for a structural change — a different configuration,
   // a row added, a record loaded. A keystroke never triggers one.
@@ -2150,5 +2468,9 @@ const Inspections = (function () {
     saveDraft: () => writeDraft(true),
     open, resume, discard, retry, refresh, raiseMaintenance,
     addSerial, removeSerial, addValue, removeValue, addFade, removeFade,
+    // #118: the history view renders this file's sheets without owning them.
+    ensureRefs, recordModel, configLabel,
+    refsReady: () => !!S().refs,
+    refsError: () => S().refsError,
   };
 })();

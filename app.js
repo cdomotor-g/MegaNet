@@ -1105,7 +1105,11 @@ function renderMain() {
   // loaded at all — only the station search needs stations.json, and it says so.
   // ARRO Data joins them too: a dropped CSV parses and plots on its own, and
   // only the link back to a station needs the station file.
-  const noDataTabs = ['packets', 'alert2', 'maps', 'serial', 'arro', 'arrodata'];
+  // Inspection History joins them too: every record it shows comes from the
+  // datastore, and only scoping the timeline to one station needs the station
+  // file — so it says that rather than rendering the load-a-file page over a
+  // history somebody can read.
+  const noDataTabs = ['packets', 'alert2', 'maps', 'serial', 'arro', 'arrodata', 'history'];
   if (!state.data && !noDataTabs.includes(state.activeTab)) { el.innerHTML = renderEmpty(); return; }
   switch (state.activeTab) {
     case 'stations':   el.innerHTML = renderStationsHtml();  initStationFilters(); initMap(); break;
@@ -1126,6 +1130,7 @@ function renderMain() {
     case 'field':      el.innerHTML = ArroData.render('field'); ArroData.init();  break;
     case 'inspections': el.innerHTML = Inspections.render();  Inspections.init(); break;
     case 'maintenance': el.innerHTML = Maintenance.render();  Maintenance.init(); break;
+    case 'history':    el.innerHTML = History.render();       History.init();      break;
     case 'export':     el.innerHTML = renderExportHtml();     initExport();     break;
     default:           el.innerHTML = '<p style="padding:1rem">Unknown tab</p>';
   }

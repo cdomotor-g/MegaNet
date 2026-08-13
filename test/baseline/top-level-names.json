@@ -23,6 +23,7 @@
     "attachments.js",
     "inspections.js",
     "maintenance.js",
+    "history.js",
     "map-rivers.js",
     "map-spider.js",
     "map-locate.js",
@@ -35,6 +36,6 @@
     "bug-report.js",
     "init.js"
   ],
-  "total": 436,
-  "distinct": 436
+  "total": 437,
+  "distinct": 437
 }

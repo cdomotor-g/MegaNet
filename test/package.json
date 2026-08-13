@@ -12,9 +12,10 @@
     "toplevel": "node toplevel.mjs",
     "registry": "node registry.mjs",
     "concat": "node concat-verify.mjs",
-    "all": "npm run check && npm run names && npm run toplevel && npm run smoke && npm run registry && npm run insp && npm run maint",
+    "all": "npm run check && npm run names && npm run toplevel && npm run smoke && npm run registry && npm run insp && npm run maint && npm run history",
     "insp": "node inspections.mjs",
-    "maint": "node maintenance.mjs"
+    "maint": "node maintenance.mjs",
+    "history": "node history.mjs"
   },
   "devDependencies": {
     "acorn": "8.15.0",

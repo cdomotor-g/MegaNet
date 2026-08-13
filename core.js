@@ -67,6 +67,7 @@ const TABS = [
     { id: 'field',      label: 'Field Data',             icon: '🌡️' },
     { id: 'inspections', label: 'Inspections',           icon: '🩺' },
     { id: 'maintenance', label: 'Site Maintenance',      icon: '🧰' },
+    { id: 'history',    label: 'Inspection History',     icon: '📋' },
     { id: 'export',     label: 'Export',                 icon: '📤' },
   ] },
 ];
@@ -292,7 +293,7 @@ const HELP = {
       + 'the photos themselves. They go into a private bucket and are shown through a link that '
       + 'expires, so a site photograph never becomes a public URL.',
     ],
-    related: ['stations', 'maintenance', 'export'],
+    related: ['stations', 'maintenance', 'history', 'export'],
   },
 
   maintenance: {
@@ -311,14 +312,43 @@ const HELP = {
       + 'carries named contacts\' phone numbers and the "Assess and WHS" site-access notes. The '
       + 'blank form and its pick-lists render signed out; the two lists and Save do not.',
       'The <strong>Comms and Power panel prints a Condition and an Owner under each of its three '
-      + 'sub-columns</strong> and the schema carries one pair for the panel. The form says so on '
-      + 'the panel rather than losing it quietly — issue #148.',
+      + 'sub-columns</strong>, and since <code>0011</code> each of the six has a column of its own. '
+      + 'A form saved before that has the Comms pair filled and the other four empty, and empty '
+      + 'here means <em>not recorded</em> — there is nothing to backfill it from.',
       'The <strong>canister-configuration screenshot and the benchmark photo can be attached</strong> '
       + 'once the form has been saved — the file hangs off the record by foreign key, so there has '
       + 'to be a saved row for it to belong to. Files go into a <strong>private</strong> bucket and '
       + 'are only ever shown through a link that expires; nothing attached here is on the open web.',
     ],
-    related: ['inspections', 'stations'],
+    related: ['inspections', 'history', 'stations'],
+  },
+
+  history: {
+    summary: 'What has already happened at a site. Every past station inspection and Council '
+           + 'maintenance form, newest first, scoped to one station or across all of them — each '
+           + 'one opening <strong>read-only</strong>, laid out the way the paper sheet is, and '
+           + 'printable to A4 or exportable as CSV. The forms themselves are filled in on the '
+           + 'Inspections and Site Maintenance tabs; this is where they are read back.',
+    watch: [
+      'The record on screen is <strong>one walk over the same sheet the form renders</strong>, not '
+      + 'a second layout — so is the CSV. A box added to either sheet appears here and in the '
+      + 'export without either being told, which is what stops the three drifting apart.',
+      'A section the sheet prints with <strong>nothing recorded in it says so</strong>, rather than '
+      + 'showing a grid of empty boxes that reads as unfilled. A section the sheet does not print '
+      + 'at all is listed under <strong>Not on this form</strong>. Those are two different facts '
+      + 'and the schema keeps them apart, so this view does too.',
+      '<strong>On departure</strong> is the printed instruction at the foot of every inspection '
+      + 'sheet, as a column: a rating the database marks as needing a maintenance visit, with a '
+      + 'tick if a Council form was raised against it and an exclamation mark if none was.',
+      'All of it is <strong>editors-only</strong> — inspection remarks carry site-access notes and '
+      + 'the Council form carries named contacts\' phone numbers. Photos are drawn through links '
+      + 'that expire, and the CSV names a photo by its object path rather than carrying a link '
+      + 'that would still open it out of somebody\'s Downloads folder.',
+      'It is <strong>empty for a station nobody has inspected in MegaNet yet</strong>. The ~35 '
+      + 'years of paper history in the archive workbook is issue #122\'s to load, and this is the '
+      + 'view that will show it.',
+    ],
+    related: ['inspections', 'maintenance', 'stations'],
   },
 
   export: {
@@ -867,6 +897,25 @@ const state = {
     outstanding: null,   // meganet.inspection_needs_maintenance, editors only
     outstandingBusy: false,
     outstandingError: null,
+  },
+  // Inspection History (#118 — lazy, like the two form tabs it reads for. It
+  // holds no form and no draft: everything here is either a list off the
+  // datastore or one saved record, and both are re-read rather than kept.)
+  hist: {
+    query: '',           // the station picker's search box
+    station: null,       // { id, name, number } the history is scoped to, or null for all
+    list: null,          // the merged inspection + maintenance timeline, newest first
+    listBusy: false,
+    listError: null,
+    flags: null,         // inspection id → meganet.inspection_needs_maintenance rows
+    open: null,          // { kind, id, doc } the record on screen
+    openBusy: false,
+    openError: null,
+    msg: null,           // one line in the toolbar — a file that would not sign, mostly
+    // storage_path → signed URL, for as long as this record is open and no
+    // longer. A signed URL is only as private as the path it signs (#149), so
+    // it is never written anywhere that outlives the view.
+    urls: {},
   },
   // Attachments (#149 — shared by the two form tabs above; see attachments.js
   // for why one file rather than a panel copied into each). One record's worth

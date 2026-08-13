@@ -79,6 +79,8 @@ MegaNet/
 ├── station-editor.js       ← the station editor card on the Stations tab
 ├── inspections.js          ← Inspections — the six paper inspection sheets, digitised
 ├── maintenance.js          ← Maintenance — Site Maintenance tab, the Council sheet
+├── history.js              ← History   — Inspection History tab: past records,
+│                             read-only, printable to A4, exportable as CSV
 │                             ↓ the ten modules #133 lifted out of it, one each
 ├── map-rivers.js           ← MapRivers — OSM watercourses under the station pins
 ├── map-spider.js           ← MapSpider — fans overlapping pins out on leader lines
@@ -151,8 +153,11 @@ MegaNet/
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
 ├── test/                   ← the web app's safety net (see test/README.md, and Testing below)
-│   ├── smoke.mjs            (headless Chromium: load, open all 18 tabs, clean console)
+│   ├── smoke.mjs            (headless Chromium: load, open all 19 tabs, clean console)
 │   ├── dup-names.mjs        (no duplicate top-level names across the loaded scripts)
+│   ├── inspections.mjs      (the six sheets, against the migration's own seed data)
+│   ├── maintenance.mjs      (the Council sheet, against the workbook's filled example)
+│   ├── history.mjs          (a saved record read back, against the form that wrote it)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
 │   ├── syntax-check.mjs     (node --check over every script index.html loads)
 │   └── package.json         (down here on purpose — the app itself still has no build step)
@@ -160,7 +165,7 @@ MegaNet/
 ├── tools/                  ← command-line helpers (needs Python; see tools/README.md)
 │   ├── check_ingest.sql     (psql: prove the telemetry contract — 48 checks, rolls back)
 │   ├── check_mqtt.sql       (psql: prove the MQTT bridge's database half — 39 checks)
-│   ├── check_inspections.sql (psql: prove the inspection schema — 71 checks, rolls back)
+│   ├── check_inspections.sql (psql: prove the inspection schema — 86 checks, rolls back)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
 │   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
@@ -498,11 +503,27 @@ published anon key**: the council form carries landowner contact details and
 inspection remarks carry site access notes. The pick-lists and the form matrix
 are public — they are the words on a blank form.
 
+Reading one back is the **Inspection History** tab. A station's past visits and
+Council forms are one timeline, newest first, with the departure ratings that met
+the printed instruction shown against each one and whether a Council form was
+raised. Opening a record renders it read-only in the layout of the sheet it was
+written on, printable to A4 — Arial, shaded section banners, one page per visit,
+the workbook's own print setup — and exportable as CSV.
+
+That view is **one walk over the same field tables the form renders from**, not a
+second layout. The screen, the printed page and the CSV are three renderings of
+one record model, which is what stops a box added to a sheet appearing in one of
+them and not the others. It keeps the schema's distinctions rather than
+flattening them: a section the sheet prints with no row saved against it says
+nobody filled it in, a section the sheet does not print at all is listed under
+*Not on this form*, and the two are different sentences because they are
+different facts.
+
 The schema is the whole of #115; the two forms that write it are #116
 (Inspections) and #117 (Site Maintenance), the history view is #118, and the
 ~35-year backfill out of the second workbook is epic #122. [`db/README.md`](db/README.md#station-inspections-and-maintenance-activities)
 has the design decisions and the write path; `tools/check_inspections.sql` proves
-it in 71 checks.
+it in 86 checks.
 
 ---
 
@@ -1100,7 +1121,7 @@ on a narrow window.
 | --- | --- |
 | **Network** | Stations · Network Maps · Networks · Pass Ranges |
 | **Radio investigation** | RF Environment · RF Changes · Interference Workbench · Bit Flipper · Network View · ALERT Packets · ALERT2 / ERT-A2 · Serial Monitor |
-| **Data & admin** | ARRO Launcher · ARRO Data · Field Data · Inspections · Site Maintenance · Export |
+| **Data & admin** | ARRO Launcher · ARRO Data · Field Data · Inspections · Site Maintenance · Inspection History · Export |
 
 The grouping is the point of the second row: RF Environment, RF Changes, the
 Workbench and Bit Flipper are one investigation approached four ways, and
@@ -1734,6 +1755,9 @@ Tabs / panels:
   stewardship form rather than the calibration one, sharing every pick-list with
   the inspection form, and listing the visits whose departure rating asked for
   one and never got it
+- **Inspection History** — what has already happened at a site: every past
+  inspection and Council form, newest first, each opening read-only in the layout
+  of the paper sheet, printable to A4 and exportable as CSV
 - **Export** — Radio Mobile file generation
 
 Technology: Vanilla JS (no framework), same stack as current `app.js`.
@@ -2007,10 +2031,11 @@ Six checks, in ascending order of cost:
 | `npm run check` | a broken brace, in under a second, before a browser is launched |
 | `npm run names` | a second `function esc()` in another file silently overwriting the first |
 | `npm run toplevel` | a statement that executes at load in a file that should only declare — the property the load order in `index.html` rests on |
-| `npm run smoke` | the page loading and all 18 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
+| `npm run smoke` | the page loading and all 19 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
 | `npm run registry` | a Leaflet map or a tab teardown no file registered — and, at runtime, one that was registered and does not fire |
 | `npm run insp` | the Inspections form drawn against the schema's own seed data, on all six sheets. Smoke cannot see this one: it blocks the datastore, and this tab renders from it |
 | `npm run maint` | the Council Maintenance Tasks form drawn against the workbook's own filled sheet, read out of the `.xlsx` in `archive/`. Every cell where that sheet differs from the blank template has to be either on screen or named as having no column |
+| `npm run history` | a saved record reading back as the sheet it was written on. The fixture is not a file: the check fills a sheet in, saves it, and serves that document back — so the round trip is what is tested, and the read-only view is compared against the *editable* form's own section list |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and
@@ -2028,13 +2053,14 @@ then clicks its way through the RF Changes and Interference Workbench controls,
 keyed by the handler each one names rather than by its label. See
 `test/lib/controls.mjs`.
 
-CI runs all three on any push touching a root `*.js`, `index.html`, `styles.css`,
-`stations.json` or `test/`. The filter is a glob rather than a list of filenames
+CI runs all eight on any push touching a root `*.js`, `index.html`, `styles.css`,
+`stations.json`, `db/migrations/`, `test/` or the inspection workbook in
+`archive/`. The filter is a glob rather than a list of filenames
 because the app's script list grew with every milestone of the split — a named
 list would have to be edited by every milestone, and the one that forgot would
 quietly stop being tested.
 
-There is a fourth, `npm run concat`, which is not in CI: it concatenates the
+There is a ninth, `npm run concat`, which is not in CI: it concatenates the
 scripts `index.html` loads and compares the bytes against a recorded snapshot.
 That is the check that proves an `app.js` split moved code without changing it,
 and the only one that catches the four literal NUL bytes the app carries inside
