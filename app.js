@@ -2711,904 +2711,6 @@ function mapNearestToCentre(stations, n) {
     .map(x => x.s);
 }
 
-// ── River highlighting ───────────────────────────────────────────────────────
-// Half this network is named after the river it sits on, so typing "burdekin"
-// into the filter box lights up the Burdekin as well as the stations on it.
-// Rivers are context, never matches: they draw beneath the pins, they never move
-// the map, and they have no say in what the filter selects. Turn the switch off
-// and the Stations tab behaves exactly as it did before this existed.
-//
-// The geometry comes from OpenStreetMap over Overpass — national, live, named,
-// and in real coordinates. The bundled `assets/geo/Qld Major Streams_reduced.svg`
-// is deliberately *not* used: inverting `BASIN_GEOREF` (maps-data.js) puts its
-// features 100–150 km from the actual watercourse, consistently west and south.
-// That is accurate enough for its own job — point-in-polygon against 65 basins
-// the size of small countries — and useless for drawing a line over a
-// topographic basemap, where 100 km off is worse than drawing nothing. No affine
-// fixes it either: the source is a projected map. See issue #84.
-//
-// Overpass is a free public service, so every request has to earn itself: a
-// name-ish term only (a bare number in that box is an ALERT address, not a
-// river), debounced past the marker rebuild, bounded by the current view, capped,
-// and cached by term and rounded bbox so a small pan or a retyped word costs
-// nothing. Failure is silent and non-blocking — no network, no rivers, and the
-// station filter behaves exactly as it does with the switch off.
-const MapRivers = (function () {
-  // Both of these serve `Access-Control-Allow-Origin: *`. The list is a list
-  // because CORS from the deployed origin is the one thing that can sink this
-  // (see #66, and the README on BoM/ACMA), and a second endpoint costs a line.
-  const ENDPOINTS = [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-  ];
-  const PANE        = 'mnRivers';
-  const MIN_TERM    = 3;      // two letters matches half the watercourses in Queensland
-  const DEBOUNCE_MS = 450;    // longer than the 160 ms marker rebuild: this one costs a request
-  const TIMEOUT_MS  = 20000;
-  const MAX_WAYS    = 250;    // ways drawn per query — a long river is many ways
-  const BBOX_STEP   = 0.25;   // deg; the bbox is rounded out to this for the cache key,
-                              // so nudging the map re-uses the answer it already has
-  const BBOX_MAX    = 12;     // deg; a continent-wide view is not a fair thing to ask for
-  const CACHE_MAX   = 40;     // (term, bbox) answers kept — a session's worth of searching
-  const FAIL_TTL    = 60000;  // how long a failure is remembered before another attempt
-
-  let map = null, layer = null, timer = null, seq = 0, failedAt = 0;
-  const cache = new Map();    // 'terms|s,w,n,e' → { ways: [{name, coords}], capped, total }
-  let note = { kind: 'idle', drawn: 0, total: 0, capped: false };
-
-  // What in the box is worth asking Overpass about. `parseSearchTerms` has
-  // already split and lower-cased them; a term with no letter in it is an ALERT
-  // address or a station number, and the app already treats it that way.
-  function riverTerms() {
-    if (!state.mapRivers) return [];
-    return prepareSearch(state.filters.search).terms
-      .filter(t => t.length >= MIN_TERM && /[a-z]/.test(t));
-  }
-
-  // Rounded *outward*, so the box asked for always contains the box on screen.
-  function roundedBbox(b) {
-    const down = v => Math.floor(v / BBOX_STEP) * BBOX_STEP;
-    const up   = v => Math.ceil(v / BBOX_STEP) * BBOX_STEP;
-    return {
-      s: Math.max(-90,  down(b.getSouth())), w: Math.max(-180, down(b.getWest())),
-      n: Math.min(90,   up(b.getNorth())),   e: Math.min(180,  up(b.getEast())),
-    };
-  }
-
-  function reEscape(t) { return t.replace(/[\\^$.*+?()[\]{}|"]/g, '\\$&'); }
-
-  // `out geom;` returns the coordinates inline, so this is one request with no
-  // recursion behind it.
-  function overpassQl(terms, b) {
-    const re = terms.map(reEscape).join('|');
-    const box = [b.s, b.w, b.n, b.e].map(v => v.toFixed(4)).join(',');
-    return `[out:json][timeout:25];\n` +
-           `way["waterway"~"^(river|stream)$"]["name"~"${re}",i](${box});\n` +
-           `out geom;`;
-  }
-
-  async function ask(ql) {
-    let last = null;
-    for (const url of ENDPOINTS) {
-      const ctl = new AbortController();
-      const t   = setTimeout(() => ctl.abort(), TIMEOUT_MS);
-      try {
-        const res = await fetch(url, {
-          method:  'POST',
-          signal:  ctl.signal,
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body:    'data=' + encodeURIComponent(ql),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await res.json();
-      } catch (err) {
-        last = err;                     // try the mirror before giving up
-      } finally {
-        clearTimeout(t);
-      }
-    }
-    throw last || new Error('no Overpass endpoint answered');
-  }
-
-  function waysFrom(json) {
-    const out = [];
-    for (const el of (json && json.elements) || []) {
-      const coords = [];
-      for (const p of el.geometry || []) {
-        if (p && p.lat != null && p.lon != null) coords.push([p.lat, p.lon]);
-      }
-      if (coords.length < 2) continue;
-      out.push({ name: (el.tags && el.tags.name) || 'Unnamed watercourse', coords });
-    }
-    return out;
-  }
-
-  // Insertion order is the whole of the LRU: re-inserting on read moves an entry
-  // to the young end, and the oldest key is the first one out.
-  function cacheGet(key) {
-    if (!cache.has(key)) return null;
-    const v = cache.get(key);
-    cache.delete(key);
-    cache.set(key, v);
-    return v;
-  }
-
-  function cachePut(key, v) {
-    cache.set(key, v);
-    while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
-  }
-
-  // The legend only claims a river line while one is on the map, so it is
-  // re-rendered whenever the layer appears or goes — the same deal the ACMA
-  // colours have with it.
-  function clearLayer() {
-    if (!layer) return;
-    layer.remove();
-    layer = null;
-    rerenderMapLegend();
-  }
-
-  function draw(ways) {
-    clearLayer();
-    if (!map || !ways.length) return;
-    const colour = getComputedStyle(document.documentElement)
-      .getPropertyValue('--map-river').trim() || '#1565c0';
-    // An explicit SVG renderer rather than the map's shared canvas. A canvas in
-    // this pane would cover the whole map and swallow pointer events that reach
-    // it today (the map's own click, MapDraw); an SVG path only takes the pointer
-    // on its own stroke, which is exactly what a hover label wants. A few hundred
-    // thin paths is nothing beside the pins.
-    const renderer = L.svg({ pane: PANE });
-    layer = L.layerGroup().addTo(map);
-    // Same two-pass trick as the pass-range links: every white casing first, then
-    // every coloured core, so one river's casing can't paint over another's line
-    // where they meet. A 2.5 px blue line vanishes into satellite imagery and
-    // into the blue the topo tiles already draw water in; the casing is what
-    // carries it on every basemap.
-    for (const pass of ['casing', 'core']) {
-      const casing = pass === 'casing';
-      for (const w of ways) {
-        const line = L.polyline(w.coords, {
-          renderer, pane: PANE,
-          color:       casing ? '#ffffff' : colour,
-          weight:      casing ? 5 : 2.5,
-          opacity:     casing ? 0.45 : 0.9,
-          interactive: !casing,
-        }).addTo(layer);
-        if (!casing) line.bindTooltip(w.name, { sticky: true, className: 'mn-river-label' });
-      }
-    }
-    rerenderMapLegend();
-  }
-
-  function setNote(kind, entry) {
-    note = {
-      kind,
-      drawn:  entry ? entry.ways.length : 0,
-      total:  entry ? entry.total : 0,
-      capped: !!(entry && entry.capped),
-    };
-    const el = document.getElementById('map-river-note');
-    if (el) el.innerHTML = noteHtml();
-  }
-
-  function noteHtml() {
-    switch (note.kind) {
-      case 'off':     return 'Rivers are hidden.';
-      case 'wide':    return 'Zoom in to look up rivers — this view is too wide to ask for.';
-      case 'loading': return 'Looking up rivers…';
-      case 'fail':    return 'Rivers unavailable — OpenStreetMap could not be reached.';
-      case 'ok':
-        if (!note.drawn) return 'No named watercourse in view matches the filter.';
-        return `<strong>${note.drawn}</strong> river segment${note.drawn === 1 ? '' : 's'} drawn` +
-               (note.capped ? ` · ${note.total - note.drawn} more in view not drawn` : '') + '.';
-      default:        return 'Type a name in the filter box to light up matching rivers.';
-    }
-  }
-
-  function run() {
-    if (!map) return;
-    const terms = riverTerms();
-    if (!terms.length) { clearLayer(); setNote(state.mapRivers ? 'idle' : 'off'); return; }
-    const b = roundedBbox(map.getBounds());
-    if (b.n - b.s > BBOX_MAX || b.e - b.w > BBOX_MAX) { clearLayer(); setNote('wide'); return; }
-
-    const key = terms.join('+') + '|' + [b.s, b.w, b.n, b.e].map(v => v.toFixed(2)).join(',');
-    const hit = cacheGet(key);
-    if (hit) { draw(hit.ways); setNote('ok', hit); return; }
-    if (Date.now() - failedAt < FAIL_TTL) { clearLayer(); setNote('fail'); return; }
-
-    // Only the newest query may draw: typing "bur" then "burdekin" leaves two
-    // requests in flight, and the slower one is the wrong answer.
-    const mine = ++seq;
-    setNote('loading');
-    ask(overpassQl(terms, b)).then(json => {
-      if (mine !== seq || !map) return;
-      const all    = waysFrom(json);
-      const capped = all.length > MAX_WAYS;
-      const entry  = { ways: capped ? all.slice(0, MAX_WAYS) : all, capped, total: all.length };
-      cachePut(key, entry);
-      draw(entry.ways);
-      setNote('ok', entry);
-    }).catch(() => {
-      if (mine !== seq || !map) return;
-      failedAt = Date.now();            // don't hammer a service that just said no
-      clearLayer();
-      setNote('fail');
-    });
-  }
-
-  // Held off until the typing pauses: a search rebuilds every marker already, and
-  // this one also spends a request.
-  function sync() {
-    clearTimeout(timer);
-    timer = setTimeout(run, DEBOUNCE_MS);
-  }
-
-  return {
-    // Wire a freshly built map. The pane sits under the leader lines (350), the
-    // pass-range links (overlayPane, 400) and the pins (markerPane, 600), so a
-    // river never draws over the network it is context for.
-    attach(m) {
-      map = m;
-      if (!m.getPane(PANE)) m.createPane(PANE).style.zIndex = 340;
-      // Rivers are bounded by the view, so a pan or a zoom is a new question.
-      // Usually a cached one: the bbox is rounded before it becomes a key.
-      m.on('moveend', sync);
-      sync();
-    },
-
-    detach() {
-      clearTimeout(timer);
-      if (map) map.off('moveend', sync);
-      clearLayer();
-      map = null;
-      seq++;                            // a request in flight has nothing to draw on
-    },
-
-    // The filter box changed, or the switch did.
-    sync,
-
-    // Theme switch. The colour is read at draw time, so this re-draws what is
-    // already there — off the cache, with no request.
-    repaint() { if (layer) run(); },
-
-    // Are there rivers on the map right now? The legend asks before claiming a
-    // river line, the way it does for the ACMA colours.
-    active() { return !!layer; },
-
-    noteHtml,
-
-    setEnabled(on) {
-      state.mapRivers = on;
-      try { localStorage.setItem('mn-rivers', on ? 'on' : 'off'); } catch (_) {}
-      if (!on) { clearTimeout(timer); clearLayer(); setNote('off'); return; }
-      setNote(riverTerms().length ? 'loading' : 'idle');   // don't leave "hidden" up for the debounce
-      sync();
-    },
-  };
-})();
-
-// ── Overlapping pins: fan-out ("spiderfy") ───────────────────────────────────
-// Co-sited stations and ACMA sites carrying a dozen licensed devices land on the
-// same few pixels, and whatever is underneath is unreachable. Hovering a stack
-// (mouse) or tapping it (touch) fans its members out around the stack centre on
-// leader lines so each one can be seen and clicked; they snap back when the
-// pointer leaves, the map zooms, or the markers are rebuilt.
-//
-// Works on any marker with getLatLng/setLatLng, so MegaNet station circles and
-// ACMA transmitter squares fan out together.
-const MapSpider = (function () {
-  const NEAR_PX   = 20;  // pins within this screen distance form one stack
-  const MAX_FAN   = 16;  // a fan bigger than this stops being readable
-  const HOVER_MAX = 10;  // bigger stacks need a deliberate click, so that panning
-                         // across a zoomed-out map doesn't fan pins constantly
-  const LEAVE_PX  = 70;  // pointer this far outside the fan closes it
-  const HOVER_MS  = 70;  // settle time, so sweeping across a stack doesn't fan it
-
-  const buckets = { stations: [], acma: [] };
-  let map = null;
-  let open = null;       // { members, centre, radius, legs }
-  let cache = null;      // { list, pts } projected at the current zoom
-  let hoverTimer = null;
-
-  function canHover() {
-    return !L.Browser.mobile && window.matchMedia('(hover: hover)').matches;
-  }
-
-  function pins() { return buckets.stations.concat(buckets.acma); }
-
-  // Where a pin belongs — its own position unless it is currently fanned out.
-  function home(m) { return m._mnHome || m.getLatLng(); }
-
-  function invalidate() { cache = null; }
-
-  function points() {
-    if (cache) return cache;
-    const zoom = map.getZoom();
-    const list = pins();
-    cache = { list, pts: list.map(m => map.project(home(m), zoom)) };
-    return cache;
-  }
-
-  // Every pin sitting within NEAR_PX of the given one, nearest first.
-  function stackFor(marker) {
-    const { list, pts } = points();
-    const i = list.indexOf(marker);
-    if (i < 0) return [];
-    const c = pts[i];
-    return list
-      .map((m, j) => ({ m, d: Math.hypot(pts[j].x - c.x, pts[j].y - c.y) }))
-      .filter(x => x.d <= NEAR_PX)
-      .sort((a, b) => a.d - b.d)
-      .map(x => x.m);
-  }
-
-  // Pixel offsets for n fanned pins: concentric rings at ~26 px spacing, so a
-  // pair sits tight and a 30-device ACMA site still reads.
-  function fanOffsets(n) {
-    const out = [];
-    let placed = 0, ring = 0;
-    while (placed < n) {
-      const r   = 30 + ring * 26;
-      const cap = Math.max(3, Math.floor((2 * Math.PI * r) / 26));
-      const k   = Math.min(cap, n - placed);
-      for (let i = 0; i < k; i++) {
-        const a = -Math.PI / 2 + (2 * Math.PI * i) / k + (ring % 2 ? Math.PI / k : 0);
-        out.push({ x: Math.cos(a) * r, y: Math.sin(a) * r, r });
-      }
-      placed += k;
-      ring++;
-    }
-    return out;
-  }
-
-  function isOpen(marker) { return !!open && open.members.indexOf(marker) >= 0; }
-
-  function spiderfy(marker) {
-    if (!map) return false;
-    const stack = stackFor(marker);
-    if (stack.length < 2) { unspiderfy(); return false; }
-    // Co-located ACMA devices share exact coordinates and never separate by
-    // zooming, so an oversized stack still fans — it just says what it left out.
-    const members = stack.slice(0, MAX_FAN);
-    if (open && open.members.length === members.length &&
-        members.every(m => open.members.indexOf(m) >= 0)) return true;
-    unspiderfy();
-    if (stack.length > MAX_FAN) {
-      mapNote(`${members.length} of ${stack.length} pins fanned out — zoom in for the rest`, 4000);
-    }
-
-    const zoom = map.getZoom();
-    const { list, pts } = points();
-    let sx = 0, sy = 0;
-    members.forEach(m => { const p = pts[list.indexOf(m)]; sx += p.x; sy += p.y; });
-    const centre = map.unproject(L.point(sx / members.length, sy / members.length), zoom);
-    const cLp    = map.latLngToLayerPoint(centre);
-    const offs   = fanOffsets(members.length);
-    const legs   = L.layerGroup().addTo(map);
-    let radius   = 0;
-
-    members.forEach((m, i) => {
-      const o    = offs[i];
-      const from = home(m);
-      const to   = map.layerPointToLatLng(cLp.add(L.point(o.x, o.y)));
-      radius = Math.max(radius, o.r);
-      m._mnHome = from;
-      // White casing under a dark line: legible over topo, imagery and dark mode.
-      L.polyline([from, to], { pane: 'mnSpiderLegs', color: '#fff',     weight: 4,   opacity: .9,  interactive: false }).addTo(legs);
-      L.polyline([from, to], { pane: 'mnSpiderLegs', color: '#4a5560', weight: 1.5, opacity: .95, interactive: false }).addTo(legs);
-      m.setLatLng(to);
-      if (m.setZIndexOffset) m.setZIndexOffset(1000);
-      if (m.bringToFront)    m.bringToFront();
-    });
-    L.circleMarker(centre, {
-      pane: 'mnSpiderLegs', radius: 2.5, color: '#4a5560', weight: 1,
-      fillColor: '#fff', fillOpacity: 1, interactive: false,
-    }).addTo(legs);
-
-    open = { members, centre, radius, legs };
-    map.on('mousemove', onMapMove);
-    return true;
-  }
-
-  function unspiderfy() {
-    clearTimeout(hoverTimer);
-    if (!open) return;
-    open.members.forEach(m => {
-      if (m._mnHome) { m.setLatLng(m._mnHome); delete m._mnHome; }
-      if (m.setZIndexOffset) m.setZIndexOffset(0);
-    });
-    open.legs.remove();
-    if (map) map.off('mousemove', onMapMove);
-    open = null;
-  }
-
-  function onMapMove(e) {
-    if (!open) return;
-    // A popup open on one of the fanned pins is the user reading it — hold.
-    if (open.members.some(m => m.isPopupOpen && m.isPopupOpen())) return;
-    if (e.layerPoint.distanceTo(map.latLngToLayerPoint(open.centre)) > open.radius + LEAVE_PX) {
-      unspiderfy();
-    }
-  }
-
-  function onPinOver(e) {
-    if (!map || isOpen(e.target)) return;
-    clearTimeout(hoverTimer);
-    hoverTimer = setTimeout(() => {
-      // Hover only opens small stacks; a zoomed-out map where everything
-      // overlaps would otherwise fan pins under every pass of the mouse.
-      if (stackFor(e.target).length <= HOVER_MAX) spiderfy(e.target);
-    }, HOVER_MS);
-  }
-
-  function onPinClick(e) {
-    if (!map || isOpen(e.target)) return;   // already fanned → let the popup open
-    // A modifier-click is the map selection talking, not "show me this stack".
-    const oe = e.originalEvent;
-    if (oe && (oe.shiftKey || oe.ctrlKey || oe.metaKey)) return;
-    // First tap on a stack fans it instead of opening whichever pin was on top.
-    if (spiderfy(e.target)) e.target.closePopup();
-  }
-
-  return {
-    // Wire a freshly built map. Leader lines get their own pane below the
-    // overlay pane so they never draw over the pins they point at.
-    attach(m) {
-      map = m;
-      open = null; cache = null;
-      buckets.stations = []; buckets.acma = [];
-      clearTimeout(hoverTimer);
-      if (!m.getPane('mnSpiderLegs')) {
-        const pane = m.createPane('mnSpiderLegs');
-        pane.style.zIndex = 350;
-        pane.style.pointerEvents = 'none';
-      }
-      m.on('zoomstart', unspiderfy);
-      m.on('zoomend viewreset', invalidate);
-      m.on('click', unspiderfy);          // pin clicks don't bubble to the map
-    },
-
-    // Hand over a rebuilt set of markers for one layer.
-    setPins(kind, markers) {
-      unspiderfy();
-      buckets[kind] = markers || [];
-      invalidate();
-      (markers || []).forEach(m => {
-        if (m._mnSpiderWired) return;
-        m._mnSpiderWired = true;
-        m.on('click', onPinClick);
-        if (canHover()) m.on('mouseover', onPinOver);
-      });
-    },
-
-    // Send every fanned pin home — call before markers are removed or replaced.
-    reset() { unspiderfy(); invalidate(); },
-
-    detach() { unspiderfy(); map = null; buckets.stations = []; buckets.acma = []; },
-  };
-})();
-
-// ── Where am I? (mobile) ─────────────────────────────────────────────────────
-// Off by default and only offered on touch devices: a button below the zoom
-// control puts a dot at the phone's GPS position with an accuracy ring, plus a
-// cone pointing the way the phone is facing when a compass is available.
-// iOS only hands out orientation events after a permission request made from a
-// user gesture, which is why that request lives in the button's click handler.
-const MapLocate = (function () {
-  let map = null, btn = null;
-  let on = false, watchId = null, marker = null, ring = null;
-  let heading = null, orientEvent = null, gotCompass = false, followed = false;
-
-  function isMobile() {
-    return L.Browser.mobile || window.matchMedia('(pointer: coarse)').matches;
-  }
-
-  function icon() {
-    return L.divIcon({
-      className: 'mn-loc-icon',
-      html: '<div class="mn-loc"><i class="mn-loc-cone"></i><i class="mn-loc-dot"></i></div>',
-      iconSize: [46, 46], iconAnchor: [23, 23],
-    });
-  }
-
-  function applyHeading() {
-    const el   = marker && marker.getElement();
-    const cone = el && el.querySelector('.mn-loc-cone');
-    if (!cone) return;
-    cone.style.display   = heading == null ? 'none' : '';
-    cone.style.transform = `rotate(${heading || 0}deg)`;
-  }
-
-  function onOrient(e) {
-    let h = null;
-    if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
-      h = e.webkitCompassHeading;                                  // iOS: clockwise from north
-    } else if (e.alpha != null && (e.absolute || e.type === 'deviceorientationabsolute')) {
-      h = 360 - e.alpha;                                           // spec alpha runs anticlockwise
-    }
-    if (h == null) return;      // relative-only sensor: no compass, leave it to GPS course
-    // Compass readings are relative to the device's natural orientation; add the
-    // screen rotation so the cone still points the right way in landscape.
-    const screenAngle = (window.screen.orientation && window.screen.orientation.angle) ||
-                        window.orientation || 0;
-    gotCompass = true;
-    heading = (h + screenAngle + 360) % 360;
-    applyHeading();
-  }
-
-  function listenOrientation() {
-    orientEvent = ('ondeviceorientationabsolute' in window)
-      ? 'deviceorientationabsolute' : 'deviceorientation';
-    window.addEventListener(orientEvent, onOrient, true);
-  }
-
-  function startOrientation() {
-    const DOE = window.DeviceOrientationEvent;
-    if (!DOE) return;
-    if (typeof DOE.requestPermission === 'function') {
-      DOE.requestPermission()
-        .then(res => { if (res === 'granted') listenOrientation(); })
-        .catch(() => {});
-    } else {
-      listenOrientation();
-    }
-  }
-
-  function onPos(p) {
-    if (!on || !map) return;
-    const ll  = [p.coords.latitude, p.coords.longitude];
-    const acc = p.coords.accuracy || 0;
-    // No compass readings arriving? Fall back to GPS course, which is only
-    // meaningful on the move.
-    if (!gotCompass && p.coords.heading != null && !isNaN(p.coords.heading) &&
-        p.coords.speed > 0.5) {
-      heading = p.coords.heading;
-    }
-    if (!marker) {
-      ring   = L.circle(ll, { radius: acc, color: '#1e88e5', weight: 1,
-                              fillColor: '#1e88e5', fillOpacity: .12, interactive: false }).addTo(map);
-      marker = L.marker(ll, { icon: icon(), interactive: false, keyboard: false,
-                              zIndexOffset: 2000 }).addTo(map);
-    } else {
-      marker.setLatLng(ll);
-      ring.setLatLng(ll).setRadius(acc);
-    }
-    applyHeading();
-    if (!followed) {                          // centre on the first fix only
-      followed = true;
-      map.setView(ll, Math.max(map.getZoom(), 14));
-      mapNote('', 0);
-    }
-  }
-
-  function onErr(e) {
-    mapNote(`Location unavailable — ${e.message || 'no fix'}`, 6000);
-    if (e.code === 1) stop();                 // permission denied: don't keep trying
-  }
-
-  function stop() {
-    on = false;
-    if (btn) btn.classList.remove('on');
-    if (watchId != null) navigator.geolocation.clearWatch(watchId);
-    watchId = null;
-    if (orientEvent) window.removeEventListener(orientEvent, onOrient, true);
-    orientEvent = null;
-    heading = null;
-    gotCompass = false;
-    if (marker) marker.remove();
-    if (ring)   ring.remove();
-    marker = ring = null;
-  }
-
-  function toggle() {
-    if (on) { stop(); mapNote('', 0); return; }
-    on = true;
-    followed = false;
-    if (btn) btn.classList.add('on');
-    mapNote('Locating…', 8000);
-    startOrientation();
-    watchId = navigator.geolocation.watchPosition(onPos, onErr, {
-      enableHighAccuracy: true, maximumAge: 2000, timeout: 20000,
-    });
-  }
-
-  return {
-    attach(m) {
-      map = m;
-      if (!('geolocation' in navigator) || !isMobile()) return;
-      const ctl = L.control({ position: 'topleft' });
-      ctl.onAdd = () => {
-        const div = L.DomUtil.create('div', 'leaflet-bar mn-locate');
-        const a   = L.DomUtil.create('a', '', div);
-        a.href = '#';
-        a.title = 'Show my location and heading';
-        a.setAttribute('role', 'button');
-        a.setAttribute('aria-label', 'Show my location and heading');
-        a.innerHTML = '➤';
-        L.DomEvent.on(a, 'click', L.DomEvent.stop).on(a, 'click', toggle);
-        btn = a;
-        return div;
-      };
-      ctl.addTo(m);
-    },
-
-    // The map is being torn down (tab switch or re-render): drop the GPS watch
-    // and the compass listener rather than leaving them running unseen.
-    detach() { if (on) stop(); map = null; btn = null; },
-  };
-})();
-
-// ── Terrain elevation ────────────────────────────────────────────────────────
-// Ground height along a line — what both the elevation profile and the link
-// budget are built on. MegaNet is a static page: there is no backend to ask and
-// no key can live in the repo, so elevation comes from open terrarium-encoded
-// PNG tiles, decoded in a canvas here in the browser.
-//
-// AWS Terrain Tiles (elevation-tiles-prod) is the source: open data, no key,
-// `Access-Control-Allow-Origin: *`, and ~30 m SRTM over Australia. It rides the
-// same XYZ scheme Leaflet already fetches base maps on (see makeBaseLayers), so
-// the lat/lon → tile maths is the standard Web Mercator pair and nothing more.
-//
-//   elevation_m = (R * 256 + G + B / 256) - 32768
-//
-// Tiles are cached decoded, so a second profile over the same country costs no
-// network at all. That is the reason for tiles over an elevation API: the API
-// would be one rate-limited request per profile with nothing kept between them,
-// and a handful of tiles already covers a whole VHF hop.
-//
-// DATUM — terrarium heights are above the EGM96 geoid; a station's
-// `elevation_ahd` is Australian Height Datum. Over Australia the two agree to
-// about a metre, well inside the ~30 m sampling error, but they are not the
-// same datum and neither one is ellipsoidal height. So where a station's own
-// elevation_ahd exists it wins for that *endpoint*, and tiles only ever supply
-// the ground *between* the ends. Everything drawn from this says so on screen.
-//
-// Every failure here is loud. A caller that cannot get terrain has to say so:
-// a flat profile reads as a clear path, which is the one wrong answer that
-// actually costs someone a site visit.
-
-const Terrain = (function () {
-  const TILE_URL  = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
-  const TILE_PX   = 256;
-  // The source is ~30 m SRTM. Past z12 (~33 m/px at Queensland latitudes) the
-  // tiles are resampling their own pixels — four times the tiles for no more
-  // terrain.
-  const MAX_ZOOM  = 12;
-  const MIN_ZOOM  = 7;
-  const MAX_TILES = 48;      // per profile; the zoom drops until the path fits
-  const CACHE_MAX = 128;     // × 128 KB decoded ≈ 16 MB — the bound on a long session
-  const FETCH_MS  = 12000;   // a tile that hasn't arrived by now has failed
-  const FAIL_TTL  = 60000;   // how long a failed tile is remembered before a retry
-
-  // Decoded tiles, oldest first: a Map iterates in insertion order, so re-inserting
-  // on read is the whole of the LRU.
-  const cache    = new Map();   // 'z/x/y' → Int16Array(65536) of metres
-  const failedAt = new Map();   // 'z/x/y' → timestamp of the last failure
-  const inflight = new Map();   // 'z/x/y' → Promise<Int16Array|null>
-  let canvas = null;
-
-  const ATTRIB = 'Elevation: AWS Terrain Tiles (SRTM/GMTED, ~30 m), height above the EGM96 geoid';
-
-  // ── Web Mercator ──
-  // Fractional tile coordinates: the integer part is the tile, the fraction
-  // times 256 is the pixel inside it.
-  function tileX(lon, z) { return (lon + 180) / 360 * Math.pow(2, z); }
-
-  function tileY(lat, z) {
-    const r = Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI / 180;
-    return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z);
-  }
-
-  // Ground distance one tile pixel covers, which is what picks the zoom.
-  function metresPerPixel(lat, z) {
-    return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z);
-  }
-
-  // ── tiles ──
-
-  function sharedCanvas() {
-    if (!canvas) {
-      canvas = document.createElement('canvas');
-      canvas.width = canvas.height = TILE_PX;
-    }
-    return canvas;
-  }
-
-  // RGB → metres, once per tile, into an Int16Array. Holding the raw RGBA
-  // instead would be 256 KB a tile; metre resolution is far finer than the
-  // ~30 m the source actually resolves, and it halves the cache.
-  function decode(img) {
-    const cv = sharedCanvas();
-    const cx = cv.getContext('2d', { willReadFrequently: true });
-    cx.clearRect(0, 0, TILE_PX, TILE_PX);
-    cx.drawImage(img, 0, 0, TILE_PX, TILE_PX);
-    // Throws if the image tainted the canvas — i.e. the CORS headers went away.
-    // That is a failure like any other, and the caller turns it into one.
-    const d = cx.getImageData(0, 0, TILE_PX, TILE_PX).data;
-    const out = new Int16Array(TILE_PX * TILE_PX);
-    for (let i = 0, j = 0; i < out.length; i++, j += 4) {
-      out[i] = Math.round(d[j] * 256 + d[j + 1] + d[j + 2] / 256 - 32768);
-    }
-    return out;
-  }
-
-  function remember(key, px) {
-    cache.set(key, px);
-    while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
-  }
-
-  // Resolves to the decoded tile, or to null for every kind of failure there is
-  // — offline, blocked, rate-limited, 404 over the ocean, CORS withdrawn. It
-  // never rejects: one missing tile is a gap in a profile, not a dead panel.
-  function loadTile(z, x, y) {
-    const key = `${z}/${x}/${y}`;
-    if (cache.has(key)) {
-      const px = cache.get(key);
-      cache.delete(key); cache.set(key, px);        // most recently used
-      return Promise.resolve(px);
-    }
-    if (inflight.has(key)) return inflight.get(key);
-    // A tile that just failed is not retried on every mouse-driven re-profile;
-    // after the TTL it gets another chance, so a dropped connection heals.
-    const fa = failedAt.get(key);
-    if (fa != null && Date.now() - fa < FAIL_TTL) return Promise.resolve(null);
-
-    const url = TILE_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y);
-    const p = new Promise(resolve => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';               // required before getImageData
-      let settled = false;
-      const finish = v => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        resolve(v);
-      };
-      const timer = setTimeout(() => finish(null), FETCH_MS);
-      img.onload  = () => { try { finish(decode(img)); } catch (_) { finish(null); } };
-      img.onerror = () => finish(null);
-      img.src = url;
-    }).then(px => {
-      inflight.delete(key);
-      if (px) { failedAt.delete(key); remember(key, px); }
-      else    { failedAt.set(key, Date.now()); }
-      return px;
-    });
-    inflight.set(key, p);
-    return p;
-  }
-
-  // Nearest pixel, deliberately: interpolating between samples of a ~30 m grid
-  // invents detail the source does not have, and across a tile edge it would
-  // need the neighbour fetched as well.
-  function readTile(px, fx, fy, tx, ty) {
-    const ix = Math.min(TILE_PX - 1, Math.max(0, Math.floor((fx - tx) * TILE_PX)));
-    const iy = Math.min(TILE_PX - 1, Math.max(0, Math.floor((fy - ty) * TILE_PX)));
-    return px[iy * TILE_PX + ix];
-  }
-
-  // ── path sampling ──
-
-  // n points evenly spaced by distance along the polyline, each carried back as
-  // a real lat/lon so the caller can name and re-use them. Great-circle within
-  // each leg, via the geodesy the map already uses.
-  function walk(pts, n) {
-    const legs = [];
-    let total = 0;
-    for (let i = 1; i < pts.length; i++) {
-      const km = acmaHaversineKm(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
-      legs.push({ from: pts[i - 1], to: pts[i], km, at: total,
-                  brg: bearingDeg(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]) });
-      total += km;
-    }
-    const out = [];
-    let leg = 0;
-    for (let i = 0; i < n; i++) {
-      const km = total * i / (n - 1);
-      while (leg < legs.length - 1 && km > legs[leg].at + legs[leg].km) leg++;
-      const L = legs[leg];
-      // The ends are the vertices themselves, not a destPoint approximation of
-      // them — a snapped endpoint has to stay exactly on its station.
-      const ll = i === 0 ? pts[0]
-               : i === n - 1 ? pts[pts.length - 1]
-               : destPoint(L.from[0], L.from[1], L.brg, Math.max(0, km - L.at));
-      out.push({ km, lat: ll[0], lon: ll[1] });
-    }
-    return { samples: out, totalKm: total };
-  }
-
-  // The coarsest zoom whose pixels are still finer than the gap between
-  // samples, then backed off further if the path won't fit in the tile budget.
-  //
-  // Going coarser than the sample spacing is the expensive mistake: adjacent
-  // samples start landing on the same pixel and a ridge narrower than a pixel
-  // simply stops existing — and a ridge that stops existing is a path that
-  // reports clear. Going finer only costs tiles. So: fine enough that no sample
-  // is wasted, and no finer. A 5 km hop lands on z12, a 120 km hop on z9.
-  function pickZoom(samples, totalKm, n) {
-    const midLat = samples[Math.floor(samples.length / 2)].lat;
-    const spacing = Math.max(1, totalKm * 1000 / Math.max(1, n - 1));
-    let z = MIN_ZOOM;
-    while (z < MAX_ZOOM && metresPerPixel(midLat, z) > spacing) z++;
-    let capped = false;
-    for (;;) {
-      const keys = new Set();
-      for (const s of samples) keys.add(`${Math.floor(tileX(s.lon, z))}/${Math.floor(tileY(s.lat, z))}`);
-      if (keys.size <= MAX_TILES || z <= MIN_ZOOM) return { z, tiles: keys.size, capped };
-      z--; capped = true;
-    }
-  }
-
-  return {
-    // Ground height at one point, or null if the tile for it can't be had.
-    sample(lat, lon, zoom) {
-      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom || MAX_ZOOM));
-      const fx = tileX(lon, z), fy = tileY(lat, z);
-      const tx = Math.floor(fx), ty = Math.floor(fy);
-      return loadTile(z, tx, ty).then(px => (px ? readTile(px, fx, fy, tx, ty) : null));
-    },
-
-    // n evenly-spaced ground samples along a polyline.
-    //
-    // Resolves — never rejects — to one of two shapes, so a caller has to look
-    // at `ok` before it can draw anything:
-    //   { ok: false, error }                      nothing usable; say so
-    //   { ok: true, distance_m[], terrain_m[], …} terrain_m holds null wherever
-    //                                             a tile was missing, and
-    //                                             `partial` says it happened
-    profile(pts, n) {
-      const count = Math.max(2, Math.min(1024, n || 256));
-      if (!pts || pts.length < 2) {
-        return Promise.resolve({ ok: false, error: 'A path needs at least two points.' });
-      }
-      const { samples, totalKm } = walk(pts, count);
-      if (!(totalKm > 0)) {
-        return Promise.resolve({ ok: false, error: 'The two ends are in the same place.' });
-      }
-      const { z, tiles, capped } = pickZoom(samples, totalKm, count);
-
-      const need = new Map();
-      for (const s of samples) {
-        s.fx = tileX(s.lon, z); s.fy = tileY(s.lat, z);
-        s.tx = Math.floor(s.fx); s.ty = Math.floor(s.fy);
-        need.set(`${s.tx}/${s.ty}`, [s.tx, s.ty]);
-      }
-      const keys = [...need.keys()];
-      return Promise.all([...need.values()].map(([x, y]) => loadTile(z, x, y))).then(got => {
-        const byKey = {};
-        keys.forEach((k, i) => { byKey[k] = got[i]; });
-        const distance_m = [], terrain_m = [], lat = [], lon = [];
-        let missing = 0;
-        for (const s of samples) {
-          const px = byKey[`${s.tx}/${s.ty}`];
-          distance_m.push(s.km * 1000);
-          lat.push(s.lat); lon.push(s.lon);
-          if (px) terrain_m.push(readTile(px, s.fx, s.fy, s.tx, s.ty));
-          else { terrain_m.push(null); missing++; }
-        }
-        if (missing === samples.length) {
-          return { ok: false,
-                   error: 'Terrain tiles could not be fetched — offline, blocked, or the tile service is unavailable.' };
-        }
-        return { ok: true, distance_m, terrain_m, lat, lon,
-                 totalKm, zoom: z, tiles, capped, missing, partial: missing > 0,
-                 resolution_m: Math.round(metresPerPixel(samples[Math.floor(samples.length / 2)].lat, z)),
-                 attribution: ATTRIB };
-      });
-    },
-
-    attribution: ATTRIB,
-    maxTiles: MAX_TILES,
-    // For the panel footer: how much of a session's terrain is already in hand.
-    cached() { return cache.size; },
-    // MemMeter's Release button. Costs a re-fetch of whatever profile is drawn
-    // next — nothing currently on screen depends on the cache staying warm.
-    clear() { cache.clear(); failedAt.clear(); },
-  };
-})();
-
 // ── Draw & measure ───────────────────────────────────────────────────────────
 // Sketching over the network map: a coverage circle round a repeater, a
 // proposed path, a box round the part of a catchment that went quiet, and a
@@ -13626,73 +12728,6 @@ function toggleFilter(key, value, checked) {
   else         set.delete(value);
 }
 
-// ── Modal shell ────────────────────────────────────────────────────────────────
-// One dialog, borrowed by whoever needs one: a title, arbitrary HTML, Esc or ×
-// to close, Tab kept inside it, and focus handed back to whatever opened it.
-//
-// The bug reporter has its own copy of this markup and keeps it. It is the one
-// thing people reach for when the app is already misbehaving, so it does not
-// get to depend on anything newer than itself.
-
-const Modal = (function () {
-  let lastFocus = null;
-
-  const root = () => document.getElementById('app-modal');
-  const isOpen = () => { const el = root(); return el && el.style.display !== 'none'; };
-
-  function open({ title, html, wide }) {
-    let el = root();
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'app-modal';
-      el.className = 'modal-overlay';
-      // Only the backdrop closes — a click that started inside the card and
-      // drifted out (selecting text, say) is not a request to close it.
-      el.onclick = ev => { if (ev.target === el) close(); };
-      document.body.appendChild(el);
-    }
-    lastFocus = document.activeElement;
-    el.innerHTML = `
-      <div class="modal-card${wide ? ' modal-card--wide' : ''}" role="dialog" aria-modal="true"
-           aria-labelledby="app-modal-title" tabindex="-1">
-        <div class="modal-head">
-          <h2 id="app-modal-title">${esc(title)}</h2>
-          <button class="modal-x" title="Close (Esc)" aria-label="Close" onclick="Modal.close()">×</button>
-        </div>
-        <div class="modal-body">${html}</div>
-      </div>`;
-    el.style.display = 'flex';
-    document.addEventListener('keydown', onKey, true);
-    el.querySelector('.modal-card')?.focus();
-  }
-
-  function onKey(e) {
-    if (!isOpen()) return;
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
-    if (e.key !== 'Tab') return;
-    // Tab cycles within the dialog. Without this it walks off into the page
-    // behind, which for a keyboard user is a dialog with no walls.
-    const items = [...root().querySelectorAll(
-      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])')]
-      .filter(n => n.offsetParent !== null);
-    if (!items.length) return;
-    const at = items.indexOf(document.activeElement);
-    if (e.shiftKey) { if (at <= 0) { e.preventDefault(); items[items.length - 1].focus(); } }
-    else if (at < 0 || at === items.length - 1) { e.preventDefault(); items[0].focus(); }
-  }
-
-  function close() {
-    const el = root();
-    if (el) { el.style.display = 'none'; el.innerHTML = ''; }
-    document.removeEventListener('keydown', onKey, true);
-    if (lastFocus && lastFocus.focus) lastFocus.focus();
-    lastFocus = null;
-  }
-
-  return { open, close };
-})();
-if (typeof window !== 'undefined') window.Modal = Modal;
-
 // ── ACMA RRL interference layer ─────────────────────────────────────────────────
 // Renders licensed transmitters from the ACMA Register of Radiocommunications
 // Licences that could plausibly interfere with MegaNet repeater RX channels.
@@ -17117,6 +16152,971 @@ function wbExportComplaint() {
   out.push('- Site-visit observations (once completed)');
   dlText(`${wbCaseStamp()}-acma-draft.md`, out.join('\n'));
 }
+
+// ── River highlighting ───────────────────────────────────────────────────────
+// Half this network is named after the river it sits on, so typing "burdekin"
+// into the filter box lights up the Burdekin as well as the stations on it.
+// Rivers are context, never matches: they draw beneath the pins, they never move
+// the map, and they have no say in what the filter selects. Turn the switch off
+// and the Stations tab behaves exactly as it did before this existed.
+//
+// The geometry comes from OpenStreetMap over Overpass — national, live, named,
+// and in real coordinates. The bundled `assets/geo/Qld Major Streams_reduced.svg`
+// is deliberately *not* used: inverting `BASIN_GEOREF` (maps-data.js) puts its
+// features 100–150 km from the actual watercourse, consistently west and south.
+// That is accurate enough for its own job — point-in-polygon against 65 basins
+// the size of small countries — and useless for drawing a line over a
+// topographic basemap, where 100 km off is worse than drawing nothing. No affine
+// fixes it either: the source is a projected map. See issue #84.
+//
+// Overpass is a free public service, so every request has to earn itself: a
+// name-ish term only (a bare number in that box is an ALERT address, not a
+// river), debounced past the marker rebuild, bounded by the current view, capped,
+// and cached by term and rounded bbox so a small pan or a retyped word costs
+// nothing. Failure is silent and non-blocking — no network, no rivers, and the
+// station filter behaves exactly as it does with the switch off.
+const MapRivers = (function () {
+  // Both of these serve `Access-Control-Allow-Origin: *`. The list is a list
+  // because CORS from the deployed origin is the one thing that can sink this
+  // (see #66, and the README on BoM/ACMA), and a second endpoint costs a line.
+  const ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+  ];
+  const PANE        = 'mnRivers';
+  const MIN_TERM    = 3;      // two letters matches half the watercourses in Queensland
+  const DEBOUNCE_MS = 450;    // longer than the 160 ms marker rebuild: this one costs a request
+  const TIMEOUT_MS  = 20000;
+  const MAX_WAYS    = 250;    // ways drawn per query — a long river is many ways
+  const BBOX_STEP   = 0.25;   // deg; the bbox is rounded out to this for the cache key,
+                              // so nudging the map re-uses the answer it already has
+  const BBOX_MAX    = 12;     // deg; a continent-wide view is not a fair thing to ask for
+  const CACHE_MAX   = 40;     // (term, bbox) answers kept — a session's worth of searching
+  const FAIL_TTL    = 60000;  // how long a failure is remembered before another attempt
+
+  let map = null, layer = null, timer = null, seq = 0, failedAt = 0;
+  const cache = new Map();    // 'terms|s,w,n,e' → { ways: [{name, coords}], capped, total }
+  let note = { kind: 'idle', drawn: 0, total: 0, capped: false };
+
+  // What in the box is worth asking Overpass about. `parseSearchTerms` has
+  // already split and lower-cased them; a term with no letter in it is an ALERT
+  // address or a station number, and the app already treats it that way.
+  function riverTerms() {
+    if (!state.mapRivers) return [];
+    return prepareSearch(state.filters.search).terms
+      .filter(t => t.length >= MIN_TERM && /[a-z]/.test(t));
+  }
+
+  // Rounded *outward*, so the box asked for always contains the box on screen.
+  function roundedBbox(b) {
+    const down = v => Math.floor(v / BBOX_STEP) * BBOX_STEP;
+    const up   = v => Math.ceil(v / BBOX_STEP) * BBOX_STEP;
+    return {
+      s: Math.max(-90,  down(b.getSouth())), w: Math.max(-180, down(b.getWest())),
+      n: Math.min(90,   up(b.getNorth())),   e: Math.min(180,  up(b.getEast())),
+    };
+  }
+
+  function reEscape(t) { return t.replace(/[\\^$.*+?()[\]{}|"]/g, '\\$&'); }
+
+  // `out geom;` returns the coordinates inline, so this is one request with no
+  // recursion behind it.
+  function overpassQl(terms, b) {
+    const re = terms.map(reEscape).join('|');
+    const box = [b.s, b.w, b.n, b.e].map(v => v.toFixed(4)).join(',');
+    return `[out:json][timeout:25];\n` +
+           `way["waterway"~"^(river|stream)$"]["name"~"${re}",i](${box});\n` +
+           `out geom;`;
+  }
+
+  async function ask(ql) {
+    let last = null;
+    for (const url of ENDPOINTS) {
+      const ctl = new AbortController();
+      const t   = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+      try {
+        const res = await fetch(url, {
+          method:  'POST',
+          signal:  ctl.signal,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body:    'data=' + encodeURIComponent(ql),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+      } catch (err) {
+        last = err;                     // try the mirror before giving up
+      } finally {
+        clearTimeout(t);
+      }
+    }
+    throw last || new Error('no Overpass endpoint answered');
+  }
+
+  function waysFrom(json) {
+    const out = [];
+    for (const el of (json && json.elements) || []) {
+      const coords = [];
+      for (const p of el.geometry || []) {
+        if (p && p.lat != null && p.lon != null) coords.push([p.lat, p.lon]);
+      }
+      if (coords.length < 2) continue;
+      out.push({ name: (el.tags && el.tags.name) || 'Unnamed watercourse', coords });
+    }
+    return out;
+  }
+
+  // Insertion order is the whole of the LRU: re-inserting on read moves an entry
+  // to the young end, and the oldest key is the first one out.
+  function cacheGet(key) {
+    if (!cache.has(key)) return null;
+    const v = cache.get(key);
+    cache.delete(key);
+    cache.set(key, v);
+    return v;
+  }
+
+  function cachePut(key, v) {
+    cache.set(key, v);
+    while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+  }
+
+  // The legend only claims a river line while one is on the map, so it is
+  // re-rendered whenever the layer appears or goes — the same deal the ACMA
+  // colours have with it.
+  function clearLayer() {
+    if (!layer) return;
+    layer.remove();
+    layer = null;
+    rerenderMapLegend();
+  }
+
+  function draw(ways) {
+    clearLayer();
+    if (!map || !ways.length) return;
+    const colour = getComputedStyle(document.documentElement)
+      .getPropertyValue('--map-river').trim() || '#1565c0';
+    // An explicit SVG renderer rather than the map's shared canvas. A canvas in
+    // this pane would cover the whole map and swallow pointer events that reach
+    // it today (the map's own click, MapDraw); an SVG path only takes the pointer
+    // on its own stroke, which is exactly what a hover label wants. A few hundred
+    // thin paths is nothing beside the pins.
+    const renderer = L.svg({ pane: PANE });
+    layer = L.layerGroup().addTo(map);
+    // Same two-pass trick as the pass-range links: every white casing first, then
+    // every coloured core, so one river's casing can't paint over another's line
+    // where they meet. A 2.5 px blue line vanishes into satellite imagery and
+    // into the blue the topo tiles already draw water in; the casing is what
+    // carries it on every basemap.
+    for (const pass of ['casing', 'core']) {
+      const casing = pass === 'casing';
+      for (const w of ways) {
+        const line = L.polyline(w.coords, {
+          renderer, pane: PANE,
+          color:       casing ? '#ffffff' : colour,
+          weight:      casing ? 5 : 2.5,
+          opacity:     casing ? 0.45 : 0.9,
+          interactive: !casing,
+        }).addTo(layer);
+        if (!casing) line.bindTooltip(w.name, { sticky: true, className: 'mn-river-label' });
+      }
+    }
+    rerenderMapLegend();
+  }
+
+  function setNote(kind, entry) {
+    note = {
+      kind,
+      drawn:  entry ? entry.ways.length : 0,
+      total:  entry ? entry.total : 0,
+      capped: !!(entry && entry.capped),
+    };
+    const el = document.getElementById('map-river-note');
+    if (el) el.innerHTML = noteHtml();
+  }
+
+  function noteHtml() {
+    switch (note.kind) {
+      case 'off':     return 'Rivers are hidden.';
+      case 'wide':    return 'Zoom in to look up rivers — this view is too wide to ask for.';
+      case 'loading': return 'Looking up rivers…';
+      case 'fail':    return 'Rivers unavailable — OpenStreetMap could not be reached.';
+      case 'ok':
+        if (!note.drawn) return 'No named watercourse in view matches the filter.';
+        return `<strong>${note.drawn}</strong> river segment${note.drawn === 1 ? '' : 's'} drawn` +
+               (note.capped ? ` · ${note.total - note.drawn} more in view not drawn` : '') + '.';
+      default:        return 'Type a name in the filter box to light up matching rivers.';
+    }
+  }
+
+  function run() {
+    if (!map) return;
+    const terms = riverTerms();
+    if (!terms.length) { clearLayer(); setNote(state.mapRivers ? 'idle' : 'off'); return; }
+    const b = roundedBbox(map.getBounds());
+    if (b.n - b.s > BBOX_MAX || b.e - b.w > BBOX_MAX) { clearLayer(); setNote('wide'); return; }
+
+    const key = terms.join('+') + '|' + [b.s, b.w, b.n, b.e].map(v => v.toFixed(2)).join(',');
+    const hit = cacheGet(key);
+    if (hit) { draw(hit.ways); setNote('ok', hit); return; }
+    if (Date.now() - failedAt < FAIL_TTL) { clearLayer(); setNote('fail'); return; }
+
+    // Only the newest query may draw: typing "bur" then "burdekin" leaves two
+    // requests in flight, and the slower one is the wrong answer.
+    const mine = ++seq;
+    setNote('loading');
+    ask(overpassQl(terms, b)).then(json => {
+      if (mine !== seq || !map) return;
+      const all    = waysFrom(json);
+      const capped = all.length > MAX_WAYS;
+      const entry  = { ways: capped ? all.slice(0, MAX_WAYS) : all, capped, total: all.length };
+      cachePut(key, entry);
+      draw(entry.ways);
+      setNote('ok', entry);
+    }).catch(() => {
+      if (mine !== seq || !map) return;
+      failedAt = Date.now();            // don't hammer a service that just said no
+      clearLayer();
+      setNote('fail');
+    });
+  }
+
+  // Held off until the typing pauses: a search rebuilds every marker already, and
+  // this one also spends a request.
+  function sync() {
+    clearTimeout(timer);
+    timer = setTimeout(run, DEBOUNCE_MS);
+  }
+
+  return {
+    // Wire a freshly built map. The pane sits under the leader lines (350), the
+    // pass-range links (overlayPane, 400) and the pins (markerPane, 600), so a
+    // river never draws over the network it is context for.
+    attach(m) {
+      map = m;
+      if (!m.getPane(PANE)) m.createPane(PANE).style.zIndex = 340;
+      // Rivers are bounded by the view, so a pan or a zoom is a new question.
+      // Usually a cached one: the bbox is rounded before it becomes a key.
+      m.on('moveend', sync);
+      sync();
+    },
+
+    detach() {
+      clearTimeout(timer);
+      if (map) map.off('moveend', sync);
+      clearLayer();
+      map = null;
+      seq++;                            // a request in flight has nothing to draw on
+    },
+
+    // The filter box changed, or the switch did.
+    sync,
+
+    // Theme switch. The colour is read at draw time, so this re-draws what is
+    // already there — off the cache, with no request.
+    repaint() { if (layer) run(); },
+
+    // Are there rivers on the map right now? The legend asks before claiming a
+    // river line, the way it does for the ACMA colours.
+    active() { return !!layer; },
+
+    noteHtml,
+
+    setEnabled(on) {
+      state.mapRivers = on;
+      try { localStorage.setItem('mn-rivers', on ? 'on' : 'off'); } catch (_) {}
+      if (!on) { clearTimeout(timer); clearLayer(); setNote('off'); return; }
+      setNote(riverTerms().length ? 'loading' : 'idle');   // don't leave "hidden" up for the debounce
+      sync();
+    },
+  };
+})();
+
+// ── Overlapping pins: fan-out ("spiderfy") ───────────────────────────────────
+// Co-sited stations and ACMA sites carrying a dozen licensed devices land on the
+// same few pixels, and whatever is underneath is unreachable. Hovering a stack
+// (mouse) or tapping it (touch) fans its members out around the stack centre on
+// leader lines so each one can be seen and clicked; they snap back when the
+// pointer leaves, the map zooms, or the markers are rebuilt.
+//
+// Works on any marker with getLatLng/setLatLng, so MegaNet station circles and
+// ACMA transmitter squares fan out together.
+const MapSpider = (function () {
+  const NEAR_PX   = 20;  // pins within this screen distance form one stack
+  const MAX_FAN   = 16;  // a fan bigger than this stops being readable
+  const HOVER_MAX = 10;  // bigger stacks need a deliberate click, so that panning
+                         // across a zoomed-out map doesn't fan pins constantly
+  const LEAVE_PX  = 70;  // pointer this far outside the fan closes it
+  const HOVER_MS  = 70;  // settle time, so sweeping across a stack doesn't fan it
+
+  const buckets = { stations: [], acma: [] };
+  let map = null;
+  let open = null;       // { members, centre, radius, legs }
+  let cache = null;      // { list, pts } projected at the current zoom
+  let hoverTimer = null;
+
+  function canHover() {
+    return !L.Browser.mobile && window.matchMedia('(hover: hover)').matches;
+  }
+
+  function pins() { return buckets.stations.concat(buckets.acma); }
+
+  // Where a pin belongs — its own position unless it is currently fanned out.
+  function home(m) { return m._mnHome || m.getLatLng(); }
+
+  function invalidate() { cache = null; }
+
+  function points() {
+    if (cache) return cache;
+    const zoom = map.getZoom();
+    const list = pins();
+    cache = { list, pts: list.map(m => map.project(home(m), zoom)) };
+    return cache;
+  }
+
+  // Every pin sitting within NEAR_PX of the given one, nearest first.
+  function stackFor(marker) {
+    const { list, pts } = points();
+    const i = list.indexOf(marker);
+    if (i < 0) return [];
+    const c = pts[i];
+    return list
+      .map((m, j) => ({ m, d: Math.hypot(pts[j].x - c.x, pts[j].y - c.y) }))
+      .filter(x => x.d <= NEAR_PX)
+      .sort((a, b) => a.d - b.d)
+      .map(x => x.m);
+  }
+
+  // Pixel offsets for n fanned pins: concentric rings at ~26 px spacing, so a
+  // pair sits tight and a 30-device ACMA site still reads.
+  function fanOffsets(n) {
+    const out = [];
+    let placed = 0, ring = 0;
+    while (placed < n) {
+      const r   = 30 + ring * 26;
+      const cap = Math.max(3, Math.floor((2 * Math.PI * r) / 26));
+      const k   = Math.min(cap, n - placed);
+      for (let i = 0; i < k; i++) {
+        const a = -Math.PI / 2 + (2 * Math.PI * i) / k + (ring % 2 ? Math.PI / k : 0);
+        out.push({ x: Math.cos(a) * r, y: Math.sin(a) * r, r });
+      }
+      placed += k;
+      ring++;
+    }
+    return out;
+  }
+
+  function isOpen(marker) { return !!open && open.members.indexOf(marker) >= 0; }
+
+  function spiderfy(marker) {
+    if (!map) return false;
+    const stack = stackFor(marker);
+    if (stack.length < 2) { unspiderfy(); return false; }
+    // Co-located ACMA devices share exact coordinates and never separate by
+    // zooming, so an oversized stack still fans — it just says what it left out.
+    const members = stack.slice(0, MAX_FAN);
+    if (open && open.members.length === members.length &&
+        members.every(m => open.members.indexOf(m) >= 0)) return true;
+    unspiderfy();
+    if (stack.length > MAX_FAN) {
+      mapNote(`${members.length} of ${stack.length} pins fanned out — zoom in for the rest`, 4000);
+    }
+
+    const zoom = map.getZoom();
+    const { list, pts } = points();
+    let sx = 0, sy = 0;
+    members.forEach(m => { const p = pts[list.indexOf(m)]; sx += p.x; sy += p.y; });
+    const centre = map.unproject(L.point(sx / members.length, sy / members.length), zoom);
+    const cLp    = map.latLngToLayerPoint(centre);
+    const offs   = fanOffsets(members.length);
+    const legs   = L.layerGroup().addTo(map);
+    let radius   = 0;
+
+    members.forEach((m, i) => {
+      const o    = offs[i];
+      const from = home(m);
+      const to   = map.layerPointToLatLng(cLp.add(L.point(o.x, o.y)));
+      radius = Math.max(radius, o.r);
+      m._mnHome = from;
+      // White casing under a dark line: legible over topo, imagery and dark mode.
+      L.polyline([from, to], { pane: 'mnSpiderLegs', color: '#fff',     weight: 4,   opacity: .9,  interactive: false }).addTo(legs);
+      L.polyline([from, to], { pane: 'mnSpiderLegs', color: '#4a5560', weight: 1.5, opacity: .95, interactive: false }).addTo(legs);
+      m.setLatLng(to);
+      if (m.setZIndexOffset) m.setZIndexOffset(1000);
+      if (m.bringToFront)    m.bringToFront();
+    });
+    L.circleMarker(centre, {
+      pane: 'mnSpiderLegs', radius: 2.5, color: '#4a5560', weight: 1,
+      fillColor: '#fff', fillOpacity: 1, interactive: false,
+    }).addTo(legs);
+
+    open = { members, centre, radius, legs };
+    map.on('mousemove', onMapMove);
+    return true;
+  }
+
+  function unspiderfy() {
+    clearTimeout(hoverTimer);
+    if (!open) return;
+    open.members.forEach(m => {
+      if (m._mnHome) { m.setLatLng(m._mnHome); delete m._mnHome; }
+      if (m.setZIndexOffset) m.setZIndexOffset(0);
+    });
+    open.legs.remove();
+    if (map) map.off('mousemove', onMapMove);
+    open = null;
+  }
+
+  function onMapMove(e) {
+    if (!open) return;
+    // A popup open on one of the fanned pins is the user reading it — hold.
+    if (open.members.some(m => m.isPopupOpen && m.isPopupOpen())) return;
+    if (e.layerPoint.distanceTo(map.latLngToLayerPoint(open.centre)) > open.radius + LEAVE_PX) {
+      unspiderfy();
+    }
+  }
+
+  function onPinOver(e) {
+    if (!map || isOpen(e.target)) return;
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => {
+      // Hover only opens small stacks; a zoomed-out map where everything
+      // overlaps would otherwise fan pins under every pass of the mouse.
+      if (stackFor(e.target).length <= HOVER_MAX) spiderfy(e.target);
+    }, HOVER_MS);
+  }
+
+  function onPinClick(e) {
+    if (!map || isOpen(e.target)) return;   // already fanned → let the popup open
+    // A modifier-click is the map selection talking, not "show me this stack".
+    const oe = e.originalEvent;
+    if (oe && (oe.shiftKey || oe.ctrlKey || oe.metaKey)) return;
+    // First tap on a stack fans it instead of opening whichever pin was on top.
+    if (spiderfy(e.target)) e.target.closePopup();
+  }
+
+  return {
+    // Wire a freshly built map. Leader lines get their own pane below the
+    // overlay pane so they never draw over the pins they point at.
+    attach(m) {
+      map = m;
+      open = null; cache = null;
+      buckets.stations = []; buckets.acma = [];
+      clearTimeout(hoverTimer);
+      if (!m.getPane('mnSpiderLegs')) {
+        const pane = m.createPane('mnSpiderLegs');
+        pane.style.zIndex = 350;
+        pane.style.pointerEvents = 'none';
+      }
+      m.on('zoomstart', unspiderfy);
+      m.on('zoomend viewreset', invalidate);
+      m.on('click', unspiderfy);          // pin clicks don't bubble to the map
+    },
+
+    // Hand over a rebuilt set of markers for one layer.
+    setPins(kind, markers) {
+      unspiderfy();
+      buckets[kind] = markers || [];
+      invalidate();
+      (markers || []).forEach(m => {
+        if (m._mnSpiderWired) return;
+        m._mnSpiderWired = true;
+        m.on('click', onPinClick);
+        if (canHover()) m.on('mouseover', onPinOver);
+      });
+    },
+
+    // Send every fanned pin home — call before markers are removed or replaced.
+    reset() { unspiderfy(); invalidate(); },
+
+    detach() { unspiderfy(); map = null; buckets.stations = []; buckets.acma = []; },
+  };
+})();
+
+// ── Where am I? (mobile) ─────────────────────────────────────────────────────
+// Off by default and only offered on touch devices: a button below the zoom
+// control puts a dot at the phone's GPS position with an accuracy ring, plus a
+// cone pointing the way the phone is facing when a compass is available.
+// iOS only hands out orientation events after a permission request made from a
+// user gesture, which is why that request lives in the button's click handler.
+const MapLocate = (function () {
+  let map = null, btn = null;
+  let on = false, watchId = null, marker = null, ring = null;
+  let heading = null, orientEvent = null, gotCompass = false, followed = false;
+
+  function isMobile() {
+    return L.Browser.mobile || window.matchMedia('(pointer: coarse)').matches;
+  }
+
+  function icon() {
+    return L.divIcon({
+      className: 'mn-loc-icon',
+      html: '<div class="mn-loc"><i class="mn-loc-cone"></i><i class="mn-loc-dot"></i></div>',
+      iconSize: [46, 46], iconAnchor: [23, 23],
+    });
+  }
+
+  function applyHeading() {
+    const el   = marker && marker.getElement();
+    const cone = el && el.querySelector('.mn-loc-cone');
+    if (!cone) return;
+    cone.style.display   = heading == null ? 'none' : '';
+    cone.style.transform = `rotate(${heading || 0}deg)`;
+  }
+
+  function onOrient(e) {
+    let h = null;
+    if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
+      h = e.webkitCompassHeading;                                  // iOS: clockwise from north
+    } else if (e.alpha != null && (e.absolute || e.type === 'deviceorientationabsolute')) {
+      h = 360 - e.alpha;                                           // spec alpha runs anticlockwise
+    }
+    if (h == null) return;      // relative-only sensor: no compass, leave it to GPS course
+    // Compass readings are relative to the device's natural orientation; add the
+    // screen rotation so the cone still points the right way in landscape.
+    const screenAngle = (window.screen.orientation && window.screen.orientation.angle) ||
+                        window.orientation || 0;
+    gotCompass = true;
+    heading = (h + screenAngle + 360) % 360;
+    applyHeading();
+  }
+
+  function listenOrientation() {
+    orientEvent = ('ondeviceorientationabsolute' in window)
+      ? 'deviceorientationabsolute' : 'deviceorientation';
+    window.addEventListener(orientEvent, onOrient, true);
+  }
+
+  function startOrientation() {
+    const DOE = window.DeviceOrientationEvent;
+    if (!DOE) return;
+    if (typeof DOE.requestPermission === 'function') {
+      DOE.requestPermission()
+        .then(res => { if (res === 'granted') listenOrientation(); })
+        .catch(() => {});
+    } else {
+      listenOrientation();
+    }
+  }
+
+  function onPos(p) {
+    if (!on || !map) return;
+    const ll  = [p.coords.latitude, p.coords.longitude];
+    const acc = p.coords.accuracy || 0;
+    // No compass readings arriving? Fall back to GPS course, which is only
+    // meaningful on the move.
+    if (!gotCompass && p.coords.heading != null && !isNaN(p.coords.heading) &&
+        p.coords.speed > 0.5) {
+      heading = p.coords.heading;
+    }
+    if (!marker) {
+      ring   = L.circle(ll, { radius: acc, color: '#1e88e5', weight: 1,
+                              fillColor: '#1e88e5', fillOpacity: .12, interactive: false }).addTo(map);
+      marker = L.marker(ll, { icon: icon(), interactive: false, keyboard: false,
+                              zIndexOffset: 2000 }).addTo(map);
+    } else {
+      marker.setLatLng(ll);
+      ring.setLatLng(ll).setRadius(acc);
+    }
+    applyHeading();
+    if (!followed) {                          // centre on the first fix only
+      followed = true;
+      map.setView(ll, Math.max(map.getZoom(), 14));
+      mapNote('', 0);
+    }
+  }
+
+  function onErr(e) {
+    mapNote(`Location unavailable — ${e.message || 'no fix'}`, 6000);
+    if (e.code === 1) stop();                 // permission denied: don't keep trying
+  }
+
+  function stop() {
+    on = false;
+    if (btn) btn.classList.remove('on');
+    if (watchId != null) navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    if (orientEvent) window.removeEventListener(orientEvent, onOrient, true);
+    orientEvent = null;
+    heading = null;
+    gotCompass = false;
+    if (marker) marker.remove();
+    if (ring)   ring.remove();
+    marker = ring = null;
+  }
+
+  function toggle() {
+    if (on) { stop(); mapNote('', 0); return; }
+    on = true;
+    followed = false;
+    if (btn) btn.classList.add('on');
+    mapNote('Locating…', 8000);
+    startOrientation();
+    watchId = navigator.geolocation.watchPosition(onPos, onErr, {
+      enableHighAccuracy: true, maximumAge: 2000, timeout: 20000,
+    });
+  }
+
+  return {
+    attach(m) {
+      map = m;
+      if (!('geolocation' in navigator) || !isMobile()) return;
+      const ctl = L.control({ position: 'topleft' });
+      ctl.onAdd = () => {
+        const div = L.DomUtil.create('div', 'leaflet-bar mn-locate');
+        const a   = L.DomUtil.create('a', '', div);
+        a.href = '#';
+        a.title = 'Show my location and heading';
+        a.setAttribute('role', 'button');
+        a.setAttribute('aria-label', 'Show my location and heading');
+        a.innerHTML = '➤';
+        L.DomEvent.on(a, 'click', L.DomEvent.stop).on(a, 'click', toggle);
+        btn = a;
+        return div;
+      };
+      ctl.addTo(m);
+    },
+
+    // The map is being torn down (tab switch or re-render): drop the GPS watch
+    // and the compass listener rather than leaving them running unseen.
+    detach() { if (on) stop(); map = null; btn = null; },
+  };
+})();
+
+// ── Terrain elevation ────────────────────────────────────────────────────────
+// Ground height along a line — what both the elevation profile and the link
+// budget are built on. MegaNet is a static page: there is no backend to ask and
+// no key can live in the repo, so elevation comes from open terrarium-encoded
+// PNG tiles, decoded in a canvas here in the browser.
+//
+// AWS Terrain Tiles (elevation-tiles-prod) is the source: open data, no key,
+// `Access-Control-Allow-Origin: *`, and ~30 m SRTM over Australia. It rides the
+// same XYZ scheme Leaflet already fetches base maps on (see makeBaseLayers), so
+// the lat/lon → tile maths is the standard Web Mercator pair and nothing more.
+//
+//   elevation_m = (R * 256 + G + B / 256) - 32768
+//
+// Tiles are cached decoded, so a second profile over the same country costs no
+// network at all. That is the reason for tiles over an elevation API: the API
+// would be one rate-limited request per profile with nothing kept between them,
+// and a handful of tiles already covers a whole VHF hop.
+//
+// DATUM — terrarium heights are above the EGM96 geoid; a station's
+// `elevation_ahd` is Australian Height Datum. Over Australia the two agree to
+// about a metre, well inside the ~30 m sampling error, but they are not the
+// same datum and neither one is ellipsoidal height. So where a station's own
+// elevation_ahd exists it wins for that *endpoint*, and tiles only ever supply
+// the ground *between* the ends. Everything drawn from this says so on screen.
+//
+// Every failure here is loud. A caller that cannot get terrain has to say so:
+// a flat profile reads as a clear path, which is the one wrong answer that
+// actually costs someone a site visit.
+
+const Terrain = (function () {
+  const TILE_URL  = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+  const TILE_PX   = 256;
+  // The source is ~30 m SRTM. Past z12 (~33 m/px at Queensland latitudes) the
+  // tiles are resampling their own pixels — four times the tiles for no more
+  // terrain.
+  const MAX_ZOOM  = 12;
+  const MIN_ZOOM  = 7;
+  const MAX_TILES = 48;      // per profile; the zoom drops until the path fits
+  const CACHE_MAX = 128;     // × 128 KB decoded ≈ 16 MB — the bound on a long session
+  const FETCH_MS  = 12000;   // a tile that hasn't arrived by now has failed
+  const FAIL_TTL  = 60000;   // how long a failed tile is remembered before a retry
+
+  // Decoded tiles, oldest first: a Map iterates in insertion order, so re-inserting
+  // on read is the whole of the LRU.
+  const cache    = new Map();   // 'z/x/y' → Int16Array(65536) of metres
+  const failedAt = new Map();   // 'z/x/y' → timestamp of the last failure
+  const inflight = new Map();   // 'z/x/y' → Promise<Int16Array|null>
+  let canvas = null;
+
+  const ATTRIB = 'Elevation: AWS Terrain Tiles (SRTM/GMTED, ~30 m), height above the EGM96 geoid';
+
+  // ── Web Mercator ──
+  // Fractional tile coordinates: the integer part is the tile, the fraction
+  // times 256 is the pixel inside it.
+  function tileX(lon, z) { return (lon + 180) / 360 * Math.pow(2, z); }
+
+  function tileY(lat, z) {
+    const r = Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI / 180;
+    return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z);
+  }
+
+  // Ground distance one tile pixel covers, which is what picks the zoom.
+  function metresPerPixel(lat, z) {
+    return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z);
+  }
+
+  // ── tiles ──
+
+  function sharedCanvas() {
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.width = canvas.height = TILE_PX;
+    }
+    return canvas;
+  }
+
+  // RGB → metres, once per tile, into an Int16Array. Holding the raw RGBA
+  // instead would be 256 KB a tile; metre resolution is far finer than the
+  // ~30 m the source actually resolves, and it halves the cache.
+  function decode(img) {
+    const cv = sharedCanvas();
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    cx.clearRect(0, 0, TILE_PX, TILE_PX);
+    cx.drawImage(img, 0, 0, TILE_PX, TILE_PX);
+    // Throws if the image tainted the canvas — i.e. the CORS headers went away.
+    // That is a failure like any other, and the caller turns it into one.
+    const d = cx.getImageData(0, 0, TILE_PX, TILE_PX).data;
+    const out = new Int16Array(TILE_PX * TILE_PX);
+    for (let i = 0, j = 0; i < out.length; i++, j += 4) {
+      out[i] = Math.round(d[j] * 256 + d[j + 1] + d[j + 2] / 256 - 32768);
+    }
+    return out;
+  }
+
+  function remember(key, px) {
+    cache.set(key, px);
+    while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+  }
+
+  // Resolves to the decoded tile, or to null for every kind of failure there is
+  // — offline, blocked, rate-limited, 404 over the ocean, CORS withdrawn. It
+  // never rejects: one missing tile is a gap in a profile, not a dead panel.
+  function loadTile(z, x, y) {
+    const key = `${z}/${x}/${y}`;
+    if (cache.has(key)) {
+      const px = cache.get(key);
+      cache.delete(key); cache.set(key, px);        // most recently used
+      return Promise.resolve(px);
+    }
+    if (inflight.has(key)) return inflight.get(key);
+    // A tile that just failed is not retried on every mouse-driven re-profile;
+    // after the TTL it gets another chance, so a dropped connection heals.
+    const fa = failedAt.get(key);
+    if (fa != null && Date.now() - fa < FAIL_TTL) return Promise.resolve(null);
+
+    const url = TILE_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+    const p = new Promise(resolve => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';               // required before getImageData
+      let settled = false;
+      const finish = v => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(v);
+      };
+      const timer = setTimeout(() => finish(null), FETCH_MS);
+      img.onload  = () => { try { finish(decode(img)); } catch (_) { finish(null); } };
+      img.onerror = () => finish(null);
+      img.src = url;
+    }).then(px => {
+      inflight.delete(key);
+      if (px) { failedAt.delete(key); remember(key, px); }
+      else    { failedAt.set(key, Date.now()); }
+      return px;
+    });
+    inflight.set(key, p);
+    return p;
+  }
+
+  // Nearest pixel, deliberately: interpolating between samples of a ~30 m grid
+  // invents detail the source does not have, and across a tile edge it would
+  // need the neighbour fetched as well.
+  function readTile(px, fx, fy, tx, ty) {
+    const ix = Math.min(TILE_PX - 1, Math.max(0, Math.floor((fx - tx) * TILE_PX)));
+    const iy = Math.min(TILE_PX - 1, Math.max(0, Math.floor((fy - ty) * TILE_PX)));
+    return px[iy * TILE_PX + ix];
+  }
+
+  // ── path sampling ──
+
+  // n points evenly spaced by distance along the polyline, each carried back as
+  // a real lat/lon so the caller can name and re-use them. Great-circle within
+  // each leg, via the geodesy the map already uses.
+  function walk(pts, n) {
+    const legs = [];
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const km = acmaHaversineKm(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
+      legs.push({ from: pts[i - 1], to: pts[i], km, at: total,
+                  brg: bearingDeg(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]) });
+      total += km;
+    }
+    const out = [];
+    let leg = 0;
+    for (let i = 0; i < n; i++) {
+      const km = total * i / (n - 1);
+      while (leg < legs.length - 1 && km > legs[leg].at + legs[leg].km) leg++;
+      const L = legs[leg];
+      // The ends are the vertices themselves, not a destPoint approximation of
+      // them — a snapped endpoint has to stay exactly on its station.
+      const ll = i === 0 ? pts[0]
+               : i === n - 1 ? pts[pts.length - 1]
+               : destPoint(L.from[0], L.from[1], L.brg, Math.max(0, km - L.at));
+      out.push({ km, lat: ll[0], lon: ll[1] });
+    }
+    return { samples: out, totalKm: total };
+  }
+
+  // The coarsest zoom whose pixels are still finer than the gap between
+  // samples, then backed off further if the path won't fit in the tile budget.
+  //
+  // Going coarser than the sample spacing is the expensive mistake: adjacent
+  // samples start landing on the same pixel and a ridge narrower than a pixel
+  // simply stops existing — and a ridge that stops existing is a path that
+  // reports clear. Going finer only costs tiles. So: fine enough that no sample
+  // is wasted, and no finer. A 5 km hop lands on z12, a 120 km hop on z9.
+  function pickZoom(samples, totalKm, n) {
+    const midLat = samples[Math.floor(samples.length / 2)].lat;
+    const spacing = Math.max(1, totalKm * 1000 / Math.max(1, n - 1));
+    let z = MIN_ZOOM;
+    while (z < MAX_ZOOM && metresPerPixel(midLat, z) > spacing) z++;
+    let capped = false;
+    for (;;) {
+      const keys = new Set();
+      for (const s of samples) keys.add(`${Math.floor(tileX(s.lon, z))}/${Math.floor(tileY(s.lat, z))}`);
+      if (keys.size <= MAX_TILES || z <= MIN_ZOOM) return { z, tiles: keys.size, capped };
+      z--; capped = true;
+    }
+  }
+
+  return {
+    // Ground height at one point, or null if the tile for it can't be had.
+    sample(lat, lon, zoom) {
+      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom || MAX_ZOOM));
+      const fx = tileX(lon, z), fy = tileY(lat, z);
+      const tx = Math.floor(fx), ty = Math.floor(fy);
+      return loadTile(z, tx, ty).then(px => (px ? readTile(px, fx, fy, tx, ty) : null));
+    },
+
+    // n evenly-spaced ground samples along a polyline.
+    //
+    // Resolves — never rejects — to one of two shapes, so a caller has to look
+    // at `ok` before it can draw anything:
+    //   { ok: false, error }                      nothing usable; say so
+    //   { ok: true, distance_m[], terrain_m[], …} terrain_m holds null wherever
+    //                                             a tile was missing, and
+    //                                             `partial` says it happened
+    profile(pts, n) {
+      const count = Math.max(2, Math.min(1024, n || 256));
+      if (!pts || pts.length < 2) {
+        return Promise.resolve({ ok: false, error: 'A path needs at least two points.' });
+      }
+      const { samples, totalKm } = walk(pts, count);
+      if (!(totalKm > 0)) {
+        return Promise.resolve({ ok: false, error: 'The two ends are in the same place.' });
+      }
+      const { z, tiles, capped } = pickZoom(samples, totalKm, count);
+
+      const need = new Map();
+      for (const s of samples) {
+        s.fx = tileX(s.lon, z); s.fy = tileY(s.lat, z);
+        s.tx = Math.floor(s.fx); s.ty = Math.floor(s.fy);
+        need.set(`${s.tx}/${s.ty}`, [s.tx, s.ty]);
+      }
+      const keys = [...need.keys()];
+      return Promise.all([...need.values()].map(([x, y]) => loadTile(z, x, y))).then(got => {
+        const byKey = {};
+        keys.forEach((k, i) => { byKey[k] = got[i]; });
+        const distance_m = [], terrain_m = [], lat = [], lon = [];
+        let missing = 0;
+        for (const s of samples) {
+          const px = byKey[`${s.tx}/${s.ty}`];
+          distance_m.push(s.km * 1000);
+          lat.push(s.lat); lon.push(s.lon);
+          if (px) terrain_m.push(readTile(px, s.fx, s.fy, s.tx, s.ty));
+          else { terrain_m.push(null); missing++; }
+        }
+        if (missing === samples.length) {
+          return { ok: false,
+                   error: 'Terrain tiles could not be fetched — offline, blocked, or the tile service is unavailable.' };
+        }
+        return { ok: true, distance_m, terrain_m, lat, lon,
+                 totalKm, zoom: z, tiles, capped, missing, partial: missing > 0,
+                 resolution_m: Math.round(metresPerPixel(samples[Math.floor(samples.length / 2)].lat, z)),
+                 attribution: ATTRIB };
+      });
+    },
+
+    attribution: ATTRIB,
+    maxTiles: MAX_TILES,
+    // For the panel footer: how much of a session's terrain is already in hand.
+    cached() { return cache.size; },
+    // MemMeter's Release button. Costs a re-fetch of whatever profile is drawn
+    // next — nothing currently on screen depends on the cache staying warm.
+    clear() { cache.clear(); failedAt.clear(); },
+  };
+})();
+
+// ── Modal shell ────────────────────────────────────────────────────────────────
+// One dialog, borrowed by whoever needs one: a title, arbitrary HTML, Esc or ×
+// to close, Tab kept inside it, and focus handed back to whatever opened it.
+//
+// The bug reporter has its own copy of this markup and keeps it. It is the one
+// thing people reach for when the app is already misbehaving, so it does not
+// get to depend on anything newer than itself.
+
+const Modal = (function () {
+  let lastFocus = null;
+
+  const root = () => document.getElementById('app-modal');
+  const isOpen = () => { const el = root(); return el && el.style.display !== 'none'; };
+
+  function open({ title, html, wide }) {
+    let el = root();
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'app-modal';
+      el.className = 'modal-overlay';
+      // Only the backdrop closes — a click that started inside the card and
+      // drifted out (selecting text, say) is not a request to close it.
+      el.onclick = ev => { if (ev.target === el) close(); };
+      document.body.appendChild(el);
+    }
+    lastFocus = document.activeElement;
+    el.innerHTML = `
+      <div class="modal-card${wide ? ' modal-card--wide' : ''}" role="dialog" aria-modal="true"
+           aria-labelledby="app-modal-title" tabindex="-1">
+        <div class="modal-head">
+          <h2 id="app-modal-title">${esc(title)}</h2>
+          <button class="modal-x" title="Close (Esc)" aria-label="Close" onclick="Modal.close()">×</button>
+        </div>
+        <div class="modal-body">${html}</div>
+      </div>`;
+    el.style.display = 'flex';
+    document.addEventListener('keydown', onKey, true);
+    el.querySelector('.modal-card')?.focus();
+  }
+
+  function onKey(e) {
+    if (!isOpen()) return;
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    // Tab cycles within the dialog. Without this it walks off into the page
+    // behind, which for a keyboard user is a dialog with no walls.
+    const items = [...root().querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])')]
+      .filter(n => n.offsetParent !== null);
+    if (!items.length) return;
+    const at = items.indexOf(document.activeElement);
+    if (e.shiftKey) { if (at <= 0) { e.preventDefault(); items[items.length - 1].focus(); } }
+    else if (at < 0 || at === items.length - 1) { e.preventDefault(); items[0].focus(); }
+  }
+
+  function close() {
+    const el = root();
+    if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+    document.removeEventListener('keydown', onKey, true);
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+    lastFocus = null;
+  }
+
+  return { open, close };
+})();
+if (typeof window !== 'undefined') window.Modal = Modal;
 
 // ── ALERT Packets tab ────────────────────────────────────────────────────────────
 // Decoder / encoder for ALERT / ERTS radio telemetry messages, per the Bureau of
