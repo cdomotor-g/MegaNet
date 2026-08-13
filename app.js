@@ -748,6 +748,8 @@ const MemMeter = (function () {
 
   // Bytes per ARRO row: t, tr, v, raw are Float64Array (8 B each), q is
   // Uint8Array (1 B) — see ArroData's parseCsv. Length × this, not a walk.
+  // A series from a source with extra columns says so in its own bytesPerRow;
+  // this is the floor every series shares.
   const ARRO_BYTES_PER_ROW = 8 * 4 + 1;
   const TERRAIN_TILE_BYTES = 65536 * 2;   // Int16Array(65536), 2 B/element
 
@@ -771,7 +773,8 @@ const MemMeter = (function () {
   }
 
   function arroBytes() {
-    return ArroData.ad.series.reduce((sum, s) => sum + (s.n || 0) * ARRO_BYTES_PER_ROW, 0);
+    return ArroData.allSeries()
+      .reduce((sum, s) => sum + (s.n || 0) * (s.bytesPerRow || ARRO_BYTES_PER_ROW), 0);
   }
 
   function localStorageBytes() {
@@ -935,8 +938,7 @@ const MemMeter = (function () {
   }
 
   function releaseArro() {
-    if (!ArroData.ad.series.length) return;
-    ArroData.clearAll();   // confirms before dropping more than one import
+    ArroData.dropAll();   // every data tab; confirms before dropping more than one
   }
 
   function release(key) {
@@ -9674,32 +9676,59 @@ const AD_DAY = 86400000;
 
 const ArroData = (function () {
 
-  const ad = {
-    series:    [],
-    seq:       0,
-    cfg:       { ...AD_CFG_DEFAULT },
-    view:      null,           // {t0,t1} visible window, ms; null = full extent
-    mode:      'both',         // raw | filtered | both
-    transform: 'value',        // value | increment | rate
-    chartType: 'line',
-    yMode:     'auto',         // auto | zero | manual
-    yMin:      '', yMax: '',
-    showRemoved:  true,
-    showRollover: true,
-    compare:      false,       // side-by-side raw/filtered panes, folded away
-    showPoints:   'auto',      // auto | on | off
-    normalise:    false,
-    hover:     null,           // {x,y,t,rows:[]}
-    pin:       null,           // clicked point: {key,i}
-    drag:      null,
-    brush:     false,          // brush-to-zoom armed (else drag pans)
-    ovDrag:    null,
-    w: 900, h: 380,
-    ro:        null,
-    sensorIdx: null,
-    sensorIdxFor: null,
-    busy:      0,
-  };
+  // One module, more than one tab. Everything between a parsed series and a
+  // drawn pixel — the chart, the 357 filter, the inspector, the export — is
+  // source-agnostic and shared; the *state* is what forks, so two tabs can each
+  // hold their own series without a line of drawing code being copied.
+  //
+  // The rule this makes structural is that sources never blur together: a series
+  // lives in exactly one instance and no code path moves one between them, so
+  // there is no merged list to accidentally draw from.
+  //
+  // Only one tab is mounted at a time — renderMain() replaces the whole pane —
+  // so `ad` is a binding onto whichever instance is on screen, and the inline
+  // handlers in the markup below can all say `ArroData.x()` and mean "the data
+  // tab you are looking at". Anything asynchronous must capture `ad` up front
+  // rather than read it again in a callback: a tab switch mid-flight would
+  // otherwise land one tab's results in the other.
+  function newState(source) {
+    return {
+      source,                    // provenance, stamped onto every series it holds
+      series:    [],
+      seq:       0,
+      cfg:       { ...AD_CFG_DEFAULT },
+      view:      null,           // {t0,t1} visible window, ms; null = full extent
+      mode:      'both',         // raw | filtered | both
+      transform: 'value',        // value | increment | rate
+      chartType: 'line',
+      yMode:     'auto',         // auto | zero | manual
+      yMin:      '', yMax: '',
+      showRemoved:  true,
+      showRollover: true,
+      compare:      false,       // side-by-side raw/filtered panes, folded away
+      showPoints:   'auto',      // auto | on | off
+      normalise:    false,
+      hover:     null,           // {x,y,t,rows:[]}
+      pin:       null,           // clicked point: {key,i}
+      drag:      null,
+      brush:     false,          // brush-to-zoom armed (else drag pans)
+      ovDrag:    null,
+      w: 900, h: 380,
+      ro:        null,
+      sensorIdx: null,
+      sensorIdxFor: null,
+      busy:      0,
+    };
+  }
+
+  const instances = { arro: newState('arro') };
+
+  let ad = instances.arro;
+
+  function activate(source) {
+    ad = instances[source] || instances.arro;
+    return ad;
+  }
 
   // ── CSV parsing ────────────────────────────────────────────────────────────
 
@@ -9809,9 +9838,33 @@ const ArroData = (function () {
     if (ragged)  warn.push(`${ragged} row${ragged === 1 ? '' : 's'} carried an unquoted thousands separator in Value and were re-joined.`);
     if (skipped) warn.push(`${skipped} row${skipped === 1 ? '' : 's'} could not be parsed and were dropped.`);
 
+    let unit = '';
+    let best = 0;
+    for (const [u, c] of units) if (c > best) { best = c; unit = u; }
+
+    return seriesData({ n, t, tr, v, raw, q, qcodes, unit, warn, hasRaw: iRaw >= 0 });
+  }
+
+  // ── the series boundary ──────────────────────────────────────────────────────
+  // The one door into this module, and the reason the Field Data tab is a query
+  // rather than a second chart. A source produces parallel arrays in whatever
+  // order it happens to have them; this puts them in the order everything
+  // downstream assumes, and hands back the shape runFilter(), tracks(), the
+  // chart and the export all read.
+  //
+  // `cols` in, series data out:
+  //   n, t, tr, v, raw, q   parallel arrays, length >= n (the tail is ignored)
+  //   qcodes                q[i] indexes this; the labels, in first-seen order
+  //   unit, warn, hasRaw    carried through untouched
+  //   extra                 optional {name: TypedArray}, reordered alongside —
+  //                         this is how the datastore's dup_count and path index
+  //                         ride along without every source having to have them
+  function seriesData(cols) {
+    const { n, t, tr, v, raw, q } = cols;
+
     // Ascending in time, latest last — the 357 algorithm depends on it, and
     // ARRO exports newest-first. A stable sort keeps same-timestamp rows in
-    // file order so the duplicate that survives de-duplication is predictable.
+    // source order so the duplicate that survives de-duplication is predictable.
     const ord = Array.from({ length: n }, (_, i) => i)
       .sort((a, b) => t[a] - t[b] || a - b);
     const desc = n > 1 && t[ord[0]] !== t[0];
@@ -9823,12 +9876,26 @@ const ArroData = (function () {
       T[i] = t[j]; TR[i] = tr[j]; V[i] = v[j]; RAW[i] = raw[j]; Q[i] = q[j];
     }
 
-    let unit = '';
-    let best = 0;
-    for (const [u, c] of units) if (c > best) { best = c; unit = u; }
+    const extra = {};
+    for (const [name, src] of Object.entries(cols.extra || {})) {
+      // Same constructor as the input, so an Int32Array of path ids stays one
+      // and a plain Array of strings stays one.
+      const out = Array.isArray(src) ? new Array(n) : new src.constructor(n);
+      for (let i = 0; i < n; i++) out[i] = src[ord[i]];
+      extra[name] = out;
+    }
 
-    return { n, t: T, tr: TR, v: V, raw: RAW, q: Q, qcodes, unit, warn, desc, hasRaw: iRaw >= 0 };
+    return {
+      n, t: T, tr: TR, v: V, raw: RAW, q: Q,
+      qcodes: cols.qcodes || [],
+      unit:   cols.unit || '',
+      warn:   cols.warn || [],
+      desc,
+      hasRaw: !!cols.hasRaw,
+      extra,
+    };
   }
+
 
   // ── filename → sensor id → station ─────────────────────────────────────────
 
@@ -10439,12 +10506,55 @@ const ArroData = (function () {
     return pts;
   }
 
-  function pathFrom(pts, y, step) {
+  // Which readings have a silence immediately after them, accumulated along the
+  // series, so that "was the record quiet anywhere between these two points?" is
+  // one subtraction. Depends only on the timestamps and the series' own gap
+  // threshold, neither of which changes after it is loaded, so it is computed
+  // once and never invalidated by a config change.
+  function gapCum(s) {
+    if (s._gapCum) return s._gapCum;
+    const c = new Int32Array(s.n);
+    let run = 0;
+    for (let i = 1; i < s.n; i++) {
+      if (s.t[i] - s.t[i - 1] > s.gapMs) run++;
+      c[i] = run;
+    }
+    s._gapCum = c;
+    return c;
+  }
+
+  // `track` and `s` are the gap rule, and both are optional: without them this
+  // joins every point to the next, which is what an ARRO import wants and
+  // exactly what it did before the Field tab existed (s.gapMs is 0 there, so
+  // passing the series changes nothing).
+  //
+  // With them, the pen lifts wherever the *record* went quiet for longer than
+  // the series' own reporting interval. Missing data is the normal condition of
+  // a radio telemetry network, and a line ruled across six hours of nothing is
+  // the chart inventing readings — the one thing this tab exists to catch other
+  // systems doing.
+  //
+  // The question is asked of the record rather than of the track being drawn,
+  // and that distinction is the whole subtlety. The filtered track has a hole
+  // wherever the 357 test removed a reading, and a hole there means "we do not
+  // believe these readings", not "nothing arrived" — conflating the two would be
+  // this tab telling exactly the kind of lie it exists to find. So a break is
+  // drawn only when the underlying series really was silent in between, which is
+  // what gapCum() answers.
+  function pathFrom(pts, y, step, track, s) {
     if (!pts.length) return '';
+    const cum = (s && s.gapMs && track && track.ref) ? gapCum(s) : null;
     let d = '';
     for (let i = 0; i < pts.length; i++) {
       const px = pts[i][0].toFixed(1), py = y(pts[i][1]).toFixed(1);
-      if (i === 0) d += `M${px} ${py}`;
+      let broke = false;
+      if (i > 0 && cum) {
+        // densify() emits up to four points per pixel column and not in track
+        // order within one, so only a step that actually advances is asked.
+        const a = track.ref[pts[i - 1][2]], b = track.ref[pts[i][2]];
+        broke = b > a && cum[b] > cum[a];
+      }
+      if (i === 0 || broke) d += `M${px} ${py}`;
       else if (step) d += `H${px}V${py}`;
       else d += `L${px} ${py}`;
     }
@@ -10478,6 +10588,50 @@ const ArroData = (function () {
     }
   }
 
+  // The other half of the boundary. Series data plus who it is, into the active
+  // instance's list — every default the chart, the filter and the export happen
+  // to read lives here, so adding a source is a query and a label rather than a
+  // checklist of fields to remember.
+  function adoptSeries(data, ident) {
+    const s = {
+      key:      `ad${++ad.seq}`,
+      // Stamped from the instance, not passed in: a series cannot claim to be
+      // from a source other than the tab that loaded it.
+      source:   ad.source,
+      fileName: ident.fileName || '',
+      meta:     ident.meta || {},
+      label:    ident.label || 'Series',
+      station:  ident.station || null,
+      sensor:   ident.sensor || null,
+      linkHow:  ident.linkHow || '',
+      sensorId: ident.sensorId || null,
+      kind:     ident.kind || 'RA',
+      unit:     data.unit,
+      color:    AD_COLORS[ad.series.length % AD_COLORS.length],
+      visible:  true,
+      // The longest silence the chart will draw a line across. Zero is off,
+      // which is what every ARRO import gets: a CSV arrives whole, so a hole in
+      // one is the record's own business rather than an artefact of a window
+      // somebody asked for. Field data is the other case entirely — see #114.
+      gapMs:    ident.gapMs || 0,
+      // Where these numbers came from, in the words the chart header and the
+      // export both print. Null on ARRO, where the tab is the answer.
+      prov:     ident.prov || null,
+      // Display-only conversion carried alongside the counts the filter runs on
+      // (engineering value, its unit, and the rule that produced it).
+      eng:      ident.eng || null,
+      engUnit:  ident.engUnit || '',
+      n: data.n, t: data.t, tr: data.tr, v: data.v, raw: data.raw, hasRaw: data.hasRaw,
+      q: data.q, qcodes: data.qcodes,
+      extra:    data.extra || {},
+      warn:     data.warn, wasDescending: data.desc,
+      bytesPerRow: ident.bytesPerRow || 0,
+      filt: null, tracks: null,
+    };
+    ad.series.push(s);
+    return s;
+  }
+
   function addSeries(fileName, text, problems) {
     const parsed = parseCsv(text);
     if (parsed.error) { problems.push(`${fileName}: ${parsed.error}`); return; }
@@ -10487,19 +10641,11 @@ const ArroData = (function () {
     const label = [link.station?.name || meta.siteName || fileName,
                    sensor?.type || meta.sensorLabel].filter(Boolean).join(' · ');
 
-    ad.series.push({
-      key:      `ad${++ad.seq}`,
+    adoptSeries(parsed, {
       fileName, meta, label,
       station:  link.station, sensor, linkHow: link.how,
       sensorId: meta.sensorId || sensor?.sensor_id || null,
       kind:     guessKind(meta, sensor),
-      unit:     parsed.unit,
-      color:    AD_COLORS[(ad.series.length) % AD_COLORS.length],
-      visible:  true,
-      n: parsed.n, t: parsed.t, tr: parsed.tr, v: parsed.v, raw: parsed.raw, hasRaw: parsed.hasRaw,
-      q: parsed.q, qcodes: parsed.qcodes,
-      warn:     parsed.warn, wasDescending: parsed.desc,
-      filt: null, tracks: null,
     });
   }
 
@@ -10514,7 +10660,10 @@ const ArroData = (function () {
 
   // ── render ─────────────────────────────────────────────────────────────────
 
-  function render() {
+  // `source` picks the instance. Called with no argument it means the ARRO tab,
+  // which is how renderMain() has always called it.
+  function render(source) {
+    activate(source || 'arro');
     return `
       <div class="ad-wrap">
         <div class="ad-layout">
@@ -11310,7 +11459,7 @@ const ArroData = (function () {
             `<circle cx="${p[0].toFixed(1)}" cy="${g.y(p[1]).toFixed(1)}" r="${ghost ? 1.1 : 1.8}"
                      fill="${escAttr(s.color)}" opacity="${ghost ? .3 : .9}"/>`).join('');
         } else {
-          series += `<path d="${pathFrom(pts, g.y, stepped)}" fill="none" stroke="${escAttr(s.color)}"
+          series += `<path d="${pathFrom(pts, g.y, stepped, track, s)}" fill="none" stroke="${escAttr(s.color)}"
                         stroke-width="${ghost ? 1 : 1.7}" opacity="${ghost ? .34 : 1}"
                         stroke-linejoin="round" stroke-linecap="round"/>`;
         }
@@ -11434,7 +11583,7 @@ const ArroData = (function () {
       const track = tracks(s)[ad.mode === 'raw' ? 'raw' : 'filt'];
       const pts = densify(track, 0, track.n, x, pw);
       if (pts.length) {
-        out += `<path d="${pathFrom(pts, y, false)}" fill="none" stroke="${escAttr(s.color)}"
+        out += `<path d="${pathFrom(pts, y, false, track, s)}" fill="none" stroke="${escAttr(s.color)}"
                       stroke-width="1" opacity=".85"/>`;
       }
     }
@@ -11552,7 +11701,7 @@ const ArroData = (function () {
       const i1 = Math.min(track.n, lower(track.t, track.n, v.t1) + 1);
       const pts = densify(track, i0, i1, x, pw);
       if (pts.length) {
-        body += `<path d="${pathFrom(pts, y, ad.chartType === 'step')}" fill="none"
+        body += `<path d="${pathFrom(pts, y, ad.chartType === 'step', track, s)}" fill="none"
                        stroke="${escAttr(s.color)}" stroke-width="1.4"
                        stroke-linejoin="round" stroke-linecap="round"/>`;
       }
@@ -11822,6 +11971,18 @@ const ArroData = (function () {
     ad.series = []; ad.pin = null; ad.hover = null; ad.view = null;
     renderAll();
   }
+
+  // The memory meter's release. It counted both instances, so it drops both —
+  // clearAll() is the per-tab button and deliberately never reaches across.
+  function dropAll() {
+    const total = Object.values(instances).reduce((a, i) => a + i.series.length, 0);
+    if (!total) return;
+    if (total > 1 && !confirm(`Remove all ${total} loaded series, on both data tabs?`)) return;
+    for (const i of Object.values(instances)) {
+      i.series = []; i.pin = null; i.hover = null; i.view = null;
+    }
+    renderAll();
+  }
   function showStation(id) {
     state.selectedId = id;
     state.activeTab = 'stations';
@@ -11949,12 +12110,21 @@ const ArroData = (function () {
   function repaint() { draw(); drawOv(); drawCompare(true); }
 
   return {
-    ad, render, init, stop, repaint, importFiles, pick,
+    // The instance on screen. A getter rather than a property because `ad` is a
+    // binding that moves with the active tab, and a captured reference would go
+    // stale the first time the operator opened another one.
+    get ad() { return ad; },
+    // Every instance's series at once, for the memory meter — which is asking
+    // about the page's footprint, not about any one tab.
+    allSeries: () => Object.values(instances).flatMap(i => i.series),
+    render, init, stop, repaint, importFiles, pick,
     toggle, setColor, setKind, solo, zoomTo, remove, clearAll, showStation,
     setCfg, resetCfg, setMode, setTransform, setChart, setY, setYRange, setFlag,
-    preset, unpin, exportCsv, exportImg, explain, compareToggle,
+    preset, unpin, exportCsv, exportImg, explain, compareToggle, dropAll,
     // exposed for reasoning about the filter outside the UI
     parseCsv, parseName, linkStation, guessKind, runFilter, walk357,
+    // the series boundary every source crosses
+    seriesData, adoptSeries,
   };
 })();
 if (typeof window !== 'undefined') window.ArroData = ArroData;
@@ -12510,6 +12680,37 @@ async function dbRpc(fn, args) {
     throw err;
   }
   return body;
+}
+
+// GET a table or view through PostgREST. `path` is everything after the base —
+// `reading?addr=in.("a:6128")&order=reading_ts.asc` — and the key, the schema
+// and the token (when there is one) are added here so that no caller assembles
+// them again. Reads only: writes go through dbRpc() and a `security definer`
+// function, which is what the RLS in db/migrations assumes.
+//
+// Anonymous is the normal case. Readings, the rollups and the vocabularies are
+// granted to `anon` in 0006 — a river height is not a secret — so this works
+// signed out, and signing in adds nothing to a read.
+async function dbSelect(path) {
+  const res = await fetch(`${DB_URL}/${path}`, {
+    headers: {
+      apikey: DB_ANON_KEY,
+      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
+      'Accept-Profile': DB_SCHEMA,
+      Accept: 'application/json',
+    },
+    cache: 'no-store',
+  });
+  const text = await res.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch (_) { /* not JSON */ }
+  if (!res.ok) {
+    const message = (body && (body.message || body.error_description)) || `HTTP ${res.status}`;
+    const err = new Error(body && body.hint ? `${message} — ${body.hint}` : message);
+    err.status = res.status;
+    throw err;
+  }
+  return Array.isArray(body) ? body : [];
 }
 
 // The version stamp the editor is holding. Two columns rather than one because
