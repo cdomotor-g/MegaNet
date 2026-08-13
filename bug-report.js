@@ -1,3 +1,23 @@
+// MegaNet — bug-report.js
+//
+//   BugReport   gathers context and opens GitHub's own prefilled "New issue"
+//               page, with a copy-the-report fallback for anyone without an
+//               account.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js and nowhere else: state, esc, TAB_LIST, APP_VERSION,
+// GITHUB_REPO, and the _errorLog ring buffer the global error handlers fill.
+// That is deliberate rather than incidental. This is the thing people reach for
+// when the app is already misbehaving, so it does not get to depend on anything
+// newer than itself — which is also why it keeps its own copy of the modal
+// markup instead of calling Modal.
+//
+// index.html's header calls BugReport.open() straight from the 🐞 button, so
+// this file has to be loaded for that button to do anything; the handler runs on
+// click, long after every script has been evaluated.
+//
+// Moved out of app.js byte-for-byte by M2 (#133) of #129.
+
 // ── Bug / issue reporting ────────────────────────────────────────────────────
 // MegaNet is a static GitHub Pages app: there's no server to POST an issue to
 // and nowhere safe to keep an API token. So the report button gathers context

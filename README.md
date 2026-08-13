@@ -28,11 +28,17 @@ so the root stays clean.
 
 The application logic was one 22,500-line `app.js` until
 [#132](https://github.com/cdomotor-g/MegaNet/issues/132) split the foundation and
-the entry point out of it. They are still plain classic scripts sharing one
+the entry point out of it and
+[#133](https://github.com/cdomotor-g/MegaNet/issues/133) took ten self-contained
+modules out into a file each. They are still plain classic scripts sharing one
 global scope — no modules, no bundler, no build step — so the split is a
 question of which file a function sits in and nothing else. **The order they
 load in is the contract**, stated at the top of `index.html`; later work adds
 files to that list rather than reordering it.
+
+Only `init.js` runs at load. Everything above it declares, which is what makes a
+module movable to its own file without its position mattering — and what every
+split so far has been able to prove byte-for-byte rather than assert.
 
 The station list now lives in Postgres as well, and that is where the app reads
 it from by default — `stations.json` is the export, the offline fallback, and
@@ -44,7 +50,20 @@ document*, so nothing below changes: see
 MegaNet/
 ├── index.html              ← single entry point; its script order is the contract
 ├── core.js                 ← constants, TABS/HELP, state, shared utilities
-├── app.js                  ← the memory meter, sign-in, and every tab
+├── app.js                  ← the memory meter, sign-in, and the tabs not yet split out
+│                             ↓ the ten modules #133 lifted out of it, one each,
+│                               loaded between app.js and init.js
+├── map-rivers.js           ← MapRivers — OSM watercourses under the station pins
+├── map-spider.js           ← MapSpider — fans overlapping pins out on leader lines
+├── map-locate.js           ← MapLocate — GPS dot, accuracy ring, compass cone
+├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
+├── modal.js                ← Modal     — the shared dialog shell
+├── packets.js              ← Packets   — ALERT / ERTS codec, and its tab
+├── alert2.js               ← Alert2    — ALERT2 / ERT-A2 tab
+├── network-maps.js         ← Maps      — Network Maps tab (named for the tab, not
+│                             the module, so it isn't confused with maps-data.js)
+├── serial.js               ← Serial    — Serial Monitor tab (Web Serial)
+├── bug-report.js           ← BugReport — prefilled GitHub issue reporter
 ├── init.js                 ← the only code that runs at load; must stay last
 ├── maps-data.js            ← Network Maps catalogue, QLD basin SVG + georeference
 ├── styles.css              ← theme and layout
@@ -1909,9 +1928,10 @@ quietly stop being tested.
 There is a fourth, `npm run concat`, which is not in CI: it concatenates the
 scripts `index.html` loads and compares the bytes against a recorded snapshot.
 That is the check that proves an `app.js` split moved code without changing it,
-and the only one that catches the four literal NUL bytes `app.js` carries inside
-string literals — a tool that rewrites the file as text normalises those away and
-silently breaks the compound keys built from them.
+and the only one that catches the four literal NUL bytes the app carries inside
+string literals — three in `app.js`, one in `alert2.js` since #133 — because a
+tool that rewrites a file as text normalises those away and silently breaks the
+compound keys built from them.
 
 `test/README.md` documents the decisions behind all of this: why HTTP rather than
 `file://`, why Leaflet is vendored and everything else blocked, and what to do

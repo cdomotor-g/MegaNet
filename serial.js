@@ -1,3 +1,24 @@
+// MegaNet — serial.js
+//
+//   Serial   the Serial Monitor tab: physical serial ports opened through the
+//            Web Serial API and streamed live, as text, as a hex dump, or
+//            decoded as ALERT payloads through the shared Packets codec.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc, slug and dlText, across to app.js for
+// switchTab, and sideways to Packets — all from inside exported functions, none
+// at load, so packets.js may load after this file.
+//
+// Live port objects hold non-serialisable streams, so connections live in this
+// module's own `conns` array rather than in global state. That is what lets them
+// survive a tab switch, and it is why none of this is in core.js.
+//
+// The last line exposes it on window. The comment above that line explains why
+// it is not what makes the inline handlers work, and why the earlier fix that
+// blamed the built-in Web Serial global was wrong.
+//
+// Moved out of app.js byte-for-byte by M2 (#133) of #129.
+
 // ── SERIAL MONITOR tab ──────────────────────────────────────────────────────────
 //
 // Connect physical serial devices to the browser's COM ports (Web Serial API) and

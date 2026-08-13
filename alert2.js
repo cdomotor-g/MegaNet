@@ -1,3 +1,27 @@
+// MegaNet — alert2.js
+//
+//   Alert2   the ALERT2 / ERT-A2 tab: decodes ELPRO ERT-A2 output, ASCII or
+//            binary, pasted in or read off a PuTTY session log.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// The most connected of the ten modules M2 moved. It reaches back to core.js for
+// state, esc, escAttr, csvEscape, dlText, stationSensors and bucketSizeMm;
+// across to app.js for renderMain, addBaseLayers, MAP_HOME and stationAlertIds,
+// plus switchTab and goToStation from inline handlers; and sideways to Packets
+// for the shared codec. All of it from inside functions this module exports —
+// the IIFE body declares 28 tables, regexes and constants and calls nothing — so
+// packets.js is free to load after this file. #133 flagged the
+// Alert2/Serial/Packets ordering as something to check; checked, it does not
+// bind, and it does not bind because init.js is still the only file that
+// executes at load.
+//
+// ⚠ This file carries one of the app's 4 literal NUL bytes — U+0000 inside a
+// string literal at line 857, used as a compound-key separator (#129).
+// Any tool that round-trips this file as text and normalises control characters
+// destroys that key silently. `npm run concat` in test/ is what catches it.
+//
+// Moved out of app.js byte-for-byte by M2 (#133) of #129.
+
 // ── ALERT2 / ERT-A2 tab ─────────────────────────────────────────────────────────
 //
 // Decoder for the "ALERT2 ASCII Protocol" an ELPRO ERT-A2 writes to its RS232

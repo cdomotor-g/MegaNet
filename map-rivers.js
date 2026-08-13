@@ -1,3 +1,18 @@
+// MegaNet — map-rivers.js
+//
+//   MapRivers   OpenStreetMap watercourses drawn under the station pins, lit up
+//               by whatever is typed into the Stations filter box.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for `state`, and across to app.js for
+// rerenderMapLegend and prepareSearch. Every one of those is called from inside
+// a MapRivers function; the IIFE body only sets tunables and an empty cache, so
+// nothing here resolves at load and this file's position among the modules is
+// free.
+//
+// Moved out of app.js byte-for-byte by M2 (#133) of #129. What it does, and why
+// Overpass rather than the bundled basin SVG, is in the banner below.
+
 // ── River highlighting ───────────────────────────────────────────────────────
 // Half this network is named after the river it sits on, so typing "burdekin"
 // into the filter box lights up the Burdekin as well as the stations on it.

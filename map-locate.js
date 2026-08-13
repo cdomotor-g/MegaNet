@@ -1,3 +1,15 @@
+// MegaNet — map-locate.js
+//
+//   MapLocate   the "where am I" control: a GPS dot, an accuracy ring, and a
+//               compass cone where the device offers one. Touch devices only.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches across to app.js for mapNote, from inside its own functions. The IIFE
+// body declares nothing but nulls, so this file's position among the modules is
+// free.
+//
+// Moved out of app.js byte-for-byte by M2 (#133) of #129.
+
 // ── Where am I? (mobile) ─────────────────────────────────────────────────────
 // Off by default and only offered on touch devices: a button below the zoom
 // control puts a dot at the phone's GPS position with an accuracy ring, plus a

@@ -1,3 +1,22 @@
+// MegaNet — modal.js
+//
+//   Modal   the one dialog shell everything else borrows: a title, arbitrary
+//           HTML, Esc or × to close, Tab kept inside it, and focus handed back
+//           to whatever opened it.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for esc and nowhere else. Nothing runs at load, so
+// this file's position among the modules is free — including relative to the
+// modules that open dialogs through it, since none of them do so before a click.
+//
+// The last line exposes it on window for parity with the other tab modules. It
+// is not what makes the inline on*= handlers resolve: a top-level const lives in
+// the global lexical environment, which name resolution consults before the
+// global object.
+//
+// Moved out of app.js byte-for-byte by M2 (#133) of #129. The bug reporter keeps
+// its own copy of this markup on purpose — bug-report.js says why.
+
 // ── Modal shell ────────────────────────────────────────────────────────────────
 // One dialog, borrowed by whoever needs one: a title, arbitrary HTML, Esc or ×
 // to close, Tab kept inside it, and focus handed back to whatever opened it.

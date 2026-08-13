@@ -1,3 +1,18 @@
+// MegaNet — packets.js
+//
+//   Packets   the ALERT / ERTS decoder and encoder behind the ALERT Packets
+//             tab, and the shared codec serial.js and alert2.js both call into.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state and esc, and across to app.js for
+// stationAlertIds and — from an inline onclick, so at click time — switchTab.
+// The IIFE body builds its format tables and calls nothing, so this file's
+// position among the modules is free: serial.js and alert2.js hold references to
+// Packets, but neither dereferences one until a tab renders, so either may load
+// before this file.
+//
+// Moved out of app.js byte-for-byte by M2 (#133) of #129.
+
 // ── ALERT Packets tab ────────────────────────────────────────────────────────────
 // Decoder / encoder for ALERT / ERTS radio telemetry messages, per the Bureau of
 // Meteorology "ERTS Data Formats" specification (July 2003). Ported from the

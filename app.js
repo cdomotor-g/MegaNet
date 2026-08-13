@@ -1,13 +1,16 @@
 // MegaNet — app.js
 //
-// The middle of the app.js lineage (#129): the memory meter, sign-in, and every
-// tab. Loads after core.js and before init.js — see the header of index.html,
-// where the order is the contract.
+// The middle of the app.js lineage (#129): the memory meter, sign-in, and the
+// tabs that have not been lifted out yet. Loads after core.js and before the
+// module files and init.js — see the header of index.html, where the order is
+// the contract.
 //
 // This file is what is left after M1 (#132) lifted out the shared foundation
-// and the entry point. It is still 21,500 lines and it is still the merge
-// surface every front-end issue collides on; M2–M4 (#133–#135) take the tab
-// modules out of it, one file each, between core.js and init.js.
+// and the entry point, and M2 (#133) lifted out ten closed modules — MapRivers,
+// MapSpider, MapLocate, Terrain, Modal, Packets, Alert2, Maps, Serial and
+// BugReport, one file each. It is down from 22,458 lines before M1 to 21,536
+// after it and 16,160 now, and it is still the merge surface most front-end
+// issues collide on; M3 and M4 (#134/#135) take the rest.
 //
 // Two things to know before editing it:
 //
@@ -18,10 +21,12 @@
 //   its position in the load order mattering. That property is the whole point
 //   of M1; do not spend it by adding top-level code that runs on sight.
 //
-//   It carries 4 literal NUL bytes (U+0000, inside string literals, used as
-//   compound-key separators — see #129), which is why grep calls it binary. Any
-//   tool that round-trips it as text and normalises control characters destroys
-//   those keys silently. `npm run concat` in test/ is what catches that.
+//   It carries 3 of the app's 4 literal NUL bytes (U+0000, inside string
+//   literals, used as compound-key separators — see #129) at lines 6154 and
+//   6218×2, which is why grep calls it binary. The fourth left with Alert2 and
+//   is now alert2.js:857. Any tool that round-trips one of these files as text
+//   and normalises control characters destroys those keys silently.
+//   `npm run concat` in test/ is what catches that.
 
 // ── Memory meter ─────────────────────────────────────────────────────────────
 // A thin bar under the header, and a panel behind it, answering "how much is

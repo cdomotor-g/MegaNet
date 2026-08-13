@@ -1,3 +1,25 @@
+// MegaNet — network-maps.js
+//
+//   Maps   the Network Maps tab: a clickable Queensland drainage-basin map,
+//          region / subregion / file navigation, an embedded PDF viewer, and
+//          station-aware search over the catalogue.
+//
+// Named for the tab rather than for the module it exposes: a maps.js sitting
+// beside maps-data.js and the maps/ directory would be three different things
+// wearing one name.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// This is the one module of the ten with a real load-order dependency of its
+// own: it reads its entire catalogue off window.MegaNetMaps at load, which
+// maps-data.js sets. maps-data.js is above core.js in index.html, so that holds
+// — but it is a constraint rather than a coincidence, and moving either file
+// breaks it.
+//
+// Otherwise it reaches back to core.js for state, esc and escAttr. It has its
+// own local slug(); core.js's is shadowed here, not used.
+//
+// Moved out of app.js byte-for-byte by M2 (#133) of #129.
+
 // ── NETWORK MAPS tab (Network Maps Navigator) ───────────────────────────────────
 //
 // Ports the legacy "ALERT Map Launcher v2.html" into MegaNet: a Queensland

@@ -7,14 +7,54 @@
     },
     {
       "file": "app.js",
-      "bytes": 1031737
+      "bytes": 754704
+    },
+    {
+      "file": "map-rivers.js",
+      "bytes": 12665
+    },
+    {
+      "file": "map-spider.js",
+      "bytes": 8381
+    },
+    {
+      "file": "map-locate.js",
+      "bytes": 6237
+    },
+    {
+      "file": "terrain.js",
+      "bytes": 13239
+    },
+    {
+      "file": "modal.js",
+      "bytes": 3947
+    },
+    {
+      "file": "packets.js",
+      "bytes": 38549
+    },
+    {
+      "file": "alert2.js",
+      "bytes": 125735
+    },
+    {
+      "file": "network-maps.js",
+      "bytes": 24925
+    },
+    {
+      "file": "serial.js",
+      "bytes": 42254
+    },
+    {
+      "file": "bug-report.js",
+      "bytes": 10225
     },
     {
       "file": "init.js",
       "bytes": 3700
     }
   ],
-  "bytes": 1086781,
-  "sha256": "ec6df55541883667d211867487de993dae982f72dcc2c25b312c01ae819a7a65",
+  "bytes": 1095905,
+  "sha256": "792fb0880ec2c51667fec405b34f12a2d2d74eaacc3b6a3b1ca3dd8d7b0dde49",
   "nulBytes": 4
 }

@@ -1,3 +1,15 @@
+// MegaNet — map-spider.js
+//
+//   MapSpider   fans a stack of overlapping map pins out on leader lines, so
+//               the ones underneath can be seen and clicked.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches across to app.js for mapNote, from inside its own functions. The IIFE
+// body declares five tunables and four nulls and calls nothing, so this file's
+// position among the modules is free.
+//
+// Moved out of app.js byte-for-byte by M2 (#133) of #129.
+
 // ── Overlapping pins: fan-out ("spiderfy") ───────────────────────────────────
 // Co-sited stations and ACMA sites carrying a dozen licensed devices land on the
 // same few pixels, and whatever is underneath is unreachable. Hovering a stack

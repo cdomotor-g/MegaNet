@@ -4,11 +4,16 @@
 // only claim that matters is "the split lost nothing". Concatenating the pieces
 // in index.html order and comparing the bytes against the file before the cut is
 // what proves it — and it is the only check that reliably catches the 4 NUL-byte
-// hazard (#129: app.js lines 7047, 7111×2, 18583). A tool that round-trips app.js as
-// text and normalises control characters corrupts those three lines invisibly;
-// a byte comparison does not care what the bytes mean.
+// hazard (#129). A tool that round-trips one of these files as text and
+// normalises control characters corrupts those lines invisibly; a byte
+// comparison does not care what the bytes mean.
 //
 // Everything here compares Buffers. Nothing decodes.
+//
+// M2 (#133) moved the fourth of those out with Alert2, so the hazard is now
+// spread across two files — app.js:6154 and 6218×2, alert2.js:857 — which is an
+// argument for this check rather than against it: the count below is over the
+// whole concatenation, so it does not care which file they end up in.
 //
 // This is a milestone tool, not a CI gate, and deliberately so: the baseline is
 // a snapshot of app.js at a moment in time, so any honest change to the app

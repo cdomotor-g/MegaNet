@@ -1,3 +1,20 @@
+// MegaNet — terrain.js
+//
+//   Terrain   ground height along a line, decoded in the browser from
+//             terrarium-encoded PNG tiles. What the elevation profile and the
+//             link budget are both built on.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for bearingDeg, destPoint and acmaHaversineKm, and
+// nowhere else in the app. Those three are among the six helpers #129 found
+// misfiled and M1 moved into core.js for exactly this case: each was defined
+// inside one feature and read by five to seven others, so leaving them where
+// they were would have made this file depend on another tab module. The IIFE
+// body sets tunables and three empty caches, so its position among the modules
+// is free.
+//
+// Moved out of app.js byte-for-byte by M2 (#133) of #129.
+
 // ── Terrain elevation ────────────────────────────────────────────────────────
 // Ground height along a line — what both the elevation profile and the link
 // budget are built on. MegaNet is a static page: there is no backend to ask and
