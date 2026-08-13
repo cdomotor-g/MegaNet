@@ -287,6 +287,10 @@ const HELP = {
       'The <strong>6% rule</strong> printed on four of the sheets is computed here rather than left '
       + 'to whoever reads the numbers later, and the threshold is stored per visit — changing it '
       + 'never rewrites what a past visit was judged against.',
+      '<strong>Photos</strong> attach to a visit once it has been saved. The tick beside "Photos" in '
+      + 'the admin block records the <em>claim</em> that photos were taken; the panel under it holds '
+      + 'the photos themselves. They go into a private bucket and are shown through a link that '
+      + 'expires, so a site photograph never becomes a public URL.',
     ],
     related: ['stations', 'maintenance', 'export'],
   },
@@ -309,9 +313,10 @@ const HELP = {
       'The <strong>Comms and Power panel prints a Condition and an Owner under each of its three '
       + 'sub-columns</strong> and the schema carries one pair for the panel. The form says so on '
       + 'the panel rather than losing it quietly — issue #148.',
-      'Nothing can be <strong>attached</strong> yet — not the canister-configuration screenshot, '
-      + 'not the benchmark photo. The table to index them exists; the upload path does not '
-      + '(issue #149). Paste what a dump says into Remarks rather than losing it.',
+      'The <strong>canister-configuration screenshot and the benchmark photo can be attached</strong> '
+      + 'once the form has been saved — the file hangs off the record by foreign key, so there has '
+      + 'to be a saved row for it to belong to. Files go into a <strong>private</strong> bucket and '
+      + 'are only ever shown through a link that expires; nothing attached here is on the open web.',
     ],
     related: ['inspections', 'stations'],
   },
@@ -474,7 +479,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 9;
+const DB_SCHEMA_VERSION = 10;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 function dbHostLabel() {
@@ -862,6 +867,23 @@ const state = {
     outstanding: null,   // meganet.inspection_needs_maintenance, editors only
     outstandingBusy: false,
     outstandingError: null,
+  },
+  // Attachments (#149 — shared by the two form tabs above; see attachments.js
+  // for why one file rather than a panel copied into each). One record's worth
+  // at a time: both tabs can hold a document at once, and the slot re-fetches
+  // when the other one asks, which is also the honest behaviour because someone
+  // else may have added a photo since.
+  attach: {
+    types: null,         // meganet.attachment_type — what may be uploaded, and how large
+    typesLoading: false,
+    typesError: null,
+    ownerKey: null,      // 'inspection:<id>' or 'maintenance:<id>' the list belongs to
+    list: null,          // that record's meganet.attachment rows, or null while loading
+    listLoading: false,
+    error: null,
+    busy: false,         // an upload is in flight; the file pickers disable
+    msg: null,           // { role, kind, text } — rendered on the panel that asked
+    urls: {},            // storage_path → signed URL, for this session only
   },
   theme: localStorage.getItem('mn-theme') || 'light',
 };

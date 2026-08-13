@@ -302,6 +302,47 @@ saved inspection that departed poor lands on this tab with the link made.
 the text Excel would show, no styles, no formulas, no dates. It fails loudly on
 anything else, which is the right failure for a fixture reader.
 
+### `lib/storage.mjs` — the upload path, faked, and what it refuses to fake
+
+Both form checks grew an attachments section at #149, and neither owns the
+fixture for it, for the same reason `lib/migration.mjs` is shared: two copies of
+an upload fake would be two things to keep in step, and the half that drifts is
+always the compensating delete.
+
+What it does is serve `…/storage/v1/**` — the upload, the signed URL, the GET of
+that URL (a one-pixel GIF, so a thumbnail does not 404 into the console the check
+reads) and the delete — plus the three RPCs `0010` adds, and **record** all of it.
+
+What it deliberately does not do is re-implement `meganet.attach_file()`. Every
+rule that function enforces — the path prefix, the uuid leaf, the extension
+against the content type, the size against the type's own limit, the role, that
+the owner exists and is not soft-deleted — is proven against a real Postgres by
+`tools/check_attachments.sql`, 47 checks of it. A JavaScript copy of those rules
+here would be exactly the "fixture that tests the copy" that `lib/migration.mjs`
+exists to avoid: it would pass while the database refused, or refuse while the
+database accepted, and either way the check would be about the fixture.
+
+So the browser's half is what is asserted, and it is the half only a browser can
+answer: that an unsaved record offers no uploader at all (the attachment is a
+foreign key and needs a row to point at), that a type or a size the vocabulary
+refuses is refused **before** anything is uploaded rather than after, that the
+bytes go up before the index row and a refused index row takes the bytes down
+again, that the object is named with a generated uuid under the record's own
+prefix rather than with the camera's filename — a private bucket read through
+signed URLs is only as private as its paths are unguessable — that the file's own
+name survives as the title, that each panel lists only its own role, and that
+removing takes the index row first and the object second.
+
+The type vocabulary comes out of `0010` the same way everything else comes out of
+`0009`: parsed, not copied. That needed one extension to the reader — `array['jpg',
+'jpeg']` is the one value shape `0009` never used, and without bracket-depth
+tracking the extensions column parses as two half-columns and every column after
+it shifts by one.
+
+Confirmed red on three deliberate breaks before being trusted — naming the object
+after the file, offering the uploader on an unsaved record, and skipping the size
+check.
+
 ## Using `concat-verify.mjs` across a split
 
 The only claim that matters when a milestone cuts `app.js` is *the split lost
@@ -377,6 +418,11 @@ without looking, and a verifier nobody looks at verifies nothing.
   paper* does: add its cell to the map at the top of `maintenance.mjs`, or the
   diff assertion will report it as unaccounted for, which is the intended
   behaviour and not a nuisance.
+- **A section grew an attachment panel.** `Attachments.sectionHtml()` is the
+  whole of it, and `lib/storage.mjs` already serves the routes — but the panel
+  list assertion in `maintenance.mjs` is exact, so a third panel on that tab is
+  an edit there. That is intended: an attachment panel appearing somewhere
+  nobody expected it is worth failing over.
 - **A member was added to `RfChanges` or `Workbench` that an `on*=` attribute
   names.** Add it to `CONTROL_SCRIPT` in `lib/controls.mjs`. Nothing forces you
   to; the coverage line at the end of the run (`controls: workbench — 18/18

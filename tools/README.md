@@ -12,6 +12,15 @@ transaction that rolls back. Ten of them compare a lookup table against the
 `Dropdown` sheet of `archive/Inspection sheets for printing.xlsx` verbatim, so a
 re-invented option list fails rather than merely looking odd.
 
+`check_attachments.sql` covers the door #149 added on top of that schema: 47
+checks over `meganet.attach_file()`, `update_attachment()` and `detach_file()`,
+most of them about a *refusal*, since the path convention those functions enforce
+is what keeps a private bucket's objects unguessable. `storage_bucket.sql` is the
+odd one out in this directory — it **writes**, and does not roll back. It creates
+the `inspections` bucket and its four policies, and exists because the previous
+plan for that (a twelve-step click-path in an issue) was followed halfway and
+nobody noticed.
+
 `check_mqtt.sql` is the companion to `check_ingest.sql` for the MQTT bridge
 (#B6): 39 checks over `meganet.station_status`, `meganet.bridge_health` and the
 token-checked endpoints the bridge calls, in a transaction that rolls back. The
@@ -184,6 +193,70 @@ table is.
 
 Run it after applying `db/migrations/0009_inspections.sql`, and again after
 touching anything in it.
+
+## `check_attachments.sql` — prove the attachment door
+
+Also a psql script, same shape and same guarantees.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_attachments.sql
+```
+
+47 checks over `db/migrations/0010_attachments.sql`. The largest group is about
+refusal, and that is the point: `meganet.attach_file()` is the only way a browser
+can write `meganet.attachment`, and most of what it does is say no. It refuses an
+object filed under another record's prefix, a camera's own filename as the object
+name, an extension the content type does not arrive under, a type that is not in
+`meganet.attachment_type`, a file over that type's limit, a role that is not real,
+both owners at once, neither owner, a bucket that is not `inspections`, a record
+that does not exist and a record that has been soft-deleted.
+
+Two of the checks are worth singling out. One asserts that `authenticated` still
+holds `select` on `meganet.attachment` and **none** of the write verbs — the
+whole reason 0010 is three functions rather than one `grant`, and a property that
+would otherwise decay silently. The other asserts that a caption can be *cleared*
+as well as changed, which is why `update_attachment()` takes a patch: a null
+argument cannot express the difference between "set this to nothing" and "leave
+this alone".
+
+What it deliberately does not check is whether the bucket exists — a database
+connection cannot see Storage's own state. That is `storage_bucket.sql`'s verdict
+block, below, and it is exactly the half that went missing last time.
+
+Run it after applying `db/migrations/0010_attachments.sql`, and again after
+touching anything in it.
+
+## `storage_bucket.sql` — create the `inspections` bucket and its policies
+
+The one script here that writes, and the one that does not roll back. Idempotent
+and safe to re-run: the bucket is an upsert and each policy is dropped before it
+is created.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/storage_bucket.sql
+```
+
+It creates a **private** bucket called `inspections` and four policies on
+`storage.objects` granting read, insert, update and delete to exactly the people
+`meganet.is_editor()` already allows — the same list as the station editor and the
+same list as every inspection table, so there is one list to take somebody off
+rather than three. It finishes by asserting all three things it could have got
+wrong: the bucket exists, `public` is false, and there are four policies. It
+raises rather than printing a row, so a scripted run fails loudly.
+
+**Why it is here and not in `db/migrations/`.** `storage.buckets` and
+`storage.objects` are Supabase's, not ours, and `db/README.md` records exactly one
+deliberate exception to "everything MegaNet owns lives in `meganet`". This is not
+a second one.
+
+**Why it is a file and not a dashboard click-path.** Because the click-path was
+tried. #145 asked for the bucket and the policies in twelve steps; its other half
+(applying `0009`) was done, this half was not, the issue was closed as if both
+had been, and #149 found the bucket missing underneath a feature that indexes
+objects into it. A file can be re-run when you are unsure, diffed when it
+changes, and checked at the foot.
+
+Run it once per project, after `db/migrations/0010_attachments.sql`.
 
 ## `meganet_agent.py` — ask questions about the network with the Claude API
 

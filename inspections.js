@@ -9,7 +9,8 @@
 // Reaches back to core.js for state, esc, escAttr, DB_URL and DB_SCHEMA (via
 // datastore.js only), registerTabTeardown; across to app.js for switchTab and
 // goToStation from inline handlers, so at click time; to auth.js for Auth; to
-// datastore.js for dbSelect, dbRpc and dbCanWrite; and to maintenance.js for
+// datastore.js for dbSelect, dbRpc and dbCanWrite; to attachments.js for the
+// photo panel in the admin section; and to maintenance.js for
 // Maintenance.startFrom(), from the prompt at the foot of a visit that departed
 // poor — the printed cross-reference, followed. Nothing reaches into this file:
 // the tab is rendered from renderMain()'s one case and nothing else calls in.
@@ -1194,6 +1195,11 @@ const Inspections = (function () {
     const doc = S().doc;
     const cfg = doc.config_key;
     const rows = sectionsFor(cfg);
+    // The photo panel in the admin section is built as a string inside this one
+    // render, so attachments.js has to know which record is on screen before it
+    // runs. Idempotent — it loads the type vocabulary once for the session and
+    // this record's index rows once, then repaints its own nodes.
+    Attachments.forRecord('inspection', doc.id);
     return `
       ${formHeadHtml()}
       ${rows.map(row => sectionHtml(row)).join('')}
@@ -1262,7 +1268,7 @@ const Inspections = (function () {
            + calibrationsHtml(cfg, key)
            + (key === 'initial_data' || key === 'final_data' ? dataValuesHtml(key) : '')
            + (key === 'rain_gauge' ? tipRuleHtml() : '')
-           + (key === 'admin_checklist' ? crossRefHtml() : '');
+           + (key === 'admin_checklist' ? photosHtml() + crossRefHtml() : '');
     }
 
     const gaps = (UNCAPTURED[cfg] && UNCAPTURED[cfg][key]) || [];
@@ -1624,6 +1630,20 @@ const Inspections = (function () {
       </select>`;
   }
 
+  // The photo checklist's other half. `photos_taken` on meganet.inspection_admin
+  // is a tick recording the *claim* that photos were taken, which is what the
+  // paper sheet asks for and all this app could hold until #149; this is where
+  // the photographs themselves go. Both stay: the tick is what the crew answered
+  // on the sheet, and a visit whose photos are still on somebody's phone is a
+  // different fact from one where nobody took any.
+  function photosHtml() {
+    return Attachments.sectionHtml({
+      kind: 'inspection', id: S().doc.id, role: 'photo',
+      label: 'Photos',
+      note: 'The tick above records that photos were taken. These are the photos.',
+    });
+  }
+
   // The footer instruction, printed on every sheet.
   function crossRefHtml() {
     return `<p class="small insp-footnote">* sites on departure that are poor or have issues
@@ -1828,6 +1848,7 @@ const Inspections = (function () {
       || (k === 'extra' && !Object.keys(obj[k] || {}).length));
 
     const out = Object.assign({}, doc);
+    delete out.attachments;          // save_inspection does not write them (#149)
     ['power', 'rain_gauge', 'water_level', 'gas', 'radio', 'admin'].forEach(k => {
       if (empty(out[k])) out[k] = null;
     });

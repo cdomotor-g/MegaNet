@@ -33,6 +33,11 @@
 //   6. Save sends a document with no section the form does not print, with what
 //      was typed in it, and with the empty grids pruned out — "not recorded" is
 //      no row, not a row of nulls.
+//   7. A photo attaches to a saved visit and not to an unsaved one; the bytes go
+//      up before the index row; the object is named with a generated uuid under
+//      the visit's own prefix rather than with the camera's filename; a type or
+//      a size the vocabulary refuses is refused before anything is uploaded; and
+//      removing takes the row first and the bytes second (#149).
 //
 // Run:  npm run insp
 //       npm run insp -- -v    also print what passed
@@ -42,6 +47,8 @@ import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { auditHandlers } from './lib/controls.mjs';
+import { storageStore, installStorage, attachmentRpc, attachmentRows, fileOf }
+  from './lib/storage.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -66,7 +73,7 @@ function check(name, pass, detail = '') {
 // anything else falls through to the abort, which is what keeps the test from
 // quietly depending on a request nobody meant to make.
 
-function installDatastore(page, tables, saved) {
+function installDatastore(page, tables, saved, store) {
   return page.route('**://*.supabase.co/rest/v1/**', async route => {
     const url = new URL(route.request().url());
     const name = url.pathname.replace(/^.*\/rest\/v1\//, '');
@@ -74,6 +81,11 @@ function installDatastore(page, tables, saved) {
     if (route.request().method() === 'POST' && name.startsWith('rpc/')) {
       const fn = name.slice(4);
       const body = JSON.parse(route.request().postData() || '{}');
+      const att = attachmentRpc(fn, body, store);
+      if (att !== undefined) {
+        return route.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify(att) });
+      }
       if (fn === 'save_inspection') {
         saved.push(body.p_doc);
         const doc = Object.assign({}, body.p_doc, {
@@ -87,6 +99,10 @@ function installDatastore(page, tables, saved) {
     }
 
     const table = name.split('?')[0];
+    if (table === 'attachment') {
+      return route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify(attachmentRows(store, url.search)) });
+    }
     const rows = tables[table];
     if (!rows) {
       return route.fulfill({ status: 404, contentType: 'application/json',
@@ -122,12 +138,14 @@ async function main() {
   const browser = await launchBrowser();
   const saved = [];
   const errors = [];
+  const store = storageStore();
 
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
     await applyNetworkPolicy(page, server.origin);
-    await installDatastore(page, tables, saved);
+    await installDatastore(page, tables, saved, store);
+    await installStorage(page, store);
 
     page.on('pageerror', e => errors.push(e.stack || e.message));
     page.on('console', m => {
@@ -296,6 +314,108 @@ async function main() {
         && (doc.data_quality || []).length === 0 && !Object.keys(doc.data || {}).length,
         `serials ${(doc.serials || []).length}, calibrations ${(doc.calibrations || []).length}`);
     }
+
+    // ── Attachments (#149) ───────────────────────────────────────────────────
+    // The Alert sheet, because Mace and DataLogger - old print no photo
+    // checklist at all and Gas Only prints five sections none of which is it —
+    // so the panel's home is the one section the matrix says this configuration
+    // has. What is being checked here is what went over the wire, not that the
+    // database would accept it: tools/check_attachments.sql owns that, against a
+    // real Postgres, and a second copy of those rules in the fixture would only
+    // ever be able to disagree with the first.
+    await page.evaluate(() => { Inspections.pick(null); Inspections.setConfig('alert'); });
+    await page.waitForTimeout(SETTLE);
+
+    const unsavedPanel = await page.evaluate(() => {
+      const el = document.querySelector('.att-panel');
+      return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+    });
+    check('an unsaved visit offers no uploader, because the file needs a row to hang off',
+      /Save this record first/.test(unsavedPanel) && !/input/i.test(unsavedPanel),
+      unsavedPanel.slice(0, 90));
+
+    await page.evaluate(() => Inspections.save());
+    await page.waitForFunction(() => !state.insp.busy && state.insp.doc.id,
+      null, { timeout: LOAD_TIMEOUT });
+    await page.waitForFunction(() => !!document.querySelector('.att-panel input[type="file"]'),
+      null, { timeout: LOAD_TIMEOUT });
+    check('once saved, the panel offers a file picker', true);
+
+    // A file the vocabulary does not carry, first. It has to be refused *before*
+    // anything is uploaded — the whole point of checking the type in the browser
+    // as well as in the database is to not spend a paddock's worth of signal on
+    // a file that will be refused at the end of it.
+    await page.setInputFiles('.att-panel input[type="file"]',
+      fileOf('notes.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 512));
+    await page.waitForFunction(() => !state.attach.busy, null, { timeout: LOAD_TIMEOUT });
+    check('a type the vocabulary does not carry is refused without uploading anything',
+      store.uploads.length === 0 && store.calls.length === 0,
+      `${store.uploads.length} upload(s), ${store.calls.length} rpc call(s)`);
+
+    // And one over the limit its own type carries. text/plain is capped at 1 MB
+    // in 0010 precisely because one limit generous enough for a phone photo is
+    // no limit at all on a terminal dump — so this is the type whose limit is
+    // worth proving the browser reads.
+    await page.setInputFiles('.att-panel input[type="file"]',
+      fileOf('dump.txt', 'text/plain', 2 * 1024 * 1024));
+    await page.waitForFunction(() => !state.attach.busy, null, { timeout: LOAD_TIMEOUT });
+    check('a file over its type\'s limit is refused without uploading anything',
+      store.uploads.length === 0 && store.calls.length === 0,
+      `${store.uploads.length} upload(s)`);
+
+    await page.setInputFiles('.att-panel input[type="file"]',
+      fileOf('IMG_0042.jpg', 'image/jpeg', 4096));
+    await page.waitForFunction(() => (state.attach.list || []).length === 1,
+      null, { timeout: LOAD_TIMEOUT });
+
+    const call = store.calls.find(c => c.fn === 'attach_file');
+    check('the bytes go up before the index row does',
+      store.uploads.length === 1 && !!call
+      && store.uploads[0].path === call.body.p_storage_path,
+      `${store.uploads.length} upload(s), path ${store.uploads[0] && store.uploads[0].path}`);
+
+    check('the index row names the inspection and only the inspection',
+      !!call && call.body.p_inspection_id === '00000000-0000-4000-8000-000000000001'
+      && call.body.p_maintenance_activity_id === undefined
+      && call.body.p_role_key === 'photo',
+      JSON.stringify(call && { i: call.body.p_inspection_id, r: call.body.p_role_key }));
+
+    // The security-carrying half: the object is named by the app, not by the
+    // phone. A private bucket read through signed URLs is only as private as its
+    // paths are unguessable, and `IMG_0042.jpg` under a known visit id is a
+    // guess away. meganet.attach_file() refuses anything else; this is the
+    // browser holding up its end.
+    const path = call ? call.body.p_storage_path : '';
+    check('the object is named with a generated uuid, under the record\'s own prefix',
+      new RegExp('^inspection/00000000-0000-4000-8000-000000000001/'
+               + '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.jpg$').test(path),
+      path);
+    check('the file\'s own name is kept as the title, not as the address',
+      !!call && call.body.p_title === 'IMG_0042.jpg' && !path.includes('IMG_0042'), path);
+
+    // The thumbnail resolves after the panel is on screen — the panel is built
+    // as a string and the URL is signed behind it — so wait for the cache rather
+    // than for the render. `state.attach.urls` is keyed by object path, which is
+    // what makes "was this one signed" answerable without a timeout.
+    await page.waitForFunction(p => !!state.attach.urls[p], path, { timeout: LOAD_TIMEOUT });
+    check('the thumbnail is fetched through a signed URL rather than a public one',
+      store.signed.includes(path), store.signed.join(', '));
+
+    const attAudit = await auditHandlers(page);
+    check(`attachments: all ${attAudit.checked} handler(s) across ${attAudit.total} attribute(s) resolve`,
+      attAudit.unresolved.length === 0,
+      attAudit.unresolved.map(u => `${u.path} (${u.attr} on ${u.where})`).join('; '));
+
+    // Removing takes the index row first and the bytes second — a photo that has
+    // gone from the form and not from the bucket is invisible; the reverse is a
+    // broken thumbnail on a record somebody is relying on.
+    await page.evaluate(() => { window.confirm = () => true; });
+    await page.evaluate(() => Attachments.remove(state.attach.list[0].id));
+    await page.waitForFunction(() => (state.attach.list || []).length === 0,
+      null, { timeout: LOAD_TIMEOUT });
+    check('removing drops the index row and then deletes the object',
+      store.rows.length === 0 && store.removed.includes(path),
+      `removed: ${store.removed.join(', ')}`);
 
     check('nothing threw and the console stayed clean', errors.length === 0,
       errors.slice(0, 3).join(' | '));

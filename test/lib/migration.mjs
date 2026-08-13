@@ -37,7 +37,7 @@ function splitTuples(body) {
 
 function splitValues(tuple) {
   const out = [];
-  let quoted = false, cur = '';
+  let quoted = false, cur = '', brackets = 0;
   for (let i = 0; i < tuple.length; i++) {
     const c = tuple[i];
     if (quoted) {
@@ -47,7 +47,15 @@ function splitValues(tuple) {
       continue;
     }
     if (c === "'") { quoted = true; continue; }
-    if (c === ',') { out.push(cur.trim()); cur = ''; continue; }
+    // `array['jpg', 'jpeg']` — 0010's one extra shape. The commas inside the
+    // brackets separate elements of one value, not values, so depth has to be
+    // tracked here the way splitTuples() tracks parentheses. Without this the
+    // extensions column parses as two half-columns and every column after it
+    // shifts by one, which is the kind of fixture bug that reads as a real
+    // failure somewhere else entirely.
+    if (c === '[') { brackets++; cur += c; continue; }
+    if (c === ']') { brackets--; cur += c; continue; }
+    if (c === ',' && brackets === 0) { out.push(cur.trim()); cur = ''; continue; }
     cur += c;
   }
   out.push(cur.trim());
@@ -73,6 +81,14 @@ export function seedRows(sql, table) {
       if (raw === undefined) { row[c] = null; return; }
       if (raw === 'true' || raw === 'false') { row[c] = raw === 'true'; return; }
       if (/^-?\d+(\.\d+)?$/.test(raw)) { row[c] = Number(raw); return; }
+      // `array[jpg, jpeg]` — the element quotes were taken off on the way in, so
+      // what is left is the list. PostgREST hands a text[] back to the browser as
+      // a JSON array, which is what the fixture has to look like too.
+      const arr = raw.match(/^array\[(.*)\]$/i);
+      if (arr) {
+        row[c] = arr[1].trim() ? arr[1].split(',').map(s => s.trim()) : [];
+        return;
+      }
       row[c] = raw;
     });
     return row;
@@ -84,6 +100,11 @@ export function seedRows(sql, table) {
 /** `db/migrations/0009_inspections.sql`, read once. */
 export function inspectionsSql() {
   return fs.readFileSync(repo('db', 'migrations', '0009_inspections.sql'), 'utf8');
+}
+
+/** `db/migrations/0010_attachments.sql`, read once (#149). */
+export function attachmentsSql() {
+  return fs.readFileSync(repo('db', 'migrations', '0010_attachments.sql'), 'utf8');
 }
 
 /** Several tables out of one migration, as { table: rows }. */
@@ -108,6 +129,10 @@ export const FORM_TABLES = [
 
 export function formFixture() {
   const tables = seedTables(inspectionsSql(), FORM_TABLES);
+  // The one vocabulary either tab reads that is not in 0009. Same rule as
+  // everything above it: parsed out of the migration that seeds it, so a size
+  // limit changed in the database is a size limit the panel is checked against.
+  Object.assign(tables, seedTables(attachmentsSql(), ['attachment_type']));
   const byCfg = Object.fromEntries(tables.inspection_config.map(c => [c.key, c]));
   const bySec = Object.fromEntries(tables.inspection_section.map(s => [s.key, s]));
   tables.inspection_form = tables.inspection_config_section.map(cs => ({

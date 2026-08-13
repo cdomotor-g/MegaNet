@@ -20,6 +20,7 @@
     "datastore.js",
     "export.js",
     "station-editor.js",
+    "attachments.js",
     "inspections.js",
     "maintenance.js",
     "map-rivers.js",
@@ -34,6 +35,6 @@
     "bug-report.js",
     "init.js"
   ],
-  "total": 430,
-  "distinct": 430
+  "total": 436,
+  "distinct": 436
 }

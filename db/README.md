@@ -169,6 +169,8 @@ its cache at all (`PGRST002`).
 | `meganet.inspection_serial`, `meganet.inspection_data`, `meganet.inspection_data_value`, `meganet.inspection_power`, `meganet.inspection_rain_gauge`, `meganet.inspection_water_level`, `meganet.inspection_gas`, `meganet.inspection_radio`, `meganet.inspection_fade_margin`, `meganet.inspection_calibration`, `meganet.inspection_data_quality`, `meganet.inspection_admin` | The sections. Each carries a trigger refusing a row whose configuration's form does not print that section. |
 | `meganet.maintenance_activity`, `meganet.maintenance_asset`, `meganet.maintenance_data_quality` | The Council Site Maintenance Tasks form. `inspection_id` is the printed cross-reference at the foot of every inspection sheet, as a foreign key. |
 | `meganet.attachment` | Photos and pasted screenshots, for an inspection or a maintenance activity — exactly one of the two. The bytes are in Supabase Storage; this is the index. |
+| `meganet.attachment_type` | What may be uploaded, and how large, per content type. A vocabulary rather than a check constraint, so a new camera format is an insert. Public: it describes a blank form, not a site. The browser reads it to build the file picker and to refuse a file *before* uploading it. |
+| `meganet.attach_file(…)`, `meganet.update_attachment(uuid, jsonb)`, `meganet.detach_file(uuid)` | The attachment write path (0010). Three functions rather than a `grant`, because the object path has to agree with the owner it is filed under, the object name has to be one the app generated rather than one a phone supplied, and `uploaded_by` has to be the caller — none of which is a fact about the row. `update_attachment()` takes a patch so that clearing a caption and leaving it alone are different requests. |
 | `meganet.inspection_form` | View: one row per section a configuration prints, in that configuration's order. What a form renderer asks. |
 | `meganet.inspection_needs_maintenance` | View: visits that departed Missing or Poor, and whether a maintenance activity was ever raised against them. |
 | `meganet.inspection_doc(uuid)`, `meganet.maintenance_activity_doc(uuid)` | One record and everything under it, as one JSON document. |
@@ -188,7 +190,24 @@ they are the words printed on a blank form and say nothing about a site.
 
 Nothing is *writable* by `anon` or by `authenticated`: no table grants either of
 them a write verb, and the only ways in are the functions above — see **Writing**
-and **Telemetry** below.
+and **Telemetry** below. `0010` re-states that rule rather than bending it: the
+obvious way to let an editor attach a photo was `grant insert on
+meganet.attachment to authenticated`, relying on the RLS policy `0009` already
+wrote, and it is not what happened. Three of the things an attachment row has to
+be true about — that its object path agrees with the record it is filed under,
+that its object *name* is one the app generated rather than one a phone supplied,
+and that `uploaded_by` is the caller — are facts about the request rather than
+about the row, and a grant hands all three to the client.
+
+**One thing this schema needs is not in this directory: the storage bucket.**
+`meganet.attachment` indexes objects in a Supabase Storage bucket called
+`inspections`, and `storage.buckets` is Supabase's table rather than ours — so it
+is not a migration, for the same reason nothing else here reaches outside
+`meganet`. It is `tools/storage_bucket.sql`: idempotent, safe to re-run, and it
+asserts at the foot that the bucket exists, that it is **private**, and that its
+four policies are there. Run it once per project after `0010`. It is a file rather
+than a page of dashboard instructions because the page of dashboard instructions
+was tried first (#145) and got half done in silence.
 
 ### Two conventions worth knowing before you read the SQL
 

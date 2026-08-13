@@ -3,7 +3,7 @@
   "recordedFrom": [
     {
       "file": "core.js",
-      "bytes": 62568
+      "bytes": 64052
     },
     {
       "file": "app.js",
@@ -63,7 +63,7 @@
     },
     {
       "file": "datastore.js",
-      "bytes": 20911
+      "bytes": 25354
     },
     {
       "file": "export.js",
@@ -74,12 +74,16 @@
       "bytes": 24667
     },
     {
+      "file": "attachments.js",
+      "bytes": 23811
+    },
+    {
       "file": "inspections.js",
-      "bytes": 101493
+      "bytes": 102708
     },
     {
       "file": "maintenance.js",
-      "bytes": 54485
+      "bytes": 55585
     },
     {
       "file": "map-rivers.js",
@@ -126,7 +130,7 @@
       "bytes": 3714
     }
   ],
-  "bytes": 1300740,
-  "sha256": "51b206e1d643d89d0401d7f557ad867a49a5b17618a1634ae8095b3355b80efb",
+  "bytes": 1332793,
+  "sha256": "14d69238e95bee4591432bb64fa5dfe43eee36721a8aff4d03828f76a6e0d7f4",
   "nulBytes": 4
 }

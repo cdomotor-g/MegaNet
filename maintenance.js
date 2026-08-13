@@ -8,7 +8,9 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr and registerTabTeardown;
 // across to app.js for switchTab from an inline handler, so at click time; to
-// auth.js for Auth; and to datastore.js for dbSelect, dbRpc and dbCanWrite.
+// auth.js for Auth; to datastore.js for dbSelect, dbRpc and dbCanWrite; and to
+// attachments.js for the two panels on this sheet that are images rather than
+// field sets.
 // One thing reaches into this file: inspections.js calls startFrom() from the
 // prompt at the foot of an inspection whose departure rating asks for one of
 // these — which is the printed cross-reference, made into a button.
@@ -53,7 +55,7 @@
 // station and its date across. A form can also be started from nothing, which
 // is the maintenance round nobody was sent on by an inspection.
 //
-// ── Three boxes on this sheet have nowhere to go ─────────────────────────────
+// ── The boxes on this sheet that still have nowhere to go ────────────────────
 //
 // Read off the workbook and confirmed against 0009: the Comms and Power panel
 // prints a Condition and an Owner under each of its three sub-columns — Comms,
@@ -63,13 +65,18 @@
 // one. Neither is it dropped in silence: UNCAPTURED renders it on the panel
 // that prints it, and #148 is the follow-up.
 //
-// Attachments are the other gap, and it is a wider one than a column. The
-// sheet's ALERT CANISTER CONFIGURATION panel is a pasted screenshot in the one
-// filled example, and "Bench Mark present" prints "(if yes take photo)" beside
-// it. `meganet.attachment` is the index for both — but `authenticated` holds
-// SELECT on it and no INSERT, and there is no storage-upload path in this app,
-// so nothing can be attached from a browser yet by anyone. Stated on the form
-// rather than mocked up; #149 is the follow-up.
+// ── The two boxes that are images, which used to be a third gap ──────────────
+//
+// The ALERT CANISTER CONFIGURATION panel is a pasted screenshot of a terminal
+// dump in the one filled example, and "Bench Mark present" prints "(if yes take
+// photo)" beside it. Neither is a field, and until #149 neither could be
+// recorded: `meganet.attachment` was an index into a bucket and `authenticated`
+// held SELECT on it and nothing else, so the editors-only insert policy under it
+// was unreachable. Both panels are real now — `Attachments.sectionHtml()`, from
+// attachments.js, which both form tabs share. They appear once the form has been
+// saved, because the attachment hangs off the record by foreign key; that is the
+// same rule as the Council-form link at the foot of an inspection, for the same
+// reason.
 //
 // ── Saving, drafts and who may read what ─────────────────────────────────────
 //
@@ -218,7 +225,7 @@ const Maintenance = (function () {
   // The sheet's own print order, top to bottom. `kind` picks the renderer:
   // 'panel' is one of the three asset mini-panels, 'blocks' is a set of boxes
   // on the activity row, 'data_quality' is the two-by-two grid and
-  // 'attachments' is the slot that is stated rather than built.
+  // 'attachments' is the canister panel, which is a file rather than a field.
   const SECTIONS = [
     { key: 'rainfall',      label: 'Rainfall',                    kind: 'panel',  asset: 'rainfall' },
     { key: 'water_level',   label: 'Water Level',                 kind: 'panel',  asset: 'water_level' },
@@ -242,11 +249,6 @@ const Maintenance = (function () {
             + 'meganet.maintenance_asset carries one Condition and one Owner for the whole panel, '
             + 'and the filled Mt Kanigan sheet answers the three differently (Comms poor, '
             + 'Equipment good, Power good), so this is a real loss rather than a theoretical one.' },
-    ],
-    gauge_boards: [
-      { issue: 149,
-        text: 'The photo "(if yes take photo)" asks for against Bench Mark present — an attachment '
-            + 'with role gauge_board, which nothing in this app can upload yet.' },
     ],
   };
 
@@ -659,6 +661,12 @@ const Maintenance = (function () {
   // ── The form ───────────────────────────────────────────────────────────────
 
   function formHtml() {
+    // Two of the nine sections carry an attachment panel, and both are built as
+    // strings inside this one render. Telling attachments.js which record is on
+    // screen first is what lets those panels be synchronous — it loads the type
+    // vocabulary and this record's index rows, and repaints its own nodes when
+    // they arrive. Idempotent, so re-rendering the form does not refetch.
+    Attachments.forRecord('maintenance', S().doc.id);
     return `
       ${formHeadHtml()}
       ${SECTIONS.map((sec, i) => sectionHtml(sec, i + 1)).join('')}
@@ -720,7 +728,7 @@ const Maintenance = (function () {
     if (sec.kind === 'panel')             body = panelHtml(sec.asset);
     else if (sec.kind === 'data_quality') body = dataQualityHtml();
     else if (sec.kind === 'attachments')  body = canisterHtml();
-    else                                  body = blocksHtml(sec.key);
+    else                                  body = blocksHtml(sec.key) + gaugeBoardPhotoHtml(sec.key);
 
     const gaps = UNCAPTURED[sec.key] || [];
     return `
@@ -752,6 +760,19 @@ const Maintenance = (function () {
       <div class="mnt-grid">
         ${panel.fields.map(f => fieldHtml(`assets.${i}.${f.k}`, f)).join('')}
       </div>`;
+  }
+
+  // "(if yes take photo)" is printed beside Bench Mark present on the paper, so
+  // the panel goes on the section that prints it rather than in a files area of
+  // its own. #149; until it landed this was an UNCAPTURED note saying the photo
+  // the sheet asks for had nowhere to go.
+  function gaugeBoardPhotoHtml(sectionKey) {
+    if (sectionKey !== 'gauge_boards') return '';
+    return Attachments.sectionHtml({
+      kind: 'maintenance', id: S().doc.id, role: 'gauge_board',
+      label: 'Gauge board and benchmark photos',
+      note: 'The sheet prints “(if yes take photo)” beside Bench Mark present.',
+    });
   }
 
   function blocksHtml(sectionKey) {
@@ -873,14 +894,12 @@ const Maintenance = (function () {
         empty; in the one filled example it is a pasted screenshot of the canister's raw terminal
         config dump — an image, not a field set, and 0009 says so out loud: it is why
         <code>meganet.attachment_role</code> has a <code>canister_config</code> row.</p>
-      <div class="mnt-gap">
-        <strong>Nothing can be attached from a browser yet</strong>
-        <p class="small">The bytes belong in Supabase Storage and
-          <code>meganet.attachment</code> is the index into it — but that table grants INSERT to
-          <code>service_role</code> only, and this app has no upload path. Both halves are issue
-          #149. Until then, paste what the dump says into Remarks rather than losing it; a screenshot
-          that exists only on a phone is the failure this panel is trying to prevent.</p>
-      </div>`;
+      ${Attachments.sectionHtml({
+        kind: 'maintenance', id: S().doc.id, role: 'canister_config',
+        label: 'Canister configuration',
+        note: 'The screenshot of the dump, or the dump itself as a text file. A screenshot that '
+            + 'exists only on a phone is the failure this panel is here to prevent.',
+      })}`;
   }
 
   // ── The foot of the form ───────────────────────────────────────────────────

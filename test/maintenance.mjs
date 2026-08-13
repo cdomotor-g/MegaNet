@@ -50,6 +50,11 @@
 //   7. The printed cross-reference works in both directions: the outstanding
 //      list starts a form linked to the visit, and the button at the foot of an
 //      inspection that departed poor lands on this tab with the link made.
+//   8. The two boxes on this sheet that are images rather than fields — the
+//      canister screenshot and the benchmark photo — are attachment panels on
+//      the sections that print them, each listing only its own role, and a file
+//      sent to one indexes against the activity under a generated object name
+//      rather than the camera's (#149).
 //
 // Run:  npm run maint
 //       npm run maint -- -v    also print what passed
@@ -61,6 +66,8 @@ import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { auditHandlers } from './lib/controls.mjs';
+import { storageStore, installStorage, attachmentRpc, attachmentRows, fileOf }
+  from './lib/storage.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -222,7 +229,7 @@ function buildMtKanigan(tables, cells) {
 
 // ── The datastore, answered from the fixture ─────────────────────────────────
 
-function installDatastore(page, tables, state) {
+function installDatastore(page, tables, state, store) {
   return page.route('**://*.supabase.co/rest/v1/**', async route => {
     const url = new URL(route.request().url());
     const name = url.pathname.replace(/^.*\/rest\/v1\//, '');
@@ -232,6 +239,8 @@ function installDatastore(page, tables, state) {
     if (route.request().method() === 'POST' && name.startsWith('rpc/')) {
       const fn = name.slice(4);
       const body = JSON.parse(route.request().postData() || '{}');
+      const att = attachmentRpc(fn, body, store);
+      if (att !== undefined) return json(200, att);
       if (fn === 'maintenance_activity_doc') {
         return json(200, body.p_id === state.doc.id ? state.doc : null);
       }
@@ -252,6 +261,7 @@ function installDatastore(page, tables, state) {
     }
 
     const table = name.split('?')[0];
+    if (table === 'attachment') return json(200, attachmentRows(store, url.search));
     if (table === 'maintenance_activity') return json(200, state.recent);
     if (table === 'inspection_needs_maintenance') return json(200, state.outstanding);
     if (table === 'inspection') return json(200, []);
@@ -349,12 +359,14 @@ async function main() {
   const server = await startServer();
   const browser = await launchBrowser();
   const errors = [];
+  const store = storageStore();
 
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
     await applyNetworkPolicy(page, server.origin);
-    await installDatastore(page, tables, state);
+    await installDatastore(page, tables, state, store);
+    await installStorage(page, store);
 
     page.on('pageerror', e => errors.push(e.stack || e.message));
     page.on('console', m => {
@@ -412,8 +424,8 @@ async function main() {
       [...document.querySelectorAll('.mnt-section')]
         .filter(s => s.querySelector('.mnt-gap li'))
         .map(s => s.dataset.section));
-    check('the sheet\'s uncaptured boxes are stated on the sections that print them',
-      JSON.stringify(gaps) === JSON.stringify(['comms_power', 'gauge_boards']), gaps.join(', '));
+    check('the sheet\'s uncaptured box is stated on the section that prints it',
+      JSON.stringify(gaps) === JSON.stringify(['comms_power']), gaps.join(', '));
 
     let audit = await auditHandlers(page);
     check(`blank form: all ${audit.checked} handler(s) across ${audit.total} attribute(s) resolve`,
@@ -458,6 +470,67 @@ async function main() {
 
     audit = await auditHandlers(page);
     check(`Mt Kanigan: all ${audit.checked} handler(s) across ${audit.total} attribute(s) resolve`,
+      audit.unresolved.length === 0,
+      audit.unresolved.map(u => `${u.path} (${u.attr} on ${u.where})`).join('; '));
+
+    // ── The two boxes on this sheet that are images (#149) ───────────────────
+    // The canister panel is a pasted screenshot in the filled example, and
+    // "(if yes take photo)" is printed beside Bench Mark present. Both are
+    // attachment panels now rather than the note that used to say they could not
+    // be. What is checked is what went over the wire: the rules the database
+    // enforces are proven by tools/check_attachments.sql against a real Postgres.
+    const panels = await page.evaluate(() =>
+      [...document.querySelectorAll('.att-panel')].map(el => ({
+        section: el.closest('.mnt-section').dataset.section,
+        role: el.dataset.attRole,
+      })));
+    check('both image boxes are attachment panels, on the sections that print them',
+      JSON.stringify(panels) === JSON.stringify([
+        { section: 'gauge_boards', role: 'gauge_board' },
+        { section: 'canister', role: 'canister_config' }]),
+      JSON.stringify(panels));
+
+    // The canister dump, as the filled sheet has it: a pasted screenshot. Sent
+    // to the panel that prints it, so the role it lands under is the one 0009
+    // created a `canister_config` row for.
+    await page.setInputFiles('.mnt-section[data-section="canister"] input[type="file"]',
+      fileOf('canister-dump.png', 'image/png', 8192));
+    await page.waitForFunction(() => (state.attach.list || []).length === 1,
+      null, { timeout: LOAD_TIMEOUT });
+
+    const call = store.calls.find(c => c.fn === 'attach_file');
+    check('the canister screenshot indexes against the activity, under canister_config',
+      !!call && call.body.p_maintenance_activity_id === mtk.id
+      && call.body.p_inspection_id === undefined
+      && call.body.p_role_key === 'canister_config',
+      JSON.stringify(call && { a: call.body.p_maintenance_activity_id, r: call.body.p_role_key }));
+
+    check('the object is named with a generated uuid, under the activity\'s own prefix',
+      !!call && new RegExp(`^maintenance/${mtk.id}/`
+        + '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.png$')
+        .test(call.body.p_storage_path),
+      call && call.body.p_storage_path);
+
+    // Two roles on one record, and each panel shows its own. A single
+    // undifferentiated pile would lose which box on the paper a file answers.
+    await page.setInputFiles('.mnt-section[data-section="gauge_boards"] input[type="file"]',
+      fileOf('benchmark.jpg', 'image/jpeg', 4096));
+    await page.waitForFunction(() => (state.attach.list || []).length === 2,
+      null, { timeout: LOAD_TIMEOUT });
+
+    const perPanel = await page.evaluate(() =>
+      [...document.querySelectorAll('.att-panel')].map(el => ({
+        role: el.dataset.attRole,
+        names: [...el.querySelectorAll('.att-name')].map(n => n.textContent.trim()),
+      })));
+    check('each panel lists only the files filed under its own role',
+      JSON.stringify(perPanel) === JSON.stringify([
+        { role: 'gauge_board', names: ['benchmark.jpg'] },
+        { role: 'canister_config', names: ['canister-dump.png'] }]),
+      JSON.stringify(perPanel));
+
+    audit = await auditHandlers(page);
+    check(`attachments: all ${audit.checked} handler(s) across ${audit.total} attribute(s) resolve`,
       audit.unresolved.length === 0,
       audit.unresolved.map(u => `${u.path} (${u.attr} on ${u.where})`).join('; '));
 

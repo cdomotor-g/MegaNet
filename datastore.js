@@ -361,6 +361,102 @@ async function dbSelect(path) {
   return Array.isArray(body) ? body : [];
 }
 
+// ── Supabase Storage ───────────────────────────────────────────────────────────
+// The third API on the same project host, after the Data API and Auth, and the
+// first thing in this app that moves bytes rather than JSON. #149 needed it:
+// meganet.attachment has been an index into a bucket since 0009 and nothing
+// could put anything in the bucket.
+//
+// Derived from DB_URL for the same reason AUTH_URL is — two constants naming
+// one project is two chances to point them at different ones.
+//
+// These three are deliberately thin. Everything about *what may be attached* —
+// the type list, the size limits, the path convention, who may — is in
+// db/migrations/0010_attachments.sql and in attachments.js, because the database
+// is the one enforcing it and a second copy of the rules here could only ever
+// disagree. This layer knows how to speak the protocol and nothing else.
+const STORAGE_URL = DB_URL.replace(/\/rest\/v1\/?$/, '/storage/v1');
+
+// PUT the bytes at a path in a bucket. Storage takes the file as the raw body,
+// not as multipart — the object's name is the URL, not a form field.
+//
+// `x-upsert: false` is the safe default and is left at it: attachments.js names
+// every object with a fresh uuid, so a collision here means something has gone
+// wrong upstream and quietly overwriting somebody else's photo is not the way to
+// find out.
+async function dbUploadObject(bucket, path, file) {
+  const res = await fetch(`${STORAGE_URL}/object/${bucket}/${path}`, {
+    method: 'POST',
+    headers: {
+      apikey: DB_ANON_KEY,
+      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
+      'Content-Type': file.type || 'application/octet-stream',
+      'x-upsert': 'false',
+    },
+    body: file,
+  });
+  if (!res.ok) throw await storageError(res);
+  return { bucket, path };
+}
+
+// A time-limited URL for a private object. The bucket holds site photographs and
+// canister config dumps and is deliberately not public (see
+// tools/storage_bucket.sql), so there is no permanent URL to render — every
+// thumbnail on screen is signed for the session that asked for it.
+async function dbSignedUrl(bucket, path, seconds) {
+  const res = await fetch(`${STORAGE_URL}/object/sign/${bucket}/${path}`, {
+    method: 'POST',
+    headers: {
+      apikey: DB_ANON_KEY,
+      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ expiresIn: seconds || 3600 }),
+    cache: 'no-store',
+  });
+  if (!res.ok) throw await storageError(res);
+  const body = await res.json();
+  // Storage answers with a path relative to /storage/v1, leading slash included.
+  const signed = body && (body.signedURL || body.signedUrl);
+  if (!signed) throw new Error('Storage returned no signed URL');
+  return `${STORAGE_URL}${signed.startsWith('/') ? '' : '/'}${signed}`;
+}
+
+// Remove the bytes. Called after meganet.detach_file() has dropped the index
+// row, and as the compensating half of a failed attach — see attachments.js for
+// why the two are in that order.
+async function dbRemoveObject(bucket, path) {
+  const res = await fetch(`${STORAGE_URL}/object/${bucket}/${path}`, {
+    method: 'DELETE',
+    headers: {
+      apikey: DB_ANON_KEY,
+      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
+      Accept: 'application/json',
+    },
+  });
+  if (!res.ok) throw await storageError(res);
+  return true;
+}
+
+// Storage speaks its own error shape — {statusCode, error, message} — rather
+// than PostgREST's, and its 400 for "Bucket not found" is the single most likely
+// thing to go wrong on a project where tools/storage_bucket.sql has not been
+// run. So that one is named rather than passed through as a status code.
+async function storageError(res) {
+  let body = null;
+  try { body = await res.json(); } catch (_) { /* not JSON; the status stands */ }
+  const raw = (body && (body.message || body.error)) || `HTTP ${res.status}`;
+  const missing = /bucket not found/i.test(raw);
+  const err = new Error(missing
+    ? 'the `inspections` storage bucket does not exist on this project — run tools/storage_bucket.sql'
+    : raw);
+  err.status = res.status;
+  err.bucketMissing = missing;
+  err.denied = res.status === 401 || res.status === 403;
+  return err;
+}
+
 // The version stamp the editor is holding. Two columns rather than one because
 // "deleted while you had it open" is worth telling the operator before they type
 // for ten minutes into a form that cannot be saved.

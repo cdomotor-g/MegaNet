@@ -4599,6 +4599,117 @@ code {
 }
 
 
+/* ── Attachments (#149) ──────────────────────────────────────────────────────
+   The one panel three sections across two tabs render: the inspection photo
+   checklist, the Council sheet's canister-configuration screenshot and its
+   gauge-board photo. It is a shared region rather than two per-tab ones for the
+   same reason attachments.js is one file — the two tabs above deliberately do
+   not share selectors, but this is not either tab's, it is a component both
+   host, and copying it into both regions would make a change to it two edits.
+
+   Everything it needs from the tabs it sits in comes through the shared tokens,
+   so a #107 U-issue restyling either tab moves this with it rather than around
+   it. Per #113's constraint 2, a change to the tokens themselves is #109's. */
+
+.att-panel { margin-top: .8rem; }
+
+.att-head {
+  margin: 0 0 .2rem;
+  font-size: .92rem;
+}
+
+.att-muted { color: var(--muted); }
+.att-bad   { color: var(--bad); }
+.att-ok    { color: var(--ok); }
+
+.att-add {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+  margin: .4rem 0 .2rem;
+}
+
+/* The picker is a real <input type="file"> rather than a button driving a
+   hidden one: a tablet's camera-or-gallery sheet is the browser's, and routing
+   it through a click handler is how that gets lost on one platform. */
+.att-file {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .35rem .55rem;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: var(--subtle);
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.att-file input[type="file"] { max-width: 100%; font-size: .82rem; }
+.att-file span { white-space: nowrap; }
+
+.att-limits { margin: .2rem 0 0; }
+
+.att-list {
+  display: grid;
+  gap: .5rem;
+  margin-top: .5rem;
+}
+
+.att-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: .6rem;
+  align-items: start;
+  padding: .5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+/* Fixed box rather than intrinsic size, so a list of photos does not reflow as
+   each signed URL arrives — on a slow link that is the whole panel jumping
+   under a caption somebody is typing. */
+.att-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--subtle);
+  border: 1px solid var(--line);
+}
+
+.att-thumb-file {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .72rem;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+
+.att-meta { display: grid; gap: .2rem; min-width: 0; }
+
+.att-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.att-caption { width: 100%; margin-top: .15rem; }
+
+.att-actions {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+
+.att-actions button { white-space: nowrap; }
+
+@media (max-width: 560px) {
+  .att-item { grid-template-columns: auto minmax(0, 1fr); }
+  .att-actions { grid-column: 1 / -1; flex-direction: row; }
+}
+
+
 /* iOS Safari zooms the page when a field smaller than 16 px takes focus, and
    never zooms back out. Every text-entry control in the app is .9 rem or less,
    so on a touch device they are all bumped to exactly 16 px — the one number
