@@ -7,7 +7,7 @@
     },
     {
       "file": "app.js",
-      "bytes": 298889
+      "bytes": 303099
     },
     {
       "file": "mem-meter.js",
@@ -107,10 +107,10 @@
     },
     {
       "file": "init.js",
-      "bytes": 3700
+      "bytes": 3714
     }
   ],
-  "bytes": 1112124,
-  "sha256": "b41f889f67f49f876909d1575bd37bef9685c19303b28dcecfb74a1554f0bcc5",
+  "bytes": 1116348,
+  "sha256": "42f323ff7a3cc8e044b0618cf9b2ee1a1b35174b399c53f8aa7077cb5803eeb7",
   "nulBytes": 4
 }
