@@ -1,6 +1,6 @@
 // Exercising the controls inside a tab, rather than only opening it (#135).
 //
-// The smoke test opens all seventeen tabs and asserts nothing threw. That catches
+// The smoke test opens all eighteen tabs and asserts nothing threw. That catches
 // a module that failed to load and a render path that blew up, and it is blind
 // to the failure M4 risks: an inline `on*=` attribute naming an identifier that
 // no longer resolves. Those attributes are evaluated by the browser against the
@@ -15,7 +15,7 @@
 //                       the callee path out of each, and asks the page whether
 //                       it resolves to a function. Exhaustive over whatever is
 //                       on screen and costs one evaluate() per tab, so it runs
-//                       on all sixteen. It proves the name is *reachable*.
+//                       on all seventeen. It proves the name is *reachable*.
 //
 //   exerciseSurface()   actually clicks. #135 asks for this in those words —
 //                       "then verify by clicking, not by reading" — and it is

@@ -66,6 +66,7 @@ const TABS = [
     { id: 'arrodata',   label: 'ARRO Data',              icon: '📊' },
     { id: 'field',      label: 'Field Data',             icon: '🌡️' },
     { id: 'inspections', label: 'Inspections',           icon: '🩺' },
+    { id: 'maintenance', label: 'Site Maintenance',      icon: '🧰' },
     { id: 'export',     label: 'Export',                 icon: '📤' },
   ] },
 ];
@@ -287,7 +288,32 @@ const HELP = {
       + 'to whoever reads the numbers later, and the threshold is stored per visit — changing it '
       + 'never rewrites what a past visit was judged against.',
     ],
-    related: ['stations', 'export'],
+    related: ['stations', 'maintenance', 'export'],
+  },
+
+  maintenance: {
+    summary: 'The <code>Council Maintenance Tasks</code> sheet, digitised. A different form from the '
+           + 'six on the Inspections tab and a different question: not "is the calibration still '
+           + 'good" but <strong>who owns this, what condition is it in, and who do we ring about '
+           + 'it</strong>. Every pick-list on it is the same row in the same table the inspection '
+           + 'form reads — one source of truth, not a parallel list — and the 22 councils come from '
+           + '<code>meganet.council</code>.',
+    watch: [
+      'Every inspection sheet prints "sites on departure that are poor or have issues please '
+      + 'complete Flood Warning Council Maintenance Project form". <strong>Visits waiting for one '
+      + 'of these</strong> is that sentence as a list — the visits it was printed for and nobody '
+      + 'followed. Starting a form from one carries the link back to the inspection with it.',
+      'This family is <strong>editors-only, and more so than the inspections one</strong>: it '
+      + 'carries named contacts\' phone numbers and the "Assess and WHS" site-access notes. The '
+      + 'blank form and its pick-lists render signed out; the two lists and Save do not.',
+      'The <strong>Comms and Power panel prints a Condition and an Owner under each of its three '
+      + 'sub-columns</strong> and the schema carries one pair for the panel. The form says so on '
+      + 'the panel rather than losing it quietly — issue #148.',
+      'Nothing can be <strong>attached</strong> yet — not the canister-configuration screenshot, '
+      + 'not the benchmark photo. The table to index them exists; the upload path does not '
+      + '(issue #149). Paste what a dump says into Remarks rather than losing it.',
+    ],
+    related: ['inspections', 'stations'],
   },
 
   export: {
@@ -815,6 +841,27 @@ const state = {
     recent: null,        // last 25 visits, editors only
     recentBusy: false,
     recentError: null,
+  },
+  // Site Maintenance (#117 — lazy, same as the Inspections tab: the pick-lists
+  // are fetched the first time the tab is opened and kept for the session)
+  maint: {
+    refs: null,          // the ten vocabularies, nine of them shared with insp
+    refsLoading: false,
+    refsError: null,
+    query: '',           // the station picker's search box
+    doc: null,           // the form on screen, shaped as maintenance_activity_doc() returns it
+    stamp: null,         // updated_at the form loaded it with; the 409 contract
+    draftKey: null,      // which localStorage draft this form writes to
+    from: null,          // the inspection row this form was raised against, if any
+    dirty: false,
+    busy: false,
+    msg: null,
+    recent: null,        // last 25 maintenance forms, editors only
+    recentBusy: false,
+    recentError: null,
+    outstanding: null,   // meganet.inspection_needs_maintenance, editors only
+    outstandingBusy: false,
+    outstandingError: null,
   },
   theme: localStorage.getItem('mn-theme') || 'light',
 };

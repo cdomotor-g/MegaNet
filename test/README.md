@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the six that run in CI
+npm run all                       # the seven that run in CI
 ```
 
 | Command | What it does |
@@ -25,18 +25,20 @@ npm run all                       # the six that run in CI
 | `npm run check` | `node --check` over every script `index.html` loads |
 | `npm run names` | no duplicate top-level declarations across those scripts |
 | `npm run toplevel` | `init.js` is still the only file that executes at load |
-| `npm run smoke` | loads the page in Chromium, opens all 17 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
+| `npm run smoke` | loads the page in Chromium, opens all 18 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
 | `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
+| `npm run maint` | the Council Maintenance Tasks form renders what the workbook's own filled sheet says — with the fixture read out of the `.xlsx` |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the six that run in CI |
+| `npm run all` | the seven that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
 `toplevel` and `registry` take `-v` too, to list what passed as well as what did
 not.
 
-CI runs `check`, `names`, `toplevel`, `smoke`, `registry` and `insp` on every push that touches a root `*.js`,
-`index.html`, `styles.css`, `stations.json`, `db/migrations/` or `test/` — see
+CI runs `check`, `names`, `toplevel`, `smoke`, `registry`, `insp` and `maint` on every push that touches a root `*.js`,
+`index.html`, `styles.css`, `stations.json`, `db/migrations/`, `test/` or the
+inspection workbook in `archive/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's
 script list grew as `app.js` was split up — `core.js` and `init.js` in M1, ten
 module files in M2, fourteen more in M3, `rf-changes.js` and `workbench.js` in
@@ -64,7 +66,7 @@ directory would not change what a browser loads.
 tool, and someone opening `index.html` off a laptop with no server is
 anticipated. But it is a bad mode to *test* in: over `file://` the bundled
 `stations.json` is unreachable (`autoLoad()` says so at `app.js:188`), so
-`state.data` stays null and twelve of the seventeen tabs render the empty state
+`state.data` stays null and thirteen of the eighteen tabs render the empty state
 instead of themselves. A smoke test that never draws a station table proves very
 little.
 
@@ -115,7 +117,7 @@ nothing inside one. `lib/controls.mjs` closes that, two ways:
 
 **`auditHandlers()`** reads every `on*=` attribute the tab rendered, pulls the
 callee paths out of it and asks the page whether each resolves to a function.
-One `evaluate()` per tab, so it runs on all sixteen — 313 distinct handler calls
+One `evaluate()` per tab, so it runs on all seventeen — 313 distinct handler calls
 across 5,578 attributes on a full pass. It is exhaustive over whatever is on
 screen, which is its advantage and also its limit: a control that did not render
 is a control it did not check.
@@ -187,7 +189,7 @@ something, so say why.
 
 ### `registry.mjs` — the half smoke cannot see
 
-Smoke opens all seventeen tabs. It never *leaves* one, so a tab that forgot to
+Smoke opens all eighteen tabs. It never *leaves* one, so a tab that forgot to
 register its Leaflet map or its teardown passes: the tab itself is fine. It is
 the leaving that isn't, and it fails in silence — a map missing from the
 re-measure list renders at the wrong size after a nav collapse, a module missing
@@ -256,6 +258,50 @@ Confirmed red on three deliberate breaks before being trusted — offering a
 calibration block the guard would refuse, dropping a section from the render,
 and sending the document unpruned.
 
+### `maintenance.mjs` — the same blind spot, a different claim
+
+The Site Maintenance tab is invisible to smoke for exactly the reason the
+Inspections tab is: it renders from the datastore, and smoke blocks it. So the
+first half of this check is `inspections.mjs`'s — the ten vocabularies are
+parsed out of `0009` by `lib/migration.mjs`, which both files now share.
+
+The second half is different, and it is the interesting one. The inspection
+form's claim is *the matrix decides which sections print*, so its test renders
+the matrix. The Council form has no matrix — there is one sheet, and its layout
+does not vary. Its claim is **fidelity to a piece of paper**, and the paper is
+in the repo: `archive/Inspection sheets for printing.xlsx` holds the blank
+template and `Council Maint Tasks Mt Kanigan`, the same sheet filled in at a
+real station.
+
+So `lib/xlsx.mjs` reads the workbook — a zip of XML, both halves of which are in
+Node's standard library, which is why this needed no new dependency — and the
+check drives the filled sheet through the form. Two assertions come out of that
+which a hand-written fixture could not make:
+
+- **Every cell where the filled sheet differs from the blank template is either
+  mapped onto a column or named in `UNMAPPED` with the reason.** A value
+  somebody wrote on that sheet cannot go missing quietly, and replacing the
+  workbook with a fuller example fails this until somebody has looked at the new
+  cells. (There is one entry: an unlabelled "HS" in the Rainfall panel that has
+  no printed box to be the value of.)
+- **Every printed pick-list word resolves against the migration's own `label`.**
+  That is #117's "one source of truth, not a parallel list" as a check rather
+  than a claim: the workbook says `Poor (add comments below)`, so does
+  `meganet.condition_rating`, and that is why the key is `poor`.
+
+The rest: the nine sections render in the sheet's print order, a blank form
+materialises the three asset panels and the two data-quality rows, no panel
+offers a box its check constraint would refuse, the uncaptured boxes are stated
+on the sections that print them, every filled value is read back **out of the
+DOM** rather than out of `state`, a save round-trips it and prunes the panels
+nobody filled in, and the printed cross-reference works in both directions —
+the outstanding list starts a linked form, and the button at the foot of a
+saved inspection that departed poor lands on this tab with the link made.
+
+`lib/xlsx.mjs` is not an xlsx library and does not try to be: cell references to
+the text Excel would show, no styles, no formulas, no dates. It fails loudly on
+anything else, which is the right failure for a fixture reader.
+
 ## Using `concat-verify.mjs` across a split
 
 The only claim that matters when a milestone cuts `app.js` is *the split lost
@@ -296,7 +342,7 @@ without looking, and a verifier nobody looks at verifies nothing.
 
 ## When the tests need updating
 
-- **A tab was added or removed.** `smoke.mjs` asserts `TABS` holds 17 entries, so
+- **A tab was added or removed.** `smoke.mjs` asserts `TABS` holds 18 entries, so
   that a tab added without a `renderMain()` case fails here rather than in front
   of an operator. Give the new tab a `renderMain()` case and a `HELP` entry, then
   bump `EXPECTED_TABS`.
@@ -325,6 +371,12 @@ without looking, and a verifier nobody looks at verifies nothing.
 - **A module needs something to happen at load.** It goes in `init.js`. Anywhere
   else and `npm run toplevel` goes red, which is the point: everything else
   declares, and that is what makes the load order safe to add to.
+- **A form tab grew a field.** `npm run insp` and `npm run maint` both take
+  their fixtures out of files in the repo — the migration and the workbook — so
+  a new column with a seeded vocabulary needs nothing here. A new *box on the
+  paper* does: add its cell to the map at the top of `maintenance.mjs`, or the
+  diff assertion will report it as unaccounted for, which is the intended
+  behaviour and not a nuisance.
 - **A member was added to `RfChanges` or `Workbench` that an `on*=` attribute
   names.** Add it to `CONTROL_SCRIPT` in `lib/controls.mjs`. Nothing forces you
   to; the coverage line at the end of the run (`controls: workbench — 18/18

@@ -78,6 +78,7 @@ MegaNet/
 ├── export.js               ← Export tab
 ├── station-editor.js       ← the station editor card on the Stations tab
 ├── inspections.js          ← Inspections — the six paper inspection sheets, digitised
+├── maintenance.js          ← Maintenance — Site Maintenance tab, the Council sheet
 │                             ↓ the ten modules #133 lifted out of it, one each
 ├── map-rivers.js           ← MapRivers — OSM watercourses under the station pins
 ├── map-spider.js           ← MapSpider — fans overlapping pins out on leader lines
@@ -150,7 +151,7 @@ MegaNet/
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
 ├── test/                   ← the web app's safety net (see test/README.md, and Testing below)
-│   ├── smoke.mjs            (headless Chromium: load, open all 17 tabs, clean console)
+│   ├── smoke.mjs            (headless Chromium: load, open all 18 tabs, clean console)
 │   ├── dup-names.mjs        (no duplicate top-level names across the loaded scripts)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
 │   ├── syntax-check.mjs     (node --check over every script index.html loads)
@@ -485,14 +486,21 @@ select station_name, inspected_on, parameter, on_departure_label
  where not has_maintenance_activity order by inspected_on desc;
 ```
 
+That view is the **Site Maintenance** tab's picker: the visits the instruction
+was printed for and nobody followed, each one a button that starts the Council
+form with the link back to the visit already made. The other direction is a
+button at the foot of an inspection that departed poor — which appears only once
+that inspection has been saved, because the link is a foreign key and needs a row
+to point at.
+
 Unlike the station list and the readings, **none of this is readable with the
 published anon key**: the council form carries landowner contact details and
 inspection remarks carry site access notes. The pick-lists and the form matrix
 are public — they are the words on a blank form.
 
-The schema is the whole of #115; the form that writes it is #116 and #117, the
-history view is #118, and the ~35-year backfill out of the second workbook is
-epic #122. [`db/README.md`](db/README.md#station-inspections-and-maintenance-activities)
+The schema is the whole of #115; the two forms that write it are #116
+(Inspections) and #117 (Site Maintenance), the history view is #118, and the
+~35-year backfill out of the second workbook is epic #122. [`db/README.md`](db/README.md#station-inspections-and-maintenance-activities)
 has the design decisions and the write path; `tools/check_inspections.sql` proves
 it in 71 checks.
 
@@ -1092,7 +1100,7 @@ on a narrow window.
 | --- | --- |
 | **Network** | Stations · Network Maps · Networks · Pass Ranges |
 | **Radio investigation** | RF Environment · RF Changes · Interference Workbench · Bit Flipper · Network View · ALERT Packets · ALERT2 / ERT-A2 · Serial Monitor |
-| **Data & admin** | ARRO Launcher · ARRO Data · Field Data · Inspections · Export |
+| **Data & admin** | ARRO Launcher · ARRO Data · Field Data · Inspections · Site Maintenance · Export |
 
 The grouping is the point of the second row: RF Environment, RF Changes, the
 Workbench and Bit Flipper are one investigation approached four ways, and
@@ -1722,6 +1730,10 @@ Tabs / panels:
 - **Inspections** — the six paper station-inspection sheets, digitised: one form
   driven by `meganet.inspection_form`, drafts on the device, and the printed 6%
   tip-test rule computed rather than read
+- **Site Maintenance** — the Council Maintenance Tasks sheet, digitised: the
+  stewardship form rather than the calibration one, sharing every pick-list with
+  the inspection form, and listing the visits whose departure rating asked for
+  one and never got it
 - **Export** — Radio Mobile file generation
 
 Technology: Vanilla JS (no framework), same stack as current `app.js`.
@@ -1995,9 +2007,10 @@ Six checks, in ascending order of cost:
 | `npm run check` | a broken brace, in under a second, before a browser is launched |
 | `npm run names` | a second `function esc()` in another file silently overwriting the first |
 | `npm run toplevel` | a statement that executes at load in a file that should only declare — the property the load order in `index.html` rests on |
-| `npm run smoke` | the page loading and all 17 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
+| `npm run smoke` | the page loading and all 18 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
 | `npm run registry` | a Leaflet map or a tab teardown no file registered — and, at runtime, one that was registered and does not fire |
 | `npm run insp` | the Inspections form drawn against the schema's own seed data, on all six sheets. Smoke cannot see this one: it blocks the datastore, and this tab renders from it |
+| `npm run maint` | the Council Maintenance Tasks form drawn against the workbook's own filled sheet, read out of the `.xlsx` in `archive/`. Every cell where that sheet differs from the blank template has to be either on screen or named as having no column |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and

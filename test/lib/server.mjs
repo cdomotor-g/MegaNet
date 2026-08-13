@@ -3,7 +3,7 @@
 // The smoke test could load index.html over `file://` — the app supports that
 // mode on purpose — but it deliberately does not. Over `file://` the bundled
 // `stations.json` is unreachable (autoLoad() says so at app.js:1671), so
-// `state.data` stays null and twelve of the seventeen tabs render the empty state
+// `state.data` stays null and thirteen of the eighteen tabs render the empty state
 // instead of themselves. A smoke test that never draws a station table is not
 // testing much. So: http on loopback, real data, real render paths.
 

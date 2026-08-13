@@ -8,10 +8,11 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, DB_URL and DB_SCHEMA (via
 // datastore.js only), registerTabTeardown; across to app.js for switchTab and
-// goToStation from inline handlers, so at click time; to auth.js for Auth; and
-// to datastore.js for dbSelect, dbRpc and dbCanWrite. Nothing reaches into this
-// file: the tab is rendered from renderMain()'s one case and nothing else calls
-// in.
+// goToStation from inline handlers, so at click time; to auth.js for Auth; to
+// datastore.js for dbSelect, dbRpc and dbCanWrite; and to maintenance.js for
+// Maintenance.startFrom(), from the prompt at the foot of a visit that departed
+// poor — the printed cross-reference, followed. Nothing reaches into this file:
+// the tab is rendered from renderMain()'s one case and nothing else calls in.
 //
 // The IIFE body builds its field tables and calls nothing, so this file's
 // position among the modules is free — checked, not reasoned about
@@ -1629,9 +1630,14 @@ const Inspections = (function () {
       please complete Flood Warning Council Maintenance Project form</p>`;
   }
 
+  // The instruction is a button once the visit is in the database, and only
+  // then: `maintenance_activity.inspection_id` is a foreign key, so there has
+  // to be a row for it to point at. An unsaved visit says so rather than
+  // offering a link that would save a maintenance form pointing at nothing.
   function crossRefTextHtml() {
     const flagged = needsMaintenance();
     if (!flagged.length) return '';
+    const doc = S().doc;
     const LABEL = { rain: 'Rain', water_level: 'Water Level' };
     return `
       <div class="insp-prompt">
@@ -1640,12 +1646,14 @@ const Inspections = (function () {
           `${esc(LABEL[f.parameter] || f.parameter)} left at <em>${esc(f.label)}</em>`).join(' · ')}
           — the sheet asks for a Flood Warning Council Maintenance Project form for a site that
           departs like this, and <code>meganet.maintenance_activity.inspection_id</code> is where
-          that record would point back to this one.</p>
-        <p class="small insp-muted">The Council Maintenance Tasks form is issue #117 and is not
-          built yet, so this is a prompt rather than a button. Saving this inspection records the
-          departure rating, and <code>meganet.inspection_needs_maintenance</code> lists every visit
-          the instruction was printed for and nobody followed — so nothing is lost by the form
-          arriving later.</p>
+          that record points back to this one.</p>
+        ${doc.id
+          ? `<p class="small"><button class="primary" onclick="Inspections.raiseMaintenance()">
+               Raise the Council Maintenance Tasks form for this visit</button></p>`
+          : `<p class="small insp-muted">Save this inspection first — the link is a foreign key, so
+               there has to be a saved visit for the maintenance form to point at. The
+               <strong>Site Maintenance</strong> tab also lists every visit the instruction was
+               printed for and nobody followed, so nothing is lost by raising it later.</p>`}
       </div>`;
   }
 
@@ -2060,6 +2068,28 @@ const Inspections = (function () {
 
   function refresh() { loadRecent(); repaint(); }
 
+  // The printed instruction at the foot of the sheet, followed. Assembled here
+  // rather than serialised into the button's own attribute: the document is
+  // right here, and a JSON blob inside an on*= attribute is a second escaping
+  // layer nobody needs. The parameter named is the last flagged one, which on a
+  // sheet with both is Water Level — the reading the crew is most likely to be
+  // going back for.
+  function raiseMaintenance() {
+    const doc = S().doc;
+    const flagged = needsMaintenance();
+    if (!doc || !doc.id || !flagged.length) return;
+    const worst = flagged[flagged.length - 1];
+    Maintenance.startFrom({
+      inspection_id: doc.id,
+      station_id: doc.station_id || null,
+      station_name: doc.station_name || '',
+      cbm_no: doc.cbm_no || '',
+      inspected_on: doc.inspected_on,
+      parameter: worst.parameter,
+      on_departure_label: worst.label,
+    });
+  }
+
   // ── Init ───────────────────────────────────────────────────────────────────
 
   function init() {
@@ -2075,7 +2105,7 @@ const Inspections = (function () {
   return {
     render, init, set, setExtra, search, pick, setConfig, close, save,
     saveDraft: () => writeDraft(true),
-    open, resume, discard, retry, refresh,
+    open, resume, discard, retry, refresh, raiseMaintenance,
     addSerial, removeSerial, addValue, removeValue, addFade, removeFade,
   };
 })();

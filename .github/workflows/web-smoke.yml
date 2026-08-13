@@ -30,6 +30,9 @@ on:
       # The Inspections check reads its fixture out of the migration, so a
       # change to the matrix has to re-run it (#116).
       - 'db/migrations/**'
+      # The Site Maintenance check reads its filled example out of the workbook
+      # itself, so replacing the workbook has to re-run it (#117).
+      - 'archive/Inspection sheets for printing.xlsx'
       - '.github/workflows/web-smoke.yml'
   pull_request:
     paths:
@@ -41,6 +44,9 @@ on:
       # The Inspections check reads its fixture out of the migration, so a
       # change to the matrix has to re-run it (#116).
       - 'db/migrations/**'
+      # The Site Maintenance check reads its filled example out of the workbook
+      # itself, so replacing the workbook has to re-run it (#117).
+      - 'archive/Inspection sheets for printing.xlsx'
       - '.github/workflows/web-smoke.yml'
   workflow_dispatch:
 
@@ -118,6 +124,15 @@ jobs:
       - name: Inspections — the form renders what the matrix says
         working-directory: test
         run: npm run insp
+
+      # Same blind spot, different claim. The Council Maintenance Tasks form
+      # does not render from a matrix — there is one sheet — so what it has to
+      # be checked against is the piece of paper. This one drives the workbook's
+      # own filled example through the form and requires every value on that
+      # sheet to be either on screen or named as having no column (#117).
+      - name: Site Maintenance — the Council sheet, against the workbook
+        working-directory: test
+        run: npm run maint
 
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —

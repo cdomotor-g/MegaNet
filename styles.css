@@ -4387,6 +4387,218 @@ code {
 }
 
 
+/* ── Site Maintenance tab (#117) ─────────────────────────────────────────────
+   The Council Maintenance Tasks sheet. Visually the same family as the
+   Inspections tab above — same banner-headed block, same dense field grid —
+   because it comes out of the same workbook and is printed with the same
+   conventions, and a crew that recognises one should recognise the other.
+
+   It is a separate set of selectors rather than a shared one, and that is the
+   deliberate reading of #113's constraint 2: a tab that is not #109 owns its
+   own region and nothing else, so that #107's per-tab issues can restyle one
+   tab without moving another. Where the two tabs genuinely have to agree —
+   tokens, the panel, the button row — they already do, through the shared
+   rules neither of them touches. */
+
+.mnt-page {
+  padding: 1rem;
+  display: grid;
+  gap: .75rem;
+  max-width: 1180px;      /* an A4 page is not 2000 px wide, and neither is a form */
+  margin: 0 auto;
+}
+
+.mnt-sub { color: var(--muted); margin: .2rem 0 .4rem; }
+
+.mnt-head-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+.mnt-note { padding: 1rem; }
+.mnt-bad  { border-left: 3px solid var(--bad); }
+
+/* The picker: search and the outstanding-visit list on the left, drafts and
+   past forms on the right. */
+.mnt-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: .75rem;
+  align-items: start;
+}
+
+.mnt-search { display: grid; gap: .3rem; font-size: .9rem; color: var(--muted); }
+
+.mnt-hits {
+  display: grid;
+  gap: .2rem;
+  margin: .6rem 0;
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.mnt-hit {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .75rem;
+  text-align: left;
+  width: 100%;
+  padding: .35rem .5rem;
+}
+
+.mnt-hit-name { font-weight: 600; }
+.mnt-muted    { color: var(--muted); }
+
+.mnt-list { display: grid; gap: .1rem; }
+
+.mnt-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .5rem;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mnt-row:last-child { border-bottom: 0; }
+
+.mnt-drop {
+  margin-left: auto;
+  padding: .1rem .4rem;
+  font-size: .78rem;
+  border-color: #c7401a;
+  color: #c7401a;
+}
+
+/* ── The form ── */
+
+.mnt-section { padding: 0 .9rem .9rem; }
+
+.mnt-banner {
+  display: flex;
+  align-items: baseline;
+  gap: .6rem;
+  margin: 0 -.9rem .6rem;
+  padding: .45rem .9rem;
+  background: var(--subtle);
+  border-bottom: 1px solid var(--border);
+  border-radius: 10px 10px 0 0;
+  font-weight: 700;
+}
+
+.mnt-banner-ord {
+  font-weight: 400;
+  font-size: .75rem;
+  color: var(--muted);
+  min-width: 1.2rem;
+}
+
+.mnt-banner-label { font-size: 1rem; }
+
+.mnt-block {
+  margin: .9rem 0 .35rem;
+  font-size: .85rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+
+.mnt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: .5rem .7rem;
+}
+
+.mnt-field { display: grid; gap: .2rem; align-content: start; }
+.mnt-field.full { grid-column: 1 / -1; }
+
+.mnt-label {
+  display: block;
+  font-size: .82rem;
+  color: var(--muted);
+  line-height: 1.25;
+}
+
+.mnt-hint {
+  display: block;
+  font-size: .72rem;
+  font-style: italic;
+  opacity: .85;
+}
+
+.mnt-field input,
+.mnt-field select,
+.mnt-field textarea { width: 100%; }
+
+/* The data-quality grid. Two rows and four columns on paper, and it stays that
+   shape rather than folding into a column. */
+.mnt-scroll { overflow-x: auto; margin: .3rem 0 .5rem; }
+
+.mnt-table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+
+.mnt-table th,
+.mnt-table td {
+  border: 1px solid var(--border);
+  padding: .2rem .3rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.mnt-table thead th {
+  background: var(--subtle);
+  font-size: .75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mnt-table input,
+.mnt-table select { width: 100%; min-width: 5.5rem; }
+
+.mnt-table .mnt-rowhead { background: var(--subtle); white-space: nowrap; }
+
+/* Where a form came from, when an inspection sent somebody. */
+.mnt-linked {
+  margin: .5rem 0 0;
+  padding: .35rem .5rem;
+  border-left: 3px solid var(--border);
+  background: var(--subtle);
+  border-radius: 0 6px 6px 0;
+}
+
+.mnt-prompt {
+  margin-top: .6rem;
+  padding: .6rem .7rem;
+  border: 1px solid var(--warn);
+  border-left-width: 3px;
+  border-radius: 6px;
+  background: var(--subtle);
+}
+
+.mnt-prompt p { margin: .3rem 0 0; }
+
+/* A box the sheet prints and the schema cannot yet hold. Visible on purpose. */
+.mnt-gap {
+  margin-top: .7rem;
+  padding: .5rem .7rem;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+.mnt-gap ul { margin: .3rem 0 .3rem 1.1rem; }
+.mnt-gap p  { margin: .3rem 0 0; }
+
+.mnt-foot { display: grid; gap: .5rem; }
+
+@media (max-width: 900px) {
+  .mnt-cols { grid-template-columns: minmax(0, 1fr); }
+  .mnt-page { padding: .6rem; }
+}
+
+@media (max-width: 560px) {
+  .mnt-grid { grid-template-columns: minmax(0, 1fr); }
+  .mnt-banner { margin-left: -.6rem; margin-right: -.6rem; padding-left: .6rem; }
+  .mnt-section { padding: 0 .6rem .6rem; }
+}
+
+
 /* iOS Safari zooms the page when a field smaller than 16 px takes focus, and
    never zooms back out. Every text-entry control in the app is .9 rem or less,
    so on a touch device they are all bumped to exactly 16 px — the one number
@@ -4398,6 +4610,7 @@ code {
   input[type="date"],
   input[type="password"],
   input[type="email"],
+  input[type="tel"],
   textarea,
   select {
     font-size: 16px;

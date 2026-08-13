@@ -3,7 +3,7 @@
 // Why this is a check of its own rather than another tab in `npm run smoke`.
 //
 // Smoke's network policy aborts every off-origin request, which is exactly
-// right for the other sixteen tabs — the run is deterministic and needs no
+// right for the other seventeen tabs — the run is deterministic and needs no
 // network. But this tab renders *from* the datastore: the sections a
 // configuration prints come out of `meganet.inspection_form`, and every
 // pick-list on the form comes out of a lookup table. Under smoke's policy the
@@ -37,8 +37,7 @@
 // Run:  npm run insp
 //       npm run insp -- -v    also print what passed
 
-import fs from 'node:fs';
-import { repo } from './lib/paths.mjs';
+import { formFixture } from './lib/migration.mjs';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
@@ -55,104 +54,10 @@ function check(name, pass, detail = '') {
 }
 
 // ── The seed data, read out of the migration ─────────────────────────────────
-// Every `insert into meganet.X (cols) values (…), (…)` in 0009. The tuples are
-// plain: single-quoted strings with '' for an embedded quote, integers, and
-// true/false. Nothing here tries to be a SQL parser — it is a reader for the
-// one statement shape this file uses, and it fails loudly rather than returning
-// an empty table, because an empty fixture is how this test would pass while
-// testing nothing.
-
-function splitTuples(body) {
-  const tuples = [];
-  let depth = 0, quoted = false, cur = '';
-  for (let i = 0; i < body.length; i++) {
-    const c = body[i];
-    if (quoted) {
-      if (c === "'" && body[i + 1] === "'") { cur += "''"; i++; continue; }
-      if (c === "'") { quoted = false; cur += c; continue; }
-      cur += c;
-      continue;
-    }
-    if (c === "'") { quoted = true; cur += c; continue; }
-    if (c === '(') { depth++; if (depth === 1) { cur = ''; continue; } }
-    if (c === ')') { depth--; if (depth === 0) { tuples.push(cur); continue; } }
-    if (depth > 0) cur += c;
-  }
-  return tuples;
-}
-
-function splitValues(tuple) {
-  const out = [];
-  let quoted = false, cur = '';
-  for (let i = 0; i < tuple.length; i++) {
-    const c = tuple[i];
-    if (quoted) {
-      if (c === "'" && tuple[i + 1] === "'") { cur += "'"; i++; continue; }
-      if (c === "'") { quoted = false; continue; }
-      cur += c;
-      continue;
-    }
-    if (c === "'") { quoted = true; continue; }
-    if (c === ',') { out.push(cur.trim()); cur = ''; continue; }
-    cur += c;
-  }
-  out.push(cur.trim());
-  // A bare word that survived unquoted is a number or a boolean; anything that
-  // was quoted has already had its quotes taken off, and a quoted empty string
-  // arrives here as ''. Distinguishing the two matters only for `''`, which is
-  // a legitimate value in this file and reads as an empty string either way.
-  return out;
-}
-
-function seedRows(sql, table) {
-  const re = new RegExp(
-    `insert into meganet\\.${table}\\s*\\(([^)]*)\\)\\s*values([\\s\\S]*?)\\non conflict`, 'i');
-  const m = sql.match(re);
-  if (!m) throw new Error(`no seed insert found for meganet.${table} in 0009`);
-  const cols = m[1].split(',').map(s => s.trim());
-  const rows = splitTuples(m[2]).map(t => {
-    const vals = splitValues(t);
-    const row = {};
-    cols.forEach((c, i) => {
-      const raw = vals[i];
-      if (raw === undefined) { row[c] = null; return; }
-      if (raw === 'true' || raw === 'false') { row[c] = raw === 'true'; return; }
-      if (/^-?\d+(\.\d+)?$/.test(raw)) { row[c] = Number(raw); return; }
-      // Doubled percent signs are printf escapes in the migration's COMMENT
-      // strings; they do not appear in a value, but strip them if one ever does.
-      row[c] = raw;
-    });
-    return row;
-  });
-  if (!rows.length) throw new Error(`meganet.${table} parsed to zero rows`);
-  return rows;
-}
-
-function buildFixture() {
-  const sql = fs.readFileSync(repo('db', 'migrations', '0009_inspections.sql'), 'utf8');
-  const tables = {};
-  for (const t of ['inspection_config', 'inspection_section', 'inspection_config_section',
-                   'calibration_kind', 'rain_instrument_type', 'condition_rating',
-                   'wl_instrument_type', 'power_supply', 'yes_no', 'data_quality_rating',
-                   'equipment_kind']) {
-    tables[t] = seedRows(sql, t);
-  }
-  // meganet.inspection_form, composed the way the view composes it.
-  const byCfg = Object.fromEntries(tables.inspection_config.map(c => [c.key, c]));
-  const bySec = Object.fromEntries(tables.inspection_section.map(s => [s.key, s]));
-  tables.inspection_form = tables.inspection_config_section.map(cs => ({
-    config_key: cs.config_key,
-    config_label: byCfg[cs.config_key].label,
-    config_sheet: byCfg[cs.config_key].sheet,
-    ord: cs.ord,
-    section_key: cs.section_key,
-    section_label: bySec[cs.section_key].label,
-    section_home: bySec[cs.section_key].home,
-    section_note: bySec[cs.section_key].note,
-    variant_note: cs.variant_note,
-  }));
-  return tables;
-}
+// Every `insert into meganet.X (cols) values (…), (…)` in 0009, parsed rather
+// than copied — see lib/migration.mjs for the reader and for why the fixture
+// has to come out of the migration itself. The reader moved there at #117,
+// which needs the same ten vocabularies for the same reason.
 
 // ── The datastore, answered from the fixture ─────────────────────────────────
 // Installed *after* the network policy, so Playwright reaches it first: the
@@ -206,7 +111,7 @@ function installDatastore(page, tables, saved) {
 // ── The run ──────────────────────────────────────────────────────────────────
 
 async function main() {
-  const tables = buildFixture();
+  const tables = formFixture();
   check(`0009 parsed — ${tables.inspection_config.length} configurations, `
       + `${tables.inspection_section.length} sections, `
       + `${tables.inspection_config_section.length} matrix rows`,

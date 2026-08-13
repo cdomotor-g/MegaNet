@@ -21,6 +21,7 @@
     "export.js",
     "station-editor.js",
     "inspections.js",
+    "maintenance.js",
     "map-rivers.js",
     "map-spider.js",
     "map-locate.js",
@@ -33,6 +34,6 @@
     "bug-report.js",
     "init.js"
   ],
-  "total": 429,
-  "distinct": 429
+  "total": 430,
+  "distinct": 430
 }

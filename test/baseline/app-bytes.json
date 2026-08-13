@@ -3,11 +3,11 @@
   "recordedFrom": [
     {
       "file": "core.js",
-      "bytes": 59631
+      "bytes": 62568
     },
     {
       "file": "app.js",
-      "bytes": 176862
+      "bytes": 176951
     },
     {
       "file": "rf-changes.js",
@@ -75,7 +75,11 @@
     },
     {
       "file": "inspections.js",
-      "bytes": 96655
+      "bytes": 101493
+    },
+    {
+      "file": "maintenance.js",
+      "bytes": 54485
     },
     {
       "file": "map-rivers.js",
@@ -122,7 +126,7 @@
       "bytes": 3714
     }
   ],
-  "bytes": 1238391,
-  "sha256": "383cd209f9bc05be4a5a5a0e53e1c399ae2f7ec3c3a5a18a2ae6fbe2fbc061e5",
+  "bytes": 1300740,
+  "sha256": "51b206e1d643d89d0401d7f557ad867a49a5b17618a1634ae8095b3355b80efb",
   "nulBytes": 4
 }
