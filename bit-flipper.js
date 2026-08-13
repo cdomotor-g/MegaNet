@@ -1,3 +1,24 @@
+// MegaNet — bit-flipper.js
+//
+//   renderBitFlipperHtml   the Bit Flipper tab: which ALERT addresses are one
+//   initBitFlipperMap      or more bit-flips away from the one you typed, and
+//   and the bit            where those stations are on the map.
+//   arithmetic behind them
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc, ROLE_COLOR, ARRO_DEFAULT_BASE,
+// buildArroUrl and buildSensorIndex — the last three hosted here for five other
+// sections until M1 (#132) moved them out, which is what let this module leave
+// on its own. Across to app.js for addBaseLayers, primaryRole,
+// findRepeaterMatches and repeaterPassingCount.
+//
+// For the record, since #134's body says otherwise and someone will read it:
+// this module carries no NUL bytes and never has. All three of app.js's were in
+// NetworkView and are now in network-view.js — the issue misread a section
+// boundary. See the correction comment on #134.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── BIT FLIPPER tab ────────────────────────────────────────────────────────────
 
 const BF_MAX_RENDER_ROWS = 2000;   // safety cap for very large N-bit expansions

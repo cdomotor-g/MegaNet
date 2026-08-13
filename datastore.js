@@ -1,3 +1,36 @@
+// MegaNet — datastore.js
+//
+//   the datastore client   the browser's whole PostgREST layer. dbPing and
+//                          dbCheck for "is it reachable and the shape this app
+//                          expects", dbSelect and dbRpc for reads,
+//                          dbSaveStation and dbDeleteStation for writes,
+//                          dbSetAccessToken for the token, and
+//                          snapshotStationsJson for the stations.json export
+//                          that keeps the offline copy from drifting into
+//                          fiction. Plus the status panel and the editor's
+//                          status line, which report all of it.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for DB_URL, DB_ANON_KEY, DB_SCHEMA,
+// DB_SCHEMA_VERSION, _dbClock, dbHostLabel, state, esc and dlText; across to
+// app.js for SOURCE_LABELS and loadFromApi; and to auth.js for Auth, which
+// reaches back here for dbSetAccessToken.
+//
+// This was three banner sections of app.js with the Export tab sitting in the
+// middle of them; they are joined here because they are one concern. The seam
+// that did not move: renderDbStatusHtml() renders into the Export tab and
+// snapshotStationsJson() is driven by a button export.js writes, so those two
+// files are wired across a file boundary. Moving a module never moves its
+// registration — constraint 3 on #113.
+//
+// One thing here executes at load, and it is the only such thing in the whole
+// app.js lineage: _dbToken reads sessionStorage for a saved access token. It
+// touches nothing outside this file, so it does not constrain load order — but
+// it is the shape to look for before moving anything, and the reason the check
+// is worth running rather than assuming.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── Datastore status ───────────────────────────────────────────────────────────
 // The whole client, for now: one timed GET of the smallest row in the database,
 // so "is the datastore reachable from a browser, and is it the shape this app

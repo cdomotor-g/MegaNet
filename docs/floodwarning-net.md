@@ -170,7 +170,8 @@ it in this order and not in one sitting.
 
 ## Why no code changes
 
-Checked, not assumed: every asset reference in `index.html` and `app.js` is
+Checked, not assumed: every asset reference in `index.html` and the app's
+scripts is
 relative, so the app does not care whether it is served from a path
 (`/MegaNet/`) or an apex (`/`). The only absolute URLs are to
 `raw.githubusercontent.com` and to the Supabase project, neither of which depends

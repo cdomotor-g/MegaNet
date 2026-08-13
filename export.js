@@ -1,3 +1,19 @@
+// MegaNet — export.js
+//
+//   renderExportHtml   the Export tab: pick radio networks, get Radio Mobile
+//   and the export     and CSV output for what is on them.
+//   builders behind it
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc, netName, csvEscape, dlText and
+// RM_NET_DEFAULTS; across to app.js for findStationMatches, stationAlertIds and
+// repeaterPassingCount; and to datastore.js for renderDbStatusHtml, which
+// renders the datastore panel this tab hosts. The snapshot button written here
+// calls snapshotStationsJson() over in datastore.js for the same reason — see
+// that file's header.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── EXPORT tab ─────────────────────────────────────────────────────────────────
 
 function renderExportHtml() {

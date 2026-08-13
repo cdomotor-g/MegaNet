@@ -1,3 +1,24 @@
+// MegaNet — arro-data.js
+//
+//   ArroData   the ARRO Data tab: reads ARRO's per-sensor CSV exports in the
+//              browser — nothing is uploaded — links each file back to the
+//              station that produced it, runs the Bureau's 3-5-7 continuity
+//              filter over it, and draws raw against filtered.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc, escAttr, csvEscape, dlText, slug,
+// arroSiteId, arroSensorUrl, bucketSizeMm and dbHostLabel; across to app.js for
+// renderMain and renderTabs; to datastore.js for dbSelect; and to modal.js for
+// Modal.
+//
+// 3,272 lines, the largest of the fourteen and the subject of #128. Moving it
+// gave it a file; it did not decompose it, and the file size is not an
+// invitation to start. The whole point of the tab is seeing what the filter
+// removed, so raw and filtered are two views of one immutable import — the
+// parsed arrays are never written to after import. Do not optimise that away.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── ARRO DATA tab (CSV import, 357 filter, plotting) ───────────────────────────
 // ARRO exports one CSV per sensor. This tab reads them in the browser — nothing
 // is uploaded — links each file back to the station that produced it, runs the

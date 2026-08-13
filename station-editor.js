@@ -1,6 +1,32 @@
+// MegaNet — station-editor.js
+//
+//   editorForm     the station editor card below the stations list on the
+//   editorSave     Stations tab: the form, what it derives from what is typed
+//   editorDelete   into it, and the save and delete path behind it.
+//   and the form
+//   helpers
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc, escAttr, slug, pInt, pFloat,
+// parseRangeLines, mapLinksHtml, stationMapLinkUrls, stationSensors,
+// arroSiteId, arroSiteUrl, arroSensorUrl, buildArroUrl, bucketSizeGapNote and
+// ROLE_LABEL; across to app.js for the Stations tab's rerender hooks —
+// rerenderStations, rerenderStationEditorCard, refreshFilterOptions,
+// updateHeaderStats, findStationMatches, stationAlertIds, passRangeCoversId,
+// repeaterPassingCount and repeaterPassRangeSpan; to auth.js for Auth; and to
+// datastore.js for dbCanWrite, dbSaveStation, dbDeleteStation, setEditorStatus,
+// editorStatusHtml and editorWritesGoToDatabase.
+//
+// This file is the form, not its host. The card is rendered by the Stations
+// tab, which is frozen in app.js for the whole of #129 — so a change to where
+// the editor appears is an app.js change, and a change to what it contains is
+// one here.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── STATION EDITOR (card on the Stations tab) ────────────────────────────────────
 // The editor lives below the stations list on the Stations tab: selecting a row
-// loads it here (see selectStation / renderStationEditorCard above). "+ New"
+// loads it here (see selectStation / renderStationEditorCard, in app.js). "+ New"
 // clears the selection and opens a blank form.
 
 function editorNew() {

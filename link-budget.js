@@ -1,3 +1,26 @@
+// MegaNet — link-budget.js
+//
+//   LinkBudget     pick two points, get a fade margin. Either end can be a
+//                  station, which fills itself in from rm_systems, or an
+//                  arbitrary point on the ground — which is what makes it
+//                  useful for a relocation nobody has visited yet.
+//   LB_MARGIN      the margin bands, and the class that colours them.
+//   lbMarginClass
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc, fmtKm, acmaHaversineKm and
+// RM_NET_DEFAULTS; across to app.js for mapNote; and sideways to
+// path-profile.js for PATH_DEFAULT_MHZ, PATH_DEFAULT_AGL, PATH_VERDICT, fsplDb,
+// wattsToDbm, rmSystemOf and PathProfile, to map-draw.js for MapDraw and to
+// terrain.js for Terrain. See path-profile.js's header for why the mutual
+// reference constrains nothing.
+//
+// The number this produces is indicative and optimistic; the banner that cannot
+// be dismissed and the comparison table under it are there so the figure cannot
+// be read as more than it is. Do not quietly make it look more confident.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── Link budget ──────────────────────────────────────────────────────────────
 // Pick two points on the map, get a fade margin. Either end can be a station —
 // which fills itself in from rm_systems — or an arbitrary point on the ground,

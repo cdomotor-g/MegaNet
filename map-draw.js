@@ -1,3 +1,23 @@
+// MegaNet — map-draw.js
+//
+//   MapDraw       sketching and measuring over the Stations map: coverage
+//                 circles, proposed paths, boxes and notes — drawn by clicking
+//                 or typed in as coordinates and real-world dimensions.
+//   DRAW_TOOLS    the tool palette.
+//   DRAW_COLOURS  the swatches.
+//   fmtArea       the area formatter the shape labels use.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc, escAttr, bearingDeg, destPoint,
+// fmtKm, kmPerDegLon, KM_PER_DEG_LAT and acmaHaversineKm — four of which this
+// module hosted for the rest of the app until M1 (#132) moved them, which is
+// why it can now leave without taking them with it. Across to app.js for
+// mapNote and addToMapSelection, and sideways to path-profile.js for
+// PathProfile, which reaches back here for MapDraw. Mutual, and free: the IIFE
+// body only defines.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── Draw & measure ───────────────────────────────────────────────────────────
 // Sketching over the network map: a coverage circle round a repeater, a
 // proposed path, a box round the part of a catchment that went quiet, and a

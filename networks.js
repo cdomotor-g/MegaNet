@@ -1,3 +1,15 @@
+// MegaNet — networks.js
+//
+//   renderNetworksHtml   the Networks tab: one card per radio network, with
+//                        what is on it.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// The smallest of the fourteen and the only one that reaches nowhere but
+// core.js, for state and esc. app.js's renderMain() calls it — which is the
+// registration that did not move with it (constraint 3 on #113).
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── NETWORKS tab ───────────────────────────────────────────────────────────────
 
 function renderNetworksHtml() {

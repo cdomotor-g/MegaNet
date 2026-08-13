@@ -1,3 +1,26 @@
+// MegaNet — path-profile.js
+//
+//   PathProfile   the elevation-profile card on the Stations map: the ground
+//                 between two points, with the Fresnel zone over it.
+//   the path      fresnelR1, earthBulge, fresnelV, knifeEdgeDb, fsplDb,
+//   physics       wattsToDbm, rmSystemOf, pathAnalyse, PATH_VERDICT and the
+//                 PATH_* constants. Shared with link-budget.js, which is why
+//                 they travel with this file rather than with the budget.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc and fmtKm; sideways to terrain.js for
+// Terrain, map-draw.js for MapDraw and link-budget.js for LinkBudget.
+//
+// #134 flagged the PathProfile <-> LinkBudget pair as an ordering constraint to
+// settle before either could move. Settled by asking what each IIFE *executes*
+// rather than what it references: across the whole of app.js, all 448 top-level
+// statements were declarations, four window.X exports and one sessionStorage
+// read. Neither of these two calls the other at load, so the order of the two
+// files is free — the same answer M2 got for Alert2 <-> Serial, for the same
+// reason: init.js is still the only thing that runs.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── Path physics ─────────────────────────────────────────────────────────────
 // The maths shared by the elevation profile and the link budget. Deliberately
 // small and deliberately visible: every term below turns up as its own line in

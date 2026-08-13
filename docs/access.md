@@ -104,7 +104,7 @@ somebody who has bypassed Cloudflare entirely by using the github.io URL.
 
 ### How it fits together
 
-- The sign-in panel (`Auth` in `app.js`) asks Supabase Auth (GoTrue) to email a
+- The sign-in panel (`Auth` in `auth.js`) asks Supabase Auth (GoTrue) to email a
   link and a six-digit code. No password is stored anywhere, because none exists.
 - Verifying mints a JWT. The app keeps it in `sessionStorage` and sends it as a
   bearer token on every write.

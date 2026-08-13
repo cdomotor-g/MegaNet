@@ -1,3 +1,20 @@
+// MegaNet — pass-ranges.js
+//
+//   renderPassRangesHtml   the Pass Ranges tab: which repeater carries which
+//   and the matching       ALERT ids, and what is carried by nothing at all.
+//   helpers behind it
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc, escAttr and netName, and across to
+// app.js for the whole of the shared search machinery — prepareSearch,
+// parseSearchTerms, stationMatchesSearch, findStationMatches, markHits,
+// markAlertId, stationAlertIds, passRangeCoversId and repeaterPassingCount.
+// That is the longest reach back into app.js of the fourteen, and it is
+// deliberate: this tab's filter box is meant to behave exactly like the Stations
+// one, so the two share the rules rather than reimplementing them.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── PASS RANGES tab ────────────────────────────────────────────────────────────
 
 // Does a station answer to the page's filter box? The box takes a station

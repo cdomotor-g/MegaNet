@@ -1,3 +1,17 @@
+// MegaNet — arro-launcher.js
+//
+//   renderArroHtml    the ARRO Launcher tab: a jump box for ARRO's
+//   initArro          administration pages, searchable by station name, number
+//   and the recents   or ALERT address — site.db_id is an arbitrary database
+//   list behind them  index and nobody carries 2,784 of them in their head.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc, escAttr, arroHost, arroSiteId,
+// arroSiteUrl, arroSensorUrl and stationSensors, and across to app.js for
+// prepareSearch and stationMatchesSearch.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── ARRO LAUNCHER tab ──────────────────────────────────────────────────────────
 // A jump box for ARRO's administration pages. The standalone launcher this
 // replaces could only take an id you already knew; the whole reason to bring it

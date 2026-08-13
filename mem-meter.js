@@ -1,3 +1,23 @@
+// MegaNet — mem-meter.js
+//
+//   MemMeter   the thin bar under the header and the panel behind it: what this
+//              page is holding, and a way to give some of it back (#79).
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state and esc; across to app.js for renderMain,
+// updateChromeHeight and refreshAcmaLayer; and into arro-data.js and terrain.js
+// for the two caches it can drop. All of it from inside MemMeter's own
+// functions — the IIFE body builds tables and nothing else — so this file's
+// position among the modules is free.
+//
+// The registry to be careful with is here rather than spread over the app: the
+// HOLDERS list, the byte-measurement map and the release() switch are three
+// lists of the same thing, and a feature added to one but not the others makes
+// the meter under-report in silence. That is constraint 3 on #113, and having
+// all three in one file is most of what moving this module buys.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── Memory meter ─────────────────────────────────────────────────────────────
 // A thin bar under the header, and a panel behind it, answering "how much is
 // this page holding, and can I give some back" — see issue #79. This is our

@@ -1,16 +1,30 @@
 // MegaNet — app.js
 //
-// The middle of the app.js lineage (#129): the memory meter, sign-in, and the
-// tabs that have not been lifted out yet. Loads after core.js and before the
-// module files and init.js — see the header of index.html, where the order is
-// the contract.
+// The middle of the app.js lineage (#129): what has not been lifted out yet.
+// Loads after core.js and before the module files and init.js — see the header
+// of index.html, where the order is the contract.
 //
-// This file is what is left after M1 (#132) lifted out the shared foundation
-// and the entry point, and M2 (#133) lifted out ten closed modules — MapRivers,
-// MapSpider, MapLocate, Terrain, Modal, Packets, Alert2, Maps, Serial and
-// BugReport, one file each. It is down from 22,458 lines before M1 to 21,536
-// after it and 16,160 now, and it is still the merge surface most front-end
-// issues collide on; M3 and M4 (#134/#135) take the rest.
+// What is left here, and why each of it is:
+//
+//   the theme and file-loading helpers, the side nav, the help panel and
+//   renderMain()   the app shell. #109 (U0) is the issue that owns it.
+//
+//   the Stations map core, the station table and its repeater list, and the
+//   search machinery all three share   frozen for the whole of #129: 25 of its
+//   own names are consumed by 20 other sections, and it is the hub the rest of
+//   the app hangs off. #136 (U1) owns the tab.
+//
+//   the filter helpers, the ACMA RRL layer and RF Environment   #138 (U3).
+//
+//   RF Changes and the Interference Workbench   111 flat top-level functions
+//   between them and no IIFE, so they need wrapping before they can move.
+//   That is M4, #135, and it is the last of this epic.
+//
+// It is down from 22,458 lines before M1 (#132) to 21,536 after it, 16,160
+// after M2 (#133) and 6,221 now — M3 (#134) took fourteen modules out in one
+// go. Still the largest file in the app and still the one most likely to be
+// edited by two agents at once, but 72% of the monolith now lives somewhere
+// with an owner.
 //
 // Two things to know before editing it:
 //
@@ -21,12 +35,13 @@
 //   its position in the load order mattering. That property is the whole point
 //   of M1; do not spend it by adding top-level code that runs on sight.
 //
-//   It carries 3 of the app's 4 literal NUL bytes (U+0000, inside string
-//   literals, used as compound-key separators — see #129) at lines 6154 and
-//   6218×2, which is why grep calls it binary. The fourth left with Alert2 and
-//   is now alert2.js:857. Any tool that round-trips one of these files as text
-//   and normalises control characters destroys those keys silently.
-//   `npm run concat` in test/ is what catches that.
+//   It no longer carries a NUL byte. All 3 of the ones that made grep call this
+//   file binary went with NetworkView in M3 and are now network-view.js:504 and
+//   568×2; the fourth left with Alert2 in M2 and is alert2.js:857. They are
+//   U+0000 inside string literals, used as compound-key separators (#129), and
+//   any tool that round-trips one of those two files as text and normalises
+//   control characters destroys the keys silently. `npm run concat` in test/ is
+//   what catches that, over the whole concatenation rather than per file.
 
 // Header buttons are icon + label, so the label is a span inside the button and
 // not the button's own text. Writing textContent would throw the icon away.

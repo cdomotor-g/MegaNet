@@ -28,13 +28,18 @@ so the root stays clean.
 
 The application logic was one 22,500-line `app.js` until
 [#132](https://github.com/cdomotor-g/MegaNet/issues/132) split the foundation and
-the entry point out of it and
+the entry point out of it,
 [#133](https://github.com/cdomotor-g/MegaNet/issues/133) took ten self-contained
-modules out into a file each. They are still plain classic scripts sharing one
-global scope — no modules, no bundler, no build step — so the split is a
-question of which file a function sits in and nothing else. **The order they
-load in is the contract**, stated at the top of `index.html`; later work adds
-files to that list rather than reordering it.
+modules out into a file each, and
+[#134](https://github.com/cdomotor-g/MegaNet/issues/134) took fourteen more.
+`app.js` is 6,221 lines now, and what is left in it is the app shell, the
+Stations tab, RF Environment, and the two sections that still need wrapping
+before they can move ([#135](https://github.com/cdomotor-g/MegaNet/issues/135)).
+They are still plain classic scripts sharing one global scope — no modules, no
+bundler, no build step — so the split is a question of which file a function
+sits in and nothing else. **The order they load in is the contract**, stated at
+the top of `index.html`; later work adds files to that list rather than
+reordering it.
 
 Only `init.js` runs at load. Everything above it declares, which is what makes a
 module movable to its own file without its position mattering — and what every
@@ -50,9 +55,24 @@ document*, so nothing below changes: see
 MegaNet/
 ├── index.html              ← single entry point; its script order is the contract
 ├── core.js                 ← constants, TABS/HELP, state, shared utilities
-├── app.js                  ← the memory meter, sign-in, and the tabs not yet split out
-│                             ↓ the ten modules #133 lifted out of it, one each,
-│                               loaded between app.js and init.js
+├── app.js                  ← the app shell, the Stations tab, and what is not split out yet
+│                             ↓ the fourteen modules #134 lifted out of it, one each,
+│                               loaded immediately after app.js
+├── mem-meter.js            ← MemMeter  — the memory bar, and giving memory back
+├── auth.js                 ← Auth      — Supabase sign-in, and the access token
+├── map-draw.js             ← MapDraw   — draw & measure over the Stations map
+├── path-profile.js         ← PathProfile — elevation profile, and the path physics
+├── link-budget.js          ← LinkBudget — fade margin between two points
+├── networks.js             ← Networks tab
+├── pass-ranges.js          ← Pass Ranges tab
+├── bit-flipper.js          ← Bit Flipper tab
+├── network-view.js         ← NetworkView — Network View tab (the knowledge graph)
+├── arro-launcher.js        ← ARRO Launcher tab
+├── arro-data.js            ← ArroData  — ARRO Data tab (CSV import, 357 filter, plots)
+├── datastore.js            ← the browser's PostgREST client: ping, reads, writes, snapshot
+├── export.js               ← Export tab
+├── station-editor.js       ← the station editor card on the Stations tab
+│                             ↓ the ten modules #133 lifted out of it, one each
 ├── map-rivers.js           ← MapRivers — OSM watercourses under the station pins
 ├── map-spider.js           ← MapSpider — fans overlapping pins out on leader lines
 ├── map-locate.js           ← MapLocate — GPS dot, accuracy ring, compass cone

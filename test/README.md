@@ -33,10 +33,11 @@ npm run all                       # syntax + duplicate names + smoke
 CI runs `check`, `names` and `smoke` on every push that touches a root `*.js`,
 `index.html`, `styles.css`, `stations.json` or `test/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's
-script list grows as `app.js` is split up — `core.js` and `init.js` in M1, then
-ten module files in M2 — and a filter naming each file would have to be edited by
-every milestone. M2 added ten scripts and changed not a line in this directory
-except the two baselines, which is the claim the glob was put there to make good.
+script list grows as `app.js` is split up — `core.js` and `init.js` in M1, ten
+module files in M2, fourteen more in M3 — and a filter naming each file would
+have to be edited by every milestone. M2 added ten scripts and M3 added fourteen,
+and neither changed a line in this directory except the two baselines, which is
+the claim the glob was put there to make good.
 
 ## Why this is not at the repo root
 
@@ -56,7 +57,7 @@ directory would not change what a browser loads.
 `file://` is a supported mode for the app and deliberately so — it is a field
 tool, and someone opening `index.html` off a laptop with no server is
 anticipated. But it is a bad mode to *test* in: over `file://` the bundled
-`stations.json` is unreachable (`autoLoad()` says so at `app.js:914`), so
+`stations.json` is unreachable (`autoLoad()` says so at `app.js:188`), so
 `state.data` stays null and eleven of the sixteen tabs render the empty state
 instead of themselves. A smoke test that never draws a station table proves very
 little.
@@ -109,13 +110,16 @@ The only claim that matters when a milestone cuts `app.js` is *the split lost
 nothing*. Concatenating the pieces in `index.html` order and comparing the bytes
 against the file before the cut is what proves it, and it is the only check that
 reliably catches the **4 NUL-byte hazard**: literal `U+0000` characters inside
-string literals, used as compound-key separators (see #129). Three are in
-`app.js` at lines 6154 and 6218×2; the fourth left with `Alert2` in M2 and is now
-`alert2.js:857`. (They were at 7895, 7959×2 and 19504 before M1, and 7047, 7111×2
-and 18583 between M1 and M2 — they move whenever code moves out above them, which
-is why the check counts them rather than looking them up.) A tool that
-round-trips one of these files as text and normalises control characters destroys
-those keys invisibly. A byte comparison does not care what the bytes mean.
+string literals, used as compound-key separators (see #129). `app.js` no longer
+carries any: three left with `NetworkView` in M3 and are now `network-view.js`
+lines 504 and 568×2, and the fourth left with `Alert2` in M2 and is
+`alert2.js:857`. (All four were in `app.js` at 7895, 7959×2 and 19504 before M1,
+at 7047, 7111×2 and 18583 between M1 and M2, and at 6154, 6218×2 and
+`alert2.js:857` between M2 and M3 — they move whenever code moves out above them,
+which is why the check counts them over the whole concatenation rather than
+looking them up.) A tool that round-trips one of these files as text and
+normalises control characters destroys those keys invisibly. A byte comparison
+does not care what the bytes mean.
 
 ```sh
 npm run concat -- --update    # 1. before cutting, record the baseline
@@ -146,11 +150,11 @@ without looking, and a verifier nobody looks at verifies nothing.
   bump `EXPECTED_TABS`.
 - **A script was added to `index.html`.** Nothing to do. Every check reads the
   script list out of `index.html`, so the split milestones are picked up
-  automatically — M1 added `core.js` and `init.js` and M2 added ten module files,
-  neither touching a line of test code. A file added to the repo but not wired
-  into `index.html` is invisible to the tests exactly as it is invisible to the
-  app. The two baselines under `baseline/` do have to be re-recorded, since both
-  name the script list they were taken over.
+  automatically — M1 added `core.js` and `init.js`, M2 added ten module files and
+  M3 added fourteen, none of them touching a line of test code. A file added to
+  the repo but not wired into `index.html` is invisible to the tests exactly as
+  it is invisible to the app. The two baselines under `baseline/` do have to be
+  re-recorded, since both name the script list they were taken over.
 - **The top-level declaration count moved.** Reported, never enforced — a check
   that goes red for ordinary work gets switched off. Re-record with
   `npm run names -- --update` when it drifts. A *drop* of a hundred in a split

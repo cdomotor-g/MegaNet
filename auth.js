@@ -1,3 +1,24 @@
+// MegaNet — auth.js
+//
+//   Auth   Supabase Auth (GoTrue) sign-in: obtains a token, keeps it alive,
+//          hands it to the datastore layer, and makes the signed-out state
+//          something the app renders rather than something it fails at.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for AUTH_URL, DB_URL, DB_ANON_KEY, DB_SCHEMA and esc;
+// across to app.js for setHeaderLabel and rerenderStationEditorCard; and to
+// datastore.js for dbSetAccessToken. datastore.js and station-editor.js call
+// back into Auth, so this is a cycle — which is fine in one shared global scope
+// and would not be under ESM, one of the four reasons #129 gives for classic
+// scripts. Nothing here runs at load, so neither file's position is fixed.
+//
+// This is not what keeps people out. Cloudflare Access is the perimeter
+// (docs/access.md) and meganet.is_editor() is the enforcement; this module is
+// the middle that turns a person into a token. The banner below says it at
+// length because it is the thing most likely to be misread here.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── Sign-in ──────────────────────────────────────────────────────────────────
 // The browser half of #B8. Supabase Auth (GoTrue) issues the token; this module
 // obtains one, keeps it alive, hands it to the datastore layer, and makes the

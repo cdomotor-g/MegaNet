@@ -9,8 +9,9 @@
 # nothing.
 #
 # The filter says '*.js' rather than naming the app's scripts, because #129 is
-# splitting app.js into a growing list of them (core.js and init.js so far, the
-# tab modules in #133–#135). A named list would have to be edited by every
+# splitting app.js into a growing list of them (core.js and init.js in M1, ten
+# module files in M2, fourteen more in M3, and RF Changes and the Interference
+# Workbench still to come in #135). A named list would have to be edited by every
 # milestone, and the one that forgot would silently stop being tested. Only the
 # repo root matches — test/ is covered by its own entry, and nothing else at the
 # root is JavaScript.

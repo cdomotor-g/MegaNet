@@ -1,3 +1,28 @@
+// MegaNet — network-view.js
+//
+//   NetworkView   the Network View tab: the ghosting knowledge graph. A node is
+//                 one ALERT address as transmitted by one station; an edge is
+//                 either computed (the two are one bit apart) or confirmed (the
+//                 relationship was observed, with an evidence file behind it).
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc, escAttr, csvEscape, dlText,
+// bearingDeg, arroSiteId, arroSiteUrl, stationSensors, ROLE_COLOR and
+// ROLE_LABEL; and across to app.js for MAP_HOME, MAP_LABEL_CAP, MAP_PIN_HIT,
+// MAP_PIN_RING, addBaseLayers, addToMapSelection, findRepeaterMatches,
+// goToStation, mapNote, passRangeCoversId, primaryRole, renderMain,
+// stationAlertIds and switchTab. The widest reach of the fourteen, which is
+// what 1,867 lines of graph over the Stations map costs.
+//
+// This file holds 3 of the app's 4 literal NUL bytes — U+0000 inside string
+// literals at lines 504 and 568 (two on that line), used as compound-key
+// separators (#129). Any tool that round-trips this file as text and normalises
+// control characters destroys those keys silently, and grep will call the file
+// binary. `npm run concat` in test/ is what catches it. app.js carries none
+// after M3; the fourth left with Alert2 in M2 and is alert2.js:857.
+//
+// Moved out of app.js byte-for-byte by M3 (#134) of #129.
+
 // ── NETWORK VIEW tab ───────────────────────────────────────────────────────────
 // The ghosting knowledge graph. A node is one ALERT address as transmitted by
 // one station; an edge is a relationship between two of them, and there are

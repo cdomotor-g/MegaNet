@@ -7,7 +7,63 @@
     },
     {
       "file": "app.js",
-      "bytes": 754704
+      "bytes": 298889
+    },
+    {
+      "file": "mem-meter.js",
+      "bytes": 11615
+    },
+    {
+      "file": "auth.js",
+      "bytes": 21656
+    },
+    {
+      "file": "map-draw.js",
+      "bytes": 34720
+    },
+    {
+      "file": "path-profile.js",
+      "bytes": 26077
+    },
+    {
+      "file": "link-budget.js",
+      "bytes": 25246
+    },
+    {
+      "file": "networks.js",
+      "bytes": 2963
+    },
+    {
+      "file": "pass-ranges.js",
+      "bytes": 10538
+    },
+    {
+      "file": "bit-flipper.js",
+      "bytes": 19429
+    },
+    {
+      "file": "network-view.js",
+      "bytes": 87285
+    },
+    {
+      "file": "arro-launcher.js",
+      "bytes": 15885
+    },
+    {
+      "file": "arro-data.js",
+      "bytes": 158765
+    },
+    {
+      "file": "datastore.js",
+      "bytes": 20911
+    },
+    {
+      "file": "export.js",
+      "bytes": 12277
+    },
+    {
+      "file": "station-editor.js",
+      "bytes": 24667
     },
     {
       "file": "map-rivers.js",
@@ -54,7 +110,7 @@
       "bytes": 3700
     }
   ],
-  "bytes": 1095905,
-  "sha256": "b4e3d3b0a1d988b7287f24679e9c31719fbaf9f5b3caa7a14f15809485a9b65e",
+  "bytes": 1112124,
+  "sha256": "b41f889f67f49f876909d1575bd37bef9685c19303b28dcecfb74a1554f0bcc5",
   "nulBytes": 4
 }
