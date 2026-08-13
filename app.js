@@ -514,6 +514,10 @@ const state = {
   // Stations picked off the map (by shape or by modifier-click). A third thing
   // alongside `filters` and `selectedId`: see the Map selection section below.
   mapSelection:   new Set(),
+  // The repeater a plain click last landed on, or null. While set, every
+  // marker/link not on that repeater's own paths is dimmed — see
+  // applyMapFocusStyles. A display overlay like mapSelection, not a filter.
+  mapFocusRepeaterId: null,
   mapShowLinks:   true,
   mapHideOthers:  false,   // filter box: highlight matches (default) vs hide the rest
   mapKillSpaghetti: true,  // drop pass-range links longer than mapMaxLinkKm
@@ -2907,7 +2911,7 @@ function initMap() {
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
   // show on the map that has just been rebuilt.
   PathProfile.sync();
-  state.map.on('click', () => acmaClearHighlight());
+  state.map.on('click', () => { acmaClearHighlight(); clearMapFocusRepeater(); });
   // Auto/On name labels are picked from what is in view, so they are re-picked
   // whenever the view changes rather than only when the layers are rebuilt.
   state.map.on('moveend zoomend', applyMapLabels);
@@ -3062,12 +3066,16 @@ function refreshMapLayers({ skipFit = false } = {}) {
   for (const pass of ['casing', 'core']) {
     const casing = pass === 'casing';
     for (const l of links) {
+      const lineOp = casing ? casingOp : coreOp;
       const line = L.polyline([[l.s.lat, l.s.lon], [l.r.lat, l.r.lon]], {
         color:   casing ? '#ffffff' : lineColor,
         weight:  casing ? MAP_LINK_CASING_W : MAP_LINK_CORE_W,
-        opacity: casing ? casingOp : coreOp,
+        opacity: lineOp,
       }).addTo(map);
-      line.mnLinkRole = pass;              // lets the opacity slider restyle in place
+      line.mnLinkRole       = pass;         // lets the opacity slider restyle in place
+      line.mnLinkStationId  = l.s.id;       // and lets repeater focus restyle in place
+      line.mnLinkRepeaterId = l.r.id;
+      line.mnBaseOpacity    = lineOp;
       state.mapLines.push(line);
     }
   }
@@ -3147,6 +3155,7 @@ function refreshMapLayers({ skipFit = false } = {}) {
   }
 
   applyMapSelectionStyles();
+  applyMapFocusStyles();
   MapSpider.setPins('stations', state.mapMarkers);
 
   // Zoom to the matches (all of them, not just the first) and to the repeaters
@@ -3201,6 +3210,7 @@ function applyMapSelectionStyles() {
 // map and its header all move together.
 function mapSelectionChanged() {
   applyMapSelectionStyles();
+  applyMapFocusStyles();
   rerenderStations();
 }
 
@@ -3226,7 +3236,8 @@ function clearMapSelection() {
 }
 
 // Every click on a station pin: shift / ctrl / ⌘ adds or removes it from the
-// selection, and a plain click opens the popup, as it always did. Both live
+// selection, and a plain click opens the popup, as it always did. A plain
+// click on a repeater also focuses it — see setMapFocusRepeater. Both live
 // here because refreshMapLayers takes Leaflet's own click-to-open off the
 // marker — see the note there.
 function onStationPinClick(e) {
@@ -3237,7 +3248,65 @@ function onStationPinClick(e) {
     return;
   }
   L.DomEvent.stopPropagation(e);      // as Leaflet's own handler did
+  const s = e.target.mnStation;
+  if (s && s.roles.includes('repeater')) {
+    setMapFocusRepeater(state.mapFocusRepeaterId === s.id ? null : s.id);
+  }
   e.target.openPopup(e.latlng);
+}
+
+// ── Repeater focus ───────────────────────────────────────────────────────────
+// Clicking a repeater pin dims every station and link that isn't on one of
+// its own pass-range paths, so the repeater's own footprint dominates the
+// view. A display overlay like the map selection: it restyles the existing
+// markers/lines in place rather than rebuilding them, and clicking the same
+// repeater again (or the empty map) clears it.
+
+// The repeater itself plus every field station its pass ranges carry — the
+// set of station ids that stay at full opacity while it is focused.
+function focusedRepeaterStationIds(repeaterId) {
+  if (!repeaterId || !state.data) return null;
+  const repeater = state.data.stations.find(s => s.id === repeaterId);
+  if (!repeater) return null;
+  const ids = new Set(findStationMatches(repeater).map(s => s.id));
+  ids.add(repeater.id);
+  return ids;
+}
+
+function setMapFocusRepeater(id) {
+  if (state.mapFocusRepeaterId === id) return;
+  state.mapFocusRepeaterId = id;
+  applyMapFocusStyles();
+}
+
+function clearMapFocusRepeater() {
+  setMapFocusRepeater(null);
+}
+
+const MAP_FOCUS_DIM_OPACITY     = 0.15;
+const MAP_FOCUS_DIM_FILLOPACITY = 0.12;
+const MAP_FOCUS_DIM_LINE_MIX    = 0.2;   // fraction of a link's own opacity, while dimmed
+
+// Put the focus dim on, or take it off, in place — mirrors
+// applyMapSelectionStyles. Runs after it so the selection ring still shows
+// through on a focused pin, and after every refreshMapLayers rebuild.
+function applyMapFocusStyles() {
+  const served = focusedRepeaterStationIds(state.mapFocusRepeaterId);
+  for (const m of state.mapMarkers) {
+    const base = m.mnBaseStyle;
+    if (!base) continue;
+    const dim = !!served && !served.has(m.mnStationId);
+    m.mnFocusDimmed = dim;
+    const opacity     = dim ? MAP_FOCUS_DIM_OPACITY     : (m.mnSelected ? 1 : base.opacity);
+    const fillOpacity = dim ? MAP_FOCUS_DIM_FILLOPACITY : (m.mnSelected ? 1 : base.fillOpacity);
+    m.setStyle({ opacity, fillOpacity });
+  }
+  for (const l of state.mapLines) {
+    if (l.mnBaseOpacity == null) continue;
+    const dim = !!served && l.mnLinkRepeaterId !== state.mapFocusRepeaterId;
+    l.mnFocusDimmed = dim;
+    l.setStyle({ opacity: dim ? l.mnBaseOpacity * MAP_FOCUS_DIM_LINE_MIX : l.mnBaseOpacity });
+  }
 }
 
 // The selection as a file — the same columns the table shows, plus the station
