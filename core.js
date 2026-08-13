@@ -1,4 +1,33 @@
-// MegaNet — app.js
+// MegaNet — core.js
+//
+// The bottom of the app.js lineage (#129 M1 / #132). Everything the feature
+// modules reach *backwards* for, gathered into one file so that nothing else
+// has to. Load order is the contract and it is set in index.html:
+//
+//   leaflet → maps-data.js → core.js → …modules… → init.js
+//
+// Nothing above this file may be assumed; nothing below it may be depended on
+// at load time. Concretely, that means core.js never calls into a tab module —
+// if you find yourself wanting to, the thing you want probably belongs here.
+//
+//   TABS, TAB_LIST      the left-hand nav, and the only description of it
+//   HELP                per-tab help panel copy
+//   APP_VERSION         read from this file's own ?v= — so keep the stamp on it
+//   GITHUB_REPO, GITHUB_* , ARRO_*, AUTH_URL, DB_*   endpoints and identifiers
+//   recordError, _errorLog                           uncaught-error ring buffer
+//   SPLIT_MIN / SPLIT_MAX, state                     every mutable thing there is
+//   esc, escAttr, csvEscape, netName, pFloat, pInt, parseRangeLines, slug, dlText
+//   KM_PER_DEG_LAT, kmPerDegLon, bearingDeg, destPoint, fmtKm, acmaHaversineKm
+//   ACMA_MECH           interference-mechanism labels and colours
+//   stationSensors, buildSensorIndex, buildArroUrl   ALERT address ↔ sensor lookup
+//
+// The last three groups are the six helpers #129 found misfiled — each defined
+// inside one feature and read by five to seven others. They live here now
+// precisely so that the tab modules can be moved out in any order (#133–#135)
+// without one of them having to load before another.
+//
+// This file is also the only sensible home for the Leaflet canvas guard at the
+// bottom, which has to be installed before the first L.map() call.
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -792,6 +821,10 @@ function dlText(name, content) {
   URL.revokeObjectURL(a.href);
 }
 
+// ── Geometry on the ground ────────────────────────────────────────────────────
+// Lived in Draw & measure until #132; read by Terrain, Link budget, the path
+// profile and the ACMA beam polygons as well, which is why they are here.
+
 const KM_PER_DEG_LAT = 110.574;                                  // as in acmaBeamPolygon
 function kmPerDegLon(lat) { return 111.320 * Math.cos(lat * Math.PI / 180); }
 
@@ -822,6 +855,14 @@ function fmtKm(km) {
   return `${Math.round(km)} km`;
 }
 
+// ── Interference mechanisms ───────────────────────────────────────────────────
+// How one licensed service can sit on top of another, with the colour each is
+// drawn in. Lived in the ACMA section until #132; seven other sections read it
+// — the RF Environment and RF Changes tabs, the Interference Workbench, the map
+// layer, its legend, the transmitter card and the ACMA draft-letter export.
+// acmaHaversineKm below it is the same story: six consumers, one of them the
+// ACMA section itself.
+
 const ACMA_MECH = {
   co_channel:     { label: 'Co-channel',          color: '#d32f2f' },
   adjacent:       { label: 'Adjacent channel',    color: '#f57c00' },
@@ -840,7 +881,16 @@ function acmaHaversineKm(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+// ── ALERT addresses ↔ sensors ─────────────────────────────────────────────────
+// Turning a station into its sensor list, the whole network into an address
+// index, and a set of {station, sensor} pairs into an ARRO graph URL. Lived in
+// the Bit Flipper until #132; five other sections read them. BF_TYPE_LABEL and
+// formatArroLocal came with them because each has exactly one caller and it is
+// one of these — leaving them behind would have made core.js reach forward into
+// a tab module.
+
 const BF_TYPE_LABEL     = { battery: 'Battery', rainfall: 'Rainfall', water_level: 'Water Level', primary: 'Primary' };
+
 // Normalized sensor list for a station. Prefers the enriched `sensors` array
 // (from the national sensor database) and falls back to synthesizing minimal
 // records from legacy `alert_ids` when a station has not been enriched.
@@ -922,8 +972,11 @@ function buildArroUrl(pairs) {
 // is nothing dependable to cancel. Neutralising the callback is, because the
 // condition is unambiguous — a redraw with no context has nothing to draw on.
 //
-// This must stay above init(): init() renders the first tab on the way past, and
-// the Stations tab builds a map while doing it.
+// This must stay above the first L.map() call. Since #132 that is what putting
+// it at the bottom of core.js buys — core.js loads before every module and
+// before init.js, and init.js is the only thing that renders a tab at load. Do
+// not move it into a module file in M2–M4: any file that can be reordered
+// relative to the map modules can reintroduce the crash.
 if (typeof L !== 'undefined' && L.Canvas) {
   const _leafletCanvasRedraw = L.Canvas.prototype._redraw;
   L.Canvas.prototype._redraw = function () {

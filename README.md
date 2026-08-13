@@ -22,8 +22,17 @@ The existing codebase is a collection of separately-evolved HTML tools with over
 ## Repository Layout
 
 The consolidation to a single-page app is done: the live tool is **`index.html`**
-(loads `styles.css`, `maps-data.js`, `app.js`) backed by the one **`stations.json`**
-data file. Everything else is organised into folders so the root stays clean.
+(loads `styles.css`, `maps-data.js`, then the app's scripts in order) backed by
+the one **`stations.json`** data file. Everything else is organised into folders
+so the root stays clean.
+
+The application logic was one 22,500-line `app.js` until
+[#132](https://github.com/cdomotor-g/MegaNet/issues/132) split the foundation and
+the entry point out of it. They are still plain classic scripts sharing one
+global scope — no modules, no bundler, no build step — so the split is a
+question of which file a function sits in and nothing else. **The order they
+load in is the contract**, stated at the top of `index.html`; later work adds
+files to that list rather than reordering it.
 
 The station list now lives in Postgres as well, and that is where the app reads
 it from by default — `stations.json` is the export, the offline fallback, and
@@ -33,8 +42,10 @@ document*, so nothing below changes: see
 
 ```
 MegaNet/
-├── index.html              ← single entry point
-├── app.js                  ← all application logic
+├── index.html              ← single entry point; its script order is the contract
+├── core.js                 ← constants, TABS/HELP, state, shared utilities
+├── app.js                  ← the memory meter, sign-in, and every tab
+├── init.js                 ← the only code that runs at load; must stay last
 ├── maps-data.js            ← Network Maps catalogue, QLD basin SVG + georeference
 ├── styles.css              ← theme and layout
 ├── stations.json           ← the document schema (see below); export + offline fallback
@@ -962,10 +973,10 @@ panel before anything leaves the browser:
 
 - Which screen (tab) they were on, and the selected station (if any)
 - Whether data is loaded, and the station / network counts
-- App build (read from the `app.js?v=` cache-buster), theme, page URL
+- App build (read from the `core.js?v=` cache-buster), theme, page URL
 - Browser, platform, language, window/screen size, online state, timestamp
 - **Recent uncaught JavaScript errors** — captured from page load via global
-  `error` / `unhandledrejection` handlers (`app.js`), so the actual failure and
+  `error` / `unhandledrejection` handlers (`core.js`), so the actual failure and
   its stack travel with the report even when the user only saw a blank panel
 
 Report type (Bug / Idea / Question) maps to the matching GitHub default label
@@ -1003,7 +1014,7 @@ second scan of the sidebar to find the decoder.
   layout and the expanded nav floats above — then closes itself once a tab has
   been picked.
 - Keyboard-driven: ↑/↓ walk the tabs, and the active one carries `aria-current`.
-- `TABS` in `app.js` is the single description of the nav — groups, labels and
+- `TABS` in `core.js` is the single description of the nav — groups, labels and
   icons — and both the rail and its headings are rendered from it.
 
 Two pieces of geometry hang off this. `--mn-chrome` (which the Stations panes
@@ -1060,7 +1071,7 @@ reorders rather than accumulates.
   the station with *"none recorded"* in the site-id column instead of silently
   dropping it.
 - **One host, set in one place.** `ARRO_HOST` and the three path constants live
-  together at the top of `app.js`. The Bit Flipper's *ARRO base URL* box is
+  together at the top of `core.js`. The Bit Flipper's *ARRO base URL* box is
   still the only control, and its host now drives every ARRO link in the app —
   the box says so, and a base that won't parse falls back to the default rather
   than producing a broken link.
@@ -1531,7 +1542,7 @@ through the app — the 357 filter modal, `docs/serial-help.html`, the ARRO id
 disambiguation copy in the station editor, the hints in the Stations filter pane
 — with no single surface a first-time user could open to find any of it.
 
-`HELP` in `app.js` is the single description of its content, keyed by the same
+`HELP` in `core.js` is the single description of its content, keyed by the same
 tab ids `TABS` uses, and the panel is rendered from it the way the nav is
 rendered from `TABS`. Each entry carries a summary, optional *watch out for*
 lines, optional links to `docs/`, and the ids of related tabs — which is how the
@@ -1889,8 +1900,11 @@ then opens each tab in turn watching for `pageerror` as well as `console.error`
 — an uncaught `ReferenceError` during script evaluation never reaches the
 console, and that is exactly the failure a moved function produces.
 
-CI runs all three on any push touching `app.js`, `index.html`, `maps-data.js`,
-`styles.css`, `stations.json` or `test/`.
+CI runs all three on any push touching a root `*.js`, `index.html`, `styles.css`,
+`stations.json` or `test/`. The filter is a glob rather than a list of filenames
+because the app's script list is still growing as `app.js` is split up — a named
+list would have to be edited by every milestone, and the one that forgot would
+quietly stop being tested.
 
 There is a fourth, `npm run concat`, which is not in CI: it concatenates the
 scripts `index.html` loads and compares the bytes against a recorded snapshot.

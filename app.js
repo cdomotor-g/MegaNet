@@ -1,3 +1,28 @@
+// MegaNet — app.js
+//
+// The middle of the app.js lineage (#129): the memory meter, sign-in, and every
+// tab. Loads after core.js and before init.js — see the header of index.html,
+// where the order is the contract.
+//
+// This file is what is left after M1 (#132) lifted out the shared foundation
+// and the entry point. It is still 21,500 lines and it is still the merge
+// surface every front-end issue collides on; M2–M4 (#133–#135) take the tab
+// modules out of it, one file each, between core.js and init.js.
+//
+// Two things to know before editing it:
+//
+//   Nothing here runs at load. Every top-level binding is a declaration or an
+//   IIFE that only defines — init.js is the single thing that executes, and it
+//   loads last. So functions in this file may call each other in any direction,
+//   forwards included, and a module may be moved out to its own file without
+//   its position in the load order mattering. That property is the whole point
+//   of M1; do not spend it by adding top-level code that runs on sight.
+//
+//   It carries 4 literal NUL bytes (U+0000, inside string literals, used as
+//   compound-key separators — see #129), which is why grep calls it binary. Any
+//   tool that round-trips it as text and normalises control characters destroys
+//   those keys silently. `npm run concat` in test/ is what catches that.
+
 // ── Memory meter ─────────────────────────────────────────────────────────────
 // A thin bar under the header, and a panel behind it, answering "how much is
 // this page holding, and can I give some back" — see issue #79. This is our
@@ -6,12 +31,12 @@
 // performance.memory (Chromium-only) and navigator.storage.estimate() are
 // shown alongside where the browser actually offers them.
 //
-// Deliberately defined ahead of the Init section below: `init()` runs
-// immediately, at its position in this file, and calls MemMeter.start() — so
-// the MemMeter binding has to exist by then. Terrain and ArroData, which its
-// functions reach into, are declared later in the file; that's fine, because
-// nothing here touches them until a click or the sampling timer calls in,
-// long after the whole script has finished loading.
+// Its position used to matter: init() called MemMeter.start() from partway
+// down this file, so the binding had to be initialised above that point. Since
+// M1 (#132) init() is the last statement of the last script, so it doesn't —
+// this could sit anywhere. Terrain and ArroData, which its functions reach
+// into, are still declared later; that was always fine, because nothing here
+// touches them until a click or the sampling timer calls in.
 const MemMeter = (function () {
   // Holders shown in the bar and the panel, in the order they're listed. Each
   // maps to one of the state slots the issue's table calls out; `color` is an

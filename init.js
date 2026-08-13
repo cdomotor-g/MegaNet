@@ -1,3 +1,25 @@
+// MegaNet — init.js
+//
+// The top of the app.js lineage (#129 M1 / #132), and the only file in it that
+// *does* anything at load. Everything else declares; this starts the app.
+//
+// It must stay last in index.html, and it must stay the only place with
+// top-level side effects. That is not a style preference — it is what retires a
+// whole class of crash. While init() ran from partway down app.js, every
+// binding declared after it was in its temporal dead zone on the way past, and
+// two of those were already live faults (#131): renderHelp → docUrl reached
+// GITHUB_RAW_URL sixty lines before it existed, and renderMain → initMap
+// reached the six map module consts thousands of lines before they existed.
+// Both were latent rather than fatal only because of which tab happened to be
+// default and because station data arrives asynchronously. Running last means
+// every top-level binding in every earlier file is initialised before anything
+// here is evaluated, so the class is gone by construction rather than by luck.
+//
+// Nothing should be added to this file that is not part of starting up. A
+// helper defined here is a helper the modules cannot see.
+//
+// Exposes: nothing. Requires: core.js and every module file before it.
+
 // ── Init ───────────────────────────────────────────────────────────────────────
 
 (function init() {
@@ -36,8 +58,13 @@
   autoLoad();
 })();
 
-// Restore a shared investigation from the URL hash. Runs at script load (after
-// init's first render); station data arrives later via autoLoad → loadJson,
-// which re-renders the restored tab.
+// Restore a shared investigation from the URL hash. Defined in app.js, called
+// from here because it has to run after init's first render — it switches to
+// the Workbench and renders it, and doing that before init has set the theme
+// and the split width renders the tab into a page that isn't ready for it.
+// While init() ran from partway down app.js this call sat at its own position
+// further down and got that ordering for free; now it has to say so.
+// Station data arrives later via autoLoad → loadJson, which re-renders the
+// restored tab.
 if (typeof window !== 'undefined') wbRestoreFromUrl();
 

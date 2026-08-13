@@ -2,7 +2,9 @@
   "note": "Re-record with: npm run names -- --update. The count is informational; the hard rule is that there are no duplicates.",
   "scripts": [
     "maps-data.js",
-    "app.js"
+    "core.js",
+    "app.js",
+    "init.js"
   ],
   "total": 528,
   "distinct": 528

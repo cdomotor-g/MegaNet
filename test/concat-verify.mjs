@@ -4,7 +4,7 @@
 // only claim that matters is "the split lost nothing". Concatenating the pieces
 // in index.html order and comparing the bytes against the file before the cut is
 // what proves it — and it is the only check that reliably catches the 4 NUL-byte
-// hazard (#129: lines 7895, 7959×2, 19504). A tool that round-trips app.js as
+// hazard (#129: app.js lines 7047, 7111×2, 18583). A tool that round-trips app.js as
 // text and normalises control characters corrupts those three lines invisibly;
 // a byte comparison does not care what the bytes mean.
 //

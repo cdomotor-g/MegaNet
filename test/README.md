@@ -30,9 +30,11 @@ npm run all                       # syntax + duplicate names + smoke
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked.
 
-CI runs `check`, `names` and `smoke` on every push that touches `app.js`,
-`index.html`, `maps-data.js`, `styles.css`, `stations.json` or `test/` — see
-`.github/workflows/web-smoke.yml`.
+CI runs `check`, `names` and `smoke` on every push that touches a root `*.js`,
+`index.html`, `styles.css`, `stations.json` or `test/` — see
+`.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's
+script list grows as `app.js` is split up (`core.js` and `init.js` so far), and
+a filter naming each file would have to be edited by every milestone.
 
 ## Why this is not at the repo root
 
@@ -52,7 +54,7 @@ directory would not change what a browser loads.
 `file://` is a supported mode for the app and deliberately so — it is a field
 tool, and someone opening `index.html` off a laptop with no server is
 anticipated. But it is a bad mode to *test* in: over `file://` the bundled
-`stations.json` is unreachable (`autoLoad()` says so at `app.js:1671`), so
+`stations.json` is unreachable (`autoLoad()` says so at `app.js:914`), so
 `state.data` stays null and eleven of the sixteen tabs render the empty state
 instead of themselves. A smoke test that never draws a station table proves very
 little.
@@ -105,8 +107,9 @@ The only claim that matters when a milestone cuts `app.js` is *the split lost
 nothing*. Concatenating the pieces in `index.html` order and comparing the bytes
 against the file before the cut is what proves it, and it is the only check that
 reliably catches the **4 NUL-byte hazard** (`app.js` carries literal `U+0000`
-characters inside string literals at lines 7895, 7959×2 and 19504, used as
-compound-key separators — see #129). A tool that round-trips the file as text and
+characters inside string literals at lines 7047, 7111×2 and 18583, used as
+compound-key separators — see #129; they were at 7895, 7959×2 and 19504 before
+the M1 split moved code out above them). A tool that round-trips the file as text and
 normalises control characters destroys those keys invisibly. A byte comparison
 does not care what the bytes mean.
 
@@ -139,8 +142,9 @@ without looking, and a verifier nobody looks at verifies nothing.
   bump `EXPECTED_TABS`.
 - **A script was added to `index.html`.** Nothing to do. Every check reads the
   script list out of `index.html`, so the split milestones are picked up
-  automatically. A file added to the repo but not wired into `index.html` is
-  invisible to the tests exactly as it is invisible to the app.
+  automatically — M1 added `core.js` and `init.js` without touching a line in
+  here. A file added to the repo but not wired into `index.html` is invisible to
+  the tests exactly as it is invisible to the app.
 - **The top-level declaration count moved.** Reported, never enforced — a check
   that goes red for ordinary work gets switched off. Re-record with
   `npm run names -- --update` when it drifts. A *drop* of a hundred in a split
@@ -158,5 +162,7 @@ on it are still coming off, leaving an animation frame that fires after the
 context is gone. With ~7,000 station and link paths on that map it lands about
 half the time. Cancelling the pending frame at teardown does not fix it: the
 frame that survives is not reliably the one the renderer still holds an id for.
-The fix is above `init()` in `app.js` — a redraw with no context returns instead
-of throwing.
+The fix is at the bottom of `core.js` — a redraw with no context returns instead
+of throwing. It only has to be installed before the first `L.map()` call; core.js
+loads before every module and before `init.js`, which is the only file that
+renders a tab at load, so that is the one place it cannot be reordered out of.
