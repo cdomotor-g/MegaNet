@@ -32,6 +32,7 @@ const TABS = [
   { group: 'Data & admin', tabs: [
     { id: 'arro',       label: 'ARRO Launcher',          icon: '🚀' },
     { id: 'arrodata',   label: 'ARRO Data',              icon: '📊' },
+    { id: 'field',      label: 'Field Data',             icon: '🌡️' },
     { id: 'export',     label: 'Export',                 icon: '📤' },
   ] },
 ];
@@ -199,7 +200,35 @@ const HELP = {
            + 'station, runs the Bureau\'s 3-5-7 continuity filter over it and plots the result with '
            + 'a chart built for finding noise rather than presenting a trend. Nothing is uploaded — '
            + 'files are read in the tab and stay there.',
-    related: ['arro', 'stations'],
+    watch: [
+      'This tab is <strong>ARRO\'s</strong> numbers. Readings our own field stations sent us live '
+      + 'next door on <strong>Field Data</strong>, and the two are never combined — different '
+      + 'source of truth, different retention, different trust.',
+    ],
+    related: ['arro', 'field', 'stations'],
+  },
+
+  field: {
+    summary: 'Plots readings that field stations sent us, out of the MegaNet datastore, using the '
+           + 'same chart and the same 3-5-7 filter as the ARRO Data tab. Pick a station, its '
+           + 'sensors and a window; the readings are fetched and drawn.',
+    watch: [
+      '<strong>This is not ARRO data and is never mixed with it.</strong> The chart says which '
+      + 'datastore it came from and at what resolution, and every export carries both in its '
+      + 'filename and in a column on every row.',
+      'Wide windows are drawn from hourly or daily rollups rather than raw readings, and the '
+      + 'header says which. Each rollup point is the counter <em>at the end of</em> its bucket, so '
+      + 'an accumulator still accumulates — but the spread inside the bucket is hidden, and it is '
+      + 'in the inspector and the export when you need it. Force <strong>Raw</strong> to see every '
+      + 'reading.',
+      'A silence longer than the station\'s own reporting interval is drawn as a gap, not ruled '
+      + 'across. Missing data is the normal condition of a radio network.',
+      'Readings arrive as <strong>counts</strong>, so the 3/5/7 thresholds are counts too. Any '
+      + 'conversion the datastore recorded is shown beside the count, never instead of it.',
+      'A window with nothing in it says so rather than drawing an empty axis — silence and a run '
+      + 'of zeroes are different claims.',
+    ],
+    related: ['arrodata', 'stations', 'alert2'],
   },
 
   export: {
@@ -748,8 +777,8 @@ const MemMeter = (function () {
 
   // Bytes per ARRO row: t, tr, v, raw are Float64Array (8 B each), q is
   // Uint8Array (1 B) — see ArroData's parseCsv. Length × this, not a walk.
-  // A series from a source with extra columns says so in its own bytesPerRow;
-  // this is the floor every series shares.
+  // A field-data series carries a couple of extra columns and says so in its
+  // own bytesPerRow; this is the floor every series shares.
   const ARRO_BYTES_PER_ROW = 8 * 4 + 1;
   const TERRAIN_TILE_BYTES = 65536 * 2;   // Int16Array(65536), 2 B/element
 
@@ -938,7 +967,7 @@ const MemMeter = (function () {
   }
 
   function releaseArro() {
-    ArroData.dropAll();   // every data tab; confirms before dropping more than one
+    ArroData.dropAll();   // both data tabs; confirms before dropping more than one
   }
 
   function release(key) {
@@ -1513,7 +1542,7 @@ function toggleTheme() {
   // The ARRO chart writes real colour values into its SVG rather than `var(…)`,
   // so that the PNG export has something to resolve. That is the trade: the
   // chart has to be told the palette moved.
-  if (state.activeTab === 'arrodata') ArroData.repaint();
+  if (state.activeTab === 'arrodata' || state.activeTab === 'field') ArroData.repaint();
 }
 
 // ── File loading ───────────────────────────────────────────────────────────────
@@ -2563,7 +2592,9 @@ function renderMain() {
     case 'alert2':     el.innerHTML = Alert2.render();        Alert2.init();       break;
     case 'serial':     el.innerHTML = Serial.render();        Serial.init();       break;
     case 'arro':       el.innerHTML = renderArroHtml();      initArro();  break;
-    case 'arrodata':   el.innerHTML = ArroData.render();     ArroData.init();     break;
+    case 'arrodata':   el.innerHTML = ArroData.render();      ArroData.init();     break;
+    // Same module, second instance — see the comment at the top of ArroData.
+    case 'field':      el.innerHTML = ArroData.render('field'); ArroData.init();  break;
     case 'export':     el.innerHTML = renderExportHtml();     initExport();     break;
     default:           el.innerHTML = '<p style="padding:1rem">Unknown tab</p>';
   }
@@ -9676,24 +9707,26 @@ const AD_DAY = 86400000;
 
 const ArroData = (function () {
 
-  // One module, more than one tab. Everything between a parsed series and a
-  // drawn pixel — the chart, the 357 filter, the inspector, the export — is
-  // source-agnostic and shared; the *state* is what forks, so two tabs can each
-  // hold their own series without a line of drawing code being copied.
+  // One module, two tabs. ARRO Data reads CSV exports; Field Data (#114) reads
+  // meganet.reading out of the datastore. Everything between a parsed series and
+  // a drawn pixel is identical, and building a second copy of it was explicitly
+  // not the job — so the chart, the 357 filter and the export are shared and the
+  // *state* is what forks.
   //
-  // The rule this makes structural is that sources never blur together: a series
-  // lives in exactly one instance and no code path moves one between them, so
-  // there is no merged list to accidentally draw from.
+  // The hard rule the epic sets is that the two sources never blur together, and
+  // this is where that is made structural: a series lives in exactly one
+  // instance, and no code path moves one between them. There is no merged list
+  // to accidentally draw from.
   //
   // Only one tab is mounted at a time — renderMain() replaces the whole pane —
   // so `ad` is a binding onto whichever instance is on screen, and the inline
   // handlers in the markup below can all say `ArroData.x()` and mean "the data
   // tab you are looking at". Anything asynchronous must capture `ad` up front
   // rather than read it again in a callback: a tab switch mid-flight would
-  // otherwise land one tab's results in the other.
+  // otherwise land a query's results in the other instance.
   function newState(source) {
     return {
-      source,                    // provenance, stamped onto every series it holds
+      source,                  // 'arro' | 'field' — provenance, and never inferred
       series:    [],
       seq:       0,
       cfg:       { ...AD_CFG_DEFAULT },
@@ -9718,10 +9751,11 @@ const ArroData = (function () {
       sensorIdx: null,
       sensorIdxFor: null,
       busy:      0,
+      fq:        null,           // the Field tab's picker; null on the ARRO tab
     };
   }
 
-  const instances = { arro: newState('arro') };
+  const instances = { arro: newState('arro'), field: newState('field') };
 
   let ad = instances.arro;
 
@@ -9895,7 +9929,6 @@ const ArroData = (function () {
       extra,
     };
   }
-
 
   // ── filename → sensor id → station ─────────────────────────────────────────
 
@@ -10649,6 +10682,616 @@ const ArroData = (function () {
     });
   }
 
+  // ── Field Data — the second entrance (#114) ──────────────────────────────────
+  // Everything below produces a series and hands it to adoptSeries(). Not one
+  // line of it draws anything: the chart, the 357 filter, the inspector and the
+  // image export are the ARRO tab's, unmodified, and that is the whole point of
+  // the exercise.
+  //
+  // Four things this source has to think about that a CSV import never did:
+  //
+  //   **The window is a request, not a file.** ARRO exports arrive whole. Here
+  //   the operator asks for the last 7 days and we go and get it, which means
+  //   choosing between the raw readings and #B4's rollups — and *saying which*,
+  //   loudly, because a chart that quietly swapped raw counts for hourly means
+  //   would flatten exactly the spikes this app exists to find. The rollups are
+  //   read at `raw_last`, the counter's reading at the end of the bucket, so an
+  //   accumulator still reads as an accumulator and the 357 walk still means
+  //   something; the min and max inside each bucket are kept and shown in the
+  //   inspector and the export rather than thrown away.
+  //
+  //   **Counts, not millimetres.** The 3/5/7 thresholds are count thresholds, so
+  //   `v` is whatever the device transmitted and the filter runs on that. Any
+  //   conversion the datastore recorded rides alongside in `eng` and is display
+  //   only — see rawBucketNote() for the same rule on the ARRO side.
+  //
+  //   **Gaps are the interesting part.** Missing data is the normal condition of
+  //   a radio telemetry network, so the line lifts rather than ruling across a
+  //   silence. See gapMs on the series and pathFrom().
+  //
+  //   **A reading usually arrives more than once.** dup_count and dup_paths are
+  //   a live diagnostic about repeater health that no other tab can show, so
+  //   they come down with the readings and are surfaced per point.
+
+  // Which table answers a window of this size. Stated as constants rather than
+  // buried in the query because the chart header has to print the answer.
+  const AD_RAW_MAX_DAYS    = 14;
+  const AD_HOURLY_MAX_DAYS = 180;
+
+  // Per query, across all addresses. A guard against an operator asking for a
+  // year of raw 1-minute data and getting a browser tab that never comes back;
+  // when it bites, the series says so rather than quietly showing a prefix.
+  const AD_FIELD_ROW_CAP = 120000;
+
+  // PostgREST pages. Supabase caps rows per response and the cap is a server
+  // setting we do not control, so this pages until a request comes back short
+  // rather than trusting any particular number.
+  const AD_FIELD_PAGE = 10000;
+
+  const AD_FIELD_WINDOWS = [
+    ['24h',  'Last 24 hours',  1],
+    ['7d',   'Last 7 days',    7],
+    ['30d',  'Last 30 days',   30],
+    ['90d',  'Last 90 days',   90],
+    ['12mo', 'Last 12 months', 365],
+  ];
+
+  const AD_RES_LABEL = {
+    raw:    'raw readings',
+    hourly: 'hourly buckets',
+    daily:  'daily buckets',
+  };
+
+  function newFieldQuery() {
+    return {
+      stationId: '',
+      find:      '',        // the station search box
+      sensors:   [],        // addresses ticked, as meganet.reading stores them
+      extra:     '',        // an address typed in by hand
+      win:       '7d',
+      from:      '', to: '',   // custom window, yyyy-mm-dd
+      res:       'auto',
+      loading:   false,
+      error:     '',
+      empty:     '',
+      seq:       0,         // in-flight query id; a late reply for an old one is dropped
+    };
+  }
+
+  const fq = () => (ad.fq || (ad.fq = newFieldQuery()));
+
+  function fieldStation() {
+    const id = fq().stationId;
+    return id ? (state.data?.stations || []).find(s => s.id === id) || null : null;
+  }
+
+  // A station's addresses, in the shape meganet.reading stores them. A radio
+  // sensor *is* its ALERT address, so one address is one measurement and the
+  // duplicate rows in stations.json (Rainfall and Rainfall Increment share
+  // 6128) collapse to one entry. A satellite or cellular station has no ALERT
+  // address at all — it reports under its station number with a channel name
+  // nobody has told this app, so those are offered as unavailable rather than
+  // guessed at, and the box underneath takes one typed in.
+  function fieldAddrs(st) {
+    const out = [], seen = new Set();
+    for (const sen of (st?.sensors || [])) {
+      if (!sen.alert_id) continue;
+      const addr = `a:${sen.alert_id}`;
+      if (seen.has(addr)) continue;
+      seen.add(addr);
+      out.push({ addr, sensor: sen, label: sen.type || addr });
+    }
+    return out;
+  }
+
+  function fieldNoAddr(st) {
+    return (st?.sensors || []).filter(sen => !sen.alert_id).map(sen => sen.type || 'sensor');
+  }
+
+  function fieldWindow(q) {
+    if (q.win === 'custom') {
+      const t0 = Date.parse(`${q.from}T00:00:00`);
+      const t1 = Date.parse(`${q.to}T23:59:59.999`);
+      if (!isFinite(t0) || !isFinite(t1) || t1 <= t0) return null;
+      return { t0, t1 };
+    }
+    const row = AD_FIELD_WINDOWS.find(w => w[0] === q.win) || AD_FIELD_WINDOWS[1];
+    const t1 = Date.now();
+    return { t0: t1 - row[2] * AD_DAY, t1 };
+  }
+
+  function fieldRes(q, win) {
+    if (q.res !== 'auto') return q.res;
+    const days = (win.t1 - win.t0) / AD_DAY;
+    if (days <= AD_RAW_MAX_DAYS)    return 'raw';
+    if (days <= AD_HOURLY_MAX_DAYS) return 'hourly';
+    return 'daily';
+  }
+
+  // How long a silence has to be before the chart stops joining across it. On a
+  // rollup that is one missing bucket. On raw readings it is taken from what the
+  // station actually does — three times the median gap it did report — because a
+  // 15-minute station and a tipping-bucket that only speaks when it rains are
+  // both normal, and one fixed threshold would libel one of them.
+  function fieldGapMs(t, n, res) {
+    if (res === 'hourly') return 1.5 * 3600000;
+    if (res === 'daily')  return 1.5 * AD_DAY;
+    if (n < 4) return 0;
+    const d = [];
+    for (let i = 1; i < n; i++) { const g = t[i] - t[i - 1]; if (g > 0) d.push(g); }
+    if (d.length < 3) return 0;
+    d.sort((a, b) => a - b);
+    return Math.max(3 * d[d.length >> 1], 900000);   // never tighter than 15 minutes
+  }
+
+  // meganet.quality is six rows and never changes within a session.
+  let fieldQualityMap = null;
+  async function fieldQualityCodes() {
+    if (fieldQualityMap) return fieldQualityMap;
+    try {
+      const rows = await dbSelect('quality?select=code,key&order=code.asc');
+      fieldQualityMap = new Map(rows.map(r => [r.code, r.key]));
+    } catch (_) {
+      fieldQualityMap = new Map();   // labels degrade to the bare code; the data is still right
+    }
+    return fieldQualityMap;
+  }
+
+  const AD_FIELD_SELECT = {
+    raw:    'addr,reading_ts,received_at,value_raw,value,unit,quality,path,dup_count,dup_paths',
+    hourly: 'addr,bucket,n,n_dup,unit,raw_min,raw_max,raw_last,val_last,first_ts,last_ts',
+    daily:  'addr,bucket,n,n_dup,unit,raw_min,raw_max,raw_last,val_last,first_ts,last_ts',
+  };
+
+  // A date for reading_daily's `bucket`, which is a date rather than a
+  // timestamptz — local, because that is the day the operator means.
+  function fieldIsoDate(ms) {
+    const d = new Date(ms);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  async function fieldQueryRows(addrs, win, res) {
+    const table = res === 'raw' ? 'reading' : res === 'hourly' ? 'reading_hourly' : 'reading_daily';
+    const tcol  = res === 'raw' ? 'reading_ts' : 'bucket';
+    const lo = res === 'daily' ? fieldIsoDate(win.t0) : new Date(win.t0).toISOString();
+    const hi = res === 'daily' ? fieldIsoDate(win.t1) : new Date(win.t1).toISOString();
+    // Quoted, because an address is `a:6128` or `s:541155/rain` and both the
+    // colon and the slash are punctuation to PostgREST's list parser.
+    const list = addrs.map(a => `"${String(a).replace(/["\\]/g, '')}"`).join(',');
+    const base = `${table}?addr=in.(${encodeURIComponent(list).replace(/%2C/g, ',')})`
+               + `&${tcol}=gte.${encodeURIComponent(lo)}&${tcol}=lt.${encodeURIComponent(hi)}`
+               + `&select=${AD_FIELD_SELECT[res]}&order=addr.asc,${tcol}.asc`;
+
+    const rows = [];
+    let capped = false;
+    for (;;) {
+      const page = await dbSelect(`${base}&limit=${AD_FIELD_PAGE}&offset=${rows.length}`);
+      if (!Array.isArray(page) || !page.length) break;
+      rows.push(...page);
+      if (page.length < AD_FIELD_PAGE) break;         // short page = the end
+      if (rows.length >= AD_FIELD_ROW_CAP) { capped = true; break; }
+    }
+    return { rows, capped };
+  }
+
+  // One address' rows into the shape seriesData() takes. Nothing here is
+  // ARRO-specific and nothing downstream is field-specific — that seam is the
+  // deliverable.
+  function fieldCols(rows, res, qmap) {
+    const n = rows.length;
+    const t = new Float64Array(n), tr = new Float64Array(n);
+    const v = new Float64Array(n), raw = new Float64Array(n);
+    const q = new Uint8Array(n);
+    const qcodes = [], qidx = new Map();
+    const dup = new Int32Array(n), cnt = new Int32Array(n);
+    const lo = new Float64Array(n), hi = new Float64Array(n);
+    const eng = new Float64Array(n);
+    const paths = new Array(n);
+    const units = new Map();
+    let anyEng = false, anyDup = false;
+
+    const codeOf = key => {
+      let i = qidx.get(key);
+      if (i === undefined) { i = qcodes.length; qcodes.push(key); qidx.set(key, i); }
+      return i;
+    };
+
+    for (let i = 0; i < n; i++) {
+      const r = rows[i];
+      if (res === 'raw') {
+        t[i]  = Date.parse(r.reading_ts);
+        tr[i] = Date.parse(r.received_at || r.reading_ts) || t[i];
+        v[i]  = raw[i] = Number(r.value_raw);
+        eng[i] = r.value == null ? NaN : Number(r.value);
+        q[i]  = codeOf(qmap.get(r.quality) || (r.quality ? `quality ${r.quality}` : 'unqualified'));
+        dup[i] = r.dup_count || 0;
+        cnt[i] = 1;
+        lo[i] = hi[i] = v[i];
+        const via = [r.path, ...(r.dup_paths || [])].filter(Boolean);
+        paths[i] = via.length ? [...new Set(via)] : null;
+      } else {
+        t[i]  = Date.parse(r.bucket);
+        tr[i] = Date.parse(r.last_ts || r.bucket) || t[i];
+        // The counter as it read at the end of the bucket. A mean would be a
+        // different quantity and would make an accumulator stop accumulating.
+        v[i]  = raw[i] = Number(r.raw_last);
+        eng[i] = r.val_last == null ? NaN : Number(r.val_last);
+        q[i]  = codeOf(res === 'hourly' ? 'hourly rollup' : 'daily rollup');
+        dup[i] = r.n_dup || 0;
+        cnt[i] = r.n || 0;
+        lo[i] = r.raw_min == null ? NaN : Number(r.raw_min);
+        hi[i] = r.raw_max == null ? NaN : Number(r.raw_max);
+        paths[i] = null;
+      }
+      if (isFinite(eng[i])) anyEng = true;
+      if (dup[i] > 0) anyDup = true;
+      const u = (r.unit || '').trim();
+      if (u) units.set(u, (units.get(u) || 0) + 1);
+    }
+
+    let modal = '', best = 0;
+    for (const [u, c] of units) if (c > best) { best = c; modal = u; }
+
+    // meganet.reading.unit describes `value`, the conversion — so when there is
+    // one, the series itself is in counts and the unit belongs to the display
+    // conversion instead. When there is not, the unit (if any) is the raw
+    // column's own.
+    const unit    = anyEng ? 'count' : (modal || 'count');
+    const engUnit = anyEng ? modal : '';
+
+    return {
+      cols: { n, t, tr, v, raw, q, qcodes, unit, warn: [], hasRaw: true,
+              extra: { dup, cnt, lo, hi, paths, eng } },
+      engUnit, anyEng, anyDup,
+    };
+  }
+
+  // The query. Everything above is pure; this is the only part that talks to the
+  // network, and it captures its instance up front so a tab switch mid-flight
+  // cannot land somebody else's readings in the field list.
+  async function fieldRun() {
+    const inst = ad;
+    const q = fq();
+    const st = fieldStation();
+    const addrs = [...q.sensors];
+    if (q.extra.trim()) addrs.push(q.extra.trim());
+
+    q.error = ''; q.empty = '';
+    if (!st && !addrs.length) { q.error = 'Pick a station and at least one sensor first.'; renderSide(); return; }
+    if (!addrs.length)        { q.error = 'Pick at least one sensor.'; renderSide(); return; }
+
+    const win = fieldWindow(q);
+    if (!win) { q.error = 'That is not a time window — the "from" date has to fall before the "to" date.'; renderSide(); return; }
+    const res = fieldRes(q, win);
+
+    const seq = ++q.seq;
+    q.loading = true;
+    renderSide();
+
+    let out;
+    try {
+      out = await fieldQueryRows(addrs, win, res);
+    } catch (err) {
+      if (inst.fq !== q || q.seq !== seq) return;
+      q.loading = false;
+      q.error = `Could not read the datastore — ${err && err.message || err}. `
+              + `${dbHostLabel()} may be unreachable, or asleep.`;
+      renderSide();
+      return;
+    }
+    if (inst.fq !== q || q.seq !== seq) return;   // superseded, or the tab was reset
+
+    const qmap = await fieldQualityCodes();
+    if (inst.fq !== q || q.seq !== seq) return;
+
+    q.loading = false;
+
+    const byAddr = new Map();
+    for (const r of out.rows) {
+      if (!byAddr.has(r.addr)) byAddr.set(r.addr, []);
+      byAddr.get(r.addr).push(r);
+    }
+
+    // Re-running replaces the addresses that were asked for rather than stacking
+    // a second copy of them beside the first — and it drops them whether or not
+    // anything came back, so a chart is never left showing last question's
+    // answer under this question's window.
+    const replacing = new Set(addrs);
+    inst.series = inst.series.filter(s => !(s.prov && replacing.has(s.prov.addr)));
+
+    if (!out.rows.length) {
+      // Nothing is drawn. An empty axis over a silent window reads as "the
+      // station reported zero", and silence and a run of zeroes are different
+      // claims — one of them is a fault.
+      q.empty = `No field readings between ${fmtFull(win.t0)} and ${fmtFull(win.t1)} for `
+              + `${addrs.length === 1 ? addrs[0] : addrs.length + ' addresses'}, `
+              + `at ${AD_RES_LABEL[res]}. `
+              + `Nothing has been ingested for ${addrs.length === 1 ? 'it' : 'them'} in that window.`;
+      inst.view = null;
+      inst.pin = null;
+      if (ad === inst) renderAll();
+      return;
+    }
+
+    const known = new Map(fieldAddrs(st).map(a => [a.addr, a]));
+    const prev = ad;
+    ad = inst;                       // adoptSeries() writes into the active instance
+    try {
+      for (const [addr, rows] of byAddr) {
+        const built = fieldCols(rows, res, qmap);
+        const data  = seriesData(built.cols);
+        const hit   = known.get(addr);
+        const sensor = hit?.sensor || null;
+        const label = [st?.name || (addr.startsWith('a:') ? `ALERT ${addr.slice(2)}` : addr),
+                       sensor?.type || (hit?.label || '')].filter(Boolean).join(' · ');
+        const warn = [];
+        if (out.capped) warn.push(`The row cap (${AD_FIELD_ROW_CAP.toLocaleString()}) was reached — this is the start of the window, not all of it. Narrow the window or pick a coarser resolution.`);
+        if (res !== 'raw') warn.push(`Drawn from ${AD_RES_LABEL[res]}: each point is the counter as it read at the end of its bucket. Within-bucket minimum and maximum are in the inspector and the export.`);
+        if (built.anyDup) warn.push('Some readings arrived by more than one path — click a point to see which.');
+        data.warn = warn;
+
+        const s = adoptSeries(data, {
+          fileName: `${addr} · ${AD_RES_LABEL[res]}`,
+          meta:     { sensorId: sensor?.sensor_id || null },
+          label,
+          station:  st || null,
+          sensor,
+          linkHow:  'address',
+          sensorId: sensor?.sensor_id || null,
+          kind:     guessKind({ sensorLabel: hit?.label || '' }, sensor),
+          gapMs:    fieldGapMs(data.t, data.n, res),
+          engUnit:  built.engUnit,
+          prov: {
+            source: 'field',
+            addr, res,
+            t0: win.t0, t1: win.t1,
+            at: Date.now(),
+            host: dbHostLabel(),
+            capped: out.capped,
+          },
+          // t, tr, v, raw, eng, lo, hi are Float64 (8 B); q is 1 B; dup and cnt
+          // are Int32 (4 B). Paths are sparse and not worth counting.
+          bytesPerRow: 8 * 7 + 1 + 4 * 2,
+        });
+        s.eng = data.extra.eng;
+      }
+    } finally { ad = prev; }
+
+    inst.view = null;
+    inst.pin = null;
+    if (ad === inst) {
+      renderAll();
+      note(`${out.rows.length.toLocaleString()} ${AD_RES_LABEL[res]} from ${dbHostLabel()}.`);
+    }
+  }
+
+  // ── the picker ───────────────────────────────────────────────────────────────
+
+  const AD_FIND_CAP = 25;   // matches offered before the operator is asked to type more
+
+  function fieldMatches(term) {
+    const all = state.data?.stations || [];
+    const t = term.trim().toLowerCase();
+    if (!t) return [];
+    const hits = [];
+    for (const s of all) {
+      if (String(s.name || '').toLowerCase().includes(t)
+          || String(s.station_number || '').includes(t)
+          || String(s.id || '').toLowerCase().includes(t)) {
+        hits.push(s);
+        if (hits.length > AD_FIND_CAP) break;
+      }
+    }
+    return hits;
+  }
+
+  function fieldPickerHtml() {
+    const q = fq();
+    const st = fieldStation();
+    const addrs = fieldAddrs(st);
+    const noAddr = fieldNoAddr(st);
+    const win = fieldWindow(q);
+    const res = win ? fieldRes(q, win) : null;
+    const hits = st ? [] : fieldMatches(q.find);
+
+    return `
+      <div class="panel ad-panel">
+        <div class="panel-header"><h3>Field readings</h3>
+          <span class="small" title="Every reading on this tab comes from the MegaNet datastore. ARRO exports live on the ARRO Data tab and the two are never mixed."
+                style="color:var(--muted)">${esc(dbHostLabel())}</span></div>
+
+        <label class="ad-cfg-row" style="display:block">
+          <span>Station</span>
+          <input type="search" placeholder="Name, station number or id…" value="${escAttr(q.find)}"
+                 oninput="ArroData.fieldSetStation('', this.value)"
+                 style="width:100%;margin-top:.2rem">
+        </label>
+        ${st ? `
+          <div class="ad-field-picked">
+            <b>${esc(st.name)}</b>
+            <span class="small mono">${esc(st.station_number || st.id)}</span>
+            <button class="ad-x" title="Pick a different station"
+                    onclick="ArroData.fieldSetStation('', '')">✕</button>
+          </div>` : hits.length ? `
+          <div class="ad-field-hits">
+            ${hits.slice(0, AD_FIND_CAP).map(s => `
+              <button class="ad-field-hit" onclick="ArroData.fieldSetStation('${escAttr(s.id)}', '')">
+                ${esc(s.name)} <span class="small mono">${esc(s.station_number || '')}</span>
+              </button>`).join('')}
+            ${hits.length > AD_FIND_CAP ? '<div class="small" style="color:var(--muted)">More than ' + AD_FIND_CAP + ' matches — keep typing.</div>' : ''}
+          </div>` : q.find.trim() ? `
+          <div class="small" style="color:var(--muted);margin:.3rem 0">No station matches that.</div>` : ''}
+
+        ${st ? `
+          <div class="ad-field-sensors">
+            <div class="panel-header" style="padding:0;border:0;margin:.5rem 0 .2rem">
+              <h3 style="font-size:.8rem">Sensors</h3>
+              <button class="btn-link" onclick="ArroData.fieldAllSensors()">${
+                addrs.length && addrs.every(a => q.sensors.includes(a.addr)) ? 'none' : 'all'}</button>
+            </div>
+            ${addrs.map(a => `
+              <label class="ad-chk" style="display:flex;gap:.35rem;align-items:baseline">
+                <input type="checkbox" ${q.sensors.includes(a.addr) ? 'checked' : ''}
+                       onchange="ArroData.fieldToggleSensor('${escAttr(a.addr)}')">
+                <span>${esc(a.label)} <span class="small mono" style="color:var(--muted)">${esc(a.addr)}</span></span>
+              </label>`).join('') || '<div class="small" style="color:var(--muted)">No ALERT addresses recorded for this station.</div>'}
+            ${noAddr.length ? `
+              <div class="small" style="color:var(--muted);margin-top:.3rem"
+                   title="A satellite or cellular station reports under its station number and a channel name, which stations.json does not record. Type the address in below if you know it.">
+                ${noAddr.length} sensor${noAddr.length === 1 ? '' : 's'} here carr${noAddr.length === 1 ? 'ies' : 'y'} no ALERT address
+                (${esc(noAddr.slice(0, 3).join(', '))}${noAddr.length > 3 ? '…' : ''}).</div>` : ''}
+            <label class="ad-cfg-row" style="display:block;margin-top:.35rem"
+                   title="An address exactly as meganet.reading stores it — a:6128, or s:541155/rain for a station that reports under its number.">
+              <span>Or an address</span>
+              <input type="text" placeholder="a:6128 or s:541155/rain" value="${escAttr(q.extra)}"
+                     onchange="ArroData.fieldSetDate('extra', this.value)"
+                     style="width:100%;margin-top:.2rem">
+            </label>
+          </div>` : ''}
+
+        <div class="panel-header" style="padding:0;border:0;margin:.6rem 0 .2rem">
+          <h3 style="font-size:.8rem">Window</h3></div>
+        <div class="ad-seg" role="group" aria-label="Time window" style="flex-wrap:wrap">
+          ${AD_FIELD_WINDOWS.map(([k, label]) => `
+            <button class="${q.win === k ? 'on' : ''}" title="${escAttr(label)}"
+                    onclick="ArroData.fieldSetWindow('${k}')">${esc(k)}</button>`).join('')}
+          <button class="${q.win === 'custom' ? 'on' : ''}" title="Type your own dates"
+                  onclick="ArroData.fieldSetWindow('custom')">dates</button>
+        </div>
+        ${q.win === 'custom' ? `
+          <div class="ad-field-dates">
+            <input type="date" value="${escAttr(q.from)}" onchange="ArroData.fieldSetDate('from', this.value)">
+            <span class="small">to</span>
+            <input type="date" value="${escAttr(q.to)}" onchange="ArroData.fieldSetDate('to', this.value)">
+          </div>` : ''}
+
+        <div class="panel-header" style="padding:0;border:0;margin:.6rem 0 .2rem">
+          <h3 style="font-size:.8rem" title="Raw readings below ${AD_RAW_MAX_DAYS} days, hourly below ${AD_HOURLY_MAX_DAYS}, daily beyond — override it here.">Resolution</h3></div>
+        <div class="ad-seg" role="group" aria-label="Resolution">
+          ${[['auto', 'Auto'], ['raw', 'Raw'], ['hourly', 'Hourly'], ['daily', 'Daily']].map(([k, label]) => `
+            <button class="${q.res === k ? 'on' : ''}" onclick="ArroData.fieldSetRes('${k}')"
+                    title="${escAttr(k === 'auto' ? 'Chosen from the width of the window' : 'Always draw ' + AD_RES_LABEL[k])}">${esc(label)}</button>`).join('')}
+        </div>
+        ${res ? `<p class="small ad-cfg-note">This window will be drawn from <b>${esc(AD_RES_LABEL[res])}</b>.</p>` : ''}
+
+        <button style="width:100%;margin-top:.5rem" ${q.loading ? 'disabled' : ''}
+                onclick="ArroData.fieldRun()">${q.loading ? 'Reading…' : 'Load readings'}</button>
+
+        ${q.error ? `<div class="small ad-note ad-note--bad" style="margin-top:.4rem">${esc(q.error)}
+            <button class="ad-inline-link" onclick="ArroData.fieldClearError()">dismiss</button></div>` : ''}
+        ${q.empty ? `<div class="small ad-warn" style="margin-top:.4rem">${esc(q.empty)}</div>` : ''}
+      </div>`;
+  }
+
+  // Setting a station clears the sensor ticks: they are addresses belonging to
+  // the station that was showing, and carrying them across would query one
+  // station's addresses under another station's name.
+  function fieldSetStation(id, find) {
+    const q = fq();
+    q.stationId = id || '';
+    q.find = id ? '' : (find || '');
+    q.sensors = [];
+    if (id) {
+      // One sensor is the common case and ticking it saves a click; more than
+      // one is a choice the operator should make deliberately.
+      const a = fieldAddrs(fieldStation());
+      if (a.length === 1) q.sensors = [a[0].addr];
+    }
+    q.error = ''; q.empty = '';
+    renderSide();
+  }
+
+  function fieldToggleSensor(addr) {
+    const q = fq();
+    q.sensors = q.sensors.includes(addr) ? q.sensors.filter(a => a !== addr) : [...q.sensors, addr];
+    renderSide();
+  }
+
+  function fieldAllSensors() {
+    const q = fq();
+    const all = fieldAddrs(fieldStation()).map(a => a.addr);
+    q.sensors = all.length && all.every(a => q.sensors.includes(a)) ? [] : all;
+    renderSide();
+  }
+
+  function fieldSetWindow(k) { const q = fq(); q.win = k; q.error = ''; renderSide(); }
+  function fieldSetRes(k)    { const q = fq(); q.res = k; renderSide(); }
+  function fieldSetDate(which, v) { const q = fq(); q[which] = v; q.error = ''; renderSide(); }
+  function fieldClearError() { const q = fq(); q.error = ''; q.empty = ''; renderSide(); }
+
+  // What the chart says about itself. Only on the Field tab: the ARRO tab's
+  // answer is its own name, and adding a banner there would change a tab this
+  // work promised not to touch.
+  function provenanceHtml() {
+    if (ad.source !== 'field') return '';
+    const vis = shown().filter(s => s.prov);
+    if (!vis.length) return '';
+    const res = [...new Set(vis.map(s => s.prov.res))];
+    const t0 = Math.min(...vis.map(s => s.prov.t0));
+    const t1 = Math.max(...vis.map(s => s.prov.t1));
+    const gaps = Math.max(...vis.map(s => s.gapMs || 0));
+    const capped = vis.some(s => s.prov.capped);
+    return `
+      <div class="ad-prov" role="note">
+        <span class="ad-badge ad-badge--src" title="These readings came out of the MegaNet datastore, not from ARRO. The two are never combined.">Field data</span>
+        <span class="mono small">${esc(vis[0].prov.host)}</span>
+        <span>·</span>
+        <b>${esc(res.map(r => AD_RES_LABEL[r]).join(' + '))}</b>
+        ${res.some(r => r !== 'raw') ? '<span class="small">(the counter at the end of each bucket)</span>' : ''}
+        <span>·</span>
+        <span>${esc(fmtFull(t0))} → ${esc(fmtFull(t1))}</span>
+        ${gaps ? `<span>·</span><span class="small" title="Nothing is drawn across a silence longer than this.">gaps over ${esc(fmtDur(gaps))} left open</span>` : ''}
+        ${capped ? '<span>·</span><span class="ad-warn-txt small">row cap reached — this is the start of the window, not all of it</span>' : ''}
+      </div>`;
+  }
+
+  // Repeater health, and the one diagnostic this tab can show that no other can.
+  // dup_count is per reading: how many further copies of it arrived after the
+  // one that was kept.
+  function dupSummary(s) {
+    const dup = s.extra?.dup;
+    if (!dup) return '';
+    let many = 0, copies = 0;
+    for (let i = 0; i < s.n; i++) if (dup[i] > 0) { many++; copies += dup[i]; }
+    if (!many) {
+      return ' · <span title="Every reading here arrived exactly once. On a repeater network that is worth a second look — it can mean the repeaters are not hearing this station.">single path</span>';
+    }
+    return ` · <span title="${escAttr(`${copies.toLocaleString()} further copies arrived across ${many.toLocaleString()} readings. A repeater network delivering most readings more than once is the network working.`)}">${many.toLocaleString()} multi-path</span>`;
+  }
+
+  // The inspector rows only a field reading has. Kept out of pinHtml's grid
+  // literal so the ARRO inspector still renders exactly the six it always did.
+  function fieldPinRows(s, i) {
+    const e = s.extra || {};
+    const rows = [];
+    if (s.eng && isFinite(s.eng[i])) {
+      rows.push(`<div><span>Converted</span><b>${esc(fmtVal(s.eng[i]))} ${esc(s.engUnit || '')}</b>
+        <span class="small" style="color:var(--muted)">display only — the filter ran on the count</span></div>`);
+    }
+    if (s.prov.res !== 'raw' && e.cnt) {
+      const per = s.prov.res === 'hourly' ? 'hour' : 'day';
+      rows.push(`<div><span>In this ${per}</span><b>${(e.cnt[i] || 0).toLocaleString()} reading${e.cnt[i] === 1 ? '' : 's'}</b></div>`);
+      if (e.lo && isFinite(e.lo[i])) {
+        rows.push(`<div><span>Bucket min–max</span><b>${esc(fmtVal(e.lo[i]))} – ${esc(fmtVal(e.hi[i]))}</b>
+          <span class="small" style="color:var(--muted)">the spread the plotted point hides</span></div>`);
+      }
+    }
+    const dup = e.dup ? e.dup[i] : 0;
+    const via = e.paths ? e.paths[i] : null;
+    rows.push(`<div><span>Copies</span><b>${dup ? `heard ${dup + 1} times` : 'heard once'}</b></div>`);
+    if (via && via.length) rows.push(`<div><span>Paths</span><b class="mono">${esc(via.join(', '))}</b></div>`);
+    rows.push(`<div><span>Source</span><b>Field · <span class="mono">${esc(s.prov.addr)}</span></b></div>`);
+    return rows.join('');
+  }
+
+  // "45 min", "1.5 h", "1.5 d" — only ever used for the gap threshold, which is
+  // a rough number that wants a rough rendering.
+  function fmtDur(ms) {
+    if (ms < 3600000) return `${Math.round(ms / 60000)} min`;
+    if (ms < AD_DAY)  return `${(ms / 3600000).toFixed(ms % 3600000 ? 1 : 0)} h`;
+    return `${(ms / AD_DAY).toFixed(ms % AD_DAY ? 1 : 0)} d`;
+  }
+
   function note(msg, bad) {
     const el = document.getElementById('ad-note');
     if (!el) return;
@@ -10660,8 +11303,9 @@ const ArroData = (function () {
 
   // ── render ─────────────────────────────────────────────────────────────────
 
-  // `source` picks the instance. Called with no argument it means the ARRO tab,
-  // which is how renderMain() has always called it.
+  // `source` picks the instance, and is the only place the two tabs diverge
+  // before the sidebar. Called with no argument it means the ARRO tab, which is
+  // how renderMain() has always called it.
   function render(source) {
     activate(source || 'arro');
     return `
@@ -10675,6 +11319,14 @@ const ArroData = (function () {
 
   function sideHtml() {
     return `
+      ${ad.source === 'field' ? fieldPickerHtml() : importHtml()}
+      <div id="ad-note" class="small ad-note"></div>
+      ${seriesHtml()}
+      ${cfgHtml()}`;
+  }
+
+  function importHtml() {
+    return `
       <div class="ad-drop" id="ad-drop">
         <input type="file" id="ad-file" accept=".csv,text/csv" multiple hidden
                onchange="ArroData.pick(this)">
@@ -10683,10 +11335,7 @@ const ArroData = (function () {
           Read in your browser — nothing is uploaded.</div>
         <button onclick="document.getElementById('ad-file').click()">Choose files…</button>
         ${ad.busy ? `<div class="small" style="margin-top:.4rem">Reading ${ad.busy} file${ad.busy === 1 ? '' : 's'}…</div>` : ''}
-      </div>
-      <div id="ad-note" class="small ad-note"></div>
-      ${seriesHtml()}
-      ${cfgHtml()}`;
+      </div>`;
   }
 
   function seriesHtml() {
@@ -10709,13 +11358,21 @@ const ArroData = (function () {
             <input type="color" class="ad-swatch" value="${escAttr(s.color)}" title="Series colour"
                    onchange="ArroData.setColor('${s.key}', this.value)">
             <b class="ad-series-name" title="${escAttr(s.fileName)}">${esc(s.label)}</b>
-            <button class="ad-x" title="Remove this import" onclick="ArroData.remove('${s.key}')">✕</button>
+            <button class="ad-x" title="Remove this ${ad.source === 'field' ? 'series' : 'import'}" onclick="ArroData.remove('${s.key}')">✕</button>
           </div>
           <div class="small ad-series-meta">
             ${linkTxt}
             ${s.sensorId ? ` · <span class="mono">${esc(s.sensorId)}</span>` : ''}
             ${arro ? ` · <a class="btn-link" href="${escAttr(arro)}" target="_blank" rel="noopener">ARRO ↗</a>` : ''}
           </div>
+          ${s.prov ? `
+            <div class="small ad-series-meta">
+              <span class="ad-badge ad-badge--src"
+                    title="From the MegaNet datastore. Never mixed with an ARRO export.">Field</span>
+              <span class="mono">${esc(s.prov.addr)}</span> ·
+              <span title="Which table this was drawn from">${esc(AD_RES_LABEL[s.prov.res])}</span>
+              ${dupSummary(s)}
+            </div>` : ''}
           <div class="small ad-series-meta">
             <span title="Readings kept by the filters">${st.good.toLocaleString()} kept</span> ·
             <button class="ad-inline-link ad-bad-txt" onclick="ArroData.explain()"
@@ -10740,7 +11397,7 @@ const ArroData = (function () {
 
     return `
       <div class="panel ad-panel">
-        <div class="panel-header"><h3>Imports</h3>
+        <div class="panel-header"><h3>${ad.source === 'field' ? 'Loaded' : 'Imports'}</h3>
           <button class="btn-link" onclick="ArroData.clearAll()">clear all</button></div>
         ${rows}
       </div>`;
@@ -11122,6 +11779,7 @@ const ArroData = (function () {
   function mainHtml() {
     if (!ad.series.length) return emptyHtml();
     return `
+      ${provenanceHtml()}
       ${toolbarHtml()}
       <div class="ad-stage" id="ad-stage" tabindex="0"
            aria-label="Sensor readings over time. Drag to pan, scroll to zoom, arrow keys to step.">
@@ -11167,6 +11825,7 @@ const ArroData = (function () {
   }
 
   function emptyHtml() {
+    if (ad.source === 'field') return fieldEmptyHtml();
     return `
       <div class="ad-empty">
         <h2>Sensor data, filtered and drawn</h2>
@@ -11179,6 +11838,34 @@ const ArroData = (function () {
            away.</p>
         <p class="small" style="color:var(--muted)">
           Expected columns: Reading, Receive, Value, Unit, Data Quality, Raw Value.</p>
+      </div>`;
+  }
+
+  function fieldEmptyHtml() {
+    const q = fq();
+    if (q.empty) {
+      return `
+        <div class="ad-empty">
+          <h2>Nothing in that window</h2>
+          <p>${esc(q.empty)}</p>
+          <p class="small" style="color:var(--muted)">A silent window and a window of zeroes are
+             different claims, so nothing is drawn. Widen the window, or check that anything has
+             been ingested for this station at all.</p>
+        </div>`;
+    }
+    return `
+      <div class="ad-empty">
+        <h2>Our own telemetry</h2>
+        <p>Readings that field stations sent us, out of the MegaNet datastore — pick a station,
+           its sensors and a window on the left.</p>
+        <p>The chart, the Bureau's 3-5-7 continuity filter and the inspector are the ARRO Data
+           tab's, unchanged. What is different is where the numbers came from, and this tab never
+           mixes the two: ARRO exports stay on the ARRO Data tab, and every chart and export here
+           says so on its face.</p>
+        <p class="small" style="color:var(--muted)">
+          Readings arrive as counts, so the 3/5/7 thresholds are counts too and the filter runs on
+          them exactly as it does on an ARRO export. Any conversion the datastore recorded is shown
+          beside the count, never instead of it.</p>
       </div>`;
   }
 
@@ -11315,12 +12002,17 @@ const ArroData = (function () {
         </div>
         <div class="ad-pin-grid">
           <div><span>Reading</span><b>${esc(fmtFull(s.t[i]))}</b></div>
-          <div><span>Received</span><b>${esc(fmtFull(s.tr[i]))}${s.tr[i] !== s.t[i]
+          <div><span>${esc(s.prov && s.prov.res !== 'raw' ? 'Last in bucket' : 'Received')}</span><b>${esc(fmtFull(s.tr[i]))}${
+              // The delay between reading and receipt is worth flagging on a
+              // real reading. On a rollup the two are an hour apart by
+              // construction, which is not news.
+              s.tr[i] !== s.t[i] && (!s.prov || s.prov.res === 'raw')
               ? ` <span class="small" style="color:var(--warn)">+${Math.round((s.tr[i] - s.t[i]) / 1000)}s</span>` : ''}</b></div>
           <div><span>Value</span><b>${esc(fmtVal(s.v[i]))} ${esc(s.unit)}</b></div>
           <div><span>Raw</span><b>${esc(fmtVal(s.raw[i]))}</b>${rawBucketNote(s, i)}</div>
           <div><span>Adjusted</span><b>${esc(fmtVal(f.adj[i]))}${rolled ? ' <span class="small">(wrap here)</span>' : ''}</b></div>
           <div><span>Quality</span><b>${esc(s.qcodes[s.q[i]] || '—')}</b></div>
+          ${s.prov ? fieldPinRows(s, i) : ''}
         </div>
         <div class="small ad-pin-why">${esc(why)}
           <button class="ad-inline-link" onclick="ArroData.explain()"
@@ -11967,7 +12659,8 @@ const ArroData = (function () {
     renderAll();
   }
   function clearAll() {
-    if (ad.series.length > 1 && !confirm(`Remove all ${ad.series.length} imports?`)) return;
+    const what = ad.source === 'field' ? 'loaded series' : 'imports';
+    if (ad.series.length > 1 && !confirm(`Remove all ${ad.series.length} ${what}?`)) return;
     ad.series = []; ad.pin = null; ad.hover = null; ad.view = null;
     renderAll();
   }
@@ -12045,6 +12738,8 @@ const ArroData = (function () {
   function exportCsv(which) {
     const vis = shown();
     if (!vis.length) { note('Nothing to export — no series is shown.', true); return; }
+    if (ad.source === 'field') return exportFieldCsv(which, vis);
+
     const multi = vis.length > 1;
     const head = ['Reading', 'Receive', 'Value', 'Unit', 'Data Quality', 'Raw Value', 'Adjusted Value'];
     if (which === 'all') head.push('Filter Status');
@@ -12069,16 +12764,98 @@ const ArroData = (function () {
     note(`Exported ${rows.toLocaleString()} rows.`);
   }
 
+  // Somebody will paste one of these into an incident report, so the file has to
+  // be unambiguous about which system said what long after the tab is closed.
+  // The source and the resolution are columns on every row rather than a comment
+  // line at the top: a comment is the first thing a spreadsheet import loses,
+  // and a row that has been copied out of the sheet still carries its
+  // provenance. The filename says it too.
+  function exportFieldCsv(which, vis) {
+    const head = ['Source', 'Datastore', 'Resolution', 'Address', 'Station', 'Station Number',
+                  'Sensor', 'Reading', 'Received', 'Value (raw)', 'Unit',
+                  'Converted', 'Converted Unit', 'Quality', 'Adjusted Value',
+                  'Copies', 'Paths', 'Bucket Min', 'Bucket Max', 'Readings In Bucket'];
+    if (which === 'all') head.push('Filter Status');
+
+    const lines = [head.join(',')];
+    let rows = 0;
+    for (const s of vis) {
+      const f = runFilter(s, ad.cfg);
+      const e = s.extra || {};
+      const p = s.prov || {};
+      const roll = p.res && p.res !== 'raw';
+      for (let i = 0; i < s.n; i++) {
+        if (which === 'kept' && f.status[i] !== AD_GOOD) continue;
+        const via = e.paths ? e.paths[i] : null;
+        const r = [
+          'MegaNet field data', p.host || dbHostLabel(), AD_RES_LABEL[p.res] || p.res || '',
+          p.addr || '', s.station?.name || '', s.station?.station_number || '',
+          s.sensor?.type || '',
+          fmtFull(s.t[i]), fmtFull(s.tr[i]), s.v[i], s.unit,
+          s.eng && isFinite(s.eng[i]) ? s.eng[i] : '', s.engUnit || '',
+          s.qcodes[s.q[i]] || '', f.adj[i],
+          e.dup ? (e.dup[i] || 0) + 1 : '',
+          via && via.length ? via.join(' | ') : '',
+          roll && e.lo && isFinite(e.lo[i]) ? e.lo[i] : '',
+          roll && e.hi && isFinite(e.hi[i]) ? e.hi[i] : '',
+          roll && e.cnt ? e.cnt[i] : '',
+        ];
+        if (which === 'all') r.push(AD_STATUS_LABEL[f.status[i]]);
+        lines.push(r.map(csvEscape).join(','));
+        rows++;
+      }
+    }
+    const res = [...new Set(vis.map(s => s.prov?.res).filter(Boolean))].join('-') || 'field';
+    const base = vis.length > 1 ? 'meganet_field' : `meganet_field_${slug(vis[0].label) || 'series'}`;
+    dlText(`${base}_${res}_${which === 'kept' ? '357filtered' : 'verdict'}.csv`, lines.join('\n'));
+    note(`Exported ${rows.toLocaleString()} rows of field data.`);
+  }
+
+  // The provenance line, burnt into the picture. The banner above the chart is
+  // HTML and does not survive an export, and a chart pasted into an incident
+  // report with nothing on it to say which system produced the numbers is
+  // exactly the ambiguity this tab was built to prevent. Returns the extra
+  // height it needs, so the caller can make room.
+  const AD_STAMP_H = 20;
+  function stampProvenance(clone, w, h) {
+    if (ad.source !== 'field') return 0;
+    const vis = shown().filter(s => s.prov);
+    if (!vis.length) return 0;
+    const p = vis[0].prov;
+    const res = [...new Set(vis.map(s => s.prov.res))].map(r => AD_RES_LABEL[r]).join(' + ');
+    const line = `MegaNet field data · ${p.host} · ${res} · `
+               + `${fmtFull(Math.min(...vis.map(s => s.prov.t0)))} to ${fmtFull(Math.max(...vis.map(s => s.prov.t1)))}`;
+    const c = theme();
+    clone.setAttribute('viewBox', `0 0 ${w} ${h + AD_STAMP_H}`);
+    clone.setAttribute('width', w);
+    clone.setAttribute('height', h + AD_STAMP_H);
+    const ns = 'http://www.w3.org/2000/svg';
+    const bg = document.createElementNS(ns, 'rect');
+    bg.setAttribute('x', 0); bg.setAttribute('y', h);
+    bg.setAttribute('width', w); bg.setAttribute('height', AD_STAMP_H);
+    bg.setAttribute('fill', c.panel);
+    const txt = document.createElementNS(ns, 'text');
+    txt.setAttribute('x', 6); txt.setAttribute('y', h + 14);
+    txt.setAttribute('font-size', '10');
+    txt.setAttribute('fill', c.muted);
+    txt.textContent = line;
+    clone.appendChild(bg);
+    clone.appendChild(txt);
+    return AD_STAMP_H;
+  }
+
   function exportImg(fmt) {
     const svg = document.getElementById('ad-svg');
     if (!svg) return;
     const clone = svg.cloneNode(true);
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const grew = stampProvenance(clone, ad.w, ad.h);
+    const base = ad.source === 'field' ? 'meganet-field-chart' : 'arro-chart';
     const text = new XMLSerializer().serializeToString(clone);
     if (fmt === 'svg') {
       const a = Object.assign(document.createElement('a'), {
         href: URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' })),
-        download: 'arro-chart.svg',
+        download: `${base}.svg`,
       });
       a.click();
       URL.revokeObjectURL(a.href);
@@ -12086,7 +12863,7 @@ const ArroData = (function () {
     }
     const scale = 2;
     const canvas = document.createElement('canvas');
-    canvas.width = ad.w * scale; canvas.height = ad.h * scale;
+    canvas.width = ad.w * scale; canvas.height = (ad.h + grew) * scale;
     const img = new Image();
     img.onload = () => {
       const ctx = canvas.getContext('2d');
@@ -12095,7 +12872,7 @@ const ArroData = (function () {
       canvas.toBlob(b => {
         if (!b) { note('The browser would not render the chart to PNG — the SVG download works.', true); return; }
         const a = Object.assign(document.createElement('a'), {
-          href: URL.createObjectURL(b), download: 'arro-chart.png',
+          href: URL.createObjectURL(b), download: `${base}.png`,
         });
         a.click();
         URL.revokeObjectURL(a.href);
@@ -12112,18 +12889,21 @@ const ArroData = (function () {
   return {
     // The instance on screen. A getter rather than a property because `ad` is a
     // binding that moves with the active tab, and a captured reference would go
-    // stale the first time the operator opened another one.
+    // stale the first time the operator opened the other one.
     get ad() { return ad; },
-    // Every instance's series at once, for the memory meter — which is asking
-    // about the page's footprint, not about any one tab.
+    // Both instances' series at once, for the memory meter — which is asking
+    // about the page's footprint, not about either tab.
     allSeries: () => Object.values(instances).flatMap(i => i.series),
     render, init, stop, repaint, importFiles, pick,
     toggle, setColor, setKind, solo, zoomTo, remove, clearAll, showStation,
     setCfg, resetCfg, setMode, setTransform, setChart, setY, setYRange, setFlag,
     preset, unpin, exportCsv, exportImg, explain, compareToggle, dropAll,
+    // the Field Data tab (#114)
+    fieldSetStation, fieldToggleSensor, fieldAllSensors, fieldSetWindow,
+    fieldSetRes, fieldSetDate, fieldRun, fieldClearError,
     // exposed for reasoning about the filter outside the UI
     parseCsv, parseName, linkStation, guessKind, runFilter, walk357,
-    // the series boundary every source crosses
+    // the series boundary both sources cross
     seriesData, adoptSeries,
   };
 })();

@@ -4071,6 +4071,46 @@ code {
 .ad-badge--bad  { color: var(--bad);  border-color: var(--bad); }
 .ad-badge--warn { color: var(--warn); border-color: var(--warn); }
 .ad-badge--dup  { color: var(--muted); }
+/* Field Data's provenance chip. Accent rather than a neutral grey because its
+   whole job is to be noticed — the one thing that must never be ambiguous on
+   this tab is which system the numbers came from. */
+.ad-badge--src  { color: var(--accent); border-color: var(--accent); }
+
+/* ── Field Data (#114) ───────────────────────────────────────────────────── */
+
+/* The line above the chart that says where these readings came from and at what
+   resolution. Sits inside the chart column so it cannot be scrolled away from
+   the thing it is describing. */
+.ad-prov {
+  display: flex; flex-wrap: wrap; gap: .35rem; align-items: baseline;
+  padding: .35rem .5rem; margin: 0 0 .4rem;
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: 6px; background: var(--subtle);
+  font-size: .8rem;
+}
+.ad-prov > span:not([class]) { color: var(--muted); }
+
+.ad-field-picked {
+  display: flex; align-items: center; gap: .4rem;
+  margin: .35rem 0 .1rem; padding: .3rem .4rem;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--subtle);
+}
+.ad-field-picked b { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The station search results. Capped in the markup, so this never has to scroll
+   far — but it is scrollable anyway, because a sidebar that grows past the fold
+   pushes the sensor list and the Load button off screen. */
+.ad-field-hits { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; margin: .3rem 0; }
+.ad-field-hit {
+  text-align: left; background: none; border: 0; border-bottom: 1px solid var(--border);
+  padding: .3rem .2rem; font-size: .82rem; color: inherit; cursor: pointer;
+}
+.ad-field-hit:hover { background: var(--subtle); }
+.ad-field-hit:last-child { border-bottom: 0; }
+
+.ad-field-sensors { margin-top: .2rem; }
+.ad-field-dates { display: flex; align-items: center; gap: .35rem; margin-top: .3rem; }
+.ad-field-dates input { flex: 1; min-width: 0; }
 
 .ad-empty { max-width: 620px; margin: 2rem auto; padding: 1.5rem; }
 .ad-empty h2 { margin: 0 0 .6rem; }
