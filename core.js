@@ -771,6 +771,77 @@ const state = {
   theme: localStorage.getItem('mn-theme') || 'light',
 };
 
+// ── Module registries ─────────────────────────────────────────────────────────
+// Two things the app shell does on behalf of whichever modules are live: stop
+// them when the tab they own is left, and re-measure their Leaflet maps when
+// the layout takes a column from them or gives one back.
+//
+// Both used to be lists of module names hardcoded in app.js — switchTab()'s
+// three stop() calls and invalidateMapSizes()'s five maps — and by the end of
+// #129 every one of those names lived in a different file. That is the failure
+// this replaces (#142): the list was in a file the module's author had no
+// reason to open, so a new tab that forgot to add itself **under-reported in
+// silence**. A map missing from the list renders at the wrong size after a nav
+// collapse; a loop missing from the stop-list keeps ticking behind whatever tab
+// replaced it, costing a frame's work every frame. Neither throws, neither
+// shows up in `npm run all`, and neither is visible in the module's own file.
+// Same shape as MemMeter's three lists, fixed the same way — a module now says
+// so in its own file, and adding a tab with a map or a teardown means editing
+// only that tab's file.
+//
+// Registration is a call made from the module's init(), or from the line that
+// creates the map — never a statement at a module's top level. `init.js` is the
+// only file that executes at load (#132), and that property is what makes a
+// module's position in the load order not matter; a bare push here would take
+// it back. Registering from init() has a second effect worth having: the
+// registry only ever holds modules that have actually run, which is precisely
+// what the old `if (m)` guard was doing by hand for maps, and what made three
+// unconditional stop() calls on every tab switch a no-op most of the time.
+//
+// Keyed by module name so re-entering a tab replaces its entry rather than
+// stacking another copy — registration has to be safe to repeat, because init()
+// runs on every render of its tab. Iteration order is registration order (first
+// time each tab was opened) and **nothing may depend on it**: a teardown that
+// only works after some other teardown has run is a bug in that teardown, not a
+// reason to fix the order.
+const _tabTeardowns = new Map();   // name → () => void
+const _liveMaps     = new Map();   // name → () => (L.Map | null)
+
+function registerTabTeardown(name, fn) { _tabTeardowns.set(name, fn); }
+function registerLiveMap(name, getMap) { _liveMaps.set(name, getMap); }
+
+// Run every registered teardown on the way out of a tab. One that throws must
+// not take the rest of the switch with it — the tab is changing either way, and
+// a half-torn-down app is worse than a module that failed to stop. The failure
+// still lands in the error log, so a bug report carries it.
+function runTabTeardowns() {
+  _tabTeardowns.forEach((fn, name) => {
+    try { fn(); }
+    catch (e) {
+      recordError({
+        kind:    'teardown',
+        message: `${name} teardown threw: ${(e && e.message) || e}`,
+        where:   '',
+        stack:   _errStack(e && e.stack, 4),
+      });
+    }
+  });
+}
+
+// Every Leaflet map currently on the page. They are created lazily per tab, so
+// most of these getters return null most of the time — a module registers once
+// and the getter answers for the map's whole lifetime, including the stretches
+// where its own teardown has set it back to null.
+function liveMaps() {
+  const out = [];
+  _liveMaps.forEach(get => {
+    let m = null;
+    try { m = get(); } catch (_) {}
+    if (m) out.push(m);
+  });
+  return out;
+}
+
 // ── Utilities ──────────────────────────────────────────────────────────────────
 
 function esc(s) {

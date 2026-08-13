@@ -7,7 +7,8 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, ROLE_COLOR, ARRO_DEFAULT_BASE,
-// buildArroUrl and buildSensorIndex — the last three hosted here for five other
+// registerLiveMap (#142 — this file now says its map exists, instead of being
+// named in app.js's list of them), buildArroUrl and buildSensorIndex — the last three hosted here for five other
 // sections until M1 (#132) moved them out, which is what let this module leave
 // on its own. Across to app.js for addBaseLayers, primaryRole,
 // findRepeaterMatches and repeaterPassingCount.
@@ -307,6 +308,9 @@ function initBitFlipperMap() {
   if (!el || !state.data || typeof L === 'undefined') return;
 
   state.bfMap = L.map('bf-map').setView([-28, 134], 4);
+  // Say so where the shell can see it, or this map is the one that renders at
+  // the wrong size after a nav collapse and never says why (#142).
+  registerLiveMap('BitFlipper', () => state.bfMap);
   addBaseLayers(state.bfMap);
   state.bfMapLayer = L.layerGroup().addTo(state.bfMap);
   refreshBitFlipperMap();

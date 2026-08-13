@@ -7,7 +7,9 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, csvEscape, dlText, slug,
-// arroSiteId, arroSensorUrl, bucketSizeMm and dbHostLabel; across to app.js for
+// arroSiteId, arroSensorUrl, bucketSizeMm, dbHostLabel and registerTabTeardown
+// (#142 — this file declares that its ResizeObserver has to be dropped on the
+// way out, where app.js used to say so for it); across to app.js for
 // renderMain and renderTabs; to datastore.js for dbSelect; and to modal.js for
 // Modal.
 //
@@ -2978,6 +2980,11 @@ const ArroData = (function () {
   }
 
   function init() {
+    // The observer below outlives the element it watches unless something drops
+    // it on the way out of the tab. Saying so here, rather than being named in
+    // app.js's stop-list, is #142; re-registering on every render is harmless
+    // because the registry is keyed by name.
+    registerTabTeardown('ArroData', stop);
     if (ad.ro) { ad.ro.disconnect(); ad.ro = null; }
     measure();
     bind();

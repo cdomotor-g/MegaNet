@@ -5,7 +5,9 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // The most connected of the ten modules M2 moved. It reaches back to core.js for
-// state, esc, escAttr, csvEscape, dlText, stationSensors and bucketSizeMm;
+// state, esc, escAttr, csvEscape, dlText, stationSensors, bucketSizeMm and —
+// since #142, so the stop-list is not a name in someone else's file —
+// registerTabTeardown and registerLiveMap;
 // across to app.js for renderMain, addBaseLayers, MAP_HOME and stationAlertIds,
 // plus switchTab and goToStation from inline handlers; and sideways to Packets
 // for the shared codec. All of it from inside functions this module exports —
@@ -16,7 +18,7 @@
 // executes at load.
 //
 // ⚠ This file carries one of the app's 4 literal NUL bytes — U+0000 inside a
-// string literal at line 857, used as a compound-key separator (#129).
+// string literal at line 859, used as a compound-key separator (#129).
 // Any tool that round-trips this file as text and normalises control characters
 // destroys that key silently. `npm run concat` in test/ is what catches it.
 //
@@ -1462,6 +1464,9 @@ const Alert2 = (function () {
     // the tab has been left is drawing into a context the removed map took with
     // it.
     const map = a.map = L.map('a2-map');
+    // The getter, not the map: stopMap() sets this back to null on the way out
+    // of the tab, and the shell has to see that (#142).
+    registerLiveMap('Alert2', () => state.a2.map);
     // A view before any layer is added: Leaflet defers layer adds until the map
     // has one, and a deferred add can otherwise run against a renderer that has
     // not been set up. Replaced by the fit below on the same tick.
@@ -2184,6 +2189,10 @@ const Alert2 = (function () {
   // ── init ──────────────────────────────────────────────────────────────────────
 
   function init() {
+    // The coverage map is built on a div the next tab throws away, so leaving
+    // has to take it down. Named in app.js's stop-list until #142; it says so
+    // here now, and the registry is keyed by name so re-running init() is free.
+    registerTabTeardown('Alert2', stop);
     // Station names come from the same two sources as the ALERT Packets tab, and
     // the national address file is the fallback for addresses MegaNet has never
     // seen. It loads once for both tabs.

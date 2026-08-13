@@ -838,19 +838,18 @@ function renderTabs() {
 }
 
 function switchTab(id) {
-  // The Network View runs a force layout on an animation frame loop. Leaving the
-  // tab is the moment it has to stop — a simulation ticking away behind another
-  // tab is invisible, useless and costs a frame's work every frame. Its own init
-  // starts it again when the tab comes back, so this is unconditional.
-  NetworkView.stop();
-  // The ARRO Data chart keeps a ResizeObserver on its stage, which the next
-  // render replaces wholesale. Dropping it here stops the observer outliving
-  // the element it was watching.
-  ArroData.stop();
-  // Same for the ALERT2 tab's coverage map: the div it was built on is about to
-  // be discarded, and a Leaflet map holding a detached node keeps its tile
-  // requests and window listeners alive behind whatever tab replaces it.
-  Alert2.stop();
+  // Every module that has run and has something to stop — an animation frame
+  // loop, a ResizeObserver, a Leaflet map on a div that is about to be thrown
+  // away. Leaving the tab is the moment they have to stop: a force layout
+  // ticking away behind another tab is invisible, useless and costs a frame's
+  // work every frame, and a map holding a detached node keeps its tile requests
+  // and window listeners alive behind whatever replaced it. Each module's own
+  // init() starts it again when the tab comes back, so this is unconditional.
+  //
+  // The list used to be three stop() calls named here, all three of them by
+  // then reaching into a file this one has nothing else to do with. It is a
+  // registry now, and each module registers itself — core.js and #142 say why.
+  runTabTeardowns();
   state.activeTab = id;
   // On a phone the expanded nav is a drawer laid over the content rather than
   // a column beside it (see styles.css). Picking a tab is the end of that
@@ -924,13 +923,15 @@ function setNavCollapsed(collapsed) {
   if (btn) btn.focus();
 }
 
-// Every Leaflet map the app holds open. They are created lazily per tab, so
-// most of these are null most of the time.
+// Re-measure every Leaflet map the app currently holds open. The list of them
+// used to be written out here — five maps, four of which had moved to other
+// files by the end of #129, so a new tab's map was silently absent from it and
+// rendered at the wrong width for as long as the omission went unnoticed. The
+// maps register themselves now (see core.js, and #142); this waits out the CSS
+// transition and asks each one that exists.
 function invalidateMapSizes(delay) {
   setTimeout(() => {
-    [state.map, state.bfMap, state.a2.map, state.wb && state.wb.map, state.nvMap].forEach(m => {
-      if (m) { try { m.invalidateSize(); } catch (_) {} }
-    });
+    liveMaps().forEach(m => { try { m.invalidateSize(); } catch (_) {} });
   }, delay || 0);
 }
 
@@ -1464,6 +1465,9 @@ function initMap() {
   // the default SVG renderer means ~6,300 SVG nodes rebuilt on every refresh.
   // A single canvas element instead.
   state.map = L.map('leaflet-map', { preferCanvas: true });
+  // The one map still declared in the file that re-measures them all. It says
+  // so the same way the other four do, so that stays true if it ever moves.
+  registerLiveMap('Stations', () => state.map);
   // A view before anything is added to the map. Leaflet defers every layer add
   // until the map has one, and the deferred adds then run in an order nothing
   // controls: a path registers the shared SVG renderer as it is queued, so a

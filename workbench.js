@@ -10,7 +10,8 @@
 // to correlate five other tabs costs:
 //
 //   core.js       ACMA_MECH, acmaHaversineKm, buildSensorIndex, csvEscape,
-//                 dlText, esc, escAttr, slug, state
+//                 dlText, esc, escAttr, registerLiveMap (#142 — the case map
+//                 says so itself now), slug, state
 //   app.js        acmaEnsureCore, acmaEnsureDevices, acmaFetchJson,
 //                 addBaseLayers, passRangeCoversId, renderMain, renderTabs,
 //                 rfStripPlotHtml, stationAlertIds, switchTab — and
@@ -1389,6 +1390,9 @@ function initWbMap() {
   if (!el || !an || !state.data || typeof L === 'undefined') return;
 
   const map = state.wb.map = L.map('wb-map').setView([-23, 146], 5);
+  // Registered here rather than in app.js's list, which is where this map was
+  // named until #142 — the fifth entry, added by M4 because someone remembered.
+  registerLiveMap('Workbench', () => state.wb.map);
   addBaseLayers(map);
   const layer = L.layerGroup().addTo(map);
   const bounds = [];

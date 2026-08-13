@@ -7,19 +7,21 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, csvEscape, dlText,
-// bearingDeg, arroSiteId, arroSiteUrl, stationSensors, ROLE_COLOR and
-// ROLE_LABEL; and across to app.js for MAP_HOME, MAP_LABEL_CAP, MAP_PIN_HIT,
+// bearingDeg, arroSiteId, arroSiteUrl, stationSensors, ROLE_COLOR,
+// ROLE_LABEL, registerTabTeardown and registerLiveMap (#142 — this file says
+// itself that it has a loop and a map to stop, rather than app.js saying it on
+// its behalf); and across to app.js for MAP_HOME, MAP_LABEL_CAP, MAP_PIN_HIT,
 // MAP_PIN_RING, addBaseLayers, addToMapSelection, findRepeaterMatches,
 // goToStation, mapNote, passRangeCoversId, primaryRole, renderMain,
 // stationAlertIds and switchTab. The widest reach of the fourteen, which is
 // what 1,867 lines of graph over the Stations map costs.
 //
 // This file holds 3 of the app's 4 literal NUL bytes — U+0000 inside string
-// literals at lines 504 and 568 (two on that line), used as compound-key
+// literals at lines 506 and 570 (two on that line), used as compound-key
 // separators (#129). Any tool that round-trips this file as text and normalises
 // control characters destroys those keys silently, and grep will call the file
 // binary. `npm run concat` in test/ is what catches it. app.js carries none
-// after M3; the fourth left with Alert2 in M2 and is alert2.js:857.
+// after M3; the fourth left with Alert2 in M2 and is alert2.js:859.
 //
 // Moved out of app.js byte-for-byte by M3 (#134) of #129.
 
@@ -1195,6 +1197,9 @@ const NetworkView = (function () {
     const el = document.getElementById('nv-map-canvas');
     if (!el) return;
     state.nvMap = L.map('nv-map-canvas', { preferCanvas: true }).setView(MAP_HOME, 4);
+    // The getter, not the map: stopNvMap() below sets this back to null, and
+    // the shell has to see that rather than hold a removed map open (#142).
+    registerLiveMap('NetworkView', () => state.nvMap);
     addBaseLayers(state.nvMap);
     refreshNvMap();
   }
@@ -1838,6 +1843,10 @@ const NetworkView = (function () {
   }
 
   function init() {
+    // The force layout and the map below both have to stop when the tab is
+    // left. app.js named this module to do it until #142; it says so itself
+    // now, and the registry is keyed by name so repeating this is free.
+    registerTabTeardown('NetworkView', stop);
     stop();
     if (!state.data) return;
     ensureConfirmed();
