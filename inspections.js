@@ -46,15 +46,21 @@
 // cell dump is not. Two places where that mattered are marked `// matrix:` in
 // FIELDS below.
 //
-// ── Two boxes on two sheets have nowhere to go ───────────────────────────────
+// ── Every printed box has a column, since 0011 ───────────────────────────────
 //
-// Read off the workbook and confirmed against 0009: the Base Station sheet
-// prints a Time box in its details block, and the Mace battery block prints DP
-// voltage and DP voltage-under-load for both the existing and the replacement
-// battery. Neither has a column in #115's schema. They are not dropped in
-// silence — `UNCAPTURED` renders them on the form that prints them, saying so,
-// and #146 is the follow-up. Extending the schema for five boxes is a migration
-// and a live apply, which is not this issue's to spend.
+// It did not when this file was written. Two sheets printed five boxes #115's
+// schema had nowhere for — the Base Station sheet's Time (A18), and the Mace
+// battery block's DP voltage and DP voltage-under-load for both the existing and
+// the replacement battery (Y22/AC22 and Y24/AC24). They were left visible rather
+// than dropped, in the dashed `UNCAPTURED` block under the section that printed
+// them, and #146 was the follow-up. `db/migrations/0011_printed_boxes.sql` is
+// that follow-up, so the five are ordinary fields below and `UNCAPTURED` is
+// empty.
+//
+// It is empty rather than gone. What it does — say on the sheet that a printed
+// box has nowhere to go — is the only honest thing to do with the next one, and
+// a mechanism that exists is a much smaller decision than a mechanism that has
+// to be reinvented.
 //
 // ── Saving ───────────────────────────────────────────────────────────────────
 //
@@ -136,6 +142,10 @@ const Inspections = (function () {
         F('date', 'inspected_on', 'Date', { lab: {
           campbell_datalogger: 'Date of Inspection', mace: 'Date of Inspection',
           datalogger_old: 'Date of Inspection' } }),
+        // Base Station is the only sheet that prints a clock reading in its
+        // details block (A18), and the only one with no data section for an
+        // `at_time` to live in — so the column is on meganet.inspection. #146.
+        F('time', 'inspected_at_time', 'Time', { only: ['base_station'] }),
         F('text', 'inspector', 'Initials', { not: ['gas_only', 'base_station'] }),
       ] },
       { title: 'Office — tick here after SitesDb & HDB/MIS entry',
@@ -224,13 +234,22 @@ const Inspections = (function () {
       ] },
       // The Mace sheet prints the same two rows against MACE rather than a
       // battery, with the DP and phone voltages beside them.
+      // The Mace sheet prints the same two rows against MACE rather than a
+      // battery, with the DP and phone voltages beside them. The DP pair is
+      // #146's — four columns 0009 had no room for, added in 0011, and the two
+      // sub-columns are headed "DP" (Y21) and "DP (U/L)" (AC21) with
+      // "Voltage (v)" printed under each on both rows.
       { title: 'Existing Battery', only: ['mace'], fields: [
         F('num', 'battery_existing_v', 'MACE Voltage (v)'),
         F('num', 'battery_existing_v_under_load', 'MACE (U/L) Voltage (v)'),
+        F('num', 'dp_existing_v', 'DP Voltage (v)'),
+        F('num', 'dp_existing_v_under_load', 'DP (U/L) Voltage (v)'),
       ] },
       { title: 'Replacement Battery', only: ['mace'], fields: [
         F('num', 'battery_replacement_v', 'MACE Voltage (v)'),
         F('num', 'battery_replacement_v_under_load', 'MACE (U/L) Voltage (v)'),
+        F('num', 'dp_replacement_v', 'DP Voltage (v)'),
+        F('num', 'dp_replacement_v_under_load', 'DP (U/L) Voltage (v)'),
       ] },
       { title: 'Consumption', only: ['campbell_datalogger', 'mace', 'datalogger_old'], fields: [
         F('num', 'consumption_sleep_ma', 'Sleep (mA)', { lab: { mace: 'MACE Sleep Consum.' } }),
@@ -648,19 +667,18 @@ const Inspections = (function () {
   // else, which the matrix says in its variant note.
   const FADE_MARGIN_CONFIGS = ['alert'];
 
-  // Printed on a sheet, and with nowhere in #115's schema to record it. Rendered
+  // Printed on a sheet, and with nowhere in the schema to record it. Rendered
   // under the section that prints it rather than dropped in silence — the same
   // principle as "does not apply is data", applied to the schema's own gaps.
   // Keyed configuration → section, so the note appears where the box would be.
-  const UNCAPTURED = {
-    base_station: {
-      station_details: ['Time — the schema carries the date of the visit but not a time of day'],
-    },
-    mace: {
-      battery: ['DP Voltage (v) and DP (U/L) Voltage (v), for both the existing and the '
-              + 'replacement battery — meganet.inspection_power has no DP columns'],
-    },
-  };
+  //
+  // Empty since 0011, and kept rather than deleted: every one of the six sheets
+  // now maps box for box, and the mechanism is what says so. Deleting it would
+  // make the next unhomed box a choice between inventing this again and dropping
+  // the box quietly, and the second is the cheaper mistake to make. The two
+  // entries that were here — the Base Station Time and the four Mace DP voltages
+  // — are columns now (#146).
+  const UNCAPTURED = {};
 
   // ── Local state ────────────────────────────────────────────────────────────
 
@@ -770,6 +788,10 @@ const Inspections = (function () {
       lat: station && station.lat != null ? station.lat : null,
       lon: station && station.lon != null ? station.lon : null,
       inspected_on: todayIso(),
+      // Deliberately not defaulted to the clock: the Base Station sheet's Time
+      // is what somebody wrote down, and now() would read as that rather than
+      // as a guess. Same call 0009 made about inspection_data.at_time. #146.
+      inspected_at_time: null,
       inspector: '',
       office_last_visit: null,
       office_stock_changes: null,

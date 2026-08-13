@@ -256,7 +256,9 @@ with no section the form does not print and with the untouched grids pruned out.
 
 Confirmed red on three deliberate breaks before being trusted — offering a
 calibration block the guard would refuse, dropping a section from the render,
-and sending the document unpruned.
+and sending the document unpruned. #146 added a fourth and a fifth: deleting the
+Base Station Time box, and offering it on all six sheets rather than the one that
+prints it.
 
 ### `maintenance.mjs` — the same blind spot, a different claim
 
@@ -291,12 +293,25 @@ which a hand-written fixture could not make:
 
 The rest: the nine sections render in the sheet's print order, a blank form
 materialises the three asset panels and the two data-quality rows, no panel
-offers a box its check constraint would refuse, the uncaptured boxes are stated
-on the sections that print them, every filled value is read back **out of the
-DOM** rather than out of `state`, a save round-trips it and prunes the panels
-nobody filled in, and the printed cross-reference works in both directions —
-the outstanding list starts a linked form, and the button at the foot of a
-saved inspection that departed poor lands on this tab with the link made.
+offers a box its check constraint would refuse, no section states an uncaptured
+box, every filled value is read back **out of the DOM** rather than out of
+`state`, a save round-trips it and prunes the panels nobody filled in, and the
+printed cross-reference works in both directions — the outstanding list starts a
+linked form, and the button at the foot of a saved inspection that departed poor
+lands on this tab with the link made.
+
+One assertion here is worth knowing about because it exists to cover a hole in
+the diff above. #148 gave the Comms and Power panel's Equipment and Power
+sub-columns their own Condition and Owner, and the blank template and the filled
+sheet carry the **same** words in those four cells — so mapping them changes no
+difference between the sheets, and the diff assertion passes either way. What
+proves that landed is the DOM: the panel prints three titled sub-blocks, and the
+four new controls show what the sheet says. **A cell map is not a coverage
+measure when both sheets agree on a cell**, which is the generalisable half.
+
+#148 confirmed its three assertions red before trusting them: dropping the three
+sub-headings, deleting one of the four new controls, and leaving a stale
+uncaptured note on the panel.
 
 `lib/xlsx.mjs` is not an xlsx library and does not try to be: cell references to
 the text Excel would show, no styles, no formulas, no dates. It fails loudly on
@@ -417,7 +432,12 @@ without looking, and a verifier nobody looks at verifies nothing.
   a new column with a seeded vocabulary needs nothing here. A new *box on the
   paper* does: add its cell to the map at the top of `maintenance.mjs`, or the
   diff assertion will report it as unaccounted for, which is the intended
-  behaviour and not a nuisance.
+  behaviour and not a nuisance. If the blank template and the filled sheet agree
+  on that cell the diff will stay silent, so add a DOM assertion too — see the
+  note under `maintenance.mjs` above. On the inspection side, a box that only
+  some of the six sheets print belongs in the per-configuration box assertion in
+  `inspections.mjs`, which checks both that the sheets printing it show it and
+  that the others do not.
 - **A section grew an attachment panel.** `Attachments.sectionHtml()` is the
   whole of it, and `lib/storage.mjs` already serves the routes — but the panel
   list assertion in `maintenance.mjs` is exact, so a third panel on that tab is

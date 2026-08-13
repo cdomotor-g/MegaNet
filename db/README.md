@@ -717,12 +717,55 @@ public: they are the words on a blank form.
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
 ```
 
-71 checks, in a transaction that rolls back, so it is safe against the live
+86 checks, in a transaction that rolls back, so it is safe against the live
 database. Ten of them compare a lookup table against the `Dropdown` sheet's
 columns verbatim; eleven check the section matrix against what the six sheets
-actually print; the rest exercise the guard, the two computed rules, a whole-visit
-round trip, the PT409 refusals, and the grants — both halves, since a schema that
-refuses the wrong things is as broken as one that permits them.
+actually print; fifteen are `0011`'s (below); the rest exercise the guard, the two
+computed rules, a whole-visit round trip, the PT409 refusals, and the grants —
+both halves, since a schema that refuses the wrong things is as broken as one that
+permits them.
+
+### Nine boxes `0011` gave a column to
+
+`0011_printed_boxes.sql`, issues #146 and #148. Both were found by building the
+forms rather than by reading the schema, and both were left visible on the form —
+in a dashed "Printed on this sheet, with nowhere to record it yet" block — until
+this migration.
+
+- **#146, five boxes on two of the six inspection sheets.** The Base Station
+  sheet's `Time` is `meganet.inspection.inspected_at_time`; the Mace battery
+  block's DP voltage and DP voltage-under-load, for the existing and the
+  replacement battery, are four columns on `meganet.inspection_power`. A `time`
+  rather than a `timestamptz`, for the reason `0009` gives about
+  `inspection_data.at_time`: what the sheet records is a clock reading in a
+  notebook.
+- **#148, four boxes on the Council sheet.** The Comms and Power panel has three
+  sub-columns — Comms, Equipment, Power — and prints a Conditon *(the sheet's
+  spelling)* and an Owner under each. `meganet.maintenance_asset` held one pair,
+  and `0011` adds `equipment_condition_key`, `equipment_owner_key`,
+  `power_condition_key` and `power_owner_key`. The existing `condition_key` /
+  `owner_key` keep their names and mean the Comms sub-column on that panel, the
+  whole panel on the other two — which is what the paper says, since those two
+  print one of each.
+
+**This half was a wrong answer, not a missing one, and that is the part worth
+remembering.** The Comms pair was stored as the whole panel's, and the filled
+`Council Maint Tasks Mt Kanigan` sheet answers the three Condition boxes
+differently — Comms poor, Equipment good, Power good. Digitising that site before
+`0011` recorded "the panel is poor" and dropped the fact that only the comms third
+of it was. There is no backfill: a row saved before `0011` has the Comms pair
+filled and the other four null, and null here means *not recorded* exactly as it
+does everywhere else.
+
+`meganet.save_maintenance_activity()` needed no change for the four, and
+`save_inspection()` needed no change for the four power columns — both write
+section tables through `meganet.form_write()`, which reads a table's columns out
+of the catalogue at write time. `save_inspection()` *is* restated in `0011`, for
+one column: it writes `meganet.inspection` with an explicit column list. The check
+script's most useful assertion is the one about a *second* save, because a
+restatement that adds the column to the insert and forgets the
+`on conflict do update set` list passes every catalogue check and loses the value
+the second time somebody presses Save.
 
 ## Checking it from outside
 

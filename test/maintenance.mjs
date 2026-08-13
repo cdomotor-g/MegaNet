@@ -42,7 +42,10 @@
 //   3. The tab renders the nine sections in the sheet's print order, and every
 //      `on*=` handler it rendered resolves in page scope.
 //   4. A blank form materialises the three asset panels and the two
-//      data-quality rows, and states the boxes 0009 has no column for.
+//      data-quality rows, states no uncaptured box, and prints the Comms and
+//      Power panel as the three sub-blocks the sheet prints (0011 / #148). The
+//      sub-block assertion is the one that matters: the diff in 1 cannot see
+//      those four boxes, because the blank and filled sheets agree on them.
 //   5. Opening the Mt Kanigan record puts every filled value on screen, in the
 //      control that belongs to it — read back out of the DOM, not out of state.
 //   6. Saving it round-trips the document unchanged, prunes the panels nobody
@@ -112,15 +115,27 @@ const ASSET_CELLS = {
     owner_key:                ['K13', 'asset_owner'],
     comments:                 ['K16', 'text'],
   },
-  // The panel's Condition and Owner are read off the Comms sub-column, which is
-  // the panel's first. Equipment's and Power's own Condition and Owner boxes
-  // (Y11/AC11, Y13/AC13) are the six the schema cannot hold — see UNMAPPED.
+  // Three sub-columns, three Conditons (the sheet's spelling) and three Owners —
+  // six boxes, all six mapped since 0011 (#148). `condition_key` and `owner_key`
+  // are the Comms sub-column's here; on the two panels above they are the whole
+  // panel's, because those print one of each.
+  //
+  // Note what the diff assertion below can and cannot say about these four. The
+  // blank template and the filled Mt Kanigan sheet carry the *same* words in
+  // Y11/AC11/Y13/AC13, so no difference between the sheets rests on them and the
+  // diff would pass whether or not they were mapped. What proves #148 landed is
+  // the DOM check further down: four more controls on screen, showing what the
+  // sheet says.
   comms_power: {
     comms_method_key:         ['U9',  'comms_method'],
-    comms_equipment_key:      ['Y9',  'comms_equipment'],
-    power_key:                ['AC9', 'power_supply'],
     condition_key:            ['U11', 'condition_rating'],
     owner_key:                ['U13', 'asset_owner'],
+    comms_equipment_key:      ['Y9',  'comms_equipment'],
+    equipment_condition_key:  ['Y11', 'condition_rating'],
+    equipment_owner_key:      ['Y13', 'asset_owner'],
+    power_key:                ['AC9', 'power_supply'],
+    power_condition_key:      ['AC11', 'condition_rating'],
+    power_owner_key:          ['AC13', 'asset_owner'],
     comments:                 ['U16', 'text'],
   },
 };
@@ -213,7 +228,9 @@ function buildMtKanigan(tables, cells) {
   for (const [asset, cols] of Object.entries(ASSET_CELLS)) {
     const row = { asset, rain_instrument_type_key: null, wl_instrument_type_key: null,
                   condition_key: null, owner_key: null, comms_method_key: null,
-                  comms_equipment_key: null, power_key: null, comments: '' };
+                  comms_equipment_key: null, power_key: null,
+                  equipment_condition_key: null, equipment_owner_key: null,
+                  power_condition_key: null, power_owner_key: null, comments: '' };
     for (const [col, spec] of Object.entries(cols)) row[col] = take(spec);
     doc.assets.push(row);
   }
@@ -419,13 +436,25 @@ async function main() {
       && JSON.stringify(shape.dq) === JSON.stringify(['rainfall', 'river_level']),
       JSON.stringify(shape));
 
-    // The boxes on the paper with no column. Two sections state one each.
+    // Every box on this sheet has a column since 0011 (#148), so no section
+    // states a gap. Asserted as zero rather than deleted: the mechanism is still
+    // there for the next unhomed box, and this is what says nothing is quietly
+    // using it.
     const gaps = await page.evaluate(() =>
       [...document.querySelectorAll('.mnt-section')]
         .filter(s => s.querySelector('.mnt-gap li'))
         .map(s => s.dataset.section));
-    check('the sheet\'s uncaptured box is stated on the section that prints it',
-      JSON.stringify(gaps) === JSON.stringify(['comms_power']), gaps.join(', '));
+    check('no section states an uncaptured box', gaps.length === 0, gaps.join(', '));
+
+    // The Comms and Power panel, as three sub-columns rather than one. This is
+    // the assertion #148 turns on: the diff below cannot see it, because the
+    // blank and filled sheets carry the same words in those four cells.
+    const commsBlocks = await page.evaluate(() =>
+      [...document.querySelectorAll('.mnt-section[data-section="comms_power"] .mnt-block')]
+        .map(h => h.textContent.trim()));
+    check('the Comms and Power panel prints its three sub-columns as three sub-blocks',
+      JSON.stringify(commsBlocks) === JSON.stringify(['Comms', 'Equipment', 'Power']),
+      commsBlocks.join(', '));
 
     let audit = await auditHandlers(page);
     check(`blank form: all ${audit.checked} handler(s) across ${audit.total} attribute(s) resolve`,
@@ -465,7 +494,13 @@ async function main() {
     mtk.data_quality.forEach((row, i) => {
       Object.keys(DQ_CELLS[row.parameter]).forEach(col => want(`data_quality.${i}.${col}`, row[col]));
     });
-    check(`Mt Kanigan: all ${Object.keys(ASSET_CELLS).length * 4 + 6} mapped boxes show what the sheet says`,
+    // Counted rather than written down: the comms panel went from four mapped
+    // boxes to nine at #148, and an arithmetic constant here would have gone on
+    // reading right while saying the wrong number.
+    const mappedBoxes = Object.values(ASSET_CELLS).reduce((n, c) => n + Object.keys(c).length, 0)
+      + Object.keys(TOP_CELLS).length
+      + Object.values(DQ_CELLS).reduce((n, c) => n + Object.keys(c).length, 0);
+    check(`Mt Kanigan: all ${mappedBoxes} mapped boxes show what the sheet says`,
       wrong.length === 0, wrong.join(' | '));
 
     audit = await auditHandlers(page);

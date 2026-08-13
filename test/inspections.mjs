@@ -28,6 +28,10 @@
 //      smoke runs, against a page smoke never gets to see.
 //   4. No calibration block is offered that the database's own guard would
 //      refuse — the kind's section has to be one the configuration prints.
+//   4b. No configuration states an uncaptured box, and the five that used to be
+//      uncaptured are on screen on the sheets that print them and on no others
+//      (0011 / #146). Zero gaps on its own would also be true of a form that
+//      quietly dropped them, which is why both halves are here.
 //   5. Typing three tip-test errors produces the mean, and the printed 6% rule
 //      reads against it.
 //   6. Save sends a document with no section the form does not print, with what
@@ -225,13 +229,41 @@ async function main() {
         && (cfg.key === 'alert' || serials.join(',') !== alertPanel),
         serials.join(' · '));
 
-      // The two boxes 0009 has no column for are stated on the form that prints
-      // them. A gap the form admits to is the point; a gap it hides is the bug.
+      // The five boxes 0009 had no column for are boxes now (0011 / #146), so
+      // every sheet maps box for box and no configuration states a gap. Asserted
+      // as zero rather than deleted: the mechanism is still there for the next
+      // unhomed box, and this is what says nothing is quietly using it.
       const gaps = await page.evaluate(() =>
         [...document.querySelectorAll('.insp-gap li')].map(e => e.textContent.trim()));
-      const wantGaps = { base_station: 1, mace: 1 }[cfg.key] || 0;
-      check(`${cfg.key}: states its ${wantGaps} uncaptured box${wantGaps === 1 ? '' : 'es'}`,
-        gaps.length === wantGaps, gaps.join(' | '));
+      check(`${cfg.key}: states no uncaptured box`, gaps.length === 0, gaps.join(' | '));
+
+      // And the other half of that claim, which zero gaps does not make: the
+      // five are on screen, on the sheets that print them and on no other. The
+      // Base Station Time is a column on meganet.inspection and the four Mace DP
+      // voltages are on meganet.inspection_power, so nothing but this file's
+      // `only:` stops them appearing on all six.
+      const boxes = await page.evaluate(() => {
+        const out = [];
+        for (const el of document.querySelectorAll('.insp-page [oninput], .insp-page [onchange]')) {
+          const h = el.getAttribute('oninput') || el.getAttribute('onchange') || '';
+          const m = h.match(/Inspections\.set\('([^']+)'/);
+          if (m) out.push(m[1]);
+        }
+        return out;
+      });
+      const wantBoxes = {
+        base_station: ['top.inspected_at_time'],
+        mace: ['power.dp_existing_v', 'power.dp_existing_v_under_load',
+               'power.dp_replacement_v', 'power.dp_replacement_v_under_load'],
+      };
+      const shouldHave = wantBoxes[cfg.key] || [];
+      const shouldNot = Object.entries(wantBoxes)
+        .filter(([k]) => k !== cfg.key).flatMap(([, v]) => v);
+      const missing = shouldHave.filter(p => !boxes.includes(p));
+      const stray = shouldNot.filter(p => boxes.includes(p));
+      check(`${cfg.key}: shows the ${shouldHave.length} box(es) 0011 gave it a column for, and no other sheet's`,
+        missing.length === 0 && stray.length === 0,
+        [...missing.map(p => `missing ${p}`), ...stray.map(p => `${p} is another sheet's`)].join('; '));
 
       // The tip-test reference values are printed on the sheet, differ per
       // sheet, and are what the % errors are worked out against — so the form

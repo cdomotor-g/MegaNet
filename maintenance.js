@@ -55,15 +55,27 @@
 // station and its date across. A form can also be started from nothing, which
 // is the maintenance round nobody was sent on by an inspection.
 //
-// ── The boxes on this sheet that still have nowhere to go ────────────────────
+// ── The Comms and Power panel is three panels, since 0011 ────────────────────
 //
-// Read off the workbook and confirmed against 0009: the Comms and Power panel
-// prints a Condition and an Owner under each of its three sub-columns — Comms,
-// Equipment and Power — and `meganet.maintenance_asset` carries one pair for
-// the panel. In the filled Mt Kanigan sheet those three differ (Comms poor,
-// Equipment good, Power good), so this is a real loss and not a theoretical
-// one. Neither is it dropped in silence: UNCAPTURED renders it on the panel
-// that prints it, and #148 is the follow-up.
+// It was rendered as one when this file was written, and that was a loss rather
+// than a gap. The panel prints a Conditon (the sheet's spelling) and an Owner
+// under each of its three sub-columns — Comms (col U), Equipment (col Y), Power
+// (col AC) — and `meganet.maintenance_asset` carried one pair for the whole
+// panel. The Comms pair was stored as the panel's, and the filled Mt Kanigan
+// sheet answers the three Condition boxes differently (Comms poor, Equipment
+// good, Power good), so digitising that site recorded "the panel is poor" and
+// dropped the fact that only the comms third of it was.
+//
+// `db/migrations/0011_printed_boxes.sql` added the other four columns, so PANELS
+// below renders the comms panel as three titled sub-blocks and `UNCAPTURED` is
+// empty. `condition_key` and `owner_key` kept their names and mean the Comms
+// sub-column here and the whole panel on the other two, which is what the paper
+// says: those two print one Conditon each.
+//
+// Worth knowing for #118 and #128, which will read these rows back: a row saved
+// before 0011 has the Comms pair filled and the other four null, and null here
+// means "not recorded" exactly as it does everywhere else in this schema. There
+// is no backfill to do, because there is nothing to backfill from.
 //
 // ── The two boxes that are images, which used to be a third gap ──────────────
 //
@@ -135,41 +147,72 @@ const Maintenance = (function () {
 
   const F = (t, k, label, extra) => Object.assign({ t, k, label }, extra || {});
 
-  // The three parallel mini-panels across the top of the sheet. Same three
-  // questions each — what is it, what condition, who owns it — and three more
-  // that only the Comms and Power panel asks. `only` is not a styling choice:
-  // meganet.maintenance_asset's two check constraints refuse a rainfall row
-  // carrying a water-level instrument, or any panel but the comms one carrying
-  // a comms key, so a box offered on the wrong panel is a save that fails after
-  // the typing.
+  // The three parallel mini-panels across the top of the sheet. `only` is not a
+  // styling choice: meganet.maintenance_asset's two check constraints refuse a
+  // rainfall row carrying a water-level instrument, or any panel but the comms
+  // one carrying a comms key, so a box offered on the wrong panel is a save that
+  // fails after the typing.
+  //
+  // Rainfall and Water Level ask three questions — what is it, what condition,
+  // who owns it — and print one box each. The Comms and Power panel asks the
+  // same three about *three* things, and prints them as three sub-columns:
+  // Comms (col U), Equipment (col Y), Power (col AC), each with its own Conditon
+  // (the sheet's spelling, row 10) and its own Owner (row 12). Six boxes across
+  // the panel, not two.
+  //
+  // #117 stored the Comms sub-column's pair as the whole panel's and said so on
+  // the panel, because 0009 had two columns. 0011 added the other four, so the
+  // panel is `blocks` below rather than a flat field list — and that shape is
+  // the reason this is not a cosmetic change. The filled Mt Kanigan sheet
+  // answers the three Condition boxes differently (Comms poor, Equipment good,
+  // Power good); before 0011 that site digitised as "the panel is poor".
+  //
+  // `condition_key` / `owner_key` keep their names and mean the Comms
+  // sub-column here, the whole panel on the other two. Renaming them would have
+  // made a column that exists on three panels and is named after one.
   const PANELS = [
     {
       asset: 'rainfall', label: 'Rainfall',
-      fields: [
-        F('select', 'rain_instrument_type_key', 'Instrument type', { opts: 'rain_instrument_type' }),
-        F('select', 'condition_key', 'Condition', { opts: 'condition_rating' }),
-        F('select', 'owner_key', 'Owner', { opts: 'asset_owner' }),
-        F('area', 'comments', 'Comments', { full: true }),
+      blocks: [
+        { fields: [
+          F('select', 'rain_instrument_type_key', 'Instrument type', { opts: 'rain_instrument_type' }),
+          F('select', 'condition_key', 'Condition', { opts: 'condition_rating' }),
+          F('select', 'owner_key', 'Owner', { opts: 'asset_owner' }),
+        ] },
+        { fields: [F('area', 'comments', 'Comments', { full: true })] },
       ],
     },
     {
       asset: 'water_level', label: 'Water Level',
-      fields: [
-        F('select', 'wl_instrument_type_key', 'Instrument type', { opts: 'wl_instrument_type' }),
-        F('select', 'condition_key', 'Condition', { opts: 'condition_rating' }),
-        F('select', 'owner_key', 'Owner', { opts: 'asset_owner' }),
-        F('area', 'comments', 'Comments', { full: true }),
+      blocks: [
+        { fields: [
+          F('select', 'wl_instrument_type_key', 'Instrument type', { opts: 'wl_instrument_type' }),
+          F('select', 'condition_key', 'Condition', { opts: 'condition_rating' }),
+          F('select', 'owner_key', 'Owner', { opts: 'asset_owner' }),
+        ] },
+        { fields: [F('area', 'comments', 'Comments', { full: true })] },
       ],
     },
     {
       asset: 'comms_power', label: 'Comms and Power',
-      fields: [
-        F('select', 'comms_method_key', 'Comms', { opts: 'comms_method' }),
-        F('select', 'comms_equipment_key', 'Equipment', { opts: 'comms_equipment' }),
-        F('select', 'power_key', 'Power', { opts: 'power_supply' }),
-        F('select', 'condition_key', 'Condition', { opts: 'condition_rating' }),
-        F('select', 'owner_key', 'Owner', { opts: 'asset_owner' }),
-        F('area', 'comments', 'Comments', { full: true }),
+      blocks: [
+        { title: 'Comms', fields: [
+          F('select', 'comms_method_key', 'Comms', { opts: 'comms_method' }),
+          F('select', 'condition_key', 'Condition', { opts: 'condition_rating' }),
+          F('select', 'owner_key', 'Owner', { opts: 'asset_owner' }),
+        ] },
+        { title: 'Equipment', fields: [
+          F('select', 'comms_equipment_key', 'Equipment', { opts: 'comms_equipment' }),
+          F('select', 'equipment_condition_key', 'Condition', { opts: 'condition_rating' }),
+          F('select', 'equipment_owner_key', 'Owner', { opts: 'asset_owner' }),
+        ] },
+        { title: 'Power', fields: [
+          F('select', 'power_key', 'Power', { opts: 'power_supply' }),
+          F('select', 'power_condition_key', 'Condition', { opts: 'condition_rating' }),
+          F('select', 'power_owner_key', 'Owner', { opts: 'asset_owner' }),
+        ] },
+        // One Comments box under the three, because the sheet prints one (U14).
+        { fields: [F('area', 'comments', 'Comments', { full: true })] },
       ],
     },
   ];
@@ -238,19 +281,16 @@ const Maintenance = (function () {
     { key: 'canister',      label: 'ALERT Canister Configuration', kind: 'attachments' },
   ];
 
-  // What the sheet prints and 0009 has no column for. Rendered on the section
-  // that prints it, in the same words a person reading the paper beside the
-  // screen would use to find it. See the header for why each is a follow-up
-  // rather than a migration in this issue.
-  const UNCAPTURED = {
-    comms_power: [
-      { issue: 148,
-        text: 'A separate Condition and Owner under each of Comms, Equipment and Power — six boxes. '
-            + 'meganet.maintenance_asset carries one Condition and one Owner for the whole panel, '
-            + 'and the filled Mt Kanigan sheet answers the three differently (Comms poor, '
-            + 'Equipment good, Power good), so this is a real loss rather than a theoretical one.' },
-    ],
-  };
+  // What the sheet prints and the schema has no column for. Rendered on the
+  // section that prints it, in the same words a person reading the paper beside
+  // the screen would use to find it.
+  //
+  // Empty since 0011, and kept for the same reason inspections.js keeps its
+  // empty one: the mechanism is the honest answer to the next unhomed box, and
+  // reinventing it is a bigger decision than dropping the box quietly. The one
+  // entry that was here — the Equipment and Power sub-columns' Condition and
+  // Owner — is four columns now (#148).
+  const UNCAPTURED = {};
 
   // The two parameters the Council sheet's own data-quality block names. They
   // are *not* the inspection form's two: this sheet prints "Data Quality
@@ -355,7 +395,9 @@ const Maintenance = (function () {
       had.find(r => r.asset === p.asset)
       || { asset: p.asset, rain_instrument_type_key: null, wl_instrument_type_key: null,
            condition_key: null, owner_key: null, comms_method_key: null,
-           comms_equipment_key: null, power_key: null, comments: '' });
+           comms_equipment_key: null, power_key: null,
+           equipment_condition_key: null, equipment_owner_key: null,
+           power_condition_key: null, power_owner_key: null, comments: '' });
 
     const hadQ = Array.isArray(doc.data_quality) ? doc.data_quality : [];
     doc.data_quality = PARAMETERS.map(([parameter]) =>
@@ -752,14 +794,19 @@ const Maintenance = (function () {
       </div>`;
   }
 
+  // Same renderer as blocksHtml() below, addressing the panel's own row rather
+  // than the activity row. The sub-headings are the sheet's own column headings
+  // on the Comms and Power panel and absent on the other two, which is exactly
+  // what the paper does. #148.
   function panelHtml(asset) {
     const i = assetIndex(asset);
     if (i < 0) return '';
     const panel = PANELS.find(p => p.asset === asset);
-    return `
+    return panel.blocks.map(block => `
+      ${block.title ? `<h4 class="mnt-block">${esc(block.title)}</h4>` : ''}
       <div class="mnt-grid">
-        ${panel.fields.map(f => fieldHtml(`assets.${i}.${f.k}`, f)).join('')}
-      </div>`;
+        ${block.fields.map(f => fieldHtml(`assets.${i}.${f.k}`, f)).join('')}
+      </div>`).join('');
   }
 
   // "(if yes take photo)" is printed beside Bench Mark present on the paper, so

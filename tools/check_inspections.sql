@@ -527,6 +527,202 @@ begin
 end
 $$;
 
+-- ── 5b. The nine boxes 0011 gave a column to ─────────────────────────────────
+-- #146 (five boxes on two inspection sheets) and #148 (four on the Council
+-- sheet's Comms and Power panel), both applied by
+-- db/migrations/0011_printed_boxes.sql.
+--
+-- These are here rather than in a check script of their own because they are
+-- nine columns on three tables this file already proves, and a second script
+-- would have had to stand up the same fixtures to say less. It does mean this
+-- file is no longer only about 0009 — which the section number says out loud.
+--
+-- The round-trips are the checks that matter. A column existing proves the
+-- `alter` ran; a value going out through save_inspection() and coming back
+-- through inspection_doc() proves the path a person uses works, and that is
+-- where 0011's one non-mechanical change lives — meganet.inspection is written
+-- with an explicit column list, so it had to be restated, and a restatement that
+-- dropped a column would pass a catalogue check and fail here.
+
+do $$
+declare
+  v_doc     jsonb;
+  v_id      uuid;
+  v_stamp   timestamptz;
+  v_mace    jsonb;
+  v_act     jsonb;
+  v_act_id  uuid;
+  v_missing text;
+begin
+  perform pg_temp.check_that('schema_version is at least 11',
+    (select value::integer >= 11 from meganet.app_meta where key = 'schema_version'),
+    'the app checks the same number — core.js DB_SCHEMA_VERSION');
+
+  select string_agg(want.t || '.' || want.c, ', ') into v_missing
+    from (values
+      ('inspection',       'inspected_at_time',           'time without time zone'),
+      ('inspection_power', 'dp_existing_v',               'numeric'),
+      ('inspection_power', 'dp_existing_v_under_load',    'numeric'),
+      ('inspection_power', 'dp_replacement_v',            'numeric'),
+      ('inspection_power', 'dp_replacement_v_under_load', 'numeric'),
+      ('maintenance_asset', 'equipment_condition_key',    'text'),
+      ('maintenance_asset', 'equipment_owner_key',        'text'),
+      ('maintenance_asset', 'power_condition_key',        'text'),
+      ('maintenance_asset', 'power_owner_key',            'text')
+    ) as want(t, c, ty)
+   where not exists (
+     select 1 from information_schema.columns col
+      where col.table_schema = 'meganet' and col.table_name = want.t
+        and col.column_name = want.c and col.data_type = want.ty);
+
+  perform pg_temp.check_that('every column 0011 adds exists, with the type it was written as',
+    v_missing is null, coalesce(v_missing, ''));
+
+  -- The four new asset keys point at the same two vocabularies as the pair they
+  -- join, so a rating that is not on the Dropdown sheet is refused here as it is
+  -- there. Checked as foreign keys rather than as a check constraint listing
+  -- values, which is what the rest of this schema does.
+  perform pg_temp.check_that('the four new asset keys reference the vocabularies 0009 wrote',
+    (select count(*) = 4 from pg_catalog.pg_constraint c
+      where c.conrelid = 'meganet.maintenance_asset'::regclass and c.contype = 'f'
+        and pg_catalog.pg_get_constraintdef(c.oid) = any(array[
+          'FOREIGN KEY (equipment_condition_key) REFERENCES meganet.condition_rating(key)',
+          'FOREIGN KEY (equipment_owner_key) REFERENCES meganet.asset_owner(key)',
+          'FOREIGN KEY (power_condition_key) REFERENCES meganet.condition_rating(key)',
+          'FOREIGN KEY (power_owner_key) REFERENCES meganet.asset_owner(key)'])),
+    'a Condition against meganet.condition_rating and an Owner against meganet.asset_owner, like the pair they join');
+
+  -- ── #146, round-tripped ────────────────────────────────────────────────────
+  -- Two documents, because the five boxes are on two sheets and the section
+  -- guard means that is not a detail: Base Station prints no battery section, so
+  -- a document carrying the Time *and* the DP voltages is refused — which this
+  -- section found by being written the other way round first.
+  v_doc := meganet.save_inspection(jsonb_build_object(
+    'station_id',        '_check_insp_base',
+    'config_key',        'base_station',
+    'station_name',      'Check Base Station',
+    'inspected_on',      current_date::text,
+    'inspected_at_time', '14:35',
+    'inspector',         'CI',
+    'remarks',           'written by tools/check_inspections.sql, 0011 section'));
+
+  v_id    := (v_doc ->> 'id')::uuid;
+  v_stamp := (v_doc ->> 'updated_at')::timestamptz;
+
+  perform pg_temp.check_that('the Base Station Time survives a save and comes back on the document',
+    (v_doc ->> 'inspected_at_time') = '14:35:00',
+    coalesce(v_doc ->> 'inspected_at_time', 'null'));
+
+  v_mace := meganet.save_inspection(jsonb_build_object(
+    'station_id',   '_check_insp_alert',
+    'config_key',   'mace',
+    'station_name', 'Check Mace Site',
+    'inspected_on', current_date::text,
+    'remarks',      'written by tools/check_inspections.sql, 0011 section',
+    'power', jsonb_build_object(
+      'dp_existing_v',               12.7,
+      'dp_existing_v_under_load',    12.1,
+      'dp_replacement_v',            13.4,
+      'dp_replacement_v_under_load', 13.0)));
+
+  perform pg_temp.check_that('the four Mace DP voltages survive a save and come back',
+    (v_mace -> 'power' ->> 'dp_existing_v')::numeric = 12.7
+    and (v_mace -> 'power' ->> 'dp_existing_v_under_load')::numeric = 12.1
+    and (v_mace -> 'power' ->> 'dp_replacement_v')::numeric = 13.4
+    and (v_mace -> 'power' ->> 'dp_replacement_v_under_load')::numeric = 13.0,
+    coalesce((v_mace -> 'power')::text, 'no power section'));
+
+  perform meganet.delete_inspection((v_mace ->> 'id')::uuid);
+
+  -- The one that would catch a restatement that lost the column: an update has
+  -- its own column list in `on conflict do update set`, and a save that writes
+  -- the time on insert and drops it on update is a bug nobody would see until
+  -- the second save.
+  v_doc := meganet.save_inspection(
+    v_doc || jsonb_build_object('inspected_at_time', '16:05'), v_stamp);
+
+  perform pg_temp.check_that('and a second save updates the Time rather than dropping it',
+    (v_doc ->> 'inspected_at_time') = '16:05:00',
+    coalesce(v_doc ->> 'inspected_at_time', 'null'));
+
+  perform pg_temp.check_that('a Time nobody wrote down stays null',
+    (select inspected_at_time is null from meganet.inspection
+      where station_id = '_check_insp_alert' and deleted_at is null limit 1),
+    'a blank box on paper is null, not midnight');
+
+  perform meganet.delete_inspection(v_id);
+
+  -- ── #148, round-tripped ────────────────────────────────────────────────────
+  v_act := meganet.save_maintenance_activity(jsonb_build_object(
+    'station_id', '_check_insp_alert',
+    'visited_on', current_date::text,
+    'assets', jsonb_build_array(
+      jsonb_build_object('asset', 'comms_power',
+        'comms_method_key',        'alert1',
+        'condition_key',           'poor',
+        'owner_key',               'council',
+        'comms_equipment_key',     'elpro_v3',
+        'equipment_condition_key', 'good',
+        'equipment_owner_key',     'council',
+        'power_key',               'solar_battery',
+        'power_condition_key',     'good',
+        'power_owner_key',         'council'))));
+
+  v_act_id := (v_act ->> 'id')::uuid;
+
+  -- The Mt Kanigan case, in the database: three sub-columns answered three ways.
+  -- Before 0011 this document could only say "poor".
+  perform pg_temp.check_that('the Comms and Power panel records its three Conditions separately',
+    (select condition_key = 'poor' and equipment_condition_key = 'good'
+        and power_condition_key = 'good'
+       from meganet.maintenance_asset
+      where activity_id = v_act_id and asset = 'comms_power'),
+    'Comms poor, Equipment good, Power good — the filled Mt Kanigan sheet');
+
+  perform pg_temp.check_that('and its three Owners',
+    (select owner_key = 'council' and equipment_owner_key = 'council'
+        and power_owner_key = 'council'
+       from meganet.maintenance_asset
+      where activity_id = v_act_id and asset = 'comms_power'));
+
+  perform pg_temp.check_that('all four new asset keys come back on the document',
+    (select elem -> 'equipment_condition_key' is not null
+        and elem -> 'equipment_owner_key' is not null
+        and elem -> 'power_condition_key' is not null
+        and elem -> 'power_owner_key' is not null
+       from jsonb_array_elements(v_act -> 'assets') elem
+      where elem ->> 'asset' = 'comms_power'),
+    'save_maintenance_activity() writes these through form_write(), so this is that claim checked');
+
+  -- The extended constraint, one column at a time. A single insert carrying all
+  -- four would pass this loop with three of the four unconstrained, which is the
+  -- shape of bug that makes a green constraint check worthless.
+  perform pg_temp.check_that(
+    pg_catalog.format('a rainfall panel cannot carry %s', col),
+    pg_temp.raises(pg_catalog.format(
+      'insert into meganet.maintenance_asset (activity_id, asset, %I)
+       values (%L, ''rainfall'', ''good'')', col, v_act_id), '23514'))
+    from unnest(array['equipment_condition_key', 'power_condition_key']) col;
+
+  perform pg_temp.check_that(
+    pg_catalog.format('a water-level panel cannot carry %s', col),
+    pg_temp.raises(pg_catalog.format(
+      'insert into meganet.maintenance_asset (activity_id, asset, %I)
+       values (%L, ''water_level'', ''council'')', col, v_act_id), '23514'))
+    from unnest(array['equipment_owner_key', 'power_owner_key']) col;
+
+  -- 0011 dropped and recreated the constraint rather than adding a second one,
+  -- so the three keys 0009 named have to still be refused. A recreate that lost
+  -- them would pass every check above.
+  perform pg_temp.check_that('the constraint 0011 recreated still refuses the three keys 0009 named',
+    pg_temp.raises(pg_catalog.format(
+      'insert into meganet.maintenance_asset (activity_id, asset, comms_equipment_key)
+       values (%L, ''rainfall'', ''elpro_v3'')', v_act_id), '23514'));
+
+  perform meganet.delete_maintenance_activity(v_act_id);
+end
+$$;
+
 -- ── 6. Nothing here is readable with the anon key ────────────────────────────
 -- The security decision at the head of 0009: the vocabularies are public, the
 -- records are not. Checked as grants rather than by reasoning about them, and
