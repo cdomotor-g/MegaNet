@@ -1,0 +1,89 @@
+# The web app's only mechanical safety net (#130).
+#
+# The two workflows next to this one are data-refresh jobs: acma-refresh.yml
+# writes data/acma-*, stations-snapshot.yml writes stations.json. Neither can
+# touch app.js, which is why the front end had no test at all until this existed.
+#
+# This one is scoped the other way round — it runs on the web app and ignores
+# data churn, so a nightly stations snapshot does not launch a browser for
+# nothing.
+
+name: Web smoke test
+
+on:
+  push:
+    paths:
+      - 'app.js'
+      - 'index.html'
+      - 'maps-data.js'
+      - 'styles.css'
+      - 'stations.json'
+      - 'test/**'
+      - '.github/workflows/web-smoke.yml'
+  pull_request:
+    paths:
+      - 'app.js'
+      - 'index.html'
+      - 'maps-data.js'
+      - 'styles.css'
+      - 'stations.json'
+      - 'test/**'
+      - '.github/workflows/web-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: test/package-lock.json
+
+      - name: Install the harness
+        working-directory: test
+        run: npm ci
+
+      # playwright-core does not fetch a browser on install, so it is asked for
+      # one explicitly. Cached across runs by version, which is pinned in
+      # test/package.json.
+      - name: Cache Chromium
+        id: browser-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('test/package-lock.json') }}
+
+      - name: Install Chromium
+        working-directory: test
+        run: npx playwright-core install --with-deps chromium
+
+      # Fast pre-filter: parses in under a second and fails the job before a
+      # browser is ever launched. #130 asks for this to be kept, not replaced.
+      - name: Syntax
+        working-directory: test
+        run: npm run check
+
+      - name: Duplicate top-level names
+        working-directory: test
+        run: npm run names
+
+      - name: Smoke — every tab, clean console
+        working-directory: test
+        run: npm run smoke
+
+# concat-verify.mjs is deliberately not run here. It compares the app's bytes
+# against a recorded snapshot, so any honest change to app.js makes it stale —
+# as a per-push gate it would train everyone to re-record the baseline without
+# reading it. It is a milestone tool for the #129 split; see test/README.md.

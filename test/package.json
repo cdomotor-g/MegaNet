@@ -1,0 +1,20 @@
+{
+  "name": "meganet-test",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Test harness for the MegaNet web app. Deliberately NOT at the repo root — see test/README.md.",
+  "scripts": {
+    "test": "node --test",
+    "check": "node syntax-check.mjs",
+    "smoke": "node smoke.mjs",
+    "names": "node dup-names.mjs",
+    "concat": "node concat-verify.mjs",
+    "all": "npm run check && npm run names && npm run smoke"
+  },
+  "devDependencies": {
+    "acorn": "8.15.0",
+    "leaflet": "1.9.4",
+    "playwright-core": "1.56.1"
+  }
+}

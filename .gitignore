@@ -4,3 +4,10 @@
 .acma-cache/
 spectra_rrl.zip
 acma_subset/
+
+# The web-app test harness (test/) pulls playwright-core, acorn and a local copy
+# of Leaflet. Deliberately not at the repo root: docs/floodwarning-net.md:90
+# depends on MegaNet staying "static files with no build step", and Cloudflare
+# Pages must keep seeing an empty build command. See test/README.md.
+test/node_modules/
+

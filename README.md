@@ -93,6 +93,13 @@ MegaNet/
 ├── assets/geo/             ← source geometry (basin SVG is inlined in maps-data.js)
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
+├── test/                   ← the web app's safety net (see test/README.md, and Testing below)
+│   ├── smoke.mjs            (headless Chromium: load, open all 16 tabs, clean console)
+│   ├── dup-names.mjs        (no duplicate top-level names across the loaded scripts)
+│   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
+│   ├── syntax-check.mjs     (node --check over every script index.html loads)
+│   └── package.json         (down here on purpose — the app itself still has no build step)
+│
 ├── tools/                  ← command-line helpers (needs Python; see tools/README.md)
 │   ├── check_ingest.sql     (psql: prove the telemetry contract — 48 checks, rolls back)
 │   ├── check_mqtt.sql       (psql: prove the MQTT bridge's database half — 39 checks)
@@ -1862,9 +1869,47 @@ degrades honestly when they don't.
 
 ---
 
+## Testing
+
+```sh
+cd test && npm install && npm run all
+```
+
+Three checks, in ascending order of cost:
+
+| | Catches |
+|---|---|
+| `npm run check` | a broken brace, in under a second, before a browser is launched |
+| `npm run names` | a second `function esc()` in another file silently overwriting the first |
+| `npm run smoke` | the page loading and all 16 tabs opening with nothing on the console |
+
+The smoke test serves the repo on loopback, blocks every off-origin request
+except a local copy of Leaflet, waits for the real `stations.json` to land, and
+then opens each tab in turn watching for `pageerror` as well as `console.error`
+— an uncaught `ReferenceError` during script evaluation never reaches the
+console, and that is exactly the failure a moved function produces.
+
+CI runs all three on any push touching `app.js`, `index.html`, `maps-data.js`,
+`styles.css`, `stations.json` or `test/`.
+
+There is a fourth, `npm run concat`, which is not in CI: it concatenates the
+scripts `index.html` loads and compares the bytes against a recorded snapshot.
+That is the check that proves an `app.js` split moved code without changing it,
+and the only one that catches the four literal NUL bytes `app.js` carries inside
+string literals — a tool that rewrites the file as text normalises those away and
+silently breaks the compound keys built from them.
+
+`test/README.md` documents the decisions behind all of this: why HTTP rather than
+`file://`, why Leaflet is vendored and everything else blocked, and what to do
+when a tab is added.
+
+---
+
 ## Design Principles
 
-- **No build step.** Open `index.html` directly in a browser; no Node, no bundler, no server required.
+- **No build step.** Open `index.html` directly in a browser; no Node, no bundler, no server required. The
+  test harness in `test/` has its own `package.json` and its own `node_modules`, deliberately kept out of
+  the repo root so this stays true and the Pages build command stays empty.
 - **Single source of truth.** `stations.json` is the only data file the application depends on at runtime.
 - **Flexible schema.** `pass_ranges` and `alert_ids` are arrays/objects, not fixed columns, so new equipment types don't require schema changes.
 - **Additive roles.** A station can be a field station, a repeater, and a base station simultaneously; roles are not mutually exclusive.

@@ -1,0 +1,12 @@
+{
+  "note": "Byte snapshot of the app.js lineage, in index.html load order. Re-record with: npm run concat -- --update. See the header of test/concat-verify.mjs.",
+  "recordedFrom": [
+    {
+      "file": "app.js",
+      "bytes": 1080222
+    }
+  ],
+  "bytes": 1080222,
+  "sha256": "bf7d83511b4dee1f56b61dc57c81560048007259a88320a93866189606e6f5c3",
+  "nulBytes": 4
+}

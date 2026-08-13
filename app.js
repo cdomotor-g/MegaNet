@@ -1483,6 +1483,37 @@ const Auth = (function () {
 })();
 if (typeof window !== 'undefined') window.Auth = Auth;
 
+// ── Leaflet: drop canvas redraws that outlive their canvas ─────────────────────
+//
+// Leaflet 1.9.4 can leave an animation frame scheduled against a canvas
+// renderer it has already torn down. Removing a map removes its layers in stamp
+// order, and the shared canvas renderer is a layer like any other — so it can be
+// destroyed while paths that draw on it are still coming off. The frame those
+// late removals leave behind fires after the map is gone, finds `this._ctx`
+// deleted, and throws an uncaught TypeError out of `Canvas._clear`.
+//
+// On the Stations map that is ~7,000 paths coming off at once, and the crash
+// lands roughly half the times you leave and re-enter the tab. It is harmless in
+// itself — the canvas it wanted to paint was thrown away on purpose — but it is
+// an uncaught exception in the console of anyone who opens dev tools, and it
+// makes "the console is clean" untestable, which is the whole premise of the
+// smoke test in test/ (#130).
+//
+// Cancelling the pending frame during teardown does *not* fix it: the frame that
+// survives is not reliably the one the renderer still holds an id for, so there
+// is nothing dependable to cancel. Neutralising the callback is, because the
+// condition is unambiguous — a redraw with no context has nothing to draw on.
+//
+// This must stay above init(): init() renders the first tab on the way past, and
+// the Stations tab builds a map while doing it.
+if (typeof L !== 'undefined' && L.Canvas) {
+  const _leafletCanvasRedraw = L.Canvas.prototype._redraw;
+  L.Canvas.prototype._redraw = function () {
+    if (!this._ctx) { this._redrawRequest = null; return; }
+    return _leafletCanvasRedraw.call(this);
+  };
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────────
 
 (function init() {
