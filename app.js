@@ -65,7 +65,11 @@ const HELP = {
     summary: 'The station list and the map, side by side. The <strong>Filters</strong> pane on the '
            + 'left drives both at once, and is built from whatever <code>stations.json</code> holds '
            + '— every option carries the number of stations behind it, and nothing is offered that '
-           + 'no station uses. Draw, measure and terrain tools sit under the map.',
+           + 'no station uses. Draw, measure and terrain tools sit under the map. Selecting a '
+           + 'station opens <strong>Repeaters listening</strong> between the list and the editor: '
+           + 'every repeater with a pass range open to that station\'s addresses, nearest first. '
+           + 'Clicking one puts the map on it and dims everything off its paths — the filters, the '
+           + 'picked selection and the station being edited all stay where they are.',
     watch: [
       '<strong>Kill spaghetti</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
@@ -2590,6 +2594,9 @@ function renderEmpty() {
 
 function renderStationsHtml() {
   const stations = tableStations();
+  // Empty while nothing is selected — the panel then carries `hidden` rather
+  // than an empty box between the table and the editor.
+  const carriers = stationCarriersHtml();
   return `
     <div class="layout map-layout">
       <aside class="sidebar stack map-pane" id="stations-left">
@@ -2632,6 +2639,9 @@ function renderStationsHtml() {
           <div class="table-wrap tall" id="stations-table-wrap">
             ${stationsTable(stations)}
           </div>
+        </div>
+        <div class="panel" id="stations-carriers-card" ${carriers ? '' : 'hidden'}>
+          ${carriers}
         </div>
         <div class="panel" id="stations-editor-card">
           ${renderStationEditorCard()}
@@ -3277,6 +3287,10 @@ function setMapFocusRepeater(id) {
   if (state.mapFocusRepeaterId === id) return;
   state.mapFocusRepeaterId = id;
   applyMapFocusStyles();
+  // The "Repeaters listening" card marks whichever of its rows is the focused
+  // repeater, so it follows the focus however it was set — a pin click, the
+  // empty map, or one of its own rows.
+  rerenderStationCarriersCard();
 }
 
 function clearMapFocusRepeater() {
@@ -6371,6 +6385,158 @@ function renderStationEditorCard() {
 function rerenderStationEditorCard() {
   const el = document.getElementById('stations-editor-card');
   if (el) el.innerHTML = renderStationEditorCard();
+  // The card below the table follows the same selection, so every caller that
+  // reloads the editor reloads it too — there is no path that changes the
+  // selected station without going through here.
+  rerenderStationCarriersCard();
+}
+
+// ── Repeaters listening to the selected station ──────────────────────────────
+// The mirror image of the repeater editor's "ALERT IDs in range → stations"
+// list: with a station selected, this says which repeaters have a pass range
+// open to *its* addresses — the hop its data actually takes out of the field,
+// and the list to check when a station stops arriving.
+//
+// It reads findRepeaterMatches/passRangeCoversId, the same pair the map links,
+// the "via pass range" badge and the Pass Ranges tab all read, so the four
+// never disagree about who carries whom.
+
+// The station the panel is about, or null: the selected row, and only when it
+// is a station that actually exists. A half-filled "+ New" draft has no id to
+// match a pass range against, so the panel stays away until it is saved.
+function carriersStation() {
+  if (!state.data || !state.selectedId) return null;
+  return state.data.stations.find(x => x.id === state.selectedId) || null;
+}
+
+// One row's worth of "why is this repeater in the list": the station's own
+// addresses this repeater carries, and the ranges that pick them up. The
+// bounds test only says *which* range — passRangeCoversId still decides
+// whether the address is carried at all, so an excluded address is absent from
+// both. Same composition as passRangesHtml on the Pass Ranges tab.
+function carrierRangeDetail(repeater, alertIds) {
+  const ids    = alertIds.filter(id => passRangeCoversId(repeater.repeater, id));
+  const ranges = (repeater.repeater.pass_ranges || [])
+    .filter(p => ids.some(id => id >= p.low && id <= p.high))
+    .map(p => `${p.low}–${p.high}`);
+  return { ids, ranges };
+}
+
+function stationCarriersHtml() {
+  const s = carriersStation();
+  if (!s) return '';
+  const ids  = stationAlertIds(s);
+  const rpts = findRepeaterMatches(s);
+
+  const rows = rpts
+    .map(r => ({
+      r,
+      ...carrierRangeDetail(r, ids),
+      km: (s.lat != null && s.lon != null && r.lat != null && r.lon != null)
+        ? acmaHaversineKm(s.lat, s.lon, r.lat, r.lon) : null,
+    }))
+    // Nearest first — the closest repeater with the address open is the one the
+    // station is most likely actually being heard by. Positionless repeaters
+    // can't be ranked, so they go last rather than pretending to be at 0 km.
+    .sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity) || a.r.name.localeCompare(b.r.name));
+
+  const header = `
+    <div class="panel-header">
+      <h2>Repeaters listening</h2>
+      <span class="badge" title="Repeaters with a pass range open to this station">${rows.length}</span>
+    </div>`;
+
+  // Two different nothings, and they mean opposite things: a station with no
+  // ALERT address (telemetry-only, or not configured yet) is not something a
+  // pass range could ever cover, while a station that has one and still has no
+  // carrier is orphaned — a finding, flagged in the same red the Pass Ranges
+  // tab flags orphans in.
+  if (!ids.length) {
+    return `${header}
+      <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+        <strong>${esc(s.name)}</strong> has no ALERT address recorded, so there is nothing for a
+        pass range to be open to. Telemetry-only stations reach the base another way.
+      </p>`;
+  }
+  if (!rows.length) {
+    return `${header}
+      <p class="small" style="color:#c7401a;margin:.5rem 0 0">
+        <strong>No repeater's pass ranges cover ${ids.length === 1 ? 'address' : 'addresses'}
+        ${ids.join(', ')}</strong> — this station is orphaned, and nothing is listening for it.
+      </p>`;
+  }
+
+  return `${header}
+    <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+      Pass ranges open to ${ids.length === 1 ? 'address' : 'addresses'} <strong>${ids.join(', ')}</strong>.
+      Click a row to put the map on that repeater and dim everything off its own paths — the
+      filters, the picked selection and the station in the editor below all stay as they are.
+      Clicking it again puts the map back.
+    </p>
+    <div class="table-wrap medium">
+      <table>
+        <colgroup>
+          <col style="width:28%"><col style="width:18%"><col style="width:14%">
+          <col style="width:18%"><col style="width:11%"><col style="width:11%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Repeater</th><th>Network</th><th>Carries</th>
+            <th>In pass range</th><th>Distance</th><th>Passing</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(({ r, ids: carried, ranges, km }) => `
+            <tr class="${state.mapFocusRepeaterId === r.id ? 'rpt-focused' : ''}"
+                onclick="focusRepeaterOnMap('${escAttr(r.id)}')" style="cursor:pointer"
+                title="Put the map on ${escAttr(r.name)} — nothing else on this page moves">
+              <td><span class="stn-name role-repeater">${esc(r.name)}</span></td>
+              <td class="small">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
+              <td class="small">${carried.join(', ')}</td>
+              <td class="small">${ranges.join(', ')}</td>
+              <td class="small" title="${km == null ? 'One end has no coordinates recorded' : 'Straight-line distance'}"
+                  >${km == null ? '—' : fmtKm(km)}</td>
+              <td><span class="badge" title="ALERT addresses this repeater carries in total, post-exclusion">${repeaterPassingCount(r) ?? 0}</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function rerenderStationCarriersCard() {
+  const el = document.getElementById('stations-carriers-card');
+  if (!el) return;
+  const html = stationCarriersHtml();
+  el.innerHTML = html;
+  el.hidden    = !html;
+}
+
+// Clicking a row in that table. Deliberately narrow: it moves the map and sets
+// the same repeater focus a plain click on the repeater's own pin sets, and
+// touches nothing else — not state.selectedId, not the editor draft, not the
+// filters, not the map selection. The station being looked at stays the station
+// being looked at; only the view moves. Clicking the focused row again clears
+// the focus, as clicking its pin again would.
+function focusRepeaterOnMap(id) {
+  const r = state.data && state.data.stations.find(x => x.id === id);
+  if (!r) return;
+  if (state.mapFocusRepeaterId === id) {
+    setMapFocusRepeater(null);
+    return;
+  }
+  setMapFocusRepeater(id);       // re-renders this card, so the row marks itself
+  if (!state.map) return;
+  if (r.lat == null || r.lon == null) {
+    mapNote(`${r.name} has no coordinates recorded, so the map can't go to it.`, 4000);
+    return;
+  }
+  state.map.setView([r.lat, r.lon], Math.max(state.map.getZoom() || 0, 10));
+  const marker = state.mapMarkers.find(m => m.mnStationId === r.id);
+  // No pin means the map display is hiding it (hide-others mode with a filter
+  // running). The view is on it either way, so say why there is nothing there
+  // rather than leaving the operator looking at empty ground.
+  if (marker) marker.openPopup();
+  else mapNote(`${r.name} isn't drawn right now — the map display is hiding it.`, 4000);
 }
 
 // ── NETWORKS tab ───────────────────────────────────────────────────────────────

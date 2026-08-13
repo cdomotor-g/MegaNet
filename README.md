@@ -1563,8 +1563,11 @@ linked from it.
 Tabs / panels:
 - **Stations** — one page holding the interactive Leaflet map, the filterable
   table of all stations below it (names colour-coded by role, matching the map)
-  and a built-in CRUD editor card below the list. The filter pane on the left
-  drives the map and the table together
+  and a built-in CRUD editor card below the list. Selecting a station also opens
+  a **Repeaters listening** card between the two, listing every repeater with a
+  pass range open to that station's addresses (nearest first); clicking a row
+  puts the map on that repeater without touching the filters or the selection.
+  The filter pane on the left drives the map and the table together
 - **Network Maps** — Queensland basin explorer + bundled Radio-path PDF maps, with station-aware search
 - **Networks** — radio network cluster management
 - **Pass Ranges** — pass-range matching and hop-chain view; rows link through to

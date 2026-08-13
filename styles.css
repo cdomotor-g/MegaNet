@@ -889,6 +889,22 @@ tr.selected td {
   background: color-mix(in srgb, #28527f 55%, var(--subtle));
 }
 
+/* "Repeaters listening" (Stations tab): the row whose repeater the map is
+   currently focused on. Tinted in the repeater's own colour rather than the
+   selected-row blue — this is a view focus, not a selection, and the two are
+   on screen together. */
+tr.rpt-focused td {
+  background: color-mix(in srgb, var(--role-repeater) 16%, transparent);
+}
+
+tr.rpt-focused:hover td {
+  background: color-mix(in srgb, var(--role-repeater) 22%, transparent);
+}
+
+tr.rpt-focused td:first-child {
+  box-shadow: inset 3px 0 0 var(--role-repeater);
+}
+
 .note,
 .summary-box {
   margin-top: .85rem;
