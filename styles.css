@@ -2129,6 +2129,91 @@ hr {
   border-top: 1px solid var(--border);
 }
 
+/* ── Find a tab (#108) ──────────────────────────────────────────────────────
+   Nineteen tabs is past the size where a column of labels is something you
+   scan. Expanded, this is a filter box over the list below it; collapsed, there
+   is no room for a box, so it is the one rail button that opens the nav with
+   the cursor already in it (app.js: focusNavFind). Ctrl+K does the same from
+   anywhere. */
+
+.nav-find {
+  margin-bottom: .4rem;
+}
+
+.nav-search {
+  width: 100%;
+  padding: .34rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: .85rem;
+}
+
+/* The rail's stand-in for the box. Shaped as a .tab-btn rather than styled from
+   scratch so the rail stays one column of identical targets. */
+.nav-find-btn {
+  display: none;
+  align-items: center;
+  gap: .55rem;
+  width: 100%;
+  padding: .42rem .45rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: .92rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.nav-find-btn:hover {
+  background: var(--subtle);
+  border-color: var(--border);
+}
+
+#tab-nav.collapsed .nav-search { display: none; }
+#tab-nav.collapsed .nav-find-btn { display: flex; justify-content: center; gap: 0; }
+
+/* How many of the nineteen survived the query, for whoever cannot see that the
+   list got shorter. Kept in the DOM at all times — a live region added to the
+   page at the moment it has something to say is a live region that says it to
+   nobody — and collapsed to nothing while there is no query. */
+.nav-found {
+  margin: .45rem .45rem 0;
+  font-size: .72rem;
+  color: var(--muted);
+}
+
+.nav-found:empty { display: none; }
+#tab-nav.collapsed .nav-found { display: none; }
+
+.nav-none {
+  margin: .3rem .45rem;
+  font-size: .82rem;
+  color: var(--muted);
+}
+
+/* The match Enter will open. Marked rather than moved: sorting the winners to
+   the top would reshuffle the list under the cursor on every keystroke, and the
+   groups are the thing being learnt. Never drawn as the active tab is — this is
+   "press Enter for this one", not "you are here". */
+#tab-nav .tab-btn.nav-best {
+  background: var(--subtle);
+  border-color: var(--border);
+}
+
+.nav-enter {
+  margin-left: auto;
+  padding-left: .4rem;
+  font-size: .8rem;
+  color: var(--muted);
+}
+
+#tab-nav .tab-btn.active .nav-enter { color: inherit; }
+
 .nav-heading {
   margin: 0 0 .25rem;
   padding: 0 .45rem;

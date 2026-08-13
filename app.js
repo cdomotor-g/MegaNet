@@ -772,9 +772,169 @@ function tableStations() {
 }
 
 // ── Side nav ───────────────────────────────────────────────────────────────────
-// Everything that touches the nav lives here: the render, the tab switch, the
-// collapse and its keyboard equivalent. Nothing else in the file reaches into
-// #tab-nav.
+// Everything that touches the nav lives here: the render, the find box, the tab
+// switch, the collapse and its keyboard equivalent. Nothing else in the file
+// reaches into #tab-nav.
+//
+// ── Finding a tab among nineteen (#108) ──────────────────────────────────────
+//
+// The nav was built for eleven tabs and grew to nineteen. Regrouping them (see
+// TABS in core.js) takes the largest group from eight down to five, which fixes
+// the scan *within* a group; it does nothing for the person who knows what they
+// want and does not know which group somebody else filed it under. That is what
+// the find box is for, and it is the answer to two of #108's questions at once
+// — "would a user looking for the packet decoder find it without scanning all
+// eight", and whether a list of groups is still the right shape at this size.
+// It is: a list of groups plus a way to skip the list.
+//
+// Matching is over the label, the group heading and the tab's `find` words, so
+// "packet decoder", "com port" and "contrail" all land somewhere the label alone
+// never would. The rule is one line: **score each tab by how many of the typed
+// terms it matches, and keep the tabs that match the most of them.**
+//
+// It was two rules first — every term must match, and a term matching no tab at
+// all is dropped — and `npm run nav` failed it on the first sentence anybody
+// would actually type. "the rf environment view" found nothing: "the" matched no
+// tab and was dropped as intended, but "view" matched the Ghosting Graph's find
+// words, so it survived, and then no single tab carried all three of rf,
+// environment and view. Requiring everything makes each extra word a chance to
+// find nothing, which is the opposite of what typing more should do.
+//
+// Best-score subsumes both of the rules it replaced and costs nothing:
+//
+//   Narrowing.      "alert packets" scores 2 on the three tabs carrying both
+//                   words and 1 on everything else, so it shows three where
+//                   "alert" showed four. A second word still narrows — it just
+//                   cannot overshoot into nothing.
+//   Noise words.    A term on no tab adds 0 everywhere, so it moves no ranking
+//                   and drops out by arithmetic rather than by a pass of its own.
+//   Nothing at all. Best score of zero is a real empty result — "zzzz" says so,
+//                   where the dropping rule quietly showed all nineteen.
+//
+// A term matches from the start of a word, not from anywhere inside one. So
+// "insp" still finds Inspections before you have finished typing the word, and
+// the two renames still resolve — "network view" scores 2 on the Ghosting
+// Graph's find words — but "the" no longer matches *hypotheses* and "rf" no
+// longer matches *interference*. Both of those were real: the first version
+// matched bare substrings, and `npm run nav` showed "the rf environment view"
+// pulling in the Interference Workbench on the strength of two accidents.
+//
+// Ties are broken by the label. A query can reach a tab three ways — its label,
+// its find words, its group heading — and "alert packets" scores 2 on all three
+// of ALERT Packets, ALERT2 and the Bit Flipper, because "packets" is in the
+// group heading they share. All three are worth showing; only one is worth
+// opening on Enter, and it is the one whose own label carries most of what was
+// typed. That tab is marked in the list, so which one Enter takes is visible
+// rather than a surprise.
+
+// A query, lower-cased and de-duplicated. [] for an empty query, which every
+// caller reads as "no filter".
+function navTerms(query) {
+  const out = [];
+  for (const t of String(query || '').toLowerCase().split(/\s+/)) {
+    if (t && !out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
+// Everything a query is matched against, as one lower-case string. The group
+// heading is in here on purpose: "interference" should reach all three tabs
+// under it, not just the one with the word in its label.
+function navHaystack(tab, group) {
+  return `${tab.label} ${group} ${tab.find || ''}`.toLowerCase();
+}
+
+// Does `text` start a word with `term`? Built per call rather than cached: the
+// whole filter is nineteen tabs against a handful of terms, once per keystroke.
+function navHasTerm(text, term) {
+  const safe = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[^a-z0-9])${safe}`).test(text);
+}
+
+function navScore(text, terms) {
+  return terms.reduce((n, t) => n + (navHasTerm(text, t) ? 1 : 0), 0);
+}
+
+// TABS, with the losing tabs removed and any group left empty removed with them,
+// plus the id of the one Enter should open. `groups: []` means the query matched
+// nothing anywhere — distinct from an empty query, which returns every group
+// untouched and no pick.
+function navFiltered() {
+  const terms = navTerms(state.navQuery);
+  if (!terms.length) return { groups: TABS.map(g => ({ group: g.group, tabs: g.tabs })), bestId: null };
+  let best = 0;
+  const scored = TABS.map(g => ({
+    group: g.group,
+    tabs: g.tabs.map(tab => {
+      const score = navScore(navHaystack(tab, g.group), terms);
+      if (score > best) best = score;
+      return { tab, score, label: navScore(tab.label.toLowerCase(), terms) };
+    }),
+  }));
+  if (!best) return { groups: [], bestId: null };
+  const won = scored
+    .map(g => ({ group: g.group, tabs: g.tabs.filter(x => x.score === best) }))
+    .filter(g => g.tabs.length);
+  let pick = null;
+  for (const g of won) for (const x of g.tabs) if (!pick || x.label > pick.label) pick = x;
+  return {
+    groups: won.map(g => ({ group: g.group, tabs: g.tabs.map(x => x.tab) })),
+    bestId: pick ? pick.tab.id : null,
+  };
+}
+
+// The groups, filtered. Rendered separately from renderTabs() because typing in
+// the find box must not rebuild the box it is being typed into — the input keeps
+// its value, its selection and its focus, and only this markup is replaced.
+function navGroupsHtml() {
+  const collapsed = state.navCollapsed;
+  const { groups, bestId } = navFiltered();
+  const html = groups.map(g => {
+    const hid = 'nav-h-' + slug(g.group);
+    // role="group" rather than nothing, because collapsed the heading is
+    // clipped: it is still the group's accessible name, and without the
+    // association a screen reader on the rail gets nineteen ungrouped buttons.
+    return `
+    <div class="nav-group" role="group" aria-labelledby="${hid}">
+      <h2 class="nav-heading" id="${hid}">${esc(g.group)}</h2>
+      <ul class="nav-list">
+        ${g.tabs.map(t => {
+          const on   = state.activeTab === t.id;
+          const pick = t.id === bestId;
+          // On the rail the label alone is not enough to place a tab — which
+          // group a tooltip belongs to is exactly what the clipped heading was
+          // saying — so collapsed the tooltip says both.
+          const tip = collapsed ? `${t.label} — ${g.group}` : t.label;
+          // The ↵ is not decoration: it is where Enter goes, said out loud, and
+          // the winner is not always the top of the list — the groups keep their
+          // order so the list does not reshuffle under the cursor.
+          return `
+        <li>
+          <button class="tab-btn${on ? ' active' : ''}${pick ? ' nav-best' : ''}"
+                  onclick="switchTab('${t.id}')"
+                  ${on ? 'aria-current="page"' : ''} title="${esc(tip)}">
+            <span class="nav-icon" aria-hidden="true">${t.icon}</span>
+            <span class="nav-label">${esc(t.label)}</span>
+            ${pick ? '<span class="nav-enter" aria-hidden="true">↵</span>' : ''}
+          </button>
+        </li>`;
+        }).join('')}
+      </ul>
+    </div>`;
+  }).join('');
+  // A filter that matches nothing says so. Silence would read as a nav that had
+  // broken rather than as a query with no answer.
+  return html || `<p class="nav-none">No tab matches <strong>${esc(state.navQuery)}</strong>.</p>`;
+}
+
+// What the live region announces, and what sighted users read under the list.
+// Empty while nothing is being filtered — the region stays in the DOM either
+// way, so it is there to announce into when a query arrives.
+function navFoundText() {
+  if (!navTerms(state.navQuery).length) return '';
+  const n = navFiltered().groups.reduce((sum, g) => sum + g.tabs.length, 0);
+  return `${n} of ${TAB_LIST.length} tabs`;
+}
 
 function renderTabs() {
   const nav = document.getElementById('tab-nav');
@@ -807,24 +967,12 @@ function renderTabs() {
 
   // Collapsed, the labels are clipped rather than removed: the button keeps its
   // accessible name, and the title attribute gives the sighted user a tooltip.
-  const groups = TABS.map(g => `
-    <div class="nav-group">
-      <h2 class="nav-heading">${esc(g.group)}</h2>
-      <ul class="nav-list">
-        ${g.tabs.map(t => {
-          const on = state.activeTab === t.id;
-          return `
-        <li>
-          <button class="tab-btn${on ? ' active' : ''}" onclick="switchTab('${t.id}')"
-                  ${on ? 'aria-current="page"' : ''} title="${esc(t.label)}">
-            <span class="nav-icon" aria-hidden="true">${t.icon}</span>
-            <span class="nav-label">${esc(t.label)}</span>
-          </button>
-        </li>`;
-        }).join('')}
-      </ul>
-    </div>`).join('');
-
+  // The groups themselves are navGroupsHtml()'s — see the note above it for why
+  // they are built by a function of their own.
+  //
+  // On the rail there is no room for a text box, so the find box becomes the one
+  // button that re-opens the nav with the cursor already in it. Same errand,
+  // 56 px of it.
   nav.innerHTML = `
     <div class="nav-inner" onkeydown="navKey(event)">
       <button class="nav-toggle" onclick="toggleNav()" aria-controls="tab-nav"
@@ -833,8 +981,66 @@ function renderTabs() {
         <span class="nav-icon" aria-hidden="true">${toggleWord.icon}</span>
         <span class="nav-label">${toggleWord.label}</span>
       </button>
-      ${groups}
+      <div class="nav-find">
+        <input id="nav-search" class="nav-search" type="search" autocomplete="off"
+               spellcheck="false" aria-label="Find a tab" placeholder="Find a tab…"
+               value="${escAttr(state.navQuery)}"
+               oninput="navFind(this.value)" onkeydown="navFindKey(event)">
+        <button class="nav-find-btn" onclick="focusNavFind()" title="Find a tab (Ctrl+K)">
+          <span class="nav-icon" aria-hidden="true">🔎</span>
+          <span class="nav-label">Find a tab</span>
+        </button>
+      </div>
+      <div id="nav-groups">${navGroupsHtml()}</div>
+      <p id="nav-found" class="nav-found" role="status" aria-live="polite">${esc(navFoundText())}</p>
     </div>`;
+}
+
+// Typing in the find box. Only the list and the count are rewritten — the input
+// is left exactly as it is, which is what keeps the caret in it.
+function navFind(query) {
+  state.navQuery = query;
+  const box = document.getElementById('nav-groups');
+  if (box) box.innerHTML = navGroupsHtml();
+  const found = document.getElementById('nav-found');
+  if (found) found.textContent = navFoundText();
+}
+
+// Escape, Enter and ArrowDown, in the box. Escape clears before it does anything
+// else and stops there — on a phone the same key closes the drawer (init.js), and
+// backing out of a query should not also throw away the nav you were using it in.
+function navFindKey(e) {
+  if (e.key === 'Escape') {
+    if (!state.navQuery) return;
+    e.stopPropagation();
+    e.preventDefault();
+    navFind('');
+    const el = document.getElementById('nav-search');
+    if (el) el.value = '';
+    return;
+  }
+  if (e.key === 'Enter') {
+    // The tab marked ↵ — the best match rather than the topmost one, which are
+    // not the same thing once a group heading has pulled its whole group in.
+    // Falls back to the first still standing, so a future render that stops
+    // marking one degrades to the old behaviour rather than to nothing.
+    const pick = document.querySelector('#nav-groups .tab-btn.nav-best')
+              || document.querySelector('#nav-groups .tab-btn');
+    if (pick) { e.preventDefault(); pick.click(); }
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    const first = document.querySelector('#nav-groups .tab-btn');
+    if (first) { e.preventDefault(); first.focus(); }
+  }
+}
+
+// Ctrl/Cmd+K from anywhere, and the rail's 🔎 button. Opening the nav first is
+// the point on the rail and on a phone: there is no box to type in until it is.
+function focusNavFind() {
+  if (state.navCollapsed) setNavCollapsed(false);
+  const el = document.getElementById('nav-search');
+  if (el) { el.focus(); el.select(); }
 }
 
 function switchTab(id) {
@@ -851,6 +1057,12 @@ function switchTab(id) {
   // registry now, and each module registers itself — core.js and #142 say why.
   runTabTeardowns();
   state.activeTab = id;
+  // The find box was an errand and picking a tab is the end of it — same rule
+  // the phone drawer follows two lines down. Left standing, the query would hide
+  // the tab you just opened from the nav that opened it, which reads as the nav
+  // having lost it. Cleared before renderTabs(), so the rebuild draws all
+  // nineteen back.
+  state.navQuery = '';
   // On a phone the expanded nav is a drawer laid over the content rather than
   // a column beside it (see styles.css). Picking a tab is the end of that
   // errand, so the drawer closes behind you instead of covering what you came
@@ -901,6 +1113,10 @@ function toggleNav() {
 function setNavCollapsed(collapsed) {
   state.navCollapsed = !!collapsed;
   localStorage.setItem('mn-nav', state.navCollapsed ? 'collapsed' : 'expanded');
+  // A query left running on the rail is a filter nobody can see or clear: the
+  // box it was typed into is not rendered there, and the rail would simply be
+  // short by however many tabs the query had removed. Collapsing ends it.
+  if (state.navCollapsed) state.navQuery = '';
   // The other half of the one-drawer-at-a-time rule — see setHelpCollapsed().
   if (!state.navCollapsed && isPhoneNav() && !state.helpCollapsed) {
     state.helpCollapsed = true;
@@ -1122,13 +1338,18 @@ function renderHelp() {
 }
 
 // Up and down walk the tabs, ignoring the group headings — the list reads as
-// one column, so it should drive as one column.
+// one column, so it should drive as one column. The find box is the top of that
+// column when it is on screen (it is not, on the rail), so ArrowUp from the
+// first tab lands in it rather than wrapping past it — and ArrowDown out of it
+// is handled in navFindKey(), which runs first and stops here from seeing it.
 function navKey(e) {
   if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-  const btns = [...document.querySelectorAll('#tab-nav .tab-btn')];
-  const i    = btns.indexOf(document.activeElement);
+  const find  = document.getElementById('nav-search');
+  const items = [...document.querySelectorAll('#tab-nav .tab-btn')];
+  if (find && find.offsetParent !== null) items.unshift(find);
+  const i = items.indexOf(document.activeElement);
   if (i < 0) return;
-  const next = btns[(i + (e.key === 'ArrowDown' ? 1 : btns.length - 1)) % btns.length];
+  const next = items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length];
   if (next) { next.focus(); e.preventDefault(); }
 }
 

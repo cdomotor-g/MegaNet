@@ -1,6 +1,6 @@
 // MegaNet — maps-data.js
 //
-// Data module for the Maps tab (Network Maps Navigator).  Curated from the
+// Data module for the Maps tab (Radio Path Maps).  Curated from the
 // legacy "ALERT Map Launcher v2.html" plus QldBasin_2009Nov_reduced.svg.
 // Loaded before app.js via a <script> tag in index.html.
 //

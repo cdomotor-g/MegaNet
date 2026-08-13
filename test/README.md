@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the nine that run in CI
+npm run all                       # the ten that run in CI
 ```
 
 | Command | What it does |
@@ -27,18 +27,20 @@ npm run all                       # the nine that run in CI
 | `npm run toplevel` | `init.js` is still the only file that executes at load |
 | `npm run smoke` | loads the page in Chromium, opens all 19 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
+| `npm run nav` | every tab is in the left nav exactly once, under one heading, and findable by its own label and by what it does |
 | `npm run help` | every tab's help entry is real content, every link out of the panel lands, and each walkthrough names itself and fits the rail |
 | `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
 | `npm run maint` | the Council Maintenance Tasks form renders what the workbook's own filled sheet says — with the fixture read out of the `.xlsx` |
 | `npm run history` | a saved record reads back as the sheet it was written on, and exports as it reads — with the records written by the app during the run |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the nine that run in CI |
+| `npm run all` | the ten that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
-`toplevel`, `registry` and `help` take `-v` too, to list what passed as well as
-what did not.
+`toplevel`, `registry`, `nav` and `help` take `-v` too, to list what passed as
+well as what did not — `nav -v` prints what each search probe actually found,
+which is the fastest way to see why a `find` word is not doing its job.
 
-CI runs `check`, `names`, `toplevel`, `smoke`, `registry`, `help`, `insp`, `maint` and `history` on every push that touches a root `*.js`,
+CI runs `check`, `names`, `toplevel`, `smoke`, `registry`, `nav`, `help`, `insp`, `maint` and `history` on every push that touches a root `*.js`,
 `index.html`, `styles.css`, `stations.json`, `db/migrations/`, `test/` or the
 inspection workbook in `archive/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's
@@ -68,7 +70,7 @@ directory would not change what a browser loads.
 tool, and someone opening `index.html` off a laptop with no server is
 anticipated. But it is a bad mode to *test* in: over `file://` the bundled
 `stations.json` is unreachable (`autoLoad()` says so at `app.js:188`), so
-`state.data` stays null and thirteen of the eighteen tabs render the empty state
+`state.data` stays null and twelve of the nineteen tabs render the empty state
 instead of themselves. A smoke test that never draws a station table proves very
 little.
 
@@ -119,7 +121,7 @@ nothing inside one. `lib/controls.mjs` closes that, two ways:
 
 **`auditHandlers()`** reads every `on*=` attribute the tab rendered, pulls the
 callee paths out of it and asks the page whether each resolves to a function.
-One `evaluate()` per tab, so it runs on all seventeen — 313 distinct handler calls
+One `evaluate()` per tab, so it runs on all nineteen — 313 distinct handler calls
 across 5,578 attributes on a full pass. It is exhaustive over whatever is on
 screen, which is its advantage and also its limit: a control that did not render
 is a control it did not check.
@@ -191,7 +193,7 @@ something, so say why.
 
 ### `registry.mjs` — the half smoke cannot see
 
-Smoke opens all eighteen tabs. It never *leaves* one, so a tab that forgot to
+Smoke opens all nineteen tabs. It never *leaves* one, so a tab that forgot to
 register its Leaflet map or its teardown passes: the tab itself is fine. It is
 the leaving that isn't, and it fails in silence — a map missing from the
 re-measure list renders at the wrong size after a nav collapse, a module missing
@@ -219,6 +221,38 @@ See #142 for why the two registries were inverted in the first place, and #143
 for why `removeMap()` exists rather than a bare `map.remove()` — a zoom in
 flight when the map goes throws from a timer, where no `try`/`catch` at the call
 site can reach it.
+
+### `nav.mjs` — the half smoke never opens
+
+Smoke reaches every tab by calling `switchTab(id)`. It never touches the nav, so
+everything about the nav is outside it: a tab could be missing from every group
+in `TABS`, or permanently filtered out of the rendered list by the find box, and
+all nineteen tabs would still open and still render clean. A user has no
+`switchTab()`.
+
+Four claims, and each one is invisible from anywhere else:
+
+- **Coverage.** Every tab in `TAB_LIST` has exactly one button, under exactly one
+  heading, in a group labelled by that heading. No group holds more than six
+  tabs — a ceiling rather than a style rule, so the next tab has to be filed
+  rather than dropped on the end of the biggest pile. That was the state #108
+  found: eight of nineteen under one heading.
+- **The find box.** Every tab is found by typing its own label, and a table of
+  probes asserts that the words people actually type — "packet decoder", "com
+  port", "contrail", "pdf", and the two labels #108 renamed — land on the tab
+  they describe *and* are the match Enter takes.
+- **Its rule.** Best score wins: narrows as a second word is typed, survives a
+  word that is on no tab, returns nothing for a query that means nothing, and
+  matches from the start of a word rather than anywhere inside one.
+- **Its exits.** Picking a tab clears the query, and so does collapsing to the
+  rail — where the box that would clear it is not rendered.
+
+This file wrote the matching rule rather than checking one that already existed.
+The first implementation required every typed term to match, and the probe for
+#108's own example — *"the RF Environment view"* — went red on it: three terms,
+no single tab carrying all three. The second matched bare substrings, and the
+same probe pulled in the Interference Workbench, because "the" is inside
+*hypotheses* and "rf" is inside *interference*. Both are assertions here now.
 
 ### `inspections.mjs` — the half the network policy hides
 
@@ -511,7 +545,18 @@ without looking, and a verifier nobody looks at verifies nothing.
   bump `EXPECTED_TABS`. The `HELP` entry has to be *written*, not stubbed —
   `npm run help` fails a summary under 140 characters and any of the usual
   placeholder words, which is what stops "every tab is documented" quietly
-  becoming untrue at tab twenty.
+  becoming untrue at tab twenty. It also needs a **group, an icon nothing else
+  uses, and `find` words**, or `npm run nav` goes red: a tab with no group is a
+  tab with no route to it, and a tab whose only find words restate its label is
+  findable only by people who already know what it is called. If the new tab
+  takes a group past six, that is the check asking where it actually belongs —
+  see #108 for how the current five were cut.
+- **A tab was renamed.** Change `label` in `TABS` and leave `id` alone: the id
+  keys `HELP`, `renderMain()`, the teardown registry and everything in
+  `localStorage`. Add the old label to that tab's `find` words as the separate
+  words it was — `npm run nav` matches from the start of a word, so `networkview`
+  would only ever be reached by typing it as one — and update the tab's own
+  heading in its module, or the nav and the page it opens disagree.
 - **A script was added to `index.html`.** Nothing to do. Every check reads the
   script list out of `index.html`, so the split milestones are picked up
   automatically — M1 added `core.js` and `init.js`, M2 added ten module files, M3

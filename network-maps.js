@@ -1,6 +1,6 @@
 // MegaNet — network-maps.js
 //
-//   Maps   the Network Maps tab: a clickable Queensland drainage-basin map,
+//   Maps   the Radio Path Maps tab: a clickable Queensland drainage-basin map,
 //          region / subregion / file navigation, an embedded PDF viewer, and
 //          station-aware search over the catalogue.
 //
@@ -20,7 +20,7 @@
 //
 // Moved out of app.js byte-for-byte by M2 (#133) of #129.
 
-// ── NETWORK MAPS tab (Network Maps Navigator) ───────────────────────────────────
+// ── RADIO PATH MAPS tab (formerly "Network Maps"; see #108) ─────────────────────
 //
 // Ports the legacy "ALERT Map Launcher v2.html" into MegaNet: a Queensland
 // drainage-basin map with clickable regions, region/subregion/file navigation
@@ -268,7 +268,7 @@ const Maps = (function () {
   // ── rendering ─────────────────────────────────────────────────────────────────
   function render() {
     if (!MD) {
-      return `<div class="layout"><div class="panel"><h2 style="margin-top:0">Network Maps</h2>
+      return `<div class="layout"><div class="panel"><h2 style="margin-top:0">Radio Path Maps</h2>
         <p class="warn-text">Map data module failed to load (<code>maps-data.js</code>). Check that it is present and loaded before <code>app.js</code>.</p></div></div>`;
     }
     return `

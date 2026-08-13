@@ -34,41 +34,115 @@
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-// The left-hand nav, and the only description of it. Grouped so the sidebar can
-// say what a flat row of eleven buttons never did — that RF Environment, RF
-// Changes, the Workbench and Bit Flipper are one investigation approached four
-// ways. Each tab carries an icon because the nav collapses to an icon rail, and
-// a rail with nothing but tooltips is a guessing game.
+// The left-hand nav, and the only description of it. Each tab carries an icon
+// because the nav collapses to an icon rail, and a set of `find` words because
+// nineteen tabs is past the point where a rail of icons — or a column of labels
+// — is something you scan.
 //
-// The packet tools sit in the same group rather than under a "Live tools"
-// heading of their own: reading what a station actually transmitted is part of
-// the same investigation as looking at who could be stepping on it, and the
-// split only ever forced a second scan of the sidebar to find the decoder.
+// ── The grouping, and where it comes from (#108) ─────────────────────────────
+//
+// Three groups held these tabs until #108, and one of the three held eight of
+// them: RF Environment, RF Changes, the Workbench, the Bit Flipper, Network
+// View, ALERT Packets, ALERT2 and the Serial Monitor, under "Radio
+// investigation". The heading was defensible — all eight are radio work — but a
+// group you have to read end to end to use is a list, not a grouping, and by
+// then a second group had quietly grown to seven.
+//
+// What settled it was not taste. `HELP[id].related` is this app's own statement,
+// written a tab at a time and never with the sidebar in mind, of which tabs
+// belong beside which. Read as a graph it does not describe three groups:
+//
+//   * The eight-tab group is two clusters with nothing mutual between them.
+//     rf ↔ rfchanges ↔ workbench is a closed triangle. bitflipper ↔ network,
+//     bitflipper ↔ packets, packets ↔ alert2, packets ↔ serial and alert2 ↔
+//     serial are a second one. The *only* edges between the halves are
+//     workbench → bitflipper and network → workbench, and both are one-way —
+//     neither cluster claims the other back. That is two groups being described
+//     as one.
+//   * The seven-tab group is likewise two closed triangles — arro ↔ arrodata ↔
+//     field, and inspections ↔ maintenance ↔ history — with *no* edge of any
+//     kind between them. Reading a sensor trace and filling in a paper form had
+//     been filed together on the strength of the word "data".
+//   * Export is the one tab that moved further than its neighbours. All three
+//     of its own `related` entries are Network-group tabs, two of them mutual
+//     (networks ↔ export, passranges ↔ export), and what it builds is scoped by
+//     the ticks on the Networks tab. It was under "Data & admin" and it belongs
+//     with the network it exports.
+//
+// So: five groups, largest of them five tabs, each one a cluster the help text
+// had already drawn. Group order runs outward from the file you loaded — what
+// is out there, what is interfering with it, what it actually transmitted, what
+// the sensors said, and what we did about it on site.
+//
+// ── Three tabs said "network" and meant three things ─────────────────────────
+//
+// "Network Maps" is not about networks: it browses the bundled Radio-path PDF
+// map sheets, so it is **Radio Path Maps**. "Network View" is not about networks
+// either: it draws ALERT addresses as nodes and bit-flip ghosting between them
+// as edges — README §16 already calls it the ghosting knowledge graph — so it is
+// the **Ghosting Graph**. "Networks" keeps the word, because it is the only one
+// of the three that means the named radio-network clusters in the file. Both old
+// labels survive as `find` words — spelled as the two words they were, because
+// the find box matches from the start of a word and `networkview` would only
+// ever be reached by typing it as one — so the rename does not strand anyone who
+// learnt the tab under its old name. Tab *ids* are untouched: they key HELP,
+// renderMain(), the teardown registry and everything in localStorage.
+//
+// ── `find`: the words nobody would think to look under the label ─────────────
+//
+// The jump box matches against the label, the group heading and these, so the
+// list here is deliberately not a restatement of the label. It holds the words
+// somebody would actually type — the job ("packet decoder", "com port"), the
+// artefact ("csv", "pdf"), the vendor ("contrail", "elpro"), and the old name of
+// anything renamed. Anything a person has called a tab out loud belongs here.
 const TABS = [
-  { group: 'Network', tabs: [
-    { id: 'stations',   label: 'Stations',               icon: '📡' },
-    { id: 'maps',       label: 'Network Maps',           icon: '🗺️' },
-    { id: 'networks',   label: 'Networks',               icon: '🕸️' },
-    { id: 'passranges', label: 'Pass Ranges',            icon: '🔗' },
+  { group: 'Stations & networks', tabs: [
+    { id: 'stations',   label: 'Stations',               icon: '📡',
+      find: 'sites list map filters repeaters draw measure terrain elevation profile photos editor' },
+    { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
+      find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
+    { id: 'networks',   label: 'Networks',               icon: '🕸️',
+      find: 'clusters primary repeater ingest counts scope ticks' },
+    { id: 'passranges', label: 'Pass Ranges',            icon: '🔗',
+      find: 'hop chain orphans gaps alertid address window coverage base' },
+    { id: 'export',     label: 'Export',                 icon: '📤',
+      find: 'csv radio mobile download stations.json backup escape hatch data source' },
   ] },
-  { group: 'Radio investigation', tabs: [
-    { id: 'rf',         label: 'RF Environment',         icon: '📶' },
-    { id: 'rfchanges',  label: 'RF Changes',             icon: '📈' },
-    { id: 'workbench',  label: 'Interference Workbench', icon: '🔬' },
-    { id: 'bitflipper', label: 'Bit Flipper',            icon: '🔀' },
-    { id: 'network',    label: 'Network View',           icon: '🧬' },
-    { id: 'packets',    label: 'ALERT Packets',          icon: '📦' },
-    { id: 'alert2',     label: 'ALERT2 / ERT-A2',        icon: '🛰️' },
-    { id: 'serial',     label: 'Serial Monitor',         icon: '🔌' },
+  { group: 'Interference', tabs: [
+    { id: 'rf',         label: 'RF Environment',         icon: '📶',
+      find: 'acma licensed transmitters spectrum frequency carrier register nearby candidates strip plot' },
+    { id: 'rfchanges',  label: 'RF Changes',             icon: '📈',
+      find: 'acma register history new licences appeared changed timeline diff when' },
+    { id: 'workbench',  label: 'Interference Workbench', icon: '🔬',
+      find: 'case hypotheses scoring evidence checklist acma complaint site visit share' },
   ] },
-  { group: 'Data & admin', tabs: [
-    { id: 'arro',       label: 'ARRO Launcher',          icon: '🚀' },
-    { id: 'arrodata',   label: 'ARRO Data',              icon: '📊' },
-    { id: 'field',      label: 'Field Data',             icon: '🌡️' },
-    { id: 'inspections', label: 'Inspections',           icon: '🩺' },
-    { id: 'maintenance', label: 'Site Maintenance',      icon: '🧰' },
-    { id: 'history',    label: 'Inspection History',     icon: '📋' },
-    { id: 'export',     label: 'Export',                 icon: '📤' },
+  { group: 'Addresses & packets', tabs: [
+    { id: 'bitflipper', label: 'Bit Flipper',            icon: '🔀',
+      find: 'flip alert address ghosting variants corruption decimal cross-reference' },
+    { id: 'network',    label: 'Ghosting Graph',         icon: '🧬',
+      find: 'network view knowledge graph force layout nodes edges addresses collisions' },
+    { id: 'packets',    label: 'ALERT Packets',          icon: '📦',
+      find: 'decoder decode encoder encode erts message frame crc check bits hex payload spec' },
+    { id: 'alert2',     label: 'ALERT2 / ERT-A2',        icon: '🛰️',
+      find: 'erta2 elpro decode ports capture sample' },
+    { id: 'serial',     label: 'Serial Monitor',         icon: '🔌',
+      find: 'com port web serial live stream terminal baud log' },
+  ] },
+  { group: 'Telemetry', tabs: [
+    { id: 'arro',       label: 'ARRO Launcher',          icon: '🚀',
+      find: 'contrail open station site raw id jump launch' },
+    { id: 'arrodata',   label: 'ARRO Data',              icon: '📊',
+      find: 'csv file chart plot sensor continuity 3-5-7 filter noise drop' },
+    { id: 'field',      label: 'Field Data',             icon: '🌡️',
+      find: 'readings datastore sensors chart plot window rainfall level quality' },
+  ] },
+  { group: 'Site visits', tabs: [
+    { id: 'inspections', label: 'Inspections',           icon: '🩺',
+      find: 'form paper sheet checklist calibration draft photo configuration' },
+    { id: 'maintenance', label: 'Site Maintenance',      icon: '🧰',
+      find: 'council tasks form condition owner contact vegetation access' },
+    { id: 'history',    label: 'Inspection History',     icon: '📋',
+      find: 'past records read back print a4 csv timeline previous visits' },
   ] },
 ];
 
@@ -1053,6 +1127,12 @@ const state = {
   // width decides, so a first visit on a laptop isn't handed two sidebars.
   navCollapsed:   (localStorage.getItem('mn-nav')
                    || (window.innerWidth < NAV_AUTO_COLLAPSE_PX ? 'collapsed' : 'expanded')) === 'collapsed',
+  // What is typed in the nav's "find a tab" box (#108). Deliberately *not*
+  // persisted: a filter is a thing you are doing now, and a nav that opens
+  // already showing four of its nineteen tabs — with no memory of why — reads as
+  // broken rather than as remembered. It is cleared by Escape, by picking a tab,
+  // and by every reload.
+  navQuery:       '',
   // Right-hand help panel: a strip, or a strip plus what it has to say about
   // the open tab. Kept under 'mn-help', in the same family as the three above.
   // Deliberately *not* given the nav's width test: it starts collapsed at every

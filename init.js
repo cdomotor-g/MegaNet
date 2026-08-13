@@ -51,6 +51,16 @@
     if (!state.navCollapsed)  setNavCollapsed(true);
     if (!state.helpCollapsed) setHelpCollapsed(true);
   });
+  // Ctrl/Cmd+K — jump to a tab without going to the nav to find it (#108).
+  // Registered here rather than on the nav because the whole value of it is that
+  // it works from wherever you are, including with the rail collapsed and on a
+  // phone where the nav is not on screen at all. preventDefault() because
+  // Firefox gives the same chord to its search bar.
+  document.addEventListener('keydown', e => {
+    if ((e.key !== 'k' && e.key !== 'K') || !(e.ctrlKey || e.metaKey) || e.altKey) return;
+    e.preventDefault();
+    focusNavFind();
+  });
   MemMeter.start();
   // Before autoLoad(), so that a tab returning from a magic link has taken the
   // session out of the URL fragment before anything else reads location.

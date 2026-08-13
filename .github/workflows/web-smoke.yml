@@ -127,6 +127,14 @@ jobs:
         working-directory: test
         run: npm run registry
 
+      # The third thing smoke cannot see, and the simplest: smoke reaches every
+      # tab by calling switchTab(id) and never touches the nav, so a tab missing
+      # from a group — or filtered permanently out of the list by the find box —
+      # is green all the way through. A user has no switchTab() (#108).
+      - name: Nav — every tab is in it once, and findable
+        working-directory: test
+        run: npm run nav
+
       # Not a check about code at all: the help panel's *content*. Smoke asserts
       # every tab has a HELP entry, which stops the rail rendering blank and
       # says nothing about what is behind the key. A doc link pointing at a file

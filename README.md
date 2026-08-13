@@ -71,7 +71,7 @@ MegaNet/
 ├── networks.js             ← Networks tab
 ├── pass-ranges.js          ← Pass Ranges tab
 ├── bit-flipper.js          ← Bit Flipper tab
-├── network-view.js         ← NetworkView — Network View tab (the knowledge graph)
+├── network-view.js         ← NetworkView — Ghosting Graph tab (the knowledge graph)
 ├── arro-launcher.js        ← ARRO Launcher tab
 ├── arro-data.js            ← ArroData  — ARRO Data tab (CSV import, 357 filter, plots)
 ├── datastore.js            ← the browser's PostgREST client: ping, reads, writes, snapshot
@@ -89,18 +89,18 @@ MegaNet/
 ├── modal.js                ← Modal     — the shared dialog shell
 ├── packets.js              ← Packets   — ALERT / ERTS codec, and its tab
 ├── alert2.js               ← Alert2    — ALERT2 / ERT-A2 tab
-├── network-maps.js         ← Maps      — Network Maps tab (named for the tab, not
+├── network-maps.js         ← Maps      — Radio Path Maps tab (named for the tab, not
 │                             the module, so it isn't confused with maps-data.js)
 ├── serial.js               ← Serial    — Serial Monitor tab (Web Serial)
 ├── bug-report.js           ← BugReport — prefilled GitHub issue reporter
 ├── init.js                 ← the only code that runs at load; must stay last
-├── maps-data.js            ← Network Maps catalogue, QLD basin SVG + georeference
+├── maps-data.js            ← Radio Path Maps catalogue, QLD basin SVG + georeference
 ├── styles.css              ← theme and layout
 ├── stations.json           ← the document schema (see below); export + offline fallback
 ├── migrate.html            ← legacy-CSV → stations.json converter (linked from the app)
 ├── .nojekyll               ← serve every file verbatim on GitHub Pages
 │
-├── maps/                   ← Radio-path maps for the Network Maps tab, by region
+├── maps/                   ← Radio-path maps for the Radio Path Maps tab, by region
 │   ├── far-north/          │  Barron, Herbert, Tully/Johnstone, Mulgrave, Saddle Mt
 │   ├── mackay-whitsundays/ │  Don/Proserpine, Pioneer
 │   ├── burdekin-townsville/│  Burdekin, Haughton, Mt Stuart
@@ -142,7 +142,7 @@ MegaNet/
 │   ├── acma-timeline.json            (authorisation-date timeline for the RF Changes tab)
 │   ├── acma-snapshots.json / acma-changes.json      (snapshot index + precomputed diffs)
 │   ├── acma-licence-suggestions.csv  (repeater ↔ ACMA licence review file)
-│   ├── ghosting-links.json           (observed candidate → target ghosting links, Network View)
+│   ├── ghosting-links.json           (observed candidate → target ghosting links, Ghosting Graph)
 │   └── rf-concepts.json              (RF explainer entries for the Workbench concept drawer)
 │
 ├── radio-mobile/           ← self-contained Radio Mobile desktop project
@@ -179,7 +179,7 @@ MegaNet/
     └── *.msg / *.pptx / *.docx                                  (original map sources)
 ```
 
-> **Map file resolution.** The Network Maps catalogue in `maps-data.js` keeps the
+> **Map file resolution.** The Radio Path Maps catalogue in `maps-data.js` keeps the
 > **bare filename** as each map's display name and lookup key; `MAPS_DIR` +
 > `REGION_DIR` build a `FILE_PATH` table (filename → `maps/<region>/<file>`) that
 > `app.js`'s `encPath()` uses to load the file. To add a map, drop it in the right
@@ -637,7 +637,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 | `repeater.exclusions` | `object[]` | Reserved for next-generation equipment; same `low`/`high` structure |
 | `rm_system_id` | `number` | References the Radio Mobile system spec (power, antenna, etc.) |
 | `satcom.enabled` | `boolean` | Marks stations with satellite comms capability |
-| `catchment_ids` | `string[]` | References `catchments[].id`. **Not yet populated** — the Network Maps tab derives a station's catchment at runtime from its coordinates (see feature 8). Populate this to make map suggestions exact. |
+| `catchment_ids` | `string[]` | References `catchments[].id`. **Not yet populated** — the Radio Path Maps tab derives a station's catchment at runtime from its coordinates (see feature 8). Populate this to make map suggestions exact. |
 | `TBRGbucketSize` | `number` | Millimetres per tip for this station's tipping-bucket rain gauge. **Absent, not `null`, when not recorded** — most stations today. Every consumer that converts a tip count to millimetres falls back to an assumed 0.2 mm/tip and says so (`bucketSizeMm()` in `app.js`) when this is missing. Named as the ticket that introduced it asked, so it doesn't match this schema's usual snake_case (`tbrg_bucket_size_mm`) — flag it if that should change before more call sites depend on the name. |
 
 > **`site` / `sensors`** are the authoritative sensor records — the `alert_ids`
@@ -982,9 +982,9 @@ specification (July 2003).
   `data/All 2021 Working 2.txt`.
 - Spec reference: `docs/BOM spec erts_data_formats_doc.pdf` (bundled).
 
-### 8. Network Maps Navigator (Integrated)
+### 8. Radio Path Maps Navigator (Integrated)
 Ported from the standalone `ALERT Map Launcher v2.html` (now removed) and
-available on the **Network Maps** tab. Browses the bundled Radio-path PDF maps
+available on the **Radio Path Maps** tab. Browses the bundled Radio-path PDF maps
 by region, and — new — suggests the relevant map(s) for any station.
 
 - **Queensland basin map** — a clickable SVG of the state's drainage basins.
@@ -1120,20 +1120,69 @@ on a narrow window.
 
 | Group | Tabs |
 | --- | --- |
-| **Network** | Stations · Network Maps · Networks · Pass Ranges |
-| **Radio investigation** | RF Environment · RF Changes · Interference Workbench · Bit Flipper · Network View · ALERT Packets · ALERT2 / ERT-A2 · Serial Monitor |
-| **Data & admin** | ARRO Launcher · ARRO Data · Field Data · Inspections · Site Maintenance · Inspection History · Export |
+| **Stations & networks** | Stations · Radio Path Maps · Networks · Pass Ranges · Export |
+| **Interference** | RF Environment · RF Changes · Interference Workbench |
+| **Addresses & packets** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · Serial Monitor |
+| **Telemetry** | ARRO Launcher · ARRO Data · Field Data |
+| **Site visits** | Inspections · Site Maintenance · Inspection History |
 
-The grouping is the point of the second row: RF Environment, RF Changes, the
-Workbench and Bit Flipper are one investigation approached four ways, and
-nothing in a flat bar ever said so. The packet tools joined them rather than
-keeping a "Live tools" heading of their own — reading what a station actually
-transmitted is part of that same investigation, and the split only ever cost a
-second scan of the sidebar to find the decoder.
+#### Where the grouping comes from
+Three groups held these tabs until #108, and one of the three held eight of the
+nineteen. "Radio investigation" was a defensible heading — all eight *are* radio
+work — but a group you have to read end to end to use is a list, not a grouping,
+and a second group had quietly grown to seven.
+
+What re-cut it was not taste. `HELP[id].related` is the app's own statement,
+written a tab at a time and never with the sidebar in mind, of which tabs belong
+beside which; read as a graph it does not describe three groups.
+
+- The eight-tab group is **two clusters with nothing mutual between them**. `rf ↔
+  rfchanges ↔ workbench` is a closed triangle; `bitflipper ↔ network`,
+  `bitflipper ↔ packets`, `packets ↔ alert2`, `packets ↔ serial` and `alert2 ↔
+  serial` are a second. The only edges between the halves — `workbench →
+  bitflipper` and `network → workbench` — are both one-way.
+- The seven-tab group is likewise two closed triangles, `arro ↔ arrodata ↔ field`
+  and `inspections ↔ maintenance ↔ history`, with **no edge of any kind** between
+  them. Reading a sensor trace and filling in a paper form had been filed
+  together on the strength of the word "data".
+- **Export moved.** All three of its own `related` entries are Stations &
+  networks tabs, two of them mutual, and what it builds is scoped by the ticks on
+  the Networks tab. It sat under "Data & admin" and belongs with the network it
+  exports.
+
+#### Three tabs said "network" and meant three things
+`Network Maps` is not about networks — it browses the bundled Radio-path PDF map
+sheets — so it is **Radio Path Maps**. `Network View` is not about networks
+either: it draws ALERT addresses as nodes and bit-flip ghosting between them as
+edges (§16 already called it the ghosting knowledge graph), so it is the
+**Ghosting Graph**. `Networks` keeps the word, being the only one of the three
+that means the named radio-network clusters in the file. Both old labels survive
+as find words, so the rename strands nobody; **tab ids are unchanged**, because
+they key `HELP`, `renderMain()`, the teardown registry and `localStorage`.
+
+#### Find a tab
+Nineteen tabs is past the size where a column of labels is something you scan, so
+the nav carries a find box — **Ctrl/Cmd+K** from anywhere, or 🔎 on the collapsed
+rail, both of which open the nav with the cursor already in it.
+
+- It matches the **label, the group heading and the tab's `find` words**, so
+  "packet decoder", "com port", "contrail" and "pdf" all land where the label
+  alone never would.
+- **Best score wins**: the tabs matching the most of what was typed. A second
+  word narrows without ever overshooting into nothing, a word on no tab costs
+  nothing, and a query that means nothing returns nothing and says so.
+- Terms match **from the start of a word**, so "insp" finds Inspections but "the"
+  does not find *hypotheses*.
+- The best match is marked **↵** and is what Enter opens — not the topmost
+  result, which is a different tab whenever a group heading has pulled its whole
+  group in. The list keeps its order rather than re-sorting under the cursor.
+- The query is an errand, not a setting: picking a tab clears it, collapsing to
+  the rail clears it, and it is never persisted.
 
 - **Collapses to an icon rail**, not to nothing — icons and tooltips stay, only
-  the labels go. The state is kept in `localStorage` under `mn-nav`, alongside
-  `mn-theme` and `mn-split`.
+  the labels go. On the rail a tooltip names the group as well as the tab, since
+  the heading giving it that context is clipped. The state is kept in
+  `localStorage` under `mn-nav`, alongside `mn-theme` and `mn-split`.
 - **Starts collapsed under 900 px**, on a first visit only. The Stations tab
   already gives a permanent column to its resizable filter pane; a second
   permanent column on a laptop is one too many. A stored preference always wins.
@@ -1142,9 +1191,15 @@ second scan of the sidebar to find the decoder.
   not fit in a 390 px phone at any setting, so the rail keeps its place in the
   layout and the expanded nav floats above — then closes itself once a tab has
   been picked.
-- Keyboard-driven: ↑/↓ walk the tabs, and the active one carries `aria-current`.
-- `TABS` in `core.js` is the single description of the nav — groups, labels and
-  icons — and both the rail and its headings are rendered from it.
+- Keyboard-driven: ↑/↓ walk the tabs and the find box as one column, and the
+  active tab carries `aria-current`. Each group is a `role="group"` labelled by
+  its own heading, so the rail is still five groups to a screen reader after the
+  headings have been visually clipped.
+- `TABS` in `core.js` is the single description of the nav — groups, labels,
+  icons and find words — and both the rail and its headings are rendered from it.
+  `npm run nav` asserts that every tab in it reaches the nav exactly once and is
+  findable by its own label; smoke cannot see that, because it opens tabs by
+  calling `switchTab(id)` and never touches the nav.
 
 Two pieces of geometry hang off this. `--mn-chrome` (which the Stations panes
 size themselves against) now measures the header alone, because the nav no
@@ -1181,7 +1236,7 @@ a sensor page also needs.
   id, station number and ARRO site name as read-only fields, a site admin link,
   and a *Graph last 7 days* link. Per-sensor admin links hang off the existing
   sensor rows rather than forming a second list beside them.
-- **The ARRO Launcher tab** — a jump box, grouped under **Data & admin**.
+- **The ARRO Launcher tab** — a jump box, grouped under **Telemetry**.
 
 **The launcher's one addition over a standalone bookmarklet is the station
 search.** Type a name, a station number or an ALERT address and it resolves to
@@ -1212,11 +1267,11 @@ back to the browser's `#0000EE` and, once followed, `#551A8B` — two shades of
 near-black on a dark panel. Links are now `var(--accent)`, visited included.
 
 
-### 16. Network View (Ghosting Knowledge Graph)
+### 16. Ghosting Graph (ALERT Address Ghosting, as a Graph)
 The Bit Flipper answers "what else could this address be?" one address at a
-time. The Network View asks it of the whole file at once and draws the answer:
+time. The Ghosting Graph asks it of the whole file at once and draws the answer:
 **ALERT addresses are nodes, and a relationship between two of them is an edge.**
-Grouped under **Radio investigation**, next to the Bit Flipper it generalises.
+Grouped under **Addresses & packets**, next to the Bit Flipper it generalises.
 
 Ported from a standalone `BitFlipper_Network_View` page — a hand-rolled SVG force
 layout with no dependencies, its own palette, a full-viewport grid and its
@@ -1773,12 +1828,12 @@ Tabs / panels:
   pass range open to that station's addresses (nearest first); clicking a row
   puts the map on that repeater without touching the filters or the selection.
   The filter pane on the left drives the map and the table together
-- **Network Maps** — Queensland basin explorer + bundled Radio-path PDF maps, with station-aware search
+- **Radio Path Maps** — Queensland basin explorer + bundled Radio-path PDF maps, with station-aware search
 - **Networks** — radio network cluster management
 - **Pass Ranges** — pass-range matching and hop-chain view; rows link through to
   the station on the Stations tab
 - **Bit Flipper** — ALERT address tool
-- **Network View** — the ghosting graph: ALERT addresses as nodes, bit-flip
+- **Ghosting Graph** — ALERT addresses as nodes, bit-flip
   adjacency and observed ghosting as edges; hands its visible set to the
   Stations map as a selection
 - **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF, A2C)

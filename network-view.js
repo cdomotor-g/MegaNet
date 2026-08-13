@@ -1,6 +1,6 @@
 // MegaNet — network-view.js
 //
-//   NetworkView   the Network View tab: the ghosting knowledge graph. A node is
+//   NetworkView   the Ghosting Graph tab: the ghosting knowledge graph. A node is
 //                 one ALERT address as transmitted by one station; an edge is
 //                 either computed (the two are one bit apart) or confirmed (the
 //                 relationship was observed, with an evidence file behind it).
@@ -1686,7 +1686,7 @@ const NetworkView = (function () {
       <div class="nv-layout">
         <aside class="nv-side stack">
           <div class="panel">
-            <div class="panel-header"><h2>Network View</h2></div>
+            <div class="panel-header"><h2>Ghosting Graph</h2></div>
             <p class="small" style="color:var(--muted);margin:.4rem 0 0">
               ALERT addresses one bit apart, drawn as a graph. Grey-blue links are
               computed from the loaded file; solid arrows are relationships that were
