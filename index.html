@@ -94,11 +94,43 @@
     </aside>
   </div>
 
+  <!-- THE ORDER OF THESE SCRIPTS IS THE CONTRACT (#129/#132).
+       Later work *adds* files to this list; it does not reorder it, and it does
+       not move a file's position within it.
+
+         leaflet → maps-data.js → core.js → …modules… → init.js
+
+       These are classic scripts, deliberately — not ES modules. They share one
+       global lexical environment, which is what keeps the 358 inline on*=
+       handlers resolving, keeps file:// working, and keeps
+       document.currentScript non-null. #129 records the four independent
+       reasons in full. The cost is that load order is load-bearing:
+
+         core.js   constants, state, shared utilities, the Leaflet canvas guard.
+                   Everything the modules reach backwards for. Nothing reaches
+                   backwards past it, so it goes first.
+         …modules… the tabs and features. They may call each other in any
+                   direction, because none of it runs until init.js does.
+         init.js   the only thing that executes at load. It goes last so that
+                   every top-level binding above it is already initialised —
+                   which is what retires the TDZ crashes in #131.
+
+       Every file names what it exposes and what must precede it in a header
+       comment, the convention maps-data.js already uses. The test harness reads
+       this list rather than keeping its own copy, so adding a file here is all
+       that is needed to bring it under test — see test/README.md.
+
+       ?v= is a cache-buster: bump it whenever the file changes so browsers and
+       GitHub Pages fetch the new copy instead of a stale one. One shared stamp
+       across all of them, bumped together, rather than a stamp per file: these
+       are slices of one program and they deploy as a set, so a partial bump can
+       only ever produce a mismatched pair. core.js must carry one regardless —
+       APP_VERSION reads it back off this very tag, and an unstamped core.js
+       makes every bug report say 'dev'. -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- ?v= is a cache-buster: bump it whenever app.js / maps-data.js / styles.css
-       change so browsers and GitHub Pages fetch the new file instead of a stale
-       copy. -->
-  <script src="maps-data.js?v=20260723a"></script>
-  <script src="app.js?v=20260813b"></script>
+  <script src="maps-data.js?v=20260813c"></script>
+  <script src="core.js?v=20260813c"></script>
+  <script src="app.js?v=20260813c"></script>
+  <script src="init.js?v=20260813c"></script>
 </body>
 </html>
