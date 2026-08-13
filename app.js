@@ -28,747 +28,6 @@
 //   and normalises control characters destroys those keys silently.
 //   `npm run concat` in test/ is what catches that.
 
-// ── Memory meter ─────────────────────────────────────────────────────────────
-// A thin bar under the header, and a panel behind it, answering "how much is
-// this page holding, and can I give some back" — see issue #79. This is our
-// own accounting, not a walk of the object graph: array/string lengths and
-// byte counts recorded at load time (loadJson, acmaFetchJson), which is free.
-// performance.memory (Chromium-only) and navigator.storage.estimate() are
-// shown alongside where the browser actually offers them.
-//
-// Its position used to matter: init() called MemMeter.start() from partway
-// down this file, so the binding had to be initialised above that point. Since
-// M1 (#132) init() is the last statement of the last script, so it doesn't —
-// this could sit anywhere. Terrain and ArroData, which its functions reach
-// into, are still declared later; that was always fine, because nothing here
-// touches them until a click or the sampling timer calls in.
-const MemMeter = (function () {
-  // Holders shown in the bar and the panel, in the order they're listed. Each
-  // maps to one of the state slots the issue's table calls out; `color` is an
-  // existing CSS custom property so the bar reuses the app's palette rather
-  // than inventing one. `releasable` holders get a Release button — the three
-  // the issue judges safe to drop and re-lazy-load or re-fetch.
-  const HOLDERS = [
-    { key: 'stations', label: 'stations.json',           color: '--role-repeater', releasable: false },
-    { key: 'acma',      label: 'ACMA / RF Changes data',  color: '--role-satcom',   releasable: true  },
-    { key: 'terrain',   label: 'Terrain tile cache',      color: '--role-base',     releasable: true  },
-    { key: 'arro',      label: 'ARRO Data series',        color: '--role-field',    releasable: true  },
-    { key: 'a2',        label: 'ALERT2 capture',          color: '--draw',         releasable: false },
-    { key: 'storage',   label: 'localStorage',            color: '--muted',        releasable: false },
-  ];
-
-  const ACMA_FILES = ['acma-threats.json', 'acma-sites.json', 'acma-dictionaries.json',
-                       'acma-devices.json', 'acma-timeline.json', 'acma-changes.json',
-                       'acma-snapshots.json'];
-
-  // Bytes per ARRO row: t, tr, v, raw are Float64Array (8 B each), q is
-  // Uint8Array (1 B) — see ArroData's parseCsv. Length × this, not a walk.
-  // A field-data series carries a couple of extra columns and says so in its
-  // own bytesPerRow; this is the floor every series shares.
-  const ARRO_BYTES_PER_ROW = 8 * 4 + 1;
-  const TERRAIN_TILE_BYTES = 65536 * 2;   // Int16Array(65536), 2 B/element
-
-  const WARN_BYTES = 60  * 1024 * 1024;
-  const BAD_BYTES  = 100 * 1024 * 1024;
-  const BAR_CAP    = 130 * 1024 * 1024;   // segment widths scale against this
-
-  let panelOpen = false;
-  let storageEstimate = null;   // {usage, quota}, fetched once per panel open
-
-  function fmtBytes(n) {
-    if (!n) return '0 B';
-    if (n < 1024) return `${n} B`;
-    if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  function acmaFileBytes() {
-    const F = state.memBytes.files;
-    return ACMA_FILES.reduce((sum, k) => sum + (F[k] || 0), 0);
-  }
-
-  function arroBytes() {
-    return ArroData.allSeries()
-      .reduce((sum, s) => sum + (s.n || 0) * (s.bytesPerRow || ARRO_BYTES_PER_ROW), 0);
-  }
-
-  function localStorageBytes() {
-    let sum = 0;
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        sum += (k.length + (localStorage.getItem(k) || '').length) * 2;   // UTF-16
-      }
-    } catch (_) { /* storage disabled — not worth surfacing here */ }
-    return sum;
-  }
-
-  function heapInfo() {
-    const m = performance && performance.memory;
-    return m ? { used: m.usedJSHeapSize, limit: m.jsHeapSizeLimit } : null;
-  }
-
-  function memoryReport() {
-    const bytes = {
-      stations: state.memBytes.stationsJson,
-      acma:     acmaFileBytes(),
-      terrain:  Terrain.cached() * TERRAIN_TILE_BYTES,
-      arro:     arroBytes(),
-      a2:       (state.a2.text || '').length * 2,
-      storage:  localStorageBytes(),
-    };
-    const holders = HOLDERS.map(h => ({ ...h, bytes: bytes[h.key] }));
-    return { holders, total: holders.reduce((s, h) => s + h.bytes, 0), heap: heapInfo() };
-  }
-
-  // ── the bar ──
-
-  function render() {
-    const bar = document.getElementById('mem-bar');
-    if (!bar) return;
-    if (!state.data) { bar.hidden = true; return; }
-    const wasHidden = bar.hidden;
-    bar.hidden = false;
-    const { holders, total } = memoryReport();
-    bar.classList.toggle('mem-warn', total >= WARN_BYTES && total < BAD_BYTES);
-    bar.classList.toggle('mem-bad', total >= BAD_BYTES);
-    bar.title = `Memory this page is holding: ~${fmtBytes(total)} (our accounting) — click for details`;
-    bar.innerHTML = holders.filter(h => h.bytes > 0).map(h => {
-      const pct = Math.max(0.4, Math.min(100, h.bytes / BAR_CAP * 100));
-      return `<span class="mem-seg" style="width:${pct}%;background:var(${h.color})" `
-           + `title="${esc(h.label)}: ${fmtBytes(h.bytes)}"></span>`;
-    }).join('');
-    if (wasHidden !== bar.hidden) updateChromeHeight();   // the bar just entered/left the layout
-    if (panelOpen) renderPanel();
-  }
-
-  let timer = null;
-  function start() {
-    if (timer) return;
-    // Never in a render path, and never while the tab is hidden — a memory
-    // meter that costs memory (or wakes a backgrounded tab) is the joke.
-    timer = setInterval(() => { if (document.visibilityState === 'visible') render(); }, 5000);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') render();
-    });
-  }
-
-  // ── the panel ──
-
-  function togglePanel() { if (panelOpen) closePanel(); else openPanel(); }
-
-  function openPanel() {
-    panelOpen = true;
-    let root = document.getElementById('mem-modal');
-    if (!root) {
-      root = document.createElement('div');
-      root.id = 'mem-modal';
-      root.className = 'modal-overlay';
-      root.onclick = closePanel;
-      document.body.appendChild(root);
-    }
-    root.style.display = 'flex';
-    renderPanel();
-    document.addEventListener('keydown', onKey);
-    if (!storageEstimate && navigator.storage && navigator.storage.estimate) {
-      navigator.storage.estimate().then(e => { storageEstimate = e; renderPanel(); }).catch(() => {});
-    }
-  }
-
-  function onKey(e) { if (e.key === 'Escape') closePanel(); }
-
-  function closePanel() {
-    panelOpen = false;
-    const root = document.getElementById('mem-modal');
-    if (root) { root.style.display = 'none'; root.innerHTML = ''; }
-    document.removeEventListener('keydown', onKey);
-  }
-
-  function renderPanel() {
-    const root = document.getElementById('mem-modal');
-    if (!root || !panelOpen) return;
-    const { holders, total, heap } = memoryReport();
-    const rows = holders.map(h => `
-      <tr>
-        <td><span class="mem-swatch" style="background:var(${h.color})"></span>${esc(h.label)}</td>
-        <td class="mem-bytes">${fmtBytes(h.bytes)}</td>
-        <td>${h.releasable && h.bytes > 0
-              ? `<button class="mem-release" onclick="MemMeter.release('${h.key}')">Release</button>`
-              : ''}</td>
-      </tr>`).join('');
-    root.innerHTML = `
-      <div class="modal-card mem-card" role="dialog" aria-modal="true" aria-labelledby="mem-title"
-           onclick="event.stopPropagation()">
-        <div class="modal-head">
-          <h2 id="mem-title">Memory this page is holding</h2>
-          <button class="modal-x" title="Close (Esc)" onclick="MemMeter.closePanel()">×</button>
-        </div>
-        <p class="sub">Our own accounting of what MegaNet is keeping in memory — cheap to compute
-           (lengths recorded when each piece loaded), not a walk of the object graph. Estimates,
-           not exact byte counts.</p>
-        <table class="mem-table">
-          <thead><tr><th>Holder</th><th>Estimate</th><th></th></tr></thead>
-          <tbody>${rows}</tbody>
-          <tfoot><tr><td>Total (our accounting)</td><td class="mem-bytes">${fmtBytes(total)}</td><td></td></tr></tfoot>
-        </table>
-        <p class="mem-heap">
-          ${heap ? `Browser JS heap: ${fmtBytes(heap.used)} of ${fmtBytes(heap.limit)} limit.`
-                 : `Browser JS heap: not available in this browser.`}<br>
-          ${storageEstimate
-              ? `Persisted storage: ${fmtBytes(storageEstimate.usage || 0)} of ${fmtBytes(storageEstimate.quota || 0)} quota.`
-              : `Persisted storage: checking…`}
-        </p>
-        <div class="modal-foot">
-          <button onclick="MemMeter.closePanel()">Close</button>
-        </div>
-      </div>`;
-  }
-
-  // ── release ──
-  // Terrain and ARRO have their own reset logic already (Terrain.clear(),
-  // ArroData.clearAll()); ACMA/RFC's is here because nothing else needed a
-  // "drop everything and let it re-lazy-load" reset before now.
-
-  function releaseAcma() {
-    const A = state.acma, R = state.rfc;
-    Object.assign(A, {
-      loaded: false, loading: false, loadPromise: null, error: null,
-      threats: null, dicts: null,
-      flat: [], siteById: {}, anchorById: {}, pairsByDevice: {}, mechCounts: {},
-      devLoaded: false, devPromise: null,
-      deviceById: {}, devicesBySite: {}, licById: {}, clientById: {}, antById: {}, texts: [],
-    });
-    Object.assign(R, {
-      loaded: false, loading: false, loadPromise: null, error: null,
-      timeline: null, changes: null, snapshots: null,
-    });
-    ACMA_FILES.forEach(k => delete state.memBytes.files[k]);
-    if (state.map) refreshAcmaLayer();   // drops the map markers rather than leaving them orphaned
-    renderMain();                        // RF Environment / RF Changes, if open, show "not loaded"
-  }
-
-  function releaseTerrain() {
-    Terrain.clear();
-    render();
-  }
-
-  function releaseArro() {
-    ArroData.dropAll();   // both data tabs; confirms before dropping more than one
-  }
-
-  function release(key) {
-    if (key === 'acma') releaseAcma();
-    else if (key === 'terrain') releaseTerrain();
-    else if (key === 'arro') releaseArro();
-    render();
-    renderPanel();
-  }
-
-  return { start, render, togglePanel, closePanel, release };
-})();
-if (typeof window !== 'undefined') window.MemMeter = MemMeter;
-
-// ── Sign-in ──────────────────────────────────────────────────────────────────
-// The browser half of #B8. Supabase Auth (GoTrue) issues the token; this module
-// obtains one, keeps it alive, hands it to the datastore layer, and makes the
-// signed-out state something the app renders rather than something it fails at.
-//
-// Read this before changing anything here:
-//
-// **This is not what keeps people out.** Cloudflare Access sits in front of the
-// site and is the perimeter (docs/access.md); meganet.is_editor() sits in front
-// of every write and is the enforcement. This module is the middle — it turns a
-// person into a token so the database has something to check. Deleting all of it
-// would make the app read-only, not open.
-//
-// **No library.** GoTrue is four HTTP endpoints and index.html gains no <script>
-// tag for them, the same trade the Data API section above makes.
-//
-// **Two ways in, because the email decides which.** Supabase's default template
-// sends a magic link; add {{ .Token }} to it and the same email also carries a
-// six-digit code. The link lands back here with the session in the URL fragment;
-// the code is typed into the panel. Both are supported because which one an
-// operator gets depends on a template in a dashboard, and an app that only
-// handles one of them is an app that breaks when somebody edits it.
-//
-// **sessionStorage, not localStorage.** #B8 said localStorage, matching the
-// mn-theme pattern; 0004 had already chosen sessionStorage for the access token
-// with a reason that still holds — a token that outlives the tab it was obtained
-// in is a token left behind on a shared machine, and these are shared machines.
-// The cost is a fresh sign-in per tab, which behind Access is a keystroke. If
-// that is ever judged the wrong trade, this is the only place it is decided.
-const Auth = (function () {
-
-  // The whole session, not just the token: the refresh token and the expiry are
-  // what make this survive a reload, and dbSetAccessToken() only knows about the
-  // one field it needs.
-  const KEY = 'meganet.session';
-
-  // Refresh this long before the token actually expires. GoTrue's default is an
-  // hour; a minute of margin covers a slow request and a clock that disagrees.
-  const REFRESH_MARGIN_MS = 60 * 1000;
-
-  let session = null;      // { access_token, refresh_token, expires_at, email }
-  let who     = null;      // last meganet.whoami() answer, or null
-  let timer   = null;
-  // `email` and `code` are mirrored here rather than left in the DOM because
-  // every state change repaints the panel: a message that arrives while somebody
-  // is mid-type would otherwise take the typing with it.
-  let ui      = { step: 'email', email: '', code: '', busy: false, msg: null };
-
-  // ── session plumbing ──
-
-  function load() {
-    try {
-      const raw = sessionStorage.getItem(KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (_) { return null; }
-  }
-
-  function store(s) {
-    try {
-      if (s) sessionStorage.setItem(KEY, JSON.stringify(s));
-      else sessionStorage.removeItem(KEY);
-    } catch (_) { /* private mode; this session lives in memory only */ }
-  }
-
-  // Everything that has to happen for a token to count as adopted, in one place
-  // so no path can adopt half of it.
-  function adopt(s) {
-    session = s;
-    store(s);
-    dbSetAccessToken(s ? s.access_token : null);
-    scheduleRefresh();
-  }
-
-  function fromTokenResponse(body, email) {
-    return {
-      access_token:  body.access_token,
-      refresh_token: body.refresh_token,
-      // Absolute rather than a duration, because a duration is only meaningful
-      // at the instant it was issued and this gets written to storage.
-      expires_at:    Date.now() + (Number(body.expires_in) || 3600) * 1000,
-      email:         (body.user && body.user.email) || email || null,
-    };
-  }
-
-  function scheduleRefresh() {
-    if (timer) { clearTimeout(timer); timer = null; }
-    if (!session) return;
-    const due = session.expires_at - Date.now() - REFRESH_MARGIN_MS;
-    // Already past it — refresh on the next tick rather than never, which is
-    // what a negative setTimeout would otherwise quietly mean.
-    timer = setTimeout(refresh, Math.max(0, due));
-  }
-
-  async function refresh() {
-    if (!session || !session.refresh_token) return false;
-    try {
-      const body = await post(`token?grant_type=refresh_token`,
-                              { refresh_token: session.refresh_token });
-      adopt(fromTokenResponse(body, session.email));
-      return true;
-    } catch (_) {
-      // A refresh token is single-use and expires; a failure here means the
-      // session is over, and pretending otherwise leaves the app showing a name
-      // for someone the database will refuse. Sign out quietly — nobody asked
-      // for this request, so nobody is waiting for an error about it.
-      await signOut({ announce: false });
-      return false;
-    }
-  }
-
-  // ── the four endpoints ──
-
-  async function post(path, body, opts = {}) {
-    const res = await fetch(`${AUTH_URL}/${path}`, {
-      method: 'POST',
-      headers: {
-        apikey: DB_ANON_KEY,
-        'Content-Type': 'application/json',
-        ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
-      },
-      body: JSON.stringify(body),
-      cache: 'no-store',
-    });
-    const text = await res.text();
-    let parsed = null;
-    try { parsed = text ? JSON.parse(text) : null; } catch (_) { /* not JSON */ }
-    if (!res.ok) {
-      const err = new Error(
-        (parsed && (parsed.error_description || parsed.msg || parsed.message))
-        || `HTTP ${res.status}`);
-      err.status = res.status;
-      throw err;
-    }
-    return parsed;
-  }
-
-  // What the database makes of the token we are holding. Called after every
-  // adoption because it is the only check that is not self-assessment: the token
-  // could be well-formed, unexpired and still refused.
-  async function whoami() {
-    try {
-      const res = await fetch(`${DB_URL}/rpc/whoami`, {
-        method: 'POST',
-        headers: {
-          apikey: DB_ANON_KEY,
-          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
-          'Content-Profile': DB_SCHEMA,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: '{}',
-        cache: 'no-store',
-      });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch (_) {
-      // Offline, or a database that has not had 0005 applied yet. Neither is
-      // worth an error in the operator's face: the app still reads, and the
-      // header simply does not claim to know who they are.
-      return null;
-    }
-  }
-
-  // ── sign in ──
-
-  // Refuse in the browser what the database is going to refuse anyway, so an
-  // address that was never going to be let in does not cost a round trip to a
-  // mailbox and a wait. Not a security check — meganet.auth_user_gate() is —
-  // and it deliberately fails open: if this call itself fails, the sign-in goes
-  // ahead and the server gets to answer.
-  async function maySignIn(email) {
-    try {
-      const res = await fetch(`${DB_URL}/rpc/email_may_sign_in`, {
-        method: 'POST',
-        headers: {
-          apikey: DB_ANON_KEY,
-          'Content-Profile': DB_SCHEMA,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ p_email: email }),
-        cache: 'no-store',
-      });
-      if (!res.ok) return true;
-      return (await res.json()) !== false;
-    } catch (_) { return true; }
-  }
-
-  async function requestCode() {
-    const email = (document.getElementById('au-email')?.value || '').trim();
-    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      return setMsg('error', 'That does not look like an email address.');
-    }
-
-    ui.email = email;
-    setBusy(true, 'Checking…');
-
-    if (!await maySignIn(email)) {
-      setBusy(false);
-      return setMsg('error',
-        `${email} is not on the access list, so no code was sent. Access is open to any `
-        + `verified @bom.gov.au address; anyone else has to be added by an administrator `
-        + `— see docs/access.md.`);
-    }
-
-    setBusy(true, 'Sending…');
-    try {
-      // create_user true is what makes this a sign-in and a signup at once. The
-      // database decides whether that signup is allowed, so "anyone can create
-      // an account" is not what this line means.
-      await post('otp', { email, create_user: true });
-    } catch (err) {
-      setBusy(false);
-      return setMsg('error', signInErrorText(err, email));
-    }
-    setBusy(false);
-    ui.step = 'code';
-    ui.code = '';
-    setMsg('ok', `Sent. Check ${email} — click the link, or type the six-digit code below.`);
-    document.getElementById('au-code')?.focus();
-  }
-
-  async function verifyCode() {
-    const token = (document.getElementById('au-code')?.value || '').trim();
-    ui.code = token;
-    if (!token) return setMsg('error', 'Enter the code from the email.');
-
-    setBusy(true, 'Verifying…');
-    let body;
-    try {
-      body = await post('verify', { email: ui.email, token, type: 'email' });
-    } catch (err) {
-      setBusy(false);
-      return setMsg('error',
-        err.status === 401 || err.status === 403
-          ? 'That code was not accepted. Codes expire — send a new one if this keeps happening.'
-          : signInErrorText(err, ui.email));
-    }
-
-    adopt(fromTokenResponse(body, ui.email));
-    who = await whoami();
-    setBusy(false);
-    ui.step = 'in';
-    ui.msg  = null;
-
-    // Signed in and still refused is a real state — an address on auth but not
-    // on editor_allow — and the header would otherwise imply write access that
-    // the first save would deny.
-    if (who && who.may_write === false) {
-      setMsg('error', 'Signed in, but this address may not edit stations. An administrator has to add it.');
-    }
-
-    syncHeader();
-    render();
-    // The editor's status line says "not signed in" until something tells it
-    // otherwise, and it is on screen behind this panel.
-    if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
-  }
-
-  // GoTrue does not pass a trigger's message through, so a refused signup
-  // arrives as a generic database error. Recognising it here is what turns
-  // "unexpected_failure" into the one thing the person needs to know.
-  function signInErrorText(err, email) {
-    const m = String(err && err.message || '');
-    if (/database error|unexpected_failure/i.test(m)) {
-      return `${email} was refused by the database, which is what happens to an address that `
-           + `is not on the access list. If it should be, an administrator has to add it — see docs/access.md.`;
-    }
-    if (err.status === 429) {
-      return 'Too many attempts in a row. Wait a minute and try again.';
-    }
-    return `Could not send the code — ${m}`;
-  }
-
-  async function signOut({ announce = true } = {}) {
-    const token = session && session.access_token;
-    adopt(null);
-    who = null;
-    ui  = { step: 'email', email: '', code: '', busy: false, msg: null };
-    // Best effort, and deliberately after the local state is already gone: if
-    // this fails the token is still forgotten here, which is the part that
-    // matters to the person at the keyboard.
-    if (token) { try { await post('logout', {}, { token }); } catch (_) { /* already gone */ } }
-    syncHeader();
-    if (announce && document.getElementById('auth-modal')?.style.display === 'flex') render();
-    if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
-  }
-
-  // ── the magic link landing ──
-  // A link from the email returns here with the session in the URL *fragment* —
-  // which never reaches a server, and is why GoTrue uses it. Consuming it means
-  // taking the tokens and then removing them from the address bar, so a copied
-  // URL or a screenshot is not a copied session.
-  function consumeHash() {
-    const raw = location.hash || '';
-    if (!raw.includes('access_token=') && !raw.includes('error=')) return false;
-
-    const p = new URLSearchParams(raw.replace(/^#/, ''));
-    // replaceState rather than clearing location.hash, which would leave a bare
-    // '#' and push a history entry.
-    history.replaceState(null, '', location.pathname + location.search);
-
-    if (p.get('error') || p.get('error_description')) {
-      ui.msg = { kind: 'error', text: p.get('error_description') || p.get('error') };
-      return false;
-    }
-    const access = p.get('access_token');
-    if (!access) return false;
-
-    adopt({
-      access_token:  access,
-      refresh_token: p.get('refresh_token'),
-      expires_at:    Date.now() + (Number(p.get('expires_in')) || 3600) * 1000,
-      email:         null,          // filled in by whoami() below
-    });
-    return true;
-  }
-
-  // ── header ──
-
-  function label() {
-    if (!session) return 'Sign in';
-    const email = (who && who.email) || session.email;
-    if (!email) return 'Signed in';
-    // The local part is enough to say "you are you" and fits the header; the
-    // full address is in the panel and the title attribute.
-    return email.split('@')[0];
-  }
-
-  function syncHeader() {
-    setHeaderLabel('btn-auth', label());
-    const btn = document.getElementById('btn-auth');
-    if (!btn) return;
-    const email = (who && who.email) || (session && session.email);
-    btn.title = session
-      ? `Signed in${email ? ` as ${email}` : ''}${who && who.may_write === false ? ' — read only' : ''}`
-      : 'Sign in to edit stations';
-    btn.classList.toggle('is-in', !!session);
-  }
-
-  // ── panel ──
-
-  function template() {
-    const busy = ui.busy;
-    const msg  = ui.msg
-      ? `<p class="small" style="color:${ui.msg.kind === 'error' ? 'var(--bad)'
-                                      : ui.msg.kind === 'ok' ? 'var(--ok)' : 'var(--muted)'}">${esc(ui.msg.text)}</p>`
-      : '';
-
-    let body;
-    if (ui.step === 'in') {
-      const email = (who && who.email) || session?.email || '';
-      const write = who ? who.may_write : null;
-      body = `
-        <div class="modal-form">
-          <p>Signed in${email ? ` as <strong>${esc(email)}</strong>` : ''}.</p>
-          <p class="small">${
-            write === false
-              ? 'This address may sign in but may not edit stations — an administrator has to add it to the editors list.'
-              : write === true
-                ? 'Edits to stations will be saved to the database and attributed to this address.'
-                : 'The database did not answer when asked what this session may do; saving will tell you.'
-          }</p>
-          <p class="small">This session ends when this tab is closed.</p>
-        </div>
-        <div class="modal-foot">
-          <button onclick="Auth.close()">Close</button>
-          <button class="primary" onclick="Auth.signOut()">Sign out</button>
-        </div>`;
-    } else if (ui.step === 'code') {
-      body = `
-        <div class="modal-form">
-          <label>Six-digit code from the email
-            <input type="text" id="au-code" inputmode="numeric" autocomplete="one-time-code"
-                   placeholder="123456" value="${esc(ui.code)}" ${busy ? 'disabled' : ''}
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();Auth.verifyCode();}">
-          </label>
-          <p class="small">The email also contains a link. Clicking it signs you in in whichever
-             tab it opens, and you can ignore this box.</p>
-          ${msg}
-        </div>
-        <div class="modal-foot">
-          <button onclick="Auth.back()" ${busy ? 'disabled' : ''}>Use a different address</button>
-          <button class="primary" onclick="Auth.verifyCode()" ${busy ? 'disabled' : ''}>Sign in</button>
-        </div>`;
-    } else {
-      body = `
-        <div class="modal-form">
-          <label>Work email address
-            <input type="email" id="au-email" autocomplete="email" placeholder="you@bom.gov.au"
-                   value="${esc(ui.email)}" ${busy ? 'disabled' : ''}
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();Auth.requestCode();}">
-          </label>
-          <p class="small">Any verified <strong>@bom.gov.au</strong> address can sign in with no
-             approval step. Other addresses have to be added first — see <code>docs/access.md</code>.
-             There is no password: an email arrives with a link and a code.</p>
-          ${msg}
-        </div>
-        <div class="modal-foot">
-          <button onclick="Auth.close()" ${busy ? 'disabled' : ''}>Cancel</button>
-          <button class="primary" onclick="Auth.requestCode()" ${busy ? 'disabled' : ''}>Email me a code</button>
-        </div>`;
-    }
-
-    return `
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="au-title"
-           onclick="event.stopPropagation()">
-        <div class="modal-head">
-          <h2 id="au-title">${ui.step === 'in' ? 'Your session' : 'Sign in to MegaNet'}</h2>
-          <button class="modal-x" title="Close (Esc)" onclick="Auth.close()">×</button>
-        </div>
-        <p class="sub">Signing in is only needed to <em>edit</em>. The station list, the maps and every
-           tool read without it.</p>
-        ${body}
-      </div>`;
-  }
-
-  function render() {
-    const root = document.getElementById('auth-modal');
-    if (!root || root.style.display !== 'flex') return;
-    root.innerHTML = template();
-  }
-
-  function open() {
-    let root = document.getElementById('auth-modal');
-    if (!root) {
-      root = document.createElement('div');
-      root.id = 'auth-modal';
-      root.className = 'modal-overlay';
-      root.onclick = close;
-      document.body.appendChild(root);
-    }
-    if (session && ui.step !== 'in') { ui.step = 'in'; ui.msg = null; }
-    root.style.display = 'flex';
-    root.innerHTML = template();
-    document.addEventListener('keydown', onKey);
-    document.getElementById(ui.step === 'code' ? 'au-code' : 'au-email')?.focus();
-  }
-
-  function onKey(e) { if (e.key === 'Escape') close(); }
-
-  function close() {
-    const root = document.getElementById('auth-modal');
-    if (root) root.style.display = 'none';
-    document.removeEventListener('keydown', onKey);
-    ui.busy = false;
-  }
-
-  function back() {
-    ui.step = 'email'; ui.code = ''; ui.msg = null;
-    render();
-    document.getElementById('au-email')?.focus();
-  }
-
-  function setMsg(kind, text) { ui.msg = { kind, text }; render(); }
-  function setBusy(on, text) {
-    ui.busy = on;
-    if (text) ui.msg = { kind: 'busy', text };
-    render();
-  }
-
-  // ── start ──
-  // Called from init(). Everything here is best-effort and none of it blocks the
-  // app drawing: a person who never signs in must not wait on an auth server to
-  // see the station list.
-  function start() {
-    const landed = consumeHash();
-    if (!landed) {
-      const s = load();
-      // Expired while the tab was closed. Keep it only if there is a refresh
-      // token to redeem — otherwise it is just a string that will 401.
-      if (s && (s.expires_at > Date.now() || s.refresh_token)) adopt(s);
-      else if (s) store(null);
-    }
-    syncHeader();
-    if (!session) return;
-
-    (async () => {
-      if (session.expires_at <= Date.now() && !await refresh()) return;
-      who = await whoami();
-      // A token the database will not honour is worse than no token: the editor
-      // would offer to save and the save would be refused.
-      if (who && who.signed_in === false) { await signOut({ announce: false }); return; }
-      syncHeader();
-      render();
-      if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
-    })();
-  }
-
-  return {
-    start, open, close, back, requestCode, verifyCode, signOut, render,
-    // Read by the editor and the Data source panel. Both ask the database in the
-    // end; these only decide what to say before that round trip.
-    isSignedIn: () => !!session,
-    mayWrite:   () => !!session && (who ? who.may_write !== false : true),
-    email:      () => (who && who.email) || (session && session.email) || null,
-    role:       () => (who && who.role) || null,
-  };
-})();
-if (typeof window !== 'undefined') window.Auth = Auth;
-
 // Header buttons are icon + label, so the label is a span inside the button and
 // not the button's own text. Writing textContent would throw the icon away.
 function setHeaderLabel(id, text) {
@@ -2716,6 +1975,4991 @@ function mapNearestToCentre(stations, n) {
     .map(x => x.s);
 }
 
+// ── Station table (lower half of the Stations tab) ─────────────────────────────
+
+// Unfiltered, the table would emit ~28,500 cells (3,174 rows × 9) as one
+// innerHTML string on every keystroke. Cap what's rendered; the footer link
+// lets the operator pull the rest in when they actually want it.
+const STATIONS_ROW_CAP = 500;
+
+// What the table says when it is listing a map selection rather than a filter
+// result — including the way back to the filter, which is the only way back.
+function selectionBarHtml() {
+  const n = state.mapSelection.size;
+  if (!n) return '';
+  return `
+    <div class="sel-bar">
+      <span class="sel-bar-count"><strong>${n}</strong> station${n === 1 ? '' : 's'} selected</span>
+      <span class="sel-bar-note">Picked off the map — not saved, and not part of the filter.</span>
+      <span class="sel-bar-actions">
+        <button onclick="exportMapSelection()" title="Download these stations as a CSV">Export CSV</button>
+        <button class="filter-reset" onclick="clearMapSelection()"
+                title="Go back to listing the filter result">Clear selection</button>
+      </span>
+    </div>`;
+}
+
+function stationsTable(allStations) {
+  const selBar = selectionBarHtml();
+  if (!allStations.length) {
+    return selBar + `<p style="padding:.75rem;color:var(--muted)">${selBar
+      ? 'None of the selected stations are in the loaded file.'
+      : 'No stations match current filters.'}</p>`;
+  }
+  const capped    = !state.stationsShowAll && allStations.length > STATIONS_ROW_CAP;
+  const stations  = capped ? allStations.slice(0, STATIONS_ROW_CAP) : allStations;
+  // Same prepared terms the filter itself ran on, so the marks land exactly
+  // where the match was made.
+  const { terms, nums } = prepareSearch(state.filters.search);
+  // Rows the filter didn't name — they are here because a pass range ties them
+  // to one that did, and the badge is what says so.
+  const relIds = relatedIdSet();
+  return `
+    ${selBar}
+    ${capped ? `
+      <p class="filter-note">Showing ${STATIONS_ROW_CAP} of ${allStations.length} —
+        narrow the filter or <a href="#" onclick="state.stationsShowAll=true;rerenderStations();return false">show all</a>.</p>
+    ` : ''}
+    <table>
+      <colgroup>
+        <col style="width:22%"><col style="width:8%"><col style="width:13%"><col style="width:13%">
+        <col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:6%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Name</th><th>Stn #</th><th>Roles</th><th>Network</th>
+          <th>AlertID</th><th>Lat</th><th>Lon</th><th>Elev (AHD)</th><th>On</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${stations.map(s => {
+          const aids = stationAlertIds(s);
+          return `
+            <tr class="${state.selectedId === s.id ? 'selected' : ''}" data-sid="${escAttr(s.id)}"
+                onclick="selectStation('${escAttr(s.id)}')" style="cursor:pointer">
+              <td title="${esc(s.id)}"><span class="stn-name role-${primaryRole(s)}">${markHits(s.name, terms)}</span></td>
+              <td class="small">${markHits(s.station_number || '', terms)}</td>
+              <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}${
+                s.roles.includes('repeater') && repeaterPassingCount(s) != null
+                  ? ` <span class="badge" title="ALERT addresses carried, in this repeater's open pass ranges">passing ${repeaterPassingCount(s)}</span>`
+                  : ''}${
+                relIds.has(s.id)
+                  ? ' <span class="badge badge--rel" title="Not a filter match — a pass range ties it to one">via pass range</span>'
+                  : ''}</td>
+              <td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
+              <td class="small">${aids.map(id => markAlertId(id, nums)).join(', ')}</td>
+              <td class="small">${s.lat != null ? s.lat.toFixed(4) : ''}</td>
+              <td class="small">${s.lon != null ? s.lon.toFixed(4) : ''}</td>
+              <td class="small">${s.elevation_ahd != null ? s.elevation_ahd : ''}</td>
+              <td>${s.enabled ? '✓' : ''}</td>
+            </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function rerenderStations() {
+  const stations = tableStations();
+  const wrap = document.getElementById('stations-table-wrap');
+  if (wrap) wrap.innerHTML = stationsTable(stations);
+  const cnt = document.getElementById('st-count');
+  if (cnt) cnt.textContent = stations.length;
+}
+
+function selectStation(id) {
+  if (state.selectedId === id) {
+    // Toggle off: clear the highlight and close the editor card below.
+    state.selectedId  = null;
+    state.editorId    = null;
+    state.editorDraft = {};
+    state.editorMsg   = null;
+    fetchEditorStamp(null);
+    rerenderStations();
+    rerenderStationEditorCard();
+    return;
+  }
+  // Select the row and load it into the editor card. A deep copy becomes the
+  // draft so fields not exposed by the form (catchments, satcom, RM metadata)
+  // survive a save.
+  const s = state.data.stations.find(x => x.id === id);
+  state.selectedId  = id;
+  state.editorId    = id;
+  state.editorDraft = JSON.parse(JSON.stringify(s || {}));
+  state.editorMsg   = null;
+  fetchEditorStamp(id);        // the version this edit starts from — see #B3
+  rerenderStations();
+  rerenderStationEditorCard();
+  if (s) focusStationOnMap(s);
+}
+
+// Pan the map above the table to a station and open its pin. Called whenever a
+// row is picked, so the list and the map stay talking about the same site.
+function focusStationOnMap(s) {
+  if (!state.map || s.lat == null || s.lon == null) return;
+  state.map.setView([s.lat, s.lon], Math.max(state.map.getZoom() || 0, 11));
+  const marker = state.mapMarkers.find(m => m.mnStationId === s.id);
+  if (marker) marker.openPopup();
+}
+
+// A bounding box roughly radiusKm around a point, for map.fitBounds() — a
+// real-world distance rather than a Leaflet zoom level, which covers different
+// ground at different latitudes. One degree of latitude is ~111 km everywhere;
+// a degree of longitude shrinks by cos(latitude) as it closes in toward the poles.
+function boundsForRadiusKm(lat, lon, radiusKm) {
+  const dLat = radiusKm / 111;
+  const dLon = radiusKm / (111 * Math.cos(lat * Math.PI / 180));
+  return [[lat - dLat, lon - dLon], [lat + dLat, lon + dLon]];
+}
+
+// "Zoom to station" from a map popup — centers the station with a 50 km
+// wide view of surrounding context visible, regardless of the map's
+// current extent when clicked.
+function zoomToStation(id) {
+  const s = state.data && state.data.stations.find(x => x.id === id);
+  if (!state.map || !s || s.lat == null || s.lon == null) return;
+  state.map.fitBounds(boundsForRadiusKm(s.lat, s.lon, 25));
+}
+
+// Scroll a station's row into the middle of the table viewport, so a station
+// arrived at from another tab isn't left somewhere in 1300 rows.
+function scrollStationRowIntoView(id) {
+  const wrap = document.getElementById('stations-table-wrap');
+  if (!wrap) return;
+  const row = [...wrap.querySelectorAll('tr[data-sid]')].find(tr => tr.dataset.sid === id);
+  if (row) row.scrollIntoView({ block: 'center' });
+}
+
+// Select a station and load it into the editor card, without touching the DOM.
+// The filter driving the table is the same one driving the map, so a station
+// the current filter excludes would be selected into a list it isn't in; in
+// that case the filters are narrowed to the station's own name instead — the
+// table then contains it, and the search box visibly says why the list changed.
+// A repeater the pass ranges pulled in is already a row, so it counts as listed
+// even though the filter never named it.
+// Returns true when the filters moved, so the caller knows the sidebar has to
+// be re-rendered and not just the table.
+function selectStationState(s) {
+  state.selectedId  = s.id;
+  state.editorId    = s.id;
+  // Same deep copy as selectStation: fields the form doesn't expose survive a save.
+  state.editorDraft = JSON.parse(JSON.stringify(s));
+  state.editorMsg   = null;
+  fetchEditorStamp(s.id);
+  // A map selection is what the table is listing, so a station asked for from
+  // outside it has no row to be scrolled to. Adding it is the least destructive
+  // answer — the picked set survives, and the count in the header says it grew.
+  if (state.mapSelection.size) {
+    if (!state.mapSelection.has(s.id)) {
+      state.mapSelection.add(s.id);
+      applyMapSelectionStyles();
+    }
+    return false;
+  }
+  if (relatedIdSet().has(s.id)) return false;
+  // Being in the filter result is not enough: the table only draws the first
+  // STATIONS_ROW_CAP of it, so an unfiltered list contains all 3,174 stations
+  // and renders 500. A station past that has no row to select or scroll to, and
+  // arriving from another tab to a table that visibly does not contain what you
+  // asked for is the same failure as the filter excluding it — so it gets the
+  // same answer.
+  const at = filteredStations().findIndex(x => x.id === s.id);
+  if (at >= 0 && (state.stationsShowAll || at < STATIONS_ROW_CAP)) return false;
+  resetStationFilters();
+  state.filters.search = s.name;
+  return true;
+}
+
+// "Show in the list below ↓" from a map popup. The map and the list share this
+// page, so there is no tab to switch to — the row is selected, scrolled to and
+// loaded into the editor beneath the map the operator is already looking at.
+function focusStation(id) {
+  const s = state.data && state.data.stations.find(x => x.id === id);
+  if (!s) return;
+  if (selectStationState(s)) {
+    renderMain();               // filters moved — the sidebar has to show it
+  } else {
+    rerenderStations();
+    rerenderStationEditorCard();
+  }
+  scrollStationRowIntoView(id);
+}
+
+// Open the Stations tab focused on one station. Used by the Pass Ranges tables,
+// where every row names a station the operator will want to look at in full.
+function goToStation(id) {
+  const s = state.data && state.data.stations.find(x => x.id === id);
+  if (!s) return;
+  selectStationState(s);
+  switchTab('stations');        // renders the page, table and map included
+  scrollStationRowIntoView(id);
+  focusStationOnMap(s);
+}
+
+// True when the editor card should show a form (an existing station is selected
+// or a new one is being created), rather than the placeholder prompt.
+function editorActive() {
+  return state.editorDraft && Object.keys(state.editorDraft).length > 0;
+}
+
+function renderStationEditorCard() {
+  if (!editorActive()) {
+    return `
+      <div class="panel-header"><h2>Station Editor</h2></div>
+      <p style="color:var(--muted);padding:.5rem 0">
+        Select a station in the list above to view and edit it, or click
+        <em>+ New</em> to add one.
+      </p>`;
+  }
+  // Existing station → render from the live record; new station → from the draft.
+  const s = state.editorId
+    ? (state.data.stations.find(x => x.id === state.editorId) || state.editorDraft)
+    : state.editorDraft;
+  return editorForm(s);
+}
+
+function rerenderStationEditorCard() {
+  const el = document.getElementById('stations-editor-card');
+  if (el) el.innerHTML = renderStationEditorCard();
+  // The card below the table follows the same selection, so every caller that
+  // reloads the editor reloads it too — there is no path that changes the
+  // selected station without going through here.
+  rerenderStationCarriersCard();
+}
+
+// ── Repeaters listening to the selected station ──────────────────────────────
+// The mirror image of the repeater editor's "ALERT IDs in range → stations"
+// list: with a station selected, this says which repeaters have a pass range
+// open to *its* addresses — the hop its data actually takes out of the field,
+// and the list to check when a station stops arriving.
+//
+// It reads findRepeaterMatches/passRangeCoversId, the same pair the map links,
+// the "via pass range" badge and the Pass Ranges tab all read, so the four
+// never disagree about who carries whom.
+
+// The station the panel is about, or null: the selected row, and only when it
+// is a station that actually exists. A half-filled "+ New" draft has no id to
+// match a pass range against, so the panel stays away until it is saved.
+function carriersStation() {
+  if (!state.data || !state.selectedId) return null;
+  return state.data.stations.find(x => x.id === state.selectedId) || null;
+}
+
+// One row's worth of "why is this repeater in the list": the station's own
+// addresses this repeater carries, and the ranges that pick them up. The
+// bounds test only says *which* range — passRangeCoversId still decides
+// whether the address is carried at all, so an excluded address is absent from
+// both. Same composition as passRangesHtml on the Pass Ranges tab.
+function carrierRangeDetail(repeater, alertIds) {
+  const ids    = alertIds.filter(id => passRangeCoversId(repeater.repeater, id));
+  const ranges = (repeater.repeater.pass_ranges || [])
+    .filter(p => ids.some(id => id >= p.low && id <= p.high))
+    .map(p => `${p.low}–${p.high}`);
+  return { ids, ranges };
+}
+
+function stationCarriersHtml() {
+  const s = carriersStation();
+  if (!s) return '';
+  const ids  = stationAlertIds(s);
+  const rpts = findRepeaterMatches(s);
+
+  const rows = rpts
+    .map(r => ({
+      r,
+      ...carrierRangeDetail(r, ids),
+      km: (s.lat != null && s.lon != null && r.lat != null && r.lon != null)
+        ? acmaHaversineKm(s.lat, s.lon, r.lat, r.lon) : null,
+    }))
+    // Nearest first — the closest repeater with the address open is the one the
+    // station is most likely actually being heard by. Positionless repeaters
+    // can't be ranked, so they go last rather than pretending to be at 0 km.
+    .sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity) || a.r.name.localeCompare(b.r.name));
+
+  const header = `
+    <div class="panel-header">
+      <h2>Repeaters listening</h2>
+      <span class="badge" title="Repeaters with a pass range open to this station">${rows.length}</span>
+    </div>`;
+
+  // Two different nothings, and they mean opposite things: a station with no
+  // ALERT address (telemetry-only, or not configured yet) is not something a
+  // pass range could ever cover, while a station that has one and still has no
+  // carrier is orphaned — a finding, flagged in the same red the Pass Ranges
+  // tab flags orphans in.
+  if (!ids.length) {
+    return `${header}
+      <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+        <strong>${esc(s.name)}</strong> has no ALERT address recorded, so there is nothing for a
+        pass range to be open to. Telemetry-only stations reach the base another way.
+      </p>`;
+  }
+  if (!rows.length) {
+    return `${header}
+      <p class="small" style="color:#c7401a;margin:.5rem 0 0">
+        <strong>No repeater's pass ranges cover ${ids.length === 1 ? 'address' : 'addresses'}
+        ${ids.join(', ')}</strong> — this station is orphaned, and nothing is listening for it.
+      </p>`;
+  }
+
+  return `${header}
+    <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+      Pass ranges open to ${ids.length === 1 ? 'address' : 'addresses'} <strong>${ids.join(', ')}</strong>.
+      Click a row to put the map on that repeater and dim everything off its own paths — the
+      filters, the picked selection and the station in the editor below all stay as they are.
+      Clicking it again puts the map back.
+    </p>
+    <div class="table-wrap medium">
+      <table>
+        <colgroup>
+          <col style="width:28%"><col style="width:18%"><col style="width:14%">
+          <col style="width:18%"><col style="width:11%"><col style="width:11%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Repeater</th><th>Network</th><th>Carries</th>
+            <th>In pass range</th><th>Distance</th><th>Passing</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(({ r, ids: carried, ranges, km }) => `
+            <tr class="${state.mapFocusRepeaterId === r.id ? 'rpt-focused' : ''}"
+                onclick="focusRepeaterOnMap('${escAttr(r.id)}')" style="cursor:pointer"
+                title="Put the map on ${escAttr(r.name)} — nothing else on this page moves">
+              <td><span class="stn-name role-repeater">${esc(r.name)}</span></td>
+              <td class="small">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
+              <td class="small">${carried.join(', ')}</td>
+              <td class="small">${ranges.join(', ')}</td>
+              <td class="small" title="${km == null ? 'One end has no coordinates recorded' : 'Straight-line distance'}"
+                  >${km == null ? '—' : fmtKm(km)}</td>
+              <td><span class="badge" title="ALERT addresses this repeater carries in total, post-exclusion">${repeaterPassingCount(r) ?? 0}</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function rerenderStationCarriersCard() {
+  const el = document.getElementById('stations-carriers-card');
+  if (!el) return;
+  const html = stationCarriersHtml();
+  el.innerHTML = html;
+  el.hidden    = !html;
+}
+
+// Clicking a row in that table. Deliberately narrow: it moves the map and sets
+// the same repeater focus a plain click on the repeater's own pin sets, and
+// touches nothing else — not state.selectedId, not the editor draft, not the
+// filters, not the map selection. The station being looked at stays the station
+// being looked at; only the view moves. Clicking the focused row again clears
+// the focus, as clicking its pin again would.
+function focusRepeaterOnMap(id) {
+  const r = state.data && state.data.stations.find(x => x.id === id);
+  if (!r) return;
+  if (state.mapFocusRepeaterId === id) {
+    setMapFocusRepeater(null);
+    return;
+  }
+  setMapFocusRepeater(id);       // re-renders this card, so the row marks itself
+  if (!state.map) return;
+  if (r.lat == null || r.lon == null) {
+    mapNote(`${r.name} has no coordinates recorded, so the map can't go to it.`, 4000);
+    return;
+  }
+  state.map.setView([r.lat, r.lon], Math.max(state.map.getZoom() || 0, 10));
+  const marker = state.mapMarkers.find(m => m.mnStationId === r.id);
+  // No pin means the map display is hiding it (hide-others mode with a filter
+  // running). The view is on it either way, so say why there is nothing there
+  // rather than leaving the operator looking at empty ground.
+  if (marker) marker.openPopup();
+  else mapNote(`${r.name} isn't drawn right now — the map display is hiding it.`, 4000);
+}
+
+// ── Filter helpers ─────────────────────────────────────────────────────────────
+
+// The grouped filters, in panel order. `alwaysOpen` groups are short enough to
+// leave expanded; the rest collapse to a one-line "All / None / 3 of 15" summary
+// so the panel stays readable with a dozen networks and twenty sensor types in it.
+const FILTER_GROUPS = {
+  roles: {
+    title: 'Station type',
+    alwaysOpen: true,
+    dots: true,
+  },
+  sensors: {
+    title: 'Sensor type',
+    hint: 'Not every site measures everything — tick the readings you care about.',
+    extra: () => `
+      <label class="filter-check">
+        <input type="checkbox" ${state.filters.sensorsAll ? 'checked' : ''}
+               onchange="setSensorsAll(this.checked)">
+        Must have <em>all</em> ticked types (not just one)
+      </label>`,
+  },
+  networks: {
+    title: 'Radio network',
+    hint: `Networks are still being mapped, so most stations sit in "${FILTER_NONE_LABEL}" — ` +
+          'they stay visible unless you untick that bucket.',
+  },
+  regions: {
+    title: 'Region',
+    hint: 'From the station\'s catchment. Regions are still being assigned.',
+  },
+};
+
+// Contents of the Filters panel. Search on top, then one block per question the
+// operator is actually asking (what kind of site, what does it measure, whose
+// network, where), then the data-completeness block for finding gaps.
+function stationFiltersHtml() {
+  return `
+    <div class="panel-header">
+      <h3>Filters</h3>
+      <span class="filter-resets">
+        <button class="filter-reset" onclick="clearStationFilters(false)"
+                title="Put every station back at full opacity, without moving the map"
+                ${anyStationFilterActive() ? '' : 'disabled'}>Clear filters</button>
+        <button class="filter-reset" onclick="clearStationFilters(true)"
+                title="Clear the filters and zoom back out to the whole network"
+                ${anyStationFilterActive() ? '' : 'disabled'}>Clear &amp; zoom out</button>
+      </span>
+    </div>
+    <div class="filter-block">
+      <div class="filter-head">
+        <span class="filter-title">Search</span>
+        <button class="filter-clear" id="search-clear" onclick="clearSearch()"
+                ${state.filters.search.trim() ? '' : 'hidden'}>clear</button>
+      </div>
+      <p class="filter-hint">Name, station # or ALERT address — or paste a list of them,
+        separated by commas, spaces or new lines.</p>
+      <textarea id="station-search" class="filter-search" rows="1" spellcheck="false"
+                placeholder="e.g. 6128, 6129 — or paste from a telemetry log"
+                oninput="mapSearchInput(this.value);autoGrowSearch(this)">${esc(state.filters.search)}</textarea>
+      <p class="filter-note" id="search-terms-note">${searchTermsNoteHtml()}</p>
+      <p class="filter-note" id="map-match-note">${mapMatchNoteHtml()}</p>
+    </div>
+    ${Object.keys(FILTER_GROUPS).map(filterGroupHtml).join('')}
+    ${filterAreaHtml()}
+    ${filterDataHtml()}`;
+}
+
+function renderStationFilters() {
+  const el = document.getElementById('station-filters');
+  if (el) el.innerHTML = stationFiltersHtml();
+  initStationFilters();
+}
+
+// The search box is a <textarea>, not an <input>: a single-line input strips
+// the line breaks out of a pasted column of addresses, gluing 6128 and 6129
+// into 61286129. It opens one line tall and grows to fit what was pasted.
+function initStationFilters() {
+  const el = document.getElementById('station-search');
+  if (el) autoGrowSearch(el);
+}
+
+const SEARCH_MAX_PX = 170;   // ~8 lines; past that the box scrolls instead
+
+function autoGrowSearch(el) {
+  el.style.height = 'auto';
+  // Boxes are border-box here but scrollHeight excludes the border, so the
+  // frame has to be added back or every growth step clips by a couple of pixels.
+  const frame = el.offsetHeight - el.clientHeight;
+  el.style.height = Math.min(el.scrollHeight + frame, SEARCH_MAX_PX) + 'px';
+}
+
+function clearSearch() {
+  state.filters.search = '';
+  const el = document.getElementById('station-search');
+  if (el) { el.value = ''; autoGrowSearch(el); el.focus(); }
+  stationsFilterChanged();
+}
+
+// What a pasted list did: how many terms, and which of them are in no station
+// on file. Silent about a single term — the match note below already covers it.
+function searchTermsNoteHtml() {
+  const terms = parseSearchTerms(state.filters.search);
+  if (terms.length < 2) return '';
+  const missing = unmatchedSearchTerms(terms);
+  if (!missing.length) return `${terms.length} search terms · all found.`;
+  const shown = missing.slice(0, 8).map(esc).join(', ');
+  const rest  = missing.length - 8;
+  return `${terms.length} search terms · <strong>${missing.length}</strong> not in this ` +
+         `database: ${shown}${rest > 0 ? ` +${rest} more` : ''}`;
+}
+
+// Editing or deleting a station moves the per-option counts (and can retire an
+// option outright), so the cached lists are dropped and the panel redrawn.
+function refreshFilterOptions() {
+  state.filterOpts  = null;
+  state.searchIdx   = null;
+  state.repeaterIdx = null;
+  state.passRelIdx  = null;   // an edited pass range re-wires the relation
+  if (state.activeTab === 'stations') renderStationFilters();
+}
+
+function filterGroupHtml(key) {
+  const cfg  = FILTER_GROUPS[key];
+  const opts = filterOptions()[key];
+  if (!opts.length) return '';
+  const head = `
+    <span class="filter-title">${esc(cfg.title)}</span>
+    <span class="filter-state" id="filter-state-${key}">${filterGroupState(key)}</span>`;
+  const body = `
+    ${cfg.hint ? `<p class="filter-hint">${cfg.hint}</p>` : ''}
+    <div class="filter-actions">
+      <button onclick="setGroupFilter('${key}','all')">All</button>
+      <button onclick="setGroupFilter('${key}','none')">None</button>
+    </div>
+    ${cfg.extra ? cfg.extra() : ''}
+    <div class="filter-list">${opts.map(o => filterRowHtml(key, o, cfg)).join('')}</div>`;
+  return cfg.alwaysOpen
+    ? `<div class="filter-block filter-group" id="filter-group-${key}">
+         <div class="filter-head">${head}</div>${body}
+       </div>`
+    : `<details class="filter-block filter-group" id="filter-group-${key}"
+                ${state.filterOpen[key] ? 'open' : ''} ontoggle="state.filterOpen['${key}']=this.open">
+         <summary class="filter-head">${head}</summary>${body}
+       </details>`;
+}
+
+// One option row: tick box + label + how many stations it covers, plus "only"
+// — one click to narrow to that value alone, which beats un-ticking fourteen.
+function filterRowHtml(key, o, cfg) {
+  const set  = state.filters[key];
+  const on   = !set.size || set.has(o.value);
+  const dot  = cfg.dots && ROLE_COLOR[o.value]
+    ? `<span class="legend-dot" style="background:${ROLE_COLOR[o.value]}"></span>` : '';
+  const none = o.value === FILTER_NONE ? ' filter-row-none' : '';
+  return `
+    <div class="filter-row">
+      <label class="filter-row-label${none}">
+        <input type="checkbox" ${on ? 'checked' : ''}
+               onchange="toggleGroupFilter('${key}','${escAttr(o.value)}',this.checked)">
+        ${dot}<span>${esc(o.label)}</span>
+      </label>
+      <span class="filter-row-side">
+        <span class="filter-count">${o.count}</span>
+        <button class="filter-only" title="Show only ${esc(o.label)}"
+                onclick="setGroupFilter('${key}','only','${escAttr(o.value)}')">only</button>
+      </span>
+    </div>`;
+}
+
+// Basin and council are long lists (65 basins, 100+ LGAs) and a station has at
+// most one of each — a dropdown reads better than a hundred tick boxes.
+function filterAreaHtml() {
+  const opts = filterOptions();
+  if (!opts.basins.length && !opts.lgas.length) return '';
+  return `
+    <details class="filter-block" id="filter-group-area" ${state.filterOpen.area ? 'open' : ''}
+             ontoggle="state.filterOpen.area=this.open">
+      <summary class="filter-head">
+        <span class="filter-title">Basin &amp; council</span>
+        <span class="filter-state" id="filter-state-area">${valueGroupState(['basin', 'lga'])}</span>
+      </summary>
+      ${filterSelectHtml('basin', 'Drainage basin', opts.basins)}
+      ${filterSelectHtml('lga',   'Local government area', opts.lgas)}
+    </details>`;
+}
+
+// Gap-hunting rather than day-to-day filtering: which sites have no position,
+// no ALERT address, or are switched off.
+function filterDataHtml() {
+  return `
+    <details class="filter-block" id="filter-group-data" ${state.filterOpen.data ? 'open' : ''}
+             ontoggle="state.filterOpen.data=this.open">
+      <summary class="filter-head">
+        <span class="filter-title">Data completeness</span>
+        <span class="filter-state" id="filter-state-data">${valueGroupState(['hasCoords', 'hasAlertId', 'enabledOnly'])}</span>
+      </summary>
+      <p class="filter-hint">For finding what still needs filling in.</p>
+      ${filterChoiceHtml('hasCoords', 'Position', [
+        ['',    'Any'],
+        ['yes', 'Has lat/lon'],
+        ['no',  'Missing lat/lon'],
+      ])}
+      ${filterChoiceHtml('hasAlertId', 'ALERT address', [
+        ['',    'Any'],
+        ['yes', 'Has an address'],
+        ['no',  'No address on file'],
+      ])}
+      <label class="filter-check">
+        <input type="checkbox" ${state.filters.enabledOnly ? 'checked' : ''}
+               onchange="setValueFilter('enabledOnly',this.checked)">
+        Enabled stations only
+      </label>
+    </details>`;
+}
+
+function filterSelectHtml(key, label, opts) {
+  if (!opts.length) return '';
+  const cur = state.filters[key];
+  return `
+    <label class="filter-field">
+      <span>${esc(label)}</span>
+      <select onchange="setValueFilter('${key}',this.value)">
+        <option value="">Any</option>
+        ${opts.map(o => `
+          <option value="${escAttr(o.value)}" ${cur === o.value ? 'selected' : ''}>
+            ${esc(o.label)} (${o.count})
+          </option>`).join('')}
+      </select>
+    </label>`;
+}
+
+function filterChoiceHtml(key, label, choices) {
+  return `
+    <label class="filter-field">
+      <span>${esc(label)}</span>
+      <select onchange="setValueFilter('${key}',this.value)">
+        ${choices.map(([v, l]) => `
+          <option value="${escAttr(v)}" ${state.filters[key] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+      </select>
+    </label>`;
+}
+
+// Summary for the blocks made of single-value controls: how many are set.
+function valueGroupState(keys) {
+  const set = keys.filter(k => state.filters[k]).length;
+  return set ? `${set} set` : 'Any';
+}
+
+// Keep the panel's live bits — group summaries, the match note and the Reset
+// button — in step with the filters without rebuilding the whole panel (which
+// would take the focus out of whatever the operator is clicking).
+function updateFilterChrome() {
+  Object.keys(FILTER_GROUPS).forEach(updateFilterGroupState);
+  const terms = document.getElementById('search-terms-note');
+  if (terms) terms.innerHTML = searchTermsNoteHtml();
+  const clear = document.getElementById('search-clear');
+  if (clear) clear.hidden = !state.filters.search.trim();
+  const area = document.getElementById('filter-state-area');
+  if (area) area.textContent = valueGroupState(['basin', 'lga']);
+  const data = document.getElementById('filter-state-data');
+  if (data) data.textContent = valueGroupState(['hasCoords', 'hasAlertId', 'enabledOnly']);
+  const idle = !anyStationFilterActive();
+  document.querySelectorAll('#station-filters .filter-reset').forEach(b => { b.disabled = idle; });
+  updateMapMatchNote();
+}
+
+// Option lists for the grouped filters, each entry { value, label, count }.
+// Built from the loaded file (so a station.json with different networks, sensor
+// types or regions filters itself correctly) and cached until the next load —
+// counting sensor types across 3000+ stations on every keystroke would not be.
+// Every group ends with the FILTER_NONE bucket when the file has stations that
+// leave the field blank, and options nobody uses are dropped.
+function filterOptions() {
+  if (state.filterOpts) return state.filterOpts;
+  const stations = state.data?.stations || [];
+
+  // key → number of stations offering that key
+  const tally = keyFn => {
+    const counts = new Map();
+    stations.forEach(s => keyFn(s).forEach(k => counts.set(k, (counts.get(k) || 0) + 1)));
+    return counts;
+  };
+  // Named options first (in the order the file lists them), then whatever the
+  // stations mention that the file never declared, then the "not recorded" bucket.
+  const build = (counts, named, { sort } = {}) => {
+    const out  = [];
+    const seen = new Set();
+    named.forEach(({ value, label }) => {
+      seen.add(value);
+      out.push({ value, label, count: counts.get(value) || 0 });
+    });
+    const extra = [...counts.keys()].filter(k => !seen.has(k) && k !== FILTER_NONE)
+      .map(value => ({ value, label: value, count: counts.get(value) }));
+    if (sort === 'count') extra.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    else                  extra.sort((a, b) => a.label.localeCompare(b.label));
+    out.push(...extra);
+    if (counts.get(FILTER_NONE)) {
+      out.push({ value: FILTER_NONE, label: FILTER_NONE_LABEL, count: counts.get(FILTER_NONE) });
+    }
+    return out.filter(o => o.count > 0);
+  };
+
+  const regionNames = [...new Set((state.data?.catchments || []).map(c => c.region).filter(Boolean))].sort();
+
+  state.filterOpts = {
+    roles:    build(tally(stationRoleKeys),
+                    Object.entries(ROLE_LABEL).map(([value, label]) => ({ value, label }))),
+    sensors:  build(tally(stationSensorTypeKeys), [], { sort: 'count' }),
+    networks: build(tally(stationNetworkKeys),
+                    (state.data?.radio_networks || []).map(n => ({ value: n.id, label: n.name }))),
+    regions:  build(tally(stationRegionKeys), regionNames.map(r => ({ value: r, label: r }))),
+    basins:   build(tally(s => groupKeys(s.basin ? [s.basin] : [])), []),
+    lgas:     build(tally(s => groupKeys(s.lga   ? [s.lga]   : [])), []),
+  };
+  return state.filterOpts;
+}
+
+function filterGroupValues(key) {
+  return filterOptions()[key].map(o => o.value);
+}
+
+// One checkbox in a grouped filter. The Set is kept canonical: empty when
+// everything is ticked (the default, "no constraint") and holding FILTER_EMPTY
+// when nothing is — so what the boxes show and what the filter does can never
+// drift apart, which is what made un-ticking a network a no-op before.
+function toggleGroupFilter(key, value, checked) {
+  const set    = state.filters[key];
+  const values = filterGroupValues(key);
+  if (!set.size && !checked) values.forEach(v => set.add(v));   // "all" → the real list, minus one
+  set.delete(FILTER_EMPTY);
+  if (checked) set.add(value);
+  else         set.delete(value);
+  if (!set.size)                    set.add(FILTER_EMPTY);      // hand-emptied ≠ show everything
+  else if (set.size === values.length) set.clear();             // back to the full list → "all"
+  stationsFilterChanged();
+}
+
+// "All" / "None" / a row's "only" — the whole group re-renders, since these
+// move every checkbox at once.
+function setGroupFilter(key, mode, value) {
+  state.filters[key] = mode === 'all'  ? new Set()
+                     : mode === 'none' ? new Set([FILTER_EMPTY])
+                     :                   new Set([value]);
+  rerenderFilterGroup(key);
+  stationsFilterChanged();
+}
+
+function setValueFilter(key, value) {
+  state.filters[key] = value;
+  stationsFilterChanged();
+}
+
+function setSensorsAll(checked) {
+  state.filters.sensorsAll = checked;
+  stationsFilterChanged();
+}
+
+// "All" / "None" / "3 of 15" — the at-a-glance state of a collapsed group.
+function filterGroupState(key) {
+  const set = state.filters[key];
+  if (!set.size)              return 'All';
+  if (set.has(FILTER_EMPTY))  return 'None';
+  return `${set.size} of ${filterGroupValues(key).length}`;
+}
+
+function updateFilterGroupState(key) {
+  const el = document.getElementById(`filter-state-${key}`);
+  if (el) el.textContent = filterGroupState(key);
+}
+
+function rerenderFilterGroup(key) {
+  const el = document.getElementById(`filter-group-${key}`);
+  if (el) el.outerHTML = filterGroupHtml(key, el.dataset.title, el.dataset.hint);
+}
+
+// Anything narrowing the station list? Every group is canonical, so a non-empty
+// Set is by definition a real constraint.
+function anyStationFilterActive() {
+  const f = state.filters;
+  return !!(f.search.trim() || f.roles.size || f.sensors.size || f.networks.size ||
+            f.regions.size || f.catchments.size || f.basin || f.lga ||
+            f.hasCoords || f.hasAlertId || f.enabledOnly);
+}
+
+function resetStationFilters() {
+  // The ACMA block keeps its own state — clearing station filters should not
+  // silently drop an RF layer the operator has configured.
+  state.filters = {
+    search: '', roles: new Set(), sensors: new Set(), networks: new Set(),
+    regions: new Set(), catchments: new Set(), sensorsAll: false,
+    basin: '', lga: '', hasCoords: '', hasAlertId: '', enabledOnly: false,
+    acma: state.filters.acma,
+  };
+}
+
+// Reset buttons on the Stations tab: clear everything and redraw the panel with
+// it (the boxes, the selects and the summaries all move at once).
+//
+// Clearing a filter is usually the operator saying "put the rest of the network
+// back at full opacity" while they carry on looking at the region they had
+// zoomed into — springing the map back to the national view throws away the
+// thing they were doing. So the default holds the view, and the second button
+// is there for when they do want to zoom back out.
+function clearStationFilters(zoomOut) {
+  resetStationFilters();
+  renderStationFilters();
+  state.stationsShowAll = false;
+  refreshMapLayers({ skipFit: !zoomOut });
+  rerenderStations();
+  updateFilterChrome();
+}
+
+function toggleFilter(key, value, checked) {
+  // The ACMA block's mechanism list is a plain Set with no "empty means all"
+  // convention — the station groups go through toggleGroupFilter instead.
+  const set = key === 'acmaMechanisms' ? state.filters.acma.mechanisms : state.filters[key];
+  if (checked) set.add(value);
+  else         set.delete(value);
+}
+
+// ── ACMA RRL interference layer ─────────────────────────────────────────────────
+// Renders licensed transmitters from the ACMA Register of Radiocommunications
+// Licences that could plausibly interfere with MegaNet repeater RX channels.
+// All data is precomputed offline by tools/acma_fetch.py into data/acma-*.json;
+// nothing here fetches until the master toggle is switched on (or the RF
+// Environment tab is opened), so page load is unaffected while the layer is off.
+// Contains ACMA RRL data, CC BY 4.0.
+
+// ACMA VHF High Band Frequency Band Plan segments (148–174 MHz). MegaNet's
+// 151.5 MHz sits in Segment F "Miscellaneous Service".
+const VHF_SEGMENTS = [
+  { seg: 'A', lo: 148.00000, hi: 149.25000, alloc: 'Paging Service' },
+  { seg: 'B', lo: 149.25000, hi: 149.75625, alloc: 'Land Mobile (two frequency, base transmit)' },
+  { seg: 'C', lo: 149.75625, hi: 149.90000, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'D', lo: 149.90000, hi: 150.05000, alloc: 'Radionavigation Satellite' },
+  { seg: 'E', lo: 150.05000, hi: 151.39375, alloc: 'Land Mobile (two frequency, base transmit); Fixed (rural)' },
+  { seg: 'F', lo: 151.39375, hi: 152.49375, alloc: 'Miscellaneous Service' },
+  { seg: 'G', lo: 152.49375, hi: 153.85000, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'H', lo: 153.85000, hi: 154.35625, alloc: 'Land Mobile (two frequency, base receive)' },
+  { seg: 'I', lo: 154.35625, hi: 154.65625, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'J', lo: 154.65625, hi: 156.00000, alloc: 'Land Mobile (two frequency, base receive); Fixed (rural)' },
+  { seg: 'K', lo: 156.00000, hi: 157.45000, alloc: 'Maritime Mobile' },
+  { seg: 'L', lo: 157.45000, hi: 158.29375, alloc: 'Land Mobile (two frequency, base receive) or single frequency' },
+  { seg: 'M', lo: 158.29375, hi: 160.60000, alloc: 'Land Mobile (two frequency, base receive)' },
+  { seg: 'N', lo: 160.60000, hi: 160.97500, alloc: 'Maritime Mobile' },
+  { seg: 'O', lo: 160.97500, hi: 161.47500, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'P', lo: 161.47500, hi: 162.05000, alloc: 'Maritime Mobile' },
+  { seg: 'Q', lo: 162.05000, hi: 162.89375, alloc: 'Land Mobile (two frequency, base transmit) or single frequency' },
+  { seg: 'R', lo: 162.89375, hi: 165.19375, alloc: 'Land Mobile (two frequency, base transmit)' },
+  { seg: 'S', lo: 165.19375, hi: 168.19375, alloc: 'Land Mobile (trunked, base transmit)' },
+  { seg: 'T', lo: 168.19375, hi: 169.79375, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'U', lo: 169.79375, hi: 172.79375, alloc: 'Land Mobile (trunked, base receive)' },
+  { seg: 'V', lo: 172.79375, hi: 173.29375, alloc: 'Land Mobile (single frequency)' },
+  { seg: 'W', lo: 173.29375, hi: 174.00000, alloc: 'Miscellaneous Service' },
+];
+
+const ACMA_MARKER_CAP = 500;
+const ACMA_LINK_CAP   = 300;
+
+function vhfSegment(mhz) {
+  return VHF_SEGMENTS.find(s => mhz >= s.lo && mhz < s.hi) || null;
+}
+
+// ── lazy loading ──
+
+function acmaFetchJson(name) {
+  return fetch(`data/${name}`).then(r => {
+    if (!r.ok) throw new Error(`${name}: HTTP ${r.status}`);
+    return r.text();
+  }).then(text => {
+    state.memBytes.files[name] = text.length;   // for MemMeter — free, the text is already here
+    return JSON.parse(text);
+  });
+}
+
+function acmaEnsureCore() {
+  const A = state.acma;
+  if (A.loaded) return Promise.resolve();
+  if (A.loadPromise) return A.loadPromise;
+  A.loading = true;
+  A.loadPromise = Promise.all([
+    acmaFetchJson('acma-threats.json'),
+    acmaFetchJson('acma-sites.json'),
+    acmaFetchJson('acma-dictionaries.json').catch(() => null),   // optional
+  ]).then(([threats, sites, dicts]) => {
+    A.threats = threats;
+    A.dicts   = dicts;
+    A.siteById = {};
+    sites.sites.forEach(s => { A.siteById[s.id] = s; });
+    A.anchorById = {};
+    A.flat = [];
+    A.pairsByDevice = {};
+    threats.anchors.forEach(a => {
+      A.anchorById[a.station_id] = a;
+      a.threats.forEach(t =>
+        A.flat.push({ anchor_id: a.station_id, anchor_name: a.name, rx_mhz: a.rx_mhz, ...t }));
+      (a.imd_pairs || []).forEach(p => {
+        (A.pairsByDevice[p.a] = A.pairsByDevice[p.a] || []).push(p);
+        (A.pairsByDevice[p.b] = A.pairsByDevice[p.b] || []).push(p);
+      });
+    });
+    A.mechCounts = {};
+    A.flat.forEach(t => { A.mechCounts[t.mechanism] = (A.mechCounts[t.mechanism] || 0) + 1; });
+    A.loaded = true;
+    A.loading = false;
+    A.error = null;
+  }).catch(err => {
+    A.loading = false;
+    A.loadPromise = null;
+    A.error = `ACMA data unavailable (${err.message}). Generate data/acma-*.json with ` +
+              `tools/acma_fetch.py; note these optional files cannot be fetched over file://.`;
+    state.filters.acma.show = false;
+    throw err;
+  });
+  return A.loadPromise;
+}
+
+// Full device/licence/client detail — several MB, loaded on first card open,
+// beam-wedge draw or RF strip plot, never at page load.
+function acmaEnsureDevices() {
+  const A = state.acma;
+  if (A.devLoaded) return Promise.resolve();
+  if (A.devPromise) return A.devPromise;
+  A.devPromise = acmaFetchJson('acma-devices.json').then(d => {
+    A.deviceById = {}; A.devicesBySite = {};
+    d.devices.forEach(x => {
+      A.deviceById[x.id] = x;
+      (A.devicesBySite[x.site_id] = A.devicesBySite[x.site_id] || []).push(x);
+    });
+    A.licById    = d.licences || {};
+    A.clientById = d.clients  || {};
+    A.antById    = d.antennas || {};
+    A.texts      = d.texts    || [];
+    A.devLoaded  = true;
+  }).catch(err => {
+    A.devPromise = null;
+    throw err;
+  });
+  return A.devPromise;
+}
+
+// ── filtering ──
+
+function acmaVisibleThreats(ignoreAnchorSel) {
+  const A = state.acma, f = state.filters.acma;
+  if (!A.loaded) return [];
+  return A.flat.filter(t =>
+    f.mechanisms.has(t.mechanism) &&
+    t.score >= f.minScore &&
+    t.distance_km <= f.radiusKm &&
+    (!f.losOnly || t.los === true) &&
+    (!f.activeOnly || !t.inactive) &&
+    (!f.hideMeganet || !t.meganet) &&
+    (ignoreAnchorSel || !A.selectedAnchorId || t.anchor_id === A.selectedAnchorId));
+}
+
+// ── filters panel block ──
+
+// The master toggle sits outside the collapsible block: ACMA transmitters are
+// drawn by default, so the way to turn them off has to be visible without
+// hunting through a closed twisty.
+function acmaFilterBlockHtml() {
+  return `<div id="acma-filter-block">${acmaFilterHeadHtml()}</div>`;
+}
+
+function acmaFilterHeadHtml() {
+  const A = state.acma, f = state.filters.acma;
+  return `
+    <label class="filter-check">
+      <input type="checkbox" ${f.show ? 'checked' : ''} onchange="toggleAcmaShow(this.checked)">
+      Show ACMA licensed transmitters
+    </label>
+    ${A.error ? `<div class="small" style="color:var(--muted)">${esc(A.error)}</div>` : ''}
+    ${A.loading ? `<div class="small" style="color:var(--muted)">Loading ACMA data…</div>` : ''}
+    ${f.show && A.loaded ? `
+      <details ${A.uiOpen ? 'open' : ''} ontoggle="state.acma.uiOpen=this.open">
+        <summary class="small" style="cursor:pointer;color:var(--muted)">ACMA / RF Environment options</summary>
+        <div id="acma-filter-body">${acmaFilterBodyHtml()}</div>
+      </details>` : ''}`;
+}
+
+function acmaFilterBodyHtml() {
+  const A = state.acma, f = state.filters.acma;
+  if (!f.show || !A.loaded) return '';
+
+  const meta = A.threats.meta;
+  const anchorChip = A.selectedAnchorId ? `
+    <div class="small" style="margin:.25rem 0">
+      Filtering to <strong>${esc((A.anchorById[A.selectedAnchorId] || {}).name || A.selectedAnchorId)}</strong>
+      <a href="#" onclick="acmaSelectAnchor('');return false">×&nbsp;clear</a>
+    </div>` : '';
+
+  return `
+    <div class="small" style="color:var(--muted);margin:.2rem 0">
+      ACMA data: ${esc(meta.source_date)} · <span id="acma-shown"></span>
+    </div>
+    ${anchorChip}
+    <div style="margin:.4rem 0">
+      ${Object.entries(ACMA_MECH).filter(([k]) => A.mechCounts[k]).map(([k, m]) => `
+        <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.15rem 0">
+          <input type="checkbox" ${f.mechanisms.has(k) ? 'checked' : ''}
+                 onchange="toggleFilter('acmaMechanisms','${k}',this.checked);refreshAcmaLayer()">
+          <span class="legend-sq" style="background:${m.color}"></span>
+          ${m.label} (${A.mechCounts[k]})
+        </label>`).join('')}
+    </div>
+    <label class="small" style="display:block;margin:.4rem 0">
+      Minimum score <strong id="acma-minscore-val">${f.minScore}</strong>
+      <input type="range" min="0" max="100" step="5" value="${f.minScore}" style="width:100%"
+             oninput="state.filters.acma.minScore=+this.value;document.getElementById('acma-minscore-val').textContent=this.value"
+             onchange="refreshAcmaLayer()">
+    </label>
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+      <input type="checkbox" ${f.losOnly ? 'checked' : ''}
+             onchange="state.filters.acma.losOnly=this.checked;refreshAcmaLayer()">
+      Line-of-sight only <span class="small" style="color:var(--muted)">(not yet assessed — hides all)</span>
+    </label>
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+      <input type="checkbox" ${f.activeOnly ? 'checked' : ''}
+             onchange="state.filters.acma.activeOnly=this.checked;refreshAcmaLayer()">
+      Current licences only
+    </label>
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+      <input type="checkbox" ${f.hideMeganet ? 'checked' : ''}
+             onchange="state.filters.acma.hideMeganet=this.checked;refreshAcmaLayer()">
+      Hide MegaNet's own licences
+    </label>
+    <label class="small" style="display:block;margin:.35rem 0">
+      Search radius
+      <select onchange="state.filters.acma.radiusKm=+this.value;refreshAcmaLayer()">
+        ${[10, 25, 50, 100].map(r => `
+          <option value="${r}" ${f.radiusKm === r ? 'selected' : ''}>${r} km</option>`).join('')}
+      </select>
+      <span style="color:var(--muted)">(data extends to ${meta.radius_km} km)</span>
+    </label>
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+      <input type="checkbox" ${f.showBeams ? 'checked' : ''}
+             onchange="state.filters.acma.showBeams=this.checked;refreshAcmaLayer()">
+      Show antenna beam wedges
+    </label>
+    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+      <input type="checkbox" ${f.showLinks ? 'checked' : ''}
+             onchange="state.filters.acma.showLinks=this.checked;refreshAcmaLayer()">
+      Show threat links
+    </label>
+    <details style="margin:.4rem 0">
+      <summary class="small" style="cursor:pointer">? What the mechanisms mean</summary>
+      <div class="small" style="color:var(--muted);margin-top:.3rem">
+        <p><strong>Co-channel</strong>: transmits on the repeater's RX frequency — direct
+        collisions and capture. <strong>Adjacent</strong>: within 50 kHz — splatter raises the
+        noise floor until marginal packets flip bits. <strong>Harmonic</strong>: a transmitter at
+        1/2…1/5 of the RX frequency whose harmonics land on it. <strong>IMD3/IMD5</strong>:
+        two transmitters at the same ACMA site whose intermod products (2f1−f2, 3f1−2f2)
+        land on the RX channel — the "rusty bolt" effect; the prime suspect when corruption
+        clusters behind one repeater. <strong>Co-site desense</strong>: any strong transmitter
+        physically at the repeater site overloading the receiver front-end, regardless of
+        frequency — the only mechanism where cellular towers matter.</p>
+        <p><strong>Not threats</strong>: mobile phone towers (700 MHz+, no spectral path to
+        151.5 MHz — co-siting only), LoRa/LoRaWAN (915–928 MHz), UHF CB (477 MHz).</p>
+        <p><strong>Blind spots</strong>: amateur radio isn't in the RRL by location (the
+        50.5 MHz × 3 harmonic path needs a spectrum sweep, not this database); unlicensed
+        or faulty emitters (solar controllers, VMS signs, electric fences, powerline arcing)
+        have no licence record; the RRL records what's <em>licensed</em>, not what's
+        <em>radiating</em>; IMD detection only sees devices ACMA records at the same site;
+        line-of-sight is not yet assessed and would be terrain-only — it cannot model the
+        tropospheric ducting that worsens during flood events.</p>
+      </div>
+    </details>`;
+}
+
+function rerenderAcmaFilterBlock() {
+  const el = document.getElementById('acma-filter-block');
+  if (el) el.innerHTML = acmaFilterHeadHtml();
+}
+
+function toggleAcmaShow(checked) {
+  state.filters.acma.show = checked;
+  if (!checked) {
+    closeAcmaCard();
+    refreshAcmaLayer();
+    rerenderAcmaFilterBlock();
+    rerenderMapLegend();
+    return;
+  }
+  // Legend and filter body gain the ACMA entries once the data lands; both are
+  // patched in place so the operator keeps their pan and zoom.
+  acmaEnsureCore().then(() => {
+    if (state.activeTab === 'stations' && state.map) acmaAfterLoad();
+  }).catch(() => rerenderAcmaFilterBlock());
+  rerenderAcmaFilterBlock();
+}
+
+function acmaSelectAnchor(id) {
+  state.acma.selectedAnchorId = id || null;
+  refreshAcmaLayer();
+  rerenderAcmaFilterBlock();
+}
+
+// Link appended to MegaNet repeater popups on the map: "N RF threats".
+function acmaRepeaterPopupExtra(s) {
+  const A = state.acma;
+  if (!state.filters.acma.show || !A.loaded) return '';
+  const a = A.anchorById[s.id];
+  if (!a || !a.threats.length) return '';
+  return `<br><a href="#" style="font-size:.83rem"
+    onclick="acmaSelectAnchor('${escAttr(s.id)}');return false">⚠ ${a.threats.length} RF threat candidates — filter map</a>`;
+}
+
+// ── map layer ──
+
+// Trim to a marker/line budget without letting one mechanism eat the lot.
+//
+// A flat "top N by score" cut looks fair and isn't: co-site desense outnumbers
+// every other mechanism roughly 8:1 in the RRL extract and its scores sit at the
+// top of the range (same site ⇒ no distance discount), so the first ~1300 devices
+// by score are all co-site. With a 500-pin cap that meant the map only ever drew
+// brown squares — co-channel, IMD and harmonic pins were filtered in, ranked, and
+// then cut, so ticking their boxes did nothing until co-site desense was ticked
+// off. Deal one item per mechanism per round instead, highest score first within
+// each: a crowded mechanism loses its tail rather than erasing the rare ones, and
+// mechanisms with fewer devices than the budget always draw in full.
+//
+// `items` must already be sorted best-first; the returned subset keeps that order.
+function acmaCapByMechanism(items, cap, mechOf) {
+  if (items.length <= cap) return items;
+  const queues = new Map();
+  items.forEach((it, i) => {
+    const k = mechOf(it);
+    if (!queues.has(k)) queues.set(k, []);
+    queues.get(k).push(i);
+  });
+  const lists = [...queues.values()];
+  const picked = [];
+  for (let round = 0; picked.length < cap; round++) {
+    let drew = false;
+    for (const l of lists) {
+      if (round >= l.length) continue;
+      picked.push(l[round]);
+      drew = true;
+      if (picked.length >= cap) break;
+    }
+    if (!drew) break;             // every queue exhausted
+  }
+  return picked.sort((a, b) => a - b).map(i => items[i]);
+}
+
+function refreshAcmaLayer() {
+  const A = state.acma, map = state.map;
+  if (!map) return;
+  MapSpider.reset();                 // fanned pins go home before any are removed
+  ['layer', 'beamLayer', 'linkLayer', 'hiLayer'].forEach(k => {
+    if (A[k]) { A[k].remove(); A[k] = null; }
+  });
+  const f = state.filters.acma;
+  if (!f.show || !A.loaded) { MapSpider.setPins('acma', []); acmaUpdateShownNote(0, 0); return; }
+
+  const visible = acmaVisibleThreats();
+
+  // one marker per device, driven by its top-scoring visible threat
+  const byDevice = new Map();
+  for (const t of visible) {
+    const cur = byDevice.get(t.device_id);
+    if (!cur || t.score > cur.top.score) {
+      byDevice.set(t.device_id, { top: t, all: cur ? cur.all : [] });
+    }
+    byDevice.get(t.device_id).all.push(t);
+  }
+  const devices = [...byDevice.values()].sort((a, b) => b.top.score - a.top.score);
+  const shown = acmaCapByMechanism(devices, ACMA_MARKER_CAP, d => d.top.mechanism);
+  acmaUpdateShownNote(shown.length, devices.length);
+
+  A.layer = L.layerGroup().addTo(map);
+  const acmaPins = [];
+  for (const d of shown) {
+    const t = d.top;
+    const site = A.siteById[t.site_id];
+    if (!site) continue;
+    const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
+    const size = Math.round(9 + t.score / 8);
+    const icon = L.divIcon({
+      className: 'acma-div',
+      html: `<div class="acma-sq${t.meganet ? ' mn' : ''}" style="width:${size}px;height:${size}px;background:${mech.color}"></div>`,
+      iconSize: [size, size], iconAnchor: [size / 2, size / 2],
+    });
+    const m = L.marker([site.lat, site.lon], { icon }).addTo(A.layer);
+    m.bindPopup(acmaPopupHtml(d, site), { maxWidth: 300 });
+    m.on('click', () => acmaHighlightDevice(t.device_id));
+    m.bindTooltip(`${esc(t.client || 'Unknown licensee')} · ${mech.label} · ${t.score}`);
+    acmaPins.push(m);
+  }
+  // Several licensed devices commonly share one site, so these are the pins that
+  // most need fanning out.
+  MapSpider.setPins('acma', acmaPins);
+
+  if (f.showLinks) {
+    A.linkLayer = L.layerGroup().addTo(map);
+    const links = acmaCapByMechanism(
+      visible.slice().sort((a, b) => b.score - a.score), ACMA_LINK_CAP, t => t.mechanism);
+    for (const t of links) {
+      const site = A.siteById[t.site_id], a = A.anchorById[t.anchor_id];
+      if (!site || !a) continue;
+      L.polyline([[site.lat, site.lon], [a.lat, a.lon]], {
+        color: (ACMA_MECH[t.mechanism] || {}).color || '#666',
+        weight: 1.2, dashArray: '4 4',
+        opacity: 0.15 + 0.55 * Math.min(1, t.score / 70),
+      }).addTo(A.linkLayer);
+    }
+  }
+
+  if (f.showBeams) {
+    if (!A.devLoaded) {
+      acmaEnsureDevices().then(() => refreshAcmaLayer()).catch(() => {});
+    } else {
+      A.beamLayer = L.layerGroup().addTo(map);
+      for (const d of shown) {
+        const dev = A.deviceById[d.top.device_id];
+        const site = A.siteById[d.top.site_id];
+        const ant = dev && dev.ant ? A.antById[dev.ant] : null;
+        if (!dev || !site || dev.az == null || !ant || !ant.h_bw || ant.h_bw <= 0 || ant.h_bw >= 360) continue;
+        const poly = acmaBeamPolygon(site.lat, site.lon, dev.az, Math.min(ant.h_bw, 120),
+                                     acmaBeamRangeKm(dev.eirp_w));
+        L.polygon(poly, {
+          color: (ACMA_MECH[d.top.mechanism] || {}).color || '#666',
+          weight: 1, fillOpacity: 0.08, opacity: 0.5,
+        }).addTo(A.beamLayer);
+      }
+    }
+  }
+}
+
+function acmaUpdateShownNote(shown, total) {
+  const el = document.getElementById('acma-shown');
+  if (el) el.textContent = total > shown
+    ? `showing ${shown} of ${total} transmitters (top by score, shared across mechanisms)`
+    : `${total} transmitters shown`;
+}
+
+function acmaBeamRangeKm(eirpW) {
+  if (!eirpW || eirpW <= 1) return 1.5;
+  return Math.max(1.5, Math.min(12, 2 + 2.5 * Math.log10(eirpW)));
+}
+
+function acmaBeamPolygon(lat, lon, azDeg, widthDeg, rangeKm) {
+  const pts = [[lat, lon]];
+  const degLat = rangeKm / 110.574;
+  const degLon = rangeKm / (111.320 * Math.cos(lat * Math.PI / 180));
+  for (let a = azDeg - widthDeg / 2; a <= azDeg + widthDeg / 2 + 0.01; a += Math.max(2, widthDeg / 12)) {
+    const rad = a * Math.PI / 180;
+    pts.push([lat + Math.cos(rad) * degLat, lon + Math.sin(rad) * degLon]);
+  }
+  pts.push([lat, lon]);
+  return pts;
+}
+
+// Emphasised links from one device to every repeater it threatens.
+function acmaHighlightDevice(deviceId) {
+  const A = state.acma, map = state.map;
+  if (!map || !A.loaded) return;
+  acmaClearHighlight();
+  A.hiLayer = L.layerGroup().addTo(map);
+  for (const t of acmaVisibleThreats()) {
+    if (t.device_id !== deviceId) continue;
+    const site = A.siteById[t.site_id], a = A.anchorById[t.anchor_id];
+    if (!site || !a) continue;
+    L.polyline([[site.lat, site.lon], [a.lat, a.lon]], {
+      color: (ACMA_MECH[t.mechanism] || {}).color || '#666',
+      weight: 3, opacity: 0.9,
+    }).addTo(A.hiLayer);
+  }
+}
+
+function acmaClearHighlight() {
+  if (state.acma.hiLayer) { state.acma.hiLayer.remove(); state.acma.hiLayer = null; }
+}
+
+// ── popup + transmitter card ──
+
+function acmaPopupHtml(d, site) {
+  const t = d.top;
+  const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
+  const others = d.all.length - 1;
+  return `
+    <strong>${esc((site && site.name) || 'Unknown site')}</strong><br>
+    <span style="font-size:.83rem">${esc(t.client || 'Unknown licensee')} · score ${t.score}</span><br>
+    <span style="background:${mech.color};color:#fff;padding:1px 6px;border-radius:999px;font-size:.78rem">${mech.label}</span>
+    ${t.meganet ? '<span class="badge">MegaNet licence</span>' : ''}<br>
+    <span style="font-size:.83rem">${esc(t.detail)}</span><br>
+    <span style="font-size:.83rem">${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz · ' : ''}${t.distance_km} km @ ${t.bearing_deg}° from ${esc(t.anchor_name)}</span><br>
+    <span style="font-size:.83rem">Licence ${esc(t.lic || '?')}${t.expiry ? ' · expires ' + esc(t.expiry) : ''}${t.inactive ? ' · <strong>not current</strong>' : ''}</span>
+    ${others > 0 ? `<br><span style="font-size:.8rem;color:#888">+${others} more mechanism/repeater match${others > 1 ? 'es' : ''}</span>` : ''}<br>
+    <a href="#" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(t.anchor_id)}');return false">Full details →</a>`;
+}
+
+function showAcmaCard(deviceId, anchorId) {
+  state.acma.cardDeviceId = deviceId;
+  state.acma.cardAnchorId = anchorId || null;
+  const el = document.getElementById('acma-card');
+  if (el) {
+    el.hidden = false;
+    el.innerHTML = '<div class="small" style="padding:1rem;color:var(--muted)">Loading transmitter details…</div>';
+  }
+  acmaEnsureDevices().then(() => renderAcmaCard()).catch(err => {
+    if (el) el.innerHTML = `<div class="small" style="padding:1rem;color:var(--muted)">
+      Device detail unavailable (${esc(err.message)}).</div>`;
+  });
+  acmaHighlightDevice(deviceId);
+}
+
+function closeAcmaCard() {
+  state.acma.cardDeviceId = null;
+  const el = document.getElementById('acma-card');
+  if (el) { el.hidden = true; el.innerHTML = ''; }
+  acmaClearHighlight();
+}
+
+function acmaCardRow(label, value) {
+  return value == null || value === '' ? '' :
+    `<div class="acma-row"><span>${label}</span><span>${value}</span></div>`;
+}
+
+function renderAcmaCard() {
+  const A = state.acma;
+  const el = document.getElementById('acma-card');
+  const dev = A.deviceById[A.cardDeviceId];
+  if (!el || !dev) return;
+  const site   = A.siteById[dev.site_id] || {};
+  const lic    = A.licById[dev.lic] || {};
+  const client = A.clientById[lic.client_no] || {};
+  const ant    = dev.ant ? (A.antById[dev.ant] || {}) : {};
+  const myThreats = A.flat.filter(t => t.device_id === dev.id);
+  const top = myThreats.slice().sort((a, b) => b.score - a.score)[0];
+  const seg = dev.f_mhz != null ? vhfSegment(dev.f_mhz) : null;
+  const noteIdxs = [...new Set([...(dev.notes || []), ...(lic.notes || [])])];
+  const notes = noteIdxs.map(i => A.texts[i]).filter(Boolean);
+  const cosited = (A.devicesBySite[dev.site_id] || []).filter(d => d.id !== dev.id);
+  const partnerIds = new Set();
+  (A.pairsByDevice[dev.id] || []).forEach(p => { partnerIds.add(p.a === dev.id ? p.b : p.a); });
+  const anchor = A.cardAnchorId ? A.anchorById[A.cardAnchorId] : null;
+  const distLine = anchor && top
+    ? `${top.distance_km} km @ ${String(top.bearing_deg).padStart(3, '0')}° from ${esc(anchor.name)}` : null;
+
+  el.hidden = false;
+  el.innerHTML = `
+    <div class="acma-card-head">
+      <span>
+        <strong>${esc(site.name || 'Unknown site')}</strong><br>
+        <span class="small" style="color:var(--muted)">${esc(client.trading || client.name || 'Unknown licensee')}</span>
+      </span>
+      <span>${top ? `score ${top.score}` : ''}
+        <button onclick="closeAcmaCard()" title="Close">×</button></span>
+    </div>
+    ${myThreats.length ? `
+      <div class="acma-sect">
+        ${myThreats.sort((a, b) => b.score - a.score).map(t => {
+          const m = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
+          return `<div class="small" style="margin:.15rem 0">
+            <span class="legend-sq" style="background:${m.color}"></span>
+            <strong>${m.label}</strong> ${t.score} vs ${esc(t.anchor_name)}<br>
+            <span style="color:var(--muted)">${esc(t.detail)} —
+              w ${t.components.mechanism_weight} × dist ${t.components.distance_factor}
+              × pwr ${t.components.power_factor} × LOS ${t.components.los_factor}</span>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
+    <div class="acma-sect"><h4>RF</h4>
+      ${acmaCardRow('Frequency', dev.f_mhz != null ? dev.f_mhz.toFixed(4) + ' MHz' : null)}
+      ${acmaCardRow('Bandwidth', dev.bw_khz != null ? dev.bw_khz + ' kHz' : null)}
+      ${acmaCardRow('Emission', esc(dev.emission))}
+      ${acmaCardRow('TX power', dev.tx_w != null ? dev.tx_w + ' W' : null)}
+      ${acmaCardRow('EIRP', dev.eirp_w != null ? dev.eirp_w + ' W' : null)}
+      ${acmaCardRow('Segment', seg ? `${seg.seg} — ${esc(seg.alloc)}` : null)}
+      ${acmaCardRow('Mode', esc(dev.mode))}
+      ${acmaCardRow('Operation hours', esc(dev.hours === '00:00-23:59' ? 'Continuous' : dev.hours))}
+      ${acmaCardRow('Station class', esc(dev.station_class))}
+      ${acmaCardRow('Authorised', esc(dev.authorised))}
+    </div>
+    ${Object.keys(ant).length ? `
+    <div class="acma-sect"><h4>Antenna</h4>
+      ${acmaCardRow('Type / model', esc([ant.type, ant.manufacturer, ant.model].filter(Boolean).join(' · ')))}
+      ${acmaCardRow('Height', dev.height_m != null ? dev.height_m + ' m' : null)}
+      ${acmaCardRow('Gain', ant.gain_dbi != null ? ant.gain_dbi + ' dBi' : null)}
+      ${acmaCardRow('Azimuth / tilt', dev.az != null ? `${dev.az}° / ${dev.tilt != null ? dev.tilt + '°' : '—'}` : null)}
+      ${acmaCardRow('H-beamwidth', ant.h_bw ? ant.h_bw + '°' : null)}
+      ${acmaCardRow('Polarisation', esc(dev.pol))}
+      ${acmaCardRow('Feeder loss', dev.feeder_db != null ? dev.feeder_db + ' dB' : null)}
+    </div>` : ''}
+    <div class="acma-sect"><h4>Site</h4>
+      ${acmaCardRow('Elevation', site.elevation_m != null ? site.elevation_m + ' m' : null)}
+      ${acmaCardRow('Coordinate precision', esc(site.precision))}
+      ${acmaCardRow('Devices at site', site.device_count)}
+      ${acmaCardRow('Distance', distLine)}
+      ${acmaCardRow('Line of sight', top ? 'not assessed' : null)}
+    </div>
+    <div class="acma-sect"><h4>Licence</h4>
+      ${acmaCardRow('Licence no.', esc(dev.lic))}
+      ${acmaCardRow('Status', esc(lic.status))}
+      ${acmaCardRow('Type', esc(lic.type))}
+      ${acmaCardRow('Category', esc(lic.category))}
+      ${acmaCardRow('Service', esc(dev.service || lic.service))}
+      ${acmaCardRow('Subservice', esc(dev.subservice || lic.subservice))}
+      ${acmaCardRow('Issued', esc(lic.issued))}
+      ${acmaCardRow('Expires', esc(lic.expiry))}
+      ${acmaCardRow('Callsign', esc(dev.callsign))}
+    </div>
+    <div class="acma-sect"><h4>Licensee</h4>
+      ${acmaCardRow('Client', esc(client.name))}
+      ${acmaCardRow('Trading as', esc(client.trading))}
+      ${acmaCardRow('ABN / ACN', esc([client.abn, client.acn].filter(Boolean).join(' / ')))}
+      ${acmaCardRow('Industry', esc(client.industry))}
+      ${acmaCardRow('Client type', esc(client.type))}
+      ${acmaCardRow('Postal', esc(client.postal))}
+    </div>
+    ${notes.length ? `
+    <div class="acma-sect"><h4>Conditions &amp; advisory notes (${notes.length})</h4>
+      ${notes.map(n => `
+        <details class="small" style="margin:.2rem 0">
+          <summary style="cursor:pointer">${esc(n.title || n.cat || 'Note')}</summary>
+          <div style="white-space:pre-wrap;color:var(--muted)">${esc(n.text || '')}</div>
+        </details>`).join('')}
+    </div>` : ''}
+    ${cosited.length ? `
+    <div class="acma-sect">
+      <details>
+        <summary style="cursor:pointer"><h4 style="display:inline">Co-sited devices (${cosited.length})</h4></summary>
+        ${cosited.sort((a, b) => (a.f_mhz || 0) - (b.f_mhz || 0)).map(d => `
+          <div class="small" style="margin:.15rem 0">
+            <a href="#" onclick="showAcmaCard('${escAttr(d.id)}','${escAttr(A.cardAnchorId || '')}');return false">
+              ${d.f_mhz != null ? d.f_mhz.toFixed(4) + ' MHz' : '?'}</a>
+            ${esc(d.emission || '')} ${d.eirp_w != null ? '· ' + d.eirp_w + ' W EIRP' : ''}
+            ${partnerIds.has(d.id) ? '<span class="badge">IMD partner</span>' : ''}
+          </div>`).join('')}
+      </details>
+    </div>` : ''}
+    <div class="small" style="color:var(--muted);padding:.4rem .6rem">
+      ACMA RRL data (CC BY 4.0), extract ${esc((A.threats.meta || {}).source_date || '')}.
+      Not to be used for unsolicited contact (Spam Act 2003 / DNCR Act 2006).
+    </div>`;
+}
+
+// ── RF Environment tab ──
+
+function renderRfHtml() {
+  const A = state.acma;
+  if (!A.loaded) {
+    return `
+      <div style="max-width:640px;margin:2.5rem auto;padding:1rem">
+        <div class="panel" style="text-align:center;padding:2rem">
+          <h2 style="margin:0 0 .6rem">RF Environment</h2>
+          <p class="small" style="color:var(--muted)">
+            ${A.error ? esc(A.error) : 'Loading ACMA interference data…'}</p>
+        </div>
+      </div>`;
+  }
+  const anchors = A.threats.anchors.slice().sort((a, b) => b.threats.length - a.threats.length);
+  const sel = state.rf.anchorId;
+  return `
+    <div class="stack" style="padding:0 .25rem">
+      <div class="panel">
+        <div class="panel-header"><h2>RF Environment — licensed interference candidates</h2>
+          <span class="small" style="color:var(--muted)">ACMA data: ${esc(A.threats.meta.source_date)} · CC BY 4.0</span>
+        </div>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin:.5rem 0">
+          <label class="small">Repeater
+            <select onchange="state.rf.anchorId=this.value;renderMain()">
+              <option value="">All (${A.flat.length} threat candidates)</option>
+              ${anchors.map(a => `
+                <option value="${escAttr(a.station_id)}" ${sel === a.station_id ? 'selected' : ''}>
+                  ${esc(a.name)} (${a.threats.length})</option>`).join('')}
+            </select>
+          </label>
+          <label class="small">Min score
+            <input type="number" min="0" max="100" step="5" value="${state.filters.acma.minScore}"
+                   style="width:4.5rem"
+                   onchange="state.filters.acma.minScore=+this.value;renderMain()">
+          </label>
+          <button onclick="rfExportCsv()">Export CSV</button>
+        </div>
+        ${sel ? rfStripPlotHtml(sel) : rfSummaryHtml(anchors)}
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Threat candidates${sel ? ` — ${esc((A.anchorById[sel] || {}).name || sel)}` : ''}</h3></div>
+        <div class="table-wrap tall" id="rf-table-wrap">${rfTableHtml()}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Corruption-time correlation helper</h3></div>
+        <p class="small" style="color:var(--muted)">Paste corruption timestamps (one per line,
+          any parseable format). Checks whether they cluster in business hours — licensed
+          operators with non-continuous operation tend to transmit 07:00–18:00 weekdays.</p>
+        <textarea id="rf-corr" rows="4" style="width:100%"
+                  placeholder="2026-07-12 09:41&#10;2026-07-12 10:05&#10;…">${esc(state.rf.corrText)}</textarea>
+        <div style="margin:.4rem 0"><button onclick="rfCorrelate()">Analyse</button></div>
+        <div id="rf-corr-out" class="small"></div>
+      </div>
+    </div>`;
+}
+
+function initRf() {
+  const A = state.acma;
+  if (!A.loaded && !A.error) {
+    acmaEnsureCore().then(() => { if (state.activeTab === 'rf') renderMain(); })
+                    .catch(() => { if (state.activeTab === 'rf') renderMain(); });
+  }
+  // strip plot carrier ticks want full device detail; refresh once it lands
+  if (A.loaded && !A.devLoaded) {
+    acmaEnsureDevices().then(() => { if (state.activeTab === 'rf') renderMain(); }).catch(() => {});
+  }
+}
+
+function rfVisibleRows() {
+  const sel = state.rf.anchorId;
+  let rows = acmaVisibleThreats(true).filter(t => !sel || t.anchor_id === sel);
+  const k = state.rf.sortKey, dir = state.rf.sortDir;
+  const val = t => {
+    switch (k) {
+      case 'anchor':    return t.anchor_name || '';
+      case 'mechanism': return t.mechanism;
+      case 'f_mhz':     return t.f_mhz || 0;
+      case 'delta':     return rfDeltaKhz(t) ?? 1e12;
+      case 'distance':  return t.distance_km;
+      case 'client':    return t.client || '';
+      case 'lic':       return t.lic || '';
+      case 'expiry':    return t.expiry || '';
+      default:          return t.score;
+    }
+  };
+  rows.sort((a, b) => {
+    const va = val(a), vb = val(b);
+    return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * dir;
+  });
+  return rows;
+}
+
+function rfDeltaKhz(t) {
+  if (t.rx_mhz == null) return null;
+  const f = t.product_mhz != null ? t.product_mhz : t.f_mhz;
+  if (f == null) return null;
+  return (f - t.rx_mhz) * 1000;
+}
+
+function rfSort(key) {
+  if (state.rf.sortKey === key) state.rf.sortDir *= -1;
+  else { state.rf.sortKey = key; state.rf.sortDir = key === 'score' ? -1 : 1; }
+  const wrap = document.getElementById('rf-table-wrap');
+  if (wrap) wrap.innerHTML = rfTableHtml();
+}
+
+function rfTableHtml() {
+  const rows = rfVisibleRows();
+  if (!rows.length) {
+    return `<p style="padding:.75rem;color:var(--muted)">No threat candidates match the current
+      filters${state.acma.mechCounts.imd3 ? '' : ' — note: no same-site IMD candidates were found in this extract'}.</p>`;
+  }
+  const arrow = k => state.rf.sortKey === k ? (state.rf.sortDir > 0 ? ' ▲' : ' ▼') : '';
+  const th = (k, label) => `<th style="cursor:pointer" onclick="rfSort('${k}')">${label}${arrow(k)}</th>`;
+  return `
+    <table class="bf-table">
+      <thead><tr>
+        ${th('anchor', 'Repeater')}${th('mechanism', 'Mechanism')}${th('score', 'Score')}
+        ${th('f_mhz', 'Freq (MHz)')}${th('delta', 'Δ (kHz)')}${th('distance', 'Dist (km)')}
+        <th>LOS</th>${th('client', 'Licensee')}${th('lic', 'Licence')}${th('expiry', 'Expiry')}<th></th>
+      </tr></thead>
+      <tbody>
+        ${rows.slice(0, 1000).map(t => {
+          const m = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
+          const dk = rfDeltaKhz(t);
+          return `<tr>
+            <td class="small">${esc(t.anchor_name)}</td>
+            <td class="small"><span class="legend-sq" style="background:${m.color}"></span> ${m.label}</td>
+            <td>${t.score}</td>
+            <td class="small">${t.f_mhz != null ? t.f_mhz.toFixed(4) : ''}</td>
+            <td class="small" title="${esc(t.detail)}">${dk != null ? dk.toFixed(1) : ''}</td>
+            <td class="small">${t.distance_km}</td>
+            <td class="small">${t.los === true ? '✓' : t.los === false ? '✗' : '—'}</td>
+            <td class="small">${esc(t.client || '')}${t.meganet ? ' <span class="badge">MegaNet</span>' : ''}</td>
+            <td class="small">${esc(t.lic || '')}</td>
+            <td class="small">${esc(t.expiry || '')}${t.inactive ? ' ⚠' : ''}</td>
+            <td><a href="#" onclick="rfShowOnMap('${escAttr(t.device_id)}','${escAttr(t.anchor_id)}');return false">map</a></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    ${rows.length > 1000 ? `<p class="small" style="color:var(--muted);padding:.4rem">Showing 1000 of ${rows.length} — tighten the filters or export the CSV.</p>` : ''}`;
+}
+
+function rfSummaryHtml(anchors) {
+  const withThreats = anchors.filter(a => a.threats.length);
+  return `
+    <div class="table-wrap medium">
+      <table class="bf-table">
+        <thead><tr><th>Repeater</th><th>RX (MHz)</th><th>Total</th>
+          ${Object.entries(ACMA_MECH).filter(([k]) => state.acma.mechCounts[k]).map(([, m]) => `<th class="small">${m.label}</th>`).join('')}
+          <th>Top score</th></tr></thead>
+        <tbody>
+          ${withThreats.map(a => {
+            const by = {};
+            a.threats.forEach(t => { by[t.mechanism] = (by[t.mechanism] || 0) + 1; });
+            const top = a.threats.length ? Math.max(...a.threats.map(t => t.score)) : '';
+            return `<tr style="cursor:pointer" onclick="state.rf.anchorId='${escAttr(a.station_id)}';renderMain()">
+              <td>${esc(a.name)}</td><td class="small">${a.rx_mhz ?? ''}</td>
+              <td><strong>${a.threats.length}</strong></td>
+              ${Object.keys(ACMA_MECH).filter(k => state.acma.mechCounts[k]).map(k => `<td class="small">${by[k] || ''}</td>`).join('')}
+              <td class="small">${top}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// Frequency-axis strip plot: RX channel centre line, nearby licensed carriers
+// as ticks coloured by band-plan segment (threat mechanisms override).
+function rfStripPlotHtml(anchorId) {
+  const A = state.acma;
+  const a = A.anchorById[anchorId];
+  if (!a || a.rx_mhz == null) return '';
+  const rx = a.rx_mhz, span = 0.6;                     // ±0.6 MHz window
+  const lo = rx - span, hi = rx + span;
+  const W = 900, H = 90, pad = 30;
+  const x = f => pad + (f - lo) / (hi - lo) * (W - 2 * pad);
+
+  const threatsByDev = {};
+  a.threats.forEach(t => { threatsByDev[t.device_id] = t; });
+
+  let carriers = [];
+  if (A.devLoaded) {
+    const seen = new Set();
+    for (const d of Object.values(A.deviceById)) {
+      if (d.f_mhz == null || d.f_mhz < lo || d.f_mhz > hi) continue;
+      const site = A.siteById[d.site_id];
+      if (!site) continue;
+      const dk = acmaHaversineKm(site.lat, site.lon, a.lat, a.lon);
+      if (dk > state.filters.acma.radiusKm) continue;
+      const key = d.f_mhz.toFixed(4) + '|' + d.site_id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      carriers.push({ f: d.f_mhz, id: d.id, dk, client: d.id in threatsByDev ? threatsByDev[d.id].client : null });
+    }
+  } else {
+    carriers = a.threats.filter(t => t.f_mhz != null && t.f_mhz >= lo && t.f_mhz <= hi)
+      .map(t => ({ f: t.f_mhz, id: t.device_id, dk: t.distance_km, client: t.client }));
+  }
+
+  const segBands = VHF_SEGMENTS.filter(s => s.hi > lo && s.lo < hi).map(s => `
+    <rect x="${x(Math.max(s.lo, lo))}" y="20" width="${x(Math.min(s.hi, hi)) - x(Math.max(s.lo, lo))}"
+          height="${H - 40}" fill="${s.seg === 'F' ? 'rgba(2,136,209,.08)' : 'rgba(128,128,128,.05)'}">
+      <title>Segment ${s.seg}: ${esc(s.alloc)}</title></rect>
+    <text x="${x(Math.max(s.lo, lo)) + 3}" y="16" font-size="9" style="fill:var(--muted)">${s.seg}</text>`).join('');
+
+  const ticks = carriers.map(c => {
+    const t = threatsByDev[c.id];
+    const color = t ? (ACMA_MECH[t.mechanism] || {}).color || '#888' : '#9aa7b3';
+    const hgt = t ? 34 : 22;
+    return `<line x1="${x(c.f)}" y1="${H - 20}" x2="${x(c.f)}" y2="${H - 20 - hgt}"
+      stroke="${color}" stroke-width="${t ? 2.5 : 1.2}">
+      <title>${c.f.toFixed(4)} MHz · ${c.dk.toFixed(1)} km${c.client ? ' · ' + esc(c.client) : ''}${t ? ' · ' + (ACMA_MECH[t.mechanism] || {}).label + ' ' + t.score : ''}</title></line>`;
+  }).join('');
+
+  return `
+    <div style="overflow-x:auto">
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:640px;height:auto" role="img"
+           aria-label="Licensed carriers near ${esc(a.name)} RX channel">
+        ${segBands}
+        <line x1="${pad}" y1="${H - 20}" x2="${W - pad}" y2="${H - 20}" style="stroke:var(--muted)" stroke-width="1"/>
+        ${[lo, rx - 0.3, rx, rx + 0.3, hi].map(f => `
+          <text x="${x(f)}" y="${H - 6}" font-size="10" text-anchor="middle" style="fill:var(--muted)">${f.toFixed(3)}</text>`).join('')}
+        ${ticks}
+        <line x1="${x(rx)}" y1="10" x2="${x(rx)}" y2="${H - 20}" stroke="#d32f2f" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <text x="${x(rx)}" y="9" font-size="10" text-anchor="middle" fill="#d32f2f">RX ${rx}</text>
+      </svg>
+      <div class="small" style="color:var(--muted)">${carriers.length} licensed carriers within
+        ±${span} MHz and ${state.filters.acma.radiusKm} km${A.devLoaded ? '' : ' (threat candidates only — full carrier set loads with device detail)'}.
+        Tall coloured ticks are classified threats; grey ticks are other licensed users.</div>
+    </div>`;
+}
+
+function rfShowOnMap(deviceId, anchorId) {
+  state.filters.acma.show = true;
+  acmaEnsureCore().then(() => {
+    switchTab('stations');
+    showAcmaCard(deviceId, anchorId);
+  }).catch(() => {});
+}
+
+function rfExportCsv() {
+  const rows = rfVisibleRows();
+  const head = ['repeater', 'rx_mhz', 'mechanism', 'score', 'freq_mhz', 'product_mhz', 'delta_khz',
+                'distance_km', 'bearing_deg', 'los', 'licensee', 'licence', 'expiry', 'current',
+                'meganet_own_licence', 'device_id', 'site_id', 'detail'];
+  const lines = [head.join(',')];
+  for (const t of rows) {
+    const dk = rfDeltaKhz(t);
+    lines.push([
+      csvEscape(t.anchor_name), t.rx_mhz ?? '', t.mechanism, t.score,
+      t.f_mhz ?? '', t.product_mhz ?? '', dk != null ? dk.toFixed(2) : '',
+      t.distance_km, t.bearing_deg, t.los == null ? 'not_assessed' : t.los,
+      csvEscape(t.client || ''), csvEscape(t.lic || ''), t.expiry || '',
+      t.inactive ? 'no' : 'yes', t.meganet ? 'yes' : '',
+      t.device_id, t.site_id, csvEscape(t.detail),
+    ].join(','));
+  }
+  dlText(`acma-threats-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
+}
+
+function rfCorrelate() {
+  const el = document.getElementById('rf-corr-out');
+  const txt = (document.getElementById('rf-corr') || {}).value || '';
+  state.rf.corrText = txt;
+  const stamps = txt.split('\n').map(l => l.trim()).filter(Boolean)
+    .map(l => new Date(l)).filter(d => !isNaN(d));
+  if (!el) return;
+  if (!stamps.length) {
+    el.innerHTML = '<span style="color:var(--muted)">No parseable timestamps.</span>';
+    return;
+  }
+  const isBiz = d => d.getDay() >= 1 && d.getDay() <= 5 && d.getHours() >= 7 && d.getHours() < 18;
+  const biz = stamps.filter(isBiz).length;
+  const pct = Math.round(100 * biz / stamps.length);
+  // Expected share of a uniform 24×7 distribution that falls in Mon–Fri 07–18: ~33%
+  const verdict = pct >= 55
+    ? 'Strongly business-hours weighted — consistent with a licensed commercial operator (check non-continuous-hours candidates below).'
+    : pct >= 40
+      ? 'Mildly business-hours weighted — inconclusive.'
+      : 'Not business-hours weighted — points away from office-hours licensees (consider continuous carriers, faulty equipment, or environmental sources).';
+  const hourly = new Array(24).fill(0);
+  stamps.forEach(d => hourly[d.getHours()]++);
+  const maxH = Math.max(...hourly, 1);
+  const bars = hourly.map((n, h) => `
+    <div title="${String(h).padStart(2, '0')}:00 — ${n}" style="flex:1;display:flex;flex-direction:column;justify-content:end">
+      <div style="height:${Math.round(40 * n / maxH)}px;background:var(--map-line, #ff6f00);opacity:.75"></div>
+    </div>`).join('');
+  const nonCont = acmaVisibleThreats(true).filter(t => {
+    const d = state.acma.deviceById[t.device_id];
+    return d && d.hours && d.hours !== '00:00-23:59';
+  });
+  el.innerHTML = `
+    <p>${stamps.length} timestamps · <strong>${pct}%</strong> in business hours (Mon–Fri 07:00–18:00;
+    a uniform 24×7 source would sit near 33%).<br>${verdict}</p>
+    <div style="display:flex;gap:1px;height:44px;align-items:end;max-width:480px">${bars}</div>
+    <div style="display:flex;justify-content:space-between;max-width:480px" class="small">
+      <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+    ${state.acma.devLoaded
+      ? (nonCont.length
+          ? `<p>Visible threats with recorded non-continuous hours: ${nonCont.map(t =>
+              `${esc(t.client || t.lic)} (${esc((state.acma.deviceById[t.device_id] || {}).hours)})`).join('; ')}</p>`
+          : '<p style="color:var(--muted)">No visible threat has recorded non-continuous operating hours (most ACMA records leave hours blank).</p>')
+      : '<p style="color:var(--muted)">Open a transmitter card once to load device detail, then re-run for per-licensee operating hours.</p>'}`;
+}
+
+// ── RF Changes tab ──────────────────────────────────────────────────────────────
+// "Did something change on the air near this repeater around the date our data
+// went bad?" Two views: a retrospective timeline of AUTHORISATION_DATEs (works
+// from a single extract) and diffs between archived monthly snapshots (works
+// from the second archive onward — removals and parameter changes are invisible
+// in a single snapshot, which is why every month is retained under
+// data/acma-raw/<YYYY-MM>/). All inputs precomputed by tools/acma_fetch.py and
+// tools/acma_diff.py; nothing fetched until this tab is opened.
+//
+// Register dates are administrative: an upper bound on when interference could
+// have begun, never proof that it did. Every string in this tab is worded as
+// "lead", not conclusion — keep it that way.
+
+const RFC_CLASS = {
+  cotenant: { label: 'New co-tenant at a repeater site', color: '#d32f2f',
+              blurb: 'A transmitter added at a site co-located with a repeater — the highest-severity change: front-end desense plus a new intermod pair with every existing carrier on the mast.' },
+  added:    { label: 'Added',                  color: '#c62828',
+              blurb: 'Assignment present now, absent in the earlier snapshot — a newly commissioned transmitter.' },
+  removed:  { label: 'Removed',                color: '#607d8b',
+              blurb: 'Assignment gone from the register — the only way a decommissioning is ever visible.' },
+  freq:     { label: 'Frequency changed',      color: '#f57c00',
+              blurb: 'May have moved onto or off a MegaNet channel.' },
+  power:    { label: 'Power changed',          color: '#7b1fa2',
+              blurb: 'TX power or EIRP differs — direct noise-floor impact.' },
+  antenna:  { label: 'Antenna changed',        color: '#0288d1',
+              blurb: 'Height, azimuth, tilt or antenna model differs — a re-point toward a repeater or extended reach.' },
+  site:     { label: 'Site moved',             color: '#6d4c41',
+              blurb: 'Assignment relocated to a different site, possibly a repeater mast.' },
+  status:   { label: 'Licence status changed', color: '#455a64',
+              blurb: 'Lapsed, surrendered or reinstated.' },
+};
+
+const RFC_FIELD_LABEL = {
+  f_mhz: 'Frequency (MHz)', tx_w: 'TX power (W)', eirp_w: 'EIRP (W)',
+  height_m: 'Antenna height (m)', az: 'Azimuth (°)', tilt: 'Tilt (°)',
+  ant_id: 'Antenna', site_id: 'Site', status: 'Licence status',
+};
+
+const RFC_SERIES_COLORS = ['#0b5cab', '#c7401a', '#107c10', '#7c35a3',
+                           '#b8860b', '#00838f', '#ad1457', '#5d4037'];
+const RFC_MARK_CAP = 800;
+const RFC_DAY = 86400000;
+
+function initRfc() {
+  const A = state.acma, R = state.rfc;
+  const rerender = () => { if (state.activeTab === 'rfchanges') renderMain(); };
+  if (!A.loaded && !A.error) acmaEnsureCore().then(rerender).catch(rerender);
+  if (!R.loaded && !R.error) rfcEnsureData().then(rerender).catch(rerender);
+}
+
+function rfcEnsureData() {
+  const R = state.rfc;
+  if (R.loaded) return Promise.resolve();
+  if (R.loadPromise) return R.loadPromise;
+  R.loading = true;
+  R.loadPromise = Promise.all([
+    acmaFetchJson('acma-timeline.json'),
+    acmaFetchJson('acma-changes.json').catch(() => null),    // optional
+    acmaFetchJson('acma-snapshots.json').catch(() => null),  // optional
+  ]).then(([tl, ch, sn]) => {
+    R.timeline = tl; R.changes = ch; R.snapshots = sn;
+    R.loaded = true; R.loading = false; R.error = null;
+  }).catch(err => {
+    R.loading = false; R.loadPromise = null;
+    R.error = `RF change data unavailable (${err.message}). Generate ` +
+              `data/acma-timeline.json with tools/acma_fetch.py; these files ` +
+              `cannot be fetched over file://.`;
+    throw err;
+  });
+  return R.loadPromise;
+}
+
+function rfcAnchorName(id) {
+  const a = state.acma.anchorById[id];
+  if (a) return a.name;
+  const s = (state.data?.stations || []).find(x => x.id === id);
+  return s ? s.name : id;
+}
+
+// ── event filtering / ranking ──
+
+// Events whose best anchor match passes the current selection, radius and
+// minimum-score filters. Returns { e (timeline event), a (best anchor match) }.
+function rfcVisibleEvents() {
+  const R = state.rfc, out = [];
+  if (!R.timeline) return out;
+  for (const e of R.timeline.events) {
+    let best = null;
+    for (const a of e.anchors || []) {
+      if (R.anchorSel.size && !R.anchorSel.has(a.id)) continue;
+      if (a.km > R.radiusKm || a.score < R.minScore) continue;
+      if (!best || a.score > best.score) best = a;
+    }
+    if (best && e.date) out.push({ e, a: best });
+  }
+  return out;
+}
+
+// Signed days from the onset date (null when no onset is set).
+function rfcDaysFromOnset(e) {
+  const R = state.rfc;
+  if (!R.onset) return null;
+  return Math.round((Date.parse(e.date) - Date.parse(R.onset)) / RFC_DAY);
+}
+
+// coincidence = interference score × temporal proximity × co-site bonus.
+// Proximity decays linearly from 1 at the onset date to 0 at the window edge
+// (stated in the UI tooltip — keep the formula and the tooltip in sync).
+function rfcCoincidence(row) {
+  const R = state.rfc;
+  const days = rfcDaysFromOnset(row.e);
+  if (days === null || Math.abs(days) > R.windowDays) return null;
+  const prox = Math.max(0, 1 - Math.abs(days) / R.windowDays);
+  const bonus = row.a.km <= 0.25 ? 1.5 : 1;
+  return { days, prox, bonus, value: row.a.score * prox * bonus };
+}
+
+// Rows for the coincidence table: windowed to onset ± window when an onset is
+// set, otherwise the full visible set sorted by date (newest first).
+function rfcTableRows() {
+  const R = state.rfc;
+  let rows = rfcVisibleEvents().map(r => ({ ...r, coin: rfcCoincidence(r) }));
+  if (R.onset) rows = rows.filter(r => r.coin);
+  const val = r => {
+    switch (R.sortKey) {
+      case 'date':   return r.e.date;
+      case 'days':   return r.coin ? r.coin.days : 0;
+      case 'client': return r.e.client || '';
+      case 'f':      return r.e.f_mhz || 0;
+      case 'delta':  return rfcDeltaKhz(r) ?? 1e12;
+      case 'mech':   return r.a.mech;
+      case 'eirp':   return r.e.eirp_w ?? r.e.tx_w ?? 0;
+      case 'km':     return r.a.km;
+      case 'score':  return r.a.score;
+      default:       return r.coin ? r.coin.value : Date.parse(r.e.date);
+    }
+  };
+  rows.sort((a, b) => {
+    const va = val(a), vb = val(b);
+    return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * R.sortDir;
+  });
+  return rows;
+}
+
+function rfcDeltaKhz(row) {
+  if (row.a.mech === 'cosite_desense') return null;   // proximity, not spectrum
+  const rx = (state.acma.anchorById[row.a.id] || {}).rx_mhz;
+  const f = row.a.product_mhz != null ? row.a.product_mhz : row.e.f_mhz;
+  if (rx == null || f == null) return null;
+  return (f - rx) * 1000;
+}
+
+function rfcSort(key) {
+  const R = state.rfc;
+  if (R.sortKey === key) R.sortDir *= -1;
+  else { R.sortKey = key; R.sortDir = (key === 'coin' || key === 'score' || key === 'date') ? -1 : 1; }
+  const wrap = document.getElementById('rfc-table-wrap');
+  if (wrap) wrap.innerHTML = rfcTableInnerHtml();
+}
+
+// ── selector handlers ──
+
+function rfcSelectAllAnchors() {
+  state.rfc.anchorSel = new Set();
+  renderMain();
+}
+
+function rfcToggleAnchor(id, on) {
+  const sel = state.rfc.anchorSel;
+  if (on) sel.add(id); else sel.delete(id);
+  renderMain();
+}
+
+function rfcFocusAnchor(id) {
+  state.rfc.anchorSel = new Set([id]);
+  renderMain();
+}
+
+function rfcUseOnset(date) {
+  state.rfc.onset = date;
+  renderMain();
+}
+
+function rfcCardFor(deviceId, anchorId) {
+  showAcmaCard(deviceId, anchorId);
+}
+
+// ── page ──
+
+function renderRfcHtml() {
+  const A = state.acma, R = state.rfc;
+  if (!A.loaded || !R.loaded) {
+    const msg = A.error || R.error ||
+      'Loading ACMA change-detection data…';
+    return `
+      <div style="max-width:640px;margin:2.5rem auto;padding:1rem">
+        <div class="panel" style="text-align:center;padding:2rem">
+          <h2 style="margin:0 0 .6rem">RF Changes</h2>
+          <p class="small" style="color:var(--muted)">${esc(msg)}</p>
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="stack rfc-page" style="padding:0 .25rem;position:relative">
+      <div class="panel">
+        <div class="panel-header"><h2>RF Changes — what changed on the air, and when</h2>
+          <span class="small" style="color:var(--muted)">ACMA data: ${esc(R.timeline.meta.source_date)} · CC BY 4.0</span>
+        </div>
+        <p class="small" style="color:var(--muted);margin:.3rem 0 .5rem">
+          Register dates are <strong>administrative</strong>: an authorisation date is an upper
+          bound on when a transmitter could have come on air — licences are often authorised
+          before installation (or never installed), and equipment can radiate with no register
+          entry at all. A date that lines up with a data-quality step is a
+          <strong>lead to investigate</strong>, never a conclusion.</p>
+        ${rfcSelectorHtml()}
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Timeline — authorisations vs data quality</h3></div>
+        ${rfcChartHtml()}
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>${R.onset ? 'Coincidence ranking' : 'Authorisation events'}</h3>
+          <span style="display:flex;gap:.5rem;align-items:center">
+            <span class="small" style="color:var(--muted)"
+                  title="coincidence = interference score × temporal proximity × co-site bonus. Proximity decays linearly from 1 at the onset date to 0 at the window edge; ×1.5 bonus when the transmitter shares the repeater's site (≤250 m).">
+              ${R.onset ? 'ranking formula ⓘ' : ''}</span>
+            <button onclick="rfcExportCsv()">Export CSV</button>
+          </span>
+        </div>
+        ${R.onset ? '' : `<p class="small" style="color:var(--muted);margin:.2rem 0">
+          Set an onset date above (or detect one below) to rank these by coincidence with the
+          data-quality step. This table is the evidence you would attach to an ACMA
+          interference complaint.</p>`}
+        <div class="table-wrap tall" id="rfc-table-wrap">${rfcTableInnerHtml()}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Snapshot diff — observed register changes</h3></div>
+        ${rfcDiffHtml()}
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>New intermod products</h3></div>
+        ${rfcImdHtml()}
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Onset detection helper</h3></div>
+        ${rfcOnsetHelperHtml()}
+      </div>
+      <div class="panel">${rfcHelpHtml()}</div>
+      <div id="acma-card" class="acma-card" hidden></div>
+    </div>`;
+}
+
+function rfcSelectorHtml() {
+  const A = state.acma, R = state.rfc;
+  const anchors = A.threats.anchors.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return `
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-start">
+      <details class="rfc-picker" ${R.pickerOpen ? 'open' : ''} ontoggle="state.rfc.pickerOpen=this.open">
+        <summary class="small" style="cursor:pointer">Repeaters:
+          <strong>${R.anchorSel.size ? `${R.anchorSel.size} selected` : 'all'}</strong></summary>
+        <div class="rfc-picker-list">
+          <label style="display:flex;gap:.4rem;align-items:center">
+            <input type="checkbox" ${R.anchorSel.size ? '' : 'checked'}
+                   onchange="rfcSelectAllAnchors()"> <em>All repeaters</em></label>
+          ${anchors.map(a => `
+            <label style="display:flex;gap:.4rem;align-items:center">
+              <input type="checkbox" ${R.anchorSel.has(a.station_id) ? 'checked' : ''}
+                     onchange="rfcToggleAnchor('${escAttr(a.station_id)}',this.checked)">
+              ${esc(a.name)}${a.rx_mhz ? ` <span class="small" style="color:var(--muted)">${a.rx_mhz}</span>` : ''}
+            </label>`).join('')}
+        </div>
+      </details>
+      <label class="small">Onset date
+        <input type="date" value="${esc(R.onset)}"
+               onchange="state.rfc.onset=this.value;renderMain()">
+      </label>
+      <label class="small">Window
+        <select onchange="state.rfc.windowDays=+this.value;renderMain()">
+          ${[30, 60, 90, 180].map(w => `
+            <option value="${w}" ${R.windowDays === w ? 'selected' : ''}>±${w} days</option>`).join('')}
+        </select>
+      </label>
+      <label class="small">Radius
+        <select onchange="state.rfc.radiusKm=+this.value;renderMain()">
+          ${[10, 25, 50, 60].map(r => `
+            <option value="${r}" ${R.radiusKm === r ? 'selected' : ''}>${r} km</option>`).join('')}
+        </select>
+      </label>
+      <label class="small">Min score
+        <input type="number" min="0" max="100" step="5" value="${R.minScore}" style="width:4.5rem"
+               onchange="state.rfc.minScore=+this.value;renderMain()">
+      </label>
+      ${R.onset ? `<button class="small" onclick="state.rfc.onset='';renderMain()">× clear onset</button>` : ''}
+    </div>`;
+}
+
+// ── timeline chart ──
+// Upper band: one mark per device authorisation, one lane per interference
+// mechanism, sized by score. Thin lane: licence effect/expiry as lighter marks.
+// Lower band: the pasted per-station corruption series, so a coincidence
+// between paperwork and data quality is visible at a glance.
+
+function rfcChartHtml() {
+  const R = state.rfc;
+  const rows = rfcVisibleEvents();
+  const onsetMs = R.onset ? Date.parse(R.onset) : null;
+  let lo, hi;
+  if (onsetMs) {
+    lo = onsetMs - R.windowDays * 1.5 * RFC_DAY;
+    hi = onsetMs + R.windowDays * 1.5 * RFC_DAY;
+  } else {
+    hi = Date.now() + 7 * RFC_DAY;
+    lo = hi - 730 * RFC_DAY;
+  }
+  const inSpan = rows.filter(r => {
+    const t = Date.parse(r.e.date);
+    return t >= lo && t <= hi;
+  });
+
+  const mechs = Object.keys(ACMA_MECH).filter(m => inSpan.some(r => r.a.mech === m));
+  const lanes = mechs.length ? mechs : ['co_channel'];
+  const W = 1000, PADL = 118, PADR = 16, laneH = 24;
+  const upperTop = 10;
+  const licY = upperTop + lanes.length * laneH;
+  const lowerTop = licY + 18 + 14, lowerH = 78;
+  const axisY = lowerTop + lowerH + 4;
+  const H = axisY + 26;
+  const x = t => PADL + (t - lo) / (hi - lo) * (W - PADL - PADR);
+
+  // month gridlines, thinned to roughly a dozen labels
+  const ticks = [];
+  const d0 = new Date(lo);
+  let ty = d0.getUTCFullYear(), tm = d0.getUTCMonth() + 1;
+  const totalMonths = Math.max(1, Math.round((hi - lo) / (30.44 * RFC_DAY)));
+  const stepM = Math.max(1, Math.ceil(totalMonths / 12));
+  for (let i = 0; ; i++) {
+    const t = Date.UTC(ty, tm, 1);
+    if (t > hi) break;
+    if (i % stepM === 0) ticks.push(t);
+    tm++; if (tm > 11) { tm = 0; ty++; }
+  }
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const tickLabel = t => {
+    const d = new Date(t);
+    return `${MON[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`;
+  };
+
+  const laneY = m => upperTop + lanes.indexOf(m) * laneH;
+
+  const shade = onsetMs ? `
+    <rect x="${x(onsetMs - R.windowDays * RFC_DAY)}" y="0"
+          width="${x(onsetMs + R.windowDays * RFC_DAY) - x(onsetMs - R.windowDays * RFC_DAY)}"
+          height="${axisY}" fill="rgba(211,47,47,.07)"/>
+    <line x1="${x(onsetMs)}" y1="0" x2="${x(onsetMs)}" y2="${axisY}"
+          stroke="#d32f2f" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text x="${x(onsetMs)}" y="${axisY + 22}" font-size="10" text-anchor="middle"
+          fill="#d32f2f">onset</text>` : '';
+
+  const shown = inSpan.slice(0, RFC_MARK_CAP);
+  const marks = shown.map(r => {
+    const t = Date.parse(r.e.date);
+    const rad = 3 + Math.min(6, r.a.score / 15);
+    const c = (ACMA_MECH[r.a.mech] || {}).color || '#666';
+    return `<circle cx="${x(t).toFixed(1)}" cy="${laneY(r.a.mech) + laneH / 2}" r="${rad.toFixed(1)}"
+      fill="${c}" opacity=".75" style="cursor:pointer"
+      onclick="rfcCardFor('${escAttr(r.e.device_id)}','${escAttr(r.a.id)}')">
+      <title>${esc(r.e.date)} · ${esc(r.e.client || r.e.lic || '?')} · ${r.e.f_mhz != null ? r.e.f_mhz.toFixed(4) + ' MHz · ' : ''}${esc((ACMA_MECH[r.a.mech] || {}).label || r.a.mech)} ${r.a.score} vs ${esc(rfcAnchorName(r.a.id))} · ${r.a.km} km${r.e.variation ? ' · variation to existing licence' : ''}</title>
+    </circle>`;
+  }).join('');
+
+  let licMarks = '';
+  let nLic = 0;
+  for (const r of shown) {
+    for (const d of [r.e.lic_effect, r.e.lic_expiry]) {
+      const t = d ? Date.parse(d) : NaN;
+      if (isNaN(t) || t < lo || t > hi || nLic >= RFC_MARK_CAP) continue;
+      nLic++;
+      licMarks += `<line x1="${x(t).toFixed(1)}" y1="${licY + 3}" x2="${x(t).toFixed(1)}" y2="${licY + 13}"
+        stroke="var(--muted)" stroke-width="1" opacity=".45">
+        <title>${esc(d)} · licence ${d === r.e.lic_effect ? 'effect' : 'expiry'} · ${esc(r.e.client || r.e.lic || '')}</title></line>`;
+    }
+  }
+
+  // lower band — corruption series
+  let lower = '';
+  const series = Object.entries(R.corrSeries || {}).filter(([, pts]) => pts.length);
+  if (series.length) {
+    let vmax = 0;
+    for (const [, pts] of series) for (const p of pts) vmax = Math.max(vmax, p.v);
+    vmax = vmax || 1;
+    lower = series.slice(0, RFC_SERIES_COLORS.length).map(([name, pts], i) => {
+      const col = RFC_SERIES_COLORS[i];
+      const vis = pts.filter(p => p.t >= lo && p.t <= hi);
+      const path = vis.map(p =>
+        `${x(p.t).toFixed(1)},${(lowerTop + lowerH - 4 - p.v / vmax * (lowerH - 10)).toFixed(1)}`).join(' ');
+      return `<polyline points="${path}" fill="none" stroke="${col}" stroke-width="1.6" opacity=".85">
+        <title>${esc(name)}</title></polyline>`;
+    }).join('');
+  } else {
+    lower = `<text x="${PADL + 8}" y="${lowerTop + lowerH / 2}" font-size="11"
+      style="fill:var(--muted)">No data-quality series loaded — paste per-station corruption
+      counts in the onset helper below to see coincidence at a glance.</text>`;
+  }
+
+  const legend = series.length ? `
+    <div class="small" style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:.2rem">
+      ${series.slice(0, RFC_SERIES_COLORS.length).map(([name], i) => `
+        <span class="legend-item"><span class="rfc-series-line" style="background:${RFC_SERIES_COLORS[i]}"></span>
+        ${esc(name)}</span>`).join('')}
+    </div>` : '';
+
+  return `
+    <div style="overflow-x:auto">
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:720px;height:auto" role="img"
+           aria-label="ACMA authorisation events and data quality over time">
+        ${shade}
+        ${ticks.map(t => `
+          <line x1="${x(t).toFixed(1)}" y1="0" x2="${x(t).toFixed(1)}" y2="${axisY}"
+                stroke="var(--border)" stroke-width="1" opacity=".6"/>
+          <text x="${x(t).toFixed(1)}" y="${axisY + 12}" font-size="10" text-anchor="middle"
+                style="fill:var(--muted)">${tickLabel(t)}</text>`).join('')}
+        ${lanes.map(m => `
+          <text x="4" y="${laneY(m) + laneH / 2 + 3}" font-size="10"
+                style="fill:${(ACMA_MECH[m] || {}).color || 'var(--muted)'}">${esc((ACMA_MECH[m] || {}).label || m)}</text>
+          <line x1="${PADL}" y1="${laneY(m) + laneH}" x2="${W - PADR}" y2="${laneY(m) + laneH}"
+                stroke="var(--border)" stroke-width=".5" opacity=".5"/>`).join('')}
+        <text x="4" y="${licY + 12}" font-size="10" style="fill:var(--muted)">licence dates</text>
+        ${licMarks}
+        <text x="4" y="${lowerTop + 10}" font-size="10" style="fill:var(--muted)">data quality</text>
+        <line x1="${PADL}" y1="${lowerTop + lowerH}" x2="${W - PADR}" y2="${lowerTop + lowerH}"
+              style="stroke:var(--muted)" stroke-width="1"/>
+        ${lower}
+        ${marks}
+      </svg>
+      ${legend}
+      <div class="small" style="color:var(--muted)">
+        ${shown.length}${inSpan.length > shown.length ? ` of ${inSpan.length}` : ''} authorisation
+        events in view · mark size = interference score · click a mark for the transmitter card.
+        ${onsetMs ? 'Shaded band = the selected onset window.' : 'Showing the last 24 months — set an onset date to zoom.'}</div>
+    </div>`;
+}
+
+// ── coincidence table ──
+
+function rfcTableInnerHtml() {
+  const R = state.rfc;
+  const rows = rfcTableRows();
+  if (!rows.length) {
+    return R.onset ? `
+      <div style="padding:.75rem">
+        <p><strong>No register events near this onset.</strong></p>
+        <p class="small" style="color:var(--muted)">A noise-floor step with no ACMA event nearby
+        is itself a finding: it points away from licensed transmitters and toward your own
+        infrastructure (corroding mast joints becoming an intermod mixer, a failing PA, water
+        in a feeder) or an unlicensed emitter (solar charge controllers, LED signage, electric
+        fences, powerline arcing). Widen the window or lower the minimum score to double-check
+        before concluding.</p>
+      </div>` :
+      `<p style="padding:.75rem;color:var(--muted)">No authorisation events match the current
+        filters — widen the radius or lower the minimum score.</p>`;
+  }
+  const arrow = k => R.sortKey === k ? (R.sortDir > 0 ? ' ▲' : ' ▼') : '';
+  const th = (k, label, tip) => `<th style="cursor:pointer" ${tip ? `title="${escAttr(tip)}"` : ''}
+    onclick="rfcSort('${k}')">${label}${arrow(k)}</th>`;
+  return `
+    <table class="bf-table">
+      <thead><tr>
+        ${th('date', 'Authorised', 'DEVICE_DETAILS.AUTHORISATION_DATE — when the frequency assignment was approved (administrative)')}
+        ${R.onset ? th('days', 'Δdays') : ''}
+        ${th('client', 'Licensee')}${th('f', 'Freq (MHz)')}${th('delta', 'Δf (kHz)')}
+        ${th('mech', 'Mechanism')}${th('eirp', 'EIRP (W)')}${th('km', 'Dist (km)')}
+        ${th('score', 'Score')}
+        ${R.onset ? th('coin', 'Coincidence', 'score × temporal proximity (linear decay to 0 at window edge) × 1.5 co-site bonus') : ''}
+      </tr></thead>
+      <tbody>
+        ${rows.slice(0, 1000).map(r => {
+          const m = ACMA_MECH[r.a.mech] || { label: r.a.mech, color: '#666' };
+          const dk = rfcDeltaKhz(r);
+          return `<tr style="cursor:pointer"
+                      onclick="rfcCardFor('${escAttr(r.e.device_id)}','${escAttr(r.a.id)}')">
+            <td class="small">${esc(r.e.date)}${r.e.variation ? ' <span class="badge" title="Authorised >30 days after the licence was issued — a variation to an existing licence (added channel, power change, re-point), not a new licence">var</span>' : ''}</td>
+            ${R.onset ? `<td class="small">${r.coin.days > 0 ? '+' : ''}${r.coin.days}</td>` : ''}
+            <td class="small">${esc(r.e.client || '')}</td>
+            <td class="small">${r.e.f_mhz != null ? r.e.f_mhz.toFixed(4) : ''}</td>
+            <td class="small">${dk != null ? dk.toFixed(1) : '—'}</td>
+            <td class="small"><span class="legend-sq" style="background:${m.color}"></span> ${m.label}</td>
+            <td class="small">${r.e.eirp_w ?? r.e.tx_w ?? ''}</td>
+            <td class="small">${r.a.km}${r.a.km <= 0.25 ? ' <span class="badge">co-site</span>' : ''}</td>
+            <td>${r.a.score}</td>
+            ${R.onset ? `<td><strong>${r.coin.value.toFixed(1)}</strong></td>` : ''}
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    ${rows.length > 1000 ? `<p class="small" style="color:var(--muted);padding:.4rem">Showing 1000 of ${rows.length} — tighten the filters or export the CSV.</p>` : ''}`;
+}
+
+function rfcExportCsv() {
+  const R = state.rfc;
+  const rows = rfcTableRows();
+  const head = ['authorisation_date', 'days_from_onset', 'repeater', 'rx_mhz', 'licensee',
+                'licence', 'licence_type', 'freq_mhz', 'product_mhz', 'delta_khz', 'mechanism',
+                'eirp_w', 'tx_w', 'distance_km', 'co_site', 'score', 'temporal_proximity',
+                'cosite_bonus', 'coincidence', 'variation_to_existing_licence',
+                'licence_issued', 'licence_effect', 'licence_expiry', 'status',
+                'device_id', 'site_id', 'stable_key'];
+  const lines = [head.join(',')];
+  for (const r of rows) {
+    const dk = rfcDeltaKhz(r);
+    const rx = (state.acma.anchorById[r.a.id] || {}).rx_mhz;
+    lines.push([
+      r.e.date, r.coin ? r.coin.days : '', csvEscape(rfcAnchorName(r.a.id)), rx ?? '',
+      csvEscape(r.e.client || ''), csvEscape(r.e.lic || ''), csvEscape(r.e.lic_type || ''),
+      r.e.f_mhz ?? '', r.a.product_mhz ?? '', dk != null ? dk.toFixed(2) : '',
+      r.a.mech, r.e.eirp_w ?? '', r.e.tx_w ?? '', r.a.km,
+      r.a.km <= 0.25 ? 'yes' : '', r.a.score,
+      r.coin ? r.coin.prox.toFixed(3) : '', r.coin ? r.coin.bonus : '',
+      r.coin ? r.coin.value.toFixed(2) : '',
+      r.e.variation ? 'yes' : '', r.e.lic_issued || '', r.e.lic_effect || '',
+      r.e.lic_expiry || '', csvEscape(r.e.status || ''),
+      r.e.device_id, r.e.site_id || '', r.e.key || '',
+    ].join(','));
+  }
+  const onset = R.onset ? `-onset-${R.onset}` : '';
+  dlText(`acma-rf-changes${onset}-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
+}
+
+// ── snapshot diff panel ──
+
+function rfcPairs() {
+  return (state.rfc.changes || {}).pairs || [];
+}
+
+function rfcSelectedPair() {
+  const pairs = rfcPairs();
+  if (!pairs.length) return null;
+  const i = state.rfc.pairIdx;
+  return pairs[i >= 0 && i < pairs.length ? i : pairs.length - 1];
+}
+
+function rfcChangeVisible(c) {
+  const R = state.rfc;
+  if (R.anchorSel.size && (!c.anchor || !R.anchorSel.has(c.anchor))) return false;
+  if (c.anchor_km != null && c.anchor_km > R.radiusKm) return false;
+  return true;
+}
+
+function rfcDiffEmptyHtml() {
+  const months = ((state.rfc.snapshots || {}).snapshots || []).map(s => s.month);
+  const one = months.length === 1;
+  return `
+    <p class="small" style="color:var(--muted)">
+      Change detection compares two archived monthly subsets, and
+      ${one ? `only one exists so far (<strong>${esc(months[0])}</strong>)`
+            : months.length ? `the archived months (${months.map(esc).join(', ')}) have not been diffed — run tools/acma_diff.py`
+            : 'none are archived yet — run tools/acma_diff.py --archive'}.
+      The monthly ACMA refresh (2nd of each month, ~06:15 AEST) archives the next snapshot,
+      and diffs appear here from then on — improving every month the archive grows.
+      Removals and prior parameter values before the first archived month are unrecoverable:
+      ACMA publishes a daily snapshot, not a back-catalogue, which is why the archive under
+      <code>data/acma-raw/&lt;YYYY-MM&gt;/</code> must never be pruned.
+      Until then, the authorisation timeline above is the available change axis.</p>`;
+}
+
+function rfcDiffHtml() {
+  const R = state.rfc;
+  const pairs = rfcPairs();
+  if (!pairs.length) return rfcDiffEmptyHtml();
+  const p = rfcSelectedPair();
+  const latestMonth = (((R.snapshots || {}).snapshots || []).slice(-1)[0] || {}).month;
+  const linkable = p.to === latestMonth;   // SDD_IDs only resolve against the current extract
+  const vis = (p.changes || []).filter(rfcChangeVisible);
+
+  const groups = [];
+  const used = new Set();
+  const take = (cls, pred) => {
+    const g = vis.filter(c => !used.has(c) && pred(c));
+    g.forEach(c => used.add(c));
+    if (g.length) groups.push([cls, g]);
+  };
+  take('cotenant', c => c.cotenant);
+  for (const cls of ['added', 'removed', 'freq', 'power', 'antenna', 'site', 'status'])
+    take(cls, c => (c.classes || [c.class]).includes(cls));
+
+  const pairSel = `
+    <label class="small">Compare
+      <select onchange="state.rfc.pairIdx=+this.value;renderMain()">
+        ${pairs.map((q, i) => `
+          <option value="${i}" ${q === p ? 'selected' : ''}>${esc(q.from)} → ${esc(q.to)}</option>`).join('')}
+      </select>
+    </label>
+    <span class="small" style="color:var(--muted)">extracts ${esc(p.from_date || p.from)} →
+      ${esc(p.to_date || p.to)} · grouped by nearest repeater · diff key: EFL_ID /
+      device registration id (never SDD_ID)</span>`;
+
+  if (!vis.length) {
+    return `<div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center">${pairSel}</div>
+      <p class="small" style="color:var(--muted);margin-top:.5rem">No register changes near the
+      selected repeaters in this pair — the RF licensing picture was stable. If the data-quality
+      step falls in this period, that points away from licensed transmitters (see the help
+      notes below).</p>`;
+  }
+
+  return `
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center">${pairSel}</div>
+    ${groups.map(([cls, g]) => {
+      const meta = RFC_CLASS[cls];
+      return `
+        <div style="margin-top:.7rem">
+          <h4 style="margin:0 0 .1rem"><span class="legend-sq" style="background:${meta.color}"></span>
+            ${meta.label} (${g.length})</h4>
+          <p class="small" style="color:var(--muted);margin:.1rem 0 .3rem">${meta.blurb}</p>
+          ${g.slice(0, 200).map(c => rfcChangeRowHtml(c, cls, linkable)).join('')}
+          ${g.length > 200 ? `<p class="small" style="color:var(--muted)">…and ${g.length - 200} more.</p>` : ''}
+        </div>`;
+    }).join('')}`;
+}
+
+function rfcChangeRowHtml(c, cls, linkable) {
+  const fields = c.fields ? Object.entries(c.fields)
+    .filter(([k]) => cls === 'status' ? k === 'status' :
+                     cls === 'freq' ? k === 'f_mhz' :
+                     cls === 'power' ? (k === 'tx_w' || k === 'eirp_w') :
+                     cls === 'antenna' ? ['height_m', 'az', 'tilt', 'ant_id'].includes(k) :
+                     cls === 'site' ? k === 'site_id' : true)
+    .map(([k, [a, b]]) => `<span style="white-space:nowrap">${RFC_FIELD_LABEL[k] || k}:
+      <s style="color:var(--muted)">${esc(a ?? '—')}</s> → <strong>${esc(b ?? '—')}</strong></span>`)
+    .join(' · ') : '';
+  const link = linkable && c.device_id
+    ? ` <a href="#" onclick="rfcCardFor('${escAttr(c.device_id)}','${escAttr(c.anchor || '')}');return false">details →</a>`
+    : '';
+  return `
+    <div class="small" style="margin:.25rem 0;padding-left:.9rem">
+      <strong>${esc(c.client || 'Unknown licensee')}</strong>
+      · ${c.f_mhz != null ? c.f_mhz.toFixed(4) + ' MHz' : 'freq ?'}
+      ${c.eirp_w != null ? `· ${c.eirp_w} W EIRP` : ''}
+      · lic ${esc(c.lic || '?')}
+      ${c.confidence === 'low' ? ' <span class="badge" title="Matched on a composite fingerprint (licence + site + frequency) because both stable identifiers were missing — treat with caution">low-confidence match</span>' : ''}
+      ${c.cotenant ? ' <span class="badge" style="color:#d32f2f">co-tenant</span>' : ''}
+      ${link}<br>
+      <span style="color:var(--muted)">${esc(c.site_name || c.site_id || '')}
+        ${c.anchor ? `· ${c.anchor_km != null ? c.anchor_km + ' km from ' : 'near '}${esc(rfcAnchorName(c.anchor))}` : ''}
+        ${c.auth ? `· authorised ${esc(c.auth)}` : ''}</span>
+      ${fields ? `<br>${fields}` : ''}
+    </div>`;
+}
+
+// ── new IMD products panel ──
+
+function rfcImdHtml() {
+  const p = rfcSelectedPair();
+  const intro = `
+    <p class="small" style="color:var(--muted);margin:.2rem 0 .5rem">
+      Adding one transmitter to a mast creates a third-order product with <em>every</em>
+      carrier already there — the offender is often nowhere near the RX frequency itself.
+      Listed below are only the products that are <strong>new in this snapshot pair</strong>
+      (created by an added or re-tuned device) and land within tolerance of a repeater RX
+      channel.</p>`;
+  if (!p) {
+    return `${intro}<p class="small" style="color:var(--muted)">Needs two archived snapshots —
+      see the snapshot diff panel above.</p>`;
+  }
+  const latestMonth = (((state.rfc.snapshots || {}).snapshots || []).slice(-1)[0] || {}).month;
+  const linkable = p.to === latestMonth;
+  const R = state.rfc;
+  const vis = (p.new_imd || []).filter(i =>
+    (!R.anchorSel.size || R.anchorSel.has(i.anchor)) &&
+    (i.anchor_km == null || i.anchor_km <= R.radiusKm));
+  if (!vis.length) {
+    return `${intro}<p class="small" style="color:var(--muted)">No new intermod products land
+      on an RX channel in ${esc(p.from)} → ${esc(p.to)} for the selected repeaters.</p>`;
+  }
+  return `${intro}
+    <div class="table-wrap medium">
+      <table class="bf-table">
+        <thead><tr><th>Product</th><th>Δ (kHz)</th><th>Order</th><th>Repeater</th>
+          <th>Site</th><th>New device</th><th>Existing partner</th></tr></thead>
+        <tbody>
+          ${vis.slice(0, 300).map(i => `
+            <tr>
+              <td class="small" style="white-space:nowrap">${esc(i.formula)}</td>
+              <td class="small">${i.delta_khz}</td>
+              <td class="small">IMD${i.order}</td>
+              <td class="small">${esc(rfcAnchorName(i.anchor))} (RX ${i.rx_mhz})</td>
+              <td class="small">${esc(i.site_name || i.site_id)}</td>
+              <td class="small">${linkable && i.device_id
+                ? `<a href="#" onclick="rfcCardFor('${escAttr(i.device_id)}','${escAttr(i.anchor)}');return false">${esc(i.client || i.trigger_key)}</a>`
+                : esc(i.client || i.trigger_key)}
+                <span class="badge">${i.trigger_class === 'added' ? 'added' : 're-tuned'}</span></td>
+              <td class="small">${linkable && i.partner_device_id
+                ? `<a href="#" onclick="rfcCardFor('${escAttr(i.partner_device_id)}','${escAttr(i.anchor)}');return false">${esc(i.partner_client || i.partner_key)}</a>`
+                : esc(i.partner_client || i.partner_key)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── onset detection helper ──
+
+function rfcParseDate(s) {
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return Date.UTC(+m[1], m[2] - 1, +m[3]);
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);          // dd/mm/yyyy (AU)
+  if (m) return Date.UTC(m[3].length === 2 ? 2000 + +m[3] : +m[3], m[2] - 1, +m[1]);
+  const d = Date.parse(s);
+  return isNaN(d) ? null : d;
+}
+
+// Accepts "date,value" (single series) or "station,date,value" per line.
+function rfcParseCorr(text) {
+  const series = {};
+  let bad = 0;
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (!t || /^#/.test(t) || /^station\b/i.test(t) || /^date\b/i.test(t)) continue;
+    const parts = t.split(/[,;\t]+/).map(s => s.trim()).filter(Boolean);
+    let name = '', ds, vs;
+    if (parts.length >= 3) [name, ds, vs] = parts;
+    else if (parts.length === 2) [ds, vs] = parts;
+    else { bad++; continue; }
+    const when = rfcParseDate(ds), v = parseFloat(vs);
+    if (when == null || isNaN(v)) { bad++; continue; }
+    const key = name || 'pasted series';
+    (series[key] = series[key] || []).push({ t: when, v });
+  }
+  for (const k in series) series[k].sort((a, b) => a.t - b.t);
+  return { series, bad };
+}
+
+// Rolling-median step detector — deliberately simple. A step is a shift in the
+// k-point median exceeding 4× the series' robust noise estimate.
+function rfcDetectSteps(series) {
+  const med = arr => {
+    const s = arr.slice().sort((a, b) => a - b), m = s.length >> 1;
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+  const steps = [];
+  for (const [name, pts] of Object.entries(series)) {
+    const v = pts.map(p => p.v), n = v.length;
+    const k = Math.max(3, Math.min(7, Math.floor(n / 4)));
+    if (n < 2 * k) continue;
+    const diffs = [];
+    for (let i = 1; i < n; i++) diffs.push(Math.abs(v[i] - v[i - 1]));
+    const noise = Math.max(1.4826 * med(diffs), 1e-9);
+    const cand = [];
+    for (let i = k; i <= n - k; i++) {
+      cand.push({ i, jump: med(v.slice(i, i + k)) - med(v.slice(i - k, i)) });
+    }
+    cand.sort((a, b) => Math.abs(b.jump) - Math.abs(a.jump));
+    const picked = [];
+    for (const c of cand) {
+      if (Math.abs(c.jump) < 4 * noise) break;
+      if (picked.some(p => Math.abs(p.i - c.i) < k)) continue;
+      picked.push(c);
+      if (picked.length >= 3) break;
+    }
+    for (const c of picked) {
+      steps.push({ station: name, date: new Date(pts[c.i].t).toISOString().slice(0, 10),
+                   jump: c.jump });
+    }
+  }
+  steps.sort((a, b) => Math.abs(b.jump) - Math.abs(a.jump));
+  return steps;
+}
+
+function rfcAnalyseCorr() {
+  const R = state.rfc;
+  const txt = (document.getElementById('rfc-corr') || {}).value || '';
+  R.corrText = txt;
+  const { series, bad } = rfcParseCorr(txt);
+  R.corrSeries = series;
+  R.corrBad = bad;
+  R.corrSteps = rfcDetectSteps(series);
+  renderMain();
+}
+
+function rfcMatchStation(name) {
+  const stations = state.data?.stations || [];
+  const q = name.toLowerCase();
+  return stations.find(s => s.id === name || (s.name || '').toLowerCase() === q) ||
+         stations.find(s => (s.name || '').toLowerCase().includes(q)) || null;
+}
+
+function rfcOnsetHelperHtml() {
+  const R = state.rfc;
+  return `
+    <p class="small" style="color:var(--muted)">Paste a per-station corruption time series —
+      one line per day: <code>date, count</code> or <code>station, date, count</code>
+      (ISO or dd/mm/yyyy dates). A rolling-median step detector finds sudden onsets; detected
+      dates pre-fill the onset selector, and the series plots in the timeline's data-quality
+      band above.</p>
+    <textarea id="rfc-corr" rows="5" style="width:100%"
+      placeholder="Bluff Ck, 2026-04-01, 0&#10;Bluff Ck, 2026-04-02, 1&#10;Bluff Ck, 2026-04-03, 14&#10;…">${esc(R.corrText)}</textarea>
+    <div style="margin:.4rem 0"><button onclick="rfcAnalyseCorr()">Detect steps</button></div>
+    ${R.corrSteps === null ? '' : rfcStepsHtml()}`;
+}
+
+function rfcStepsHtml() {
+  const R = state.rfc;
+  const nSeries = Object.keys(R.corrSeries || {}).length;
+  if (!nSeries) {
+    return `<p class="small" style="color:var(--muted)">No parseable lines${R.corrBad ? ` (${R.corrBad} rejected)` : ''}.</p>`;
+  }
+  const stepsHtml = R.corrSteps.length ? `
+    <div class="small" style="margin:.3rem 0">Detected steps (largest first — click to set as onset):</div>
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+      ${R.corrSteps.map(s => `
+        <button class="small" onclick="rfcUseOnset('${escAttr(s.date)}')"
+                title="Rolling-median shift of ${s.jump > 0 ? '+' : ''}${s.jump.toFixed(1)} at ${escAttr(s.station)}">
+          ${esc(s.date)} · ${esc(s.station)} ${s.jump > 0 ? '▲' : '▼'}${Math.abs(s.jump).toFixed(1)}</button>`).join('')}
+    </div>` : `
+    <p class="small" style="color:var(--muted)">No step larger than 4× the noise floor found in
+      ${nSeries} series${R.corrBad ? ` (${R.corrBad} lines rejected)` : ''} — the change may be
+      gradual rather than a step, which points away from a switched-on transmitter.</p>`;
+  return stepsHtml + rfcGroupingHtml();
+}
+
+// If every affected station reports through the same repeater, the search
+// narrows to one site — corruption confined to one repeater's children is
+// strong evidence for a specific site rather than a network-wide problem.
+function rfcGroupingHtml() {
+  const R = state.rfc;
+  const names = Object.keys(R.corrSeries || {}).filter(n => n !== 'pasted series');
+  if (!names.length || !state.data) return '';
+  const rows = names.map(n => {
+    const st = rfcMatchStation(n);
+    const reps = st ? findRepeaterMatches(st) : [];
+    return { n, st, reps };
+  });
+  const matched = rows.filter(r => r.st && r.reps.length);
+  let commonHtml = '';
+  if (matched.length > 1) {
+    const common = matched[0].reps.filter(r =>
+      matched.every(m => m.reps.some(x => x.id === r.id)));
+    if (common.length) {
+      const c = common[0];
+      const isAnchor = !!state.acma.anchorById[c.id];
+      commonHtml = `
+        <p class="small" style="margin:.4rem 0">
+          ⚑ <strong>All ${matched.length} matched stations report through
+          ${esc(c.name)}</strong> — corruption confined to one repeater's stations is strong
+          evidence for something at or near that specific site.
+          ${isAnchor ? `<button class="small" onclick="rfcFocusAnchor('${escAttr(c.id)}')">Focus ${esc(c.name)}</button>`
+                     : `<span style="color:var(--muted)">(${esc(c.name)} has no RX frequency recorded, so it is not in the ACMA threat layer — record repeater.rx_mhz to include it.)</span>`}
+        </p>`;
+    } else {
+      commonHtml = `
+        <p class="small" style="color:var(--muted);margin:.4rem 0">
+          The affected stations do not share a single repeater — that spreads the search across
+          sites, or points to something common to the receive side (base station, decoder) rather
+          than one repeater's RF environment.</p>`;
+    }
+  }
+  return `
+    <div style="margin-top:.5rem">
+      <div class="small" style="color:var(--muted)">Which repeater serves each affected station:</div>
+      <table class="bf-table" style="margin-top:.2rem">
+        <thead><tr><th>Series</th><th>Matched station</th><th>Serving repeater(s)</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td class="small">${esc(r.n)}</td>
+              <td class="small">${r.st ? esc(r.st.name) : '<span style="color:var(--muted)">no match in stations.json</span>'}</td>
+              <td class="small">${r.reps.length ? r.reps.map(x => esc(x.name)).join(', ')
+                : '<span style="color:var(--muted)">—</span>'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      ${commonHtml}
+    </div>`;
+}
+
+// ── help ──
+
+function rfcHelpHtml() {
+  return `
+    <details>
+      <summary style="cursor:pointer"><strong>What this page will not catch</strong>
+        <span class="small" style="color:var(--muted)">— read before trusting an empty result</span></summary>
+      <div class="small" style="color:var(--muted);margin-top:.4rem">
+        <p><strong>Anything unlicensed or faulty.</strong> Solar charge controllers, VMS/LED sign
+        drivers, electric fence energisers, powerline arcing, out-of-spec or failing equipment —
+        the most common sources of a raised noise floor at a remote gauging site — never appear
+        in the register.</p>
+        <p><strong>Removals and prior values before archiving began.</strong> ACMA publishes a
+        daily snapshot with no back-catalogue; history exists only from the first archived month
+        onward (see the snapshot index in the diff panel). Nothing recovers earlier months.</p>
+        <p><strong>Physical installation dates.</strong> An authorisation date is when the
+        paperwork was approved. Transmitters go live months later, or never.</p>
+        <p><strong>Amateur transmissions.</strong> Not recorded by location — the
+        50.5 MHz × 3 = 151.5 MHz harmonic path needs a spectrum sweep, not this register.</p>
+        <p><strong>Degradation with no register event at all.</strong> Corroding mast joints
+        maturing into an intermod mixer, a failing PA growing spurious emissions, water in a
+        feeder. <strong>A step change in noise floor with no ACMA event nearby is itself a
+        finding</strong> — it points at your own infrastructure, and this page says so rather
+        than returning a bare empty table.</p>
+        <p>Data: ACMA Register of Radiocommunications Licences (CC BY 4.0). Licensee details must
+        not be used for unsolicited contact (Spam Act 2003 / DNCR Act 2006).</p>
+      </div>
+    </details>`;
+}
+
+// ── INTERFERENCE WORKBENCH tab ───────────────────────────────────────────────────
+// A single investigation surface: select the stations you believe are affected and
+// the Workbench assembles the evidence, scores five competing explanations and
+// names what to check next. It argues a case rather than showing numbers — every
+// score expands to its inputs, confidence is always stated, and a weak or empty
+// result is reported as a finding with a next step, never a blank panel.
+// Wording discipline: never "cause" — always "most consistent with" / "leading
+// hypothesis" / "worth checking first".
+// Reuses the Bit Flipper sensor index (H5 misattribution check), the pass-range
+// helpers (H1), the ACMA threat data (suspect list, strip plot, map squares) and
+// the RF Changes timeline. Nothing is fetched until the tab is opened, and the
+// ACMA/RFC files only load once an investigation has a leading candidate.
+
+const WB_HYP = {
+  h1: { short: 'H1', label: 'Repeater common-mode' },
+  h2: { short: 'H2', label: 'Geographic / regional' },
+  h3: { short: 'H3', label: 'Channel-wide' },
+  h4: { short: 'H4', label: 'Site-local, independent' },
+  h5: { short: 'H5', label: 'Misattribution artefact' },
+};
+
+const WB_SYMPTOMS = {
+  bitflips:       'Bit flips',
+  values:         'Value corruption',
+  dropouts:       'Dropouts / missing reports',
+  misattribution: 'Cross-station misattribution',
+  noise:          'Raised noise floor',
+};
+
+// Symptom → hypothesis score multiplier. Deliberately mild (≤1.35): the symptom
+// tilts the ranking, the data decides it. Applied multiplicatively, capped at
+// 0.99, and shown in every score's expandable arithmetic.
+const WB_SYMPTOM_WEIGHT = {
+  bitflips:       { h1: 1.10, h3: 1.10 },
+  values:         { h1: 1.10, h5: 1.10 },
+  dropouts:       { h2: 1.10, h3: 1.10, h4: 1.10 },
+  misattribution: { h5: 1.35, h1: 0.85 },
+  noise:          { h2: 1.15, h3: 1.15 },
+};
+
+const WB_CASES_KEY     = 'mn-wb-cases';
+const WB_MATRIX_COLS   = 10;   // routing-matrix column cap (ranked candidates)
+const WB_MATRIX_GOOD   = 15;   // known-good rows shown in the matrix
+const WB_AFFECTED_COLOR = '#c7401a';
+const WB_GOOD_COLOR     = '#107c10';
+const WB_DISC_COLOR     = '#ff8c00';
+
+// ── selection ──
+
+function wbParseIds(text) {
+  return [...new Set(String(text || '').split(/[\s,;]+/)
+    .map(t => parseInt(t, 10))
+    .filter(n => !isNaN(n) && n > 0 && n < 65536))];
+}
+
+function wbAddFromPaste(list) {
+  const el = document.getElementById('wb-paste');
+  const ids = wbParseIds(el ? el.value : '');
+  if (!ids.length) return;
+  wbAddIds(ids, list);
+  if (el) el.value = '';
+  renderMain();
+}
+
+function wbAddIds(ids, list) {
+  const other = list === 'affected' ? 'good' : 'affected';
+  state.wb[other] = state.wb[other].filter(id => !ids.includes(id));
+  state.wb[list]  = [...new Set([...state.wb[list], ...ids])];
+}
+
+function wbAddStation(stationId, list) {
+  const s = (state.data?.stations || []).find(x => x.id === stationId);
+  if (!s) return;
+  wbAddIds(stationAlertIds(s), list);
+  state.wb.pickQuery = '';
+  renderMain();
+}
+
+function wbRemoveId(list, id) {
+  state.wb[list] = state.wb[list].filter(x => x !== id);
+  renderMain();
+}
+
+function wbSwapId(list, id) {
+  const other = list === 'affected' ? 'good' : 'affected';
+  state.wb[list] = state.wb[list].filter(x => x !== id);
+  if (!state.wb[other].includes(id)) state.wb[other].push(id);
+  renderMain();
+}
+
+function wbClearCase() {
+  Object.assign(state.wb, { affected: [], good: [], onset: '', onsetEnd: '',
+                            symptom: '', caseName: '', lastAnalysis: null });
+  renderMain();
+}
+
+// Worked example for the intro screen: flag a handful of stations behind the
+// busiest documented repeater as affected plus two of its neighbours as
+// known-good — a clean H1 pattern that also demonstrates the specificity
+// penalty of a heavily-shared repeater.
+function wbLoadExample() {
+  const all = state.data.stations;
+  const reps = all.filter(s => s.roles.includes('repeater') && s.repeater &&
+                               (s.repeater.pass_ranges || []).length);
+  let best = null, bestServed = [];
+  for (const r of reps) {
+    const served = all.filter(s => s.id !== r.id && s.roles.includes('field') &&
+      stationAlertIds(s).some(id => passRangeCoversId(r.repeater, id)));
+    if (served.length > bestServed.length) { best = r; bestServed = served; }
+  }
+  if (!best || bestServed.length < 7) return;
+  state.wb.affected = bestServed.slice(0, 5).map(s => stationAlertIds(s)[0]);
+  state.wb.good     = bestServed.slice(5, 7).map(s => stationAlertIds(s)[0]);
+  state.wb.symptom  = 'bitflips';
+  state.wb.caseName = 'Worked example';
+  renderMain();
+}
+
+// ── bit arithmetic (shared with the Bit Flipper's mental model) ──
+
+function wbPopcount(x) { let c = 0; while (x) { x &= x - 1; c++; } return c; }
+
+function wbBitsDiff(a, b) {
+  const out = []; const x = a ^ b;
+  for (let i = 0; i < 16; i++) if (x & (1 << i)) out.push(i);
+  return out;
+}
+
+// Deep-link into the existing Bit Flipper rather than reimplementing it.
+function wbOpenBf(addr) {
+  state.bfInput = String(addr);
+  state.bfBits = '2';
+  state.bfOnlyMatches = true;
+  switchTab('bitflipper');
+}
+
+// ── analysis core ──
+
+// Resolve ALERT addresses against the sensor index → unique station records
+// plus the addresses that matched nothing in the database.
+function wbResolve(addrs, idx) {
+  const byStation = new Map(), unmatched = [];
+  for (const id of addrs) {
+    const hits = idx.get(id) || [];
+    if (!hits.length) { unmatched.push(id); continue; }
+    for (const { station } of hits) {
+      if (!byStation.has(station.id)) byStation.set(station.id, { station, addrs: [] });
+      const rec = byStation.get(station.id);
+      if (!rec.addrs.includes(id)) rec.addrs.push(id);
+    }
+  }
+  return { byStation, stations: [...byStation.values()].map(x => x.station), unmatched };
+}
+
+function wbMeanPairKm(stations) {
+  const pts = stations.filter(s => s.lat != null && s.lon != null);
+  if (pts.length < 2) return null;
+  let sum = 0, n = 0;
+  for (let i = 0; i < pts.length; i++)
+    for (let j = i + 1; j < pts.length; j++) {
+      sum += acmaHaversineKm(pts[i].lat, pts[i].lon, pts[j].lat, pts[j].lon); n++;
+    }
+  return sum / n;
+}
+
+// Evaluate all five hypotheses against the current selection. Pure computation
+// — no DOM, no fetches — so the same result feeds the verdict card, ranking,
+// evidence panels, map and exports within one render.
+function wbAnalyse() {
+  const wbs = state.wb;
+  const idx  = buildSensorIndex();
+  const aff  = wbResolve(wbs.affected, idx);
+  const goodR = wbResolve(wbs.good, idx);
+  const A      = aff.stations;
+  const affSet = new Set(A.map(s => s.id));
+  const G      = goodR.stations.filter(s => !affSet.has(s.id));
+  const goodSet = new Set(G.map(s => s.id));
+
+  const all     = state.data.stations;
+  const idsCache = new Map();
+  const idsOf = s => {
+    if (!idsCache.has(s.id)) idsCache.set(s.id, stationAlertIds(s));
+    return idsCache.get(s.id);
+  };
+  const withIds = all.filter(s => idsOf(s).length);
+
+  // Comparison universe: explicit known-good stations when given, otherwise
+  // every station not flagged affected is assumed good (stated in the UI).
+  const explicitGood = G.length > 0;
+  const U = explicitGood ? G : withIds.filter(s => !affSet.has(s.id));
+
+  const repeaters = all.filter(s => s.roles.includes('repeater') && s.repeater &&
+    Array.isArray(s.repeater.pass_ranges) && s.repeater.pass_ranges.length);
+  const repeaterRoleCount = all.filter(s => s.roles.includes('repeater')).length;
+  const passes = (s, r) => s.id !== r.id && idsOf(s).some(id => passRangeCoversId(r.repeater, id));
+
+  // station.id → repeaters whose pass ranges carry it (A ∪ U only)
+  const throughMap = new Map();
+  for (const s of [...A, ...U]) {
+    const rs = repeaters.filter(r => passes(s, r));
+    if (rs.length) throughMap.set(s.id, rs);
+  }
+  const A_routed = A.filter(s => throughMap.has(s.id));
+  const U_routed = U.filter(s => throughMap.has(s.id));
+  const A_unrouted = A.filter(s => !throughMap.has(s.id));
+
+  // ── H1: per-repeater explanatory power ──
+  const byRep = new Map();
+  for (const s of A_routed) for (const r of throughMap.get(s.id)) {
+    if (!byRep.has(r.id)) byRep.set(r.id, { r, passA: [], passUn: 0 });
+    byRep.get(r.id).passA.push(s);
+  }
+  for (const s of U_routed) for (const r of throughMap.get(s.id)) {
+    if (byRep.has(r.id)) byRep.get(r.id).passUn++;
+  }
+  const candidates = [...byRep.values()].map(c => {
+    const through     = c.passA.length + c.passUn;
+    const coverage    = A_routed.length ? c.passA.length / A_routed.length : 0;
+    const specificity = through ? 1 - c.passUn / through : 0;
+    const power = (coverage + specificity) > 0
+      ? 2 * coverage * specificity / (coverage + specificity) : 0;
+    return { ...c, through, coverage, specificity, power, chain: [] };
+  }).sort((a, b) => b.power - a.power || b.coverage - a.coverage);
+
+  // Two repeaters in series both score highly — flag them as a chain rather
+  // than presenting them as competing suspects. R1 feeds R2 when R2's pass
+  // ranges carry R1's own ALERT ids.
+  const topSlice = candidates.slice(0, 6)
+    .filter(c => candidates.length && c.power >= 0.75 * candidates[0].power);
+  for (const c1 of topSlice) for (const c2 of topSlice) {
+    if (c1 === c2) continue;
+    if (idsOf(c1.r).some(id => passRangeCoversId(c2.r.repeater, id))) {
+      if (!c1.chain.includes(c2.r.name)) c1.chain.push(c2.r.name);
+      if (!c2.chain.includes(c1.r.name)) c2.chain.push(c1.r.name);
+    }
+  }
+  const top = candidates[0] || null;
+  const h1base = top ? top.power : 0;
+
+  // ── affected-cluster geometry (shared by H2 and the discriminators) ──
+  const affPts = A.filter(s => s.lat != null && s.lon != null);
+  let cluster = null;
+  if (affPts.length >= 2) {
+    const cLat = affPts.reduce((t, s) => t + s.lat, 0) / affPts.length;
+    const cLon = affPts.reduce((t, s) => t + s.lon, 0) / affPts.length;
+    const dists = affPts.map(s => acmaHaversineKm(cLat, cLon, s.lat, s.lon));
+    cluster = { lat: cLat, lon: cLon, radiusKm: Math.max(5, Math.max(...dists)) };
+  }
+
+  // ── H2: spatial clustering vs network baseline ──
+  // Two terms, mirroring H1's grammar: tightness (are the affected stations
+  // closer together than the network at large?) and cluster specificity (how
+  // much of the affected area is actually affected? — a tight cluster where 25
+  // of 30 neighbours are fine points at shared infrastructure, not geography).
+  const dAff = wbMeanPairKm(A);
+  const netPts = withIds.filter(s => s.lat != null && s.lon != null);
+  const stride = Math.max(1, Math.ceil(netPts.length / 160));   // deterministic sample
+  const sample = netPts.filter((_, i) => i % stride === 0);
+  const dNet = wbMeanPairKm(sample);
+  const h2ratio = (dAff != null && dNet) ? dNet / Math.max(dAff, 0.5) : null;
+  const h2tight = (h2ratio == null || affPts.length < 3)
+    ? 0 : Math.max(0, Math.min(1, (h2ratio - 1) / 4));
+  let h2inCluster = 0, h2spec = 0;
+  if (cluster && affPts.length >= 3) {
+    const uIn = U.filter(s => s.lat != null && s.lon != null &&
+      acmaHaversineKm(cluster.lat, cluster.lon, s.lat, s.lon) <= cluster.radiusKm).length;
+    h2inCluster = uIn + affPts.length;
+    h2spec = h2inCluster ? affPts.length / h2inCluster : 0;
+  }
+  const h2base = (h2tight + h2spec) > 0 ? 2 * h2tight * h2spec / (h2tight + h2spec) : 0;
+
+  // ── H3: shared RX channel vs base rate ──
+  const freqCount = list => {
+    const m = new Map();
+    for (const s of list) {
+      const fs = new Set((throughMap.get(s.id) || [])
+        .map(r => r.repeater.rx_mhz).filter(f => f != null));
+      for (const f of fs) m.set(f, (m.get(f) || 0) + 1);
+    }
+    return m;
+  };
+  const fA = freqCount(A_routed), fU = freqCount(U_routed);
+  const h3rows = [...fA.entries()].map(([f, n]) => {
+    const share = A_routed.length ? n / A_routed.length : 0;
+    const base  = U_routed.length ? (fU.get(f) || 0) / U_routed.length : 0;
+    const lift  = base > 0 ? share / base : (share > 0 ? null : 1);  // null = no base rate
+    const liftEff = lift == null ? 3 : Math.min(lift, 4);
+    const score = Math.max(0, Math.min(0.9, (liftEff - 1) / 1.5)) * share;
+    return { f, n, share, base, lift, score };
+  }).sort((a, b) => b.score - a.score);
+  const h3best = h3rows[0] || null;
+  const h3base = h3best ? h3best.score : 0;
+
+  // ── H5: near-address pairs among the selected ALERT ids ──
+  const addrs = [...new Set([...wbs.affected])];
+  const h5pairs = [];
+  for (let i = 0; i < addrs.length; i++)
+    for (let j = i + 1; j < addrs.length; j++) {
+      const d = wbPopcount(addrs[i] ^ addrs[j]);
+      if (d >= 1 && d <= 2)
+        h5pairs.push({ a: addrs[i], b: addrs[j], d, bits: wbBitsDiff(addrs[i], addrs[j]) });
+    }
+  h5pairs.sort((x, y) => x.d - y.d || x.a - y.a);
+  const h5d1 = h5pairs.filter(p => p.d === 1).length;
+  const h5base = h5d1 ? Math.min(0.95, 0.8 + 0.05 * h5d1)
+               : h5pairs.length ? 0.45 : 0.05;
+
+  // ── H4: the residual — strong only when every shared-cause hypothesis is weak ──
+  const h4base = Math.max(0.05, Math.min(0.7, 0.7 * (1 - Math.max(h1base, h2base, h3base))));
+
+  // ── ranking, symptom weights, confidence ──
+  const w = WB_SYMPTOM_WEIGHT[wbs.symptom] || {};
+  const mk = (key, base) => ({
+    key, ...WB_HYP[key], base,
+    weight: w[key] || 1,
+    score: Math.min(0.99, base * (w[key] || 1)),
+  });
+  const hyps = [mk('h1', h1base), mk('h2', h2base), mk('h3', h3base),
+                mk('h4', h4base), mk('h5', h5base)];
+  hyps.sort((a, b) => b.score - a.score);
+  const lead = hyps[0], second = hyps[1];
+  const gap = lead.score - second.score;
+
+  const hOf = k => hyps.find(h => h.key === k);
+  let confidence = lead.score >= 0.6 && gap >= 0.2 ? 'high'
+                 : lead.score >= 0.35 && gap >= 0.08 ? 'moderate' : 'low';
+  const notes = [];
+  if (hOf('h1').score >= 0.45 && hOf('h2').score >= 0.45 &&
+      Math.abs(hOf('h1').score - hOf('h2').score) < 0.15) {
+    if (confidence === 'high') confidence = 'moderate';
+    notes.push('Your affected stations share both a repeater and a location, so H1 and H2 ' +
+      'cannot be separated with the current selection — repeaters serve geographic areas. ' +
+      'The discriminating stations below are how to break the tie.');
+  }
+  if (A.length < 3) {
+    confidence = 'low';
+    notes.push(`Only ${A.length} affected station${A.length === 1 ? '' : 's'} resolved — ` +
+      'most patterns need at least three to mean much.');
+  }
+  if (!explicitGood) {
+    notes.push('No known-good stations marked: specificity assumes every unselected station ' +
+      'is fine, which overstates it if the event is wider than your selection.');
+  }
+  if (A_unrouted.length) {
+    notes.push(`${A_unrouted.length} affected station${A_unrouted.length === 1 ? ' has' : 's have'} ` +
+      'no recorded routing — they can neither support nor refute H1 and are excluded from its arithmetic.');
+  }
+  if (aff.unmatched.length) {
+    notes.push(`Address${aff.unmatched.length === 1 ? '' : 'es'} ${aff.unmatched.join(', ')} ` +
+      'matched no station in the database — still included in the misattribution check (H5), invisible everywhere else.');
+  }
+
+  // ── discriminating stations: the highest-value observation in the analysis ──
+  // Inside the affected cluster, routed via something other than the leading
+  // repeater — clean strengthens H1, affected strengthens H2. Also the affected
+  // stations the leading repeater does NOT explain.
+  let disc = [], unexplained = [];
+  if (top && cluster) {
+    disc = all
+      .filter(s => !affSet.has(s.id) && s.lat != null && s.lon != null && idsOf(s).length &&
+                   !s.roles.includes('repeater'))
+      .map(s => ({ s, km: acmaHaversineKm(cluster.lat, cluster.lon, s.lat, s.lon) }))
+      .filter(x => x.km <= cluster.radiusKm)
+      .filter(x => !passes(x.s, top.r))
+      .map(x => ({ ...x,
+        via: repeaters.filter(r => passes(x.s, r)).map(r => r.name),
+        status: goodSet.has(x.s.id) ? 'known-good' : 'unchecked' }))
+      .filter(x => x.via.length)
+      .sort((a, b) =>
+        (a.status === 'unchecked' ? 0 : 1) - (b.status === 'unchecked' ? 0 : 1) || a.km - b.km)
+      .slice(0, 5);
+    const inTop = new Set(top.passA.map(s => s.id));
+    unexplained = A_routed.filter(s => !inTop.has(s.id));
+  }
+
+  // ── plain-language statements (kept as text; escaped at render) ──
+  const stmt = {};
+  stmt.h1 = top
+    ? `${top.passA.length} of ${A_routed.length} routed affected stations pass through ` +
+      `${top.r.name}; ${top.passUn} of the ${top.through} stations through it are unaffected.` +
+      (top.chain.length ? ` In series with ${top.chain.join(', ')} — a chain, not competing suspects.` : '')
+    : (A_routed.length
+        ? 'No documented repeater carries any of the affected stations — H1 cannot fire.'
+        : 'None of the affected stations have recorded pass-range routing, so the repeater ' +
+          'hypothesis cannot be evaluated — backfilling pass ranges is the fix.');
+  stmt.h2 = (h2ratio != null && affPts.length >= 3)
+    ? `Affected stations are ${h2ratio.toFixed(1)}× more tightly clustered than the network ` +
+      `baseline (mean spacing ${dAff.toFixed(0)} km vs ${dNet.toFixed(0)} km)` +
+      (h2inCluster ? `, but ${affPts.length} of the ${h2inCluster} comparison stations inside ` +
+        `that area are affected (${Math.round(h2spec * 100)}%).` : '.') +
+      (h2ratio < 1.5 ? ' Not meaningfully tighter — this looks routing- or site-related, not regional.'
+        : h2spec < 0.4 ? ' A tight cluster where most neighbours are fine points at shared ' +
+          'infrastructure, not a blanket regional source.'
+        : ' This looks regional — but repeaters serve regions too; see the confound note.')
+    : 'Fewer than three affected stations have coordinates — spatial clustering cannot be assessed.';
+  stmt.h3 = h3best
+    ? `${Math.round(h3best.share * 100)}% of routed affected stations sit behind ` +
+      `${h3best.f} MHz RX, against a ${Math.round(h3best.base * 100)}% base rate` +
+      (h3best.lift == null ? ' (no unaffected comparison stations on that channel).'
+        : ` — lift ${h3best.lift.toFixed(1)}×.`) +
+      (h3best.lift != null && h3best.lift < 1.3
+        ? ' Nearly everything shares this channel, so the overlap is uninformative.' : '')
+    : 'No shared RX channel among the routed affected stations.';
+  stmt.h4 = 'The residual explanation: it strengthens only as the shared-cause hypotheses ' +
+    `weaken (currently max ${Math.max(h1base, h2base, h3base).toFixed(2)}). Staggered onsets ` +
+    'and no shared pattern point at separate local sources — solar controllers, fences, powerline arcing.';
+  stmt.h5 = h5pairs.length
+    ? `${h5pairs.length} pair${h5pairs.length === 1 ? '' : 's'} of selected addresses within ` +
+      `2 bit flips of each other${h5d1 ? ` (${h5d1} at distance 1)` : ''} — some "affected" ` +
+      'stations may be one victim and one ghost of the same corrupted packets.'
+    : 'No selected addresses within 2 bit flips of each other — the selection looks independently addressed.';
+
+  return { aff, A, G, U, explicitGood, A_routed, U_routed, A_unrouted,
+           unmatched: aff.unmatched, goodUnmatched: goodR.unmatched,
+           repeaters, repeaterRoleCount, passes, throughMap,
+           candidates, top,
+           h2: { dAff, dNet, ratio: h2ratio, nPts: affPts.length, sampleN: sample.length,
+                 tight: h2tight, spec: h2spec, inCluster: h2inCluster, base: h2base },
+           h3: { rows: h3rows, best: h3best, base: h3base },
+           h5: { pairs: h5pairs, d1: h5d1, base: h5base },
+           h4: { base: h4base },
+           h1: { base: h1base },
+           hyps, lead, second, gap, confidence, notes,
+           disc, unexplained, cluster,
+           stmt, nextCheck: null };  // nextCheck filled below (needs stmt/disc)
+}
+
+// The one observation most likely to change the answer, phrased as an action.
+function wbNextCheck(an) {
+  const lead = an.lead;
+  if (lead.key === 'h5' && an.h5.pairs.length) {
+    const p = an.h5.pairs[0];
+    return `Open addresses ${p.a} and ${p.b} in the Bit Flipper and compare their data ` +
+      'series — misattributed readings appear in one series as ghosts of the other. ' +
+      'Deselect the victim and re-run before trusting anything else here.';
+  }
+  const un = an.disc.find(d => d.status === 'unchecked');
+  if ((lead.key === 'h1' || lead.key === 'h2') && un) {
+    return `Station ${un.s.name} is inside the affected area but routes via ${un.via[0]}. ` +
+      'If its data is clean, the repeater explanation strengthens considerably; if it is ' +
+      'also affected, the pattern is more likely geographic. Check it, mark it here, re-run.';
+  }
+  if (lead.key === 'h1') {
+    return 'Mark known-good stations — especially any inside the affected area on a ' +
+      'different repeater. Specificity is currently assumed, not confirmed.';
+  }
+  if (lead.key === 'h2') {
+    return 'Check the ACMA candidates near the cluster centre and the weather record at ' +
+      'onset — a regional pattern with sudden onset suggests ducting or a new local emitter.';
+  }
+  if (lead.key === 'h3') {
+    return 'Check a station behind the same RX channel in a different region: a channel-wide ' +
+      'source crosses regions, a repeater fault does not.';
+  }
+  return 'Run a battery-only power-down test at each affected site (kill mains/solar, watch ' +
+    'the noise floor) — the classic separator for independent site-local sources.';
+}
+
+// ── saved investigations & shareable URL state ──
+
+function wbCases() {
+  try { return JSON.parse(localStorage.getItem(WB_CASES_KEY) || '{}'); }
+  catch (_) { return {}; }
+}
+
+function wbSaveCase() {
+  const el = document.getElementById('wb-case-name');
+  const name = ((el && el.value) || state.wb.caseName || '').trim();
+  if (!name) { alert('Name the investigation first.'); return; }
+  const cases = wbCases();
+  cases[name] = { a: state.wb.affected, g: state.wb.good, o: state.wb.onset,
+                  e: state.wb.onsetEnd, s: state.wb.symptom, saved: new Date().toISOString() };
+  localStorage.setItem(WB_CASES_KEY, JSON.stringify(cases));
+  state.wb.caseName = name;
+  renderMain();
+}
+
+function wbLoadCase(name) {
+  const c = wbCases()[name];
+  if (!c) return;
+  Object.assign(state.wb, { affected: c.a || [], good: c.g || [], onset: c.o || '',
+                            onsetEnd: c.e || '', symptom: c.s || '', caseName: name });
+  renderMain();
+}
+
+function wbDeleteCase() {
+  const sel = document.getElementById('wb-case-sel');
+  const name = sel && sel.value;
+  if (!name) return;
+  const cases = wbCases();
+  delete cases[name];
+  localStorage.setItem(WB_CASES_KEY, JSON.stringify(cases));
+  renderMain();
+}
+
+function wbHashState() {
+  const wbs = state.wb;
+  if (!wbs.affected.length && !wbs.good.length) return null;
+  const p = new URLSearchParams();
+  p.set('a', wbs.affected.join('.'));
+  if (wbs.good.length) p.set('g', wbs.good.join('.'));
+  if (wbs.onset)       p.set('o', wbs.onset);
+  if (wbs.onsetEnd)    p.set('e', wbs.onsetEnd);
+  if (wbs.symptom)     p.set('s', wbs.symptom);
+  if (wbs.caseName)    p.set('n', wbs.caseName);
+  return 'wb&' + p.toString();
+}
+
+function wbSyncUrl() {
+  try {
+    const h = wbHashState();
+    const cur = location.hash.replace(/^#/, '');
+    if (h) { if (cur !== h) history.replaceState(null, '', '#' + h); }
+    else if (cur.startsWith('wb')) history.replaceState(null, '', location.pathname + location.search);
+  } catch (_) {}   // history API unavailable over some file:// contexts
+}
+
+function wbShareLink(btn) {
+  const h = wbHashState();
+  if (!h) return;
+  const url = location.href.split('#')[0] + '#' + h;
+  const done = ok => {
+    if (!btn) return;
+    const prev = btn.textContent;
+    btn.textContent = ok ? 'Copied ✓' : url;
+    setTimeout(() => { btn.textContent = prev; }, 2000);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => done(true), () => done(false));
+  } else done(false);
+}
+
+function wbRestoreFromUrl() {
+  const raw = location.hash.replace(/^#/, '');
+  if (!raw.startsWith('wb')) return;
+  const p = new URLSearchParams(raw.slice(3));
+  const nums = v => (v || '').split(/[.,]/).map(x => parseInt(x, 10))
+    .filter(n => !isNaN(n) && n > 0 && n < 65536);
+  state.wb.affected = nums(p.get('a'));
+  state.wb.good     = nums(p.get('g'));
+  state.wb.onset    = (p.get('o') || '').slice(0, 10);
+  state.wb.onsetEnd = (p.get('e') || '').slice(0, 10);
+  state.wb.symptom  = WB_SYMPTOMS[p.get('s')] ? p.get('s') : '';
+  state.wb.caseName = (p.get('n') || '').slice(0, 80);
+  if (state.wb.affected.length || state.wb.good.length) {
+    state.activeTab = 'workbench';
+    renderTabs();
+    renderMain();
+  }
+}
+
+// ── education layer ──
+
+// Tier 1: dotted-underline tooltip; clicking through opens the concept drawer
+// (tier 3) when a concept id is given.
+function wbT(text, tip, conceptId) {
+  const click = conceptId ? ` onclick="wbOpenConcept('${escAttr(conceptId)}')"` : '';
+  return `<span class="wb-term${conceptId ? ' wb-term-link' : ''}" tabindex="0"` +
+         ` data-tip="${esc(tip)}"${click}>${esc(text)}</span>`;
+}
+
+// Tier 2: per-panel "Why this matters" expander.
+function wbWhy(html) {
+  return `<details class="wb-why"><summary>Why this matters</summary>
+    <div class="small" style="color:var(--muted);margin-top:.35rem">${html}</div></details>`;
+}
+
+function wbEnsureConcepts() {
+  const wbs = state.wb;
+  if (wbs.concepts) return Promise.resolve();
+  if (wbs.conceptsPromise) return wbs.conceptsPromise;
+  wbs.conceptsPromise = acmaFetchJson('rf-concepts.json')
+    .then(d => { wbs.concepts = d; })
+    .catch(err => { wbs.conceptsPromise = null; throw err; });
+  return wbs.conceptsPromise;
+}
+
+function wbOpenConcept(id) {
+  state.wb.drawerId = id || null;
+  const el = document.getElementById('wb-drawer');
+  if (!el) return;
+  el.hidden = false;
+  el.innerHTML = '<div class="small" style="padding:1rem;color:var(--muted)">Loading concept notes…</div>';
+  wbEnsureConcepts().then(() => wbRenderDrawer()).catch(err => {
+    el.innerHTML = `<div style="padding:1rem">
+      <button onclick="wbCloseDrawer()" style="float:right">×</button>
+      <p class="small" style="color:var(--muted)">Concept notes unavailable (${esc(err.message)}) —
+      data/rf-concepts.json cannot be fetched over file://.</p></div>`;
+  });
+}
+
+function wbCloseDrawer() {
+  const el = document.getElementById('wb-drawer');
+  if (el) { el.hidden = true; el.innerHTML = ''; }
+  state.wb.drawerId = null;
+}
+
+function wbRenderDrawer() {
+  const el = document.getElementById('wb-drawer');
+  const data = state.wb.concepts;
+  if (!el || !data) return;
+  const list = data.concepts || [];
+  const cur = list.find(c => c.id === state.wb.drawerId) || null;
+  const head = `
+    <div class="wb-drawer-head">
+      <strong>${cur ? esc(cur.title) : 'RF concepts'}</strong>
+      <span>
+        ${cur ? `<button onclick="wbOpenConcept('')" title="All concepts">≡</button>` : ''}
+        <button onclick="wbCloseDrawer()" title="Close">×</button>
+      </span>
+    </div>`;
+  if (!cur) {
+    el.innerHTML = `${head}
+      <div class="wb-drawer-body">
+        <p class="small" style="color:var(--muted)">Short, field-oriented explainers. Every entry
+        says what the phenomenon looks like <em>in your data</em>, not just what it is.</p>
+        ${list.map(c => `<a href="#" class="wb-drawer-item"
+            onclick="wbOpenConcept('${escAttr(c.id)}');return false">${esc(c.title)}</a>`).join('')}
+      </div>`;
+    return;
+  }
+  const also = (cur.see_also || []).map(id => {
+    const t = list.find(c => c.id === id);
+    return t ? `<a href="#" onclick="wbOpenConcept('${escAttr(id)}');return false">${esc(t.title)}</a>` : '';
+  }).filter(Boolean).join(' · ');
+  el.innerHTML = `${head}
+    <div class="wb-drawer-body">
+      <p>${esc(cur.what)}</p>
+      <p><strong>In your data:</strong> ${esc(cur.in_your_data)}</p>
+      <p><strong>What to do:</strong> ${esc(cur.next)}</p>
+      ${also ? `<p class="small" style="color:var(--muted)">See also: ${also}</p>` : ''}
+    </div>`;
+}
+
+// ── page shell ──
+
+function renderWorkbenchHtml() {
+  const wbs = state.wb;
+  const hasCase = wbs.affected.length > 0;
+  const an = hasCase ? wbAnalyse() : null;
+  if (an) an.nextCheck = wbNextCheck(an);
+  state.wb.lastAnalysis = an;
+  return `
+    <div class="wb-page">
+      <div class="wb-layout">
+        <aside class="stack wb-rail">${wbSetupHtml(an)}</aside>
+        <div class="stack">${an ? wbCentreHtml(an) : wbIntroHtml()}</div>
+        <aside class="stack wb-rail">${wbRightHtml(an)}</aside>
+      </div>
+      <div id="acma-card" class="acma-card" hidden></div>
+      <div id="wb-drawer" class="wb-drawer" hidden></div>
+    </div>`;
+}
+
+function initWb() {
+  wbSyncUrl();
+  const A = state.acma, R = state.rfc;
+  const rerender = () => { if (state.activeTab === 'workbench') renderMain(); };
+  // Suspects / strip plot / timeline need ACMA + RFC data — fetch only once an
+  // investigation exists, and only what hasn't already been loaded elsewhere.
+  if (state.wb.affected.length) {
+    if (!A.loaded && !A.loadPromise && !A.error) acmaEnsureCore().then(rerender).catch(rerender);
+    if (A.loaded && !A.devLoaded && !A.devPromise) acmaEnsureDevices().then(rerender).catch(() => {});
+    if (!R.loaded && !R.loadPromise && !R.error) rfcEnsureData().then(rerender).catch(rerender);
+  }
+  initWbMap();
+}
+
+// ── left rail: investigation setup ──
+
+function wbSetupHtml(an) {
+  const wbs = state.wb;
+  const cases = wbCases();
+  const caseNames = Object.keys(cases).sort();
+  const passRangeReps = state.data.stations.filter(s =>
+    s.roles.includes('repeater') && s.repeater && (s.repeater.pass_ranges || []).length).length;
+  const roleReps = state.data.stations.filter(s => s.roles.includes('repeater')).length;
+  return `
+    <div class="panel">
+      <div class="panel-header"><h3>Investigation</h3>
+        ${(wbs.affected.length || wbs.good.length) ? '<button onclick="wbClearCase()">Clear</button>' : ''}
+      </div>
+      <label class="small" style="display:block;margin-top:.5rem">Paste ALERT IDs
+        <textarea id="wb-paste" rows="2" style="margin-top:.3rem"
+          placeholder="6129, 6130 2316&#10;2320 — space, comma or newline separated"></textarea>
+      </label>
+      <div class="button-row" style="justify-content:flex-start;margin:.4rem 0">
+        <button class="primary" onclick="wbAddFromPaste('affected')">Add as affected</button>
+        <button onclick="wbAddFromPaste('good')">Add as known-good</button>
+      </div>
+      <label class="small" style="display:block;margin-top:.4rem">Or search stations
+        <input type="search" id="wb-pick" placeholder="Station name or number…"
+               value="${esc(wbs.pickQuery)}" style="margin-top:.3rem"
+               oninput="state.wb.pickQuery=this.value;wbRefreshPick()">
+      </label>
+      <div id="wb-pick-out">${wbPickResultsHtml()}</div>
+      ${wbChipsHtml('affected', 'Affected stations')}
+      ${wbChipsHtml('good', 'Known-good stations')}
+      <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+        ${wbT('Known-good', 'Stations you have checked and found fine. Marking them sharpens specificity far more than adding affected stations does.', 'coverage_specificity')}
+        stations sharpen the analysis; unselected stations are otherwise assumed good.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><h3>Context</h3></div>
+      <div class="upload-grid" style="margin-top:.5rem">
+        <label>Onset date <span class="small" style="color:var(--muted)">(blank = unknown)</span>
+          <input type="date" value="${esc(wbs.onset)}"
+                 onchange="state.wb.onset=this.value;renderMain()">
+        </label>
+        <label>Onset range end <span class="small" style="color:var(--muted)">(optional)</span>
+          <input type="date" value="${esc(wbs.onsetEnd)}"
+                 onchange="state.wb.onsetEnd=this.value;renderMain()">
+        </label>
+        <label>Symptom type
+          <select onchange="state.wb.symptom=this.value;renderMain()">
+            <option value="">Unknown / mixed</option>
+            ${Object.entries(WB_SYMPTOMS).map(([k, v]) => `
+              <option value="${k}" ${wbs.symptom === k ? 'selected' : ''}>${v}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+      <p class="small" style="color:var(--muted);margin:.5rem 0 0">The symptom mildly weights the
+        hypothesis ranking (shown in each score's arithmetic); it never decides it.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><h3>Save / share</h3></div>
+      <div class="upload-grid" style="margin-top:.5rem">
+        <label>Case name
+          <input type="text" id="wb-case-name" value="${esc(wbs.caseName)}" placeholder="e.g. Mt Stuart June event"
+                 oninput="state.wb.caseName=this.value">
+        </label>
+      </div>
+      <div class="button-row" style="justify-content:flex-start;margin-top:.5rem">
+        <button onclick="wbSaveCase()">Save</button>
+        <button onclick="wbShareLink(this)" ${wbs.affected.length ? '' : 'disabled'}>Copy share link</button>
+      </div>
+      ${caseNames.length ? `
+        <div style="display:flex;gap:.4rem;align-items:center;margin-top:.6rem">
+          <select id="wb-case-sel" onchange="wbLoadCase(this.value)">
+            <option value="">Load saved case…</option>
+            ${caseNames.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}
+          </select>
+          <button onclick="wbDeleteCase()" title="Delete the case selected above">🗑</button>
+        </div>` : ''}
+      <p class="small" style="color:var(--muted);margin:.5rem 0 0">Cases save to this browser;
+        the share link carries the whole investigation in the URL.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><h3>Routing data quality</h3></div>
+      <p class="small" style="color:var(--muted);margin:.4rem 0 0">
+        ${passRangeReps} of ${roleReps} repeaters have recorded pass ranges — H1 can only see
+        those.${an && an.A_unrouted.length ? ` <strong>${an.A_unrouted.length}</strong> of your affected
+        stations have no routing data.` : ''} If a suspect repeater is missing here, backfilling its
+        pass ranges in stations.json is the highest-value fix.</p>
+    </div>`;
+}
+
+function wbChipsHtml(list, label) {
+  const ids = state.wb[list];
+  if (!ids.length) return '';
+  // Resolve names cheaply for chip labels (re-uses the analysis index pattern).
+  const idx = buildSensorIndex();
+  const cls = list === 'affected' ? 'wb-chip-aff' : 'wb-chip-good';
+  const swapTitle = list === 'affected' ? 'Move to known-good' : 'Move to affected';
+  return `
+    <div style="margin-top:.6rem">
+      <div class="small" style="color:var(--muted);margin-bottom:.25rem">${label} (${ids.length})</div>
+      <div class="wb-chips">
+        ${ids.map(id => {
+          const hits = idx.get(id) || [];
+          const name = hits.length ? hits[0].station.name : 'not in database';
+          return `<span class="wb-chip ${cls}${hits.length ? '' : ' wb-chip-miss'}" title="${esc(name)}">
+            <strong>${id}</strong> <span class="wb-chip-name">${esc(name)}</span>
+            <a href="#" title="${swapTitle}" onclick="wbSwapId('${list}',${id});return false">⇄</a>
+            <a href="#" title="Remove" onclick="wbRemoveId('${list}',${id});return false">×</a>
+          </span>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function wbRefreshPick() {
+  const el = document.getElementById('wb-pick-out');
+  if (el) el.innerHTML = wbPickResultsHtml();
+}
+
+function wbPickResultsHtml() {
+  const q = (state.wb.pickQuery || '').trim().toLowerCase();
+  if (q.length < 2) return '';
+  const hits = state.data.stations.filter(s => stationAlertIds(s).length &&
+    (s.name.toLowerCase().includes(q) || (s.station_number || '').includes(q))).slice(0, 8);
+  if (!hits.length) return '<p class="small" style="color:var(--muted);margin:.4rem 0 0">No stations with ALERT ids match.</p>';
+  return `
+    <div class="wb-pick-list">
+      ${hits.map(s => `
+        <div class="wb-pick-row">
+          <span>${esc(s.name)} <span class="small" style="color:var(--muted)">${stationAlertIds(s).join(', ')}</span></span>
+          <span>
+            <button onclick="wbAddStation('${escAttr(s.id)}','affected')" title="Add as affected">+ aff</button>
+            <button onclick="wbAddStation('${escAttr(s.id)}','good')" title="Add as known-good">+ good</button>
+          </span>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ── intro (empty state) ──
+
+function wbIntroHtml() {
+  return `
+    <div class="panel">
+      <div class="panel-header"><h2>Interference Workbench</h2></div>
+      <p style="max-width:75ch">Select the stations you believe are affected (left) and the
+        Workbench assembles the evidence spread across Map, Networks, Bit Flipper, RF Environment
+        and RF Changes into one argued case: five competing explanations, scored, with the
+        arithmetic open to inspection and the most informative next check named.</p>
+      <div class="table-wrap" style="margin-top:.5rem">
+        <table>
+          <thead><tr><th style="width:16%">Hypothesis</th><th>Signature in the selected stations</th></tr></thead>
+          <tbody>
+            <tr><td><strong>H1</strong> Repeater common-mode</td><td class="small">Affected stations share a repeater path; unaffected ones mostly don't.</td></tr>
+            <tr><td><strong>H2</strong> Geographic / regional</td><td class="small">Affected stations cluster spatially regardless of routing.</td></tr>
+            <tr><td><strong>H3</strong> Channel-wide</td><td class="small">Affected stations share an RX frequency across different repeaters.</td></tr>
+            <tr><td><strong>H4</strong> Site-local, independent</td><td class="small">No shared path, cluster or channel — staggered onsets, separate local sources.</td></tr>
+            <tr><td><strong>H5</strong> Misattribution artefact</td><td class="small">"Affected" stations 1 address bit apart — data bleeding across IDs via bit flips. Checked first, because it invalidates the selection itself.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="button-row" style="justify-content:flex-start;margin-top:.75rem">
+        <button class="primary" onclick="wbLoadExample()">Load a worked example</button>
+        <button onclick="wbOpenConcept('')">Open the RF concept notes</button>
+      </div>
+      <p class="small" style="color:var(--muted);margin-top:.6rem">The Workbench never claims a
+        cause. It ranks explanations by how well they fit, states its confidence, and tells you
+        what would most change the answer.</p>
+    </div>`;
+}
+
+// ── centre column ──
+
+function wbCentreHtml(an) {
+  return `
+    ${an.h5.pairs.length ? wbH5BannerHtml(an) : ''}
+    ${wbVerdictHtml(an)}
+    ${wbRankingHtml(an)}
+    ${wbH5PanelHtml(an)}
+    ${wbMatrixHtml(an)}
+    ${wbMapPanelHtml(an)}
+    ${wbTimelineHtml(an)}
+    ${wbStripHtml(an)}
+    ${wbBlindSpotsHtml()}`;
+}
+
+// H5 warning shown before ANY other analysis — a bit-flip pair means the
+// selection itself may be wrong, which invalidates everything below it.
+function wbH5BannerHtml(an) {
+  const p = an.h5.pairs[0];
+  return `
+    <div class="wb-banner">
+      <strong>⚠ Check misattribution first.</strong>
+      Addresses ${an.h5.pairs.map(x => `${x.a} / ${x.b} (${x.d} bit${x.d > 1 ? 's' : ''})`).join(', ')}
+      are within 2 bit flips of each other. With no
+      ${wbT('payload protection', 'The plain ALERT Binary Format has no checksum over address or data — any flipped bit is accepted as truth.', 'no_crc')}
+      in ALERT Binary Format, one may be the victim of the other's corrupted packets rather than
+      independently affected — which would change this entire selection.
+      <button style="margin-left:.5rem" onclick="wbOpenBf(${p.a})">Open ${p.a} in Bit Flipper</button>
+    </div>`;
+}
+
+function wbVerdictHtml(an) {
+  const lead = an.lead;
+  const top = an.top;
+  const conf = { high: 'High', moderate: 'Moderate', low: 'Low' }[an.confidence];
+  let confWhy = `${lead.short} scores ${lead.score.toFixed(2)} against ${an.second.short} at ${an.second.score.toFixed(2)}.`;
+  if (lead.key === 'h1' && top && top.specificity < 0.5 && top.coverage >= 0.8) {
+    confWhy += ` Specificity is weak because ${esc(top.r.name)} carries most of this sub-network.`;
+  }
+  const title = lead.key === 'h1' && top
+    ? `${lead.label} — ${esc(top.r.name)}` : lead.label;
+  return `
+    <div class="panel wb-verdict">
+      <div class="small" style="color:var(--muted)">Leading hypothesis — most consistent with the evidence, not a proven cause</div>
+      <h2 style="margin:.25rem 0">${title}</h2>
+      <p style="margin:.3rem 0">${esc(an.stmt[lead.key])}</p>
+      ${lead.key === 'h1' && top ? `
+        <p class="small" style="margin:.3rem 0">
+          ${wbT('Coverage', 'What fraction of the affected stations pass through this repeater — does it explain all of them?', 'coverage_specificity')} ${top.coverage.toFixed(2)}
+          · ${wbT('Specificity', 'How well the repeater avoids explaining stations that are fine. Low specificity: it is on almost everyone’s path, so its involvement is less informative.', 'coverage_specificity')} ${top.specificity.toFixed(2)}
+          · ${wbT('Explanatory power', 'Harmonic mean (F1) of coverage and specificity — punishes a candidate weak on either.', 'coverage_specificity')} ${top.power.toFixed(2)}</p>` : ''}
+      <p style="margin:.35rem 0"><strong>Confidence: ${conf}.</strong> <span class="small">${confWhy}</span></p>
+      <p style="margin:.35rem 0"><strong>Most informative next check:</strong> ${esc(an.nextCheck)}</p>
+      ${an.notes.length ? `<div class="wb-notes">${an.notes.map(n => `<p class="small">▸ ${esc(n)}</p>`).join('')}</div>` : ''}
+    </div>`;
+}
+
+function wbRankingHtml(an) {
+  const arith = { h1: wbArithH1, h2: wbArithH2, h3: wbArithH3, h4: wbArithH4, h5: wbArithH5 };
+  return `
+    <div class="panel">
+      <div class="panel-header"><h3>Hypothesis ranking</h3>
+        <span class="small" style="color:var(--muted)">all five scored — losing hypotheses stay visible</span></div>
+      ${an.hyps.map((h, i) => `
+        <details class="wb-hyp">
+          <summary>
+            <span class="wb-hyp-rank">#${i + 1}</span>
+            <span class="wb-hyp-name"><strong>${h.short}</strong> ${h.label}</span>
+            <span class="wb-hyp-bar"><span style="width:${Math.round(h.score * 100)}%"></span></span>
+            <span class="wb-hyp-score">${h.score.toFixed(2)}</span>
+          </summary>
+          <div class="wb-hyp-body">
+            <p class="small" style="margin:.3rem 0">${esc(an.stmt[h.key])}</p>
+            ${arith[h.key](an, h)}
+          </div>
+        </details>`).join('')}
+      ${wbWhy(`A dashboard would show you one number; an investigation needs the competition.
+        Seeing that H2 scored nearly as high as H1 tells you the case is not settled — and the
+        arithmetic under each score shows exactly which stations drive it, so a number you cannot
+        interrogate never has to be taken on faith.`)}
+    </div>`;
+}
+
+function wbWeightRow(h) {
+  return h.weight !== 1
+    ? `<div class="acma-row"><span>× symptom weight (${esc(WB_SYMPTOMS[state.wb.symptom] || '')})</span><span>${h.weight.toFixed(2)} → ${h.score.toFixed(2)}</span></div>`
+    : `<div class="acma-row"><span>symptom weight</span><span>1.00 (none)</span></div>`;
+}
+
+function wbArithH1(an, h) {
+  if (!an.top) {
+    return `<div class="wb-arith small">
+      ${an.A_routed.length
+        ? `Routed affected stations: ${an.A_routed.length}, but no documented repeater carries any of them.`
+        : `Affected stations with routing data: 0 of ${an.A.length}. Pass ranges are recorded for
+           ${an.repeaters.length} of ${an.repeaterRoleCount} repeaters — the gap is data, not analysis.`}
+      ${wbWeightRow(h)}</div>`;
+  }
+  const t = an.top;
+  const universe = an.explicitGood
+    ? `the ${an.U.length} stations you marked known-good`
+    : `all ${an.U.length} stations not flagged affected (assumed good)`;
+  return `<div class="wb-arith small">
+    <div class="acma-row"><span>unaffected universe</span><span>${universe}</span></div>
+    <div class="acma-row"><span>coverage = |A ∩ through| / |A routed|</span><span>${t.passA.length} / ${an.A_routed.length} = ${t.coverage.toFixed(2)}</span></div>
+    <div class="acma-row"><span>specificity = 1 − |U ∩ through| / |through|</span><span>1 − ${t.passUn}/${t.through} = ${t.specificity.toFixed(2)}</span></div>
+    <div class="acma-row"><span>explanatory power = 2cs/(c+s)</span><span>${t.power.toFixed(2)}</span></div>
+    ${wbWeightRow(h)}
+    ${t.chain.length ? `<div class="acma-row"><span>chain</span><span>in series with ${esc(t.chain.join(', '))}</span></div>` : ''}
+    ${an.A_unrouted.length ? `<div class="acma-row"><span>excluded (no routing)</span><span>${an.A_unrouted.map(s => esc(s.name)).join(', ')}</span></div>` : ''}
+  </div>`;
+}
+
+function wbArithH2(an, h) {
+  const H = an.h2;
+  if (H.ratio == null || H.nPts < 3) {
+    return `<div class="wb-arith small">Needs ≥3 affected stations with coordinates (have ${H.nPts}). ${wbWeightRow(h)}</div>`;
+  }
+  return `<div class="wb-arith small">
+    <div class="acma-row"><span>mean pairwise distance, affected (${H.nPts} stations)</span><span>${H.dAff.toFixed(1)} km</span></div>
+    <div class="acma-row"><span>network baseline (${H.sampleN}-station sample)</span><span>${H.dNet.toFixed(1)} km</span></div>
+    <div class="acma-row"><span>tightness = clamp((baseline/affected − 1) / 4, 0–1)</span><span>${H.ratio.toFixed(2)}× → ${H.tight.toFixed(2)}</span></div>
+    <div class="acma-row"><span>cluster specificity = affected in area / stations in area</span><span>${H.nPts}/${H.inCluster} = ${H.spec.toFixed(2)}</span></div>
+    <div class="acma-row"><span>score = 2ts/(t+s) — same F1 grammar as H1</span><span>${H.base.toFixed(2)}</span></div>
+    ${wbWeightRow(h)}
+    <div class="acma-row"><span>confound</span><span>repeaters serve areas — see discriminating stations</span></div>
+  </div>`;
+}
+
+function wbArithH3(an, h) {
+  const H = an.h3;
+  if (!H.rows.length) return `<div class="wb-arith small">No routed affected stations, so no channel statistics. ${wbWeightRow(h)}</div>`;
+  return `<div class="wb-arith small">
+    ${H.rows.slice(0, 4).map(r => `
+      <div class="acma-row"><span>${r.f} MHz — affected ${Math.round(r.share * 100)}% vs base ${Math.round(r.base * 100)}%</span>
+        <span>lift ${r.lift == null ? '∞ (capped 3)' : r.lift.toFixed(2) + '×'} → ${r.score.toFixed(2)}</span></div>`).join('')}
+    <div class="acma-row"><span>score = clamp((lift − 1)/1.5, 0–0.9) × affected share</span><span>${H.base.toFixed(2)}</span></div>
+    ${wbWeightRow(h)}
+    <div class="acma-row"><span>why relative to base rate</span><span>68 of 88 documented repeaters share 151.5 MHz — raw sharing always fires</span></div>
+  </div>`;
+}
+
+function wbArithH4(an, h) {
+  return `<div class="wb-arith small">
+    <div class="acma-row"><span>residual = 0.7 × (1 − max(H1, H2, H3 base))</span>
+      <span>0.7 × (1 − ${Math.max(an.h1.base, an.h2.base, an.h3.base).toFixed(2)}) = ${an.h4.base.toFixed(2)}</span></div>
+    ${wbWeightRow(h)}
+    <div class="acma-row"><span>capped at 0.7</span><span>a residual can lead, never dominate</span></div>
+  </div>`;
+}
+
+function wbArithH5(an, h) {
+  const H = an.h5;
+  return `<div class="wb-arith small">
+    <div class="acma-row"><span>selected address pairs at Hamming distance 1 / 2</span><span>${H.d1} / ${H.pairs.length - H.d1}</span></div>
+    <div class="acma-row"><span>score</span><span>${H.d1 ? 'distance-1 pair(s): 0.8 + 0.05 each, cap 0.95' : H.pairs.length ? 'distance-2 only: 0.45' : 'none: 0.05 baseline'} = ${H.base.toFixed(2)}</span></div>
+    ${wbWeightRow(h)}
+  </div>`;
+}
+
+// ── evidence panels ──
+
+function wbH5PanelHtml(an) {
+  const H = an.h5;
+  return `
+    <div class="panel">
+      <div class="panel-header"><h3>1 · Address bit-flip check (H5)</h3>
+        <span class="small" style="${H.pairs.length ? 'color:var(--warn)' : 'color:var(--ok)'}">
+          ${H.pairs.length ? `${H.pairs.length} suspect pair${H.pairs.length > 1 ? 's' : ''}` : 'clear'}</span></div>
+      <p class="small" style="color:var(--muted);margin:.4rem 0">Runs first because it can invalidate
+        the selection: with 13 unprotected address bits, a single flip re-attributes a reading to a
+        station whose ID differs by a power of two. Pairwise XOR over the selected addresses,
+        flagging ${wbT('Hamming distance', 'How many bits differ between two addresses. Distance 1 = reachable by a single bit error.', 'hamming')} ≤ 2.</p>
+      ${H.pairs.length ? `
+        <div class="table-wrap">
+          <table class="bf-table" style="min-width:560px">
+            <thead><tr><th>Address A</th><th>Address B</th><th>Distance</th><th>Differing bit(s)</th><th></th></tr></thead>
+            <tbody>${H.pairs.map(p => {
+              const nameOf = a => { const rec = an.aff.byStation; for (const { station, addrs } of rec.values()) if (addrs.includes(a)) return station.name; return '—'; };
+              return `<tr>
+                <td>${p.a} <span class="small" style="color:var(--muted)">${esc(nameOf(p.a))}</span></td>
+                <td>${p.b} <span class="small" style="color:var(--muted)">${esc(nameOf(p.b))}</span></td>
+                <td>${p.d}</td>
+                <td class="small mono">bit ${p.bits.join(', bit ')}</td>
+                <td><button onclick="wbOpenBf(${p.a})">Bit Flipper →</button></td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>
+        </div>
+        <p class="small" style="color:var(--warn);margin:.4rem 0 0">These stations may not be
+          independently affected — compare their data series before treating them as separate evidence.</p>`
+      : `<p class="small" style="color:var(--ok);margin:.4rem 0 0">✓ No selected addresses within 2 bit
+          flips of each other — the selection looks independently addressed, and the rest of the
+          analysis can be read at face value.</p>`}
+      ${wbWhy(`An operator seeing bad data at stations 2316 and 2320 may believe both are affected
+        when one is the victim of the other's corrupted packets (they differ by a single bit).
+        Because this corrupts the input to every other hypothesis, it is checked before anything
+        else is presented. The check reuses the Bit Flipper's address index — open any pair there
+        for the full variant table and ARRO graph links.`)}
+    </div>`;
+}
+
+function wbMatrixHtml(an) {
+  const cols = an.candidates.slice(0, WB_MATRIX_COLS);
+  if (!cols.length) {
+    return `
+    <div class="panel">
+      <div class="panel-header"><h3>2 · Routing / pass-range matrix</h3></div>
+      <p class="small" style="color:var(--muted);margin:.4rem 0 0">No documented repeater carries any
+        selected station, so there is no matrix to draw. That is a finding: either these stations'
+        routing is undocumented (see routing data quality, left) or their paths genuinely don't
+        share infrastructure — which points at H2/H4, not H1.</p>
+    </div>`;
+  }
+  const rows = [
+    ...an.A.map(s => ({ s, cls: 'wb-row-aff', tag: 'affected' })),
+    ...an.G.slice(0, WB_MATRIX_GOOD).map(s => ({ s, cls: 'wb-row-good', tag: 'known-good' })),
+  ];
+  return `
+    <div class="panel">
+      <div class="panel-header"><h3>2 · Routing / pass-range matrix</h3>
+        <span class="small" style="color:var(--muted)">● = station's ALERT id inside repeater's pass ranges</span></div>
+      <div class="table-wrap" style="margin-top:.5rem">
+        <table class="wb-matrix">
+          <thead><tr>
+            <th style="min-width:140px">Station</th>
+            ${cols.map(c => `<th class="wb-m-h" title="${esc(c.r.name)} — power ${c.power.toFixed(2)}"><span>${esc(c.r.name)}</span></th>`).join('')}
+          </tr></thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr class="${row.cls}">
+                <td title="${row.tag}">${esc(row.s.name)}
+                  <span class="small" style="color:var(--muted)">${(stationAlertIds(row.s) || []).join(', ')}</span></td>
+                ${cols.map(c => {
+                  const hit = an.passes(row.s, c.r);
+                  return `<td class="wb-m${hit ? ' hit' : ''}">${hit ? '●' : ''}</td>`;
+                }).join('')}
+              </tr>`).join('')}
+          </tbody>
+          <tfoot>
+            <tr><td class="small">coverage</td>${cols.map(c => `<td class="small">${c.coverage.toFixed(2)}</td>`).join('')}</tr>
+            <tr><td class="small">specificity</td>${cols.map(c => `<td class="small">${c.specificity.toFixed(2)}</td>`).join('')}</tr>
+            <tr><td class="small"><strong>power</strong></td>${cols.map(c => `<td class="small"><strong>${c.power.toFixed(2)}</strong></td>`).join('')}</tr>
+          </tfoot>
+        </table>
+      </div>
+      ${an.candidates.length > cols.length ? `<p class="small" style="color:var(--muted);margin:.4rem 0 0">Top ${cols.length} of ${an.candidates.length} candidate repeaters shown, ranked by explanatory power.</p>` : ''}
+      ${wbWhy(`The visual pattern usually makes the answer obvious before any score is read: a solid
+        column of dots on the affected (red) rows that is sparse on the known-good (green) rows IS
+        the repeater hypothesis. A column solid on both is a repeater that carries everything —
+        high coverage, low specificity, uninformative. Red rows with no dots at all are the
+        stations the leading repeater cannot explain.`)}
+    </div>`;
+}
+
+function wbMapPanelHtml(an) {
+  return `
+    <div class="panel">
+      <div class="panel-header"><h3>3 · Map</h3></div>
+      <div class="map-legend" style="margin:.4rem 0">
+        <span class="legend-item"><span class="legend-dot" style="background:${WB_AFFECTED_COLOR}"></span><span class="small">Affected</span></span>
+        <span class="legend-item"><span class="legend-dot" style="background:${WB_GOOD_COLOR}"></span><span class="small">Known-good</span></span>
+        <span class="legend-item"><span class="legend-dot" style="background:#0b5cab"></span><span class="small">Candidate repeater (sized by power)</span></span>
+        <span class="legend-item"><span class="legend-dot" style="background:${WB_DISC_COLOR}"></span><span class="small">Discriminating station</span></span>
+        ${state.acma.loaded && an.top ? `<span class="legend-item"><span class="legend-sq" style="background:#7b1fa2"></span><span class="small">ACMA threat (top candidate)</span></span>` : ''}
+      </div>
+      <div id="wb-map" style="height:430px;border-radius:6px"></div>
+      ${an.disc.length ? `
+        <div style="margin-top:.6rem">
+          <div class="small"><strong>Discriminating stations</strong> — inside the affected area, routed differently; the highest-value observation available:</div>
+          <div class="table-wrap" style="margin-top:.35rem">
+            <table style="table-layout:auto"><thead><tr><th>Station</th><th>Routes via</th><th>km from cluster centre</th><th>Status</th></tr></thead>
+            <tbody>${an.disc.map(d => `
+              <tr><td>${esc(d.s.name)}</td><td class="small">${esc(d.via.join(', '))}</td>
+                <td class="small">${d.km.toFixed(0)}</td>
+                <td class="small">${d.status === 'known-good'
+                  ? '<span style="color:var(--ok)">known-good — already supports H1</span>'
+                  : '<span style="color:var(--warn)">unchecked — go look at its data</span>'}</td></tr>`).join('')}
+            </tbody></table>
+          </div>
+        </div>`
+      : an.top ? `<p class="small" style="color:var(--muted);margin:.5rem 0 0">No discriminating
+          stations found: every routed station inside the affected area passes through
+          ${esc(an.top.r.name)} too, so geography and routing cannot be separated from this
+          selection alone. Widening the known-good set is the way forward.</p>` : ''}
+      ${wbWhy(`H1 and H2 are confounded — repeaters serve geographic areas, so stations sharing a
+        repeater are usually also near each other. The discriminator is a station inside the
+        affected cluster on a different repeater: if it is clean, the repeater explanation gains;
+        if it is affected, the geographic one does. Checking one named station is worth more than
+        any amount of re-scoring.`)}
+    </div>`;
+}
+
+function wbTimelineHtml(an) {
+  const R = state.rfc;
+  const wbs = state.wb;
+  const topIds = new Set(an.candidates.slice(0, 3).map(c => c.r.id));
+  let body;
+  if (!topIds.size) {
+    body = `<p class="small" style="color:var(--muted)">No candidate repeaters — register activity
+      cannot be anchored to a suspect. If routing data is the blocker, that comes first.</p>`;
+  } else if (R.error) {
+    body = `<p class="small" style="color:var(--muted)">${esc(R.error)}</p>`;
+  } else if (!R.loaded) {
+    body = `<p class="small" style="color:var(--muted)">Loading register timeline…</p>`;
+  } else {
+    const onsetMid = wbs.onset
+      ? (Date.parse(wbs.onset) + (wbs.onsetEnd ? Date.parse(wbs.onsetEnd) : Date.parse(wbs.onset))) / 2
+      : null;
+    const rows = [];
+    for (const e of R.timeline.events) {
+      let best = null;
+      for (const a of e.anchors || []) {
+        if (!topIds.has(a.id)) continue;
+        if (!best || a.score > best.score) best = a;
+      }
+      if (!best || !e.date) continue;
+      const days = onsetMid != null ? Math.round((Date.parse(e.date) - onsetMid) / 86400000) : null;
+      if (onsetMid != null && Math.abs(days) > 120) continue;
+      rows.push({ e, a: best, days });
+    }
+    rows.sort((x, y) => onsetMid != null
+      ? Math.abs(x.days) - Math.abs(y.days)
+      : (y.e.date || '').localeCompare(x.e.date || ''));
+    const shown = rows.slice(0, 8);
+    body = shown.length ? `
+      <div class="table-wrap">
+        <table style="table-layout:auto"><thead><tr>
+          <th>Date</th>${onsetMid != null ? '<th>Δ onset</th>' : ''}<th>Licensee</th><th>Mechanism</th><th>Score</th><th>km</th><th>Near</th></tr></thead>
+        <tbody>${shown.map(r => `
+          <tr>
+            <td class="small">${esc(r.e.date)}</td>
+            ${onsetMid != null ? `<td class="small">${r.days > 0 ? '+' : ''}${r.days} d</td>` : ''}
+            <td class="small">${esc(r.e.client || '?')}</td>
+            <td class="small"><span class="legend-sq" style="background:${(ACMA_MECH[r.a.mech] || {}).color || '#666'}"></span> ${(ACMA_MECH[r.a.mech] || {}).label || esc(r.a.mech)}</td>
+            <td class="small">${r.a.score}</td>
+            <td class="small">${r.a.km}</td>
+            <td class="small">${esc(rfcAnchorName(r.a.id))}</td>
+          </tr>`).join('')}</tbody></table>
+      </div>
+      <p class="small" style="color:var(--muted);margin:.4rem 0 0">${onsetMid != null
+        ? `Register events within ±120 days of onset, nearest first. An authorisation date is when paperwork was approved — an upper bound on when interference could have begun, never proof that it did.`
+        : 'No onset date set — showing the most recent register events near the top candidates. Set an onset date (left) to rank by temporal proximity.'}</p>`
+    : `<p class="small" style="color:var(--muted)"><strong>No register events near the leading
+        candidates${onsetMid != null ? ' within ±120 days of onset' : ''}.</strong> That is a
+        finding, not a failure: it points away from newly licensed transmitters and toward
+        register-invisible sources — your own infrastructure (corrosion, equipment fault) or
+        unlicensed emitters. The site-visit checklist covers those.</p>`;
+    body += `<div class="button-row" style="justify-content:flex-start;margin-top:.5rem">
+      <button onclick="wbOpenRfc()">Open in RF Changes →</button></div>`;
+  }
+  return `
+    <div class="panel">
+      <div class="panel-header"><h3>4 · Register activity vs onset</h3></div>
+      <p class="small" style="color:var(--muted);margin:.4rem 0">Simultaneous onset across stations
+        argues an external event; staggered onsets argue progressive degradation such as corrosion.
+        ${wbT('ACMA register', 'The Register of Radiocommunications Licences records authorisations, not what is actually radiating.', 'acma_register')}
+        events near the candidates are leads to correlate, not conclusions.</p>
+      ${body}
+    </div>`;
+}
+
+function wbOpenRfc() {
+  const an = state.wb.lastAnalysis;
+  if (an) state.rfc.anchorSel = new Set(an.candidates.slice(0, 3).map(c => c.r.id));
+  if (state.wb.onset) state.rfc.onset = state.wb.onset;
+  switchTab('rfchanges');
+}
+
+function wbStripHtml(an) {
+  if (!an.top) return '';
+  const A = state.acma;
+  let body;
+  if (A.error)        body = `<p class="small" style="color:var(--muted)">${esc(A.error)}</p>`;
+  else if (!A.loaded) body = `<p class="small" style="color:var(--muted)">Loading ACMA carrier data…</p>`;
+  else if (!A.anchorById[an.top.r.id]) {
+    body = `<p class="small" style="color:var(--muted)">${esc(an.top.r.name)} is not an anchor in the
+      ACMA extract${an.top.r.repeater.rx_mhz == null ? ' — it has no recorded RX frequency, which is the same backfill gap flagged under routing data quality' : ''}.
+      Re-run tools/acma_fetch.py after fixing stations.json to include it.</p>`;
+  } else {
+    body = rfStripPlotHtml(an.top.r.id);
+  }
+  return `
+    <div class="panel">
+      <div class="panel-header"><h3>5 · Frequency neighbourhood — ${esc(an.top.r.name)}</h3></div>
+      ${body}
+      ${wbWhy(`The strip plot shows every licensed carrier around the leading candidate's RX
+        channel. A tall coloured tick on or beside the red RX line is a classified threat; a wall
+        of grey ticks nearby means a crowded segment where
+        <em>adjacent-channel splatter</em> erodes margin without ever being "on" your frequency.
+        An empty neighbourhood shifts suspicion to unlicensed sources and your own hardware.`)}
+    </div>`;
+}
+
+function wbBlindSpotsHtml() {
+  return `
+    <div class="panel">
+      ${rfcHelpHtml()}
+    </div>`;
+}
+
+// ── right rail: suspects & actions ──
+
+function wbRightHtml(an) {
+  if (!an) {
+    return `
+      <div class="panel">
+        <div class="panel-header"><h3>Suspects</h3></div>
+        <p class="small" style="color:var(--muted);margin:.4rem 0 0">Ranked repeaters and licensed
+          interference candidates appear here once affected stations are selected.</p>
+      </div>`;
+  }
+  return `
+    ${wbRepListHtml(an)}
+    ${wbAcmaSuspectsHtml(an)}
+    ${wbActionsHtml(an)}`;
+}
+
+function wbRepListHtml(an) {
+  const cands = an.candidates.slice(0, 8);
+  return `
+    <div class="panel">
+      <div class="panel-header"><h3>Ranked repeaters</h3></div>
+      ${cands.length ? cands.map((c, i) => `
+        <details class="wb-sus">
+          <summary>
+            <span class="wb-hyp-rank">#${i + 1}</span>
+            <span class="wb-sus-name">${esc(c.r.name)}${c.chain.length ? ' <span class="badge">chain</span>' : ''}</span>
+            <span class="wb-hyp-bar"><span style="width:${Math.round(c.power * 100)}%"></span></span>
+            <span class="wb-hyp-score">${c.power.toFixed(2)}</span>
+          </summary>
+          <div class="small" style="padding:.35rem 0 .2rem">
+            coverage ${c.coverage.toFixed(2)} · specificity ${c.specificity.toFixed(2)}
+            ${c.chain.length ? `<br>In series with ${esc(c.chain.join(', '))} — inspect the chain as one path.` : ''}
+            <br>Carries affected: ${c.passA.map(s => esc(s.name)).join(', ')}
+            <br>Also carries ${c.passUn} unaffected station${c.passUn === 1 ? '' : 's'}.
+          </div>
+        </details>`).join('')
+      : `<p class="small" style="color:var(--muted);margin:.4rem 0 0">No repeater carries any selected
+          station — see the routing data quality note.</p>`}
+    </div>`;
+}
+
+function wbAcmaSuspectsHtml(an) {
+  const A = state.acma;
+  let body;
+  if (!an.top) {
+    body = `<p class="small" style="color:var(--muted)">Needs a leading repeater candidate.</p>`;
+  } else if (A.error) {
+    body = `<p class="small" style="color:var(--muted)">${esc(A.error)}</p>`;
+  } else if (!A.loaded) {
+    body = `<p class="small" style="color:var(--muted)">Loading ACMA threat data…</p>`;
+  } else {
+    const anchor = A.anchorById[an.top.r.id];
+    const threats = anchor ? anchor.threats.slice().sort((a, b) => b.score - a.score).slice(0, 8) : [];
+    body = threats.length ? `
+      ${threats.map(t => {
+        const m = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
+        return `<a href="#" class="wb-threat" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(anchor.station_id)}');return false">
+          <span class="legend-sq" style="background:${m.color}"></span>
+          <span class="wb-threat-name">${esc(t.client || 'Unknown licensee')}
+            <span class="small" style="color:var(--muted)">${m.label} · ${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz · ' : ''}${t.distance_km} km${t.inactive ? ' · not current' : ''}</span></span>
+          <span class="wb-hyp-score">${t.score}</span>
+        </a>`;
+      }).join('')}
+      <p class="small" style="color:var(--muted);margin:.4rem 0 0">Licensed candidates near
+        ${esc(an.top.r.name)}, using the existing ACMA scoring — click for the full transmitter card.</p>`
+    : `<p class="small" style="color:var(--muted)">No licensed interference candidates recorded near
+        ${esc(an.top.r.name)}. A finding in itself: it shifts weight toward unlicensed emitters and
+        the repeater's own hardware — both invisible to the register.</p>`;
+  }
+  return `
+    <div class="panel">
+      <div class="panel-header"><h3>Interference sources</h3></div>
+      <div style="margin-top:.4rem">${body}</div>
+    </div>`;
+}
+
+function wbActionsHtml(an) {
+  return `
+    <div class="panel">
+      <div class="panel-header"><h3>Actions</h3></div>
+      <div class="button-column">
+        <button onclick="wbExportCsv()">Export case (CSV)</button>
+        <button onclick="wbExportChecklist()">Site-visit checklist</button>
+        <button onclick="wbExportComplaint()">Draft ACMA complaint</button>
+      </div>
+      <p class="small" style="color:var(--muted);margin:.5rem 0 0">The checklist is tailored to the
+        leading mechanism; the complaint draft pre-fills the evidence and marks every inference as
+        an inference.</p>
+    </div>`;
+}
+
+// ── map ──
+
+function initWbMap() {
+  // remove() can be mid-animation when a lazy data load re-renders the tab and
+  // detaches the old container — Leaflet throws harmlessly there; swallow it.
+  if (state.wb.map) { try { state.wb.map.remove(); } catch (_) {} state.wb.map = null; }
+  const el = document.getElementById('wb-map');
+  const an = state.wb.lastAnalysis;
+  if (!el || !an || !state.data || typeof L === 'undefined') return;
+
+  const map = state.wb.map = L.map('wb-map').setView([-23, 146], 5);
+  addBaseLayers(map);
+  const layer = L.layerGroup().addTo(map);
+  const bounds = [];
+
+  if (an.cluster) {
+    L.circle([an.cluster.lat, an.cluster.lon], {
+      radius: an.cluster.radiusKm * 1000, color: '#888',
+      weight: 1, dashArray: '6 6', fill: false, opacity: 0.6,
+    }).addTo(layer);
+  }
+
+  const dot = (s, color, opts, popup) => {
+    if (s.lat == null || s.lon == null) return;
+    const m = L.circleMarker([s.lat, s.lon], {
+      radius: 6, color, fillColor: color, fillOpacity: 0.85, weight: 1.5, ...opts,
+    }).addTo(layer);
+    m.bindPopup(popup);
+    bounds.push([s.lat, s.lon]);
+  };
+
+  const topR = an.top ? an.top.r : null;
+  for (const s of an.A) {
+    dot(s, WB_AFFECTED_COLOR, {}, `<strong>${esc(s.name)}</strong><br>
+      <span style="font-size:.83rem">Affected · AlertID ${stationAlertIds(s).join(', ')}</span>`);
+    if (topR && topR.lat != null && s.lat != null && an.passes(s, topR)) {
+      L.polyline([[s.lat, s.lon], [topR.lat, topR.lon]],
+        { color: '#0b5cab', weight: 1.2, opacity: 0.45, dashArray: '5 6' }).addTo(layer);
+    }
+  }
+  for (const s of an.G) {
+    dot(s, WB_GOOD_COLOR, {}, `<strong>${esc(s.name)}</strong><br>
+      <span style="font-size:.83rem">Known-good · AlertID ${stationAlertIds(s).join(', ')}</span>`);
+  }
+  for (const c of an.candidates.slice(0, 8)) {
+    dot(c.r, '#0b5cab', { radius: 6 + Math.round(8 * c.power), weight: c === an.top ? 3 : 1.5 },
+      `<strong>${esc(c.r.name)}</strong><br>
+       <span style="font-size:.83rem">Candidate repeater · coverage ${c.coverage.toFixed(2)}
+       · specificity ${c.specificity.toFixed(2)} · power ${c.power.toFixed(2)}</span>`);
+  }
+  for (const d of an.disc) {
+    dot(d.s, WB_DISC_COLOR, { fillOpacity: 0.25, weight: 3 },
+      `<strong>${esc(d.s.name)}</strong><br>
+       <span style="font-size:.83rem">Discriminating station (${d.status}) — routes via
+       ${esc(d.via.join(', '))}. Clean strengthens H1; affected strengthens H2.</span>`);
+  }
+
+  // ACMA threat squares around the leading candidate — same visual language as
+  // the main map's RF layer (squares, mechanism colours).
+  const A = state.acma;
+  if (A.loaded && topR && A.anchorById[topR.id]) {
+    const anchor = A.anchorById[topR.id];
+    for (const t of anchor.threats.slice().sort((a, b) => b.score - a.score).slice(0, 10)) {
+      const site = A.siteById[t.site_id];
+      if (!site) continue;
+      const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
+      const size = Math.round(9 + t.score / 8);
+      const icon = L.divIcon({
+        className: 'acma-div',
+        html: `<div class="acma-sq" style="width:${size}px;height:${size}px;background:${mech.color}"></div>`,
+        iconSize: [size, size], iconAnchor: [size / 2, size / 2],
+      });
+      const m = L.marker([site.lat, site.lon], { icon }).addTo(layer);
+      m.bindPopup(`<strong>${esc(t.client || 'Unknown licensee')}</strong> · score ${t.score}<br>
+        <span style="font-size:.83rem">${mech.label} · ${esc(t.detail)}</span><br>
+        <a href="#" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(anchor.station_id)}');return false">Full details →</a>`);
+    }
+  }
+
+  // animate:false — an in-flight animation throws if a re-render (lazy ACMA/RFC
+  // data arriving) replaces the container before it settles
+  if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 11, animate: false });
+}
+
+// ── exports ──
+
+function wbCaseStamp() {
+  return (state.wb.caseName ? slug(state.wb.caseName) + '-' : 'workbench-case-') +
+         new Date().toISOString().slice(0, 10);
+}
+
+function wbExportCsv() {
+  const an = state.wb.lastAnalysis;
+  if (!an) return;
+  const wbs = state.wb;
+  const L1 = [];
+  L1.push('MegaNet Interference Workbench — case export');
+  L1.push(`generated,${new Date().toISOString()}`);
+  L1.push(`case,${csvEscape(wbs.caseName || '(unnamed)')}`);
+  L1.push(`affected_ids,${csvEscape(wbs.affected.join(' '))}`);
+  L1.push(`known_good_ids,${csvEscape(wbs.good.join(' '))}`);
+  L1.push(`onset,${wbs.onset || 'unknown'}${wbs.onsetEnd ? ' to ' + wbs.onsetEnd : ''}`);
+  L1.push(`symptom,${WB_SYMPTOMS[wbs.symptom] || 'unknown'}`);
+  L1.push(`confidence,${an.confidence}`);
+  L1.push('');
+  L1.push('section,hypothesis_ranking');
+  L1.push('rank,hypothesis,label,score,base_score,symptom_weight,statement');
+  an.hyps.forEach((h, i) => L1.push([i + 1, h.short, csvEscape(h.label), h.score.toFixed(2),
+    h.base.toFixed(2), h.weight.toFixed(2), csvEscape(an.stmt[h.key])].join(',')));
+  L1.push('');
+  L1.push('section,repeater_candidates');
+  L1.push('repeater,coverage,specificity,explanatory_power,affected_through,unaffected_through,chain_with');
+  an.candidates.forEach(c => L1.push([csvEscape(c.r.name), c.coverage.toFixed(2),
+    c.specificity.toFixed(2), c.power.toFixed(2), c.passA.length, c.passUn,
+    csvEscape(c.chain.join('; '))].join(',')));
+  if (an.h5.pairs.length) {
+    L1.push('');
+    L1.push('section,h5_address_pairs');
+    L1.push('addr_a,addr_b,hamming_distance,differing_bits');
+    an.h5.pairs.forEach(p => L1.push([p.a, p.b, p.d, csvEscape(p.bits.join(' '))].join(',')));
+  }
+  if (an.disc.length) {
+    L1.push('');
+    L1.push('section,discriminating_stations');
+    L1.push('station,routes_via,km_from_cluster_centre,status');
+    an.disc.forEach(d => L1.push([csvEscape(d.s.name), csvEscape(d.via.join('; ')),
+      d.km.toFixed(1), d.status].join(',')));
+  }
+  L1.push('');
+  L1.push('note,"Scores rank explanations by fit; none is a proven cause. See the Workbench for the arithmetic behind every number."');
+  dlText(`${wbCaseStamp()}.csv`, L1.join('\n'));
+}
+
+// Mechanism-tailored fieldwork list — converts the analysis into a site visit.
+function wbExportChecklist() {
+  const an = state.wb.lastAnalysis;
+  if (!an) return;
+  const lead = an.lead;
+  const topMech = (() => {
+    const A = state.acma;
+    if (!A.loaded || !an.top) return null;
+    const anchor = A.anchorById[an.top.r.id];
+    if (!anchor || !anchor.threats.length) return null;
+    return anchor.threats.slice().sort((a, b) => b.score - a.score)[0].mechanism;
+  })();
+  const out = [];
+  out.push(`# Site-visit checklist — ${state.wb.caseName || 'unnamed investigation'}`);
+  out.push(`Generated ${new Date().toISOString().slice(0, 10)} · leading hypothesis: ${lead.short} ${lead.label} (score ${lead.score.toFixed(2)}, confidence ${an.confidence})`);
+  out.push('');
+  out.push('## Before leaving');
+  out.push('- [ ] Export this case (CSV) and the RF Environment threat CSV for the target repeater');
+  out.push('- [ ] Pull the last 30 days of data for every affected station and the discriminating stations named in the case');
+  if (an.nextCheck) out.push(`- [ ] Most informative check first: ${an.nextCheck}`);
+  out.push('');
+  if (lead.key === 'h1' || lead.key === 'h3') {
+    out.push(`## At the repeater (${an.top ? an.top.r.name : 'leading candidate'})`);
+    if (topMech === 'imd3' || topMech === 'imd5' || topMech === 'imd3_triple' || !topMech) {
+      out.push('- [ ] Inspect and torque mast joints, guy attachments and antenna mounts (rusty-bolt IMD)');
+      out.push('- [ ] Check every RF connector for corrosion / water ingress; reseat and re-weatherproof');
+      out.push('- [ ] Log co-tenant transmitter TX times against your corruption timestamps');
+    }
+    if (topMech === 'cosite_desense' || !topMech) {
+      out.push('- [ ] Get the co-sited transmitter TX log from the site operator if they will share it');
+      out.push('- [ ] Consider a band-pass cavity filter on the repeater RX');
+    }
+    if (topMech === 'co_channel' || topMech === 'adjacent' || lead.key === 'h3') {
+      out.push('- [ ] Monitor the RX channel with a handheld/SDR for the co-channel carrier; note times and signal strength');
+    }
+    out.push('- [ ] Measure repeater RX noise floor (record dBm and time); compare against any previous reading');
+    out.push('- [ ] Check squelch setting and RX sensitivity against commissioning values');
+    out.push('- [ ] Photograph antenna, feedline and connector condition for the record');
+  }
+  if (lead.key === 'h2') {
+    out.push('## In the affected area');
+    out.push('- [ ] Drive-test the area with a handheld/SDR on the RX channel; log where the interferer is audible');
+    out.push('- [ ] Note any new infrastructure since onset (towers, solar farms, VMS signs, industrial sites)');
+    out.push('- [ ] Check the ACMA suspects list against what is physically present');
+  }
+  if (lead.key === 'h4' || lead.key === 'h2') {
+    out.push('## At each affected site');
+    out.push('- [ ] Battery-only power-down test: kill mains/solar, watch whether the noise floor drops (self-interference)');
+    out.push('- [ ] Check solar regulator make/model — switch-mode controllers are notorious VHF noise sources');
+    out.push('- [ ] Inspect nearby electric fences, powerlines (arcing insulators), pumps and VSDs');
+    out.push('- [ ] Verify antenna connections, feedline condition and earth bonding');
+  }
+  if (lead.key === 'h5') {
+    out.push('## Desk work first — no site visit indicated yet');
+    out.push('- [ ] Compare the flagged address pairs\' data series; identify victim vs ghost');
+    out.push('- [ ] Correct the affected list and re-run the Workbench before committing to fieldwork');
+  }
+  out.push('');
+  out.push('## Log while on site');
+  out.push('- [ ] Times of any observed interference (with your corruption timestamps to hand)');
+  out.push('- [ ] Weather at time of visit (IMD and corrosion effects are weather-sensitive)');
+  out.push('- [ ] Anything keying nearby: voice traffic, pagers, telemetry bursts');
+  dlText(`${wbCaseStamp()}-site-visit.md`, out.join('\n'));
+}
+
+// Draft interference complaint with the evidence pre-filled. Every inference is
+// marked as an inference — the draft argues "worth investigating", not "guilty".
+function wbExportComplaint() {
+  const an = state.wb.lastAnalysis;
+  if (!an) return;
+  const wbs = state.wb;
+  const A = state.acma;
+  const top = an.top;
+  const lic = top && top.r.repeater.acma_licence ? top.r.repeater.acma_licence : '(licence number)';
+  const rx = top && top.r.repeater.rx_mhz != null ? top.r.repeater.rx_mhz + ' MHz' : '(RX frequency)';
+  const suspects = (A.loaded && top && A.anchorById[top.r.id])
+    ? A.anchorById[top.r.id].threats.slice().sort((a, b) => b.score - a.score).slice(0, 5) : [];
+  const out = [];
+  out.push('# Draft — interference report to ACMA');
+  out.push('(Review every field before sending. This draft was assembled by the MegaNet');
+  out.push('Interference Workbench; all conclusions are stated as leads, not findings.)');
+  out.push('');
+  out.push('## Reporting party');
+  out.push('Name / organisation: (fill in)');
+  out.push('Contact: (fill in)');
+  out.push('');
+  out.push('## Service experiencing interference');
+  out.push(`Service: ALERT flood-warning telemetry network (VHF, ${rx})`);
+  out.push(`Licence: ${lic}`);
+  if (top) out.push(`Receiver site: ${top.r.name}${top.r.lat != null ? ` (${top.r.lat.toFixed(4)}, ${top.r.lon.toFixed(4)})` : ''}`);
+  out.push('');
+  out.push('## Nature and extent of the interference');
+  out.push(`Symptom: ${WB_SYMPTOMS[wbs.symptom] || 'data corruption (mixed symptoms)'} on the ALERT telemetry channel.`);
+  out.push(`First observed: ${wbs.onset || '(date unknown)'}${wbs.onsetEnd ? ' – ' + wbs.onsetEnd : ''}.`);
+  out.push(`Affected field stations: ${an.A.length} (${an.A.slice(0, 10).map(s => s.name).join('; ')}${an.A.length > 10 ? '; …' : ''}).`);
+  if (top) {
+    out.push(`Pattern: ${top.passA.length} of ${an.A_routed.length} routed affected stations share the ` +
+      `${top.r.name} repeater path (coverage ${top.coverage.toFixed(2)}, specificity ${top.specificity.toFixed(2)}), ` +
+      'which is most consistent with interference at or near that receiver. This is an inference from ' +
+      'routing analysis, not a direct observation of an emitter.');
+  }
+  out.push('');
+  out.push('## Impact');
+  out.push('The affected service provides real-time flood warning data (rainfall and river level)');
+  out.push('used for public-safety decisions. Corrupted or lost readings during a flood event delay');
+  out.push('warnings. (Adjust to your circumstances.)');
+  out.push('');
+  if (suspects.length) {
+    out.push('## Licensed services identified as worth investigating (from the ACMA RRL)');
+    suspects.forEach(t => {
+      const m = (ACMA_MECH[t.mechanism] || { label: t.mechanism }).label;
+      out.push(`- ${t.client || 'Unknown licensee'} — licence ${t.lic || '?'}, ` +
+        `${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz, ' : ''}${t.distance_km} km from the receiver. ` +
+        `Candidate mechanism: ${m}${t.inactive ? ' (licence not current)' : ''}.`);
+    });
+    out.push('');
+    out.push('These are candidates identified by automated screening of the public register; no');
+    out.push('transmission by any of them has been directly observed causing the interference.');
+    out.push('');
+  }
+  out.push('## Evidence available on request');
+  out.push('- Corruption timestamps per affected station');
+  out.push('- Routing analysis (which repeater paths the affected stations share) with arithmetic');
+  out.push('- Register-change timeline near the receiver around the onset date');
+  out.push('- Site-visit observations (once completed)');
+  dlText(`${wbCaseStamp()}-acma-draft.md`, out.join('\n'));
+}
+
+// ── Memory meter ─────────────────────────────────────────────────────────────
+// A thin bar under the header, and a panel behind it, answering "how much is
+// this page holding, and can I give some back" — see issue #79. This is our
+// own accounting, not a walk of the object graph: array/string lengths and
+// byte counts recorded at load time (loadJson, acmaFetchJson), which is free.
+// performance.memory (Chromium-only) and navigator.storage.estimate() are
+// shown alongside where the browser actually offers them.
+//
+// Its position used to matter: init() called MemMeter.start() from partway
+// down this file, so the binding had to be initialised above that point. Since
+// M1 (#132) init() is the last statement of the last script, so it doesn't —
+// this could sit anywhere. Terrain and ArroData, which its functions reach
+// into, are still declared later; that was always fine, because nothing here
+// touches them until a click or the sampling timer calls in.
+const MemMeter = (function () {
+  // Holders shown in the bar and the panel, in the order they're listed. Each
+  // maps to one of the state slots the issue's table calls out; `color` is an
+  // existing CSS custom property so the bar reuses the app's palette rather
+  // than inventing one. `releasable` holders get a Release button — the three
+  // the issue judges safe to drop and re-lazy-load or re-fetch.
+  const HOLDERS = [
+    { key: 'stations', label: 'stations.json',           color: '--role-repeater', releasable: false },
+    { key: 'acma',      label: 'ACMA / RF Changes data',  color: '--role-satcom',   releasable: true  },
+    { key: 'terrain',   label: 'Terrain tile cache',      color: '--role-base',     releasable: true  },
+    { key: 'arro',      label: 'ARRO Data series',        color: '--role-field',    releasable: true  },
+    { key: 'a2',        label: 'ALERT2 capture',          color: '--draw',         releasable: false },
+    { key: 'storage',   label: 'localStorage',            color: '--muted',        releasable: false },
+  ];
+
+  const ACMA_FILES = ['acma-threats.json', 'acma-sites.json', 'acma-dictionaries.json',
+                       'acma-devices.json', 'acma-timeline.json', 'acma-changes.json',
+                       'acma-snapshots.json'];
+
+  // Bytes per ARRO row: t, tr, v, raw are Float64Array (8 B each), q is
+  // Uint8Array (1 B) — see ArroData's parseCsv. Length × this, not a walk.
+  // A field-data series carries a couple of extra columns and says so in its
+  // own bytesPerRow; this is the floor every series shares.
+  const ARRO_BYTES_PER_ROW = 8 * 4 + 1;
+  const TERRAIN_TILE_BYTES = 65536 * 2;   // Int16Array(65536), 2 B/element
+
+  const WARN_BYTES = 60  * 1024 * 1024;
+  const BAD_BYTES  = 100 * 1024 * 1024;
+  const BAR_CAP    = 130 * 1024 * 1024;   // segment widths scale against this
+
+  let panelOpen = false;
+  let storageEstimate = null;   // {usage, quota}, fetched once per panel open
+
+  function fmtBytes(n) {
+    if (!n) return '0 B';
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function acmaFileBytes() {
+    const F = state.memBytes.files;
+    return ACMA_FILES.reduce((sum, k) => sum + (F[k] || 0), 0);
+  }
+
+  function arroBytes() {
+    return ArroData.allSeries()
+      .reduce((sum, s) => sum + (s.n || 0) * (s.bytesPerRow || ARRO_BYTES_PER_ROW), 0);
+  }
+
+  function localStorageBytes() {
+    let sum = 0;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        sum += (k.length + (localStorage.getItem(k) || '').length) * 2;   // UTF-16
+      }
+    } catch (_) { /* storage disabled — not worth surfacing here */ }
+    return sum;
+  }
+
+  function heapInfo() {
+    const m = performance && performance.memory;
+    return m ? { used: m.usedJSHeapSize, limit: m.jsHeapSizeLimit } : null;
+  }
+
+  function memoryReport() {
+    const bytes = {
+      stations: state.memBytes.stationsJson,
+      acma:     acmaFileBytes(),
+      terrain:  Terrain.cached() * TERRAIN_TILE_BYTES,
+      arro:     arroBytes(),
+      a2:       (state.a2.text || '').length * 2,
+      storage:  localStorageBytes(),
+    };
+    const holders = HOLDERS.map(h => ({ ...h, bytes: bytes[h.key] }));
+    return { holders, total: holders.reduce((s, h) => s + h.bytes, 0), heap: heapInfo() };
+  }
+
+  // ── the bar ──
+
+  function render() {
+    const bar = document.getElementById('mem-bar');
+    if (!bar) return;
+    if (!state.data) { bar.hidden = true; return; }
+    const wasHidden = bar.hidden;
+    bar.hidden = false;
+    const { holders, total } = memoryReport();
+    bar.classList.toggle('mem-warn', total >= WARN_BYTES && total < BAD_BYTES);
+    bar.classList.toggle('mem-bad', total >= BAD_BYTES);
+    bar.title = `Memory this page is holding: ~${fmtBytes(total)} (our accounting) — click for details`;
+    bar.innerHTML = holders.filter(h => h.bytes > 0).map(h => {
+      const pct = Math.max(0.4, Math.min(100, h.bytes / BAR_CAP * 100));
+      return `<span class="mem-seg" style="width:${pct}%;background:var(${h.color})" `
+           + `title="${esc(h.label)}: ${fmtBytes(h.bytes)}"></span>`;
+    }).join('');
+    if (wasHidden !== bar.hidden) updateChromeHeight();   // the bar just entered/left the layout
+    if (panelOpen) renderPanel();
+  }
+
+  let timer = null;
+  function start() {
+    if (timer) return;
+    // Never in a render path, and never while the tab is hidden — a memory
+    // meter that costs memory (or wakes a backgrounded tab) is the joke.
+    timer = setInterval(() => { if (document.visibilityState === 'visible') render(); }, 5000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') render();
+    });
+  }
+
+  // ── the panel ──
+
+  function togglePanel() { if (panelOpen) closePanel(); else openPanel(); }
+
+  function openPanel() {
+    panelOpen = true;
+    let root = document.getElementById('mem-modal');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'mem-modal';
+      root.className = 'modal-overlay';
+      root.onclick = closePanel;
+      document.body.appendChild(root);
+    }
+    root.style.display = 'flex';
+    renderPanel();
+    document.addEventListener('keydown', onKey);
+    if (!storageEstimate && navigator.storage && navigator.storage.estimate) {
+      navigator.storage.estimate().then(e => { storageEstimate = e; renderPanel(); }).catch(() => {});
+    }
+  }
+
+  function onKey(e) { if (e.key === 'Escape') closePanel(); }
+
+  function closePanel() {
+    panelOpen = false;
+    const root = document.getElementById('mem-modal');
+    if (root) { root.style.display = 'none'; root.innerHTML = ''; }
+    document.removeEventListener('keydown', onKey);
+  }
+
+  function renderPanel() {
+    const root = document.getElementById('mem-modal');
+    if (!root || !panelOpen) return;
+    const { holders, total, heap } = memoryReport();
+    const rows = holders.map(h => `
+      <tr>
+        <td><span class="mem-swatch" style="background:var(${h.color})"></span>${esc(h.label)}</td>
+        <td class="mem-bytes">${fmtBytes(h.bytes)}</td>
+        <td>${h.releasable && h.bytes > 0
+              ? `<button class="mem-release" onclick="MemMeter.release('${h.key}')">Release</button>`
+              : ''}</td>
+      </tr>`).join('');
+    root.innerHTML = `
+      <div class="modal-card mem-card" role="dialog" aria-modal="true" aria-labelledby="mem-title"
+           onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <h2 id="mem-title">Memory this page is holding</h2>
+          <button class="modal-x" title="Close (Esc)" onclick="MemMeter.closePanel()">×</button>
+        </div>
+        <p class="sub">Our own accounting of what MegaNet is keeping in memory — cheap to compute
+           (lengths recorded when each piece loaded), not a walk of the object graph. Estimates,
+           not exact byte counts.</p>
+        <table class="mem-table">
+          <thead><tr><th>Holder</th><th>Estimate</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><td>Total (our accounting)</td><td class="mem-bytes">${fmtBytes(total)}</td><td></td></tr></tfoot>
+        </table>
+        <p class="mem-heap">
+          ${heap ? `Browser JS heap: ${fmtBytes(heap.used)} of ${fmtBytes(heap.limit)} limit.`
+                 : `Browser JS heap: not available in this browser.`}<br>
+          ${storageEstimate
+              ? `Persisted storage: ${fmtBytes(storageEstimate.usage || 0)} of ${fmtBytes(storageEstimate.quota || 0)} quota.`
+              : `Persisted storage: checking…`}
+        </p>
+        <div class="modal-foot">
+          <button onclick="MemMeter.closePanel()">Close</button>
+        </div>
+      </div>`;
+  }
+
+  // ── release ──
+  // Terrain and ARRO have their own reset logic already (Terrain.clear(),
+  // ArroData.clearAll()); ACMA/RFC's is here because nothing else needed a
+  // "drop everything and let it re-lazy-load" reset before now.
+
+  function releaseAcma() {
+    const A = state.acma, R = state.rfc;
+    Object.assign(A, {
+      loaded: false, loading: false, loadPromise: null, error: null,
+      threats: null, dicts: null,
+      flat: [], siteById: {}, anchorById: {}, pairsByDevice: {}, mechCounts: {},
+      devLoaded: false, devPromise: null,
+      deviceById: {}, devicesBySite: {}, licById: {}, clientById: {}, antById: {}, texts: [],
+    });
+    Object.assign(R, {
+      loaded: false, loading: false, loadPromise: null, error: null,
+      timeline: null, changes: null, snapshots: null,
+    });
+    ACMA_FILES.forEach(k => delete state.memBytes.files[k]);
+    if (state.map) refreshAcmaLayer();   // drops the map markers rather than leaving them orphaned
+    renderMain();                        // RF Environment / RF Changes, if open, show "not loaded"
+  }
+
+  function releaseTerrain() {
+    Terrain.clear();
+    render();
+  }
+
+  function releaseArro() {
+    ArroData.dropAll();   // both data tabs; confirms before dropping more than one
+  }
+
+  function release(key) {
+    if (key === 'acma') releaseAcma();
+    else if (key === 'terrain') releaseTerrain();
+    else if (key === 'arro') releaseArro();
+    render();
+    renderPanel();
+  }
+
+  return { start, render, togglePanel, closePanel, release };
+})();
+if (typeof window !== 'undefined') window.MemMeter = MemMeter;
+
+// ── Sign-in ──────────────────────────────────────────────────────────────────
+// The browser half of #B8. Supabase Auth (GoTrue) issues the token; this module
+// obtains one, keeps it alive, hands it to the datastore layer, and makes the
+// signed-out state something the app renders rather than something it fails at.
+//
+// Read this before changing anything here:
+//
+// **This is not what keeps people out.** Cloudflare Access sits in front of the
+// site and is the perimeter (docs/access.md); meganet.is_editor() sits in front
+// of every write and is the enforcement. This module is the middle — it turns a
+// person into a token so the database has something to check. Deleting all of it
+// would make the app read-only, not open.
+//
+// **No library.** GoTrue is four HTTP endpoints and index.html gains no <script>
+// tag for them, the same trade the Data API section above makes.
+//
+// **Two ways in, because the email decides which.** Supabase's default template
+// sends a magic link; add {{ .Token }} to it and the same email also carries a
+// six-digit code. The link lands back here with the session in the URL fragment;
+// the code is typed into the panel. Both are supported because which one an
+// operator gets depends on a template in a dashboard, and an app that only
+// handles one of them is an app that breaks when somebody edits it.
+//
+// **sessionStorage, not localStorage.** #B8 said localStorage, matching the
+// mn-theme pattern; 0004 had already chosen sessionStorage for the access token
+// with a reason that still holds — a token that outlives the tab it was obtained
+// in is a token left behind on a shared machine, and these are shared machines.
+// The cost is a fresh sign-in per tab, which behind Access is a keystroke. If
+// that is ever judged the wrong trade, this is the only place it is decided.
+const Auth = (function () {
+
+  // The whole session, not just the token: the refresh token and the expiry are
+  // what make this survive a reload, and dbSetAccessToken() only knows about the
+  // one field it needs.
+  const KEY = 'meganet.session';
+
+  // Refresh this long before the token actually expires. GoTrue's default is an
+  // hour; a minute of margin covers a slow request and a clock that disagrees.
+  const REFRESH_MARGIN_MS = 60 * 1000;
+
+  let session = null;      // { access_token, refresh_token, expires_at, email }
+  let who     = null;      // last meganet.whoami() answer, or null
+  let timer   = null;
+  // `email` and `code` are mirrored here rather than left in the DOM because
+  // every state change repaints the panel: a message that arrives while somebody
+  // is mid-type would otherwise take the typing with it.
+  let ui      = { step: 'email', email: '', code: '', busy: false, msg: null };
+
+  // ── session plumbing ──
+
+  function load() {
+    try {
+      const raw = sessionStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  }
+
+  function store(s) {
+    try {
+      if (s) sessionStorage.setItem(KEY, JSON.stringify(s));
+      else sessionStorage.removeItem(KEY);
+    } catch (_) { /* private mode; this session lives in memory only */ }
+  }
+
+  // Everything that has to happen for a token to count as adopted, in one place
+  // so no path can adopt half of it.
+  function adopt(s) {
+    session = s;
+    store(s);
+    dbSetAccessToken(s ? s.access_token : null);
+    scheduleRefresh();
+  }
+
+  function fromTokenResponse(body, email) {
+    return {
+      access_token:  body.access_token,
+      refresh_token: body.refresh_token,
+      // Absolute rather than a duration, because a duration is only meaningful
+      // at the instant it was issued and this gets written to storage.
+      expires_at:    Date.now() + (Number(body.expires_in) || 3600) * 1000,
+      email:         (body.user && body.user.email) || email || null,
+    };
+  }
+
+  function scheduleRefresh() {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (!session) return;
+    const due = session.expires_at - Date.now() - REFRESH_MARGIN_MS;
+    // Already past it — refresh on the next tick rather than never, which is
+    // what a negative setTimeout would otherwise quietly mean.
+    timer = setTimeout(refresh, Math.max(0, due));
+  }
+
+  async function refresh() {
+    if (!session || !session.refresh_token) return false;
+    try {
+      const body = await post(`token?grant_type=refresh_token`,
+                              { refresh_token: session.refresh_token });
+      adopt(fromTokenResponse(body, session.email));
+      return true;
+    } catch (_) {
+      // A refresh token is single-use and expires; a failure here means the
+      // session is over, and pretending otherwise leaves the app showing a name
+      // for someone the database will refuse. Sign out quietly — nobody asked
+      // for this request, so nobody is waiting for an error about it.
+      await signOut({ announce: false });
+      return false;
+    }
+  }
+
+  // ── the four endpoints ──
+
+  async function post(path, body, opts = {}) {
+    const res = await fetch(`${AUTH_URL}/${path}`, {
+      method: 'POST',
+      headers: {
+        apikey: DB_ANON_KEY,
+        'Content-Type': 'application/json',
+        ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    });
+    const text = await res.text();
+    let parsed = null;
+    try { parsed = text ? JSON.parse(text) : null; } catch (_) { /* not JSON */ }
+    if (!res.ok) {
+      const err = new Error(
+        (parsed && (parsed.error_description || parsed.msg || parsed.message))
+        || `HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    return parsed;
+  }
+
+  // What the database makes of the token we are holding. Called after every
+  // adoption because it is the only check that is not self-assessment: the token
+  // could be well-formed, unexpired and still refused.
+  async function whoami() {
+    try {
+      const res = await fetch(`${DB_URL}/rpc/whoami`, {
+        method: 'POST',
+        headers: {
+          apikey: DB_ANON_KEY,
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          'Content-Profile': DB_SCHEMA,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: '{}',
+        cache: 'no-store',
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (_) {
+      // Offline, or a database that has not had 0005 applied yet. Neither is
+      // worth an error in the operator's face: the app still reads, and the
+      // header simply does not claim to know who they are.
+      return null;
+    }
+  }
+
+  // ── sign in ──
+
+  // Refuse in the browser what the database is going to refuse anyway, so an
+  // address that was never going to be let in does not cost a round trip to a
+  // mailbox and a wait. Not a security check — meganet.auth_user_gate() is —
+  // and it deliberately fails open: if this call itself fails, the sign-in goes
+  // ahead and the server gets to answer.
+  async function maySignIn(email) {
+    try {
+      const res = await fetch(`${DB_URL}/rpc/email_may_sign_in`, {
+        method: 'POST',
+        headers: {
+          apikey: DB_ANON_KEY,
+          'Content-Profile': DB_SCHEMA,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ p_email: email }),
+        cache: 'no-store',
+      });
+      if (!res.ok) return true;
+      return (await res.json()) !== false;
+    } catch (_) { return true; }
+  }
+
+  async function requestCode() {
+    const email = (document.getElementById('au-email')?.value || '').trim();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return setMsg('error', 'That does not look like an email address.');
+    }
+
+    ui.email = email;
+    setBusy(true, 'Checking…');
+
+    if (!await maySignIn(email)) {
+      setBusy(false);
+      return setMsg('error',
+        `${email} is not on the access list, so no code was sent. Access is open to any `
+        + `verified @bom.gov.au address; anyone else has to be added by an administrator `
+        + `— see docs/access.md.`);
+    }
+
+    setBusy(true, 'Sending…');
+    try {
+      // create_user true is what makes this a sign-in and a signup at once. The
+      // database decides whether that signup is allowed, so "anyone can create
+      // an account" is not what this line means.
+      await post('otp', { email, create_user: true });
+    } catch (err) {
+      setBusy(false);
+      return setMsg('error', signInErrorText(err, email));
+    }
+    setBusy(false);
+    ui.step = 'code';
+    ui.code = '';
+    setMsg('ok', `Sent. Check ${email} — click the link, or type the six-digit code below.`);
+    document.getElementById('au-code')?.focus();
+  }
+
+  async function verifyCode() {
+    const token = (document.getElementById('au-code')?.value || '').trim();
+    ui.code = token;
+    if (!token) return setMsg('error', 'Enter the code from the email.');
+
+    setBusy(true, 'Verifying…');
+    let body;
+    try {
+      body = await post('verify', { email: ui.email, token, type: 'email' });
+    } catch (err) {
+      setBusy(false);
+      return setMsg('error',
+        err.status === 401 || err.status === 403
+          ? 'That code was not accepted. Codes expire — send a new one if this keeps happening.'
+          : signInErrorText(err, ui.email));
+    }
+
+    adopt(fromTokenResponse(body, ui.email));
+    who = await whoami();
+    setBusy(false);
+    ui.step = 'in';
+    ui.msg  = null;
+
+    // Signed in and still refused is a real state — an address on auth but not
+    // on editor_allow — and the header would otherwise imply write access that
+    // the first save would deny.
+    if (who && who.may_write === false) {
+      setMsg('error', 'Signed in, but this address may not edit stations. An administrator has to add it.');
+    }
+
+    syncHeader();
+    render();
+    // The editor's status line says "not signed in" until something tells it
+    // otherwise, and it is on screen behind this panel.
+    if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
+  }
+
+  // GoTrue does not pass a trigger's message through, so a refused signup
+  // arrives as a generic database error. Recognising it here is what turns
+  // "unexpected_failure" into the one thing the person needs to know.
+  function signInErrorText(err, email) {
+    const m = String(err && err.message || '');
+    if (/database error|unexpected_failure/i.test(m)) {
+      return `${email} was refused by the database, which is what happens to an address that `
+           + `is not on the access list. If it should be, an administrator has to add it — see docs/access.md.`;
+    }
+    if (err.status === 429) {
+      return 'Too many attempts in a row. Wait a minute and try again.';
+    }
+    return `Could not send the code — ${m}`;
+  }
+
+  async function signOut({ announce = true } = {}) {
+    const token = session && session.access_token;
+    adopt(null);
+    who = null;
+    ui  = { step: 'email', email: '', code: '', busy: false, msg: null };
+    // Best effort, and deliberately after the local state is already gone: if
+    // this fails the token is still forgotten here, which is the part that
+    // matters to the person at the keyboard.
+    if (token) { try { await post('logout', {}, { token }); } catch (_) { /* already gone */ } }
+    syncHeader();
+    if (announce && document.getElementById('auth-modal')?.style.display === 'flex') render();
+    if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
+  }
+
+  // ── the magic link landing ──
+  // A link from the email returns here with the session in the URL *fragment* —
+  // which never reaches a server, and is why GoTrue uses it. Consuming it means
+  // taking the tokens and then removing them from the address bar, so a copied
+  // URL or a screenshot is not a copied session.
+  function consumeHash() {
+    const raw = location.hash || '';
+    if (!raw.includes('access_token=') && !raw.includes('error=')) return false;
+
+    const p = new URLSearchParams(raw.replace(/^#/, ''));
+    // replaceState rather than clearing location.hash, which would leave a bare
+    // '#' and push a history entry.
+    history.replaceState(null, '', location.pathname + location.search);
+
+    if (p.get('error') || p.get('error_description')) {
+      ui.msg = { kind: 'error', text: p.get('error_description') || p.get('error') };
+      return false;
+    }
+    const access = p.get('access_token');
+    if (!access) return false;
+
+    adopt({
+      access_token:  access,
+      refresh_token: p.get('refresh_token'),
+      expires_at:    Date.now() + (Number(p.get('expires_in')) || 3600) * 1000,
+      email:         null,          // filled in by whoami() below
+    });
+    return true;
+  }
+
+  // ── header ──
+
+  function label() {
+    if (!session) return 'Sign in';
+    const email = (who && who.email) || session.email;
+    if (!email) return 'Signed in';
+    // The local part is enough to say "you are you" and fits the header; the
+    // full address is in the panel and the title attribute.
+    return email.split('@')[0];
+  }
+
+  function syncHeader() {
+    setHeaderLabel('btn-auth', label());
+    const btn = document.getElementById('btn-auth');
+    if (!btn) return;
+    const email = (who && who.email) || (session && session.email);
+    btn.title = session
+      ? `Signed in${email ? ` as ${email}` : ''}${who && who.may_write === false ? ' — read only' : ''}`
+      : 'Sign in to edit stations';
+    btn.classList.toggle('is-in', !!session);
+  }
+
+  // ── panel ──
+
+  function template() {
+    const busy = ui.busy;
+    const msg  = ui.msg
+      ? `<p class="small" style="color:${ui.msg.kind === 'error' ? 'var(--bad)'
+                                      : ui.msg.kind === 'ok' ? 'var(--ok)' : 'var(--muted)'}">${esc(ui.msg.text)}</p>`
+      : '';
+
+    let body;
+    if (ui.step === 'in') {
+      const email = (who && who.email) || session?.email || '';
+      const write = who ? who.may_write : null;
+      body = `
+        <div class="modal-form">
+          <p>Signed in${email ? ` as <strong>${esc(email)}</strong>` : ''}.</p>
+          <p class="small">${
+            write === false
+              ? 'This address may sign in but may not edit stations — an administrator has to add it to the editors list.'
+              : write === true
+                ? 'Edits to stations will be saved to the database and attributed to this address.'
+                : 'The database did not answer when asked what this session may do; saving will tell you.'
+          }</p>
+          <p class="small">This session ends when this tab is closed.</p>
+        </div>
+        <div class="modal-foot">
+          <button onclick="Auth.close()">Close</button>
+          <button class="primary" onclick="Auth.signOut()">Sign out</button>
+        </div>`;
+    } else if (ui.step === 'code') {
+      body = `
+        <div class="modal-form">
+          <label>Six-digit code from the email
+            <input type="text" id="au-code" inputmode="numeric" autocomplete="one-time-code"
+                   placeholder="123456" value="${esc(ui.code)}" ${busy ? 'disabled' : ''}
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();Auth.verifyCode();}">
+          </label>
+          <p class="small">The email also contains a link. Clicking it signs you in in whichever
+             tab it opens, and you can ignore this box.</p>
+          ${msg}
+        </div>
+        <div class="modal-foot">
+          <button onclick="Auth.back()" ${busy ? 'disabled' : ''}>Use a different address</button>
+          <button class="primary" onclick="Auth.verifyCode()" ${busy ? 'disabled' : ''}>Sign in</button>
+        </div>`;
+    } else {
+      body = `
+        <div class="modal-form">
+          <label>Work email address
+            <input type="email" id="au-email" autocomplete="email" placeholder="you@bom.gov.au"
+                   value="${esc(ui.email)}" ${busy ? 'disabled' : ''}
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();Auth.requestCode();}">
+          </label>
+          <p class="small">Any verified <strong>@bom.gov.au</strong> address can sign in with no
+             approval step. Other addresses have to be added first — see <code>docs/access.md</code>.
+             There is no password: an email arrives with a link and a code.</p>
+          ${msg}
+        </div>
+        <div class="modal-foot">
+          <button onclick="Auth.close()" ${busy ? 'disabled' : ''}>Cancel</button>
+          <button class="primary" onclick="Auth.requestCode()" ${busy ? 'disabled' : ''}>Email me a code</button>
+        </div>`;
+    }
+
+    return `
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="au-title"
+           onclick="event.stopPropagation()">
+        <div class="modal-head">
+          <h2 id="au-title">${ui.step === 'in' ? 'Your session' : 'Sign in to MegaNet'}</h2>
+          <button class="modal-x" title="Close (Esc)" onclick="Auth.close()">×</button>
+        </div>
+        <p class="sub">Signing in is only needed to <em>edit</em>. The station list, the maps and every
+           tool read without it.</p>
+        ${body}
+      </div>`;
+  }
+
+  function render() {
+    const root = document.getElementById('auth-modal');
+    if (!root || root.style.display !== 'flex') return;
+    root.innerHTML = template();
+  }
+
+  function open() {
+    let root = document.getElementById('auth-modal');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'auth-modal';
+      root.className = 'modal-overlay';
+      root.onclick = close;
+      document.body.appendChild(root);
+    }
+    if (session && ui.step !== 'in') { ui.step = 'in'; ui.msg = null; }
+    root.style.display = 'flex';
+    root.innerHTML = template();
+    document.addEventListener('keydown', onKey);
+    document.getElementById(ui.step === 'code' ? 'au-code' : 'au-email')?.focus();
+  }
+
+  function onKey(e) { if (e.key === 'Escape') close(); }
+
+  function close() {
+    const root = document.getElementById('auth-modal');
+    if (root) root.style.display = 'none';
+    document.removeEventListener('keydown', onKey);
+    ui.busy = false;
+  }
+
+  function back() {
+    ui.step = 'email'; ui.code = ''; ui.msg = null;
+    render();
+    document.getElementById('au-email')?.focus();
+  }
+
+  function setMsg(kind, text) { ui.msg = { kind, text }; render(); }
+  function setBusy(on, text) {
+    ui.busy = on;
+    if (text) ui.msg = { kind: 'busy', text };
+    render();
+  }
+
+  // ── start ──
+  // Called from init(). Everything here is best-effort and none of it blocks the
+  // app drawing: a person who never signs in must not wait on an auth server to
+  // see the station list.
+  function start() {
+    const landed = consumeHash();
+    if (!landed) {
+      const s = load();
+      // Expired while the tab was closed. Keep it only if there is a refresh
+      // token to redeem — otherwise it is just a string that will 401.
+      if (s && (s.expires_at > Date.now() || s.refresh_token)) adopt(s);
+      else if (s) store(null);
+    }
+    syncHeader();
+    if (!session) return;
+
+    (async () => {
+      if (session.expires_at <= Date.now() && !await refresh()) return;
+      who = await whoami();
+      // A token the database will not honour is worse than no token: the editor
+      // would offer to save and the save would be refused.
+      if (who && who.signed_in === false) { await signOut({ announce: false }); return; }
+      syncHeader();
+      render();
+      if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
+    })();
+  }
+
+  return {
+    start, open, close, back, requestCode, verifyCode, signOut, render,
+    // Read by the editor and the Data source panel. Both ask the database in the
+    // end; these only decide what to say before that round trip.
+    isSignedIn: () => !!session,
+    mayWrite:   () => !!session && (who ? who.may_write !== false : true),
+    email:      () => (who && who.email) || (session && session.email) || null,
+    role:       () => (who && who.role) || null,
+  };
+})();
+if (typeof window !== 'undefined') window.Auth = Auth;
+
 // ── Draw & measure ───────────────────────────────────────────────────────────
 // Sketching over the network map: a coverage circle round a repeater, a
 // proposed path, a box round the part of a catchment that went quiet, and a
@@ -4604,405 +8848,6 @@ const LinkBudget = (function () {
     },
   };
 })();
-
-// ── Station table (lower half of the Stations tab) ─────────────────────────────
-
-// Unfiltered, the table would emit ~28,500 cells (3,174 rows × 9) as one
-// innerHTML string on every keystroke. Cap what's rendered; the footer link
-// lets the operator pull the rest in when they actually want it.
-const STATIONS_ROW_CAP = 500;
-
-// What the table says when it is listing a map selection rather than a filter
-// result — including the way back to the filter, which is the only way back.
-function selectionBarHtml() {
-  const n = state.mapSelection.size;
-  if (!n) return '';
-  return `
-    <div class="sel-bar">
-      <span class="sel-bar-count"><strong>${n}</strong> station${n === 1 ? '' : 's'} selected</span>
-      <span class="sel-bar-note">Picked off the map — not saved, and not part of the filter.</span>
-      <span class="sel-bar-actions">
-        <button onclick="exportMapSelection()" title="Download these stations as a CSV">Export CSV</button>
-        <button class="filter-reset" onclick="clearMapSelection()"
-                title="Go back to listing the filter result">Clear selection</button>
-      </span>
-    </div>`;
-}
-
-function stationsTable(allStations) {
-  const selBar = selectionBarHtml();
-  if (!allStations.length) {
-    return selBar + `<p style="padding:.75rem;color:var(--muted)">${selBar
-      ? 'None of the selected stations are in the loaded file.'
-      : 'No stations match current filters.'}</p>`;
-  }
-  const capped    = !state.stationsShowAll && allStations.length > STATIONS_ROW_CAP;
-  const stations  = capped ? allStations.slice(0, STATIONS_ROW_CAP) : allStations;
-  // Same prepared terms the filter itself ran on, so the marks land exactly
-  // where the match was made.
-  const { terms, nums } = prepareSearch(state.filters.search);
-  // Rows the filter didn't name — they are here because a pass range ties them
-  // to one that did, and the badge is what says so.
-  const relIds = relatedIdSet();
-  return `
-    ${selBar}
-    ${capped ? `
-      <p class="filter-note">Showing ${STATIONS_ROW_CAP} of ${allStations.length} —
-        narrow the filter or <a href="#" onclick="state.stationsShowAll=true;rerenderStations();return false">show all</a>.</p>
-    ` : ''}
-    <table>
-      <colgroup>
-        <col style="width:22%"><col style="width:8%"><col style="width:13%"><col style="width:13%">
-        <col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:6%">
-      </colgroup>
-      <thead>
-        <tr>
-          <th>Name</th><th>Stn #</th><th>Roles</th><th>Network</th>
-          <th>AlertID</th><th>Lat</th><th>Lon</th><th>Elev (AHD)</th><th>On</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${stations.map(s => {
-          const aids = stationAlertIds(s);
-          return `
-            <tr class="${state.selectedId === s.id ? 'selected' : ''}" data-sid="${escAttr(s.id)}"
-                onclick="selectStation('${escAttr(s.id)}')" style="cursor:pointer">
-              <td title="${esc(s.id)}"><span class="stn-name role-${primaryRole(s)}">${markHits(s.name, terms)}</span></td>
-              <td class="small">${markHits(s.station_number || '', terms)}</td>
-              <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}${
-                s.roles.includes('repeater') && repeaterPassingCount(s) != null
-                  ? ` <span class="badge" title="ALERT addresses carried, in this repeater's open pass ranges">passing ${repeaterPassingCount(s)}</span>`
-                  : ''}${
-                relIds.has(s.id)
-                  ? ' <span class="badge badge--rel" title="Not a filter match — a pass range ties it to one">via pass range</span>'
-                  : ''}</td>
-              <td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
-              <td class="small">${aids.map(id => markAlertId(id, nums)).join(', ')}</td>
-              <td class="small">${s.lat != null ? s.lat.toFixed(4) : ''}</td>
-              <td class="small">${s.lon != null ? s.lon.toFixed(4) : ''}</td>
-              <td class="small">${s.elevation_ahd != null ? s.elevation_ahd : ''}</td>
-              <td>${s.enabled ? '✓' : ''}</td>
-            </tr>`;
-        }).join('')}
-      </tbody>
-    </table>`;
-}
-
-function rerenderStations() {
-  const stations = tableStations();
-  const wrap = document.getElementById('stations-table-wrap');
-  if (wrap) wrap.innerHTML = stationsTable(stations);
-  const cnt = document.getElementById('st-count');
-  if (cnt) cnt.textContent = stations.length;
-}
-
-function selectStation(id) {
-  if (state.selectedId === id) {
-    // Toggle off: clear the highlight and close the editor card below.
-    state.selectedId  = null;
-    state.editorId    = null;
-    state.editorDraft = {};
-    state.editorMsg   = null;
-    fetchEditorStamp(null);
-    rerenderStations();
-    rerenderStationEditorCard();
-    return;
-  }
-  // Select the row and load it into the editor card. A deep copy becomes the
-  // draft so fields not exposed by the form (catchments, satcom, RM metadata)
-  // survive a save.
-  const s = state.data.stations.find(x => x.id === id);
-  state.selectedId  = id;
-  state.editorId    = id;
-  state.editorDraft = JSON.parse(JSON.stringify(s || {}));
-  state.editorMsg   = null;
-  fetchEditorStamp(id);        // the version this edit starts from — see #B3
-  rerenderStations();
-  rerenderStationEditorCard();
-  if (s) focusStationOnMap(s);
-}
-
-// Pan the map above the table to a station and open its pin. Called whenever a
-// row is picked, so the list and the map stay talking about the same site.
-function focusStationOnMap(s) {
-  if (!state.map || s.lat == null || s.lon == null) return;
-  state.map.setView([s.lat, s.lon], Math.max(state.map.getZoom() || 0, 11));
-  const marker = state.mapMarkers.find(m => m.mnStationId === s.id);
-  if (marker) marker.openPopup();
-}
-
-// A bounding box roughly radiusKm around a point, for map.fitBounds() — a
-// real-world distance rather than a Leaflet zoom level, which covers different
-// ground at different latitudes. One degree of latitude is ~111 km everywhere;
-// a degree of longitude shrinks by cos(latitude) as it closes in toward the poles.
-function boundsForRadiusKm(lat, lon, radiusKm) {
-  const dLat = radiusKm / 111;
-  const dLon = radiusKm / (111 * Math.cos(lat * Math.PI / 180));
-  return [[lat - dLat, lon - dLon], [lat + dLat, lon + dLon]];
-}
-
-// "Zoom to station" from a map popup — centers the station with a 50 km
-// wide view of surrounding context visible, regardless of the map's
-// current extent when clicked.
-function zoomToStation(id) {
-  const s = state.data && state.data.stations.find(x => x.id === id);
-  if (!state.map || !s || s.lat == null || s.lon == null) return;
-  state.map.fitBounds(boundsForRadiusKm(s.lat, s.lon, 25));
-}
-
-// Scroll a station's row into the middle of the table viewport, so a station
-// arrived at from another tab isn't left somewhere in 1300 rows.
-function scrollStationRowIntoView(id) {
-  const wrap = document.getElementById('stations-table-wrap');
-  if (!wrap) return;
-  const row = [...wrap.querySelectorAll('tr[data-sid]')].find(tr => tr.dataset.sid === id);
-  if (row) row.scrollIntoView({ block: 'center' });
-}
-
-// Select a station and load it into the editor card, without touching the DOM.
-// The filter driving the table is the same one driving the map, so a station
-// the current filter excludes would be selected into a list it isn't in; in
-// that case the filters are narrowed to the station's own name instead — the
-// table then contains it, and the search box visibly says why the list changed.
-// A repeater the pass ranges pulled in is already a row, so it counts as listed
-// even though the filter never named it.
-// Returns true when the filters moved, so the caller knows the sidebar has to
-// be re-rendered and not just the table.
-function selectStationState(s) {
-  state.selectedId  = s.id;
-  state.editorId    = s.id;
-  // Same deep copy as selectStation: fields the form doesn't expose survive a save.
-  state.editorDraft = JSON.parse(JSON.stringify(s));
-  state.editorMsg   = null;
-  fetchEditorStamp(s.id);
-  // A map selection is what the table is listing, so a station asked for from
-  // outside it has no row to be scrolled to. Adding it is the least destructive
-  // answer — the picked set survives, and the count in the header says it grew.
-  if (state.mapSelection.size) {
-    if (!state.mapSelection.has(s.id)) {
-      state.mapSelection.add(s.id);
-      applyMapSelectionStyles();
-    }
-    return false;
-  }
-  if (relatedIdSet().has(s.id)) return false;
-  // Being in the filter result is not enough: the table only draws the first
-  // STATIONS_ROW_CAP of it, so an unfiltered list contains all 3,174 stations
-  // and renders 500. A station past that has no row to select or scroll to, and
-  // arriving from another tab to a table that visibly does not contain what you
-  // asked for is the same failure as the filter excluding it — so it gets the
-  // same answer.
-  const at = filteredStations().findIndex(x => x.id === s.id);
-  if (at >= 0 && (state.stationsShowAll || at < STATIONS_ROW_CAP)) return false;
-  resetStationFilters();
-  state.filters.search = s.name;
-  return true;
-}
-
-// "Show in the list below ↓" from a map popup. The map and the list share this
-// page, so there is no tab to switch to — the row is selected, scrolled to and
-// loaded into the editor beneath the map the operator is already looking at.
-function focusStation(id) {
-  const s = state.data && state.data.stations.find(x => x.id === id);
-  if (!s) return;
-  if (selectStationState(s)) {
-    renderMain();               // filters moved — the sidebar has to show it
-  } else {
-    rerenderStations();
-    rerenderStationEditorCard();
-  }
-  scrollStationRowIntoView(id);
-}
-
-// Open the Stations tab focused on one station. Used by the Pass Ranges tables,
-// where every row names a station the operator will want to look at in full.
-function goToStation(id) {
-  const s = state.data && state.data.stations.find(x => x.id === id);
-  if (!s) return;
-  selectStationState(s);
-  switchTab('stations');        // renders the page, table and map included
-  scrollStationRowIntoView(id);
-  focusStationOnMap(s);
-}
-
-// True when the editor card should show a form (an existing station is selected
-// or a new one is being created), rather than the placeholder prompt.
-function editorActive() {
-  return state.editorDraft && Object.keys(state.editorDraft).length > 0;
-}
-
-function renderStationEditorCard() {
-  if (!editorActive()) {
-    return `
-      <div class="panel-header"><h2>Station Editor</h2></div>
-      <p style="color:var(--muted);padding:.5rem 0">
-        Select a station in the list above to view and edit it, or click
-        <em>+ New</em> to add one.
-      </p>`;
-  }
-  // Existing station → render from the live record; new station → from the draft.
-  const s = state.editorId
-    ? (state.data.stations.find(x => x.id === state.editorId) || state.editorDraft)
-    : state.editorDraft;
-  return editorForm(s);
-}
-
-function rerenderStationEditorCard() {
-  const el = document.getElementById('stations-editor-card');
-  if (el) el.innerHTML = renderStationEditorCard();
-  // The card below the table follows the same selection, so every caller that
-  // reloads the editor reloads it too — there is no path that changes the
-  // selected station without going through here.
-  rerenderStationCarriersCard();
-}
-
-// ── Repeaters listening to the selected station ──────────────────────────────
-// The mirror image of the repeater editor's "ALERT IDs in range → stations"
-// list: with a station selected, this says which repeaters have a pass range
-// open to *its* addresses — the hop its data actually takes out of the field,
-// and the list to check when a station stops arriving.
-//
-// It reads findRepeaterMatches/passRangeCoversId, the same pair the map links,
-// the "via pass range" badge and the Pass Ranges tab all read, so the four
-// never disagree about who carries whom.
-
-// The station the panel is about, or null: the selected row, and only when it
-// is a station that actually exists. A half-filled "+ New" draft has no id to
-// match a pass range against, so the panel stays away until it is saved.
-function carriersStation() {
-  if (!state.data || !state.selectedId) return null;
-  return state.data.stations.find(x => x.id === state.selectedId) || null;
-}
-
-// One row's worth of "why is this repeater in the list": the station's own
-// addresses this repeater carries, and the ranges that pick them up. The
-// bounds test only says *which* range — passRangeCoversId still decides
-// whether the address is carried at all, so an excluded address is absent from
-// both. Same composition as passRangesHtml on the Pass Ranges tab.
-function carrierRangeDetail(repeater, alertIds) {
-  const ids    = alertIds.filter(id => passRangeCoversId(repeater.repeater, id));
-  const ranges = (repeater.repeater.pass_ranges || [])
-    .filter(p => ids.some(id => id >= p.low && id <= p.high))
-    .map(p => `${p.low}–${p.high}`);
-  return { ids, ranges };
-}
-
-function stationCarriersHtml() {
-  const s = carriersStation();
-  if (!s) return '';
-  const ids  = stationAlertIds(s);
-  const rpts = findRepeaterMatches(s);
-
-  const rows = rpts
-    .map(r => ({
-      r,
-      ...carrierRangeDetail(r, ids),
-      km: (s.lat != null && s.lon != null && r.lat != null && r.lon != null)
-        ? acmaHaversineKm(s.lat, s.lon, r.lat, r.lon) : null,
-    }))
-    // Nearest first — the closest repeater with the address open is the one the
-    // station is most likely actually being heard by. Positionless repeaters
-    // can't be ranked, so they go last rather than pretending to be at 0 km.
-    .sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity) || a.r.name.localeCompare(b.r.name));
-
-  const header = `
-    <div class="panel-header">
-      <h2>Repeaters listening</h2>
-      <span class="badge" title="Repeaters with a pass range open to this station">${rows.length}</span>
-    </div>`;
-
-  // Two different nothings, and they mean opposite things: a station with no
-  // ALERT address (telemetry-only, or not configured yet) is not something a
-  // pass range could ever cover, while a station that has one and still has no
-  // carrier is orphaned — a finding, flagged in the same red the Pass Ranges
-  // tab flags orphans in.
-  if (!ids.length) {
-    return `${header}
-      <p class="small" style="color:var(--muted);margin:.5rem 0 0">
-        <strong>${esc(s.name)}</strong> has no ALERT address recorded, so there is nothing for a
-        pass range to be open to. Telemetry-only stations reach the base another way.
-      </p>`;
-  }
-  if (!rows.length) {
-    return `${header}
-      <p class="small" style="color:#c7401a;margin:.5rem 0 0">
-        <strong>No repeater's pass ranges cover ${ids.length === 1 ? 'address' : 'addresses'}
-        ${ids.join(', ')}</strong> — this station is orphaned, and nothing is listening for it.
-      </p>`;
-  }
-
-  return `${header}
-    <p class="small" style="color:var(--muted);margin:.5rem 0 0">
-      Pass ranges open to ${ids.length === 1 ? 'address' : 'addresses'} <strong>${ids.join(', ')}</strong>.
-      Click a row to put the map on that repeater and dim everything off its own paths — the
-      filters, the picked selection and the station in the editor below all stay as they are.
-      Clicking it again puts the map back.
-    </p>
-    <div class="table-wrap medium">
-      <table>
-        <colgroup>
-          <col style="width:28%"><col style="width:18%"><col style="width:14%">
-          <col style="width:18%"><col style="width:11%"><col style="width:11%">
-        </colgroup>
-        <thead>
-          <tr>
-            <th>Repeater</th><th>Network</th><th>Carries</th>
-            <th>In pass range</th><th>Distance</th><th>Passing</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map(({ r, ids: carried, ranges, km }) => `
-            <tr class="${state.mapFocusRepeaterId === r.id ? 'rpt-focused' : ''}"
-                onclick="focusRepeaterOnMap('${escAttr(r.id)}')" style="cursor:pointer"
-                title="Put the map on ${escAttr(r.name)} — nothing else on this page moves">
-              <td><span class="stn-name role-repeater">${esc(r.name)}</span></td>
-              <td class="small">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
-              <td class="small">${carried.join(', ')}</td>
-              <td class="small">${ranges.join(', ')}</td>
-              <td class="small" title="${km == null ? 'One end has no coordinates recorded' : 'Straight-line distance'}"
-                  >${km == null ? '—' : fmtKm(km)}</td>
-              <td><span class="badge" title="ALERT addresses this repeater carries in total, post-exclusion">${repeaterPassingCount(r) ?? 0}</span></td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
-}
-
-function rerenderStationCarriersCard() {
-  const el = document.getElementById('stations-carriers-card');
-  if (!el) return;
-  const html = stationCarriersHtml();
-  el.innerHTML = html;
-  el.hidden    = !html;
-}
-
-// Clicking a row in that table. Deliberately narrow: it moves the map and sets
-// the same repeater focus a plain click on the repeater's own pin sets, and
-// touches nothing else — not state.selectedId, not the editor draft, not the
-// filters, not the map selection. The station being looked at stays the station
-// being looked at; only the view moves. Clicking the focused row again clears
-// the focus, as clicking its pin again would.
-function focusRepeaterOnMap(id) {
-  const r = state.data && state.data.stations.find(x => x.id === id);
-  if (!r) return;
-  if (state.mapFocusRepeaterId === id) {
-    setMapFocusRepeater(null);
-    return;
-  }
-  setMapFocusRepeater(id);       // re-renders this card, so the row marks itself
-  if (!state.map) return;
-  if (r.lat == null || r.lon == null) {
-    mapNote(`${r.name} has no coordinates recorded, so the map can't go to it.`, 4000);
-    return;
-  }
-  state.map.setView([r.lat, r.lon], Math.max(state.map.getZoom() || 0, 10));
-  const marker = state.mapMarkers.find(m => m.mnStationId === r.id);
-  // No pin means the map display is hiding it (hide-others mode with a filter
-  // running). The view is on it either way, so say why there is nothing there
-  // rather than leaving the operator looking at empty ground.
-  if (marker) marker.openPopup();
-  else mapNote(`${r.name} isn't drawn right now — the map display is hiding it.`, 4000);
-}
 
 // ── NETWORKS tab ───────────────────────────────────────────────────────────────
 
@@ -11383,6 +15228,223 @@ async function snapshotStationsJson() {
   }
 }
 
+// ── Datastore writes ───────────────────────────────────────────────────────────
+// The other direction. Reads are a GET anyone may make; a write has to say who
+// is making it, arrives at exactly two functions, and can be refused — so this
+// is a little more than fetch().
+//
+// Everything goes through meganet.save_station() and meganet.delete_station()
+// rather than at the tables, because a station is a row plus its sensors plus
+// its repeater plus that repeater's pass ranges, and those have to land together
+// or not at all. The database enforces that by being the only thing granted the
+// write verbs; see db/migrations/0004_station_writes.sql.
+
+// The access token for the signed-in session, when there is one. #B8 owns
+// getting one — verified @bom.gov.au, allowlist for everyone else — and calls
+// dbSetAccessToken() with it. Until that lands this is null, every write goes
+// out as `anon`, and the database refuses it. That is the write path working
+// correctly, not a bug: the gate is server-side, so it does not matter that the
+// browser has no sign-in screen yet.
+//
+// sessionStorage rather than localStorage: a token outliving the tab it was
+// obtained in is a token left on a shared machine.
+const DB_TOKEN_KEY = 'meganet.access_token';
+
+let _dbToken = (() => {
+  try { return sessionStorage.getItem(DB_TOKEN_KEY) || null; } catch (_) { return null; }
+})();
+
+function dbSetAccessToken(token) {
+  _dbToken = token || null;
+  try {
+    if (_dbToken) sessionStorage.setItem(DB_TOKEN_KEY, _dbToken);
+    else sessionStorage.removeItem(DB_TOKEN_KEY);
+  } catch (_) { /* private mode; the token stays in memory for this page */ }
+  return dbCanWrite();
+}
+
+// Whether this browser holds anything worth sending. Deliberately not a
+// permission check — the database decides that, and this only decides whether
+// the editor says "sign in first" before spending a round trip finding out.
+function dbCanWrite() { return !!_dbToken; }
+
+if (typeof window !== 'undefined') window.dbSetAccessToken = dbSetAccessToken;
+
+// POST to a PostgREST function, with the errors turned into something the caller
+// can branch on rather than a string to be pattern-matched:
+//
+//   err.conflict  somebody else changed the row first (HTTP 409, SQLSTATE PT409)
+//   err.denied    not signed in, or signed in as somebody who may not write
+//
+// PostgREST answers 404 for a function the current role has no EXECUTE on, which
+// reads as "no such thing" but means "not for you" — anon holds no grant on
+// either of these, so that is the shape a signed-out save comes back in.
+async function dbRpc(fn, args) {
+  const res = await fetch(`${DB_URL}/rpc/${fn}`, {
+    method: 'POST',
+    headers: {
+      apikey: DB_ANON_KEY,
+      // Only when there is one. The publishable key is not a token, and offering
+      // it as a bearer would get "invalid JWT" back instead of the honest
+      // answer, which is that this request is anonymous.
+      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
+      'Content-Profile': DB_SCHEMA,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(args),
+    cache: 'no-store',
+  });
+
+  const text = await res.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch (_) { /* not JSON */ }
+
+  if (!res.ok) {
+    const message = (body && (body.message || body.error_description))
+      || `HTTP ${res.status}`;
+    const err = new Error(body && body.hint ? `${message} — ${body.hint}` : message);
+    err.status   = res.status;
+    err.conflict = res.status === 409;
+    err.denied   = res.status === 401 || res.status === 403 || res.status === 404;
+    throw err;
+  }
+  return body;
+}
+
+// GET a table or view through PostgREST. `path` is everything after the base —
+// `reading?addr=in.("a:6128")&order=reading_ts.asc` — and the key, the schema
+// and the token (when there is one) are added here so that no caller assembles
+// them again. Reads only: writes go through dbRpc() and a `security definer`
+// function, which is what the RLS in db/migrations assumes.
+//
+// Anonymous is the normal case. Readings, the rollups and the vocabularies are
+// granted to `anon` in 0006 — a river height is not a secret — so this works
+// signed out, and signing in adds nothing to a read.
+async function dbSelect(path) {
+  const res = await fetch(`${DB_URL}/${path}`, {
+    headers: {
+      apikey: DB_ANON_KEY,
+      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
+      'Accept-Profile': DB_SCHEMA,
+      Accept: 'application/json',
+    },
+    cache: 'no-store',
+  });
+  const text = await res.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch (_) { /* not JSON */ }
+  if (!res.ok) {
+    const message = (body && (body.message || body.error_description)) || `HTTP ${res.status}`;
+    const err = new Error(body && body.hint ? `${message} — ${body.hint}` : message);
+    err.status = res.status;
+    throw err;
+  }
+  return Array.isArray(body) ? body : [];
+}
+
+// The version stamp the editor is holding. Two columns rather than one because
+// "deleted while you had it open" is worth telling the operator before they type
+// for ten minutes into a form that cannot be saved.
+async function dbStationStamp(id) {
+  const url = `${DB_URL}/station?id=eq.${encodeURIComponent(id)}&select=updated_at,deleted_at`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: DB_ANON_KEY,
+      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
+      'Accept-Profile': DB_SCHEMA,
+      Accept: 'application/vnd.pgrst.object+json',
+    },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function dbSaveStation(doc, expectedUpdatedAt) {
+  return dbRpc('save_station', {
+    p_doc: doc,
+    p_expected_updated_at: expectedUpdatedAt || null,
+  });
+}
+
+function dbDeleteStation(id, expectedUpdatedAt) {
+  return dbRpc('delete_station', {
+    p_id: id,
+    p_expected_updated_at: expectedUpdatedAt || null,
+  });
+}
+
+// Pull the stamp for the station just opened, in the background. Nothing waits
+// on it — the operator starts typing immediately — but a save that arrives
+// before it does is refused by the database rather than guessed at, which is the
+// safe half of that race.
+async function fetchEditorStamp(id) {
+  state.editorStamp    = null;
+  state.editorStampFor = id;
+  if (!id) return;
+  try {
+    const row = await dbStationStamp(id);
+    if (state.editorStampFor !== id) return;   // the operator moved on
+    state.editorStamp = row && row.updated_at;
+    if (row && row.deleted_at) {
+      setEditorStatus({ kind: 'error', text: 'This station has been deleted in the database. Saving will bring it back.' });
+    }
+  } catch (_) {
+    // Left null. The save will be refused with a message that says to reload,
+    // which is the truthful answer: this editor cannot prove what it started
+    // from.
+    if (state.editorStampFor === id) state.editorStamp = null;
+  }
+}
+
+// The editor's own status line. Repainted on its own so a failed save can say
+// why without redrawing the form underneath it and throwing away the typing
+// that is the entire thing being protected.
+function setEditorStatus(msg) {
+  state.editorMsg = msg;
+  const el = document.getElementById('ef-status');
+  if (el) el.innerHTML = editorStatusHtml();
+}
+
+function editorStatusHtml() {
+  const m = state.editorMsg;
+  if (m) {
+    const colour = m.kind === 'error' ? 'var(--bad)'
+                 : m.kind === 'ok'    ? 'var(--ok)'
+                 : 'var(--muted)';
+    return `<span style="color:${colour}">${esc(m.text)}</span>`;
+  }
+  // Nothing has happened yet, so say what will happen when Save is pressed —
+  // which is different depending on where the list on screen came from and
+  // whether this browser holds a session.
+  if (!editorWritesGoToDatabase()) {
+    return `<span style="color:var(--warn)">Showing ${esc(SOURCE_LABELS[state.dataSource?.kind] || 'a file')} rather than the datastore —
+      <a href="#" onclick="reloadFromDatastore();return false">load from the datastore</a> before editing,
+      or Save would write what is on screen over whatever the database now holds.</span>`;
+  }
+  if (!dbCanWrite()) {
+    return `<span style="color:var(--muted)">Not signed in — the database refuses anonymous writes.
+      <a href="#" onclick="Auth.open();return false">Sign in</a> to save; everything on this form is kept while you do.</span>`;
+  }
+  // Signed in, and the database has already said this address may not write.
+  // Worth saying here rather than letting Save be the one to find out, because
+  // the answer will not change by trying again.
+  if (!Auth.mayWrite()) {
+    return `<span style="color:var(--warn)">Signed in as ${esc(Auth.email() || 'you')}, but this address is not on the
+      editors list — saving will be refused. An administrator has to add it (see <code>docs/access.md</code>).</span>`;
+  }
+  return '';
+}
+
+// Saving is only safe when the station on screen came out of the database this
+// session. On the file fallback the form holds values that may be older than the
+// row it would overwrite — and the version stamp would not catch it, because the
+// stamp is read live and would match.
+function editorWritesGoToDatabase() {
+  return state.dataSource && state.dataSource.kind === 'api';
+}
+
 // ── EXPORT tab ─────────────────────────────────────────────────────────────────
 
 function renderExportHtml() {
@@ -11635,223 +15697,6 @@ function runExport() {
   ].forEach(([name, content], i) => {
     setTimeout(() => dlText(name, content), i * 180);
   });
-}
-
-// ── Datastore writes ───────────────────────────────────────────────────────────
-// The other direction. Reads are a GET anyone may make; a write has to say who
-// is making it, arrives at exactly two functions, and can be refused — so this
-// is a little more than fetch().
-//
-// Everything goes through meganet.save_station() and meganet.delete_station()
-// rather than at the tables, because a station is a row plus its sensors plus
-// its repeater plus that repeater's pass ranges, and those have to land together
-// or not at all. The database enforces that by being the only thing granted the
-// write verbs; see db/migrations/0004_station_writes.sql.
-
-// The access token for the signed-in session, when there is one. #B8 owns
-// getting one — verified @bom.gov.au, allowlist for everyone else — and calls
-// dbSetAccessToken() with it. Until that lands this is null, every write goes
-// out as `anon`, and the database refuses it. That is the write path working
-// correctly, not a bug: the gate is server-side, so it does not matter that the
-// browser has no sign-in screen yet.
-//
-// sessionStorage rather than localStorage: a token outliving the tab it was
-// obtained in is a token left on a shared machine.
-const DB_TOKEN_KEY = 'meganet.access_token';
-
-let _dbToken = (() => {
-  try { return sessionStorage.getItem(DB_TOKEN_KEY) || null; } catch (_) { return null; }
-})();
-
-function dbSetAccessToken(token) {
-  _dbToken = token || null;
-  try {
-    if (_dbToken) sessionStorage.setItem(DB_TOKEN_KEY, _dbToken);
-    else sessionStorage.removeItem(DB_TOKEN_KEY);
-  } catch (_) { /* private mode; the token stays in memory for this page */ }
-  return dbCanWrite();
-}
-
-// Whether this browser holds anything worth sending. Deliberately not a
-// permission check — the database decides that, and this only decides whether
-// the editor says "sign in first" before spending a round trip finding out.
-function dbCanWrite() { return !!_dbToken; }
-
-if (typeof window !== 'undefined') window.dbSetAccessToken = dbSetAccessToken;
-
-// POST to a PostgREST function, with the errors turned into something the caller
-// can branch on rather than a string to be pattern-matched:
-//
-//   err.conflict  somebody else changed the row first (HTTP 409, SQLSTATE PT409)
-//   err.denied    not signed in, or signed in as somebody who may not write
-//
-// PostgREST answers 404 for a function the current role has no EXECUTE on, which
-// reads as "no such thing" but means "not for you" — anon holds no grant on
-// either of these, so that is the shape a signed-out save comes back in.
-async function dbRpc(fn, args) {
-  const res = await fetch(`${DB_URL}/rpc/${fn}`, {
-    method: 'POST',
-    headers: {
-      apikey: DB_ANON_KEY,
-      // Only when there is one. The publishable key is not a token, and offering
-      // it as a bearer would get "invalid JWT" back instead of the honest
-      // answer, which is that this request is anonymous.
-      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
-      'Content-Profile': DB_SCHEMA,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(args),
-    cache: 'no-store',
-  });
-
-  const text = await res.text();
-  let body = null;
-  try { body = text ? JSON.parse(text) : null; } catch (_) { /* not JSON */ }
-
-  if (!res.ok) {
-    const message = (body && (body.message || body.error_description))
-      || `HTTP ${res.status}`;
-    const err = new Error(body && body.hint ? `${message} — ${body.hint}` : message);
-    err.status   = res.status;
-    err.conflict = res.status === 409;
-    err.denied   = res.status === 401 || res.status === 403 || res.status === 404;
-    throw err;
-  }
-  return body;
-}
-
-// GET a table or view through PostgREST. `path` is everything after the base —
-// `reading?addr=in.("a:6128")&order=reading_ts.asc` — and the key, the schema
-// and the token (when there is one) are added here so that no caller assembles
-// them again. Reads only: writes go through dbRpc() and a `security definer`
-// function, which is what the RLS in db/migrations assumes.
-//
-// Anonymous is the normal case. Readings, the rollups and the vocabularies are
-// granted to `anon` in 0006 — a river height is not a secret — so this works
-// signed out, and signing in adds nothing to a read.
-async function dbSelect(path) {
-  const res = await fetch(`${DB_URL}/${path}`, {
-    headers: {
-      apikey: DB_ANON_KEY,
-      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
-      'Accept-Profile': DB_SCHEMA,
-      Accept: 'application/json',
-    },
-    cache: 'no-store',
-  });
-  const text = await res.text();
-  let body = null;
-  try { body = text ? JSON.parse(text) : null; } catch (_) { /* not JSON */ }
-  if (!res.ok) {
-    const message = (body && (body.message || body.error_description)) || `HTTP ${res.status}`;
-    const err = new Error(body && body.hint ? `${message} — ${body.hint}` : message);
-    err.status = res.status;
-    throw err;
-  }
-  return Array.isArray(body) ? body : [];
-}
-
-// The version stamp the editor is holding. Two columns rather than one because
-// "deleted while you had it open" is worth telling the operator before they type
-// for ten minutes into a form that cannot be saved.
-async function dbStationStamp(id) {
-  const url = `${DB_URL}/station?id=eq.${encodeURIComponent(id)}&select=updated_at,deleted_at`;
-  const res = await fetch(url, {
-    headers: {
-      apikey: DB_ANON_KEY,
-      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
-      'Accept-Profile': DB_SCHEMA,
-      Accept: 'application/vnd.pgrst.object+json',
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-function dbSaveStation(doc, expectedUpdatedAt) {
-  return dbRpc('save_station', {
-    p_doc: doc,
-    p_expected_updated_at: expectedUpdatedAt || null,
-  });
-}
-
-function dbDeleteStation(id, expectedUpdatedAt) {
-  return dbRpc('delete_station', {
-    p_id: id,
-    p_expected_updated_at: expectedUpdatedAt || null,
-  });
-}
-
-// Pull the stamp for the station just opened, in the background. Nothing waits
-// on it — the operator starts typing immediately — but a save that arrives
-// before it does is refused by the database rather than guessed at, which is the
-// safe half of that race.
-async function fetchEditorStamp(id) {
-  state.editorStamp    = null;
-  state.editorStampFor = id;
-  if (!id) return;
-  try {
-    const row = await dbStationStamp(id);
-    if (state.editorStampFor !== id) return;   // the operator moved on
-    state.editorStamp = row && row.updated_at;
-    if (row && row.deleted_at) {
-      setEditorStatus({ kind: 'error', text: 'This station has been deleted in the database. Saving will bring it back.' });
-    }
-  } catch (_) {
-    // Left null. The save will be refused with a message that says to reload,
-    // which is the truthful answer: this editor cannot prove what it started
-    // from.
-    if (state.editorStampFor === id) state.editorStamp = null;
-  }
-}
-
-// The editor's own status line. Repainted on its own so a failed save can say
-// why without redrawing the form underneath it and throwing away the typing
-// that is the entire thing being protected.
-function setEditorStatus(msg) {
-  state.editorMsg = msg;
-  const el = document.getElementById('ef-status');
-  if (el) el.innerHTML = editorStatusHtml();
-}
-
-function editorStatusHtml() {
-  const m = state.editorMsg;
-  if (m) {
-    const colour = m.kind === 'error' ? 'var(--bad)'
-                 : m.kind === 'ok'    ? 'var(--ok)'
-                 : 'var(--muted)';
-    return `<span style="color:${colour}">${esc(m.text)}</span>`;
-  }
-  // Nothing has happened yet, so say what will happen when Save is pressed —
-  // which is different depending on where the list on screen came from and
-  // whether this browser holds a session.
-  if (!editorWritesGoToDatabase()) {
-    return `<span style="color:var(--warn)">Showing ${esc(SOURCE_LABELS[state.dataSource?.kind] || 'a file')} rather than the datastore —
-      <a href="#" onclick="reloadFromDatastore();return false">load from the datastore</a> before editing,
-      or Save would write what is on screen over whatever the database now holds.</span>`;
-  }
-  if (!dbCanWrite()) {
-    return `<span style="color:var(--muted)">Not signed in — the database refuses anonymous writes.
-      <a href="#" onclick="Auth.open();return false">Sign in</a> to save; everything on this form is kept while you do.</span>`;
-  }
-  // Signed in, and the database has already said this address may not write.
-  // Worth saying here rather than letting Save be the one to find out, because
-  // the answer will not change by trying again.
-  if (!Auth.mayWrite()) {
-    return `<span style="color:var(--warn)">Signed in as ${esc(Auth.email() || 'you')}, but this address is not on the
-      editors list — saving will be refused. An administrator has to add it (see <code>docs/access.md</code>).</span>`;
-  }
-  return '';
-}
-
-// Saving is only safe when the station on screen came out of the database this
-// session. On the file fallback the form holds values that may be older than the
-// row it would overwrite — and the version stamp would not catch it, because the
-// stamp is read live and would match.
-function editorWritesGoToDatabase() {
-  return state.dataSource && state.dataSource.kind === 'api';
 }
 
 // ── STATION EDITOR (card on the Stations tab) ────────────────────────────────────
@@ -12311,3850 +16156,5 @@ async function editorDelete() {
   refreshFilterOptions();
   rerenderStations();
   rerenderStationEditorCard();
-}
-
-// ── Filter helpers ─────────────────────────────────────────────────────────────
-
-// The grouped filters, in panel order. `alwaysOpen` groups are short enough to
-// leave expanded; the rest collapse to a one-line "All / None / 3 of 15" summary
-// so the panel stays readable with a dozen networks and twenty sensor types in it.
-const FILTER_GROUPS = {
-  roles: {
-    title: 'Station type',
-    alwaysOpen: true,
-    dots: true,
-  },
-  sensors: {
-    title: 'Sensor type',
-    hint: 'Not every site measures everything — tick the readings you care about.',
-    extra: () => `
-      <label class="filter-check">
-        <input type="checkbox" ${state.filters.sensorsAll ? 'checked' : ''}
-               onchange="setSensorsAll(this.checked)">
-        Must have <em>all</em> ticked types (not just one)
-      </label>`,
-  },
-  networks: {
-    title: 'Radio network',
-    hint: `Networks are still being mapped, so most stations sit in "${FILTER_NONE_LABEL}" — ` +
-          'they stay visible unless you untick that bucket.',
-  },
-  regions: {
-    title: 'Region',
-    hint: 'From the station\'s catchment. Regions are still being assigned.',
-  },
-};
-
-// Contents of the Filters panel. Search on top, then one block per question the
-// operator is actually asking (what kind of site, what does it measure, whose
-// network, where), then the data-completeness block for finding gaps.
-function stationFiltersHtml() {
-  return `
-    <div class="panel-header">
-      <h3>Filters</h3>
-      <span class="filter-resets">
-        <button class="filter-reset" onclick="clearStationFilters(false)"
-                title="Put every station back at full opacity, without moving the map"
-                ${anyStationFilterActive() ? '' : 'disabled'}>Clear filters</button>
-        <button class="filter-reset" onclick="clearStationFilters(true)"
-                title="Clear the filters and zoom back out to the whole network"
-                ${anyStationFilterActive() ? '' : 'disabled'}>Clear &amp; zoom out</button>
-      </span>
-    </div>
-    <div class="filter-block">
-      <div class="filter-head">
-        <span class="filter-title">Search</span>
-        <button class="filter-clear" id="search-clear" onclick="clearSearch()"
-                ${state.filters.search.trim() ? '' : 'hidden'}>clear</button>
-      </div>
-      <p class="filter-hint">Name, station # or ALERT address — or paste a list of them,
-        separated by commas, spaces or new lines.</p>
-      <textarea id="station-search" class="filter-search" rows="1" spellcheck="false"
-                placeholder="e.g. 6128, 6129 — or paste from a telemetry log"
-                oninput="mapSearchInput(this.value);autoGrowSearch(this)">${esc(state.filters.search)}</textarea>
-      <p class="filter-note" id="search-terms-note">${searchTermsNoteHtml()}</p>
-      <p class="filter-note" id="map-match-note">${mapMatchNoteHtml()}</p>
-    </div>
-    ${Object.keys(FILTER_GROUPS).map(filterGroupHtml).join('')}
-    ${filterAreaHtml()}
-    ${filterDataHtml()}`;
-}
-
-function renderStationFilters() {
-  const el = document.getElementById('station-filters');
-  if (el) el.innerHTML = stationFiltersHtml();
-  initStationFilters();
-}
-
-// The search box is a <textarea>, not an <input>: a single-line input strips
-// the line breaks out of a pasted column of addresses, gluing 6128 and 6129
-// into 61286129. It opens one line tall and grows to fit what was pasted.
-function initStationFilters() {
-  const el = document.getElementById('station-search');
-  if (el) autoGrowSearch(el);
-}
-
-const SEARCH_MAX_PX = 170;   // ~8 lines; past that the box scrolls instead
-
-function autoGrowSearch(el) {
-  el.style.height = 'auto';
-  // Boxes are border-box here but scrollHeight excludes the border, so the
-  // frame has to be added back or every growth step clips by a couple of pixels.
-  const frame = el.offsetHeight - el.clientHeight;
-  el.style.height = Math.min(el.scrollHeight + frame, SEARCH_MAX_PX) + 'px';
-}
-
-function clearSearch() {
-  state.filters.search = '';
-  const el = document.getElementById('station-search');
-  if (el) { el.value = ''; autoGrowSearch(el); el.focus(); }
-  stationsFilterChanged();
-}
-
-// What a pasted list did: how many terms, and which of them are in no station
-// on file. Silent about a single term — the match note below already covers it.
-function searchTermsNoteHtml() {
-  const terms = parseSearchTerms(state.filters.search);
-  if (terms.length < 2) return '';
-  const missing = unmatchedSearchTerms(terms);
-  if (!missing.length) return `${terms.length} search terms · all found.`;
-  const shown = missing.slice(0, 8).map(esc).join(', ');
-  const rest  = missing.length - 8;
-  return `${terms.length} search terms · <strong>${missing.length}</strong> not in this ` +
-         `database: ${shown}${rest > 0 ? ` +${rest} more` : ''}`;
-}
-
-// Editing or deleting a station moves the per-option counts (and can retire an
-// option outright), so the cached lists are dropped and the panel redrawn.
-function refreshFilterOptions() {
-  state.filterOpts  = null;
-  state.searchIdx   = null;
-  state.repeaterIdx = null;
-  state.passRelIdx  = null;   // an edited pass range re-wires the relation
-  if (state.activeTab === 'stations') renderStationFilters();
-}
-
-function filterGroupHtml(key) {
-  const cfg  = FILTER_GROUPS[key];
-  const opts = filterOptions()[key];
-  if (!opts.length) return '';
-  const head = `
-    <span class="filter-title">${esc(cfg.title)}</span>
-    <span class="filter-state" id="filter-state-${key}">${filterGroupState(key)}</span>`;
-  const body = `
-    ${cfg.hint ? `<p class="filter-hint">${cfg.hint}</p>` : ''}
-    <div class="filter-actions">
-      <button onclick="setGroupFilter('${key}','all')">All</button>
-      <button onclick="setGroupFilter('${key}','none')">None</button>
-    </div>
-    ${cfg.extra ? cfg.extra() : ''}
-    <div class="filter-list">${opts.map(o => filterRowHtml(key, o, cfg)).join('')}</div>`;
-  return cfg.alwaysOpen
-    ? `<div class="filter-block filter-group" id="filter-group-${key}">
-         <div class="filter-head">${head}</div>${body}
-       </div>`
-    : `<details class="filter-block filter-group" id="filter-group-${key}"
-                ${state.filterOpen[key] ? 'open' : ''} ontoggle="state.filterOpen['${key}']=this.open">
-         <summary class="filter-head">${head}</summary>${body}
-       </details>`;
-}
-
-// One option row: tick box + label + how many stations it covers, plus "only"
-// — one click to narrow to that value alone, which beats un-ticking fourteen.
-function filterRowHtml(key, o, cfg) {
-  const set  = state.filters[key];
-  const on   = !set.size || set.has(o.value);
-  const dot  = cfg.dots && ROLE_COLOR[o.value]
-    ? `<span class="legend-dot" style="background:${ROLE_COLOR[o.value]}"></span>` : '';
-  const none = o.value === FILTER_NONE ? ' filter-row-none' : '';
-  return `
-    <div class="filter-row">
-      <label class="filter-row-label${none}">
-        <input type="checkbox" ${on ? 'checked' : ''}
-               onchange="toggleGroupFilter('${key}','${escAttr(o.value)}',this.checked)">
-        ${dot}<span>${esc(o.label)}</span>
-      </label>
-      <span class="filter-row-side">
-        <span class="filter-count">${o.count}</span>
-        <button class="filter-only" title="Show only ${esc(o.label)}"
-                onclick="setGroupFilter('${key}','only','${escAttr(o.value)}')">only</button>
-      </span>
-    </div>`;
-}
-
-// Basin and council are long lists (65 basins, 100+ LGAs) and a station has at
-// most one of each — a dropdown reads better than a hundred tick boxes.
-function filterAreaHtml() {
-  const opts = filterOptions();
-  if (!opts.basins.length && !opts.lgas.length) return '';
-  return `
-    <details class="filter-block" id="filter-group-area" ${state.filterOpen.area ? 'open' : ''}
-             ontoggle="state.filterOpen.area=this.open">
-      <summary class="filter-head">
-        <span class="filter-title">Basin &amp; council</span>
-        <span class="filter-state" id="filter-state-area">${valueGroupState(['basin', 'lga'])}</span>
-      </summary>
-      ${filterSelectHtml('basin', 'Drainage basin', opts.basins)}
-      ${filterSelectHtml('lga',   'Local government area', opts.lgas)}
-    </details>`;
-}
-
-// Gap-hunting rather than day-to-day filtering: which sites have no position,
-// no ALERT address, or are switched off.
-function filterDataHtml() {
-  return `
-    <details class="filter-block" id="filter-group-data" ${state.filterOpen.data ? 'open' : ''}
-             ontoggle="state.filterOpen.data=this.open">
-      <summary class="filter-head">
-        <span class="filter-title">Data completeness</span>
-        <span class="filter-state" id="filter-state-data">${valueGroupState(['hasCoords', 'hasAlertId', 'enabledOnly'])}</span>
-      </summary>
-      <p class="filter-hint">For finding what still needs filling in.</p>
-      ${filterChoiceHtml('hasCoords', 'Position', [
-        ['',    'Any'],
-        ['yes', 'Has lat/lon'],
-        ['no',  'Missing lat/lon'],
-      ])}
-      ${filterChoiceHtml('hasAlertId', 'ALERT address', [
-        ['',    'Any'],
-        ['yes', 'Has an address'],
-        ['no',  'No address on file'],
-      ])}
-      <label class="filter-check">
-        <input type="checkbox" ${state.filters.enabledOnly ? 'checked' : ''}
-               onchange="setValueFilter('enabledOnly',this.checked)">
-        Enabled stations only
-      </label>
-    </details>`;
-}
-
-function filterSelectHtml(key, label, opts) {
-  if (!opts.length) return '';
-  const cur = state.filters[key];
-  return `
-    <label class="filter-field">
-      <span>${esc(label)}</span>
-      <select onchange="setValueFilter('${key}',this.value)">
-        <option value="">Any</option>
-        ${opts.map(o => `
-          <option value="${escAttr(o.value)}" ${cur === o.value ? 'selected' : ''}>
-            ${esc(o.label)} (${o.count})
-          </option>`).join('')}
-      </select>
-    </label>`;
-}
-
-function filterChoiceHtml(key, label, choices) {
-  return `
-    <label class="filter-field">
-      <span>${esc(label)}</span>
-      <select onchange="setValueFilter('${key}',this.value)">
-        ${choices.map(([v, l]) => `
-          <option value="${escAttr(v)}" ${state.filters[key] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}
-      </select>
-    </label>`;
-}
-
-// Summary for the blocks made of single-value controls: how many are set.
-function valueGroupState(keys) {
-  const set = keys.filter(k => state.filters[k]).length;
-  return set ? `${set} set` : 'Any';
-}
-
-// Keep the panel's live bits — group summaries, the match note and the Reset
-// button — in step with the filters without rebuilding the whole panel (which
-// would take the focus out of whatever the operator is clicking).
-function updateFilterChrome() {
-  Object.keys(FILTER_GROUPS).forEach(updateFilterGroupState);
-  const terms = document.getElementById('search-terms-note');
-  if (terms) terms.innerHTML = searchTermsNoteHtml();
-  const clear = document.getElementById('search-clear');
-  if (clear) clear.hidden = !state.filters.search.trim();
-  const area = document.getElementById('filter-state-area');
-  if (area) area.textContent = valueGroupState(['basin', 'lga']);
-  const data = document.getElementById('filter-state-data');
-  if (data) data.textContent = valueGroupState(['hasCoords', 'hasAlertId', 'enabledOnly']);
-  const idle = !anyStationFilterActive();
-  document.querySelectorAll('#station-filters .filter-reset').forEach(b => { b.disabled = idle; });
-  updateMapMatchNote();
-}
-
-// Option lists for the grouped filters, each entry { value, label, count }.
-// Built from the loaded file (so a station.json with different networks, sensor
-// types or regions filters itself correctly) and cached until the next load —
-// counting sensor types across 3000+ stations on every keystroke would not be.
-// Every group ends with the FILTER_NONE bucket when the file has stations that
-// leave the field blank, and options nobody uses are dropped.
-function filterOptions() {
-  if (state.filterOpts) return state.filterOpts;
-  const stations = state.data?.stations || [];
-
-  // key → number of stations offering that key
-  const tally = keyFn => {
-    const counts = new Map();
-    stations.forEach(s => keyFn(s).forEach(k => counts.set(k, (counts.get(k) || 0) + 1)));
-    return counts;
-  };
-  // Named options first (in the order the file lists them), then whatever the
-  // stations mention that the file never declared, then the "not recorded" bucket.
-  const build = (counts, named, { sort } = {}) => {
-    const out  = [];
-    const seen = new Set();
-    named.forEach(({ value, label }) => {
-      seen.add(value);
-      out.push({ value, label, count: counts.get(value) || 0 });
-    });
-    const extra = [...counts.keys()].filter(k => !seen.has(k) && k !== FILTER_NONE)
-      .map(value => ({ value, label: value, count: counts.get(value) }));
-    if (sort === 'count') extra.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
-    else                  extra.sort((a, b) => a.label.localeCompare(b.label));
-    out.push(...extra);
-    if (counts.get(FILTER_NONE)) {
-      out.push({ value: FILTER_NONE, label: FILTER_NONE_LABEL, count: counts.get(FILTER_NONE) });
-    }
-    return out.filter(o => o.count > 0);
-  };
-
-  const regionNames = [...new Set((state.data?.catchments || []).map(c => c.region).filter(Boolean))].sort();
-
-  state.filterOpts = {
-    roles:    build(tally(stationRoleKeys),
-                    Object.entries(ROLE_LABEL).map(([value, label]) => ({ value, label }))),
-    sensors:  build(tally(stationSensorTypeKeys), [], { sort: 'count' }),
-    networks: build(tally(stationNetworkKeys),
-                    (state.data?.radio_networks || []).map(n => ({ value: n.id, label: n.name }))),
-    regions:  build(tally(stationRegionKeys), regionNames.map(r => ({ value: r, label: r }))),
-    basins:   build(tally(s => groupKeys(s.basin ? [s.basin] : [])), []),
-    lgas:     build(tally(s => groupKeys(s.lga   ? [s.lga]   : [])), []),
-  };
-  return state.filterOpts;
-}
-
-function filterGroupValues(key) {
-  return filterOptions()[key].map(o => o.value);
-}
-
-// One checkbox in a grouped filter. The Set is kept canonical: empty when
-// everything is ticked (the default, "no constraint") and holding FILTER_EMPTY
-// when nothing is — so what the boxes show and what the filter does can never
-// drift apart, which is what made un-ticking a network a no-op before.
-function toggleGroupFilter(key, value, checked) {
-  const set    = state.filters[key];
-  const values = filterGroupValues(key);
-  if (!set.size && !checked) values.forEach(v => set.add(v));   // "all" → the real list, minus one
-  set.delete(FILTER_EMPTY);
-  if (checked) set.add(value);
-  else         set.delete(value);
-  if (!set.size)                    set.add(FILTER_EMPTY);      // hand-emptied ≠ show everything
-  else if (set.size === values.length) set.clear();             // back to the full list → "all"
-  stationsFilterChanged();
-}
-
-// "All" / "None" / a row's "only" — the whole group re-renders, since these
-// move every checkbox at once.
-function setGroupFilter(key, mode, value) {
-  state.filters[key] = mode === 'all'  ? new Set()
-                     : mode === 'none' ? new Set([FILTER_EMPTY])
-                     :                   new Set([value]);
-  rerenderFilterGroup(key);
-  stationsFilterChanged();
-}
-
-function setValueFilter(key, value) {
-  state.filters[key] = value;
-  stationsFilterChanged();
-}
-
-function setSensorsAll(checked) {
-  state.filters.sensorsAll = checked;
-  stationsFilterChanged();
-}
-
-// "All" / "None" / "3 of 15" — the at-a-glance state of a collapsed group.
-function filterGroupState(key) {
-  const set = state.filters[key];
-  if (!set.size)              return 'All';
-  if (set.has(FILTER_EMPTY))  return 'None';
-  return `${set.size} of ${filterGroupValues(key).length}`;
-}
-
-function updateFilterGroupState(key) {
-  const el = document.getElementById(`filter-state-${key}`);
-  if (el) el.textContent = filterGroupState(key);
-}
-
-function rerenderFilterGroup(key) {
-  const el = document.getElementById(`filter-group-${key}`);
-  if (el) el.outerHTML = filterGroupHtml(key, el.dataset.title, el.dataset.hint);
-}
-
-// Anything narrowing the station list? Every group is canonical, so a non-empty
-// Set is by definition a real constraint.
-function anyStationFilterActive() {
-  const f = state.filters;
-  return !!(f.search.trim() || f.roles.size || f.sensors.size || f.networks.size ||
-            f.regions.size || f.catchments.size || f.basin || f.lga ||
-            f.hasCoords || f.hasAlertId || f.enabledOnly);
-}
-
-function resetStationFilters() {
-  // The ACMA block keeps its own state — clearing station filters should not
-  // silently drop an RF layer the operator has configured.
-  state.filters = {
-    search: '', roles: new Set(), sensors: new Set(), networks: new Set(),
-    regions: new Set(), catchments: new Set(), sensorsAll: false,
-    basin: '', lga: '', hasCoords: '', hasAlertId: '', enabledOnly: false,
-    acma: state.filters.acma,
-  };
-}
-
-// Reset buttons on the Stations tab: clear everything and redraw the panel with
-// it (the boxes, the selects and the summaries all move at once).
-//
-// Clearing a filter is usually the operator saying "put the rest of the network
-// back at full opacity" while they carry on looking at the region they had
-// zoomed into — springing the map back to the national view throws away the
-// thing they were doing. So the default holds the view, and the second button
-// is there for when they do want to zoom back out.
-function clearStationFilters(zoomOut) {
-  resetStationFilters();
-  renderStationFilters();
-  state.stationsShowAll = false;
-  refreshMapLayers({ skipFit: !zoomOut });
-  rerenderStations();
-  updateFilterChrome();
-}
-
-function toggleFilter(key, value, checked) {
-  // The ACMA block's mechanism list is a plain Set with no "empty means all"
-  // convention — the station groups go through toggleGroupFilter instead.
-  const set = key === 'acmaMechanisms' ? state.filters.acma.mechanisms : state.filters[key];
-  if (checked) set.add(value);
-  else         set.delete(value);
-}
-
-// ── ACMA RRL interference layer ─────────────────────────────────────────────────
-// Renders licensed transmitters from the ACMA Register of Radiocommunications
-// Licences that could plausibly interfere with MegaNet repeater RX channels.
-// All data is precomputed offline by tools/acma_fetch.py into data/acma-*.json;
-// nothing here fetches until the master toggle is switched on (or the RF
-// Environment tab is opened), so page load is unaffected while the layer is off.
-// Contains ACMA RRL data, CC BY 4.0.
-
-// ACMA VHF High Band Frequency Band Plan segments (148–174 MHz). MegaNet's
-// 151.5 MHz sits in Segment F "Miscellaneous Service".
-const VHF_SEGMENTS = [
-  { seg: 'A', lo: 148.00000, hi: 149.25000, alloc: 'Paging Service' },
-  { seg: 'B', lo: 149.25000, hi: 149.75625, alloc: 'Land Mobile (two frequency, base transmit)' },
-  { seg: 'C', lo: 149.75625, hi: 149.90000, alloc: 'Land Mobile (single frequency)' },
-  { seg: 'D', lo: 149.90000, hi: 150.05000, alloc: 'Radionavigation Satellite' },
-  { seg: 'E', lo: 150.05000, hi: 151.39375, alloc: 'Land Mobile (two frequency, base transmit); Fixed (rural)' },
-  { seg: 'F', lo: 151.39375, hi: 152.49375, alloc: 'Miscellaneous Service' },
-  { seg: 'G', lo: 152.49375, hi: 153.85000, alloc: 'Land Mobile (single frequency)' },
-  { seg: 'H', lo: 153.85000, hi: 154.35625, alloc: 'Land Mobile (two frequency, base receive)' },
-  { seg: 'I', lo: 154.35625, hi: 154.65625, alloc: 'Land Mobile (single frequency)' },
-  { seg: 'J', lo: 154.65625, hi: 156.00000, alloc: 'Land Mobile (two frequency, base receive); Fixed (rural)' },
-  { seg: 'K', lo: 156.00000, hi: 157.45000, alloc: 'Maritime Mobile' },
-  { seg: 'L', lo: 157.45000, hi: 158.29375, alloc: 'Land Mobile (two frequency, base receive) or single frequency' },
-  { seg: 'M', lo: 158.29375, hi: 160.60000, alloc: 'Land Mobile (two frequency, base receive)' },
-  { seg: 'N', lo: 160.60000, hi: 160.97500, alloc: 'Maritime Mobile' },
-  { seg: 'O', lo: 160.97500, hi: 161.47500, alloc: 'Land Mobile (single frequency)' },
-  { seg: 'P', lo: 161.47500, hi: 162.05000, alloc: 'Maritime Mobile' },
-  { seg: 'Q', lo: 162.05000, hi: 162.89375, alloc: 'Land Mobile (two frequency, base transmit) or single frequency' },
-  { seg: 'R', lo: 162.89375, hi: 165.19375, alloc: 'Land Mobile (two frequency, base transmit)' },
-  { seg: 'S', lo: 165.19375, hi: 168.19375, alloc: 'Land Mobile (trunked, base transmit)' },
-  { seg: 'T', lo: 168.19375, hi: 169.79375, alloc: 'Land Mobile (single frequency)' },
-  { seg: 'U', lo: 169.79375, hi: 172.79375, alloc: 'Land Mobile (trunked, base receive)' },
-  { seg: 'V', lo: 172.79375, hi: 173.29375, alloc: 'Land Mobile (single frequency)' },
-  { seg: 'W', lo: 173.29375, hi: 174.00000, alloc: 'Miscellaneous Service' },
-];
-
-const ACMA_MARKER_CAP = 500;
-const ACMA_LINK_CAP   = 300;
-
-function vhfSegment(mhz) {
-  return VHF_SEGMENTS.find(s => mhz >= s.lo && mhz < s.hi) || null;
-}
-
-// ── lazy loading ──
-
-function acmaFetchJson(name) {
-  return fetch(`data/${name}`).then(r => {
-    if (!r.ok) throw new Error(`${name}: HTTP ${r.status}`);
-    return r.text();
-  }).then(text => {
-    state.memBytes.files[name] = text.length;   // for MemMeter — free, the text is already here
-    return JSON.parse(text);
-  });
-}
-
-function acmaEnsureCore() {
-  const A = state.acma;
-  if (A.loaded) return Promise.resolve();
-  if (A.loadPromise) return A.loadPromise;
-  A.loading = true;
-  A.loadPromise = Promise.all([
-    acmaFetchJson('acma-threats.json'),
-    acmaFetchJson('acma-sites.json'),
-    acmaFetchJson('acma-dictionaries.json').catch(() => null),   // optional
-  ]).then(([threats, sites, dicts]) => {
-    A.threats = threats;
-    A.dicts   = dicts;
-    A.siteById = {};
-    sites.sites.forEach(s => { A.siteById[s.id] = s; });
-    A.anchorById = {};
-    A.flat = [];
-    A.pairsByDevice = {};
-    threats.anchors.forEach(a => {
-      A.anchorById[a.station_id] = a;
-      a.threats.forEach(t =>
-        A.flat.push({ anchor_id: a.station_id, anchor_name: a.name, rx_mhz: a.rx_mhz, ...t }));
-      (a.imd_pairs || []).forEach(p => {
-        (A.pairsByDevice[p.a] = A.pairsByDevice[p.a] || []).push(p);
-        (A.pairsByDevice[p.b] = A.pairsByDevice[p.b] || []).push(p);
-      });
-    });
-    A.mechCounts = {};
-    A.flat.forEach(t => { A.mechCounts[t.mechanism] = (A.mechCounts[t.mechanism] || 0) + 1; });
-    A.loaded = true;
-    A.loading = false;
-    A.error = null;
-  }).catch(err => {
-    A.loading = false;
-    A.loadPromise = null;
-    A.error = `ACMA data unavailable (${err.message}). Generate data/acma-*.json with ` +
-              `tools/acma_fetch.py; note these optional files cannot be fetched over file://.`;
-    state.filters.acma.show = false;
-    throw err;
-  });
-  return A.loadPromise;
-}
-
-// Full device/licence/client detail — several MB, loaded on first card open,
-// beam-wedge draw or RF strip plot, never at page load.
-function acmaEnsureDevices() {
-  const A = state.acma;
-  if (A.devLoaded) return Promise.resolve();
-  if (A.devPromise) return A.devPromise;
-  A.devPromise = acmaFetchJson('acma-devices.json').then(d => {
-    A.deviceById = {}; A.devicesBySite = {};
-    d.devices.forEach(x => {
-      A.deviceById[x.id] = x;
-      (A.devicesBySite[x.site_id] = A.devicesBySite[x.site_id] || []).push(x);
-    });
-    A.licById    = d.licences || {};
-    A.clientById = d.clients  || {};
-    A.antById    = d.antennas || {};
-    A.texts      = d.texts    || [];
-    A.devLoaded  = true;
-  }).catch(err => {
-    A.devPromise = null;
-    throw err;
-  });
-  return A.devPromise;
-}
-
-// ── filtering ──
-
-function acmaVisibleThreats(ignoreAnchorSel) {
-  const A = state.acma, f = state.filters.acma;
-  if (!A.loaded) return [];
-  return A.flat.filter(t =>
-    f.mechanisms.has(t.mechanism) &&
-    t.score >= f.minScore &&
-    t.distance_km <= f.radiusKm &&
-    (!f.losOnly || t.los === true) &&
-    (!f.activeOnly || !t.inactive) &&
-    (!f.hideMeganet || !t.meganet) &&
-    (ignoreAnchorSel || !A.selectedAnchorId || t.anchor_id === A.selectedAnchorId));
-}
-
-// ── filters panel block ──
-
-// The master toggle sits outside the collapsible block: ACMA transmitters are
-// drawn by default, so the way to turn them off has to be visible without
-// hunting through a closed twisty.
-function acmaFilterBlockHtml() {
-  return `<div id="acma-filter-block">${acmaFilterHeadHtml()}</div>`;
-}
-
-function acmaFilterHeadHtml() {
-  const A = state.acma, f = state.filters.acma;
-  return `
-    <label class="filter-check">
-      <input type="checkbox" ${f.show ? 'checked' : ''} onchange="toggleAcmaShow(this.checked)">
-      Show ACMA licensed transmitters
-    </label>
-    ${A.error ? `<div class="small" style="color:var(--muted)">${esc(A.error)}</div>` : ''}
-    ${A.loading ? `<div class="small" style="color:var(--muted)">Loading ACMA data…</div>` : ''}
-    ${f.show && A.loaded ? `
-      <details ${A.uiOpen ? 'open' : ''} ontoggle="state.acma.uiOpen=this.open">
-        <summary class="small" style="cursor:pointer;color:var(--muted)">ACMA / RF Environment options</summary>
-        <div id="acma-filter-body">${acmaFilterBodyHtml()}</div>
-      </details>` : ''}`;
-}
-
-function acmaFilterBodyHtml() {
-  const A = state.acma, f = state.filters.acma;
-  if (!f.show || !A.loaded) return '';
-
-  const meta = A.threats.meta;
-  const anchorChip = A.selectedAnchorId ? `
-    <div class="small" style="margin:.25rem 0">
-      Filtering to <strong>${esc((A.anchorById[A.selectedAnchorId] || {}).name || A.selectedAnchorId)}</strong>
-      <a href="#" onclick="acmaSelectAnchor('');return false">×&nbsp;clear</a>
-    </div>` : '';
-
-  return `
-    <div class="small" style="color:var(--muted);margin:.2rem 0">
-      ACMA data: ${esc(meta.source_date)} · <span id="acma-shown"></span>
-    </div>
-    ${anchorChip}
-    <div style="margin:.4rem 0">
-      ${Object.entries(ACMA_MECH).filter(([k]) => A.mechCounts[k]).map(([k, m]) => `
-        <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.15rem 0">
-          <input type="checkbox" ${f.mechanisms.has(k) ? 'checked' : ''}
-                 onchange="toggleFilter('acmaMechanisms','${k}',this.checked);refreshAcmaLayer()">
-          <span class="legend-sq" style="background:${m.color}"></span>
-          ${m.label} (${A.mechCounts[k]})
-        </label>`).join('')}
-    </div>
-    <label class="small" style="display:block;margin:.4rem 0">
-      Minimum score <strong id="acma-minscore-val">${f.minScore}</strong>
-      <input type="range" min="0" max="100" step="5" value="${f.minScore}" style="width:100%"
-             oninput="state.filters.acma.minScore=+this.value;document.getElementById('acma-minscore-val').textContent=this.value"
-             onchange="refreshAcmaLayer()">
-    </label>
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
-      <input type="checkbox" ${f.losOnly ? 'checked' : ''}
-             onchange="state.filters.acma.losOnly=this.checked;refreshAcmaLayer()">
-      Line-of-sight only <span class="small" style="color:var(--muted)">(not yet assessed — hides all)</span>
-    </label>
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
-      <input type="checkbox" ${f.activeOnly ? 'checked' : ''}
-             onchange="state.filters.acma.activeOnly=this.checked;refreshAcmaLayer()">
-      Current licences only
-    </label>
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
-      <input type="checkbox" ${f.hideMeganet ? 'checked' : ''}
-             onchange="state.filters.acma.hideMeganet=this.checked;refreshAcmaLayer()">
-      Hide MegaNet's own licences
-    </label>
-    <label class="small" style="display:block;margin:.35rem 0">
-      Search radius
-      <select onchange="state.filters.acma.radiusKm=+this.value;refreshAcmaLayer()">
-        ${[10, 25, 50, 100].map(r => `
-          <option value="${r}" ${f.radiusKm === r ? 'selected' : ''}>${r} km</option>`).join('')}
-      </select>
-      <span style="color:var(--muted)">(data extends to ${meta.radius_km} km)</span>
-    </label>
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
-      <input type="checkbox" ${f.showBeams ? 'checked' : ''}
-             onchange="state.filters.acma.showBeams=this.checked;refreshAcmaLayer()">
-      Show antenna beam wedges
-    </label>
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
-      <input type="checkbox" ${f.showLinks ? 'checked' : ''}
-             onchange="state.filters.acma.showLinks=this.checked;refreshAcmaLayer()">
-      Show threat links
-    </label>
-    <details style="margin:.4rem 0">
-      <summary class="small" style="cursor:pointer">? What the mechanisms mean</summary>
-      <div class="small" style="color:var(--muted);margin-top:.3rem">
-        <p><strong>Co-channel</strong>: transmits on the repeater's RX frequency — direct
-        collisions and capture. <strong>Adjacent</strong>: within 50 kHz — splatter raises the
-        noise floor until marginal packets flip bits. <strong>Harmonic</strong>: a transmitter at
-        1/2…1/5 of the RX frequency whose harmonics land on it. <strong>IMD3/IMD5</strong>:
-        two transmitters at the same ACMA site whose intermod products (2f1−f2, 3f1−2f2)
-        land on the RX channel — the "rusty bolt" effect; the prime suspect when corruption
-        clusters behind one repeater. <strong>Co-site desense</strong>: any strong transmitter
-        physically at the repeater site overloading the receiver front-end, regardless of
-        frequency — the only mechanism where cellular towers matter.</p>
-        <p><strong>Not threats</strong>: mobile phone towers (700 MHz+, no spectral path to
-        151.5 MHz — co-siting only), LoRa/LoRaWAN (915–928 MHz), UHF CB (477 MHz).</p>
-        <p><strong>Blind spots</strong>: amateur radio isn't in the RRL by location (the
-        50.5 MHz × 3 harmonic path needs a spectrum sweep, not this database); unlicensed
-        or faulty emitters (solar controllers, VMS signs, electric fences, powerline arcing)
-        have no licence record; the RRL records what's <em>licensed</em>, not what's
-        <em>radiating</em>; IMD detection only sees devices ACMA records at the same site;
-        line-of-sight is not yet assessed and would be terrain-only — it cannot model the
-        tropospheric ducting that worsens during flood events.</p>
-      </div>
-    </details>`;
-}
-
-function rerenderAcmaFilterBlock() {
-  const el = document.getElementById('acma-filter-block');
-  if (el) el.innerHTML = acmaFilterHeadHtml();
-}
-
-function toggleAcmaShow(checked) {
-  state.filters.acma.show = checked;
-  if (!checked) {
-    closeAcmaCard();
-    refreshAcmaLayer();
-    rerenderAcmaFilterBlock();
-    rerenderMapLegend();
-    return;
-  }
-  // Legend and filter body gain the ACMA entries once the data lands; both are
-  // patched in place so the operator keeps their pan and zoom.
-  acmaEnsureCore().then(() => {
-    if (state.activeTab === 'stations' && state.map) acmaAfterLoad();
-  }).catch(() => rerenderAcmaFilterBlock());
-  rerenderAcmaFilterBlock();
-}
-
-function acmaSelectAnchor(id) {
-  state.acma.selectedAnchorId = id || null;
-  refreshAcmaLayer();
-  rerenderAcmaFilterBlock();
-}
-
-// Link appended to MegaNet repeater popups on the map: "N RF threats".
-function acmaRepeaterPopupExtra(s) {
-  const A = state.acma;
-  if (!state.filters.acma.show || !A.loaded) return '';
-  const a = A.anchorById[s.id];
-  if (!a || !a.threats.length) return '';
-  return `<br><a href="#" style="font-size:.83rem"
-    onclick="acmaSelectAnchor('${escAttr(s.id)}');return false">⚠ ${a.threats.length} RF threat candidates — filter map</a>`;
-}
-
-// ── map layer ──
-
-// Trim to a marker/line budget without letting one mechanism eat the lot.
-//
-// A flat "top N by score" cut looks fair and isn't: co-site desense outnumbers
-// every other mechanism roughly 8:1 in the RRL extract and its scores sit at the
-// top of the range (same site ⇒ no distance discount), so the first ~1300 devices
-// by score are all co-site. With a 500-pin cap that meant the map only ever drew
-// brown squares — co-channel, IMD and harmonic pins were filtered in, ranked, and
-// then cut, so ticking their boxes did nothing until co-site desense was ticked
-// off. Deal one item per mechanism per round instead, highest score first within
-// each: a crowded mechanism loses its tail rather than erasing the rare ones, and
-// mechanisms with fewer devices than the budget always draw in full.
-//
-// `items` must already be sorted best-first; the returned subset keeps that order.
-function acmaCapByMechanism(items, cap, mechOf) {
-  if (items.length <= cap) return items;
-  const queues = new Map();
-  items.forEach((it, i) => {
-    const k = mechOf(it);
-    if (!queues.has(k)) queues.set(k, []);
-    queues.get(k).push(i);
-  });
-  const lists = [...queues.values()];
-  const picked = [];
-  for (let round = 0; picked.length < cap; round++) {
-    let drew = false;
-    for (const l of lists) {
-      if (round >= l.length) continue;
-      picked.push(l[round]);
-      drew = true;
-      if (picked.length >= cap) break;
-    }
-    if (!drew) break;             // every queue exhausted
-  }
-  return picked.sort((a, b) => a - b).map(i => items[i]);
-}
-
-function refreshAcmaLayer() {
-  const A = state.acma, map = state.map;
-  if (!map) return;
-  MapSpider.reset();                 // fanned pins go home before any are removed
-  ['layer', 'beamLayer', 'linkLayer', 'hiLayer'].forEach(k => {
-    if (A[k]) { A[k].remove(); A[k] = null; }
-  });
-  const f = state.filters.acma;
-  if (!f.show || !A.loaded) { MapSpider.setPins('acma', []); acmaUpdateShownNote(0, 0); return; }
-
-  const visible = acmaVisibleThreats();
-
-  // one marker per device, driven by its top-scoring visible threat
-  const byDevice = new Map();
-  for (const t of visible) {
-    const cur = byDevice.get(t.device_id);
-    if (!cur || t.score > cur.top.score) {
-      byDevice.set(t.device_id, { top: t, all: cur ? cur.all : [] });
-    }
-    byDevice.get(t.device_id).all.push(t);
-  }
-  const devices = [...byDevice.values()].sort((a, b) => b.top.score - a.top.score);
-  const shown = acmaCapByMechanism(devices, ACMA_MARKER_CAP, d => d.top.mechanism);
-  acmaUpdateShownNote(shown.length, devices.length);
-
-  A.layer = L.layerGroup().addTo(map);
-  const acmaPins = [];
-  for (const d of shown) {
-    const t = d.top;
-    const site = A.siteById[t.site_id];
-    if (!site) continue;
-    const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-    const size = Math.round(9 + t.score / 8);
-    const icon = L.divIcon({
-      className: 'acma-div',
-      html: `<div class="acma-sq${t.meganet ? ' mn' : ''}" style="width:${size}px;height:${size}px;background:${mech.color}"></div>`,
-      iconSize: [size, size], iconAnchor: [size / 2, size / 2],
-    });
-    const m = L.marker([site.lat, site.lon], { icon }).addTo(A.layer);
-    m.bindPopup(acmaPopupHtml(d, site), { maxWidth: 300 });
-    m.on('click', () => acmaHighlightDevice(t.device_id));
-    m.bindTooltip(`${esc(t.client || 'Unknown licensee')} · ${mech.label} · ${t.score}`);
-    acmaPins.push(m);
-  }
-  // Several licensed devices commonly share one site, so these are the pins that
-  // most need fanning out.
-  MapSpider.setPins('acma', acmaPins);
-
-  if (f.showLinks) {
-    A.linkLayer = L.layerGroup().addTo(map);
-    const links = acmaCapByMechanism(
-      visible.slice().sort((a, b) => b.score - a.score), ACMA_LINK_CAP, t => t.mechanism);
-    for (const t of links) {
-      const site = A.siteById[t.site_id], a = A.anchorById[t.anchor_id];
-      if (!site || !a) continue;
-      L.polyline([[site.lat, site.lon], [a.lat, a.lon]], {
-        color: (ACMA_MECH[t.mechanism] || {}).color || '#666',
-        weight: 1.2, dashArray: '4 4',
-        opacity: 0.15 + 0.55 * Math.min(1, t.score / 70),
-      }).addTo(A.linkLayer);
-    }
-  }
-
-  if (f.showBeams) {
-    if (!A.devLoaded) {
-      acmaEnsureDevices().then(() => refreshAcmaLayer()).catch(() => {});
-    } else {
-      A.beamLayer = L.layerGroup().addTo(map);
-      for (const d of shown) {
-        const dev = A.deviceById[d.top.device_id];
-        const site = A.siteById[d.top.site_id];
-        const ant = dev && dev.ant ? A.antById[dev.ant] : null;
-        if (!dev || !site || dev.az == null || !ant || !ant.h_bw || ant.h_bw <= 0 || ant.h_bw >= 360) continue;
-        const poly = acmaBeamPolygon(site.lat, site.lon, dev.az, Math.min(ant.h_bw, 120),
-                                     acmaBeamRangeKm(dev.eirp_w));
-        L.polygon(poly, {
-          color: (ACMA_MECH[d.top.mechanism] || {}).color || '#666',
-          weight: 1, fillOpacity: 0.08, opacity: 0.5,
-        }).addTo(A.beamLayer);
-      }
-    }
-  }
-}
-
-function acmaUpdateShownNote(shown, total) {
-  const el = document.getElementById('acma-shown');
-  if (el) el.textContent = total > shown
-    ? `showing ${shown} of ${total} transmitters (top by score, shared across mechanisms)`
-    : `${total} transmitters shown`;
-}
-
-function acmaBeamRangeKm(eirpW) {
-  if (!eirpW || eirpW <= 1) return 1.5;
-  return Math.max(1.5, Math.min(12, 2 + 2.5 * Math.log10(eirpW)));
-}
-
-function acmaBeamPolygon(lat, lon, azDeg, widthDeg, rangeKm) {
-  const pts = [[lat, lon]];
-  const degLat = rangeKm / 110.574;
-  const degLon = rangeKm / (111.320 * Math.cos(lat * Math.PI / 180));
-  for (let a = azDeg - widthDeg / 2; a <= azDeg + widthDeg / 2 + 0.01; a += Math.max(2, widthDeg / 12)) {
-    const rad = a * Math.PI / 180;
-    pts.push([lat + Math.cos(rad) * degLat, lon + Math.sin(rad) * degLon]);
-  }
-  pts.push([lat, lon]);
-  return pts;
-}
-
-// Emphasised links from one device to every repeater it threatens.
-function acmaHighlightDevice(deviceId) {
-  const A = state.acma, map = state.map;
-  if (!map || !A.loaded) return;
-  acmaClearHighlight();
-  A.hiLayer = L.layerGroup().addTo(map);
-  for (const t of acmaVisibleThreats()) {
-    if (t.device_id !== deviceId) continue;
-    const site = A.siteById[t.site_id], a = A.anchorById[t.anchor_id];
-    if (!site || !a) continue;
-    L.polyline([[site.lat, site.lon], [a.lat, a.lon]], {
-      color: (ACMA_MECH[t.mechanism] || {}).color || '#666',
-      weight: 3, opacity: 0.9,
-    }).addTo(A.hiLayer);
-  }
-}
-
-function acmaClearHighlight() {
-  if (state.acma.hiLayer) { state.acma.hiLayer.remove(); state.acma.hiLayer = null; }
-}
-
-// ── popup + transmitter card ──
-
-function acmaPopupHtml(d, site) {
-  const t = d.top;
-  const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-  const others = d.all.length - 1;
-  return `
-    <strong>${esc((site && site.name) || 'Unknown site')}</strong><br>
-    <span style="font-size:.83rem">${esc(t.client || 'Unknown licensee')} · score ${t.score}</span><br>
-    <span style="background:${mech.color};color:#fff;padding:1px 6px;border-radius:999px;font-size:.78rem">${mech.label}</span>
-    ${t.meganet ? '<span class="badge">MegaNet licence</span>' : ''}<br>
-    <span style="font-size:.83rem">${esc(t.detail)}</span><br>
-    <span style="font-size:.83rem">${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz · ' : ''}${t.distance_km} km @ ${t.bearing_deg}° from ${esc(t.anchor_name)}</span><br>
-    <span style="font-size:.83rem">Licence ${esc(t.lic || '?')}${t.expiry ? ' · expires ' + esc(t.expiry) : ''}${t.inactive ? ' · <strong>not current</strong>' : ''}</span>
-    ${others > 0 ? `<br><span style="font-size:.8rem;color:#888">+${others} more mechanism/repeater match${others > 1 ? 'es' : ''}</span>` : ''}<br>
-    <a href="#" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(t.anchor_id)}');return false">Full details →</a>`;
-}
-
-function showAcmaCard(deviceId, anchorId) {
-  state.acma.cardDeviceId = deviceId;
-  state.acma.cardAnchorId = anchorId || null;
-  const el = document.getElementById('acma-card');
-  if (el) {
-    el.hidden = false;
-    el.innerHTML = '<div class="small" style="padding:1rem;color:var(--muted)">Loading transmitter details…</div>';
-  }
-  acmaEnsureDevices().then(() => renderAcmaCard()).catch(err => {
-    if (el) el.innerHTML = `<div class="small" style="padding:1rem;color:var(--muted)">
-      Device detail unavailable (${esc(err.message)}).</div>`;
-  });
-  acmaHighlightDevice(deviceId);
-}
-
-function closeAcmaCard() {
-  state.acma.cardDeviceId = null;
-  const el = document.getElementById('acma-card');
-  if (el) { el.hidden = true; el.innerHTML = ''; }
-  acmaClearHighlight();
-}
-
-function acmaCardRow(label, value) {
-  return value == null || value === '' ? '' :
-    `<div class="acma-row"><span>${label}</span><span>${value}</span></div>`;
-}
-
-function renderAcmaCard() {
-  const A = state.acma;
-  const el = document.getElementById('acma-card');
-  const dev = A.deviceById[A.cardDeviceId];
-  if (!el || !dev) return;
-  const site   = A.siteById[dev.site_id] || {};
-  const lic    = A.licById[dev.lic] || {};
-  const client = A.clientById[lic.client_no] || {};
-  const ant    = dev.ant ? (A.antById[dev.ant] || {}) : {};
-  const myThreats = A.flat.filter(t => t.device_id === dev.id);
-  const top = myThreats.slice().sort((a, b) => b.score - a.score)[0];
-  const seg = dev.f_mhz != null ? vhfSegment(dev.f_mhz) : null;
-  const noteIdxs = [...new Set([...(dev.notes || []), ...(lic.notes || [])])];
-  const notes = noteIdxs.map(i => A.texts[i]).filter(Boolean);
-  const cosited = (A.devicesBySite[dev.site_id] || []).filter(d => d.id !== dev.id);
-  const partnerIds = new Set();
-  (A.pairsByDevice[dev.id] || []).forEach(p => { partnerIds.add(p.a === dev.id ? p.b : p.a); });
-  const anchor = A.cardAnchorId ? A.anchorById[A.cardAnchorId] : null;
-  const distLine = anchor && top
-    ? `${top.distance_km} km @ ${String(top.bearing_deg).padStart(3, '0')}° from ${esc(anchor.name)}` : null;
-
-  el.hidden = false;
-  el.innerHTML = `
-    <div class="acma-card-head">
-      <span>
-        <strong>${esc(site.name || 'Unknown site')}</strong><br>
-        <span class="small" style="color:var(--muted)">${esc(client.trading || client.name || 'Unknown licensee')}</span>
-      </span>
-      <span>${top ? `score ${top.score}` : ''}
-        <button onclick="closeAcmaCard()" title="Close">×</button></span>
-    </div>
-    ${myThreats.length ? `
-      <div class="acma-sect">
-        ${myThreats.sort((a, b) => b.score - a.score).map(t => {
-          const m = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-          return `<div class="small" style="margin:.15rem 0">
-            <span class="legend-sq" style="background:${m.color}"></span>
-            <strong>${m.label}</strong> ${t.score} vs ${esc(t.anchor_name)}<br>
-            <span style="color:var(--muted)">${esc(t.detail)} —
-              w ${t.components.mechanism_weight} × dist ${t.components.distance_factor}
-              × pwr ${t.components.power_factor} × LOS ${t.components.los_factor}</span>
-          </div>`;
-        }).join('')}
-      </div>` : ''}
-    <div class="acma-sect"><h4>RF</h4>
-      ${acmaCardRow('Frequency', dev.f_mhz != null ? dev.f_mhz.toFixed(4) + ' MHz' : null)}
-      ${acmaCardRow('Bandwidth', dev.bw_khz != null ? dev.bw_khz + ' kHz' : null)}
-      ${acmaCardRow('Emission', esc(dev.emission))}
-      ${acmaCardRow('TX power', dev.tx_w != null ? dev.tx_w + ' W' : null)}
-      ${acmaCardRow('EIRP', dev.eirp_w != null ? dev.eirp_w + ' W' : null)}
-      ${acmaCardRow('Segment', seg ? `${seg.seg} — ${esc(seg.alloc)}` : null)}
-      ${acmaCardRow('Mode', esc(dev.mode))}
-      ${acmaCardRow('Operation hours', esc(dev.hours === '00:00-23:59' ? 'Continuous' : dev.hours))}
-      ${acmaCardRow('Station class', esc(dev.station_class))}
-      ${acmaCardRow('Authorised', esc(dev.authorised))}
-    </div>
-    ${Object.keys(ant).length ? `
-    <div class="acma-sect"><h4>Antenna</h4>
-      ${acmaCardRow('Type / model', esc([ant.type, ant.manufacturer, ant.model].filter(Boolean).join(' · ')))}
-      ${acmaCardRow('Height', dev.height_m != null ? dev.height_m + ' m' : null)}
-      ${acmaCardRow('Gain', ant.gain_dbi != null ? ant.gain_dbi + ' dBi' : null)}
-      ${acmaCardRow('Azimuth / tilt', dev.az != null ? `${dev.az}° / ${dev.tilt != null ? dev.tilt + '°' : '—'}` : null)}
-      ${acmaCardRow('H-beamwidth', ant.h_bw ? ant.h_bw + '°' : null)}
-      ${acmaCardRow('Polarisation', esc(dev.pol))}
-      ${acmaCardRow('Feeder loss', dev.feeder_db != null ? dev.feeder_db + ' dB' : null)}
-    </div>` : ''}
-    <div class="acma-sect"><h4>Site</h4>
-      ${acmaCardRow('Elevation', site.elevation_m != null ? site.elevation_m + ' m' : null)}
-      ${acmaCardRow('Coordinate precision', esc(site.precision))}
-      ${acmaCardRow('Devices at site', site.device_count)}
-      ${acmaCardRow('Distance', distLine)}
-      ${acmaCardRow('Line of sight', top ? 'not assessed' : null)}
-    </div>
-    <div class="acma-sect"><h4>Licence</h4>
-      ${acmaCardRow('Licence no.', esc(dev.lic))}
-      ${acmaCardRow('Status', esc(lic.status))}
-      ${acmaCardRow('Type', esc(lic.type))}
-      ${acmaCardRow('Category', esc(lic.category))}
-      ${acmaCardRow('Service', esc(dev.service || lic.service))}
-      ${acmaCardRow('Subservice', esc(dev.subservice || lic.subservice))}
-      ${acmaCardRow('Issued', esc(lic.issued))}
-      ${acmaCardRow('Expires', esc(lic.expiry))}
-      ${acmaCardRow('Callsign', esc(dev.callsign))}
-    </div>
-    <div class="acma-sect"><h4>Licensee</h4>
-      ${acmaCardRow('Client', esc(client.name))}
-      ${acmaCardRow('Trading as', esc(client.trading))}
-      ${acmaCardRow('ABN / ACN', esc([client.abn, client.acn].filter(Boolean).join(' / ')))}
-      ${acmaCardRow('Industry', esc(client.industry))}
-      ${acmaCardRow('Client type', esc(client.type))}
-      ${acmaCardRow('Postal', esc(client.postal))}
-    </div>
-    ${notes.length ? `
-    <div class="acma-sect"><h4>Conditions &amp; advisory notes (${notes.length})</h4>
-      ${notes.map(n => `
-        <details class="small" style="margin:.2rem 0">
-          <summary style="cursor:pointer">${esc(n.title || n.cat || 'Note')}</summary>
-          <div style="white-space:pre-wrap;color:var(--muted)">${esc(n.text || '')}</div>
-        </details>`).join('')}
-    </div>` : ''}
-    ${cosited.length ? `
-    <div class="acma-sect">
-      <details>
-        <summary style="cursor:pointer"><h4 style="display:inline">Co-sited devices (${cosited.length})</h4></summary>
-        ${cosited.sort((a, b) => (a.f_mhz || 0) - (b.f_mhz || 0)).map(d => `
-          <div class="small" style="margin:.15rem 0">
-            <a href="#" onclick="showAcmaCard('${escAttr(d.id)}','${escAttr(A.cardAnchorId || '')}');return false">
-              ${d.f_mhz != null ? d.f_mhz.toFixed(4) + ' MHz' : '?'}</a>
-            ${esc(d.emission || '')} ${d.eirp_w != null ? '· ' + d.eirp_w + ' W EIRP' : ''}
-            ${partnerIds.has(d.id) ? '<span class="badge">IMD partner</span>' : ''}
-          </div>`).join('')}
-      </details>
-    </div>` : ''}
-    <div class="small" style="color:var(--muted);padding:.4rem .6rem">
-      ACMA RRL data (CC BY 4.0), extract ${esc((A.threats.meta || {}).source_date || '')}.
-      Not to be used for unsolicited contact (Spam Act 2003 / DNCR Act 2006).
-    </div>`;
-}
-
-// ── RF Environment tab ──
-
-function renderRfHtml() {
-  const A = state.acma;
-  if (!A.loaded) {
-    return `
-      <div style="max-width:640px;margin:2.5rem auto;padding:1rem">
-        <div class="panel" style="text-align:center;padding:2rem">
-          <h2 style="margin:0 0 .6rem">RF Environment</h2>
-          <p class="small" style="color:var(--muted)">
-            ${A.error ? esc(A.error) : 'Loading ACMA interference data…'}</p>
-        </div>
-      </div>`;
-  }
-  const anchors = A.threats.anchors.slice().sort((a, b) => b.threats.length - a.threats.length);
-  const sel = state.rf.anchorId;
-  return `
-    <div class="stack" style="padding:0 .25rem">
-      <div class="panel">
-        <div class="panel-header"><h2>RF Environment — licensed interference candidates</h2>
-          <span class="small" style="color:var(--muted)">ACMA data: ${esc(A.threats.meta.source_date)} · CC BY 4.0</span>
-        </div>
-        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin:.5rem 0">
-          <label class="small">Repeater
-            <select onchange="state.rf.anchorId=this.value;renderMain()">
-              <option value="">All (${A.flat.length} threat candidates)</option>
-              ${anchors.map(a => `
-                <option value="${escAttr(a.station_id)}" ${sel === a.station_id ? 'selected' : ''}>
-                  ${esc(a.name)} (${a.threats.length})</option>`).join('')}
-            </select>
-          </label>
-          <label class="small">Min score
-            <input type="number" min="0" max="100" step="5" value="${state.filters.acma.minScore}"
-                   style="width:4.5rem"
-                   onchange="state.filters.acma.minScore=+this.value;renderMain()">
-          </label>
-          <button onclick="rfExportCsv()">Export CSV</button>
-        </div>
-        ${sel ? rfStripPlotHtml(sel) : rfSummaryHtml(anchors)}
-      </div>
-      <div class="panel">
-        <div class="panel-header"><h3>Threat candidates${sel ? ` — ${esc((A.anchorById[sel] || {}).name || sel)}` : ''}</h3></div>
-        <div class="table-wrap tall" id="rf-table-wrap">${rfTableHtml()}</div>
-      </div>
-      <div class="panel">
-        <div class="panel-header"><h3>Corruption-time correlation helper</h3></div>
-        <p class="small" style="color:var(--muted)">Paste corruption timestamps (one per line,
-          any parseable format). Checks whether they cluster in business hours — licensed
-          operators with non-continuous operation tend to transmit 07:00–18:00 weekdays.</p>
-        <textarea id="rf-corr" rows="4" style="width:100%"
-                  placeholder="2026-07-12 09:41&#10;2026-07-12 10:05&#10;…">${esc(state.rf.corrText)}</textarea>
-        <div style="margin:.4rem 0"><button onclick="rfCorrelate()">Analyse</button></div>
-        <div id="rf-corr-out" class="small"></div>
-      </div>
-    </div>`;
-}
-
-function initRf() {
-  const A = state.acma;
-  if (!A.loaded && !A.error) {
-    acmaEnsureCore().then(() => { if (state.activeTab === 'rf') renderMain(); })
-                    .catch(() => { if (state.activeTab === 'rf') renderMain(); });
-  }
-  // strip plot carrier ticks want full device detail; refresh once it lands
-  if (A.loaded && !A.devLoaded) {
-    acmaEnsureDevices().then(() => { if (state.activeTab === 'rf') renderMain(); }).catch(() => {});
-  }
-}
-
-function rfVisibleRows() {
-  const sel = state.rf.anchorId;
-  let rows = acmaVisibleThreats(true).filter(t => !sel || t.anchor_id === sel);
-  const k = state.rf.sortKey, dir = state.rf.sortDir;
-  const val = t => {
-    switch (k) {
-      case 'anchor':    return t.anchor_name || '';
-      case 'mechanism': return t.mechanism;
-      case 'f_mhz':     return t.f_mhz || 0;
-      case 'delta':     return rfDeltaKhz(t) ?? 1e12;
-      case 'distance':  return t.distance_km;
-      case 'client':    return t.client || '';
-      case 'lic':       return t.lic || '';
-      case 'expiry':    return t.expiry || '';
-      default:          return t.score;
-    }
-  };
-  rows.sort((a, b) => {
-    const va = val(a), vb = val(b);
-    return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * dir;
-  });
-  return rows;
-}
-
-function rfDeltaKhz(t) {
-  if (t.rx_mhz == null) return null;
-  const f = t.product_mhz != null ? t.product_mhz : t.f_mhz;
-  if (f == null) return null;
-  return (f - t.rx_mhz) * 1000;
-}
-
-function rfSort(key) {
-  if (state.rf.sortKey === key) state.rf.sortDir *= -1;
-  else { state.rf.sortKey = key; state.rf.sortDir = key === 'score' ? -1 : 1; }
-  const wrap = document.getElementById('rf-table-wrap');
-  if (wrap) wrap.innerHTML = rfTableHtml();
-}
-
-function rfTableHtml() {
-  const rows = rfVisibleRows();
-  if (!rows.length) {
-    return `<p style="padding:.75rem;color:var(--muted)">No threat candidates match the current
-      filters${state.acma.mechCounts.imd3 ? '' : ' — note: no same-site IMD candidates were found in this extract'}.</p>`;
-  }
-  const arrow = k => state.rf.sortKey === k ? (state.rf.sortDir > 0 ? ' ▲' : ' ▼') : '';
-  const th = (k, label) => `<th style="cursor:pointer" onclick="rfSort('${k}')">${label}${arrow(k)}</th>`;
-  return `
-    <table class="bf-table">
-      <thead><tr>
-        ${th('anchor', 'Repeater')}${th('mechanism', 'Mechanism')}${th('score', 'Score')}
-        ${th('f_mhz', 'Freq (MHz)')}${th('delta', 'Δ (kHz)')}${th('distance', 'Dist (km)')}
-        <th>LOS</th>${th('client', 'Licensee')}${th('lic', 'Licence')}${th('expiry', 'Expiry')}<th></th>
-      </tr></thead>
-      <tbody>
-        ${rows.slice(0, 1000).map(t => {
-          const m = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-          const dk = rfDeltaKhz(t);
-          return `<tr>
-            <td class="small">${esc(t.anchor_name)}</td>
-            <td class="small"><span class="legend-sq" style="background:${m.color}"></span> ${m.label}</td>
-            <td>${t.score}</td>
-            <td class="small">${t.f_mhz != null ? t.f_mhz.toFixed(4) : ''}</td>
-            <td class="small" title="${esc(t.detail)}">${dk != null ? dk.toFixed(1) : ''}</td>
-            <td class="small">${t.distance_km}</td>
-            <td class="small">${t.los === true ? '✓' : t.los === false ? '✗' : '—'}</td>
-            <td class="small">${esc(t.client || '')}${t.meganet ? ' <span class="badge">MegaNet</span>' : ''}</td>
-            <td class="small">${esc(t.lic || '')}</td>
-            <td class="small">${esc(t.expiry || '')}${t.inactive ? ' ⚠' : ''}</td>
-            <td><a href="#" onclick="rfShowOnMap('${escAttr(t.device_id)}','${escAttr(t.anchor_id)}');return false">map</a></td>
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table>
-    ${rows.length > 1000 ? `<p class="small" style="color:var(--muted);padding:.4rem">Showing 1000 of ${rows.length} — tighten the filters or export the CSV.</p>` : ''}`;
-}
-
-function rfSummaryHtml(anchors) {
-  const withThreats = anchors.filter(a => a.threats.length);
-  return `
-    <div class="table-wrap medium">
-      <table class="bf-table">
-        <thead><tr><th>Repeater</th><th>RX (MHz)</th><th>Total</th>
-          ${Object.entries(ACMA_MECH).filter(([k]) => state.acma.mechCounts[k]).map(([, m]) => `<th class="small">${m.label}</th>`).join('')}
-          <th>Top score</th></tr></thead>
-        <tbody>
-          ${withThreats.map(a => {
-            const by = {};
-            a.threats.forEach(t => { by[t.mechanism] = (by[t.mechanism] || 0) + 1; });
-            const top = a.threats.length ? Math.max(...a.threats.map(t => t.score)) : '';
-            return `<tr style="cursor:pointer" onclick="state.rf.anchorId='${escAttr(a.station_id)}';renderMain()">
-              <td>${esc(a.name)}</td><td class="small">${a.rx_mhz ?? ''}</td>
-              <td><strong>${a.threats.length}</strong></td>
-              ${Object.keys(ACMA_MECH).filter(k => state.acma.mechCounts[k]).map(k => `<td class="small">${by[k] || ''}</td>`).join('')}
-              <td class="small">${top}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
-}
-
-// Frequency-axis strip plot: RX channel centre line, nearby licensed carriers
-// as ticks coloured by band-plan segment (threat mechanisms override).
-function rfStripPlotHtml(anchorId) {
-  const A = state.acma;
-  const a = A.anchorById[anchorId];
-  if (!a || a.rx_mhz == null) return '';
-  const rx = a.rx_mhz, span = 0.6;                     // ±0.6 MHz window
-  const lo = rx - span, hi = rx + span;
-  const W = 900, H = 90, pad = 30;
-  const x = f => pad + (f - lo) / (hi - lo) * (W - 2 * pad);
-
-  const threatsByDev = {};
-  a.threats.forEach(t => { threatsByDev[t.device_id] = t; });
-
-  let carriers = [];
-  if (A.devLoaded) {
-    const seen = new Set();
-    for (const d of Object.values(A.deviceById)) {
-      if (d.f_mhz == null || d.f_mhz < lo || d.f_mhz > hi) continue;
-      const site = A.siteById[d.site_id];
-      if (!site) continue;
-      const dk = acmaHaversineKm(site.lat, site.lon, a.lat, a.lon);
-      if (dk > state.filters.acma.radiusKm) continue;
-      const key = d.f_mhz.toFixed(4) + '|' + d.site_id;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      carriers.push({ f: d.f_mhz, id: d.id, dk, client: d.id in threatsByDev ? threatsByDev[d.id].client : null });
-    }
-  } else {
-    carriers = a.threats.filter(t => t.f_mhz != null && t.f_mhz >= lo && t.f_mhz <= hi)
-      .map(t => ({ f: t.f_mhz, id: t.device_id, dk: t.distance_km, client: t.client }));
-  }
-
-  const segBands = VHF_SEGMENTS.filter(s => s.hi > lo && s.lo < hi).map(s => `
-    <rect x="${x(Math.max(s.lo, lo))}" y="20" width="${x(Math.min(s.hi, hi)) - x(Math.max(s.lo, lo))}"
-          height="${H - 40}" fill="${s.seg === 'F' ? 'rgba(2,136,209,.08)' : 'rgba(128,128,128,.05)'}">
-      <title>Segment ${s.seg}: ${esc(s.alloc)}</title></rect>
-    <text x="${x(Math.max(s.lo, lo)) + 3}" y="16" font-size="9" style="fill:var(--muted)">${s.seg}</text>`).join('');
-
-  const ticks = carriers.map(c => {
-    const t = threatsByDev[c.id];
-    const color = t ? (ACMA_MECH[t.mechanism] || {}).color || '#888' : '#9aa7b3';
-    const hgt = t ? 34 : 22;
-    return `<line x1="${x(c.f)}" y1="${H - 20}" x2="${x(c.f)}" y2="${H - 20 - hgt}"
-      stroke="${color}" stroke-width="${t ? 2.5 : 1.2}">
-      <title>${c.f.toFixed(4)} MHz · ${c.dk.toFixed(1)} km${c.client ? ' · ' + esc(c.client) : ''}${t ? ' · ' + (ACMA_MECH[t.mechanism] || {}).label + ' ' + t.score : ''}</title></line>`;
-  }).join('');
-
-  return `
-    <div style="overflow-x:auto">
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:640px;height:auto" role="img"
-           aria-label="Licensed carriers near ${esc(a.name)} RX channel">
-        ${segBands}
-        <line x1="${pad}" y1="${H - 20}" x2="${W - pad}" y2="${H - 20}" style="stroke:var(--muted)" stroke-width="1"/>
-        ${[lo, rx - 0.3, rx, rx + 0.3, hi].map(f => `
-          <text x="${x(f)}" y="${H - 6}" font-size="10" text-anchor="middle" style="fill:var(--muted)">${f.toFixed(3)}</text>`).join('')}
-        ${ticks}
-        <line x1="${x(rx)}" y1="10" x2="${x(rx)}" y2="${H - 20}" stroke="#d32f2f" stroke-width="1.5" stroke-dasharray="5 3"/>
-        <text x="${x(rx)}" y="9" font-size="10" text-anchor="middle" fill="#d32f2f">RX ${rx}</text>
-      </svg>
-      <div class="small" style="color:var(--muted)">${carriers.length} licensed carriers within
-        ±${span} MHz and ${state.filters.acma.radiusKm} km${A.devLoaded ? '' : ' (threat candidates only — full carrier set loads with device detail)'}.
-        Tall coloured ticks are classified threats; grey ticks are other licensed users.</div>
-    </div>`;
-}
-
-function rfShowOnMap(deviceId, anchorId) {
-  state.filters.acma.show = true;
-  acmaEnsureCore().then(() => {
-    switchTab('stations');
-    showAcmaCard(deviceId, anchorId);
-  }).catch(() => {});
-}
-
-function rfExportCsv() {
-  const rows = rfVisibleRows();
-  const head = ['repeater', 'rx_mhz', 'mechanism', 'score', 'freq_mhz', 'product_mhz', 'delta_khz',
-                'distance_km', 'bearing_deg', 'los', 'licensee', 'licence', 'expiry', 'current',
-                'meganet_own_licence', 'device_id', 'site_id', 'detail'];
-  const lines = [head.join(',')];
-  for (const t of rows) {
-    const dk = rfDeltaKhz(t);
-    lines.push([
-      csvEscape(t.anchor_name), t.rx_mhz ?? '', t.mechanism, t.score,
-      t.f_mhz ?? '', t.product_mhz ?? '', dk != null ? dk.toFixed(2) : '',
-      t.distance_km, t.bearing_deg, t.los == null ? 'not_assessed' : t.los,
-      csvEscape(t.client || ''), csvEscape(t.lic || ''), t.expiry || '',
-      t.inactive ? 'no' : 'yes', t.meganet ? 'yes' : '',
-      t.device_id, t.site_id, csvEscape(t.detail),
-    ].join(','));
-  }
-  dlText(`acma-threats-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
-}
-
-function rfCorrelate() {
-  const el = document.getElementById('rf-corr-out');
-  const txt = (document.getElementById('rf-corr') || {}).value || '';
-  state.rf.corrText = txt;
-  const stamps = txt.split('\n').map(l => l.trim()).filter(Boolean)
-    .map(l => new Date(l)).filter(d => !isNaN(d));
-  if (!el) return;
-  if (!stamps.length) {
-    el.innerHTML = '<span style="color:var(--muted)">No parseable timestamps.</span>';
-    return;
-  }
-  const isBiz = d => d.getDay() >= 1 && d.getDay() <= 5 && d.getHours() >= 7 && d.getHours() < 18;
-  const biz = stamps.filter(isBiz).length;
-  const pct = Math.round(100 * biz / stamps.length);
-  // Expected share of a uniform 24×7 distribution that falls in Mon–Fri 07–18: ~33%
-  const verdict = pct >= 55
-    ? 'Strongly business-hours weighted — consistent with a licensed commercial operator (check non-continuous-hours candidates below).'
-    : pct >= 40
-      ? 'Mildly business-hours weighted — inconclusive.'
-      : 'Not business-hours weighted — points away from office-hours licensees (consider continuous carriers, faulty equipment, or environmental sources).';
-  const hourly = new Array(24).fill(0);
-  stamps.forEach(d => hourly[d.getHours()]++);
-  const maxH = Math.max(...hourly, 1);
-  const bars = hourly.map((n, h) => `
-    <div title="${String(h).padStart(2, '0')}:00 — ${n}" style="flex:1;display:flex;flex-direction:column;justify-content:end">
-      <div style="height:${Math.round(40 * n / maxH)}px;background:var(--map-line, #ff6f00);opacity:.75"></div>
-    </div>`).join('');
-  const nonCont = acmaVisibleThreats(true).filter(t => {
-    const d = state.acma.deviceById[t.device_id];
-    return d && d.hours && d.hours !== '00:00-23:59';
-  });
-  el.innerHTML = `
-    <p>${stamps.length} timestamps · <strong>${pct}%</strong> in business hours (Mon–Fri 07:00–18:00;
-    a uniform 24×7 source would sit near 33%).<br>${verdict}</p>
-    <div style="display:flex;gap:1px;height:44px;align-items:end;max-width:480px">${bars}</div>
-    <div style="display:flex;justify-content:space-between;max-width:480px" class="small">
-      <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
-    ${state.acma.devLoaded
-      ? (nonCont.length
-          ? `<p>Visible threats with recorded non-continuous hours: ${nonCont.map(t =>
-              `${esc(t.client || t.lic)} (${esc((state.acma.deviceById[t.device_id] || {}).hours)})`).join('; ')}</p>`
-          : '<p style="color:var(--muted)">No visible threat has recorded non-continuous operating hours (most ACMA records leave hours blank).</p>')
-      : '<p style="color:var(--muted)">Open a transmitter card once to load device detail, then re-run for per-licensee operating hours.</p>'}`;
-}
-
-// ── RF Changes tab ──────────────────────────────────────────────────────────────
-// "Did something change on the air near this repeater around the date our data
-// went bad?" Two views: a retrospective timeline of AUTHORISATION_DATEs (works
-// from a single extract) and diffs between archived monthly snapshots (works
-// from the second archive onward — removals and parameter changes are invisible
-// in a single snapshot, which is why every month is retained under
-// data/acma-raw/<YYYY-MM>/). All inputs precomputed by tools/acma_fetch.py and
-// tools/acma_diff.py; nothing fetched until this tab is opened.
-//
-// Register dates are administrative: an upper bound on when interference could
-// have begun, never proof that it did. Every string in this tab is worded as
-// "lead", not conclusion — keep it that way.
-
-const RFC_CLASS = {
-  cotenant: { label: 'New co-tenant at a repeater site', color: '#d32f2f',
-              blurb: 'A transmitter added at a site co-located with a repeater — the highest-severity change: front-end desense plus a new intermod pair with every existing carrier on the mast.' },
-  added:    { label: 'Added',                  color: '#c62828',
-              blurb: 'Assignment present now, absent in the earlier snapshot — a newly commissioned transmitter.' },
-  removed:  { label: 'Removed',                color: '#607d8b',
-              blurb: 'Assignment gone from the register — the only way a decommissioning is ever visible.' },
-  freq:     { label: 'Frequency changed',      color: '#f57c00',
-              blurb: 'May have moved onto or off a MegaNet channel.' },
-  power:    { label: 'Power changed',          color: '#7b1fa2',
-              blurb: 'TX power or EIRP differs — direct noise-floor impact.' },
-  antenna:  { label: 'Antenna changed',        color: '#0288d1',
-              blurb: 'Height, azimuth, tilt or antenna model differs — a re-point toward a repeater or extended reach.' },
-  site:     { label: 'Site moved',             color: '#6d4c41',
-              blurb: 'Assignment relocated to a different site, possibly a repeater mast.' },
-  status:   { label: 'Licence status changed', color: '#455a64',
-              blurb: 'Lapsed, surrendered or reinstated.' },
-};
-
-const RFC_FIELD_LABEL = {
-  f_mhz: 'Frequency (MHz)', tx_w: 'TX power (W)', eirp_w: 'EIRP (W)',
-  height_m: 'Antenna height (m)', az: 'Azimuth (°)', tilt: 'Tilt (°)',
-  ant_id: 'Antenna', site_id: 'Site', status: 'Licence status',
-};
-
-const RFC_SERIES_COLORS = ['#0b5cab', '#c7401a', '#107c10', '#7c35a3',
-                           '#b8860b', '#00838f', '#ad1457', '#5d4037'];
-const RFC_MARK_CAP = 800;
-const RFC_DAY = 86400000;
-
-function initRfc() {
-  const A = state.acma, R = state.rfc;
-  const rerender = () => { if (state.activeTab === 'rfchanges') renderMain(); };
-  if (!A.loaded && !A.error) acmaEnsureCore().then(rerender).catch(rerender);
-  if (!R.loaded && !R.error) rfcEnsureData().then(rerender).catch(rerender);
-}
-
-function rfcEnsureData() {
-  const R = state.rfc;
-  if (R.loaded) return Promise.resolve();
-  if (R.loadPromise) return R.loadPromise;
-  R.loading = true;
-  R.loadPromise = Promise.all([
-    acmaFetchJson('acma-timeline.json'),
-    acmaFetchJson('acma-changes.json').catch(() => null),    // optional
-    acmaFetchJson('acma-snapshots.json').catch(() => null),  // optional
-  ]).then(([tl, ch, sn]) => {
-    R.timeline = tl; R.changes = ch; R.snapshots = sn;
-    R.loaded = true; R.loading = false; R.error = null;
-  }).catch(err => {
-    R.loading = false; R.loadPromise = null;
-    R.error = `RF change data unavailable (${err.message}). Generate ` +
-              `data/acma-timeline.json with tools/acma_fetch.py; these files ` +
-              `cannot be fetched over file://.`;
-    throw err;
-  });
-  return R.loadPromise;
-}
-
-function rfcAnchorName(id) {
-  const a = state.acma.anchorById[id];
-  if (a) return a.name;
-  const s = (state.data?.stations || []).find(x => x.id === id);
-  return s ? s.name : id;
-}
-
-// ── event filtering / ranking ──
-
-// Events whose best anchor match passes the current selection, radius and
-// minimum-score filters. Returns { e (timeline event), a (best anchor match) }.
-function rfcVisibleEvents() {
-  const R = state.rfc, out = [];
-  if (!R.timeline) return out;
-  for (const e of R.timeline.events) {
-    let best = null;
-    for (const a of e.anchors || []) {
-      if (R.anchorSel.size && !R.anchorSel.has(a.id)) continue;
-      if (a.km > R.radiusKm || a.score < R.minScore) continue;
-      if (!best || a.score > best.score) best = a;
-    }
-    if (best && e.date) out.push({ e, a: best });
-  }
-  return out;
-}
-
-// Signed days from the onset date (null when no onset is set).
-function rfcDaysFromOnset(e) {
-  const R = state.rfc;
-  if (!R.onset) return null;
-  return Math.round((Date.parse(e.date) - Date.parse(R.onset)) / RFC_DAY);
-}
-
-// coincidence = interference score × temporal proximity × co-site bonus.
-// Proximity decays linearly from 1 at the onset date to 0 at the window edge
-// (stated in the UI tooltip — keep the formula and the tooltip in sync).
-function rfcCoincidence(row) {
-  const R = state.rfc;
-  const days = rfcDaysFromOnset(row.e);
-  if (days === null || Math.abs(days) > R.windowDays) return null;
-  const prox = Math.max(0, 1 - Math.abs(days) / R.windowDays);
-  const bonus = row.a.km <= 0.25 ? 1.5 : 1;
-  return { days, prox, bonus, value: row.a.score * prox * bonus };
-}
-
-// Rows for the coincidence table: windowed to onset ± window when an onset is
-// set, otherwise the full visible set sorted by date (newest first).
-function rfcTableRows() {
-  const R = state.rfc;
-  let rows = rfcVisibleEvents().map(r => ({ ...r, coin: rfcCoincidence(r) }));
-  if (R.onset) rows = rows.filter(r => r.coin);
-  const val = r => {
-    switch (R.sortKey) {
-      case 'date':   return r.e.date;
-      case 'days':   return r.coin ? r.coin.days : 0;
-      case 'client': return r.e.client || '';
-      case 'f':      return r.e.f_mhz || 0;
-      case 'delta':  return rfcDeltaKhz(r) ?? 1e12;
-      case 'mech':   return r.a.mech;
-      case 'eirp':   return r.e.eirp_w ?? r.e.tx_w ?? 0;
-      case 'km':     return r.a.km;
-      case 'score':  return r.a.score;
-      default:       return r.coin ? r.coin.value : Date.parse(r.e.date);
-    }
-  };
-  rows.sort((a, b) => {
-    const va = val(a), vb = val(b);
-    return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * R.sortDir;
-  });
-  return rows;
-}
-
-function rfcDeltaKhz(row) {
-  if (row.a.mech === 'cosite_desense') return null;   // proximity, not spectrum
-  const rx = (state.acma.anchorById[row.a.id] || {}).rx_mhz;
-  const f = row.a.product_mhz != null ? row.a.product_mhz : row.e.f_mhz;
-  if (rx == null || f == null) return null;
-  return (f - rx) * 1000;
-}
-
-function rfcSort(key) {
-  const R = state.rfc;
-  if (R.sortKey === key) R.sortDir *= -1;
-  else { R.sortKey = key; R.sortDir = (key === 'coin' || key === 'score' || key === 'date') ? -1 : 1; }
-  const wrap = document.getElementById('rfc-table-wrap');
-  if (wrap) wrap.innerHTML = rfcTableInnerHtml();
-}
-
-// ── selector handlers ──
-
-function rfcSelectAllAnchors() {
-  state.rfc.anchorSel = new Set();
-  renderMain();
-}
-
-function rfcToggleAnchor(id, on) {
-  const sel = state.rfc.anchorSel;
-  if (on) sel.add(id); else sel.delete(id);
-  renderMain();
-}
-
-function rfcFocusAnchor(id) {
-  state.rfc.anchorSel = new Set([id]);
-  renderMain();
-}
-
-function rfcUseOnset(date) {
-  state.rfc.onset = date;
-  renderMain();
-}
-
-function rfcCardFor(deviceId, anchorId) {
-  showAcmaCard(deviceId, anchorId);
-}
-
-// ── page ──
-
-function renderRfcHtml() {
-  const A = state.acma, R = state.rfc;
-  if (!A.loaded || !R.loaded) {
-    const msg = A.error || R.error ||
-      'Loading ACMA change-detection data…';
-    return `
-      <div style="max-width:640px;margin:2.5rem auto;padding:1rem">
-        <div class="panel" style="text-align:center;padding:2rem">
-          <h2 style="margin:0 0 .6rem">RF Changes</h2>
-          <p class="small" style="color:var(--muted)">${esc(msg)}</p>
-        </div>
-      </div>`;
-  }
-  return `
-    <div class="stack rfc-page" style="padding:0 .25rem;position:relative">
-      <div class="panel">
-        <div class="panel-header"><h2>RF Changes — what changed on the air, and when</h2>
-          <span class="small" style="color:var(--muted)">ACMA data: ${esc(R.timeline.meta.source_date)} · CC BY 4.0</span>
-        </div>
-        <p class="small" style="color:var(--muted);margin:.3rem 0 .5rem">
-          Register dates are <strong>administrative</strong>: an authorisation date is an upper
-          bound on when a transmitter could have come on air — licences are often authorised
-          before installation (or never installed), and equipment can radiate with no register
-          entry at all. A date that lines up with a data-quality step is a
-          <strong>lead to investigate</strong>, never a conclusion.</p>
-        ${rfcSelectorHtml()}
-      </div>
-      <div class="panel">
-        <div class="panel-header"><h3>Timeline — authorisations vs data quality</h3></div>
-        ${rfcChartHtml()}
-      </div>
-      <div class="panel">
-        <div class="panel-header"><h3>${R.onset ? 'Coincidence ranking' : 'Authorisation events'}</h3>
-          <span style="display:flex;gap:.5rem;align-items:center">
-            <span class="small" style="color:var(--muted)"
-                  title="coincidence = interference score × temporal proximity × co-site bonus. Proximity decays linearly from 1 at the onset date to 0 at the window edge; ×1.5 bonus when the transmitter shares the repeater's site (≤250 m).">
-              ${R.onset ? 'ranking formula ⓘ' : ''}</span>
-            <button onclick="rfcExportCsv()">Export CSV</button>
-          </span>
-        </div>
-        ${R.onset ? '' : `<p class="small" style="color:var(--muted);margin:.2rem 0">
-          Set an onset date above (or detect one below) to rank these by coincidence with the
-          data-quality step. This table is the evidence you would attach to an ACMA
-          interference complaint.</p>`}
-        <div class="table-wrap tall" id="rfc-table-wrap">${rfcTableInnerHtml()}</div>
-      </div>
-      <div class="panel">
-        <div class="panel-header"><h3>Snapshot diff — observed register changes</h3></div>
-        ${rfcDiffHtml()}
-      </div>
-      <div class="panel">
-        <div class="panel-header"><h3>New intermod products</h3></div>
-        ${rfcImdHtml()}
-      </div>
-      <div class="panel">
-        <div class="panel-header"><h3>Onset detection helper</h3></div>
-        ${rfcOnsetHelperHtml()}
-      </div>
-      <div class="panel">${rfcHelpHtml()}</div>
-      <div id="acma-card" class="acma-card" hidden></div>
-    </div>`;
-}
-
-function rfcSelectorHtml() {
-  const A = state.acma, R = state.rfc;
-  const anchors = A.threats.anchors.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  return `
-    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-start">
-      <details class="rfc-picker" ${R.pickerOpen ? 'open' : ''} ontoggle="state.rfc.pickerOpen=this.open">
-        <summary class="small" style="cursor:pointer">Repeaters:
-          <strong>${R.anchorSel.size ? `${R.anchorSel.size} selected` : 'all'}</strong></summary>
-        <div class="rfc-picker-list">
-          <label style="display:flex;gap:.4rem;align-items:center">
-            <input type="checkbox" ${R.anchorSel.size ? '' : 'checked'}
-                   onchange="rfcSelectAllAnchors()"> <em>All repeaters</em></label>
-          ${anchors.map(a => `
-            <label style="display:flex;gap:.4rem;align-items:center">
-              <input type="checkbox" ${R.anchorSel.has(a.station_id) ? 'checked' : ''}
-                     onchange="rfcToggleAnchor('${escAttr(a.station_id)}',this.checked)">
-              ${esc(a.name)}${a.rx_mhz ? ` <span class="small" style="color:var(--muted)">${a.rx_mhz}</span>` : ''}
-            </label>`).join('')}
-        </div>
-      </details>
-      <label class="small">Onset date
-        <input type="date" value="${esc(R.onset)}"
-               onchange="state.rfc.onset=this.value;renderMain()">
-      </label>
-      <label class="small">Window
-        <select onchange="state.rfc.windowDays=+this.value;renderMain()">
-          ${[30, 60, 90, 180].map(w => `
-            <option value="${w}" ${R.windowDays === w ? 'selected' : ''}>±${w} days</option>`).join('')}
-        </select>
-      </label>
-      <label class="small">Radius
-        <select onchange="state.rfc.radiusKm=+this.value;renderMain()">
-          ${[10, 25, 50, 60].map(r => `
-            <option value="${r}" ${R.radiusKm === r ? 'selected' : ''}>${r} km</option>`).join('')}
-        </select>
-      </label>
-      <label class="small">Min score
-        <input type="number" min="0" max="100" step="5" value="${R.minScore}" style="width:4.5rem"
-               onchange="state.rfc.minScore=+this.value;renderMain()">
-      </label>
-      ${R.onset ? `<button class="small" onclick="state.rfc.onset='';renderMain()">× clear onset</button>` : ''}
-    </div>`;
-}
-
-// ── timeline chart ──
-// Upper band: one mark per device authorisation, one lane per interference
-// mechanism, sized by score. Thin lane: licence effect/expiry as lighter marks.
-// Lower band: the pasted per-station corruption series, so a coincidence
-// between paperwork and data quality is visible at a glance.
-
-function rfcChartHtml() {
-  const R = state.rfc;
-  const rows = rfcVisibleEvents();
-  const onsetMs = R.onset ? Date.parse(R.onset) : null;
-  let lo, hi;
-  if (onsetMs) {
-    lo = onsetMs - R.windowDays * 1.5 * RFC_DAY;
-    hi = onsetMs + R.windowDays * 1.5 * RFC_DAY;
-  } else {
-    hi = Date.now() + 7 * RFC_DAY;
-    lo = hi - 730 * RFC_DAY;
-  }
-  const inSpan = rows.filter(r => {
-    const t = Date.parse(r.e.date);
-    return t >= lo && t <= hi;
-  });
-
-  const mechs = Object.keys(ACMA_MECH).filter(m => inSpan.some(r => r.a.mech === m));
-  const lanes = mechs.length ? mechs : ['co_channel'];
-  const W = 1000, PADL = 118, PADR = 16, laneH = 24;
-  const upperTop = 10;
-  const licY = upperTop + lanes.length * laneH;
-  const lowerTop = licY + 18 + 14, lowerH = 78;
-  const axisY = lowerTop + lowerH + 4;
-  const H = axisY + 26;
-  const x = t => PADL + (t - lo) / (hi - lo) * (W - PADL - PADR);
-
-  // month gridlines, thinned to roughly a dozen labels
-  const ticks = [];
-  const d0 = new Date(lo);
-  let ty = d0.getUTCFullYear(), tm = d0.getUTCMonth() + 1;
-  const totalMonths = Math.max(1, Math.round((hi - lo) / (30.44 * RFC_DAY)));
-  const stepM = Math.max(1, Math.ceil(totalMonths / 12));
-  for (let i = 0; ; i++) {
-    const t = Date.UTC(ty, tm, 1);
-    if (t > hi) break;
-    if (i % stepM === 0) ticks.push(t);
-    tm++; if (tm > 11) { tm = 0; ty++; }
-  }
-  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const tickLabel = t => {
-    const d = new Date(t);
-    return `${MON[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`;
-  };
-
-  const laneY = m => upperTop + lanes.indexOf(m) * laneH;
-
-  const shade = onsetMs ? `
-    <rect x="${x(onsetMs - R.windowDays * RFC_DAY)}" y="0"
-          width="${x(onsetMs + R.windowDays * RFC_DAY) - x(onsetMs - R.windowDays * RFC_DAY)}"
-          height="${axisY}" fill="rgba(211,47,47,.07)"/>
-    <line x1="${x(onsetMs)}" y1="0" x2="${x(onsetMs)}" y2="${axisY}"
-          stroke="#d32f2f" stroke-width="1.5" stroke-dasharray="5 3"/>
-    <text x="${x(onsetMs)}" y="${axisY + 22}" font-size="10" text-anchor="middle"
-          fill="#d32f2f">onset</text>` : '';
-
-  const shown = inSpan.slice(0, RFC_MARK_CAP);
-  const marks = shown.map(r => {
-    const t = Date.parse(r.e.date);
-    const rad = 3 + Math.min(6, r.a.score / 15);
-    const c = (ACMA_MECH[r.a.mech] || {}).color || '#666';
-    return `<circle cx="${x(t).toFixed(1)}" cy="${laneY(r.a.mech) + laneH / 2}" r="${rad.toFixed(1)}"
-      fill="${c}" opacity=".75" style="cursor:pointer"
-      onclick="rfcCardFor('${escAttr(r.e.device_id)}','${escAttr(r.a.id)}')">
-      <title>${esc(r.e.date)} · ${esc(r.e.client || r.e.lic || '?')} · ${r.e.f_mhz != null ? r.e.f_mhz.toFixed(4) + ' MHz · ' : ''}${esc((ACMA_MECH[r.a.mech] || {}).label || r.a.mech)} ${r.a.score} vs ${esc(rfcAnchorName(r.a.id))} · ${r.a.km} km${r.e.variation ? ' · variation to existing licence' : ''}</title>
-    </circle>`;
-  }).join('');
-
-  let licMarks = '';
-  let nLic = 0;
-  for (const r of shown) {
-    for (const d of [r.e.lic_effect, r.e.lic_expiry]) {
-      const t = d ? Date.parse(d) : NaN;
-      if (isNaN(t) || t < lo || t > hi || nLic >= RFC_MARK_CAP) continue;
-      nLic++;
-      licMarks += `<line x1="${x(t).toFixed(1)}" y1="${licY + 3}" x2="${x(t).toFixed(1)}" y2="${licY + 13}"
-        stroke="var(--muted)" stroke-width="1" opacity=".45">
-        <title>${esc(d)} · licence ${d === r.e.lic_effect ? 'effect' : 'expiry'} · ${esc(r.e.client || r.e.lic || '')}</title></line>`;
-    }
-  }
-
-  // lower band — corruption series
-  let lower = '';
-  const series = Object.entries(R.corrSeries || {}).filter(([, pts]) => pts.length);
-  if (series.length) {
-    let vmax = 0;
-    for (const [, pts] of series) for (const p of pts) vmax = Math.max(vmax, p.v);
-    vmax = vmax || 1;
-    lower = series.slice(0, RFC_SERIES_COLORS.length).map(([name, pts], i) => {
-      const col = RFC_SERIES_COLORS[i];
-      const vis = pts.filter(p => p.t >= lo && p.t <= hi);
-      const path = vis.map(p =>
-        `${x(p.t).toFixed(1)},${(lowerTop + lowerH - 4 - p.v / vmax * (lowerH - 10)).toFixed(1)}`).join(' ');
-      return `<polyline points="${path}" fill="none" stroke="${col}" stroke-width="1.6" opacity=".85">
-        <title>${esc(name)}</title></polyline>`;
-    }).join('');
-  } else {
-    lower = `<text x="${PADL + 8}" y="${lowerTop + lowerH / 2}" font-size="11"
-      style="fill:var(--muted)">No data-quality series loaded — paste per-station corruption
-      counts in the onset helper below to see coincidence at a glance.</text>`;
-  }
-
-  const legend = series.length ? `
-    <div class="small" style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:.2rem">
-      ${series.slice(0, RFC_SERIES_COLORS.length).map(([name], i) => `
-        <span class="legend-item"><span class="rfc-series-line" style="background:${RFC_SERIES_COLORS[i]}"></span>
-        ${esc(name)}</span>`).join('')}
-    </div>` : '';
-
-  return `
-    <div style="overflow-x:auto">
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:720px;height:auto" role="img"
-           aria-label="ACMA authorisation events and data quality over time">
-        ${shade}
-        ${ticks.map(t => `
-          <line x1="${x(t).toFixed(1)}" y1="0" x2="${x(t).toFixed(1)}" y2="${axisY}"
-                stroke="var(--border)" stroke-width="1" opacity=".6"/>
-          <text x="${x(t).toFixed(1)}" y="${axisY + 12}" font-size="10" text-anchor="middle"
-                style="fill:var(--muted)">${tickLabel(t)}</text>`).join('')}
-        ${lanes.map(m => `
-          <text x="4" y="${laneY(m) + laneH / 2 + 3}" font-size="10"
-                style="fill:${(ACMA_MECH[m] || {}).color || 'var(--muted)'}">${esc((ACMA_MECH[m] || {}).label || m)}</text>
-          <line x1="${PADL}" y1="${laneY(m) + laneH}" x2="${W - PADR}" y2="${laneY(m) + laneH}"
-                stroke="var(--border)" stroke-width=".5" opacity=".5"/>`).join('')}
-        <text x="4" y="${licY + 12}" font-size="10" style="fill:var(--muted)">licence dates</text>
-        ${licMarks}
-        <text x="4" y="${lowerTop + 10}" font-size="10" style="fill:var(--muted)">data quality</text>
-        <line x1="${PADL}" y1="${lowerTop + lowerH}" x2="${W - PADR}" y2="${lowerTop + lowerH}"
-              style="stroke:var(--muted)" stroke-width="1"/>
-        ${lower}
-        ${marks}
-      </svg>
-      ${legend}
-      <div class="small" style="color:var(--muted)">
-        ${shown.length}${inSpan.length > shown.length ? ` of ${inSpan.length}` : ''} authorisation
-        events in view · mark size = interference score · click a mark for the transmitter card.
-        ${onsetMs ? 'Shaded band = the selected onset window.' : 'Showing the last 24 months — set an onset date to zoom.'}</div>
-    </div>`;
-}
-
-// ── coincidence table ──
-
-function rfcTableInnerHtml() {
-  const R = state.rfc;
-  const rows = rfcTableRows();
-  if (!rows.length) {
-    return R.onset ? `
-      <div style="padding:.75rem">
-        <p><strong>No register events near this onset.</strong></p>
-        <p class="small" style="color:var(--muted)">A noise-floor step with no ACMA event nearby
-        is itself a finding: it points away from licensed transmitters and toward your own
-        infrastructure (corroding mast joints becoming an intermod mixer, a failing PA, water
-        in a feeder) or an unlicensed emitter (solar charge controllers, LED signage, electric
-        fences, powerline arcing). Widen the window or lower the minimum score to double-check
-        before concluding.</p>
-      </div>` :
-      `<p style="padding:.75rem;color:var(--muted)">No authorisation events match the current
-        filters — widen the radius or lower the minimum score.</p>`;
-  }
-  const arrow = k => R.sortKey === k ? (R.sortDir > 0 ? ' ▲' : ' ▼') : '';
-  const th = (k, label, tip) => `<th style="cursor:pointer" ${tip ? `title="${escAttr(tip)}"` : ''}
-    onclick="rfcSort('${k}')">${label}${arrow(k)}</th>`;
-  return `
-    <table class="bf-table">
-      <thead><tr>
-        ${th('date', 'Authorised', 'DEVICE_DETAILS.AUTHORISATION_DATE — when the frequency assignment was approved (administrative)')}
-        ${R.onset ? th('days', 'Δdays') : ''}
-        ${th('client', 'Licensee')}${th('f', 'Freq (MHz)')}${th('delta', 'Δf (kHz)')}
-        ${th('mech', 'Mechanism')}${th('eirp', 'EIRP (W)')}${th('km', 'Dist (km)')}
-        ${th('score', 'Score')}
-        ${R.onset ? th('coin', 'Coincidence', 'score × temporal proximity (linear decay to 0 at window edge) × 1.5 co-site bonus') : ''}
-      </tr></thead>
-      <tbody>
-        ${rows.slice(0, 1000).map(r => {
-          const m = ACMA_MECH[r.a.mech] || { label: r.a.mech, color: '#666' };
-          const dk = rfcDeltaKhz(r);
-          return `<tr style="cursor:pointer"
-                      onclick="rfcCardFor('${escAttr(r.e.device_id)}','${escAttr(r.a.id)}')">
-            <td class="small">${esc(r.e.date)}${r.e.variation ? ' <span class="badge" title="Authorised >30 days after the licence was issued — a variation to an existing licence (added channel, power change, re-point), not a new licence">var</span>' : ''}</td>
-            ${R.onset ? `<td class="small">${r.coin.days > 0 ? '+' : ''}${r.coin.days}</td>` : ''}
-            <td class="small">${esc(r.e.client || '')}</td>
-            <td class="small">${r.e.f_mhz != null ? r.e.f_mhz.toFixed(4) : ''}</td>
-            <td class="small">${dk != null ? dk.toFixed(1) : '—'}</td>
-            <td class="small"><span class="legend-sq" style="background:${m.color}"></span> ${m.label}</td>
-            <td class="small">${r.e.eirp_w ?? r.e.tx_w ?? ''}</td>
-            <td class="small">${r.a.km}${r.a.km <= 0.25 ? ' <span class="badge">co-site</span>' : ''}</td>
-            <td>${r.a.score}</td>
-            ${R.onset ? `<td><strong>${r.coin.value.toFixed(1)}</strong></td>` : ''}
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table>
-    ${rows.length > 1000 ? `<p class="small" style="color:var(--muted);padding:.4rem">Showing 1000 of ${rows.length} — tighten the filters or export the CSV.</p>` : ''}`;
-}
-
-function rfcExportCsv() {
-  const R = state.rfc;
-  const rows = rfcTableRows();
-  const head = ['authorisation_date', 'days_from_onset', 'repeater', 'rx_mhz', 'licensee',
-                'licence', 'licence_type', 'freq_mhz', 'product_mhz', 'delta_khz', 'mechanism',
-                'eirp_w', 'tx_w', 'distance_km', 'co_site', 'score', 'temporal_proximity',
-                'cosite_bonus', 'coincidence', 'variation_to_existing_licence',
-                'licence_issued', 'licence_effect', 'licence_expiry', 'status',
-                'device_id', 'site_id', 'stable_key'];
-  const lines = [head.join(',')];
-  for (const r of rows) {
-    const dk = rfcDeltaKhz(r);
-    const rx = (state.acma.anchorById[r.a.id] || {}).rx_mhz;
-    lines.push([
-      r.e.date, r.coin ? r.coin.days : '', csvEscape(rfcAnchorName(r.a.id)), rx ?? '',
-      csvEscape(r.e.client || ''), csvEscape(r.e.lic || ''), csvEscape(r.e.lic_type || ''),
-      r.e.f_mhz ?? '', r.a.product_mhz ?? '', dk != null ? dk.toFixed(2) : '',
-      r.a.mech, r.e.eirp_w ?? '', r.e.tx_w ?? '', r.a.km,
-      r.a.km <= 0.25 ? 'yes' : '', r.a.score,
-      r.coin ? r.coin.prox.toFixed(3) : '', r.coin ? r.coin.bonus : '',
-      r.coin ? r.coin.value.toFixed(2) : '',
-      r.e.variation ? 'yes' : '', r.e.lic_issued || '', r.e.lic_effect || '',
-      r.e.lic_expiry || '', csvEscape(r.e.status || ''),
-      r.e.device_id, r.e.site_id || '', r.e.key || '',
-    ].join(','));
-  }
-  const onset = R.onset ? `-onset-${R.onset}` : '';
-  dlText(`acma-rf-changes${onset}-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
-}
-
-// ── snapshot diff panel ──
-
-function rfcPairs() {
-  return (state.rfc.changes || {}).pairs || [];
-}
-
-function rfcSelectedPair() {
-  const pairs = rfcPairs();
-  if (!pairs.length) return null;
-  const i = state.rfc.pairIdx;
-  return pairs[i >= 0 && i < pairs.length ? i : pairs.length - 1];
-}
-
-function rfcChangeVisible(c) {
-  const R = state.rfc;
-  if (R.anchorSel.size && (!c.anchor || !R.anchorSel.has(c.anchor))) return false;
-  if (c.anchor_km != null && c.anchor_km > R.radiusKm) return false;
-  return true;
-}
-
-function rfcDiffEmptyHtml() {
-  const months = ((state.rfc.snapshots || {}).snapshots || []).map(s => s.month);
-  const one = months.length === 1;
-  return `
-    <p class="small" style="color:var(--muted)">
-      Change detection compares two archived monthly subsets, and
-      ${one ? `only one exists so far (<strong>${esc(months[0])}</strong>)`
-            : months.length ? `the archived months (${months.map(esc).join(', ')}) have not been diffed — run tools/acma_diff.py`
-            : 'none are archived yet — run tools/acma_diff.py --archive'}.
-      The monthly ACMA refresh (2nd of each month, ~06:15 AEST) archives the next snapshot,
-      and diffs appear here from then on — improving every month the archive grows.
-      Removals and prior parameter values before the first archived month are unrecoverable:
-      ACMA publishes a daily snapshot, not a back-catalogue, which is why the archive under
-      <code>data/acma-raw/&lt;YYYY-MM&gt;/</code> must never be pruned.
-      Until then, the authorisation timeline above is the available change axis.</p>`;
-}
-
-function rfcDiffHtml() {
-  const R = state.rfc;
-  const pairs = rfcPairs();
-  if (!pairs.length) return rfcDiffEmptyHtml();
-  const p = rfcSelectedPair();
-  const latestMonth = (((R.snapshots || {}).snapshots || []).slice(-1)[0] || {}).month;
-  const linkable = p.to === latestMonth;   // SDD_IDs only resolve against the current extract
-  const vis = (p.changes || []).filter(rfcChangeVisible);
-
-  const groups = [];
-  const used = new Set();
-  const take = (cls, pred) => {
-    const g = vis.filter(c => !used.has(c) && pred(c));
-    g.forEach(c => used.add(c));
-    if (g.length) groups.push([cls, g]);
-  };
-  take('cotenant', c => c.cotenant);
-  for (const cls of ['added', 'removed', 'freq', 'power', 'antenna', 'site', 'status'])
-    take(cls, c => (c.classes || [c.class]).includes(cls));
-
-  const pairSel = `
-    <label class="small">Compare
-      <select onchange="state.rfc.pairIdx=+this.value;renderMain()">
-        ${pairs.map((q, i) => `
-          <option value="${i}" ${q === p ? 'selected' : ''}>${esc(q.from)} → ${esc(q.to)}</option>`).join('')}
-      </select>
-    </label>
-    <span class="small" style="color:var(--muted)">extracts ${esc(p.from_date || p.from)} →
-      ${esc(p.to_date || p.to)} · grouped by nearest repeater · diff key: EFL_ID /
-      device registration id (never SDD_ID)</span>`;
-
-  if (!vis.length) {
-    return `<div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center">${pairSel}</div>
-      <p class="small" style="color:var(--muted);margin-top:.5rem">No register changes near the
-      selected repeaters in this pair — the RF licensing picture was stable. If the data-quality
-      step falls in this period, that points away from licensed transmitters (see the help
-      notes below).</p>`;
-  }
-
-  return `
-    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center">${pairSel}</div>
-    ${groups.map(([cls, g]) => {
-      const meta = RFC_CLASS[cls];
-      return `
-        <div style="margin-top:.7rem">
-          <h4 style="margin:0 0 .1rem"><span class="legend-sq" style="background:${meta.color}"></span>
-            ${meta.label} (${g.length})</h4>
-          <p class="small" style="color:var(--muted);margin:.1rem 0 .3rem">${meta.blurb}</p>
-          ${g.slice(0, 200).map(c => rfcChangeRowHtml(c, cls, linkable)).join('')}
-          ${g.length > 200 ? `<p class="small" style="color:var(--muted)">…and ${g.length - 200} more.</p>` : ''}
-        </div>`;
-    }).join('')}`;
-}
-
-function rfcChangeRowHtml(c, cls, linkable) {
-  const fields = c.fields ? Object.entries(c.fields)
-    .filter(([k]) => cls === 'status' ? k === 'status' :
-                     cls === 'freq' ? k === 'f_mhz' :
-                     cls === 'power' ? (k === 'tx_w' || k === 'eirp_w') :
-                     cls === 'antenna' ? ['height_m', 'az', 'tilt', 'ant_id'].includes(k) :
-                     cls === 'site' ? k === 'site_id' : true)
-    .map(([k, [a, b]]) => `<span style="white-space:nowrap">${RFC_FIELD_LABEL[k] || k}:
-      <s style="color:var(--muted)">${esc(a ?? '—')}</s> → <strong>${esc(b ?? '—')}</strong></span>`)
-    .join(' · ') : '';
-  const link = linkable && c.device_id
-    ? ` <a href="#" onclick="rfcCardFor('${escAttr(c.device_id)}','${escAttr(c.anchor || '')}');return false">details →</a>`
-    : '';
-  return `
-    <div class="small" style="margin:.25rem 0;padding-left:.9rem">
-      <strong>${esc(c.client || 'Unknown licensee')}</strong>
-      · ${c.f_mhz != null ? c.f_mhz.toFixed(4) + ' MHz' : 'freq ?'}
-      ${c.eirp_w != null ? `· ${c.eirp_w} W EIRP` : ''}
-      · lic ${esc(c.lic || '?')}
-      ${c.confidence === 'low' ? ' <span class="badge" title="Matched on a composite fingerprint (licence + site + frequency) because both stable identifiers were missing — treat with caution">low-confidence match</span>' : ''}
-      ${c.cotenant ? ' <span class="badge" style="color:#d32f2f">co-tenant</span>' : ''}
-      ${link}<br>
-      <span style="color:var(--muted)">${esc(c.site_name || c.site_id || '')}
-        ${c.anchor ? `· ${c.anchor_km != null ? c.anchor_km + ' km from ' : 'near '}${esc(rfcAnchorName(c.anchor))}` : ''}
-        ${c.auth ? `· authorised ${esc(c.auth)}` : ''}</span>
-      ${fields ? `<br>${fields}` : ''}
-    </div>`;
-}
-
-// ── new IMD products panel ──
-
-function rfcImdHtml() {
-  const p = rfcSelectedPair();
-  const intro = `
-    <p class="small" style="color:var(--muted);margin:.2rem 0 .5rem">
-      Adding one transmitter to a mast creates a third-order product with <em>every</em>
-      carrier already there — the offender is often nowhere near the RX frequency itself.
-      Listed below are only the products that are <strong>new in this snapshot pair</strong>
-      (created by an added or re-tuned device) and land within tolerance of a repeater RX
-      channel.</p>`;
-  if (!p) {
-    return `${intro}<p class="small" style="color:var(--muted)">Needs two archived snapshots —
-      see the snapshot diff panel above.</p>`;
-  }
-  const latestMonth = (((state.rfc.snapshots || {}).snapshots || []).slice(-1)[0] || {}).month;
-  const linkable = p.to === latestMonth;
-  const R = state.rfc;
-  const vis = (p.new_imd || []).filter(i =>
-    (!R.anchorSel.size || R.anchorSel.has(i.anchor)) &&
-    (i.anchor_km == null || i.anchor_km <= R.radiusKm));
-  if (!vis.length) {
-    return `${intro}<p class="small" style="color:var(--muted)">No new intermod products land
-      on an RX channel in ${esc(p.from)} → ${esc(p.to)} for the selected repeaters.</p>`;
-  }
-  return `${intro}
-    <div class="table-wrap medium">
-      <table class="bf-table">
-        <thead><tr><th>Product</th><th>Δ (kHz)</th><th>Order</th><th>Repeater</th>
-          <th>Site</th><th>New device</th><th>Existing partner</th></tr></thead>
-        <tbody>
-          ${vis.slice(0, 300).map(i => `
-            <tr>
-              <td class="small" style="white-space:nowrap">${esc(i.formula)}</td>
-              <td class="small">${i.delta_khz}</td>
-              <td class="small">IMD${i.order}</td>
-              <td class="small">${esc(rfcAnchorName(i.anchor))} (RX ${i.rx_mhz})</td>
-              <td class="small">${esc(i.site_name || i.site_id)}</td>
-              <td class="small">${linkable && i.device_id
-                ? `<a href="#" onclick="rfcCardFor('${escAttr(i.device_id)}','${escAttr(i.anchor)}');return false">${esc(i.client || i.trigger_key)}</a>`
-                : esc(i.client || i.trigger_key)}
-                <span class="badge">${i.trigger_class === 'added' ? 'added' : 're-tuned'}</span></td>
-              <td class="small">${linkable && i.partner_device_id
-                ? `<a href="#" onclick="rfcCardFor('${escAttr(i.partner_device_id)}','${escAttr(i.anchor)}');return false">${esc(i.partner_client || i.partner_key)}</a>`
-                : esc(i.partner_client || i.partner_key)}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
-}
-
-// ── onset detection helper ──
-
-function rfcParseDate(s) {
-  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (m) return Date.UTC(+m[1], m[2] - 1, +m[3]);
-  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);          // dd/mm/yyyy (AU)
-  if (m) return Date.UTC(m[3].length === 2 ? 2000 + +m[3] : +m[3], m[2] - 1, +m[1]);
-  const d = Date.parse(s);
-  return isNaN(d) ? null : d;
-}
-
-// Accepts "date,value" (single series) or "station,date,value" per line.
-function rfcParseCorr(text) {
-  const series = {};
-  let bad = 0;
-  for (const line of text.split('\n')) {
-    const t = line.trim();
-    if (!t || /^#/.test(t) || /^station\b/i.test(t) || /^date\b/i.test(t)) continue;
-    const parts = t.split(/[,;\t]+/).map(s => s.trim()).filter(Boolean);
-    let name = '', ds, vs;
-    if (parts.length >= 3) [name, ds, vs] = parts;
-    else if (parts.length === 2) [ds, vs] = parts;
-    else { bad++; continue; }
-    const when = rfcParseDate(ds), v = parseFloat(vs);
-    if (when == null || isNaN(v)) { bad++; continue; }
-    const key = name || 'pasted series';
-    (series[key] = series[key] || []).push({ t: when, v });
-  }
-  for (const k in series) series[k].sort((a, b) => a.t - b.t);
-  return { series, bad };
-}
-
-// Rolling-median step detector — deliberately simple. A step is a shift in the
-// k-point median exceeding 4× the series' robust noise estimate.
-function rfcDetectSteps(series) {
-  const med = arr => {
-    const s = arr.slice().sort((a, b) => a - b), m = s.length >> 1;
-    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-  };
-  const steps = [];
-  for (const [name, pts] of Object.entries(series)) {
-    const v = pts.map(p => p.v), n = v.length;
-    const k = Math.max(3, Math.min(7, Math.floor(n / 4)));
-    if (n < 2 * k) continue;
-    const diffs = [];
-    for (let i = 1; i < n; i++) diffs.push(Math.abs(v[i] - v[i - 1]));
-    const noise = Math.max(1.4826 * med(diffs), 1e-9);
-    const cand = [];
-    for (let i = k; i <= n - k; i++) {
-      cand.push({ i, jump: med(v.slice(i, i + k)) - med(v.slice(i - k, i)) });
-    }
-    cand.sort((a, b) => Math.abs(b.jump) - Math.abs(a.jump));
-    const picked = [];
-    for (const c of cand) {
-      if (Math.abs(c.jump) < 4 * noise) break;
-      if (picked.some(p => Math.abs(p.i - c.i) < k)) continue;
-      picked.push(c);
-      if (picked.length >= 3) break;
-    }
-    for (const c of picked) {
-      steps.push({ station: name, date: new Date(pts[c.i].t).toISOString().slice(0, 10),
-                   jump: c.jump });
-    }
-  }
-  steps.sort((a, b) => Math.abs(b.jump) - Math.abs(a.jump));
-  return steps;
-}
-
-function rfcAnalyseCorr() {
-  const R = state.rfc;
-  const txt = (document.getElementById('rfc-corr') || {}).value || '';
-  R.corrText = txt;
-  const { series, bad } = rfcParseCorr(txt);
-  R.corrSeries = series;
-  R.corrBad = bad;
-  R.corrSteps = rfcDetectSteps(series);
-  renderMain();
-}
-
-function rfcMatchStation(name) {
-  const stations = state.data?.stations || [];
-  const q = name.toLowerCase();
-  return stations.find(s => s.id === name || (s.name || '').toLowerCase() === q) ||
-         stations.find(s => (s.name || '').toLowerCase().includes(q)) || null;
-}
-
-function rfcOnsetHelperHtml() {
-  const R = state.rfc;
-  return `
-    <p class="small" style="color:var(--muted)">Paste a per-station corruption time series —
-      one line per day: <code>date, count</code> or <code>station, date, count</code>
-      (ISO or dd/mm/yyyy dates). A rolling-median step detector finds sudden onsets; detected
-      dates pre-fill the onset selector, and the series plots in the timeline's data-quality
-      band above.</p>
-    <textarea id="rfc-corr" rows="5" style="width:100%"
-      placeholder="Bluff Ck, 2026-04-01, 0&#10;Bluff Ck, 2026-04-02, 1&#10;Bluff Ck, 2026-04-03, 14&#10;…">${esc(R.corrText)}</textarea>
-    <div style="margin:.4rem 0"><button onclick="rfcAnalyseCorr()">Detect steps</button></div>
-    ${R.corrSteps === null ? '' : rfcStepsHtml()}`;
-}
-
-function rfcStepsHtml() {
-  const R = state.rfc;
-  const nSeries = Object.keys(R.corrSeries || {}).length;
-  if (!nSeries) {
-    return `<p class="small" style="color:var(--muted)">No parseable lines${R.corrBad ? ` (${R.corrBad} rejected)` : ''}.</p>`;
-  }
-  const stepsHtml = R.corrSteps.length ? `
-    <div class="small" style="margin:.3rem 0">Detected steps (largest first — click to set as onset):</div>
-    <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-      ${R.corrSteps.map(s => `
-        <button class="small" onclick="rfcUseOnset('${escAttr(s.date)}')"
-                title="Rolling-median shift of ${s.jump > 0 ? '+' : ''}${s.jump.toFixed(1)} at ${escAttr(s.station)}">
-          ${esc(s.date)} · ${esc(s.station)} ${s.jump > 0 ? '▲' : '▼'}${Math.abs(s.jump).toFixed(1)}</button>`).join('')}
-    </div>` : `
-    <p class="small" style="color:var(--muted)">No step larger than 4× the noise floor found in
-      ${nSeries} series${R.corrBad ? ` (${R.corrBad} lines rejected)` : ''} — the change may be
-      gradual rather than a step, which points away from a switched-on transmitter.</p>`;
-  return stepsHtml + rfcGroupingHtml();
-}
-
-// If every affected station reports through the same repeater, the search
-// narrows to one site — corruption confined to one repeater's children is
-// strong evidence for a specific site rather than a network-wide problem.
-function rfcGroupingHtml() {
-  const R = state.rfc;
-  const names = Object.keys(R.corrSeries || {}).filter(n => n !== 'pasted series');
-  if (!names.length || !state.data) return '';
-  const rows = names.map(n => {
-    const st = rfcMatchStation(n);
-    const reps = st ? findRepeaterMatches(st) : [];
-    return { n, st, reps };
-  });
-  const matched = rows.filter(r => r.st && r.reps.length);
-  let commonHtml = '';
-  if (matched.length > 1) {
-    const common = matched[0].reps.filter(r =>
-      matched.every(m => m.reps.some(x => x.id === r.id)));
-    if (common.length) {
-      const c = common[0];
-      const isAnchor = !!state.acma.anchorById[c.id];
-      commonHtml = `
-        <p class="small" style="margin:.4rem 0">
-          ⚑ <strong>All ${matched.length} matched stations report through
-          ${esc(c.name)}</strong> — corruption confined to one repeater's stations is strong
-          evidence for something at or near that specific site.
-          ${isAnchor ? `<button class="small" onclick="rfcFocusAnchor('${escAttr(c.id)}')">Focus ${esc(c.name)}</button>`
-                     : `<span style="color:var(--muted)">(${esc(c.name)} has no RX frequency recorded, so it is not in the ACMA threat layer — record repeater.rx_mhz to include it.)</span>`}
-        </p>`;
-    } else {
-      commonHtml = `
-        <p class="small" style="color:var(--muted);margin:.4rem 0">
-          The affected stations do not share a single repeater — that spreads the search across
-          sites, or points to something common to the receive side (base station, decoder) rather
-          than one repeater's RF environment.</p>`;
-    }
-  }
-  return `
-    <div style="margin-top:.5rem">
-      <div class="small" style="color:var(--muted)">Which repeater serves each affected station:</div>
-      <table class="bf-table" style="margin-top:.2rem">
-        <thead><tr><th>Series</th><th>Matched station</th><th>Serving repeater(s)</th></tr></thead>
-        <tbody>
-          ${rows.map(r => `
-            <tr>
-              <td class="small">${esc(r.n)}</td>
-              <td class="small">${r.st ? esc(r.st.name) : '<span style="color:var(--muted)">no match in stations.json</span>'}</td>
-              <td class="small">${r.reps.length ? r.reps.map(x => esc(x.name)).join(', ')
-                : '<span style="color:var(--muted)">—</span>'}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-      ${commonHtml}
-    </div>`;
-}
-
-// ── help ──
-
-function rfcHelpHtml() {
-  return `
-    <details>
-      <summary style="cursor:pointer"><strong>What this page will not catch</strong>
-        <span class="small" style="color:var(--muted)">— read before trusting an empty result</span></summary>
-      <div class="small" style="color:var(--muted);margin-top:.4rem">
-        <p><strong>Anything unlicensed or faulty.</strong> Solar charge controllers, VMS/LED sign
-        drivers, electric fence energisers, powerline arcing, out-of-spec or failing equipment —
-        the most common sources of a raised noise floor at a remote gauging site — never appear
-        in the register.</p>
-        <p><strong>Removals and prior values before archiving began.</strong> ACMA publishes a
-        daily snapshot with no back-catalogue; history exists only from the first archived month
-        onward (see the snapshot index in the diff panel). Nothing recovers earlier months.</p>
-        <p><strong>Physical installation dates.</strong> An authorisation date is when the
-        paperwork was approved. Transmitters go live months later, or never.</p>
-        <p><strong>Amateur transmissions.</strong> Not recorded by location — the
-        50.5 MHz × 3 = 151.5 MHz harmonic path needs a spectrum sweep, not this register.</p>
-        <p><strong>Degradation with no register event at all.</strong> Corroding mast joints
-        maturing into an intermod mixer, a failing PA growing spurious emissions, water in a
-        feeder. <strong>A step change in noise floor with no ACMA event nearby is itself a
-        finding</strong> — it points at your own infrastructure, and this page says so rather
-        than returning a bare empty table.</p>
-        <p>Data: ACMA Register of Radiocommunications Licences (CC BY 4.0). Licensee details must
-        not be used for unsolicited contact (Spam Act 2003 / DNCR Act 2006).</p>
-      </div>
-    </details>`;
-}
-
-// ── INTERFERENCE WORKBENCH tab ───────────────────────────────────────────────────
-// A single investigation surface: select the stations you believe are affected and
-// the Workbench assembles the evidence, scores five competing explanations and
-// names what to check next. It argues a case rather than showing numbers — every
-// score expands to its inputs, confidence is always stated, and a weak or empty
-// result is reported as a finding with a next step, never a blank panel.
-// Wording discipline: never "cause" — always "most consistent with" / "leading
-// hypothesis" / "worth checking first".
-// Reuses the Bit Flipper sensor index (H5 misattribution check), the pass-range
-// helpers (H1), the ACMA threat data (suspect list, strip plot, map squares) and
-// the RF Changes timeline. Nothing is fetched until the tab is opened, and the
-// ACMA/RFC files only load once an investigation has a leading candidate.
-
-const WB_HYP = {
-  h1: { short: 'H1', label: 'Repeater common-mode' },
-  h2: { short: 'H2', label: 'Geographic / regional' },
-  h3: { short: 'H3', label: 'Channel-wide' },
-  h4: { short: 'H4', label: 'Site-local, independent' },
-  h5: { short: 'H5', label: 'Misattribution artefact' },
-};
-
-const WB_SYMPTOMS = {
-  bitflips:       'Bit flips',
-  values:         'Value corruption',
-  dropouts:       'Dropouts / missing reports',
-  misattribution: 'Cross-station misattribution',
-  noise:          'Raised noise floor',
-};
-
-// Symptom → hypothesis score multiplier. Deliberately mild (≤1.35): the symptom
-// tilts the ranking, the data decides it. Applied multiplicatively, capped at
-// 0.99, and shown in every score's expandable arithmetic.
-const WB_SYMPTOM_WEIGHT = {
-  bitflips:       { h1: 1.10, h3: 1.10 },
-  values:         { h1: 1.10, h5: 1.10 },
-  dropouts:       { h2: 1.10, h3: 1.10, h4: 1.10 },
-  misattribution: { h5: 1.35, h1: 0.85 },
-  noise:          { h2: 1.15, h3: 1.15 },
-};
-
-const WB_CASES_KEY     = 'mn-wb-cases';
-const WB_MATRIX_COLS   = 10;   // routing-matrix column cap (ranked candidates)
-const WB_MATRIX_GOOD   = 15;   // known-good rows shown in the matrix
-const WB_AFFECTED_COLOR = '#c7401a';
-const WB_GOOD_COLOR     = '#107c10';
-const WB_DISC_COLOR     = '#ff8c00';
-
-// ── selection ──
-
-function wbParseIds(text) {
-  return [...new Set(String(text || '').split(/[\s,;]+/)
-    .map(t => parseInt(t, 10))
-    .filter(n => !isNaN(n) && n > 0 && n < 65536))];
-}
-
-function wbAddFromPaste(list) {
-  const el = document.getElementById('wb-paste');
-  const ids = wbParseIds(el ? el.value : '');
-  if (!ids.length) return;
-  wbAddIds(ids, list);
-  if (el) el.value = '';
-  renderMain();
-}
-
-function wbAddIds(ids, list) {
-  const other = list === 'affected' ? 'good' : 'affected';
-  state.wb[other] = state.wb[other].filter(id => !ids.includes(id));
-  state.wb[list]  = [...new Set([...state.wb[list], ...ids])];
-}
-
-function wbAddStation(stationId, list) {
-  const s = (state.data?.stations || []).find(x => x.id === stationId);
-  if (!s) return;
-  wbAddIds(stationAlertIds(s), list);
-  state.wb.pickQuery = '';
-  renderMain();
-}
-
-function wbRemoveId(list, id) {
-  state.wb[list] = state.wb[list].filter(x => x !== id);
-  renderMain();
-}
-
-function wbSwapId(list, id) {
-  const other = list === 'affected' ? 'good' : 'affected';
-  state.wb[list] = state.wb[list].filter(x => x !== id);
-  if (!state.wb[other].includes(id)) state.wb[other].push(id);
-  renderMain();
-}
-
-function wbClearCase() {
-  Object.assign(state.wb, { affected: [], good: [], onset: '', onsetEnd: '',
-                            symptom: '', caseName: '', lastAnalysis: null });
-  renderMain();
-}
-
-// Worked example for the intro screen: flag a handful of stations behind the
-// busiest documented repeater as affected plus two of its neighbours as
-// known-good — a clean H1 pattern that also demonstrates the specificity
-// penalty of a heavily-shared repeater.
-function wbLoadExample() {
-  const all = state.data.stations;
-  const reps = all.filter(s => s.roles.includes('repeater') && s.repeater &&
-                               (s.repeater.pass_ranges || []).length);
-  let best = null, bestServed = [];
-  for (const r of reps) {
-    const served = all.filter(s => s.id !== r.id && s.roles.includes('field') &&
-      stationAlertIds(s).some(id => passRangeCoversId(r.repeater, id)));
-    if (served.length > bestServed.length) { best = r; bestServed = served; }
-  }
-  if (!best || bestServed.length < 7) return;
-  state.wb.affected = bestServed.slice(0, 5).map(s => stationAlertIds(s)[0]);
-  state.wb.good     = bestServed.slice(5, 7).map(s => stationAlertIds(s)[0]);
-  state.wb.symptom  = 'bitflips';
-  state.wb.caseName = 'Worked example';
-  renderMain();
-}
-
-// ── bit arithmetic (shared with the Bit Flipper's mental model) ──
-
-function wbPopcount(x) { let c = 0; while (x) { x &= x - 1; c++; } return c; }
-
-function wbBitsDiff(a, b) {
-  const out = []; const x = a ^ b;
-  for (let i = 0; i < 16; i++) if (x & (1 << i)) out.push(i);
-  return out;
-}
-
-// Deep-link into the existing Bit Flipper rather than reimplementing it.
-function wbOpenBf(addr) {
-  state.bfInput = String(addr);
-  state.bfBits = '2';
-  state.bfOnlyMatches = true;
-  switchTab('bitflipper');
-}
-
-// ── analysis core ──
-
-// Resolve ALERT addresses against the sensor index → unique station records
-// plus the addresses that matched nothing in the database.
-function wbResolve(addrs, idx) {
-  const byStation = new Map(), unmatched = [];
-  for (const id of addrs) {
-    const hits = idx.get(id) || [];
-    if (!hits.length) { unmatched.push(id); continue; }
-    for (const { station } of hits) {
-      if (!byStation.has(station.id)) byStation.set(station.id, { station, addrs: [] });
-      const rec = byStation.get(station.id);
-      if (!rec.addrs.includes(id)) rec.addrs.push(id);
-    }
-  }
-  return { byStation, stations: [...byStation.values()].map(x => x.station), unmatched };
-}
-
-function wbMeanPairKm(stations) {
-  const pts = stations.filter(s => s.lat != null && s.lon != null);
-  if (pts.length < 2) return null;
-  let sum = 0, n = 0;
-  for (let i = 0; i < pts.length; i++)
-    for (let j = i + 1; j < pts.length; j++) {
-      sum += acmaHaversineKm(pts[i].lat, pts[i].lon, pts[j].lat, pts[j].lon); n++;
-    }
-  return sum / n;
-}
-
-// Evaluate all five hypotheses against the current selection. Pure computation
-// — no DOM, no fetches — so the same result feeds the verdict card, ranking,
-// evidence panels, map and exports within one render.
-function wbAnalyse() {
-  const wbs = state.wb;
-  const idx  = buildSensorIndex();
-  const aff  = wbResolve(wbs.affected, idx);
-  const goodR = wbResolve(wbs.good, idx);
-  const A      = aff.stations;
-  const affSet = new Set(A.map(s => s.id));
-  const G      = goodR.stations.filter(s => !affSet.has(s.id));
-  const goodSet = new Set(G.map(s => s.id));
-
-  const all     = state.data.stations;
-  const idsCache = new Map();
-  const idsOf = s => {
-    if (!idsCache.has(s.id)) idsCache.set(s.id, stationAlertIds(s));
-    return idsCache.get(s.id);
-  };
-  const withIds = all.filter(s => idsOf(s).length);
-
-  // Comparison universe: explicit known-good stations when given, otherwise
-  // every station not flagged affected is assumed good (stated in the UI).
-  const explicitGood = G.length > 0;
-  const U = explicitGood ? G : withIds.filter(s => !affSet.has(s.id));
-
-  const repeaters = all.filter(s => s.roles.includes('repeater') && s.repeater &&
-    Array.isArray(s.repeater.pass_ranges) && s.repeater.pass_ranges.length);
-  const repeaterRoleCount = all.filter(s => s.roles.includes('repeater')).length;
-  const passes = (s, r) => s.id !== r.id && idsOf(s).some(id => passRangeCoversId(r.repeater, id));
-
-  // station.id → repeaters whose pass ranges carry it (A ∪ U only)
-  const throughMap = new Map();
-  for (const s of [...A, ...U]) {
-    const rs = repeaters.filter(r => passes(s, r));
-    if (rs.length) throughMap.set(s.id, rs);
-  }
-  const A_routed = A.filter(s => throughMap.has(s.id));
-  const U_routed = U.filter(s => throughMap.has(s.id));
-  const A_unrouted = A.filter(s => !throughMap.has(s.id));
-
-  // ── H1: per-repeater explanatory power ──
-  const byRep = new Map();
-  for (const s of A_routed) for (const r of throughMap.get(s.id)) {
-    if (!byRep.has(r.id)) byRep.set(r.id, { r, passA: [], passUn: 0 });
-    byRep.get(r.id).passA.push(s);
-  }
-  for (const s of U_routed) for (const r of throughMap.get(s.id)) {
-    if (byRep.has(r.id)) byRep.get(r.id).passUn++;
-  }
-  const candidates = [...byRep.values()].map(c => {
-    const through     = c.passA.length + c.passUn;
-    const coverage    = A_routed.length ? c.passA.length / A_routed.length : 0;
-    const specificity = through ? 1 - c.passUn / through : 0;
-    const power = (coverage + specificity) > 0
-      ? 2 * coverage * specificity / (coverage + specificity) : 0;
-    return { ...c, through, coverage, specificity, power, chain: [] };
-  }).sort((a, b) => b.power - a.power || b.coverage - a.coverage);
-
-  // Two repeaters in series both score highly — flag them as a chain rather
-  // than presenting them as competing suspects. R1 feeds R2 when R2's pass
-  // ranges carry R1's own ALERT ids.
-  const topSlice = candidates.slice(0, 6)
-    .filter(c => candidates.length && c.power >= 0.75 * candidates[0].power);
-  for (const c1 of topSlice) for (const c2 of topSlice) {
-    if (c1 === c2) continue;
-    if (idsOf(c1.r).some(id => passRangeCoversId(c2.r.repeater, id))) {
-      if (!c1.chain.includes(c2.r.name)) c1.chain.push(c2.r.name);
-      if (!c2.chain.includes(c1.r.name)) c2.chain.push(c1.r.name);
-    }
-  }
-  const top = candidates[0] || null;
-  const h1base = top ? top.power : 0;
-
-  // ── affected-cluster geometry (shared by H2 and the discriminators) ──
-  const affPts = A.filter(s => s.lat != null && s.lon != null);
-  let cluster = null;
-  if (affPts.length >= 2) {
-    const cLat = affPts.reduce((t, s) => t + s.lat, 0) / affPts.length;
-    const cLon = affPts.reduce((t, s) => t + s.lon, 0) / affPts.length;
-    const dists = affPts.map(s => acmaHaversineKm(cLat, cLon, s.lat, s.lon));
-    cluster = { lat: cLat, lon: cLon, radiusKm: Math.max(5, Math.max(...dists)) };
-  }
-
-  // ── H2: spatial clustering vs network baseline ──
-  // Two terms, mirroring H1's grammar: tightness (are the affected stations
-  // closer together than the network at large?) and cluster specificity (how
-  // much of the affected area is actually affected? — a tight cluster where 25
-  // of 30 neighbours are fine points at shared infrastructure, not geography).
-  const dAff = wbMeanPairKm(A);
-  const netPts = withIds.filter(s => s.lat != null && s.lon != null);
-  const stride = Math.max(1, Math.ceil(netPts.length / 160));   // deterministic sample
-  const sample = netPts.filter((_, i) => i % stride === 0);
-  const dNet = wbMeanPairKm(sample);
-  const h2ratio = (dAff != null && dNet) ? dNet / Math.max(dAff, 0.5) : null;
-  const h2tight = (h2ratio == null || affPts.length < 3)
-    ? 0 : Math.max(0, Math.min(1, (h2ratio - 1) / 4));
-  let h2inCluster = 0, h2spec = 0;
-  if (cluster && affPts.length >= 3) {
-    const uIn = U.filter(s => s.lat != null && s.lon != null &&
-      acmaHaversineKm(cluster.lat, cluster.lon, s.lat, s.lon) <= cluster.radiusKm).length;
-    h2inCluster = uIn + affPts.length;
-    h2spec = h2inCluster ? affPts.length / h2inCluster : 0;
-  }
-  const h2base = (h2tight + h2spec) > 0 ? 2 * h2tight * h2spec / (h2tight + h2spec) : 0;
-
-  // ── H3: shared RX channel vs base rate ──
-  const freqCount = list => {
-    const m = new Map();
-    for (const s of list) {
-      const fs = new Set((throughMap.get(s.id) || [])
-        .map(r => r.repeater.rx_mhz).filter(f => f != null));
-      for (const f of fs) m.set(f, (m.get(f) || 0) + 1);
-    }
-    return m;
-  };
-  const fA = freqCount(A_routed), fU = freqCount(U_routed);
-  const h3rows = [...fA.entries()].map(([f, n]) => {
-    const share = A_routed.length ? n / A_routed.length : 0;
-    const base  = U_routed.length ? (fU.get(f) || 0) / U_routed.length : 0;
-    const lift  = base > 0 ? share / base : (share > 0 ? null : 1);  // null = no base rate
-    const liftEff = lift == null ? 3 : Math.min(lift, 4);
-    const score = Math.max(0, Math.min(0.9, (liftEff - 1) / 1.5)) * share;
-    return { f, n, share, base, lift, score };
-  }).sort((a, b) => b.score - a.score);
-  const h3best = h3rows[0] || null;
-  const h3base = h3best ? h3best.score : 0;
-
-  // ── H5: near-address pairs among the selected ALERT ids ──
-  const addrs = [...new Set([...wbs.affected])];
-  const h5pairs = [];
-  for (let i = 0; i < addrs.length; i++)
-    for (let j = i + 1; j < addrs.length; j++) {
-      const d = wbPopcount(addrs[i] ^ addrs[j]);
-      if (d >= 1 && d <= 2)
-        h5pairs.push({ a: addrs[i], b: addrs[j], d, bits: wbBitsDiff(addrs[i], addrs[j]) });
-    }
-  h5pairs.sort((x, y) => x.d - y.d || x.a - y.a);
-  const h5d1 = h5pairs.filter(p => p.d === 1).length;
-  const h5base = h5d1 ? Math.min(0.95, 0.8 + 0.05 * h5d1)
-               : h5pairs.length ? 0.45 : 0.05;
-
-  // ── H4: the residual — strong only when every shared-cause hypothesis is weak ──
-  const h4base = Math.max(0.05, Math.min(0.7, 0.7 * (1 - Math.max(h1base, h2base, h3base))));
-
-  // ── ranking, symptom weights, confidence ──
-  const w = WB_SYMPTOM_WEIGHT[wbs.symptom] || {};
-  const mk = (key, base) => ({
-    key, ...WB_HYP[key], base,
-    weight: w[key] || 1,
-    score: Math.min(0.99, base * (w[key] || 1)),
-  });
-  const hyps = [mk('h1', h1base), mk('h2', h2base), mk('h3', h3base),
-                mk('h4', h4base), mk('h5', h5base)];
-  hyps.sort((a, b) => b.score - a.score);
-  const lead = hyps[0], second = hyps[1];
-  const gap = lead.score - second.score;
-
-  const hOf = k => hyps.find(h => h.key === k);
-  let confidence = lead.score >= 0.6 && gap >= 0.2 ? 'high'
-                 : lead.score >= 0.35 && gap >= 0.08 ? 'moderate' : 'low';
-  const notes = [];
-  if (hOf('h1').score >= 0.45 && hOf('h2').score >= 0.45 &&
-      Math.abs(hOf('h1').score - hOf('h2').score) < 0.15) {
-    if (confidence === 'high') confidence = 'moderate';
-    notes.push('Your affected stations share both a repeater and a location, so H1 and H2 ' +
-      'cannot be separated with the current selection — repeaters serve geographic areas. ' +
-      'The discriminating stations below are how to break the tie.');
-  }
-  if (A.length < 3) {
-    confidence = 'low';
-    notes.push(`Only ${A.length} affected station${A.length === 1 ? '' : 's'} resolved — ` +
-      'most patterns need at least three to mean much.');
-  }
-  if (!explicitGood) {
-    notes.push('No known-good stations marked: specificity assumes every unselected station ' +
-      'is fine, which overstates it if the event is wider than your selection.');
-  }
-  if (A_unrouted.length) {
-    notes.push(`${A_unrouted.length} affected station${A_unrouted.length === 1 ? ' has' : 's have'} ` +
-      'no recorded routing — they can neither support nor refute H1 and are excluded from its arithmetic.');
-  }
-  if (aff.unmatched.length) {
-    notes.push(`Address${aff.unmatched.length === 1 ? '' : 'es'} ${aff.unmatched.join(', ')} ` +
-      'matched no station in the database — still included in the misattribution check (H5), invisible everywhere else.');
-  }
-
-  // ── discriminating stations: the highest-value observation in the analysis ──
-  // Inside the affected cluster, routed via something other than the leading
-  // repeater — clean strengthens H1, affected strengthens H2. Also the affected
-  // stations the leading repeater does NOT explain.
-  let disc = [], unexplained = [];
-  if (top && cluster) {
-    disc = all
-      .filter(s => !affSet.has(s.id) && s.lat != null && s.lon != null && idsOf(s).length &&
-                   !s.roles.includes('repeater'))
-      .map(s => ({ s, km: acmaHaversineKm(cluster.lat, cluster.lon, s.lat, s.lon) }))
-      .filter(x => x.km <= cluster.radiusKm)
-      .filter(x => !passes(x.s, top.r))
-      .map(x => ({ ...x,
-        via: repeaters.filter(r => passes(x.s, r)).map(r => r.name),
-        status: goodSet.has(x.s.id) ? 'known-good' : 'unchecked' }))
-      .filter(x => x.via.length)
-      .sort((a, b) =>
-        (a.status === 'unchecked' ? 0 : 1) - (b.status === 'unchecked' ? 0 : 1) || a.km - b.km)
-      .slice(0, 5);
-    const inTop = new Set(top.passA.map(s => s.id));
-    unexplained = A_routed.filter(s => !inTop.has(s.id));
-  }
-
-  // ── plain-language statements (kept as text; escaped at render) ──
-  const stmt = {};
-  stmt.h1 = top
-    ? `${top.passA.length} of ${A_routed.length} routed affected stations pass through ` +
-      `${top.r.name}; ${top.passUn} of the ${top.through} stations through it are unaffected.` +
-      (top.chain.length ? ` In series with ${top.chain.join(', ')} — a chain, not competing suspects.` : '')
-    : (A_routed.length
-        ? 'No documented repeater carries any of the affected stations — H1 cannot fire.'
-        : 'None of the affected stations have recorded pass-range routing, so the repeater ' +
-          'hypothesis cannot be evaluated — backfilling pass ranges is the fix.');
-  stmt.h2 = (h2ratio != null && affPts.length >= 3)
-    ? `Affected stations are ${h2ratio.toFixed(1)}× more tightly clustered than the network ` +
-      `baseline (mean spacing ${dAff.toFixed(0)} km vs ${dNet.toFixed(0)} km)` +
-      (h2inCluster ? `, but ${affPts.length} of the ${h2inCluster} comparison stations inside ` +
-        `that area are affected (${Math.round(h2spec * 100)}%).` : '.') +
-      (h2ratio < 1.5 ? ' Not meaningfully tighter — this looks routing- or site-related, not regional.'
-        : h2spec < 0.4 ? ' A tight cluster where most neighbours are fine points at shared ' +
-          'infrastructure, not a blanket regional source.'
-        : ' This looks regional — but repeaters serve regions too; see the confound note.')
-    : 'Fewer than three affected stations have coordinates — spatial clustering cannot be assessed.';
-  stmt.h3 = h3best
-    ? `${Math.round(h3best.share * 100)}% of routed affected stations sit behind ` +
-      `${h3best.f} MHz RX, against a ${Math.round(h3best.base * 100)}% base rate` +
-      (h3best.lift == null ? ' (no unaffected comparison stations on that channel).'
-        : ` — lift ${h3best.lift.toFixed(1)}×.`) +
-      (h3best.lift != null && h3best.lift < 1.3
-        ? ' Nearly everything shares this channel, so the overlap is uninformative.' : '')
-    : 'No shared RX channel among the routed affected stations.';
-  stmt.h4 = 'The residual explanation: it strengthens only as the shared-cause hypotheses ' +
-    `weaken (currently max ${Math.max(h1base, h2base, h3base).toFixed(2)}). Staggered onsets ` +
-    'and no shared pattern point at separate local sources — solar controllers, fences, powerline arcing.';
-  stmt.h5 = h5pairs.length
-    ? `${h5pairs.length} pair${h5pairs.length === 1 ? '' : 's'} of selected addresses within ` +
-      `2 bit flips of each other${h5d1 ? ` (${h5d1} at distance 1)` : ''} — some "affected" ` +
-      'stations may be one victim and one ghost of the same corrupted packets.'
-    : 'No selected addresses within 2 bit flips of each other — the selection looks independently addressed.';
-
-  return { aff, A, G, U, explicitGood, A_routed, U_routed, A_unrouted,
-           unmatched: aff.unmatched, goodUnmatched: goodR.unmatched,
-           repeaters, repeaterRoleCount, passes, throughMap,
-           candidates, top,
-           h2: { dAff, dNet, ratio: h2ratio, nPts: affPts.length, sampleN: sample.length,
-                 tight: h2tight, spec: h2spec, inCluster: h2inCluster, base: h2base },
-           h3: { rows: h3rows, best: h3best, base: h3base },
-           h5: { pairs: h5pairs, d1: h5d1, base: h5base },
-           h4: { base: h4base },
-           h1: { base: h1base },
-           hyps, lead, second, gap, confidence, notes,
-           disc, unexplained, cluster,
-           stmt, nextCheck: null };  // nextCheck filled below (needs stmt/disc)
-}
-
-// The one observation most likely to change the answer, phrased as an action.
-function wbNextCheck(an) {
-  const lead = an.lead;
-  if (lead.key === 'h5' && an.h5.pairs.length) {
-    const p = an.h5.pairs[0];
-    return `Open addresses ${p.a} and ${p.b} in the Bit Flipper and compare their data ` +
-      'series — misattributed readings appear in one series as ghosts of the other. ' +
-      'Deselect the victim and re-run before trusting anything else here.';
-  }
-  const un = an.disc.find(d => d.status === 'unchecked');
-  if ((lead.key === 'h1' || lead.key === 'h2') && un) {
-    return `Station ${un.s.name} is inside the affected area but routes via ${un.via[0]}. ` +
-      'If its data is clean, the repeater explanation strengthens considerably; if it is ' +
-      'also affected, the pattern is more likely geographic. Check it, mark it here, re-run.';
-  }
-  if (lead.key === 'h1') {
-    return 'Mark known-good stations — especially any inside the affected area on a ' +
-      'different repeater. Specificity is currently assumed, not confirmed.';
-  }
-  if (lead.key === 'h2') {
-    return 'Check the ACMA candidates near the cluster centre and the weather record at ' +
-      'onset — a regional pattern with sudden onset suggests ducting or a new local emitter.';
-  }
-  if (lead.key === 'h3') {
-    return 'Check a station behind the same RX channel in a different region: a channel-wide ' +
-      'source crosses regions, a repeater fault does not.';
-  }
-  return 'Run a battery-only power-down test at each affected site (kill mains/solar, watch ' +
-    'the noise floor) — the classic separator for independent site-local sources.';
-}
-
-// ── saved investigations & shareable URL state ──
-
-function wbCases() {
-  try { return JSON.parse(localStorage.getItem(WB_CASES_KEY) || '{}'); }
-  catch (_) { return {}; }
-}
-
-function wbSaveCase() {
-  const el = document.getElementById('wb-case-name');
-  const name = ((el && el.value) || state.wb.caseName || '').trim();
-  if (!name) { alert('Name the investigation first.'); return; }
-  const cases = wbCases();
-  cases[name] = { a: state.wb.affected, g: state.wb.good, o: state.wb.onset,
-                  e: state.wb.onsetEnd, s: state.wb.symptom, saved: new Date().toISOString() };
-  localStorage.setItem(WB_CASES_KEY, JSON.stringify(cases));
-  state.wb.caseName = name;
-  renderMain();
-}
-
-function wbLoadCase(name) {
-  const c = wbCases()[name];
-  if (!c) return;
-  Object.assign(state.wb, { affected: c.a || [], good: c.g || [], onset: c.o || '',
-                            onsetEnd: c.e || '', symptom: c.s || '', caseName: name });
-  renderMain();
-}
-
-function wbDeleteCase() {
-  const sel = document.getElementById('wb-case-sel');
-  const name = sel && sel.value;
-  if (!name) return;
-  const cases = wbCases();
-  delete cases[name];
-  localStorage.setItem(WB_CASES_KEY, JSON.stringify(cases));
-  renderMain();
-}
-
-function wbHashState() {
-  const wbs = state.wb;
-  if (!wbs.affected.length && !wbs.good.length) return null;
-  const p = new URLSearchParams();
-  p.set('a', wbs.affected.join('.'));
-  if (wbs.good.length) p.set('g', wbs.good.join('.'));
-  if (wbs.onset)       p.set('o', wbs.onset);
-  if (wbs.onsetEnd)    p.set('e', wbs.onsetEnd);
-  if (wbs.symptom)     p.set('s', wbs.symptom);
-  if (wbs.caseName)    p.set('n', wbs.caseName);
-  return 'wb&' + p.toString();
-}
-
-function wbSyncUrl() {
-  try {
-    const h = wbHashState();
-    const cur = location.hash.replace(/^#/, '');
-    if (h) { if (cur !== h) history.replaceState(null, '', '#' + h); }
-    else if (cur.startsWith('wb')) history.replaceState(null, '', location.pathname + location.search);
-  } catch (_) {}   // history API unavailable over some file:// contexts
-}
-
-function wbShareLink(btn) {
-  const h = wbHashState();
-  if (!h) return;
-  const url = location.href.split('#')[0] + '#' + h;
-  const done = ok => {
-    if (!btn) return;
-    const prev = btn.textContent;
-    btn.textContent = ok ? 'Copied ✓' : url;
-    setTimeout(() => { btn.textContent = prev; }, 2000);
-  };
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(() => done(true), () => done(false));
-  } else done(false);
-}
-
-function wbRestoreFromUrl() {
-  const raw = location.hash.replace(/^#/, '');
-  if (!raw.startsWith('wb')) return;
-  const p = new URLSearchParams(raw.slice(3));
-  const nums = v => (v || '').split(/[.,]/).map(x => parseInt(x, 10))
-    .filter(n => !isNaN(n) && n > 0 && n < 65536);
-  state.wb.affected = nums(p.get('a'));
-  state.wb.good     = nums(p.get('g'));
-  state.wb.onset    = (p.get('o') || '').slice(0, 10);
-  state.wb.onsetEnd = (p.get('e') || '').slice(0, 10);
-  state.wb.symptom  = WB_SYMPTOMS[p.get('s')] ? p.get('s') : '';
-  state.wb.caseName = (p.get('n') || '').slice(0, 80);
-  if (state.wb.affected.length || state.wb.good.length) {
-    state.activeTab = 'workbench';
-    renderTabs();
-    renderMain();
-  }
-}
-
-// ── education layer ──
-
-// Tier 1: dotted-underline tooltip; clicking through opens the concept drawer
-// (tier 3) when a concept id is given.
-function wbT(text, tip, conceptId) {
-  const click = conceptId ? ` onclick="wbOpenConcept('${escAttr(conceptId)}')"` : '';
-  return `<span class="wb-term${conceptId ? ' wb-term-link' : ''}" tabindex="0"` +
-         ` data-tip="${esc(tip)}"${click}>${esc(text)}</span>`;
-}
-
-// Tier 2: per-panel "Why this matters" expander.
-function wbWhy(html) {
-  return `<details class="wb-why"><summary>Why this matters</summary>
-    <div class="small" style="color:var(--muted);margin-top:.35rem">${html}</div></details>`;
-}
-
-function wbEnsureConcepts() {
-  const wbs = state.wb;
-  if (wbs.concepts) return Promise.resolve();
-  if (wbs.conceptsPromise) return wbs.conceptsPromise;
-  wbs.conceptsPromise = acmaFetchJson('rf-concepts.json')
-    .then(d => { wbs.concepts = d; })
-    .catch(err => { wbs.conceptsPromise = null; throw err; });
-  return wbs.conceptsPromise;
-}
-
-function wbOpenConcept(id) {
-  state.wb.drawerId = id || null;
-  const el = document.getElementById('wb-drawer');
-  if (!el) return;
-  el.hidden = false;
-  el.innerHTML = '<div class="small" style="padding:1rem;color:var(--muted)">Loading concept notes…</div>';
-  wbEnsureConcepts().then(() => wbRenderDrawer()).catch(err => {
-    el.innerHTML = `<div style="padding:1rem">
-      <button onclick="wbCloseDrawer()" style="float:right">×</button>
-      <p class="small" style="color:var(--muted)">Concept notes unavailable (${esc(err.message)}) —
-      data/rf-concepts.json cannot be fetched over file://.</p></div>`;
-  });
-}
-
-function wbCloseDrawer() {
-  const el = document.getElementById('wb-drawer');
-  if (el) { el.hidden = true; el.innerHTML = ''; }
-  state.wb.drawerId = null;
-}
-
-function wbRenderDrawer() {
-  const el = document.getElementById('wb-drawer');
-  const data = state.wb.concepts;
-  if (!el || !data) return;
-  const list = data.concepts || [];
-  const cur = list.find(c => c.id === state.wb.drawerId) || null;
-  const head = `
-    <div class="wb-drawer-head">
-      <strong>${cur ? esc(cur.title) : 'RF concepts'}</strong>
-      <span>
-        ${cur ? `<button onclick="wbOpenConcept('')" title="All concepts">≡</button>` : ''}
-        <button onclick="wbCloseDrawer()" title="Close">×</button>
-      </span>
-    </div>`;
-  if (!cur) {
-    el.innerHTML = `${head}
-      <div class="wb-drawer-body">
-        <p class="small" style="color:var(--muted)">Short, field-oriented explainers. Every entry
-        says what the phenomenon looks like <em>in your data</em>, not just what it is.</p>
-        ${list.map(c => `<a href="#" class="wb-drawer-item"
-            onclick="wbOpenConcept('${escAttr(c.id)}');return false">${esc(c.title)}</a>`).join('')}
-      </div>`;
-    return;
-  }
-  const also = (cur.see_also || []).map(id => {
-    const t = list.find(c => c.id === id);
-    return t ? `<a href="#" onclick="wbOpenConcept('${escAttr(id)}');return false">${esc(t.title)}</a>` : '';
-  }).filter(Boolean).join(' · ');
-  el.innerHTML = `${head}
-    <div class="wb-drawer-body">
-      <p>${esc(cur.what)}</p>
-      <p><strong>In your data:</strong> ${esc(cur.in_your_data)}</p>
-      <p><strong>What to do:</strong> ${esc(cur.next)}</p>
-      ${also ? `<p class="small" style="color:var(--muted)">See also: ${also}</p>` : ''}
-    </div>`;
-}
-
-// ── page shell ──
-
-function renderWorkbenchHtml() {
-  const wbs = state.wb;
-  const hasCase = wbs.affected.length > 0;
-  const an = hasCase ? wbAnalyse() : null;
-  if (an) an.nextCheck = wbNextCheck(an);
-  state.wb.lastAnalysis = an;
-  return `
-    <div class="wb-page">
-      <div class="wb-layout">
-        <aside class="stack wb-rail">${wbSetupHtml(an)}</aside>
-        <div class="stack">${an ? wbCentreHtml(an) : wbIntroHtml()}</div>
-        <aside class="stack wb-rail">${wbRightHtml(an)}</aside>
-      </div>
-      <div id="acma-card" class="acma-card" hidden></div>
-      <div id="wb-drawer" class="wb-drawer" hidden></div>
-    </div>`;
-}
-
-function initWb() {
-  wbSyncUrl();
-  const A = state.acma, R = state.rfc;
-  const rerender = () => { if (state.activeTab === 'workbench') renderMain(); };
-  // Suspects / strip plot / timeline need ACMA + RFC data — fetch only once an
-  // investigation exists, and only what hasn't already been loaded elsewhere.
-  if (state.wb.affected.length) {
-    if (!A.loaded && !A.loadPromise && !A.error) acmaEnsureCore().then(rerender).catch(rerender);
-    if (A.loaded && !A.devLoaded && !A.devPromise) acmaEnsureDevices().then(rerender).catch(() => {});
-    if (!R.loaded && !R.loadPromise && !R.error) rfcEnsureData().then(rerender).catch(rerender);
-  }
-  initWbMap();
-}
-
-// ── left rail: investigation setup ──
-
-function wbSetupHtml(an) {
-  const wbs = state.wb;
-  const cases = wbCases();
-  const caseNames = Object.keys(cases).sort();
-  const passRangeReps = state.data.stations.filter(s =>
-    s.roles.includes('repeater') && s.repeater && (s.repeater.pass_ranges || []).length).length;
-  const roleReps = state.data.stations.filter(s => s.roles.includes('repeater')).length;
-  return `
-    <div class="panel">
-      <div class="panel-header"><h3>Investigation</h3>
-        ${(wbs.affected.length || wbs.good.length) ? '<button onclick="wbClearCase()">Clear</button>' : ''}
-      </div>
-      <label class="small" style="display:block;margin-top:.5rem">Paste ALERT IDs
-        <textarea id="wb-paste" rows="2" style="margin-top:.3rem"
-          placeholder="6129, 6130 2316&#10;2320 — space, comma or newline separated"></textarea>
-      </label>
-      <div class="button-row" style="justify-content:flex-start;margin:.4rem 0">
-        <button class="primary" onclick="wbAddFromPaste('affected')">Add as affected</button>
-        <button onclick="wbAddFromPaste('good')">Add as known-good</button>
-      </div>
-      <label class="small" style="display:block;margin-top:.4rem">Or search stations
-        <input type="search" id="wb-pick" placeholder="Station name or number…"
-               value="${esc(wbs.pickQuery)}" style="margin-top:.3rem"
-               oninput="state.wb.pickQuery=this.value;wbRefreshPick()">
-      </label>
-      <div id="wb-pick-out">${wbPickResultsHtml()}</div>
-      ${wbChipsHtml('affected', 'Affected stations')}
-      ${wbChipsHtml('good', 'Known-good stations')}
-      <p class="small" style="color:var(--muted);margin:.5rem 0 0">
-        ${wbT('Known-good', 'Stations you have checked and found fine. Marking them sharpens specificity far more than adding affected stations does.', 'coverage_specificity')}
-        stations sharpen the analysis; unselected stations are otherwise assumed good.</p>
-    </div>
-
-    <div class="panel">
-      <div class="panel-header"><h3>Context</h3></div>
-      <div class="upload-grid" style="margin-top:.5rem">
-        <label>Onset date <span class="small" style="color:var(--muted)">(blank = unknown)</span>
-          <input type="date" value="${esc(wbs.onset)}"
-                 onchange="state.wb.onset=this.value;renderMain()">
-        </label>
-        <label>Onset range end <span class="small" style="color:var(--muted)">(optional)</span>
-          <input type="date" value="${esc(wbs.onsetEnd)}"
-                 onchange="state.wb.onsetEnd=this.value;renderMain()">
-        </label>
-        <label>Symptom type
-          <select onchange="state.wb.symptom=this.value;renderMain()">
-            <option value="">Unknown / mixed</option>
-            ${Object.entries(WB_SYMPTOMS).map(([k, v]) => `
-              <option value="${k}" ${wbs.symptom === k ? 'selected' : ''}>${v}</option>`).join('')}
-          </select>
-        </label>
-      </div>
-      <p class="small" style="color:var(--muted);margin:.5rem 0 0">The symptom mildly weights the
-        hypothesis ranking (shown in each score's arithmetic); it never decides it.</p>
-    </div>
-
-    <div class="panel">
-      <div class="panel-header"><h3>Save / share</h3></div>
-      <div class="upload-grid" style="margin-top:.5rem">
-        <label>Case name
-          <input type="text" id="wb-case-name" value="${esc(wbs.caseName)}" placeholder="e.g. Mt Stuart June event"
-                 oninput="state.wb.caseName=this.value">
-        </label>
-      </div>
-      <div class="button-row" style="justify-content:flex-start;margin-top:.5rem">
-        <button onclick="wbSaveCase()">Save</button>
-        <button onclick="wbShareLink(this)" ${wbs.affected.length ? '' : 'disabled'}>Copy share link</button>
-      </div>
-      ${caseNames.length ? `
-        <div style="display:flex;gap:.4rem;align-items:center;margin-top:.6rem">
-          <select id="wb-case-sel" onchange="wbLoadCase(this.value)">
-            <option value="">Load saved case…</option>
-            ${caseNames.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}
-          </select>
-          <button onclick="wbDeleteCase()" title="Delete the case selected above">🗑</button>
-        </div>` : ''}
-      <p class="small" style="color:var(--muted);margin:.5rem 0 0">Cases save to this browser;
-        the share link carries the whole investigation in the URL.</p>
-    </div>
-
-    <div class="panel">
-      <div class="panel-header"><h3>Routing data quality</h3></div>
-      <p class="small" style="color:var(--muted);margin:.4rem 0 0">
-        ${passRangeReps} of ${roleReps} repeaters have recorded pass ranges — H1 can only see
-        those.${an && an.A_unrouted.length ? ` <strong>${an.A_unrouted.length}</strong> of your affected
-        stations have no routing data.` : ''} If a suspect repeater is missing here, backfilling its
-        pass ranges in stations.json is the highest-value fix.</p>
-    </div>`;
-}
-
-function wbChipsHtml(list, label) {
-  const ids = state.wb[list];
-  if (!ids.length) return '';
-  // Resolve names cheaply for chip labels (re-uses the analysis index pattern).
-  const idx = buildSensorIndex();
-  const cls = list === 'affected' ? 'wb-chip-aff' : 'wb-chip-good';
-  const swapTitle = list === 'affected' ? 'Move to known-good' : 'Move to affected';
-  return `
-    <div style="margin-top:.6rem">
-      <div class="small" style="color:var(--muted);margin-bottom:.25rem">${label} (${ids.length})</div>
-      <div class="wb-chips">
-        ${ids.map(id => {
-          const hits = idx.get(id) || [];
-          const name = hits.length ? hits[0].station.name : 'not in database';
-          return `<span class="wb-chip ${cls}${hits.length ? '' : ' wb-chip-miss'}" title="${esc(name)}">
-            <strong>${id}</strong> <span class="wb-chip-name">${esc(name)}</span>
-            <a href="#" title="${swapTitle}" onclick="wbSwapId('${list}',${id});return false">⇄</a>
-            <a href="#" title="Remove" onclick="wbRemoveId('${list}',${id});return false">×</a>
-          </span>`;
-        }).join('')}
-      </div>
-    </div>`;
-}
-
-function wbRefreshPick() {
-  const el = document.getElementById('wb-pick-out');
-  if (el) el.innerHTML = wbPickResultsHtml();
-}
-
-function wbPickResultsHtml() {
-  const q = (state.wb.pickQuery || '').trim().toLowerCase();
-  if (q.length < 2) return '';
-  const hits = state.data.stations.filter(s => stationAlertIds(s).length &&
-    (s.name.toLowerCase().includes(q) || (s.station_number || '').includes(q))).slice(0, 8);
-  if (!hits.length) return '<p class="small" style="color:var(--muted);margin:.4rem 0 0">No stations with ALERT ids match.</p>';
-  return `
-    <div class="wb-pick-list">
-      ${hits.map(s => `
-        <div class="wb-pick-row">
-          <span>${esc(s.name)} <span class="small" style="color:var(--muted)">${stationAlertIds(s).join(', ')}</span></span>
-          <span>
-            <button onclick="wbAddStation('${escAttr(s.id)}','affected')" title="Add as affected">+ aff</button>
-            <button onclick="wbAddStation('${escAttr(s.id)}','good')" title="Add as known-good">+ good</button>
-          </span>
-        </div>`).join('')}
-    </div>`;
-}
-
-// ── intro (empty state) ──
-
-function wbIntroHtml() {
-  return `
-    <div class="panel">
-      <div class="panel-header"><h2>Interference Workbench</h2></div>
-      <p style="max-width:75ch">Select the stations you believe are affected (left) and the
-        Workbench assembles the evidence spread across Map, Networks, Bit Flipper, RF Environment
-        and RF Changes into one argued case: five competing explanations, scored, with the
-        arithmetic open to inspection and the most informative next check named.</p>
-      <div class="table-wrap" style="margin-top:.5rem">
-        <table>
-          <thead><tr><th style="width:16%">Hypothesis</th><th>Signature in the selected stations</th></tr></thead>
-          <tbody>
-            <tr><td><strong>H1</strong> Repeater common-mode</td><td class="small">Affected stations share a repeater path; unaffected ones mostly don't.</td></tr>
-            <tr><td><strong>H2</strong> Geographic / regional</td><td class="small">Affected stations cluster spatially regardless of routing.</td></tr>
-            <tr><td><strong>H3</strong> Channel-wide</td><td class="small">Affected stations share an RX frequency across different repeaters.</td></tr>
-            <tr><td><strong>H4</strong> Site-local, independent</td><td class="small">No shared path, cluster or channel — staggered onsets, separate local sources.</td></tr>
-            <tr><td><strong>H5</strong> Misattribution artefact</td><td class="small">"Affected" stations 1 address bit apart — data bleeding across IDs via bit flips. Checked first, because it invalidates the selection itself.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="button-row" style="justify-content:flex-start;margin-top:.75rem">
-        <button class="primary" onclick="wbLoadExample()">Load a worked example</button>
-        <button onclick="wbOpenConcept('')">Open the RF concept notes</button>
-      </div>
-      <p class="small" style="color:var(--muted);margin-top:.6rem">The Workbench never claims a
-        cause. It ranks explanations by how well they fit, states its confidence, and tells you
-        what would most change the answer.</p>
-    </div>`;
-}
-
-// ── centre column ──
-
-function wbCentreHtml(an) {
-  return `
-    ${an.h5.pairs.length ? wbH5BannerHtml(an) : ''}
-    ${wbVerdictHtml(an)}
-    ${wbRankingHtml(an)}
-    ${wbH5PanelHtml(an)}
-    ${wbMatrixHtml(an)}
-    ${wbMapPanelHtml(an)}
-    ${wbTimelineHtml(an)}
-    ${wbStripHtml(an)}
-    ${wbBlindSpotsHtml()}`;
-}
-
-// H5 warning shown before ANY other analysis — a bit-flip pair means the
-// selection itself may be wrong, which invalidates everything below it.
-function wbH5BannerHtml(an) {
-  const p = an.h5.pairs[0];
-  return `
-    <div class="wb-banner">
-      <strong>⚠ Check misattribution first.</strong>
-      Addresses ${an.h5.pairs.map(x => `${x.a} / ${x.b} (${x.d} bit${x.d > 1 ? 's' : ''})`).join(', ')}
-      are within 2 bit flips of each other. With no
-      ${wbT('payload protection', 'The plain ALERT Binary Format has no checksum over address or data — any flipped bit is accepted as truth.', 'no_crc')}
-      in ALERT Binary Format, one may be the victim of the other's corrupted packets rather than
-      independently affected — which would change this entire selection.
-      <button style="margin-left:.5rem" onclick="wbOpenBf(${p.a})">Open ${p.a} in Bit Flipper</button>
-    </div>`;
-}
-
-function wbVerdictHtml(an) {
-  const lead = an.lead;
-  const top = an.top;
-  const conf = { high: 'High', moderate: 'Moderate', low: 'Low' }[an.confidence];
-  let confWhy = `${lead.short} scores ${lead.score.toFixed(2)} against ${an.second.short} at ${an.second.score.toFixed(2)}.`;
-  if (lead.key === 'h1' && top && top.specificity < 0.5 && top.coverage >= 0.8) {
-    confWhy += ` Specificity is weak because ${esc(top.r.name)} carries most of this sub-network.`;
-  }
-  const title = lead.key === 'h1' && top
-    ? `${lead.label} — ${esc(top.r.name)}` : lead.label;
-  return `
-    <div class="panel wb-verdict">
-      <div class="small" style="color:var(--muted)">Leading hypothesis — most consistent with the evidence, not a proven cause</div>
-      <h2 style="margin:.25rem 0">${title}</h2>
-      <p style="margin:.3rem 0">${esc(an.stmt[lead.key])}</p>
-      ${lead.key === 'h1' && top ? `
-        <p class="small" style="margin:.3rem 0">
-          ${wbT('Coverage', 'What fraction of the affected stations pass through this repeater — does it explain all of them?', 'coverage_specificity')} ${top.coverage.toFixed(2)}
-          · ${wbT('Specificity', 'How well the repeater avoids explaining stations that are fine. Low specificity: it is on almost everyone’s path, so its involvement is less informative.', 'coverage_specificity')} ${top.specificity.toFixed(2)}
-          · ${wbT('Explanatory power', 'Harmonic mean (F1) of coverage and specificity — punishes a candidate weak on either.', 'coverage_specificity')} ${top.power.toFixed(2)}</p>` : ''}
-      <p style="margin:.35rem 0"><strong>Confidence: ${conf}.</strong> <span class="small">${confWhy}</span></p>
-      <p style="margin:.35rem 0"><strong>Most informative next check:</strong> ${esc(an.nextCheck)}</p>
-      ${an.notes.length ? `<div class="wb-notes">${an.notes.map(n => `<p class="small">▸ ${esc(n)}</p>`).join('')}</div>` : ''}
-    </div>`;
-}
-
-function wbRankingHtml(an) {
-  const arith = { h1: wbArithH1, h2: wbArithH2, h3: wbArithH3, h4: wbArithH4, h5: wbArithH5 };
-  return `
-    <div class="panel">
-      <div class="panel-header"><h3>Hypothesis ranking</h3>
-        <span class="small" style="color:var(--muted)">all five scored — losing hypotheses stay visible</span></div>
-      ${an.hyps.map((h, i) => `
-        <details class="wb-hyp">
-          <summary>
-            <span class="wb-hyp-rank">#${i + 1}</span>
-            <span class="wb-hyp-name"><strong>${h.short}</strong> ${h.label}</span>
-            <span class="wb-hyp-bar"><span style="width:${Math.round(h.score * 100)}%"></span></span>
-            <span class="wb-hyp-score">${h.score.toFixed(2)}</span>
-          </summary>
-          <div class="wb-hyp-body">
-            <p class="small" style="margin:.3rem 0">${esc(an.stmt[h.key])}</p>
-            ${arith[h.key](an, h)}
-          </div>
-        </details>`).join('')}
-      ${wbWhy(`A dashboard would show you one number; an investigation needs the competition.
-        Seeing that H2 scored nearly as high as H1 tells you the case is not settled — and the
-        arithmetic under each score shows exactly which stations drive it, so a number you cannot
-        interrogate never has to be taken on faith.`)}
-    </div>`;
-}
-
-function wbWeightRow(h) {
-  return h.weight !== 1
-    ? `<div class="acma-row"><span>× symptom weight (${esc(WB_SYMPTOMS[state.wb.symptom] || '')})</span><span>${h.weight.toFixed(2)} → ${h.score.toFixed(2)}</span></div>`
-    : `<div class="acma-row"><span>symptom weight</span><span>1.00 (none)</span></div>`;
-}
-
-function wbArithH1(an, h) {
-  if (!an.top) {
-    return `<div class="wb-arith small">
-      ${an.A_routed.length
-        ? `Routed affected stations: ${an.A_routed.length}, but no documented repeater carries any of them.`
-        : `Affected stations with routing data: 0 of ${an.A.length}. Pass ranges are recorded for
-           ${an.repeaters.length} of ${an.repeaterRoleCount} repeaters — the gap is data, not analysis.`}
-      ${wbWeightRow(h)}</div>`;
-  }
-  const t = an.top;
-  const universe = an.explicitGood
-    ? `the ${an.U.length} stations you marked known-good`
-    : `all ${an.U.length} stations not flagged affected (assumed good)`;
-  return `<div class="wb-arith small">
-    <div class="acma-row"><span>unaffected universe</span><span>${universe}</span></div>
-    <div class="acma-row"><span>coverage = |A ∩ through| / |A routed|</span><span>${t.passA.length} / ${an.A_routed.length} = ${t.coverage.toFixed(2)}</span></div>
-    <div class="acma-row"><span>specificity = 1 − |U ∩ through| / |through|</span><span>1 − ${t.passUn}/${t.through} = ${t.specificity.toFixed(2)}</span></div>
-    <div class="acma-row"><span>explanatory power = 2cs/(c+s)</span><span>${t.power.toFixed(2)}</span></div>
-    ${wbWeightRow(h)}
-    ${t.chain.length ? `<div class="acma-row"><span>chain</span><span>in series with ${esc(t.chain.join(', '))}</span></div>` : ''}
-    ${an.A_unrouted.length ? `<div class="acma-row"><span>excluded (no routing)</span><span>${an.A_unrouted.map(s => esc(s.name)).join(', ')}</span></div>` : ''}
-  </div>`;
-}
-
-function wbArithH2(an, h) {
-  const H = an.h2;
-  if (H.ratio == null || H.nPts < 3) {
-    return `<div class="wb-arith small">Needs ≥3 affected stations with coordinates (have ${H.nPts}). ${wbWeightRow(h)}</div>`;
-  }
-  return `<div class="wb-arith small">
-    <div class="acma-row"><span>mean pairwise distance, affected (${H.nPts} stations)</span><span>${H.dAff.toFixed(1)} km</span></div>
-    <div class="acma-row"><span>network baseline (${H.sampleN}-station sample)</span><span>${H.dNet.toFixed(1)} km</span></div>
-    <div class="acma-row"><span>tightness = clamp((baseline/affected − 1) / 4, 0–1)</span><span>${H.ratio.toFixed(2)}× → ${H.tight.toFixed(2)}</span></div>
-    <div class="acma-row"><span>cluster specificity = affected in area / stations in area</span><span>${H.nPts}/${H.inCluster} = ${H.spec.toFixed(2)}</span></div>
-    <div class="acma-row"><span>score = 2ts/(t+s) — same F1 grammar as H1</span><span>${H.base.toFixed(2)}</span></div>
-    ${wbWeightRow(h)}
-    <div class="acma-row"><span>confound</span><span>repeaters serve areas — see discriminating stations</span></div>
-  </div>`;
-}
-
-function wbArithH3(an, h) {
-  const H = an.h3;
-  if (!H.rows.length) return `<div class="wb-arith small">No routed affected stations, so no channel statistics. ${wbWeightRow(h)}</div>`;
-  return `<div class="wb-arith small">
-    ${H.rows.slice(0, 4).map(r => `
-      <div class="acma-row"><span>${r.f} MHz — affected ${Math.round(r.share * 100)}% vs base ${Math.round(r.base * 100)}%</span>
-        <span>lift ${r.lift == null ? '∞ (capped 3)' : r.lift.toFixed(2) + '×'} → ${r.score.toFixed(2)}</span></div>`).join('')}
-    <div class="acma-row"><span>score = clamp((lift − 1)/1.5, 0–0.9) × affected share</span><span>${H.base.toFixed(2)}</span></div>
-    ${wbWeightRow(h)}
-    <div class="acma-row"><span>why relative to base rate</span><span>68 of 88 documented repeaters share 151.5 MHz — raw sharing always fires</span></div>
-  </div>`;
-}
-
-function wbArithH4(an, h) {
-  return `<div class="wb-arith small">
-    <div class="acma-row"><span>residual = 0.7 × (1 − max(H1, H2, H3 base))</span>
-      <span>0.7 × (1 − ${Math.max(an.h1.base, an.h2.base, an.h3.base).toFixed(2)}) = ${an.h4.base.toFixed(2)}</span></div>
-    ${wbWeightRow(h)}
-    <div class="acma-row"><span>capped at 0.7</span><span>a residual can lead, never dominate</span></div>
-  </div>`;
-}
-
-function wbArithH5(an, h) {
-  const H = an.h5;
-  return `<div class="wb-arith small">
-    <div class="acma-row"><span>selected address pairs at Hamming distance 1 / 2</span><span>${H.d1} / ${H.pairs.length - H.d1}</span></div>
-    <div class="acma-row"><span>score</span><span>${H.d1 ? 'distance-1 pair(s): 0.8 + 0.05 each, cap 0.95' : H.pairs.length ? 'distance-2 only: 0.45' : 'none: 0.05 baseline'} = ${H.base.toFixed(2)}</span></div>
-    ${wbWeightRow(h)}
-  </div>`;
-}
-
-// ── evidence panels ──
-
-function wbH5PanelHtml(an) {
-  const H = an.h5;
-  return `
-    <div class="panel">
-      <div class="panel-header"><h3>1 · Address bit-flip check (H5)</h3>
-        <span class="small" style="${H.pairs.length ? 'color:var(--warn)' : 'color:var(--ok)'}">
-          ${H.pairs.length ? `${H.pairs.length} suspect pair${H.pairs.length > 1 ? 's' : ''}` : 'clear'}</span></div>
-      <p class="small" style="color:var(--muted);margin:.4rem 0">Runs first because it can invalidate
-        the selection: with 13 unprotected address bits, a single flip re-attributes a reading to a
-        station whose ID differs by a power of two. Pairwise XOR over the selected addresses,
-        flagging ${wbT('Hamming distance', 'How many bits differ between two addresses. Distance 1 = reachable by a single bit error.', 'hamming')} ≤ 2.</p>
-      ${H.pairs.length ? `
-        <div class="table-wrap">
-          <table class="bf-table" style="min-width:560px">
-            <thead><tr><th>Address A</th><th>Address B</th><th>Distance</th><th>Differing bit(s)</th><th></th></tr></thead>
-            <tbody>${H.pairs.map(p => {
-              const nameOf = a => { const rec = an.aff.byStation; for (const { station, addrs } of rec.values()) if (addrs.includes(a)) return station.name; return '—'; };
-              return `<tr>
-                <td>${p.a} <span class="small" style="color:var(--muted)">${esc(nameOf(p.a))}</span></td>
-                <td>${p.b} <span class="small" style="color:var(--muted)">${esc(nameOf(p.b))}</span></td>
-                <td>${p.d}</td>
-                <td class="small mono">bit ${p.bits.join(', bit ')}</td>
-                <td><button onclick="wbOpenBf(${p.a})">Bit Flipper →</button></td>
-              </tr>`;
-            }).join('')}</tbody>
-          </table>
-        </div>
-        <p class="small" style="color:var(--warn);margin:.4rem 0 0">These stations may not be
-          independently affected — compare their data series before treating them as separate evidence.</p>`
-      : `<p class="small" style="color:var(--ok);margin:.4rem 0 0">✓ No selected addresses within 2 bit
-          flips of each other — the selection looks independently addressed, and the rest of the
-          analysis can be read at face value.</p>`}
-      ${wbWhy(`An operator seeing bad data at stations 2316 and 2320 may believe both are affected
-        when one is the victim of the other's corrupted packets (they differ by a single bit).
-        Because this corrupts the input to every other hypothesis, it is checked before anything
-        else is presented. The check reuses the Bit Flipper's address index — open any pair there
-        for the full variant table and ARRO graph links.`)}
-    </div>`;
-}
-
-function wbMatrixHtml(an) {
-  const cols = an.candidates.slice(0, WB_MATRIX_COLS);
-  if (!cols.length) {
-    return `
-    <div class="panel">
-      <div class="panel-header"><h3>2 · Routing / pass-range matrix</h3></div>
-      <p class="small" style="color:var(--muted);margin:.4rem 0 0">No documented repeater carries any
-        selected station, so there is no matrix to draw. That is a finding: either these stations'
-        routing is undocumented (see routing data quality, left) or their paths genuinely don't
-        share infrastructure — which points at H2/H4, not H1.</p>
-    </div>`;
-  }
-  const rows = [
-    ...an.A.map(s => ({ s, cls: 'wb-row-aff', tag: 'affected' })),
-    ...an.G.slice(0, WB_MATRIX_GOOD).map(s => ({ s, cls: 'wb-row-good', tag: 'known-good' })),
-  ];
-  return `
-    <div class="panel">
-      <div class="panel-header"><h3>2 · Routing / pass-range matrix</h3>
-        <span class="small" style="color:var(--muted)">● = station's ALERT id inside repeater's pass ranges</span></div>
-      <div class="table-wrap" style="margin-top:.5rem">
-        <table class="wb-matrix">
-          <thead><tr>
-            <th style="min-width:140px">Station</th>
-            ${cols.map(c => `<th class="wb-m-h" title="${esc(c.r.name)} — power ${c.power.toFixed(2)}"><span>${esc(c.r.name)}</span></th>`).join('')}
-          </tr></thead>
-          <tbody>
-            ${rows.map(row => `
-              <tr class="${row.cls}">
-                <td title="${row.tag}">${esc(row.s.name)}
-                  <span class="small" style="color:var(--muted)">${(stationAlertIds(row.s) || []).join(', ')}</span></td>
-                ${cols.map(c => {
-                  const hit = an.passes(row.s, c.r);
-                  return `<td class="wb-m${hit ? ' hit' : ''}">${hit ? '●' : ''}</td>`;
-                }).join('')}
-              </tr>`).join('')}
-          </tbody>
-          <tfoot>
-            <tr><td class="small">coverage</td>${cols.map(c => `<td class="small">${c.coverage.toFixed(2)}</td>`).join('')}</tr>
-            <tr><td class="small">specificity</td>${cols.map(c => `<td class="small">${c.specificity.toFixed(2)}</td>`).join('')}</tr>
-            <tr><td class="small"><strong>power</strong></td>${cols.map(c => `<td class="small"><strong>${c.power.toFixed(2)}</strong></td>`).join('')}</tr>
-          </tfoot>
-        </table>
-      </div>
-      ${an.candidates.length > cols.length ? `<p class="small" style="color:var(--muted);margin:.4rem 0 0">Top ${cols.length} of ${an.candidates.length} candidate repeaters shown, ranked by explanatory power.</p>` : ''}
-      ${wbWhy(`The visual pattern usually makes the answer obvious before any score is read: a solid
-        column of dots on the affected (red) rows that is sparse on the known-good (green) rows IS
-        the repeater hypothesis. A column solid on both is a repeater that carries everything —
-        high coverage, low specificity, uninformative. Red rows with no dots at all are the
-        stations the leading repeater cannot explain.`)}
-    </div>`;
-}
-
-function wbMapPanelHtml(an) {
-  return `
-    <div class="panel">
-      <div class="panel-header"><h3>3 · Map</h3></div>
-      <div class="map-legend" style="margin:.4rem 0">
-        <span class="legend-item"><span class="legend-dot" style="background:${WB_AFFECTED_COLOR}"></span><span class="small">Affected</span></span>
-        <span class="legend-item"><span class="legend-dot" style="background:${WB_GOOD_COLOR}"></span><span class="small">Known-good</span></span>
-        <span class="legend-item"><span class="legend-dot" style="background:#0b5cab"></span><span class="small">Candidate repeater (sized by power)</span></span>
-        <span class="legend-item"><span class="legend-dot" style="background:${WB_DISC_COLOR}"></span><span class="small">Discriminating station</span></span>
-        ${state.acma.loaded && an.top ? `<span class="legend-item"><span class="legend-sq" style="background:#7b1fa2"></span><span class="small">ACMA threat (top candidate)</span></span>` : ''}
-      </div>
-      <div id="wb-map" style="height:430px;border-radius:6px"></div>
-      ${an.disc.length ? `
-        <div style="margin-top:.6rem">
-          <div class="small"><strong>Discriminating stations</strong> — inside the affected area, routed differently; the highest-value observation available:</div>
-          <div class="table-wrap" style="margin-top:.35rem">
-            <table style="table-layout:auto"><thead><tr><th>Station</th><th>Routes via</th><th>km from cluster centre</th><th>Status</th></tr></thead>
-            <tbody>${an.disc.map(d => `
-              <tr><td>${esc(d.s.name)}</td><td class="small">${esc(d.via.join(', '))}</td>
-                <td class="small">${d.km.toFixed(0)}</td>
-                <td class="small">${d.status === 'known-good'
-                  ? '<span style="color:var(--ok)">known-good — already supports H1</span>'
-                  : '<span style="color:var(--warn)">unchecked — go look at its data</span>'}</td></tr>`).join('')}
-            </tbody></table>
-          </div>
-        </div>`
-      : an.top ? `<p class="small" style="color:var(--muted);margin:.5rem 0 0">No discriminating
-          stations found: every routed station inside the affected area passes through
-          ${esc(an.top.r.name)} too, so geography and routing cannot be separated from this
-          selection alone. Widening the known-good set is the way forward.</p>` : ''}
-      ${wbWhy(`H1 and H2 are confounded — repeaters serve geographic areas, so stations sharing a
-        repeater are usually also near each other. The discriminator is a station inside the
-        affected cluster on a different repeater: if it is clean, the repeater explanation gains;
-        if it is affected, the geographic one does. Checking one named station is worth more than
-        any amount of re-scoring.`)}
-    </div>`;
-}
-
-function wbTimelineHtml(an) {
-  const R = state.rfc;
-  const wbs = state.wb;
-  const topIds = new Set(an.candidates.slice(0, 3).map(c => c.r.id));
-  let body;
-  if (!topIds.size) {
-    body = `<p class="small" style="color:var(--muted)">No candidate repeaters — register activity
-      cannot be anchored to a suspect. If routing data is the blocker, that comes first.</p>`;
-  } else if (R.error) {
-    body = `<p class="small" style="color:var(--muted)">${esc(R.error)}</p>`;
-  } else if (!R.loaded) {
-    body = `<p class="small" style="color:var(--muted)">Loading register timeline…</p>`;
-  } else {
-    const onsetMid = wbs.onset
-      ? (Date.parse(wbs.onset) + (wbs.onsetEnd ? Date.parse(wbs.onsetEnd) : Date.parse(wbs.onset))) / 2
-      : null;
-    const rows = [];
-    for (const e of R.timeline.events) {
-      let best = null;
-      for (const a of e.anchors || []) {
-        if (!topIds.has(a.id)) continue;
-        if (!best || a.score > best.score) best = a;
-      }
-      if (!best || !e.date) continue;
-      const days = onsetMid != null ? Math.round((Date.parse(e.date) - onsetMid) / 86400000) : null;
-      if (onsetMid != null && Math.abs(days) > 120) continue;
-      rows.push({ e, a: best, days });
-    }
-    rows.sort((x, y) => onsetMid != null
-      ? Math.abs(x.days) - Math.abs(y.days)
-      : (y.e.date || '').localeCompare(x.e.date || ''));
-    const shown = rows.slice(0, 8);
-    body = shown.length ? `
-      <div class="table-wrap">
-        <table style="table-layout:auto"><thead><tr>
-          <th>Date</th>${onsetMid != null ? '<th>Δ onset</th>' : ''}<th>Licensee</th><th>Mechanism</th><th>Score</th><th>km</th><th>Near</th></tr></thead>
-        <tbody>${shown.map(r => `
-          <tr>
-            <td class="small">${esc(r.e.date)}</td>
-            ${onsetMid != null ? `<td class="small">${r.days > 0 ? '+' : ''}${r.days} d</td>` : ''}
-            <td class="small">${esc(r.e.client || '?')}</td>
-            <td class="small"><span class="legend-sq" style="background:${(ACMA_MECH[r.a.mech] || {}).color || '#666'}"></span> ${(ACMA_MECH[r.a.mech] || {}).label || esc(r.a.mech)}</td>
-            <td class="small">${r.a.score}</td>
-            <td class="small">${r.a.km}</td>
-            <td class="small">${esc(rfcAnchorName(r.a.id))}</td>
-          </tr>`).join('')}</tbody></table>
-      </div>
-      <p class="small" style="color:var(--muted);margin:.4rem 0 0">${onsetMid != null
-        ? `Register events within ±120 days of onset, nearest first. An authorisation date is when paperwork was approved — an upper bound on when interference could have begun, never proof that it did.`
-        : 'No onset date set — showing the most recent register events near the top candidates. Set an onset date (left) to rank by temporal proximity.'}</p>`
-    : `<p class="small" style="color:var(--muted)"><strong>No register events near the leading
-        candidates${onsetMid != null ? ' within ±120 days of onset' : ''}.</strong> That is a
-        finding, not a failure: it points away from newly licensed transmitters and toward
-        register-invisible sources — your own infrastructure (corrosion, equipment fault) or
-        unlicensed emitters. The site-visit checklist covers those.</p>`;
-    body += `<div class="button-row" style="justify-content:flex-start;margin-top:.5rem">
-      <button onclick="wbOpenRfc()">Open in RF Changes →</button></div>`;
-  }
-  return `
-    <div class="panel">
-      <div class="panel-header"><h3>4 · Register activity vs onset</h3></div>
-      <p class="small" style="color:var(--muted);margin:.4rem 0">Simultaneous onset across stations
-        argues an external event; staggered onsets argue progressive degradation such as corrosion.
-        ${wbT('ACMA register', 'The Register of Radiocommunications Licences records authorisations, not what is actually radiating.', 'acma_register')}
-        events near the candidates are leads to correlate, not conclusions.</p>
-      ${body}
-    </div>`;
-}
-
-function wbOpenRfc() {
-  const an = state.wb.lastAnalysis;
-  if (an) state.rfc.anchorSel = new Set(an.candidates.slice(0, 3).map(c => c.r.id));
-  if (state.wb.onset) state.rfc.onset = state.wb.onset;
-  switchTab('rfchanges');
-}
-
-function wbStripHtml(an) {
-  if (!an.top) return '';
-  const A = state.acma;
-  let body;
-  if (A.error)        body = `<p class="small" style="color:var(--muted)">${esc(A.error)}</p>`;
-  else if (!A.loaded) body = `<p class="small" style="color:var(--muted)">Loading ACMA carrier data…</p>`;
-  else if (!A.anchorById[an.top.r.id]) {
-    body = `<p class="small" style="color:var(--muted)">${esc(an.top.r.name)} is not an anchor in the
-      ACMA extract${an.top.r.repeater.rx_mhz == null ? ' — it has no recorded RX frequency, which is the same backfill gap flagged under routing data quality' : ''}.
-      Re-run tools/acma_fetch.py after fixing stations.json to include it.</p>`;
-  } else {
-    body = rfStripPlotHtml(an.top.r.id);
-  }
-  return `
-    <div class="panel">
-      <div class="panel-header"><h3>5 · Frequency neighbourhood — ${esc(an.top.r.name)}</h3></div>
-      ${body}
-      ${wbWhy(`The strip plot shows every licensed carrier around the leading candidate's RX
-        channel. A tall coloured tick on or beside the red RX line is a classified threat; a wall
-        of grey ticks nearby means a crowded segment where
-        <em>adjacent-channel splatter</em> erodes margin without ever being "on" your frequency.
-        An empty neighbourhood shifts suspicion to unlicensed sources and your own hardware.`)}
-    </div>`;
-}
-
-function wbBlindSpotsHtml() {
-  return `
-    <div class="panel">
-      ${rfcHelpHtml()}
-    </div>`;
-}
-
-// ── right rail: suspects & actions ──
-
-function wbRightHtml(an) {
-  if (!an) {
-    return `
-      <div class="panel">
-        <div class="panel-header"><h3>Suspects</h3></div>
-        <p class="small" style="color:var(--muted);margin:.4rem 0 0">Ranked repeaters and licensed
-          interference candidates appear here once affected stations are selected.</p>
-      </div>`;
-  }
-  return `
-    ${wbRepListHtml(an)}
-    ${wbAcmaSuspectsHtml(an)}
-    ${wbActionsHtml(an)}`;
-}
-
-function wbRepListHtml(an) {
-  const cands = an.candidates.slice(0, 8);
-  return `
-    <div class="panel">
-      <div class="panel-header"><h3>Ranked repeaters</h3></div>
-      ${cands.length ? cands.map((c, i) => `
-        <details class="wb-sus">
-          <summary>
-            <span class="wb-hyp-rank">#${i + 1}</span>
-            <span class="wb-sus-name">${esc(c.r.name)}${c.chain.length ? ' <span class="badge">chain</span>' : ''}</span>
-            <span class="wb-hyp-bar"><span style="width:${Math.round(c.power * 100)}%"></span></span>
-            <span class="wb-hyp-score">${c.power.toFixed(2)}</span>
-          </summary>
-          <div class="small" style="padding:.35rem 0 .2rem">
-            coverage ${c.coverage.toFixed(2)} · specificity ${c.specificity.toFixed(2)}
-            ${c.chain.length ? `<br>In series with ${esc(c.chain.join(', '))} — inspect the chain as one path.` : ''}
-            <br>Carries affected: ${c.passA.map(s => esc(s.name)).join(', ')}
-            <br>Also carries ${c.passUn} unaffected station${c.passUn === 1 ? '' : 's'}.
-          </div>
-        </details>`).join('')
-      : `<p class="small" style="color:var(--muted);margin:.4rem 0 0">No repeater carries any selected
-          station — see the routing data quality note.</p>`}
-    </div>`;
-}
-
-function wbAcmaSuspectsHtml(an) {
-  const A = state.acma;
-  let body;
-  if (!an.top) {
-    body = `<p class="small" style="color:var(--muted)">Needs a leading repeater candidate.</p>`;
-  } else if (A.error) {
-    body = `<p class="small" style="color:var(--muted)">${esc(A.error)}</p>`;
-  } else if (!A.loaded) {
-    body = `<p class="small" style="color:var(--muted)">Loading ACMA threat data…</p>`;
-  } else {
-    const anchor = A.anchorById[an.top.r.id];
-    const threats = anchor ? anchor.threats.slice().sort((a, b) => b.score - a.score).slice(0, 8) : [];
-    body = threats.length ? `
-      ${threats.map(t => {
-        const m = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-        return `<a href="#" class="wb-threat" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(anchor.station_id)}');return false">
-          <span class="legend-sq" style="background:${m.color}"></span>
-          <span class="wb-threat-name">${esc(t.client || 'Unknown licensee')}
-            <span class="small" style="color:var(--muted)">${m.label} · ${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz · ' : ''}${t.distance_km} km${t.inactive ? ' · not current' : ''}</span></span>
-          <span class="wb-hyp-score">${t.score}</span>
-        </a>`;
-      }).join('')}
-      <p class="small" style="color:var(--muted);margin:.4rem 0 0">Licensed candidates near
-        ${esc(an.top.r.name)}, using the existing ACMA scoring — click for the full transmitter card.</p>`
-    : `<p class="small" style="color:var(--muted)">No licensed interference candidates recorded near
-        ${esc(an.top.r.name)}. A finding in itself: it shifts weight toward unlicensed emitters and
-        the repeater's own hardware — both invisible to the register.</p>`;
-  }
-  return `
-    <div class="panel">
-      <div class="panel-header"><h3>Interference sources</h3></div>
-      <div style="margin-top:.4rem">${body}</div>
-    </div>`;
-}
-
-function wbActionsHtml(an) {
-  return `
-    <div class="panel">
-      <div class="panel-header"><h3>Actions</h3></div>
-      <div class="button-column">
-        <button onclick="wbExportCsv()">Export case (CSV)</button>
-        <button onclick="wbExportChecklist()">Site-visit checklist</button>
-        <button onclick="wbExportComplaint()">Draft ACMA complaint</button>
-      </div>
-      <p class="small" style="color:var(--muted);margin:.5rem 0 0">The checklist is tailored to the
-        leading mechanism; the complaint draft pre-fills the evidence and marks every inference as
-        an inference.</p>
-    </div>`;
-}
-
-// ── map ──
-
-function initWbMap() {
-  // remove() can be mid-animation when a lazy data load re-renders the tab and
-  // detaches the old container — Leaflet throws harmlessly there; swallow it.
-  if (state.wb.map) { try { state.wb.map.remove(); } catch (_) {} state.wb.map = null; }
-  const el = document.getElementById('wb-map');
-  const an = state.wb.lastAnalysis;
-  if (!el || !an || !state.data || typeof L === 'undefined') return;
-
-  const map = state.wb.map = L.map('wb-map').setView([-23, 146], 5);
-  addBaseLayers(map);
-  const layer = L.layerGroup().addTo(map);
-  const bounds = [];
-
-  if (an.cluster) {
-    L.circle([an.cluster.lat, an.cluster.lon], {
-      radius: an.cluster.radiusKm * 1000, color: '#888',
-      weight: 1, dashArray: '6 6', fill: false, opacity: 0.6,
-    }).addTo(layer);
-  }
-
-  const dot = (s, color, opts, popup) => {
-    if (s.lat == null || s.lon == null) return;
-    const m = L.circleMarker([s.lat, s.lon], {
-      radius: 6, color, fillColor: color, fillOpacity: 0.85, weight: 1.5, ...opts,
-    }).addTo(layer);
-    m.bindPopup(popup);
-    bounds.push([s.lat, s.lon]);
-  };
-
-  const topR = an.top ? an.top.r : null;
-  for (const s of an.A) {
-    dot(s, WB_AFFECTED_COLOR, {}, `<strong>${esc(s.name)}</strong><br>
-      <span style="font-size:.83rem">Affected · AlertID ${stationAlertIds(s).join(', ')}</span>`);
-    if (topR && topR.lat != null && s.lat != null && an.passes(s, topR)) {
-      L.polyline([[s.lat, s.lon], [topR.lat, topR.lon]],
-        { color: '#0b5cab', weight: 1.2, opacity: 0.45, dashArray: '5 6' }).addTo(layer);
-    }
-  }
-  for (const s of an.G) {
-    dot(s, WB_GOOD_COLOR, {}, `<strong>${esc(s.name)}</strong><br>
-      <span style="font-size:.83rem">Known-good · AlertID ${stationAlertIds(s).join(', ')}</span>`);
-  }
-  for (const c of an.candidates.slice(0, 8)) {
-    dot(c.r, '#0b5cab', { radius: 6 + Math.round(8 * c.power), weight: c === an.top ? 3 : 1.5 },
-      `<strong>${esc(c.r.name)}</strong><br>
-       <span style="font-size:.83rem">Candidate repeater · coverage ${c.coverage.toFixed(2)}
-       · specificity ${c.specificity.toFixed(2)} · power ${c.power.toFixed(2)}</span>`);
-  }
-  for (const d of an.disc) {
-    dot(d.s, WB_DISC_COLOR, { fillOpacity: 0.25, weight: 3 },
-      `<strong>${esc(d.s.name)}</strong><br>
-       <span style="font-size:.83rem">Discriminating station (${d.status}) — routes via
-       ${esc(d.via.join(', '))}. Clean strengthens H1; affected strengthens H2.</span>`);
-  }
-
-  // ACMA threat squares around the leading candidate — same visual language as
-  // the main map's RF layer (squares, mechanism colours).
-  const A = state.acma;
-  if (A.loaded && topR && A.anchorById[topR.id]) {
-    const anchor = A.anchorById[topR.id];
-    for (const t of anchor.threats.slice().sort((a, b) => b.score - a.score).slice(0, 10)) {
-      const site = A.siteById[t.site_id];
-      if (!site) continue;
-      const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-      const size = Math.round(9 + t.score / 8);
-      const icon = L.divIcon({
-        className: 'acma-div',
-        html: `<div class="acma-sq" style="width:${size}px;height:${size}px;background:${mech.color}"></div>`,
-        iconSize: [size, size], iconAnchor: [size / 2, size / 2],
-      });
-      const m = L.marker([site.lat, site.lon], { icon }).addTo(layer);
-      m.bindPopup(`<strong>${esc(t.client || 'Unknown licensee')}</strong> · score ${t.score}<br>
-        <span style="font-size:.83rem">${mech.label} · ${esc(t.detail)}</span><br>
-        <a href="#" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(anchor.station_id)}');return false">Full details →</a>`);
-    }
-  }
-
-  // animate:false — an in-flight animation throws if a re-render (lazy ACMA/RFC
-  // data arriving) replaces the container before it settles
-  if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 11, animate: false });
-}
-
-// ── exports ──
-
-function wbCaseStamp() {
-  return (state.wb.caseName ? slug(state.wb.caseName) + '-' : 'workbench-case-') +
-         new Date().toISOString().slice(0, 10);
-}
-
-function wbExportCsv() {
-  const an = state.wb.lastAnalysis;
-  if (!an) return;
-  const wbs = state.wb;
-  const L1 = [];
-  L1.push('MegaNet Interference Workbench — case export');
-  L1.push(`generated,${new Date().toISOString()}`);
-  L1.push(`case,${csvEscape(wbs.caseName || '(unnamed)')}`);
-  L1.push(`affected_ids,${csvEscape(wbs.affected.join(' '))}`);
-  L1.push(`known_good_ids,${csvEscape(wbs.good.join(' '))}`);
-  L1.push(`onset,${wbs.onset || 'unknown'}${wbs.onsetEnd ? ' to ' + wbs.onsetEnd : ''}`);
-  L1.push(`symptom,${WB_SYMPTOMS[wbs.symptom] || 'unknown'}`);
-  L1.push(`confidence,${an.confidence}`);
-  L1.push('');
-  L1.push('section,hypothesis_ranking');
-  L1.push('rank,hypothesis,label,score,base_score,symptom_weight,statement');
-  an.hyps.forEach((h, i) => L1.push([i + 1, h.short, csvEscape(h.label), h.score.toFixed(2),
-    h.base.toFixed(2), h.weight.toFixed(2), csvEscape(an.stmt[h.key])].join(',')));
-  L1.push('');
-  L1.push('section,repeater_candidates');
-  L1.push('repeater,coverage,specificity,explanatory_power,affected_through,unaffected_through,chain_with');
-  an.candidates.forEach(c => L1.push([csvEscape(c.r.name), c.coverage.toFixed(2),
-    c.specificity.toFixed(2), c.power.toFixed(2), c.passA.length, c.passUn,
-    csvEscape(c.chain.join('; '))].join(',')));
-  if (an.h5.pairs.length) {
-    L1.push('');
-    L1.push('section,h5_address_pairs');
-    L1.push('addr_a,addr_b,hamming_distance,differing_bits');
-    an.h5.pairs.forEach(p => L1.push([p.a, p.b, p.d, csvEscape(p.bits.join(' '))].join(',')));
-  }
-  if (an.disc.length) {
-    L1.push('');
-    L1.push('section,discriminating_stations');
-    L1.push('station,routes_via,km_from_cluster_centre,status');
-    an.disc.forEach(d => L1.push([csvEscape(d.s.name), csvEscape(d.via.join('; ')),
-      d.km.toFixed(1), d.status].join(',')));
-  }
-  L1.push('');
-  L1.push('note,"Scores rank explanations by fit; none is a proven cause. See the Workbench for the arithmetic behind every number."');
-  dlText(`${wbCaseStamp()}.csv`, L1.join('\n'));
-}
-
-// Mechanism-tailored fieldwork list — converts the analysis into a site visit.
-function wbExportChecklist() {
-  const an = state.wb.lastAnalysis;
-  if (!an) return;
-  const lead = an.lead;
-  const topMech = (() => {
-    const A = state.acma;
-    if (!A.loaded || !an.top) return null;
-    const anchor = A.anchorById[an.top.r.id];
-    if (!anchor || !anchor.threats.length) return null;
-    return anchor.threats.slice().sort((a, b) => b.score - a.score)[0].mechanism;
-  })();
-  const out = [];
-  out.push(`# Site-visit checklist — ${state.wb.caseName || 'unnamed investigation'}`);
-  out.push(`Generated ${new Date().toISOString().slice(0, 10)} · leading hypothesis: ${lead.short} ${lead.label} (score ${lead.score.toFixed(2)}, confidence ${an.confidence})`);
-  out.push('');
-  out.push('## Before leaving');
-  out.push('- [ ] Export this case (CSV) and the RF Environment threat CSV for the target repeater');
-  out.push('- [ ] Pull the last 30 days of data for every affected station and the discriminating stations named in the case');
-  if (an.nextCheck) out.push(`- [ ] Most informative check first: ${an.nextCheck}`);
-  out.push('');
-  if (lead.key === 'h1' || lead.key === 'h3') {
-    out.push(`## At the repeater (${an.top ? an.top.r.name : 'leading candidate'})`);
-    if (topMech === 'imd3' || topMech === 'imd5' || topMech === 'imd3_triple' || !topMech) {
-      out.push('- [ ] Inspect and torque mast joints, guy attachments and antenna mounts (rusty-bolt IMD)');
-      out.push('- [ ] Check every RF connector for corrosion / water ingress; reseat and re-weatherproof');
-      out.push('- [ ] Log co-tenant transmitter TX times against your corruption timestamps');
-    }
-    if (topMech === 'cosite_desense' || !topMech) {
-      out.push('- [ ] Get the co-sited transmitter TX log from the site operator if they will share it');
-      out.push('- [ ] Consider a band-pass cavity filter on the repeater RX');
-    }
-    if (topMech === 'co_channel' || topMech === 'adjacent' || lead.key === 'h3') {
-      out.push('- [ ] Monitor the RX channel with a handheld/SDR for the co-channel carrier; note times and signal strength');
-    }
-    out.push('- [ ] Measure repeater RX noise floor (record dBm and time); compare against any previous reading');
-    out.push('- [ ] Check squelch setting and RX sensitivity against commissioning values');
-    out.push('- [ ] Photograph antenna, feedline and connector condition for the record');
-  }
-  if (lead.key === 'h2') {
-    out.push('## In the affected area');
-    out.push('- [ ] Drive-test the area with a handheld/SDR on the RX channel; log where the interferer is audible');
-    out.push('- [ ] Note any new infrastructure since onset (towers, solar farms, VMS signs, industrial sites)');
-    out.push('- [ ] Check the ACMA suspects list against what is physically present');
-  }
-  if (lead.key === 'h4' || lead.key === 'h2') {
-    out.push('## At each affected site');
-    out.push('- [ ] Battery-only power-down test: kill mains/solar, watch whether the noise floor drops (self-interference)');
-    out.push('- [ ] Check solar regulator make/model — switch-mode controllers are notorious VHF noise sources');
-    out.push('- [ ] Inspect nearby electric fences, powerlines (arcing insulators), pumps and VSDs');
-    out.push('- [ ] Verify antenna connections, feedline condition and earth bonding');
-  }
-  if (lead.key === 'h5') {
-    out.push('## Desk work first — no site visit indicated yet');
-    out.push('- [ ] Compare the flagged address pairs\' data series; identify victim vs ghost');
-    out.push('- [ ] Correct the affected list and re-run the Workbench before committing to fieldwork');
-  }
-  out.push('');
-  out.push('## Log while on site');
-  out.push('- [ ] Times of any observed interference (with your corruption timestamps to hand)');
-  out.push('- [ ] Weather at time of visit (IMD and corrosion effects are weather-sensitive)');
-  out.push('- [ ] Anything keying nearby: voice traffic, pagers, telemetry bursts');
-  dlText(`${wbCaseStamp()}-site-visit.md`, out.join('\n'));
-}
-
-// Draft interference complaint with the evidence pre-filled. Every inference is
-// marked as an inference — the draft argues "worth investigating", not "guilty".
-function wbExportComplaint() {
-  const an = state.wb.lastAnalysis;
-  if (!an) return;
-  const wbs = state.wb;
-  const A = state.acma;
-  const top = an.top;
-  const lic = top && top.r.repeater.acma_licence ? top.r.repeater.acma_licence : '(licence number)';
-  const rx = top && top.r.repeater.rx_mhz != null ? top.r.repeater.rx_mhz + ' MHz' : '(RX frequency)';
-  const suspects = (A.loaded && top && A.anchorById[top.r.id])
-    ? A.anchorById[top.r.id].threats.slice().sort((a, b) => b.score - a.score).slice(0, 5) : [];
-  const out = [];
-  out.push('# Draft — interference report to ACMA');
-  out.push('(Review every field before sending. This draft was assembled by the MegaNet');
-  out.push('Interference Workbench; all conclusions are stated as leads, not findings.)');
-  out.push('');
-  out.push('## Reporting party');
-  out.push('Name / organisation: (fill in)');
-  out.push('Contact: (fill in)');
-  out.push('');
-  out.push('## Service experiencing interference');
-  out.push(`Service: ALERT flood-warning telemetry network (VHF, ${rx})`);
-  out.push(`Licence: ${lic}`);
-  if (top) out.push(`Receiver site: ${top.r.name}${top.r.lat != null ? ` (${top.r.lat.toFixed(4)}, ${top.r.lon.toFixed(4)})` : ''}`);
-  out.push('');
-  out.push('## Nature and extent of the interference');
-  out.push(`Symptom: ${WB_SYMPTOMS[wbs.symptom] || 'data corruption (mixed symptoms)'} on the ALERT telemetry channel.`);
-  out.push(`First observed: ${wbs.onset || '(date unknown)'}${wbs.onsetEnd ? ' – ' + wbs.onsetEnd : ''}.`);
-  out.push(`Affected field stations: ${an.A.length} (${an.A.slice(0, 10).map(s => s.name).join('; ')}${an.A.length > 10 ? '; …' : ''}).`);
-  if (top) {
-    out.push(`Pattern: ${top.passA.length} of ${an.A_routed.length} routed affected stations share the ` +
-      `${top.r.name} repeater path (coverage ${top.coverage.toFixed(2)}, specificity ${top.specificity.toFixed(2)}), ` +
-      'which is most consistent with interference at or near that receiver. This is an inference from ' +
-      'routing analysis, not a direct observation of an emitter.');
-  }
-  out.push('');
-  out.push('## Impact');
-  out.push('The affected service provides real-time flood warning data (rainfall and river level)');
-  out.push('used for public-safety decisions. Corrupted or lost readings during a flood event delay');
-  out.push('warnings. (Adjust to your circumstances.)');
-  out.push('');
-  if (suspects.length) {
-    out.push('## Licensed services identified as worth investigating (from the ACMA RRL)');
-    suspects.forEach(t => {
-      const m = (ACMA_MECH[t.mechanism] || { label: t.mechanism }).label;
-      out.push(`- ${t.client || 'Unknown licensee'} — licence ${t.lic || '?'}, ` +
-        `${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz, ' : ''}${t.distance_km} km from the receiver. ` +
-        `Candidate mechanism: ${m}${t.inactive ? ' (licence not current)' : ''}.`);
-    });
-    out.push('');
-    out.push('These are candidates identified by automated screening of the public register; no');
-    out.push('transmission by any of them has been directly observed causing the interference.');
-    out.push('');
-  }
-  out.push('## Evidence available on request');
-  out.push('- Corruption timestamps per affected station');
-  out.push('- Routing analysis (which repeater paths the affected stations share) with arithmetic');
-  out.push('- Register-change timeline near the receiver around the onset date');
-  out.push('- Site-visit observations (once completed)');
-  dlText(`${wbCaseStamp()}-acma-draft.md`, out.join('\n'));
 }
 
