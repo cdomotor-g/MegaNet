@@ -742,6 +742,196 @@ const state = {
   theme: localStorage.getItem('mn-theme') || 'light',
 };
 
+// ── Utilities ──────────────────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Escape a value for use inside a single-quoted JS string embedded in a
+// double-quoted HTML attribute (e.g. onclick="fn('${escAttr(x)}')"). JS-escapes
+// backslash/quote first, then HTML-escapes so map filenames containing spaces,
+// commas or "&" survive both parsing layers intact.
+function escAttr(s) {
+  return String(s ?? '')
+    .replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function csvEscape(s) {
+  s = String(s ?? '');
+  return (s.includes(',') || s.includes('"') || s.includes('\n'))
+    ? `"${s.replace(/"/g,'""')}"` : s;
+}
+
+function netName(id) {
+  return (state.data?.radio_networks || []).find(n => n.id === id)?.name ?? id;
+}
+
+function pFloat(v) { const n = parseFloat(v); return isNaN(n) ? null : n; }
+function pInt(v)   { const n = parseInt(v, 10); return isNaN(n) ? null : n; }
+
+function parseRangeLines(text) {
+  return text.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const m = l.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+    return m ? { low: parseInt(m[1]), high: parseInt(m[2]) } : null;
+  }).filter(Boolean);
+}
+
+function slug(s) {
+  return (s || '').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0, 64);
+}
+
+function dlText(name, content) {
+  const a = Object.assign(document.createElement('a'), {
+    href:     URL.createObjectURL(new Blob([content], { type: 'text/csv' })),
+    download: name,
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+const KM_PER_DEG_LAT = 110.574;                                  // as in acmaBeamPolygon
+function kmPerDegLon(lat) { return 111.320 * Math.cos(lat * Math.PI / 180); }
+
+function bearingDeg(lat1, lon1, lat2, lon2) {
+  const rad = Math.PI / 180;
+  const y = Math.sin((lon2 - lon1) * rad) * Math.cos(lat2 * rad);
+  const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) -
+            Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos((lon2 - lon1) * rad);
+  return (Math.atan2(y, x) / rad + 360) % 360;
+}
+
+// Where you end up starting at a point and travelling a distance on a bearing —
+// the "from this repeater, 12 km on 045°" form of drawing a line.
+function destPoint(lat, lon, brg, km) {
+  const R = 6371.0088, rad = Math.PI / 180;
+  const d = km / R, b = brg * rad, p1 = lat * rad, l1 = lon * rad;
+  const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(b));
+  const l2 = l1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(p1),
+                             Math.cos(d) - Math.sin(p1) * Math.sin(p2));
+  return [p2 / rad, ((l2 / rad + 540) % 360) - 180];
+}
+
+function fmtKm(km) {
+  if (!isFinite(km)) return '—';
+  if (km < 1)   return `${Math.round(km * 1000)} m`;
+  if (km < 10)  return `${km.toFixed(2)} km`;
+  if (km < 100) return `${km.toFixed(1)} km`;
+  return `${Math.round(km)} km`;
+}
+
+const ACMA_MECH = {
+  co_channel:     { label: 'Co-channel',          color: '#d32f2f' },
+  adjacent:       { label: 'Adjacent channel',    color: '#f57c00' },
+  imd3:           { label: 'Intermod IMD3',       color: '#7b1fa2' },
+  imd5:           { label: 'Intermod IMD5',       color: '#ce93d8' },
+  imd3_triple:    { label: 'Intermod 3-signal',   color: '#9575cd' },
+  harmonic:       { label: 'Harmonic',            color: '#0288d1' },
+  cosite_desense: { label: 'Co-site desense',     color: '#6d4c41' },
+};
+
+function acmaHaversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371.0088, rad = Math.PI / 180;
+  const dp = (lat2 - lat1) * rad, dl = (lon2 - lon1) * rad;
+  const a = Math.sin(dp / 2) ** 2 +
+            Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dl / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+const BF_TYPE_LABEL     = { battery: 'Battery', rainfall: 'Rainfall', water_level: 'Water Level', primary: 'Primary' };
+// Normalized sensor list for a station. Prefers the enriched `sensors` array
+// (from the national sensor database) and falls back to synthesizing minimal
+// records from legacy `alert_ids` when a station has not been enriched.
+function stationSensors(s) {
+  if (Array.isArray(s.sensors) && s.sensors.length) return s.sensors;
+  const out = [];
+  const a = s.alert_ids || {};
+  ['battery', 'rainfall', 'water_level', 'primary'].forEach(k => {
+    const v = a[k];
+    if (v == null) return;
+    (Array.isArray(v) ? v : [v]).forEach(id =>
+      out.push({ alert_id: id, type: BF_TYPE_LABEL[k] || k, sensor_id: '', device_id: null }));
+  });
+  return out;
+}
+
+// Build an ALERT-address → [{ station, sensor }] index across all stations.
+function buildSensorIndex() {
+  const idx = new Map();
+  state.data.stations.forEach(s => {
+    stationSensors(s).forEach(sensor => {
+      const id = sensor.alert_id;
+      if (id == null) return;
+      if (!idx.has(id)) idx.set(id, []);
+      idx.get(id).push({ station: s, sensor });
+    });
+  });
+  return idx;
+}
+
+function formatArroLocal(d) {
+  const p = x => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `
+       + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// Build an ARRO graph URL for the given {station,sensor} pairs. Returns
+// { url, count } or null when no pair carries the site/device ids ARRO needs.
+function buildArroUrl(pairs) {
+  const base = (state.bfArroBase || ARRO_DEFAULT_BASE).trim();
+  const now = new Date(), start = new Date(now.getTime() - 7 * 86400e3);
+  const p = new URLSearchParams({
+    refresh: 'off', markers: 'false', legend: 'true', bin: '86400',
+    time_zone: 'Australia/Brisbane', invalid: 'true',
+    has_regular_sensors: 'true', has_forecast_sensors: 'false',
+    for_forecast: 'false', hidden_devices: 'none',
+    data_start: formatArroLocal(start), data_end: formatArroLocal(now),
+  });
+  const seen = new Set();
+  pairs.forEach(({ station, sensor }) => {
+    const dbId = station.site && station.site.db_id;
+    const dev  = sensor.device_id;
+    if (dbId == null || dev == null) return;
+    const key = `${dbId}|${dev}`;
+    if (!seen.has(key)) { seen.add(key); p.append('devices[]', key); }
+  });
+  if (!seen.size) return null;
+  return { url: base.replace(/\?+$/, '') + '?' + p.toString(), count: seen.size };
+}
+
+// ── Leaflet: drop canvas redraws that outlive their canvas ─────────────────────
+//
+// Leaflet 1.9.4 can leave an animation frame scheduled against a canvas
+// renderer it has already torn down. Removing a map removes its layers in stamp
+// order, and the shared canvas renderer is a layer like any other — so it can be
+// destroyed while paths that draw on it are still coming off. The frame those
+// late removals leave behind fires after the map is gone, finds `this._ctx`
+// deleted, and throws an uncaught TypeError out of `Canvas._clear`.
+//
+// On the Stations map that is ~7,000 paths coming off at once, and the crash
+// lands roughly half the times you leave and re-enter the tab. It is harmless in
+// itself — the canvas it wanted to paint was thrown away on purpose — but it is
+// an uncaught exception in the console of anyone who opens dev tools, and it
+// makes "the console is clean" untestable, which is the whole premise of the
+// smoke test in test/ (#130).
+//
+// Cancelling the pending frame during teardown does *not* fix it: the frame that
+// survives is not reliably the one the renderer still holds an id for, so there
+// is nothing dependable to cancel. Neutralising the callback is, because the
+// condition is unambiguous — a redraw with no context has nothing to draw on.
+//
+// This must stay above init(): init() renders the first tab on the way past, and
+// the Stations tab builds a map while doing it.
+if (typeof L !== 'undefined' && L.Canvas) {
+  const _leafletCanvasRedraw = L.Canvas.prototype._redraw;
+  L.Canvas.prototype._redraw = function () {
+    if (!this._ctx) { this._redrawRequest = null; return; }
+    return _leafletCanvasRedraw.call(this);
+  };
+}
+
 // ── Memory meter ─────────────────────────────────────────────────────────────
 // A thin bar under the header, and a panel behind it, answering "how much is
 // this page holding, and can I give some back" — see issue #79. This is our
@@ -1482,75 +1672,6 @@ const Auth = (function () {
   };
 })();
 if (typeof window !== 'undefined') window.Auth = Auth;
-
-// ── Leaflet: drop canvas redraws that outlive their canvas ─────────────────────
-//
-// Leaflet 1.9.4 can leave an animation frame scheduled against a canvas
-// renderer it has already torn down. Removing a map removes its layers in stamp
-// order, and the shared canvas renderer is a layer like any other — so it can be
-// destroyed while paths that draw on it are still coming off. The frame those
-// late removals leave behind fires after the map is gone, finds `this._ctx`
-// deleted, and throws an uncaught TypeError out of `Canvas._clear`.
-//
-// On the Stations map that is ~7,000 paths coming off at once, and the crash
-// lands roughly half the times you leave and re-enter the tab. It is harmless in
-// itself — the canvas it wanted to paint was thrown away on purpose — but it is
-// an uncaught exception in the console of anyone who opens dev tools, and it
-// makes "the console is clean" untestable, which is the whole premise of the
-// smoke test in test/ (#130).
-//
-// Cancelling the pending frame during teardown does *not* fix it: the frame that
-// survives is not reliably the one the renderer still holds an id for, so there
-// is nothing dependable to cancel. Neutralising the callback is, because the
-// condition is unambiguous — a redraw with no context has nothing to draw on.
-//
-// This must stay above init(): init() renders the first tab on the way past, and
-// the Stations tab builds a map while doing it.
-if (typeof L !== 'undefined' && L.Canvas) {
-  const _leafletCanvasRedraw = L.Canvas.prototype._redraw;
-  L.Canvas.prototype._redraw = function () {
-    if (!this._ctx) { this._redrawRequest = null; return; }
-    return _leafletCanvasRedraw.call(this);
-  };
-}
-
-// ── Init ───────────────────────────────────────────────────────────────────────
-
-(function init() {
-  document.documentElement.setAttribute('data-theme', state.theme);
-  setHeaderLabel('btn-theme', state.theme === 'dark' ? 'Light' : 'Dark');
-  setSplitWidth(state.splitW);          // also clamps whatever was stored
-  renderTabs();
-  renderHelp();
-  renderMain();
-  // The header's height and the shape of both rails depend on the width, so all
-  // three are re-checked when it changes — crossing the phone breakpoint with a
-  // drawer open would otherwise leave its backdrop behind.
-  window.addEventListener('resize', () => {
-    updateChromeHeight();
-    syncNavChrome(state.navCollapsed);
-    syncHelpChrome(state.helpCollapsed);
-  });
-  // Crossing the phone breakpoint changes what the two rails *are* — columns or
-  // drawers — and so what their toggles should say. Re-rendered on the crossing
-  // itself rather than on every resize event: both are rebuilt wholesale.
-  window.matchMedia('(max-width: 560px)').addEventListener('change', () => {
-    renderTabs();
-    renderHelp();
-  });
-  // On a phone both rails are drawers laid over the page, and a drawer that
-  // only closes by picking a tab is a trap — Escape backs out of either.
-  document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape' || !isPhoneNav()) return;
-    if (!state.navCollapsed)  setNavCollapsed(true);
-    if (!state.helpCollapsed) setHelpCollapsed(true);
-  });
-  MemMeter.start();
-  // Before autoLoad(), so that a tab returning from a magic link has taken the
-  // session out of the URL fragment before anything else reads location.
-  Auth.start();
-  autoLoad();
-})();
 
 // Header buttons are icon + label, so the label is a span inside the button and
 // not the button's own text. Writing textContent would throw the icon away.
@@ -4422,36 +4543,6 @@ const DRAW_TOOLS = {
   text:   { icon: 'T',  label: 'Text',      hint: 'Click where the note goes, then type it.' },
 };
 
-const KM_PER_DEG_LAT = 110.574;                                  // as in acmaBeamPolygon
-function kmPerDegLon(lat) { return 111.320 * Math.cos(lat * Math.PI / 180); }
-
-function bearingDeg(lat1, lon1, lat2, lon2) {
-  const rad = Math.PI / 180;
-  const y = Math.sin((lon2 - lon1) * rad) * Math.cos(lat2 * rad);
-  const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) -
-            Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos((lon2 - lon1) * rad);
-  return (Math.atan2(y, x) / rad + 360) % 360;
-}
-
-// Where you end up starting at a point and travelling a distance on a bearing —
-// the "from this repeater, 12 km on 045°" form of drawing a line.
-function destPoint(lat, lon, brg, km) {
-  const R = 6371.0088, rad = Math.PI / 180;
-  const d = km / R, b = brg * rad, p1 = lat * rad, l1 = lon * rad;
-  const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(b));
-  const l2 = l1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(p1),
-                             Math.cos(d) - Math.sin(p1) * Math.sin(p2));
-  return [p2 / rad, ((l2 / rad + 540) % 360) - 180];
-}
-
-function fmtKm(km) {
-  if (!isFinite(km)) return '—';
-  if (km < 1)   return `${Math.round(km * 1000)} m`;
-  if (km < 10)  return `${km.toFixed(2)} km`;
-  if (km < 100) return `${km.toFixed(1)} km`;
-  return `${Math.round(km)} km`;
-}
-
 function fmtArea(km2) {
   if (!isFinite(km2)) return '—';
   if (km2 < 10)   return `${km2.toFixed(2)} km²`;
@@ -6963,41 +7054,10 @@ function onPassRangeFilter(value) {
 
 // ── BIT FLIPPER tab ────────────────────────────────────────────────────────────
 
-const BF_TYPE_LABEL     = { battery: 'Battery', rainfall: 'Rainfall', water_level: 'Water Level', primary: 'Primary' };
 const BF_MAX_RENDER_ROWS = 2000;   // safety cap for very large N-bit expansions
 // Station of interest — the entered address. Ties the pinned table row (see
 // .bf-row-base in styles.css) to its highlighted pin on the map below.
 const BF_BASE_COLOR      = '#ff8c00';
-
-// Normalized sensor list for a station. Prefers the enriched `sensors` array
-// (from the national sensor database) and falls back to synthesizing minimal
-// records from legacy `alert_ids` when a station has not been enriched.
-function stationSensors(s) {
-  if (Array.isArray(s.sensors) && s.sensors.length) return s.sensors;
-  const out = [];
-  const a = s.alert_ids || {};
-  ['battery', 'rainfall', 'water_level', 'primary'].forEach(k => {
-    const v = a[k];
-    if (v == null) return;
-    (Array.isArray(v) ? v : [v]).forEach(id =>
-      out.push({ alert_id: id, type: BF_TYPE_LABEL[k] || k, sensor_id: '', device_id: null }));
-  });
-  return out;
-}
-
-// Build an ALERT-address → [{ station, sensor }] index across all stations.
-function buildSensorIndex() {
-  const idx = new Map();
-  state.data.stations.forEach(s => {
-    stationSensors(s).forEach(sensor => {
-      const id = sensor.alert_id;
-      if (id == null) return;
-      if (!idx.has(id)) idx.set(id, []);
-      idx.get(id).push({ station: s, sensor });
-    });
-  });
-  return idx;
-}
 
 // All combinations of `k` bit positions chosen from 0..width-1 (lexicographic).
 function bitCombos(width, k) {
@@ -7034,36 +7094,6 @@ function bfComputeVariants(idx) {
     variants.push({ bits: combo, value: v, binary: v.toString(2).padStart(16, '0'), matches: idx.get(v) || [] });
   }
   return variants;
-}
-
-function formatArroLocal(d) {
-  const p = x => String(x).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `
-       + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-
-// Build an ARRO graph URL for the given {station,sensor} pairs. Returns
-// { url, count } or null when no pair carries the site/device ids ARRO needs.
-function buildArroUrl(pairs) {
-  const base = (state.bfArroBase || ARRO_DEFAULT_BASE).trim();
-  const now = new Date(), start = new Date(now.getTime() - 7 * 86400e3);
-  const p = new URLSearchParams({
-    refresh: 'off', markers: 'false', legend: 'true', bin: '86400',
-    time_zone: 'Australia/Brisbane', invalid: 'true',
-    has_regular_sensors: 'true', has_forecast_sensors: 'false',
-    for_forecast: 'false', hidden_devices: 'none',
-    data_start: formatArroLocal(start), data_end: formatArroLocal(now),
-  });
-  const seen = new Set();
-  pairs.forEach(({ station, sensor }) => {
-    const dbId = station.site && station.site.db_id;
-    const dev  = sensor.device_id;
-    if (dbId == null || dev == null) return;
-    const key = `${dbId}|${dev}`;
-    if (!seen.has(key)) { seen.add(key); p.append('devices[]', key); }
-  });
-  if (!seen.size) return null;
-  return { url: base.replace(/\?+$/, '') + '?' + p.toString(), count: seen.size };
 }
 
 // Collapse duplicate matches so a sensor isn't repeated once per duplicate
@@ -14505,56 +14535,6 @@ function toggleFilter(key, value, checked) {
   else         set.delete(value);
 }
 
-// ── Utilities ──────────────────────────────────────────────────────────────────
-
-function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// Escape a value for use inside a single-quoted JS string embedded in a
-// double-quoted HTML attribute (e.g. onclick="fn('${escAttr(x)}')"). JS-escapes
-// backslash/quote first, then HTML-escapes so map filenames containing spaces,
-// commas or "&" survive both parsing layers intact.
-function escAttr(s) {
-  return String(s ?? '')
-    .replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function csvEscape(s) {
-  s = String(s ?? '');
-  return (s.includes(',') || s.includes('"') || s.includes('\n'))
-    ? `"${s.replace(/"/g,'""')}"` : s;
-}
-
-function netName(id) {
-  return (state.data?.radio_networks || []).find(n => n.id === id)?.name ?? id;
-}
-
-function pFloat(v) { const n = parseFloat(v); return isNaN(n) ? null : n; }
-function pInt(v)   { const n = parseInt(v, 10); return isNaN(n) ? null : n; }
-
-function parseRangeLines(text) {
-  return text.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
-    const m = l.match(/^(\d+)\s*[-–]\s*(\d+)$/);
-    return m ? { low: parseInt(m[1]), high: parseInt(m[2]) } : null;
-  }).filter(Boolean);
-}
-
-function slug(s) {
-  return (s || '').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0, 64);
-}
-
-function dlText(name, content) {
-  const a = Object.assign(document.createElement('a'), {
-    href:     URL.createObjectURL(new Blob([content], { type: 'text/csv' })),
-    download: name,
-  });
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 // ── Modal shell ────────────────────────────────────────────────────────────────
 // One dialog, borrowed by whoever needs one: a title, arbitrary HTML, Esc or ×
 // to close, Tab kept inside it, and focus handed back to whatever opened it.
@@ -14630,16 +14610,6 @@ if (typeof window !== 'undefined') window.Modal = Modal;
 // Environment tab is opened), so page load is unaffected while the layer is off.
 // Contains ACMA RRL data, CC BY 4.0.
 
-const ACMA_MECH = {
-  co_channel:     { label: 'Co-channel',          color: '#d32f2f' },
-  adjacent:       { label: 'Adjacent channel',    color: '#f57c00' },
-  imd3:           { label: 'Intermod IMD3',       color: '#7b1fa2' },
-  imd5:           { label: 'Intermod IMD5',       color: '#ce93d8' },
-  imd3_triple:    { label: 'Intermod 3-signal',   color: '#9575cd' },
-  harmonic:       { label: 'Harmonic',            color: '#0288d1' },
-  cosite_desense: { label: 'Co-site desense',     color: '#6d4c41' },
-};
-
 // ACMA VHF High Band Frequency Band Plan segments (148–174 MHz). MegaNet's
 // 151.5 MHz sits in Segment F "Miscellaneous Service".
 const VHF_SEGMENTS = [
@@ -14673,14 +14643,6 @@ const ACMA_LINK_CAP   = 300;
 
 function vhfSegment(mhz) {
   return VHF_SEGMENTS.find(s => mhz >= s.lo && mhz < s.hi) || null;
-}
-
-function acmaHaversineKm(lat1, lon1, lat2, lon2) {
-  const R = 6371.0088, rad = Math.PI / 180;
-  const dp = (lat2 - lat1) * rad, dl = (lon2 - lon1) * rad;
-  const a = Math.sin(dp / 2) ** 2 +
-            Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dl / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
 }
 
 // ── lazy loading ──
@@ -18064,11 +18026,6 @@ function wbExportComplaint() {
   out.push('- Site-visit observations (once completed)');
   dlText(`${wbCaseStamp()}-acma-draft.md`, out.join('\n'));
 }
-
-// Restore a shared investigation from the URL hash. Runs at script load (after
-// init's first render); station data arrives later via autoLoad → loadJson,
-// which re-renders the restored tab.
-if (typeof window !== 'undefined') wbRestoreFromUrl();
 
 // ── ALERT Packets tab ────────────────────────────────────────────────────────────
 // Decoder / encoder for ALERT / ERTS radio telemetry messages, per the Bureau of
@@ -22486,3 +22443,46 @@ const BugReport = (function () {
   return { open, close, submit, copy };
 })();
 if (typeof window !== 'undefined') window.BugReport = BugReport;
+// ── Init ───────────────────────────────────────────────────────────────────────
+
+(function init() {
+  document.documentElement.setAttribute('data-theme', state.theme);
+  setHeaderLabel('btn-theme', state.theme === 'dark' ? 'Light' : 'Dark');
+  setSplitWidth(state.splitW);          // also clamps whatever was stored
+  renderTabs();
+  renderHelp();
+  renderMain();
+  // The header's height and the shape of both rails depend on the width, so all
+  // three are re-checked when it changes — crossing the phone breakpoint with a
+  // drawer open would otherwise leave its backdrop behind.
+  window.addEventListener('resize', () => {
+    updateChromeHeight();
+    syncNavChrome(state.navCollapsed);
+    syncHelpChrome(state.helpCollapsed);
+  });
+  // Crossing the phone breakpoint changes what the two rails *are* — columns or
+  // drawers — and so what their toggles should say. Re-rendered on the crossing
+  // itself rather than on every resize event: both are rebuilt wholesale.
+  window.matchMedia('(max-width: 560px)').addEventListener('change', () => {
+    renderTabs();
+    renderHelp();
+  });
+  // On a phone both rails are drawers laid over the page, and a drawer that
+  // only closes by picking a tab is a trap — Escape backs out of either.
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !isPhoneNav()) return;
+    if (!state.navCollapsed)  setNavCollapsed(true);
+    if (!state.helpCollapsed) setHelpCollapsed(true);
+  });
+  MemMeter.start();
+  // Before autoLoad(), so that a tab returning from a magic link has taken the
+  // session out of the URL fragment before anything else reads location.
+  Auth.start();
+  autoLoad();
+})();
+
+// Restore a shared investigation from the URL hash. Runs at script load (after
+// init's first render); station data arrives later via autoLoad → loadJson,
+// which re-renders the restored tab.
+if (typeof window !== 'undefined') wbRestoreFromUrl();
+
