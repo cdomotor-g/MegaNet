@@ -158,6 +158,7 @@ MegaNet/
 │   ├── inspections.mjs      (the six sheets, against the migration's own seed data)
 │   ├── maintenance.mjs      (the Council sheet, against the workbook's filled example)
 │   ├── history.mjs          (a saved record read back, against the form that wrote it)
+│   ├── help.mjs             (every tab's help entry: real content, links that land)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
 │   ├── syntax-check.mjs     (node --check over every script index.html loads)
 │   └── package.json         (down here on purpose — the app itself still has no build step)
@@ -1673,10 +1674,45 @@ disambiguation copy in the station editor, the hints in the Stations filter pane
 `HELP` in `core.js` is the single description of its content, keyed by the same
 tab ids `TABS` uses, and the panel is rendered from it the way the nav is
 rendered from `TABS`. Each entry carries a summary, optional *watch out for*
-lines, optional links to `docs/`, and the ids of related tabs — which is how the
+lines, optional links out, and the ids of related tabs — which is how the
 panel says out loud that Bit Flipper, ALERT Packets, ALERT2 and the Serial
 Monitor are one investigation approached four ways, and lets you walk between
 them.
+
+**All nineteen tabs are written (#105)**, and what "written" means here is
+mostly the *watch out for* list rather than the summary. Those lines are the
+things a tab is silent about and a user otherwise finds out the hard way — that
+an orphaned station on Pass Ranges usually means a repeater nobody has recorded
+rather than a site nothing serves; that the Export tab ignores the Stations
+filters entirely and scopes off the ticked networks instead; that an ACMA score
+ranks without measuring, because line-of-sight is not assessed and every
+candidate carries the same factor for it; that Web Serial being blocked by
+policy looks like nothing happening rather than like a refusal.
+
+**Two of the nineteen carry a walkthrough**, both because the thing being
+explained is a shape rather than a sentence: *Draw & measure* on the Stations
+tab, and what a pass range actually is on Pass Ranges. They are inline SVG using
+the app's own custom properties, so they repaint with the theme and quote the
+map's real colours instead of inventing a second palette. Seventeen tabs have
+none, which is the intended result rather than an unfinished one — `npm run
+help` prints the count so it is a stated number rather than an inferred one.
+
+**Three sorts of link out**, and the third is the one worth naming. A `.md`
+link goes to GitHub's renderer, because markdown served off Pages downloads
+rather than renders; a bundled PDF or HTML page is served from the site itself;
+and a `call` entry opens something the app already has. That last one is how the
+panel offers *How the 357 filter works* — the explainer is a wide modal whose
+worked example is coloured by what `walk357()` actually returns, so the panel
+opens the real one rather than keeping a second, worse copy that drifts.
+
+Which of the app's existing embedded explanations moved in here and which stayed
+was decided per item, and the decisions are recorded above `HELP` in `core.js`:
+the 357 modal and `docs/serial-help.html` are linked rather than moved (one
+would drift, the other exists to be forwarded to an IT department and needs a
+URL of its own); the station editor's ARRO id labels stay where the typing
+happens and the rule is restated in the panel; and the filter pane's inline
+hints stay, because they are generated from the loaded file and cannot be lifted
+into a static string.
 
 It borrows the nav's interaction contract on purpose (§14): it collapses to a
 strip rather than to nothing, keeps its state in `localStorage` under `mn-help`
@@ -1703,11 +1739,11 @@ hold width together above that — where there is width to hold. `--mn-help`
 narrows from 300 px to 260 px below 1400 px all the same, so the map keeps a
 usable share of a laptop with everything open.
 
-What the panel *says* is deliberately a separate job from the shell it says it
-in — see issue #105, which finishes the per-tab content, adds visual
-walkthroughs where a picture beats a sentence, and decides case by case which of
-the existing embedded explanations should move into the panel rather than be
-linked from it.
+**The content has a check of its own**, `npm run help`, and it exists because
+every way this decays is silent. A doc link that 404s, a *see also* naming a tab
+that was renamed, a placeholder that shipped and a walkthrough with no `<title>`
+all render a perfectly good-looking panel — `npm run smoke` opens the tab and
+the tab is fine. See **Testing** below.
 
 ---
 
@@ -2024,7 +2060,7 @@ degrades honestly when they don't.
 cd test && npm install && npm run all
 ```
 
-Six checks, in ascending order of cost:
+Nine checks, in ascending order of cost:
 
 | | Catches |
 |---|---|
@@ -2033,6 +2069,7 @@ Six checks, in ascending order of cost:
 | `npm run toplevel` | a statement that executes at load in a file that should only declare — the property the load order in `index.html` rests on |
 | `npm run smoke` | the page loading and all 19 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
 | `npm run registry` | a Leaflet map or a tab teardown no file registered — and, at runtime, one that was registered and does not fire |
+| `npm run help` | a help entry that decayed: a doc link pointing at a file that is no longer there, a *see also* naming a tab that was renamed, a placeholder that shipped, a walkthrough with no `<title>` or with a width of its own. Every one of those renders a panel that looks right, which is why smoke cannot see any of them |
 | `npm run insp` | the Inspections form drawn against the schema's own seed data, on all six sheets. Smoke cannot see this one: it blocks the datastore, and this tab renders from it |
 | `npm run maint` | the Council Maintenance Tasks form drawn against the workbook's own filled sheet, read out of the `.xlsx` in `archive/`. Every cell where that sheet differs from the blank template has to be either on screen or named as having no column |
 | `npm run history` | a saved record reading back as the sheet it was written on. The fixture is not a file: the check fills a sheet in, saves it, and serves that document back — so the round trip is what is tested, and the read-only view is compared against the *editable* form's own section list |
@@ -2053,14 +2090,14 @@ then clicks its way through the RF Changes and Interference Workbench controls,
 keyed by the handler each one names rather than by its label. See
 `test/lib/controls.mjs`.
 
-CI runs all eight on any push touching a root `*.js`, `index.html`, `styles.css`,
+CI runs all nine on any push touching a root `*.js`, `index.html`, `styles.css`,
 `stations.json`, `db/migrations/`, `test/` or the inspection workbook in
 `archive/`. The filter is a glob rather than a list of filenames
 because the app's script list grew with every milestone of the split — a named
 list would have to be edited by every milestone, and the one that forgot would
 quietly stop being tested.
 
-There is a ninth, `npm run concat`, which is not in CI: it concatenates the
+There is a tenth, `npm run concat`, which is not in CI: it concatenates the
 scripts `index.html` loads and compares the bytes against a recorded snapshot.
 That is the check that proves an `app.js` split moved code without changing it,
 and the only one that catches the four literal NUL bytes the app carries inside

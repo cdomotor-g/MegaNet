@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the eight that run in CI
+npm run all                       # the nine that run in CI
 ```
 
 | Command | What it does |
@@ -27,17 +27,18 @@ npm run all                       # the eight that run in CI
 | `npm run toplevel` | `init.js` is still the only file that executes at load |
 | `npm run smoke` | loads the page in Chromium, opens all 19 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
+| `npm run help` | every tab's help entry is real content, every link out of the panel lands, and each walkthrough names itself and fits the rail |
 | `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
 | `npm run maint` | the Council Maintenance Tasks form renders what the workbook's own filled sheet says — with the fixture read out of the `.xlsx` |
 | `npm run history` | a saved record reads back as the sheet it was written on, and exports as it reads — with the records written by the app during the run |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the eight that run in CI |
+| `npm run all` | the nine that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
-`toplevel` and `registry` take `-v` too, to list what passed as well as what did
-not.
+`toplevel`, `registry` and `help` take `-v` too, to list what passed as well as
+what did not.
 
-CI runs `check`, `names`, `toplevel`, `smoke`, `registry`, `insp`, `maint` and `history` on every push that touches a root `*.js`,
+CI runs `check`, `names`, `toplevel`, `smoke`, `registry`, `help`, `insp`, `maint` and `history` on every push that touches a root `*.js`,
 `index.html`, `styles.css`, `stations.json`, `db/migrations/`, `test/` or the
 inspection workbook in `archive/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's
@@ -420,6 +421,50 @@ Confirmed red on three deliberate breaks before being trusted — naming the obj
 after the file, offering the uploader on an unsaved record, and skipping the size
 check.
 
+### `help.mjs` — the check for content, not for code
+
+Every other check in here is about whether the app *works*. This one is about
+whether what it says is still true, and it exists because #105 wrote nineteen
+help entries and every way they decay is silent.
+
+Smoke already asserts that each tab has a key in `HELP`. That is the check that
+stops the rail rendering blank, and it says nothing at all about what is behind
+the key. The three failures that actually arrive later all render a
+perfectly good-looking panel:
+
+- **A doc link that 404s.** Nine of these were added at #105, out to `docs/`,
+  `db/README.md` and two bundled specification PDFs. Rename one of those files
+  and the panel still draws the link, in the right place, with the right words
+  on it. This is the load-bearing assertion here, and it is a filesystem check
+  rather than a fetch — "is that file in the repo" is the same answer on
+  GitHub Pages, and it is the only answer available for the `.md` ones, which
+  `docUrl()` sends to GitHub's renderer and the network policy cannot reach.
+- **A *see also* naming a tab that no longer exists.** The renderer drops it in
+  silence: `TAB_LIST.find()` returns undefined and the map contributes an empty
+  string. Rename a tab id in `TABS` and it quietly loses every route into it.
+- **A placeholder that shipped.** #105's acceptance is real content on every
+  tab, and the only way that stays true of tab twenty is if something checks it.
+
+Two more about the walkthroughs, which are the one thing in the panel that the
+prose around them does not also carry: an inline SVG with no `<title>` is an
+empty box to a screen reader, and one carrying its own `width` is right in
+exactly one of the three widths the rail is ever at. Both are asserted against
+the **rendered** drawing rather than the source string, because what the panel
+does with it is the question.
+
+Two things it prints rather than asserts, on the no-silent-caps principle: how
+many tabs have a walkthrough (two of nineteen, which is the intended result and
+should be a stated number rather than an inferred one), and which *see also*
+links are one-way. The second is deliberately not a failure — the Stations tab
+is worth reaching from nearly everywhere and does not point back at everywhere —
+but a missing return route should at least be visible.
+
+Ten deliberate breaks were run before it was trusted and all ten went red on the
+assertion they should have. Two of those were the halves of `docUrl()` that
+#105 had to add: a fragment surviving (`db/README.md#…` did not match a plain
+`/\.md$/`, so the useful link was being served as a download) and the space
+encoding for the PDFs.
+
 ## Using `concat-verify.mjs` across a split
 
 The only claim that matters when a milestone cuts `app.js` is *the split lost
@@ -463,7 +508,10 @@ without looking, and a verifier nobody looks at verifies nothing.
 - **A tab was added or removed.** `smoke.mjs` asserts `TABS` holds 19 entries, so
   that a tab added without a `renderMain()` case fails here rather than in front
   of an operator. Give the new tab a `renderMain()` case and a `HELP` entry, then
-  bump `EXPECTED_TABS`.
+  bump `EXPECTED_TABS`. The `HELP` entry has to be *written*, not stubbed —
+  `npm run help` fails a summary under 140 characters and any of the usual
+  placeholder words, which is what stops "every tab is documented" quietly
+  becoming untrue at tab twenty.
 - **A script was added to `index.html`.** Nothing to do. Every check reads the
   script list out of `index.html`, so the split milestones are picked up
   automatically — M1 added `core.js` and `init.js`, M2 added ten module files, M3

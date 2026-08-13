@@ -2413,8 +2413,57 @@ hr {
   gap: .45rem;
 }
 
+/* The walkthrough, on the two tabs that have one (#105). The drawing scales to
+   whatever the rail is — 300 px, or 260 px below 1400 px, or the full width of
+   a phone drawer — so it is authored with a viewBox and no width, and the rule
+   below is what actually sizes it. A fixed width here would either overflow the
+   narrow case or waste the wide one. */
+.help-fig {
+  margin: .1rem 0 0;
+}
+
+.help-fig svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-sub);
+}
+
+/* Numbers, because the steps are an order — "click the centre, then the edge"
+   is the whole content of that instruction. */
+.help-steps {
+  margin: .55rem 0 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+
+.help-fig figcaption {
+  margin-top: .5rem;
+  color: var(--muted);
+  font-size: .81rem;
+  line-height: 1.45;
+}
+
 .help-body a {
   color: var(--accent);
+}
+
+/* A "Read more" entry that opens something already in the app rather than
+   leaving it. It is a button because it does something, and it looks like the
+   links beside it because to the reader it is the same offer. */
+.help-inline {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .help-link {

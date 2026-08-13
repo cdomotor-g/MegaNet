@@ -965,10 +965,24 @@ function invalidateMapSizes(delay) {
 // is a download rather than a page, so .md goes to GitHub's renderer while
 // anything already HTML is served from the site itself. Derived from the raw
 // URL the loader already carries, so the owner/repo is written once.
+// Two things #105 needed that the first version did not do, both because the
+// links it added are to real files rather than to tidy ones:
+//
+//  * A fragment has to survive. `db/README.md#station-inspections…` is the
+//    useful link — the file is 1,500 lines and the section is the answer — and
+//    a plain /\.md$/ test does not match it, so it was being served as a
+//    download instead of rendered.
+//  * The bundled specification PDFs have spaces in their filenames. A bare
+//    space in an href works by browser tolerance rather than by rule; encoding
+//    each segment (and not the slashes) makes it a URL.
 function docUrl(path) {
-  if (!/\.md$/i.test(path)) return path;
+  const hash  = path.indexOf('#');
+  const file  = hash < 0 ? path : path.slice(0, hash);
+  const frag  = hash < 0 ? ''   : path.slice(hash);
+  const enc   = file.split('/').map(encodeURIComponent).join('/');
+  if (!/\.md$/i.test(file)) return enc + frag;
   return GITHUB_RAW_URL.replace('https://raw.githubusercontent.com/', 'https://github.com/')
-                       .replace(/\/main\/.*$/, '/blob/main/') + path;
+                       .replace(/\/main\/.*$/, '/blob/main/') + enc + frag;
 }
 
 // The one piece of chrome that lives outside #help-panel and has to agree with
@@ -1051,10 +1065,31 @@ function renderHelp() {
       }).join('')}</ul>`
     : '';
 
+  // Two kinds of entry in one list, because to whoever is reading they are the
+  // same kind of thing — more explanation, over there. `href` leaves the app;
+  // `call` opens something the app already has, which is how #105's
+  // migrate-or-link decisions land on the "link" side without the panel having
+  // to re-type a modal that already works. See the note above HELP.
   const links = h && h.links && h.links.length
-    ? `<ul class="help-list help-bullets">${h.links.map(l =>
-        `<li><a href="${esc(docUrl(l.href))}" target="_blank" rel="noopener">${esc(l.label)}</a></li>`
+    ? `<ul class="help-list help-bullets">${h.links.map(l => l.call
+        ? `<li><button class="help-inline" onclick="${escAttr(l.call)}">${esc(l.label)}</button></li>`
+        : `<li><a href="${esc(docUrl(l.href))}" target="_blank" rel="noopener">${esc(l.label)}</a></li>`
       ).join('')}</ul>`
+    : '';
+
+  // The walkthrough, on the two tabs that have one. `svg` is authored markup
+  // like `summary` and `watch` and is not escaped for the same reason; `steps`
+  // is authored too. The <figure> carries the drawing and the numbered steps
+  // together because neither half is the walkthrough on its own — the drawing
+  // says what the result looks like, the steps say which clicks produce it.
+  const figure = h && h.figure
+    ? `<figure class="help-fig">
+         ${h.figure.svg || ''}
+         ${h.figure.steps && h.figure.steps.length
+            ? `<ol class="help-steps">${h.figure.steps.map(s => `<li>${s}</li>`).join('')}</ol>`
+            : ''}
+         ${h.figure.caption ? `<figcaption>${h.figure.caption}</figcaption>` : ''}
+       </figure>`
     : '';
 
   // A tab with no HELP entry says so rather than rendering an empty panel — the
@@ -1063,6 +1098,7 @@ function renderHelp() {
   const body = h
     ? `<p class="help-summary">${h.summary}</p>
        ${section('Watch out for', watch)}
+       ${section(h.figure && h.figure.title ? h.figure.title : 'Walkthrough', figure)}
        ${section('See also', related)}
        ${section('Read more', links)}`
     : `<p class="help-summary help-empty">Nothing written for this tab yet.</p>`;

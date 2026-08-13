@@ -33,6 +33,12 @@ on:
       # The Site Maintenance check reads its filled example out of the workbook
       # itself, so replacing the workbook has to re-run it (#117).
       - 'archive/Inspection sheets for printing.xlsx'
+      # The help check asserts that every link out of the panel points at a file
+      # that exists, so renaming one of those files has to re-run it — otherwise
+      # the one push that could break those links is the one push that does not
+      # check them (#105).
+      - 'docs/**'
+      - 'db/README.md'
       - '.github/workflows/web-smoke.yml'
   pull_request:
     paths:
@@ -47,6 +53,12 @@ on:
       # The Site Maintenance check reads its filled example out of the workbook
       # itself, so replacing the workbook has to re-run it (#117).
       - 'archive/Inspection sheets for printing.xlsx'
+      # The help check asserts that every link out of the panel points at a file
+      # that exists, so renaming one of those files has to re-run it — otherwise
+      # the one push that could break those links is the one push that does not
+      # check them (#105).
+      - 'docs/**'
+      - 'db/README.md'
       - '.github/workflows/web-smoke.yml'
   workflow_dispatch:
 
@@ -114,6 +126,16 @@ jobs:
       - name: Module registries — maps re-measure, teardowns run
         working-directory: test
         run: npm run registry
+
+      # Not a check about code at all: the help panel's *content*. Smoke asserts
+      # every tab has a HELP entry, which stops the rail rendering blank and
+      # says nothing about what is behind the key. A doc link pointing at a file
+      # that has since been renamed, a "see also" naming a tab that no longer
+      # exists, and a placeholder that shipped all render a panel that looks
+      # entirely right (#105).
+      - name: Help panel — every tab explains itself, every link lands
+        working-directory: test
+        run: npm run help
 
       # The other half smoke cannot see, for the opposite reason: the
       # Inspections tab renders *from* the datastore, and smoke's network policy

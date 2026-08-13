@@ -86,16 +86,61 @@ const TAB_LIST = TABS.flatMap(g => g.tabs);
 //   summary  a sentence or two: what this tab is for
 //   watch    the things found out the hard way otherwise
 //   related  other tab ids, for the "one investigation, four ways" groupings
-//   links    { label, href } out to docs/ — href through docUrl()
+//   links    "read more": { label, href } out to docs/, href through docUrl();
+//            or { label, call } to open something the app already has — see the
+//            migrate-or-link note below for why both belong in one list
+//   figure   { title, svg, steps[], caption } — a walkthrough, on the two tabs
+//            that earn one. See the note below.
 //
-// `summary` and `watch` are authored HTML, not user input: they are written
-// here and nowhere else, so they may carry <code>, <strong> and links, and the
-// renderer deliberately does not escape them. Anything read from stations.json
-// or typed by a user must not be interpolated into them.
+// `summary`, `watch`, `steps` and `svg` are authored HTML, not user input: they
+// are written here and nowhere else, so they may carry <code>, <strong> and
+// links, and the renderer deliberately does not escape them. Anything read from
+// stations.json or typed by a user must not be interpolated into them.
 //
-// Issue #105 owns finishing this — the "watch out for" lines beyond the three
-// the README already names as traps, the visual walkthroughs, and the decision
-// about which existing embedded help moves in here versus stays where it is.
+// ── Walkthroughs: two of nineteen, on purpose (#105) ─────────────────────────
+//
+// A drawing goes in where "click here, then type this" genuinely beats a
+// sentence, which is not most tabs. Two qualify, and both for the same reason:
+// the thing being explained is a *shape* rather than a sequence of words.
+//
+//  * Stations — Draw & measure. The README needs forty lines of prose for it,
+//    and the one fact that makes it click (a snapped line is named after the
+//    two stations and carries its own distance and bearing) is a picture.
+//  * Pass Ranges — the hop chain. An address window is an interval, "orphaned"
+//    means falling outside every one of them, and both are drawings.
+//
+// The SVGs are inline and use the app's own CSS custom properties, so they
+// repaint with the theme and quote the map's real colours — amber #ffc400 for a
+// filter match, magenta var(--draw) for the sketch layer — rather than
+// inventing a second palette for the help panel to be wrong in. Each carries a
+// <title> and role="img": it is the only content in the panel that prose does
+// not already carry, so a screen reader must not be handed an empty box.
+//
+// ── What stayed where it was, and why (#105's migrate-or-link decisions) ─────
+//
+// Four pieces of explanation were already embedded in the app before this panel
+// existed. The decision for each was made rather than defaulted:
+//
+//  * The 357 filter explainer (#80) — **linked, not moved.** It is a wide modal
+//    carrying two drawings, one of which is a worked example coloured by what
+//    walk357() actually returns for those readings. Re-typing that into a
+//    300 px rail would produce a second, worse copy that drifts from the code;
+//    the panel opens the real one instead (ArroData.explain()).
+//  * docs/serial-help.html — **linked, not moved.** Its whole job is to be
+//    forwarded to somebody's IT department, which needs a page with its own URL
+//    and no MegaNet chrome around it. Text inside the help rail cannot be sent
+//    to anyone.
+//  * The ARRO id disambiguation in the station editor — **stays, and is
+//    restated here.** The editor labels the two boxes at the moment somebody is
+//    typing into one of them, which is where that warning works; the rule
+//    itself ("db_id is ARRO's, number is BoM's") is short enough to also live
+//    in the panel, and does, on both the Stations and ARRO Launcher tabs.
+//  * The Stations filter pane's inline hints — **stay.** They are generated
+//    per block from the loaded file (counts, the "not recorded yet" bucket's
+//    size) so they cannot be lifted into a static string. What moved here is
+//    the part that is *not* data-dependent and that the pane never says out
+//    loud: that the box highlights rather than hides, and that a "not recorded
+//    yet" bucket is ticked by default.
 const HELP = {
   stations: {
     summary: 'The station list and the map, side by side. The <strong>Filters</strong> pane on the '
@@ -116,35 +161,198 @@ const HELP = {
       + 'repeaters whose pass ranges cover a matched station are pulled in even though they don\'t '
       + 'match the filter text. That is why the station count can exceed the number of rows your '
       + 'search would explain.',
+      'The search box <strong>highlights rather than hides</strong>. Every station stays on the '
+      + 'map; matches take an amber ring, get their names drawn, and the map zooms to fit them — '
+      + 'so a pin still on screen has not necessarily matched anything. <em>Hide stations that '
+      + 'don\'t match</em>, under <strong>Map display</strong>, is the subtractive behaviour if '
+      + 'that is what you want. Names are capped at 60 either way, and the pane says when the cap '
+      + 'is in effect.',
+      'Every tick-box block ends with a <strong>Not recorded yet</strong> bucket, and it is ticked '
+      + 'like everything else — which is why the opening view is the whole network. Most stations '
+      + 'have no radio network recorded and two thirds have no catchment, so unticking one of '
+      + 'those buckets removes most of the file rather than a fringe. Each block header says '
+      + '<em>All</em>, <em>None</em> or <em>3 of 15</em>, so a collapsed block can never be '
+      + 'quietly filtering the list.',
+      'Saving a station edit needs a <strong>signed-in session</strong>, and is refused outright '
+      + 'while the header says the list came from <code>stations.json</code> rather than the '
+      + 'datastore — writing then would put a stale screen over whatever the database has since '
+      + 'been told. Two people editing one station is <strong>refused, not merged</strong>: you '
+      + 'are asked to reload rather than quietly overwriting somebody\'s afternoon, and a failed '
+      + 'save never clears what you typed.',
+      'The editor\'s two ARRO numbers are <strong>not the same number</strong>. <code>ARRO site '
+      + 'id</code> is ARRO\'s own database key and the only one its URLs accept; <code>station '
+      + 'number</code> is BoM\'s. The boxes sit side by side and are labelled, because handing '
+      + 'ARRO the station number fails by opening somebody else\'s station rather than by '
+      + 'erroring.',
     ],
-    related: ['passranges', 'maps'],
+    figure: {
+      title: 'Draw & measure',
+      svg: `
+      <svg viewBox="0 0 300 176" role="img" aria-labelledby="fig-draw-t fig-draw-d">
+        <title id="fig-draw-t">Drawing a measured path between two stations</title>
+        <desc id="fig-draw-d">A line snapped between a field station and a repeater, carrying its
+          own length and bearing, with a circle drawn beside it to an exact radius.</desc>
+        <circle cx="68" cy="48" r="25" fill="none" stroke="var(--draw)" stroke-width="1.6"
+                stroke-dasharray="4 3"/>
+        <line x1="68" y1="48" x2="93" y2="48" stroke="var(--draw)" stroke-width="1.4"/>
+        <circle cx="68" cy="48" r="1.8" fill="var(--draw)"/>
+        <text x="72" y="43" font-size="8.5" text-anchor="middle" fill="var(--draw)">25 km</text>
+        <line x1="58" y1="126" x2="228" y2="64" stroke="var(--draw)" stroke-width="2.2"
+              stroke-linecap="round"/>
+        <g transform="rotate(-20 143 95)">
+          <text x="143" y="71" font-size="9" text-anchor="middle" fill="var(--draw)"
+                font-weight="600">Mt Stuart &#8594; Durikai</text>
+          <text x="143" y="83" font-size="9" text-anchor="middle" fill="var(--draw)">42.1 km @ 073&#176;</text>
+        </g>
+        <circle cx="58" cy="126" r="11" fill="none" stroke="#ffc400" stroke-width="1.6"
+                stroke-dasharray="3 3"/>
+        <circle cx="58" cy="126" r="5.5" fill="var(--role-field)" stroke="#fff" stroke-width="1.6"/>
+        <text x="58" y="150" font-size="9" text-anchor="middle" fill="var(--muted)">field station</text>
+        <circle cx="228" cy="64" r="7.5" fill="var(--role-repeater)" stroke="#fff" stroke-width="1.6"/>
+        <text x="228" y="44" font-size="9" text-anchor="middle" fill="var(--muted)">repeater</text>
+      </svg>`,
+      steps: [
+        'Open <strong>Draw &amp; measure</strong> under the map and pick <em>Line</em>. The cursor '
+        + 'becomes a crosshair and clicks pass through the pins to the map underneath.',
+        'Click near one station, then near the other, and double-click (or <em>Finish</em>) to end '
+        + 'the line. Within about 15 px of a pin the click <strong>snaps</strong> to that '
+        + 'station\'s exact coordinates — the ring in the drawing is what says the next click will.',
+        'The line now carries its own length and bearing, and is named after the two stations '
+        + 'rather than after two lat/lon pairs.',
+        'Type over its numbers in the list to make it exact — a radius of <code>25</code> km, or a '
+        + 'bearing and a distance instead of a second coordinate. Typing releases the shape from '
+        + 'whatever it was snapped to.',
+      ],
+      caption: 'A two-point line also feeds the elevation profile and the link budget under the '
+             + 'map. Esc cancels the shape in progress; Esc again puts the tool away. Nothing here '
+             + 'is saved — reloading clears it, and there is no export beyond a screen clipping.',
+    },
+    links: [{ label: 'Who may edit, and what to do when nobody can get in', href: 'docs/access.md' }],
+    related: ['passranges', 'maps', 'inspections'],
   },
 
   maps: {
     summary: 'Browses the bundled Radio-path PDF maps by region, and suggests the relevant map for '
            + 'a given station. The Queensland basin drawing is clickable — pick a basin, or a '
-           + 'region chip, to filter the list down to it.',
-    related: ['stations'],
+           + 'region chip, to filter the list down to it. Type a station name, ALERT address or '
+           + 'site number instead and it lists the stations that match with the maps they are '
+           + 'likely to be on.',
+    watch: [
+      'A suggested map is a <strong>suggestion</strong>. Only a station carrying a recorded radio '
+      + 'network gets an authoritative answer; for everything else the station\'s coordinates are '
+      + 'projected onto the basin drawing, and that projection is a least-squares fit averaging '
+      + 'about <strong>34 km</strong> of error. Near a basin boundary it will name the wrong '
+      + 'catchment, which is exactly why the result is not written back into the station file as '
+      + 'data.',
+      'The maps are <strong>PDFs shipped with the app</strong>, not a live layer — they are as '
+      + 'current as the day they were drawn, and nothing on the Stations map feeds them. This tab '
+      + 'works with no station file loaded at all; only the search half needs one.',
+    ],
+    related: ['stations', 'networks'],
   },
 
   networks: {
     summary: 'The named radio-network clusters in the loaded file — usually named after their '
            + 'primary repeater or ingest point — with the repeater and field-station counts behind '
            + 'each one. Ticking networks here is what scopes the Export tab.',
-    related: ['export'],
+    watch: [
+      'Network membership is <strong>recorded, not derived</strong>, and most of the file has none: '
+      + 'a station is on a network because somebody put it there. So these counts describe what '
+      + 'has been mapped so far rather than the whole network, and a station missing from every '
+      + 'row is unrecorded rather than unconnected.',
+      'The catchment list below is the 76-basin Queensland vocabulary, and it is <strong>not '
+      + 'yet assigned per station</strong> — the Stations tab derives a station\'s region from its '
+      + 'coordinates at runtime instead. It is here because the filters and the schema are ready '
+      + 'for it, not because the data is.',
+    ],
+    related: ['export', 'stations'],
   },
 
   passranges: {
     summary: 'Which repeaters have a pass range covering a station\'s AlertIDs, and the hop chain '
            + 'that follows: field → repeater(s) → base. Stations no repeater covers are flagged as '
-           + 'orphans, and AlertIDs that fall between every window are flagged as gaps.',
-    related: ['stations', 'bitflipper'],
+           + 'orphans, and AlertIDs that fall between every window are flagged as gaps. One filter '
+           + 'box drives both tables, and takes a name, a station number, an address or a pasted '
+           + 'list of them.',
+    watch: [
+      '<strong>Orphaned usually means unrecorded, not unserved.</strong> A station is orphaned '
+      + 'here when no repeater\'s <em>recorded</em> pass ranges cover any of its addresses — and '
+      + 'only 88 stations in the file carry a pass-range block at all. A site plainly reporting '
+      + 'every day can still be listed here; what that is evidence of is a repeater whose windows '
+      + 'nobody has written down.',
+      'A station is only treated as a repeater when it <strong>carries pass ranges</strong>. An '
+      + 'entry tagged <code>repeater</code> with no pass-range block is a field station that was '
+      + 'mis-tagged on import, and it is left out of the matching rather than matching nothing.',
+      'On an address search the <strong>one range that picked the station up is marked</strong>, '
+      + 'which is the question this tab is usually open for. Matched stations are pulled to the '
+      + 'front of the "first 10" in each row, so the mark is visible on a repeater kept because of '
+      + 'a station eighty names down the list.',
+    ],
+    figure: {
+      title: 'What a pass range is',
+      svg: `
+      <svg viewBox="0 0 300 150" role="img" aria-labelledby="fig-pr-t fig-pr-d">
+        <title id="fig-pr-t">A hop chain, and the address windows behind it</title>
+        <desc id="fig-pr-d">A field station hops through a repeater to a base station; below, two
+          address windows on a number line, with one address falling outside both and so
+          orphaned.</desc>
+        <line x1="52" y1="30" x2="128" y2="30" stroke="var(--map-line)" stroke-width="2"/>
+        <line x1="172" y1="30" x2="248" y2="30" stroke="var(--map-line)" stroke-width="2"/>
+        <circle cx="38" cy="30" r="6" fill="var(--role-field)" stroke="#fff" stroke-width="1.5"/>
+        <circle cx="150" cy="30" r="8" fill="var(--role-repeater)" stroke="#fff" stroke-width="1.5"/>
+        <circle cx="262" cy="30" r="7" fill="var(--role-base)" stroke="#fff" stroke-width="1.5"/>
+        <text x="38" y="50" font-size="8.5" text-anchor="middle" fill="var(--muted)">field</text>
+        <text x="150" y="50" font-size="8.5" text-anchor="middle" fill="var(--muted)">repeater</text>
+        <text x="262" y="50" font-size="8.5" text-anchor="middle" fill="var(--muted)">base</text>
+        <text x="150" y="72" font-size="9" text-anchor="middle" fill="var(--text)">forwards these address windows:</text>
+        <line x1="20" y1="104" x2="280" y2="104" stroke="var(--border)" stroke-width="1.5"/>
+        <rect x="34" y="96" width="64" height="16" rx="3" fill="var(--role-repeater)" opacity=".22"
+              stroke="var(--role-repeater)" stroke-width="1.2"/>
+        <text x="66" y="128" font-size="8.5" text-anchor="middle" fill="var(--muted)">1001–1199</text>
+        <rect x="126" y="96" width="58" height="16" rx="3" fill="var(--role-repeater)" opacity=".22"
+              stroke="var(--role-repeater)" stroke-width="1.2"/>
+        <text x="155" y="128" font-size="8.5" text-anchor="middle" fill="var(--muted)">2400–2499</text>
+        <line x1="238" y1="92" x2="238" y2="116" stroke="var(--bad)" stroke-width="2"/>
+        <text x="238" y="128" font-size="8.5" text-anchor="middle" fill="var(--bad)">6128</text>
+        <text x="238" y="88" font-size="8.5" text-anchor="middle" fill="var(--bad)">orphaned</text>
+      </svg>`,
+      steps: [
+        'A repeater forwards an address only if that address falls <strong>inside one of its '
+        + 'windows</strong>, and outside every one of its exclusions. Nothing else decides it — '
+        + 'not distance, not which network the station is on.',
+        'So the hop chain is arithmetic over intervals: put an address in the filter box and the '
+        + 'row that comes back is every repeater whose windows contain it, with the covering '
+        + 'window marked.',
+        'An address covered by no window anywhere is <strong>orphaned</strong> — the red mark. '
+        + 'That is the tab\'s headline count, and the caveat above is what it usually means.',
+      ],
+      caption: 'Windows are inclusive at both ends and a repeater may carry any number of them. '
+             + 'Two distant sites sharing one window is normal and is why the Stations map caps '
+             + 'how long a drawn link may be.',
+    },
+    related: ['stations', 'bitflipper', 'export'],
   },
 
   rf: {
     summary: 'Licensed transmitters near each repeater that could be stepping on it, read out of '
-           + 'the ACMA register. Pick a repeater and the candidates are ranked against it.',
-    related: ['rfchanges', 'workbench'],
+           + 'the ACMA register. Pick a repeater and the candidates are ranked against it, with a '
+           + 'frequency strip plot of every licensed carrier around its RX channel and a helper '
+           + 'for testing whether your corruption timestamps cluster in business hours.',
+    watch: [
+      '<strong>The register only knows what is licensed.</strong> An unlicensed transmitter, a '
+      + 'faulty one splattering outside its allocation, a spurious emission and an amateur '
+      + 'operator are all invisible here, and any of them can be the actual cause. An empty '
+      + 'candidate list is not a clean site.',
+      'A score <strong>ranks, it does not measure</strong>. Line-of-sight is not yet assessed, so '
+      + 'every candidate carries the same 0.7 factor for it — a transmitter with a mountain in the '
+      + 'way scores exactly like one you can see. Open the card to read the components rather than '
+      + 'trusting the total.',
+      'Only repeaters with a <strong>recorded RX frequency</strong> can be anchored on, which is '
+      + '88 of them. A repeater absent from the picker has not been cleared; it has no frequency '
+      + 'on file, and backfilling <code>rx_mhz</code> is the highest-value data task this layer '
+      + 'has.',
+    ],
+    related: ['rfchanges', 'workbench', 'stations'],
   },
 
   rfchanges: {
@@ -154,14 +362,41 @@ const HELP = {
       'Register dates are <strong>administrative</strong>. An authorisation date is an upper bound '
       + 'on when a transmitter could have come on air, not the day it did — licences are often '
       + 'authorised well before anything is switched on.',
+      'A single extract can never show a <strong>removal</strong> or a prior value, so the timeline '
+      + 'answers "what appeared" and only the snapshot diffs answer "what changed". The diffs start '
+      + 'at the second archived month — nothing before the first one is observable, and a month '
+      + 'nobody captured can never be recovered, because ACMA publishes today\'s register rather '
+      + 'than a back catalogue.',
+      'A new carrier is often <strong>not the one on your frequency</strong>. Adding one device to '
+      + 'a mast forms a new third-order product with every carrier already on it, and the tool '
+      + 'reports which of those products are new — the offender can be nowhere near 151.5 MHz.',
     ],
     related: ['rf', 'workbench'],
   },
 
   workbench: {
     summary: 'Works one interference case end to end. Name the affected stations and the analysis, '
-           + 'the candidate transmitters and a suggested next check are assembled around them.',
-    related: ['rf', 'rfchanges'],
+           + 'the candidate transmitters and a suggested next check are assembled around them. Five '
+           + 'competing explanations are scored in parallel and the losing ones stay on screen, '
+           + 'because which hypothesis is <em>second</em> is most of what decides the next site '
+           + 'visit.',
+    watch: [
+      'It never says <strong>cause</strong>, and that is a rule rather than a hedge — it says '
+      + '"most consistent with", shows the arithmetic behind every score, and names the one '
+      + 'observation most likely to change the answer. A confound it can see, it states: your '
+      + 'affected stations usually share both a repeater and a patch of ground.',
+      'The <strong>misattribution check runs first</strong>, before anything else is presented. '
+      + 'Two "affected" stations whose ALERT addresses are one bit apart may be one real victim '
+      + 'and one ghost of the same corrupted packets — which would change the selection the whole '
+      + 'case is built on. Flagged pairs link straight into the Bit Flipper.',
+      'The repeater hypothesis is only as good as the <strong>pass-range data</strong>, and much '
+      + 'of it is missing. The Workbench reports per case how many of your affected stations have '
+      + 'no routing at all rather than quietly scoring them as unexplained.',
+      'A saved case lives in <strong>this browser</strong>, and sharing one means sharing a URL '
+      + 'with the whole investigation encoded in it — the station sets, the onset date and the '
+      + 'symptom all travel in the link.',
+    ],
+    related: ['rf', 'rfchanges', 'bitflipper'],
   },
 
   bitflipper: {
@@ -171,6 +406,13 @@ const HELP = {
       'Flipping more bits is combinatorial — <code>C(16, N)</code> variants. Past two or three bits '
       + 'the useful view is <em>show only matched addresses</em>; the render cap is there to stop '
       + 'the table, not to tell you the search finished.',
+      'An ALERT address is <strong>only unique within a region</strong>: 614 of the file\'s 5,122 '
+      + 'addresses belong to more than one station. So a variant that matches is a candidate, and '
+      + 'a variant matching two stations 1,200 km apart is the normal case rather than a data '
+      + 'error.',
+      'The <strong>ARRO base URL</strong> box on this tab is not local to it — its host drives '
+      + 'every ARRO link in the app, including the launcher\'s and the ones in map popups. A base '
+      + 'that will not parse falls back to the default rather than producing a broken link.',
     ],
     related: ['network', 'packets', 'passranges'],
   },
@@ -178,15 +420,48 @@ const HELP = {
   network: {
     summary: 'The Bit Flipper\'s question asked of the whole file at once: ALERT addresses are '
            + 'nodes, a ghosting relationship between two of them is an edge, and the answer is '
-           + 'drawn as a force layout with a geographical map beside it.',
-    related: ['bitflipper', 'stations'],
+           + 'drawn as a force layout with a geographical map beside it. What can be filtered and '
+           + 'coloured by is generated from the data, so a new sensor type or network appears here '
+           + 'without anybody adding a checkbox.',
+    watch: [
+      '<strong>Two kinds of edge in one graph, deliberately.</strong> A plain line is arithmetic — '
+      + 'these two addresses are one bit apart, which is symmetric and true of ~23,700 pairs. An '
+      + 'arrow is an observation with an evidence file behind it. The only question worth asking '
+      + 'is which of the arithmetic pairs was ever actually seen ghosting, and separating them '
+      + 'into two views would have hidden it.',
+      'A node that resolves to no station in the loaded file is <strong>drawn grey and dashed, not '
+      + 'dropped</strong> — a confirmed relationship pointing at an address the station file has '
+      + 'never heard of is a finding. Where several stations claim one address and the evidence '
+      + 'names none of them, that end is left unresolved rather than attributed to whichever came '
+      + 'first.',
+      'The graph draws the <strong>first 400 matching nodes</strong> and says how many matched. '
+      + 'The cap is drawing cost, not arithmetic — filter down rather than reading the picture as '
+      + 'the whole answer.',
+    ],
+    related: ['bitflipper', 'stations', 'workbench'],
   },
 
   packets: {
     summary: 'Decodes and encodes ALERT / ERTS messages against the Bureau\'s <em>ERTS Data '
            + 'Formats</em> specification. Paste a 40-bit framed message, a 32-bit payload or eight '
            + 'hex digits and it is tried against every known format, with check bits and CRC '
-           + 'validated and framing polarity detected.',
+           + 'validated and framing polarity detected. A colour-coded bit map shows which bits '
+           + 'belong to which field.',
+    watch: [
+      'Several formats can decode the same bits — the one highlighted is the <strong>best '
+      + 'match</strong>, being the one whose check bits and CRC all pass, not the only reading. '
+      + 'The others stay on screen for that reason.',
+      '<strong>A2C is decode-only, and its integrity claim is thin.</strong> It is offered for '
+      + '32-bit input alone: the four-byte form an address and value take inside an ALERT2 '
+      + 'concentration payload, with no framing and no CRC — just a status byte that reads zero on '
+      + 'every valid record seen. Whole serial lines of it belong on the ALERT2 tab.',
+      'A decoded address is matched against the <strong>loaded MegaNet file first</strong> (shown '
+      + 'with a badge) and only then against the bundled 2021 national address list. An address is '
+      + 'unique within a region and not nationally, so a name here is a candidate rather than an '
+      + 'identification.',
+    ],
+    links: [{ label: 'ERTS Data Formats — the specification this decodes against',
+              href: 'docs/BOM spec erts_data_formats_doc.pdf' }],
     related: ['bitflipper', 'alert2', 'serial'],
   },
 
@@ -201,6 +476,19 @@ const HELP = {
       + 'everywhere, since no station carries a recorded bucket size yet. The rule beside each '
       + 'converted value says which of the two it used; a millimetre figure headed for a report '
       + 'should be read with that.',
+      '<strong>The two ports do not carry the same information</strong>, so which one a capture '
+      + 'came off decides what you can ask of it. The USB binary framing is the only one carrying '
+      + '<strong>RSSI</strong>; the RS232 ASCII line is the only one carrying the receiver\'s own '
+      + 'clock. The tab sniffs which it was handed rather than asking, and says what is missing '
+      + 'instead of inventing it.',
+      'Addresses matching exactly one station are what <strong>fix where a capture is</strong>, '
+      + 'and an ambiguous address is then resolved to whichever candidate is near them. Two '
+      + 'stations 6 km apart carrying the same addresses cannot be told apart by anything in the '
+      + 'frame, so those are reported as ambiguous rather than guessed.',
+      'On an ASCII capture the summary reports the gap between the receiver\'s clock and the '
+      + 'network\'s frame time — a <strong>clock skew</strong> of hours is an AM/PM error on the '
+      + 'unit rather than a decode fault. A binary capture has no receiver clock in it to compare, '
+      + 'and says so.',
     ],
     related: ['serial', 'packets'],
   },
@@ -213,6 +501,14 @@ const HELP = {
       + 'HTTPS or localhost. A managed browser can also have it switched off by policy, in which '
       + 'case nothing on this tab will work until IT changes that — the linked page is written to '
       + 'be forwarded to them.',
+      'A <strong>policy block looks nothing like a refusal</strong>: the port chooser is rejected '
+      + 'instantly, without ever appearing. The tab reads that instant rejection as policy rather '
+      + 'than as somebody cancelling the dialog, and says so — if you never saw a dialog, the '
+      + 'machine said no, not you.',
+      '<strong>Capture keeps running while you are on another tab.</strong> The connections live '
+      + 'outside the page\'s render cycle, and the log is repainted from a capped scrollback when '
+      + 'you come back — so a long unattended capture loses its oldest lines rather than its '
+      + 'newest. <em>Save log</em> before <em>Clear</em>, and before the buffer laps.',
     ],
     links: [{ label: 'Serial Monitor — what to ask IT for', href: 'docs/serial-help.html' }],
     related: ['alert2', 'packets'],
@@ -226,8 +522,15 @@ const HELP = {
       + 'database index; <code>site.number</code> is the BoM station number. Handing ARRO the '
       + 'station number is the most common mistake here, and it fails by opening somebody else\'s '
       + 'station rather than by erroring.',
+      '<strong>390 of 3,174 stations have no ARRO site id on file</strong>, and those degrade '
+      + 'explicitly rather than silently: the search lists them with <em>none recorded</em> in the '
+      + 'site-id column, map popups omit the link instead of rendering a dead one, and the editor '
+      + 'says where the id would have come from. Nothing here invents one.',
+      'The box also takes a <strong>pasted ARRO URL of any shape</strong> — an admin page, a '
+      + '<code>devices[]=site|device</code> graph link, or a bare <code>3318|2</code> pair — and '
+      + 'shows which ids it read out of it before you commit to opening anything.',
     ],
-    related: ['arrodata', 'stations'],
+    related: ['arrodata', 'stations', 'bitflipper'],
   },
 
   arrodata: {
@@ -239,6 +542,25 @@ const HELP = {
       'This tab is <strong>ARRO\'s</strong> numbers. Readings our own field stations sent us live '
       + 'next door on <strong>Field Data</strong>, and the two are never combined — different '
       + 'source of truth, different retention, different trust.',
+      'The <strong>3/5/7 thresholds are in counts, not millimetres</strong>. A rain accumulator '
+      + 'transmits tips; what a tip is worth is the gauge\'s bucket size, which is a separate fact '
+      + 'the filter never sees. Setting a threshold as though it were millimetres is the quiet way '
+      + 'to throw away a real record.',
+      '<strong>Only two of the five filters are the specification\'s.</strong> The 3-5-7 test and '
+      + 'rollover correction come from it; rate-of-rise, minimum/maximum and the repeat-collapsing '
+      + 'minimum gap are this app\'s, run before the continuity walk, and each has its own switch '
+      + 'so you can read the difference straight off the counts.',
+      'Raw is <strong>never overwritten</strong> — filtering only produces a parallel verdict '
+      + 'against each reading, every rejection can be clicked for the row and the reason, and the '
+      + '<em>verdict</em> export is the artifact to keep when the question is what was thrown away.',
+      'A file that will not link to a station still <strong>parses and plots</strong>. The link is '
+      + 'read out of ARRO\'s own filename, so a renamed export falls back to the station number '
+      + 'and then to saying plainly that it is not linked.',
+    ],
+    links: [
+      { label: 'How the 357 filter works — the test, drawn', call: 'ArroData.explain()' },
+      { label: 'Hydrology Raw Data Filtering — the specification (v2.1, 2009)',
+        href: 'docs/Hydrology Raw Data Filtering Program Specification.pdf' },
     ],
     related: ['arro', 'field', 'stations'],
   },
@@ -262,6 +584,21 @@ const HELP = {
       + 'conversion the datastore recorded is shown beside the count, never instead of it.',
       'A window with nothing in it says so rather than drawing an empty axis — silence and a run '
       + 'of zeroes are different claims.',
+      '<strong>Raw readings age out; the rollups do not.</strong> Ninety days back is as far as '
+      + 'individual readings go before the hourly and daily rollups are all that is left of them — '
+      + 'which is why a wide window is drawn from rollups and why the header says so. Nothing is '
+      + 'lost silently, but "Raw" over last winter will come back empty.',
+      'The same reading arrives more than once — one transmission heard direct and via two '
+      + 'repeaters is three copies — and the store <strong>counts the duplicates rather than '
+      + 'discarding them</strong>. That count is the only place this network\'s real path '
+      + 'redundancy is visible.',
+    ],
+    links: [
+      { label: 'How the 357 filter works — the test, drawn', call: 'ArroData.explain()' },
+      { label: 'Posting readings over HTTP — for whoever configures the logger',
+        href: 'docs/ingest-http.md' },
+      { label: 'Posting readings over MQTT, and knowing which stations went quiet',
+        href: 'docs/ingest-mqtt.md' },
     ],
     related: ['arrodata', 'stations', 'alert2'],
   },
@@ -293,6 +630,8 @@ const HELP = {
       + 'the photos themselves. They go into a private bucket and are shown through a link that '
       + 'expires, so a site photograph never becomes a public URL.',
     ],
+    links: [{ label: 'The inspection schema, and why the form matrix earns its keep',
+              href: 'db/README.md#station-inspections-and-maintenance-activities' }],
     related: ['stations', 'maintenance', 'history', 'export'],
   },
 
@@ -320,6 +659,7 @@ const HELP = {
       + 'to be a saved row for it to belong to. Files go into a <strong>private</strong> bucket and '
       + 'are only ever shown through a link that expires; nothing attached here is on the open web.',
     ],
+    links: [{ label: 'Who may read and write these records', href: 'docs/access.md' }],
     related: ['inspections', 'history', 'stations'],
   },
 
@@ -354,8 +694,28 @@ const HELP = {
   export: {
     summary: 'Builds the full set of CSV files Radio Mobile needs, scoped to the networks ticked in '
            + 'the sidebar. The station file itself can also be exported here as the escape hatch '
-           + 'from the database.',
-    related: ['networks'],
+           + 'from the database, and the <strong>Data source</strong> panel says which of the '
+           + 'three sources the list on screen actually came from.',
+    watch: [
+      '<strong>The Stations tab\'s filters have no say here.</strong> What gets exported is the '
+      + 'repeaters on the ticked networks plus every station their pass ranges cover — so a '
+      + 'station you filtered to a minute ago may not be in the file, and a station you have never '
+      + 'looked at may be. The unit count above the button is the set that will be written; check '
+      + 'it rather than the map.',
+      'That also means a station on <strong>no recorded network</strong> cannot be exported by '
+      + 'ticking every box, because nothing pulls it in. Ticking all of them is a little under '
+      + 'half the file, not the file.',
+      'The <strong>Data source</strong> panel is the first place a schema mismatch shows up: if it '
+      + 'says the list came from <code>stations.json</code> rather than the datastore, the app '
+      + 'fell back, edits elsewhere are refused, and the retry button is there rather than a '
+      + 'reload.',
+      '<strong>Snapshot</strong> writes today\'s document out as a file to take somewhere without '
+      + 'a network. It is a copy, not a branch — nothing reads it back in automatically, and '
+      + 'editing it changes nothing in the database.',
+    ],
+    links: [{ label: 'Why the station list lives in Postgres, and what that bought',
+              href: 'docs/datastore-decision.md' }],
+    related: ['networks', 'stations', 'passranges'],
   },
 };
 
