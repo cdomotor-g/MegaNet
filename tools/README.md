@@ -5,6 +5,13 @@ itself, most of these need Python (the ACMA tools are stdlib-only; the agent als
 needs a network connection and the `anthropic` package). `check_ingest.sql` and
 `check_mqtt.sql` need nothing but `psql`.
 
+`check_inspections.sql` is the same idea for the station-inspection schema
+(#115): 71 checks over the lookup tables, the form matrix, the applicability
+guard and the two write paths `db/migrations/0009_inspections.sql` adds, in a
+transaction that rolls back. Ten of them compare a lookup table against the
+`Dropdown` sheet of `archive/Inspection sheets for printing.xlsx` verbatim, so a
+re-invented option list fails rather than merely looking odd.
+
 `check_mqtt.sql` is the companion to `check_ingest.sql` for the MQTT bridge
 (#B6): 39 checks over `meganet.station_status`, `meganet.bridge_health` and the
 token-checked endpoints the bridge calls, in a transaction that rolls back. The
@@ -154,6 +161,29 @@ moves, so it is safe against the live database. It has to be run as a role
 
 Run it after applying `db/migrations/0006_telemetry.sql`, and again after touching
 anything in it.
+
+## `check_inspections.sql` — prove the inspection schema
+
+Also a psql script, same shape and same guarantees.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
+```
+
+71 checks, one per line of #115's acceptance. Three groups are worth knowing
+about. Ten compare a lookup table's labels, in order, against the `Dropdown`
+sheet's columns A–L — the acceptance asks for the transcribed values rather than
+a re-invented set, and this is what makes that a test instead of an intention.
+Eleven check the section matrix against what the six inspection sheets actually
+print, including the four places the sheets disagree with a prose summary of the
+same workbook. The rest exercise the applicability guard in both directions, the
+two rules the sheets print in words and the schema computes, a whole-visit round
+trip through `meganet.save_inspection()`, the `PT409` refusals, and the grants —
+checking both that the vocabularies *are* reachable by `anon` and that no record
+table is.
+
+Run it after applying `db/migrations/0009_inspections.sql`, and again after
+touching anything in it.
 
 ## `meganet_agent.py` — ask questions about the network with the Claude API
 

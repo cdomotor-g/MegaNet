@@ -162,12 +162,29 @@ its cache at all (`PGRST002`).
 | `meganet.bridge_health` | One row per running MQTT bridge. Exists so "no readings since Tuesday" can be told apart from "the relay died on Tuesday". |
 | `meganet.ingest_token_id()` | The `X-Ingest-Token` check `0007` does inline, factored out for `0008`'s endpoints. Raises PT401. Not granted to `anon` — directly reachable it would be a guessing oracle. |
 | `meganet.mqtt_status(jsonb)`, `meganet.mqtt_seen(text, timestamptz)`, `meganet.bridge_heartbeat(jsonb)` | What the bridge reports that is not a reading: a station's status or LWT, when its reading last arrived, and the bridge's own pulse. Token-checked, like `ingest_http()`. |
+| `meganet.rain_instrument_type`, `meganet.condition_rating`, `meganet.asset_owner`, `meganet.wl_instrument_type`, `meganet.comms_method`, `meganet.comms_equipment`, `meganet.power_supply`, `meganet.yes_no`, `meganet.data_quality_rating`, `meganet.council` | The ten pick-lists on the inspection workbook's `Dropdown` sheet, labels transcribed verbatim. What #116's and #117's form dropdowns read from. |
+| `meganet.equipment_kind`, `meganet.attachment_role`, `meganet.calibration_kind` | Three more vocabularies the forms need that the `Dropdown` sheet does not carry — read off the Serial Numbers panels, the photo checklists and the calibration grids instead. |
+| `meganet.inspection_config`, `meganet.inspection_section`, `meganet.inspection_config_section` | The form, as data: six configurations, fourteen sections, and which configuration prints which. **A section absent from the matrix is a section that form does not have** — a different fact from a section table with no row. |
+| `meganet.inspection` | One station visit. The details panel and the remarks; every banner-headed block hangs off it. |
+| `meganet.inspection_serial`, `meganet.inspection_data`, `meganet.inspection_data_value`, `meganet.inspection_power`, `meganet.inspection_rain_gauge`, `meganet.inspection_water_level`, `meganet.inspection_gas`, `meganet.inspection_radio`, `meganet.inspection_fade_margin`, `meganet.inspection_calibration`, `meganet.inspection_data_quality`, `meganet.inspection_admin` | The sections. Each carries a trigger refusing a row whose configuration's form does not print that section. |
+| `meganet.maintenance_activity`, `meganet.maintenance_asset`, `meganet.maintenance_data_quality` | The Council Site Maintenance Tasks form. `inspection_id` is the printed cross-reference at the foot of every inspection sheet, as a foreign key. |
+| `meganet.attachment` | Photos and pasted screenshots, for an inspection or a maintenance activity — exactly one of the two. The bytes are in Supabase Storage; this is the index. |
+| `meganet.inspection_form` | View: one row per section a configuration prints, in that configuration's order. What a form renderer asks. |
+| `meganet.inspection_needs_maintenance` | View: visits that departed Missing or Poor, and whether a maintenance activity was ever raised against them. |
+| `meganet.inspection_doc(uuid)`, `meganet.maintenance_activity_doc(uuid)` | One record and everything under it, as one JSON document. |
+| `meganet.save_inspection(jsonb, timestamptz)`, `meganet.save_maintenance_activity(jsonb, timestamptz)` | The write paths. One call is one transaction; children are replaced, not merged; a stale write is refused with `PT409`. |
+| `meganet.delete_inspection(uuid, timestamptz)`, `meganet.delete_maintenance_activity(uuid, timestamptz)` | Soft delete, as for stations. |
+| `meganet.form_write(text, jsonb)` | Internal: inserts one section row from a JSON object, over a closed table list, skipping generated columns. Granted to nothing a browser can reach. |
 
-Everything is readable by `anon` **except `meganet.reading_raw`**, which holds
-whatever a device or an adapter actually sent, unread — a debugging artefact
-rather than a publication, and the day an adapter puts a header or a device key
-in its payload is the day the difference matters. Editors and `service_role` can
-read it.
+Everything is readable by `anon` **except `meganet.reading_raw` and the whole
+inspection domain**. `reading_raw` holds whatever a device or an adapter actually
+sent, unread — a debugging artefact rather than a publication, and the day an
+adapter puts a header or a device key in its payload is the day the difference
+matters. The inspection tables are withheld for a different reason: the Council
+form carries landowner names, emails and phone numbers, and inspection remarks
+carry site access notes. Editors and `service_role` can read both. The inspection
+domain's *vocabularies* — the pick-lists and the form matrix — are public, because
+they are the words printed on a blank form and say nothing about a site.
 
 Nothing is *writable* by `anon` or by `authenticated`: no table grants either of
 them a write verb, and the only ways in are the functions above — see **Writing**
@@ -588,6 +605,105 @@ psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_mqtt.sql
 transaction that rolls back. The half that cannot — reconnects, acknowledgement,
 no message lost — is `bridge/test/integration.test.js`, which runs a real broker
 against the real client with a database that fails on demand.
+
+## Station inspections and maintenance activities
+
+Added by `0009_inspections.sql`. The paper forms in
+`archive/Inspection sheets for printing.xlsx` — six station-inspection sheets and
+one Council Site Maintenance Tasks sheet — as tables. Epic #78 builds the form
+that writes them going forward; epic #122 backfills ~35 years of the same sheets
+out of a second workbook. Both write through here.
+
+**There is one form, not six.** `Alert`, `Campbell DataLogger`, `Mace`,
+`Gas Only`, `Base Station` and `DataLogger - old` are one family with sections
+added, removed or reworded per station configuration — the workbook's own `Index`
+sheet says form identity follows the station's telemetry type. So there is one
+`meganet.inspection` and one set of section tables.
+
+**"Does not apply" is a row, not a null.** This is the decision the rest hangs
+off. `meganet.inspection_config_section` records which sections each
+configuration's form actually prints, so a missing row in a section table means
+*not recorded* and a missing row in the matrix means *not on this form*. A trigger
+on every section table refuses the second case:
+
+```sql
+insert into meganet.inspection_gas (inspection_id, existing_cylinder_pressure_kpa)
+values ('…a base-station inspection…', 12000);
+-- ERROR: the base_station form has no gas section, so this inspection cannot carry one
+```
+
+The matrix was read off the six sheets cell by cell, and four entries came out
+differently from a prose summary of the same workbook: `Mace` and
+`DataLogger - old` print no Data Quality block and no photo checklist,
+`DataLogger - old` has no radio section, and `Gas Only` has five sections in
+total. Where the two disagree, the sheets win.
+
+**Sixty-one column layouts collapse into one calibration table.** Every sheet
+prints its calibration blocks differently, but all of them are the same seven
+columns — expected, start, end, result, difference, error, passed.
+`meganet.inspection_calibration` is that shape, keyed by `kind`, and
+`meganet.calibration_kind` maps each kind to the section it prints under. That
+mapping is also how the applicability guard works for a table whose section is a
+property of its row rather than of the table.
+
+**Two printed rules are computed rather than read.** "Calibration adjustment
+should only be performed if the mean % error after 3 checks is greater than 6%"
+is `meganet.inspection_rain_gauge.adjustment_indicated`, a generated column over a
+per-visit threshold — per visit, because a threshold that changes must not
+silently rewrite what past visits were judged against. The SWR legend beside the
+antenna box ("<1.5 = Good  1.5 - 2.0 = Fair  >2.0 = Poor") is
+`meganet.inspection_radio.swr_rating`.
+
+**The cross-reference at the foot of every sheet is a foreign key.** Every
+inspection form ends with *"sites on departure that are poor or have issues please
+complete Flood Warning Council Maintenance Project form"*.
+`meganet.maintenance_activity.inspection_id` is that sentence, and the view is the
+list of times it was printed and not followed:
+
+```sql
+select station_name, inspected_on, parameter, on_departure_label
+  from meganet.inspection_needs_maintenance
+ where not has_maintenance_activity
+ order by inspected_on desc;
+```
+
+**Two ways in, and they are functions** — same reasoning as `save_station()`. A
+visit is a parent plus up to eleven children, and one whose gas section saved and
+whose calibration rows did not is worse than one that did not save at all. No
+table grants a write verb to a role a browser can reach. Children are *replaced*
+rather than merged, because the form holds the whole record on screen and a merge
+makes "I deleted that row" unsayable. The stale-write contract is 0004's exactly:
+
+```sql
+select meganet.save_inspection(
+         '{"station_id":"…","config_key":"alert","inspected_on":"2026-08-13"}'::jsonb);
+-- returns the saved document, which is what meganet.inspection_doc() returns
+```
+
+`meganet.form_write()` is worth one look before you trust it: it builds an INSERT
+with dynamic SQL so that adding a column to a section table does not mean editing
+a save function. Its table list is closed, every identifier goes through
+`quote_ident`, and it is granted to nothing — the save functions reach it as
+`security definer`.
+
+**Nothing here is readable with the anon key.** The anon key is committed to this
+repo and served from GitHub Pages, so "readable by anon" means "published", and
+this domain holds landowner contact details and site access notes. Editors only —
+which is who fills the forms in. The vocabularies and the form matrix *are*
+public: they are the words on a blank form.
+
+### Proving it
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
+```
+
+71 checks, in a transaction that rolls back, so it is safe against the live
+database. Ten of them compare a lookup table against the `Dropdown` sheet's
+columns verbatim; eleven check the section matrix against what the six sheets
+actually print; the rest exercise the guard, the two computed rules, a whole-visit
+round trip, the PT409 refusals, and the grants — both halves, since a schema that
+refuses the wrong things is as broken as one that permits them.
 
 ## Checking it from outside
 

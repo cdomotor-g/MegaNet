@@ -158,6 +158,7 @@ MegaNet/
 ├── tools/                  ← command-line helpers (needs Python; see tools/README.md)
 │   ├── check_ingest.sql     (psql: prove the telemetry contract — 48 checks, rolls back)
 │   ├── check_mqtt.sql       (psql: prove the MQTT bridge's database half — 39 checks)
+│   ├── check_inspections.sql (psql: prove the inspection schema — 71 checks, rolls back)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
 │   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
@@ -440,6 +441,59 @@ that way, per-station credentials and ACLs, and how to prove the whole path from
 a laptop. [`bridge/README.md`](bridge/README.md) is for whoever runs the process;
 `db/migrations/0008_mqtt_bridge.sql` and `tools/check_mqtt.sql` are the database
 side.
+
+---
+
+## Station inspections
+
+Field crews carry paper forms: six station-inspection sheets, one per station
+configuration, and a Council Site Maintenance Tasks sheet for the stewardship and
+liaison side. They are in
+[`archive/Inspection sheets for printing.xlsx`](archive/), and since
+`db/migrations/0009_inspections.sql` they are also tables.
+
+The forms are not six unrelated layouts. They are one family — a core of sections
+with blocks added, removed or reworded per configuration — and the workbook's own
+index sheet says so: form identity follows the station's telemetry type. So the
+schema is one `meganet.inspection` and one set of section tables, plus a matrix
+saying which sections each configuration's form actually prints:
+
+```sql
+select section_label, variant_note
+  from meganet.inspection_form
+ where config_key = 'gas_only' order by ord;
+```
+
+That matrix is the part that earns its keep. Without it, "this station has no gas
+bubbler" and "nobody filled the gas section in" are the same null. With it, the
+first is a missing row in `meganet.inspection_config_section` and the second is a
+missing row in `meganet.inspection_gas` — and a trigger refuses to record a
+section on a form that does not have one.
+
+Two rules the sheets print in words are computed rather than left to whoever
+reads the numbers later: the "adjust only if the mean % error after 3 checks is
+greater than 6%" note beside the rain-gauge tip test, and the SWR legend beside
+the antenna box. And the sentence at the foot of every inspection sheet —
+*"sites on departure that are poor or have issues please complete Flood Warning
+Council Maintenance Project form"* — is a foreign key, with a view listing the
+times it was printed and nobody followed it:
+
+```sql
+select station_name, inspected_on, parameter, on_departure_label
+  from meganet.inspection_needs_maintenance
+ where not has_maintenance_activity order by inspected_on desc;
+```
+
+Unlike the station list and the readings, **none of this is readable with the
+published anon key**: the council form carries landowner contact details and
+inspection remarks carry site access notes. The pick-lists and the form matrix
+are public — they are the words on a blank form.
+
+The schema is the whole of #115; the form that writes it is #116 and #117, the
+history view is #118, and the ~35-year backfill out of the second workbook is
+epic #122. [`db/README.md`](db/README.md#station-inspections-and-maintenance-activities)
+has the design decisions and the write path; `tools/check_inspections.sql` proves
+it in 71 checks.
 
 ---
 

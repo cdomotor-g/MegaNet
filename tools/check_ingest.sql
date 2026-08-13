@@ -67,8 +67,12 @@ on conflict (key) do update set value = excluded.value;
 
 do $$
 begin
-  perform pg_temp.check_that('schema_version is 6',
-    (select value = '6' from meganet.app_meta where key = 'schema_version'));
+  -- At least 6, not exactly 6: this file checks the telemetry contract, and a
+  -- database that has also applied 0007, 0008 or 0009 still has it. Asserting
+  -- equality here meant this check failed on every current database from the
+  -- moment 0007 landed.
+  perform pg_temp.check_that('schema_version is at least 6',
+    (select value::integer >= 6 from meganet.app_meta where key = 'schema_version'));
 
   perform pg_temp.check_that('all four tables exist',
     (select count(*) = 4 from pg_catalog.pg_class c
