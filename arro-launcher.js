@@ -6,11 +6,14 @@
 //   list behind them  index and nobody carries 2,784 of them in their head.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, escAttr, arroHost, arroSiteId,
-// arroSiteUrl, arroSensorUrl and stationSensors, and across to app.js for
-// prepareSearch and stationMatchesSearch.
+// Reaches back to core.js for state, esc, escAttr, announce, arroHost,
+// arroSiteId, arroSiteUrl, arroSensorUrl and stationSensors, and across to
+// app.js for prepareSearch and stationMatchesSearch.
 //
 // Moved out of app.js byte-for-byte by M3 (#134) of #129.
+// Restyled against the design system by U6 (#141) of EPIC #107 — the markup
+// here uses .page, the table pattern and the tokens; the classes it names live
+// in the "ARRO Launcher tab (#141)" section of styles.css.
 
 // ── ARRO LAUNCHER tab ──────────────────────────────────────────────────────────
 // A jump box for ARRO's administration pages. The standalone launcher this
@@ -90,28 +93,31 @@ function arroSearchResults() {
 function renderArroHtml() {
   const a = state.arro;
   return `
-    <div style="max-width:1000px;margin:auto;padding:1rem;display:grid;gap:1rem">
+    <div class="page" style="--page-max:1000px">
       <div class="panel">
         <div class="panel-header"><h2>ARRO Launcher</h2></div>
-        <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+        <p class="small arro-lede">
           Opens ARRO's <strong>administration</strong> pages. Find the station by name, number or
           ALERT address and the site id is filled in for you — or paste an ARRO URL and the ids are
           read out of it. Everything opens in a new tab.
         </p>
-        <p class="small" style="color:var(--muted);margin:.35rem 0 0">
+        <p class="small arro-lede">
           Host: <code>${esc(arroHost())}</code> — set by the ARRO base URL on the Bit Flipper tab.
         </p>
       </div>
 
       <div class="panel">
-        <div class="panel-header"><h3>Find a station</h3></div>
+        <div class="panel-header"><h3 id="arro-find-h">Find a station</h3></div>
         ${state.data ? `
-          <input type="search" id="arro-search" value="${esc(a.search)}"
+          <input type="search" id="arro-search" class="arro-search" value="${esc(a.search)}"
+                 aria-labelledby="arro-find-h" aria-describedby="arro-find-hint"
                  placeholder="Station name, station number or ALERT address — e.g. Loudoun, 541155, 6128"
-                 style="margin-top:.6rem" oninput="onArroSearch(this.value)">
-          <div id="arro-results" style="margin-top:.6rem">${arroResultsHtml()}</div>
+                 oninput="onArroSearch(this.value)">
+          <p id="arro-find-hint" class="small arro-hint">
+            Matches the station's name, its number, or any ALERT address it reports on.</p>
+          <div id="arro-results" class="arro-results">${arroResultsHtml()}</div>
         ` : `
-          <p class="small" style="color:var(--muted);margin:.6rem 0 0">
+          <p class="small arro-lede">
             No <strong>stations.json</strong> loaded, so there is nothing to search. The raw id box
             below still works — load a file to look site ids up by name instead.
           </p>`}
@@ -119,35 +125,36 @@ function renderArroHtml() {
 
       <div class="panel">
         <div class="panel-header"><h3>Open by id</h3></div>
-        <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-top:.6rem">
-          <label style="font-size:.9rem;color:var(--muted);flex:0 0 12rem">
-            ARRO site id
+        <div class="arro-ids">
+          <label class="arro-id-field">
+            <span>ARRO site id</span>
             <input type="text" id="arro-site" value="${esc(a.siteId)}" placeholder="e.g. 3318"
-                   style="margin-top:.3rem" oninput="onArroIdInput('siteId',this.value)"
+                   oninput="onArroIdInput('siteId',this.value)"
                    onkeydown="onArroKey(event)">
           </label>
-          <label style="font-size:.9rem;color:var(--muted);flex:0 0 12rem">
-            Device id <span style="font-weight:400">(optional)</span>
+          <label class="arro-id-field">
+            <span>Device id <span class="arro-optional">(optional)</span></span>
             <input type="text" id="arro-device" value="${esc(a.deviceId)}" placeholder="e.g. 2"
-                   style="margin-top:.3rem" oninput="onArroIdInput('deviceId',this.value)"
+                   oninput="onArroIdInput('deviceId',this.value)"
                    onkeydown="onArroKey(event)">
           </label>
-          <label style="font-size:.9rem;color:var(--muted);flex:1 1 18rem;min-width:14rem">
-            …or paste an ARRO URL
+          <label class="arro-id-field arro-id-field--wide">
+            <span>…or paste an ARRO URL</span>
             <input type="text" id="arro-paste" placeholder="https://…/administration/site/details/?site_id=3318"
-                   style="margin-top:.3rem" oninput="onArroPaste(this.value)"
+                   oninput="onArroPaste(this.value)"
                    onkeydown="onArroKey(event)">
           </label>
         </div>
-        <div id="arro-actions" style="margin-top:.75rem">${arroActionsHtml()}</div>
+        <div id="arro-actions" class="arro-actions">${arroActionsHtml()}</div>
       </div>
 
       <div class="panel">
         <div class="panel-header">
-          <h3>Recent</h3>
-          <button onclick="arroClearRecents()" style="padding:.25rem .5rem;font-size:.8rem">Clear</button>
+          <h3 id="arro-recent-h">Recent</h3>
+          <button class="arro-btn-sm" onclick="arroClearRecents()"
+                  aria-label="Clear the list of recently opened ARRO pages">Clear</button>
         </div>
-        <div id="arro-recents" style="margin-top:.6rem">${arroRecentsHtml()}</div>
+        <div id="arro-recents" class="arro-recents">${arroRecentsHtml()}</div>
       </div>
     </div>`;
 }
@@ -161,19 +168,28 @@ function arroActionsHtml() {
   const devUrl  = /^\d+$/.test(device) ? arroSensorUrl(site, device) : null;
 
   if (!siteUrl) {
-    return `<p class="small" style="color:var(--muted);margin:0">
+    return `<p class="small arro-flush">
       Enter a numeric site id — or pick a station above — to open its ARRO pages.
       ${a.note ? `<br>${esc(a.note)}` : ''}</p>`;
   }
+  const where = a.note ? ` for ${a.note}` : ` for site ${site}`;
   return `
-    <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
+    <div class="arro-action-row">
       <a class="btn-link" href="${esc(siteUrl)}" target="_blank" rel="noopener"
+         aria-label="Open ARRO site admin${escAttr(where)} in a new tab"
          onclick="arroRemember()">Open site admin ↗</a>
       ${devUrl
         ? `<a class="btn-link" href="${esc(devUrl)}" target="_blank" rel="noopener"
+             aria-label="Open ARRO sensor admin${escAttr(where)}, device ${escAttr(device)}, in a new tab"
              onclick="arroRemember()">Open sensor admin ↗</a>`
-        : `<span class="btn-link disabled" title="Add a device id to open a sensor page">Open sensor admin ↗</span>`}
-      <span class="small" style="color:var(--muted)">
+        // A disabled <button> rather than the <span> this was: a span is not in
+        // the accessibility tree as a control at all, so the reason the second
+        // action is unavailable was visible and nothing else. A disabled button
+        // is announced as one, with its own name.
+        : `<button type="button" class="btn-link disabled" disabled
+                   aria-label="Open sensor admin — add a device id above first"
+                   title="Add a device id to open a sensor page">Open sensor admin ↗</button>`}
+      <span class="small">
         site <code>${esc(site)}</code>${device ? ` · device <code>${esc(device)}</code>` : ''}
         ${a.note ? ` · ${esc(a.note)}` : ''}
         · press <kbd>Enter</kbd> in any box above
@@ -185,22 +201,31 @@ function arroResultsHtml() {
   if (!state.data) return '';
   const text = state.arro.search.trim();
   if (!text) {
-    return `<p class="small" style="color:var(--muted);margin:0">
+    return `<p class="small arro-flush">
       Type to search ${state.data.stations.length.toLocaleString()} stations.</p>`;
   }
   const hits = arroSearchResults();
   if (!hits.length) {
-    return `<p class="small" style="color:var(--muted);margin:0">No station matches that.</p>`;
+    return `<p class="small arro-flush">No station matches that.</p>`;
   }
   const more  = hits.length > ARRO_RESULT_MAX;
   const shown = more ? hits.slice(0, ARRO_RESULT_MAX) : hits;
+  // Pattern 7a — the wrapper caps its height, so it scrolls, so it is a named
+  // region with a tab stop. Named off the panel's own heading rather than a
+  // second form of words.
   return `
-    <div class="table-wrap" style="max-height:320px">
+    <div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="arro-find-h">
       <table>
+        <caption class="sr-only">Stations matching “${esc(text)}” — ${shown.length} shown</caption>
+        <colgroup>
+          <col style="width:40%"><col style="width:13%">
+          <col style="width:16%"><col style="width:11%"><col style="width:20%">
+        </colgroup>
         <thead><tr>
-          <th style="width:40%">Station</th><th style="width:13%">Stn #</th>
-          <th style="width:16%">ARRO site id</th><th style="width:11%">Sensors</th>
-          <th style="width:20%"></th>
+          <th scope="col">Station</th><th scope="col">Stn #</th>
+          <th scope="col">ARRO site id</th>
+          <th scope="col" class="col-optional">Sensors</th>
+          <th scope="col"><span class="sr-only">Actions</span></th>
         </tr></thead>
         <tbody>
           ${shown.map(s => {
@@ -212,51 +237,63 @@ function arroResultsHtml() {
                 <td>${esc(s.name)}</td>
                 <td class="small">${esc(s.station_number || '—')}</td>
                 <td class="small">${dbId == null
-                  ? `<span style="color:var(--muted)">none recorded</span>`
+                  ? `<span class="arro-none">none recorded</span>`
                   : `<code>${esc(dbId)}</code>`}</td>
-                <td class="small">${devs || '—'}</td>
-                <td class="small" style="white-space:nowrap">${dbId == null ? '' : `
-                  <button onclick="arroPickStation('${escAttr(s.id)}')"
-                          style="padding:.2rem .5rem;font-size:.8rem">Use</button>
+                <td class="small col-optional">${devs || '—'}</td>
+                <td class="small arro-row-acts">${dbId == null ? '' : `
+                  <button class="arro-btn-sm" onclick="arroPickStation('${escAttr(s.id)}')"
+                          aria-label="Use ${escAttr(s.name)} — fill site id ${escAttr(dbId)} in below">Use</button>
                   <a href="${esc(url)}" target="_blank" rel="noopener"
+                     aria-label="Open ARRO site admin for ${escAttr(s.name)} in a new tab"
                      onclick="arroRememberStation('${escAttr(s.id)}')">admin ↗</a>`}</td>
               </tr>`;
           }).join('')}
         </tbody>
       </table>
     </div>
-    ${more ? `<p class="small" style="color:var(--muted);margin:.4rem 0 0">
+    ${more ? `<p class="small arro-hint">
       Showing the first ${ARRO_RESULT_MAX} — narrow the search to see the rest.</p>` : ''}`;
 }
 
 function arroRecentsHtml() {
   const list = arroRecents();
   if (!list.length) {
-    return `<p class="small" style="color:var(--muted);margin:0">
+    return `<p class="small arro-flush">
       Nothing yet. Pages you open from here are listed for next time.</p>`;
   }
+  // A list of pages is a list: <ul> gives a screen reader the count on entry,
+  // which a stack of divs never did.
   return `
-    <div style="display:grid;gap:.3rem">
+    <ul class="arro-recent-list" aria-labelledby="arro-recent-h">
       ${list.map(r => {
-        const url = r.device ? arroSensorUrl(r.site, r.device) : arroSiteUrl(r.site);
+        const url  = r.device ? arroSensorUrl(r.site, r.device) : arroSiteUrl(r.site);
+        const what = r.device ? 'sensor admin' : 'site admin';
+        const name = r.label || `Site ${r.site}`;
         return `
-          <div style="display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap">
-            <a href="${esc(url)}" target="_blank" rel="noopener" style="font-weight:600">
-              ${esc(r.label || `Site ${r.site}`)}</a>
-            <span class="small" style="color:var(--muted)">
+          <li>
+            <a href="${esc(url)}" target="_blank" rel="noopener" class="arro-recent-name"
+               aria-label="Open ARRO ${escAttr(what)} for ${escAttr(name)} in a new tab">
+              ${esc(name)}</a>
+            <span class="small">
               site <code>${esc(r.site)}</code>${r.device ? ` · device <code>${esc(r.device)}</code>` : ''}
-              · ${esc(r.device ? 'sensor admin' : 'site admin')}</span>
-            <button onclick="arroUseRecent('${escAttr(r.site)}','${escAttr(r.device || '')}')"
-                    style="padding:.1rem .45rem;font-size:.78rem">Use</button>
-          </div>`;
+              · ${esc(what)}</span>
+            <button class="arro-btn-sm" onclick="arroUseRecent('${escAttr(r.site)}','${escAttr(r.device || '')}')"
+                    aria-label="Use ${escAttr(name)} — fill these ids in above">Use</button>
+          </li>`;
       }).join('')}
-    </div>`;
+    </ul>`;
 }
 
-function initArro() {
-  const el = document.getElementById(state.data ? 'arro-search' : 'arro-site');
-  if (el) el.focus();
-}
+// This used to focus the search box on arrival. It no longer does, and the
+// reason is the app's rather than this tab's: #109's focus policy puts focus on
+// the nav button that just became `aria-current="page"` after a tab switch, and
+// a tab that grabs it back leaves a keyboard user somewhere the nav did not put
+// them — with no way to tell that the tab even changed. The search box is the
+// first control inside the tab, so it is one Tab away from where focus is, and
+// the skip link reaches it in two from anywhere. Nothing else needed doing on
+// mount, so this is what is left; app.js still calls it, and a future entrance
+// hook has somewhere to live.
+function initArro() { /* no focus steal — see above */ }
 
 function rerenderArroResults() {
   const el = document.getElementById('arro-results');
@@ -289,15 +326,18 @@ function onArroIdInput(field, v) {
 function onArroPaste(v) {
   if (!v.trim()) return;
   const { site, device } = arroParseIds(v);
-  if (!site && !device) { state.arro.note = 'No site id found in that.'; rerenderArroActions(); return; }
+  if (!site && !device) {
+    state.arro.note = 'No site id found in that.';
+    rerenderArroActions();
+    announce('No site id found in that.');
+    return;
+  }
   if (site)   state.arro.siteId   = site;
   if (device) state.arro.deviceId = device;
   state.arro.note = 'read from the pasted URL';
-  const siteEl = document.getElementById('arro-site');
-  const devEl  = document.getElementById('arro-device');
-  if (siteEl) siteEl.value = state.arro.siteId;
-  if (devEl)  devEl.value  = state.arro.deviceId;
-  rerenderArroActions();
+  arroFillIds(`Read site ${state.arro.siteId}`
+    + (state.arro.deviceId ? `, device ${state.arro.deviceId}` : '')
+    + ' out of the pasted URL.', false);
 }
 
 // Enter opens the most specific page the boxes describe — the sensor if a device
@@ -341,12 +381,27 @@ function arroPickStation(id) {
   state.arro.siteId   = String(dbId);
   state.arro.deviceId = '';
   state.arro.note     = s.name;
+  arroFillIds(`${s.name} — ARRO site ${dbId}. The open buttons are ready.`);
+  document.getElementById('arro-actions')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+// Both "Use" buttons — in the results table and in the recents list — write the
+// ids into the boxes forty rows above or below the button that was pressed.
+// Sighted, the scroll says so; on a keyboard it was a button that appeared to do
+// nothing. Focus follows the value into the field it landed in, and the result
+// is announced, because the field's own name does not say which station it now
+// holds.
+// `moveFocus` is false for the paste box, where the operator is still typing:
+// pulling focus out from under a paste is the one case where following the
+// value is wrong.
+function arroFillIds(message, moveFocus = true) {
   const siteEl = document.getElementById('arro-site');
   const devEl  = document.getElementById('arro-device');
   if (siteEl) siteEl.value = state.arro.siteId;
-  if (devEl)  devEl.value  = '';
+  if (devEl)  devEl.value  = state.arro.deviceId;
   rerenderArroActions();
-  document.getElementById('arro-actions')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (moveFocus) siteEl?.focus();
+  if (message) announce(message);
 }
 
 function arroRememberStation(id) {
@@ -361,10 +416,8 @@ function arroUseRecent(site, device) {
   state.arro.siteId   = String(site || '');
   state.arro.deviceId = String(device || '');
   state.arro.note     = arroLabelForSite(site);
-  const siteEl = document.getElementById('arro-site');
-  const devEl  = document.getElementById('arro-device');
-  if (siteEl) siteEl.value = state.arro.siteId;
-  if (devEl)  devEl.value  = state.arro.deviceId;
-  rerenderArroActions();
+  arroFillIds(`Site ${state.arro.siteId}`
+    + (state.arro.deviceId ? `, device ${state.arro.deviceId}` : '')
+    + `${state.arro.note ? ` — ${state.arro.note}` : ''}. The open buttons are ready.`);
 }
 

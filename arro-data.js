@@ -34,9 +34,40 @@
 // Reference: "Hydrology Raw Data Filtering Program Specification" v2.1,
 // Commonwealth Bureau of Meteorology, May 2009 (and the 1998 first edition).
 
+// The twelve series colours. These used to be twelve hex literals here, which
+// is why the top of styles.css carried a warning that a palette change did not
+// reach this chart: the SVG needs a real colour value (a `var(…)` resolves to
+// nothing once the picture has been pulled out of the page and handed to a
+// canvas), and the only way anyone had found to give it one was to type it.
+//
+// They are tokens now — --ad-series-1…12, with a dark set — resolved off the
+// document at the moment a series is adopted and again on every repaint(). The
+// SVG still carries hex, so the PNG export is unchanged; what changed is where
+// the hex comes from. Before this the chart drew the light-theme palette on a
+// dark page, because toggleTheme() had no way to reach an array in a script.
+//
+// AD_COLORS survives as the fallback, and it is the light set exactly: a
+// `getComputedStyle` miss (a stylesheet that has not landed, a test harness
+// rendering without one) should degrade to the colours this chart has always
+// had rather than to black.
+const AD_SERIES_TOKENS = ['--ad-series-1',  '--ad-series-2',  '--ad-series-3',  '--ad-series-4',
+                          '--ad-series-5',  '--ad-series-6',  '--ad-series-7',  '--ad-series-8',
+                          '--ad-series-9',  '--ad-series-10', '--ad-series-11', '--ad-series-12'];
+
 const AD_COLORS = ['#0b5cab', '#c7401a', '#107c10', '#7c35a3',
                    '#b8860b', '#00838f', '#ad1457', '#5d4037',
                    '#3949ab', '#ef6c00', '#2e7d32', '#6a1b9a'];
+
+// Colour is not the only thing telling two lines apart. WCAG 1.4.1 is the rule
+// and a printed-in-greyscale incident report is the everyday case: six dash
+// patterns, cycled with the colour, so two series remain distinguishable with
+// no hue at all. Only applied when more than one series is on the chart — a
+// single dashed line says "provisional" and means nothing of the kind.
+const AD_DASH = ['', '7 3', '2 3', '10 3 2 3', '5 2 1 2', '1 3'];
+
+// …and the same argument for the modes that draw marks rather than lines. Four
+// shapes, cycled with the colour.
+const AD_SHAPES = ['circle', 'square', 'triangle', 'diamond'];
 
 // Point status. Ordered so that "kept" is < BAD and the drawing code can test
 // with a single comparison. RANGE and RATE are removals by the two limit
@@ -123,6 +154,8 @@ const ArroData = (function () {
       showRemoved:  true,
       showRollover: true,
       compare:      false,       // side-by-side raw/filtered panes, folded away
+      tableOpen:    false,       // the readings table under the chart (#141), folded away
+      tableSig:     '',          // what it was last built from — see renderTable()
       showPoints:   'auto',      // auto | on | off
       normalise:    false,
       hover:     null,           // {x,y,t,rows:[]}
@@ -1024,7 +1057,13 @@ const ArroData = (function () {
       sensorId: ident.sensorId || null,
       kind:     ident.kind || 'RA',
       unit:     data.unit,
-      color:    AD_COLORS[ad.series.length % AD_COLORS.length],
+      // Which of the twelve slots this series has, and whether the operator has
+      // taken it over. `color` is the resolved literal the SVG carries; `slot`
+      // is what re-resolves it when the theme moves, and `colorSet` is what
+      // stops that happening to a colour somebody chose.
+      slot:     ad.series.length % AD_SERIES_TOKENS.length,
+      colorSet: false,
+      color:    slotColor(ad.series.length % AD_SERIES_TOKENS.length),
       visible:  true,
       // The longest silence the chart will draw a line across. Zero is off,
       // which is what every ARRO import gets: a CSV arrives whole, so a hole in
@@ -1480,90 +1519,99 @@ const ArroData = (function () {
 
     return `
       <div class="panel ad-panel">
-        <div class="panel-header"><h3>Field readings</h3>
-          <span class="small" title="Every reading on this tab comes from the MegaNet datastore. ARRO exports live on the ARRO Data tab and the two are never mixed."
-                style="color:var(--muted)">${esc(dbHostLabel())}</span></div>
+        <div class="panel-header"><h2 id="ad-field-h">Field readings</h2>
+          <span class="small"
+                title="Every reading on this tab comes from the MegaNet datastore. ARRO exports live on the ARRO Data tab and the two are never mixed."
+                >${esc(dbHostLabel())}</span></div>
 
-        <label class="ad-cfg-row" style="display:block">
+        <label class="ad-cfg-row ad-cfg-row--block">
           <span>Station</span>
-          <input type="search" placeholder="Name, station number or id…" value="${escAttr(q.find)}"
-                 oninput="ArroData.fieldSetStation('', this.value)"
-                 style="width:100%;margin-top:.2rem">
+          <input type="search" class="ad-field-input" placeholder="Name, station number or id…"
+                 value="${escAttr(q.find)}"
+                 oninput="ArroData.fieldSetStation('', this.value)">
         </label>
         ${st ? `
           <div class="ad-field-picked">
             <b>${esc(st.name)}</b>
             <span class="small mono">${esc(st.station_number || st.id)}</span>
             <button class="ad-x" title="Pick a different station"
+                    aria-label="Clear ${escAttr(st.name)} and pick a different station"
                     onclick="ArroData.fieldSetStation('', '')">✕</button>
           </div>` : hits.length ? `
-          <div class="ad-field-hits">
+          <div class="ad-field-hits" role="group" aria-label="Stations matching “${escAttr(q.find.trim())}”">
             ${hits.slice(0, AD_FIND_CAP).map(s => `
               <button class="ad-field-hit" onclick="ArroData.fieldSetStation('${escAttr(s.id)}', '')">
                 ${esc(s.name)} <span class="small mono">${esc(s.station_number || '')}</span>
               </button>`).join('')}
-            ${hits.length > AD_FIND_CAP ? '<div class="small" style="color:var(--muted)">More than ' + AD_FIND_CAP + ' matches — keep typing.</div>' : ''}
+            ${hits.length > AD_FIND_CAP ? '<div class="small">More than ' + AD_FIND_CAP + ' matches — keep typing.</div>' : ''}
           </div>` : q.find.trim() ? `
-          <div class="small" style="color:var(--muted);margin:.3rem 0">No station matches that.</div>` : ''}
+          <div class="small ad-field-none">No station matches that.</div>` : ''}
 
         ${st ? `
           <div class="ad-field-sensors">
-            <div class="panel-header" style="padding:0;border:0;margin:.5rem 0 .2rem">
-              <h3 style="font-size:.8rem">Sensors</h3>
-              <button class="btn-link" onclick="ArroData.fieldAllSensors()">${
+            <div class="panel-header ad-subhead">
+              <h3 class="ad-subhead-h" id="ad-sensors-h">Sensors</h3>
+              <button class="btn-link" onclick="ArroData.fieldAllSensors()"
+                      aria-label="${addrs.length && addrs.every(a => q.sensors.includes(a.addr))
+                        ? 'Untick every sensor' : 'Tick every sensor'}">${
                 addrs.length && addrs.every(a => q.sensors.includes(a.addr)) ? 'none' : 'all'}</button>
             </div>
             ${addrs.map(a => `
-              <label class="ad-chk" style="display:flex;gap:.35rem;align-items:baseline">
+              <label class="ad-chk ad-sensor-row">
                 <input type="checkbox" ${q.sensors.includes(a.addr) ? 'checked' : ''}
                        onchange="ArroData.fieldToggleSensor('${escAttr(a.addr)}')">
-                <span>${esc(a.label)} <span class="small mono" style="color:var(--muted)">${esc(a.addr)}</span></span>
-              </label>`).join('') || '<div class="small" style="color:var(--muted)">No ALERT addresses recorded for this station.</div>'}
+                <span>${esc(a.label)} <span class="small mono">${esc(a.addr)}</span></span>
+              </label>`).join('') || '<div class="small">No ALERT addresses recorded for this station.</div>'}
             ${noAddr.length ? `
-              <div class="small" style="color:var(--muted);margin-top:.3rem"
+              <div class="small ad-field-noaddr"
                    title="A satellite or cellular station reports under its station number and a channel name, which stations.json does not record. Type the address in below if you know it.">
                 ${noAddr.length} sensor${noAddr.length === 1 ? '' : 's'} here carr${noAddr.length === 1 ? 'ies' : 'y'} no ALERT address
                 (${esc(noAddr.slice(0, 3).join(', '))}${noAddr.length > 3 ? '…' : ''}).</div>` : ''}
-            <label class="ad-cfg-row" style="display:block;margin-top:.35rem"
+            <label class="ad-cfg-row ad-cfg-row--block ad-cfg-row--spaced"
                    title="An address exactly as meganet.reading stores it — a:6128, or s:541155/rain for a station that reports under its number.">
               <span>Or an address</span>
-              <input type="text" placeholder="a:6128 or s:541155/rain" value="${escAttr(q.extra)}"
-                     onchange="ArroData.fieldSetDate('extra', this.value)"
-                     style="width:100%;margin-top:.2rem">
+              <input type="text" class="ad-field-input" placeholder="a:6128 or s:541155/rain"
+                     value="${escAttr(q.extra)}"
+                     onchange="ArroData.fieldSetDate('extra', this.value)">
             </label>
           </div>` : ''}
 
-        <div class="panel-header" style="padding:0;border:0;margin:.6rem 0 .2rem">
-          <h3 style="font-size:.8rem">Window</h3></div>
-        <div class="ad-seg" role="group" aria-label="Time window" style="flex-wrap:wrap">
+        <div class="panel-header ad-subhead">
+          <h3 class="ad-subhead-h" id="ad-window-h">Window</h3></div>
+        <div class="ad-seg ad-seg--wrap" role="group" aria-labelledby="ad-window-h">
           ${AD_FIELD_WINDOWS.map(([k, label]) => `
             <button class="${q.win === k ? 'on' : ''}" title="${escAttr(label)}"
+                    aria-pressed="${q.win === k}" aria-label="${escAttr(label)}"
                     onclick="ArroData.fieldSetWindow('${k}')">${esc(k)}</button>`).join('')}
           <button class="${q.win === 'custom' ? 'on' : ''}" title="Type your own dates"
+                  aria-pressed="${q.win === 'custom'}"
                   onclick="ArroData.fieldSetWindow('custom')">dates</button>
         </div>
         ${q.win === 'custom' ? `
           <div class="ad-field-dates">
-            <input type="date" value="${escAttr(q.from)}" onchange="ArroData.fieldSetDate('from', this.value)">
+            <input type="date" value="${escAttr(q.from)}" aria-label="Window starts"
+                   onchange="ArroData.fieldSetDate('from', this.value)">
             <span class="small">to</span>
-            <input type="date" value="${escAttr(q.to)}" onchange="ArroData.fieldSetDate('to', this.value)">
+            <input type="date" value="${escAttr(q.to)}" aria-label="Window ends"
+                   onchange="ArroData.fieldSetDate('to', this.value)">
           </div>` : ''}
 
-        <div class="panel-header" style="padding:0;border:0;margin:.6rem 0 .2rem">
-          <h3 style="font-size:.8rem" title="Raw readings below ${AD_RAW_MAX_DAYS} days, hourly below ${AD_HOURLY_MAX_DAYS}, daily beyond — override it here.">Resolution</h3></div>
-        <div class="ad-seg" role="group" aria-label="Resolution">
+        <div class="panel-header ad-subhead">
+          <h3 class="ad-subhead-h" id="ad-res-h" title="Raw readings below ${AD_RAW_MAX_DAYS} days, hourly below ${AD_HOURLY_MAX_DAYS}, daily beyond — override it here.">Resolution</h3></div>
+        <div class="ad-seg" role="group" aria-labelledby="ad-res-h">
           ${[['auto', 'Auto'], ['raw', 'Raw'], ['hourly', 'Hourly'], ['daily', 'Daily']].map(([k, label]) => `
             <button class="${q.res === k ? 'on' : ''}" onclick="ArroData.fieldSetRes('${k}')"
+                    aria-pressed="${q.res === k}"
                     title="${escAttr(k === 'auto' ? 'Chosen from the width of the window' : 'Always draw ' + AD_RES_LABEL[k])}">${esc(label)}</button>`).join('')}
         </div>
         ${res ? `<p class="small ad-cfg-note">This window will be drawn from <b>${esc(AD_RES_LABEL[res])}</b>.</p>` : ''}
 
-        <button style="width:100%;margin-top:.5rem" ${q.loading ? 'disabled' : ''}
+        <button class="ad-field-run" ${q.loading ? 'disabled' : ''}
                 onclick="ArroData.fieldRun()">${q.loading ? 'Reading…' : 'Load readings'}</button>
 
-        ${q.error ? `<div class="small ad-note ad-note--bad" style="margin-top:.4rem">${esc(q.error)}
+        ${q.error ? `<div class="small ad-note ad-note--bad ad-field-msg">${esc(q.error)}
             <button class="ad-inline-link" onclick="ArroData.fieldClearError()">dismiss</button></div>` : ''}
-        ${q.empty ? `<div class="small ad-warn" style="margin-top:.4rem">${esc(q.empty)}</div>` : ''}
+        ${q.empty ? `<div class="small ad-warn ad-field-msg">${esc(q.empty)}</div>` : ''}
       </div>`;
   }
 
@@ -1625,7 +1673,7 @@ const ArroData = (function () {
         <span>·</span>
         <span>${esc(fmtFull(t0))} → ${esc(fmtFull(t1))}</span>
         ${gaps ? `<span>·</span><span class="small" title="Nothing is drawn across a silence longer than this.">gaps over ${esc(fmtDur(gaps))} left open</span>` : ''}
-        ${capped ? '<span>·</span><span class="ad-warn-txt small">row cap reached — this is the start of the window, not all of it</span>' : ''}
+        ${capped ? '<span>·</span><span class="txt-warn small">row cap reached — this is the start of the window, not all of it</span>' : ''}
       </div>`;
   }
 
@@ -1650,14 +1698,14 @@ const ArroData = (function () {
     const rows = [];
     if (s.eng && isFinite(s.eng[i])) {
       rows.push(`<div><span>Converted</span><b>${esc(fmtVal(s.eng[i]))} ${esc(s.engUnit || '')}</b>
-        <span class="small" style="color:var(--muted)">display only — the filter ran on the count</span></div>`);
+        <span class="small">display only — the filter ran on the count</span></div>`);
     }
     if (s.prov.res !== 'raw' && e.cnt) {
       const per = s.prov.res === 'hourly' ? 'hour' : 'day';
       rows.push(`<div><span>In this ${per}</span><b>${(e.cnt[i] || 0).toLocaleString()} reading${e.cnt[i] === 1 ? '' : 's'}</b></div>`);
       if (e.lo && isFinite(e.lo[i])) {
         rows.push(`<div><span>Bucket min–max</span><b>${esc(fmtVal(e.lo[i]))} – ${esc(fmtVal(e.hi[i]))}</b>
-          <span class="small" style="color:var(--muted)">the spread the plotted point hides</span></div>`);
+          <span class="small">the spread the plotted point hides</span></div>`);
       }
     }
     const dup = e.dup ? e.dup[i] : 0;
@@ -1676,7 +1724,14 @@ const ArroData = (function () {
     return `${(ms / AD_DAY).toFixed(ms % AD_DAY ? 1 : 0)} d`;
   }
 
+  // Every call to this is the result of something the operator did — an import
+  // finished, an export was written, a file would not parse — which is exactly
+  // rule 1 of #109's live-region policy, so it goes through announce() as well
+  // as onto the screen. The line itself is not a live region: it is rebuilt by
+  // renderSide() often enough that a freshly-inserted one would be unreliable,
+  // and two regions saying the same sentence is worse than one.
   function note(msg, bad) {
+    announce(msg);
     const el = document.getElementById('ad-note');
     if (!el) return;
     el.textContent = msg;
@@ -1692,10 +1747,17 @@ const ArroData = (function () {
   // how renderMain() has always called it.
   function render(source) {
     activate(source || 'arro');
+    // The <aside> is a complementary landmark in every screen reader's landmark
+    // list, and an unnamed one is an entry reading "complementary" (#109 §4).
+    // The two tabs get different names because they hold different things — the
+    // Field tab's rail starts with a station picker the ARRO tab has no use for.
     return `
-      <div class="ad-wrap">
+      <div class="ad-wrap${ad.series.length ? ' ad-wrap--charted' : ''}">
         <div class="ad-layout">
-          <aside class="ad-side" id="ad-side">${sideHtml()}</aside>
+          <aside class="ad-side" id="ad-side"
+                 aria-label="${ad.source === 'field'
+                   ? 'Station, sensors, window and filters'
+                   : 'Imports and filters'}">${sideHtml()}</aside>
           <section class="ad-main">${mainHtml()}</section>
         </div>
       </div>`;
@@ -1715,10 +1777,11 @@ const ArroData = (function () {
         <input type="file" id="ad-file" accept=".csv,text/csv" multiple hidden
                onchange="ArroData.pick(this)">
         <div><strong>Drop ARRO sensor CSVs here</strong></div>
-        <div class="small" style="margin:.3rem 0 .5rem">
+        <div class="small ad-drop-sub">
           Read in your browser — nothing is uploaded.</div>
-        <button onclick="document.getElementById('ad-file').click()">Choose files…</button>
-        ${ad.busy ? `<div class="small" style="margin-top:.4rem">Reading ${ad.busy} file${ad.busy === 1 ? '' : 's'}…</div>` : ''}
+        <button onclick="document.getElementById('ad-file').click()"
+                aria-label="Choose ARRO sensor CSV files to import">Choose files…</button>
+        ${ad.busy ? `<div class="small ad-drop-busy">Reading ${ad.busy} file${ad.busy === 1 ? '' : 's'}…</div>` : ''}
       </div>`;
   }
 
@@ -1738,11 +1801,15 @@ const ArroData = (function () {
         <div class="ad-series${ad.sel === s.key ? ' ad-series--sel' : ''}">
           <div class="ad-series-top">
             <input type="checkbox" ${s.visible ? 'checked' : ''} title="Show on the chart"
+                   aria-label="Show ${escAttr(s.label)} on the chart"
                    onchange="ArroData.toggle('${s.key}')">
             <input type="color" class="ad-swatch" value="${escAttr(s.color)}" title="Series colour"
+                   aria-label="Colour for ${escAttr(s.label)}${s.colorSet ? '' : ' — currently the theme’s'}"
                    onchange="ArroData.setColor('${s.key}', this.value)">
             <b class="ad-series-name" title="${escAttr(s.fileName)}">${esc(s.label)}</b>
-            <button class="ad-x" title="Remove this ${ad.source === 'field' ? 'series' : 'import'}" onclick="ArroData.remove('${s.key}')">✕</button>
+            <button class="ad-x" title="Remove this ${ad.source === 'field' ? 'series' : 'import'}"
+                    aria-label="Remove ${escAttr(s.label)}"
+                    onclick="ArroData.remove('${s.key}')">✕</button>
           </div>
           <div class="small ad-series-meta">
             ${linkTxt}
@@ -1759,21 +1826,24 @@ const ArroData = (function () {
             </div>` : ''}
           <div class="small ad-series-meta">
             <span title="Readings kept by the filters">${st.good.toLocaleString()} kept</span> ·
-            <button class="ad-inline-link ad-bad-txt" onclick="ArroData.explain()"
+            <button class="ad-inline-link txt-bad" onclick="ArroData.explain()"
                     title="Readings the 357 test rejected — click for what the test does">${st.bad.toLocaleString()} removed</button> ·
             <span title="Repeat or out-of-sequence timestamps, excluded before filtering">${st.oos.toLocaleString()} repeats</span>
-            ${st.range ? ` · <span class="ad-warn-txt" title="Readings outside the minimum / maximum you set">${st.range.toLocaleString()} out of range</span>` : ''}
-            ${st.rate ? ` · <span class="ad-warn-txt" title="Readings that climbed faster than the rate limit">${st.rate.toLocaleString()} too fast</span>` : ''}
+            ${st.range ? ` · <span class="txt-warn" title="Readings outside the minimum / maximum you set">${st.range.toLocaleString()} out of range</span>` : ''}
+            ${st.rate ? ` · <span class="txt-warn" title="Readings that climbed faster than the rate limit">${st.rate.toLocaleString()} too fast</span>` : ''}
             ${st.rollovers ? ` · <span title="Accumulator wraps corrected">${st.rollovers} rollover${st.rollovers === 1 ? '' : 's'}</span>` : ''}
           </div>
           <div class="small ad-series-meta">
             <label title="How diff() compares two readings. A rain accumulator only climbs; a water level may move either way.">reads as
-              <select onchange="ArroData.setKind('${s.key}', this.value)">
+              <select aria-label="How ${escAttr(s.label)} reads — accumulator or level"
+                      onchange="ArroData.setKind('${s.key}', this.value)">
                 <option value="RA" ${s.kind === 'RA' ? 'selected' : ''}>RainAccum</option>
                 <option value="WL" ${s.kind === 'WL' ? 'selected' : ''}>WaterLevel</option>
               </select></label>
-            <button class="btn-link" onclick="ArroData.solo('${s.key}')" title="Show only this series">solo</button>
-            <button class="btn-link" onclick="ArroData.zoomTo('${s.key}')" title="Zoom the chart to this series">fit</button>
+            <button class="btn-link" onclick="ArroData.solo('${s.key}')"
+                    aria-label="Show only ${escAttr(s.label)}" title="Show only this series">solo</button>
+            <button class="btn-link" onclick="ArroData.zoomTo('${s.key}')"
+                    aria-label="Zoom the chart to ${escAttr(s.label)}" title="Zoom the chart to this series">fit</button>
           </div>
           ${(s.warn || []).map(w => `<div class="small ad-warn">${esc(w)}</div>`).join('')}
         </div>`;
@@ -1781,8 +1851,10 @@ const ArroData = (function () {
 
     return `
       <div class="panel ad-panel">
-        <div class="panel-header"><h3>${ad.source === 'field' ? 'Loaded' : 'Imports'}</h3>
-          <button class="btn-link" onclick="ArroData.clearAll()">clear all</button></div>
+        <div class="panel-header"><h2>${ad.source === 'field' ? 'Loaded' : 'Imports'}</h2>
+          <button class="btn-link" onclick="ArroData.clearAll()"
+                  aria-label="Remove all ${ad.series.length} ${
+                    ad.source === 'field' ? 'loaded series' : 'imports'}">clear all</button></div>
         ${rows}
       </div>`;
   }
@@ -1822,16 +1894,17 @@ const ArroData = (function () {
 
     return `
       <div class="panel ad-panel">
-        <div class="panel-header"><h3>Filters</h3>
+        <div class="panel-header"><h2>Filters</h2>
           <span class="ad-panel-acts">
             <button class="btn-link" onclick="ArroData.explain()"
                     title="What the 3-5-7 continuity test does, and why it removed what it did">How the 357 filter works</button>
-            <button class="btn-link" onclick="ArroData.resetCfg()">defaults</button>
+            <button class="btn-link" onclick="ArroData.resetCfg()"
+                    aria-label="Reset every filter to the Bureau's defaults">defaults</button>
           </span></div>
 
         ${block('use357', '3-5-7 continuity test',
           'The Bureau\'s continuity filter. Off leaves every reading the other filters kept.',
-          `<p class="small" style="color:var(--muted);margin:.1rem 0 .4rem">
+          `<p class="small ad-filt-lede">
              A reading passes if it is within <b>${esc(c.small)}</b> of the next, or <b>${esc(c.medium)}</b> of the
              next-next, or <b>${esc(c.large)}</b> of the one after that. Bureau spec, May 2009.</p>
            ${num('small', 'Small step', 'Difference allowed against the next reading (spec: 3)', 0, 10000, c.use357)}
@@ -2160,20 +2233,218 @@ const ArroData = (function () {
     });
   }
 
+  // ── what the chart says about itself (#141) ─────────────────────────────────
+  // The house answer for a graphic with no DOM to annotate is three parts, and a
+  // graphic needs all three (docs/design-system.md §3): a name carrying the
+  // headline number and updated whenever the picture is, a sentence saying what
+  // it shows, and the data as a real table one activation away. This chart had
+  // none of them — `aria-label="Sensor readings over time"` told a screen reader
+  // the same thing whether it was holding twelve readings or twelve thousand,
+  // and the only route to a number was hovering a pixel with a mouse.
+  //
+  // The numbers, once, so the name and the table cannot disagree.
+  function chartFacts() {
+    const vis = shown();
+    const v = view();
+    if (!vis.length || !v) return null;
+    let inView = 0, removed = 0, lo = Infinity, hi = -Infinity;
+    const per = [];
+    for (const s of vis) {
+      const tr = tracks(s);
+      const track = ad.mode === 'raw' ? tr.raw : tr.filt;
+      const i0 = lower(track.t, track.n, v.t0), i1 = lower(track.t, track.n, v.t1);
+      let slo = Infinity, shi = -Infinity, sum = 0;
+      for (let k = i0; k < i1; k++) {
+        const y = track.y[k];
+        if (y < slo) slo = y;
+        if (y > shi) shi = y;
+        sum += y;
+      }
+      const f = runFilter(s, ad.cfg);
+      const j0 = lower(s.t, s.n, v.t0), j1 = lower(s.t, s.n, v.t1);
+      let cut = 0;
+      for (let i = j0; i < j1; i++) if (adCut(f.status[i])) cut++;
+      const n = Math.max(0, i1 - i0);
+      per.push({
+        s, n, cut, i0, i1, j0, j1, f, track,
+        lo: n ? slo : null, hi: n ? shi : null,
+        net: n && ad.transform === 'value' ? track.y[i1 - 1] - track.y[i0] : sum,
+      });
+      inView += n; removed += cut;
+      if (n) { if (slo < lo) lo = slo; if (shi > hi) hi = shi; }
+    }
+    return { vis, v, per, inView, removed, unit: vis[0].unit || '',
+             lo: isFinite(lo) ? lo : null, hi: isFinite(hi) ? hi : null };
+  }
+
+  // Parts 1 and 2 of the pattern, plus the sentence that says where the operable
+  // version is. Rebuilt on every render of the stage, which is what makes it a
+  // name rather than a caption.
+  function chartName() {
+    const f = chartFacts();
+    const how = 'Drag to pan, scroll or + and − to zoom, arrow keys to step, 0 to reset. '
+              + 'Every value is in the readings table below the chart.';
+    if (!f) return `Chart, empty — no series is shown. ${how}`;
+    const shape = ad.chartType === 'dots' ? 'Point chart' : ad.chartType === 'step' ? 'Step chart' : 'Line chart';
+    const names = f.vis.slice(0, 3).map(s => s.label).join(', ')
+                + (f.vis.length > 3 ? ` and ${f.vis.length - 3} more` : '');
+    const range = f.lo == null ? '' : `, ${fmtVal(f.lo)} to ${fmtVal(f.hi)} ${f.unit}`.trimEnd();
+    return `${shape} of ${f.vis.length} series — ${names}. `
+         + `${f.inView.toLocaleString()} reading${f.inView === 1 ? '' : 's'} shown, `
+         + `${fmtFull(f.v.t0)} to ${fmtFull(f.v.t1)}${range}. `
+         + `${f.removed.toLocaleString()} removed by the filters in this window. ${how}`;
+  }
+
+  function overviewName() {
+    const ex = extent();
+    if (!ex) return 'Overview of the whole record — nothing loaded';
+    const v = view();
+    return `Overview of the whole record, ${fmtFull(ex.t0)} to ${fmtFull(ex.t1)}. `
+         + `The box marks the window drawn on the chart above, `
+         + `${fmtFull(v.t0)} to ${fmtFull(v.t1)}.`;
+  }
+
   function mainHtml() {
     if (!ad.series.length) return emptyHtml();
     return `
       ${provenanceHtml()}
+      <h2 class="sr-only">${ad.source === 'field' ? 'Field readings' : 'Imported readings'}, charted</h2>
       ${toolbarHtml()}
+      <!-- Two elements, two jobs, and keeping them apart is the point. The stage
+           is a *control* — it pans, it zooms, it pins a reading — so it is a tab
+           stop with a name saying what operating it does. The picture inside it
+           is a picture, so it is role="img" with a name carrying the numbers.
+           Marking the stage itself role="img" would be the thing §3 forbids: a
+           graphic that is a shortcut for controls beside it may be named as a
+           picture while being clicked (pattern 8), and this is not that shape —
+           arbitrary pan and zoom exist nowhere else on the tab. -->
       <div class="ad-stage" id="ad-stage" tabindex="0"
-           aria-label="Sensor readings over time. Drag to pan, scroll to zoom, arrow keys to step.">
-        <svg id="ad-svg" role="img"></svg>
+           aria-label="Chart window — arrow keys to step, + and − to zoom, 0 to reset, Escape to unpin">
+        <svg id="ad-svg" role="img" aria-label="${escAttr(chartName())}"></svg>
         <div class="ad-tip" id="ad-tip" hidden></div>
       </div>
       <svg id="ad-ov" class="ad-ov" role="img"
-           aria-label="Whole record, with the visible window shaded"></svg>
+           aria-label="${escAttr(overviewName())}"></svg>
       <div id="ad-readout" class="ad-readout">${readoutHtml()}</div>
+      ${tableDetailsHtml()}
       ${compareHtml()}`;
+  }
+
+  // Part 3: the data, as a real table, one activation away. A `<details>` rather
+  // than a second panel because it is the same numbers a second way and not a
+  // second thing to read — and built only while it is open, because the readings
+  // table is up to AD_TABLE_MAX rows and a pan should not pay for it.
+  const AD_TABLE_MAX = 300;
+
+  function tableDetailsHtml() {
+    return `
+      <details class="ad-table" id="ad-table" ${ad.tableOpen ? 'open' : ''}
+               ontoggle="ArroData.tableToggle(this)">
+        <summary>Readings as a table
+          <span class="small">— the numbers behind the chart, for the window on screen</span></summary>
+        <div id="ad-table-body">${ad.tableOpen ? tableHtml() : ''}</div>
+      </details>`;
+  }
+
+  function tableHtml() {
+    const f = chartFacts();
+    if (!f) return '<p class="small ad-flush">No series is shown — tick one on the left.</p>';
+
+    const summary = `
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">One row per series shown, over the window on the chart</caption>
+          <thead><tr>
+            <th scope="col">Series</th>
+            <th scope="col">Readings</th>
+            <th scope="col">Lowest</th>
+            <th scope="col">Highest</th>
+            <th scope="col">${ad.transform === 'value' ? 'Net' : 'Total'}</th>
+            <th scope="col">Removed</th>
+          </tr></thead>
+          <tbody>
+            ${f.per.map(p => `
+              <tr>
+                <td>${esc(p.s.label)}</td>
+                <td class="small">${p.n.toLocaleString()}</td>
+                <td class="small">${p.lo == null ? '—' : esc(fmtVal(p.lo))}</td>
+                <td class="small">${p.hi == null ? '—' : esc(fmtVal(p.hi))}</td>
+                <td class="small">${p.n ? esc(fmtVal(p.net)) : '—'}</td>
+                <td class="small">${p.cut.toLocaleString()}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    // Every reading in the window would be a hundred thousand rows on a wide
+    // one. Capped, and the cap is *said* rather than silently applied — the two
+    // Export buttons in the toolbar are the uncapped answer and this points at
+    // them.
+    const rows = [];
+    let total = 0;
+    for (const p of f.per) {
+      for (let i = p.j0; i < p.j1; i++) {
+        total++;
+        if (rows.length >= AD_TABLE_MAX) continue;
+        const st = p.f.status[i];
+        rows.push(`
+          <tr>
+            <td>${esc(p.s.label)}</td>
+            <td class="small mono">${esc(fmtFull(p.s.t[i]))}</td>
+            <td class="small">${esc(fmtVal(p.s.v[i]))}</td>
+            <td class="small col-optional">${esc(p.s.unit || '')}</td>
+            <td class="small">${esc(AD_STATUS_LABEL[st])}</td>
+          </tr>`);
+      }
+    }
+    const capped = total > rows.length;
+
+    return `${summary}
+      <p class="small ad-table-note" id="ad-table-note">
+        ${capped
+          ? `The first ${rows.length.toLocaleString()} of ${total.toLocaleString()} readings in this
+             window. Zoom in for fewer, or use <b>Export kept</b> / <b>Export + verdict</b> in the
+             toolbar for all of them.`
+          : `All ${total.toLocaleString()} reading${total === 1 ? '' : 's'} in this window.`}
+      </p>
+      <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="ad-table-note">
+        <table>
+          <caption class="sr-only">Every reading the chart draws in this window, with the filter's verdict against it</caption>
+          <thead><tr>
+            <th scope="col">Series</th>
+            <th scope="col">Reading</th>
+            <th scope="col">Value</th>
+            <th scope="col" class="col-optional">Unit</th>
+            <th scope="col">Verdict</th>
+          </tr></thead>
+          <tbody>${rows.join('')}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // Same shape as the comparison panes: remembered across re-renders, and drawn
+  // the first time it is actually on screen.
+  function tableToggle(el) {
+    ad.tableOpen = !!el.open;
+    if (ad.tableOpen) renderTable(true);
+  }
+
+  // Rebuilt where the comparison panes are — off a view change, which is the one
+  // place that is not also every mouse move. Skipped mid-drag: a pan would
+  // otherwise rebuild three hundred rows a frame, and the pointerup redraw
+  // catches it up.
+  function renderTable(force) {
+    const box  = document.getElementById('ad-table');
+    const body = document.getElementById('ad-table-body');
+    if (!box || !box.open || !body) return;
+    if (!force && (ad.drag || ad.ovDrag)) return;
+    const v = view();
+    const sig = [ad.mode, ad.transform, cfgKey(ad.cfg, 'tbl'),
+                 v ? `${Math.round(v.t0)}-${Math.round(v.t1)}` : '',
+                 shown().map(s => s.key).join(',')].join('|');
+    if (!force && sig === ad.tableSig) return;
+    ad.tableSig = sig;
+    body.innerHTML = tableHtml();
   }
 
   // Raw and filtered on one chart answers "what was removed". Raw and filtered
@@ -2193,12 +2464,15 @@ const ArroData = (function () {
           <figure>
             <figcaption>As recorded <span class="small">${tot.toLocaleString()} readings</span></figcaption>
             <svg id="ad-cmp-raw" role="img"
-                 aria-label="Every reading as exported, over the visible window"></svg>
+                 aria-label="As recorded — every one of the ${tot.toLocaleString()} readings the ${
+                   ad.source === 'field' ? 'datastore returned' : 'export contains'}, over the visible window,
+                   with the removals marked. The same numbers are in the readings table above."></svg>
           </figure>
           <figure>
             <figcaption>Filtered <span class="small">${kept.toLocaleString()} kept</span></figcaption>
             <svg id="ad-cmp-filt" role="img"
-                 aria-label="The readings that survived the filters, over the same window"></svg>
+                 aria-label="Filtered — the ${kept.toLocaleString()} readings of ${tot.toLocaleString()}
+                   that survived the filters, over the same window and the same vertical scale."></svg>
           </figure>
         </div>
         <p class="small ad-cfg-note">Both panes hold the same time window and the same vertical
@@ -2220,7 +2494,7 @@ const ArroData = (function () {
            filter runs alongside it, never over it, so you can switch between what
            the gauge sent and what survives the test — and look at whatever it threw
            away.</p>
-        <p class="small" style="color:var(--muted)">
+        <p class="small">
           Expected columns: Reading, Receive, Value, Unit, Data Quality, Raw Value.</p>
       </div>`;
   }
@@ -2232,7 +2506,7 @@ const ArroData = (function () {
         <div class="ad-empty">
           <h2>Nothing in that window</h2>
           <p>${esc(q.empty)}</p>
-          <p class="small" style="color:var(--muted)">A silent window and a window of zeroes are
+          <p class="small">A silent window and a window of zeroes are
              different claims, so nothing is drawn. Widen the window, or check that anything has
              been ingested for this station at all.</p>
         </div>`;
@@ -2246,17 +2520,22 @@ const ArroData = (function () {
            tab's, unchanged. What is different is where the numbers came from, and this tab never
            mixes the two: ARRO exports stay on the ARRO Data tab, and every chart and export here
            says so on its face.</p>
-        <p class="small" style="color:var(--muted)">
+        <p class="small">
           Readings arrive as counts, so the 3/5/7 thresholds are counts too and the filter runs on
           them exactly as it does on an ARRO export. Any conversion the datastore recorded is shown
           beside the count, never instead of it.</p>
       </div>`;
   }
 
+  // aria-pressed, because "on" was a background colour and nothing else: a
+  // screen reader was given four identically-announced buttons and no way to
+  // tell which one the chart was currently obeying (#137 made the same fix on
+  // the region chips).
   const seg = (group, cur, opts, fn) => `
     <div class="ad-seg" role="group" aria-label="${escAttr(group)}">
       ${opts.map(([v, label, tip]) => `
         <button class="${cur === v ? 'on' : ''}" title="${escAttr(tip || label)}"
+                aria-pressed="${cur === v}" aria-label="${escAttr(group)}: ${escAttr(label)}"
                 onclick="ArroData.${fn}('${v}')">${esc(label)}</button>`).join('')}
     </div>`;
 
@@ -2292,9 +2571,8 @@ const ArroData = (function () {
             <input type="number" class="ad-num" value="${escAttr(ad.yMax)}" placeholder="max"
                    onchange="ArroData.setYRange('max', this.value)">
           </span>` : ''}
-        <span class="ad-tool-grp">
-          <label class="ad-chk" title="Mark every reading the filter rejected"
-                 style="${anyFilt ? '' : 'opacity:.45'}">
+        <span class="ad-tool-grp" role="group" aria-label="What to mark on the chart">
+          <label class="ad-chk${anyFilt ? '' : ' ad-chk--off'}" title="Mark every reading the filter rejected">
             <input type="checkbox" ${ad.showRemoved ? 'checked' : ''} ${anyFilt ? '' : 'disabled'}
                    onchange="ArroData.setFlag('showRemoved', this.checked)"> removed</label>
           <label class="ad-chk" title="Mark repeat timestamps dropped before filtering">
@@ -2307,15 +2585,23 @@ const ArroData = (function () {
             <input type="checkbox" ${ad.brush ? 'checked' : ''}
                    onchange="ArroData.setFlag('brush', this.checked)"> drag zooms</label>
         </span>
-        <span class="ad-tool-grp">
+        <span class="ad-tool-grp" role="group" aria-label="Jump the window">
           ${[['all', 'All'], ['24h', '24h'], ['7d', '7d'], ['30d', '30d'], ['90d', '90d']]
-            .map(([k, l]) => `<button onclick="ArroData.preset('${k}')" title="Show the last ${l === 'All' ? 'of everything' : l}">${l}</button>`).join('')}
+            .map(([k, l]) => `<button onclick="ArroData.preset('${k}')"
+                   aria-label="Show ${l === 'All' ? 'the whole record' : 'the last ' + l}"
+                   title="Show the last ${l === 'All' ? 'of everything' : l}">${l}</button>`).join('')}
         </span>
-        <span class="ad-tool-grp">
-          <button onclick="ArroData.exportCsv('kept')" title="The filtered series, as CSV">Export kept</button>
-          <button onclick="ArroData.exportCsv('all')" title="Every reading with the filter's verdict against it">Export + verdict</button>
-          <button onclick="ArroData.exportImg('svg')" title="Download the chart as SVG">SVG</button>
-          <button onclick="ArroData.exportImg('png')" title="Download the chart as PNG">PNG</button>
+        <span class="ad-tool-grp" role="group" aria-label="Export">
+          <button onclick="ArroData.exportCsv('kept')"
+                  aria-label="Export the filtered readings as CSV"
+                  title="The filtered series, as CSV">Export kept</button>
+          <button onclick="ArroData.exportCsv('all')"
+                  aria-label="Export every reading with the filter's verdict, as CSV"
+                  title="Every reading with the filter's verdict against it">Export + verdict</button>
+          <button onclick="ArroData.exportImg('svg')"
+                  aria-label="Download the chart as an SVG image" title="Download the chart as SVG">SVG</button>
+          <button onclick="ArroData.exportImg('png')"
+                  aria-label="Download the chart as a PNG image" title="Download the chart as PNG">PNG</button>
         </span>
       </div>`;
   }
@@ -2338,11 +2624,11 @@ const ArroData = (function () {
           <b>${esc(fmtFull(ad.hover.t))}</b>
           ${ad.hover.rows.map(r => `
             <span class="ad-read-item">
-              <span class="ad-dot" style="background:${escAttr(r.color)}"></span>
+              <span class="ad-dot" style="--dot:${escAttr(r.color)}"></span>
               ${esc(r.label)} <b>${esc(fmtVal(r.y))}</b>${r.unit ? ' ' + esc(r.unit) : ''}
-              <span class="small" style="color:var(--muted)">${esc(r.kindLabel)}${r.q ? ' · ' + esc(r.q) : ''}</span>
+              <span class="small">${esc(r.kindLabel)}${r.q ? ' · ' + esc(r.q) : ''}</span>
             </span>`).join('')}
-          <span class="small" style="color:var(--muted)">click to pin a reading</span>
+          <span class="small">click to pin a reading</span>
         </div>`;
     }
     return statsHtml();
@@ -2358,7 +2644,7 @@ const ArroData = (function () {
     const b = bucketSizeMm(s.station);
     const mm = s.raw[i] * b.mm;
     const note = b.recorded ? `recorded, ${b.mm} mm/tip` : `assumed ${b.mm} mm/tip — not recorded for this site`;
-    return ` <span class="small" style="color:var(--muted)">= ${esc(fmtVal(mm))} mm (${esc(note)})</span>`;
+    return ` <span class="small">= ${esc(fmtVal(mm))} mm (${esc(note)})</span>`;
   }
 
   function pinHtml(s, i) {
@@ -2379,10 +2665,11 @@ const ArroData = (function () {
     return `
       <div class="ad-pin">
         <div class="ad-pin-head">
-          <span class="ad-dot" style="background:${escAttr(s.color)}"></span>
+          <span class="ad-dot" style="--dot:${escAttr(s.color)}"></span>
           <b>${esc(s.label)}</b>
           <span class="ad-badge ad-badge--${badge}">${esc(AD_STATUS_LABEL[st])}</span>
-          <button class="ad-x" onclick="ArroData.unpin()" title="Close">✕</button>
+          <button class="ad-x" onclick="ArroData.unpin()"
+                  aria-label="Close the pinned reading" title="Close">✕</button>
         </div>
         <div class="ad-pin-grid">
           <div><span>Reading</span><b>${esc(fmtFull(s.t[i]))}</b></div>
@@ -2391,7 +2678,7 @@ const ArroData = (function () {
               // real reading. On a rollup the two are an hour apart by
               // construction, which is not news.
               s.tr[i] !== s.t[i] && (!s.prov || s.prov.res === 'raw')
-              ? ` <span class="small" style="color:var(--warn)">+${Math.round((s.tr[i] - s.t[i]) / 1000)}s</span>` : ''}</b></div>
+              ? ` <span class="small txt-warn">+${Math.round((s.tr[i] - s.t[i]) / 1000)}s</span>` : ''}</b></div>
           <div><span>Value</span><b>${esc(fmtVal(s.v[i]))} ${esc(s.unit)}</b></div>
           <div><span>Raw</span><b>${esc(fmtVal(s.raw[i]))}</b>${rawBucketNote(s, i)}</div>
           <div><span>Adjusted</span><b>${esc(fmtVal(f.adj[i]))}${rolled ? ' <span class="small">(wrap here)</span>' : ''}</b></div>
@@ -2407,7 +2694,7 @@ const ArroData = (function () {
 
   function statsHtml() {
     const vis = shown();
-    if (!vis.length) return '<span class="small" style="color:var(--muted)">No series shown — tick one on the left.</span>';
+    if (!vis.length) return '<span class="small">No series shown — tick one on the left.</span>';
     const v = view();
     return `<div class="ad-stats">${vis.map(s => {
       const tr = tracks(s);
@@ -2418,7 +2705,7 @@ const ArroData = (function () {
       const net = cnt && ad.transform === 'value' ? track.y[i1 - 1] - track.y[i0] : sum;
       return `
         <span class="ad-stat">
-          <span class="ad-dot" style="background:${escAttr(s.color)}"></span>
+          <span class="ad-dot" style="--dot:${escAttr(s.color)}"></span>
           <b>${esc(s.label)}</b>
           <span class="small">${cnt.toLocaleString()} in view${cnt ? ` · ${fmtVal(lo)}–${fmtVal(hi)} ${esc(s.unit)}
             · ${ad.transform === 'value' ? 'net' : 'total'} ${fmtVal(net)}` : ''}</span>
@@ -2430,6 +2717,64 @@ const ArroData = (function () {
   // Theme colours are read from the document rather than written as `var(...)`
   // into the markup, because the SVG has to survive being pulled out of the
   // page and turned into a PNG, where nothing would resolve them.
+
+  // One of the twelve series tokens, as a literal. Read fresh rather than
+  // cached: the whole point is that it is different in the two themes, and the
+  // cost is one getComputedStyle per series per repaint, which is nothing
+  // beside the redraw it is part of.
+  function slotColor(slot) {
+    const tok = AD_SERIES_TOKENS[slot % AD_SERIES_TOKENS.length];
+    if (typeof getComputedStyle !== 'function') return AD_COLORS[slot % AD_COLORS.length];
+    const v = getComputedStyle(document.documentElement).getPropertyValue(tok).trim();
+    return v || AD_COLORS[slot % AD_COLORS.length];
+  }
+
+  // Re-resolve every series that has not been coloured by hand. Called from
+  // repaint(), which is what toggleTheme() calls — and across *both* instances,
+  // because the theme is the document's and the tab that is not on screen would
+  // otherwise come back carrying the other theme's palette.
+  function reslotColors() {
+    let moved = false;
+    for (const inst of Object.values(instances)) {
+      for (const s of inst.series) {
+        if (s.colorSet) continue;
+        const c = slotColor(s.slot || 0);
+        if (c !== s.color) { s.color = c; moved = true; }
+      }
+    }
+    return moved;
+  }
+
+  // The dash pattern that goes with a slot. Empty for a lone series: see AD_DASH.
+  function seriesDash(s) {
+    if (shown().length < 2) return '';
+    return AD_DASH[(s.slot || 0) % AD_DASH.length];
+  }
+
+  function seriesShape(s) { return AD_SHAPES[(s.slot || 0) % AD_SHAPES.length]; }
+
+  // One mark, in the shape belonging to the series. Written as a path for
+  // everything but the circle so that a single string works for all four.
+  function shapeMark(shape, cx, cy, r, fill, opacity) {
+    const o = opacity == null ? 1 : opacity;
+    const x = cx.toFixed(1), y = cy.toFixed(1);
+    if (shape === 'square') {
+      return `<rect x="${(cx - r).toFixed(1)}" y="${(cy - r).toFixed(1)}"
+                    width="${(r * 2).toFixed(1)}" height="${(r * 2).toFixed(1)}"
+                    fill="${fill}" opacity="${o}"/>`;
+    }
+    if (shape === 'triangle') {
+      const h = r * 1.25;
+      return `<path d="M${x} ${(cy - h).toFixed(1)}L${(cx + h).toFixed(1)} ${(cy + h * 0.7).toFixed(1)}
+                       H${(cx - h).toFixed(1)}Z" fill="${fill}" opacity="${o}"/>`;
+    }
+    if (shape === 'diamond') {
+      const h = r * 1.3;
+      return `<path d="M${x} ${(cy - h).toFixed(1)}L${(cx + h).toFixed(1)} ${y}L${x} ${(cy + h).toFixed(1)}
+                       L${(cx - h).toFixed(1)} ${y}Z" fill="${fill}" opacity="${o}"/>`;
+    }
+    return `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" opacity="${o}"/>`;
+  }
 
   function theme() {
     const cs = getComputedStyle(document.documentElement);
@@ -2530,20 +2875,24 @@ const ArroData = (function () {
         // In "both", raw sits underneath as a ghost so that what the filter took
         // out reads as a gap in the solid line rather than a second chart.
         const ghost = ad.mode === 'both' && kind === 'raw';
+        const shape = seriesShape(s);
         if (dots) {
           markers += pts.slice(0, 4000).map(p =>
-            `<circle cx="${p[0].toFixed(1)}" cy="${g.y(p[1]).toFixed(1)}" r="${ghost ? 1.1 : 1.8}"
-                     fill="${escAttr(s.color)}" opacity="${ghost ? .3 : .9}"/>`).join('');
+            shapeMark(shape, p[0], g.y(p[1]), ghost ? 1.3 : 2, escAttr(s.color), ghost ? .3 : .9)).join('');
         } else {
+          // The dash is the series' identity without its colour — see AD_DASH.
+          // It rides on the ghost too: raw and filtered are one series drawn
+          // twice, and giving them different dashes would say otherwise.
+          const dash = seriesDash(s);
           series += `<path d="${pathFrom(pts, g.y, stepped, track, s)}" fill="none" stroke="${escAttr(s.color)}"
                         stroke-width="${ghost ? 1 : 1.7}" opacity="${ghost ? .34 : 1}"
+                        ${dash ? `stroke-dasharray="${dash}"` : ''}
                         stroke-linejoin="round" stroke-linecap="round"/>`;
         }
         // Few enough points on screen that each one is a real reading: show them.
         if (!dots && ad.showPoints !== 'off' && (i1 - i0) <= Math.max(40, g.pw / 12) && !ghost) {
           for (let k = i0; k < i1; k++) {
-            markers += `<circle cx="${g.x(track.t[k]).toFixed(1)}" cy="${g.y(track.y[k]).toFixed(1)}"
-                                r="2.2" fill="${escAttr(s.color)}"/>`;
+            markers += shapeMark(shape, g.x(track.t[k]), g.y(track.y[k]), 2.2, escAttr(s.color));
           }
         }
       }
@@ -2659,8 +3008,10 @@ const ArroData = (function () {
       const track = tracks(s)[ad.mode === 'raw' ? 'raw' : 'filt'];
       const pts = densify(track, 0, track.n, x, pw);
       if (pts.length) {
+        const dash = seriesDash(s);
         out += `<path d="${pathFrom(pts, y, false, track, s)}" fill="none" stroke="${escAttr(s.color)}"
-                      stroke-width="1" opacity=".85"/>`;
+                      stroke-width="1" opacity=".85"
+                      ${dash ? `stroke-dasharray="${dash}"` : ''}/>`;
       }
     }
     const v = view();
@@ -2676,9 +3027,18 @@ const ArroData = (function () {
             <text x="${w - PADR}" y="${h - 5}" font-size="9" text-anchor="end" fill="${c.muted}">${esc(fmtFull(ex.t1).slice(0, 10))}</text>`;
     svg.innerHTML = out;
 
+    svg.setAttribute('aria-label', overviewName());
+
     // Every view change redraws the overview, and nothing else does — which
     // makes this the one place the comparison panes can follow the window
-    // without also being rebuilt on every mouse move.
+    // without also being rebuilt on every mouse move. Since #141 it is also
+    // where the chart's own name and the readings table follow it, for exactly
+    // that reason: chartFacts() walks the readings in the window, and doing
+    // that on every crosshair move would be a measurable cost for a string
+    // nothing reads between one pixel and the next.
+    const stage = document.getElementById('ad-svg');
+    if (stage) stage.setAttribute('aria-label', chartName());
+    renderTable();
     drawCompare();
   }
 
@@ -2777,8 +3137,10 @@ const ArroData = (function () {
       const i1 = Math.min(track.n, lower(track.t, track.n, v.t1) + 1);
       const pts = densify(track, i0, i1, x, pw);
       if (pts.length) {
+        const dash = seriesDash(s);
         body += `<path d="${pathFrom(pts, y, ad.chartType === 'step', track, s)}" fill="none"
                        stroke="${escAttr(s.color)}" stroke-width="1.4"
+                       ${dash ? `stroke-dasharray="${dash}"` : ''}
                        stroke-linejoin="round" stroke-linecap="round"/>`;
       }
       // The removals belong on the "as recorded" side: that pane is the record
@@ -2847,7 +3209,7 @@ const ArroData = (function () {
     if (!tip || !stage || !ad.hover || !ad.hover.rows.length) { if (tip) tip.hidden = true; return; }
     tip.innerHTML = `<div class="ad-tip-t">${esc(fmtFull(ad.hover.t))}</div>`
       + ad.hover.rows.slice(0, 6).map(r => `
-        <div class="ad-tip-r"><span class="ad-dot" style="background:${escAttr(r.color)}"></span>
+        <div class="ad-tip-r"><span class="ad-dot" style="--dot:${escAttr(r.color)}"></span>
           ${esc(r.label)} <b>${esc(fmtVal(r.y))}</b> ${esc(r.unit)}</div>`).join('');
     const r = stage.getBoundingClientRect();
     const lx = ev.clientX - r.left, ly = ev.clientY - r.top;
@@ -3032,7 +3394,17 @@ const ArroData = (function () {
   function pick(input) { importFiles(input.files); input.value = ''; }
 
   function toggle(key) { const s = find(key); if (s) { s.visible = !s.visible; redraw(true); } }
-  function setColor(key, v) { const s = find(key); if (s) { s.color = v; draw(); drawOv(); } }
+  // A colour chosen by hand takes the series out of the token palette for good,
+  // in both themes. Overruling it on the next theme toggle would be the app
+  // undoing a decision the operator made, which is worse than a colour that is
+  // a little dark on one of the two.
+  function setColor(key, v) {
+    const s = find(key);
+    if (!s) return;
+    s.color = v;
+    s.colorSet = true;
+    draw(); drawOv(); drawCompare(true);
+  }
   function setKind(key, v) { const s = find(key); if (s) { s.kind = v; s.filt = null; s.tracks = null; redraw(true); } }
   function solo(key) { ad.series.forEach(s => { s.visible = s.key === key; }); redraw(true); }
   function zoomTo(key) {
@@ -3248,6 +3620,7 @@ const ArroData = (function () {
       });
       a.click();
       URL.revokeObjectURL(a.href);
+      note(`Downloaded ${base}.svg.`);
       return;
     }
     const scale = 2;
@@ -3265,6 +3638,7 @@ const ArroData = (function () {
         });
         a.click();
         URL.revokeObjectURL(a.href);
+        note(`Downloaded ${base}.png.`);
       });
     };
     img.onerror = () => note('The browser would not render the chart to PNG — the SVG download works.', true);
@@ -3272,8 +3646,14 @@ const ArroData = (function () {
   }
 
   // Called on a theme change, where every colour in both panes is now wrong —
-  // so the comparison redraws whether or not its inputs moved.
-  function repaint() { draw(); drawOv(); drawCompare(true); }
+  // so the comparison redraws whether or not its inputs moved. Since #141 the
+  // series colours are among the things that just went wrong, so they are
+  // re-resolved first; the sidebar only rebuilds if one actually moved, because
+  // its colour swatches would otherwise show the previous theme's palette.
+  function repaint() {
+    if (reslotColors()) renderSide();
+    draw(); drawOv(); drawCompare(true);
+  }
 
   return {
     // The instance on screen. A getter rather than a property because `ad` is a
@@ -3286,7 +3666,7 @@ const ArroData = (function () {
     render, init, stop, repaint, importFiles, pick,
     toggle, setColor, setKind, solo, zoomTo, remove, clearAll, showStation,
     setCfg, resetCfg, setMode, setTransform, setChart, setY, setYRange, setFlag,
-    preset, unpin, exportCsv, exportImg, explain, compareToggle, dropAll,
+    preset, unpin, exportCsv, exportImg, explain, compareToggle, tableToggle, dropAll,
     // the Field Data tab (#114)
     fieldSetStation, fieldToggleSensor, fieldAllSensors, fieldSetWindow,
     fieldSetRes, fieldSetDate, fieldRun, fieldClearError,

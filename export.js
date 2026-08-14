@@ -5,14 +5,16 @@
 //   builders behind it
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, netName, csvEscape, dlText and
-// RM_NET_DEFAULTS; across to app.js for findStationMatches, stationAlertIds and
+// Reaches back to core.js for state, esc, escAttr, announce, netName, csvEscape,
+// dlText and RM_NET_DEFAULTS; across to app.js for findStationMatches, stationAlertIds and
 // repeaterPassingCount; and to datastore.js for renderDbStatusHtml, which
 // renders the datastore panel this tab hosts. The snapshot button written here
 // calls snapshotStationsJson() over in datastore.js for the same reason — see
 // that file's header.
 //
 // Moved out of app.js byte-for-byte by M3 (#134) of #129.
+// Restyled against the design system by U6 (#141) of EPIC #107 — the classes
+// this file names live in the "Export tab (#141)" section of styles.css.
 
 // ── EXPORT tab ─────────────────────────────────────────────────────────────────
 
@@ -28,26 +30,35 @@ function renderExportHtml() {
 
   return `
     <div class="layout">
-      <aside class="sidebar stack">
+      <aside class="sidebar stack" aria-label="Export options">
         <div class="panel">
           <div class="panel-header">
-            <h3>BoM Networks</h3>
-            <span>
-              <button onclick="exportSelectAll(true)" style="padding:.25rem .5rem;font-size:.8rem">All</button>
-              <button onclick="exportSelectAll(false)" style="padding:.25rem .5rem;font-size:.8rem">None</button>
+            <h2 id="exp-nets-h">BoM Networks</h2>
+            <span class="exp-head-acts" role="group" aria-label="Select networks">
+              <button class="exp-btn-sm" data-all="1" onclick="exportSelectAll(true)"
+                      aria-label="Select every BoM network">All</button>
+              <button class="exp-btn-sm" data-all="0" onclick="exportSelectAll(false)"
+                      aria-label="Clear every BoM network">None</button>
             </span>
           </div>
-          <div class="checklist">
+          <div class="checklist" role="group" aria-labelledby="exp-nets-h">
             ${nets.map(n => `
               <label>
-                <input type="checkbox" ${state.exportNets.has(n.id) ? 'checked' : ''}
-                       onchange="toggleExportNet('${n.id}',this.checked)">
+                <input type="checkbox" data-net="${escAttr(n.id)}"
+                       ${state.exportNets.has(n.id) ? 'checked' : ''}
+                       onchange="toggleExportNet('${escAttr(n.id)}',this.checked)">
                 ${esc(n.name)}
               </label>`).join('')}
           </div>
         </div>
+
+        <!-- The count of what the ticks above add up to. Not a live region of
+             its own: every tick re-renders the whole tab, so this element is a
+             *new* node each time and a freshly-inserted live region is not
+             reliably announced. The count goes through announce() instead, from
+             the two handlers that change it. -->
         <div class="panel">
-          <div class="small" style="color:var(--muted)">
+          <div class="small" id="exp-count">
             <strong>${selRpts.length}</strong> repeater${selRpts.length !== 1 ? 's' : ''} selected<br>
             <strong>${unitCount}</strong> total units in export
           </div>
@@ -60,39 +71,40 @@ function renderExportHtml() {
              the case worth being able to see. -->
         <div class="panel">
           <div class="panel-header">
-            <h3>Data source</h3>
-            <button onclick="dbCheck()" style="padding:.25rem .5rem;font-size:.8rem">Re-test</button>
+            <h2>Data source</h2>
+            <button class="exp-btn-sm" onclick="dbCheck()"
+                    aria-label="Re-test the datastore connection">Re-test</button>
           </div>
-          <div id="db-status">${renderDbStatusHtml()}</div>
+          <div id="db-status" role="status">${renderDbStatusHtml()}</div>
         </div>
 
         <!-- The JSON escape hatch. Edits land in the database now, so the file
              has to be refreshable from it — see snapshotStationsJson(). -->
         <div class="panel">
           <div class="panel-header">
-            <h3>stations.json</h3>
-            <button id="btn-snapshot" onclick="snapshotStationsJson()"
-                    style="padding:.25rem .5rem;font-size:.8rem"
+            <h2>stations.json</h2>
+            <button id="btn-snapshot" class="exp-btn-sm" onclick="snapshotStationsJson()"
                     title="Download the database's current station list as stations.json">Snapshot</button>
           </div>
-          <div class="small" style="color:var(--muted)">
+          <div class="small">
             The whole station list as a file — the offline copy, and what this app
             falls back to when the datastore cannot be reached. Taken from the
             database as it is right now, not from what this tab has loaded.
           </div>
-          <div id="snapshot-note" class="small" style="margin-top:.35rem"></div>
+          <div id="snapshot-note" class="small exp-note" role="status"></div>
         </div>
       </aside>
 
       <div>
-        <div class="panel stack" style="gap:.75rem">
+        <div class="panel stack exp-main-panel">
           <div class="panel-header">
-            <h2>Radio Mobile Export</h2>
+            <h2 id="exp-files-h">Radio Mobile Export</h2>
             <button class="primary" onclick="runExport()">Generate &amp; Download All</button>
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>File</th><th>Contents</th></tr></thead>
+              <caption class="sr-only">The five files "Generate &amp; Download All" produces, and what each holds</caption>
+              <thead><tr><th scope="col">File</th><th scope="col">Contents</th></tr></thead>
               <tbody>
                 <tr><td><code>MegaNet.csv</code></td>        <td class="small">Master config — version, map/land paths, $Include list</td></tr>
                 <tr><td><code>MegaNet_Network.csv</code></td><td class="small">One row per selected repeater, propagation parameters</td></tr>
@@ -108,45 +120,86 @@ function renderExportHtml() {
           </div>
         </div>
 
-        <div class="panel" style="margin-top:1rem">
-          <div class="panel-header"><h2>Selected Repeaters</h2></div>
-          <div class="table-wrap medium">
-            <table>
-              <colgroup>
-                <col style="width:28%"><col style="width:20%"><col style="width:13%">
-                <col style="width:13%"><col style="width:26%">
-              </colgroup>
-              <thead><tr><th>Repeater</th><th>Network</th><th>Rx (MHz)</th><th>Tx (MHz)</th><th>Pass ranges</th></tr></thead>
-              <tbody>
-                ${selRpts.map(r => `
-                  <tr>
-                    <td>${esc(r.name)}</td>
-                    <td class="small">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
-                    <td class="rx-cell small">${r.repeater.rx_mhz || ''}</td>
-                    <td class="tx-cell small">${r.repeater.tx_mhz || ''}</td>
-                    <td class="small">${(r.repeater.pass_ranges || []).map(p => `${p.low}–${p.high}`).join(', ')}${
-                      repeaterPassingCount(r) != null
-                        ? ` <span class="badge" title="ALERT addresses carried, post-exclusion">passing ${repeaterPassingCount(r)}</span>`
-                        : ''}</td>
-                  </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
+        <div class="panel exp-repeaters">
+          <div class="panel-header"><h2 id="exp-rpts-h">Selected Repeaters</h2></div>
+          ${selRpts.length ? `
+            <div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="exp-rpts-h">
+              <table>
+                <caption class="sr-only">The ${selRpts.length} repeater${selRpts.length !== 1 ? 's' : ''} the ticked networks put in the export</caption>
+                <colgroup>
+                  <col style="width:28%"><col style="width:20%"><col style="width:13%">
+                  <col style="width:13%"><col style="width:26%">
+                </colgroup>
+                <thead><tr>
+                  <th scope="col">Repeater</th>
+                  <th scope="col" class="col-optional">Network</th>
+                  <th scope="col">Rx (MHz)</th><th scope="col">Tx (MHz)</th>
+                  <th scope="col">Pass ranges</th>
+                </tr></thead>
+                <tbody>
+                  ${selRpts.map(r => `
+                    <tr>
+                      <td>${esc(r.name)}</td>
+                      <td class="small col-optional">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
+                      <td class="rx-cell small">${r.repeater.rx_mhz || ''}</td>
+                      <td class="tx-cell small">${r.repeater.tx_mhz || ''}</td>
+                      <td class="small">${(r.repeater.pass_ranges || []).map(p => `${p.low}–${p.high}`).join(', ')}${
+                        repeaterPassingCount(r) != null
+                          ? ` <span class="badge" title="ALERT addresses carried, post-exclusion">passing ${repeaterPassingCount(r)}</span>`
+                          : ''}</td>
+                    </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>`
+          : `<p class="small table-empty">No network is ticked, so the export would be empty.
+               Tick one on the left, or press <b>All</b>.</p>`}
         </div>
       </div>
     </div>`;
 }
 
+// Both selection handlers rebuild the whole tab, because the counts and the
+// repeater table are downstream of the ticks. That is fine for a mouse and was
+// silently hostile to a keyboard: the checkbox that was just operated no longer
+// exists when the render finishes, so focus was dropped on <body> after every
+// single tick — the same failure #109 fixed in the nav, in a tab nobody had
+// looked at. Re-rendering and then putting focus back on the equivalent control
+// is the whole fix; `find` is how each caller says which control that is. It is
+// a function rather than a selector string because a network id goes into an
+// attribute selector, and quoting one safely is a job for the DOM rather than
+// for string concatenation.
+function rerenderExport(find) {
+  document.getElementById('main-content').innerHTML = renderExportHtml();
+  const el = find && find();
+  if (el) el.focus();
+  announce(exportSelectionSummary());
+}
+
+// What the ticks currently add up to. Said out loud rather than left to the
+// count panel: that panel is a new node on every render, and a live region that
+// has only just been inserted is not reliably announced.
+function exportSelectionSummary() {
+  const rpts = state.data.stations.filter(s =>
+    s.roles.includes('repeater') && s.repeater &&
+    s.radio_network_ids.some(id => state.exportNets.has(id))
+  ).length;
+  const nets = state.exportNets.size;
+  return `${nets} network${nets === 1 ? '' : 's'} selected — `
+       + `${rpts} repeater${rpts === 1 ? '' : 's'}, `
+       + `${countExportUnits(state.exportNets)} units in the export.`;
+}
+
 function toggleExportNet(id, checked) {
   if (checked) state.exportNets.add(id); else state.exportNets.delete(id);
-  document.getElementById('main-content').innerHTML = renderExportHtml();
+  rerenderExport(() => [...document.querySelectorAll('.checklist input[data-net]')]
+    .find(el => el.dataset.net === id));
 }
 
 function exportSelectAll(v) {
   state.exportNets = v
     ? new Set((state.data.radio_networks || []).map(n => n.id))
     : new Set();
-  document.getElementById('main-content').innerHTML = renderExportHtml();
+  rerenderExport(() => document.querySelector(`.exp-head-acts button[data-all="${v ? 1 : 0}"]`));
 }
 
 function countExportUnits(selectedNets) {
@@ -257,14 +310,27 @@ function runExport() {
     netSection('$NetRole',      (isRpt, isFld) => isRpt ? 1 : 2),
   ].join('\n');
 
-  [
+  const files = [
     ['MegaNet.csv',         megaNetCsv ],
     ['MegaNet_Network.csv', networkCsv ],
     ['MegaNet_Unit.csv',    unitCsv    ],
     ['MegaNet_System.csv',  systemCsv  ],
     ['MegaNet_NetData.csv', netDataCsv ],
-  ].forEach(([name, content], i) => {
+  ];
+  files.forEach(([name, content], i) => {
     setTimeout(() => dlText(name, content), i * 180);
   });
+
+  // Five downloads, spaced 180 ms apart so the browser does not fold them into
+  // one prompt — which means the only sign the button worked is five files
+  // appearing somewhere off screen. Said once, after the last one is handed
+  // over, and it says what was produced rather than that something happened.
+  // Focus stays on the button, which is where the operator left it and where
+  // "do that again" is.
+  setTimeout(() => announce(
+    `Exported ${files.length} Radio Mobile files — `
+    + `${repeaters.length} repeater${repeaters.length === 1 ? '' : 's'}, `
+    + `${units.length} unit${units.length === 1 ? '' : 's'}. Check your downloads.`
+  ), (files.length - 1) * 180 + 60);
 }
 

@@ -34,10 +34,12 @@
    fails that check rather than shipping as a light-theme colour on a dark
    panel.
 
-   ⚠ One palette change does not reach one chart. ArroData writes literal
-   colour values into its SVG rather than var(…), so the PNG export has
-   something to resolve (app.js / arro-data.js). Change a colour here and that
-   chart keeps the old one until somebody edits it by hand — #141 owns it.
+   ⚠ ~~One palette change does not reach one chart.~~ Closed by #141. ArroData
+   still writes literal colour values into its SVG — the PNG export needs
+   something to resolve — but it resolves them off --ad-series-1…12 below at
+   draw time rather than out of an array in arro-data.js, the same way it has
+   always resolved --text and --panel. A palette change reaches the chart on
+   the next repaint(), which toggleTheme() already calls.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 * { box-sizing: border-box; }
@@ -120,6 +122,41 @@
   --maps-region-seqld:     #9b5de5;
   --maps-region-west:      #d98b3a;
   --maps-region-nsw:       #8d99ae;
+
+  /* ── ARRO Data / Field Data: the twelve series colours (#141) ──────────────
+     The warning at the top of this file said a palette change does not reach
+     the ARRO chart, because that chart writes literal colour values into its
+     SVG so the PNG export has something to resolve. Both halves of that were
+     true and only the second was necessary: the *literals* have to be in the
+     SVG, but they did not have to be typed into arro-data.js. They are these
+     tokens now, and the chart resolves them off the document at draw time,
+     exactly as it already resolved --text, --muted, --border and --panel. So
+     the SVG still carries hex, the PNG still renders, and a palette change now
+     reaches the chart on the next repaint() rather than waiting for somebody to
+     retype twelve values in a second file.
+
+     Categorical, like the region fills above, and out of the contrast contract
+     for the same reason — these say "a different sensor", not "better or
+     worse". What tells two series apart without colour is the legend, the dash
+     pattern on the line (arro-data.js's seriesDash) and the readings table
+     under the chart; the hue is the join between them.
+
+     An operator who picks a colour by hand owns it: that series stops tracking
+     the token, in both themes, because a chosen colour is a decision and the
+     theme is not entitled to overrule it. */
+  --ad-series-1:  #0b5cab;
+  --ad-series-2:  #c7401a;
+  --ad-series-3:  #107c10;
+  --ad-series-4:  #7c35a3;
+  --ad-series-5:  #b8860b;
+  --ad-series-6:  #00838f;
+  --ad-series-7:  #ad1457;
+  --ad-series-8:  #5d4037;
+  --ad-series-9:  #3949ab;
+  --ad-series-10: #ef6c00;
+  --ad-series-11: #2e7d32;
+  --ad-series-12: #6a1b9a;
+
   /* ALERT packet bit-field colours (self-contained: mid-tone bg + light text, theme-independent) */
   --c-frame: #4a5568; --c-frame-t: #eef1f5;
   --c-addr:  #2f6fb8; --c-addr-t:  #eaf3ff;
@@ -261,6 +298,25 @@
   --maps-region-seqld:     #c396f5;
   --maps-region-west:      #f0b26b;
   --maps-region-nsw:       #b7c1d4;
+
+  /* The twelve series colours, lifted for a dark page. Same twelve hues, raised
+     in lightness and dropped in saturation: a 1.7 px #5d4037 line on a #18222d
+     panel was a brown that could not be seen at all, and #0b5cab was reading as
+     the panel's own border. This is the set the chart has never had — before
+     #141 it drew the light values on both themes, because the palette lived in
+     a JavaScript array that toggleTheme() had no way to reach. */
+  --ad-series-1:  #6bb6ff;
+  --ad-series-2:  #ff8a63;
+  --ad-series-3:  #57d657;
+  --ad-series-4:  #c79ae8;
+  --ad-series-5:  #e3c05c;
+  --ad-series-6:  #4fd3dd;
+  --ad-series-7:  #ff8ab5;
+  --ad-series-8:  #c9a894;
+  --ad-series-9:  #9aa9ff;
+  --ad-series-10: #ffb066;
+  --ad-series-11: #8fdc9e;
+  --ad-series-12: #d9a6ff;
 
   /* Control surfaces, dark. --border (#2a3948) is the right colour for a
      divider between two dark surfaces and the wrong one for the edge of a
@@ -1362,6 +1418,25 @@ h2.h-bad {
   font-size: .82rem;
   color: var(--muted);
 }
+
+/* ── A status line's colour is a system decision (#141) ──────────────────────
+   Four surfaces had each invented their own way of saying "this line is good /
+   worth a look / wrong": `style="color:var(--ok)"` inline in datastore.js,
+   .ad-bad-txt and .ad-warn-txt in the ARRO Data tab, .hist-bad-text in the
+   history tab. They are the same three statements and they are these three
+   classes, which is what stops the fifth surface inventing a fourth spelling.
+   The first three are converted; .hist-bad-text is left, because it also
+   carries an :empty rule and the Inspection History tab is not #141's.
+
+   The colours are the status tokens, so they are already in the contrast
+   contract `npm run shell` checks — which is the actual argument for a class
+   over an inline colour: an inline `color:` is a decision no check can see.
+   `.txt-muted` is here for the same reason, as the thing to name when a line
+   needs the muted colour without `.small`'s type step. */
+.txt-ok    { color: var(--ok); }
+.txt-warn  { color: var(--warn); }
+.txt-bad   { color: var(--bad); }
+.txt-muted { color: var(--muted); }
 
 /* Station name coloured by primary role, matching the map's colour coding. */
 .stn-name {
@@ -3595,6 +3670,112 @@ code {
   color: var(--muted);
 }
 
+/* ── Export tab (#141) ───────────────────────────────────────────────────────
+   Four inline `padding:.25rem .5rem;font-size:.8rem` buttons, an inline gap and
+   two inline margins. The tab's shape is the shared `.layout` (a sidebar and a
+   column, stacking at --bp-lg on its own), so this is only what was inline. */
+.exp-btn-sm    { padding: var(--sp-1) var(--sp-2); font-size: var(--fs-xs); }
+.exp-head-acts { display: flex; gap: var(--sp-1); align-items: center; }
+.exp-note      { margin-top: var(--sp-1); }
+
+/* The generate panel packs tighter than the app-wide stack: its three children
+   are a header, the file list and one note about a path, which read as one
+   thing rather than three. */
+.exp-main-panel { gap: var(--sp-3); }
+.exp-repeaters  { margin-top: var(--sp-4); }
+
+/* The datastore panel this tab hosts (rendered by datastore.js). Its markup
+   carried eight inline styles, and one of them was a real defect rather than a
+   style: the divider under "Showing …" was `1px solid var(--line)`, and --line
+   is the token #109 found referenced and never defined. An invalid var()
+   invalidates the whole declaration, so that border has never been drawn. #109
+   fixed the three occurrences it knew about; this is the fourth. */
+.db-loaded {
+  margin-bottom: var(--sp-2);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.db-sub    { margin-top: var(--sp-1); }
+.db-host   { margin-top: var(--sp-1); }
+.db-auth   { margin-top: var(--sp-1); }
+.db-reload { padding: var(--sp-1) var(--sp-2); font-size: var(--fs-xs); margin-top: var(--sp-1); }
+
+/* ── ARRO Launcher tab (#141) ────────────────────────────────────────────────
+   Like Pass Ranges before #137, this tab had no section here: one inline
+   `max-width:1000px;margin:auto;padding:1rem;display:grid;gap:1rem` wrapper and
+   sixteen more inline styles inside it, four of which were `color:var(--muted)`
+   on an element that already carried `.small` — which sets that colour. The
+   wrapper is `.page` with --page-max, and what is left below is the two things
+   genuinely local to this tab: the id row, and the recents list. */
+
+.arro-lede  { margin: var(--sp-2) 0 0; max-width: 90ch; }
+.arro-hint  { margin: var(--sp-1) 0 0; }
+.arro-flush { margin: 0; }
+.arro-none  { color: var(--muted); }
+
+.arro-search  { margin-top: var(--sp-2); }
+.arro-results { margin-top: var(--sp-2); }
+
+/* Three boxes that are one thought: two ids, or a URL carrying both. They wrap
+   rather than shrink — an id box narrower than the id in it is worse than a
+   second row. */
+.arro-ids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: flex-end;
+  margin-top: var(--sp-2);
+}
+
+.arro-id-field {
+  display: grid;
+  gap: var(--sp-1);
+  flex: 0 0 12rem;
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.arro-id-field--wide { flex: 1 1 18rem; min-width: 14rem; }
+.arro-optional       { font-weight: 400; }
+
+.arro-actions    { margin-top: var(--sp-3); }
+.arro-action-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+
+/* The two small buttons in a dense row — the results table's "Use" and the
+   recents "Use"/"Clear". One class rather than the three different inline
+   padding/font-size pairs that were here. */
+.arro-btn-sm {
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-xs);
+}
+
+.arro-row-acts {
+  white-space: nowrap;
+  display: flex;
+  gap: var(--sp-1);
+  align-items: center;
+}
+
+.arro-recents { margin-top: var(--sp-2); }
+
+.arro-recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.arro-recent-list li {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.arro-recent-name { font-weight: 600; }
+
 /* ── Serial Monitor tab ─────────────────────────────────────────────────────── */
 .serial { max-width: 1100px; margin: auto; padding: 1rem; display: grid; gap: 1rem; }
 .serial .sub { color: var(--muted); font-size: .92rem; margin: .35rem 0 0; max-width: 90ch; }
@@ -4545,12 +4726,31 @@ code {
   font-size: .85rem;
 }
 .ad-drop--active { border-color: var(--accent); color: var(--accent); background: var(--subtle); }
+.ad-drop-sub     { margin: var(--sp-1) 0 var(--sp-2); }
+.ad-drop-busy    { margin-top: var(--sp-1); }
 
 .ad-note { min-height: 1.1rem; margin: .35rem 0 .1rem; color: var(--muted); }
 .ad-note--bad { color: var(--bad); }
 
 .ad-panel { margin-top: .6rem; padding: .6rem .7rem .7rem; }
 .ad-panel .panel-header { margin-bottom: .35rem; }
+
+/* A panel's own heading is an h2 under the shell's h1 (#141 — the tab used to
+   open at h3, which told a screen reader it was a subsection of something that
+   is not there). A section *inside* a panel is the h3, and it is a heading
+   rather than a bold line so it appears in a heading list at all; the type step
+   is what stops it reading as a second panel. */
+.ad-panel > .panel-header h2 { font-size: var(--fs-md); }
+
+.ad-subhead {
+  padding: 0;
+  border: 0;
+  margin: var(--sp-2) 0 var(--sp-1);
+}
+
+.ad-subhead-h { font-size: var(--fs-xs); }
+
+.ad-filt-lede { margin: 0 0 var(--sp-1); }
 
 /* One import. The colour swatch doubles as the legend key, so it sits with the
    name rather than in a legend of its own. */
@@ -4578,7 +4778,6 @@ code {
   cursor: pointer; padding: 0 .25rem; font-size: .9rem; line-height: 1;
 }
 .ad-x:hover { color: var(--bad); }
-.ad-bad-txt { color: var(--bad); }
 .ad-unlinked { color: var(--warn); }
 .ad-warn { color: var(--warn); margin-top: .2rem; }
 
@@ -4587,6 +4786,15 @@ code {
   gap: .5rem; margin: .2rem 0; font-size: .8rem;
 }
 .ad-cfg-row input { width: 84px; }
+
+/* The picker's rows are a label above a full-width field rather than a label
+   beside a number box — a station name does not fit in 84 px. Same class, one
+   modifier, so the two read as the same kind of row. */
+.ad-cfg-row--block  { display: block; }
+.ad-cfg-row--spaced { margin-top: var(--sp-1); }
+/* Scoped, because `.ad-cfg-row input` above is (0,1,1) and would otherwise hold
+   a station-name box at the 84 px a number box wants. */
+.ad-cfg-row .ad-field-input { width: 100%; margin-top: var(--sp-1); }
 .ad-cfg-chk { display: flex; align-items: center; gap: .35rem; font-size: .8rem; margin: .25rem 0; }
 .ad-cfg-note { color: var(--muted); margin: .45rem 0 0; }
 .ad-panel-acts { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
@@ -4604,7 +4812,6 @@ code {
 .ad-filt-body { padding-left: 1.35rem; }
 .ad-filt--off .ad-filt-head { color: var(--muted); font-weight: 500; }
 .ad-filt--off .ad-filt-body { opacity: .5; }
-.ad-warn-txt { color: var(--warn); }
 
 /* A link that has to read as part of a sentence. .btn-link is a bordered
    button, which inside a run of stats or a paragraph shoulders the words apart
@@ -4614,16 +4821,24 @@ code {
   font: inherit; color: var(--accent);
   text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
 }
-.ad-inline-link.ad-bad-txt { color: var(--bad); }
-.ad-inline-link:hover { text-decoration-thickness: 2px; }
+.ad-inline-link.ad-inline-link:hover { text-decoration-thickness: 2px; }
 
-/* Two charts of the same window, folded away until asked for. */
-.ad-compare { margin-top: .6rem; border-top: 1px solid var(--border); padding-top: .4rem; }
-.ad-compare > summary {
+/* Two charts of the same window, folded away until asked for — and, since #141,
+   the same numbers as a table, folded away beside it. Same treatment, because
+   they are the same kind of thing: a second look at what the chart is already
+   showing. The table is part 3 of the chart pattern (docs/design-system.md §3),
+   which is why it is not optional furniture: it is the only route to the values
+   that does not involve pointing at a pixel. */
+.ad-compare,
+.ad-table { margin-top: .6rem; border-top: 1px solid var(--border); padding-top: .4rem; }
+.ad-compare > summary,
+.ad-table > summary {
   cursor: pointer; font-size: .85rem; font-weight: 600;
   padding: .2rem 0; list-style-position: outside;
 }
-.ad-compare > summary .small { font-weight: 400; color: var(--muted); }
+.ad-compare > summary .small,
+.ad-table > summary .small { font-weight: 400; color: var(--muted); }
+.ad-table-note { margin: var(--sp-2) 0 0; }
 .ad-compare-grid {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: .6rem; margin-top: .5rem;
@@ -4649,9 +4864,23 @@ code {
 .ad-tool-grp { display: flex; gap: .25rem; align-items: center; flex-wrap: wrap; }
 .ad-num { width: 76px; }
 .ad-chk { display: flex; align-items: center; gap: .25rem; font-size: .78rem; color: var(--muted); }
+/* A tick whose filter is not running. The control is `disabled` too, so this is
+   the visible half of a state the accessibility tree already has. */
+.ad-chk--off { opacity: .45; }
+
+/* The sensor list's ticks sit against a two-part label — name, then address —
+   so they align on the text rather than on the box's middle. */
+.ad-sensor-row { gap: var(--sp-1); align-items: baseline; font-size: var(--fs-sm); color: var(--text); }
+
+.ad-field-none   { margin: var(--sp-1) 0; }
+.ad-field-noaddr { margin-top: var(--sp-1); }
+.ad-field-run    { width: 100%; margin-top: var(--sp-2); }
+.ad-field-msg    { margin-top: var(--sp-1); }
+.ad-flush        { margin: 0; }
 
 /* Segmented control: one choice out of a few, reading as a single object. */
 .ad-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.ad-seg--wrap { flex-wrap: wrap; }
 .ad-seg button {
   border: 0; border-radius: 0; margin: 0;
   padding: .26rem .55rem; font-size: .78rem;
@@ -4689,7 +4918,16 @@ code {
 .ad-tip-t { color: var(--muted); margin-bottom: .15rem; }
 .ad-tip-r { display: flex; align-items: center; gap: .3rem; white-space: nowrap; }
 
-.ad-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+/* The legend key beside a series name, in the readout, the tooltip and the
+   pinned reading. Its colour is the series' own, so it arrives as a token on
+   the element — `style="--dot:#0b5cab"` — rather than as an inline `background`.
+   That is the distinction #109's proving-ground check and #137's basin fills
+   both rest on: a custom property on an element is the system reaching it; a
+   declaration is the element deciding. */
+.ad-dot {
+  width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none;
+  background: var(--dot, var(--muted));
+}
 
 .ad-readout {
   margin-top: .5rem; min-height: 2.6rem;
@@ -4764,6 +5002,18 @@ code {
   .ad-layout { grid-template-columns: 1fr; }
   .ad-side   { height: auto; overflow: visible; }
   .ad-stage  { height: 54dvh; }
+
+  /* Stacked, the rail comes first in the DOM and put about a thousand pixels of
+     imports and filter settings above the chart — on the tab whose entire point
+     is the chart. Same trade the map tabs already make above (`.map-layout >
+     .sidebar { order: 2 }`), and the same reasoning: on a phone the thing the
+     tab is for goes first.
+
+     Only once there is a chart to put there (#141). With nothing loaded the
+     "main" column is a paragraph explaining what to drop on the tab, and the
+     rail is the drop zone and the station picker — so with no data the input
+     is the point, and it keeps the top of the screen. */
+  .ad-wrap--charted .ad-side { order: 2; }
 }
 
 /* ══ Mobile pass ═══════════════════════════════════════════════════════════
@@ -5456,6 +5706,48 @@ code {
     min-height: 2.75rem;
     display: inline-flex;
     align-items: center;
+  }
+
+  /* #141's own controls, at the same 44 px and for the same reason as #137's:
+     the ARRO Data toolbar is thirty controls in four groups, and the segmented
+     buttons were 28 px tall by design — a dense desktop row that a fingertip
+     hits by luck. The colour swatch is the extreme case at 20 px square.
+
+     `align-items: center` for the same reason it is on the chips above: without
+     it the text sits at the top of a 44 px box and the bottom third reads as a
+     gap. */
+  .ad-seg button,
+  .ad-x,
+  .ad-field-hit,
+  .ad-inline-link,
+  .ad-tool-grp button,
+  .arro-btn-sm,
+  .arro-row-acts a,
+  .exp-btn-sm,
+  .db-reload {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: var(--sp-1);
+    padding-bottom: var(--sp-1);
+  }
+
+  /* The station hits are a left-aligned list, not a row of buttons. */
+  .ad-field-hit { justify-content: flex-start; }
+
+  /* …and the one that cannot grow into a box, because a colour input *is* its
+     swatch: it gets the height instead, and the row around it the room. */
+  .ad-swatch { width: 2.4rem; height: 2.4rem; }
+
+  /* A link that has to read as part of a sentence cannot become a 44 px block
+     without breaking the sentence — it takes the hit area as padding, the same
+     trade .filter-only makes above. */
+  .ad-inline-link {
+    display: inline;
+    padding-top: 0;
+    padding-bottom: 0;
+    min-height: 0;
   }
 
   /* The "only" shortcut hides until hover where there is a pointer. There is

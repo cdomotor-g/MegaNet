@@ -107,25 +107,23 @@ function renderLoadedSourceHtml() {
   if (!src) return '';
 
   const live = src.kind === 'api';
-  const colour = live ? 'var(--ok)' : 'var(--warn)';
+  const tone = live ? 'txt-ok' : 'txt-warn';
   const bits = [];
   if (src.ms != null) bits.push(`${src.ms} ms`);
   if (src.dated) bits.push(`data dated ${esc(src.dated)}`);
   bits.push(`loaded ${src.at.toLocaleTimeString()}`);
 
   return `
-    <div style="margin-bottom:.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--line)">
-      <div style="color:${colour}">
+    <div class="db-loaded">
+      <div class="${tone}">
         <strong>Showing ${esc(SOURCE_LABELS[src.kind] || src.kind)}</strong>
       </div>
-      <div class="small" style="margin-top:.25rem">${bits.join(' · ')}</div>
+      <div class="small db-sub">${bits.join(' · ')}</div>
       ${!live && state.loadError
-        ? `<div class="small" style="margin-top:.25rem;color:var(--warn)">
-             fell back — ${esc(state.loadError)}
-           </div>`
+        ? `<div class="small db-sub txt-warn">fell back — ${esc(state.loadError)}</div>`
         : ''}
       ${!live
-        ? `<button onclick="reloadFromDatastore()" style="padding:.25rem .5rem;font-size:.8rem;margin-top:.4rem">
+        ? `<button class="db-reload" onclick="reloadFromDatastore()">
              Load from the datastore
            </button>`
         : ''}
@@ -145,12 +143,12 @@ async function reloadFromDatastore() {
 // and a write that will not is otherwise indistinguishable from here.
 function authLineHtml() {
   if (!Auth.isSignedIn()) {
-    return `<div class="small" style="margin-top:.2rem;color:var(--muted)">
+    return `<div class="small db-auth">
       Reading anonymously — <a href="#" onclick="Auth.open();return false">sign in</a> to edit.</div>`;
   }
   const email = Auth.email();
   const ok    = Auth.mayWrite();
-  return `<div class="small" style="margin-top:.2rem;color:${ok ? 'var(--ok)' : 'var(--warn)'}">
+  return `<div class="small db-auth ${ok ? 'txt-ok' : 'txt-warn'}">
     Signed in${email ? ` as ${esc(email)}` : ''}${Auth.role() ? ` (${esc(Auth.role())})` : ''} —
     ${ok ? 'edits will be saved and attributed' : 'not on the editors list, so edits will be refused'}.</div>`;
 }
@@ -158,7 +156,7 @@ function authLineHtml() {
 function renderDbStatusHtml() {
   const s = state.dbStatus;
   const loaded = renderLoadedSourceHtml();
-  const host = `<div class="small" style="margin-top:.35rem">${esc(dbHostLabel())}</div>${authLineHtml()}`;
+  const host = `<div class="small db-host">${esc(dbHostLabel())}</div>${authLineHtml()}`;
 
   if (!s || s.checking) {
     return `${loaded}<div class="small">Checking…</div>${host}`;
@@ -167,8 +165,8 @@ function renderDbStatusHtml() {
   if (!s.ok) {
     return `
       ${loaded}
-      <div style="color:var(--bad)"><strong>Not connected</strong></div>
-      <div class="small" style="margin-top:.25rem;color:var(--bad)">${esc(s.error)}</div>
+      <div class="txt-bad"><strong>Not connected</strong></div>
+      <div class="small db-sub txt-bad">${esc(s.error)}</div>
       ${host}`;
   }
 
@@ -178,17 +176,17 @@ function renderDbStatusHtml() {
   if (s.version !== DB_SCHEMA_VERSION) {
     const older = s.version != null && s.version < DB_SCHEMA_VERSION;
     return `
-      <div style="color:var(--warn)"><strong>Connected · schema mismatch</strong></div>
-      <div class="small" style="margin-top:.25rem;color:var(--warn)">
+      <div class="txt-warn"><strong>Connected · schema mismatch</strong></div>
+      <div class="small db-sub txt-warn">
         database is v${esc(s.version ?? '?')}, this app expects v${DB_SCHEMA_VERSION} —
         ${older ? 'apply the newer migrations in db/migrations/' : 'this copy of the app is out of date'}
       </div>
-      <div class="small" style="margin-top:.25rem">${s.ms} ms round trip</div>
+      <div class="small db-sub">${s.ms} ms round trip</div>
       ${host}`;
   }
 
   return `
-    <div style="color:var(--ok)"><strong>Connected · schema v${s.version} · ${s.ms} ms</strong></div>
+    <div class="txt-ok"><strong>Connected · schema v${s.version} · ${s.ms} ms</strong></div>
     ${host}`;
 }
 
@@ -214,9 +212,11 @@ function initExport() {
 // wants a copy on a USB stick before going somewhere without a network.
 async function snapshotStationsJson() {
   const btn = document.getElementById('btn-snapshot');
-  const say = (text, colour) => {
+  // The note is a live region on the Export tab (#141), so writing to it is the
+  // announcement — the tone class is the visible half of the same sentence.
+  const say = (text, tone) => {
     const el = document.getElementById('snapshot-note');
-    if (el) el.innerHTML = `<span style="color:${colour || 'var(--muted)'}">${esc(text)}</span>`;
+    if (el) el.innerHTML = `<span class="${tone || 'txt-muted'}">${esc(text)}</span>`;
   };
 
   if (btn) btn.disabled = true;
@@ -238,9 +238,9 @@ async function snapshotStationsJson() {
     // or a diff can show. The committed file is produced the same way.
     dlText('stations.json', JSON.stringify(doc, null, 2) + '\n');
     say(`Downloaded ${doc.stations.length.toLocaleString()} stations, as at ${new Date().toLocaleString()}.`,
-        'var(--ok)');
+        'txt-ok');
   } catch (err) {
-    say(`Could not snapshot the database — ${err && err.message || err}`, 'var(--bad)');
+    say(`Could not snapshot the database — ${err && err.message || err}`, 'txt-bad');
   } finally {
     if (btn) btn.disabled = false;
   }

@@ -141,11 +141,21 @@ Non-text contrast (1.4.11, 3:1) is checked for `--ctl-border` against its
 panel. Purely decorative dividers — `--border` between two surfaces — are not
 in scope for 1.4.11 and are not checked.
 
-⚠️ **A palette change does not reach the ARRO chart.** `ArroData` writes
-literal colour values into its SVG rather than `var(…)` so the PNG export has
-something to resolve. Change a colour here and that chart keeps the old one
-until somebody edits it by hand, keeping `ArroData.repaint()` in step. #141
-owns it. Flag any palette change loudly for this reason.
+⚠️ ~~**A palette change does not reach the ARRO chart.**~~ **Closed by #141.**
+`ArroData` still writes literal colour values into its SVG rather than `var(…)`
+— the PNG export has to have something to render, and a `var()` resolves to
+nothing once the picture has been handed to a canvas — but the literals now
+come from `--ad-series-1…12` (light and dark), resolved off the document at draw
+time exactly as `--text` and `--panel` always were. A palette change reaches the
+chart on the next `repaint()`, which `toggleTheme()` already calls, and
+`npm run tabs` holds the round trip.
+
+The twelve series colours are **categorical and deliberately out of the contrast
+contract**, for the same reason the eight region fills are: they say "a
+different sensor", not "better or worse". What tells two series apart without
+colour is the legend, the **dash pattern** on the line and the readings table
+under the chart — see the chart pattern below. A colour the operator picks by
+hand takes that series out of the palette permanently, in both themes.
 
 ---
 
@@ -306,6 +316,17 @@ to write it down rather than let each of them re-derive a different half.
    the text it replaces, not as a button — forty bordered buttons down a column
    read as a form; hover and focus are what say it is a control.
 
+9. **A status line's colour is a class, not an inline `color:`** *(added by
+   #141)*. `.txt-ok` · `.txt-warn` · `.txt-bad` · `.txt-muted`. Four surfaces had
+   each invented their own spelling of the same three statements — an inline
+   `style="color:var(--ok)"` in `datastore.js`, `.ad-bad-txt` and `.ad-warn-txt`
+   on the ARRO Data tab, `.hist-bad-text` on the history tab. The argument for
+   the class over the inline colour is not tidiness: the status tokens are in
+   the contrast contract `npm run shell` measures, and an inline `color:` is a
+   decision no check can see. Three of the four are converted; `.hist-bad-text`
+   is left where it is, because it also carries an `:empty` rule and the
+   Inspection History tab is not #141's to restyle.
+
 **One implementation note that bit #137 and will bit the rest.** A
 `<colgroup>` of percentage widths is still honoured under `table-layout: auto`,
 strongly enough that Pass Ranges' six columns came out at 16% and 8% of a 340 px
@@ -342,6 +363,36 @@ its estimate and its Release button.
 What **not** to do: `aria-label` on a `<canvas>` and nothing else; a hidden
 `<div>` containing every data point as prose; `role="img"` on something
 interactive.
+
+**Two things #141 learned applying this to the biggest chart in the app**, and
+both generalise:
+
+- **The picture and the control are two elements, and keeping them apart is what
+  makes part 1 possible.** The ARRO chart is an `<svg>` inside a focusable stage
+  that pans, zooms and pins. The stage is a *control*: it is the tab stop and
+  its name says what operating it does. The `<svg>` is the *picture*: it is
+  `role="img"` and its name carries the numbers. Putting one name on the stage
+  meant the interaction hint and the headline number competing for one string,
+  and the number lost — the label was `"Sensor readings over time"` whether the
+  chart held twelve readings or twelve thousand.
+- **Rebuild the name where the view changes, not where the picture is drawn.**
+  Computing it walks the readings in the window, and the chart redraws on every
+  crosshair move. `ArroData.drawOv()` is the one function that runs on a view
+  change and on nothing else, which is where the name, the readings table and
+  the comparison panes are all refreshed from.
+
+**And part 3 has a floor: a capped table says so.** The readings table is up to
+300 rows and the window can hold a hundred thousand; it prints which it is and
+points at the two Export buttons for the rest. A table that silently showed the
+first 300 would read as "these are the readings", which is a worse answer than
+no table.
+
+**Colour is never the only channel.** Two series drawn in two hues are one
+series to a red-green dichromat and to a greyscale printer, which is what an
+incident report usually is. `arro-data.js` carries six dash patterns and four
+marker shapes cycled with the twelve colours — off when only one series is
+shown, because a lone dashed line says "provisional" and means nothing of the
+kind.
 
 ### …and the one graphic that is allowed to be `role="img"` while being clicked
 
@@ -537,12 +588,33 @@ that list.** Per tab:
 - **Clickable rows** — every `<tr onclick>` holds a focusable control (pattern 8).
 - **Landmarks** — every `<aside>` inside `<main>` has a name.
 - **Names** — every visible interactive element has an accessible name.
-- **Headings** step by one, counting the shell's `h1`.
+- **Headings** step by one, over the shell's `h1` **plus the headings inside
+  `#main-content`** — corrected by #141. It used to read the whole document in
+  order, which handed every tab five free `h2`s: #108's nav group headings sit
+  ahead of `<main>` in the DOM, so a tab opening at `h3` followed an `h2` and
+  passed. Three of the four tabs #141 converted were doing exactly that.
 - **No sideways scroll** of the document at 375, 768 and 1440, in both themes.
 
-Plus pattern 8's condition, which belongs to the pattern rather than to a tab:
-every region the basin drawing draws has a chip of its own, no polygon is a tab
-stop, and the drawing's name carries a number.
+A converted tab may carry a **`seed`** — source for a function run in the page
+right after `switchTab()` (#141). Two of the nineteen tabs have nothing to check
+until something is loaded: ARRO Data draws nothing until a CSV is dropped on it,
+and Field Data draws nothing until the datastore answers, which under the
+harness it never does. Both seed a pair of series through the module's own
+boundary (`seriesData` → `adoptSeries`), so what the check draws is what the app
+draws, and both open the `<details>` panels — a closed one is `display: none`
+and everything inside it would be filtered out as invisible.
+
+Plus two claims that belong to a pattern rather than to a tab:
+
+- **Pattern 8's condition** — every region the basin drawing draws has a chip of
+  its own, no polygon is a tab stop, and the drawing's name carries a number.
+- **The chart palette is the document's** *(added by #141)* — the twelve
+  `--ad-series-*` tokens have a dark set and it differs, each series is the
+  colour its token resolves to in both themes, the SVG still carries literals so
+  a PNG can render it, a colour chosen by hand survives a theme change, and two
+  series carry different dash patterns. Without this, the sentence "a palette
+  change now reaches the chart" is a claim about a second file that nothing
+  holds.
 
 ## 7. What #109 deliberately did not do
 
@@ -553,5 +625,26 @@ three concerns in one file, three agents in the same lines. See #107 and
 constraint 2 on #113.
 
 **#137 has since taken Networks, Pass Ranges and Radio Path Maps**, and left §6
-behind so the next five are checked rather than reviewed. Sixteen tabs to go,
-across #136 and #138–#141.
+behind so the next five are checked rather than reviewed.
+
+**#141 has since taken ARRO Launcher, ARRO Data, Field Data and Export** — the
+whole Telemetry-and-admin end of the nav. What it left the remaining three
+(#136 U1, #138 U3, #139 U4, #140 U5) is in this document rather than in its own
+four files: the chart pattern applied end to end and the two lessons that came
+out of doing it (§3), the `.txt-*` status classes (pattern 9), the series
+palette as tokens with the round trip checked (§1, §6), the `seed` hook and the
+corrected heading assertion (§6). **Twelve tabs to go, across #136 and
+#138–#140.**
+
+Three of those four are worth knowing about before picking up another U-issue:
+
+- **The heading assertion was blind, and probably still is in your tab.** It
+  read the whole document, and the nav's five `h2`s meant a tab opening at `h3`
+  passed. It does not any more. If your tab's first heading is an `h3`, it is
+  going to fail now, and it was wrong before.
+- **A tab that renders nothing until something loads was checked as an empty
+  state.** If yours has a populated view the harness cannot reach — a query, an
+  upload, a device — give it a `seed` rather than accepting the pass.
+- **An inline `color:` is invisible to the contrast check.** That is the real
+  reason pattern 9 exists, and it applies to any status line, not just the four
+  #141 found.

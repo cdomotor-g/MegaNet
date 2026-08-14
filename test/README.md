@@ -29,7 +29,7 @@ npm run all                       # the twelve that run in CI
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
 | `npm run nav` | every tab is in the left nav exactly once, under one heading, and findable by its own label and by what it does |
 | `npm run shell` | the shell's landmarks, skip link, focus policy and disclosure state; the six-step breakpoint scale; and WCAG contrast for every token pair in both themes |
-| `npm run tabs` | EPIC #107's per-tab Definition of Done, per tab that claims to have been through a U-issue: no inline styles, tables wrapped/captioned/scoped, scroll regions named, clickable rows keyboard-reachable, landmarks and controls named, headings stepping by one, and no sideways scroll at 375/768/1440 in both themes |
+| `npm run tabs` | EPIC #107's per-tab Definition of Done, per tab that claims to have been through a U-issue: no inline styles, tables wrapped/captioned/scoped, scroll regions named, clickable rows keyboard-reachable, landmarks and controls named, headings stepping by one, and no sideways scroll at 375/768/1440 in both themes — plus the two pattern-level claims (the basin drawing's shortcut condition, and the ARRO chart's palette round trip) |
 | `npm run help` | every tab's help entry is real content, every link out of the panel lands, and each walkthrough names itself and fits the rail |
 | `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
 | `npm run maint` | the Council Maintenance Tasks form renders what the workbook's own filled sheet says — with the fixture read out of the `.xlsx` |
@@ -322,6 +322,41 @@ theme and green in the other, which is not a theme bug: crossing the `xs` step
 turns both rails from drawers into columns over a 160 ms transition, and the
 check was measuring inside it. It waits the transition out now, for exactly the
 reason `app.js` does before it re-measures a map.
+
+### `tabs.mjs` — a list rather than a sweep, and two blind spots in it
+
+`shell.mjs` holds #109's system against the shell **and one tab**, deliberately
+and by its own comment. `tabs.mjs` (#137) is the other half: the same system
+held against every tab a U-issue claims to have converted, named in `CONVERTED`.
+A list rather than a sweep, on purpose — a tab nobody has converted does not
+fail a check for work nobody has done, and a U-issue's landing commit adding its
+ids is what puts it under the check.
+
+**Two ways this check was quietly passing tabs it should not have**, both found
+by #141 and both fixed there:
+
+- **It read the whole document's heading outline**, so every tab got five free
+  `h2`s: #108's nav group headings sit ahead of `<main>` in the DOM. A tab whose
+  own first heading was an `h3` — three of #141's four — followed an `h2` and
+  passed. It reads the shell's `h1` plus the headings inside `#main-content`
+  now, which is the outline that actually belongs to the tab. Confirmed red by
+  putting one heading back.
+- **It checked two tabs in a state they are almost never in.** ARRO Data draws
+  nothing until a CSV is dropped on it and Field Data draws nothing until the
+  datastore answers — which under this harness it never does. Both were passing
+  on an empty state and a paragraph while the toolbar, the chart, the legend,
+  the readout and the readings table went unmeasured. A `CONVERTED` entry can
+  carry a **`seed`** now: source for a function run in the page right after
+  `switchTab()`. It builds two series through the module's own boundary
+  (`seriesData` → `adoptSeries`) rather than out of a fixture file, so what the
+  check draws is what the app draws, and it opens the `<details>` panels because
+  a closed one is `display: none` and everything inside it filters out as
+  invisible. The seeded ARRO Data tab checks 61 controls and 2 tables; before
+  it, **one control and no tables**.
+
+The generalisable half is the same shape as `maint`'s and `history`'s findings:
+*a check is only as good as the state it is run against*. Uniform fixtures hide
+rules about the non-uniform case; empty states hide everything.
 
 ### `inspections.mjs` — the half the network policy hides
 
@@ -687,12 +722,25 @@ without looking, and a verifier nobody looks at verifies nothing.
   every pair in its contract, in both themes, so a new token needs a
   dark-theme value *and* a line in `TEXT_PAIRS` or `NONTEXT_PAIRS` in
   `shell.mjs` naming what it is drawn on. Two of #109's own colours moved
-  because of that check rather than because anyone looked at them. And if the
+  because of that check rather than because anyone looked at them. ~~And if the
   colour is one the ARRO chart draws, `ArroData` writes literal values into its
-  SVG for the PNG export and does **not** pick up a token change — that is
-  #141's, by hand.
+  SVG for the PNG export and does not pick up a token change.~~ **Closed by
+  #141** — the chart's twelve colours are `--ad-series-1…12` and it resolves
+  them off the document at draw time, so a palette change reaches it on the next
+  `repaint()`. `tabs.mjs` holds that round trip; break it and two assertions go
+  red. The twelve are categorical and deliberately *not* in the contrast
+  contract, the same argument as `--maps-region-*`.
 - **A U-issue landed a tab.** Add its tab id to `CONVERTED` in `tabs.mjs`, in
-  the same commit. That list is what the per-tab Definition of Done is asserted
+  the same commit. If the tab renders nothing worth checking until something is
+  loaded, give the entry a `seed` — source for a function run in the page right
+  after `switchTab()` (#141). Two of the nineteen are like that and they are the
+  same module: ARRO Data draws nothing until a CSV is dropped on it, and Field
+  Data draws nothing until the datastore answers, which under this harness it
+  never does. Both were passing as an empty state and a paragraph while the
+  toolbar, the chart, the legend and the readings table went unmeasured. Seed
+  through the module's own boundary rather than a fixture file, and open any
+  `<details>` you want checked — a closed one is `display: none`, and everything
+  inside it is filtered out as invisible. That list is what the per-tab Definition of Done is asserted
   against, and a tab left off it is a tab nobody is holding — the check will go
   green all the way through a conversion that dropped half of it. The reverse is
   deliberate too: a tab nobody has converted yet does not fail a check for work

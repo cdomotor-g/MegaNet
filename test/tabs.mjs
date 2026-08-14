@@ -48,6 +48,14 @@
 //                   h1. A tab that opens at h3 tells a screen reader it is a
 //                   subsection of something that is not there.
 //
+//                   Measured over the shell's h1 plus the headings inside
+//                   #main-content, and *not* over the whole document (#141).
+//                   Reading the document in order gave every tab five free h2s
+//                   before it started: #108's five nav group headings sit ahead
+//                   of <main> in the DOM, so a tab opening at h3 followed an h2
+//                   and passed. Three of the four tabs #141 converted were doing
+//                   exactly that, and this check said nothing about any of them.
+//
 //   Overflow.       No sideways scroll of the document at 375, 768 and 1440, in
 //                   both themes. Same assertion shell.mjs makes about the shell,
 //                   made about each converted tab — which is where the wide
@@ -73,14 +81,83 @@ import { applyNetworkPolicy } from './lib/network.mjs';
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
 
+// ── Seeds ───────────────────────────────────────────────────────────────────
+// A `seed` on a CONVERTED entry is source for a function run in the page
+// immediately after switchTab(), for a tab whose interesting state does not
+// exist until something is loaded (#141). Two of the nineteen are like that and
+// they are the same module: ARRO Data draws nothing until a CSV is dropped on
+// it, and Field Data draws nothing until the datastore answers — which under
+// this harness it never does, because the network policy blocks it. Checked as
+// they arrive, both tabs are an empty state and a paragraph, and the toolbar,
+// the chart, the legend, the readout and the readings table — every surface
+// #141 actually converted — went unmeasured. Seeded, ARRO Data goes from one
+// visible control and no tables to 61 and two.
+//
+// The series seed goes through the module's own boundary (`seriesData` →
+// `adoptSeries`, the door #114 added and documented) rather than reaching into
+// its internals, so a series this check can draw is a series the app can draw.
+// It is deliberately not a fixture file: a file would be a second statement of
+// the shape, and the shape is what the boundary is for.
+
+// The Launcher's results table only exists once something has been typed, and
+// the table is most of what there is to check on that tab.
+const SEED_ARRO_SEARCH = `() => {
+  state.arro.search = 'a';
+  renderMain();
+}`;
+
+// Two series, because one series is the case where the dash patterns are
+// deliberately off and the chart's name says "1 series" — neither of which is
+// the case worth holding. Both <details> are opened, because a closed one is
+// display:none and everything inside it would be filtered out as invisible:
+// the readings table is the chart pattern's part 3 and the whole reason this
+// seed exists.
+function seedSeries(source) {
+  return `() => {
+    const mk = (n, t0, step, spike) => {
+      const t = new Float64Array(n), tr = new Float64Array(n);
+      const v = new Float64Array(n), raw = new Float64Array(n), q = new Uint8Array(n);
+      for (let i = 0; i < n; i++) {
+        t[i]  = t0 + i * step;
+        tr[i] = t[i] + 5000;
+        v[i]  = i * 0.4 + (i % 53 === 0 ? spike : 0);
+        raw[i] = v[i];
+        q[i] = 0;
+      }
+      return { n, t, tr, v, raw, q, qcodes: ['Good'], unit: 'mm', warn: [], hasRaw: true };
+    };
+    const t0 = Date.UTC(2026, 2, 1, 0, 0, 0);
+    const field = ${source === 'field' ? 'true' : 'false'};
+    const prov = i => field ? {
+      host: 'seed.meganet.test', res: 'raw', addr: 'a:612' + i,
+      t0, t1: t0 + 400 * 900000, capped: false,
+    } : null;
+    ArroData.adoptSeries(ArroData.seriesData(mk(400, t0, 900000, 900)), {
+      fileName: 'seed-a.csv', label: 'Seed A · Rainfall', kind: 'RA', prov: prov(8),
+    });
+    ArroData.adoptSeries(ArroData.seriesData(mk(400, t0, 900000, -400)), {
+      fileName: 'seed-b.csv', label: 'Seed B · Water level', kind: 'WL', prov: prov(9),
+    });
+    ArroData.ad.tableOpen = true;
+    ArroData.ad.compare = true;
+    renderMain();
+  }`;
+}
+
 // The tabs that have been through a U-issue. Add yours here when you land it —
 // that is how this check grows with the epic. The label is the nav label, so a
-// failure names the tab the way the app does.
+// failure names the tab the way the app does. Add a `seed` above and name it
+// here if your tab has a state the harness cannot reach on its own.
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
   { id: 'maps',       label: 'Radio Path Maps', issue: '#137' },
+  { id: 'arro',       label: 'ARRO Launcher',   issue: '#141', seed: SEED_ARRO_SEARCH },
+  { id: 'arrodata',   label: 'ARRO Data',       issue: '#141', seed: seedSeries('arro') },
+  { id: 'field',      label: 'Field Data',      issue: '#141', seed: seedSeries('field') },
+  { id: 'export',     label: 'Export',          issue: '#141' },
 ];
+
 
 const results = [];
 function check(name, pass, detail = '') {
@@ -133,9 +210,10 @@ try {
   for (const tab of CONVERTED) {
     console.log(`\n${tab.label} — converted by ${tab.issue}\n`);
 
-    const found = await page.evaluate(async ([id, nameSrc]) => {
+    const found = await page.evaluate(async ([id, nameSrc, seedSrc]) => {
       const accName = eval('(' + nameSrc + ')');
       switchTab(id);
+      if (seedSrc) eval('(' + seedSrc + ')')();
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       const main = document.getElementById('main-content');
       const visible = el => !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
@@ -182,11 +260,16 @@ try {
       const unnamed = controls.filter(el => !accName(el))
         .map(el => el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).split(/\s+/)[0] : ''));
 
-      // Counting the shell's own h1, because that is what a screen reader's
-      // heading list shows: the tab's headings are a continuation of it.
-      const levels = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')]
-        .filter(visible)
-        .map(h => Number(h.tagName[1]));
+      // The shell's own h1, then the tab's headings — the outline a screen
+      // reader gets for *this tab*, which is the thing being asserted. The nav's
+      // group headings are deliberately not in it: they belong to the nav, they
+      // are the same five on every tab, and counting them handed every tab in
+      // the app an h2 it had not written (#141).
+      const levels = [
+        ...[...document.querySelectorAll('header h1')].filter(visible).map(() => 1),
+        ...[...main.querySelectorAll('h1, h2, h3, h4, h5, h6')].filter(visible)
+          .map(h => Number(h.tagName[1])),
+      ];
       const skips = [];
       for (let i = 1; i < levels.length; i++) {
         if (levels[i] > levels[i - 1] + 1) skips.push(`h${levels[i - 1]} → h${levels[i]}`);
@@ -200,7 +283,7 @@ try {
         asides: asides.length, controls: controls.length, unnamed,
         skips, levels: levels.join(' '),
       };
-    }, [tab.id, NAME_FN]);
+    }, [tab.id, NAME_FN, tab.seed || null]);
 
     check(`${tab.label}: no inline style but a token override`,
       found.inline.length === 0, found.inline.slice(0, 3).join(' · '));
@@ -287,6 +370,70 @@ try {
     (shortcut.orphanRegions || []).length === 0, (shortcut.orphanRegions || []).join(', '));
   check('and exactly one region chip reads as pressed', shortcut.pressed === 1,
     String(shortcut.pressed));
+
+  // ── A chart's palette belongs to the document, not to a script ─────────────
+  // The second pattern-level check, added by #141 for the same reason #137
+  // added the first: the claim is about a pattern rather than about a tab, and
+  // without this nothing holds it.
+  //
+  // For most of this app's life the ARRO chart drew twelve hex literals typed
+  // into arro-data.js. They could not follow the theme, so the top of
+  // styles.css carried a warning that a palette change did not reach this
+  // chart, and #113 listed it as a thing #141 would have to do by hand. It is
+  // --ad-series-1…12 now, resolved off the document at draw time — which means
+  // the *next* palette change is only free if this stays true. Three claims:
+  // the twelve tokens exist in both themes and differ, the series take the
+  // values the tokens resolve to, and the SVG still carries literals so the PNG
+  // export has something to render.
+  console.log('\nThe chart palette — the document\'s, in both themes, and still literal in the SVG\n');
+
+  const palette = await page.evaluate(async () => {
+    document.documentElement.setAttribute('data-theme', 'light');
+    switchTab('arrodata');
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    if (!ArroData.ad.series.length) return { seeded: false };
+
+    const tok = n => getComputedStyle(document.documentElement)
+      .getPropertyValue(`--ad-series-${n}`).trim();
+    const colours = () => ArroData.ad.series.map(s => s.color);
+    const svgSrc  = () => document.getElementById('ad-svg').innerHTML;
+
+    ArroData.repaint();
+    const light = colours(), lightTok = [1, 2].map(tok), lightSvg = svgSrc();
+
+    document.documentElement.setAttribute('data-theme', 'dark');
+    ArroData.repaint();
+    const dark = colours(), darkTok = [1, 2].map(tok), darkSvg = svgSrc();
+
+    // …and a colour the operator chose is not the theme's to take back.
+    ArroData.setColor(ArroData.ad.series[0].key, '#ff00ff');
+    document.documentElement.setAttribute('data-theme', 'light');
+    ArroData.repaint();
+    const held = ArroData.ad.series[0].color;
+
+    document.documentElement.setAttribute('data-theme', 'light');
+    return {
+      seeded: true, light, dark, lightTok, darkTok, held,
+      tracksToken: light.slice(0, 2).join() === lightTok.join()
+                && dark.slice(0, 2).join() === darkTok.join(),
+      literal: /stroke="#[0-9a-f]{3,8}"/i.test(lightSvg) && /stroke="#[0-9a-f]{3,8}"/i.test(darkSvg),
+      noVar: !/var\(--/.test(lightSvg) && !/var\(--/.test(darkSvg),
+      dashed: /stroke-dasharray/.test(lightSvg),
+    };
+  });
+
+  check('the seeded chart has series to colour', palette.seeded !== false);
+  check('the twelve tokens have a dark set, and it is a different one',
+    palette.light && palette.light.join() !== palette.dark.join(),
+    `${(palette.light || []).slice(0, 2).join(' ')} → ${(palette.dark || []).slice(0, 2).join(' ')}`);
+  check('each series is the colour its token resolves to, in both themes',
+    !!palette.tracksToken, `${(palette.lightTok || []).join(' ')} / ${(palette.darkTok || []).join(' ')}`);
+  check('and the SVG still carries literals rather than var(), so a PNG can render it',
+    !!palette.literal && !!palette.noVar);
+  check('a colour chosen by hand survives a theme change', palette.held === '#ff00ff',
+    String(palette.held));
+  check('two series are told apart by more than hue', !!palette.dashed,
+    'stroke-dasharray on the second series');
 
   if (errors.length) check('no uncaught page errors', false, errors.join(' | '));
 } finally {

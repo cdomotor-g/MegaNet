@@ -630,6 +630,10 @@ const HELP = {
       'A file that will not link to a station still <strong>parses and plots</strong>. The link is '
       + 'read out of ARRO\'s own filename, so a renamed export falls back to the station number '
       + 'and then to saying plainly that it is not linked.',
+      '<strong>Readings as a table</strong>, under the chart, is the same numbers without a mouse: '
+      + 'one row per series for the window on screen, then the individual readings with the '
+      + 'filter\'s verdict against each. It is capped at 300 rows and says when it has capped — '
+      + 'the two export buttons are the uncapped answer.',
     ],
     links: [
       { label: 'How the 357 filter works — the test, drawn', call: 'ArroData.explain()' },
@@ -666,6 +670,8 @@ const HELP = {
       + 'repeaters is three copies — and the store <strong>counts the duplicates rather than '
       + 'discarding them</strong>. That count is the only place this network\'s real path '
       + 'redundancy is visible.',
+      '<strong>Readings as a table</strong>, under the chart, is the same numbers without a mouse — '
+      + 'the ARRO Data tab\'s, unchanged, and capped at 300 rows with the cap stated.',
     ],
     links: [
       { label: 'How the 357 filter works — the test, drawn', call: 'ArroData.explain()' },

@@ -155,6 +155,13 @@ jobs:
       # regions, clickable rows, landmark names, accessible names, heading
       # order and sideways scroll, per converted tab. Its list of converted tabs
       # grows as each U-issue lands (#137).
+      #
+      # It also carries the pattern-level claims that belong to no single tab:
+      # the basin drawing's role="img" shortcut condition (#137), and the ARRO
+      # chart's palette round trip (#141) — that chart writes literal colours
+      # into its SVG so the PNG export can render it, and the whole point of
+      # #141 was that those literals come from tokens now. Nothing else can see
+      # that; break it and two assertions here go red.
       - name: Tabs — the per-tab Definition of Done, per converted tab
         working-directory: test
         run: npm run tabs
