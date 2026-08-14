@@ -62,6 +62,10 @@
      pass-range link nor any station-role fill, and a deeper blue than the water
      the topo tiles already draw, so a highlighted river reads as highlighted. */
   --map-river: #0d47a1;
+  /* Survey marks & CORS sites (#120). Teal — none of the four role fills, none
+     of the ACMA mechanism colours, and distinct from the river's blue and the
+     draw tool's magenta, so the layer reads as its own thing at a glance. */
+  --map-survey: #00695c;
   --map-repeater: #0b5cab;
   --map-field: #107c10;
   /* Station-role colours (mirror ROLE_COLOR in app.js and the map markers). */
@@ -334,6 +338,7 @@
   --tx-bg: #19362a;
   --map-line: #ff9f43;
   --map-river: #4fc3f7;
+  --map-survey: #4dd0c8;
   --map-repeater: #6bb6ff;
   --map-field: #57d657;
   /* Lighter role tints so coloured station names stay legible on dark panels. */
@@ -1820,6 +1825,7 @@ hr {
 }
 
 .legend-line-river { border-top-color: var(--map-river); }
+.legend-dot-survey { background: var(--map-survey); }
 
 /* River name on hover. Follows the cursor along the line (sticky tooltip), so it
    stays small and out of the way of the pins it sits under. */
@@ -2654,6 +2660,40 @@ hr {
 .acma-sq.mn {
   outline: 2px dashed #0b5cab;
   outline-offset: 3px;         /* clear of the white ring */
+}
+
+/* ── Survey marks & CORS sites (#120) ────────────────────────────────────────
+   A CSS-border triangle rather than a circle (station pins) or a square (ACMA
+   transmitters) — the map already has two dot shapes with a colour meaning of
+   their own, and a third needs a silhouette, not just a hue, to read as
+   distinct at a glance. It also happens to be the conventional GIS symbol for
+   a trig/survey point.
+   Unlike MapRivers and the ACMA squares, the colour is `var(--map-survey)`
+   directly in the rule below rather than resolved in JS at draw time: a
+   divIcon is a real DOM node against this stylesheet, so a theme switch
+   repaints it for free and MapSurvey needs no repaint() hook in toggleTheme(). */
+.mn-survey-div { background: none; border: none; }
+
+.mn-survey-pin {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid var(--map-survey);
+  /* Dark outline then a light halo, the same two-layer trick the station pins'
+     white ring and the ACMA squares' box-shadow use to separate a small shape
+     from whatever basemap is under it. */
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, .6)) drop-shadow(0 0 1.5px rgba(255, 255, 255, .9));
+}
+
+/* CORS sites are the rarer, more significant mark — bigger, and a glow in its
+   own colour rather than a second DOM node to keep the divIcon to one element. */
+.mn-survey-cors {
+  border-left-width: 7px;
+  border-right-width: 7px;
+  border-bottom-width: 13px;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, .6)) drop-shadow(0 0 2px rgba(255, 255, 255, .95))
+          drop-shadow(0 0 3px var(--map-survey));
 }
 
 /* ── RF Environment tab (#138) ───────────────────────────────────────────────

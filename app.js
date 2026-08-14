@@ -1653,6 +1653,12 @@ function mapDisplayControlsHtml() {
       Highlight matching rivers
     </label>
     <p class="filter-note" id="map-river-note">${MapRivers.noteHtml()}</p>
+    <label class="filter-check">
+      <input type="checkbox" ${state.mapSurvey ? 'checked' : ''}
+             onchange="MapSurvey.setEnabled(this.checked)">
+      Survey marks &amp; CORS sites (Qld)
+    </label>
+    <p class="filter-note" id="map-survey-note">${MapSurvey.noteHtml()}</p>
     <label class="filter-field" style="margin-top:.5rem">
       <span>Station names</span>
       <select onchange="setMapLabelMode(this.value)">
@@ -1707,6 +1713,11 @@ function mapLegendHtml() {
     <span class="legend-item">
       <span class="legend-line legend-line-river"></span>
       <span class="small">Matching watercourse (OpenStreetMap)</span>
+    </span>` : ''}
+    ${MapSurvey.active() ? `
+    <span class="legend-item">
+      <span class="legend-dot legend-dot-survey"></span>
+      <span class="small">Survey mark / CORS site (Qld Dept of Resources)</span>
     </span>` : ''}
     ${state.filters.acma.show ? Object.entries(ACMA_MECH).map(([k, m]) => `
       <span class="legend-item">
@@ -1806,6 +1817,7 @@ function stopStationsMap() {
   MapDraw.detach();
   LinkBudget.detach();
   MapRivers.detach();
+  MapSurvey.detach();
   state.map = removeMap(state.map);
   state.mapMarkers = [];
   state.mapLines   = [];
@@ -1846,6 +1858,7 @@ function initMap() {
   // Before the first refresh, so the fit that refresh performs is the view the
   // first river lookup is bounded by.
   MapRivers.attach(state.map);
+  MapSurvey.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
   // show on the map that has just been rebuilt.
   PathProfile.sync();

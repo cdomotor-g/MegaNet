@@ -1161,6 +1161,10 @@ const state = {
   // The one map display switch that is remembered between visits: it is the only
   // one that costs a network request, so an operator who turns it off means it.
   mapRivers:      localStorage.getItem('mn-rivers') !== 'off',
+  // Survey marks & CORS sites (see MapSurvey, #120). Off by default and not
+  // persisted — see the comment on MapSurvey.setEnabled() for why this one
+  // departs from mapRivers' remembered-between-visits pattern.
+  mapSurvey:      false,
   mapMatchLabels: new Set(),  // ids the current filter earned a label (see mapLabelIds)
   mapLinkCount:   { drawn: 0, culled: 0 },   // last refresh, for the sidebar note
   mapFitKey:      null,    // extent the map was last auto-fitted to (re-fit only on change)
