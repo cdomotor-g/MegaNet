@@ -3,6 +3,16 @@
 #
 #   docker build -t meganet-bridge bridge/
 #   docker run --env-file bridge/.env meganet-bridge
+#
+# ⚠ #155, before wiring the HFEM decoder in: hfem.js lives at the REPO ROOT
+# (#153 put one file there for both the browser and this bridge — see its
+# header), and a COPY cannot reach above its build context, which is bridge/.
+# The moment src/ requires it, this build must move to the repo root —
+# `docker build -f bridge/Dockerfile .`, every COPY below gains a bridge/
+# prefix, `COPY hfem.js ../hfem.js` joins them, and the `cd bridge && fly
+# deploy` recipe in README.md needs the same treatment. Until then the file is
+# deliberately NOT copied: a require that cannot resolve crashes the container
+# at startup, which is loud; an image quietly carrying a stale copy is not.
 FROM node:22-alpine
 
 # tini, so SIGTERM reaches node as PID 1 rather than being swallowed. Without it

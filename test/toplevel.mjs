@@ -72,6 +72,15 @@ const ACCEPTED = {
          + 'and is generated data behind its own namespace.',
     },
   ],
+  'hfem.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = HFEM;",
+      why: 'The HFEM codec\'s CommonJS registration (#153): the bridge requires '
+         + 'this same file, so there is one decoder and never a second opinion '
+         + 'about what T3 means. Guarded so the browser, where `module` is '
+         + 'undefined, never runs it. Constrains nothing below it.',
+    },
+  ],
   'core.js': [
     {
       match: "if (typeof window !== 'undefined') {",
