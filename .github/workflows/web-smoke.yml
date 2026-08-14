@@ -116,6 +116,14 @@ jobs:
         working-directory: test
         run: npm run toplevel
 
+      # Node-only and fast, so it runs before a browser is launched. The HFEM
+      # codec's tests ARE the specification restated — there is no sample
+      # capture, the spec's ten worked examples are the only oracle, and the
+      # timestamp table is the trap they exist to hold shut (#153).
+      - name: HFEM codec — the spec's own examples round-trip
+        working-directory: test
+        run: npm run hfem
+
       - name: Smoke — every tab, clean console
         working-directory: test
         run: npm run smoke
