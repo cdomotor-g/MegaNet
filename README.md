@@ -95,7 +95,8 @@ MegaNet/
 ├── bug-report.js           ← BugReport — prefilled GitHub issue reporter
 ├── init.js                 ← the only code that runs at load; must stay last
 ├── maps-data.js            ← Radio Path Maps catalogue, QLD basin SVG + georeference
-├── styles.css              ← theme and layout
+├── styles.css              ← the design system, then theme and layout
+│                             (tokens at the top; docs/design-system.md is the prose)
 ├── stations.json           ← the document schema (see below); export + offline fallback
 ├── migrate.html            ← legacy-CSV → stations.json converter (linked from the app)
 ├── .nojekyll               ← serve every file verbatim on GitHub Pages
@@ -111,6 +112,7 @@ MegaNet/
 │   └── nsw-border/         │  NSW North Coast repeater maps
 │
 ├── docs/                   ← reference documents
+│   ├── design-system.md                    (tokens, breakpoints, patterns, a11y primitives — #109)
 │   ├── datastore-decision.md               (why Postgres on Supabase, and where)
 │   ├── access.md                           (who gets in, who may edit, and recovery)
 │   ├── ingest-http.md                      (posting readings from a field station — #B5)

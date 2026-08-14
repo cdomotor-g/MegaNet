@@ -1043,7 +1043,51 @@ function focusNavFind() {
   if (el) { el.focus(); el.select(); }
 }
 
+// The skip link's other half (#109). `href="#main-content"` alone scrolls the
+// page and, in Safari and Firefox, leaves focus at the top of the document —
+// so the link appears to work, and the very next Tab goes back to the second
+// item in the banner. Moving focus explicitly is what makes it a skip.
+// preventDefault() keeps the fragment out of the URL, where it would otherwise
+// survive a reload and sit in every shared link.
+function focusMain(e) {
+  if (e) e.preventDefault();
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  main.focus();
+  main.scrollIntoView({ block: 'start' });
+}
+
+// Where focus goes when the open tab changes (#109), and why it has to go
+// anywhere at all: renderTabs() replaces the nav's innerHTML, so the button
+// that was just clicked does not exist by the time the switch has finished. A
+// keyboard user was left with focus on <body> after every tab change — a fresh
+// Tab from the top of the document, nineteen buttons back to where they were.
+//
+// The rule: focus lands on the new tab's own nav button, the element that just
+// became aria-current="page". It is the closest thing to "where you already
+// were", and it leaves the arrow keys walking the list they were walking.
+//
+// The exception: on a phone the drawer has closed behind the switch, so that
+// button is off-screen. Focus goes to <main> instead, which is the thing the
+// user asked to see and the region the drawer was covering.
+//
+// The guard: only when focus was inside the shell to begin with. switchTab()
+// is also called by Workbench.restoreFromUrl() at startup and by "See also" and
+// deep-link buttons inside tabs; a page that grabs focus on load, or a tab that
+// yanks it out of the control you are using, is worse than the problem being
+// fixed here.
+function refocusAfterTabSwitch(cameFromShell) {
+  if (!cameFromShell) return;
+  if (isPhoneNav()) { focusMain(); return; }
+  const btn = document.querySelector('#tab-nav .tab-btn.active');
+  if (btn) btn.focus(); else focusMain();
+}
+
 function switchTab(id) {
+  // Read before anything re-renders — afterwards the element is gone and the
+  // question "was the user in the nav" can no longer be asked.
+  const from = document.activeElement;
+  const cameFromShell = !!(from && from.closest && (from.closest('#tab-nav') || from.closest('#help-panel')));
   // Every module that has run and has something to stop — an animation frame
   // loop, a ResizeObserver, a Leaflet map on a div that is about to be thrown
   // away. Leaving the tab is the moment they have to stop: a force layout
@@ -1083,14 +1127,37 @@ function switchTab(id) {
   renderTabs();
   renderHelp();
   renderMain();
+  refocusAfterTabSwitch(cameFromShell);
+  // What changed, said once, politely (#109's live-region policy — see
+  // announce() in core.js), and *only when focus did not already say it*.
+  //
+  // A switch from the nav lands focus on the new tab's own button one line
+  // above, and a screen reader reads that button as it arrives: "Networks,
+  // button, current page". Announcing the same thing again into the live
+  // region is rule 4's "updated" noise one step removed — the same fact,
+  // twice, half a second apart.
+  //
+  // What is left is every other route in, and none of them says anything on
+  // its own: a deep-link button inside a tab, a restore from the URL, and the
+  // phone drawer closing to <main>, which has no accessible name to read. The
+  // group comes with the label for the reason the rail's tooltip carries it —
+  // "Networks" alone does not say where in nineteen tabs you have landed.
+  if (!cameFromShell || isPhoneNav()) {
+    const opened = TAB_LIST.find(t => t.id === id);
+    const group  = TABS.find(g => g.tabs.some(t => t.id === id));
+    if (opened) announce(group ? `${opened.label} — ${group.group}` : opened.label);
+  }
 }
 
 // Below this width the icon rail is gone from the layout entirely and the nav
 // is a drawer opened from the header — 56 px of permanent rail is a seventh of
 // a 390 px screen, and the tables and maps need it more than the icons do.
-// Kept in step with the matching breakpoint in styles.css.
+// Named off BREAKPOINTS in core.js rather than repeated as a literal — `xs` is
+// the step that means "a phone", and styles.css is held to the same list by
+// `npm run shell`. That is what keeps this function and the matching media
+// query from drifting apart (#109).
 function isPhoneNav() {
-  return window.matchMedia('(max-width: 560px)').matches;
+  return window.matchMedia(`(max-width: ${BREAKPOINTS.xs}px)`).matches;
 }
 
 // The two bits of chrome that live outside #tab-nav and have to agree with it:

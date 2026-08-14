@@ -197,6 +197,20 @@ const MemMeter = (function () {
     bar.classList.toggle('mem-warn', total >= WARN_BYTES && total < BAD_BYTES);
     bar.classList.toggle('mem-bad', total >= BAD_BYTES);
     bar.title = `Memory this page is holding: ~${fmtBytes(total)} (our accounting) — click for details`;
+    // The house pattern for a graphic with data behind it, applied to the one
+    // graphic the shell owns (#109). The strip is seven coloured segments and
+    // nothing else — a screen reader was told "Memory usage", a fixed string
+    // that stayed the same whether the page was holding 4 MB or 40. The
+    // accessible name carries the number now, and points at the accessible
+    // *table* that is the real alternative: the panel behind this control
+    // already lists every holder, its estimate and its Release button, so the
+    // pattern here is "graphic, plus a summary in its name, plus the table one
+    // activation away" rather than a second copy of the data in the DOM.
+    // U3/U5/U6 apply the same three parts to the map, the graph, the timeline
+    // and the ARRO chart — see docs/design-system.md.
+    bar.setAttribute('aria-label',
+      `Memory this page is holding: about ${fmtBytes(total)} across `
+      + `${holders.filter(h => h.bytes > 0).length} holders. Activate for the full breakdown.`);
     bar.innerHTML = holders.filter(h => h.bytes > 0).map(h => {
       const pct = Math.max(0.4, Math.min(100, h.bytes / BAR_CAP * 100));
       return `<span class="mem-seg" style="width:${pct}%;background:var(${h.color})" `
@@ -233,6 +247,14 @@ const MemMeter = (function () {
     }
     root.style.display = 'flex';
     renderPanel();
+    // The strip is the control that discloses this panel, so it has to say so
+    // and has to say when (#109). aria-controls is in index.html; the state is
+    // here, because here is where it changes.
+    document.getElementById('mem-bar')?.setAttribute('aria-expanded', 'true');
+    // Same contract Modal already keeps: focus moves into the dialog on open
+    // and comes back to what opened it on close. Without it Escape closes a
+    // panel the keyboard was never inside, and Tab walks the page behind it.
+    root.querySelector('.mem-card')?.focus();
     document.addEventListener('keydown', onKey);
     if (!storageEstimate && navigator.storage && navigator.storage.estimate) {
       navigator.storage.estimate().then(e => { storageEstimate = e; renderPanel(); }).catch(() => {});
@@ -246,6 +268,15 @@ const MemMeter = (function () {
     const root = document.getElementById('mem-modal');
     if (root) { root.style.display = 'none'; root.innerHTML = ''; }
     document.removeEventListener('keydown', onKey);
+    const bar = document.getElementById('mem-bar');
+    if (bar) {
+      bar.setAttribute('aria-expanded', 'false');
+      // Focus goes back to the strip, but only if it is still the panel's
+      // doing — a Release button that navigated somewhere, or a close that
+      // followed a click into the page behind, should not have the focus
+      // dragged back up to the header.
+      if (!document.activeElement || document.activeElement === document.body) bar.focus();
+    }
   }
 
   function renderPanel() {
@@ -263,7 +294,7 @@ const MemMeter = (function () {
       </tr>`).join('');
     root.innerHTML = `
       <div class="modal-card mem-card" role="dialog" aria-modal="true" aria-labelledby="mem-title"
-           onclick="event.stopPropagation()">
+           tabindex="-1" onclick="event.stopPropagation()">
         <div class="modal-head">
           <h2 id="mem-title">Memory this page is holding</h2>
           <button class="modal-x" title="Close (Esc)" onclick="MemMeter.closePanel()">×</button>

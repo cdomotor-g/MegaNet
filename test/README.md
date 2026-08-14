@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the ten that run in CI
+npm run all                       # the eleven that run in CI
 ```
 
 | Command | What it does |
@@ -28,19 +28,23 @@ npm run all                       # the ten that run in CI
 | `npm run smoke` | loads the page in Chromium, opens all 19 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
 | `npm run nav` | every tab is in the left nav exactly once, under one heading, and findable by its own label and by what it does |
+| `npm run shell` | the shell's landmarks, skip link, focus policy and disclosure state; the six-step breakpoint scale; and WCAG contrast for every token pair in both themes |
 | `npm run help` | every tab's help entry is real content, every link out of the panel lands, and each walkthrough names itself and fits the rail |
 | `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
 | `npm run maint` | the Council Maintenance Tasks form renders what the workbook's own filled sheet says — with the fixture read out of the `.xlsx` |
 | `npm run history` | a saved record reads back as the sheet it was written on, and exports as it reads — with the records written by the app during the run |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the ten that run in CI |
+| `npm run all` | the eleven that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
-`toplevel`, `registry`, `nav` and `help` take `-v` too, to list what passed as
-well as what did not — `nav -v` prints what each search probe actually found,
-which is the fastest way to see why a `find` word is not doing its job.
+`toplevel`, `registry`, `nav`, `shell` and `help` take `-v` too, to list what
+passed as well as what did not — `shell -v` prints every contrast ratio it
+measured, in both themes, which is the fastest way to see how much headroom a
+colour has before it stops clearing AA, and `nav -v` prints what each search
+probe actually found, which is the fastest way to see why a `find` word is not
+doing its job.
 
-CI runs `check`, `names`, `toplevel`, `smoke`, `registry`, `nav`, `help`, `insp`, `maint` and `history` on every push that touches a root `*.js`,
+CI runs `check`, `names`, `toplevel`, `smoke`, `registry`, `nav`, `shell`, `help`, `insp`, `maint` and `history` on every push that touches a root `*.js`,
 `index.html`, `styles.css`, `stations.json`, `db/migrations/`, `test/` or the
 inspection workbook in `archive/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's
@@ -253,6 +257,70 @@ The first implementation required every typed term to match, and the probe for
 no single tab carrying all three. The second matched bare substrings, and the
 same probe pulled in the Interference Workbench, because "the" is inside
 *hypotheses* and "rf" is inside *interference*. Both are assertions here now.
+
+### `shell.mjs` — the half that renders perfectly and cannot be used
+
+Every other check in this directory asks whether the app *works*. This one asks
+whether it can be operated by someone who is not looking at it with a mouse in
+their hand, and whether the design decisions six parallel issues are about to
+inherit are the ones actually in the file.
+
+Nothing above it can see any of that. A page opens all nineteen tabs with a
+clean console just as happily with no skip link, no landmark structure, a focus
+ring that disappears on half its backgrounds, a nav that drops focus on `<body>`
+every time you change tab, and a dark palette that fails contrast. None of it
+throws.
+
+It is also the check that turns #109 from documentation into a contract. Six
+per-tab issues (#136–#141) are each told: use the tokens, do not add a
+breakpoint, do not remove the focus ring, do not invent a table pattern. Those
+instructions are worth exactly what they can be checked against.
+
+Seven claims:
+
+- **The scale.** Every `@media (max-width: N)` in `styles.css` has `N` in
+  `BREAKPOINTS`, which is read out of the *running page* rather than re-typed
+  here — so the CSS, `NAV_AUTO_COLLAPSE_PX` and `isPhoneNav()` cannot drift
+  apart. Both directions: an unnamed width fails, and so does a named step that
+  no rule uses, because an unused step is one somebody will "helpfully" pick.
+- **Contrast.** Twenty-five text pairs and four control-boundary pairs, in both
+  themes, computed from the values the browser resolves rather than from the
+  source — so a `var()` chain, a `color-mix()` or a missing dark value is
+  measured as rendered. A sentinel colour distinguishes "this token resolves to
+  black" from "this token does not exist and the declaration was discarded",
+  which is not hypothetical: `--line` was referenced three times and never
+  defined, so three borders were not being drawn at all.
+- **The focus ring.** `outline: none` appears in the file exactly where an
+  allowlist in `shell.mjs` says it may, and every allowlist entry corresponds
+  to a rule that still exists. A stale exemption is a licence nobody is using
+  and the next person reads as precedent.
+- **Landmarks and the skip link.** One banner, one main that can take focus,
+  one labelled nav, one labelled complementary — counted *outside*
+  `#main-content`, because five tabs render an `<aside>` of their own inside it
+  and naming those is each U-issue's job, not this one's. The skip link has to
+  be present, first in the tab order, visible when focused, and actually move
+  focus rather than only scroll.
+- **Disclosure.** Four shell controls open something; each is toggled and its
+  `aria-expanded` re-read. Exactly one nav item is `aria-current`.
+- **Focus and voice on a tab switch.** Focus lands on the new tab's own nav
+  button — `renderTabs()` replaces the nav's `innerHTML`, so the button that
+  was clicked is gone by the time the switch finishes, and a keyboard user was
+  left on `<body>` every single time. And the guard on the other side: a switch
+  from *outside* the shell must not move focus at all, because `switchTab()` is
+  also called at startup by `Workbench.restoreFromUrl()`.
+- **Sideways scroll.** The document does not scroll horizontally at 375, 768 or
+  1440, in either theme, on the shell and on the proving-ground tab. Not all
+  nineteen: that is U1–U6's Definition of Done, and asserting it here would be
+  claiming work #109 did not do.
+
+Two things this check taught its own author, both recorded in the file. The
+first `--ctl-border` candidate cleared 3:1 against `--panel` (3.20) and missed
+it against `--bg` (2.98) — a near-miss no eye catches, on a token that is drawn
+on both surfaces. And the sideways-scroll assertion went red at 768 px in one
+theme and green in the other, which is not a theme bug: crossing the `xs` step
+turns both rails from drawers into columns over a 160 ms transition, and the
+check was measuring inside it. It waits the transition out now, for exactly the
+reason `app.js` does before it re-measures a map.
 
 ### `inspections.mjs` — the half the network policy hides
 
@@ -606,6 +674,26 @@ without looking, and a verifier nobody looks at verifies nothing.
   list assertion in `maintenance.mjs` is exact, so a third panel on that tab is
   an edit there. That is intended: an attachment panel appearing somewhere
   nobody expected it is worth failing over.
+- **A tab needs a width that is not on the breakpoint scale.** It does not get
+  one. `npm run shell` fails any `@media (max-width:)` outside `BREAKPOINTS` in
+  `core.js`, which is the whole point of #109: nine ad-hoc widths became six
+  named steps, and the instruction to #136–#141 not to add a tenth is only
+  worth something because this check enforces it. If a step is genuinely
+  missing, add it to `BREAKPOINTS`, say what it means in
+  `docs/design-system.md`, and use it — a change to the system, made in the
+  open, rather than a number typed into one tab's CSS.
+- **A colour was added or changed.** `npm run shell` computes WCAG contrast for
+  every pair in its contract, in both themes, so a new token needs a
+  dark-theme value *and* a line in `TEXT_PAIRS` or `NONTEXT_PAIRS` in
+  `shell.mjs` naming what it is drawn on. Two of #109's own colours moved
+  because of that check rather than because anyone looked at them. And if the
+  colour is one the ARRO chart draws, `ArroData` writes literal values into its
+  SVG for the PNG export and does **not** pick up a token change — that is
+  #141's, by hand.
+- **A control needs a different focus ring.** Override it; one selector beats
+  the `:where()` rule with no `!important`. What you may not do is remove it:
+  `outline: none` outside the two-entry allowlist in `shell.mjs` goes red, and
+  an entry whose rule no longer exists goes red too.
 - **A member was added to `RfChanges` or `Workbench` that an `on*=` attribute
   names.** Add it to `CONTROL_SCRIPT` in `lib/controls.mjs`. Nothing forces you
   to; the coverage line at the end of the run (`controls: workbench — 18/18

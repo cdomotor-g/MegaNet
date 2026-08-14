@@ -135,6 +135,18 @@ jobs:
         working-directory: test
         run: npm run nav
 
+      # The shell and the design system (#109). Everything it asserts is
+      # invisible to the checks above: a page renders nineteen tabs with a
+      # clean console just as happily with no skip link, no landmark
+      # structure, a focus ring that vanishes on half its backgrounds, a nav
+      # that drops focus on every tab change, and a palette that fails
+      # contrast in the dark theme. It is also what makes #109's instructions
+      # to #136–#141 enforceable — a breakpoint outside the scale, or an
+      # `outline: none` that is not on the allowlist, fails here.
+      - name: Shell — landmarks, focus, contrast, and six breakpoints
+        working-directory: test
+        run: npm run shell
+
       # Not a check about code at all: the help panel's *content*. Smoke asserts
       # every tab has a HELP entry, which stops the rail rendering blank and
       # says nothing about what is behind the key. A doc link pointing at a file

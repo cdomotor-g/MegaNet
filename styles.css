@@ -1,3 +1,45 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MegaNet — the design system (#109, foundation of EPIC #107)
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Six per-tab issues (#136–#141) are about to restyle nineteen tabs in
+   parallel. What keeps that from producing six products in one window is that
+   the decisions they share are made once, here, and are named — so a U-issue
+   applies a token rather than picking a number.
+
+   The full prose is docs/design-system.md. What follows is the contract, in
+   the order the tokens are declared below:
+
+     1. Tokens.       Colour, spacing, type, radius, elevation, motion, focus.
+                      A U-issue uses these. If one is missing, it is added
+                      here and documented, not invented locally.
+     2. Breakpoints.  Six named steps, and no seventh. `npm run shell` fails
+                      on any `@media (max-width:)` whose value is not one of
+                      them, and the list it checks against is BREAKPOINTS in
+                      core.js — the same object isPhoneNav() and
+                      NAV_AUTO_COLLAPSE_PX read. One source of truth, in the
+                      file the app actually runs.
+     3. Patterns.     Panel, panel header, button, form field, and *one* table
+                      pattern (see "Tables" below). Six issues styling tables
+                      independently is the single most likely way this epic
+                      produces six products; there is one answer and it is
+                      already what the app does.
+     4. Primitives.   Skip link, landmarks, focus ring, `.sr-only`, the shared
+                      live region, and one reduced-motion policy.
+
+   Contrast is a property of the palette rather than of any tab, so it is
+   checked here too: `npm run shell` computes WCAG contrast for every pair
+   below that produces text-on-background, in *both* themes, off the values
+   the browser actually resolves. A token added without a dark-theme value
+   fails that check rather than shipping as a light-theme colour on a dark
+   panel.
+
+   ⚠ One palette change does not reach one chart. ArroData writes literal
+   colour values into its SVG rather than var(…), so the PNG export has
+   something to resolve (app.js / arro-data.js). Change a colour here and that
+   chart keeps the old one until somebody edits it by hand — #141 owns it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 * { box-sizing: border-box; }
 
 :root {
@@ -28,7 +70,11 @@
   --accent: #0b5cab;
   --ok:   #107c10;
   --bad:  #c7401a;
-  --warn: #a86400;
+  /* Darkened from #a86400 by #109's contrast pass. It cleared AA on a --panel
+     (4.68:1) and missed it on the page background (4.36:1) — and --bg is where
+     a warning line outside a panel actually sits. 4.82:1 on --bg now, 5.18:1
+     on --panel. The other three status colours already cleared both. */
+  --warn: #9e5e00;
   /* Side nav: expanded, and collapsed to an icon rail. The expanded width is
      set by the longest label, "Interference Workbench" — a nav that ellipsises
      its own tab names is worse than a wider one. */
@@ -59,6 +105,90 @@
   --c-hd:    #0f8a8a; --c-hd-t:    #e2fafa;
   --c-time:   #a8562a; --c-time-t:   #fff0e6;
   --c-status: #5a6b7d; --c-status-t: #eef3f8;
+
+  /* ── Control surfaces (#109) ───────────────────────────────────────────────
+     Buttons, inputs, selects and textareas had their border written out three
+     times as a literal — #b9c7d6 on buttons, #bfd0e0 on fields, #b9c7d6 again
+     on .btn-link — and none of the three had a dark-theme value, so every
+     control in the app was outlined in pale blue-grey on a #18222d panel.
+     They are one token now, and it is the token the contrast check measures.
+
+     It is darker than what it replaces, and that is the point rather than a
+     side effect: WCAG 1.4.11 wants 3:1 between a control's boundary and what
+     is behind it, and #b9c7d6 on white is 1.70:1 — the edge of a button was
+     not reliably visible to anyone who needed it to be. Both values clear 3:1
+     against --panel *and* against --bg, because a control sits on both — the
+     first candidate cleared the panel at 3.20:1 and missed the page at 2.98:1,
+     which is exactly the kind of near-miss a check catches and an eye does
+     not. */
+  --ctl-border: #798c9f;
+  /* The affirmative action — Save, Apply, Sign in. Was the literal #107c10 in
+     both themes with white on top (5.44:1, so the colour was fine); it is a
+     token now so the check can see it and so a U-issue has something to name. */
+  --primary: #107c10;
+  --primary-text: #ffffff;
+
+  /* ── Focus (#109) ──────────────────────────────────────────────────────────
+     One ring, defined once, so that U1–U6 inherit it rather than each deciding
+     what focus looks like on their own backgrounds. It is the accent, which is
+     already checked for contrast against both --panel and --bg, plus an outer
+     halo in the page colour so the ring stays visible where it lands on a
+     control that is itself accent-coloured.
+
+     The rule: never `outline: none` without a replacement that is at least as
+     visible. There are two allowlisted exceptions in this file (.map-split and
+     .nv-node) and both replace the outline with a shape change on the thing
+     being focused; `npm run shell` holds the allowlist, so a third one has to
+     be argued for rather than added. */
+  --focus: var(--accent);
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --focus-halo: var(--bg);
+
+  /* ── Spacing (#109) ────────────────────────────────────────────────────────
+     A 4 px base. The app was already writing .3/.35/.4/.45/.5/.55/.6/.65rem
+     for what are three distinct gaps; these are those three, plus the two
+     above and the one below them. Existing rules are not being rewritten
+     wholesale — a U-issue converts its own tab as it goes. */
+  --sp-1: .25rem;   /*  4px — inside a chip, between an icon and its label */
+  --sp-2: .5rem;    /*  8px — between controls in a row */
+  --sp-3: .75rem;   /* 12px — between the parts of a panel */
+  --sp-4: 1rem;     /* 16px — between panels, and the page gutter */
+  --sp-5: 1.5rem;   /* 24px — between sections of a long page */
+  --sp-6: 2rem;     /* 32px — above a page-level heading */
+
+  /* ── Type (#109) ───────────────────────────────────────────────────────────
+     The scale the app already uses, named. .72/.74 became one step, .84/.85
+     became one, .9/.92/.93 became one — those were not three decisions. */
+  --fs-xs: .74rem;  /* counts, captions, attribution */
+  --fs-sm: .85rem;  /* dense tables, secondary lines */
+  --fs-md: .92rem;  /* body */
+  --fs-lg: 1.05rem; /* a panel's own heading on a phone */
+  --fs-xl: 1.3rem;  /* a page heading */
+  --lh-tight: 1.25; /* headings */
+  --lh-body: 1.5;   /* prose */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* ── Radius & elevation (#109) ─────────────────────────────────────────────
+     --shadow keeps its name: it is used in ~20 places and is the panel's
+     elevation. --shadow-2 is the raised one (drawers, modals, popovers), which
+     was previously written out per-component. */
+  --r-sm: 4px;      /* a chip, a kbd, a swatch */
+  --r-md: 8px;      /* a button, a field, a note */
+  --r-lg: 10px;     /* a panel */
+  --r-pill: 999px;
+  --shadow: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-2: 0 6px 24px rgba(8,15,24,.18);
+
+  /* ── Motion (#109) ─────────────────────────────────────────────────────────
+     --motion-rail is the one that is load-bearing: it must stay in step with
+     NAV_TRANSITION_MS / HELP_TRANSITION_MS in core.js, because app.js waits
+     that long before re-measuring every Leaflet map. The reduced-motion policy
+     is one block at the foot of this file. */
+  --motion-fast: .12s;
+  --motion-rail: .16s;
+  --motion-slow: .24s;
+  --ease: ease;
 }
 
 [data-theme="dark"] {
@@ -94,6 +224,21 @@
   --hit-ring: #ffc400;
   --hit-glow: rgba(255, 196, 0, .55);
   --draw: #ff6fb0;
+
+  /* Control surfaces, dark. --border (#2a3948) is the right colour for a
+     divider between two dark surfaces and the wrong one for the edge of a
+     control: it is 1.36:1 against --panel, so a button would have had no
+     visible boundary at all. This is 3.81:1. */
+  --ctl-border: #6a7d92;
+  /* The green holds in the dark theme — white on #107c10 is 5.44:1 either way,
+     and the affirmative action reading the same colour in both themes is worth
+     more than matching --ok, which lightens so it can be *text* on a panel. */
+  --primary: #107c10;
+  --primary-text: #ffffff;
+
+  /* --shadow is already redefined above with the rest of the surfaces; only the
+     raised elevation needs a darker value here. */
+  --shadow-2: 0 6px 24px rgba(0,0,0,.5);
 }
 
 body {
@@ -111,6 +256,87 @@ body {
 a,
 a:visited {
   color: var(--accent);
+}
+
+/* ── Accessibility primitives (#109) ─────────────────────────────────────────
+   The parts that are the app's rather than any tab's. U1–U6 inherit these;
+   they do not restate them, and they do not opt out of them. */
+
+/* Text for a screen reader and for nothing else. Not `display: none` and not
+   `visibility: hidden` — both remove it from the accessibility tree, which is
+   the one place it is meant to be. The 1px/clip-path form is the one that
+   survives a forced-colours mode. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+/* The skip link. First focusable thing on the page, invisible until it has
+   focus, and then a real target over the banner. It exists because the nav is
+   nineteen buttons plus a find box: a keyboard user arriving at the page had
+   twenty-one stops before the first thing on the tab they came for. */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1300;              /* over the drawers (1200) and their backdrops */
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--panel);
+  color: var(--accent);
+  border: 1px solid var(--ctl-border);
+  border-radius: 0 0 var(--r-md) 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-120%);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* One focus indicator, on everything, defined against the token rather than
+   per component. The halo is what keeps it visible when the ring lands on an
+   accent-coloured control — the accent ring alone would disappear into it. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+  box-shadow: 0 0 0 calc(var(--focus-width) + var(--focus-offset)) var(--focus-halo);
+}
+
+/* :where() is 0-specificity on purpose — a component that needs a different
+   ring (the modal card, the memory strip) overrides it with one selector and
+   no !important. What a component may *not* do is remove it. */
+
+/* The main region is a focus target for the skip link and for a tab switch on
+   a phone; it must not paint a ring when the page is merely clicked into. */
+#main-content:focus { outline: none; }
+#main-content:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: calc(var(--focus-offset) * -1);
+  box-shadow: none;
+}
+
+/* ── One page wrapper (#109) ─────────────────────────────────────────────────
+   Eight tabs open with the same inline style — `max-width:Npx;margin:auto;
+   padding:1rem;display:grid;gap:1rem` — written out eight times with four
+   different maximums. A tab that wants a centred column uses this and sets
+   --page-max if the default is wrong for it. Inline styles are what U1–U6
+   are replacing; this is the thing to replace them with. */
+.page {
+  max-width: var(--page-max, 1100px);
+  margin: 0 auto;
+  padding: var(--sp-4);
+  display: grid;
+  gap: var(--sp-4);
+  align-content: start;
 }
 
 /* ── Page header ─────────────────────────────────────────────────────────────
@@ -370,6 +596,12 @@ header p {
   background: var(--accent);
 }
 
+/* Allowlisted `outline: none` #1 of 2 (#109's focus policy). The divider is a
+   3 px hairline the full height of the page; a 2 px ring offset 2 px around it
+   is a 7 px-wide box that reads as a second divider. The replacement is the
+   rule directly above — focus turns the bar itself the accent colour, which is
+   the same signal at the same contrast on the same pixels. `npm run shell`
+   holds this allowlist; a third exception has to be argued into it. */
 .map-split:focus-visible {
   outline: none;
 }
@@ -416,11 +648,11 @@ header p {
 }
 
 button {
-  border: 1px solid #b9c7d6;
+  border: 1px solid var(--ctl-border);
   background: var(--panel);
   color: var(--text);
   padding: .55rem .8rem;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   cursor: pointer;
 }
 
@@ -430,9 +662,9 @@ button[disabled] {
 }
 
 button.primary {
-  background: #107c10;
-  color: white;
-  border-color: #107c10;
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
 }
 
 /* A real <a> that reads as a button. Used where the action is "leave for another
@@ -440,11 +672,11 @@ button.primary {
    which a button with a window.open handler throws away. */
 .btn-link {
   display: inline-block;
-  border: 1px solid #b9c7d6;
+  border: 1px solid var(--ctl-border);
   background: var(--panel);
   color: var(--accent);
   padding: .5rem .8rem;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   font-size: .9rem;
   font-weight: 600;
   text-decoration: none;
@@ -480,8 +712,8 @@ textarea,
 select {
   width: 100%;
   padding: .55rem .65rem;
-  border: 1px solid #bfd0e0;
-  border-radius: 8px;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
   background: var(--panel);
   color: var(--text);
 }
@@ -812,11 +1044,56 @@ tr.selected mark.hit {
   box-shadow: 0 0 0 1px var(--hit-ring);
 }
 
+/* ── The table pattern — there is one (#109) ─────────────────────────────────
+   Six per-tab issues are about to style tables. This is the answer all six
+   inherit, and it is mostly a description of what the app already does rather
+   than a new invention — which is the reason to write it down rather than let
+   each of them re-derive a different half of it.
+
+     1. Every table is wrapped in `.table-wrap`. The *wrapper* scrolls; the
+        page never does. A panel is not allowed to decide the document is
+        wider than the screen (see the min-width:0 rule above) — whatever is
+        too wide has its own scroller.
+     2. Wide by columns, not by page. Below --bp-md the global
+        `table-layout: fixed` is dropped inside a wrapper so each column takes
+        what it needs and the total scrolls sideways; the wrapper paints a
+        shadow on whichever edge has more table behind it, because a sideways
+        scroll is otherwise invisible until you try it. That block is at the
+        foot of this file with the rest of the responsive rules.
+     3. Column priority is opt-in, one class, and it is the *only* sanctioned
+        way to drop a column: `.col-optional` (below). It hides the cell from
+        sight and from the accessibility tree together, so a screen reader is
+        not read a header with no data under it. A column carrying anything a
+        field crew needs does not get this class — it scrolls instead.
+     4. Stacked cards are not the house answer. They were considered and are
+        not used: the app's tables are read by comparing rows down a column
+        (repeater counts, RSSI, addresses), and stacking destroys exactly that.
+     5. `.bf-table` is the sanctioned exception to `table-layout: fixed` and
+        stays one — eight columns including a 16-character binary field, at a
+        fixed 880 px, scrolling inside its wrapper. It is pattern 1 taken to
+        its limit rather than a departure from it.
+     6. Every table gets a caption. `.sr-only` on it if the panel heading
+        already says the same thing out loud — a table with no accessible name
+        is the single most common finding across the thirteen tabs #111
+        measured. */
+
 .table-wrap {
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  margin-top: .75rem;
+  border-radius: var(--r-md);
+  margin-top: var(--sp-3);
+}
+
+/* A column that carries context rather than an answer. Hidden below --bp-sm
+   from sight and from the accessibility tree at once — `display: none` rather
+   than a visual-only hide, so nothing reads out a header whose cells are gone.
+   Goes on the <th> *and* on every <td> beneath it; miss one and the header row
+   and the body rows disagree about how many columns there are. Not on the
+   <col>: `display:none` on a column element is not honoured, and it does not
+   need to be — below --bp-md the wrapper's tables are `table-layout: auto`, so
+   the remaining columns re-share the width on their own. */
+@media (max-width: 700px) {
+  .col-optional { display: none; }
 }
 
 .table-wrap.tall {
@@ -2026,7 +2303,14 @@ hr {
   font-size: .72rem;
 }
 
-@media (max-width: 1200px) {
+/* Folded 1200 → 1400 by #109's breakpoint pass, and *up* rather than down,
+   which is the direction that removes the marginal case instead of moving it.
+   .crud-layout's two columns have hard minimums — minmax(320px,1fr) and
+   minmax(360px,1fr) with a 1rem gap, so 696 px before the page padding. With
+   the nav (236) and the help panel (260) both open, a 1200 px window leaves
+   704 px: it fitted by eight pixels. At 1100 — the next step down — it would
+   not have fitted at all. */
+@media (max-width: 1400px) {
   .crud-layout {
     grid-template-columns: 1fr;
   }
@@ -2067,7 +2351,10 @@ hr {
   }
 }
 
-@media (max-width: 720px) {
+/* Folded 720 → 700 by #109's breakpoint pass — the only one of the three folds
+   with nothing behind it. Two values twenty pixels apart, in a file where five
+   other blocks already said 700, were never two decisions. */
+@media (max-width: 700px) {
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -2143,12 +2430,15 @@ hr {
 .nav-search {
   width: 100%;
   padding: .34rem .5rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  /* A form field, so --ctl-border rather than --border: it is the edge of a
+     control and has to clear 3:1 against what is behind it, which --border
+     (a divider between two surfaces) does not (#109). */
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
   background: var(--bg);
   color: var(--text);
   font: inherit;
-  font-size: .85rem;
+  font-size: var(--fs-sm);
 }
 
 /* The rail's stand-in for the box. Shaped as a .tab-btn rather than styled from
@@ -2319,10 +2609,6 @@ hr {
 [data-theme="dark"] #tab-nav .tab-btn.active {
   background: #2a6fb0;
   border-color: #2a6fb0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #tab-nav.nav-ready { transition: none; }
 }
 
 /* A phone has no width to give away: 236 px of nav plus a filter pane that
@@ -2568,10 +2854,6 @@ hr {
 
 .help-link:hover {
   background: var(--subtle);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #help-panel.help-ready { transition: none; }
 }
 
 /* Everything open on a 1200 px laptop is 236 px of nav plus a 320 px filter pane
@@ -3351,7 +3633,11 @@ code {
   .wb-layout > aside:last-child { grid-column: 1 / -1; }
 }
 
-@media (max-width: 1000px) {
+/* Folded 1000 → 1100 by #109's breakpoint pass. Between the two the Workbench
+   was holding a 300 px rail beside a main column that, with both shell rails
+   open, had about 204 px left — so the step it lost was one it was not really
+   surviving anyway. */
+@media (max-width: 1100px) {
   .wb-layout { grid-template-columns: 1fr; }
   .wb-layout > aside:last-child { grid-column: auto; }
 }
@@ -3740,6 +4026,11 @@ code {
 }
 
 .nv-node:hover circle { stroke: var(--text); stroke-width: 2.5; }
+/* Allowlisted `outline: none` #2 of 2 (#109's focus policy). An SVG <g> has no
+   box to outline — browsers draw the ring around the group's bounding box,
+   which on a force-directed graph is a rectangle nowhere near the node. The
+   replacement is the line under it: the node's own circle takes the accent
+   stroke at 3 px, which is the ring, drawn on the shape that has focus. */
 .nv-node:focus-visible { outline: none; }
 .nv-node:focus-visible circle { stroke: var(--accent); stroke-width: 3; }
 
@@ -4796,7 +5087,7 @@ code {
   gap: .6rem;
   align-items: start;
   padding: .5rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 6px;
 }
 
@@ -4809,7 +5100,7 @@ code {
   object-fit: cover;
   border-radius: 4px;
   background: var(--subtle);
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
 }
 
 .att-thumb-file {
@@ -4946,7 +5237,10 @@ code {
 
   /* 1 rem of page padding on every side of every panel, on a screen that is
      itself only 26 rem wide, is most of a column of text given to margins. */
+  /* .page is the shared centred-column wrapper (#109) and folds with the two
+     tab-specific layouts that predate it. */
   .layout,
+  .page,
   .wb-page { padding: .75rem; }
 
   .panel     { padding: .75rem; }
@@ -5045,6 +5339,7 @@ code {
   }
 
   .layout,
+  .page,
   .wb-page { padding: .5rem; }
 
   .panel     { padding: .6rem; }
@@ -5327,7 +5622,7 @@ code {
   width: 15rem;
   height: 11rem;
   object-fit: cover;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--subtle);
 }
@@ -5365,6 +5660,42 @@ code {
    it; the rest of the page is black on white either way, and forcing colour
    across a whole document is how a printer ends up laying down ink for a
    background nobody asked for. */
+
+/* ── Reduced motion — one policy (#109) ──────────────────────────────────────
+   This used to be two blocks a thousand lines apart, each turning off one
+   rail's width transition, and everything else in the app — hovers, the
+   memory strip's grow, the drawers, whatever U1–U6 add next — animated
+   regardless. The policy is now stated once and applies to the whole document:
+
+     Anything decorative stops. Anything load-bearing keeps its duration.
+
+   The second half is not a hedge. app.js re-measures every Leaflet map
+   NAV_TRANSITION_MS + 40 after a rail moves, because a map measured mid-slide
+   caches the wrong container width and renders grey tiles with offset clicks.
+   Setting those two transitions to 0s is safe — the timeout still fires, just
+   after the slide has already finished — but setting them to `0.01ms` via a
+   blanket `* { transition-duration: 0.01ms !important }` and *also* killing
+   the `transitionend` semantics elsewhere is how that class of bug comes back.
+   So the rails are named here explicitly, at `none`, and the blanket rule
+   below covers everything that is only there to look nice.
+
+   Scroll behaviour is included: a smooth scroll is motion whether or not it
+   was written as an animation. */
+@media (prefers-reduced-motion: reduce) {
+  #tab-nav.nav-ready,
+  #help-panel.help-ready {
+    transition: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 @page {
   size: A4 portrait;

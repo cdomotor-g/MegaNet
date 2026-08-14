@@ -40,7 +40,7 @@
   // Crossing the phone breakpoint changes what the two rails *are* — columns or
   // drawers — and so what their toggles should say. Re-rendered on the crossing
   // itself rather than on every resize event: both are rebuilt wholesale.
-  window.matchMedia('(max-width: 560px)').addEventListener('change', () => {
+  window.matchMedia(`(max-width: ${BREAKPOINTS.xs}px)`).addEventListener('change', () => {
     renderTabs();
     renderHelp();
   });

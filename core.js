@@ -793,15 +793,54 @@ const HELP = {
   },
 };
 
-// Matches the width transition in styles.css. Measuring a map mid-slide is
-// worse than not measuring it at all, so the invalidate that follows a collapse
-// waits the transition out rather than racing it.
+// ── The breakpoint scale (#109) ──────────────────────────────────────────────
+// Six named steps, and this object is the only place they are written down.
+//
+// Before #109 styles.css held 23 `@media (max-width:)` blocks across *nine*
+// distinct widths — 1400, 1200, 1100, 1000, 900, 720, 700, 560, 380 — which is
+// not a responsive system, it is nine independent decisions that happened to
+// be in the same file. Three of them were folded away (1200→1400, 1000→1100,
+// 720→700; each fold carries its reasoning at the block it changed) and the
+// six that remain are these.
+//
+// It lives in core.js rather than in styles.css for two reasons. CSS custom
+// properties cannot be used inside a media query, so tokens there would look
+// usable and not be. And two of these steps are already load-bearing in
+// JavaScript — the nav auto-collapses at `md` and becomes a drawer at `xs` —
+// so the app was going to hold the numbers regardless. `npm run shell` reads
+// this object out of the running page and fails on any max-width in styles.css
+// that is not one of its values, which is what makes "U1–U6 must not introduce
+// a new breakpoint" a checked claim rather than an instruction.
+//
+//   xl  1400  the widest layouts give up a column (help panel narrows,
+//             .crud-layout and the Workbench rail stack)
+//   lg  1100  side-by-side becomes stacked (.layout, .map-layout, Radio Path
+//             Maps, the Workbench)
+//   md   900  a tablet. The nav auto-collapses to the icon rail, header
+//             buttons drop their labels, tables switch to automatic layout and
+//             scroll inside their wrapper
+//   sm   700  two-column content folds to one (forms, pickers, optional table
+//             columns)
+//   xs   560  a phone. The nav and the help panel stop being columns and
+//             become drawers over the page
+//   xxs  380  the smallest phone. The banner shrinks its title rather than
+//             pushing a button off the edge
+//
+// Adding a seventh step is allowed — it is a change to the system, made here
+// and documented in docs/design-system.md, not a number typed into one tab's
+// media query.
+const BREAKPOINTS = { xl: 1400, lg: 1100, md: 900, sm: 700, xs: 560, xxs: 380 };
+
+// Matches the width transition in styles.css (--motion-rail). Measuring a map
+// mid-slide is worse than not measuring it at all, so the invalidate that
+// follows a collapse waits the transition out rather than racing it.
 const NAV_TRANSITION_MS = 160;
 
 // Below this the nav starts collapsed, on first visit only. The Stations tab
 // already gives a permanent column to its resizable filter pane, and on a
-// laptop a second permanent column is one too many.
-const NAV_AUTO_COLLAPSE_PX = 900;
+// laptop a second permanent column is one too many. Named off the scale rather
+// than repeated as a literal — this is what `md` *means*.
+const NAV_AUTO_COLLAPSE_PX = BREAKPOINTS.md;
 
 // The help panel's own width transition, and it plays exactly the role
 // NAV_TRANSITION_MS does: the maps are re-measured once the slide has finished
@@ -1477,6 +1516,43 @@ function liveMaps() {
     if (m) out.push(m);
   });
   return out;
+}
+
+// ── The app's live region (#109) ──────────────────────────────────────────────
+// One polite region, in index.html, and this is the only thing that writes to
+// it. U5 (#140) has three streaming surfaces — ALERT packets, ALERT2 frames,
+// the serial monitor — and needed a policy to apply rather than one to invent,
+// so here is the policy, in four rules:
+//
+//   1. Announce the *result of something the user did*, and nothing else. A
+//      tab opened, a filter narrowed to three, a record saved, an import
+//      rejected. Never a clock, never a progress percentage, never data that
+//      arrived on its own.
+//   2. Never per-frame. A stream is not an announcement — a packet decoder
+//      that announces each packet is a screen reader that cannot be silenced
+//      short of leaving the page. A streaming surface announces when it starts
+//      and when it stops, and offers a summary on demand; the frames
+//      themselves live in a log the user reads at their own pace.
+//   3. Polite, always, from here. `assertive` interrupts whatever the user is
+//      currently being read, which is right for exactly one thing — an error
+//      that has just destroyed what they were doing — and that case belongs to
+//      Modal or to a visible banner, both of which move focus and so announce
+//      by themselves.
+//   4. Say what changed, not that something changed. "Networks — 12 radio
+//      networks" is an announcement; "updated" is a noise.
+//
+// The region is cleared before it is written, because a region assigned the
+// same string twice announces once — the second "3 of 19 tabs" after a
+// backspace and a retype would otherwise be silent.
+function announce(message) {
+  const el = document.getElementById('app-status');
+  if (!el) return;
+  const text = String(message ?? '').trim();
+  el.textContent = '';
+  if (!text) return;
+  // A microtask is not enough — the region has to be observed empty between
+  // the two writes, and that means a frame.
+  requestAnimationFrame(() => { el.textContent = text; });
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
