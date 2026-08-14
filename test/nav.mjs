@@ -1,6 +1,6 @@
 // The left nav: grouping, coverage, and the find box (#108).
 //
-// `npm run smoke` opens all nineteen tabs and asserts each one renders, but it
+// `npm run smoke` opens all twenty tabs and asserts each one renders, but it
 // opens them by calling `switchTab(id)` — it never touches the nav. So the whole
 // of #108 is invisible to it. A tab could be missing from `TABS`' groups, or
 // rendered into no group at all, or filtered permanently out of the list by the

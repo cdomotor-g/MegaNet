@@ -5601,6 +5601,132 @@ code {
   .ad-wrap--charted .ad-side { order: 2; }
 }
 
+/* ── Message Log tab ─────────────────────────────────────────────────────────
+   The arrival log. Two jobs the layout has to do: keep the table the first
+   thing on the page (the tray above it is collapsed by default and stays a
+   one-line summary until opened), and survive a phone — which is what the
+   narrow view, the fixed-width station-name column and the wrap rules below
+   are for. Everything else is the shared table/panel system. */
+
+.ml-wrap { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3); }
+
+.ml-header { flex-wrap: wrap; gap: var(--sp-2); }
+.ml-header-tools { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin-left: auto; }
+
+.ml-viewswitch { display: inline-flex; border: 1px solid var(--ctl-border); border-radius: var(--r-md); overflow: hidden; }
+.ml-seg {
+  border: 0; background: var(--panel); color: inherit; cursor: pointer;
+  padding: .25rem .6rem; font-size: var(--fs-sm);
+}
+.ml-seg + .ml-seg { border-left: 1px solid var(--ctl-border); }
+.ml-seg--on { background: var(--accent); color: #fff; }
+
+.ml-btn {
+  border: 1px solid var(--ctl-border); border-radius: var(--r-md);
+  background: var(--panel); color: inherit; cursor: pointer;
+  padding: .2rem .55rem; font-size: var(--fs-sm);
+}
+.ml-btn:hover { background: var(--subtle); }
+
+/* The filter rail. A flex wrap rather than a grid: the blocks are different
+   shapes and the row is allowed to break wherever it has to. */
+.ml-filters { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: flex-end; margin: var(--sp-2) 0; }
+.ml-f { display: flex; flex-direction: column; gap: .2rem; font-size: var(--fs-sm); }
+.ml-f > span, .ml-f label > span:first-child { color: var(--muted); font-size: var(--fs-xs); }
+.ml-f--find { flex: 1 1 260px; }
+.ml-f--find textarea {
+  width: 100%; resize: vertical; min-height: 1.9rem;
+  font: inherit; font-size: var(--fs-sm);
+}
+.ml-f--win { flex-direction: row; flex-wrap: wrap; gap: .25rem; align-items: center; }
+.ml-f--dates { flex-direction: row; gap: var(--sp-2); }
+.ml-f--dates label { display: flex; flex-direction: column; gap: .2rem; }
+.ml-f--run { display: flex; gap: var(--sp-2); align-items: center; }
+
+.ml-chip {
+  border: 1px solid var(--ctl-border); border-radius: var(--r-pill);
+  background: var(--panel); color: inherit; cursor: pointer;
+  padding: .18rem .6rem; font-size: var(--fs-sm);
+}
+.ml-chip--on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.ml-check { display: inline-flex; gap: .3rem; align-items: center; font-size: var(--fs-sm); cursor: pointer; }
+
+.ml-more summary { cursor: pointer; font-size: var(--fs-sm); color: var(--muted); }
+.ml-more-grid { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: flex-end; padding: var(--sp-2) 0; }
+
+/* The column chooser — a small dropdown, not a modal. */
+.ml-colpick { position: relative; }
+.ml-colpick summary {
+  cursor: pointer; font-size: var(--fs-sm); list-style: none;
+  border: 1px solid var(--ctl-border); border-radius: var(--r-md);
+  background: var(--panel); padding: .2rem .55rem;
+}
+.ml-colpick[open] summary { background: var(--subtle); }
+.ml-colpick-list {
+  position: absolute; right: 0; z-index: 40; min-width: 200px;
+  display: flex; flex-direction: column; gap: .3rem;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md);
+  box-shadow: var(--shadow-2); padding: var(--sp-3); margin-top: .25rem;
+}
+
+.ml-note { margin: .2rem 0 var(--sp-2); }
+.ml-flush { color: var(--muted); padding: var(--sp-3) 0; }
+
+/* The table. Time is the leftmost data column and its cell is the row's
+   expand button; the station name is capped so it cannot spend the whole of
+   a phone's width on one long site name. */
+.ml-table td, .ml-table th { white-space: nowrap; }
+.ml-pick { width: 1.6rem; text-align: center; }
+.ml-ts { padding-right: .4rem; }
+.ml-expand {
+  border: 0; background: none; color: inherit; cursor: pointer;
+  font: inherit; padding: 0; text-decoration: underline;
+  text-decoration-color: var(--ctl-border); text-underline-offset: 2px;
+}
+.ml-expand:hover { text-decoration-color: var(--accent); }
+.ml-name { max-width: 11em; overflow: hidden; text-overflow: ellipsis; }
+.ml-raw { font-weight: 600; }
+.ml-row--sel td { background: var(--rx-bg); }
+.ml-row--open td { border-bottom: 0; }
+
+/* The detail drawer — the ad-pin grid's shape, one row per fact, the label in
+   the muted column. */
+.ml-detail td { background: var(--subtle); }
+.ml-det-grid { display: flex; flex-direction: column; gap: .3rem; padding: .3rem .2rem; white-space: normal; }
+.ml-det-grid > div { display: flex; flex-wrap: wrap; gap: .4rem; align-items: baseline; font-size: var(--fs-sm); }
+.ml-det-grid > div > span:first-child { color: var(--muted); min-width: 84px; font-size: var(--fs-xs); }
+.ml-det-grid .small { color: var(--muted); }
+.ml-payload pre {
+  margin: 0; padding: .4rem .5rem; max-height: 240px; overflow: auto;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-sm);
+  white-space: pre-wrap; word-break: break-word;
+}
+.ml-frame { white-space: normal; word-break: break-all; }
+
+/* The tray. Collapsed it is one summary line; open it is the plot and the map
+   side by side, stacking on anything narrower than a laptop. */
+.ml-tray summary { cursor: pointer; padding: .2rem 0; }
+.ml-tray-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); padding-top: var(--sp-3); }
+.ml-plot { margin: 0; min-width: 0; }
+.ml-plot svg { width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); }
+.ml-mapbox { min-width: 0; }
+.ml-map { height: 300px; border: 1px solid var(--border); border-radius: var(--r-md); }
+.ml-map-note { color: var(--muted); margin: .3rem 0 0; }
+.ml-key { display: inline-flex; gap: .25rem; align-items: center; margin-right: .4rem; }
+.ml-dot {
+  width: .65rem; height: .65rem; border-radius: 50%;
+  background: var(--dot, var(--accent)); display: inline-block;
+}
+
+@media (max-width: 1100px) {
+  .ml-tray-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .ml-f--dates { flex-wrap: wrap; }
+  .ml-map { height: 240px; }
+}
+
 /* ══ Mobile pass ═══════════════════════════════════════════════════════════
    Everything below is width- or pointer-conditional and deliberately lives at
    the end of the file, so it lands after the component rules it tunes without

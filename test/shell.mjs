@@ -1,8 +1,8 @@
 // The app shell and the design system (#109).
 //
 // The eleventh check, and it exists for the reason the other ten do: every
-// claim below is invisible to `npm run smoke`, which opens all nineteen tabs
-// and asserts a clean console. A page can render nineteen tabs perfectly while
+// claim below is invisible to `npm run smoke`, which opens all twenty tabs
+// and asserts a clean console. A page can render twenty tabs perfectly while
 // having no skip link, no landmark structure, a focus ring that vanishes on
 // half its backgrounds, a nav that drops focus on every tab change, and a
 // palette that fails contrast in the dark theme. None of that throws.
@@ -479,7 +479,7 @@ try {
     policy.includes('#tab-nav.nav-ready') && policy.includes('#help-panel.help-ready'));
 
   // The proving ground plus the shell, at the three widths the epic names, in
-  // both themes. Not all nineteen tabs — that is U1–U6's Definition of Done,
+  // both themes. Not all twenty tabs — that is U1–U6's Definition of Done,
   // and asserting it here would be claiming work this issue did not do.
   for (const width of [375, 768, 1440]) {
     await page.setViewportSize({ width, height: 800 });

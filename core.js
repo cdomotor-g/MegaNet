@@ -36,7 +36,7 @@
 
 // The left-hand nav, and the only description of it. Each tab carries an icon
 // because the nav collapses to an icon rail, and a set of `find` words because
-// nineteen tabs is past the point where a rail of icons — or a column of labels
+// twenty tabs is past the point where a rail of icons — or a column of labels
 // — is something you scan.
 //
 // ── The grouping, and where it comes from (#108) ─────────────────────────────
@@ -135,6 +135,8 @@ const TABS = [
       find: 'csv file chart plot sensor continuity 3-5-7 filter noise drop' },
     { id: 'field',      label: 'Field Data',             icon: '🌡️',
       find: 'readings datastore sensors chart plot window rainfall level quality' },
+    { id: 'msglog',     label: 'Message Log',            icon: '📨',
+      find: 'messages arrivals incoming ingest raw log fade margin ingress base pathway follow live decode calibration' },
   ] },
   { group: 'Site visits', tabs: [
     { id: 'inspections', label: 'Inspections',           icon: '🩺',
@@ -680,7 +682,53 @@ const HELP = {
       { label: 'Posting readings over MQTT, and knowing which stations went quiet',
         href: 'docs/ingest-mqtt.md' },
     ],
-    related: ['arrodata', 'stations', 'alert2'],
+    related: ['arrodata', 'msglog', 'stations', 'alert2'],
+  },
+
+  msglog: {
+    summary: 'The arrival log: every message the datastore accepted, newest first, one row per '
+           + 'reading — who sent it, on what address, the raw value that arrived, and the pathway '
+           + 'in (protocol, transport, ingress point, duplicate copies). Filter by window, by a '
+           + 'pasted list of stations or addresses, by protocol or path; tick rows to plot them '
+           + 'and map their stations in the tray above the table; open a row for the whole '
+           + 'record and its decode. <strong>Follow</strong> re-asks every 30 seconds, which is '
+           + 'the mode for standing in a paddock waiting for a test transmission to land.',
+    watch: [
+      '<strong>Raw is the headline column because raw is the truth.</strong> The value the device '
+      + 'transmitted is always shown; the converted value appears beside it only when the '
+      + 'datastore recorded a conversion, and the rule that produced it is in the row\'s detail. '
+      + 'A rainfall count means nothing without the bucket size, and this tab never pretends '
+      + 'otherwise.',
+      'The <strong>narrow view is a reading aid, not the record</strong>. It opens with the '
+      + 'field set — time, station, address, raw value — and the Columns button decides what '
+      + 'each view keeps, remembered on this device per view. Export CSV always writes every '
+      + 'column of every fetched row, whatever the views are hiding.',
+      '<strong>One row is one reading, not one transmission.</strong> The datastore deduplicates '
+      + 'on address, instant and value, and counts the further copies — so a reading heard '
+      + 'direct and via two repeaters is one row saying ×3, and the copies\' paths are in the '
+      + 'detail drawer. That count is the network\'s real path redundancy, visible nowhere else.',
+      'A station name here is a <strong>resolution, not a claim the message made</strong>. The '
+      + 'datastore backfills <code>station_id</code> where the address is unambiguous; where it '
+      + 'is not, the row shows the first candidate and says how many more share the address — '
+      + '604 of 5,122 ALERT addresses belong to more than one station.',
+      '<strong>Raw readings age out at about 90 days</strong>, so a window into last winter '
+      + 'comes back empty here — the hourly and daily rollups that survive live on the Field '
+      + 'Data tab. The submission a reading arrived on ages out faster (~30 days) and needs a '
+      + 'signed-in session to fetch; the reading itself is public and stays the full 90.',
+      'The <strong>tray map follows the Stations tab\'s rules</strong>: every pin stays on the '
+      + 'map, ghosted; the stations behind your selected rows come up at full opacity with '
+      + 'their names; and the repeaters whose pass ranges carry them are pulled in dashed cyan '
+      + '— cyan meaning a pass range named it, never you.',
+    ],
+    links: [
+      { label: 'The Message Log — what each column means, and the intended uses',
+        href: 'docs/message-log.md' },
+      { label: 'Posting readings over HTTP — for whoever configures the logger',
+        href: 'docs/ingest-http.md' },
+      { label: 'Posting readings over MQTT, and knowing which stations went quiet',
+        href: 'docs/ingest-mqtt.md' },
+    ],
+    related: ['field', 'alert2', 'packets', 'stations'],
   },
 
   inspections: {
@@ -1183,7 +1231,7 @@ const state = {
                    || (window.innerWidth < NAV_AUTO_COLLAPSE_PX ? 'collapsed' : 'expanded')) === 'collapsed',
   // What is typed in the nav's "find a tab" box (#108). Deliberately *not*
   // persisted: a filter is a thing you are doing now, and a nav that opens
-  // already showing four of its nineteen tabs — with no memory of why — reads as
+  // already showing four of its twenty tabs — with no memory of why — reads as
   // broken rather than as remembered. It is cleared by Escape, by picking a tab,
   // and by every reload.
   navQuery:       '',

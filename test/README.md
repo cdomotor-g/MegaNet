@@ -25,7 +25,7 @@ npm run all                       # the twelve that run in CI
 | `npm run check` | `node --check` over every script `index.html` loads |
 | `npm run names` | no duplicate top-level declarations across those scripts |
 | `npm run toplevel` | `init.js` is still the only file that executes at load |
-| `npm run smoke` | loads the page in Chromium, opens all 19 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
+| `npm run smoke` | loads the page in Chromium, opens all 20 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
 | `npm run nav` | every tab is in the left nav exactly once, under one heading, and findable by its own label and by what it does |
 | `npm run shell` | the shell's landmarks, skip link, focus policy and disclosure state; the six-step breakpoint scale; and WCAG contrast for every token pair in both themes |
@@ -75,7 +75,7 @@ directory would not change what a browser loads.
 tool, and someone opening `index.html` off a laptop with no server is
 anticipated. But it is a bad mode to *test* in: over `file://` the bundled
 `stations.json` is unreachable (`autoLoad()` says so at `app.js:188`), so
-`state.data` stays null and twelve of the nineteen tabs render the empty state
+`state.data` stays null and twelve of the twenty tabs render the empty state
 instead of themselves. A smoke test that never draws a station table proves very
 little.
 
@@ -126,7 +126,7 @@ nothing inside one. `lib/controls.mjs` closes that, two ways:
 
 **`auditHandlers()`** reads every `on*=` attribute the tab rendered, pulls the
 callee paths out of it and asks the page whether each resolves to a function.
-One `evaluate()` per tab, so it runs on all nineteen — 313 distinct handler calls
+One `evaluate()` per tab, so it runs on all twenty — 313 distinct handler calls
 across 5,578 attributes on a full pass. It is exhaustive over whatever is on
 screen, which is its advantage and also its limit: a control that did not render
 is a control it did not check.
@@ -198,7 +198,7 @@ something, so say why.
 
 ### `registry.mjs` — the half smoke cannot see
 
-Smoke opens all nineteen tabs. It never *leaves* one, so a tab that forgot to
+Smoke opens all twenty tabs. It never *leaves* one, so a tab that forgot to
 register its Leaflet map or its teardown passes: the tab itself is fine. It is
 the leaving that isn't, and it fails in silence — a map missing from the
 re-measure list renders at the wrong size after a nav collapse, a module missing
@@ -232,7 +232,7 @@ site can reach it.
 Smoke reaches every tab by calling `switchTab(id)`. It never touches the nav, so
 everything about the nav is outside it: a tab could be missing from every group
 in `TABS`, or permanently filtered out of the rendered list by the find box, and
-all nineteen tabs would still open and still render clean. A user has no
+all twenty tabs would still open and still render clean. A user has no
 `switchTab()`.
 
 Four claims, and each one is invisible from anywhere else:
@@ -266,7 +266,7 @@ whether it can be operated by someone who is not looking at it with a mouse in
 their hand, and whether the design decisions six parallel issues are about to
 inherit are the ones actually in the file.
 
-Nothing above it can see any of that. A page opens all nineteen tabs with a
+Nothing above it can see any of that. A page opens all twenty tabs with a
 clean console just as happily with no skip link, no landmark structure, a focus
 ring that disappears on half its backgrounds, a nav that drops focus on `<body>`
 every time you change tab, and a dark palette that fails contrast. None of it
@@ -311,7 +311,7 @@ Seven claims:
   also called at startup by `Workbench.restoreFromUrl()`.
 - **Sideways scroll.** The document does not scroll horizontally at 375, 768 or
   1440, in either theme, on the shell and on the proving-ground tab. Not all
-  nineteen: that is U1–U6's Definition of Done, and asserting it here would be
+  twenty: that is U1–U6's Definition of Done, and asserting it here would be
   claiming work #109 did not do.
 
 Two things this check taught its own author, both recorded in the file. The
@@ -643,7 +643,7 @@ without looking, and a verifier nobody looks at verifies nothing.
 
 ## When the tests need updating
 
-- **A tab was added or removed.** `smoke.mjs` asserts `TABS` holds 19 entries, so
+- **A tab was added or removed.** `smoke.mjs` asserts `TABS` holds 20 entries, so
   that a tab added without a `renderMain()` case fails here rather than in front
   of an operator. Give the new tab a `renderMain()` case and a `HELP` entry, then
   bump `EXPECTED_TABS`. The `HELP` entry has to be *written*, not stubbed —
@@ -733,11 +733,12 @@ without looking, and a verifier nobody looks at verifies nothing.
 - **A U-issue landed a tab.** Add its tab id to `CONVERTED` in `tabs.mjs`, in
   the same commit. If the tab renders nothing worth checking until something is
   loaded, give the entry a `seed` — source for a function run in the page right
-  after `switchTab()` (#141). Two of the nineteen are like that and they are the
-  same module: ARRO Data draws nothing until a CSV is dropped on it, and Field
-  Data draws nothing until the datastore answers, which under this harness it
-  never does. Both were passing as an empty state and a paragraph while the
-  toolbar, the chart, the legend and the readings table went unmeasured. Seed
+  after `switchTab()` (#141). Three of the twenty are like that: ARRO Data
+  draws nothing until a CSV is dropped on it, and Field Data and the Message
+  Log draw nothing until the datastore answers, which under this harness it
+  never does. The first two were passing as an empty state and a paragraph
+  while the toolbar, the chart, the legend and the readings table went
+  unmeasured. Seed
   through the module's own boundary rather than a fixture file, and open any
   `<details>` you want checked — a closed one is `display: none`, and everything
   inside it is filtered out as invisible. That list is what the per-tab Definition of Done is asserted
@@ -745,7 +746,7 @@ without looking, and a verifier nobody looks at verifies nothing.
   green all the way through a conversion that dropped half of it. The reverse is
   deliberate too: a tab nobody has converted yet does not fail a check for work
   nobody has done, which is why this is a list rather than a sweep over all
-  nineteen.
+  twenty.
 - **A tab needs a pattern that is not in the design system.** Add it to
   `docs/design-system.md` §3 and check it here, in that order. #137 added two
   (a scrolling `.table-wrap` is a named region; a clickable row carries a real

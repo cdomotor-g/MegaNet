@@ -84,10 +84,10 @@ const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
 // ── Seeds ───────────────────────────────────────────────────────────────────
 // A `seed` on a CONVERTED entry is source for a function run in the page
 // immediately after switchTab(), for a tab whose interesting state does not
-// exist until something is loaded (#141). Two of the nineteen are like that and
-// they are the same module: ARRO Data draws nothing until a CSV is dropped on
-// it, and Field Data draws nothing until the datastore answers — which under
-// this harness it never does, because the network policy blocks it. Checked as
+// exist until something is loaded (#141). Three of the twenty are like that —
+// ARRO Data draws nothing until a CSV is dropped on it, and Field Data and the
+// Message Log draw nothing until the datastore answers — which under this
+// harness it never does, because the network policy blocks it. Checked as
 // they arrive, both tabs are an empty state and a paragraph, and the toolbar,
 // the chart, the legend, the readout and the readings table — every surface
 // #141 actually converted — went unmeasured. Seeded, ARRO Data goes from one
@@ -232,6 +232,32 @@ const SEED_RFC_ONSET = `async () => {${SEED_ACMA}
 // that is how this check grows with the epic. The label is the nav label, so a
 // failure names the tab the way the app does. Add a `seed` above and name it
 // here if your tab has a state the harness cannot reach on its own.
+// The Message Log renders its table from whatever the datastore returned, and
+// under this harness the datastore never answers — so, like ARRO Data above,
+// the unseeded tab is an error note and a filter rail. Seeded through the
+// module's own boundary (adoptRows, the documented door: rows exactly as
+// meganet.reading returns them), the table, the selection column and an open
+// detail drawer are all on screen to be measured. Two addresses, one of them
+// station-number-addressed, so the channel column and the "no ALERT id" cell
+// are both exercised; toggleRow opens the drawer the way a click would.
+const SEED_MSGLOG = `() => {
+  MessageLog.adoptRows([
+    { addr: 'a:6128', alert_id: 6128, station_number: null, channel: '',
+      station_id: null, reading_ts: '2026-03-01T04:15:00+00:00',
+      received_at: '2026-03-01T04:15:32+00:00', value_raw: 12, value: 2.4,
+      unit: 'mm', conversion: 'raw x 0.2 mm per tip', quality: 0, protocol: 1,
+      source: 2, path: 'MOUNT_TABLETOP', dup_count: 2,
+      dup_paths: ['DURIKAI', 'direct'], last_dup_at: '2026-03-01T04:15:40+00:00',
+      raw_id: 41 },
+    { addr: 's:541155/level', alert_id: null, station_number: '541155',
+      channel: 'level', station_id: null, reading_ts: '2026-03-01T04:10:00+00:00',
+      received_at: '2026-03-01T04:10:05+00:00', value_raw: 1.842, value: null,
+      unit: 'm', conversion: null, quality: 1, protocol: 0, source: 1,
+      path: null, dup_count: 0, dup_paths: [], last_dup_at: null, raw_id: null },
+  ]);
+  MessageLog.toggleRow('a:6128|2026-03-01T04:15:00+00:00|12');
+}`;
+
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
@@ -244,6 +270,7 @@ const CONVERTED = [
   { id: 'rf',         label: 'RF Environment — one repeater',  issue: '#138', seed: SEED_RF_ONE },
   { id: 'rfchanges',  label: 'RF Changes — no onset',          issue: '#138', seed: SEED_RFC_PLAIN },
   { id: 'rfchanges',  label: 'RF Changes — onset and a series', issue: '#138', seed: SEED_RFC_ONSET },
+  { id: 'msglog',     label: 'Message Log',     issue: 'new with the tab', seed: SEED_MSGLOG },
 ];
 
 

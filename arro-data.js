@@ -1651,6 +1651,41 @@ const ArroData = (function () {
   function fieldSetDate(which, v) { const q = fq(); q[which] = v; q.error = ''; renderSide(); }
   function fieldClearError() { const q = fq(); q.error = ''; q.empty = ''; renderSide(); }
 
+  // The Message Log's door in: chart one address' raw readings around a
+  // moment, exactly as if the operator had worked the picker by hand — so
+  // everything downstream (the provenance line, the exports, the inspector)
+  // behaves as it always does. Callers switchTab('field') first, which makes
+  // `ad` the field instance; a day either side of the moment keeps the window
+  // inside AD_RAW_MAX_DAYS, so the resolution stays raw without forcing it.
+  function fieldShow(addr, tsMs) {
+    const a = String(addr || '').trim();
+    if (!a) return;
+    let st = null;
+    if (a.startsWith('a:') && state.data) {
+      const hits = buildSensorIndex().get(+a.slice(2)) || [];
+      st = hits.length ? hits[0].station : null;
+    } else if (a.startsWith('s:') && state.data) {
+      const num = a.slice(2).split('/')[0];
+      st = (state.data.stations || []).find(s =>
+        String(s.station_number || '') === num || String(s.site?.number || '') === num) || null;
+    }
+    const q = fq();
+    q.stationId = st ? st.id : '';
+    q.find = '';
+    const known = st ? fieldAddrs(st).some(x => x.addr === a) : false;
+    q.sensors = known ? [a] : [];
+    q.extra   = known ? '' : a;
+    const day = d => {
+      const x = new Date(d);
+      return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+    };
+    q.win  = 'custom';
+    q.from = day(tsMs - AD_DAY);
+    q.to   = day(tsMs + AD_DAY);
+    q.res  = 'raw';
+    fieldRun();
+  }
+
   // What the chart says about itself. Only on the Field tab: the ARRO tab's
   // answer is its own name, and adding a banner there would change a tab this
   // work promised not to touch.
@@ -1713,6 +1748,16 @@ const ArroData = (function () {
     rows.push(`<div><span>Copies</span><b>${dup ? `heard ${dup + 1} times` : 'heard once'}</b></div>`);
     if (via && via.length) rows.push(`<div><span>Paths</span><b class="mono">${esc(via.join(', '))}</b></div>`);
     rows.push(`<div><span>Source</span><b>Field · <span class="mono">${esc(s.prov.addr)}</span></b></div>`);
+    // The same reading, seen as a message: the ingress pathway, the duplicate
+    // copies and the decode live on the Message Log, and this is the join
+    // between the two pages — its counterpart is the drawer's "chart this
+    // address" button over there. Rollup points name no single message, so
+    // only a raw point gets the door.
+    if (s.prov.res === 'raw') {
+      rows.push(`<div><span>Message Log</span>
+        <button class="ad-inline-link" onclick="MessageLog.showReading('${escAttr(s.prov.addr)}', ${Math.round(s.t[i])})"
+                title="Open this reading's row in the Message Log — the ingress pathway, the duplicate copies and the decode are there">Open this reading in the Message Log</button></div>`);
+    }
     return rows.join('');
   }
 
@@ -3670,6 +3715,8 @@ const ArroData = (function () {
     // the Field Data tab (#114)
     fieldSetStation, fieldToggleSensor, fieldAllSensors, fieldSetWindow,
     fieldSetRes, fieldSetDate, fieldRun, fieldClearError,
+    // the Message Log's door in — one address, one moment, charted
+    fieldShow,
     // exposed for reasoning about the filter outside the UI
     parseCsv, parseName, linkStation, guessKind, runFilter, walk357,
     // the series boundary both sources cross

@@ -92,6 +92,9 @@ MegaNet/
 ├── network-maps.js         ← Maps      — Radio Path Maps tab (named for the tab, not
 │                             the module, so it isn't confused with maps-data.js)
 ├── serial.js               ← Serial    — Serial Monitor tab (Web Serial)
+├── message-log.js          ← MessageLog — Message Log tab (the arrival log:
+│                             every message the datastore accepted, filterable,
+│                             with a plot-and-map tray and a decode drawer)
 ├── bug-report.js           ← BugReport — prefilled GitHub issue reporter
 ├── init.js                 ← the only code that runs at load; must stay last
 ├── maps-data.js            ← Radio Path Maps catalogue, QLD basin SVG + georeference
@@ -117,6 +120,7 @@ MegaNet/
 │   ├── access.md                           (who gets in, who may edit, and recovery)
 │   ├── ingest-http.md                      (posting readings from a field station — #B5)
 │   ├── ingest-mqtt.md                      (topic scheme, broker choice, station credentials — #B6)
+│   ├── message-log.md                      (the Message Log tab — columns, uses, edges)
 │   ├── floodwarning-net.md                 (moving the domain to MegaNet — runbook)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
@@ -444,6 +448,18 @@ select station_key, station_name, online, round(minutes_since_seen) as quiet_for
   from meganet.station_health
  where minutes_since_seen > 180 order by minutes_since_seen desc;
 ```
+
+### Reading it back — two tabs, one table
+
+What lands through `ingest()` is read back two ways. **Field Data** charts one
+station's sensors over a window — the 357 filter, the rollups, the gaps.
+**Message Log** is the same rows read as an arrival log: every message the
+datastore accepted, newest first, with the ingress pathway (protocol,
+transport, which base heard it, how many further copies by which other paths)
+as columns, a plot-and-map tray over any selection, a decode drawer per row,
+and a Follow switch for watching a field test land. Each page links to the
+other per reading. [`docs/message-log.md`](docs/message-log.md) is the long
+form.
 
 [`docs/ingest-mqtt.md`](docs/ingest-mqtt.md) is the page for whoever is
 configuring a logger or choosing a broker — the topic scheme and why it is shaped

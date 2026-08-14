@@ -845,7 +845,7 @@ function navHaystack(tab, group) {
 }
 
 // Does `text` start a word with `term`? Built per call rather than cached: the
-// whole filter is nineteen tabs against a handful of terms, once per keystroke.
+// whole filter is twenty tabs against a handful of terms, once per keystroke.
 function navHasTerm(text, term) {
   const safe = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`(?:^|[^a-z0-9])${safe}`).test(text);
@@ -893,7 +893,7 @@ function navGroupsHtml() {
     const hid = 'nav-h-' + slug(g.group);
     // role="group" rather than nothing, because collapsed the heading is
     // clipped: it is still the group's accessible name, and without the
-    // association a screen reader on the rail gets nineteen ungrouped buttons.
+    // association a screen reader on the rail gets twenty ungrouped buttons.
     return `
     <div class="nav-group" role="group" aria-labelledby="${hid}">
       <h2 class="nav-heading" id="${hid}">${esc(g.group)}</h2>
@@ -1061,7 +1061,7 @@ function focusMain(e) {
 // anywhere at all: renderTabs() replaces the nav's innerHTML, so the button
 // that was just clicked does not exist by the time the switch has finished. A
 // keyboard user was left with focus on <body> after every tab change — a fresh
-// Tab from the top of the document, nineteen buttons back to where they were.
+// Tab from the top of the document, twenty buttons back to where they were.
 //
 // The rule: focus lands on the new tab's own nav button, the element that just
 // became aria-current="page". It is the closest thing to "where you already
@@ -1105,7 +1105,7 @@ function switchTab(id) {
   // the phone drawer follows two lines down. Left standing, the query would hide
   // the tab you just opened from the nav that opened it, which reads as the nav
   // having lost it. Cleared before renderTabs(), so the rebuild draws all
-  // nineteen back.
+  // twenty back.
   state.navQuery = '';
   // On a phone the expanded nav is a drawer laid over the content rather than
   // a column beside it (see styles.css). Picking a tab is the end of that
@@ -1141,7 +1141,7 @@ function switchTab(id) {
   // its own: a deep-link button inside a tab, a restore from the URL, and the
   // phone drawer closing to <main>, which has no accessible name to read. The
   // group comes with the label for the reason the rail's tooltip carries it —
-  // "Networks" alone does not say where in nineteen tabs you have landed.
+  // "Networks" alone does not say where in twenty tabs you have landed.
   if (!cameFromShell || isPhoneNav()) {
     const opened = TAB_LIST.find(t => t.id === id);
     const group  = TABS.find(g => g.tabs.some(t => t.id === id));
@@ -1433,7 +1433,10 @@ function renderMain() {
   // datastore, and only scoping the timeline to one station needs the station
   // file — so it says that rather than rendering the load-a-file page over a
   // history somebody can read.
-  const noDataTabs = ['packets', 'alert2', 'maps', 'serial', 'arro', 'arrodata', 'history'];
+  // The Message Log joins them too: every row comes from the datastore, and
+  // the station file is only what turns addresses into names — the log reads
+  // fine before it loads, and says which names it cannot resolve yet.
+  const noDataTabs = ['packets', 'alert2', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog'];
   if (!state.data && !noDataTabs.includes(state.activeTab)) { el.innerHTML = renderEmpty(); return; }
   switch (state.activeTab) {
     case 'stations':   el.innerHTML = renderStationsHtml();  initStationFilters(); initMap(); break;
@@ -1452,6 +1455,7 @@ function renderMain() {
     case 'arrodata':   el.innerHTML = ArroData.render();      ArroData.init();     break;
     // Same module, second instance — see the comment at the top of ArroData.
     case 'field':      el.innerHTML = ArroData.render('field'); ArroData.init();  break;
+    case 'msglog':     el.innerHTML = MessageLog.render();      MessageLog.init(); break;
     case 'inspections': el.innerHTML = Inspections.render();  Inspections.init(); break;
     case 'maintenance': el.innerHTML = Maintenance.render();  Maintenance.init(); break;
     case 'history':    el.innerHTML = History.render();       History.init();      break;

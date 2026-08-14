@@ -25,17 +25,21 @@
     "maintenance.js",
     "history.js",
     "map-rivers.js",
+    "map-survey.js",
+    "map-contours.js",
     "map-spider.js",
     "map-locate.js",
     "terrain.js",
     "modal.js",
     "packets.js",
     "alert2.js",
+    "hfem.js",
     "network-maps.js",
     "serial.js",
+    "message-log.js",
     "bug-report.js",
     "init.js"
   ],
-  "total": 459,
-  "distinct": 459
+  "total": 475,
+  "distinct": 475
 }
