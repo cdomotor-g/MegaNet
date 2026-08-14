@@ -2066,6 +2066,10 @@ function refreshMapLayers({ skipFit = false } = {}) {
     marker.mnStation   = s;                // and lets labels be re-picked on pan
     marker.mnRadius    = radius;
     marker.mnBaseStyle = base;
+    // The classification, not just its numbers — the canvas renderer draws no
+    // DOM node for a className to land on, but the name label is real DOM in
+    // the tooltip pane, and applyMapLabels dims it off this flag.
+    marker.mnFilterDim = dim;
 
     // bindPopup takes a function so the HTML is built when the popup opens,
     // not for all ~3,174 markers on every refresh.
@@ -2228,6 +2232,7 @@ function setMapFocusRepeater(id) {
   if (state.mapFocusRepeaterId === id) return;
   state.mapFocusRepeaterId = id;
   applyMapFocusStyles();
+  applyMapLabels();          // the names recede with their pins (mnFocusDimmed)
   // The "Repeaters listening" card marks whichever of its rows is the focused
   // repeater, so it follows the focus however it was set — a pin click, the
   // empty map, or one of its own rows.
@@ -2324,9 +2329,10 @@ function mapLabelIds() {
   return wanted;
 }
 
-// Bind or unbind the name tooltips in place. Called after a rebuild and on
-// every pan and zoom, so it only touches the pins whose label actually changed
-// — rebuilding ~3,100 markers to add a name is not a pan.
+// Bind or unbind the name tooltips in place. Called after a rebuild, on every
+// pan and zoom, and on a repeater-focus change, so it only touches the pins
+// whose label or dim actually changed — rebuilding ~3,100 markers to add a
+// name is not a pan.
 function applyMapLabels() {
   if (!state.map) return;
   const wanted = mapLabelIds();
@@ -2335,12 +2341,23 @@ function applyMapLabels() {
     if (!s) continue;
     const want = wanted.has(s.id);
     const has  = !!m.getTooltip();
+    // The filter is additive — it dims rather than removes — so the name has
+    // to take part or the faded pin keeps the highest-contrast thing on the
+    // map hanging off it. Same for repeater focus, whose dim is deeper.
+    const dim  = !!(m.mnFilterDim || m.mnFocusDimmed);
     if (want && !has) {
       m.bindTooltip(esc(s.name), {
-        permanent: true, direction: 'bottom', offset: [0, m.mnRadius || 6], className: 'mn-pin-label',
+        permanent: true, direction: 'bottom', offset: [0, m.mnRadius || 6],
+        className: dim ? 'mn-pin-label mn-pin-label-dim' : 'mn-pin-label',
       });
+      m.mnLabelDim = dim;
     } else if (!want && has) {
       m.unbindTooltip();
+      m.mnLabelDim = undefined;
+    } else if (want && has && dim !== m.mnLabelDim) {
+      const el = m.getTooltip().getElement();
+      if (el) el.classList.toggle('mn-pin-label-dim', dim);
+      m.mnLabelDim = dim;
     }
   }
 }

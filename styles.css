@@ -1845,7 +1845,8 @@ hr {
   cursor: pointer;
 }
 
-/* name labels — only ever drawn for filter-box matches */
+/* name labels — filter-box matches always, plus whatever is in view once the
+   zoom is tight enough (auto/on modes in mapLabelIds) */
 .leaflet-tooltip.mn-pin-label {
   background: rgba(255, 255, 255, .93);
   color: #1a1a1a;
@@ -1858,6 +1859,18 @@ hr {
   line-height: 1.5;
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* A filtered-out or focus-dimmed pin's name recedes with it. The box keeps its
+   own white ground (fading the whole tooltip would put grey text straight on
+   satellite tiles); the ink drops weight instead. #616161 on the label's
+   rgba(255,255,255,.93) ground is 5.3:1 over a black tile, 6.2:1 over white —
+   AA either way, in both themes, because the ground is the label's own. */
+.leaflet-tooltip.mn-pin-label-dim {
+  color: #616161;
+  font-weight: 400;
+  border-color: rgba(0, 0, 0, .12);
+  box-shadow: none;
 }
 
 .leaflet-tooltip.mn-pin-label::before {
