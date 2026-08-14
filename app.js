@@ -1924,6 +1924,9 @@ const MAP_PIN_SEL   = '#7c4dff';   // heavy ring: hand-picked into the map selec
                                    // Violet is none of the role fills, none of the
                                    // ACMA colours, and neither the amber of a filter
                                    // match nor the cyan of a pass-range relation.
+const MAP_PIN_R_FIELD = 5;         // circleMarker radii, so 2R px across. Named
+const MAP_PIN_R_RPT   = 8;         // because the ACMA squares size off the field
+                                   // pin — see ACMA_PIN_PX.
 const MAP_HOME      = [-25.6, 134.3];   // middle of Australia — the opening view,
                                         // replaced by a fit to whatever is plotted
 
@@ -2064,7 +2067,7 @@ function refreshMapLayers({ skipFit = false } = {}) {
     const hit    = active && matchIds.has(s.id);
     const rel    = active && !hit && relIds.has(s.id);
     const dim    = active && !hit && !rel;
-    const radius = (isRpt ? 8 : 5) + (hit || rel ? 1 : 0);
+    const radius = (isRpt ? MAP_PIN_R_RPT : MAP_PIN_R_FIELD) + (hit || rel ? 1 : 0);
     // Every pin carries a white ring so it separates from the base map and from
     // its neighbours; matches swap it for amber, and stations pulled in by a
     // pass range for a dashed cyan one — full opacity either way, but you can
@@ -3277,6 +3280,36 @@ const VHF_SEGMENTS = [
 const ACMA_MARKER_CAP = 500;
 const ACMA_LINK_CAP   = 300;
 
+// A licensed transmitter is context for MegaNet's own sites, not the subject of
+// the map, so its square is drawn half as big as a field-station pin. Those pins
+// are circleMarkers of radius MAP_PIN_R_FIELD — 2R px across — so half of that
+// is exactly R px of square.
+const ACMA_PIN_PX     = MAP_PIN_R_FIELD;
+// The score still sizes the square, but half-size leaves only ±1px for the ramp
+// (scores run 0–100), so it is compressed rather than dropped: in the current
+// data everything above score 25 draws at the full half-pin.
+const ACMA_PIN_RAMP   = 1;
+// The square is centred in a fixed, transparent hit box — shrinking the mark
+// should not shrink the click target with it, and the box is about the size the
+// old score-scaled squares were.
+const ACMA_PIN_HIT_PX = 14;
+
+function acmaPinPx(score) {
+  const s = Math.min(100, Math.max(0, score || 0)) / 100;   // the min-score slider's scale
+  return ACMA_PIN_PX - ACMA_PIN_RAMP + Math.round(s * 2 * ACMA_PIN_RAMP);
+}
+
+// Both this map and the Workbench's draw ACMA squares; they share the icon so
+// they keep sharing a visual language.
+function acmaSquareIcon(size, extraClass, color) {
+  return L.divIcon({
+    className: 'acma-div',
+    html: `<div class="acma-sq${extraClass}" style="width:${size}px;height:${size}px;background:${color}"></div>`,
+    iconSize:   [ACMA_PIN_HIT_PX, ACMA_PIN_HIT_PX],
+    iconAnchor: [ACMA_PIN_HIT_PX / 2, ACMA_PIN_HIT_PX / 2],
+  });
+}
+
 function vhfSegment(mhz) {
   return VHF_SEGMENTS.find(s => mhz >= s.lo && mhz < s.hi) || null;
 }
@@ -3596,12 +3629,7 @@ function refreshAcmaLayer() {
     const site = A.siteById[t.site_id];
     if (!site) continue;
     const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-    const size = Math.round(9 + t.score / 8);
-    const icon = L.divIcon({
-      className: 'acma-div',
-      html: `<div class="acma-sq${t.meganet ? ' mn' : ''}" style="width:${size}px;height:${size}px;background:${mech.color}"></div>`,
-      iconSize: [size, size], iconAnchor: [size / 2, size / 2],
-    });
+    const icon = acmaSquareIcon(acmaPinPx(t.score), t.meganet ? ' mn' : '', mech.color);
     const m = L.marker([site.lat, site.lon], { icon }).addTo(A.layer);
     m.bindPopup(acmaPopupHtml(d, site), { maxWidth: 300 });
     m.on('click', () => acmaHighlightDevice(t.device_id));

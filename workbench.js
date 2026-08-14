@@ -13,8 +13,10 @@
 //                 dlText, esc, escAttr, registerLiveMap (#142 — the case map
 //                 says so itself now), registerTabTeardown, removeMap (#143 —
 //                 and takes itself down on the way out), slug, state
-//   app.js        acmaEnsureCore, acmaEnsureDevices, acmaFetchJson,
-//                 addBaseLayers, passRangeCoversId, renderMain, renderTabs,
+//   app.js        acmaEnsureCore, acmaEnsureDevices, acmaFetchJson, acmaPinPx,
+//                 acmaSquareIcon (the case map's threat squares are the main
+//                 map's, at the same half-a-field-pin size), addBaseLayers,
+//                 passRangeCoversId, renderMain, renderTabs,
 //                 rfStripPlotHtml, stationAlertIds, switchTab — and
 //                 showAcmaCard, which it reaches *only* from two inline
 //                 onclick strings, so no AST walk over this file will find it
@@ -1465,12 +1467,7 @@ function initWbMap() {
       const site = A.siteById[t.site_id];
       if (!site) continue;
       const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-      const size = Math.round(9 + t.score / 8);
-      const icon = L.divIcon({
-        className: 'acma-div',
-        html: `<div class="acma-sq" style="width:${size}px;height:${size}px;background:${mech.color}"></div>`,
-        iconSize: [size, size], iconAnchor: [size / 2, size / 2],
-      });
+      const icon = acmaSquareIcon(acmaPinPx(t.score), '', mech.color);
       const m = L.marker([site.lat, site.lon], { icon }).addTo(layer);
       m.bindPopup(`<strong>${esc(t.client || 'Unknown licensee')}</strong> · score ${t.score}<br>
         <span style="font-size:.83rem">${mech.label} · ${esc(t.detail)}</span><br>
