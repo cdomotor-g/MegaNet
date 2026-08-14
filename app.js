@@ -1710,7 +1710,7 @@ function mapLegendHtml() {
     </span>` : ''}
     ${state.filters.acma.show ? Object.entries(ACMA_MECH).map(([k, m]) => `
       <span class="legend-item">
-        <span class="legend-sq" style="background:${m.color}"></span>
+        <span class="legend-sq" style="--dot:${acmaMechVar(k)}"></span>
         <span class="small">${m.label}</span>
       </span>`).join('') + `
     <span class="legend-item"><span class="small" style="color:var(--muted)">ACMA RRL data (CC BY 4.0)${state.acma.threats ? ' · ' + esc(state.acma.threats.meta.source_date) : ''}</span></span>` : ''}`;
@@ -3364,7 +3364,7 @@ function acmaFilterBodyHtml() {
         <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.15rem 0">
           <input type="checkbox" ${f.mechanisms.has(k) ? 'checked' : ''}
                  onchange="toggleFilter('acmaMechanisms','${k}',this.checked);refreshAcmaLayer()">
-          <span class="legend-sq" style="background:${m.color}"></span>
+          <span class="legend-sq" style="--dot:${acmaMechVar(k)}"></span>
           ${m.label} (${A.mechCounts[k]})
         </label>`).join('')}
     </div>

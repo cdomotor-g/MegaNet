@@ -2620,10 +2620,15 @@ hr {
    Its colour arrives as `style="--dot: var(--acma-mech-imd3)"` (#138), which is
    the token reaching the element rather than the element deciding — the same
    move `.ad-dot` and `.maps-chip-dot` already make. It was `style="background:
-   #7b1fa2"` on 1,536 swatches across the two RF tabs, the transmitter card and
-   the map legend, which is 1,536 inline declarations no check could see and no
-   theme could reach. The border stays a literal rgba: it is a hairline drawn to
-   keep a pale swatch off a white panel, not a colour with an opinion. */
+   #7b1fa2"` on 1,536 swatches across the two RF tabs, the transmitter card, the
+   map legend and the ACMA filter panel, which is 1,536 inline declarations no
+   check could see and no theme could reach.
+
+   The fallback is what makes the conversion incremental rather than a flag day:
+   an unconverted caller's own `background:` still wins, so the three left in
+   `workbench.js` draw exactly what they always did until #139 gets to them. The
+   border stays a literal rgba — it is a hairline drawn to keep a pale swatch
+   off a white panel, not a colour with an opinion. */
 .legend-sq {
   width: 10px;
   height: 10px;

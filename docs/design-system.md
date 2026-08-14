@@ -835,8 +835,20 @@ Worth knowing before picking up one of the three that are left:
 - **`.button-row` spreads its children apart.** #138 used it for a group of two
   and got a confirm/cancel pair at opposite ends of a panel. `.button-group` is
   the one that packs.
-- **Three surfaces #138 deliberately left**, all of them somebody else's tab and
-  all of them now free: `workbench.js` has a `#7b1fa2` literal in its legend and
-  two `ACMA_MECH[…].color` reads (#139), and the map's ACMA popup still writes a
-  mechanism pill with an inline `background` (#136). All three work unchanged;
-  all three become one-line conversions against the tokens above.
+- **Every `.legend-sq` in `app.js` takes its colour as `--dot` now**, including
+  the two on the Stations map — the map legend and the ACMA filter panel. They
+  are #136's tab, but they are the *palette*, and the palette is the system's;
+  a one-token swap that makes a swatch follow the theme is not a layout
+  decision. **Five surfaces #138 deliberately left**, all of them somebody
+  else's and none of them broken today, because `.legend-sq` still lets a
+  literal `background:` win:
+  - `workbench.js` — a `#7b1fa2` literal in its legend and two
+    `ACMA_MECH[…].color` reads (**#139**).
+  - `app.js` — the ACMA map pin's divIcon `background` and the popup's
+    mechanism pill (**#136**). Both are CSS contexts, so both take
+    `acmaMechVar()`. The pill also puts `color:#fff` on a categorical hue,
+    which is a contrast question rather than a palette one and belongs with
+    whoever restyles the popup.
+  - The five Leaflet **options** (`L.polyline({color})`, `L.polygon({color})`)
+    are the ones that cannot take `var()` at all and need `acmaMechColor()`
+    (**#136**).
