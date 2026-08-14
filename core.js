@@ -1317,6 +1317,9 @@ const state = {
     deviceById: {}, devicesBySite: {}, licById: {}, clientById: {}, antById: {}, texts: [],
     layer: null, beamLayer: null, linkLayer: null, hiLayer: null,
     selectedAnchorId: null, cardDeviceId: null, cardAnchorId: null,
+    // Whatever opened the transmitter card, so closing it can put focus back
+    // where it came from (#138). Not persisted anywhere — it is an element.
+    cardOpener: null,
     uiOpen: false,
   },
   rf: { anchorId: '', sortKey: 'score', sortDir: -1, corrText: '' },
@@ -1653,15 +1656,60 @@ function fmtKm(km) {
 // acmaHaversineKm below it is the same story: six consumers, one of them the
 // ACMA section itself.
 
+// The seven colours are the document's now, not this file's (#138), for the
+// reason #141 gave about the twelve ARRO series colours: a palette written into
+// a JavaScript object cannot follow the theme, and #6d4c41 — co-site desense,
+// the mechanism with the most candidates in the current extract — is a dark
+// brown that on a #18222d panel could not be seen at all.
+//
+// `color` stays, and stays the light literal, because five of the twelve
+// consumers are Leaflet options (`L.polyline({color})`, `L.polygon({color})`)
+// which become SVG *presentation attributes*, and a presentation attribute does
+// not accept `var()`. Those five are the Stations map layer and belong to #136;
+// this file gives it the two things it needs to convert them whenever it likes
+// and changes none of them. See docs/design-system.md §3, "the ACMA boundary".
+//
+// Which of the two to reach for:
+//   acmaMechVar()   — a CSS context (a `--dot` on a swatch, a `fill:` in a
+//                     stylesheet). The token reaches the element; the theme
+//                     reaches it for free, with no repaint.
+//   acmaMechColor() — an SVG presentation attribute or a canvas, where a
+//                     `var()` resolves to nothing. Resolved off the document at
+//                     draw time, so a theme change reaches it on the next draw.
 const ACMA_MECH = {
-  co_channel:     { label: 'Co-channel',          color: '#d32f2f' },
-  adjacent:       { label: 'Adjacent channel',    color: '#f57c00' },
-  imd3:           { label: 'Intermod IMD3',       color: '#7b1fa2' },
-  imd5:           { label: 'Intermod IMD5',       color: '#ce93d8' },
-  imd3_triple:    { label: 'Intermod 3-signal',   color: '#9575cd' },
-  harmonic:       { label: 'Harmonic',            color: '#0288d1' },
-  cosite_desense: { label: 'Co-site desense',     color: '#6d4c41' },
+  co_channel:     { label: 'Co-channel',          color: '#d32f2f', token: '--acma-mech-co-channel' },
+  adjacent:       { label: 'Adjacent channel',    color: '#f57c00', token: '--acma-mech-adjacent' },
+  imd3:           { label: 'Intermod IMD3',       color: '#7b1fa2', token: '--acma-mech-imd3' },
+  imd5:           { label: 'Intermod IMD5',       color: '#ce93d8', token: '--acma-mech-imd5' },
+  imd3_triple:    { label: 'Intermod 3-signal',   color: '#9575cd', token: '--acma-mech-imd3-triple' },
+  harmonic:       { label: 'Harmonic',            color: '#0288d1', token: '--acma-mech-harmonic' },
+  cosite_desense: { label: 'Co-site desense',     color: '#6d4c41', token: '--acma-mech-cosite-desense' },
 };
+
+function acmaMechVar(mech) {
+  const t = (ACMA_MECH[mech] || {}).token;
+  return t ? `var(${t})` : 'var(--muted)';
+}
+
+function acmaMechColor(mech) {
+  return cssVar((ACMA_MECH[mech] || {}).token, (ACMA_MECH[mech] || {}).color || '#666');
+}
+
+// What a token resolves to *right now*, for the places a `var()` cannot go: an
+// SVG presentation attribute, a canvas fill, a Leaflet option. Six files had
+// written this line out by hand before #138 (app.js, arro-data.js twice,
+// map-draw.js, map-rivers.js, network-view.js), which is five more chances to
+// forget the `.trim()` — getPropertyValue returns the declaration's whitespace
+// and ` #0b5cab` is not a colour any of those three contexts accepts.
+//
+// The fallback is not decoration. A token misspelt here resolves to the empty
+// string and the attribute silently draws in black, which on a dark panel is a
+// line nobody can see and nothing throws.
+function cssVar(name, fallback = '') {
+  if (!name) return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
 
 function acmaHaversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371.0088, rad = Math.PI / 180;

@@ -7,12 +7,40 @@
 //               series.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for ACMA_MECH, csvEscape, dlText, esc, escAttr and
-// state; and across to app.js for acmaEnsureCore, acmaFetchJson,
-// findRepeaterMatches, renderMain and showAcmaCard. Four of those five are the
-// ACMA RRL layer, which is still in app.js and belongs to #138 — so this file
-// is not independent of that work, and whoever picks up #138 should read this
-// list before moving anything.
+// Reaches back to core.js for ACMA_MECH, acmaMechColor, acmaMechVar, cssVar,
+// csvEscape, dlText, esc, escAttr and state; and across to app.js for
+// acmaEnsureCore, acmaFetchJson, findRepeaterMatches, renderMain and
+// showAcmaCard. Four of those five are the ACMA RRL layer, which is still in
+// app.js — #138 took it and did not move it, for the reason under "U3" below.
+//
+// ── U3 (#138): layout, mobile and accessibility ──────────────────────────────
+// What this tab was: 1,987 inline styles under a filter the check can see (536
+// of them a legend swatch's own `background:`), a repeater picker that scrolled
+// the whole document sideways by 520 px on a phone the moment it was opened,
+// ten mouse-only sort headers, 550 rows openable by mouse only, a timeline in a
+// `div{overflow-x:auto}` no keyboard could scroll whose accessible name was the
+// same eleven words whether it drew nothing or eight hundred marks, and eight
+// series colours in a JavaScript array that the dark theme could not reach.
+//
+// What it is now is #109's system applied, with three additions made to the
+// system rather than to this tab — patterns 10 (a sortable header is a button)
+// and 11 (a wide graphic scrolls in a named region), and the ACMA mechanism
+// palette as tokens. All three are in docs/design-system.md, because #136,
+// #139 and #140 each have at least one of the same three problems.
+//
+// The two things worth knowing before touching it again:
+//
+//   The chart's part 3 is the table below it, not a <details> of its own. The
+//   coincidence table already lists every event the timeline draws, row for
+//   row; a second copy would be a second thing to keep in step. The name says
+//   so, which is what #138's issue asked for — "wire them together explicitly
+//   rather than leaving it implied".
+//
+//   The marks stay clickable and stay out of the tab order, which is pattern 8
+//   and legal here for the same reason it was legal on the basin drawing: every
+//   mark opens the transmitter card, and so does every row of that table. If a
+//   mark ever gains an operation the table does not have, role="img" becomes a
+//   lie and the pattern stops covering it.
 //
 // The IIFE body declares and calls nothing at load — 41 statements, 35 function
 // declarations and 5 constants and the return — so this file's position among
@@ -52,22 +80,28 @@
 
 const RfChanges = (function () {
 
+// The eight change-class swatches. `token` rather than a literal for the same
+// reason ACMA_MECH grew one at #138: these are drawn as a `--dot` on a
+// .legend-sq, which is a CSS context, so the token can reach the element
+// directly and follow the theme with no repaint at all. There is no `color`
+// alongside them because — unlike the mechanisms — nothing draws these into a
+// Leaflet option or an SVG attribute; the swatch is the only consumer.
 const RFC_CLASS = {
-  cotenant: { label: 'New co-tenant at a repeater site', color: '#d32f2f',
+  cotenant: { label: 'New co-tenant at a repeater site', token: '--rfc-class-cotenant',
               blurb: 'A transmitter added at a site co-located with a repeater — the highest-severity change: front-end desense plus a new intermod pair with every existing carrier on the mast.' },
-  added:    { label: 'Added',                  color: '#c62828',
+  added:    { label: 'Added',                  token: '--rfc-class-added',
               blurb: 'Assignment present now, absent in the earlier snapshot — a newly commissioned transmitter.' },
-  removed:  { label: 'Removed',                color: '#607d8b',
+  removed:  { label: 'Removed',                token: '--rfc-class-removed',
               blurb: 'Assignment gone from the register — the only way a decommissioning is ever visible.' },
-  freq:     { label: 'Frequency changed',      color: '#f57c00',
+  freq:     { label: 'Frequency changed',      token: '--rfc-class-freq',
               blurb: 'May have moved onto or off a MegaNet channel.' },
-  power:    { label: 'Power changed',          color: '#7b1fa2',
+  power:    { label: 'Power changed',          token: '--rfc-class-power',
               blurb: 'TX power or EIRP differs — direct noise-floor impact.' },
-  antenna:  { label: 'Antenna changed',        color: '#0288d1',
+  antenna:  { label: 'Antenna changed',        token: '--rfc-class-antenna',
               blurb: 'Height, azimuth, tilt or antenna model differs — a re-point toward a repeater or extended reach.' },
-  site:     { label: 'Site moved',             color: '#6d4c41',
+  site:     { label: 'Site moved',             token: '--rfc-class-site',
               blurb: 'Assignment relocated to a different site, possibly a repeater mast.' },
-  status:   { label: 'Licence status changed', color: '#455a64',
+  status:   { label: 'Licence status changed', token: '--rfc-class-status',
               blurb: 'Lapsed, surrendered or reinstated.' },
 };
 
@@ -77,10 +111,25 @@ const RFC_FIELD_LABEL = {
   ant_id: 'Antenna', site_id: 'Site', status: 'Licence status',
 };
 
-const RFC_SERIES_COLORS = ['#0b5cab', '#c7401a', '#107c10', '#7c35a3',
-                           '#b8860b', '#00838f', '#ad1457', '#5d4037'];
+// The eight data-quality series colours are --rfc-series-1…8 now (#138), for
+// the reason #141 gave about the twelve ARRO ones: an array in a script cannot
+// follow the theme, and these are drawn as `stroke=` — a presentation
+// attribute, where a var() resolves to nothing — so they are resolved off the
+// document at draw time instead. #5d4037 on a #18222d panel was a brown line
+// nobody could see, and the chart redraws on every filter change anyway.
+//
+// The dash patterns are the other half, and they are not decoration: two
+// corruption series drawn in two hues are one series to a red-green dichromat
+// and to the greyscale printer an incident report usually comes off. Cycled
+// with the colours, and — like arro-data.js — off when there is only one series,
+// because a lone dashed line says "provisional" and means nothing of the kind.
+const RFC_SERIES_DASH = ['', '7 4', '2 3', '10 3 2 3', '4 3', '12 4', '2 2 8 2', '6 2'];
 const RFC_MARK_CAP = 800;
 const RFC_DAY = 86400000;
+
+function rfcSeriesColor(i) {
+  return cssVar(`--rfc-series-${(i % 8) + 1}`, '#0b5cab');
+}
 
 function initRfc() {
   const A = state.acma, R = state.rfc;
@@ -197,6 +246,10 @@ function rfcSort(key) {
   else { R.sortKey = key; R.sortDir = (key === 'coin' || key === 'score' || key === 'date') ? -1 : 1; }
   const wrap = document.getElementById('rfc-table-wrap');
   if (wrap) wrap.innerHTML = rfcTableInnerHtml();
+  // The button that was just pressed no longer exists; without this a keyboard
+  // sort drops the user on <body>, exactly as a tab switch used to (#109 §4).
+  const btn = wrap && wrap.querySelector(`.th-sort[data-key="${CSS.escape(key)}"]`);
+  if (btn) btn.focus();
 }
 
 // ── selector handlers ──
@@ -234,20 +287,20 @@ function renderRfcHtml() {
     const msg = A.error || R.error ||
       'Loading ACMA change-detection data…';
     return `
-      <div style="max-width:640px;margin:2.5rem auto;padding:1rem">
-        <div class="panel" style="text-align:center;padding:2rem">
-          <h2 style="margin:0 0 .6rem">RF Changes</h2>
-          <p class="small" style="color:var(--muted)">${esc(msg)}</p>
+      <div class="page" style="--page-max:640px">
+        <div class="panel rf-loading">
+          <h2>RF Changes</h2>
+          <p class="small txt-muted">${esc(msg)}</p>
         </div>
       </div>`;
   }
   return `
-    <div class="stack rfc-page" style="padding:0 .25rem;position:relative">
+    <div class="page rfc-page" style="--page-max:1400px">
       <div class="panel">
         <div class="panel-header"><h2>RF Changes — what changed on the air, and when</h2>
-          <span class="small" style="color:var(--muted)">ACMA data: ${esc(R.timeline.meta.source_date)} · CC BY 4.0</span>
+          <span class="small txt-muted">ACMA data: ${esc(R.timeline.meta.source_date)} · CC BY 4.0</span>
         </div>
-        <p class="small" style="color:var(--muted);margin:.3rem 0 .5rem">
+        <p class="small txt-muted rfc-intro">
           Register dates are <strong>administrative</strong>: an authorisation date is an upper
           bound on when a transmitter could have come on air — licences are often authorised
           before installation (or never installed), and equipment can radiate with no register
@@ -256,34 +309,35 @@ function renderRfcHtml() {
         ${rfcSelectorHtml()}
       </div>
       <div class="panel">
-        <div class="panel-header"><h3>Timeline — authorisations vs data quality</h3></div>
+        <div class="panel-header"><h3 id="rfc-chart-h">Timeline — authorisations vs data quality</h3></div>
         ${rfcChartHtml()}
       </div>
       <div class="panel">
-        <div class="panel-header"><h3>${R.onset ? 'Coincidence ranking' : 'Authorisation events'}</h3>
-          <span style="display:flex;gap:.5rem;align-items:center">
-            <span class="small" style="color:var(--muted)"
+        <div class="panel-header"><h3 id="rfc-table-h">${R.onset ? 'Coincidence ranking' : 'Authorisation events'}</h3>
+          <span class="button-group">
+            ${R.onset ? `<span class="small txt-muted"
                   title="coincidence = interference score × temporal proximity × co-site bonus. Proximity decays linearly from 1 at the onset date to 0 at the window edge; ×1.5 bonus when the transmitter shares the repeater's site (≤250 m).">
-              ${R.onset ? 'ranking formula ⓘ' : ''}</span>
-            <button onclick="RfChanges.exportCsv()">Export CSV</button>
+              ranking formula ⓘ</span>` : ''}
+            <button type="button" onclick="RfChanges.exportCsv()">Export CSV</button>
           </span>
         </div>
-        ${R.onset ? '' : `<p class="small" style="color:var(--muted);margin:.2rem 0">
+        ${R.onset ? '' : `<p class="small txt-muted rfc-note">
           Set an onset date above (or detect one below) to rank these by coincidence with the
           data-quality step. This table is the evidence you would attach to an ACMA
           interference complaint.</p>`}
-        <div class="table-wrap tall" id="rfc-table-wrap">${rfcTableInnerHtml()}</div>
+        <div class="table-wrap tall" id="rfc-table-wrap"
+             role="region" tabindex="0" aria-labelledby="rfc-table-h">${rfcTableInnerHtml()}</div>
       </div>
       <div class="panel">
-        <div class="panel-header"><h3>Snapshot diff — observed register changes</h3></div>
+        <div class="panel-header"><h3 id="rfc-diff-h">Snapshot diff — observed register changes</h3></div>
         ${rfcDiffHtml()}
       </div>
       <div class="panel">
-        <div class="panel-header"><h3>New intermod products</h3></div>
+        <div class="panel-header"><h3 id="rfc-imd-h">New intermod products</h3></div>
         ${rfcImdHtml()}
       </div>
       <div class="panel">
-        <div class="panel-header"><h3>Onset detection helper</h3></div>
+        <div class="panel-header"><h3 id="rfc-onset-h">Onset detection helper</h3></div>
         ${rfcOnsetHelperHtml()}
       </div>
       <div class="panel">${rfcHelpHtml()}</div>
@@ -295,43 +349,44 @@ function rfcSelectorHtml() {
   const A = state.acma, R = state.rfc;
   const anchors = A.threats.anchors.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   return `
-    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-start">
+    <div class="control-row rfc-controls">
       <details class="rfc-picker" ${R.pickerOpen ? 'open' : ''} ontoggle="state.rfc.pickerOpen=this.open">
-        <summary class="small" style="cursor:pointer">Repeaters:
+        <summary class="small">Repeaters:
           <strong>${R.anchorSel.size ? `${R.anchorSel.size} selected` : 'all'}</strong></summary>
-        <div class="rfc-picker-list">
-          <label style="display:flex;gap:.4rem;align-items:center">
+        <div class="rfc-picker-list" role="group" aria-label="Which repeaters to include">
+          <label class="rfc-pick">
             <input type="checkbox" ${R.anchorSel.size ? '' : 'checked'}
                    onchange="RfChanges.selectAllAnchors()"> <em>All repeaters</em></label>
           ${anchors.map(a => `
-            <label style="display:flex;gap:.4rem;align-items:center">
+            <label class="rfc-pick">
               <input type="checkbox" ${R.anchorSel.has(a.station_id) ? 'checked' : ''}
                      onchange="RfChanges.toggleAnchor('${escAttr(a.station_id)}',this.checked)">
-              ${esc(a.name)}${a.rx_mhz ? ` <span class="small" style="color:var(--muted)">${a.rx_mhz}</span>` : ''}
+              ${esc(a.name)}${a.rx_mhz ? ` <span class="small txt-muted">${a.rx_mhz}</span>` : ''}
             </label>`).join('')}
         </div>
       </details>
-      <label class="small">Onset date
+      <label>Onset date
         <input type="date" value="${esc(R.onset)}"
                onchange="state.rfc.onset=this.value;renderMain()">
       </label>
-      <label class="small">Window
+      <label>Window
         <select onchange="state.rfc.windowDays=+this.value;renderMain()">
           ${[30, 60, 90, 180].map(w => `
             <option value="${w}" ${R.windowDays === w ? 'selected' : ''}>±${w} days</option>`).join('')}
         </select>
       </label>
-      <label class="small">Radius
+      <label>Radius
         <select onchange="state.rfc.radiusKm=+this.value;renderMain()">
           ${[10, 25, 50, 60].map(r => `
             <option value="${r}" ${R.radiusKm === r ? 'selected' : ''}>${r} km</option>`).join('')}
         </select>
       </label>
-      <label class="small">Min score
-        <input type="number" min="0" max="100" step="5" value="${R.minScore}" style="width:4.5rem"
+      <label>Min score
+        <input type="number" min="0" max="100" step="5" class="field-num" value="${R.minScore}"
                onchange="state.rfc.minScore=+this.value;renderMain()">
       </label>
-      ${R.onset ? `<button class="small" onclick="state.rfc.onset='';renderMain()">× clear onset</button>` : ''}
+      ${R.onset ? `<button type="button" class="small" onclick="state.rfc.onset='';renderMain()">
+        <span aria-hidden="true">×</span> clear onset</button>` : ''}
     </div>`;
 }
 
@@ -340,6 +395,52 @@ function rfcSelectorHtml() {
 // mechanism, sized by score. Thin lane: licence effect/expiry as lighter marks.
 // Lower band: the pasted per-station corruption series, so a coincidence
 // between paperwork and data quality is visible at a glance.
+
+// Parts 1 and 2 of the chart pattern (docs/design-system.md §3), rebuilt from
+// the same numbers the picture is drawn from. The old name was
+// `aria-label="ACMA authorisation events and data quality over time"` — a fixed
+// string, true of an empty chart and of eight hundred marks alike, which is the
+// exact failure #141 found on the ARRO chart and wrote the rule against.
+//
+// Part 3 is not a <details> here, because it already exists: the coincidence
+// table in the next panel *is* this chart's data, row for row, and a second
+// copy would be a second thing to keep in step. The name says so and points at
+// it, which is what #138's issue asked for — "wire them together explicitly
+// rather than leaving it implied".
+//
+// The one part of the picture the table does not hold is the lower band, the
+// pasted corruption series. That has no second home, so the name carries its
+// shape: how many series, and over what range.
+function rfcChartName(f) {
+  const R = state.rfc;
+  const span = `${rfcFmtDate(f.lo)} to ${rfcFmtDate(f.hi)}`;
+  const marks = f.inSpan.length === f.shown.length
+    ? `${f.shown.length} authorisation event${f.shown.length === 1 ? '' : 's'}`
+    : `${f.shown.length} of ${f.inSpan.length} authorisation events`;
+  const lanes = f.lanes.map(m => (ACMA_MECH[m] || {}).label || m).join(', ');
+  const band = f.series.length
+    ? `The lower band plots ${f.series.length} pasted data-quality series — ${
+        f.series.map(([n]) => n).join(', ')} — peaking at ${f.vmax}.`
+    : 'The lower band is empty: no data-quality series has been pasted into the onset helper below.';
+  const onset = R.onset
+    ? `The onset is marked at ${esc(R.onset)}, with the ±${R.windowDays}-day window shaded.`
+    : 'No onset date is set, so the view is the last 24 months.';
+  // …and the sentence pattern 8 asks for: a graphic whose marks can be clicked
+  // is named as a picture only while every operation it offers is on a named
+  // control beside it. Every mark opens the transmitter card, and so does every
+  // row of the table below — which is why no mark is a tab stop.
+  return `Timeline, ${span}. ${marks}, in ${f.lanes.length} mechanism lane${
+    f.lanes.length === 1 ? '' : 's'}: ${lanes}. Mark size is the interference score. `
+    + `${onset} ${band} Every event drawn here is a row of the coincidence table below, `
+    + `which is where the numbers are and where each one opens its transmitter card.`;
+}
+
+function rfcFmtDate(ms) {
+  const d = new Date(ms);
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+                  'July', 'August', 'September', 'October', 'November', 'December'];
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
 
 function rfcChartHtml() {
   const R = state.rfc;
@@ -388,22 +489,25 @@ function rfcChartHtml() {
 
   const laneY = m => upperTop + lanes.indexOf(m) * laneH;
 
+  const marker = cssVar('--chart-marker', '#c62828');
   const shade = onsetMs ? `
     <rect x="${x(onsetMs - R.windowDays * RFC_DAY)}" y="0"
           width="${x(onsetMs + R.windowDays * RFC_DAY) - x(onsetMs - R.windowDays * RFC_DAY)}"
-          height="${axisY}" fill="rgba(211,47,47,.07)"/>
+          height="${axisY}" class="chart-band"/>
     <line x1="${x(onsetMs)}" y1="0" x2="${x(onsetMs)}" y2="${axisY}"
-          stroke="#d32f2f" stroke-width="1.5" stroke-dasharray="5 3"/>
+          stroke="${marker}" stroke-width="1.5" stroke-dasharray="5 3"/>
     <text x="${x(onsetMs)}" y="${axisY + 22}" font-size="10" text-anchor="middle"
-          fill="#d32f2f">onset</text>` : '';
+          fill="${marker}">onset</text>` : '';
 
   const shown = inSpan.slice(0, RFC_MARK_CAP);
   const marks = shown.map(r => {
     const t = Date.parse(r.e.date);
     const rad = 3 + Math.min(6, r.a.score / 15);
-    const c = (ACMA_MECH[r.a.mech] || {}).color || '#666';
+    // Resolved rather than referenced: `fill="var(--acma-mech-imd3)"` on an SVG
+    // presentation attribute draws nothing.
+    const c = acmaMechColor(r.a.mech);
     return `<circle cx="${x(t).toFixed(1)}" cy="${laneY(r.a.mech) + laneH / 2}" r="${rad.toFixed(1)}"
-      fill="${c}" opacity=".75" style="cursor:pointer"
+      fill="${c}" opacity=".75" class="rfc-mark"
       onclick="RfChanges.cardFor('${escAttr(r.e.device_id)}','${escAttr(r.a.id)}')">
       <title>${esc(r.e.date)} · ${esc(r.e.client || r.e.lic || '?')} · ${r.e.f_mhz != null ? r.e.f_mhz.toFixed(4) + ' MHz · ' : ''}${esc((ACMA_MECH[r.a.mech] || {}).label || r.a.mech)} ${r.a.score} vs ${esc(rfcAnchorName(r.a.id))} · ${r.a.km} km${r.e.variation ? ' · variation to existing licence' : ''}</title>
     </circle>`;
@@ -417,115 +521,154 @@ function rfcChartHtml() {
       if (isNaN(t) || t < lo || t > hi || nLic >= RFC_MARK_CAP) continue;
       nLic++;
       licMarks += `<line x1="${x(t).toFixed(1)}" y1="${licY + 3}" x2="${x(t).toFixed(1)}" y2="${licY + 13}"
-        stroke="var(--muted)" stroke-width="1" opacity=".45">
+        class="chart-line" stroke-width="1" opacity=".45">
         <title>${esc(d)} · licence ${d === r.e.lic_effect ? 'effect' : 'expiry'} · ${esc(r.e.client || r.e.lic || '')}</title></line>`;
     }
   }
 
   // lower band — corruption series
   let lower = '';
-  const series = Object.entries(R.corrSeries || {}).filter(([, pts]) => pts.length);
+  const series = Object.entries(R.corrSeries || {}).filter(([, pts]) => pts.length)
+    .slice(0, RFC_SERIES_DASH.length);
+  let vmax = 0;
   if (series.length) {
-    let vmax = 0;
     for (const [, pts] of series) for (const p of pts) vmax = Math.max(vmax, p.v);
     vmax = vmax || 1;
-    lower = series.slice(0, RFC_SERIES_COLORS.length).map(([name, pts], i) => {
-      const col = RFC_SERIES_COLORS[i];
+    lower = series.map(([name, pts], i) => {
+      const col = rfcSeriesColor(i);
       const vis = pts.filter(p => p.t >= lo && p.t <= hi);
       const path = vis.map(p =>
         `${x(p.t).toFixed(1)},${(lowerTop + lowerH - 4 - p.v / vmax * (lowerH - 10)).toFixed(1)}`).join(' ');
-      return `<polyline points="${path}" fill="none" stroke="${col}" stroke-width="1.6" opacity=".85">
+      // One series is the case where a dash means nothing, so it is not drawn —
+      // a lone dashed line reads as "provisional" (arro-data.js does the same).
+      const dash = series.length > 1 && RFC_SERIES_DASH[i]
+        ? ` stroke-dasharray="${RFC_SERIES_DASH[i]}"` : '';
+      return `<polyline points="${path}" fill="none" stroke="${col}" stroke-width="1.6"${dash} opacity=".85">
         <title>${esc(name)}</title></polyline>`;
     }).join('');
   } else {
     lower = `<text x="${PADL + 8}" y="${lowerTop + lowerH / 2}" font-size="11"
-      style="fill:var(--muted)">No data-quality series loaded — paste per-station corruption
+      class="chart-muted">No data-quality series loaded — paste per-station corruption
       counts in the onset helper below to see coincidence at a glance.</text>`;
   }
 
   const legend = series.length ? `
-    <div class="small" style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:.2rem">
-      ${series.slice(0, RFC_SERIES_COLORS.length).map(([name], i) => `
-        <span class="legend-item"><span class="rfc-series-line" style="background:${RFC_SERIES_COLORS[i]}"></span>
-        ${esc(name)}</span>`).join('')}
-    </div>` : '';
+    <ul class="rfc-legend small">
+      ${series.map(([name], i) => `
+        <li class="legend-item"><span class="rfc-series-line"
+          style="--dot:var(--rfc-series-${(i % 8) + 1})"></span>${esc(name)}</li>`).join('')}
+    </ul>` : '';
 
+  const facts = { lo, hi, inSpan, shown, lanes, series, vmax };
   return `
-    <div style="overflow-x:auto">
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:720px;height:auto" role="img"
-           aria-label="ACMA authorisation events and data quality over time">
+    <div class="chart-scroll" role="region" tabindex="0"
+         aria-label="Timeline, two years wide at its widest — scroll sideways to read the whole
+                     span. The picture inside describes itself, and the coincidence table below
+                     is the same events as rows.">
+      <svg viewBox="0 0 ${W} ${H}" class="rfc-chart-svg" role="img"
+           aria-label="${escAttr(rfcChartName(facts))}">
         ${shade}
         ${ticks.map(t => `
           <line x1="${x(t).toFixed(1)}" y1="0" x2="${x(t).toFixed(1)}" y2="${axisY}"
-                stroke="var(--border)" stroke-width="1" opacity=".6"/>
+                class="chart-grid" stroke-width="1" opacity=".6"/>
           <text x="${x(t).toFixed(1)}" y="${axisY + 12}" font-size="10" text-anchor="middle"
-                style="fill:var(--muted)">${tickLabel(t)}</text>`).join('')}
+                class="chart-muted">${tickLabel(t)}</text>`).join('')}
         ${lanes.map(m => `
-          <text x="4" y="${laneY(m) + laneH / 2 + 3}" font-size="10"
-                style="fill:${(ACMA_MECH[m] || {}).color || 'var(--muted)'}">${esc((ACMA_MECH[m] || {}).label || m)}</text>
+          <rect x="4" y="${laneY(m) + laneH / 2 - 4}" width="9" height="9"
+                fill="${acmaMechColor(m)}"/>
+          <text x="17" y="${laneY(m) + laneH / 2 + 3}" font-size="10"
+                class="chart-text">${esc((ACMA_MECH[m] || {}).label || m)}</text>
           <line x1="${PADL}" y1="${laneY(m) + laneH}" x2="${W - PADR}" y2="${laneY(m) + laneH}"
-                stroke="var(--border)" stroke-width=".5" opacity=".5"/>`).join('')}
-        <text x="4" y="${licY + 12}" font-size="10" style="fill:var(--muted)">licence dates</text>
+                class="chart-grid" stroke-width=".5" opacity=".5"/>`).join('')}
+        <text x="4" y="${licY + 12}" font-size="10" class="chart-muted">licence dates</text>
         ${licMarks}
-        <text x="4" y="${lowerTop + 10}" font-size="10" style="fill:var(--muted)">data quality</text>
+        <text x="4" y="${lowerTop + 10}" font-size="10" class="chart-muted">data quality</text>
         <line x1="${PADL}" y1="${lowerTop + lowerH}" x2="${W - PADR}" y2="${lowerTop + lowerH}"
-              style="stroke:var(--muted)" stroke-width="1"/>
+              class="chart-line" stroke-width="1"/>
         ${lower}
         ${marks}
       </svg>
-      ${legend}
-      <div class="small" style="color:var(--muted)">
-        ${shown.length}${inSpan.length > shown.length ? ` of ${inSpan.length}` : ''} authorisation
-        events in view · mark size = interference score · click a mark for the transmitter card.
-        ${onsetMs ? 'Shaded band = the selected onset window.' : 'Showing the last 24 months — set an onset date to zoom.'}</div>
-    </div>`;
+    </div>
+    ${legend}
+    <p class="small txt-muted">
+      ${shown.length}${inSpan.length > shown.length ? ` of ${inSpan.length}` : ''} authorisation
+      events in view · mark size = interference score · choose a mark, or a row of the table
+      below, for the transmitter card.
+      ${onsetMs ? 'Shaded band = the selected onset window.' : 'Showing the last 24 months — set an onset date to zoom.'}</p>`;
 }
 
 // ── coincidence table ──
+
+// Pattern 10 (#138) — see rfSortTh in app.js, which is the same shape on the
+// same kind of table one tab over. aria-sort goes on the <th>; the button takes
+// the press; the arrow is aria-hidden because aria-sort has already said it.
+function rfcSortTh(k, label, tip, cls = '') {
+  const R = state.rfc;
+  const on = R.sortKey === k;
+  const dir = R.sortDir > 0 ? 'ascending' : 'descending';
+  return `<th scope="col"${cls ? ` class="${cls}"` : ''}${on ? ` aria-sort="${dir}"` : ''}${
+    tip ? ` title="${escAttr(tip)}"` : ''}>
+    <button type="button" class="th-sort" data-key="${k}" onclick="RfChanges.sort('${k}')">${label}${
+      on ? `<span class="th-arrow" aria-hidden="true">${R.sortDir > 0 ? '▲' : '▼'}</span>` : ''}</button></th>`;
+}
+
+const RFC_SORT_LABEL = {
+  date: 'authorisation date', days: 'days from onset', client: 'licensee', f: 'frequency',
+  delta: 'frequency offset', mech: 'mechanism', eirp: 'EIRP', km: 'distance',
+  score: 'interference score', coin: 'coincidence',
+};
 
 function rfcTableInnerHtml() {
   const R = state.rfc;
   const rows = rfcTableRows();
   if (!rows.length) {
     return R.onset ? `
-      <div style="padding:.75rem">
+      <div class="table-empty">
         <p><strong>No register events near this onset.</strong></p>
-        <p class="small" style="color:var(--muted)">A noise-floor step with no ACMA event nearby
+        <p class="small txt-muted">A noise-floor step with no ACMA event nearby
         is itself a finding: it points away from licensed transmitters and toward your own
         infrastructure (corroding mast joints becoming an intermod mixer, a failing PA, water
         in a feeder) or an unlicensed emitter (solar charge controllers, LED signage, electric
         fences, powerline arcing). Widen the window or lower the minimum score to double-check
         before concluding.</p>
       </div>` :
-      `<p style="padding:.75rem;color:var(--muted)">No authorisation events match the current
+      `<p class="small table-empty">No authorisation events match the current
         filters — widen the radius or lower the minimum score.</p>`;
   }
-  const arrow = k => R.sortKey === k ? (R.sortDir > 0 ? ' ▲' : ' ▼') : '';
-  const th = (k, label, tip) => `<th style="cursor:pointer" ${tip ? `title="${escAttr(tip)}"` : ''}
-    onclick="RfChanges.sort('${k}')">${label}${arrow(k)}</th>`;
+  const shown = rows.slice(0, 1000);
   return `
     <table class="bf-table">
+      <caption class="sr-only">${R.onset ? 'Coincidence ranking' : 'Authorisation events'},
+        ${shown.length === rows.length ? `${rows.length} rows` : `the first 1,000 of ${rows.length} rows`},
+        sorted by ${esc(RFC_SORT_LABEL[R.sortKey] || R.sortKey)},
+        ${R.sortDir > 0 ? 'lowest' : 'highest'} first. Choose a date to open that
+        transmitter's details.</caption>
       <thead><tr>
-        ${th('date', 'Authorised', 'DEVICE_DETAILS.AUTHORISATION_DATE — when the frequency assignment was approved (administrative)')}
-        ${R.onset ? th('days', 'Δdays') : ''}
-        ${th('client', 'Licensee')}${th('f', 'Freq (MHz)')}${th('delta', 'Δf (kHz)')}
-        ${th('mech', 'Mechanism')}${th('eirp', 'EIRP (W)')}${th('km', 'Dist (km)')}
-        ${th('score', 'Score')}
-        ${R.onset ? th('coin', 'Coincidence', 'score × temporal proximity (linear decay to 0 at window edge) × 1.5 co-site bonus') : ''}
+        ${rfcSortTh('date', 'Authorised', 'DEVICE_DETAILS.AUTHORISATION_DATE — when the frequency assignment was approved (administrative)')}
+        ${R.onset ? rfcSortTh('days', 'Δdays') : ''}
+        ${rfcSortTh('client', 'Licensee')}${rfcSortTh('f', 'Freq (MHz)')}${rfcSortTh('delta', 'Δf (kHz)')}
+        ${rfcSortTh('mech', 'Mechanism')}${rfcSortTh('eirp', 'EIRP (W)', '', 'col-optional')}${rfcSortTh('km', 'Dist (km)')}
+        ${rfcSortTh('score', 'Score')}
+        ${R.onset ? rfcSortTh('coin', 'Coincidence', 'score × temporal proximity (linear decay to 0 at window edge) × 1.5 co-site bonus') : ''}
       </tr></thead>
       <tbody>
-        ${rows.slice(0, 1000).map(r => {
-          const m = ACMA_MECH[r.a.mech] || { label: r.a.mech, color: '#666' };
+        ${shown.map(r => {
+          const m = ACMA_MECH[r.a.mech] || { label: r.a.mech };
           const dk = rfcDeltaKhz(r);
-          return `<tr style="cursor:pointer"
+          // Pattern 7b: the row keeps its handler so a mouse can hit anywhere,
+          // and the date cell holds the half a keyboard can reach.
+          return `<tr class="row-link"
                       onclick="RfChanges.cardFor('${escAttr(r.e.device_id)}','${escAttr(r.a.id)}')">
-            <td class="small">${esc(r.e.date)}${r.e.variation ? ' <span class="badge" title="Authorised >30 days after the licence was issued — a variation to an existing licence (added channel, power change, re-point), not a new licence">var</span>' : ''}</td>
+            <td class="small"><button type="button" class="row-open"
+                    onclick="event.stopPropagation();RfChanges.cardFor('${escAttr(r.e.device_id)}','${escAttr(r.a.id)}')"
+                    title="Transmitter details for ${escAttr(r.e.client || r.e.lic || 'this device')}">${esc(r.e.date)}</button>${
+              r.e.variation ? ' <span class="badge" title="Authorised >30 days after the licence was issued — a variation to an existing licence (added channel, power change, re-point), not a new licence">var</span>' : ''}</td>
             ${R.onset ? `<td class="small">${r.coin.days > 0 ? '+' : ''}${r.coin.days}</td>` : ''}
             <td class="small">${esc(r.e.client || '')}</td>
             <td class="small">${r.e.f_mhz != null ? r.e.f_mhz.toFixed(4) : ''}</td>
             <td class="small">${dk != null ? dk.toFixed(1) : '—'}</td>
-            <td class="small"><span class="legend-sq" style="background:${m.color}"></span> ${m.label}</td>
-            <td class="small">${r.e.eirp_w ?? r.e.tx_w ?? ''}</td>
+            <td class="small"><span class="legend-sq" style="--dot:${acmaMechVar(r.a.mech)}"></span> ${m.label}</td>
+            <td class="small col-optional">${r.e.eirp_w ?? r.e.tx_w ?? ''}</td>
             <td class="small">${r.a.km}${r.a.km <= 0.25 ? ' <span class="badge">co-site</span>' : ''}</td>
             <td>${r.a.score}</td>
             ${R.onset ? `<td><strong>${r.coin.value.toFixed(1)}</strong></td>` : ''}
@@ -533,7 +676,8 @@ function rfcTableInnerHtml() {
         }).join('')}
       </tbody>
     </table>
-    ${rows.length > 1000 ? `<p class="small" style="color:var(--muted);padding:.4rem">Showing 1000 of ${rows.length} — tighten the filters or export the CSV.</p>` : ''}`;
+    ${rows.length > shown.length ? `<p class="small table-empty txt-muted">Showing 1,000 of
+      ${rows.length} — tighten the filters or export the CSV for the rest.</p>` : ''}`;
 }
 
 function rfcExportCsv() {
@@ -590,7 +734,7 @@ function rfcDiffEmptyHtml() {
   const months = ((state.rfc.snapshots || {}).snapshots || []).map(s => s.month);
   const one = months.length === 1;
   return `
-    <p class="small" style="color:var(--muted)">
+    <p class="small txt-muted">
       Change detection compares two archived monthly subsets, and
       ${one ? `only one exists so far (<strong>${esc(months[0])}</strong>)`
             : months.length ? `the archived months (${months.map(esc).join(', ')}) have not been diffed — run tools/acma_diff.py`
@@ -624,35 +768,35 @@ function rfcDiffHtml() {
     take(cls, c => (c.classes || [c.class]).includes(cls));
 
   const pairSel = `
-    <label class="small">Compare
+    <label>Compare
       <select onchange="state.rfc.pairIdx=+this.value;renderMain()">
         ${pairs.map((q, i) => `
           <option value="${i}" ${q === p ? 'selected' : ''}>${esc(q.from)} → ${esc(q.to)}</option>`).join('')}
       </select>
     </label>
-    <span class="small" style="color:var(--muted)">extracts ${esc(p.from_date || p.from)} →
+    <span class="small txt-muted">extracts ${esc(p.from_date || p.from)} →
       ${esc(p.to_date || p.to)} · grouped by nearest repeater · diff key: EFL_ID /
       device registration id (never SDD_ID)</span>`;
 
   if (!vis.length) {
-    return `<div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center">${pairSel}</div>
-      <p class="small" style="color:var(--muted);margin-top:.5rem">No register changes near the
+    return `<div class="control-row">${pairSel}</div>
+      <p class="small txt-muted">No register changes near the
       selected repeaters in this pair — the RF licensing picture was stable. If the data-quality
       step falls in this period, that points away from licensed transmitters (see the help
       notes below).</p>`;
   }
 
   return `
-    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center">${pairSel}</div>
+    <div class="control-row">${pairSel}</div>
     ${groups.map(([cls, g]) => {
       const meta = RFC_CLASS[cls];
       return `
-        <div style="margin-top:.7rem">
-          <h4 style="margin:0 0 .1rem"><span class="legend-sq" style="background:${meta.color}"></span>
+        <div class="rfc-diff-group">
+          <h4><span class="legend-sq" style="--dot:var(${meta.token})"></span>
             ${meta.label} (${g.length})</h4>
-          <p class="small" style="color:var(--muted);margin:.1rem 0 .3rem">${meta.blurb}</p>
+          <p class="small txt-muted rfc-diff-blurb">${meta.blurb}</p>
           ${g.slice(0, 200).map(c => rfcChangeRowHtml(c, cls, linkable)).join('')}
-          ${g.length > 200 ? `<p class="small" style="color:var(--muted)">…and ${g.length - 200} more.</p>` : ''}
+          ${g.length > 200 ? `<p class="small txt-muted">…and ${g.length - 200} more.</p>` : ''}
         </div>`;
     }).join('')}`;
 }
@@ -664,22 +808,25 @@ function rfcChangeRowHtml(c, cls, linkable) {
                      cls === 'power' ? (k === 'tx_w' || k === 'eirp_w') :
                      cls === 'antenna' ? ['height_m', 'az', 'tilt', 'ant_id'].includes(k) :
                      cls === 'site' ? k === 'site_id' : true)
-    .map(([k, [a, b]]) => `<span style="white-space:nowrap">${RFC_FIELD_LABEL[k] || k}:
-      <s style="color:var(--muted)">${esc(a ?? '—')}</s> → <strong>${esc(b ?? '—')}</strong></span>`)
+    .map(([k, [a, b]]) => `<span class="rfc-field">${RFC_FIELD_LABEL[k] || k}:
+      <s class="txt-muted">${esc(a ?? '—')}</s> → <strong>${esc(b ?? '—')}</strong></span>`)
     .join(' · ') : '';
   const link = linkable && c.device_id
-    ? ` <a href="#" onclick="RfChanges.cardFor('${escAttr(c.device_id)}','${escAttr(c.anchor || '')}');return false">details →</a>`
+    ? ` <button type="button" class="link-btn"
+            onclick="RfChanges.cardFor('${escAttr(c.device_id)}','${escAttr(c.anchor || '')}')"
+            aria-label="Transmitter details for ${escAttr(c.client || 'this licensee')} at ${
+              escAttr(c.site_name || c.site_id || 'this site')}">details →</button>`
     : '';
   return `
-    <div class="small" style="margin:.25rem 0;padding-left:.9rem">
+    <div class="small rfc-change">
       <strong>${esc(c.client || 'Unknown licensee')}</strong>
       · ${c.f_mhz != null ? c.f_mhz.toFixed(4) + ' MHz' : 'freq ?'}
       ${c.eirp_w != null ? `· ${c.eirp_w} W EIRP` : ''}
       · lic ${esc(c.lic || '?')}
       ${c.confidence === 'low' ? ' <span class="badge" title="Matched on a composite fingerprint (licence + site + frequency) because both stable identifiers were missing — treat with caution">low-confidence match</span>' : ''}
-      ${c.cotenant ? ' <span class="badge" style="color:#d32f2f">co-tenant</span>' : ''}
+      ${c.cotenant ? ' <span class="badge txt-bad">co-tenant</span>' : ''}
       ${link}<br>
-      <span style="color:var(--muted)">${esc(c.site_name || c.site_id || '')}
+      <span class="txt-muted">${esc(c.site_name || c.site_id || '')}
         ${c.anchor ? `· ${c.anchor_km != null ? c.anchor_km + ' km from ' : 'near '}${esc(rfcAnchorName(c.anchor))}` : ''}
         ${c.auth ? `· authorised ${esc(c.auth)}` : ''}</span>
       ${fields ? `<br>${fields}` : ''}
@@ -691,14 +838,14 @@ function rfcChangeRowHtml(c, cls, linkable) {
 function rfcImdHtml() {
   const p = rfcSelectedPair();
   const intro = `
-    <p class="small" style="color:var(--muted);margin:.2rem 0 .5rem">
+    <p class="small txt-muted rfc-note">
       Adding one transmitter to a mast creates a third-order product with <em>every</em>
       carrier already there — the offender is often nowhere near the RX frequency itself.
       Listed below are only the products that are <strong>new in this snapshot pair</strong>
       (created by an added or re-tuned device) and land within tolerance of a repeater RX
       channel.</p>`;
   if (!p) {
-    return `${intro}<p class="small" style="color:var(--muted)">Needs two archived snapshots —
+    return `${intro}<p class="small txt-muted">Needs two archived snapshots —
       see the snapshot diff panel above.</p>`;
   }
   const latestMonth = (((state.rfc.snapshots || {}).snapshots || []).slice(-1)[0] || {}).month;
@@ -708,33 +855,41 @@ function rfcImdHtml() {
     (!R.anchorSel.size || R.anchorSel.has(i.anchor)) &&
     (i.anchor_km == null || i.anchor_km <= R.radiusKm));
   if (!vis.length) {
-    return `${intro}<p class="small" style="color:var(--muted)">No new intermod products land
+    return `${intro}<p class="small txt-muted">No new intermod products land
       on an RX channel in ${esc(p.from)} → ${esc(p.to)} for the selected repeaters.</p>`;
   }
+  const shown = vis.slice(0, 300);
+  const devBtn = (id, anchor, label, what) => linkable && id
+    ? `<button type="button" class="link-btn"
+           onclick="RfChanges.cardFor('${escAttr(id)}','${escAttr(anchor)}')"
+           aria-label="Transmitter details for the ${what}, ${escAttr(label)}">${esc(label)}</button>`
+    : esc(label);
   return `${intro}
-    <div class="table-wrap medium">
+    <div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="rfc-imd-h">
       <table class="bf-table">
-        <thead><tr><th>Product</th><th>Δ (kHz)</th><th>Order</th><th>Repeater</th>
-          <th>Site</th><th>New device</th><th>Existing partner</th></tr></thead>
+        <caption class="sr-only">${shown.length === vis.length
+          ? `${vis.length} new intermod products` : `the first 300 of ${vis.length} new intermod products`}
+          landing on a repeater receive channel between ${esc(p.from)} and ${esc(p.to)}.</caption>
+        <thead><tr><th scope="col">Product</th><th scope="col">Δ (kHz)</th><th scope="col">Order</th>
+          <th scope="col">Repeater</th><th scope="col" class="col-optional">Site</th>
+          <th scope="col">New device</th><th scope="col">Existing partner</th></tr></thead>
         <tbody>
-          ${vis.slice(0, 300).map(i => `
+          ${shown.map(i => `
             <tr>
-              <td class="small" style="white-space:nowrap">${esc(i.formula)}</td>
+              <td class="small rfc-formula">${esc(i.formula)}</td>
               <td class="small">${i.delta_khz}</td>
               <td class="small">IMD${i.order}</td>
               <td class="small">${esc(rfcAnchorName(i.anchor))} (RX ${i.rx_mhz})</td>
-              <td class="small">${esc(i.site_name || i.site_id)}</td>
-              <td class="small">${linkable && i.device_id
-                ? `<a href="#" onclick="RfChanges.cardFor('${escAttr(i.device_id)}','${escAttr(i.anchor)}');return false">${esc(i.client || i.trigger_key)}</a>`
-                : esc(i.client || i.trigger_key)}
+              <td class="small col-optional">${esc(i.site_name || i.site_id)}</td>
+              <td class="small">${devBtn(i.device_id, i.anchor, i.client || i.trigger_key, 'newly added or re-tuned device')}
                 <span class="badge">${i.trigger_class === 'added' ? 'added' : 're-tuned'}</span></td>
-              <td class="small">${linkable && i.partner_device_id
-                ? `<a href="#" onclick="RfChanges.cardFor('${escAttr(i.partner_device_id)}','${escAttr(i.anchor)}');return false">${esc(i.partner_client || i.partner_key)}</a>`
-                : esc(i.partner_client || i.partner_key)}</td>
+              <td class="small">${devBtn(i.partner_device_id, i.anchor, i.partner_client || i.partner_key, 'existing partner carrier')}</td>
             </tr>`).join('')}
         </tbody>
       </table>
-    </div>`;
+    </div>
+    ${vis.length > shown.length ? `<p class="small table-empty txt-muted">Showing 300 of
+      ${vis.length} — narrow the repeater selection or the radius for the rest.</p>` : ''}`;
 }
 
 // ── onset detection helper ──
@@ -826,14 +981,15 @@ function rfcMatchStation(name) {
 function rfcOnsetHelperHtml() {
   const R = state.rfc;
   return `
-    <p class="small" style="color:var(--muted)">Paste a per-station corruption time series —
+    <p class="small txt-muted">Paste a per-station corruption time series —
       one line per day: <code>date, count</code> or <code>station, date, count</code>
       (ISO or dd/mm/yyyy dates). A rolling-median step detector finds sudden onsets; detected
       dates pre-fill the onset selector, and the series plots in the timeline's data-quality
       band above.</p>
-    <textarea id="rfc-corr" rows="5" style="width:100%"
+    <label class="sr-only" for="rfc-corr">Corruption counts, one line per day</label>
+    <textarea id="rfc-corr" rows="5"
       placeholder="Bluff Ck, 2026-04-01, 0&#10;Bluff Ck, 2026-04-02, 1&#10;Bluff Ck, 2026-04-03, 14&#10;…">${esc(R.corrText)}</textarea>
-    <div style="margin:.4rem 0"><button onclick="RfChanges.analyseCorr()">Detect steps</button></div>
+    <div class="button-group rfc-analyse"><button type="button" onclick="RfChanges.analyseCorr()">Detect steps</button></div>
     ${R.corrSteps === null ? '' : rfcStepsHtml()}`;
 }
 
@@ -841,17 +997,20 @@ function rfcStepsHtml() {
   const R = state.rfc;
   const nSeries = Object.keys(R.corrSeries || {}).length;
   if (!nSeries) {
-    return `<p class="small" style="color:var(--muted)">No parseable lines${R.corrBad ? ` (${R.corrBad} rejected)` : ''}.</p>`;
+    return `<p class="small txt-muted">No parseable lines${R.corrBad ? ` (${R.corrBad} rejected)` : ''}.</p>`;
   }
   const stepsHtml = R.corrSteps.length ? `
-    <div class="small" style="margin:.3rem 0">Detected steps (largest first — click to set as onset):</div>
-    <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+    <p class="small rfc-steps-lead" id="rfc-steps-h">Detected steps, largest first — choose one to
+      set it as the onset date:</p>
+    <div class="button-group rfc-steps" role="group" aria-labelledby="rfc-steps-h">
       ${R.corrSteps.map(s => `
-        <button class="small" onclick="RfChanges.useOnset('${escAttr(s.date)}')"
+        <button type="button" class="small" onclick="RfChanges.useOnset('${escAttr(s.date)}')"
                 title="Rolling-median shift of ${s.jump > 0 ? '+' : ''}${s.jump.toFixed(1)} at ${escAttr(s.station)}">
-          ${esc(s.date)} · ${esc(s.station)} ${s.jump > 0 ? '▲' : '▼'}${Math.abs(s.jump).toFixed(1)}</button>`).join('')}
+          ${esc(s.date)} · ${esc(s.station)}
+          <span aria-hidden="true">${s.jump > 0 ? '▲' : '▼'}</span><span class="sr-only">${
+            s.jump > 0 ? 'up' : 'down'}</span>${Math.abs(s.jump).toFixed(1)}</button>`).join('')}
     </div>` : `
-    <p class="small" style="color:var(--muted)">No step larger than 4× the noise floor found in
+    <p class="small txt-muted">No step larger than 4× the noise floor found in
       ${nSeries} series${R.corrBad ? ` (${R.corrBad} lines rejected)` : ''} — the change may be
       gradual rather than a step, which points away from a switched-on transmitter.</p>`;
   return stepsHtml + rfcGroupingHtml();
@@ -878,36 +1037,39 @@ function rfcGroupingHtml() {
       const c = common[0];
       const isAnchor = !!state.acma.anchorById[c.id];
       commonHtml = `
-        <p class="small" style="margin:.4rem 0">
-          ⚑ <strong>All ${matched.length} matched stations report through
+        <p class="small rfc-common">
+          <span aria-hidden="true">⚑</span> <strong>All ${matched.length} matched stations report through
           ${esc(c.name)}</strong> — corruption confined to one repeater's stations is strong
           evidence for something at or near that specific site.
-          ${isAnchor ? `<button class="small" onclick="RfChanges.focusAnchor('${escAttr(c.id)}')">Focus ${esc(c.name)}</button>`
-                     : `<span style="color:var(--muted)">(${esc(c.name)} has no RX frequency recorded, so it is not in the ACMA threat layer — record repeater.rx_mhz to include it.)</span>`}
+          ${isAnchor ? `<button type="button" class="small" onclick="RfChanges.focusAnchor('${escAttr(c.id)}')">Focus ${esc(c.name)}</button>`
+                     : `<span class="txt-muted">(${esc(c.name)} has no RX frequency recorded, so it is not in the ACMA threat layer — record repeater.rx_mhz to include it.)</span>`}
         </p>`;
     } else {
       commonHtml = `
-        <p class="small" style="color:var(--muted);margin:.4rem 0">
+        <p class="small txt-muted rfc-common">
           The affected stations do not share a single repeater — that spreads the search across
           sites, or points to something common to the receive side (base station, decoder) rather
           than one repeater's RF environment.</p>`;
     }
   }
   return `
-    <div style="margin-top:.5rem">
-      <div class="small" style="color:var(--muted)">Which repeater serves each affected station:</div>
-      <table class="bf-table" style="margin-top:.2rem">
-        <thead><tr><th>Series</th><th>Matched station</th><th>Serving repeater(s)</th></tr></thead>
-        <tbody>
-          ${rows.map(r => `
-            <tr>
-              <td class="small">${esc(r.n)}</td>
-              <td class="small">${r.st ? esc(r.st.name) : '<span style="color:var(--muted)">no match in stations.json</span>'}</td>
-              <td class="small">${r.reps.length ? r.reps.map(x => esc(x.name)).join(', ')
-                : '<span style="color:var(--muted)">—</span>'}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
+    <div class="rfc-grouping">
+      <div class="table-wrap">
+        <table class="bf-table">
+          <caption>Which repeater serves each affected station</caption>
+          <thead><tr><th scope="col">Series</th><th scope="col">Matched station</th>
+            <th scope="col">Serving repeater(s)</th></tr></thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr>
+                <td class="small">${esc(r.n)}</td>
+                <td class="small">${r.st ? esc(r.st.name) : '<span class="txt-muted">no match in stations.json</span>'}</td>
+                <td class="small">${r.reps.length ? r.reps.map(x => esc(x.name)).join(', ')
+                  : '<span class="txt-muted">—</span>'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
       ${commonHtml}
     </div>`;
 }
@@ -916,10 +1078,10 @@ function rfcGroupingHtml() {
 
 function rfcHelpHtml() {
   return `
-    <details>
-      <summary style="cursor:pointer"><strong>What this page will not catch</strong>
-        <span class="small" style="color:var(--muted)">— read before trusting an empty result</span></summary>
-      <div class="small" style="color:var(--muted);margin-top:.4rem">
+    <details class="rfc-blind">
+      <summary><strong>What this page will not catch</strong>
+        <span class="small txt-muted">— read before trusting an empty result</span></summary>
+      <div class="small txt-muted rfc-blind-body">
         <p><strong>Anything unlicensed or faulty.</strong> Solar charge controllers, VMS/LED sign
         drivers, electric fence energisers, powerline arcing, out-of-spec or failing equipment —
         the most common sources of a raised noise floor at a remote gauging site — never appear

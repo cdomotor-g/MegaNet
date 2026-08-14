@@ -157,6 +157,72 @@
   --ad-series-11: #2e7d32;
   --ad-series-12: #6a1b9a;
 
+  /* ── ACMA interference mechanisms, and the RF Changes series (#138) ────────
+     The third categorical set, and it arrives here for the reason the first two
+     did: it was seven literals inside ACMA_MECH in core.js, drawn as a legend
+     swatch, a lane label, a chart mark and a map pin, and none of the four
+     could follow the theme. --acma-mech-cosite-desense was #6d4c41 in both —
+     a dark brown on a #18222d panel, which is the mechanism with the most
+     candidates in the current extract and the one nobody could see.
+
+     Categorical, so out of the contrast contract like the region fills and the
+     series colours: these say "a different mechanism", not "worse". What tells
+     two mechanisms apart without hue is the label beside the swatch — which is
+     why #138 draws the timeline's lane labels in --text with a coloured key
+     square in front, rather than colouring the words. Colour is never the only
+     channel and it is never the text.
+
+     `color` in core.js stays the light literal on purpose: five consumers are
+     Leaflet options, which become SVG presentation attributes, and those do not
+     take var(). Those five are the Stations map and are #136's — see
+     docs/design-system.md §3, "the ACMA boundary". */
+  --acma-mech-co-channel:     #d32f2f;
+  --acma-mech-adjacent:       #f57c00;
+  --acma-mech-imd3:           #7b1fa2;
+  --acma-mech-imd5:           #ce93d8;
+  --acma-mech-imd3-triple:    #9575cd;
+  --acma-mech-harmonic:       #0288d1;
+  --acma-mech-cosite-desense: #6d4c41;
+
+  /* The RF Changes timeline's data-quality series — the pasted corruption
+     counts, up to eight at once. Same argument as --ad-series-*, one tab over:
+     they were RFC_SERIES_COLORS, an array in rf-changes.js, drawn as a
+     `stroke=` attribute the theme could not reach. rf-changes.js resolves these
+     off the document at draw time and pairs each with a dash pattern, so two
+     series are told apart in greyscale and by a dichromat. */
+  --rfc-series-1: #0b5cab;
+  --rfc-series-2: #c7401a;
+  --rfc-series-3: #107c10;
+  --rfc-series-4: #7c35a3;
+  --rfc-series-5: #b8860b;
+  --rfc-series-6: #00838f;
+  --rfc-series-7: #ad1457;
+  --rfc-series-8: #5d4037;
+
+  /* The eight change classes in the RF Changes snapshot-diff panel. The fourth
+     categorical set and the smallest — one 10 px swatch each, beside a heading
+     that names the class in words. Tokens rather than literals in
+     rf-changes.js's RFC_CLASS because the swatch is a CSS context, so the token
+     reaches it with no repaint and nothing has to resolve anything. */
+  --rfc-class-cotenant: #d32f2f;
+  --rfc-class-added:    #c62828;
+  --rfc-class-removed:  #607d8b;
+  --rfc-class-freq:     #f57c00;
+  --rfc-class-power:    #7b1fa2;
+  --rfc-class-antenna:  #0288d1;
+  --rfc-class-site:     #6d4c41;
+  --rfc-class-status:   #455a64;
+
+  /* The onset marker on the RF Changes timeline and the RX channel line on the
+     RF Environment strip plot: the one annotation on either chart that is not
+     categorical. It says "this is the moment/frequency everything else is
+     measured against", which is --bad's job everywhere else in the app. It is a
+     token of its own rather than --bad directly because it is drawn *on* a
+     chart, over a shaded band, and the dark theme wants it brighter than the
+     text colour --bad is tuned for. */
+  --chart-marker: #c62828;
+  --chart-marker-band: rgba(198, 40, 40, .09);
+
   /* ALERT packet bit-field colours (self-contained: mid-tone bg + light text, theme-independent) */
   --c-frame: #4a5568; --c-frame-t: #eef1f5;
   --c-addr:  #2f6fb8; --c-addr-t:  #eaf3ff;
@@ -317,6 +383,47 @@
   --ad-series-10: #ffb066;
   --ad-series-11: #8fdc9e;
   --ad-series-12: #d9a6ff;
+
+  /* The seven mechanism colours, lifted for a dark page — same seven hues,
+     raised in lightness and dropped in saturation, on the same reasoning as the
+     region fills and the series colours above. #6d4c41 is the one that was
+     actually invisible; #7b1fa2 and #9575cd were close behind. */
+  --acma-mech-co-channel:     #ff6b6b;
+  --acma-mech-adjacent:       #ffa94d;
+  --acma-mech-imd3:           #c79ae8;
+  --acma-mech-imd5:           #e6c4f2;
+  --acma-mech-imd3-triple:    #b3a4e8;
+  --acma-mech-harmonic:       #6bb6ff;
+  --acma-mech-cosite-desense: #c9a894;
+
+  /* The eight RF Changes series, lifted for a dark page. Same eight values the
+     twelve ARRO series use for their first eight, and deliberately so: the two
+     charts sit two tabs apart and a reader moving between them should not have
+     to learn a second palette. */
+  --rfc-series-1: #6bb6ff;
+  --rfc-series-2: #ff8a63;
+  --rfc-series-3: #57d657;
+  --rfc-series-4: #c79ae8;
+  --rfc-series-5: #e3c05c;
+  --rfc-series-6: #4fd3dd;
+  --rfc-series-7: #ff8ab5;
+  --rfc-series-8: #c9a894;
+
+  /* The eight change classes, lifted for a dark page. #455a64 and #607d8b were
+     both slate-on-slate against a #18222d panel. */
+  --rfc-class-cotenant: #ff6b6b;
+  --rfc-class-added:    #ff8a63;
+  --rfc-class-removed:  #9fb1c3;
+  --rfc-class-antenna:  #6bb6ff;
+  --rfc-class-freq:     #ffa94d;
+  --rfc-class-power:    #c79ae8;
+  --rfc-class-site:     #c9a894;
+  --rfc-class-status:   #b0bfcc;
+
+  /* Brighter than the light value: this line is drawn over a shaded band on a
+     dark panel, where #c62828 reads as a smudge. */
+  --chart-marker: #ff6b6b;
+  --chart-marker-band: rgba(255, 107, 107, .12);
 
   /* Control surfaces, dark. --border (#2a3948) is the right colour for a
      divider between two dark surfaces and the wrong one for the edge of a
@@ -731,6 +838,23 @@ header p {
   justify-content: space-between;
 }
 
+/* …and its counterpart, which the app was missing (#138). The three above are
+   "a row spread across the panel" — `justify-content: space-between` is the
+   whole point of them, a heading at one end and its actions at the other.
+   `.button-group` is "these controls belong together": same gap, same wrap, no
+   spreading. Used with `.button-row` it does not fight it — the group is one
+   child of the row and travels as one.
+
+   Worth naming rather than leaving to each tab, because reaching for
+   `.button-row` when you meant this is a mistake that *looks* deliberate: two
+   buttons at opposite ends of a panel read as "confirm" and "cancel". */
+.button-group {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .panel-header-wrap {
   align-items: flex-start;
 }
@@ -785,6 +909,33 @@ button.primary {
   color: var(--muted);
   opacity: .55;
   pointer-events: none;
+}
+
+/* …and its opposite, which the app needed just as often and had never named
+   (#138). `.btn-link` is an <a> that reads as a button, for leaving the site.
+   `.link-btn` is a <button> that reads as a link, for the thing the app writes
+   forty times as `<a href="#" onclick="doSomething();return false">` — which is
+   announced as a link, offers a middle-click that opens a copy of the page, and
+   navigates to the top of the document if the handler ever throws before
+   `return false`. The action is in-page, so the element is a button and this is
+   what makes it look like what it replaced.
+
+   Not `.row-open`: that one is deliberately styled as the *text* it replaces,
+   because forty bordered controls down a name column read as a form. This one
+   is styled as the link it replaces, because that is what it is. */
+.link-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--accent);
+  text-align: left;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
 }
 
 kbd {
@@ -1178,6 +1329,20 @@ tr.selected mark.hit {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   margin-top: var(--sp-3);
+  /* Not cosmetic, and found the hard way (#138). `overflow` clips a descendant
+     only when the scroll container is that descendant's containing block, and
+     an absolutely positioned box's containing block is the nearest *positioned*
+     ancestor — which this was not. So a `.sr-only` inside a cell (the word
+     behind a ✓, the caption of a table whose panel heading already says its
+     name) was positioned against the page rather than the wrapper, escaped the
+     clip, and put its static x — 490 px into an 880 px table — into the
+     document's scrollWidth. The page scrolled sideways on a phone because a
+     screen-reader-only span was doing it, which is a bug no screenshot shows
+     and no eye finds.
+
+     Every table in the app is in one of these, so stating it here is what makes
+     `.sr-only` safe to use in a cell at all. */
+  position: relative;
 }
 
 /* Pattern 7a — a scrolling wrapper is a region, and it is named (#137).
@@ -1232,6 +1397,131 @@ tr.selected mark.hit {
 .row-open:hover {
   color: var(--accent);
   text-decoration: underline;
+}
+
+/* Pattern 10 — a sortable column header is a button, and the <th> says which
+   way it sorted (#138).
+   Two tables on the RF tabs carried nineteen `<th style="cursor:pointer"
+   onclick="…sort('score')">` between them. That is the row-open problem one
+   level up: a `<th>` is not in the tab order and has no role, so *every* column
+   on both tables could only be re-sorted with a mouse — and a screen reader was
+   never told the table was sorted at all, let alone by which column.
+
+   The shape mirrors pattern 7b exactly, and for the same reason: the cell is
+   not a control, so the control goes inside it.
+
+     <th scope="col" aria-sort="descending">
+       <button type="button" class="th-sort" onclick="…">Score<span
+             class="th-arrow" aria-hidden="true">▼</span></button>
+     </th>
+
+   `aria-sort` goes on the <th>, which is where the spec puts it, and exactly
+   one <th> in a table may carry it. The arrow is `aria-hidden` because
+   `aria-sort` already says it — a name reading "Score ▼" makes a screen reader
+   pronounce a glyph, and this is the one place the visible text and the
+   accessible name are allowed to differ. Full width so the whole cell is the
+   target, and left-aligned so the column heading has not moved. */
+.th-sort {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  cursor: pointer;
+}
+
+.th-sort:hover {
+  color: var(--accent);
+}
+
+.th-arrow {
+  font-size: var(--fs-xs);
+  color: var(--accent);
+}
+
+/* Pattern 11 — a graphic wider than its column scrolls in a named region
+   (#138).
+   Pattern 7a, applied to something that is not a table. Both RF charts sit in a
+   `div` with `overflow-x: auto` and a `min-width` on the SVG inside — 640 px on
+   the strip plot, 720 px on the timeline — which on a phone is a box holding
+   two thirds of a picture and no way to reach the rest without a mouse. It is
+   the same three attributes and the same reasoning, plus the split #141 found:
+
+     the scroller is the *control*  — tab stop, role="region", a name saying
+                                      what operating it does;
+     the <svg> is the *picture*     — role="img", a name carrying the numbers.
+
+   One name each. Putting both jobs on one element is what made the ARRO chart's
+   label say "Sensor readings over time" whether it held twelve readings or
+   twelve thousand. */
+.chart-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.chart-scroll:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
+/* Text drawn inside an SVG cannot take a class from the design system by
+   accident — `fill` is not inherited from a stylesheet unless something says
+   so. These are that something, and they exist because the alternative is
+   `style="fill:var(--muted)"` on every label, which is an inline style the
+   check cannot see past and the tab has to justify one by one. */
+.chart-text  { fill: var(--text); }
+.chart-muted { fill: var(--muted); }
+.chart-line  { stroke: var(--muted); }
+.chart-grid  { stroke: var(--border); }
+.chart-mark  { stroke: var(--chart-marker); fill: var(--chart-marker); }
+.chart-band  { fill: var(--chart-marker-band); }
+
+/* A row of labelled controls above a table or a chart — a filter bar, in the
+   two shapes the app draws it: `.control-row` wraps at whatever width it runs
+   out of, `.control-row > label` stacks its text over its control the way
+   `.form-grid` does. Six tabs write this out inline with four different gaps;
+   this is the one to use. The 44 px floor under a coarse pointer is EPIC #107's
+   per-tab Definition of Done rather than the app-wide 2 rem, because a filter
+   bar is exactly the thing being tapped in a vehicle. */
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  align-items: flex-end;
+  margin: var(--sp-3) 0;
+}
+
+.control-row > label {
+  display: grid;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.control-row > label > input,
+.control-row > label > select {
+  color: var(--text);
+}
+
+/* A field holding a number of two or three digits. `input` is `width: 100%` by
+   default, which in a wrapping row means "as wide as the row", and every tab
+   that needed a small one wrote `style="width:4.5rem"`. */
+.field-num {
+  width: 5rem;
+}
+
+@media (pointer: coarse) {
+  .control-row > label > input,
+  .control-row > label > select,
+  .control-row > button {
+    min-height: 2.75rem;
+  }
 }
 
 /* The empty state under a filtered-away table. `.small` already carries the
@@ -2325,12 +2615,21 @@ hr {
 /* ── ACMA RRL interference layer ─────────────────────────────────────────── */
 
 /* square swatch — ACMA transmitters are squares so they never read as
-   MegaNet's circular station markers */
+   MegaNet's circular station markers.
+
+   Its colour arrives as `style="--dot: var(--acma-mech-imd3)"` (#138), which is
+   the token reaching the element rather than the element deciding — the same
+   move `.ad-dot` and `.maps-chip-dot` already make. It was `style="background:
+   #7b1fa2"` on 1,536 swatches across the two RF tabs, the transmitter card and
+   the map legend, which is 1,536 inline declarations no check could see and no
+   theme could reach. The border stays a literal rgba: it is a hairline drawn to
+   keep a pale swatch off a white panel, not a colour with an opinion. */
 .legend-sq {
   width: 10px;
   height: 10px;
   display: inline-block;
   border: 1px solid rgba(0, 0, 0, .35);
+  background: var(--dot, var(--muted));
 }
 
 .acma-div {
@@ -2352,36 +2651,213 @@ hr {
   outline-offset: 3px;         /* clear of the white ring */
 }
 
+/* ── RF Environment tab (#138) ───────────────────────────────────────────────
+   Six inline styles and a 24-div histogram, replaced. The tab is otherwise
+   .page / .panel / .control-row / the table pattern, which is the whole point
+   of there being a system: a chart-and-table tab should need almost no CSS of
+   its own. */
+
+.rf-loading {
+  text-align: center;
+  padding: var(--sp-6) var(--sp-4);
+}
+
+/* The strip plot's own minimum. Below it the ±0.6 MHz span stops being readable
+   as an axis at all — the .chart-scroll around it is what makes the rest of it
+   reachable, on a phone and from a keyboard alike (pattern 11). */
+.rf-strip-svg {
+  width: 100%;
+  min-width: 640px;
+  height: auto;
+  display: block;
+}
+
+.rf-strip-table,
+.rf-hours-table {
+  margin-top: var(--sp-3);
+}
+
+.rf-strip-table > summary,
+.rf-hours-table > summary {
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: var(--accent);
+}
+
+.rf-analyse {
+  margin: var(--sp-2) 0;
+}
+
+/* The hour-of-day histogram. Twenty-four bars whose *heights are data*, so the
+   height arrives as `--h` on the element and this rule is what reads it — the
+   element is not deciding anything, the measurement is. */
+.rf-hours {
+  display: flex;
+  gap: 1px;
+  height: 44px;
+  align-items: end;
+  max-width: 480px;
+}
+
+.rf-hour {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+}
+
+.rf-hour-bar {
+  height: var(--h, 0);
+  background: var(--map-line);
+  opacity: .75;
+}
+
+.rf-hours-axis {
+  display: flex;
+  justify-content: space-between;
+  max-width: 480px;
+  color: var(--muted);
+}
+
 /* ── RF Changes tab ──────────────────────────────────────────────────────── */
 
 .rfc-picker {
   position: relative;
 }
 
+.rfc-picker > summary {
+  cursor: pointer;
+}
+
+/* The 88-repeater picker. It is `position: absolute`, and an absolutely
+   positioned box still counts toward its containing block's scrollWidth — so
+   with the picker open on a phone the *document* scrolled sideways by 520 px
+   while the panel behind it sat inside the screen (#138). `max-width` against
+   the viewport is what stops that; `right: 0` is what keeps a list opened near
+   the right edge from hanging off it. Neither is a breakpoint, so neither goes
+   in the responsive block: the rule is "never wider than the window", at every
+   width. */
 .rfc-picker-list {
   position: absolute;
+  left: 0;
   z-index: 1200;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
-  padding: .5rem .6rem;
-  margin-top: .25rem;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+  padding: var(--sp-2) var(--sp-3);
+  margin-top: var(--sp-1);
   max-height: 300px;
   overflow-y: auto;
   min-width: 260px;
-  font-size: .88rem;
+  max-width: calc(100vw - var(--sp-6));
+  font-size: var(--fs-sm);
 }
 
-.rfc-picker-list label {
-  margin: .12rem 0;
+.rfc-pick {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  margin: var(--sp-1) 0;
 }
 
-/* corruption-series swatch in the timeline legend */
+/* A checkbox in a list of 88 is the smallest target on either RF tab, and the
+   one most likely to be tapped in a vehicle. The row carries the 44 px rather
+   than the box, so the label's text is part of the target. */
+@media (pointer: coarse) {
+  .rfc-pick {
+    min-height: 2.75rem;
+  }
+}
+
+/* corruption-series swatch in the timeline legend. Its colour arrives as a
+   `--dot` token like every other swatch in the app (#138). */
 .rfc-series-line {
   width: 16px;
   height: 3px;
   display: inline-block;
+  background: var(--dot, var(--muted));
+}
+
+.rfc-legend {
+  display: flex;
+  gap: var(--sp-2) var(--sp-4);
+  flex-wrap: wrap;
+  margin: var(--sp-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The timeline's own minimum. Same reasoning as .rf-strip-svg, one tab over —
+   below 720 px the two-year axis stops being an axis, and .chart-scroll around
+   it is what makes the rest reachable (pattern 11). */
+.rfc-chart-svg {
+  width: 100%;
+  min-width: 720px;
+  height: auto;
+  display: block;
+}
+
+/* A mark opens the transmitter card, and the card is also on every row of the
+   table below — which is the condition pattern 8 rests on, and the reason no
+   mark is a tab stop. */
+.rfc-mark {
+  cursor: pointer;
+}
+
+.rfc-intro {
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+
+.rfc-note {
+  margin: var(--sp-1) 0;
+}
+
+.rfc-analyse,
+.rfc-common {
+  margin: var(--sp-2) 0;
+}
+
+.rfc-steps-lead {
+  margin: var(--sp-2) 0 var(--sp-1);
+}
+
+.rfc-steps {
+  margin-bottom: var(--sp-2);
+}
+
+.rfc-grouping {
+  margin-top: var(--sp-2);
+}
+
+.rfc-diff-group {
+  margin-top: var(--sp-3);
+}
+
+.rfc-diff-group > h4 {
+  margin: 0 0 var(--sp-1);
+}
+
+.rfc-diff-blurb {
+  margin: 0 0 var(--sp-2);
+}
+
+.rfc-change {
+  margin: var(--sp-1) 0;
+  padding-left: var(--sp-3);
+}
+
+.rfc-field,
+.rfc-formula {
+  white-space: nowrap;
+}
+
+.rfc-blind > summary {
+  cursor: pointer;
+}
+
+.rfc-blind-body {
+  margin-top: var(--sp-2);
 }
 
 /* on the (long, scrolling) RF Changes page the transmitter card floats over
@@ -2428,6 +2904,53 @@ hr {
   padding: 0 .45rem;
   font-size: 1rem;
   line-height: 1.4;
+}
+
+/* The card is a non-modal dialog that appears over the page, so it takes focus
+   when it opens and Escape closes it back to whatever opened it (#138). It is
+   given `tabindex="-1"` in JS rather than here because the attribute only makes
+   sense while it is showing.
+
+   No `outline: none` here, deliberately, and the allowlist is why it was worth
+   checking rather than assuming: a mouse click that opens the card does not
+   match `:focus-visible`, so the ring only appears when a *keyboard* opened it —
+   which is precisely when somebody needs to be shown where focus went. The
+   shared ring is inherited; only its offset is overridden, because a ring drawn
+   2 px outside a `position: fixed` panel is clipped by the panel's own edge. */
+.acma-card:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
+/* One rule for the card's repeated small rows — a mechanism line, a co-sited
+   device — which had `style="margin:.15rem 0"` written out on each. */
+.acma-mech-row {
+  margin: var(--sp-1) 0;
+}
+
+.acma-card-note {
+  color: var(--muted);
+  padding: var(--sp-2) var(--sp-3);
+  margin: 0;
+}
+
+.acma-note {
+  margin: var(--sp-1) 0;
+}
+
+.acma-note > summary,
+.acma-cosited > summary {
+  cursor: pointer;
+}
+
+.acma-note-body {
+  white-space: pre-wrap;
+}
+
+/* A heading inside a summary is legitimate — it is the disclosure's own name —
+   but it must not break the line the twisty sits on. */
+.acma-cosited > summary > h4 {
+  display: inline;
 }
 
 .acma-sect {

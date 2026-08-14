@@ -3655,19 +3655,43 @@ function acmaPopupHtml(d, site) {
     <a href="#" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(t.anchor_id)}');return false">Full details →</a>`;
 }
 
+// ── the transmitter card, and where it belongs (#138) ────────────────────────
+// This card renders on three tabs owned by three different U-issues — the
+// Stations map (#136), RF Changes (#138) and the Interference Workbench (#139)
+// — which is why #138's issue text calls it "the likely collision point" and
+// asks for a boundary to be agreed before anyone starts. The boundary that was
+// agreed is that there is no boundary to draw through the card itself: a
+// surface three tabs render is not any tab's, it is shared furniture, and the
+// answer is the one #141 reached about the chart pattern — apply it once rather
+// than negotiate it three times. So #138 converted it, and #136 and #139
+// inherit it converted. What #136 still owns is everything *around* it on the
+// map: the filters panel, the layer, the pins and the legend.
+//
+// Opening it moves focus into it and Escape closes it back to whatever opened
+// it. Before this it was a panel that appeared over the page with the close
+// button unreachable from a keyboard on the two long tabs where it is
+// `position: fixed` — you could open a card and not be able to shut it.
 function showAcmaCard(deviceId, anchorId) {
   state.acma.cardDeviceId = deviceId;
   state.acma.cardAnchorId = anchorId || null;
+  state.acma.cardOpener = document.activeElement;
   const el = document.getElementById('acma-card');
   if (el) {
     el.hidden = false;
-    el.innerHTML = '<div class="small" style="padding:1rem;color:var(--muted)">Loading transmitter details…</div>';
+    el.innerHTML = '<p class="small acma-card-note">Loading transmitter details…</p>';
   }
   acmaEnsureDevices().then(() => renderAcmaCard()).catch(err => {
-    if (el) el.innerHTML = `<div class="small" style="padding:1rem;color:var(--muted)">
-      Device detail unavailable (${esc(err.message)}).</div>`;
+    if (el) el.innerHTML = `<p class="small acma-card-note">
+      Device detail unavailable (${esc(err.message)}).</p>`;
   });
   acmaHighlightDevice(deviceId);
+}
+
+// Escape closes the card from anywhere inside it. Registered on the card rather
+// than on the document: three tabs render one, and a global key handler would
+// have to know which of them is open.
+function acmaCardKey(e) {
+  if (e.key === 'Escape') { e.stopPropagation(); closeAcmaCard(); }
 }
 
 function closeAcmaCard() {
@@ -3675,6 +3699,12 @@ function closeAcmaCard() {
   const el = document.getElementById('acma-card');
   if (el) { el.hidden = true; el.innerHTML = ''; }
   acmaClearHighlight();
+  // Back to whatever opened it — a table row's button, a chart mark, a map pin.
+  // A card that closes to <body> loses a keyboard user their place in a
+  // thousand-row table.
+  const back = state.acma.cardOpener;
+  state.acma.cardOpener = null;
+  if (back && document.contains(back) && typeof back.focus === 'function') back.focus();
 }
 
 function acmaCardRow(label, value) {
@@ -3707,20 +3737,21 @@ function renderAcmaCard() {
   el.innerHTML = `
     <div class="acma-card-head">
       <span>
-        <strong>${esc(site.name || 'Unknown site')}</strong><br>
-        <span class="small" style="color:var(--muted)">${esc(client.trading || client.name || 'Unknown licensee')}</span>
+        <strong id="acma-card-title">${esc(site.name || 'Unknown site')}</strong><br>
+        <span class="small txt-muted">${esc(client.trading || client.name || 'Unknown licensee')}</span>
       </span>
       <span>${top ? `score ${top.score}` : ''}
-        <button onclick="closeAcmaCard()" title="Close">×</button></span>
+        <button type="button" onclick="closeAcmaCard()"
+                aria-label="Close the transmitter details"><span aria-hidden="true">×</span></button></span>
     </div>
     ${myThreats.length ? `
       <div class="acma-sect">
         ${myThreats.sort((a, b) => b.score - a.score).map(t => {
-          const m = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-          return `<div class="small" style="margin:.15rem 0">
-            <span class="legend-sq" style="background:${m.color}"></span>
+          const m = ACMA_MECH[t.mechanism] || { label: t.mechanism };
+          return `<div class="small acma-mech-row">
+            <span class="legend-sq" style="--dot:${acmaMechVar(t.mechanism)}"></span>
             <strong>${m.label}</strong> ${t.score} vs ${esc(t.anchor_name)}<br>
-            <span style="color:var(--muted)">${esc(t.detail)} —
+            <span class="txt-muted">${esc(t.detail)} —
               w ${t.components.mechanism_weight} × dist ${t.components.distance_factor}
               × pwr ${t.components.power_factor} × LOS ${t.components.los_factor}</span>
           </div>`;
@@ -3777,54 +3808,92 @@ function renderAcmaCard() {
     ${notes.length ? `
     <div class="acma-sect"><h4>Conditions &amp; advisory notes (${notes.length})</h4>
       ${notes.map(n => `
-        <details class="small" style="margin:.2rem 0">
-          <summary style="cursor:pointer">${esc(n.title || n.cat || 'Note')}</summary>
-          <div style="white-space:pre-wrap;color:var(--muted)">${esc(n.text || '')}</div>
+        <details class="small acma-note">
+          <summary>${esc(n.title || n.cat || 'Note')}</summary>
+          <div class="acma-note-body txt-muted">${esc(n.text || '')}</div>
         </details>`).join('')}
     </div>` : ''}
     ${cosited.length ? `
     <div class="acma-sect">
-      <details>
-        <summary style="cursor:pointer"><h4 style="display:inline">Co-sited devices (${cosited.length})</h4></summary>
+      <details class="acma-cosited">
+        <summary><h4>Co-sited devices (${cosited.length})</h4></summary>
         ${cosited.sort((a, b) => (a.f_mhz || 0) - (b.f_mhz || 0)).map(d => `
-          <div class="small" style="margin:.15rem 0">
-            <a href="#" onclick="showAcmaCard('${escAttr(d.id)}','${escAttr(A.cardAnchorId || '')}');return false">
-              ${d.f_mhz != null ? d.f_mhz.toFixed(4) + ' MHz' : '?'}</a>
+          <div class="small acma-mech-row">
+            <button type="button" class="link-btn"
+                    onclick="showAcmaCard('${escAttr(d.id)}','${escAttr(A.cardAnchorId || '')}')"
+                    aria-label="Show the details for the ${d.f_mhz != null ? d.f_mhz.toFixed(4) + ' MHz' : 'unknown'} device at this site">
+              ${d.f_mhz != null ? d.f_mhz.toFixed(4) + ' MHz' : '?'}</button>
             ${esc(d.emission || '')} ${d.eirp_w != null ? '· ' + d.eirp_w + ' W EIRP' : ''}
             ${partnerIds.has(d.id) ? '<span class="badge">IMD partner</span>' : ''}
           </div>`).join('')}
       </details>
     </div>` : ''}
-    <div class="small" style="color:var(--muted);padding:.4rem .6rem">
+    <p class="small acma-card-note">
       ACMA RRL data (CC BY 4.0), extract ${esc((A.threats.meta || {}).source_date || '')}.
       Not to be used for unsolicited contact (Spam Act 2003 / DNCR Act 2006).
-    </div>`;
+    </p>`;
+  // Parts 2 and 3 of opening a card: it names itself, and focus goes into it —
+  // otherwise a card that has just appeared over the page is announced as
+  // nothing and Tab carries on from wherever the row was.
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-labelledby', 'acma-card-title');
+  el.setAttribute('tabindex', '-1');
+  el.onkeydown = acmaCardKey;
+  el.focus();
 }
 
 // ── RF Environment tab ──
+//
+// ── U3 (#138): layout, mobile and accessibility ──────────────────────────────
+// What this tab was: a `.stack` with an inline gutter, a control row written out
+// inline, two tables with no caption, no scope and nine mouse-only sort headers
+// between them, a strip plot in a `div{overflow-x:auto}` no keyboard could
+// scroll, an hour histogram made of 24 inline-styled divs, and 1,000 legend
+// swatches each carrying its own `background:` literal.
+//
+// What it is now is #109's system applied, plus the three additions #138 made
+// *to* that system rather than to this tab (all three are in
+// docs/design-system.md, patterns 10 and 11 and the ACMA-boundary note):
+//
+//   A sortable header is a button, and the <th> carries aria-sort. Every column
+//   on both tables here could only be re-sorted with a mouse, and a screen
+//   reader was never told the table was sorted at all.
+//
+//   A graphic wider than its column scrolls in a named region. Pattern 7a for
+//   something that is not a table, with #141's split kept: the scroller is the
+//   control and takes the tab stop, the <svg> is the picture and takes the
+//   numbers.
+//
+//   The ACMA mechanism palette is the document's. Seven literals in core.js,
+//   drawn four different ways and none of them able to follow the theme.
+//
+// Both graphics get the full three-part chart answer (§3): a name carrying the
+// headline number and rebuilt whenever the picture is, a sentence saying what
+// they show, and the data as a real table one activation away.
 
 function renderRfHtml() {
   const A = state.acma;
   if (!A.loaded) {
     return `
-      <div style="max-width:640px;margin:2.5rem auto;padding:1rem">
-        <div class="panel" style="text-align:center;padding:2rem">
-          <h2 style="margin:0 0 .6rem">RF Environment</h2>
-          <p class="small" style="color:var(--muted)">
+      <div class="page" style="--page-max:640px">
+        <div class="panel rf-loading">
+          <h2>RF Environment</h2>
+          <p class="small txt-muted">
             ${A.error ? esc(A.error) : 'Loading ACMA interference data…'}</p>
         </div>
       </div>`;
   }
   const anchors = A.threats.anchors.slice().sort((a, b) => b.threats.length - a.threats.length);
   const sel = state.rf.anchorId;
+  const selName = sel ? esc((A.anchorById[sel] || {}).name || sel) : '';
   return `
-    <div class="stack" style="padding:0 .25rem">
+    <div class="page" style="--page-max:1400px">
       <div class="panel">
         <div class="panel-header"><h2>RF Environment — licensed interference candidates</h2>
-          <span class="small" style="color:var(--muted)">ACMA data: ${esc(A.threats.meta.source_date)} · CC BY 4.0</span>
+          <span class="small txt-muted">ACMA data: ${esc(A.threats.meta.source_date)} · CC BY 4.0</span>
         </div>
-        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin:.5rem 0">
-          <label class="small">Repeater
+        <div class="control-row">
+          <label>Repeater
             <select onchange="state.rf.anchorId=this.value;renderMain()">
               <option value="">All (${A.flat.length} threat candidates)</option>
               ${anchors.map(a => `
@@ -3832,27 +3901,34 @@ function renderRfHtml() {
                   ${esc(a.name)} (${a.threats.length})</option>`).join('')}
             </select>
           </label>
-          <label class="small">Min score
-            <input type="number" min="0" max="100" step="5" value="${state.filters.acma.minScore}"
-                   style="width:4.5rem"
+          <label>Min score
+            <input type="number" min="0" max="100" step="5" class="field-num"
+                   value="${state.filters.acma.minScore}"
                    onchange="state.filters.acma.minScore=+this.value;renderMain()">
           </label>
-          <button onclick="rfExportCsv()">Export CSV</button>
+          <button type="button" onclick="rfExportCsv()">Export CSV</button>
         </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3 id="rf-focus-h">${sel
+          ? `Licensed carriers around ${selName}’s RX channel`
+          : 'Threat candidates by repeater'}</h3></div>
         ${sel ? rfStripPlotHtml(sel) : rfSummaryHtml(anchors)}
       </div>
       <div class="panel">
-        <div class="panel-header"><h3>Threat candidates${sel ? ` — ${esc((A.anchorById[sel] || {}).name || sel)}` : ''}</h3></div>
-        <div class="table-wrap tall" id="rf-table-wrap">${rfTableHtml()}</div>
+        <div class="panel-header"><h3 id="rf-table-h">Threat candidates${sel ? ` — ${selName}` : ''}</h3></div>
+        <div class="table-wrap tall" id="rf-table-wrap"
+             role="region" tabindex="0" aria-labelledby="rf-table-h">${rfTableHtml()}</div>
       </div>
       <div class="panel">
-        <div class="panel-header"><h3>Corruption-time correlation helper</h3></div>
-        <p class="small" style="color:var(--muted)">Paste corruption timestamps (one per line,
+        <div class="panel-header"><h3 id="rf-corr-h">Corruption-time correlation helper</h3></div>
+        <p class="small txt-muted">Paste corruption timestamps (one per line,
           any parseable format). Checks whether they cluster in business hours — licensed
           operators with non-continuous operation tend to transmit 07:00–18:00 weekdays.</p>
-        <textarea id="rf-corr" rows="4" style="width:100%"
+        <label class="sr-only" for="rf-corr">Corruption timestamps, one per line</label>
+        <textarea id="rf-corr" rows="4"
                   placeholder="2026-07-12 09:41&#10;2026-07-12 10:05&#10;…">${esc(state.rf.corrText)}</textarea>
-        <div style="margin:.4rem 0"><button onclick="rfCorrelate()">Analyse</button></div>
+        <div class="button-group rf-analyse"><button type="button" onclick="rfCorrelate()">Analyse</button></div>
         <div id="rf-corr-out" class="small"></div>
       </div>
     </div>`;
@@ -3906,63 +3982,112 @@ function rfSort(key) {
   else { state.rf.sortKey = key; state.rf.sortDir = key === 'score' ? -1 : 1; }
   const wrap = document.getElementById('rf-table-wrap');
   if (wrap) wrap.innerHTML = rfTableHtml();
+  // The header the user just pressed has been replaced by an identical one, so
+  // focus has to be put back or a keyboard sort drops the user on <body> — the
+  // same thing renderTabs() does to the nav, fixed the same way (#109 §4).
+  const btn = wrap && wrap.querySelector(`.th-sort[data-key="${CSS.escape(key)}"]`);
+  if (btn) btn.focus();
+}
+
+// Pattern 10 (#138). The <th> carries aria-sort because that is where the spec
+// puts it and because exactly one column may claim it; the button carries the
+// press. The arrow is aria-hidden — aria-sort has already said which way, and a
+// name reading "Score ▼" makes a screen reader pronounce the glyph.
+function rfSortTh(k, label, cls = '') {
+  const on = state.rf.sortKey === k;
+  const dir = state.rf.sortDir > 0 ? 'ascending' : 'descending';
+  return `<th scope="col"${cls ? ` class="${cls}"` : ''}${on ? ` aria-sort="${dir}"` : ''}>
+    <button type="button" class="th-sort" data-key="${k}" onclick="rfSort('${k}')">${label}${
+      on ? `<span class="th-arrow" aria-hidden="true">${state.rf.sortDir > 0 ? '▲' : '▼'}</span>` : ''}</button></th>`;
 }
 
 function rfTableHtml() {
   const rows = rfVisibleRows();
   if (!rows.length) {
-    return `<p style="padding:.75rem;color:var(--muted)">No threat candidates match the current
+    return `<p class="small table-empty">No threat candidates match the current
       filters${state.acma.mechCounts.imd3 ? '' : ' — note: no same-site IMD candidates were found in this extract'}.</p>`;
   }
-  const arrow = k => state.rf.sortKey === k ? (state.rf.sortDir > 0 ? ' ▲' : ' ▼') : '';
-  const th = (k, label) => `<th style="cursor:pointer" onclick="rfSort('${k}')">${label}${arrow(k)}</th>`;
+  const shown = rows.slice(0, 1000);
   return `
     <table class="bf-table">
+      <caption class="sr-only">Threat candidates, ${shown.length === rows.length
+        ? `${rows.length} rows` : `the first 1,000 of ${rows.length} rows`}, sorted by
+        ${esc(RF_SORT_LABEL[state.rf.sortKey] || state.rf.sortKey)},
+        ${state.rf.sortDir > 0 ? 'lowest' : 'highest'} first.</caption>
       <thead><tr>
-        ${th('anchor', 'Repeater')}${th('mechanism', 'Mechanism')}${th('score', 'Score')}
-        ${th('f_mhz', 'Freq (MHz)')}${th('delta', 'Δ (kHz)')}${th('distance', 'Dist (km)')}
-        <th>LOS</th>${th('client', 'Licensee')}${th('lic', 'Licence')}${th('expiry', 'Expiry')}<th></th>
+        ${rfSortTh('anchor', 'Repeater')}${rfSortTh('mechanism', 'Mechanism')}${rfSortTh('score', 'Score')}
+        ${rfSortTh('f_mhz', 'Freq (MHz)')}${rfSortTh('delta', 'Δ (kHz)')}${rfSortTh('distance', 'Dist (km)')}
+        <th scope="col">LOS</th>${rfSortTh('client', 'Licensee')}${rfSortTh('lic', 'Licence', 'col-optional')}
+        ${rfSortTh('expiry', 'Expiry', 'col-optional')}<th scope="col"><span class="sr-only">On the map</span></th>
       </tr></thead>
       <tbody>
-        ${rows.slice(0, 1000).map(t => {
-          const m = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
+        ${shown.map(t => {
+          const m = ACMA_MECH[t.mechanism] || { label: t.mechanism };
           const dk = rfDeltaKhz(t);
           return `<tr>
             <td class="small">${esc(t.anchor_name)}</td>
-            <td class="small"><span class="legend-sq" style="background:${m.color}"></span> ${m.label}</td>
+            <td class="small"><span class="legend-sq" style="--dot:${acmaMechVar(t.mechanism)}"></span> ${m.label}</td>
             <td>${t.score}</td>
             <td class="small">${t.f_mhz != null ? t.f_mhz.toFixed(4) : ''}</td>
             <td class="small" title="${esc(t.detail)}">${dk != null ? dk.toFixed(1) : ''}</td>
             <td class="small">${t.distance_km}</td>
-            <td class="small">${t.los === true ? '✓' : t.los === false ? '✗' : '—'}</td>
+            <td class="small">${rfLosCell(t.los)}</td>
             <td class="small">${esc(t.client || '')}${t.meganet ? ' <span class="badge">MegaNet</span>' : ''}</td>
-            <td class="small">${esc(t.lic || '')}</td>
-            <td class="small">${esc(t.expiry || '')}${t.inactive ? ' ⚠' : ''}</td>
-            <td><a href="#" onclick="rfShowOnMap('${escAttr(t.device_id)}','${escAttr(t.anchor_id)}');return false">map</a></td>
+            <td class="small col-optional">${esc(t.lic || '')}</td>
+            <td class="small col-optional">${esc(t.expiry || '')}${t.inactive
+              ? ' <span class="txt-warn" title="Licence is not current">⚠<span class="sr-only"> not current</span></span>' : ''}</td>
+            <td><button type="button" class="link-btn"
+                    onclick="rfShowOnMap('${escAttr(t.device_id)}','${escAttr(t.anchor_id)}')"
+                    aria-label="Show ${escAttr(t.client || 'this transmitter')}${
+                      t.f_mhz != null ? ` at ${t.f_mhz.toFixed(4)} MHz` : ''} on the Stations map">map</button></td>
           </tr>`;
         }).join('')}
       </tbody>
     </table>
-    ${rows.length > 1000 ? `<p class="small" style="color:var(--muted);padding:.4rem">Showing 1000 of ${rows.length} — tighten the filters or export the CSV.</p>` : ''}`;
+    ${rows.length > shown.length ? `<p class="small table-empty txt-muted">Showing 1,000 of
+      ${rows.length} — tighten the filters or export the CSV for the rest.</p>` : ''}`;
 }
+
+// A tick and a cross are two glyphs a screen reader reads as "check mark" and
+// "multiplication x", which is not what this column means and, at "not
+// assessed", not even close. The glyph is decoration and the word is the cell.
+function rfLosCell(los) {
+  if (los === true)  return '<span aria-hidden="true">✓</span><span class="sr-only">line of sight</span>';
+  if (los === false) return '<span aria-hidden="true">✗</span><span class="sr-only">no line of sight</span>';
+  return '<span aria-hidden="true">—</span><span class="sr-only">not assessed</span>';
+}
+
+const RF_SORT_LABEL = {
+  anchor: 'repeater', mechanism: 'mechanism', score: 'score', f_mhz: 'frequency',
+  delta: 'frequency offset', distance: 'distance', client: 'licensee',
+  lic: 'licence', expiry: 'expiry',
+};
 
 function rfSummaryHtml(anchors) {
   const withThreats = anchors.filter(a => a.threats.length);
+  const mechs = Object.entries(ACMA_MECH).filter(([k]) => state.acma.mechCounts[k]);
+  const total = withThreats.reduce((n, a) => n + a.threats.length, 0);
   return `
-    <div class="table-wrap medium">
+    <div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="rf-focus-h">
       <table class="bf-table">
-        <thead><tr><th>Repeater</th><th>RX (MHz)</th><th>Total</th>
-          ${Object.entries(ACMA_MECH).filter(([k]) => state.acma.mechCounts[k]).map(([, m]) => `<th class="small">${m.label}</th>`).join('')}
-          <th>Top score</th></tr></thead>
+        <caption class="sr-only">${withThreats.length} repeaters with threat candidates,
+          ${total} candidates in total, most first. Choose a repeater's name to look at it on
+          its own.</caption>
+        <thead><tr><th scope="col">Repeater</th><th scope="col">RX (MHz)</th><th scope="col">Total</th>
+          ${mechs.map(([, m]) => `<th scope="col" class="small">${m.label}</th>`).join('')}
+          <th scope="col">Top score</th></tr></thead>
         <tbody>
           ${withThreats.map(a => {
             const by = {};
             a.threats.forEach(t => { by[t.mechanism] = (by[t.mechanism] || 0) + 1; });
             const top = a.threats.length ? Math.max(...a.threats.map(t => t.score)) : '';
-            return `<tr style="cursor:pointer" onclick="state.rf.anchorId='${escAttr(a.station_id)}';renderMain()">
-              <td>${esc(a.name)}</td><td class="small">${a.rx_mhz ?? ''}</td>
+            return `<tr class="row-link" onclick="state.rf.anchorId='${escAttr(a.station_id)}';renderMain()">
+              <td><button type="button" class="row-open"
+                      onclick="event.stopPropagation();state.rf.anchorId='${escAttr(a.station_id)}';renderMain()"
+                      title="Look at ${escAttr(a.name)} on its own">${esc(a.name)}</button></td>
+              <td class="small">${a.rx_mhz ?? ''}</td>
               <td><strong>${a.threats.length}</strong></td>
-              ${Object.keys(ACMA_MECH).filter(k => state.acma.mechCounts[k]).map(k => `<td class="small">${by[k] || ''}</td>`).join('')}
+              ${mechs.map(([k]) => `<td class="small">${by[k] || ''}</td>`).join('')}
               <td class="small">${top}</td>
             </tr>`;
           }).join('')}
@@ -3973,14 +4098,17 @@ function rfSummaryHtml(anchors) {
 
 // Frequency-axis strip plot: RX channel centre line, nearby licensed carriers
 // as ticks coloured by band-plan segment (threat mechanisms override).
-function rfStripPlotHtml(anchorId) {
+//
+// The numbers, once, so the picture, its name and the table under it cannot
+// disagree — the shape #141 arrived at for the ARRO chart, and the reason is the
+// same: three places were computing "how many carriers" and the accessible name
+// was the one that had stopped.
+function rfStripFacts(anchorId) {
   const A = state.acma;
   const a = A.anchorById[anchorId];
-  if (!a || a.rx_mhz == null) return '';
+  if (!a || a.rx_mhz == null) return null;
   const rx = a.rx_mhz, span = 0.6;                     // ±0.6 MHz window
   const lo = rx - span, hi = rx + span;
-  const W = 900, H = 90, pad = 30;
-  const x = f => pad + (f - lo) / (hi - lo) * (W - 2 * pad);
 
   const threatsByDev = {};
   a.threats.forEach(t => { threatsByDev[t.device_id] = t; });
@@ -3997,44 +4125,120 @@ function rfStripPlotHtml(anchorId) {
       const key = d.f_mhz.toFixed(4) + '|' + d.site_id;
       if (seen.has(key)) continue;
       seen.add(key);
-      carriers.push({ f: d.f_mhz, id: d.id, dk, client: d.id in threatsByDev ? threatsByDev[d.id].client : null });
+      carriers.push({ f: d.f_mhz, id: d.id, dk, site: site.name || d.site_id,
+                      client: d.id in threatsByDev ? threatsByDev[d.id].client : null });
     }
   } else {
     carriers = a.threats.filter(t => t.f_mhz != null && t.f_mhz >= lo && t.f_mhz <= hi)
-      .map(t => ({ f: t.f_mhz, id: t.device_id, dk: t.distance_km, client: t.client }));
+      .map(t => ({ f: t.f_mhz, id: t.device_id, dk: t.distance_km,
+                   site: (A.siteById[t.site_id] || {}).name || t.site_id, client: t.client }));
   }
+  carriers.sort((p, q) => p.f - q.f);
+  const threats = carriers.filter(c => threatsByDev[c.id]);
+  const nearest = carriers.length
+    ? carriers.reduce((best, c) => Math.abs(c.f - rx) < Math.abs(best.f - rx) ? c : best) : null;
+  return { a, rx, span, lo, hi, carriers, threats, threatsByDev, nearest,
+           devLoaded: A.devLoaded, radiusKm: state.filters.acma.radiusKm };
+}
+
+// Parts 1 and 2 of the chart pattern. Rebuilt from the facts on every render,
+// which is what makes it a name rather than a caption — the old one said
+// "Licensed carriers near X RX channel" whether it was drawing two ticks or two
+// hundred, and whether the nearest was 4 kHz away or 400.
+function rfStripName(f) {
+  const kHz = f.nearest ? Math.abs(f.nearest.f - f.rx) * 1000 : null;
+  return `Frequency strip plot, ${f.carriers.length} licensed carrier${f.carriers.length === 1 ? '' : 's'} `
+       + `within ±${f.span} MHz of ${f.a.name}’s ${f.rx} MHz receive channel and `
+       + `${f.radiusKm} km of it, ${f.threats.length} of them classified as threat candidates. `
+       + (kHz == null ? 'Nothing in the window. '
+          : `The closest sits ${kHz.toFixed(1)} kHz away${f.nearest.client ? `, ${f.nearest.client}` : ''}. `)
+       + 'Every carrier is listed in the table under the plot.';
+}
+
+function rfStripPlotHtml(anchorId) {
+  const f = rfStripFacts(anchorId);
+  if (!f) return '';
+  const { a, rx, lo, hi, carriers, threatsByDev } = f;
+  const W = 900, H = 90, pad = 30;
+  const x = q => pad + (q - lo) / (hi - lo) * (W - 2 * pad);
+  const grey = cssVar('--muted', '#9aa7b3');
 
   const segBands = VHF_SEGMENTS.filter(s => s.hi > lo && s.lo < hi).map(s => `
     <rect x="${x(Math.max(s.lo, lo))}" y="20" width="${x(Math.min(s.hi, hi)) - x(Math.max(s.lo, lo))}"
           height="${H - 40}" fill="${s.seg === 'F' ? 'rgba(2,136,209,.08)' : 'rgba(128,128,128,.05)'}">
       <title>Segment ${s.seg}: ${esc(s.alloc)}</title></rect>
-    <text x="${x(Math.max(s.lo, lo)) + 3}" y="16" font-size="9" style="fill:var(--muted)">${s.seg}</text>`).join('');
+    <text x="${x(Math.max(s.lo, lo)) + 3}" y="16" font-size="9" class="chart-muted">${s.seg}</text>`).join('');
 
   const ticks = carriers.map(c => {
     const t = threatsByDev[c.id];
-    const color = t ? (ACMA_MECH[t.mechanism] || {}).color || '#888' : '#9aa7b3';
+    // A presentation attribute, so the token has to be resolved rather than
+    // referenced — `stroke="var(--acma-mech-imd3)"` draws nothing at all.
+    const color = t ? acmaMechColor(t.mechanism) : grey;
     const hgt = t ? 34 : 22;
     return `<line x1="${x(c.f)}" y1="${H - 20}" x2="${x(c.f)}" y2="${H - 20 - hgt}"
       stroke="${color}" stroke-width="${t ? 2.5 : 1.2}">
       <title>${c.f.toFixed(4)} MHz · ${c.dk.toFixed(1)} km${c.client ? ' · ' + esc(c.client) : ''}${t ? ' · ' + (ACMA_MECH[t.mechanism] || {}).label + ' ' + t.score : ''}</title></line>`;
   }).join('');
 
+  const marker = cssVar('--chart-marker', '#c62828');
   return `
-    <div style="overflow-x:auto">
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:640px;height:auto" role="img"
-           aria-label="Licensed carriers near ${esc(a.name)} RX channel">
+    <div class="chart-scroll" role="region" tabindex="0"
+         aria-label="Strip plot, ${f.span * 2} MHz wide — scroll sideways to read the whole span. The picture inside describes itself.">
+      <svg viewBox="0 0 ${W} ${H}" class="rf-strip-svg" role="img"
+           aria-label="${escAttr(rfStripName(f))}">
         ${segBands}
-        <line x1="${pad}" y1="${H - 20}" x2="${W - pad}" y2="${H - 20}" style="stroke:var(--muted)" stroke-width="1"/>
-        ${[lo, rx - 0.3, rx, rx + 0.3, hi].map(f => `
-          <text x="${x(f)}" y="${H - 6}" font-size="10" text-anchor="middle" style="fill:var(--muted)">${f.toFixed(3)}</text>`).join('')}
+        <line x1="${pad}" y1="${H - 20}" x2="${W - pad}" y2="${H - 20}" class="chart-line" stroke-width="1"/>
+        ${[lo, rx - 0.3, rx, rx + 0.3, hi].map(q => `
+          <text x="${x(q)}" y="${H - 6}" font-size="10" text-anchor="middle" class="chart-muted">${q.toFixed(3)}</text>`).join('')}
         ${ticks}
-        <line x1="${x(rx)}" y1="10" x2="${x(rx)}" y2="${H - 20}" stroke="#d32f2f" stroke-width="1.5" stroke-dasharray="5 3"/>
-        <text x="${x(rx)}" y="9" font-size="10" text-anchor="middle" fill="#d32f2f">RX ${rx}</text>
+        <line x1="${x(rx)}" y1="10" x2="${x(rx)}" y2="${H - 20}" stroke="${marker}" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <text x="${x(rx)}" y="9" font-size="10" text-anchor="middle" fill="${marker}">RX ${rx}</text>
       </svg>
-      <div class="small" style="color:var(--muted)">${carriers.length} licensed carriers within
-        ±${span} MHz and ${state.filters.acma.radiusKm} km${A.devLoaded ? '' : ' (threat candidates only — full carrier set loads with device detail)'}.
-        Tall coloured ticks are classified threats; grey ticks are other licensed users.</div>
-    </div>`;
+    </div>
+    <p class="small txt-muted">${carriers.length} licensed carriers within
+      ±${f.span} MHz and ${f.radiusKm} km${f.devLoaded ? '' : ' (threat candidates only — full carrier set loads with device detail)'}.
+      Tall coloured ticks are classified threats; grey ticks are other licensed users.</p>
+    ${rfStripTableHtml(f)}`;
+}
+
+// Part 3: the data, as a real table, one activation away. A <details> rather
+// than a second panel, because it is the same carriers a second way and not a
+// second thing to read. No cap and no floor note needed — the window is ±0.6 MHz
+// inside one radius, which is tens of rows and not thousands.
+function rfStripTableHtml(f) {
+  if (!f.carriers.length) return '';
+  return `
+    <details class="rf-strip-table">
+      <summary>The ${f.carriers.length} carriers in the plot, as a table</summary>
+      <div class="table-wrap medium" role="region" tabindex="0"
+           aria-labelledby="rf-strip-cap">
+        <table class="bf-table">
+          <caption id="rf-strip-cap">Licensed carriers within ±${f.span} MHz of
+            ${esc(f.a.name)}’s ${f.rx} MHz receive channel, closest frequency first.</caption>
+          <thead><tr>
+            <th scope="col">Freq (MHz)</th><th scope="col">Δ from RX (kHz)</th>
+            <th scope="col">Dist (km)</th><th scope="col">Licensee</th>
+            <th scope="col">Site</th><th scope="col">Classified as</th>
+          </tr></thead>
+          <tbody>
+            ${f.carriers.map(c => {
+              const t = f.threatsByDev[c.id];
+              const m = t ? (ACMA_MECH[t.mechanism] || { label: t.mechanism }) : null;
+              return `<tr>
+                <td class="small">${c.f.toFixed(4)}</td>
+                <td class="small">${((c.f - f.rx) * 1000).toFixed(1)}</td>
+                <td class="small">${c.dk.toFixed(1)}</td>
+                <td class="small">${esc(c.client || '—')}</td>
+                <td class="small">${esc(c.site || '')}</td>
+                <td class="small">${m
+                  ? `<span class="legend-sq" style="--dot:${acmaMechVar(t.mechanism)}"></span> ${m.label} ${t.score}`
+                  : '<span class="txt-muted">other licensed user</span>'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </details>`;
 }
 
 function rfShowOnMap(deviceId, anchorId) {
@@ -4073,7 +4277,7 @@ function rfCorrelate() {
     .map(l => new Date(l)).filter(d => !isNaN(d));
   if (!el) return;
   if (!stamps.length) {
-    el.innerHTML = '<span style="color:var(--muted)">No parseable timestamps.</span>';
+    el.innerHTML = '<span class="txt-muted">No parseable timestamps.</span>';
     return;
   }
   const isBiz = d => d.getDay() >= 1 && d.getDay() <= 5 && d.getHours() >= 7 && d.getHours() < 18;
@@ -4088,25 +4292,51 @@ function rfCorrelate() {
   const hourly = new Array(24).fill(0);
   stamps.forEach(d => hourly[d.getHours()]++);
   const maxH = Math.max(...hourly, 1);
+  const peak = hourly.indexOf(maxH);
+  const hh = h => `${String(h).padStart(2, '0')}:00`;
+  // A bar's height is data, so it arrives on the element as a custom property
+  // rather than as a declaration — the same distinction the basin fills and the
+  // series dots rest on, and the reason this stays inside the no-inline-style
+  // rule rather than needing an exemption from it.
   const bars = hourly.map((n, h) => `
-    <div title="${String(h).padStart(2, '0')}:00 — ${n}" style="flex:1;display:flex;flex-direction:column;justify-content:end">
-      <div style="height:${Math.round(40 * n / maxH)}px;background:var(--map-line, #ff6f00);opacity:.75"></div>
+    <div class="rf-hour" title="${hh(h)} — ${n}">
+      <div class="rf-hour-bar" style="--h:${Math.round(40 * n / maxH)}px"></div>
     </div>`).join('');
   const nonCont = acmaVisibleThreats(true).filter(t => {
     const d = state.acma.deviceById[t.device_id];
     return d && d.hours && d.hours !== '00:00-23:59';
   });
+  // The third graphic on this tab, and the same three-part answer as the other
+  // two: the strip of bars is a picture with no DOM, so it is one role="img"
+  // with a name carrying the numbers, and the counts are a real table under it.
+  // It is not interactive, so there is no control to keep separate from it.
   el.innerHTML = `
     <p>${stamps.length} timestamps · <strong>${pct}%</strong> in business hours (Mon–Fri 07:00–18:00;
     a uniform 24×7 source would sit near 33%).<br>${verdict}</p>
-    <div style="display:flex;gap:1px;height:44px;align-items:end;max-width:480px">${bars}</div>
-    <div style="display:flex;justify-content:space-between;max-width:480px" class="small">
+    <div class="rf-hours" role="img" aria-label="Bar chart of ${stamps.length} timestamps by hour
+      of day. Busiest hour ${hh(peak)} with ${maxH}; ${pct}% of them fall in business hours.
+      The counts are in the table below.">${bars}</div>
+    <div class="rf-hours-axis small" aria-hidden="true">
       <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+    <details class="rf-hours-table">
+      <summary>The 24 hourly counts, as a table</summary>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Timestamps by hour of day, local time.</caption>
+          <thead><tr><th scope="col">Hour</th><th scope="col">Timestamps</th>
+            <th scope="col">Business hours</th></tr></thead>
+          <tbody>
+            ${hourly.map((n, h) => `<tr><td>${hh(h)}</td><td>${n}</td>
+              <td class="small ${h >= 7 && h < 18 ? '' : 'txt-muted'}">${h >= 7 && h < 18 ? 'Mon–Fri' : '—'}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </details>
     ${state.acma.devLoaded
       ? (nonCont.length
           ? `<p>Visible threats with recorded non-continuous hours: ${nonCont.map(t =>
               `${esc(t.client || t.lic)} (${esc((state.acma.deviceById[t.device_id] || {}).hours)})`).join('; ')}</p>`
-          : '<p style="color:var(--muted)">No visible threat has recorded non-continuous operating hours (most ACMA records leave hours blank).</p>')
-      : '<p style="color:var(--muted)">Open a transmitter card once to load device detail, then re-run for per-licensee operating hours.</p>'}`;
+          : '<p class="txt-muted">No visible threat has recorded non-continuous operating hours (most ACMA records leave hours blank).</p>')
+      : '<p class="txt-muted">Open a transmitter card once to load device detail, then re-run for per-licensee operating hours.</p>'}`;
 }
 

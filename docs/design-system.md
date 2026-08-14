@@ -23,7 +23,8 @@ Three files hold the system itself, and this document explains them:
 
 And two files check it: `test/shell.mjs` (`npm run shell`) holds the system
 against the shell, and `test/tabs.mjs` (`npm run tabs`, added by #137) holds it
-against every tab a U-issue has converted. Both run in CI on every push that
+against every tab a U-issue has converted — **nine of the nineteen, 154
+assertions, as of #138**. Both run in CI on every push that
 touches the app; what each enforces is listed in §5 and §6 at the bottom of this
 page. Every claim below that *can* be checked mechanically is
 checked — this repo has a habit of that, and the reason is in constraint 1 of
@@ -157,6 +158,55 @@ colour is the legend, the **dash pattern** on the line and the readings table
 under the chart — see the chart pattern below. A colour the operator picks by
 hand takes that series out of the palette permanently, in both themes.
 
+### The categorical sets, and the ACMA boundary (#138)
+
+There are now **four** categorical palettes, all built the same way and all out
+of the contrast contract for the same reason:
+
+| Set | Where it is drawn |
+|---|---|
+| `--maps-region-*` (8) | Radio Path Maps' basin drawing and its chips (#137) |
+| `--ad-series-*` (12) | the ARRO / Field Data chart (#141) |
+| `--acma-mech-*` (7) | interference mechanisms — RF Environment, RF Changes, the transmitter card, the Workbench, the Stations map (#138) |
+| `--rfc-series-*` (8), `--rfc-class-*` (8) | the RF Changes timeline's data-quality series, and the snapshot-diff change classes (#138) |
+
+The mechanism set is the one that crosses tabs, so **which of two helpers to
+reach for is the thing to know**, and `core.js` states it above `ACMA_MECH`:
+
+- **`acmaMechVar(mech)`** returns `var(--acma-mech-…)`, for a CSS context — a
+  `--dot` on a `.legend-sq`, a `fill:` in a stylesheet. The token reaches the
+  element and the theme reaches it for free, with no repaint.
+- **`acmaMechColor(mech)`** returns the value the token resolves to *now*, for
+  an SVG presentation attribute or a canvas, where `var()` resolves to nothing.
+  A theme change reaches it on the next draw.
+- **`cssVar(name, fallback)`** is the general form of the second one. Six files
+  had written that `getComputedStyle(…).getPropertyValue(…).trim()` line out by
+  hand; it is one function now, with a fallback, because a token misspelt there
+  resolves to the empty string and the attribute draws in black with nothing
+  thrown.
+
+`ACMA_MECH[k].color` **stays the light literal**, and that is not an oversight.
+Five of its consumers are Leaflet options — `L.polyline({color})`,
+`L.polygon({color})`, a divIcon's inline `background` — which become SVG
+presentation attributes, and those do not take `var()`. Those five are the
+Stations map layer.
+
+**So the ACMA boundary #138 and #136 were told to agree is this**, and it is
+drawn between *kinds of thing* rather than down the middle of one:
+
+- **The palette is the system's.** #138 tokenised it, converted every swatch in
+  the app to `--dot`, and left `.color` working untouched. #136 converts the map
+  layer's five call sites to `acmaMechColor()` whenever it likes, or never.
+- **The transmitter card is shared furniture, and it is done.** It renders on
+  three tabs owned by three issues (Stations, RF Changes, the Workbench), so it
+  is not any of theirs to style. #138 converted it once — tokens, `.link-btn`
+  in place of six `<a href="#" onclick>`, a name, `role="dialog"`, focus in on
+  open and back to the opener on Escape. #136 and #139 inherit it converted.
+  Before this you could open a card on either long tab and, from a keyboard, not
+  be able to shut it.
+- **Everything else on the map is #136's**: the filters panel, the layer, the
+  pins, the beams, the legend and the popup.
+
 ---
 
 ## 2. Breakpoints
@@ -253,6 +303,33 @@ and is used where the action is "leave for another site" — an anchor keeps
 middle-click, ctrl-click and "copy link address", which a button with a
 `window.open` handler throws away.
 
+`.link-btn` is its opposite, added by #138: a `<button>` that reads as a link,
+for the thing the app writes dozens of times as
+`<a href="#" onclick="doSomething();return false">`. That is announced as a
+link, offers a middle-click that opens a copy of the page, and navigates to the
+top of the document if the handler throws before `return false`. The action is
+in-page, so the element is a button. Not `.row-open` — that one is deliberately
+styled as the *text* it replaces, because forty bordered controls down a name
+column read as a form; this one is styled as the link it replaces.
+
+### Rows of controls
+
+`.panel-header`, `.header-actions` and `.button-row` are all "a row spread
+across the panel" — `justify-content: space-between` is the point of them, a
+heading at one end and its actions at the other. **`.button-group`** (#138) is
+"these controls belong together": same gap, same wrap, no spreading. Reaching
+for `.button-row` when you meant `.button-group` is a mistake that looks
+deliberate — two buttons at opposite ends of a panel read as confirm and cancel.
+
+**`.control-row`** (#138) is the filter bar above a table or a chart: a wrapping
+row whose `label` children stack their text over their control, the way
+`.form-grid` does. Six tabs were writing it out inline with four different gaps.
+Under `(pointer: coarse)` its controls take the 44 px floor rather than the
+app-wide 2 rem, because a filter bar is exactly the thing being tapped in a
+vehicle. **`.field-num`** goes on a two- or three-digit input: `input` is
+`width: 100%` by default, which in a wrapping row means "as wide as the row",
+and every tab that needed a small one had written `style="width:4.5rem"`.
+
 ### Form fields
 
 `input`, `textarea` and `select` share one rule: full width, `--ctl-border`,
@@ -326,6 +403,66 @@ to write it down rather than let each of them re-derive a different half.
    decision no check can see. Three of the four are converted; `.hist-bad-text`
    is left where it is, because it also carries an `:empty` rule and the
    Inspection History tab is not #141's to restyle.
+
+10. **A sortable column header is a button, and the `<th>` says which way it
+    sorted** *(added by #138)*. Nineteen headers across the two RF tables were
+    `<th style="cursor:pointer" onclick="…sort('score')">` — pattern 8's problem
+    one row up. Every column on both tables could only be re-sorted with a
+    mouse, and a screen reader was never told the table was sorted at all, let
+    alone by which column.
+
+    ```html
+    <th scope="col" aria-sort="descending">
+      <button type="button" class="th-sort" data-key="score" onclick="…">Score<span
+            class="th-arrow" aria-hidden="true">▼</span></button>
+    </th>
+    ```
+
+    `aria-sort` goes on the `<th>`, where the spec puts it, and **exactly one
+    `<th>` in a table may carry it**. The arrow is `aria-hidden` because
+    `aria-sort` has already said which way — this is the one place the visible
+    text and the accessible name are allowed to differ, because a name reading
+    "Score ▼" makes a screen reader pronounce the glyph. And the sort handler
+    **puts focus back**: it replaces the header row's innerHTML, so the button
+    that was just pressed no longer exists, and without a `data-key` to find its
+    replacement by, a keyboard sort drops the user on `<body>` — exactly what
+    `renderTabs()` used to do to the nav (§4).
+
+11. **A graphic wider than its column scrolls in a named region** *(added by
+    #138)*. Pattern 7a, applied to something that is not a table. Both RF charts
+    sit in a `div` with `overflow-x: auto` and a `min-width` on the SVG inside —
+    640 px on the strip plot, 720 px on the timeline — which on a phone is a box
+    holding two thirds of a picture and no way to reach the rest without a
+    mouse. Same three attributes, and the split #141 found is kept:
+
+    ```html
+    <div class="chart-scroll" role="region" tabindex="0"
+         aria-label="Strip plot, 1.2 MHz wide — scroll sideways to read the whole span…">
+      <svg role="img" aria-label="…12 licensed carriers within ±0.6 MHz…">
+    ```
+
+    The scroller is the **control** — it takes the tab stop and its name says
+    what operating it does. The `<svg>` is the **picture** — `role="img"`, and
+    its name carries the numbers. One job each.
+
+    Text inside an SVG cannot pick up a colour from the design system by
+    accident, so `.chart-text` / `.chart-muted` / `.chart-line` / `.chart-grid`
+    / `.chart-mark` / `.chart-band` exist to be put on it. The alternative is
+    `style="fill:var(--muted)"` on every label, which is an inline style the
+    check cannot see past.
+
+**An implementation note that bit #138, and will bit anything that puts a
+`.sr-only` in a table cell.** `overflow` clips a descendant only when the scroll
+container is that descendant's **containing block**, and an absolutely
+positioned box's containing block is the nearest *positioned* ancestor.
+`.table-wrap` was not positioned. So a `.sr-only` inside a cell — the word behind
+a ✓, the caption of a table whose panel heading already says its name — was
+positioned against the page, escaped the wrapper's clip, and put its static x
+(490 px into an 880 px table) into the document's `scrollWidth`. **The page
+scrolled sideways on a phone because a screen-reader-only span was doing it**,
+which is a bug no screenshot shows and no eye finds. `.table-wrap` is
+`position: relative` now, which is what makes `.sr-only` safe to use in a cell
+at all.
 
 **One implementation note that bit #137 and will bit the rest.** A
 `<colgroup>` of percentage widths is still honoured under `table-layout: auto`,
@@ -604,6 +741,26 @@ boundary (`seriesData` → `adoptSeries`), so what the check draws is what the a
 draws, and both open the `<details>` panels — a closed one is `display: none`
 and everything inside it would be filtered out as invisible.
 
+Three things #138 changed about seeds, all of them because the two RF tabs are
+lazy and each has two views:
+
+- **A seed is awaited.** Both RF tabs fetch ~2 MB of ACMA JSON on open and draw
+  "Loading ACMA interference data…" until it parses, which is far longer than
+  two animation frames. A seed that is called and not waited for is a seed that
+  checks the loading state.
+- **A seed runs in the overflow pass too.** That loop used to measure whatever
+  the tab shows on arrival — for these two, a one-line panel that could not
+  overflow anything. It is also where the widest thing on RF Changes lives: the
+  89-checkbox repeater picker, which only exists once something has opened it,
+  and which used to scroll the page sideways by 520 px because an absolutely
+  positioned list still counts toward its container's `scrollWidth`.
+- **One tab may appear twice**, under two labels, when it has two views that
+  cannot both be on screen. RF Environment draws a by-repeater summary table
+  *or* — with a repeater chosen — a strip plot and its carrier table in place of
+  it; RF Changes grows two columns, a shaded band, a legend, a lower band and a
+  grouping table once an onset date and a pasted series exist. The default is
+  the half with less markup in it, which is the half a single entry would check.
+
 Plus two claims that belong to a pattern rather than to a tab:
 
 - **Pattern 8's condition** — every region the basin drawing draws has a chip of
@@ -628,15 +785,37 @@ constraint 2 on #113.
 behind so the next five are checked rather than reviewed.
 
 **#141 has since taken ARRO Launcher, ARRO Data, Field Data and Export** — the
-whole Telemetry-and-admin end of the nav. What it left the remaining three
-(#136 U1, #138 U3, #139 U4, #140 U5) is in this document rather than in its own
-four files: the chart pattern applied end to end and the two lessons that came
-out of doing it (§3), the `.txt-*` status classes (pattern 9), the series
-palette as tokens with the round trip checked (§1, §6), the `seed` hook and the
-corrected heading assertion (§6). **Twelve tabs to go, across #136 and
-#138–#140.**
+whole Telemetry-and-admin end of the nav. What it left the rest is in this
+document rather than in its own four files: the chart pattern applied end to end
+and the two lessons that came out of doing it (§3), the `.txt-*` status classes
+(pattern 9), the series palette as tokens with the round trip checked (§1, §6),
+the `seed` hook and the corrected heading assertion (§6).
 
-Three of those four are worth knowing about before picking up another U-issue:
+**#138 has since taken RF Environment and RF Changes** — the two chart- and
+table-heavy tabs in Radio investigation, and between them the densest markup in
+the epic (3,133 inline styles the check could see, 628 clickable rows and marks
+reachable by mouse alone, nineteen mouse-only sort headers). Almost none of what
+it leaves behind is in its own two files:
+
+- **Pattern 10**, a sortable header is a button and the `<th>` carries
+  `aria-sort` — including the focus restore, because a sort replaces the header
+  it was pressed on.
+- **Pattern 11**, a graphic wider than its column scrolls in a named region,
+  plus the `.chart-*` classes for text drawn inside an SVG.
+- **`.link-btn`, `.button-group`, `.control-row`, `.field-num`** — four
+  primitives the app had been writing out by hand.
+- **The ACMA mechanism palette as tokens**, `acmaMechVar` / `acmaMechColor` /
+  `cssVar` in `core.js`, and **the ACMA boundary settled** (§1) — including the
+  transmitter card, converted once for the three tabs that render it.
+- **`.table-wrap` is `position: relative`**, which is what makes `.sr-only`
+  usable in a table cell without scrolling the page sideways (§3).
+- **Three changes to `npm run tabs`** (§6): seeds are awaited, seeds run in the
+  overflow pass, and a tab with two mutually exclusive views gets two entries.
+
+**Ten tabs to go, across #136 (Stations), #139 (Workbench, Bit Flipper) and
+#140 (Ghosting Graph, ALERT Packets, ALERT2, Serial Monitor).**
+
+Worth knowing before picking up one of the three that are left:
 
 - **The heading assertion was blind, and probably still is in your tab.** It
   read the whole document, and the nav's five `h2`s meant a tab opening at `h3`
@@ -644,7 +823,20 @@ Three of those four are worth knowing about before picking up another U-issue:
   going to fail now, and it was wrong before.
 - **A tab that renders nothing until something loads was checked as an empty
   state.** If yours has a populated view the harness cannot reach — a query, an
-  upload, a device — give it a `seed` rather than accepting the pass.
+  upload, a device — give it a `seed` rather than accepting the pass. If it has
+  two views that cannot both be shown, give it two entries.
 - **An inline `color:` is invisible to the contrast check.** That is the real
   reason pattern 9 exists, and it applies to any status line, not just the four
   #141 found.
+- **A palette in a JavaScript file cannot follow the theme, and this has now
+  been true four times** — the region fills, the ARRO series, the ACMA
+  mechanisms, the RF Changes series. If your tab draws a colour it typed itself,
+  that is the fourth-time-lucky sign it belongs in the token block.
+- **`.button-row` spreads its children apart.** #138 used it for a group of two
+  and got a confirm/cancel pair at opposite ends of a panel. `.button-group` is
+  the one that packs.
+- **Three surfaces #138 deliberately left**, all of them somebody else's tab and
+  all of them now free: `workbench.js` has a `#7b1fa2` literal in its legend and
+  two `ACMA_MECH[…].color` reads (#139), and the map's ACMA popup still writes a
+  mechanism pill with an inline `background` (#136). All three work unchanged;
+  all three become one-line conversions against the tokens above.

@@ -144,6 +144,90 @@ function seedSeries(source) {
   }`;
 }
 
+// ── The two RF tabs, and why they need four entries between them (#138) ──────
+// Both are lazy: nothing is fetched until the tab is opened, and neither draws
+// anything but "Loading ACMA interference data…" until ~2 MB of JSON has
+// parsed. Two animation frames is nowhere near that, so checked as they arrive
+// both tabs are a heading and a paragraph — the #141 empty-state problem again,
+// with a different cause. Their seeds therefore *await*, which is what the
+// `await` on the seed call below is for.
+//
+// And each of them has two views that cannot both be on screen at once, so each
+// gets two entries. That is not padding: the pair is where the interesting
+// markup lives, and the default is the half with less of it.
+//
+//   RF Environment  with no repeater chosen, it draws the by-repeater summary
+//                   table; with one chosen, that table is *replaced* by the
+//                   strip plot and its carrier table. The correlation helper
+//                   draws nothing at all until timestamps have been analysed —
+//                   an hour histogram, a 24-row table and a <details>, none of
+//                   which any earlier state can reach.
+//   RF Changes      with no onset date the coincidence table has two fewer
+//                   columns and the timeline has no shaded band; with an onset
+//                   and a pasted series it also grows a legend, a lower band, a
+//                   row of step buttons and the repeater-grouping table.
+//
+// The repeater picker is opened in both RF Changes seeds on purpose. It is 89
+// checkboxes inside a closed <details>, which is `display: none` — so every one
+// of them is invisible, and the check filters invisible elements out. Closed, it
+// is 89 controls nobody measured; open, it is also the thing that used to
+// scroll the page sideways by 520 px on a phone, because an absolutely
+// positioned list still counts toward its container's scrollWidth.
+const SEED_ACMA = `
+  await acmaEnsureCore().catch(() => {});
+  if (typeof RfChanges !== 'undefined') await RfChanges.ensureData().catch(() => {});`;
+
+// A dated series with a step in it, so the detector finds something and the
+// grouping table below it has rows. Two series rather than one, because one is
+// the case where the dash patterns are deliberately off.
+const RFC_CORR = [
+  'Bluff Ck, 2026-03-25, 0', 'Bluff Ck, 2026-03-26, 1', 'Bluff Ck, 2026-03-27, 0',
+  'Bluff Ck, 2026-03-28, 1', 'Bluff Ck, 2026-03-29, 0', 'Bluff Ck, 2026-03-30, 2',
+  'Bluff Ck, 2026-03-31, 1', 'Bluff Ck, 2026-04-01, 0', 'Bluff Ck, 2026-04-02, 1',
+  'Bluff Ck, 2026-04-03, 14', 'Bluff Ck, 2026-04-04, 16', 'Bluff Ck, 2026-04-05, 12',
+  'Bluff Ck, 2026-04-06, 15', 'Bluff Ck, 2026-04-07, 18', 'Bluff Ck, 2026-04-08, 13',
+  'Amiens, 2026-03-25, 1', 'Amiens, 2026-03-26, 0', 'Amiens, 2026-03-27, 2',
+  'Amiens, 2026-03-28, 1', 'Amiens, 2026-03-29, 0', 'Amiens, 2026-03-30, 1',
+  'Amiens, 2026-03-31, 2', 'Amiens, 2026-04-01, 1', 'Amiens, 2026-04-02, 0',
+  'Amiens, 2026-04-03, 11', 'Amiens, 2026-04-04, 13', 'Amiens, 2026-04-05, 9',
+  'Amiens, 2026-04-06, 12', 'Amiens, 2026-04-07, 14', 'Amiens, 2026-04-08, 10',
+].join('\\n');
+
+const SEED_RF_ALL = `async () => {${SEED_ACMA}
+  state.rf.anchorId = '';
+  state.rf.corrText = '2026-07-12 09:41\\n2026-07-13 10:05\\n2026-07-14 22:40\\n2026-07-15 09:15';
+  renderMain();
+  rfCorrelate();
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
+const SEED_RF_ONE = `async () => {${SEED_ACMA}
+  // The first repeater that actually has candidates — an empty one draws no
+  // ticks and no carrier table, which is the state this entry exists to avoid.
+  const withThreats = state.acma.threats.anchors.filter(a => a.threats.length);
+  state.rf.anchorId = (withThreats[0] || {}).station_id || '';
+  renderMain();
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
+const SEED_RFC_PLAIN = `async () => {${SEED_ACMA}
+  state.rfc.onset = '';
+  state.rfc.corrText = '';
+  state.rfc.corrSeries = null;
+  state.rfc.corrSteps = null;
+  state.rfc.pickerOpen = true;
+  renderMain();
+}`;
+
+const SEED_RFC_ONSET = `async () => {${SEED_ACMA}
+  state.rfc.onset = '2026-04-03';
+  state.rfc.pickerOpen = true;
+  state.rfc.corrText = \`${RFC_CORR}\`;
+  renderMain();
+  RfChanges.analyseCorr();
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
 // The tabs that have been through a U-issue. Add yours here when you land it —
 // that is how this check grows with the epic. The label is the nav label, so a
 // failure names the tab the way the app does. Add a `seed` above and name it
@@ -156,6 +240,10 @@ const CONVERTED = [
   { id: 'arrodata',   label: 'ARRO Data',       issue: '#141', seed: seedSeries('arro') },
   { id: 'field',      label: 'Field Data',      issue: '#141', seed: seedSeries('field') },
   { id: 'export',     label: 'Export',          issue: '#141' },
+  { id: 'rf',         label: 'RF Environment — all repeaters', issue: '#138', seed: SEED_RF_ALL },
+  { id: 'rf',         label: 'RF Environment — one repeater',  issue: '#138', seed: SEED_RF_ONE },
+  { id: 'rfchanges',  label: 'RF Changes — no onset',          issue: '#138', seed: SEED_RFC_PLAIN },
+  { id: 'rfchanges',  label: 'RF Changes — onset and a series', issue: '#138', seed: SEED_RFC_ONSET },
 ];
 
 
@@ -213,7 +301,10 @@ try {
     const found = await page.evaluate(async ([id, nameSrc, seedSrc]) => {
       const accName = eval('(' + nameSrc + ')');
       switchTab(id);
-      if (seedSrc) eval('(' + seedSrc + ')')();
+      // Awaited since #138: two of the four seeds have to load ~2 MB of ACMA
+      // JSON before the tab draws anything but "Loading…", and a seed that is
+      // called and not waited for is a seed that checks the loading state.
+      if (seedSrc) await eval('(' + seedSrc + ')')();
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       const main = document.getElementById('main-content');
       const visible = el => !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
@@ -313,13 +404,20 @@ try {
     await page.waitForTimeout(250);
     for (const tab of CONVERTED) {
       for (const theme of ['light', 'dark']) {
-        const over = await page.evaluate(async ([id, t]) => {
+        // Seeded here too, since #138. Without it this loop measured whatever
+        // the tab shows on arrival, which for the two RF tabs is a one-line
+        // "Loading…" panel that could not overflow anything — and the widest
+        // thing on either of them, the 89-checkbox repeater picker, only exists
+        // once something has opened it. Re-running a seed is cheap: the JSON is
+        // already parsed and cached by the pass above.
+        const over = await page.evaluate(async ([id, t, seedSrc]) => {
           document.documentElement.setAttribute('data-theme', t);
           switchTab(id);
+          if (seedSrc) await eval('(' + seedSrc + ')')();
           await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
           const d = document.documentElement;
           return { scroll: d.scrollWidth, client: d.clientWidth };
-        }, [tab.id, theme]);
+        }, [tab.id, theme, tab.seed || null]);
         check(`${tab.label} at ${width}px, ${theme}`,
           over.scroll <= over.client + 1, `${over.scroll}px of content in ${over.client}px`);
       }
