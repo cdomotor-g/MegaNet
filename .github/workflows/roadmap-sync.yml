@@ -1,0 +1,47 @@
+# Push roadmap/roadmap-113.md into issue #113's body whenever it changes on
+# main — so the roadmap is edited the way everything else in this repo is
+# edited: as a file, with a diff, in a commit.
+#
+# Why this exists (revision 29): #113's body is ~200 KB and its own header
+# says a stale board is a bug in the maintenance process. The old process WAS
+# the bug — the only way to update the body was to round-trip the whole
+# 200 KB through one API call, which no session does twice and some cannot do
+# once. The file is the working copy; the issue stays the front door; this
+# workflow keeps them identical. An edit typed straight into the issue box is
+# overwritten by the next file-driven sync — edit the file.
+#
+# GITHUB_TOKEN only, scoped to issues: write. Nothing else in the repo is
+# reachable with what this workflow holds.
+
+name: Roadmap sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'roadmap/roadmap-113.md'
+      - '.github/workflows/roadmap-sync.yml'
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update issue 113 from the file
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('roadmap/roadmap-113.md', 'utf8');
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 113,
+              body,
+            });
+            core.info(`issue #113 body updated (${body.length} bytes)`);
