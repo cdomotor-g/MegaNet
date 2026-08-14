@@ -423,7 +423,10 @@ function rfcChartName(f) {
         f.series.map(([n]) => n).join(', ')} — peaking at ${f.vmax}.`
     : 'The lower band is empty: no data-quality series has been pasted into the onset helper below.';
   const onset = R.onset
-    ? `The onset is marked at ${esc(R.onset)}, with the ±${R.windowDays}-day window shaded.`
+    // Not esc()'d: every string this function returns is escaped once, by the
+    // escAttr() at the call site. Escaping here as well would put a literal
+    // "&amp;" into an accessible name the moment a value carried an ampersand.
+    ? `The onset is marked at ${R.onset}, with the ±${R.windowDays}-day window shaded.`
     : 'No onset date is set, so the view is the last 24 months.';
   // …and the sentence pattern 8 asks for: a graphic whose marks can be clicked
   // is named as a picture only while every operation it offers is on a named
