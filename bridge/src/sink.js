@@ -1,7 +1,7 @@
 // sink.js — The other side of the bridge: MegaNet's HTTP ingest endpoint.
 //
 // The bridge is an MQTT client on one side and an ordinary HTTP ingest client on
-// the other. It holds a device token from meganet.ingest_token and nothing else
+// the other. It holds an ingest token from meganet.ingest_token and nothing else
 // — no service key, no database password — so a host running this process that
 // somebody else gets into is worth exactly one revoked token. See
 // docs/ingest-mqtt.md, "What the bridge is trusted with".

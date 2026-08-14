@@ -87,11 +87,18 @@ Shown once, stored only as a hash. Put it in `MEGANET_INGEST_TOKEN`. If it is
 ever exposed, `update meganet.ingest_token set revoked_at = now() where label =
 'mqtt bridge'` takes effect on the very next call — and then mint a new one.
 
-**The bridge holds a device token and nothing else.** No service key, no
+**The bridge holds an ingest token and nothing else.** No service key, no
 database password. A host running this process that somebody else gets into is
 worth exactly one revoked token: the token can post readings, record a station's
 status and update this bridge's health row, and cannot read a reading back, edit
 a station, or see the token table.
+
+The bridge is an ingest point in the sense `docs/ingest-http.md` means it — one
+token covering every station it relays for, not one per station. Its token is
+worth the whole network it bridges, and revoking it stops all of them at once.
+Every reading it posts records that it came in through this token, so
+`meganet.reading.ingest_token_id` tells you what the bridge wrote if you ever
+need to find out.
 
 ---
 

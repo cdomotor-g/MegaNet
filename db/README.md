@@ -144,7 +144,7 @@ its cache at all (`PGRST002`).
 | `meganet.auth_user_sync()` | `AFTER INSERT/UPDATE` on `auth.users`: keeps `app_user` in step. Never writes `role`. |
 | `meganet.email_may_sign_in(text)` | Yes/no for one address, callable anonymously so the sign-in panel can refuse before emailing. Deliberately an oracle — see `docs/access.md`. |
 | `meganet.whoami()` | Identity and write permission as the database sees them. What the app shows in the header and the Data source panel. |
-| `meganet.reading` | Every field-station reading. `addr` is the identity and the primary key is the deduplication — see **Telemetry**, below. |
+| `meganet.reading` | Every field-station reading. `addr` is the identity and the primary key is the deduplication — see **Telemetry**, below. `ingest_token_id` names the ingest point it came in through, or is null for a backfill or a manual edit. |
 | `meganet.reading_raw` | One row per `ingest()` call, holding the payload exactly as submitted. Ages out in 30 days. **The one table `anon` cannot read.** |
 | `meganet.reading_hourly`, `meganet.reading_daily` | The rollups, kept forever. Sums rather than means, so a day re-aggregates from its hours exactly — and goes on being right after the readings are gone. |
 | `meganet.ingest_source`, `meganet.protocol`, `meganet.quality`, `meganet.unit` | The four vocabularies a reading is validated against. A new transport or protocol is an `insert` here, not a migration. |
@@ -154,10 +154,11 @@ its cache at all (`PGRST002`).
 | `meganet.roll_up(timestamptz)` | Rebuild the rollups for every bucket touched since the watermark. Idempotent. |
 | `meganet.retain(int)` | Roll up, then age out. The one retention job. |
 | `meganet.as_ts()`, `meganet.as_num()`, `meganet.code_for()` | `ingest()`'s validators, split out so "be liberal in what you accept" is written once and a bad field produces a sentence rather than a cast error. |
-| `meganet.ingest_token` | Per-device credentials for the HTTP ingest endpoint (#B5). Only `token_hash` is stored. RLS on, no policy — reachable with the service key or a direct connection, same trade as `editor_allow`. |
-| `meganet.create_ingest_token(text, text, int, int)` | Mints a device token and returns it once. `EXECUTE` revoked from `public`, granted only to `service_role`. |
-| `meganet.ingest_http(jsonb)` | The HTTP endpoint — `POST /rest/v1/rpc/ingest_http`. Checks `X-Ingest-Token` against `ingest_token`, then hands the batch to `ingest()`. The only function `anon` is granted here. |
-| `meganet.station_status` | What the broker last said about each station: its retained status, and the LWT published when its connection drops (#B6). Keyed by the topic segment, not `station.id`. |
+| `meganet.ingest_token` | One row per **ingest point** — a base station, a gateway, the MQTT bridge — not per field station: an ingest point writes for every station it can hear (`0012`). Only `token_hash` is stored. RLS on, no policy — reachable with the service key or a direct connection, same trade as `editor_allow`. |
+| `meganet.create_ingest_token(text, text, int, int)` | Mints a token for one ingest point and returns it once. Its second argument is `p_host_station_id` — where the ingest point *lives*, not what it may write. `EXECUTE` revoked from `public`, granted only to `service_role`. |
+| `meganet.current_ingest_token_id()` | The ingest point this request proved it is, from a transaction-local setting `ingest_http()` publishes. Backs the `ingest_token_id` default on `reading` and `reading_raw`, which is why it is granted widely: it reads one setting belonging to the caller's own request and nothing else. |
+| `meganet.ingest_http(jsonb)` | The HTTP endpoint — `POST /rest/v1/rpc/ingest_http`. Checks `X-Ingest-Token`, names the ingest point for the transaction, hands the batch to `ingest()`, then records which stations the batch proves are still transmitting. The only function `anon` is granted here. |
+| `meganet.station_status` | What the last thing to speak for each station said about it: an MQTT retained status or LWT from the bridge (#B6), or the arrival of a batch through an ingest point (`0012`). Keyed by the topic segment where MQTT named one, and by station id or address otherwise. |
 | `meganet.station_health` | View: `station_status` plus the minutes since each station last spoke and last sent a reading. Applies no staleness threshold — the caller picks, per station. `security_invoker`. |
 | `meganet.bridge_health` | One row per running MQTT bridge. Exists so "no readings since Tuesday" can be told apart from "the relay died on Tuesday". |
 | `meganet.ingest_token_id()` | The `X-Ingest-Token` check `0007` does inline, factored out for `0008`'s endpoints. Raises PT401. Not granted to `anon` — directly reachable it would be a guessing oracle. |
@@ -518,10 +519,21 @@ Run it after applying `0006`, and again after touching anything in it.
 
 ## HTTP ingest
 
-Added by `0007_ingest_http.sql`. A field station posts its own readings without
-holding an editor session — the operational side, with a working `curl` and how
-to mint and revoke a token, is [`docs/ingest-http.md`](../docs/ingest-http.md);
-what follows is only the part that lives in the database.
+Added by `0007_ingest_http.sql`, reshaped by `0012_base_station_tokens.sql`. A
+field station's readings reach the database without anyone holding an editor
+session — the operational side, with a working `curl` and how to mint and revoke
+a token, is [`docs/ingest-http.md`](../docs/ingest-http.md); what follows is only
+the part that lives in the database.
+
+**A token belongs to an ingest point, not to a station.** One token is minted per
+base station, gateway or bridge — the place where radio, satellite or serial
+becomes TCP/IP — and it writes readings for every station that ingest point can
+hear. Per-station tokens do not scale past a pilot and were never actually
+enforced: `ingest_http()` has never read `station_id`, `alert_low` or
+`alert_high`, and `ingest()` has always resolved each reading in a batch on its
+own address, so one POST covering forty stations is the shape this endpoint was
+built for. What `0012` changed is the vocabulary and one promise made in it —
+see **Ingest points**, below.
 
 **`POST /rest/v1/rpc/ingest_http`, not `/rest/v1/rpc/ingest`.** `ingest()` stays
 exactly as `0006` left it — `anon` holds no `EXECUTE` on it, ever.
@@ -559,17 +571,74 @@ once. There is no second copy anywhere; a lost token is a new one, not a lookup.
 token lifetime to wait out:
 
 ```sql
-update meganet.ingest_token set revoked_at = now() where label = 'Mount Stuart logger';
+update meganet.ingest_token set revoked_at = now() where label = 'Mt Stuart base';
 ```
-
-**`station_id` and the ALERT range are recorded, not enforced.** Same trade
-`0005_auth.sql` made with `app_user.role`: a token minted today already carries
-whichever station or address range its logger is for, so enforcing it later is
-an `update` to `ingest_http()`, not a migration that touches a device in the
-field.
 
 **Batch size is capped at 1,000** readings per call, returned as a clear `22023`
 (HTTP 400) rather than a request that times out instead.
+
+### Ingest points
+
+`0012_base_station_tokens.sql`. Three things changed, none of them the wire
+format: a logger already in the field keeps working, unmodified, across this
+migration.
+
+**`ingest_token.station_id` became `host_station_id`, and its meaning inverted.**
+It was "the station this logger reports for" — a constraint. It is now "the
+station where this ingest point physically lives" — a location, null for a
+gateway that is not at a station. Renamed rather than recommented, because
+`0007` promised that scoping a token to one station was "one `update` away and
+never a migration", and acting on that promise is precisely what would break a
+base station. `alert_low`/`alert_high` remain, still unenforced, but they are one
+contiguous range and that is not the shape of what a base station hears. Real
+coverage rules need a set, and a table of their own.
+
+**Every reading records the ingest point it came in through.**
+`reading.ingest_token_id` and `reading_raw.ingest_token_id`, null for a backfill,
+a manual edit or anything else that did not arrive holding a token. Under
+per-station tokens "which token wrote this" was answered by the station; under
+one token for forty stations it is not answerable at all, and it is the question
+that makes a shared credential safe to operate:
+
+```sql
+-- What did this ingest point write, and for which stations?
+select t.label, r.station_id, count(*), max(r.received_at)
+  from meganet.reading r join meganet.ingest_token t on t.id = r.ingest_token_id
+ where t.label = 'Mt Stuart base'
+ group by t.label, r.station_id order by 3 desc;
+```
+
+`ingest()` is untouched: `ingest_http()` publishes the token's id as a
+transaction-local setting beside the authorising flag it already set, and the two
+columns default from `meganet.current_ingest_token_id()`. The setting is a record
+and not a permission — anything able to forge it could forge
+`meganet.ingest_authorized`, and that is the one deciding whether a write happens
+at all. The column sits on a world-readable table, which buys the anon key the
+knowledge that two readings shared an ingest point; it is a surrogate id naming
+nothing, the labels and hashes are in a table with no policy for any verb, and
+`stations.json` has always published every station, repeater and base anyway.
+
+**"Which stations have gone quiet" moved from the token to the station.**
+`ingest_token.last_used_at` says the base is alive and cannot say more: it moves
+identically whether one station of forty stopped transmitting or none did. So
+`ingest_http()` unpacks each batch into `meganet.station_status` — the same place
+the MQTT bridge reports to — and `meganet.station_health` answers for both paths.
+`last_seen_at` moves for every address in the batch, including one whose reading
+was rejected, because a logger with a dead clock is still on the air and the
+fault that needs a person is the clock rather than the silence; `last_reading_at`
+moves only for rows actually stored. Where an address resolves to no one station
+— 604 ALERT addresses are shared — the row is keyed `a:<address>` or
+`s:<station number>`, which is the identity we have rather than a guess.
+
+`station_status.online` is nullable from this migration. It is what a *broker*
+said, and a radio station relayed over HTTP has no connection to have an opinion
+about; leaving it `not null default false` would have read as "offline" for every
+station a base station reports for. Null now means nothing has ever told us.
+
+**The bookkeeping cannot cost a reading.** The `station_status` update runs after
+`ingest()` has returned and inside an exception block: a batch that was accepted
+must not be lost to a failure in the record of it. A failure there is a `warning`
+in the server log naming the token and the SQLSTATE, and a `200` for the device.
 
 ## MQTT ingest
 
@@ -589,6 +658,10 @@ Same reasoning as `reading.station_id` having no foreign key: a station that
 starts publishing before MegaNet has been told about it is exactly the one whose
 silence matters, and a foreign key would refuse to record it. `station_id` is
 resolved where the key names a live station and left null where it does not.
+Since `0012` this table is no longer MQTT's alone — HTTP ingest writes here too,
+keyed by station id or by address where an address resolves to no one station —
+so a `station_key` is "the identity whatever spoke for this station gave us",
+which for MQTT is still the topic segment.
 
 **`online` is what the broker last said; staleness is computed, not stored.** The
 LWT says a station's connection dropped, which is not the same as a station
@@ -599,6 +672,10 @@ on every reconnect must not reset "down since 03:14"), and
 `meganet.station_health` exposes the minutes since each station last spoke
 without picking a threshold. Every station's reporting interval is different; a
 constant here would be wrong for most of the network and invisible when it was.
+`0012` made the column nullable for the case it did not previously have: a
+station relayed over radio and posted by HTTP has no broker and no connection, so
+null means nothing has ever told us. `mqtt_status()` coalesces its own value to
+false before writing, so nothing on this path changed.
 
 **`meganet.bridge_health` exists so two silences can be told apart.** "No
 readings since Tuesday" and "the relay died on Tuesday" look identical from the
