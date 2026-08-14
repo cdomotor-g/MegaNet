@@ -147,6 +147,18 @@ jobs:
         working-directory: test
         run: npm run shell
 
+      # The other half of that, and the half nothing was holding until #137:
+      # `npm run shell` asserts #109's system against the shell and *one* tab,
+      # by its own comment and on purpose. Six per-tab issues are converting
+      # nineteen tabs against a shared Definition of Done, and this is that
+      # Definition, checked — inline styles, table captions and scopes, scroll
+      # regions, clickable rows, landmark names, accessible names, heading
+      # order and sideways scroll, per converted tab. Its list of converted tabs
+      # grows as each U-issue lands (#137).
+      - name: Tabs — the per-tab Definition of Done, per converted tab
+        working-directory: test
+        run: npm run tabs
+
       # Not a check about code at all: the help panel's *content*. Smoke asserts
       # every tab has a HELP entry, which stops the rail rendering blank and
       # says nothing about what is behind the key. A doc link pointing at a file

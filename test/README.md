@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the eleven that run in CI
+npm run all                       # the twelve that run in CI
 ```
 
 | Command | What it does |
@@ -29,15 +29,16 @@ npm run all                       # the eleven that run in CI
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
 | `npm run nav` | every tab is in the left nav exactly once, under one heading, and findable by its own label and by what it does |
 | `npm run shell` | the shell's landmarks, skip link, focus policy and disclosure state; the six-step breakpoint scale; and WCAG contrast for every token pair in both themes |
+| `npm run tabs` | EPIC #107's per-tab Definition of Done, per tab that claims to have been through a U-issue: no inline styles, tables wrapped/captioned/scoped, scroll regions named, clickable rows keyboard-reachable, landmarks and controls named, headings stepping by one, and no sideways scroll at 375/768/1440 in both themes |
 | `npm run help` | every tab's help entry is real content, every link out of the panel lands, and each walkthrough names itself and fits the rail |
 | `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
 | `npm run maint` | the Council Maintenance Tasks form renders what the workbook's own filled sheet says — with the fixture read out of the `.xlsx` |
 | `npm run history` | a saved record reads back as the sheet it was written on, and exports as it reads — with the records written by the app during the run |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the eleven that run in CI |
+| `npm run all` | the twelve that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
-`toplevel`, `registry`, `nav`, `shell` and `help` take `-v` too, to list what
+`toplevel`, `registry`, `nav`, `shell`, `tabs` and `help` take `-v` too, to list what
 passed as well as what did not — `shell -v` prints every contrast ratio it
 measured, in both themes, which is the fastest way to see how much headroom a
 colour has before it stops clearing AA, and `nav -v` prints what each search
@@ -690,6 +691,21 @@ without looking, and a verifier nobody looks at verifies nothing.
   colour is one the ARRO chart draws, `ArroData` writes literal values into its
   SVG for the PNG export and does **not** pick up a token change — that is
   #141's, by hand.
+- **A U-issue landed a tab.** Add its tab id to `CONVERTED` in `tabs.mjs`, in
+  the same commit. That list is what the per-tab Definition of Done is asserted
+  against, and a tab left off it is a tab nobody is holding — the check will go
+  green all the way through a conversion that dropped half of it. The reverse is
+  deliberate too: a tab nobody has converted yet does not fail a check for work
+  nobody has done, which is why this is a list rather than a sweep over all
+  nineteen.
+- **A tab needs a pattern that is not in the design system.** Add it to
+  `docs/design-system.md` §3 and check it here, in that order. #137 added two
+  (a scrolling `.table-wrap` is a named region; a clickable row carries a real
+  button) and a third that is a condition rather than a shape (a graphic marked
+  `role="img"` as a shortcut must have every operation it offers on a named
+  control beside it — `tabs.mjs` asserts that every region on the basin drawing
+  has a chip). A pattern nobody can find is a pattern the next five tabs will
+  re-derive differently.
 - **A control needs a different focus ring.** Override it; one selector beats
   the `:where()` rule with no `!important`. What you may not do is remove it:
   `outline: none` outside the two-entry allowlist in `shell.mjs` goes red, and

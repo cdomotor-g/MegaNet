@@ -95,6 +95,31 @@
   /* Draw & measure overlay — magenta, which is not a station role, not an ACMA
      mechanism and not the orange of a pass-range link. */
   --draw: #c2185b;
+
+  /* ── Radio Path Maps: the eight region fills (#137) ────────────────────────
+     A categorical palette, and the one kind of colour set that does not reduce
+     to the status tokens above: these say "a different region", not "better or
+     worse", so hue is the whole signal and there is no ordering to preserve.
+     They were eight literals inside network-maps.js, written into
+     `polygon.style.fill` and into a chip's inline `background` — which is why a
+     drawing that is 90% of the tab's surface stayed at light-theme saturation
+     on a #0f1720 page.
+
+     They are not in the contrast contract and should not be: a basin fill is
+     drawn at 0.32 fill-opacity behind no text, and the chip dot is a 9 px
+     square beside a label that already says the region's name. What carries the
+     meaning is the name; the colour is the join between the drawing and the
+     chip. Both are decorative under 1.4.1, and a categorical set forced to 4.5:1
+     against two themes is a set of eight near-blacks that no longer tell each
+     other apart. */
+  --maps-region-far-north: #2a9d8f;
+  --maps-region-mackay:    #e76f51;
+  --maps-region-burdekin:  #457b9d;
+  --maps-region-central:   #e9a92c;
+  --maps-region-widebay:   #6aa84f;
+  --maps-region-seqld:     #9b5de5;
+  --maps-region-west:      #d98b3a;
+  --maps-region-nsw:       #8d99ae;
   /* ALERT packet bit-field colours (self-contained: mid-tone bg + light text, theme-independent) */
   --c-frame: #4a5568; --c-frame-t: #eef1f5;
   --c-addr:  #2f6fb8; --c-addr-t:  #eaf3ff;
@@ -224,6 +249,18 @@
   --hit-ring: #ffc400;
   --hit-glow: rgba(255, 196, 0, .55);
   --draw: #ff6fb0;
+
+  /* The eight region fills, lifted for a dark page. Same eight hues, raised in
+     lightness and dropped in saturation so a 0.32-opacity fill over #111923 is
+     still visibly its own colour rather than eight shades of grey-blue. */
+  --maps-region-far-north: #5fd0c2;
+  --maps-region-mackay:    #ff9c7f;
+  --maps-region-burdekin:  #7fb3d5;
+  --maps-region-central:   #f7c95c;
+  --maps-region-widebay:   #98d47b;
+  --maps-region-seqld:     #c396f5;
+  --maps-region-west:      #f0b26b;
+  --maps-region-nsw:       #b7c1d4;
 
   /* Control surfaces, dark. --border (#2a3948) is the right colour for a
      divider between two dark surfaces and the wrong one for the edge of a
@@ -1075,13 +1112,77 @@ tr.selected mark.hit {
      6. Every table gets a caption. `.sr-only` on it if the panel heading
         already says the same thing out loud — a table with no accessible name
         is the single most common finding across the thirteen tabs #111
-        measured. */
+        measured.
+     7. A wrapper that can scroll is a labelled region, and a row that opens
+        something carries a button. Both added by #137, the first U-issue to
+        apply this pattern; both are below, with the reasoning. */
 
 .table-wrap {
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   margin-top: var(--sp-3);
+}
+
+/* Pattern 7a — a scrolling wrapper is a region, and it is named (#137).
+   `overflow: auto` on a div makes it scrollable with a mouse and a trackpad and
+   with nothing else: Firefox gives such a box a tab stop of its own, Chrome and
+   Safari do not, so a table taller or wider than its wrapper had content no
+   keyboard could reach. The fix is three attributes on the wrapper and they go
+   together —
+
+     role="region" tabindex="0" aria-labelledby="<the panel heading's id>"
+
+   — because `tabindex` alone buys a stop that a screen reader announces as
+   nothing at all, and `role="region"` without a name is not exposed as a
+   landmark. The label points at the heading already sitting above the table
+   rather than repeating its words: two names for one thing drift.
+
+   Only wrappers that can actually scroll. `.tall` and `.medium` cap their
+   height and always can; a short table in a plain wrapper is not a region and
+   must not become a tab stop for nothing. */
+.table-wrap[tabindex]:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
+/* Pattern 7b — a clickable row carries a real button (#137).
+   `<tr onclick>` is a mouse affordance and nothing more: it is not in the tab
+   order, it has no role, and a screen reader is given no hint that the row does
+   anything. Rather than make the row itself focusable — a row is not a control,
+   and `role="button"` on a `<tr>` destroys the table semantics around it — the
+   row's *name* cell holds a real button, and the row keeps its own handler so
+   the whole thing stays a target for a pointer. The button stops the event so
+   the two never both fire.
+
+   The button is styled as the text it replaces, not as a button: this is a
+   name that happens to be operable, and forty bordered buttons down a column
+   would read as a form. Hover and focus are what say it is a control. */
+.row-link {
+  cursor: pointer;
+}
+
+.row-open {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row-open:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* The empty state under a filtered-away table. `.small` already carries the
+   colour; this is the padding that keeps it off the wrapper's border. */
+.table-empty {
+  padding: var(--sp-3);
+  margin: 0;
 }
 
 /* A column that carries context rather than an answer. Hidden below --bp-sm
@@ -1201,6 +1302,23 @@ tr.rpt-focused td:first-child {
   gap: .35rem;
   font-size: .93rem;
   margin-top: .75rem;
+}
+
+/* The same figures laid out across the top of a tab rather than down the side
+   of a panel — Pass Ranges' four headline counts (#137). Wraps rather than
+   scrolls, so a phone gets them stacked without a media query. */
+.stats.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-5);
+}
+
+/* A count that is a problem when it is not zero. The colour is the whole of the
+   emphasis, so the label beside it always names what it is counting — a colour
+   on its own is not information (WCAG 1.4.1). */
+.stat-bad,
+h2.h-bad {
+  color: var(--bad);
 }
 
 .badge {
@@ -3223,117 +3341,180 @@ code {
   .a2 .a2-methods { grid-template-columns: 1fr; }
 }
 
-/* ── Network Maps tab (Network Maps Navigator) ──────────────────────────────── */
+/* ── Radio Path Maps tab (#108 renamed it; #137 restyled it) ─────────────────
+   The map navigator: a Queensland basin drawing, region and subregion chips, a
+   file list, and a PDF/image viewer beside them. #137's pass moved every colour
+   here into a token, every state on the basin drawing into a data-state, and
+   every inline layout out of network-maps.js. */
 .maps-layout {
   display: grid;
   grid-template-columns: minmax(380px, 460px) 1fr;
-  gap: 1rem;
-  padding: 1rem;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
   align-items: start;
 }
-.maps-left { position: sticky; top: 1rem; }
+/* Both columns hold something that can be wider than they are — a file name
+   with no spaces in it on the left, an iframe on the right — and a grid item is
+   min-width:auto by default. Without this the left column grows to its longest
+   filename and takes the page sideways with it. .panel already carries the same
+   rule; .maps-left is an <aside>, which does not. */
+.maps-left {
+  position: sticky;
+  top: var(--sp-4);
+  min-width: 0;
+}
+
+.maps-search-label {
+  display: grid;
+  gap: var(--sp-1);
+  margin-top: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.maps-hint {
+  margin: var(--sp-2) 0 0;
+}
 
 .maps-basin {
-  margin-top: .6rem;
+  margin-top: var(--sp-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--subtle);
-  padding: .4rem;
+  padding: var(--sp-1);
   max-height: 360px;
   display: flex;
   justify-content: center;
 }
 .maps-basin-svg { width: 100%; height: auto; max-height: 344px; display: block; }
-.maps-basin-svg polygon { transition: fill-opacity .12s ease; }
 
-.maps-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+/* The drawing is a shortcut for the chip row under it (pattern 8 in
+   docs/design-system.md): the whole of it is one role="img" with a name, and
+   none of its hundred polygons is a tab stop. Which means every state a polygon
+   can be in has to be expressible without :focus — so they are data-states set
+   by applyRegionHighlight(), and the colour is a custom property the JS points
+   at a token rather than a value the JS computes. */
+.maps-basin-svg polygon {
+  fill: var(--basin, var(--muted));
+  stroke: var(--basin, var(--border));
+  stroke-opacity: .85;
+  fill-opacity: .32;
+  transition: fill-opacity var(--motion-fast) var(--ease);
+}
+.maps-basin-svg polygon[data-state="unmapped"] { fill-opacity: .06; }
+.maps-basin-svg polygon[data-state="on"]       { fill-opacity: .32; }
+.maps-basin-svg polygon[data-state="active"]   { fill-opacity: .62; stroke-opacity: .9; }
+.maps-basin-svg polygon[data-state="off"]      { fill-opacity: .08; stroke-opacity: .3; }
+.maps-basin-svg polygon[data-region]:not([data-region=""]) { cursor: pointer; }
+.maps-basin-svg polygon[data-region]:not([data-region=""]):hover { fill-opacity: .6; }
+
+.maps-chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.maps-chips-spaced { margin-top: var(--sp-2); }
 .maps-chip {
   display: inline-flex;
   align-items: center;
-  gap: .35rem;
-  padding: .35rem .6rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-pill);
   background: var(--panel-sub);
   color: var(--text);
-  font-size: .82rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
-  line-height: 1.2;
+  line-height: var(--lh-tight);
 }
 .maps-chip:hover { background: color-mix(in srgb, var(--accent) 12%, var(--panel-sub)); }
-.maps-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.maps-chip-dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; }
-.maps-count {
-  font-size: .72rem;
-  opacity: .8;
-  background: color-mix(in srgb, var(--muted) 22%, transparent);
-  border-radius: 999px;
-  padding: 0 .35rem;
+/* The pressed chip. --primary-text rather than a literal white, because that
+   pair is in the contrast contract and `#fff` on --accent is not. */
+.maps-chip.active {
+  background: var(--accent);
+  color: var(--primary-text);
+  border-color: var(--accent);
 }
-.maps-chip.active .maps-count { background: rgba(255,255,255,.25); }
+.maps-chip-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-pill);
+  display: inline-block;
+  background: var(--dot, var(--muted));
+}
+.maps-count {
+  font-size: var(--fs-xs);
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+  border-radius: var(--r-pill);
+  padding: 0 var(--sp-1);
+}
+/* Was `opacity: .8` on the count. On the pressed chip that put white at 80% over
+   the accent — 3.6:1, under AA for the one number in the row anybody reads. The
+   dimming is in the background wash now, where it costs nothing. */
+.maps-chip.active .maps-count { background: color-mix(in srgb, var(--primary-text) 25%, transparent); }
 .maps-chip-hint { display: none; }
 
 .maps-reset {
-  padding: .3rem .6rem;
-  font-size: .78rem;
-  border-radius: 8px;
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-sm);
+  border-radius: var(--r-md);
 }
 
 /* file list */
-.maps-file-list { list-style: none; margin: .5rem 0 0; padding: 0; max-height: 42vh; overflow: auto; }
+.maps-file-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; max-height: 42vh; overflow: auto; }
 .maps-file {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: .6rem;
+  gap: var(--sp-2);
   align-items: center;
-  padding: .55rem .6rem;
-  margin: .35rem 0;
+  padding: var(--sp-2);
+  margin: var(--sp-1) 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--panel-sub);
 }
+.maps-file-main { min-width: 0; }
 .maps-file:hover { background: color-mix(in srgb, var(--accent) 8%, var(--panel-sub)); }
 .maps-file.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--panel-sub)); }
-.maps-file-name { font-size: .88rem; word-break: break-word; }
-.maps-badges { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .3rem; }
-.badge.maps-badge { font-size: .68rem; background: color-mix(in srgb, var(--muted) 16%, transparent); color: var(--muted); }
-.maps-file-actions { display: flex; gap: .35rem; align-items: center; }
-.maps-file-actions button { padding: .35rem .6rem; font-size: .8rem; }
+.maps-file-name { font-size: var(--fs-sm); word-break: break-word; }
+.maps-badges { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-top: var(--sp-1); }
+.badge.maps-badge { font-size: var(--fs-xs); background: color-mix(in srgb, var(--muted) 16%, transparent); color: var(--muted); }
+.maps-file-actions { display: flex; gap: var(--sp-1); align-items: center; }
+.maps-file-actions button { padding: var(--sp-1) var(--sp-2); font-size: var(--fs-sm); }
+
+.maps-list-header { margin-top: var(--sp-2); }
+.maps-list-header h2 { font-size: var(--fs-md); }
 
 .maps-newtab {
   text-decoration: none;
   color: var(--accent);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: .35rem .55rem;
-  font-size: .8rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-sm);
   white-space: nowrap;
   background: var(--panel);
 }
 .maps-newtab:hover { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
 
 /* station → map suggestions */
-.maps-suggest-note { margin: .7rem 0 .4rem; color: var(--muted); }
+.maps-suggest-note { margin: var(--sp-3) 0 var(--sp-1); }
 .maps-suggest-item {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: .5rem .6rem;
-  margin: .35rem 0;
+  border-radius: var(--r-md);
+  padding: var(--sp-2);
+  margin: var(--sp-1) 0;
   background: color-mix(in srgb, var(--accent) 6%, var(--panel-sub));
 }
-.maps-suggest-station { font-size: .88rem; font-weight: 600; margin-bottom: .35rem; }
-.maps-suggest-maps { display: flex; flex-wrap: wrap; gap: .35rem; }
+.maps-suggest-station { font-size: var(--fs-sm); font-weight: 600; margin-bottom: var(--sp-1); }
+.maps-suggest-maps { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
 .maps-suggest-map {
-  padding: .3rem .55rem;
-  font-size: .78rem;
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-sm);
   border: 1px solid var(--accent);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--panel);
   color: var(--accent);
   cursor: pointer;
   text-align: left;
 }
-.maps-suggest-map:hover { background: var(--accent); color: #fff; }
+.maps-suggest-map:hover { background: var(--accent); color: var(--primary-text); }
 
 /* viewer */
 .maps-viewer-panel { display: flex; flex-direction: column; padding: 0; overflow: hidden; min-height: calc(100vh - 160px); }
@@ -3341,11 +3522,16 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: .8rem;
-  padding: .6rem .8rem;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
   border-bottom: 1px solid var(--border);
   background: var(--panel-sub);
+  flex-wrap: wrap;
 }
+.maps-current { min-width: 0; }
+.maps-current strong { display: block; }
+.maps-current .small { word-break: break-all; }
+.maps-toolbar-actions { flex-wrap: nowrap; flex: 0 0 auto; }
 /* Sized from the opened file's real page proportions (set via --maps-aspect
    in JS once known) so an A3/A4 map isn't cropped when fit to width; the
    1:√2 fallback keeps it at least A4-shaped before that's detected. */
@@ -3365,7 +3551,7 @@ code {
   height: 100%;
   text-align: center;
   color: var(--muted);
-  padding: 2rem;
+  padding: var(--sp-6);
   background: var(--subtle);
 }
 
@@ -3374,6 +3560,39 @@ code {
   .maps-left { position: static; }
   .maps-viewer-panel { min-height: 70vh; }
   .maps-viewer { min-height: 480px; }
+}
+
+@media (max-width: 560px) {
+  /* A phone. The page gutter is worth more as content than as margin, the
+     viewer stops trying to hold half a screen of nothing before a map is
+     opened, and the basin drawing gives up a third of its height — it is a
+     region picker, and the chips underneath it do the same job in a row. */
+  .maps-layout { padding: var(--sp-2); gap: var(--sp-2); }
+  .maps-basin { max-height: 240px; }
+  .maps-basin-svg { max-height: 232px; }
+  .maps-viewer-panel { min-height: 0; }
+  .maps-viewer { min-height: 320px; }
+  /* The name and the actions stop competing for one row: 375 px cannot hold a
+     filename, Prev, Next and a link, and the wrap was landing the buttons under
+     a path that had already broken across three lines. */
+  .maps-toolbar-actions { width: 100%; justify-content: flex-start; }
+}
+
+/* ── Pass Ranges tab (#137) ──────────────────────────────────────────────────
+   The tab had no section here at all: it was one inline `max-width:1100px;
+   margin:auto;padding:1rem` wrapper and six more inline styles inside it. The
+   wrapper is `.page` now (1100 is the default, so it does not even set
+   --page-max), and what is left is the one thing genuinely local to this tab —
+   the filter box's label. Everything else it needed turned out to be shared and
+   is up with the table pattern and .stats: .row-link, .row-open, .table-empty,
+   .stats-row, .stat-bad. */
+.pr-filter {
+  display: grid;
+  gap: var(--sp-1);
+  margin-top: var(--sp-3);
+  max-width: 420px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
 }
 
 /* ── Serial Monitor tab ─────────────────────────────────────────────────────── */
@@ -5201,12 +5420,42 @@ code {
      rather than a bigger box: padding is cheaper than a redesign. */
   .filter-only,
   .filter-reset,
-  .filter-actions button,
-  .maps-chip,
-  .maps-reset {
+  .filter-actions button {
     min-height: 2rem;
     padding-top: .3rem;
     padding-bottom: .3rem;
+  }
+
+  /* #137's tabs go to 44 px rather than the 2 rem floor above, which is what
+     EPIC #107's Definition of Done asks for and what WCAG 2.5.5 (AAA) sets. The
+     app-wide floor stays 2 rem: 32 px clears 2.5.8 (AA, 24 px) comfortably and
+     raising every button in nineteen tabs is not this issue's to do. Where the
+     two differ, the rule is the one the U-issue's own controls are held to —
+     these are chips and icon buttons on a map browser, tapped on a phone in a
+     vehicle, and they are the case 44 px exists for.
+
+     `align-items: center` matters as much as the height: without it a 28 px
+     chip inside a 44 px box has its text at the top and the bottom 16 px of the
+     target look like a gap between rows. */
+  .maps-chip,
+  .maps-reset,
+  .maps-newtab,
+  .maps-suggest-map,
+  .maps-file-actions button {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    padding-top: var(--sp-1);
+    padding-bottom: var(--sp-1);
+  }
+
+  /* A row is the target on Pass Ranges, and it is already finger-sized; the
+     name inside it is a control of its own, so it gets its own hit area rather
+     than relying on the row's. */
+  .row-open {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
   }
 
   /* The "only" shortcut hides until hover where there is a pointer. There is
@@ -5281,6 +5530,21 @@ code {
     overflow: visible;
     text-overflow: clip;
   }
+
+  /* …and the <colgroup> has to let go, or the rule above does nothing (#137).
+     A `<col style="width:16%">` is still honoured under `table-layout: auto` —
+     as a strong hint rather than a division, but strong enough that Pass
+     Ranges' six columns came out at 16% and 8% of a 340 px wrapper and wrapped
+     "Pass ranges" onto four lines while the automatic layout it was supposed to
+     have got no say. The percentages are a proportion picked for a laptop; on a
+     phone the proportion is not the thing that matters, the content is.
+
+     `!important` because the widths are inline on the element and nothing else
+     reaches them — and because this is the system overriding a per-table hint
+     at a breakpoint, which is the case the keyword exists for rather than a
+     specificity fight with another rule. It does not remove the columns'
+     proportions above --bp-md, where they are right. */
+  .table-wrap col { width: auto !important; }
 
   /* Sideways scroll is invisible until you try it, so the wrapper says it is
      there: the shadow only paints while there is more table to the right. */

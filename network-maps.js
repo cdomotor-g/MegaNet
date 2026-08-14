@@ -19,6 +19,38 @@
 // own local slug(); core.js's is shadowed here, not used.
 //
 // Moved out of app.js byte-for-byte by M2 (#133) of #129.
+//
+// ── U2 (#137): layout, mobile and accessibility ──────────────────────────────
+// The biggest of #137's three tabs and the one with the most to fix. What
+// changed, and why each one is a rule rather than a repair:
+//
+//   The left column is a named landmark. It is an <aside> inside <main>, which
+//   a screen reader lists as an unnamed complementary region — #109's own shell
+//   check names this tab as one of five owing that label (shell.mjs, §4).
+//
+//   The basin drawing is a shortcut, and is now labelled as one. Its polygons
+//   were click-only: no tab stop, no name, no keyboard route. Making a hundred
+//   basins into a hundred tab stops would be worse than the problem, and it is
+//   unnecessary — every action the drawing offers (setRegion) is already on a
+//   named button in the region-chip row directly beneath it. So the drawing is
+//   role="img" with a name that carries the headline number, and the chips are
+//   the operable path. That is pattern 8 in docs/design-system.md, and the
+//   condition it states is checked rather than assumed: `npm run tabs` fails if
+//   a region on the drawing has no chip.
+//
+//   Region colours became tokens. Eight literal hex values lived in
+//   REGION_COLOR and were written into `polygon.style.fill` and into a chip's
+//   inline `background`. They are --maps-region-* now, with dark values, and
+//   the JS sets a custom property rather than a colour — so the drawing follows
+//   the theme, which it previously did not.
+//
+//   Every icon-only control got a name. "Open" ×N in the file list, a bare "↗"
+//   anchor per row and another in the toolbar, all of which a screen reader
+//   read as "Open, button" or "link, ↗". Each carries the file name now.
+//
+//   The search box got a label, the viewer's "open in new tab" link stops
+//   pointing at nothing before a map is open, and opening a map announces
+//   itself — the result of something the user did, which is rule 1.
 
 // ── RADIO PATH MAPS tab (formerly "Network Maps"; see #108) ─────────────────────
 //
@@ -33,16 +65,21 @@
 const Maps = (function () {
   const MD = (typeof window !== 'undefined' && window.MegaNetMaps) || null;
 
-  // Region fill palette (applied to basin polygons; readable on both themes).
-  const REGION_COLOR = {
-    'Far North':             '#2a9d8f',
-    'Mackay / Whitsundays':  '#e76f51',
-    'Burdekin / Townsville': '#457b9d',
-    'Central QLD':           '#e9a92c',
-    'Wide Bay / Burnett':    '#6aa84f',
-    'SE QLD':                '#9b5de5',
-    'West / South West':     '#d98b3a',
-    'NSW Border':            '#8d99ae',
+  // Region fill palette. The eight values themselves live in styles.css as
+  // --maps-region-* tokens with a dark-theme set (#137); what is held here is
+  // the mapping from a region's name to the token that colours it, so the JS
+  // hands out `var(--maps-region-far-north)` and never a colour. A basin fill
+  // and the chip dot beside it then resolve the same token, and both follow the
+  // theme — which the eight literals did not.
+  const REGION_VAR = {
+    'Far North':             'var(--maps-region-far-north)',
+    'Mackay / Whitsundays':  'var(--maps-region-mackay)',
+    'Burdekin / Townsville': 'var(--maps-region-burdekin)',
+    'Central QLD':           'var(--maps-region-central)',
+    'Wide Bay / Burnett':    'var(--maps-region-widebay)',
+    'SE QLD':                'var(--maps-region-seqld)',
+    'West / South West':     'var(--maps-region-west)',
+    'NSW Border':            'var(--maps-region-nsw)',
   };
 
   const mstate = {
@@ -268,50 +305,51 @@ const Maps = (function () {
   // ── rendering ─────────────────────────────────────────────────────────────────
   function render() {
     if (!MD) {
-      return `<div class="layout"><div class="panel"><h2 style="margin-top:0">Radio Path Maps</h2>
+      return `<div class="layout"><div class="panel"><div class="panel-header"><h2>Radio Path Maps</h2></div>
         <p class="warn-text">Map data module failed to load (<code>maps-data.js</code>). Check that it is present and loaded before <code>app.js</code>.</p></div></div>`;
     }
     return `
     <div class="maps-layout">
-      <aside class="maps-left stack">
+      <aside class="maps-left stack" aria-label="Find a map">
         <div class="panel">
-          <div class="panel-header"><h3 style="margin:0">Find a map</h3>
+          <div class="panel-header"><h2>Find a map</h2>
             <span class="small" id="maps-total"></span></div>
-          <div style="margin-top:.6rem">
+          <label class="maps-search-label" for="maps-search">
+            Search maps and stations
             <input type="search" id="maps-search" placeholder="Map, catchment, town — or station name / ALERT ID…"
                    value="${esc(mstate.query)}" oninput="Maps.onSearch(this.value)">
-          </div>
-          <div class="small" style="margin-top:.4rem;color:var(--muted)">
-            Browse by region below, or search a station (name, ALERT ID, site number) to get suggested maps.</div>
+          </label>
+          <p class="small maps-hint">
+            Browse by region below, or search a station (name, ALERT ID, site number) to get suggested maps.</p>
           <div id="maps-suggest"></div>
         </div>
 
         <div class="panel">
-          <div class="panel-header"><h3 style="margin:0">Queensland basins</h3>
+          <div class="panel-header"><h2>Queensland basins</h2>
             <button class="maps-reset" onclick="Maps.setRegion('All files')" title="Show all regions">Reset</button></div>
           <div id="maps-basin" class="maps-basin"></div>
-          <div id="maps-region-chips" class="maps-chips" style="margin-top:.6rem"></div>
+          <div id="maps-region-chips" class="maps-chips maps-chips-spaced"></div>
         </div>
 
         <div class="panel">
           <div id="maps-subregion-chips" class="maps-chips"></div>
-          <div class="panel-header" style="margin-top:.5rem">
-            <strong id="maps-list-title"></strong>
+          <div class="panel-header maps-list-header">
+            <h2 id="maps-list-title"></h2>
             <span class="small" id="maps-list-count"></span></div>
-          <ul id="maps-file-list" class="maps-file-list"></ul>
+          <ul id="maps-file-list" class="maps-file-list" aria-labelledby="maps-list-title"></ul>
         </div>
       </aside>
 
       <div class="panel maps-viewer-panel">
         <div class="maps-viewer-toolbar">
-          <div style="min-width:0">
-            <strong id="maps-current-file" style="display:block">No map open</strong>
-            <span class="small" id="maps-current-path" style="word-break:break-all"></span>
+          <div class="maps-current">
+            <strong id="maps-current-file">No map open</strong>
+            <span class="small" id="maps-current-path"></span>
           </div>
-          <div class="button-row" style="flex-wrap:nowrap">
+          <div class="button-row maps-toolbar-actions">
             <button onclick="Maps.step(-1)" title="Previous map">‹ Prev</button>
             <button onclick="Maps.step(1)" title="Next map">Next ›</button>
-            <a id="maps-newtab" class="maps-newtab" target="_blank" rel="noopener">Open in new tab ↗</a>
+            <a id="maps-newtab" class="maps-newtab" target="_blank" rel="noopener" hidden>Open in new tab ↗</a>
           </div>
         </div>
         <div id="maps-viewer" class="maps-viewer">
@@ -337,6 +375,12 @@ const Maps = (function () {
     if (el) el.textContent = allFiles().length + ' maps';
   }
 
+  // The drawing is a shortcut for the chip row underneath it, and is named as
+  // one (pattern 8). role="img" plus a name carrying the headline number, and
+  // the polygons stay out of the tab order — a hundred basins would be a
+  // hundred stops for an operation that is already on eight labelled buttons.
+  // Every state a polygon can be in is a data-state now, so the opacities and
+  // the hover live in styles.css with the rest of the tab.
   function injectBasinMap() {
     const host = document.getElementById('maps-basin');
     if (!host) return;
@@ -346,24 +390,24 @@ const Maps = (function () {
     svg.removeAttribute('width');
     svg.removeAttribute('height');
     svg.classList.add('maps-basin-svg');
+    svg.setAttribute('role', 'img');
     svg.querySelector('rect')?.remove();                     // drop the white backdrop
+    let mapped = 0;
     svg.querySelectorAll('polygon').forEach(p => {
       const name = (p.querySelector('title')?.textContent || '').replace(/&apos;/g, "'");
       const region = basinRegion(name);
       p.dataset.region = region || '';
       p.dataset.basin = name;
-      const col = region ? REGION_COLOR[region] : null;
-      p.style.fill = col || 'var(--muted)';
-      p.style.fillOpacity = region ? '0.32' : '0.06';
-      p.style.stroke = col || 'var(--border)';
-      p.style.strokeOpacity = '0.85';
-      p.style.cursor = region ? 'pointer' : 'default';
+      p.style.setProperty('--basin', region ? REGION_VAR[region] : 'var(--muted)');
       if (region) {
+        mapped++;
         p.addEventListener('click', () => setRegion(region));
-        p.addEventListener('mouseenter', () => { p.style.fillOpacity = '0.6'; });
-        p.addEventListener('mouseleave', () => applyRegionHighlight());
       }
     });
+    svg.setAttribute('aria-label',
+      `Queensland drainage basins — ${mapped} of them across ${regions().length - 1} regions, `
+      + 'coloured by region. Picking a basin filters the map list to its region, which the '
+      + 'region buttons below do as well.');
     applyRegionHighlight();
   }
 
@@ -373,10 +417,9 @@ const Maps = (function () {
     const active = mstate.region;
     host.querySelectorAll('polygon').forEach(p => {
       const region = p.dataset.region;
-      if (!region) return;
-      const on = active === 'All files' || region === active;
-      p.style.fillOpacity = on ? (active !== 'All files' && region === active ? '0.62' : '0.32') : '0.08';
-      p.style.strokeOpacity = on ? '0.9' : '0.3';
+      if (!region) { p.dataset.state = 'unmapped'; return; }
+      if (active === 'All files') p.dataset.state = 'on';
+      else p.dataset.state = region === active ? 'active' : 'off';
     });
   }
 
@@ -386,9 +429,21 @@ const Maps = (function () {
     el.innerHTML = regions().map(r => {
       const count = r === 'All files' ? allFiles().length : regionFiles(r).length;
       const hint = (MD.REGION_HINTS[r]) ? `<span class="maps-chip-hint">${esc(MD.REGION_HINTS[r])}</span>` : '';
-      const dot = r !== 'All files' && REGION_COLOR[r]
-        ? `<span class="maps-chip-dot" style="background:${REGION_COLOR[r]}"></span>` : '';
-      return `<button class="maps-chip${r === mstate.region ? ' active' : ''}" onclick="Maps.setRegion('${escAttr(r)}')">
+      // The dot is a token override rather than a colour written onto the
+      // element — the same shape as .page's --page-max, and the reason the
+      // theme reaches it.
+      const dot = r !== 'All files' && REGION_VAR[r]
+        ? `<span class="maps-chip-dot" style="--dot:${REGION_VAR[r]}"></span>` : '';
+      // Two things the visible content cannot do on its own. aria-pressed,
+      // because "active" is a look and a toggle that only looks pressed is not
+      // pressed as far as a screen reader is concerned. And an explicit name,
+      // because the label and the count are adjacent text nodes with no space
+      // between them — the computed name was "Far North5", which is a region
+      // nobody has heard of.
+      const n = `${r}, ${count} map${count === 1 ? '' : 's'}`;
+      return `<button class="maps-chip${r === mstate.region ? ' active' : ''}" data-region="${escAttr(r)}"
+        aria-pressed="${r === mstate.region}" aria-label="${escAttr(n)}"
+        onclick="Maps.setRegion('${escAttr(r)}')">
         ${dot}${esc(r)}<span class="maps-count">${count}</span>${hint}</button>`;
     }).join('');
   }
@@ -398,11 +453,16 @@ const Maps = (function () {
     if (!el) return;
     const subs = subregions(mstate.region);
     if (!subs.length) { el.innerHTML = ''; return; }
-    let html = `<button class="maps-chip${mstate.subregion === '_all' ? ' active' : ''}" onclick="Maps.setSubregion('_all')">All in region</button>`;
-    html += subs.map(sub =>
-      `<button class="maps-chip${mstate.subregion === sub ? ' active' : ''}" onclick="Maps.setSubregion('${escAttr(sub)}')">
-        ${esc(sub)}<span class="maps-count">${(MD.MAP_CATALOG[mstate.region][sub] || []).length}</span></button>`
-    ).join('');
+    let html = `<button class="maps-chip${mstate.subregion === '_all' ? ' active' : ''}"
+      aria-pressed="${mstate.subregion === '_all'}" onclick="Maps.setSubregion('_all')">All in region</button>`;
+    html += subs.map(sub => {
+      const n = (MD.MAP_CATALOG[mstate.region][sub] || []).length;
+      return `<button class="maps-chip${mstate.subregion === sub ? ' active' : ''}"
+        aria-pressed="${mstate.subregion === sub}"
+        aria-label="${escAttr(`${sub}, ${n} map${n === 1 ? '' : 's'}`)}"
+        onclick="Maps.setSubregion('${escAttr(sub)}')">
+        ${esc(sub)}<span class="maps-count">${n}</span></button>`;
+    }).join('');
     el.innerHTML = html;
   }
 
@@ -418,16 +478,21 @@ const Maps = (function () {
       el.innerHTML = `<li class="maps-file"><div class="maps-file-name small">No maps match “${esc(mstate.query)}”.</div></li>`;
       return;
     }
+    // Both controls carry the file name. "Open" repeated forty times and a bare
+    // "↗" are what a screen reader was given to choose between; the name is
+    // sr-only so the row still reads as a name with two small buttons.
     el.innerHTML = files.map(f => {
       const badges = fileTags(f).map(t => `<span class="badge maps-badge">${esc(t)}</span>`).join('');
-      return `<li class="maps-file${f === mstate.file ? ' selected' : ''}">
-        <div style="min-width:0">
+      const open = f === mstate.file;
+      return `<li class="maps-file${open ? ' selected' : ''}"${open ? ' aria-current="true"' : ''}>
+        <div class="maps-file-main">
           <div class="maps-file-name">${esc(f)}</div>
           <div class="maps-badges">${badges}</div>
         </div>
         <div class="maps-file-actions">
-          <button onclick="Maps.openFile('${escAttr(f)}')">Open</button>
-          <a class="maps-newtab" href="${encPath(f)}" target="_blank" rel="noopener">↗</a>
+          <button onclick="Maps.openFile('${escAttr(f)}')">Open<span class="sr-only"> ${esc(f)} in the viewer</span></button>
+          <a class="maps-newtab" href="${encPath(f)}" target="_blank" rel="noopener"
+             ><span aria-hidden="true">↗</span><span class="sr-only">Open ${esc(f)} in a new tab</span></a>
         </div></li>`;
     }).join('');
   }
@@ -438,21 +503,23 @@ const Maps = (function () {
     const q = mstate.query.trim();
     if (!q) { el.innerHTML = ''; return; }
     if (!state.data) {
-      el.innerHTML = `<div class="maps-suggest-note small">Load <strong>stations.json</strong> to search by station name / ALERT ID.</div>`;
+      el.innerHTML = '<p class="maps-suggest-note small">Load <strong>stations.json</strong> to search by station name / ALERT ID.</p>';
       return;
     }
     const matches = matchStations(q);
     if (!matches.length) { el.innerHTML = ''; return; }
-    el.innerHTML = `<div class="maps-suggest-note small">Stations matching “${esc(q)}” → suggested maps:</div>` +
+    el.innerHTML = `<p class="maps-suggest-note small">Stations matching “${esc(q)}” → suggested maps:</p>` +
       matches.map(({ s }) => {
         const maps = mapsForStation(s);
         const aid = [...stationHaystack(s).ids].slice(0, 4).join(', ');
         const chips = maps.length
-          ? maps.map(m => `<button class="maps-suggest-map" title="${escAttr(m.reasons.join('; '))}" onclick="Maps.openFile('${escAttr(m.file)}')">${esc(m.file)}</button>`).join('')
-          : `<span class="small" style="color:var(--muted)">no map match — try browsing the region</span>`;
+          ? maps.map(m => `<button class="maps-suggest-map" title="${escAttr(m.reasons.join('; '))}"
+              aria-label="Open ${escAttr(m.file)} — suggested because ${escAttr(m.reasons.join('; '))}"
+              onclick="Maps.openFile('${escAttr(m.file)}')">${esc(m.file)}</button>`).join('')
+          : '<span class="small">no map match — try browsing the region</span>';
         return `<div class="maps-suggest-item">
           <div class="maps-suggest-station">${esc(s.name)}
-            ${aid ? `<span class="small" style="color:var(--muted)">· ALERT ${esc(aid)}</span>` : ''}</div>
+            ${aid ? `<span class="small">· ALERT ${esc(aid)}</span>` : ''}</div>
           <div class="maps-suggest-maps">${chips}</div>
         </div>`;
       }).join('');
@@ -526,7 +593,14 @@ const Maps = (function () {
     const path = encPath(file);
     if (nameEl) nameEl.textContent = file;
     if (pathEl) pathEl.textContent = path;
-    if (linkEl) linkEl.href = path;
+    // Hidden until there is somewhere to go: an <a> with no href is not a link
+    // at all, so before the first map opened this was a tab stop that read as
+    // "Open in new tab" and did nothing.
+    if (linkEl) {
+      linkEl.href = path;
+      linkEl.hidden = false;
+      linkEl.setAttribute('aria-label', 'Open ' + file + ' in a new tab');
+    }
     if (host) {
       if (isImage(file)) {
         host.innerHTML = `<img class="maps-view-img" alt="${escAttr(file)}" src="${path}">`;
@@ -544,6 +618,11 @@ const Maps = (function () {
       }
     }
     renderList();
+    // The viewer is an <iframe> or an <img>, neither of which says anything on
+    // its own — and on a phone it is below the fold. Announced only when the
+    // user asked for it: the restore-from-localStorage call passes scroll=false
+    // and is not the result of anything anybody just did (rule 1).
+    if (scroll) announce('Opened ' + file);
     if (scroll && host) host.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
   function step(delta) {

@@ -39,6 +39,15 @@
 //   carries context rather than an answer, so below --bp-sm it goes and the
 //   other four get the width — which is the sanctioned way to drop a column,
 //   and the only one. Everything else scrolls inside its wrapper instead.
+//
+// ── U2 (#137) picked it up, and found one thing left ─────────────────────────
+// Both wrappers scroll — `.tall` is 42vh and this table is longer than that on
+// any real file — and a div with `overflow:auto` is keyboard-scrollable in
+// Firefox and in nothing else. So each is a labelled region now:
+// role="region" + tabindex="0" + aria-labelledby, pointed at the two heading
+// ids that were already sitting here unused. That is pattern 7 in
+// docs/design-system.md, and it applies to every scrolling wrapper in the app
+// rather than to this tab.
 
 // ── NETWORKS tab ───────────────────────────────────────────────────────────────
 
@@ -53,7 +62,7 @@ function renderNetworksHtml() {
           <h2 id="net-radio-h">Radio Networks</h2>
           <span class="badge">${nets.length}</span>
         </div>
-        <div class="table-wrap tall">
+        <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="net-radio-h">
           <table>
             <caption class="sr-only">
               Radio networks — ${nets.length} of them, with the repeaters and field
@@ -95,7 +104,7 @@ function renderNetworksHtml() {
         </div>
         ${!cats.length
           ? '<p class="note">No catchments defined yet.</p>'
-          : `<div class="table-wrap medium">
+          : `<div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="net-catch-h">
                <table>
                  <caption class="sr-only">Catchments — ${cats.length} of them, by id and name.</caption>
                  <thead>

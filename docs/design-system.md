@@ -21,9 +21,11 @@ Three files hold the system itself, and this document explains them:
 | `core.js`, `BREAKPOINTS` | The breakpoint scale — the only place the numbers exist |
 | `core.js`, `announce()` | The live-region policy, stated above the function |
 
-And one file checks it: `test/shell.mjs`, run as `npm run shell` from `test/`,
-in CI on every push that touches the app. What it enforces is listed at the
-bottom of this page. Every claim below that *can* be checked mechanically is
+And two files check it: `test/shell.mjs` (`npm run shell`) holds the system
+against the shell, and `test/tabs.mjs` (`npm run tabs`, added by #137) holds it
+against every tab a U-issue has converted. Both run in CI on every push that
+touches the app; what each enforces is listed in §5 and §6 at the bottom of this
+page. Every claim below that *can* be checked mechanically is
 checked — this repo has a habit of that, and the reason is in constraint 1 of
 [#113](https://github.com/cdomotor-g/MegaNet/issues/113).
 
@@ -278,6 +280,39 @@ to write it down rather than let each of them re-derive a different half.
    already says the same words. A table with no accessible name is what a
    screen reader lands in with no idea what it is reading, and it was the most
    common single finding in the audit behind #111. Headers get `scope="col"`.
+7. **A wrapper that can scroll is a named region** *(added by #137)*. A
+   `.tall` or `.medium` wrapper caps its height, which means it scrolls, and
+   `overflow: auto` on a div is keyboard-scrollable in Firefox and in nothing
+   else — everything below the fold of one was unreachable without a mouse.
+   Three attributes, and they go together:
+
+   ```html
+   <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="net-radio-h">
+   ```
+
+   `tabindex` alone buys a stop a screen reader announces as nothing;
+   `role="region"` without a name is not exposed at all. Point the label at the
+   panel heading that is already there rather than repeating its words — two
+   names for one thing drift. Only on wrappers that actually cap their height: a
+   short table in a plain wrapper is not a region and must not become a tab stop
+   for nothing.
+8. **A clickable row carries a real button** *(added by #137)*. `<tr onclick>`
+   is a mouse affordance and nothing else — no tab stop, no role, no hint. Do
+   not make the row focusable: a row is not a control, and `role="button"` on a
+   `<tr>` destroys the table semantics around it. Put a `<button class="row-open">`
+   in the row's *name* cell, with the row's own text inside it, and keep the
+   row's `onclick` so the whole thing stays a pointer target. The button calls
+   `event.stopPropagation()` so the two never both fire. `.row-open` is styled as
+   the text it replaces, not as a button — forty bordered buttons down a column
+   read as a form; hover and focus are what say it is a control.
+
+**One implementation note that bit #137 and will bit the rest.** A
+`<colgroup>` of percentage widths is still honoured under `table-layout: auto`,
+strongly enough that Pass Ranges' six columns came out at 16% and 8% of a 340 px
+wrapper — so pattern 2 was not actually happening on a phone, on any table with
+a colgroup. `.table-wrap col { width: auto !important }` below `md` is what makes
+it happen, and it is in the responsive block at the foot of `styles.css`. The
+proportions still apply above `md`, where they are right.
 
 ### Charts, canvas and maps — the house answer
 
@@ -307,6 +342,38 @@ its estimate and its Release button.
 What **not** to do: `aria-label` on a `<canvas>` and nothing else; a hidden
 `<div>` containing every data point as prose; `role="img"` on something
 interactive.
+
+### …and the one graphic that is allowed to be `role="img"` while being clicked
+
+*(Pattern 8, added by #137.)* The rule above has an edge, and Radio Path Maps'
+Queensland basin drawing is standing on it: a hundred clickable polygons whose
+only operation — filter the list to this region — is **already on eight labelled
+buttons in the chip row directly beneath it**. Making each basin a tab stop
+would be a hundred stops for something that is eight; leaving them unnamed and
+unreachable is what it was.
+
+So: **a graphic that is a shortcut for controls beside it is named as a picture,
+and the controls are the operable path.** The conditions, all three:
+
+1. Every operation the graphic offers is on a named control **in the same
+   panel**. If one is not, the graphic is the sole route to it and `role="img"`
+   is a lie.
+2. Nothing inside the graphic is in the tab order.
+3. Its accessible name still does parts 1 and 2 above — the headline number and
+   what it shows — *and* says where the operable version is. The basin drawing's
+   name ends "…which the region buttons below do as well."
+
+Condition 1 is checked rather than promised: `npm run tabs` fails if a region
+drawn on the basin map has no chip.
+
+Colours inside such a graphic are tokens like any other. The eight region fills
+were eight literals inside `network-maps.js`, written into `polygon.style.fill`
+— which is why the largest surface on that tab stayed at light-theme saturation
+on a `#0f1720` page. They are `--maps-region-*` now, with a dark set, and the JS
+sets `--basin` to a `var(…)` rather than to a colour. They are deliberately
+**not** in the contrast contract: a categorical palette forced to 4.5:1 against
+two themes is eight near-blacks that no longer tell each other apart, and what
+carries the meaning here is the region's name on the chip, not the hue.
 
 ---
 
@@ -409,6 +476,16 @@ comes back.
 sliders a 1.75 rem thumb. Header buttons are 2.4 rem square from `md` down and
 2.15 rem from `xxs`. A U-issue adding a touch control on a phone matches those.
 
+**Two floors, and which one applies.** The app-wide floor is **2 rem / 32 px** —
+comfortably past WCAG 2.5.8 (AA, 24 px), and raising every button in nineteen
+tabs was not #109's to do. EPIC #107's per-tab Definition of Done asks for
+**44 px**, which is 2.5.5 (AAA). Where they differ, a U-issue's own controls
+take 44: #137's chips, icon buttons and row-name buttons are at 2.75 rem under
+`(pointer: coarse)`, because a map browser tapped on a phone in a vehicle is the
+case the larger number exists for. Pair the height with `align-items: center` —
+a 28 px chip in a 44 px box has its text at the top and the bottom 16 px of the
+target reads as a gap between rows.
+
 ---
 
 ## 5. What `npm run shell` checks
@@ -441,10 +518,40 @@ smoke`, which opens all nineteen tabs and asserts a clean console.
 - **No sideways scroll.** The document does not scroll horizontally at 375,
   768 or 1440, in either theme, on the shell and on the proving-ground tab.
 
-## 6. What #109 deliberately did not do
+## 6. What `npm run tabs` checks
 
-The system is applied to the shell and to **one** tab — Networks, the smallest
-in the app, which #137 owns afterwards. It is not rolled out across the other
-eighteen. Doing that here would re-create exactly the contention the epic's
-re-cut removed: three concerns in one file, three agents in the same lines. See
-#107 and constraint 2 on #113.
+The twelfth check, added by #137, and the other half of `npm run shell`: that
+one holds this document against the shell and **one** tab, deliberately and by
+its own comment. Nothing was holding the other eighteen.
+
+It runs per tab named in `CONVERTED` in `test/tabs.mjs` — the tabs that claim to
+have been through a U-issue. **A U-issue's landing commit adds its tab ids to
+that list.** Per tab:
+
+- **No inline style**, except a declaration block that is *only* custom
+  properties (`--page-max`, `--basin`, `--dot` — that is the token reaching the
+  element) and a `<col>` width.
+- **Tables** wrapped, captioned, every `thead th` scoped.
+- **Scroll regions** — every `.tall` / `.medium` wrapper is `role="region"`,
+  `tabindex="0"` and named (pattern 7).
+- **Clickable rows** — every `<tr onclick>` holds a focusable control (pattern 8).
+- **Landmarks** — every `<aside>` inside `<main>` has a name.
+- **Names** — every visible interactive element has an accessible name.
+- **Headings** step by one, counting the shell's `h1`.
+- **No sideways scroll** of the document at 375, 768 and 1440, in both themes.
+
+Plus pattern 8's condition, which belongs to the pattern rather than to a tab:
+every region the basin drawing draws has a chip of its own, no polygon is a tab
+stop, and the drawing's name carries a number.
+
+## 7. What #109 deliberately did not do
+
+The system was applied to the shell and to **one** tab — Networks, the smallest
+in the app. It was not rolled out across the other eighteen, because doing it
+there would have re-created exactly the contention the epic's re-cut removed:
+three concerns in one file, three agents in the same lines. See #107 and
+constraint 2 on #113.
+
+**#137 has since taken Networks, Pass Ranges and Radio Path Maps**, and left §6
+behind so the next five are checked rather than reviewed. Sixteen tabs to go,
+across #136 and #138–#141.
