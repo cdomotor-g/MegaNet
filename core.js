@@ -1165,6 +1165,11 @@ const state = {
   // persisted — see the comment on MapSurvey.setEnabled() for why this one
   // departs from mapRivers' remembered-between-visits pattern.
   mapSurvey:      false,
+  // LiDAR contour lines (see MapContours, #121). Off by default and not
+  // persisted, for MapSurvey's reasons; the interval is the 5 m default
+  // SoRT's experience picked as the sane fast one.
+  mapContours:        false,
+  mapContourInterval: '5',
   mapMatchLabels: new Set(),  // ids the current filter earned a label (see mapLabelIds)
   mapLinkCount:   { drawn: 0, culled: 0 },   // last refresh, for the sidebar note
   mapFitKey:      null,    // extent the map was last auto-fitted to (re-fit only on change)

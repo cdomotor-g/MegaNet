@@ -1826,6 +1826,10 @@ hr {
 
 .legend-line-river { border-top-color: var(--map-river); }
 .legend-dot-survey { background: var(--map-survey); }
+/* SoRT's warmed burnt orange for LiDAR contour lines — a hard-coded colour on
+   purpose: the swatch matches the server-rendered image (MapContours draws the
+   MapServer's own symbology), which no theme token can restyle. */
+.legend-line-contour { border-top-color: rgb(214, 104, 26); }
 
 /* River name on hover. Follows the cursor along the line (sticky tooltip), so it
    stays small and out of the way of the pins it sits under. */

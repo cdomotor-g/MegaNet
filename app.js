@@ -1659,6 +1659,21 @@ function mapDisplayControlsHtml() {
       Survey marks &amp; CORS sites (Qld)
     </label>
     <p class="filter-note" id="map-survey-note">${MapSurvey.noteHtml()}</p>
+    <label class="filter-check">
+      <input type="checkbox" ${state.mapContours ? 'checked' : ''}
+             onchange="MapContours.setEnabled(this.checked)">
+      LiDAR contours (Qld)
+    </label>
+    <label class="filter-field">
+      <span>Contour interval</span>
+      <select onchange="MapContours.setInterval(this.value)">
+        ${[['1', '1 m — heaviest, closest look'],
+           ['5', '5 m'],
+           ['10', '10 m — lightest']].map(([v, l]) =>
+          `<option value="${v}" ${state.mapContourInterval === v ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+    </label>
+    <p class="filter-note" id="map-contour-note">${MapContours.noteHtml()}</p>
     <label class="filter-field" style="margin-top:.5rem">
       <span>Station names</span>
       <select onchange="setMapLabelMode(this.value)">
@@ -1718,6 +1733,11 @@ function mapLegendHtml() {
     <span class="legend-item">
       <span class="legend-dot legend-dot-survey"></span>
       <span class="small">Survey mark / CORS site (Qld Dept of Resources)</span>
+    </span>` : ''}
+    ${MapContours.active() ? `
+    <span class="legend-item">
+      <span class="legend-line legend-line-contour"></span>
+      <span class="small">LiDAR contours (Qld Dept of Resources)</span>
     </span>` : ''}
     ${state.filters.acma.show ? Object.entries(ACMA_MECH).map(([k, m]) => `
       <span class="legend-item">
@@ -1818,6 +1838,7 @@ function stopStationsMap() {
   LinkBudget.detach();
   MapRivers.detach();
   MapSurvey.detach();
+  MapContours.detach();
   state.map = removeMap(state.map);
   state.mapMarkers = [];
   state.mapLines   = [];
@@ -1859,6 +1880,7 @@ function initMap() {
   // first river lookup is bounded by.
   MapRivers.attach(state.map);
   MapSurvey.attach(state.map);
+  MapContours.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
   // show on the map that has just been rebuilt.
   PathProfile.sync();
