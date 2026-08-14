@@ -124,7 +124,7 @@ its cache at all (`PGRST002`).
 | `meganet` | The schema. Everything MegaNet owns lives here, not in `public`. |
 | `meganet.touch_updated_at()` | `BEFORE UPDATE` trigger function stamping `updated_at`. Every table with that column hangs it off this one. |
 | `meganet.app_meta` | Key/value facts about the database itself. `schema_version` is the number of the highest migration applied. Readable by anyone, writable by no one holding the anon key. |
-| `meganet.station` | One row per station, 3,174 of them. `id` is the `stations.json` slug — also the app's `selectedId`, and in URLs. `deleted_at` is the soft delete: null means live. |
+| `meganet.station` | One row per station, 3,174 of them. `id` is the `stations.json` slug — also the app's `selectedId`, and in URLs. `deleted_at` is the soft delete: null means live. `inspection_config_key` (`0013`, #147) names which of the six inspection sheets the site's telemetry answers to — FK into `meganet.inspection_config`, null until somebody who knows the site says; deliberately not backfilled, because a wrong pre-selected form is worse than being asked. |
 | `meganet.sensor` | 8,815 rows. Natural key `(station_id, sensor_id, type)`: one SSR carries several measurements. Indexed on `alert_id`, which is what the search box matches. |
 | `meganet.repeater` | Repeater detail for the 88 stations carrying the role. One-to-one with `station`. |
 | `meganet.pass_range` | The ALERT ranges a repeater passes or excludes, as rows with an `int4range` and a GiST index — so "which repeaters cover address N" is a lookup, not 88 × 10 ranges walked in JavaScript. |

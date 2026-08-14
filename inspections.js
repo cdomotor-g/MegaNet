@@ -1146,14 +1146,22 @@ const Inspections = (function () {
   }
 
   // Which form to open on. The workbook's Index sheet is explicit that form
-  // identity follows the station's telemetry type — and `stations.json` has no
-  // telemetry-type field. `roles` is the only signal it carries, and it only
-  // separates infrastructure from a field site. So the strongest available
-  // answer is what somebody chose the last time this station was inspected,
-  // and where there is no answer this says so rather than guessing. #147 is the
-  // follow-up: put the configuration on the station record itself.
+  // identity follows the station's telemetry type, and since #147 the station
+  // record can carry it: inspection_config_key, FK-checked against
+  // meganet.inspection_config, written from the station editor. Where the
+  // record is silent — most of the network, until sites are visited or #122's
+  // backfill answers it with evidence — the strongest available answer is what
+  // somebody chose the last time this station was inspected, and where there
+  // is no answer this says so rather than guessing.
   function suggestConfig(station) {
     if (!station) return { key: '', why: '' };
+    // An unknown key here means a stations.json snapshot older than the list —
+    // the database's FK makes it impossible from the editor — so fall through
+    // to the next signal rather than open a form that does not exist.
+    const rec = station.inspection_config_key;
+    if (rec && (!configs().length || configs().some(c => c.key === rec))) {
+      return { key: rec, why: 'the station record' };
+    }
     const prev = (S().recent || []).find(r => r.station_id === station.id);
     if (prev) {
       return { key: prev.config_key,
@@ -2469,7 +2477,9 @@ const Inspections = (function () {
     open, resume, discard, retry, refresh, raiseMaintenance,
     addSerial, removeSerial, addValue, removeValue, addFade, removeFade,
     // #118: the history view renders this file's sheets without owning them.
-    ensureRefs, recordModel, configLabel,
+    // #147: the station editor's telemetry pick-list reads configs() — one
+    // list, from meganet.inspection_config, no second copy.
+    ensureRefs, recordModel, configLabel, configs,
     refsReady: () => !!S().refs,
     refsError: () => S().refsError,
   };

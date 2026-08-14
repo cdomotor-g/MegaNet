@@ -15,7 +15,10 @@
 // updateHeaderStats, findStationMatches, stationAlertIds, passRangeCoversId,
 // repeaterPassingCount and repeaterPassRangeSpan; to auth.js for Auth; and to
 // datastore.js for dbCanWrite, dbSaveStation, dbDeleteStation, setEditorStatus,
-// editorStatusHtml and editorWritesGoToDatabase.
+// editorStatusHtml and editorWritesGoToDatabase; and to inspections.js for
+// Inspections.configs and Inspections.ensureRefs — the telemetry pick-list
+// (#147) reads the same meganet.inspection_config list the Inspections tab
+// renders its form from, rather than keeping a second copy.
 //
 // This file is the form, not its host. The card is rendered by the Stations
 // tab, which is frozen in app.js for the whole of #129 — so a change to where
@@ -143,6 +146,14 @@ function editorForm(s) {
             </label>`).join('')}
         </div>
       </label>
+      <label class="full">Telemetry / inspection form
+        <select id="ef-insp-config">${editorInspConfigOptions(s.inspection_config_key)}</select>
+      </label>
+      <div class="full small" style="color:var(--muted);margin-top:-.35rem">
+        Which of the six inspection sheets a crew prints at this site — the Inspections tab
+        pre-selects its form from this. “Not recorded” means nobody has said yet, and the form
+        asks rather than guesses; leave it that way unless you know the site's telemetry.
+      </div>
       <div class="full" style="margin-top:.4rem">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.45rem">
           <div style="font-weight:600">ALERT IDs / Sensors${sensors.length ? ` <span class="small" style="font-weight:400">— ${sensors.length}</span>` : ''}</div>
@@ -181,6 +192,32 @@ function editorForm(s) {
         </label>
       </div>` : ''}
     ${editorArroSection(s, sensors)}`;
+}
+
+// The telemetry-type pick-list (#147). The six configurations come from
+// meganet.inspection_config via the Inspections tab's reference load — one
+// list, no second copy — so the options may not be here yet on the first
+// render. Rather than repainting the whole card when they arrive (which would
+// throw away anything typed since), the callback rebuilds this one select in
+// place, keeping whatever it was set to.
+function editorInspConfigOptions(currentKey) {
+  const cur  = currentKey || '';
+  const list = Inspections.configs();
+  // While the list is loading, a recorded value still shows — as its key,
+  // which the fill below upgrades to its label.
+  const opts = list.length ? list : (cur ? [{ key: cur, label: cur }] : []);
+  Inspections.ensureRefs(editorFillInspConfigSelect);
+  return [
+    '<option value="">— not recorded —</option>',
+    ...opts.map(c => `<option value="${escAttr(c.key)}"${c.key === cur ? ' selected' : ''}>${esc(c.label)}</option>`),
+  ].join('');
+}
+
+function editorFillInspConfigSelect() {
+  const sel = document.getElementById('ef-insp-config');
+  if (!sel || !Inspections.configs().length) return;
+  const cur = sel.value;
+  sel.innerHTML = editorInspConfigOptions(cur);
 }
 
 // The ARRO block at the foot of the editor. Read-only throughout: these ids come
@@ -304,6 +341,8 @@ function editorReadForm() {
   d.enabled        = document.getElementById('ef-enabled')?.checked ?? true;
   d.notes          = document.getElementById('ef-notes')?.value || '';
   d.roles          = [...document.querySelectorAll('input[name="ef-roles"]:checked')].map(b => b.value);
+  const inspCfg = document.getElementById('ef-insp-config')?.value || '';
+  if (inspCfg) d.inspection_config_key = inspCfg; else delete d.inspection_config_key;
 
   // ALERT sensors — read the editable rows, preserving national-export metadata.
   const sensors = [...document.querySelectorAll('#ef-sensors .sensor-row')].map(row => {

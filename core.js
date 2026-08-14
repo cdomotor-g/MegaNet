@@ -988,7 +988,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 11;
+const DB_SCHEMA_VERSION = 13;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 function dbHostLabel() {

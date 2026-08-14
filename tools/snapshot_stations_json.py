@@ -75,7 +75,7 @@ KEY_ORDER = {
                 'roles', 'radio_network_ids', 'catchment_ids', 'alert_ids',
                 'satcom', 'rm_system_id', 'enabled', 'notes', 'legacy_unit_id',
                 'repeater', 'site', 'sensors', 'lga', 'basin', 'location_types',
-                'TBRGbucketSize'],
+                'TBRGbucketSize', 'inspection_config_key'],
     'sensor':  ['alert_id', 'type', 'sensor_id', 'device_id'],
     'site':    ['db_id', 'number', 'name'],
     'satcom':  ['enabled', 'provider', 'terminal_id'],
