@@ -11,13 +11,17 @@ database side is `db/migrations/0007_ingest_http.sql` and `db/README.md`.
 POST https://jjprlritvhdqpvphfrnu.supabase.co/rest/v1/rpc/ingest_http
 ```
 
-Every request needs three headers and a JSON body:
+Every request needs four headers, and a JSON body with everything nested one
+level under a `payload` key — PostgREST maps an RPC body's top-level keys to
+the function's named arguments, and `ingest_http` takes exactly one argument,
+called `payload`:
 
 | Header | Value |
 | --- | --- |
 | `apikey` | `sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY` — identifies the project. Not a secret; it is committed to this repo and cannot read or write anything on its own. |
 | `X-Ingest-Token` | Your device token — see **Getting a token**, below. This is the secret. |
 | `Content-Type` | `application/json` |
+| `Content-Profile` | `meganet` — MegaNet's tables live in their own schema, not `public`. Without this, PostgREST looks in `public`, finds no `ingest_http` there, and the request never reaches the database ([`db/README.md`](../db/README.md)). |
 
 ```sh
 curl -sS -X POST \
@@ -25,11 +29,14 @@ curl -sS -X POST \
   -H 'apikey: sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY' \
   -H 'X-Ingest-Token: mgn_your-token-here' \
   -H 'Content-Type: application/json' \
+  -H 'Content-Profile: meganet' \
   -d '{
-        "path": "MT_STUART",
-        "readings": [
-          {"alert_id": 6128, "reading_ts": "2026-08-11T04:15:00Z", "value_raw": 301}
-        ]
+        "payload": {
+          "path": "MT_STUART",
+          "readings": [
+            {"alert_id": 6128, "reading_ts": "2026-08-11T04:15:00Z", "value_raw": 301}
+          ]
+        }
       }'
 ```
 
@@ -54,8 +61,9 @@ that passes straight through, which is where MegaNet actually checks it.
 
 ## Payload shape
 
-The body is one reading, an array of readings, or an object with a `readings`
-array plus shared defaults for the batch:
+`payload` — the value nested under the top-level `"payload"` key, not the POST
+body itself — is one reading, an array of readings, or an object with a
+`readings` array plus shared defaults for the batch:
 
 ```json
 {
@@ -122,7 +130,9 @@ most common `why` you will see in the field:
 
 **A malformed request is a `400`, not a partial accept** — this is the caller
 misunderstanding the contract, a different thing from a device sending one bad
-reading:
+reading. This assumes a **valid** token: `ingest_http` checks `X-Ingest-Token`
+before it looks at the body at all, so an invalid token reports `401`
+regardless of what the body says — swap in a real one to see this response.
 
 ```sh
 curl -o /dev/null -w '%{http_code}\n' -X POST \
@@ -130,8 +140,9 @@ curl -o /dev/null -w '%{http_code}\n' -X POST \
   -H 'apikey: sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY' \
   -H 'X-Ingest-Token: mgn_your-token-here' \
   -H 'Content-Type: application/json' \
-  -d '{"readings": "not an array"}'
-# => 400
+  -H 'Content-Profile: meganet' \
+  -d '{"payload": {"readings": "not an array"}}'
+# => 400 (with a valid token; an invalid one reports 401 first)
 ```
 
 **No token, or a bad one, is `401`:**
@@ -141,7 +152,8 @@ curl -o /dev/null -w '%{http_code}\n' -X POST \
   'https://jjprlritvhdqpvphfrnu.supabase.co/rest/v1/rpc/ingest_http' \
   -H 'apikey: sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY' \
   -H 'Content-Type: application/json' \
-  -d '{"readings": []}'
+  -H 'Content-Profile: meganet' \
+  -d '{"payload": {"readings": []}}'
 # => 401, no X-Ingest-Token header at all
 
 curl -o /dev/null -w '%{http_code}\n' -X POST \
@@ -149,7 +161,8 @@ curl -o /dev/null -w '%{http_code}\n' -X POST \
   -H 'apikey: sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY' \
   -H 'X-Ingest-Token: mgn_made-up-and-invalid' \
   -H 'Content-Type: application/json' \
-  -d '{"readings": []}'
+  -H 'Content-Profile: meganet' \
+  -d '{"payload": {"readings": []}}'
 # => 401, token does not match anything live
 ```
 
