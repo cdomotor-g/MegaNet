@@ -1,23 +1,29 @@
 {
   "_": "One entry per worksheet — #123 deliverable 1. Written by tools/ingest/survey.py; do not edit by hand.",
-  "open_questions": [
+  "decisions": [
     {
       "id": "122-1",
-      "for": "@cdomotor-g",
       "question": "`SLS 26092023` (hidden) has the identical 34-column Service Level Specification shape as `SLS OCT23`, which you asked to ignore. Ignore both, or ingest the registry separately into the station table?",
-      "held_as": "Both marked `skip`/`defer` in this manifest. Neither is an inspection tab — they are station metadata (basin, agency number, flood classes, priority, gauge/telemetry/sensor type, LGA, owner, maintainer, schedules, hub) and would write to the station table, not to meganet.inspection. Nothing in this epic is blocked by the answer."
+      "answer": "Ignore both.",
+      "answered_by": "@cdomotor-g",
+      "answered_on": "2026-08-15",
+      "effect": "Both SLS tabs are `skip`. Neither is an inspection tab — they are a station registry (basin, agency number, flood classes, priority, gauge/telemetry/sensor type, LGA, owner, maintainer, schedules, hub) and would have written to the station table rather than to meganet.inspection, so nothing in #122 changes shape."
     },
     {
       "id": "122-2",
-      "for": "@cdomotor-g",
       "question": "Hidden legacy sheets versus their visible `!` twins — merge both, or treat the `!` sheet as authoritative?",
-      "held_as": "Measured rather than guessed: see `hidden_twins` in this file for the visits each hidden sheet holds that its visible twin does not. The spec's recommendation is to ingest both and let the load deduplicate on (station, visit date), because the hidden sheets are not subsets — but the recommendation is not a decision, and #124 should not proceed on it without a yes."
+      "answer": "Ignore the hidden sheets. The visible `!` sheet is authoritative.",
+      "answered_by": "@cdomotor-g",
+      "answered_on": "2026-08-15",
+      "effect": "The twelve hidden legacy twins are `skip` (`Master` was already skipped as a template). They are still read, and `hidden_twins` still records what each one holds that its visible twin does not — 222 visits across 18 station keys, every one an identity artefact rather than a missing visit. Keeping the measurement is what makes the decision checkable later; #124 loads only the visible sheets."
     },
     {
       "id": "122-3",
-      "for": "@cdomotor-g",
       "question": "NSW tabs (`NSW Lismore `, `NSW McIntyre`, `NSW Tweed!`, `NSW Richmond!`) — in scope, or QLD only?",
-      "held_as": "Marked `ingest` in this manifest on the grounds that they are the same form family and the same crews, and that excluding them would lose history no other system holds. Flip them to `skip` in SKIP_REASONS if the answer is QLD-only."
+      "answer": "In scope.",
+      "answered_by": "@cdomotor-g",
+      "answered_on": "2026-08-15",
+      "effect": "All four stay `ingest`: 41 blocks and 31 inspection rows, same form family and same crews as the QLD sheets."
     }
   ],
   "hidden_twins": [
@@ -766,8 +772,8 @@
       "used_cols": 34,
       "cell_comments": 1,
       "threaded_comments": 1,
-      "disposition": "defer",
-      "reason": "#122 open question 1. Hidden twin of `SLS OCT23`, identical 34-column shape, dated slightly earlier. Same registry content — belongs to the station table, not the inspection tables, if it is wanted at all.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: ignore both SLS tabs. Hidden twin of `SLS OCT23`, identical 34-column shape, dated slightly earlier. Station registry rather than inspections, so it would write to the station table and nothing in #122 is affected either way.",
       "form_families": [],
       "inspection_config": null,
       "blocks": 0,
@@ -1329,8 +1335,8 @@
       "used_cols": 21,
       "cell_comments": 0,
       "threaded_comments": 0,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Pioneer!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "ALERT"
@@ -1357,8 +1363,8 @@
       "used_cols": 20,
       "cell_comments": 0,
       "threaded_comments": 0,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Moonie!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "DATA LOGGER"
@@ -1382,8 +1388,8 @@
       "used_cols": 21,
       "cell_comments": 23,
       "threaded_comments": 0,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Logan!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "ALERT"
@@ -1438,8 +1444,8 @@
       "used_cols": 21,
       "cell_comments": 0,
       "threaded_comments": 0,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Redlands!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "ALERT"
@@ -2000,8 +2006,8 @@
       "used_cols": 22,
       "cell_comments": 0,
       "threaded_comments": 0,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Townsville!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "ALERT"
@@ -2027,8 +2033,8 @@
       "used_cols": 21,
       "cell_comments": 0,
       "threaded_comments": 0,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Burdekin!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "ALERT"
@@ -2055,8 +2061,8 @@
       "used_cols": 21,
       "cell_comments": 0,
       "threaded_comments": 0,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Haughton!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "ALERT"
@@ -2084,8 +2090,8 @@
       "used_cols": 21,
       "cell_comments": 0,
       "threaded_comments": 0,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Don!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "ALERT"
@@ -2141,8 +2147,8 @@
       "used_cols": 20,
       "cell_comments": 0,
       "threaded_comments": 0,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Herbert!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "ALERT"
@@ -2253,8 +2259,8 @@
       "used_cols": 21,
       "cell_comments": 0,
       "threaded_comments": 0,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Barron!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "ALERT"
@@ -2282,8 +2288,8 @@
       "used_cols": 21,
       "cell_comments": 0,
       "threaded_comments": 0,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Burrum Cherwell!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "ALERT"
@@ -2311,8 +2317,8 @@
       "used_cols": 21,
       "cell_comments": 1,
       "threaded_comments": 1,
-      "disposition": "ingest",
-      "reason": "Station inspection blocks.",
+      "disposition": "skip",
+      "reason": "Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored and the visible `Mary!` is authoritative. Kept in the survey — see `hidden_twins` for what this sheet holds that its visible twin does not (measured, and every difference is an identity artefact rather than a missing visit).",
       "structure": "stacked_blocks",
       "form_families": [
         "ALERT",

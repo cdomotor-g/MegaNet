@@ -5,6 +5,10 @@
   "visible": 45,
   "hidden": 14,
   "blocks": 1420,
+  "ingested_sheets": 42,
+  "ingested_blocks": 1093,
+  "ingested_inspection_rows": 15207,
+  "ingested_rejects": 147,
   "blocks_by_family": {
     "ALERT": 1286,
     "DATA LOGGER": 131,
@@ -185,7 +189,7 @@
       "issue_122": 18500,
       "survey": 20407,
       "agrees": false,
-      "note": "#122's figure is approximate and appears to count only cells Excel stores as dates. This survey also counts the text dates (`16/03/06` and friends) and the two flat tabs, which have no banner and so no blocks."
+      "note": "#122's figure is approximate and appears to count only cells Excel stores as dates. This survey also counts the text dates (`16/03/06` and friends) and the two flat tabs, which have no banner and so no blocks. `ingested_inspection_rows` is the number #124 loads, which is lower: the hidden legacy sheets are read for comparison and not ingested."
     },
     {
       "figure": "distinct column-header layouts",
@@ -222,7 +226,7 @@
       "ALERTS!224 #n/a 2024-03-15",
       "ALERTS!230 bakers bend 2024-05-01"
     ],
-    "note": "Matched on (station name or station number, visit date). The ALERTS tab prints both, so a row that was copied down to its basin block matches on either. `Master (2)` instructs the crew to enter here first and copy into the basin block, so a match means the copy happened and the basin block is the canonical home; a miss means this tab is the only record."
+    "note": "Matched on (station name or station number, visit date). The ALERTS tab prints both, so a row that was copied down to its basin block matches on either. `Master (2)` instructs the crew to enter here first and copy into the basin block, so a match means the copy happened and the basin block is the canonical home; a miss means this tab is the only record. Matched against the ingested sheets only, so the hidden legacy sheets @cdomotor-g ruled out cannot supply a match."
   },
   "unresolved_examples": [
     "Ipswich!503 [undated_data]: Gas 0 5 10 15 20",

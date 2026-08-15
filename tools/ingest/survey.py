@@ -21,13 +21,14 @@ Artefacts:
   inspection_survey_counts.json    the headline counts, and how they reconcile
                                    against the ones quoted in #122.
 
-Nothing here writes to a database and nothing here decides anything #122 left
-open. Its three open questions — the hidden SLS twin, precedence between a
-hidden legacy sheet and its visible twin, and whether the NSW tabs are in scope
-— are carried into the manifest as questions rather than resolved quietly, which
-is what #123 asks for. Two of the three are now *measured*: the manifest says
-exactly what each hidden sheet holds that its visible twin does not, and what
-the NSW tabs would cost. A measurement is not an answer.
+Nothing here writes to a database, and nothing here decides scope on its own.
+#122's three open questions — the SLS tabs, precedence between a hidden legacy
+sheet and its visible twin, and whether the NSW tabs are in scope — were
+measured here and **answered by @cdomotor-g on 2026-08-15**; the answers are in
+`DECISIONS` and in every affected sheet's `reason`. The twelve hidden legacy
+sheets are out of scope and are still read, because the comparison that makes
+ignoring them safe stops being checkable the moment the survey stops reading
+them.
 """
 
 from __future__ import annotations
@@ -795,10 +796,11 @@ SKIP_REASONS = {
                           "station registry (34 columns of Service Level Specification), "
                           "not inspections, so it would not write to these tables anyway."),
     'SWR': ('skip', '#122 non-goal: a 3-cell SWR calculator, not data.'),
-    'SLS 26092023': ('defer', "#122 open question 1. Hidden twin of `SLS OCT23`, identical "
-                              "34-column shape, dated slightly earlier. Same registry content "
-                              "— belongs to the station table, not the inspection tables, if "
-                              "it is wanted at all."),
+    'SLS 26092023': ('skip', "Answered by @cdomotor-g on 2026-08-15: ignore both SLS tabs. "
+                             "Hidden twin of `SLS OCT23`, identical 34-column shape, dated "
+                             "slightly earlier. Station registry rather than inspections, so "
+                             "it would write to the station table and nothing in #122 is "
+                             "affected either way."),
 }
 
 # The hidden legacy sheets and the visible sheet each one shadows. Established
@@ -809,6 +811,29 @@ TWINS = {
     'Don': 'Don!', 'Haughton': 'Haughton!', 'Herbert': 'Herbert!', 'Logan': 'Logan!',
     'Mary': 'Mary!', 'Moonie': 'Moonie!', 'Pioneer': 'Pioneer!', 'Redlands': 'Redlands!',
     'Townsville': 'Townsville!', 'Master': 'Master (2)',
+}
+
+# Answered by @cdomotor-g on 2026-08-15, in reply to #122's open question 2:
+# ignore the hidden legacy sheets, and take the visible `!` twin as
+# authoritative. They are still *read* — the comparison in `hidden_twins` is
+# what makes the decision a safe one rather than a hopeful one, and it stops
+# being checkable the moment the survey stops reading them.
+#
+# `Master` is hidden too and is skipped on its own merits (it is a template with
+# no dated row), so it keeps that reason rather than this one.
+DECIDED_OUT_OF_SCOPE = {
+    hidden: ('skip',
+             'Answered by @cdomotor-g on 2026-08-15: the hidden legacy sheets are ignored '
+             f'and the visible `{visible}` is authoritative. Kept in the survey — see '
+             '`hidden_twins` for what this sheet holds that its visible twin does not '
+             '(measured, and every difference is an identity artefact rather than a '
+             'missing visit).')
+    for hidden, visible in {
+        'Barron': 'Barron!', 'Burdekin': 'Burdekin!', 'Burrum Cherwell': 'Burrum Cherwell!',
+        'Don': 'Don!', 'Haughton': 'Haughton!', 'Herbert': 'Herbert!', 'Logan': 'Logan!',
+        'Mary': 'Mary!', 'Moonie': 'Moonie!', 'Pioneer': 'Pioneer!', 'Redlands': 'Redlands!',
+        'Townsville': 'Townsville!',
+    }.items()
 }
 
 FAMILY_TO_CONFIG = {
@@ -992,6 +1017,8 @@ def survey():
             disposition = 'skip'
             reason = ('Template. It carries the blank form — `NAME` and `xxxxxx` '
                       'in place of a station — and not one dated row.')
+        elif sheet.name in DECIDED_OUT_OF_SCOPE:
+            disposition, reason = DECIDED_OUT_OF_SCOPE[sheet.name]
         elif info['flat']:
             disposition, reason = 'ingest', 'Flat one-row-per-inspection tab.'
         else:
@@ -1093,7 +1120,8 @@ def survey():
         })
 
     # -- ALERTS duplication --
-    duplication = alerts_duplication(parsed)
+    duplication = alerts_duplication(
+        parsed, {e['sheet'] for e in manifest if e['disposition'] == 'ingest'})
 
     counts = {
         'workbook': 'archive/QLD All Site Inspections.xlsx',
@@ -1101,6 +1129,15 @@ def survey():
         'visible': sum(1 for s in wb.sheets if not s.hidden),
         'hidden': sum(1 for s in wb.sheets if s.hidden),
         'blocks': sum(e.get('blocks', 0) for e in manifest),
+        'ingested_sheets': sum(1 for e in manifest if e['disposition'] == 'ingest'),
+        'ingested_blocks': sum(e.get('blocks', 0) for e in manifest
+                               if e['disposition'] == 'ingest'),
+        'ingested_inspection_rows': sum(e.get('inspection_rows', 0) for e in manifest
+                                        if e['disposition'] == 'ingest'),
+        'ingested_rejects': sum(
+            n for e in manifest if e['disposition'] == 'ingest'
+            for cls, n in (e.get('row_classes') or {}).items()
+            if cls in ('unresolved', 'malformed_date', 'undated_data')),
         'blocks_by_family': dict(collections.Counter(
             b.family for name, info in parsed.items() if not info['flat']
             for b in info['blocks'])),
@@ -1250,13 +1287,13 @@ def hidden_twin_report(parsed, sheets):
     return out
 
 
-def alerts_duplication(parsed):
+def alerts_duplication(parsed, in_scope):
     """How many `ALERTS` rows are already on a basin tab, and how they match."""
     if 'ALERTS' not in parsed:
         return {}
     basin = collections.defaultdict(set)
     for name, info in parsed.items():
-        if info['flat']:
+        if info['flat'] or name not in in_scope:
             continue
         for b in info['blocks']:
             key = norm(b.station_name).lower()
@@ -1290,7 +1327,9 @@ def alerts_duplication(parsed):
                 'basin block matches on either. `Master (2)` instructs the '
                 'crew to enter here first and copy into the basin block, so a '
                 'match means the copy happened and the basin block is the '
-                'canonical home; a miss means this tab is the only record.',
+                'canonical home; a miss means this tab is the only record. Matched '
+                'against the ingested sheets only, so the hidden legacy sheets '
+                '@cdomotor-g ruled out cannot supply a match.',
     }
 
 
@@ -1321,7 +1360,9 @@ def reconcile(counts):
             "#122's figure is approximate and appears to count only cells Excel "
             "stores as dates. This survey also counts the text dates "
             "(`16/03/06` and friends) and the two flat tabs, which have no "
-            "banner and so no blocks."),
+            "banner and so no blocks. `ingested_inspection_rows` is the "
+            "number #124 loads, which is lower: the hidden legacy sheets are "
+            "read for comparison and not ingested."),
         row('distinct column-header layouts', 61, counts['distinct_layouts'],
             "Not reproducible: #122 does not record how a layout was counted, "
             "and no natural definition lands on 61. Measured here under four: "
@@ -1372,7 +1413,7 @@ def payload(result, name):
     body = result[key]
     doc = {'_': BANNERS[name]}
     if name == 'inspection_sheet_manifest.json':
-        doc['open_questions'] = OPEN_QUESTIONS
+        doc['decisions'] = DECISIONS
         doc['hidden_twins'] = result['twins']
         doc['cell_comments'] = result['comments']
         doc['sheets'] = body
@@ -1385,40 +1426,47 @@ def payload(result, name):
     return json.dumps(doc, indent=2, ensure_ascii=False) + '\n'
 
 
-OPEN_QUESTIONS = [
+# #122's three open questions, answered by @cdomotor-g on 2026-08-15 and
+# recorded here rather than only in prose, so the artefact that carries the
+# dispositions also carries the reason they are what they are.
+DECISIONS = [
     {
         'id': '122-1',
-        'for': '@cdomotor-g',
         'question': "`SLS 26092023` (hidden) has the identical 34-column Service Level "
                     "Specification shape as `SLS OCT23`, which you asked to ignore. Ignore "
                     "both, or ingest the registry separately into the station table?",
-        'held_as': "Both marked `skip`/`defer` in this manifest. Neither is an inspection "
-                   "tab — they are station metadata (basin, agency number, flood classes, "
-                   "priority, gauge/telemetry/sensor type, LGA, owner, maintainer, "
-                   "schedules, hub) and would write to the station table, not to "
-                   "meganet.inspection. Nothing in this epic is blocked by the answer.",
+        'answer': 'Ignore both.',
+        'answered_by': '@cdomotor-g',
+        'answered_on': '2026-08-15',
+        'effect': "Both SLS tabs are `skip`. Neither is an inspection tab — they are a "
+                  "station registry (basin, agency number, flood classes, priority, "
+                  "gauge/telemetry/sensor type, LGA, owner, maintainer, schedules, hub) "
+                  "and would have written to the station table rather than to "
+                  "meganet.inspection, so nothing in #122 changes shape.",
     },
     {
         'id': '122-2',
-        'for': '@cdomotor-g',
         'question': "Hidden legacy sheets versus their visible `!` twins — merge both, or "
                     "treat the `!` sheet as authoritative?",
-        'held_as': "Measured rather than guessed: see `hidden_twins` in this file for the "
-                   "visits each hidden sheet holds that its visible twin does not. The "
-                   "spec's recommendation is to ingest both and let the load deduplicate "
-                   "on (station, visit date), because the hidden sheets are not subsets — "
-                   "but the recommendation is not a decision, and #124 should not proceed "
-                   "on it without a yes.",
+        'answer': 'Ignore the hidden sheets. The visible `!` sheet is authoritative.',
+        'answered_by': '@cdomotor-g',
+        'answered_on': '2026-08-15',
+        'effect': "The twelve hidden legacy twins are `skip` (`Master` was already skipped "
+                  "as a template). They are still read, and `hidden_twins` still records "
+                  "what each one holds that its visible twin does not — 222 visits across "
+                  "18 station keys, every one an identity artefact rather than a missing "
+                  "visit. Keeping the measurement is what makes the decision checkable "
+                  "later; #124 loads only the visible sheets.",
     },
     {
         'id': '122-3',
-        'for': '@cdomotor-g',
         'question': "NSW tabs (`NSW Lismore `, `NSW McIntyre`, `NSW Tweed!`, "
                     "`NSW Richmond!`) — in scope, or QLD only?",
-        'held_as': "Marked `ingest` in this manifest on the grounds that they are the same "
-                   "form family and the same crews, and that excluding them would lose "
-                   "history no other system holds. Flip them to `skip` in "
-                   "SKIP_REASONS if the answer is QLD-only.",
+        'answer': 'In scope.',
+        'answered_by': '@cdomotor-g',
+        'answered_on': '2026-08-15',
+        'effect': "All four stay `ingest`: 41 blocks and 31 inspection rows, same form "
+                  "family and same crews as the QLD sheets.",
     },
 ]
 

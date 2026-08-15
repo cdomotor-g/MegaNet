@@ -10,7 +10,7 @@ It has four companions, all machine-readable, all written by
 
 | File | What it is |
 |---|---|
-| [`tools/ingest/inspection_sheet_manifest.json`](../tools/ingest/inspection_sheet_manifest.json) | one entry per worksheet — all 59 — with a disposition, the counts to reconcile against, the hidden-twin comparison, every cell comment, and the questions still open for @cdomotor-g |
+| [`tools/ingest/inspection_sheet_manifest.json`](../tools/ingest/inspection_sheet_manifest.json) | one entry per worksheet — all 59 — with a disposition, the counts to reconcile against, the hidden-twin comparison, every cell comment, and the three decisions behind the dispositions |
 | [`tools/ingest/inspection_field_map.json`](../tools/ingest/inspection_field_map.json) | the canonical field vocabulary, and every header label in the workbook mapped onto it — or listed unmapped, with a reason |
 | [`tools/ingest/inspection_layouts.json`](../tools/ingest/inspection_layouts.json) | every distinct column layout, each column carrying its canonical field |
 | [`tools/ingest/inspection_survey_counts.json`](../tools/ingest/inspection_survey_counts.json) | the headline counts, and how they reconcile against the figures quoted in #122 |
@@ -30,9 +30,23 @@ workbook. Nothing in this issue writes to a database.
 
 59 worksheets, **45 visible and 14 hidden** (#122 says 44/15; the workbook's own
 `state` attribute says otherwise — see *Reconciliation* at the foot of this
-page). Four of them are skipped and one is deferred, which leaves **54 sheets
-holding 1,420 station blocks and 20,407 dated inspection rows** between 1980 and
-2024.
+page). The survey reads all but three of them: **1,420 station blocks and
+20,407 dated inspection rows** between 1980 and 2024.
+
+**What #124 loads is smaller, and deliberately so.** @cdomotor-g's answers to
+#122's three open questions (see *Decisions*, below) put the two SLS tabs and
+the twelve hidden legacy sheets out of scope, which leaves:
+
+| | Read by the survey | **Ingested by #124** |
+|---|---|---|
+| Sheets | 56 | **42** |
+| Station blocks | 1,420 | **1,093** |
+| Dated inspection rows | 20,407 | **15,207** |
+| Rows needing a reject reason | 170 | **147** |
+
+The hidden sheets are still *read* — the comparison in the manifest's
+`hidden_twins` is what makes ignoring them a safe decision rather than a hopeful
+one, and it stops being checkable the moment the survey stops reading them.
 
 Two sheets are not blocks at all. `ALERTS` (228 rows) and `TM Only` (54 rows)
 are flat tables: one header band at the top, one row per inspection under it,
@@ -256,7 +270,8 @@ is retained in every case.** Every numeric column needs a raw companion — a
 because a fade margin of `>30` is a real observation, coercing it to null loses
 it and coercing it to `30` invents precision.
 
-Measured over the data rows of the 54 ingested sheets:
+Measured over the data rows of every sheet the survey reads — the 42 ingested
+plus the hidden twins it reads for comparison:
 
 | Class | Count | What it is | Rule |
 |---|---|---|---|
@@ -378,9 +393,10 @@ the block, and the extractor's rejects file should carry the same labels.
 | `malformed_date` | 40 | **reject** — a date cell that no parser should accept: `"9/11/2004` with a stray opening quote, `12/5//97`, `4/1/2/2012` |
 | `repeat_header` | 5 | ignore — a header repeated mid-block |
 
-**170 rows need a reject reason**, against 20,407 that load. That is the number
-#124 reconciles: loaded + rejected = every row inside every block, with nothing
-in between.
+**170 rows need a reject reason** across everything the survey reads, and
+**147 of them are in the sheets #124 actually loads**, against 15,207 rows. That
+is the number #124 reconciles: loaded + rejected = every row inside every block,
+with nothing in between.
 
 ---
 
@@ -488,41 +504,53 @@ claim #123's acceptance actually rests on.
 
 ---
 
-## Open questions
+## Decisions
 
-Recorded rather than resolved, per #123's acceptance. All three are also in
-`inspection_sheet_manifest.json` under `open_questions`, so the artefacts carry
-them and not just this page.
+#122 left three questions open and #123's job was to record them, not to resolve
+them. **@cdomotor-g answered all three on 2026-08-15**, and the answers are in
+`inspection_sheet_manifest.json` under `decisions` as well as here — the file
+that carries the dispositions should carry the reason they are what they are.
 
-**1. `SLS 26092023` (hidden) — ignore, like `SLS OCT23`?** Both are marked
-`skip`/`defer`. Neither is an inspection tab: they are a 34-column station
-registry (basin, agency number, flood classes, priority, gauge/telemetry/sensor
-type, LGA, owner, maintainer, schedules, hub) which would write to the station
-table, not to `meganet.inspection`. **Nothing in this epic is blocked by the
-answer** — but the registry overlaps #115's lookup work and may be worth a
-separate issue.
+**1. The two SLS tabs — ignore both.** `SLS OCT23` and its hidden twin
+`SLS 26092023` are both `skip`. Neither is an inspection tab: they are a
+34-column station registry (basin, agency number, flood classes, priority,
+gauge/telemetry/sensor type, LGA, owner, maintainer, schedules, hub) which would
+have written to the station table rather than to `meganet.inspection`, so
+nothing in this epic changes shape. If that registry is ever wanted, it is a
+separate issue against the station table and it overlaps #115's lookup work.
 
-**2. Hidden legacy sheets versus their visible `!` twins.** Measured rather than
-guessed. Once station identity is normalised (name, or CBM without leading
-zeros), **the visible sheets are near-perfect supersets**: across all thirteen
-pairs, 1,682 visits exist only on the visible sheet and only **222 exist only on
-the hidden one — and those 222 fall into just 18 station keys**, every one of
-which is an identity artefact rather than missing history (`c:34029/34097` is a
-block covering two CBM numbers, `c:040868.` has a trailing dot, `c:040931key92268`
-has a key number in the CBM cell, `n:mtkanigantmalert` is one station named
-differently on the two sheets).
+**2. The hidden legacy sheets — ignore them; the visible `!` twin is
+authoritative.** The twelve hidden twins are `skip` (`Master` is hidden too and
+was already skipped as a template). That takes 327 blocks and 5,200 rows out of
+the load.
 
-> **Recommendation, not a decision:** ingest both and deduplicate on (station,
-> visit date). The dedupe collapses almost everything, the visible sheet is
-> effectively authoritative, and the 18 odd keys get looked at rather than
-> discarded. **#124 should not proceed on this without a yes** — it changes
-> whether ~10,000 rows are loaded once or twice.
+The decision is safe rather than merely convenient, and the manifest keeps the
+measurement that says so. Once station identity is normalised — name with
+punctuation and case removed, or CBM number without its leading zeros, because
+`040876` and `40876` are the same station and a literal comparison says
+otherwise — the visible sheets are near-perfect supersets:
 
-**3. NSW tabs — in scope, or QLD only?** `NSW Lismore `, `NSW McIntyre`,
-`NSW Tweed!` and `NSW Richmond!` are marked `ingest`: 41 blocks, 31 inspection
-rows, the same form family and the same crews. Excluding them loses history no
-other system holds, and including them costs almost nothing. Flip them to `skip`
-in `SKIP_REASONS` if the answer is QLD-only.
+> Across all thirteen pairs, **1,682 visits exist only on the visible sheet** and
+> only **222 exist only on the hidden one — and those 222 fall into just 18
+> station keys**, every one of which is an identity artefact rather than missing
+> history: `c:34029/34097` is a block covering two CBM numbers, `c:040868.` has a
+> trailing dot, `c:040931key92268` has a key number in the CBM cell, and
+> `n:mtkanigantmalert` is one station named differently on the two sheets.
+
+The row-count deltas quoted in #122 (`Logan` 803 rows against `Logan!` 807) are
+real and are not evidence of missing inspections — they are blank rows, markers
+and spacing. `hidden_twins` in the manifest stays populated so that this claim
+can be re-checked against a future version of the workbook rather than taken on
+trust from this page.
+
+**3. The NSW tabs — in scope.** `NSW Lismore `, `NSW McIntyre`, `NSW Tweed!` and
+`NSW Richmond!` are `ingest`: 41 blocks and 31 inspection rows, the same form
+family and the same crews.
+
+**Nothing about these decisions is inferable from a sheet name.** #124 should
+read each sheet's `disposition` out of the manifest rather than deciding for
+itself which sheets to open — the twelve skipped twins are read by the survey
+and not loaded, and that distinction only exists in the file.
 
 ---
 
@@ -537,9 +565,14 @@ In dependency order:
    loader code, but the rules are the same rules and lifting them is cheaper
    than rewriting them.
 3. Reconcile against `inspection_survey_counts.json` **before** loading
-   anything: 1,420 blocks, 20,407 inspection rows, 170 rejects. A different
-   number means one of the two readers changed, and that is worth knowing while
-   the table is still empty.
+   anything. The numbers to hit are the `ingested_*` ones — **1,093 blocks,
+   15,207 inspection rows, 147 rejects** — with the whole-workbook figures
+   (1,420 / 20,407 / 170) beside them as the reading the dispositions were
+   applied to. A different number means one of the two readers changed, and that
+   is worth knowing while the table is still empty.
 4. Land the staging rows with the raw string beside every value (§5) and the
    provenance identifier on every row (§10).
-5. Do not decide open question 2 by writing code that assumes an answer.
+5. The dispositions in the manifest are the scope. Read a sheet's
+   `disposition` rather than its name — twelve of the sheets the survey reads
+   are deliberately not loaded, and which twelve is a decision recorded in the
+   file rather than a rule you can infer from the `!` in a sheet name.
