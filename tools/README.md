@@ -27,6 +27,33 @@ token-checked endpoints the bridge calls, in a transaction that rolls back. The
 half of that acceptance which is about a client and a broker rather than about
 Postgres is `bridge/test/integration.test.js`.
 
+## `ingest/` — the historical inspection workbook (#122)
+
+`ingest/xlsx.py` is a read-only .xlsx reader with nothing but the standard
+library, and `ingest/survey.py` is #123's survey of
+`archive/QLD All Site Inspections.xlsx` — 59 worksheets, 1,420 stacked station
+blocks and 20,407 dated inspection rows going back to 1980.
+
+```bash
+python3 tools/ingest/survey.py           # rewrite the four artefacts
+python3 tools/ingest/survey.py --check   # re-run and fail on any drift (CI does this)
+```
+
+It writes `inspection_sheet_manifest.json` (one row per worksheet, with a
+disposition and the counts #124 reconciles against), `inspection_field_map.json`
+(every header label in the workbook mapped onto a canonical field, or listed
+unmapped with a reason), `inspection_layouts.json` (all 226 distinct column
+layouts, each column carrying its field) and `inspection_survey_counts.json`.
+The prose half — block detection, header resolution, value coercion, dates,
+provenance, and the three questions still open for @cdomotor-g — is
+[`docs/inspection-workbook-parse-spec.md`](../docs/inspection-workbook-parse-spec.md).
+
+Neither file writes to a database; #124 is the extractor. `xlsx.py` is the piece
+worth reusing: it reads merged ranges, `#VALUE!` as an error rather than as a
+blank, the real used range (`Johnstone!` declares 16,382 columns and uses 29),
+and the text of a threaded comment rather than the "your version of Excel"
+stand-in Excel writes beside it.
+
 ## `acma_prefilter.py` + `acma_fetch.py` — the ACMA RF interference pipeline
 
 See the "ACMA RF Interference Layer" section of the repo README for the full

@@ -39,6 +39,12 @@ on:
       # check them (#105).
       - 'docs/**'
       - 'db/README.md'
+      # #123's survey artefacts are derived from the historical workbook and
+      # from the survey tool, so a change to either has to re-derive them —
+      # otherwise a checked-in manifest quietly stops describing the file it
+      # claims to describe.
+      - 'tools/ingest/**'
+      - 'archive/QLD All Site Inspections.xlsx'
       - '.github/workflows/web-smoke.yml'
   pull_request:
     paths:
@@ -59,6 +65,12 @@ on:
       # check them (#105).
       - 'docs/**'
       - 'db/README.md'
+      # #123's survey artefacts are derived from the historical workbook and
+      # from the survey tool, so a change to either has to re-derive them —
+      # otherwise a checked-in manifest quietly stops describing the file it
+      # claims to describe.
+      - 'tools/ingest/**'
+      - 'archive/QLD All Site Inspections.xlsx'
       - '.github/workflows/web-smoke.yml'
   workflow_dispatch:
 
@@ -211,6 +223,14 @@ jobs:
       - name: Inspection History — a record reads back as the sheet it was written on
         working-directory: test
         run: npm run history
+
+      # Python, no browser, no dependencies, and the only check in this file
+      # that is about a *data* artefact rather than about the app: #123's sheet
+      # manifest, field map and layout table are derived from the historical
+      # workbook, and a derived file that nobody re-derives is a file that
+      # quietly stops being true. This re-runs the survey and diffs.
+      - name: Inspection workbook survey — the artefacts still match the workbook
+        run: python3 tools/ingest/survey.py --check
 
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —

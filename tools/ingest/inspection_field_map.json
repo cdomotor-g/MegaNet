@@ -1,0 +1,2244 @@
+{
+  "_": "The canonical field vocabulary and every header label mapped onto it. Written by tools/ingest/survey.py; do not edit by hand.",
+  "canonical": [
+    {
+      "field": "station_number",
+      "target": "inspection.cbm_no",
+      "note": "The CBM/Bureau number printed in the column, where the layout has one."
+    },
+    {
+      "field": "inspect_date",
+      "target": "inspection.inspected_on",
+      "note": "The visit date. The only field whose absence disqualifies a row."
+    },
+    {
+      "field": "canister_no",
+      "target": "inspection_serial (equipment=alert_canister)",
+      "note": "ALERT canister serial."
+    },
+    {
+      "field": "canister_type",
+      "target": "inspection_serial.model",
+      "note": "Canister type, where a layout prints it instead of the serial."
+    },
+    {
+      "field": "logger_no",
+      "target": "inspection_serial (equipment=logger)",
+      "note": "Logger or Mace serial."
+    },
+    {
+      "field": "battery_standby_v",
+      "target": "inspection_power.battery_existing_v",
+      "note": ""
+    },
+    {
+      "field": "battery_under_load_v",
+      "target": "inspection_power.battery_existing_v_under_load",
+      "note": ""
+    },
+    {
+      "field": "lithium_battery_v",
+      "target": "inspection_power.lithium_battery_v",
+      "note": ""
+    },
+    {
+      "field": "battery_test_raw",
+      "target": "inspection_power.comments",
+      "note": "Argus battery tester, printed as V/CCA — two numbers in one cell."
+    },
+    {
+      "field": "consumption_standby_ma",
+      "target": "inspection_power (new column)",
+      "note": "0009 has sleep/interrogation/operating but no standby; ALERT prints standby."
+    },
+    {
+      "field": "consumption_transmit_ma",
+      "target": "inspection_power (new column)",
+      "note": "ALERT transmit draw."
+    },
+    {
+      "field": "consumption_sleep_ma",
+      "target": "inspection_power.consumption_sleep_ma",
+      "note": ""
+    },
+    {
+      "field": "consumption_operating_ma",
+      "target": "inspection_power.consumption_operating_ma",
+      "note": ""
+    },
+    {
+      "field": "consumption_interrogation_ma",
+      "target": "inspection_power.consumption_interrogation_ma",
+      "note": ""
+    },
+    {
+      "field": "solar_output_v",
+      "target": "inspection_power.solar_output_v",
+      "note": "Open-circuit output; several layouts word it \"Open circuit\" or \"Volts\"."
+    },
+    {
+      "field": "solar_short_circuit_ma",
+      "target": "inspection_power.solar_short_circuit_ma",
+      "note": ""
+    },
+    {
+      "field": "solar_regulated_v",
+      "target": "inspection_power.solar_regulator_v",
+      "note": ""
+    },
+    {
+      "field": "solar_charge_current_ma",
+      "target": "inspection_power.solar_charge_current_ma",
+      "note": ""
+    },
+    {
+      "field": "solar_step_up_v",
+      "target": "inspection_power.solar_step_up_v",
+      "note": ""
+    },
+    {
+      "field": "mains_charge_current_ma",
+      "target": "inspection_power (new column)",
+      "note": "Mains charger, on the sheets that have one instead of solar."
+    },
+    {
+      "field": "mains_regulated_v",
+      "target": "inspection_power (new column)",
+      "note": ""
+    },
+    {
+      "field": "telephone_socket_v",
+      "target": "inspection_power.telephone_socket_v",
+      "note": ""
+    },
+    {
+      "field": "tx_forward_w",
+      "target": "inspection_radio.existing_forward_w",
+      "note": ""
+    },
+    {
+      "field": "tx_reflected_w",
+      "target": "inspection_radio.existing_reflected_w",
+      "note": ""
+    },
+    {
+      "field": "swr",
+      "target": "inspection_radio.existing_swr",
+      "note": ""
+    },
+    {
+      "field": "tx_size_w",
+      "target": "inspection_radio.tx_size_w",
+      "note": ""
+    },
+    {
+      "field": "tx_deviation_khz",
+      "target": "inspection_radio (new column)",
+      "note": "DEV (kHz) on the sheets that measure deviation."
+    },
+    {
+      "field": "fade_margin_db",
+      "target": "inspection_fade_margin.load_db",
+      "note": "One number per visit here, not the sheet's full table."
+    },
+    {
+      "field": "rssi_dbm",
+      "target": "inspection_data.rssi_dbm",
+      "note": ""
+    },
+    {
+      "field": "antenna_forward_w",
+      "target": "inspection_calibration (kind=receiver_test) / radio",
+      "note": "Base-station antenna test, per frequency and per antenna number."
+    },
+    {
+      "field": "antenna_reflected_w",
+      "target": "inspection_calibration (kind=receiver_test) / radio",
+      "note": ""
+    },
+    {
+      "field": "antenna_swr",
+      "target": "inspection_calibration (kind=receiver_test) / radio",
+      "note": ""
+    },
+    {
+      "field": "decoder_v",
+      "target": "inspection_calibration (kind=decoder_test)",
+      "note": ""
+    },
+    {
+      "field": "receiver_v",
+      "target": "inspection_calibration (kind=receiver_test)",
+      "note": ""
+    },
+    {
+      "field": "decoder_serial",
+      "target": "inspection_serial (equipment=decoder)",
+      "note": ""
+    },
+    {
+      "field": "receiver1_serial",
+      "target": "inspection_serial (equipment=receiver)",
+      "note": ""
+    },
+    {
+      "field": "receiver2_serial",
+      "target": "inspection_serial (equipment=receiver)",
+      "note": ""
+    },
+    {
+      "field": "tbrg_calibration_mm",
+      "target": "inspection_calibration (kind=rain_tip_test)",
+      "note": "The one-number tip-test result these sheets print."
+    },
+    {
+      "field": "river_calibration_point",
+      "target": "inspection_calibration (kind=river_calibration — NEW)",
+      "note": "A (point, reading) pair. 0009 has no river_calibration kind; #126 has to add one."
+    },
+    {
+      "field": "shaft_encoder_increments_per_rev",
+      "target": "inspection_calibration.revolutions / extra",
+      "note": ""
+    },
+    {
+      "field": "shaft_encoder_revs",
+      "target": "inspection_calibration.revolutions",
+      "note": ""
+    },
+    {
+      "field": "shaft_encoder_result",
+      "target": "inspection_calibration.result",
+      "note": ""
+    },
+    {
+      "field": "shaft_encoder_error",
+      "target": "inspection_calibration.error_m",
+      "note": ""
+    },
+    {
+      "field": "shaft_encoder_accum_diff",
+      "target": "inspection_calibration.difference",
+      "note": ""
+    },
+    {
+      "field": "gas_pressure_kpa",
+      "target": "inspection_data.gas_pressure_kpa",
+      "note": ""
+    },
+    {
+      "field": "cylinder_pressure_kpa",
+      "target": "inspection_gas.existing_cylinder_pressure_kpa",
+      "note": ""
+    },
+    {
+      "field": "replacement_cylinder_pressure_kpa",
+      "target": "inspection_gas.replacement_cylinder_pressure_kpa",
+      "note": ""
+    },
+    {
+      "field": "feed_pressure_kpa",
+      "target": "inspection_gas.existing_feed_pressure_kpa",
+      "note": ""
+    },
+    {
+      "field": "bubble_rate_bpm",
+      "target": "inspection_gas.existing_bubble_rate_bpm",
+      "note": ""
+    },
+    {
+      "field": "gas_consumption_kpa_month",
+      "target": "inspection_gas.consumption_kpa_per_month",
+      "note": ""
+    },
+    {
+      "field": "gas_pump_cycle_kpa",
+      "target": "inspection_gas.compressor_pump_cycle_from_kpa",
+      "note": ""
+    },
+    {
+      "field": "dp_counter",
+      "target": "inspection_data.dp_counter",
+      "note": ""
+    },
+    {
+      "field": "dp_battery_v",
+      "target": "inspection_power (new column)",
+      "note": "Mace DP battery, distinct from the station battery."
+    },
+    {
+      "field": "supply_v",
+      "target": "inspection_calibration.supply_v",
+      "note": "Voltage the decoder supplies to a receiver."
+    },
+    {
+      "field": "antenna_frequency_mhz",
+      "target": "inspection_radio.existing_frequency_mhz",
+      "note": ""
+    },
+    {
+      "field": "shaft_encoder_count_direction",
+      "target": "inspection_calibration.notes",
+      "note": "S/E Count UP/DN."
+    },
+    {
+      "field": "analogue_range_m",
+      "target": "inspection_water_level.transmitter_range",
+      "note": ""
+    },
+    {
+      "field": "remarks",
+      "target": "inspection.remarks",
+      "note": ""
+    },
+    {
+      "field": "station_name",
+      "target": "inspection.station_name",
+      "note": "Only the two flat tabs print it as a column."
+    }
+  ],
+  "mapped": {
+    "Remarks": {
+      "count": 1402,
+      "example": "Ipswich!R5",
+      "field": "remarks"
+    },
+    "Inspect Date": {
+      "count": 1339,
+      "example": "Ipswich!A5",
+      "field": "inspect_date"
+    },
+    "Battery Voltage Stand -by": {
+      "count": 1274,
+      "example": "Ipswich!C5",
+      "field": "battery_standby_v"
+    },
+    "Canister No": {
+      "count": 1230,
+      "example": "Ipswich!B5",
+      "field": "canister_no"
+    },
+    "Fade Margin (db)": {
+      "count": 1229,
+      "example": "Ipswich!H5",
+      "field": "fade_margin_db"
+    },
+    "Transmitter Ref": {
+      "count": 1159,
+      "example": "Ipswich!J5",
+      "field": "tx_reflected_w"
+    },
+    "SWR": {
+      "count": 1157,
+      "example": "Ipswich!K5",
+      "field": "swr"
+    },
+    "Solar Output Voltage (v)": {
+      "count": 963,
+      "example": "Brisbane!!H5",
+      "field": "solar_output_v"
+    },
+    "Solar Short Circuit (mA)": {
+      "count": 913,
+      "example": "Brisbane!!I5",
+      "field": "solar_short_circuit_ma"
+    },
+    "Solar Regulated Voltage (v)": {
+      "count": 908,
+      "example": "Brisbane!!J5",
+      "field": "solar_regulated_v"
+    },
+    "Solar Current Charge (mA)": {
+      "count": 907,
+      "example": "Brisbane!!K5",
+      "field": "solar_charge_current_ma"
+    },
+    "Transmitter Fwd": {
+      "count": 900,
+      "example": "Brisbane!!L5",
+      "field": "tx_forward_w"
+    },
+    "ALERT Station Number": {
+      "count": 889,
+      "example": "Brisbane!!A5",
+      "field": "station_number"
+    },
+    "Consumption Stand-by (mA)": {
+      "count": 886,
+      "example": "Brisbane!!F5",
+      "field": "consumption_standby_ma"
+    },
+    "TBRG Calib": {
+      "count": 883,
+      "example": "Brisbane!!P5",
+      "field": "tbrg_calibration_mm"
+    },
+    "Battery Voltage Under -load": {
+      "count": 835,
+      "example": "Brisbane!!E5",
+      "field": "battery_under_load_v"
+    },
+    "Consumption Transmit (mA)": {
+      "count": 835,
+      "example": "Brisbane!!G5",
+      "field": "consumption_transmit_ma"
+    },
+    "10": {
+      "count": 677,
+      "example": "Ipswich!O5",
+      "field": "river_calibration_point"
+    },
+    "5": {
+      "count": 628,
+      "example": "Ipswich!N5",
+      "field": "river_calibration_point"
+    },
+    "20": {
+      "count": 598,
+      "example": "Ipswich!Q5",
+      "field": "river_calibration_point"
+    },
+    "2": {
+      "count": 597,
+      "example": "Ipswich!N37",
+      "field": "river_calibration_point"
+    },
+    "15": {
+      "count": 589,
+      "example": "Ipswich!P5",
+      "field": "river_calibration_point"
+    },
+    "1": {
+      "count": 561,
+      "example": "Ipswich!L810",
+      "field": "river_calibration_point"
+    },
+    "0": {
+      "count": 520,
+      "example": "Brisbane!!Q188",
+      "field": "river_calibration_point"
+    },
+    "30": {
+      "count": 489,
+      "example": "Ipswich!Q169",
+      "field": "river_calibration_point"
+    },
+    "8": {
+      "count": 455,
+      "example": "Ipswich!P746",
+      "field": "river_calibration_point"
+    },
+    "Battery Under Load": {
+      "count": 379,
+      "example": "Ipswich!D5",
+      "field": "battery_under_load_v"
+    },
+    "TBRG Calb (mm)": {
+      "count": 370,
+      "example": "Ipswich!L137",
+      "field": "tbrg_calibration_mm"
+    },
+    "Transmitter Power (w) Fwd": {
+      "count": 330,
+      "example": "Ipswich!I5",
+      "field": "tx_forward_w"
+    },
+    "Solar (mA) Charge": {
+      "count": 274,
+      "example": "Ipswich!F5",
+      "field": "solar_charge_current_ma"
+    },
+    "Consu- mption Stand -by": {
+      "count": 252,
+      "example": "Ipswich!E5",
+      "field": "consumption_standby_ma"
+    },
+    "River Calibration (metres)": {
+      "count": 194,
+      "example": "Ipswich!M5",
+      "field": "tbrg_calibration_mm"
+    },
+    "Solar (v) Regul- ator": {
+      "count": 146,
+      "example": "Ipswich!G5",
+      "field": "solar_regulated_v"
+    },
+    "Logger No": {
+      "count": 130,
+      "example": "Brisbane!!C1467",
+      "field": "logger_no"
+    },
+    "Consumption Sleep (mA)": {
+      "count": 90,
+      "example": "Brisbane!!F1467",
+      "field": "consumption_sleep_ma"
+    },
+    "Consumption Operating (mA)": {
+      "count": 87,
+      "example": "Brisbane!!G1467",
+      "field": "consumption_operating_ma"
+    },
+    "TBRG Calib (mm)": {
+      "count": 78,
+      "example": "Brisbane!!P1467",
+      "field": "tbrg_calibration_mm"
+    },
+    "RSSI": {
+      "count": 77,
+      "example": "Brisbane!!M1467",
+      "field": "rssi_dbm"
+    },
+    "Lithium Batter Voltage (v)": {
+      "count": 77,
+      "example": "Brisbane!!N1467",
+      "field": "lithium_battery_v"
+    },
+    "Phone Socket Voltage": {
+      "count": 77,
+      "example": "Brisbane!!O1467",
+      "field": "telephone_socket_v"
+    },
+    "Battery Voltage Stan -by": {
+      "count": 76,
+      "example": "Brisbane!!D1467",
+      "field": "battery_standby_v"
+    },
+    "TM Inspection Date": {
+      "count": 74,
+      "example": "Brisbane!!B1467",
+      "field": "inspect_date"
+    },
+    "Consumption Interrogation (mA)": {
+      "count": 74,
+      "example": "Brisbane!!H1467",
+      "field": "consumption_interrogation_ma"
+    },
+    "Battery Voltage Under -Load": {
+      "count": 73,
+      "example": "Brisbane!!E1467",
+      "field": "battery_under_load_v"
+    },
+    "Solar Charge Current (mA)": {
+      "count": 70,
+      "example": "Pioneer!G5",
+      "field": "solar_charge_current_ma"
+    },
+    "Ref": {
+      "count": 67,
+      "example": "Ipswich!J297",
+      "field": "tx_reflected_w"
+    },
+    "DEV (kHz)": {
+      "count": 65,
+      "example": "Brisbane!!AC5",
+      "field": "tx_deviation_khz"
+    },
+    "Short Circuit (mA)": {
+      "count": 56,
+      "example": "Barcaldine!!I7",
+      "field": "solar_short_circuit_ma"
+    },
+    "Regulated Voltage (v)": {
+      "count": 56,
+      "example": "Barcaldine!!J7",
+      "field": "solar_regulated_v"
+    },
+    "Current Charge (mA)": {
+      "count": 56,
+      "example": "Barcaldine!!K7",
+      "field": "solar_charge_current_ma"
+    },
+    "Solar (v) Volts": {
+      "count": 55,
+      "example": "Townsville!G5",
+      "field": "solar_output_v"
+    },
+    "TM STATION NUMBER": {
+      "count": 52,
+      "example": "Brisbane!!A1467",
+      "field": "station_number"
+    },
+    "Under -load": {
+      "count": 52,
+      "example": "Barcaldine!!E7",
+      "field": "battery_under_load_v"
+    },
+    "Transmit (mA)": {
+      "count": 52,
+      "example": "Barcaldine!!G7",
+      "field": "consumption_transmit_ma"
+    },
+    "Argus Battery Test V/CCA": {
+      "count": 46,
+      "example": "Burnett&Kolan!!AC5",
+      "field": "battery_test_raw"
+    },
+    "RECEI- VER": {
+      "count": 45,
+      "example": "Brisbane!!N1529",
+      "field": "receiver_v"
+    },
+    "Phone socket Voltage (v)": {
+      "count": 45,
+      "example": "Mary!M498",
+      "field": "telephone_socket_v"
+    },
+    "Solar Regul- ated (v.)": {
+      "count": 43,
+      "example": "Logan!G549",
+      "field": "solar_regulated_v"
+    },
+    "Consumption (mA) Sleep": {
+      "count": 42,
+      "example": "Mary!!F605",
+      "field": "consumption_sleep_ma"
+    },
+    "Consumption (mA) Operat -ing": {
+      "count": 41,
+      "example": "Moonie!F4",
+      "field": "consumption_operating_ma"
+    },
+    "SERIAL NUMBERS Serial No. RECEIVER": {
+      "count": 39,
+      "example": "Brisbane!!V1529",
+      "field": "receiver_v"
+    },
+    "Consu- mption Trans mit": {
+      "count": 34,
+      "example": "Noosa!L5",
+      "field": "consumption_transmit_ma"
+    },
+    "BASE STATION": {
+      "count": 33,
+      "example": "Brisbane!!A1506",
+      "field": "station_name"
+    },
+    "TX Size (watts)": {
+      "count": 33,
+      "example": "Brisbane!!C1506",
+      "field": "tx_size_w"
+    },
+    "4": {
+      "count": 30,
+      "example": "Ipswich!O105",
+      "field": "river_calibration_point"
+    },
+    "Consum. Stand -by (mA)": {
+      "count": 29,
+      "example": "Logan!E549",
+      "field": "consumption_standby_ma"
+    },
+    "Solar (v) Open circuit": {
+      "count": 28,
+      "example": "Mary!I498",
+      "field": "solar_output_v"
+    },
+    "Solar (v) Volt": {
+      "count": 26,
+      "example": "Logan!G1491",
+      "field": "solar_output_v"
+    },
+    "6": {
+      "count": 25,
+      "example": "Ipswich!P105",
+      "field": "river_calibration_point"
+    },
+    "Consumption (mA) Stand -by": {
+      "count": 25,
+      "example": "Pioneer!E5",
+      "field": "consumption_standby_ma"
+    },
+    "DECO- DER": {
+      "count": 24,
+      "example": "Brisbane!!M1529",
+      "field": "decoder_v"
+    },
+    "Solar Voltage (v)": {
+      "count": 24,
+      "example": "Pioneer!F5",
+      "field": "solar_output_v"
+    },
+    "Solar Regul- ator (v)": {
+      "count": 24,
+      "example": "Pioneer!H5",
+      "field": "solar_regulated_v"
+    },
+    "Solar (v) Regul -ated": {
+      "count": 23,
+      "example": "Mary!J498",
+      "field": "solar_regulated_v"
+    },
+    "Solar (v) Reg": {
+      "count": 21,
+      "example": "Ipswich!G778",
+      "field": "solar_regulated_v"
+    },
+    "Consumption (mA) Interrog -ation": {
+      "count": 21,
+      "example": "Mary!G498",
+      "field": "consumption_interrogation_ma"
+    },
+    "SERIAL NUMBERS Serial No. DECODER": {
+      "count": 20,
+      "example": "Brisbane!!T1529",
+      "field": "decoder_serial"
+    },
+    "Shaft Encoder Increm. / rev. No of Revs.": {
+      "count": 19,
+      "example": "Ipswich!M297",
+      "field": "shaft_encoder_revs"
+    },
+    "Antenna 151.5 #1 FWD PWR": {
+      "count": 18,
+      "example": "Brisbane!!D1506",
+      "field": "antenna_forward_w"
+    },
+    "Consumption Stand -by (mA)": {
+      "count": 18,
+      "example": "Logan!E409",
+      "field": "consumption_standby_ma"
+    },
+    "Solar (mA) Charge Current": {
+      "count": 18,
+      "example": "Logan!G1427",
+      "field": "solar_charge_current_ma"
+    },
+    "Lithium Battery Voltage (v)": {
+      "count": 18,
+      "example": "Mary!H498",
+      "field": "lithium_battery_v"
+    },
+    "Gas (kpa)": {
+      "count": 17,
+      "example": "Ipswich!L37",
+      "field": "gas_pressure_kpa"
+    },
+    "Consumption Trans -mit (mA)": {
+      "count": 17,
+      "example": "Logan!F409",
+      "field": "consumption_transmit_ma"
+    },
+    "Antenna 151.5 #1 REF PWR": {
+      "count": 15,
+      "example": "Brisbane!!E1506",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 151.5 #1 SWR": {
+      "count": 15,
+      "example": "Brisbane!!F1506",
+      "field": "antenna_swr"
+    },
+    "5 3": {
+      "count": 15,
+      "example": "Nerang!!T85",
+      "field": "river_calibration_point"
+    },
+    "Transmitter Ref.": {
+      "count": 13,
+      "example": "Ipswich!D810",
+      "field": "tx_reflected_w"
+    },
+    "Battery Voltage Under Load": {
+      "count": 13,
+      "example": "Logan!D1164",
+      "field": "battery_under_load_v"
+    },
+    "Solar Open circuit (v)": {
+      "count": 13,
+      "example": "Closed stations!H153",
+      "field": "solar_output_v"
+    },
+    "Receiver": {
+      "count": 12,
+      "example": "Brisbane!!H1506",
+      "field": "receiver_v"
+    },
+    "#1 REF PWR": {
+      "count": 12,
+      "example": "Burrum Cherwell!!E333",
+      "field": "antenna_reflected_w"
+    },
+    "#1 SWR": {
+      "count": 12,
+      "example": "Burrum Cherwell!!F333",
+      "field": "antenna_swr"
+    },
+    "Solar Regul -ated (v)": {
+      "count": 12,
+      "example": "Closed stations!I189",
+      "field": "solar_regulated_v"
+    },
+    "3": {
+      "count": 11,
+      "example": "Ipswich!N810",
+      "field": "river_calibration_point"
+    },
+    "TM STATION Formula above change the xxxxxx to the station number": {
+      "count": 11,
+      "example": "NSW Tweed!!A193",
+      "field": "station_number"
+    },
+    "Supply V": {
+      "count": 10,
+      "example": "Ipswich!E810",
+      "field": "supply_v"
+    },
+    "Feed Pressure Kpa": {
+      "count": 10,
+      "example": "Brisbane!!D431",
+      "field": "cylinder_pressure_kpa"
+    },
+    "Bubble Rate BPM": {
+      "count": 10,
+      "example": "Brisbane!!E431",
+      "field": "bubble_rate_bpm"
+    },
+    "8 5": {
+      "count": 10,
+      "example": "Nerang!!U85",
+      "field": "river_calibration_point"
+    },
+    "Solar Charge (mA)": {
+      "count": 10,
+      "example": "Closed stations!I153",
+      "field": "solar_charge_current_ma"
+    },
+    "#1 FWD PWR": {
+      "count": 9,
+      "example": "Burrum Cherwell!!D333",
+      "field": "antenna_forward_w"
+    },
+    "Step Up (v)": {
+      "count": 9,
+      "example": "Fitzroy!!AD2246",
+      "field": "solar_step_up_v"
+    },
+    "8 4": {
+      "count": 9,
+      "example": "Nerang!!U220",
+      "field": "river_calibration_point"
+    },
+    "Consu-mption Stand -by": {
+      "count": 9,
+      "example": "Pioneer!E964",
+      "field": "consumption_standby_ma"
+    },
+    "Shaft Encoder Incre -ments": {
+      "count": 8,
+      "example": "Ipswich!N297",
+      "field": "shaft_encoder_increments_per_rev"
+    },
+    "Remarks BoM Commissioning": {
+      "count": 8,
+      "example": "Brisbane!!Z1324",
+      "field": "remarks"
+    },
+    "TM STATION": {
+      "count": 8,
+      "example": "Fitzroy!!A1046",
+      "field": "station_number"
+    },
+    "10 5": {
+      "count": 8,
+      "example": "Nerang!!V220",
+      "field": "river_calibration_point"
+    },
+    "5 4": {
+      "count": 8,
+      "example": "Nerang!!T547",
+      "field": "river_calibration_point"
+    },
+    "Decoder Voltage (V)": {
+      "count": 8,
+      "example": "Pioneer!E678",
+      "field": "decoder_v"
+    },
+    "Solar (mA) Short Circuit": {
+      "count": 8,
+      "example": "Herbert!F730",
+      "field": "solar_short_circuit_ma"
+    },
+    "Transmitter Power Ref. (w)": {
+      "count": 8,
+      "example": "Barron!D413",
+      "field": "tx_forward_w"
+    },
+    "Transmitter Power SWR": {
+      "count": 8,
+      "example": "Barron!E413",
+      "field": "tx_forward_w"
+    },
+    "Solar (v) Step up": {
+      "count": 8,
+      "example": "Mary!J1049",
+      "field": "solar_step_up_v"
+    },
+    "Shaft Encoder Correct Result": {
+      "count": 7,
+      "example": "Ipswich!O297",
+      "field": "shaft_encoder_result"
+    },
+    "Shaft Encoder Error": {
+      "count": 7,
+      "example": "Ipswich!P297",
+      "field": "shaft_encoder_error"
+    },
+    "Antenna Fwd": {
+      "count": 7,
+      "example": "Pioneer!B678",
+      "field": "antenna_forward_w"
+    },
+    "Antenna Ref.": {
+      "count": 7,
+      "example": "Pioneer!C678",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna SWR": {
+      "count": 7,
+      "example": "Pioneer!D678",
+      "field": "antenna_swr"
+    },
+    "Mains charger (mA) Charge": {
+      "count": 7,
+      "example": "Barron!F78",
+      "field": "mains_charge_current_ma"
+    },
+    "Solar (v) Open Circuit": {
+      "count": 7,
+      "example": "Mary!G1158",
+      "field": "solar_output_v"
+    },
+    "Solar Step up (v)": {
+      "count": 7,
+      "example": "Closed stations!J189",
+      "field": "solar_step_up_v"
+    },
+    "DECO": {
+      "count": 6,
+      "example": "Brisbane!!G1506",
+      "field": "decoder_v"
+    },
+    "Serial No. RECEIVER": {
+      "count": 6,
+      "example": "Burnett&Kolan!!V975",
+      "field": "receiver_v"
+    },
+    "Antenna 151.95 #2 FWD PWR": {
+      "count": 6,
+      "example": "Mary!!G656",
+      "field": "antenna_forward_w"
+    },
+    "Mains Charger (mA) Charge": {
+      "count": 6,
+      "example": "Townsville!F601",
+      "field": "mains_charge_current_ma"
+    },
+    "der Press- ure": {
+      "count": 6,
+      "example": "Closed stations!K738",
+      "field": "cylinder_pressure_kpa"
+    },
+    "Canister Type Used": {
+      "count": 5,
+      "example": "Ipswich!B810",
+      "field": "canister_type"
+    },
+    "Existing Cylinder Cylinder Pressure Kpa": {
+      "count": 5,
+      "example": "Brisbane!!C431",
+      "field": "cylinder_pressure_kpa"
+    },
+    "Cons/ month Kpa": {
+      "count": 5,
+      "example": "Brisbane!!F431",
+      "field": "gas_consumption_kpa_month"
+    },
+    "Voltage Under Load": {
+      "count": 5,
+      "example": "Brisbane!!K431",
+      "field": "battery_under_load_v"
+    },
+    "Cons. Sleep m / A": {
+      "count": 5,
+      "example": "Brisbane!!L431",
+      "field": "consumption_sleep_ma"
+    },
+    "Cons. Operat. m / A": {
+      "count": 5,
+      "example": "Brisbane!!M431",
+      "field": "consumption_operating_ma"
+    },
+    "Counter": {
+      "count": 5,
+      "example": "Brisbane!!N431",
+      "field": "dp_counter"
+    },
+    "Antenna 151.95 #2 REF PWR": {
+      "count": 5,
+      "example": "Mary!!H656",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 151.95 #2 SWR": {
+      "count": 5,
+      "example": "Mary!!I656",
+      "field": "antenna_swr"
+    },
+    "Shaft Encoder Increm. / rev. Incre- ments": {
+      "count": 5,
+      "example": "Maroochy!!AC487",
+      "field": "shaft_encoder_increments_per_rev"
+    },
+    "Solar (v.) Regulator": {
+      "count": 5,
+      "example": "Moonie!H4",
+      "field": "solar_regulated_v"
+    },
+    "Solar (v) Output Voltage": {
+      "count": 5,
+      "example": "Logan!F1427",
+      "field": "solar_output_v"
+    },
+    "Mains Charger (v) Regul- ator": {
+      "count": 5,
+      "example": "Townsville!G601",
+      "field": "mains_charge_current_ma"
+    },
+    "from Decoder to Receiver": {
+      "count": 5,
+      "example": "Barron!B413",
+      "field": "decoder_v"
+    },
+    "Consumption (mA) Interr- ogation": {
+      "count": 5,
+      "example": "Closed stations!G5",
+      "field": "consumption_interrogation_ma"
+    },
+    "Replacement Cylinder Cylinder Pressure Kpa": {
+      "count": 4,
+      "example": "Brisbane!!G431",
+      "field": "replacement_cylinder_pressure_kpa"
+    },
+    "DP Battery Voltage": {
+      "count": 4,
+      "example": "Brisbane!!J431",
+      "field": "dp_battery_v"
+    },
+    "Remarks Station installed.": {
+      "count": 4,
+      "example": "Brisbane!!Z1146",
+      "field": "remarks"
+    },
+    "SERIAL NUMBERS Serial No. DECO- DER": {
+      "count": 4,
+      "example": "Brisbane!!T1506",
+      "field": "decoder_serial"
+    },
+    "SERIAL NUMBERS Serial No. RECEI- VER1": {
+      "count": 4,
+      "example": "Brisbane!!V1506",
+      "field": "receiver_v"
+    },
+    "Serial No. DECODER": {
+      "count": 4,
+      "example": "Burnett&Kolan!!T975",
+      "field": "decoder_serial"
+    },
+    "Step Up(v)": {
+      "count": 4,
+      "example": "Condamine!!AC1565",
+      "field": "solar_step_up_v"
+    },
+    "Under -Load": {
+      "count": 4,
+      "example": "Fitzroy!!E2549",
+      "field": "battery_under_load_v"
+    },
+    "Operating (mA)": {
+      "count": 4,
+      "example": "Fitzroy!!G2549",
+      "field": "consumption_operating_ma"
+    },
+    "Interrogation (mA)": {
+      "count": 4,
+      "example": "Fitzroy!!H2549",
+      "field": "consumption_interrogation_ma"
+    },
+    "Battery Voltage Stand": {
+      "count": 4,
+      "example": "Mary!!D605",
+      "field": "battery_standby_v"
+    },
+    "Antenna 152.4 #2 FWD PWR": {
+      "count": 4,
+      "example": "Logan!!G421",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 152.4 #2 REF PWR": {
+      "count": 4,
+      "example": "Logan!!H421",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 152.4 #2 SWR": {
+      "count": 4,
+      "example": "Logan!!I421",
+      "field": "antenna_swr"
+    },
+    "Accum. Diff.": {
+      "count": 4,
+      "example": "Logan!!AC1131",
+      "field": "shaft_encoder_accum_diff"
+    },
+    "5 6": {
+      "count": 4,
+      "example": "Logan!!T1485",
+      "field": "river_calibration_point"
+    },
+    "8 6": {
+      "count": 4,
+      "example": "Nerang!!U869",
+      "field": "river_calibration_point"
+    },
+    "Receiver Voltage (V)": {
+      "count": 4,
+      "example": "Pioneer!F710",
+      "field": "receiver_v"
+    },
+    "TM STATION NUMBER ENTER ANY NEW DATA FROM THE TM & BASE TAB": {
+      "count": 4,
+      "example": "NSW Lismore !A154",
+      "field": "station_number"
+    },
+    "No of Revs": {
+      "count": 4,
+      "example": "Barron!!AB104",
+      "field": "shaft_encoder_revs"
+    },
+    "Test Set": {
+      "count": 4,
+      "example": "Barron!!AC104",
+      "field": "shaft_encoder_result"
+    },
+    "Solar (v) volt": {
+      "count": 4,
+      "example": "Burdekin!G316",
+      "field": "solar_output_v"
+    },
+    "Ref.": {
+      "count": 4,
+      "example": "Don!C360",
+      "field": "tx_reflected_w"
+    },
+    "Mains charger (v) Regul- ated": {
+      "count": 4,
+      "example": "Barron!G330",
+      "field": "mains_charge_current_ma"
+    },
+    "TBRG": {
+      "count": 3,
+      "example": "Ipswich!K37",
+      "field": "tbrg_calibration_mm"
+    },
+    "Transmitter 151.500 MHz Fwd": {
+      "count": 3,
+      "example": "Ipswich!F810",
+      "field": "tx_forward_w"
+    },
+    "SERIAL NUMBERS Serial No. RECEI- VER2": {
+      "count": 3,
+      "example": "Brisbane!!X1506",
+      "field": "receiver_v"
+    },
+    "Shaft Encoder Increm. / rev. Increments": {
+      "count": 3,
+      "example": "Border!!AC1001",
+      "field": "shaft_encoder_increments_per_rev"
+    },
+    "Shaft Encoder Test Set": {
+      "count": 3,
+      "example": "Herbert!N698",
+      "field": "shaft_encoder_result"
+    },
+    "Mains charger (v) Regul- ator": {
+      "count": 3,
+      "example": "Barron!G78",
+      "field": "mains_charge_current_ma"
+    },
+    "Transmitter Power 151.5 Antenna Fwd (w)": {
+      "count": 3,
+      "example": "Barron!C721",
+      "field": "antenna_forward_w"
+    },
+    "Transmitter Power 151.95 Antenna Fwd (w)": {
+      "count": 3,
+      "example": "Barron!F721",
+      "field": "antenna_forward_w"
+    },
+    "Power Supply Voltages Receiver (V)": {
+      "count": 3,
+      "example": "Burrum Cherwell!G427",
+      "field": "supply_v"
+    },
+    "Battery Test V/CCA": {
+      "count": 3,
+      "example": "Burrum Cherwell!R504",
+      "field": "battery_test_raw"
+    },
+    "Consu- Stand": {
+      "count": 3,
+      "example": "Burrum Cherwell!E504",
+      "field": "consumption_standby_ma"
+    },
+    "Mace No": {
+      "count": 3,
+      "example": "Closed stations!B5",
+      "field": "logger_no"
+    },
+    "Battery Voltage Stand -by (v)": {
+      "count": 3,
+      "example": "Closed stations!C408",
+      "field": "battery_standby_v"
+    },
+    "Battery Voltage Under Load (v)": {
+      "count": 3,
+      "example": "Closed stations!D408",
+      "field": "battery_under_load_v"
+    },
+    "Battery Voltage(x2) Stand -by": {
+      "count": 3,
+      "example": "Closed stations!C491",
+      "field": "battery_standby_v"
+    },
+    "Lithium Battery (v.)": {
+      "count": 3,
+      "example": "Closed stations!I491",
+      "field": "lithium_battery_v"
+    },
+    "Lithium battery Voltage (v)": {
+      "count": 3,
+      "example": "Closed stations!J965",
+      "field": "lithium_battery_v"
+    },
+    "Transmitter 151.950 MHz Fwd": {
+      "count": 2,
+      "example": "Ipswich!L842",
+      "field": "tx_forward_w"
+    },
+    "Antenna 173.900 MHz #1 FWD PWR": {
+      "count": 2,
+      "example": "Brisbane!!J1529",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 173.900 MHz #1 REF PWR": {
+      "count": 2,
+      "example": "Brisbane!!K1529",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 173.900 MHz #1 SWR": {
+      "count": 2,
+      "example": "Brisbane!!L1529",
+      "field": "antenna_swr"
+    },
+    "Pump Cycle (kPa)": {
+      "count": 2,
+      "example": "Fitzroy!!AD1046",
+      "field": "gas_pump_cycle_kpa"
+    },
+    "Gas on Arrival": {
+      "count": 2,
+      "example": "Fitzroy!!AB1320",
+      "field": "gas_pressure_kpa"
+    },
+    "Shaft Encoder Revs. Negative": {
+      "count": 2,
+      "example": "Logan!!AB1131",
+      "field": "shaft_encoder_revs"
+    },
+    "Shaft Encoder Revs. Positive": {
+      "count": 2,
+      "example": "Logan!!AD1131",
+      "field": "shaft_encoder_revs"
+    },
+    "TM STATION NUMBER ENTER ANY NEW DATA FROM THE TM & BASE TAB Formula above change the xxxxxx to the station number": {
+      "count": 2,
+      "example": "Moonie!!A55",
+      "field": "station_number"
+    },
+    "10 6": {
+      "count": 2,
+      "example": "Nerang!!V578",
+      "field": "river_calibration_point"
+    },
+    "1 2": {
+      "count": 2,
+      "example": "Nerang!!R1290",
+      "field": "river_calibration_point"
+    },
+    "2 4": {
+      "count": 2,
+      "example": "Nerang!!S1290",
+      "field": "river_calibration_point"
+    },
+    "Antenna 151.5 Fwd": {
+      "count": 2,
+      "example": "Logan!B377",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 151.5 Ref.": {
+      "count": 2,
+      "example": "Logan!C377",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 151.5 SWR": {
+      "count": 2,
+      "example": "Logan!D377",
+      "field": "antenna_swr"
+    },
+    "Antenna 152.4 Fwd": {
+      "count": 2,
+      "example": "Logan!E377",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 152.4 Ref.": {
+      "count": 2,
+      "example": "Logan!F377",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 152.4 SWR": {
+      "count": 2,
+      "example": "Logan!G377",
+      "field": "antenna_swr"
+    },
+    "Mains Charger Charge Current (mA)": {
+      "count": 2,
+      "example": "Logan!G409",
+      "field": "mains_charge_current_ma"
+    },
+    "Mains Charger Regul- ated (v.)": {
+      "count": 2,
+      "example": "Logan!H409",
+      "field": "mains_charge_current_ma"
+    },
+    "Shaft Encoder Accum Diff.": {
+      "count": 2,
+      "example": "Logan!M1003",
+      "field": "shaft_encoder_accum_diff"
+    },
+    "TBRG Cal (10.4)": {
+      "count": 2,
+      "example": "Logan!L1524",
+      "field": "tbrg_calibration_mm"
+    },
+    "Mains (v) Regul- ator": {
+      "count": 2,
+      "example": "Redlands!H37",
+      "field": "mains_regulated_v"
+    },
+    "TM Inspection Date Installed": {
+      "count": 2,
+      "example": "Warrego!!B802",
+      "field": "inspect_date"
+    },
+    "Station Number ENTER ANY NEW DATA FROM THE ALERTS TAB Formula above change the xxxxxx to the station number": {
+      "count": 2,
+      "example": "Master (2)!A9",
+      "field": "station_number"
+    },
+    "Serial No. DECO- DER": {
+      "count": 2,
+      "example": "Barron!!T548",
+      "field": "decoder_serial"
+    },
+    "Serial No. RECEI- VER1": {
+      "count": 2,
+      "example": "Barron!!V548",
+      "field": "receiver_v"
+    },
+    "Serial No. RECEI- VER2": {
+      "count": 2,
+      "example": "Barron!!X548",
+      "field": "receiver_v"
+    },
+    "S/E Count UP/DN": {
+      "count": 2,
+      "example": "Burdekin!!AB149",
+      "field": "shaft_encoder_count_direction"
+    },
+    "Mains (mA) Charge": {
+      "count": 2,
+      "example": "Townsville!F148",
+      "field": "mains_charge_current_ma"
+    },
+    "Solar (ma) Charge": {
+      "count": 2,
+      "example": "Burdekin!F454",
+      "field": "solar_charge_current_ma"
+    },
+    "Consumption mption Stand -by": {
+      "count": 2,
+      "example": "Herbert!E792",
+      "field": "consumption_standby_ma"
+    },
+    "Transmitter Power Fwd (w)": {
+      "count": 2,
+      "example": "Barron!C413",
+      "field": "tx_forward_w"
+    },
+    "Receiver No.": {
+      "count": 2,
+      "example": "Barron!F413",
+      "field": "receiver_v"
+    },
+    "Decoder No.": {
+      "count": 2,
+      "example": "Barron!H413",
+      "field": "decoder_v"
+    },
+    "Power Supply Voltages Decoder (V)": {
+      "count": 2,
+      "example": "Burrum Cherwell!I427",
+      "field": "supply_v"
+    },
+    "Fwd": {
+      "count": 2,
+      "example": "Mary!C573",
+      "field": "tx_forward_w"
+    },
+    "Solar Output Voltage": {
+      "count": 2,
+      "example": "Mary!F853",
+      "field": "solar_output_v"
+    },
+    "Solar Short Curcuit Current": {
+      "count": 2,
+      "example": "Mary!G853",
+      "field": "solar_short_circuit_ma"
+    },
+    "Gas Consump- tion / month": {
+      "count": 2,
+      "example": "Closed stations!K645",
+      "field": "gas_consumption_kpa_month"
+    },
+    "Gas kpa": {
+      "count": 1,
+      "example": "Ipswich!L5",
+      "field": "gas_pressure_kpa"
+    },
+    "TBRG Cal (mm)": {
+      "count": 1,
+      "example": "Ipswich!L105",
+      "field": "tbrg_calibration_mm"
+    },
+    "Consu- Calb (mm)": {
+      "count": 1,
+      "example": "Ipswich!L393",
+      "field": "tbrg_calibration_mm"
+    },
+    "TBRG Cal. (10.0mm)": {
+      "count": 1,
+      "example": "Ipswich!L778",
+      "field": "tbrg_calibration_mm"
+    },
+    "Transmitter 173.95 MHz Fwd": {
+      "count": 1,
+      "example": "Ipswich!C810",
+      "field": "tx_forward_w"
+    },
+    "Transmitter 173.900 MHz Fwd": {
+      "count": 1,
+      "example": "Ipswich!I810",
+      "field": "tx_forward_w"
+    },
+    "Transmitter 151.425 MHz Fwd": {
+      "count": 1,
+      "example": "Ipswich!C842",
+      "field": "tx_forward_w"
+    },
+    "Transmitter 151.525 MHz Fwd": {
+      "count": 1,
+      "example": "Ipswich!I842",
+      "field": "tx_forward_w"
+    },
+    "Transmitter 152.250 MHz Fwd": {
+      "count": 1,
+      "example": "Ipswich!O842",
+      "field": "tx_forward_w"
+    },
+    "Solar (mA)": {
+      "count": 1,
+      "example": "Noosa!F329",
+      "field": "solar_charge_current_ma"
+    },
+    "Solar (v)": {
+      "count": 1,
+      "example": "Noosa!G329",
+      "field": "solar_output_v"
+    },
+    "Decoder Voltage 151.5 Output": {
+      "count": 1,
+      "example": "Noosa!I349",
+      "field": "decoder_v"
+    },
+    "Decoder Voltage 151.95 Output": {
+      "count": 1,
+      "example": "Noosa!J349",
+      "field": "decoder_v"
+    },
+    "Cylinder Pressure Kpa": {
+      "count": 1,
+      "example": "Brisbane!!G564",
+      "field": "cylinder_pressure_kpa"
+    },
+    "Battery Voltage": {
+      "count": 1,
+      "example": "Brisbane!!J564",
+      "field": "battery_standby_v"
+    },
+    "ALERT ID: Inspect Date": {
+      "count": 1,
+      "example": "Brisbane!!B887",
+      "field": "inspect_date"
+    },
+    "Phone Socket Voltage (v)": {
+      "count": 1,
+      "example": "Brisbane!!AC1467",
+      "field": "telephone_socket_v"
+    },
+    "Antenna 151.500 MHz #1 FWD PWR": {
+      "count": 1,
+      "example": "Brisbane!!D1529",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 151.500 MHz #1 REF PWR": {
+      "count": 1,
+      "example": "Brisbane!!E1529",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 151.500 MHz #1 SWR": {
+      "count": 1,
+      "example": "Brisbane!!F1529",
+      "field": "antenna_swr"
+    },
+    "Antenna 151.525 MHz #2 FWD PWR": {
+      "count": 1,
+      "example": "Brisbane!!G1529",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 151.525 MHz #2 REF PWR": {
+      "count": 1,
+      "example": "Brisbane!!H1529",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 151.525 MHz #2 SWR": {
+      "count": 1,
+      "example": "Brisbane!!I1529",
+      "field": "antenna_swr"
+    },
+    "Antenna 151.500 #1 FWD PWR": {
+      "count": 1,
+      "example": "Burnett&Kolan!!D975",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 151.500 #1 REF PWR": {
+      "count": 1,
+      "example": "Burnett&Kolan!!E975",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 151.500 #1 SWR": {
+      "count": 1,
+      "example": "Burnett&Kolan!!F975",
+      "field": "antenna_swr"
+    },
+    "Increments": {
+      "count": 1,
+      "example": "Burrum Cherwell!!AC50",
+      "field": "shaft_encoder_increments_per_rev"
+    },
+    "Antenna 151.475 MHz #1 FWD PWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!D1096",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 151.475 MHz #1 REF PWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!E1096",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 151.475 MHz #1 SWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!F1096",
+      "field": "antenna_swr"
+    },
+    "Antenna 151.500 MHz #2 FWD PWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!G1096",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 151.500 MHz #2 REF PWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!H1096",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 151.500 MHz #2 SWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!I1096",
+      "field": "antenna_swr"
+    },
+    "Antenna 151.550 MHz #1 FWD PWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!J1096",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 151.550 MHz #1 REF PWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!K1096",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 151.550 MHz #1 SWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!L1096",
+      "field": "antenna_swr"
+    },
+    "Antenna 152.250 MHz #2 FWD PWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!M1096",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 152.250 MHz #2 REF PWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!N1096",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 152.250 MHz #2 SWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!O1096",
+      "field": "antenna_swr"
+    },
+    "Antenna 173.950 MHz #2 FWD PWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!S1096",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 173.950 MHz #2 REF PWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!T1096",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 173.950 MHz #2 SWR": {
+      "count": 1,
+      "example": "Caboolture&Pine!!U1096",
+      "field": "antenna_swr"
+    },
+    "Consumption Stand-by (mA) inc": {
+      "count": 1,
+      "example": "Condamine!!F734",
+      "field": "consumption_standby_ma"
+    },
+    "TBRG Calib mm": {
+      "count": 1,
+      "example": "Condamine!!P1180",
+      "field": "tbrg_calibration_mm"
+    },
+    "Next G Signal Strength": {
+      "count": 1,
+      "example": "Condamine!!AD1655",
+      "field": "rssi_dbm"
+    },
+    "Gas Consumption / month": {
+      "count": 1,
+      "example": "Condamine!!AC1737",
+      "field": "gas_consumption_kpa_month"
+    },
+    "Gas Pressure Kpa": {
+      "count": 1,
+      "example": "Condamine!!AD1737",
+      "field": "cylinder_pressure_kpa"
+    },
+    "30 25": {
+      "count": 1,
+      "example": "Fitzroy!!Y5",
+      "field": "river_calibration_point"
+    },
+    "15 20": {
+      "count": 1,
+      "example": "Fitzroy!!W513",
+      "field": "river_calibration_point"
+    },
+    "20 25": {
+      "count": 1,
+      "example": "Fitzroy!!X513",
+      "field": "river_calibration_point"
+    },
+    "TBRG Result (%)": {
+      "count": 1,
+      "example": "Fitzroy!!AD2161",
+      "field": "tbrg_calibration_mm"
+    },
+    "Inspection Date": {
+      "count": 1,
+      "example": "Fitzroy!!B2549",
+      "field": "inspect_date"
+    },
+    "Stan -by": {
+      "count": 1,
+      "example": "Fitzroy!!D2549",
+      "field": "battery_standby_v"
+    },
+    "Sleep (mA)": {
+      "count": 1,
+      "example": "Fitzroy!!F2549",
+      "field": "consumption_sleep_ma"
+    },
+    "Output Voltage (v)": {
+      "count": 1,
+      "example": "Fitzroy!!I2549",
+      "field": "solar_output_v"
+    },
+    "TBRG Calib 20.8mm": {
+      "count": 1,
+      "example": "Fitzroy!!P2711",
+      "field": "tbrg_calibration_mm"
+    },
+    "TM Inspect Date": {
+      "count": 1,
+      "example": "Mary!!B605",
+      "field": "inspect_date"
+    },
+    "Consumption (mA) Operat": {
+      "count": 1,
+      "example": "Mary!!G605",
+      "field": "consumption_operating_ma"
+    },
+    "Consumption (mA) Interrog": {
+      "count": 1,
+      "example": "Mary!!H605",
+      "field": "consumption_interrogation_ma"
+    },
+    "Mains Charger (v) Regul": {
+      "count": 1,
+      "example": "Mary!!I605",
+      "field": "mains_charge_current_ma"
+    },
+    "Solar (v) Step": {
+      "count": 1,
+      "example": "Mary!!K605",
+      "field": "solar_output_v"
+    },
+    "Lithium Battery Voltage": {
+      "count": 1,
+      "example": "Mary!!N605",
+      "field": "lithium_battery_v"
+    },
+    "Phone socket Voltage": {
+      "count": 1,
+      "example": "Mary!!O605",
+      "field": "telephone_socket_v"
+    },
+    "Battery Voltage Under": {
+      "count": 1,
+      "example": "Mary!!E605",
+      "field": "battery_under_load_v"
+    },
+    "TBRG Calb": {
+      "count": 1,
+      "example": "Mary!!P605",
+      "field": "tbrg_calibration_mm"
+    },
+    "ALERT from 7/4/14 IDs - Inspect Date": {
+      "count": 1,
+      "example": "Mary!!B626",
+      "field": "inspect_date"
+    },
+    "#2 REF PWR": {
+      "count": 1,
+      "example": "Maroochy!!H914",
+      "field": "antenna_reflected_w"
+    },
+    "#2 SWR": {
+      "count": 1,
+      "example": "Maroochy!!I914",
+      "field": "antenna_swr"
+    },
+    "Revs.": {
+      "count": 1,
+      "example": "Mooloolah!!AB285",
+      "field": "shaft_encoder_revs"
+    },
+    "-ments": {
+      "count": 1,
+      "example": "Mooloolah!!AC285",
+      "field": "shaft_encoder_increments_per_rev"
+    },
+    "Result": {
+      "count": 1,
+      "example": "Mooloolah!!AD285",
+      "field": "shaft_encoder_result"
+    },
+    "TBRG Calib HS": {
+      "count": 1,
+      "example": "Mooloolah!!P479",
+      "field": "tbrg_calibration_mm"
+    },
+    "River Calibration Count difference per revolution Revolutions of Shaft Encoder": {
+      "count": 1,
+      "example": "Nerang!!AB516",
+      "field": "tbrg_calibration_mm"
+    },
+    "1 0.5": {
+      "count": 1,
+      "example": "Nerang!!R643",
+      "field": "river_calibration_point"
+    },
+    "2 1": {
+      "count": 1,
+      "example": "Nerang!!S643",
+      "field": "river_calibration_point"
+    },
+    "5 1.5": {
+      "count": 1,
+      "example": "Nerang!!T643",
+      "field": "river_calibration_point"
+    },
+    "8 2": {
+      "count": 1,
+      "example": "Nerang!!U643",
+      "field": "river_calibration_point"
+    },
+    "10 8": {
+      "count": 1,
+      "example": "Nerang!!V1158",
+      "field": "river_calibration_point"
+    },
+    "River Calibration": {
+      "count": 1,
+      "example": "Logan!R828",
+      "field": "tbrg_calibration_mm"
+    },
+    "Shaft Encoder Test Revs. Negative": {
+      "count": 1,
+      "example": "Logan!L1003",
+      "field": "shaft_encoder_revs"
+    },
+    "Shaft Encoder Test Revs. Positive": {
+      "count": 1,
+      "example": "Logan!N1003",
+      "field": "shaft_encoder_revs"
+    },
+    "Fade Margin (dB)": {
+      "count": 1,
+      "example": "Logan!H1491",
+      "field": "fade_margin_db"
+    },
+    "Mains (v) Output Voltage": {
+      "count": 1,
+      "example": "Redlands!F37",
+      "field": "mains_regulated_v"
+    },
+    "Inspect Date 6'6'2013": {
+      "count": 1,
+      "example": "Warrego!!B244",
+      "field": "inspect_date"
+    },
+    "0 3": {
+      "count": 1,
+      "example": "Warrego!!Q244",
+      "field": "river_calibration_point"
+    },
+    "1 23": {
+      "count": 1,
+      "example": "Warrego!!R244",
+      "field": "river_calibration_point"
+    },
+    "2 43": {
+      "count": 1,
+      "example": "Warrego!!S244",
+      "field": "river_calibration_point"
+    },
+    "5 103": {
+      "count": 1,
+      "example": "Warrego!!T244",
+      "field": "river_calibration_point"
+    },
+    "10 202": {
+      "count": 1,
+      "example": "Warrego!!V244",
+      "field": "river_calibration_point"
+    },
+    "Remarks Alert installed": {
+      "count": 1,
+      "example": "Warrego!!Z244",
+      "field": "remarks"
+    },
+    "Remarks Hydrology and ROM / dual loggers": {
+      "count": 1,
+      "example": "Warrego!!Z802",
+      "field": "remarks"
+    },
+    "Remarks F 68 station": {
+      "count": 1,
+      "example": "Warrego!!Z842",
+      "field": "remarks"
+    },
+    "Cylin- der Press- ure": {
+      "count": 1,
+      "example": "Warrego!!AC884",
+      "field": "cylinder_pressure_kpa"
+    },
+    "Base station Entires": {
+      "count": 1,
+      "example": "TM Only!A3",
+      "field": "station_name"
+    },
+    "Forward Power 1": {
+      "count": 1,
+      "example": "TM Only!E3",
+      "field": "tx_forward_w"
+    },
+    "Reflected Power 1": {
+      "count": 1,
+      "example": "TM Only!F3",
+      "field": "tx_reflected_w"
+    },
+    "SWR 1": {
+      "count": 1,
+      "example": "TM Only!G3",
+      "field": "swr"
+    },
+    "Forward Power 2": {
+      "count": 1,
+      "example": "TM Only!H3",
+      "field": "tx_forward_w"
+    },
+    "Reflected Power 2": {
+      "count": 1,
+      "example": "TM Only!I3",
+      "field": "tx_reflected_w"
+    },
+    "SWR 2": {
+      "count": 1,
+      "example": "TM Only!J3",
+      "field": "swr"
+    },
+    "Decoder": {
+      "count": 1,
+      "example": "TM Only!K3",
+      "field": "decoder_v"
+    },
+    "Receiver 2": {
+      "count": 1,
+      "example": "TM Only!M3",
+      "field": "receiver_v"
+    },
+    "SN Decoder": {
+      "count": 1,
+      "example": "TM Only!U3",
+      "field": "decoder_v"
+    },
+    "SN Receiver 1": {
+      "count": 1,
+      "example": "TM Only!W3",
+      "field": "receiver_v"
+    },
+    "19": {
+      "count": 1,
+      "example": "TM Only!X3",
+      "field": "river_calibration_point"
+    },
+    "SN Receiver 2": {
+      "count": 1,
+      "example": "TM Only!Y3",
+      "field": "receiver_v"
+    },
+    "ALERT Crosscheck Site Name": {
+      "count": 1,
+      "example": "ALERTS!A2",
+      "field": "station_name"
+    },
+    "Antenna 151.5 #1 FREQ": {
+      "count": 1,
+      "example": "Barron!!D548",
+      "field": "antenna_frequency_mhz"
+    },
+    "Antenna 151.95 #2 FREQ": {
+      "count": 1,
+      "example": "Barron!!H548",
+      "field": "antenna_frequency_mhz"
+    },
+    "Cylinder Pressure": {
+      "count": 1,
+      "example": "Daintree!!AC5",
+      "field": "cylinder_pressure_kpa"
+    },
+    "Antenna 151.500 mHz #1 FWD PWR": {
+      "count": 1,
+      "example": "Pioneer!!D961",
+      "field": "antenna_forward_w"
+    },
+    "Antenna 151.500 mHz #1 REF PWR": {
+      "count": 1,
+      "example": "Pioneer!!E961",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna 151.500 mHz #1 SWR": {
+      "count": 1,
+      "example": "Pioneer!!F961",
+      "field": "antenna_swr"
+    },
+    "Solar Current Charge (mA) FLOAT": {
+      "count": 1,
+      "example": "Proserpine!!K128",
+      "field": "solar_charge_current_ma"
+    },
+    "1 20": {
+      "count": 1,
+      "example": "Proserpine!!R128",
+      "field": "river_calibration_point"
+    },
+    "2 40": {
+      "count": 1,
+      "example": "Proserpine!!S128",
+      "field": "river_calibration_point"
+    },
+    "5 100": {
+      "count": 1,
+      "example": "Proserpine!!T128",
+      "field": "river_calibration_point"
+    },
+    "10 200": {
+      "count": 1,
+      "example": "Proserpine!!V128",
+      "field": "river_calibration_point"
+    },
+    "15 300": {
+      "count": 1,
+      "example": "Proserpine!!W128",
+      "field": "river_calibration_point"
+    },
+    "20 400": {
+      "count": 1,
+      "example": "Proserpine!!X128",
+      "field": "river_calibration_point"
+    },
+    "Station Number ENTER ANY NEW DATA FROM THE ALERTS TAB": {
+      "count": 1,
+      "example": "Townsville!!A186",
+      "field": "station_number"
+    },
+    "Shaft Encoder No. of Revs": {
+      "count": 1,
+      "example": "Townsville!!AB762",
+      "field": "shaft_encoder_revs"
+    },
+    "Shaft Encoder Incre- ments": {
+      "count": 1,
+      "example": "Townsville!!AC762",
+      "field": "shaft_encoder_increments_per_rev"
+    },
+    "Mains (v) Volts": {
+      "count": 1,
+      "example": "Townsville!G148",
+      "field": "mains_regulated_v"
+    },
+    "Margin (db)": {
+      "count": 1,
+      "example": "Townsville!K148",
+      "field": "fade_margin_db"
+    },
+    "Fade Fwd (db)": {
+      "count": 1,
+      "example": "Townsville!H1299",
+      "field": "fade_margin_db"
+    },
+    "Transmitter Power (w) Ref": {
+      "count": 1,
+      "example": "Townsville!I1299",
+      "field": "tx_forward_w"
+    },
+    "S/E Count Up/Dn": {
+      "count": 1,
+      "example": "Burdekin!L121",
+      "field": "shaft_encoder_count_direction"
+    },
+    "Consu- DEV (kHz)": {
+      "count": 1,
+      "example": "Burdekin!L567",
+      "field": "tx_deviation_khz"
+    },
+    "Solar Charge": {
+      "count": 1,
+      "example": "Haughton!F153",
+      "field": "solar_charge_current_ma"
+    },
+    "Antenna Fwd.": {
+      "count": 1,
+      "example": "Don!B360",
+      "field": "antenna_forward_w"
+    },
+    "Shaft Encoder No of Revs.": {
+      "count": 1,
+      "example": "Herbert!!AB953",
+      "field": "shaft_encoder_revs"
+    },
+    "Shaft Encoder Set": {
+      "count": 1,
+      "example": "Herbert!!AC953",
+      "field": "shaft_encoder_result"
+    },
+    "Shaft Encoder Test No of Revs.": {
+      "count": 1,
+      "example": "Herbert!M698",
+      "field": "shaft_encoder_revs"
+    },
+    "Solar Charge Current": {
+      "count": 1,
+      "example": "Herbert!G730",
+      "field": "solar_charge_current_ma"
+    },
+    "Antenna #1 FWD PWR": {
+      "count": 1,
+      "example": "Johnstone!!D919",
+      "field": "antenna_forward_w"
+    },
+    "Antenna #1 REF PWR": {
+      "count": 1,
+      "example": "Johnstone!!E919",
+      "field": "antenna_reflected_w"
+    },
+    "Antenna #1 SWR": {
+      "count": 1,
+      "example": "Johnstone!!F919",
+      "field": "antenna_swr"
+    },
+    "Mains (v) Output": {
+      "count": 1,
+      "example": "Barron!F444",
+      "field": "mains_regulated_v"
+    },
+    "Use Key GMK EL DD1 Remarks": {
+      "count": 1,
+      "example": "Barron!R548",
+      "field": "remarks"
+    },
+    "Consumption mA (mA) Stand -by": {
+      "count": 1,
+      "example": "Barron!E583",
+      "field": "consumption_standby_ma"
+    },
+    "Solar mA Charge": {
+      "count": 1,
+      "example": "Barron!G583",
+      "field": "solar_charge_current_ma"
+    },
+    "Solar V. Regul- ator": {
+      "count": 1,
+      "example": "Barron!H583",
+      "field": "solar_regulated_v"
+    },
+    "Consumption mA Trans -mit": {
+      "count": 1,
+      "example": "Barron!F583",
+      "field": "consumption_transmit_ma"
+    },
+    "ogue Range m.": {
+      "count": 1,
+      "example": "Barron!M688",
+      "field": "analogue_range_m"
+    },
+    "Under Load": {
+      "count": 1,
+      "example": "Burrum Cherwell!D42",
+      "field": "battery_under_load_v"
+    },
+    "Mains Charger (v) Regul -ated": {
+      "count": 1,
+      "example": "Mary!I535",
+      "field": "mains_charge_current_ma"
+    },
+    "Mains Charger (v) Step up": {
+      "count": 1,
+      "example": "Mary!J535",
+      "field": "mains_charge_current_ma"
+    },
+    "151.95": {
+      "count": 1,
+      "example": "Mary!I573",
+      "field": "river_calibration_point"
+    },
+    "Solar (v) Regulated": {
+      "count": 1,
+      "example": "Closed stations!I89",
+      "field": "solar_regulated_v"
+    },
+    "TBRG Calb mm": {
+      "count": 1,
+      "example": "Closed stations!K153",
+      "field": "tbrg_calibration_mm"
+    },
+    "Solar (v.) Open Circuit": {
+      "count": 1,
+      "example": "Closed stations!H1014",
+      "field": "solar_output_v"
+    },
+    "Inspect Date Installed": {
+      "count": 1,
+      "example": "Closed stations!A1118",
+      "field": "inspect_date"
+    },
+    "Remarks Same site as River Ht station": {
+      "count": 1,
+      "example": "Closed stations!N1118",
+      "field": "remarks"
+    },
+    "Decoder (V)": {
+      "count": 1,
+      "example": "Master!H104",
+      "field": "decoder_v"
+    }
+  },
+  "unmapped": {
+    "Putty Log": {
+      "count": 1,
+      "example": "Fitzroy!!AB831",
+      "reason": "a note about how the reading was taken, not a reading"
+    },
+    "Column4": {
+      "count": 1,
+      "example": "TM Only!N3",
+      "reason": "Excel table placeholder header over an empty column on the TM Only tab"
+    },
+    "Column5": {
+      "count": 1,
+      "example": "TM Only!O3",
+      "reason": "Excel table placeholder header over an empty column on the TM Only tab"
+    },
+    "Column6": {
+      "count": 1,
+      "example": "TM Only!P3",
+      "reason": "Excel table placeholder header over an empty column on the TM Only tab"
+    },
+    "Column7": {
+      "count": 1,
+      "example": "TM Only!Q3",
+      "reason": "Excel table placeholder header over an empty column on the TM Only tab"
+    },
+    "Column8": {
+      "count": 1,
+      "example": "TM Only!R3",
+      "reason": "Excel table placeholder header over an empty column on the TM Only tab"
+    },
+    "Column9": {
+      "count": 1,
+      "example": "TM Only!S3",
+      "reason": "Excel table placeholder header over an empty column on the TM Only tab"
+    },
+    "Column10": {
+      "count": 1,
+      "example": "TM Only!T3",
+      "reason": "Excel table placeholder header over an empty column on the TM Only tab"
+    },
+    "Cons. (mA)": {
+      "count": 1,
+      "example": "Burrum Cherwell!K240",
+      "reason": "a bare \"Cons. (mA)\" with no group cell of its own — standby or transmit is not recoverable from the sheet, so #124 rejects the column rather than guessing (Burrum Cherwell!K240)"
+    }
+  }
+}

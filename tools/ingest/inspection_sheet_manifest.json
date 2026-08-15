@@ -1,0 +1,2399 @@
+{
+  "_": "One entry per worksheet — #123 deliverable 1. Written by tools/ingest/survey.py; do not edit by hand.",
+  "open_questions": [
+    {
+      "id": "122-1",
+      "for": "@cdomotor-g",
+      "question": "`SLS 26092023` (hidden) has the identical 34-column Service Level Specification shape as `SLS OCT23`, which you asked to ignore. Ignore both, or ingest the registry separately into the station table?",
+      "held_as": "Both marked `skip`/`defer` in this manifest. Neither is an inspection tab — they are station metadata (basin, agency number, flood classes, priority, gauge/telemetry/sensor type, LGA, owner, maintainer, schedules, hub) and would write to the station table, not to meganet.inspection. Nothing in this epic is blocked by the answer."
+    },
+    {
+      "id": "122-2",
+      "for": "@cdomotor-g",
+      "question": "Hidden legacy sheets versus their visible `!` twins — merge both, or treat the `!` sheet as authoritative?",
+      "held_as": "Measured rather than guessed: see `hidden_twins` in this file for the visits each hidden sheet holds that its visible twin does not. The spec's recommendation is to ingest both and let the load deduplicate on (station, visit date), because the hidden sheets are not subsets — but the recommendation is not a decision, and #124 should not proceed on it without a yes."
+    },
+    {
+      "id": "122-3",
+      "for": "@cdomotor-g",
+      "question": "NSW tabs (`NSW Lismore `, `NSW McIntyre`, `NSW Tweed!`, `NSW Richmond!`) — in scope, or QLD only?",
+      "held_as": "Marked `ingest` in this manifest on the grounds that they are the same form family and the same crews, and that excluding them would lose history no other system holds. Flip them to `skip` in SKIP_REASONS if the answer is QLD-only."
+    }
+  ],
+  "hidden_twins": [
+    {
+      "hidden": "Barron",
+      "visible": "Barron!",
+      "hidden_rows": 801,
+      "visible_rows": 993,
+      "hidden_blocks": 27,
+      "visible_blocks": 26,
+      "hidden_visits": 856,
+      "visible_visits": 1058,
+      "visits_only_in_hidden": 9,
+      "visits_only_in_visible": 211,
+      "keys_only_in_hidden": [
+        {
+          "key": "n:saddlemt1515mhzreceivingstation",
+          "visits": 4
+        },
+        {
+          "key": "n:saddlemt15195mhzreceivingstation",
+          "visits": 4
+        },
+        {
+          "key": "c:531043",
+          "visits": 1
+        }
+      ],
+      "examples_only_in_hidden": [
+        "c:531043 2008-08-07",
+        "n:saddlemt1515mhzreceivingstation 2012-10-05",
+        "n:saddlemt1515mhzreceivingstation 2013-10-17",
+        "n:saddlemt1515mhzreceivingstation 2014-10-14",
+        "n:saddlemt1515mhzreceivingstation 2016-11-15"
+      ]
+    },
+    {
+      "hidden": "Burdekin",
+      "visible": "Burdekin!",
+      "hidden_rows": 1014,
+      "visible_rows": 1285,
+      "hidden_blocks": 32,
+      "visible_blocks": 35,
+      "hidden_visits": 1258,
+      "visible_visits": 1440,
+      "visits_only_in_hidden": 111,
+      "visits_only_in_visible": 293,
+      "keys_only_in_hidden": [
+        {
+          "key": "c:34029/34097",
+          "visits": 35
+        },
+        {
+          "key": "c:33205/33291",
+          "visits": 29
+        },
+        {
+          "key": "c:33292/533024",
+          "visits": 29
+        },
+        {
+          "key": "c:s34085/533011/533075",
+          "visits": 18
+        }
+      ],
+      "examples_only_in_hidden": [
+        "c:33205/33291 1990-12-08",
+        "c:33205/33291 1991-09-05",
+        "c:33205/33291 1992-11-18",
+        "c:33205/33291 1993-10-24",
+        "c:33205/33291 1994-09-30"
+      ]
+    },
+    {
+      "hidden": "Burrum Cherwell",
+      "visible": "Burrum Cherwell!",
+      "hidden_rows": 546,
+      "visible_rows": 591,
+      "hidden_blocks": 19,
+      "visible_blocks": 19,
+      "hidden_visits": 538,
+      "visible_visits": 550,
+      "visits_only_in_hidden": 0,
+      "visits_only_in_visible": 12,
+      "keys_only_in_hidden": [],
+      "examples_only_in_hidden": []
+    },
+    {
+      "hidden": "Don",
+      "visible": "Don!",
+      "hidden_rows": 376,
+      "visible_rows": 472,
+      "hidden_blocks": 10,
+      "visible_blocks": 10,
+      "hidden_visits": 556,
+      "visible_visits": 604,
+      "visits_only_in_hidden": 0,
+      "visits_only_in_visible": 48,
+      "keys_only_in_hidden": [],
+      "examples_only_in_hidden": []
+    },
+    {
+      "hidden": "Haughton",
+      "visible": "Haughton!",
+      "hidden_rows": 411,
+      "visible_rows": 519,
+      "hidden_blocks": 13,
+      "visible_blocks": 13,
+      "hidden_visits": 546,
+      "visible_visits": 598,
+      "visits_only_in_hidden": 0,
+      "visits_only_in_visible": 52,
+      "keys_only_in_hidden": [],
+      "examples_only_in_hidden": []
+    },
+    {
+      "hidden": "Herbert",
+      "visible": "Herbert!",
+      "hidden_rows": 835,
+      "visible_rows": 1203,
+      "hidden_blocks": 26,
+      "visible_blocks": 30,
+      "hidden_visits": 1091,
+      "visible_visits": 1320,
+      "visits_only_in_hidden": 0,
+      "visits_only_in_visible": 229,
+      "keys_only_in_hidden": [],
+      "examples_only_in_hidden": []
+    },
+    {
+      "hidden": "Logan",
+      "visible": "Logan!",
+      "hidden_rows": 1564,
+      "visible_rows": 1641,
+      "hidden_blocks": 48,
+      "visible_blocks": 48,
+      "hidden_visits": 1684,
+      "visible_visits": 1692,
+      "visits_only_in_hidden": 24,
+      "visits_only_in_visible": 32,
+      "keys_only_in_hidden": [
+        {
+          "key": "c:040931key92268",
+          "visits": 24
+        }
+      ],
+      "examples_only_in_hidden": [
+        "c:040931key92268 2002-05-31",
+        "c:040931key92268 2002-07-25",
+        "c:040931key92268 2002-11-28",
+        "c:040931key92268 2003-05-19",
+        "c:040931key92268 2003-07-21"
+      ]
+    },
+    {
+      "hidden": "Mary",
+      "visible": "Mary!",
+      "hidden_rows": 1196,
+      "visible_rows": 1091,
+      "hidden_blocks": 39,
+      "visible_blocks": 40,
+      "hidden_visits": 920,
+      "visible_visits": 952,
+      "visits_only_in_hidden": 54,
+      "visits_only_in_visible": 86,
+      "keys_only_in_hidden": [
+        {
+          "key": "c:040868.",
+          "visits": 30
+        },
+        {
+          "key": "n:mtkanigantmalert",
+          "visits": 10
+        },
+        {
+          "key": "c:040625radar",
+          "visits": 8
+        },
+        {
+          "key": "n:goombooriantm",
+          "visits": 6
+        }
+      ],
+      "examples_only_in_hidden": [
+        "c:040625radar 2014-04-07",
+        "c:040625radar 2018-06-18",
+        "c:040625radar 2019-06-24",
+        "c:040625radar 2019-12-17",
+        "c:040625radar 2020-10-15"
+      ]
+    },
+    {
+      "hidden": "Master",
+      "visible": "Master (2)",
+      "hidden_rows": 106,
+      "visible_rows": 82,
+      "hidden_blocks": 4,
+      "visible_blocks": 3,
+      "hidden_visits": 0,
+      "visible_visits": 0,
+      "visits_only_in_hidden": 0,
+      "visits_only_in_visible": 0,
+      "keys_only_in_hidden": [],
+      "examples_only_in_hidden": []
+    },
+    {
+      "hidden": "Moonie",
+      "visible": "Moonie!",
+      "hidden_rows": 71,
+      "visible_rows": 64,
+      "hidden_blocks": 3,
+      "visible_blocks": 4,
+      "hidden_visits": 6,
+      "visible_visits": 6,
+      "visits_only_in_hidden": 0,
+      "visits_only_in_visible": 0,
+      "keys_only_in_hidden": [],
+      "examples_only_in_hidden": []
+    },
+    {
+      "hidden": "Pioneer",
+      "visible": "Pioneer!",
+      "hidden_rows": 1130,
+      "visible_rows": 1562,
+      "hidden_blocks": 36,
+      "visible_blocks": 54,
+      "hidden_visits": 968,
+      "visible_visits": 1372,
+      "visits_only_in_hidden": 7,
+      "visits_only_in_visible": 411,
+      "keys_only_in_hidden": [
+        {
+          "key": "c:33119",
+          "visits": 4
+        },
+        {
+          "key": "c:260134",
+          "visits": 1
+        },
+        {
+          "key": "n:pagetbasestation11524mhz",
+          "visits": 1
+        },
+        {
+          "key": "n:pagetbasestation21515mhz",
+          "visits": 1
+        }
+      ],
+      "examples_only_in_hidden": [
+        "c:260134 2018-05-09",
+        "c:33119 2009-11-03",
+        "c:33119 2012-09-05",
+        "c:33119 2015-09-12",
+        "c:33119 2016-09-12"
+      ]
+    },
+    {
+      "hidden": "Redlands",
+      "visible": "Redlands!",
+      "hidden_rows": 181,
+      "visible_rows": 123,
+      "hidden_blocks": 6,
+      "visible_blocks": 6,
+      "hidden_visits": 56,
+      "visible_visits": 58,
+      "visits_only_in_hidden": 0,
+      "visits_only_in_visible": 2,
+      "keys_only_in_hidden": [],
+      "examples_only_in_hidden": []
+    },
+    {
+      "hidden": "Townsville",
+      "visible": "Townsville!",
+      "hidden_rows": 1461,
+      "visible_rows": 2035,
+      "hidden_blocks": 61,
+      "visible_blocks": 61,
+      "hidden_visits": 1690,
+      "visible_visits": 1979,
+      "visits_only_in_hidden": 17,
+      "visits_only_in_visible": 306,
+      "keys_only_in_hidden": [
+        {
+          "key": "c:532075",
+          "visits": 11
+        },
+        {
+          "key": "c:532038",
+          "visits": 6
+        }
+      ],
+      "examples_only_in_hidden": [
+        "c:532038 2001-09-24",
+        "c:532038 2003-09-18",
+        "c:532038 2010-09-29",
+        "c:532038 2013-09-20",
+        "c:532038 2015-10-30"
+      ]
+    }
+  ],
+  "cell_comments": [
+    {
+      "sheet": "SLS 26092023",
+      "comments": 1,
+      "threaded": 1,
+      "authors": [],
+      "notes": [
+        {
+          "ref": "S858",
+          "author": "",
+          "text": "Forecasts at both Moggill and Jindalee are provided on both the rising and falling limbs of the flood hydrograph, and are in conjunction with forecasts provided for the Brisbane City tide gauge"
+        }
+      ]
+    },
+    {
+      "sheet": "Brisbane!",
+      "comments": 1,
+      "threaded": 0,
+      "authors": [],
+      "notes": [
+        {
+          "ref": "Z413",
+          "author": "",
+          "text": "Richard Gardiner: Can't power through solar plug in the top. It locked up the canister in test mode. Battery cable from bottom piggybacks charger directly on battery terminals"
+        }
+      ]
+    },
+    {
+      "sheet": "Burnett&Kolan!",
+      "comments": 1,
+      "threaded": 1,
+      "authors": [],
+      "notes": [
+        {
+          "ref": "P238",
+          "author": "",
+          "text": "expected 41.5"
+        }
+      ]
+    },
+    {
+      "sheet": "Fitzroy!",
+      "comments": 5,
+      "threaded": 3,
+      "authors": [
+        "Richard Gardiner"
+      ],
+      "notes": [
+        {
+          "ref": "P1300",
+          "author": "",
+          "text": "Not recorded, must have been within cal."
+        },
+        {
+          "ref": "P2317",
+          "author": "Richard Gardiner",
+          "text": "HS3 - Should have been recalibrated."
+        },
+        {
+          "ref": "E2442",
+          "author": "Richard Gardiner",
+          "text": "compressor running"
+        },
+        {
+          "ref": "E2443",
+          "author": "",
+          "text": "compressor running"
+        },
+        {
+          "ref": "R2446",
+          "author": "",
+          "text": "Difficult to use DPI pump"
+        }
+      ]
+    },
+    {
+      "sheet": "Mary!",
+      "comments": 1,
+      "threaded": 1,
+      "authors": [],
+      "notes": [
+        {
+          "ref": "J939",
+          "author": "",
+          "text": "Overcast"
+        }
+      ]
+    },
+    {
+      "sheet": "Logan!",
+      "comments": 23,
+      "threaded": 0,
+      "authors": [
+        "Amanda Smith",
+        "Damien Wright",
+        "Richard Gardiner"
+      ],
+      "notes": [
+        {
+          "ref": "O631",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: not consistent"
+        },
+        {
+          "ref": "O858",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: erratic, none from 5-20, then 23 came in."
+        },
+        {
+          "ref": "E906",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: whilst HS-40 pumping"
+        },
+        {
+          "ref": "E910",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping 12.5 recovery"
+        },
+        {
+          "ref": "E958",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: hs40 running"
+        },
+        {
+          "ref": "E970",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.7 recovery"
+        },
+        {
+          "ref": "L995",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: old canister was 3 and 0"
+        },
+        {
+          "ref": "E1150",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: hs40 running"
+        },
+        {
+          "ref": "E1151",
+          "author": "Amanda Smith",
+          "text": "Amanda Smith: comp running"
+        },
+        {
+          "ref": "E1153",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.6 recovery"
+        },
+        {
+          "ref": "K1250",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: cloudy"
+        },
+        {
+          "ref": "E1399",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: HS40 running"
+        },
+        {
+          "ref": "E1402",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.3 recovery"
+        },
+        {
+          "ref": "E1463",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: compressor running"
+        },
+        {
+          "ref": "P1463",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: value not recorded"
+        },
+        {
+          "ref": "P1468",
+          "author": "Damien Wright",
+          "text": "Damien Wright: Not recorded on inspection sheet but passed calibration"
+        },
+        {
+          "ref": "E1491",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: hs40 running"
+        },
+        {
+          "ref": "O1491",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: >=11, <14"
+        },
+        {
+          "ref": "F1492",
+          "author": "Amanda Smith",
+          "text": "Amanda Smith: combined"
+        },
+        {
+          "ref": "E1494",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.3 recovery"
+        },
+        {
+          "ref": "E1521",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.8 recovery"
+        },
+        {
+          "ref": "E1610",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.9v recovery"
+        },
+        {
+          "ref": "E1631",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.5v recovery"
+        }
+      ]
+    },
+    {
+      "sheet": "Mooloolah!",
+      "comments": 1,
+      "threaded": 0,
+      "authors": [
+        "Amanda Smith"
+      ],
+      "notes": [
+        {
+          "ref": "F150",
+          "author": "Amanda Smith",
+          "text": "Amanda Smith: combined"
+        }
+      ]
+    },
+    {
+      "sheet": "Nerang!",
+      "comments": 1,
+      "threaded": 1,
+      "authors": [],
+      "notes": [
+        {
+          "ref": "P430",
+          "author": "",
+          "text": "expected 10.2 as using large FCD"
+        }
+      ]
+    },
+    {
+      "sheet": "Logan",
+      "comments": 23,
+      "threaded": 0,
+      "authors": [
+        "Amanda Smith",
+        "Damien Wright",
+        "Richard Gardiner"
+      ],
+      "notes": [
+        {
+          "ref": "K569",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: not consistent"
+        },
+        {
+          "ref": "K771",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: erratic, none from 5-20, then 23 came in."
+        },
+        {
+          "ref": "D813",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: whilst HS-40 pumping"
+        },
+        {
+          "ref": "D818",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping 12.5 recovery"
+        },
+        {
+          "ref": "D859",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: hs40 running"
+        },
+        {
+          "ref": "D863",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.7 recovery"
+        },
+        {
+          "ref": "H890",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: old canister was 3 and 0"
+        },
+        {
+          "ref": "D1025",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: hs40 running"
+        },
+        {
+          "ref": "D1027",
+          "author": "Amanda Smith",
+          "text": "Amanda Smith: comp running"
+        },
+        {
+          "ref": "D1029",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.6 recovery"
+        },
+        {
+          "ref": "F1116",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: cloudy"
+        },
+        {
+          "ref": "D1247",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: HS40 running"
+        },
+        {
+          "ref": "D1252",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.3 recovery"
+        },
+        {
+          "ref": "D1334",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: compressor running"
+        },
+        {
+          "ref": "L1334",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: value not recorded"
+        },
+        {
+          "ref": "L1339",
+          "author": "Damien Wright",
+          "text": "Damien Wright: Not recorded on inspection sheet but passed calibration"
+        },
+        {
+          "ref": "D1367",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: hs40 running"
+        },
+        {
+          "ref": "K1367",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: >=11, <14"
+        },
+        {
+          "ref": "E1368",
+          "author": "Amanda Smith",
+          "text": "Amanda Smith: combined"
+        },
+        {
+          "ref": "D1370",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.3 recovery"
+        },
+        {
+          "ref": "D1403",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.8 recovery"
+        },
+        {
+          "ref": "D1529",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.9v recovery"
+        },
+        {
+          "ref": "D1563",
+          "author": "Damien Wright",
+          "text": "Damien Wright: while pumping, 12.5v recovery"
+        }
+      ]
+    },
+    {
+      "sheet": "Stanthorpe!",
+      "comments": 1,
+      "threaded": 0,
+      "authors": [
+        "Richard Gardiner"
+      ],
+      "notes": [
+        {
+          "ref": "E14",
+          "author": "Richard Gardiner",
+          "text": "Richard Gardiner: compressor running"
+        }
+      ]
+    },
+    {
+      "sheet": "Warrego!",
+      "comments": 3,
+      "threaded": 0,
+      "authors": [],
+      "notes": [
+        {
+          "ref": "O277",
+          "author": "",
+          "text": "Richard Gardiner: No data received at all from the test. Possibly <10dB or maybe radio data clashes responsible."
+        },
+        {
+          "ref": "O303",
+          "author": "",
+          "text": "Richard Gardiner: to middle creek"
+        },
+        {
+          "ref": "O466",
+          "author": "",
+          "text": "Richard Gardiner: 25 to middle creek (on site return), 30 to enviromon (direct)."
+        }
+      ]
+    },
+    {
+      "sheet": "Mary",
+      "comments": 1,
+      "threaded": 1,
+      "authors": [],
+      "notes": [
+        {
+          "ref": "J1099",
+          "author": "",
+          "text": "Overcast"
+        }
+      ]
+    }
+  ],
+  "sheets": [
+    {
+      "sheet": "SWR",
+      "visible": true,
+      "declared_dimension": "A2:D6",
+      "used_range": "A1:D5",
+      "used_rows": 5,
+      "used_cols": 4,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "skip",
+      "reason": "#122 non-goal: a 3-cell SWR calculator, not data.",
+      "form_families": [],
+      "inspection_config": null,
+      "blocks": 0,
+      "inspection_rows": 0
+    },
+    {
+      "sheet": "SLS 26092023",
+      "visible": false,
+      "declared_dimension": "A1:AH3353",
+      "used_range": "A1:AH3353",
+      "used_rows": 3353,
+      "used_cols": 34,
+      "cell_comments": 1,
+      "threaded_comments": 1,
+      "disposition": "defer",
+      "reason": "#122 open question 1. Hidden twin of `SLS OCT23`, identical 34-column shape, dated slightly earlier. Same registry content — belongs to the station table, not the inspection tables, if it is wanted at all.",
+      "form_families": [],
+      "inspection_config": null,
+      "blocks": 0,
+      "inspection_rows": 0
+    },
+    {
+      "sheet": "SLS OCT23",
+      "visible": true,
+      "declared_dimension": "A1:AH3353",
+      "used_range": "A1:AH3353",
+      "used_rows": 3353,
+      "used_cols": 34,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "skip",
+      "reason": "#122 non-goal: @cdomotor-g called this tab outdated. It is a station registry (34 columns of Service Level Specification), not inspections, so it would not write to these tables anyway.",
+      "form_families": [],
+      "inspection_config": null,
+      "blocks": 0,
+      "inspection_rows": 0
+    },
+    {
+      "sheet": "Ipswich",
+      "visible": true,
+      "declared_dimension": "A1:Z869",
+      "used_range": "A1:V848",
+      "used_rows": 848,
+      "used_cols": 22,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 27,
+      "inspection_rows": 397,
+      "row_classes": {
+        "inspection": 397,
+        "undated_data": 1,
+        "calibration_point_row": 8,
+        "next_block_owner": 1
+      }
+    },
+    {
+      "sheet": "Noosa",
+      "visible": true,
+      "declared_dimension": "A1:U849",
+      "used_range": "A1:U849",
+      "used_rows": 849,
+      "used_cols": 21,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 19,
+      "inspection_rows": 219,
+      "row_classes": {
+        "inspection": 219,
+        "annotation": 1
+      }
+    },
+    {
+      "sheet": "Brisbane!",
+      "visible": true,
+      "declared_dimension": "A1:IV1555",
+      "used_range": "A1:AC1537",
+      "used_rows": 1537,
+      "used_cols": 29,
+      "cell_comments": 1,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "alert",
+        "datalogger_old"
+      ],
+      "blocks": 55,
+      "inspection_rows": 713,
+      "row_classes": {
+        "inspection": 713,
+        "marker": 65,
+        "next_block_owner": 18,
+        "error_only": 6,
+        "annotation": 7,
+        "undated_data": 3,
+        "calibration_point_row": 10
+      }
+    },
+    {
+      "sheet": "Barcaldine!",
+      "visible": true,
+      "declared_dimension": "A3:IV113",
+      "used_range": "A1:Z98",
+      "used_rows": 98,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 5,
+      "inspection_rows": 5,
+      "row_classes": {
+        "inspection": 5,
+        "marker": 10,
+        "error_only": 5,
+        "next_block_owner": 4
+      }
+    },
+    {
+      "sheet": "Border!",
+      "visible": true,
+      "declared_dimension": "A1:AD1087",
+      "used_range": "A1:AC1085",
+      "used_rows": 1085,
+      "used_cols": 29,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "alert",
+        "datalogger_old"
+      ],
+      "blocks": 32,
+      "inspection_rows": 537,
+      "row_classes": {
+        "inspection": 537,
+        "annotation": 3,
+        "marker": 63,
+        "error_only": 16,
+        "calibration_point_row": 1,
+        "next_block_owner": 17
+      }
+    },
+    {
+      "sheet": "Burnett&Kolan!",
+      "visible": true,
+      "declared_dimension": "A1:AD1003",
+      "used_range": "A1:AC1003",
+      "used_rows": 1003,
+      "used_cols": 29,
+      "cell_comments": 1,
+      "threaded_comments": 1,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 43,
+      "inspection_rows": 270,
+      "row_classes": {
+        "inspection": 270,
+        "marker": 85,
+        "error_only": 35,
+        "next_block_owner": 40,
+        "annotation": 3,
+        "calibration_point_row": 1,
+        "undated_data": 3
+      }
+    },
+    {
+      "sheet": "Burnett North!",
+      "visible": true,
+      "declared_dimension": "A2:IV113",
+      "used_range": "A1:AC83",
+      "used_rows": 83,
+      "used_cols": 29,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 4,
+      "inspection_rows": 8,
+      "row_classes": {
+        "inspection": 8,
+        "marker": 8,
+        "error_only": 4,
+        "next_block_owner": 3
+      }
+    },
+    {
+      "sheet": "Burrum Cherwell!",
+      "visible": true,
+      "declared_dimension": "A1:IV637",
+      "used_range": "A1:AC591",
+      "used_rows": 591,
+      "used_cols": 29,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 19,
+      "inspection_rows": 276,
+      "row_classes": {
+        "inspection": 276,
+        "annotation": 23,
+        "marker": 31,
+        "error_only": 9,
+        "malformed_date": 1,
+        "next_block_owner": 6
+      }
+    },
+    {
+      "sheet": "Caboolture&Pine!",
+      "visible": true,
+      "declared_dimension": "A1:IV1978",
+      "used_range": "A1:AA1968",
+      "used_rows": 1968,
+      "used_cols": 27,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 61,
+      "inspection_rows": 692,
+      "row_classes": {
+        "inspection": 692,
+        "marker": 121,
+        "error_only": 59,
+        "next_block_owner": 27,
+        "calibration_point_row": 30,
+        "annotation": 10,
+        "repeat_header": 1,
+        "undated_data": 4
+      }
+    },
+    {
+      "sheet": "Condamine!",
+      "visible": true,
+      "declared_dimension": "A1:AE1800",
+      "used_range": "A1:AE1800",
+      "used_rows": 1800,
+      "used_cols": 31,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "alert",
+        "datalogger_old"
+      ],
+      "blocks": 54,
+      "inspection_rows": 764,
+      "row_classes": {
+        "inspection": 764,
+        "marker": 105,
+        "error_only": 42,
+        "next_block_owner": 51,
+        "calibration_point_row": 16,
+        "malformed_date": 3,
+        "annotation": 38
+      }
+    },
+    {
+      "sheet": "Cooper!",
+      "visible": true,
+      "declared_dimension": "A2:AC34",
+      "used_range": "A1:Z16",
+      "used_rows": 16,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 1,
+      "inspection_rows": 1,
+      "row_classes": {
+        "inspection": 1,
+        "marker": 2,
+        "error_only": 1
+      }
+    },
+    {
+      "sheet": "Fitzroy!",
+      "visible": true,
+      "declared_dimension": "A1:AD2895",
+      "used_range": "A1:AD2895",
+      "used_rows": 2895,
+      "used_cols": 30,
+      "cell_comments": 5,
+      "threaded_comments": 3,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "alert",
+        "datalogger_old"
+      ],
+      "blocks": 103,
+      "inspection_rows": 1097,
+      "row_classes": {
+        "inspection": 1097,
+        "calibration_point_row": 10,
+        "marker": 204,
+        "error_only": 85,
+        "next_block_owner": 96,
+        "annotation": 25,
+        "undated_data": 2,
+        "malformed_date": 1,
+        "repeat_header": 1
+      }
+    },
+    {
+      "sheet": "Mary!",
+      "visible": true,
+      "declared_dimension": "A1:IV1091",
+      "used_range": "A1:AB1091",
+      "used_rows": 1091,
+      "used_cols": 28,
+      "cell_comments": 1,
+      "threaded_comments": 1,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "CR800",
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "alert",
+        "campbell_datalogger",
+        "datalogger_old"
+      ],
+      "blocks": 40,
+      "inspection_rows": 478,
+      "row_classes": {
+        "inspection": 478,
+        "marker": 63,
+        "error_only": 17,
+        "malformed_date": 2,
+        "calibration_point_row": 2,
+        "next_block_owner": 15,
+        "annotation": 11
+      }
+    },
+    {
+      "sheet": "Logan!",
+      "visible": true,
+      "declared_dimension": "A1:AE1654",
+      "used_range": "A1:AE1641",
+      "used_rows": 1641,
+      "used_cols": 31,
+      "cell_comments": 23,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 48,
+      "inspection_rows": 849,
+      "row_classes": {
+        "inspection": 849,
+        "marker": 90,
+        "error_only": 41,
+        "annotation": 4,
+        "calibration_point_row": 10,
+        "next_block_owner": 22
+      }
+    },
+    {
+      "sheet": "Moonie!",
+      "visible": true,
+      "declared_dimension": "A1:AD74",
+      "used_range": "A1:Z64",
+      "used_rows": 64,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "datalogger_old"
+      ],
+      "blocks": 4,
+      "inspection_rows": 3,
+      "row_classes": {
+        "inspection": 3,
+        "marker": 7,
+        "error_only": 3
+      }
+    },
+    {
+      "sheet": "Maroochy!",
+      "visible": true,
+      "declared_dimension": "A1:IV1313",
+      "used_range": "A1:AC1273",
+      "used_rows": 1273,
+      "used_cols": 29,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 34,
+      "inspection_rows": 639,
+      "row_classes": {
+        "inspection": 639,
+        "marker": 66,
+        "error_only": 28,
+        "undated_data": 4,
+        "calibration_point_row": 6,
+        "next_block_owner": 1,
+        "annotation": 3
+      }
+    },
+    {
+      "sheet": "Mooloolah!",
+      "visible": true,
+      "declared_dimension": "A2:AE663",
+      "used_range": "A1:AE490",
+      "used_rows": 490,
+      "used_cols": 31,
+      "cell_comments": 1,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 19,
+      "inspection_rows": 152,
+      "row_classes": {
+        "inspection": 152,
+        "marker": 35,
+        "error_only": 16,
+        "next_block_owner": 12,
+        "calibration_point_row": 2,
+        "annotation": 2,
+        "undated_data": 3,
+        "malformed_date": 1
+      }
+    },
+    {
+      "sheet": "Nerang!",
+      "visible": true,
+      "declared_dimension": "A1:AI1532",
+      "used_range": "A1:AF1511",
+      "used_rows": 1511,
+      "used_cols": 32,
+      "cell_comments": 1,
+      "threaded_comments": 1,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 51,
+      "inspection_rows": 712,
+      "row_classes": {
+        "inspection": 712,
+        "marker": 102,
+        "next_block_owner": 5,
+        "error_only": 48,
+        "calibration_point_row": 39,
+        "undated_data": 1,
+        "annotation": 2
+      }
+    },
+    {
+      "sheet": "Pioneer",
+      "visible": false,
+      "declared_dimension": "A1:U1154",
+      "used_range": "A1:U1130",
+      "used_rows": 1130,
+      "used_cols": 21,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 36,
+      "inspection_rows": 499,
+      "row_classes": {
+        "inspection": 499,
+        "malformed_date": 2,
+        "calibration_point_row": 6,
+        "next_block_owner": 4
+      },
+      "shadows": "Pioneer!"
+    },
+    {
+      "sheet": "Moonie",
+      "visible": false,
+      "declared_dimension": "A1:T92",
+      "used_range": "A1:T71",
+      "used_rows": 71,
+      "used_cols": 20,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "datalogger_old"
+      ],
+      "blocks": 3,
+      "inspection_rows": 3,
+      "row_classes": {
+        "inspection": 3
+      },
+      "shadows": "Moonie!"
+    },
+    {
+      "sheet": "Logan",
+      "visible": false,
+      "declared_dimension": "A1:W1585",
+      "used_range": "A1:U1564",
+      "used_rows": 1564,
+      "used_cols": 21,
+      "cell_comments": 23,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 48,
+      "inspection_rows": 845,
+      "row_classes": {
+        "inspection": 845,
+        "annotation": 11,
+        "calibration_point_row": 12,
+        "next_block_owner": 22,
+        "undated_data": 3
+      },
+      "shadows": "Logan!"
+    },
+    {
+      "sheet": "Redlands!",
+      "visible": true,
+      "declared_dimension": "A1:AD129",
+      "used_range": "A1:Z123",
+      "used_rows": 123,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 6,
+      "inspection_rows": 29,
+      "row_classes": {
+        "inspection": 29,
+        "marker": 12,
+        "error_only": 5,
+        "next_block_owner": 1
+      }
+    },
+    {
+      "sheet": "Redlands",
+      "visible": false,
+      "declared_dimension": "A1:AD196",
+      "used_range": "A1:U181",
+      "used_rows": 181,
+      "used_cols": 21,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 6,
+      "inspection_rows": 28,
+      "row_classes": {
+        "inspection": 28,
+        "next_block_owner": 1,
+        "annotation": 1
+      },
+      "shadows": "Redlands!"
+    },
+    {
+      "sheet": "Stanthorpe!",
+      "visible": true,
+      "declared_dimension": "A1:AE418",
+      "used_range": "A1:Z416",
+      "used_rows": 416,
+      "used_cols": 26,
+      "cell_comments": 1,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 14,
+      "inspection_rows": 192,
+      "row_classes": {
+        "inspection": 192,
+        "marker": 27,
+        "error_only": 1,
+        "undated_data": 2
+      }
+    },
+    {
+      "sheet": "Toowoomba!",
+      "visible": true,
+      "declared_dimension": "A1:AC73",
+      "used_range": "A1:Z61",
+      "used_rows": 61,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 2,
+      "inspection_rows": 33,
+      "row_classes": {
+        "inspection": 33,
+        "marker": 4
+      }
+    },
+    {
+      "sheet": "Warrego!",
+      "visible": true,
+      "declared_dimension": "A1:AF912",
+      "used_range": "A1:AF912",
+      "used_rows": 912,
+      "used_cols": 32,
+      "cell_comments": 3,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "alert",
+        "datalogger_old"
+      ],
+      "blocks": 39,
+      "inspection_rows": 247,
+      "row_classes": {
+        "inspection": 247,
+        "marker": 76,
+        "error_only": 31,
+        "next_block_owner": 28,
+        "annotation": 6
+      }
+    },
+    {
+      "sheet": "Warwick!",
+      "visible": true,
+      "declared_dimension": "A1:AD1182",
+      "used_range": "A1:AC1155",
+      "used_rows": 1155,
+      "used_cols": 29,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 33,
+      "inspection_rows": 619,
+      "row_classes": {
+        "inspection": 619,
+        "marker": 65,
+        "error_only": 4,
+        "next_block_owner": 23,
+        "malformed_date": 3,
+        "undated_data": 1,
+        "annotation": 1
+      }
+    },
+    {
+      "sheet": "Master (2)",
+      "visible": true,
+      "declared_dimension": "A4:IV82",
+      "used_range": "A1:Z82",
+      "used_rows": 82,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "skip",
+      "reason": "Template. It carries the blank form — `NAME` and `xxxxxx` in place of a station — and not one dated row.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "alert",
+        "datalogger_old"
+      ],
+      "blocks": 3,
+      "inspection_rows": 0,
+      "row_classes": {
+        "marker": 7,
+        "annotation": 5,
+        "undated_data": 1,
+        "error_only": 1,
+        "repeat_header": 1
+      }
+    },
+    {
+      "sheet": "TM Only",
+      "visible": true,
+      "declared_dimension": "A1:AA73",
+      "used_range": "A1:AA73",
+      "used_rows": 73,
+      "used_cols": 27,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Flat one-row-per-inspection tab.",
+      "structure": "flat",
+      "form_families": [
+        "BASE STATION"
+      ],
+      "inspection_config": [
+        "base_station"
+      ],
+      "blocks": 0,
+      "inspection_rows": 54,
+      "row_classes": {
+        "inspection": 54,
+        "marker": 1,
+        "unresolved": 4
+      }
+    },
+    {
+      "sheet": "ALERTS",
+      "visible": true,
+      "declared_dimension": "A1:AA301",
+      "used_range": "A1:AA301",
+      "used_rows": 301,
+      "used_cols": 27,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Flat one-row-per-inspection tab.",
+      "structure": "flat",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 0,
+      "inspection_rows": 228,
+      "row_classes": {
+        "inspection": 228,
+        "unresolved": 71
+      }
+    },
+    {
+      "sheet": "NSW Lismore ",
+      "visible": true,
+      "declared_dimension": "A1:AD178",
+      "used_range": "A1:Z178",
+      "used_rows": 178,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "alert",
+        "datalogger_old"
+      ],
+      "blocks": 12,
+      "inspection_rows": 12,
+      "row_classes": {
+        "inspection": 12,
+        "marker": 12,
+        "next_block_owner": 11
+      }
+    },
+    {
+      "sheet": "NSW McIntyre",
+      "visible": true,
+      "declared_dimension": "A1:AD73",
+      "used_range": "A1:Z73",
+      "used_rows": 73,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "alert",
+        "datalogger_old"
+      ],
+      "blocks": 5,
+      "inspection_rows": 5,
+      "row_classes": {
+        "inspection": 5,
+        "marker": 5,
+        "next_block_owner": 4
+      }
+    },
+    {
+      "sheet": "NSW Tweed!",
+      "visible": true,
+      "declared_dimension": "A1:AC352",
+      "used_range": "A1:Z352",
+      "used_rows": 352,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "alert",
+        "datalogger_old"
+      ],
+      "blocks": 22,
+      "inspection_rows": 12,
+      "row_classes": {
+        "inspection": 12,
+        "marker": 23,
+        "next_block_owner": 21
+      }
+    },
+    {
+      "sheet": "NSW Richmond!",
+      "visible": true,
+      "declared_dimension": "A1:AC33",
+      "used_range": "A1:Z33",
+      "used_rows": 33,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 2,
+      "inspection_rows": 2,
+      "row_classes": {
+        "inspection": 2,
+        "marker": 4,
+        "error_only": 1,
+        "next_block_owner": 1,
+        "annotation": 1
+      }
+    },
+    {
+      "sheet": "Barron!",
+      "visible": true,
+      "declared_dimension": "A1:AD993",
+      "used_range": "A1:AC993",
+      "used_rows": 993,
+      "used_cols": 29,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 26,
+      "inspection_rows": 534,
+      "row_classes": {
+        "inspection": 534,
+        "marker": 41,
+        "error_only": 19,
+        "next_block_owner": 19,
+        "undated_data": 6,
+        "calibration_point_row": 10,
+        "annotation": 6,
+        "malformed_date": 1
+      }
+    },
+    {
+      "sheet": "Burdekin!",
+      "visible": true,
+      "declared_dimension": "A1:AC1285",
+      "used_range": "A1:AB1285",
+      "used_rows": 1285,
+      "used_cols": 28,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 35,
+      "inspection_rows": 724,
+      "row_classes": {
+        "inspection": 724,
+        "marker": 66,
+        "error_only": 7,
+        "annotation": 12,
+        "calibration_point_row": 1,
+        "next_block_owner": 5
+      }
+    },
+    {
+      "sheet": "Daintree!",
+      "visible": true,
+      "declared_dimension": "A1:IV15",
+      "used_range": "A1:AC15",
+      "used_rows": 15,
+      "used_cols": 29,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "datalogger_old"
+      ],
+      "blocks": 1,
+      "inspection_rows": 1,
+      "row_classes": {
+        "inspection": 1,
+        "marker": 2,
+        "error_only": 1
+      }
+    },
+    {
+      "sheet": "Don!",
+      "visible": true,
+      "declared_dimension": "A1:AC535",
+      "used_range": "A1:AC472",
+      "used_rows": 472,
+      "used_cols": 29,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 10,
+      "inspection_rows": 309,
+      "row_classes": {
+        "inspection": 309,
+        "marker": 19,
+        "malformed_date": 1,
+        "undated_data": 1,
+        "calibration_point_row": 2,
+        "annotation": 1
+      }
+    },
+    {
+      "sheet": "Haughton!",
+      "visible": true,
+      "declared_dimension": "A1:AC521",
+      "used_range": "A1:AC519",
+      "used_rows": 519,
+      "used_cols": 29,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 13,
+      "inspection_rows": 300,
+      "row_classes": {
+        "inspection": 300,
+        "marker": 26,
+        "error_only": 10,
+        "annotation": 9,
+        "malformed_date": 1,
+        "undated_data": 1,
+        "next_block_owner": 2
+      }
+    },
+    {
+      "sheet": "Pioneer!",
+      "visible": true,
+      "declared_dimension": "A1:AD1577",
+      "used_range": "A1:Z1562",
+      "used_rows": 1562,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 54,
+      "inspection_rows": 691,
+      "row_classes": {
+        "inspection": 691,
+        "marker": 103,
+        "malformed_date": 2,
+        "annotation": 7,
+        "calibration_point_row": 11,
+        "next_block_owner": 22,
+        "error_only": 1
+      }
+    },
+    {
+      "sheet": "Proserpine!",
+      "visible": true,
+      "declared_dimension": "A1:AD169",
+      "used_range": "A1:Z169",
+      "used_rows": 169,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 10,
+      "inspection_rows": 22,
+      "row_classes": {
+        "inspection": 22,
+        "marker": 18,
+        "error_only": 1
+      }
+    },
+    {
+      "sheet": "Townsville!",
+      "visible": true,
+      "declared_dimension": "A1:AE2035",
+      "used_range": "A1:AE2035",
+      "used_rows": 2035,
+      "used_cols": 31,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 61,
+      "inspection_rows": 992,
+      "row_classes": {
+        "inspection": 992,
+        "marker": 120,
+        "error_only": 59,
+        "annotation": 2,
+        "malformed_date": 6,
+        "calibration_point_row": 1
+      }
+    },
+    {
+      "sheet": "Townsville",
+      "visible": false,
+      "declared_dimension": "A1:V1467",
+      "used_range": "A1:V1461",
+      "used_rows": 1461,
+      "used_cols": 22,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 61,
+      "inspection_rows": 873,
+      "row_classes": {
+        "inspection": 873,
+        "malformed_date": 6,
+        "calibration_point_row": 1
+      },
+      "shadows": "Townsville!"
+    },
+    {
+      "sheet": "Burdekin",
+      "visible": false,
+      "declared_dimension": "A1:X1036",
+      "used_range": "A1:U1014",
+      "used_rows": 1014,
+      "used_cols": 21,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 32,
+      "inspection_rows": 643,
+      "row_classes": {
+        "inspection": 643,
+        "calibration_point_row": 1,
+        "annotation": 9,
+        "next_block_owner": 5
+      },
+      "shadows": "Burdekin!"
+    },
+    {
+      "sheet": "Haughton",
+      "visible": false,
+      "declared_dimension": "A1:Y516",
+      "used_range": "A1:U411",
+      "used_rows": 411,
+      "used_cols": 21,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 13,
+      "inspection_rows": 274,
+      "row_classes": {
+        "inspection": 274,
+        "annotation": 2,
+        "malformed_date": 1,
+        "undated_data": 1,
+        "next_block_owner": 2
+      },
+      "shadows": "Haughton!"
+    },
+    {
+      "sheet": "Don",
+      "visible": false,
+      "declared_dimension": "A1:V456",
+      "used_range": "A1:U376",
+      "used_rows": 376,
+      "used_cols": 21,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 10,
+      "inspection_rows": 285,
+      "row_classes": {
+        "inspection": 285,
+        "undated_data": 1,
+        "calibration_point_row": 1,
+        "annotation": 1
+      },
+      "shadows": "Don!"
+    },
+    {
+      "sheet": "Herbert!",
+      "visible": true,
+      "declared_dimension": "A1:AF1204",
+      "used_range": "A1:AC1203",
+      "used_rows": 1203,
+      "used_cols": 29,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 30,
+      "inspection_rows": 677,
+      "row_classes": {
+        "inspection": 677,
+        "marker": 58,
+        "error_only": 25,
+        "annotation": 21,
+        "malformed_date": 2,
+        "undated_data": 4
+      }
+    },
+    {
+      "sheet": "Herbert",
+      "visible": false,
+      "declared_dimension": "A1:AE851",
+      "used_range": "A1:T835",
+      "used_rows": 835,
+      "used_cols": 20,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 26,
+      "inspection_rows": 561,
+      "row_classes": {
+        "inspection": 561,
+        "annotation": 16,
+        "malformed_date": 2
+      },
+      "shadows": "Herbert!"
+    },
+    {
+      "sheet": "Tully!",
+      "visible": true,
+      "declared_dimension": "A1:AE708",
+      "used_range": "A1:Z668",
+      "used_rows": 668,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 19,
+      "inspection_rows": 324,
+      "row_classes": {
+        "inspection": 324,
+        "marker": 38,
+        "error_only": 19,
+        "annotation": 2,
+        "undated_data": 2
+      }
+    },
+    {
+      "sheet": "Johnstone!",
+      "visible": true,
+      "declared_dimension": "A1:XFB1145",
+      "used_range": "A1:AC1134",
+      "used_rows": 1134,
+      "used_cols": 29,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 25,
+      "inspection_rows": 672,
+      "row_classes": {
+        "inspection": 672,
+        "marker": 49,
+        "error_only": 24,
+        "next_block_owner": 20,
+        "annotation": 3,
+        "undated_data": 5
+      }
+    },
+    {
+      "sheet": "Mulgrave&Russell!",
+      "visible": true,
+      "declared_dimension": "A1:AC207",
+      "used_range": "A1:Z204",
+      "used_rows": 204,
+      "used_cols": 26,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 6,
+      "inspection_rows": 96,
+      "row_classes": {
+        "inspection": 96,
+        "marker": 12,
+        "error_only": 6,
+        "next_block_owner": 1,
+        "undated_data": 2
+      }
+    },
+    {
+      "sheet": "Barron",
+      "visible": false,
+      "declared_dimension": "A1:U818",
+      "used_range": "A1:U801",
+      "used_rows": 801,
+      "used_cols": 21,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 27,
+      "inspection_rows": 458,
+      "row_classes": {
+        "inspection": 458,
+        "next_block_owner": 19,
+        "calibration_point_row": 4,
+        "annotation": 5,
+        "malformed_date": 1
+      },
+      "shadows": "Barron!"
+    },
+    {
+      "sheet": "Burrum Cherwell",
+      "visible": false,
+      "declared_dimension": "A1:IU604",
+      "used_range": "A1:U546",
+      "used_rows": 546,
+      "used_cols": 21,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 19,
+      "inspection_rows": 270,
+      "row_classes": {
+        "inspection": 270,
+        "annotation": 20,
+        "malformed_date": 1,
+        "calibration_point_row": 11,
+        "next_block_owner": 6
+      },
+      "shadows": "Burrum Cherwell!"
+    },
+    {
+      "sheet": "Mary",
+      "visible": false,
+      "declared_dimension": "A1:IU1222",
+      "used_range": "A1:U1196",
+      "used_rows": 1196,
+      "used_cols": 21,
+      "cell_comments": 1,
+      "threaded_comments": 1,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "CR800",
+        "DATA LOGGER"
+      ],
+      "inspection_config": [
+        "alert",
+        "campbell_datalogger",
+        "datalogger_old"
+      ],
+      "blocks": 39,
+      "inspection_rows": 461,
+      "row_classes": {
+        "inspection": 461,
+        "annotation": 14,
+        "malformed_date": 2,
+        "calibration_point_row": 2,
+        "next_block_owner": 15,
+        "repeat_header": 2,
+        "undated_data": 2
+      },
+      "shadows": "Mary!"
+    },
+    {
+      "sheet": "Closed stations",
+      "visible": true,
+      "declared_dimension": "A1:V1144",
+      "used_range": "A1:U1143",
+      "used_rows": 1143,
+      "used_cols": 21,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "ingest",
+      "reason": "Station inspection blocks.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT",
+        "DATA LOGGER",
+        "RRDL3"
+      ],
+      "inspection_config": [
+        "alert",
+        "datalogger_old"
+      ],
+      "blocks": 49,
+      "inspection_rows": 620,
+      "row_classes": {
+        "inspection": 620,
+        "marker": 11,
+        "next_block_owner": 40,
+        "annotation": 49,
+        "malformed_date": 1,
+        "undated_data": 2,
+        "calibration_point_row": 1
+      }
+    },
+    {
+      "sheet": "Master",
+      "visible": false,
+      "declared_dimension": "A1:V132",
+      "used_range": "A1:V106",
+      "used_rows": 106,
+      "used_cols": 22,
+      "cell_comments": 0,
+      "threaded_comments": 0,
+      "disposition": "skip",
+      "reason": "Template. It carries the blank form — `NAME` and `xxxxxx` in place of a station — and not one dated row.",
+      "structure": "stacked_blocks",
+      "form_families": [
+        "ALERT"
+      ],
+      "inspection_config": [
+        "alert"
+      ],
+      "blocks": 4,
+      "inspection_rows": 0,
+      "row_classes": {
+        "next_block_owner": 2
+      },
+      "shadows": "Master (2)"
+    }
+  ]
+}

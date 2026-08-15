@@ -11,3 +11,8 @@ acma_subset/
 # Pages must keep seeing an empty build command. See test/README.md.
 test/node_modules/
 
+# tools/ingest/ is plain scripts run with python3, not a package. The bytecode
+# cache appears the moment survey.py imports xlsx.py from beside it.
+__pycache__/
+*.pyc
+

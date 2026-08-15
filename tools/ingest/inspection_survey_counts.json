@@ -1,0 +1,269 @@
+{
+  "_": "Headline counts and how they reconcile against #122. Written by tools/ingest/survey.py; do not edit by hand.",
+  "workbook": "archive/QLD All Site Inspections.xlsx",
+  "sheets": 59,
+  "visible": 45,
+  "hidden": 14,
+  "blocks": 1420,
+  "blocks_by_family": {
+    "ALERT": 1286,
+    "DATA LOGGER": 131,
+    "CR800": 2,
+    "RRDL3": 1
+  },
+  "blocks_with_inherited_header": 1,
+  "inspection_rows": 20407,
+  "inspection_rows_by_date_kind": {
+    "year_only": 9,
+    "datetime": 18873,
+    "text": 1525
+  },
+  "inspection_rows_by_decade": {
+    "1980s": 51,
+    "1990s": 2029,
+    "2000s": 6765,
+    "2010s": 8827,
+    "2020s": 2729
+  },
+  "date_range": [
+    1980,
+    2024
+  ],
+  "distinct_cbm": 1123,
+  "distinct_station_names": 1067,
+  "blocks_without_cbm": 44,
+  "distinct_header_labels": 388,
+  "distinct_layouts": 226,
+  "distinct_calibration_point_sets": 52,
+  "value_classes": {
+    "number": 196713,
+    "short_text": 8510,
+    "prose": 6209,
+    "qualified": 3302,
+    "status": 2694,
+    "numeric_text": 1073,
+    "range": 308,
+    "number_with_unit": 253,
+    "error": 19
+  },
+  "top_qualified": {
+    "<1": 892,
+    ">21": 740,
+    ">30": 606,
+    ">9.0": 139,
+    ">20": 131,
+    ">31": 88,
+    "<1ma": 71,
+    ">23": 69,
+    ">25": 49,
+    ">40": 49,
+    ">9": 49,
+    ">26": 28,
+    ">1": 28,
+    "<10": 26,
+    ">35": 26,
+    ">28": 25,
+    ">15": 22,
+    ">29": 19,
+    ">27": 17,
+    ">1.00": 15
+  },
+  "top_status": {
+    "-": 1984,
+    "N/M": 254,
+    "?": 124,
+    "OK": 82,
+    "N/A": 57,
+    "n/m": 43,
+    "n/a": 40,
+    "reset": 18,
+    "NM": 14,
+    "nil": 14,
+    "Nil": 13,
+    "NA": 13,
+    "U/S": 10,
+    "u/s": 6,
+    "ok": 5,
+    "N/R": 4,
+    "N/m": 4,
+    "Ok": 2,
+    "--": 2,
+    "n/r": 2
+  },
+  "unresolved_rows": 170,
+  "rows_needing_a_reject_reason": 170,
+  "implausible_dates": [
+    "Logan!!991: '23/6/215' -> 0215-06-23",
+    "Logan!886: '23/6/215' -> 0215-06-23",
+    "Burdekin!!162: '1900-01-03 21:00:00' -> 1900-01-03",
+    "Burdekin!136: '1900-01-03 21:00:00' -> 1900-01-03",
+    "Johnstone!!459: '08/11/219' -> 0219-11-08",
+    "Johnstone!!501: '15/10/208' -> 0208-10-15"
+  ],
+  "cell_comments": 62,
+  "sheets_with_comments": 12,
+  "text_date_evidence": {
+    "day_over_12_proving_day_first": 1058,
+    "four_digit_year": 1448,
+    "two_digit_year": 77
+  },
+  "block_notes": {
+    "stray_point_row_above_header": 480,
+    "absorbed_value_in_header": 237,
+    "group_row_note": 139,
+    "alert_id_note": 55,
+    "phone_no": 36,
+    "formula_error_in_header": 20,
+    "repeater_window": 8,
+    "key_number": 1,
+    "frequency": 1
+  },
+  "row_classes": {
+    "inspection": 20407,
+    "marker": 1856,
+    "error_only": 630,
+    "next_block_owner": 592,
+    "annotation": 336,
+    "calibration_point_row": 199,
+    "unresolved": 75,
+    "undated_data": 55,
+    "malformed_date": 40,
+    "repeat_header": 5
+  },
+  "reconciliation": [
+    {
+      "figure": "worksheets",
+      "issue_122": 59,
+      "survey": 59,
+      "agrees": true,
+      "note": "Agrees."
+    },
+    {
+      "figure": "visible worksheets",
+      "issue_122": 44,
+      "survey": 45,
+      "agrees": false,
+      "note": "#122 says 44 visible / 15 hidden. The workbook's own `state` attribute says 45 / 14 — every hidden sheet is listed in `twins` plus `SLS 26092023`, and there are fourteen."
+    },
+    {
+      "figure": "hidden worksheets",
+      "issue_122": 15,
+      "survey": 14,
+      "agrees": false,
+      "note": "See above; off by one."
+    },
+    {
+      "figure": "station blocks",
+      "issue_122": 1420,
+      "survey": 1420,
+      "agrees": true,
+      "note": "Agrees exactly."
+    },
+    {
+      "figure": "distinct CBM numbers",
+      "issue_122": 1098,
+      "survey": 1123,
+      "agrees": false,
+      "note": "Depends on the extraction rule; this survey adds a positional fallback for the sheets that print the number with no label at all (Ipswich prints it in a fixed column throughout). See the spec, \"Block header extraction\"."
+    },
+    {
+      "figure": "blocks with no CBM on the banner",
+      "issue_122": 55,
+      "survey": 44,
+      "agrees": false,
+      "note": "Same cause as the line above."
+    },
+    {
+      "figure": "distinct station names",
+      "issue_122": 1083,
+      "survey": 1067,
+      "agrees": false,
+      "note": "Same extraction question, plus whitespace normalisation."
+    },
+    {
+      "figure": "date-bearing inspection rows",
+      "issue_122": 18500,
+      "survey": 20407,
+      "agrees": false,
+      "note": "#122's figure is approximate and appears to count only cells Excel stores as dates. This survey also counts the text dates (`16/03/06` and friends) and the two flat tabs, which have no banner and so no blocks."
+    },
+    {
+      "figure": "distinct column-header layouts",
+      "issue_122": 61,
+      "survey": 226,
+      "agrees": false,
+      "note": "Not reproducible: #122 does not record how a layout was counted, and no natural definition lands on 61. Measured here under four: column positions only = 87, the anchor header row's text = 140, the anchor row with column letters = 152, and the fully resolved header (group label + stacked rows, per column) = the number in `survey`. The mapping is the artefact rather than the count — every layout in inspection_layouts.json carries a canonical field per column."
+    },
+    {
+      "figure": "free-text remark cells (>40 chars)",
+      "issue_122": 7932,
+      "survey": null,
+      "agrees": false,
+      "note": "Measured over every cell of every in-scope sheet rather than over data rows only; reported in value_classes as `prose` for data rows. The 7,932 figure reproduces exactly on the whole-sheet measure."
+    },
+    {
+      "figure": "#VALUE! cells",
+      "issue_122": 707,
+      "survey": null,
+      "agrees": false,
+      "note": "Reproduces exactly (707), plus #NAME? ×22, #N/A ×21 and #REF! ×1, which #122 does not mention."
+    }
+  ],
+  "alerts_tab": {
+    "alerts_rows": 228,
+    "already_on_a_basin_tab": 221,
+    "only_on_the_alerts_tab": 7,
+    "examples_only_on_alerts": [
+      "ALERTS!87 #n/a 2023-08-23",
+      "ALERTS!94 #n/a 2023-08-24",
+      "ALERTS!171 #n/a 2024-03-11",
+      "ALERTS!200 warwick 2024-03-11",
+      "ALERTS!210 scottsdale alert 2024-03-28",
+      "ALERTS!224 #n/a 2024-03-15",
+      "ALERTS!230 bakers bend 2024-05-01"
+    ],
+    "note": "Matched on (station name or station number, visit date). The ALERTS tab prints both, so a row that was copied down to its basin block matches on either. `Master (2)` instructs the crew to enter here first and copy into the basin block, so a match means the copy happened and the basin block is the canonical home; a miss means this tab is the only record."
+  },
+  "unresolved_examples": [
+    "Ipswich!503 [undated_data]: Gas 0 5 10 15 20",
+    "Brisbane!!312 [undated_data]: 9811342002 13.6 13.25 0.65 13.8 150 10 2 10 Suspect SWR meter may be faulty. - Check Fwd & Ref readings next visit.",
+    "Brisbane!!967 [undated_data]: 0 1 2 5 10 15 20 Shaft Encoder replaced by OTT with Druck in capillary line",
+    "Brisbane!!989 [undated_data]: 0 1 2 5 10 15 20 Shaft Encoder replaced by OTT with Druck in capillary line",
+    "Burnett&Kolan!!313 [undated_data]: 0 0.125 0.25 0.5 0.75 1 0 Canister Calibration mA",
+    "Burnett&Kolan!!339 [undated_data]: 4 8 12 16 20 BRC inspection - Recal AI",
+    "Burnett&Kolan!!886 [undated_data]: 13.6 13.1 <1 15.9 300 5 0 16 10.8 Antenna replaced due to high reflected (4/0.5)",
+    "Burrum Cherwell!!202 [malformed_date]: \"9/11/2004 12.6 12.4 0.8 15.9 104 2 0 20 9.8 0 101 201 302 402 new gas, new battery",
+    "Caboolture&Pine!!462 [undated_data]: 03102431671 1 2 4 6 10 Canister changed by MBRC - date unknown",
+    "Caboolture&Pine!!1122 [undated_data]: Output Short circuit 0 1 2 5 8 10 15 20 30",
+    "Caboolture&Pine!!1209 [undated_data]: Output Short Circuit 0 1 2 5 8 10 15 20 30",
+    "Caboolture&Pine!!1236 [undated_data]: Output Short Circuit 0 1 2 5 8 10 15 20 30",
+    "Condamine!!251 [malformed_date]: 12/5//97 13.8 13.6 2.2 13.9 20 2.9 0.1 1.4560832005096076 25 9.8 20 100 198",
+    "Condamine!!1742 [malformed_date]: Campbell CR800 logger 0 1 2 5 8 10 15 20 30",
+    "Condamine!!1754 [malformed_date]: Campbell CR800 NextG IP - Enviromon 0 1 2 5 8 10 15 20 30",
+    "Fitzroy!!1273 [undated_data]: 5W 6 0.05",
+    "Fitzroy!!2352 [undated_data]: HS0046 14.2 14 0.33 119 10.5 7.5 85 35.5 21.2 Invertor fuse & phone connection replaced; logger lithium battery low (2.9",
+    "Fitzroy!!2447 [malformed_date]: - wl3100 1.01 2.008 5.014 10.06 19.99",
+    "Mary!!217 [malformed_date]: 29/02/2023 13.3 13.1 <1 16.2 350 20 0.4 >21 11 Battery replaced due to age",
+    "Mary!!519 [malformed_date]: 97/03/2023 13.4 12.5 21 490 5 0 24 10.6 0 41 100 200 300 400 Battery due for replacing by council. Battery charging but ",
+    "Maroochy!!121 [undated_data]: 0 0.125 0.25 0.5 0.75 1 0 Canister Calibration mA",
+    "Maroochy!!207 [undated_data]: 0 0.125 0.25 0.5 0.75 1 0 Canister Calibration mA",
+    "Maroochy!!728 [undated_data]: 0 2 5 10 15 20 Remarks",
+    "Maroochy!!729 [undated_data]: 0 40 100 200 300 400 Druck connected to DNRME OTT. DNRME are decommissioning the station after wet season - SCC will reb",
+    "Mooloolah!!293 [undated_data]: 0 1 2 5 8 10 15 20 30 T Piece fitting for Druck installed by DNRM in April",
+    "Mooloolah!!356 [undated_data]: 0 0.125 0.25 0.5 0.75 1 0 Canister Calibration mA",
+    "Mooloolah!!417 [undated_data]: 0 0.125 0.25 0.5 0.75 1 0 Canister Calibration mA",
+    "Mooloolah!!461 [malformed_date]: 13/03/02023 12.9 12.6 <1 20.1 16.4 209 5 0 30 10.6 Some large trees from S to NW 20+ metres from gauge. Fair exposure.",
+    "Nerang!!238 [undated_data]: 0 1 2 4 6 8 10m. Range sensor installed by GCCC",
+    "Pioneer!105 [malformed_date]: 1610/1997 P-123 15.7 14.4 60 2.2 0 9.4",
+    "Pioneer!139 [malformed_date]: 1610/97 13.53 12.07 18 2.3 0 9.6 40 101 201 301 402 New 1.5aH fuse installed.",
+    "Logan!923 [undated_data]: Output V SC cur 0 1 2 5 10 20",
+    "Logan!1022 [undated_data]: 0 1 2 4 6 8 10 Station upgraded to HS40",
+    "Logan!1366 [undated_data]: Raw V 0 1 2 5 10 20",
+    "Stanthorpe!!295 [undated_data]: 0 0.125 0.25 0.5 0.75 1 0 Canister Calibration mA",
+    "Stanthorpe!!356 [undated_data]: 0 0.125 0.25 0.5 0.75 1 0 Canister Calibration mA",
+    "Warwick!!532 [malformed_date]: 9'/11/98 12.8 12.5 0.5 16.1 120 2.5 0 10 9.8 20 41 100 201 301 Gas line repaired. New Sol/P installed.",
+    "Warwick!!590 [undated_data]: 11.4 10.4 0.75 12.3 0.6 Battery replaced 12.5/12.3v.",
+    "Warwick!!813 [malformed_date]: 04\\02\\2021 13.18 12 19.42 700 4.5 0 30 10.7 0 20 40 100 200 15=300, 20=400",
+    "Warwick!!815 [malformed_date]: 21//02/2023 13.3 12.8 20.3 916 6 0 30 10.8 0 20 40 100 200 Ants in base sprayed. Water just beneath road crossing hight "
+  ]
+}
