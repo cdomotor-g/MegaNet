@@ -39,11 +39,13 @@ on:
       # check them (#105).
       - 'docs/**'
       - 'db/README.md'
-      # #123's survey artefacts are derived from the historical workbook and
-      # from the survey tool, so a change to either has to re-derive them —
-      # otherwise a checked-in manifest quietly stops describing the file it
-      # claims to describe.
+      # #123's survey artefacts and #124's staging rows are both derived from
+      # the historical workbook and from the tools next to it, so a change to
+      # any of them has to re-derive both — otherwise a checked-in manifest
+      # quietly stops describing the file it claims to describe, or a staging
+      # row stops matching the cell it came from.
       - 'tools/ingest/**'
+      - 'data/inspections/**'
       - 'archive/QLD All Site Inspections.xlsx'
       - '.github/workflows/web-smoke.yml'
   pull_request:
@@ -65,11 +67,13 @@ on:
       # check them (#105).
       - 'docs/**'
       - 'db/README.md'
-      # #123's survey artefacts are derived from the historical workbook and
-      # from the survey tool, so a change to either has to re-derive them —
-      # otherwise a checked-in manifest quietly stops describing the file it
-      # claims to describe.
+      # #123's survey artefacts and #124's staging rows are both derived from
+      # the historical workbook and from the tools next to it, so a change to
+      # any of them has to re-derive both — otherwise a checked-in manifest
+      # quietly stops describing the file it claims to describe, or a staging
+      # row stops matching the cell it came from.
       - 'tools/ingest/**'
+      - 'data/inspections/**'
       - 'archive/QLD All Site Inspections.xlsx'
       - '.github/workflows/web-smoke.yml'
   workflow_dispatch:
