@@ -271,6 +271,7 @@ const CONVERTED = [
   { id: 'rfchanges',  label: 'RF Changes — no onset',          issue: '#138', seed: SEED_RFC_PLAIN },
   { id: 'rfchanges',  label: 'RF Changes — onset and a series', issue: '#138', seed: SEED_RFC_ONSET },
   { id: 'msglog',     label: 'Message Log',     issue: 'new with the tab', seed: SEED_MSGLOG },
+  { id: 'mapgen',     label: 'Map Generator',   issue: 'new with the tab' },
 ];
 
 
@@ -345,8 +346,13 @@ try {
       // element deciding, which is the thing being replaced.
       const tokenOnly = s => s.split(';').map(d => d.trim()).filter(Boolean)
         .every(d => /^--[\w-]+\s*:/.test(d));
+      // Leaflet positions every pane, tile and marker with inline styles
+      // inside the container it owns; that is the library's decision, not the
+      // tab's, so its subtree is outside the rule (design-system.md §6 — first
+      // needed by the Map Generator, whose view-picker map is always up).
       const inline = [...main.querySelectorAll('[style]')]
         .filter(el => el.tagName !== 'COL')
+        .filter(el => !el.closest('.leaflet-container'))
         .filter(el => !tokenOnly(el.getAttribute('style') || ''))
         .map(el => el.tagName.toLowerCase() + '[style="' + el.getAttribute('style') + '"]');
 

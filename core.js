@@ -107,6 +107,8 @@ const TABS = [
       find: 'hop chain orphans gaps alertid address window coverage base' },
     { id: 'export',     label: 'Export',                 icon: '📤',
       find: 'csv radio mobile download stations.json backup escape hatch data source' },
+    { id: 'mapgen',     label: 'Map Generator',          icon: '🖨️',
+      find: 'print paper a4 svg laser cut engrave k40 whisperer contour elevation layers billet plate title block scale bar graticule sheet' },
   ] },
   { group: 'Interference', tabs: [
     { id: 'rf',         label: 'RF Environment',         icon: '📶',
@@ -729,6 +731,36 @@ const HELP = {
         href: 'docs/ingest-mqtt.md' },
     ],
     related: ['field', 'alert2', 'packets', 'stations'],
+  },
+
+  mapgen: {
+    summary: 'Composes a to-scale map sheet — stations, rivers, elevation contours, a lat/lon '
+           + 'graticule, a title block — as a millimetre-true SVG. Pick a page (A4, the '
+           + '200 × 200 mm laser billet, or custom), a centre and a 1:n scale, tick the features, '
+           + 'and print it, save it as PDF from the print window, or download the SVG. The two '
+           + 'laser modes speak K40 Whisperer\'s colour language — black raster-engraves, blue '
+           + 'vector-engraves, red vector-cuts — and the layered mode writes <strong>one file per '
+           + 'elevation level</strong> for stacked, vector-cut terrain.',
+    watch: [
+      'Every dimension is physical: the SVG\'s units are millimetres, so print at <strong>100% '
+      + 'scale</strong> (never "fit to page") or the scale bar and the 1:n figure both lie. The '
+      + 'stated scale is read at the centre latitude, as on any printed sheet.',
+      'In layered mode each file <strong>cuts its own contour in red and engraves the next level '
+      + 'up in blue</strong> — the engraved line is the assembly jig: the plate above sits exactly '
+      + 'on it. The border cut repeats in every file so pieces that touch the plate edge come '
+      + 'free of the blank.',
+      'Contours are traced from the same ~30 m terrain tiles the elevation profile uses, so they '
+      + 'are <strong>network-planning contours, not survey</strong> — the Stations tab\'s 1 m '
+      + 'LiDAR layer is the close-look tool. Elevation step versus material thickness is yours '
+      + 'to judge; the export panel shows the vertical scale and exaggeration that fall out.',
+      'Station names manage their own overlap: each tries eight positions around its pin and a '
+      + 'name that fits nowhere is dropped and counted in the notes rather than printed over a '
+      + 'neighbour. Zoom the scale in and the dropped names come back.',
+      'The base map, the rivers and the terrain all arrive over the network. Whatever fails, '
+      + 'the sheet still generates with what did arrive, and the notes under the preview say '
+      + 'what is missing — a blank-based laser plate needs none of it to be complete.',
+    ],
+    related: ['stations', 'maps', 'export'],
   },
 
   inspections: {

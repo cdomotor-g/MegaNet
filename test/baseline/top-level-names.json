@@ -38,8 +38,9 @@
     "serial.js",
     "message-log.js",
     "bug-report.js",
+    "map-generator.js",
     "init.js"
   ],
-  "total": 482,
-  "distinct": 482
+  "total": 483,
+  "distinct": 483
 }

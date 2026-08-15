@@ -140,7 +140,7 @@ async function main() {
     // ── The tab registry ─────────────────────────────────────────────────
     // #130 asks for the count to be asserted, so that a tab added to TABS
     // without a renderMain() case fails here rather than in front of a user.
-    const EXPECTED_TABS = 20;
+    const EXPECTED_TABS = 21;
     check(`TABS holds ${EXPECTED_TABS} tabs`, boot.tabs.length === EXPECTED_TABS ? []
       : [{ kind: 'assert', text: `TABS holds ${boot.tabs.length} tabs, expected ${EXPECTED_TABS}. `
           + `If a tab was added on purpose: give it a renderMain() case, a HELP entry, and bump `

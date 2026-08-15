@@ -6919,6 +6919,209 @@ code {
 }
 
 
+/* ── Map Generator tab ───────────────────────────────────────────────────────
+   The control rail reuses the shared .layout/.panel/.control-row system; what
+   is new here is the little view-picker map, the compact per-role pin grid,
+   the colour rows, the layer-file list, and the preview — which always draws
+   on white, in both themes, because the thing being previewed is a sheet of
+   paper (or a billet), not a UI surface. */
+
+.mg-minimap {
+  height: 240px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.mg-row { margin-top: var(--sp-2); align-items: center; }
+
+.mg-hint {
+  margin: var(--sp-1) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  flex-basis: 100%;
+}
+
+.mg-check {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: var(--fs-sm);
+  padding: .18rem 0;
+}
+
+.mg-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-left: 1.55rem;
+}
+
+.mg-num    { width: 7.5rem; }
+.mg-num-sm { width: 4.5rem; }
+.mg-inline .mg-num-sm, .mg-pin-grid .mg-num-sm { width: 4.5rem; }
+
+.mg-sub {
+  margin: var(--sp-3) 0 var(--sp-1);
+  font-size: var(--fs-md);
+}
+
+/* Mode picker: three radios that read as one segmented row. */
+.mg-modes {
+  display: grid;
+  gap: .35rem;
+  margin-bottom: var(--sp-2);
+}
+
+.mg-mode {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .4rem .6rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.mg-mode.on {
+  border-color: var(--accent);
+  background: var(--subtle);
+}
+
+.mg-colors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .25rem .8rem;
+  margin-top: var(--sp-2);
+}
+
+.mg-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.mg-color-row input[type="color"] {
+  width: 2.4rem;
+  padding: 0;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+}
+
+/* Per-role pin styles: role · on · shape · size · filled, one row per role. */
+.mg-pin-grid {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  gap: .3rem .6rem;
+  align-items: center;
+  font-size: var(--fs-sm);
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+
+.mg-pin-head {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.mg-pin-grid input[type="checkbox"] { justify-self: center; }
+
+.mg-pin-grid.is-off, .control-row.is-off { opacity: .5; }
+
+.mg-wide { flex: 1 1 14rem; }
+
+/* The preview: a sheet on a desk. White stays white in dark theme — it is
+   the paper being previewed, not the app. */
+.mg-preview {
+  margin-top: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: auto;
+  text-align: center;
+}
+
+.mg-preview svg {
+  max-width: 100%;
+  height: auto;
+  background: #ffffff;
+  box-shadow: var(--shadow-2);
+}
+
+.mg-status {
+  margin: var(--sp-1) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.mg-notes {
+  margin: var(--sp-1) 0 0;
+  padding-left: 1.2rem;
+  color: var(--warn);
+  font-size: var(--fs-xs);
+}
+
+.mg-file-count { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); }
+
+.mg-file-list {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow: auto;
+  display: grid;
+  gap: .2rem;
+}
+
+.mg-file-list li {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: var(--fs-sm);
+}
+
+.mg-file-list li label {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mg-file-name {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.mg-file-meta {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.mg-btn-sm {
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-xs);
+}
+
+/* The send-to-generator button under the Stations map display controls. */
+.mg-send-row { margin-top: var(--sp-2); }
+
+@media (max-width: 700px) {
+  .mg-minimap { height: 200px; }
+  .mg-colors { grid-template-columns: minmax(0, 1fr); }
+}
+
+
 /* ── Print (#118) ────────────────────────────────────────────────────────────
    The workbook's own print setup is A4 portrait, one page per station visit,
    Arial with 8pt labels and 10pt bold banner headings, and an explicit print

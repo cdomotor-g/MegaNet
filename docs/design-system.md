@@ -718,7 +718,14 @@ that list.** Per tab:
 
 - **No inline style**, except a declaration block that is *only* custom
   properties (`--page-max`, `--basin`, `--dot` — that is the token reaching the
-  element) and a `<col>` width.
+  element) and a `<col>` width. DOM that a third-party library builds and owns
+  inside its own container is outside the rule: Leaflet positions every pane
+  and tile with inline styles, and that is Leaflet's decision, not the tab's —
+  the check skips anything inside a `.leaflet-container`. (First needed by the
+  Map Generator, whose view-picker map is up whenever the tab is; the earlier
+  converted tabs only build their maps on interaction, so the check had never
+  met a live one.) The rule still holds for every element the tab itself
+  writes, including anything it appends *into* a Leaflet popup or control.
 - **Tables** wrapped, captioned, every `thead th` scoped.
 - **Scroll regions** — every `.tall` / `.medium` wrapper is `role="region"`,
   `tabindex="0"` and named (pattern 7).

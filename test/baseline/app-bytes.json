@@ -3,23 +3,23 @@
   "recordedFrom": [
     {
       "file": "core.js",
-      "bytes": 64052
+      "bytes": 115277
     },
     {
       "file": "app.js",
-      "bytes": 176951
+      "bytes": 212471
     },
     {
       "file": "rf-changes.js",
-      "bytes": 47636
+      "bytes": 57037
     },
     {
       "file": "workbench.js",
-      "bytes": 87183
+      "bytes": 87108
     },
     {
       "file": "mem-meter.js",
-      "bytes": 17033
+      "bytes": 19126
     },
     {
       "file": "auth.js",
@@ -39,11 +39,11 @@
     },
     {
       "file": "networks.js",
-      "bytes": 2963
+      "bytes": 5992
     },
     {
       "file": "pass-ranges.js",
-      "bytes": 10538
+      "bytes": 14964
     },
     {
       "file": "bit-flipper.js",
@@ -51,27 +51,27 @@
     },
     {
       "file": "network-view.js",
-      "bytes": 88012
+      "bytes": 88016
     },
     {
       "file": "arro-launcher.js",
-      "bytes": 15885
+      "bytes": 18793
     },
     {
       "file": "arro-data.js",
-      "bytes": 159244
+      "bytes": 180702
     },
     {
       "file": "datastore.js",
-      "bytes": 25354
+      "bytes": 25110
     },
     {
       "file": "export.js",
-      "bytes": 12277
+      "bytes": 16274
     },
     {
       "file": "station-editor.js",
-      "bytes": 24667
+      "bytes": 26836
     },
     {
       "file": "attachments.js",
@@ -79,15 +79,27 @@
     },
     {
       "file": "inspections.js",
-      "bytes": 102708
+      "bytes": 118264
     },
     {
       "file": "maintenance.js",
-      "bytes": 55585
+      "bytes": 65424
+    },
+    {
+      "file": "history.js",
+      "bytes": 35926
     },
     {
       "file": "map-rivers.js",
       "bytes": 12665
+    },
+    {
+      "file": "map-survey.js",
+      "bytes": 14658
+    },
+    {
+      "file": "map-contours.js",
+      "bytes": 12406
     },
     {
       "file": "map-spider.js",
@@ -99,7 +111,7 @@
     },
     {
       "file": "terrain.js",
-      "bytes": 13239
+      "bytes": 17039
     },
     {
       "file": "modal.js",
@@ -114,23 +126,35 @@
       "bytes": 126442
     },
     {
+      "file": "hfem.js",
+      "bytes": 25895
+    },
+    {
       "file": "network-maps.js",
-      "bytes": 24925
+      "bytes": 29961
     },
     {
       "file": "serial.js",
       "bytes": 42254
     },
     {
+      "file": "message-log.js",
+      "bytes": 66618
+    },
+    {
       "file": "bug-report.js",
       "bytes": 10225
     },
     {
+      "file": "map-generator.js",
+      "bytes": 88549
+    },
+    {
       "file": "init.js",
-      "bytes": 3714
+      "bytes": 4283
     }
   ],
-  "bytes": 1332793,
-  "sha256": "14d69238e95bee4591432bb64fa5dfe43eee36721a8aff4d03828f76a6e0d7f4",
+  "bytes": 1747556,
+  "sha256": "4b82bdee56c33d0205b92e6f47e657a8cc92d000cc16cc8d153d389c0219d933",
   "nulBytes": 4
 }
