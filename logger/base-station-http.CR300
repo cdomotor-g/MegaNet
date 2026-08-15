@@ -1,0 +1,1250 @@
+'MegaNet -- base-station-http.CR300
+'
+'   A radio base station's half of MegaNet's HTTP ingest: read what the ALERT2
+'   receiver hears off RS-232, and POST it to meganet.ingest_http().
+'
+' Target: CR300-series. "Other dataloggers" at the foot says what to change for
+' a CR1000X or a CR6. Written against the HTTPPost help page that ships with
+' CRBasic Editor (CR300 Instructions > Internet Protocols > HTTPPost) and
+' against docs/ingest-http.md in this repository, which is the contract this
+' program has to satisfy. logger/README.md is the commissioning guide, including
+' the two Device Configuration Utility settings that have to be right before any
+' of this can post at all.
+'
+' --- What this is -----------------------------------------------------------
+'
+' bridge/ is MQTT -> MegaNet, and it exists because Postgres cannot subscribe to
+' MQTT so something has to hold the subscription. This is the other inbound path
+' and it needs no process anywhere: the datalogger is already at the site.
+'
+'   field stations --radio--> ERT-A2 receiver --RS-232--> THIS PROGRAM
+'                                                            |
+'                                                          HTTPS
+'                                                            v
+'                                                 meganet.ingest_http()
+'                                                            |
+'                                                    meganet.ingest()
+'
+' One token, one base station, every station it can hear -- docs/ingest-http.md
+' explains why the token belongs to the ingest point rather than to a site.
+'
+' --- The five things this program is careful about --------------------------
+'
+' 1. It never blocks the scan on the network. Serial is read in the 1-second
+'    main scan; the POST happens in a SlowSequence, because HTTPPost sits there
+'    until the server answers and a base station that stops reading its serial
+'    port for a minute has lost every transmission in that window.
+'
+' 2. It never throws a reading away because the link was down. Parsed readings
+'    go into a ring buffer and stay there until the endpoint says "accepted".
+'    A failed POST is retried with backoff and the same batch is sent again --
+'    docs/ingest-http.md guarantees that re-posting the same reading stores it
+'    once, so there is no acknowledgement protocol to build here.
+'
+' 3. It does not trust a clock it cannot check. The endpoint rejects anything
+'    stamped before 1990, and the usual cause is an RTC that lost power. This
+'    program disciplines its clock against NTP, and refuses to stamp a reading
+'    until the clock passes a sanity check, rather than posting rubbish.
+'
+' 4. It does not convert. value_raw is the 11-bit number that came off the air.
+'    A base station hearing forty sites does not know which of them is a rain
+'    gauge and which is a level sensor, and a wrong bucket size is worse than
+'    no bucket size -- MegaNet does the conversion where it knows the sensor.
+'
+' 5. The token is not in this file, and never appears in a Public variable. It
+'    is read at startup out of a file on the logger, so this program can live in
+'    a public repository, be emailed, and be loaded onto a second base station
+'    without carrying a live credential.
+'
+' --- A note on why some of this is hand-rolled ------------------------------
+'
+' The line splitter and the substring search below are written out by hand
+' rather than calling SplitStr() and InStr(). Both of those take an option code
+' whose meaning varies, and a wrong option code does not fail to compile -- it
+' silently parses the wrong thing, which for a program whose entire job is
+' parsing is the worst failure mode available. Mid(), Len() and ASCII() behave
+' the same on every operating system that has HTTPPost at all, so the parser is
+' built out of those and depends on no table anyone has to look up. It is more
+' lines and no cleverness, on purpose.
+'
+' This file is deliberately plain ASCII throughout, so it reads the same in
+' CRBasic Editor as it does on GitHub.
+'
+'==============================================================================
+
+
+'==============================================================================
+' 1. SITE CONFIGURATION -- the part you edit
+'==============================================================================
+
+' Which ingest point this is. It lands in the reading's `path` column and is
+' what the Message Log tab shows as "which base heard it", so name it for the
+' place a person standing there would recognise. Not the name of a field
+' station it relays: a base hears forty of those.
+Const BASE_NAME = "MT_STUART"
+
+' The endpoint, from docs/ingest-http.md. https, so TLS turns itself on -- the
+' help page's exception ("unless the URI is a constant and the first 5
+' characters are HTTP:") is about plain-HTTP constants and does not apply here.
+Const INGEST_URI = "https://jjprlritvhdqpvphfrnu.supabase.co/rest/v1/rpc/ingest_http"
+
+' Identifies the Supabase project. Not a secret -- it is committed to this
+' repository and can neither read nor write anything on its own.
+Const API_KEY = "sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY"
+
+' Where the secret lives. One line, the token, nothing else. Load it with Device
+' Configuration Utility (File Control); see logger/README.md. If the file is
+' missing the program still runs and still fills its Readings table -- it just
+' says "no token" in PostState and keeps queueing. CPU: is used because a CR300
+' has no microSD slot, so CRD: does not exist on this hardware.
+Const TOKEN_FILE = "CPU:meganet_token.txt"
+
+' The wire protocol behind the readings, recorded against every one of them.
+' "alert2" for an ERT-A2. Change it to "alert" if your decoder is feeding this
+' program legacy ALERT, or "unknown" if you would rather not claim.
+Const PROTOCOL = "alert2"
+
+' The receiver's serial port. 9600-8-N-1 is the ERT-A2's ALERT2 ASCII default.
+Const RX_PORT = ComRS232
+Const RX_BAUD = 9600
+
+' SerialOpen's Format parameter. 3 is 8-N-1 transparent, and it is the right one
+' for a third-party feed: format 0 discards ASCII 0 and every byte above 127,
+' and leaves the PakBus stack scanning the stream for frames it will never find.
+Const RX_FORMAT = 3
+
+' How often to try a POST, and how many readings may go in one. The endpoint's
+' own limit is 1000 per batch, which is not the binding one here: a reading is
+' 69 characters, or 92 when it carries the suspect flag, so 25 of the longest
+' possible readings plus the envelope come to 2366 -- comfortably inside
+' CONTENT_GUARD below, which means the guard stays a backstop rather than
+' becoming the thing that actually decides the batch size. 25 readings every 30
+' seconds is 50 a minute; a 40-station base reporting every 15 minutes produces
+' about 8.
+Const POST_EVERY = 30              'seconds between POST attempts
+Const MAX_BATCH = 25               'readings per POST
+
+' How long to wait for the server, in hundredths of a second -- HTTPPost's own
+' default is 7500, which is 75 seconds and not 7.5.
+'
+' Generous rather than tight, on purpose: a TLS handshake over a slow cellular
+' link needs real headroom, and Campbell's troubleshooting pages name a short
+' timeout as a common cause of a missed response on HTTPS. It costs nothing,
+' because a long block here delays only this sequence and the scan reading the
+' serial port is a different one.
+'
+' TimeOut is the NINTH parameter, so the five bare commas in the HTTPPost call
+' in PostBatch are placeholders stepping past the four table-streaming ones. If
+' your operating system's compiler will not accept empty placeholders, delete
+' ",,,,,POST_TIMEOUT" from that call and live with the 75-second default.
+Const POST_TIMEOUT = 6000          '60 seconds
+
+' Retry backoff after a failed POST: doubles from BACKOFF_MIN up to BACKOFF_MAX.
+Const BACKOFF_MIN = 30             'seconds
+Const BACKOFF_MAX = 900            'seconds -- 15 minutes
+
+' Clock discipline. NTPOffset is seconds of offset from UTC, so 0 means the
+' logger's clock runs in UTC -- which is what lets the timestamps below end in
+' Z and mean it. Blank NTP_SERVER to turn this off and set the clock by hand.
+Const NTP_SERVER = "au.pool.ntp.org"
+Const NTP_EVERY_HR = 6
+
+' How much unsent data to hold. Each slot is one reading and costs about 40
+' bytes; 250 slots is roughly two hours for a busy 40-station base. When it
+' fills, the OLDEST reading is dropped and QDropped counts it -- for flood
+' warning the newest river level matters more than the one before it.
+Const Q_SIZE = 250
+
+' The JSON body buffer, and the length at which BuildBatch stops adding. Raise
+' all three together if you raise MAX_BATCH, and leave at least 92 characters --
+' one longest-case reading -- between the guard and the buffer, or the last
+' append can still overrun.
+Const CONTENT_SIZE = 3000
+Const CONTENT_GUARD = 2700         'stop adding readings past this length
+
+' A reading whose 11-bit value is all ones. alert2.js calls this out as
+' over-range or a dead sensor, so it is posted with quality "suspect" rather
+' than dropped -- a stuck sensor is a fact about the network, not a bad row.
+Const FULL_SCALE = 2047
+
+' The clock sanity floor. The endpoint rejects anything before 1990 as "a dead
+' clock, not a reading"; this refuses to stamp one in the first place. Set well
+' above 1990 on purpose: a logger whose clock has reset can land just after
+' 1990 and pass a literal 1990 test while still being meaningless.
+Const MIN_YEAR = 2020
+
+' This program's own limit on a serial line, not the port's. A complete ALERT2A
+' line carrying a full 24-byte payload is about 180 characters.
+Const RX_MAX = 250
+
+' The ALERT2 ASCII protocol's fixed fields, before the payload hex begins, and
+' the most fields this program will split a line into.
+Const N_FIELDS = 24
+Const FIELD_MAX = 60
+
+
+'==============================================================================
+' 2. DIAGNOSTICS -- what a technician reads in the Public table
+'==============================================================================
+'
+' Everything below is visible in LoggerNet, PC400 or Device Configuration
+' Utility without collecting a table. The order is the order you read them in
+' when something is wrong: is the logger alive, is the receiver talking, is the
+' queue draining, did the last POST work.
+
+'--- is the logger alive ------------------------------------------------------
+Public Batt_volt                   'V -- station supply
+Public PTemp                       'degC -- panel temperature
+Public ClockOK As Boolean          'false = clock failed its sanity check, and
+                                   'nothing is being stamped or queued
+Public NowISO As String * 24       'the clock, formatted exactly as it is posted
+Public NTPErrMs                    'clock error NTP found, in ms, before it
+                                   'corrected it. Growing between syncs is drift
+Public NTPLastOK As Boolean        'the last NTP sync succeeded
+Public SecsSinceNTP
+
+' Status table fields, read straight out of the Status table with
+' Status.Fieldname -- no GetRecord and no boilerplate. These three are on the
+' CR300's own Status table; several familiar CR1000X fields (MemoryFree,
+' SkippedSlowScan, ProgErrors) are NOT, which is why they are absent here rather
+' than left to fail at compile time. Free memory is on the Status tab in Device
+' Configuration Utility if you want it.
+Public WatchdogErrs                'non-zero means the logger has been resetting
+Public SkippedScans                'the main scan overrunning its second
+Public VarOutOfBound               'an array index that went past its dimension.
+                                   'Worth watching here specifically: CRBasic
+                                   'does not bounds-check a variable index, and
+                                   'this program indexes arrays from serial data
+
+'--- is the receiver talking --------------------------------------------------
+Public SecsSinceRx                 'seconds since the last serial line. THE
+                                   'number: a base station that has gone deaf
+                                   'shows up here and nowhere else, because a
+                                   'deaf base station is not an error, it is a
+                                   'silence
+Public RxLines                     'lines read off the serial port since startup
+Public RxFrames                    'frames that decoded
+Public RxReadings                  'readings extracted from them
+Public RxBadFrames                 'lines rejected -- RxLastBad and RxLastWhy
+                                   'are the last one and the reason
+Public RxBadRecords                'records inside good frames whose status byte
+                                   'was non-zero
+Public RxLastLine As String * 200  'the last line, verbatim. Worth more than any
+                                   'counter when the format is not what you
+                                   'expected
+Public RxLastBad As String * 200   'the last line that would not decode
+Public RxLastWhy As String * 60    'why that one would not decode
+Public RxLastId As Long            'ALERT id of the last reading decoded
+Public RxLastValue As Long         'and its value
+Public RxFrameSkew                 'seconds between the frame's own ALERT2 time
+                                   'and this logger's clock -- see the note at
+                                   'ParseAlert2
+
+'--- is the queue draining ----------------------------------------------------
+Public QDepth                      'readings waiting to be posted
+Public QPeak                       'the deepest it has ever been, which is what
+                                   'says how much outage Q_SIZE actually buys
+Public QDropped                    'readings lost to a full queue. Non-zero means
+                                   'the link has been down longer than the buffer
+                                   'holds
+
+'--- did the last POST work ---------------------------------------------------
+Public PostState As String * 40    'plain English: what the poster is doing, or
+                                   'why it is not
+Public TokenOK As Boolean          'the token file was found and was not empty
+Public TokenLen As Long            'how many characters it held -- enough to spot
+                                   'a truncated paste without printing the secret
+Public PostAttempts
+Public PostOK
+Public PostFail
+Public ConsecFail                  'consecutive failures -- resets on success
+Public Backoff                     'seconds until the next attempt, when failing
+Public SecsSincePost               'seconds since the last ACCEPTED post, not
+                                   'since the last attempt
+
+Public Accepted                    'cumulative, from the endpoint's own answer
+Public Duplicates                  'readings it had already stored -- normal after
+                                   'a retry, and proof the retry was safe
+Public Rejected                    'readings it refused. Non-zero needs reading:
+                                   'LastReject says why
+
+Public LastAccepted                'the last POST's answer, on its own
+Public LastDuplicates
+Public LastRejected
+Public LastStatus As Long          'the HTTP status code: 200 good, 401 token,
+                                   '400 malformed body
+Public LastSocket                  'HTTPPost's own return: >=100 is the TCP
+                                   'socket it used, 0 the request never got out,
+                                   '-2 the instruction did not execute
+Public LastReject As String * 200  'the first "why" out of the last rejected array
+Public HTTPResponse As String * 500
+Public SentHeader As String * 200  'the request headers as built, TOKEN REDACTED
+Public RespHeader As String * 300  'what came back in their place -- see PostBatch
+Public LastPayload As String * 200 'the first 200 characters of the last body sent
+
+
+'==============================================================================
+' 3. WORKING VARIABLES
+'==============================================================================
+
+' The unsent-readings ring buffer. QHead is the next slot to write, QTail the
+' next to send; empty when they are equal, so capacity is Q_SIZE - 1.
+Dim qAddr(Q_SIZE) As Long
+Dim qVal(Q_SIZE) As Long
+Dim qStamp(Q_SIZE) As String * 24
+Dim qSus(Q_SIZE) As Boolean
+Dim QHead As Long
+Dim QTail As Long
+
+' Dim, not Public, on purpose: a Public token is readable by anyone who can
+' reach the logger, which is the whole thing the token file was for.
+Dim IngestToken As String * 80
+
+Dim ContentsString As String * CONTENT_SIZE
+Dim HTTPHeader As String * 300
+Dim BatchN As Long                 'readings in the batch currently in flight
+Dim CRLF As String * 2
+Dim DQ As String * 1               'a double quote. CHR(34) is the portable way
+                                   'to get one into a CRBasic string
+
+Dim RxLine As String * RX_MAX
+Dim RxBytes As Long
+
+Dim fld(FIELD_MAX) As String * 16
+Dim nFld As Long
+Dim pay(32) As Long                'payload bytes, decoded from hex
+Dim nPay As Long
+Dim frameOk As Long
+Dim payLen As Long
+Dim frameSecs As Long
+Dim loggerSecs As Long
+Dim suspect As Long
+
+Dim rTime(9) As Long               '1 yr, 2 mo, 3 day, 4 hr, 5 min, 6 sec,
+                                   '7 usec, 8 day-of-week, 9 day-of-year
+
+' JSON fragments, built once in BeginProg so the per-reading concatenation in
+' BuildBatch stays legible instead of becoming a wall of CHR(34).
+Dim jEnvelope As String * 200      '{"payload":{"path":"..","protocol":"..","readings":[
+Dim jTail As String * 8            ']}}
+Dim fId As String * 16             '{"alert_id":
+Dim fTs As String * 20             ,"reading_ts":"
+Dim fVal As String * 20            ","value_raw":
+Dim fSus As String * 24            ,"quality":"suspect"
+Dim jRec As String * 120           'one reading, being built
+Dim numStr As String * 16          'one number, formatted
+Dim sprLen As Long                 'Sprintf returns the LENGTH it wrote, not the
+                                   'text -- the text goes into the first argument
+
+' Scratch, one set per subroutine, so a call never quietly clobbers its caller's
+' loop counter. CRBasic has no local scope worth relying on here.
+Dim hk As Long                     'HexByte
+Dim hn As Long
+Dim hexVal As Long
+Dim hexIn As String * 4
+Dim fi As Long                     'FindStr
+Dim srcStr As String * 500
+Dim needle As String * 32
+Dim foundAt As Long
+Dim si As Long                     'SplitLine
+Dim sStart As Long
+Dim sChar As String * 1
+Dim delim As String * 1
+Dim jp As Long                     'JsonInt
+Dim jd As Long
+Dim jsonKey As String * 16
+Dim jsonVal As Long
+Dim pp As Long                     'ParseStatus
+Dim pd As Long
+Dim qn As Long                     'QueuePush
+Dim tk As Long                     'ParseLine / LoadToken trimming
+Dim fh As Long                     'LoadToken -- the file handle
+Dim i As Long                      'ParseAlert2, and nothing else: the scan that
+                                   'calls it must not use i for its own counter
+Dim bi As Long                     'BuildBatch
+Dim drained As Long                'the main scan's drain counter
+Dim postDue As Boolean
+
+
+'==============================================================================
+' 4. DATA TABLES
+'==============================================================================
+
+' The local archive, and the reason a broken link is an inconvenience rather
+' than a data loss. Every reading is stored here whether or not it ever posts,
+' so a base station that spent a fortnight offline can still be collected over
+' a cable and backfilled.
+' Sized, not auto-allocated. Campbell costs an auto-allocated event-driven table
+' at one record per second, so a -1 here would claim almost all the memory and
+' starve the two tables below.
+DataTable (Readings,True,20000)
+  Sample (1,RxLastId,Long)
+  Sample (1,RxLastValue,Long)
+  Sample (1,RxFrameSkew,FP2)
+EndTable
+
+' The heartbeat. Five minutes is frequent enough to see a link flapping and slow
+' enough to keep months on a CR300.
+'
+' Counters are Long, not FP2, on purpose: FP2 carries four significant digits
+' and cannot hold an integer above 7999 exactly, so a POST counter stored as FP2
+' starts lying on about the fourth day.
+DataTable (Diag,True,-1)
+  DataInterval (0,5,Min,10)
+  Minimum (1,Batt_volt,FP2,False,False)
+  Sample (1,PTemp,FP2)
+  Sample (1,WatchdogErrs,Long)
+  Sample (1,SkippedScans,Long)
+  Sample (1,VarOutOfBound,Long)
+  Sample (1,NTPErrMs,FP2)
+  Sample (1,RxLines,Long)
+  Sample (1,RxReadings,Long)
+  Sample (1,RxBadFrames,Long)
+  Maximum (1,SecsSinceRx,Long,False,False)
+  Sample (1,QDepth,Long)
+  Maximum (1,QPeak,Long,False,False)
+  Sample (1,QDropped,Long)
+  Sample (1,Accepted,Long)
+  Sample (1,Duplicates,Long)
+  Sample (1,Rejected,Long)
+  Sample (1,PostOK,Long)
+  Sample (1,PostFail,Long)
+  Maximum (1,SecsSincePost,Long,False,False)
+EndTable
+
+' One record per POST attempt, successful or not. This is what answers "when did
+' it stop working" -- a question the five-minute averages in Diag erase.
+DataTable (PostLog,True,2000)
+  Sample (1,BatchN,Long)
+  Sample (1,LastStatus,Long)
+  Sample (1,LastSocket,Long)
+  Sample (1,LastAccepted,Long)
+  Sample (1,LastDuplicates,Long)
+  Sample (1,LastRejected,Long)
+  Sample (1,PostState,String)
+  Sample (1,LastReject,String)
+EndTable
+
+
+'==============================================================================
+' 5. SUBROUTINES
+'==============================================================================
+'
+' Declared before BeginProg, and in call order. They write their answers into
+' module-level variables rather than returning them: it reads a little flatter
+' than a Function would, and it sidesteps every question about how CRBasic
+' passes strings and arrays into a call.
+
+'------------------------------------------------------------------------------
+' FindStr -- the position of `needle` in `srcStr`, into foundAt. 0 if absent.
+'
+' This is InStr, written out. See the note at the top of the file for why: the
+' option code InStr takes could not be verified, and the failure mode of a wrong
+' one is a silent mis-parse rather than a compile error.
+'------------------------------------------------------------------------------
+Sub FindStr()
+  foundAt = 0
+  If Len(needle) = 0 Then Exit Sub
+  If Len(srcStr) < Len(needle) Then Exit Sub
+  For fi = 1 To Len(srcStr) - Len(needle) + 1
+    If Mid(srcStr,fi,Len(needle)) = needle Then
+      foundAt = fi
+      ExitFor
+    EndIf
+  Next fi
+EndSub
+
+'------------------------------------------------------------------------------
+' SplitLine -- RxLine split on `delim` into fld(), count into nFld.
+'
+' This is SplitStr, written out, for the same reason. Fields past FIELD_MAX are
+' counted but not stored, so a runaway line cannot write past the array -- and
+' CRBasic does not bounds-check a variable array index, so that guard is the
+' only thing between a malformed line and memory that belongs to something else.
+'------------------------------------------------------------------------------
+Sub SplitLine()
+  nFld = 0
+  sStart = 1
+  For si = 1 To Len(RxLine) + 1
+    If si > Len(RxLine) Then
+      sChar = delim                              'flush the final field
+    Else
+      sChar = Mid(RxLine,si,1)
+    EndIf
+    If sChar = delim Then
+      nFld = nFld + 1
+      If nFld <= FIELD_MAX Then fld(nFld) = Mid(RxLine,sStart,si - sStart)
+      sStart = si + 1
+    EndIf
+  Next si
+  If nFld > FIELD_MAX Then nFld = FIELD_MAX
+EndSub
+
+'------------------------------------------------------------------------------
+' HexByte -- hex characters in hexIn, the value out in hexVal, -1 if not hex.
+'
+' Done from ASCII codes rather than with a conversion function so it compiles on
+' every operating system that has HTTPPost at all, and so a stray character in a
+' line a terminal wrapped is a counted rejection rather than a silent zero.
+'------------------------------------------------------------------------------
+Sub HexByte()
+  hexVal = 0
+  If Len(hexIn) = 0 Then
+    hexVal = -1
+    Exit Sub
+  EndIf
+  For hk = 1 To Len(hexIn)
+    hn = ASCII(Mid(hexIn,hk,1))
+    If hn >= 48 AND hn <= 57 Then
+      hn = hn - 48                               '0-9
+    ElseIf hn >= 65 AND hn <= 70 Then
+      hn = hn - 55                               'A-F
+    ElseIf hn >= 97 AND hn <= 102 Then
+      hn = hn - 87                               'a-f
+    Else
+      hexVal = -1
+      Exit Sub
+    EndIf
+    hexVal = hexVal * 16 + hn
+  Next hk
+EndSub
+
+'------------------------------------------------------------------------------
+' StampNow -- the clock, as "2026-08-11T04:15:00Z", into NowISO.
+'
+' The logger's clock is UTC (NTP offset 0, above), so the Z is the truth and not
+' a claim. ClockOK is set here and nowhere else: a reading is only queued when it
+' is true, because the endpoint's most common rejection is a reading stamped
+' 1970 by an RTC that lost its backup battery, and a base station that posts a
+' thousand of those has made a battery fault look like a network fault.
+'
+' Sprintf rather than FormatFloat because the zero-padded widths are the whole
+' point and Sprintf takes integer specifiers natively -- RealTime fills a Long
+' array, so %d matches its arguments exactly. Sprintf does no type conversion of
+' its own, and a mismatch there is silent.
+'
+' NowISO is Public so a malformed stamp is visible on the bench before anything
+' is posted, rather than being inferred later from rejection reasons.
+'------------------------------------------------------------------------------
+Sub StampNow()
+  RealTime (rTime())
+  If rTime(1) < MIN_YEAR Then
+    ClockOK = False
+    NowISO = ""
+  Else
+    ClockOK = True
+    sprLen = Sprintf(NowISO,"%04d-%02d-%02dT%02d:%02d:%02dZ",rTime(1),rTime(2),rTime(3),rTime(4),rTime(5),rTime(6))
+  EndIf
+EndSub
+
+'------------------------------------------------------------------------------
+' QueuePush -- one reading into the ring buffer. Address in RxLastId, value in
+' RxLastValue, suspect flag in `suspect`.
+'
+' Called from the main scan. The SlowSequence reads the other end of the same
+' buffer, which is why the two ends are separate variables and why the poster
+' takes semaphore 1 around the few lines where it touches an index.
+'------------------------------------------------------------------------------
+Sub QueuePush()
+  qn = QHead + 1
+  If qn > Q_SIZE Then qn = 1
+  If qn = QTail Then
+    'Full. Drop the oldest rather than refuse the newest -- at a flood warning
+    'base the current river level is the reading that matters.
+    QTail = QTail + 1
+    If QTail > Q_SIZE Then QTail = 1
+    QDropped = QDropped + 1
+  EndIf
+  qAddr(QHead) = RxLastId
+  qVal(QHead) = RxLastValue
+  qStamp(QHead) = NowISO
+  qSus(QHead) = (suspect = 1)
+  QHead = qn
+
+  RxReadings = RxReadings + 1
+  CallTable Readings
+EndSub
+
+'------------------------------------------------------------------------------
+' RejectLine -- one place to record a line that would not decode, so every
+' rejection leaves the same evidence behind. Reason in RxLastWhy before the call.
+'------------------------------------------------------------------------------
+Sub RejectLine()
+  RxLastBad = RxLine
+  RxBadFrames = RxBadFrames + 1
+EndSub
+
+'------------------------------------------------------------------------------
+' ParsePlain -- "<alert id>,<value>" or "<alert id> <value>".
+'
+' The fallback for any decoder that is not an ERT-A2, and what you type into a
+' terminal to prove the whole path end to end without waiting for a
+' transmission. logger/README.md walks through that test.
+'------------------------------------------------------------------------------
+Sub ParsePlain()
+  RxLastId = fld(1)                              'CRBasic converts the text on
+  RxLastValue = fld(2)                           'assignment to a numeric
+
+  If RxLastId < 1 OR RxLastId > 65535 Then
+    RxLastWhy = "alert id outside 1-65535"
+    Call RejectLine()
+    Exit Sub
+  EndIf
+
+  Call StampNow()
+  If NOT ClockOK Then
+    RxLastWhy = "clock not set - not stamping"
+    Call RejectLine()
+    Exit Sub
+  EndIf
+
+  RxFrames = RxFrames + 1
+  RxFrameSkew = NAN                              'no frame clock in this shape
+  suspect = 0
+  If RxLastValue = FULL_SCALE Then suspect = 1
+  Call QueuePush()
+EndSub
+
+'------------------------------------------------------------------------------
+' ParseAlert2 -- the ERT-A2's ALERT2 ASCII protocol.
+'
+'   ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00
+'   |_______________________ 24 fixed fields ________________________|__ payload __|
+'
+' Field 18 is the frame-valid flag, field 23 the payload length in bytes, and
+' field 24 the transmitting node. The full table, and the evidence behind each
+' entry, is in alert2.js -- this program reads the three fields that decide
+' whether a frame is worth anything and leaves the rest to the app.
+'
+' The payload is an ALERT2 "ALERT concentration" element:
+'
+'   byte 0     0x74, the element type
+'   bytes 1-2  seconds since midnight, from the transmitting network
+'   then four bytes per reading:
+'     byte 0   AAAAAAAA   address bits 7-0
+'     byte 1   DDDAAAAA   value bits 10-8, then address bits 12-8
+'     byte 2   DDDDDDDD   value bits 7-0
+'     byte 3   SSSSSSSS   status; 0 on every valid record observed
+'
+' That second byte is the only part of the encoding that is not obvious by eye:
+' a byte that looks like address is carrying the top of the value too.
+'
+' Nothing is decoded on a best-effort basis. A line that is not understood in
+' full is rejected whole, because half an ALERT frame is a plausible-looking
+' reading for the wrong station, and a wrong station is worse than a gap.
+'
+' --- Which clock stamps the reading -----------------------------------------
+'
+' This one, not either of the two in the frame. The ERT-A2's own RTC is in
+' fields 7-12 and is demonstrably unreliable -- the 444-frame reference capture
+' behind alert2.js has it twelve hours out, an AM/PM error on the unit. The
+' payload's seconds-since-midnight comes from the transmitting network and is
+' the better of the two, but nothing in the frame or in ELPRO's documentation
+' says which zone it counts from, and a base station that guessed wrong would
+' silently shift every reading it ever posted by a whole number of hours.
+'
+' So the reading is stamped with this logger's NTP-disciplined UTC clock at the
+' moment the line arrives -- receive latency at a base station is seconds -- and
+' the disagreement is reported rather than resolved. RxFrameSkew is the frame
+' time minus this logger's time of day: near zero means the two agree and the
+' frame time is UTC; parked at a whole number of hours is the answer to the
+' question above, and worth telling MegaNet about.
+'------------------------------------------------------------------------------
+Sub ParseAlert2()
+  If nFld < N_FIELDS + 4 Then
+    RxLastWhy = "short line - wrapped or truncated"
+    Call RejectLine()
+    Exit Sub
+  EndIf
+
+  'Field 18 was 1 on all 443 good frames in the reference capture and 0 on the
+  'single corrupt one, whose records also carried addresses matching no station.
+  'So this is a gate rather than a warning.
+  frameOk = fld(18)
+  If frameOk <> 1 Then
+    RxLastWhy = "receiver flagged the frame invalid"
+    Call RejectLine()
+    Exit Sub
+  EndIf
+
+  'Field 23 is the payload length in bytes, and it matched the number of
+  'trailing hex fields on all 444 frames -- so it is what tells a complete line
+  'from one a narrow terminal wrapped.
+  payLen = fld(23)
+  nPay = nFld - N_FIELDS
+  If payLen <> nPay Then
+    RxLastWhy = "payload length disagrees with the hex"
+    Call RejectLine()
+    Exit Sub
+  EndIf
+  If nPay < 7 OR nPay > 32 Then
+    RxLastWhy = "payload too short or too long"
+    Call RejectLine()
+    Exit Sub
+  EndIf
+  If ((nPay - 3) MOD 4) <> 0 Then
+    RxLastWhy = "payload is not whole records"
+    Call RejectLine()
+    Exit Sub
+  EndIf
+
+  'Hex to bytes. pay(1) is payload byte 0 -- CRBasic arrays start at 1.
+  For i = 1 To nPay
+    hexIn = fld(N_FIELDS + i)
+    Call HexByte()
+    If hexVal < 0 OR hexVal > 255 Then
+      RxLastWhy = "payload byte is not hex"
+      Call RejectLine()
+      Exit Sub
+    EndIf
+    pay(i) = hexVal
+  Next i
+
+  If pay(1) <> &H74 Then
+    RxLastWhy = "not an ALERT concentration element"
+    Call RejectLine()
+    Exit Sub
+  EndIf
+
+  Call StampNow()
+  If NOT ClockOK Then
+    RxLastWhy = "clock not set - not stamping"
+    Call RejectLine()
+    Exit Sub
+  EndIf
+
+  RxFrames = RxFrames + 1
+
+  'The frame's own clock, against ours. See the note above.
+  frameSecs = pay(2) * 256 + pay(3)
+  loggerSecs = rTime(4) * 3600 + rTime(5) * 60 + rTime(6)
+  RxFrameSkew = frameSecs - loggerSecs
+  If RxFrameSkew > 43200 Then RxFrameSkew = RxFrameSkew - 86400
+  If RxFrameSkew < -43200 Then RxFrameSkew = RxFrameSkew + 86400
+
+  For i = 4 To nPay Step 4
+    If pay(i + 3) <> 0 Then
+      'A non-zero status byte marked corrupt records in the reference capture,
+      'and those records carried addresses matching no station. Counted, not
+      'posted.
+      RxBadRecords = RxBadRecords + 1
+    Else
+      RxLastId = ((pay(i + 1) AND &H1F) << 8) OR pay(i)
+      RxLastValue = ((pay(i + 1) >> 5) << 8) OR pay(i + 2)
+      If RxLastId >= 1 AND RxLastId <= 65535 Then
+        suspect = 0
+        If RxLastValue = FULL_SCALE Then suspect = 1
+        Call QueuePush()
+      Else
+        RxBadRecords = RxBadRecords + 1
+      EndIf
+    EndIf
+  Next i
+EndSub
+
+'------------------------------------------------------------------------------
+' ParseLine -- one serial line in RxLine, zero or more readings into the queue.
+'
+' Two shapes, told apart by what the line starts with, the same way alert2.js
+' sniffs a capture. Sniffing on the raw text rather than on a split field means
+' a line whose delimiters are wrong is still identified before it is blamed.
+'------------------------------------------------------------------------------
+Sub ParseLine()
+  RxLastWhy = ""
+
+  'Trim whatever the terminator left behind, so the last field is a clean number
+  'whichever of CR, LF or CRLF the receiver ends its lines with -- and so the
+  'program does not depend on which of those SerialInRecord strips.
+  Do While Len(RxLine) > 0
+    tk = ASCII(Mid(RxLine,Len(RxLine),1))
+    If tk = 13 OR tk = 10 OR tk = 32 OR tk = 9 Then
+      RxLine = Mid(RxLine,1,Len(RxLine) - 1)
+    Else
+      ExitDo
+    EndIf
+  Loop
+  If Len(RxLine) = 0 Then Exit Sub
+
+  RxLines = RxLines + 1
+  RxLastLine = RxLine
+
+  delim = ","
+  Call SplitLine()
+  If nFld < 2 Then
+    delim = " "                                  'the plain "<id> <value>" case
+    Call SplitLine()
+  EndIf
+
+  If Mid(RxLine,1,7) = "ALERT2A" Then
+    Call ParseAlert2()
+  ElseIf nFld >= 2 Then
+    Call ParsePlain()
+  Else
+    RxLastWhy = "unrecognised line"
+    Call RejectLine()
+  EndIf
+EndSub
+
+'------------------------------------------------------------------------------
+' BuildBatch -- up to MAX_BATCH readings out of the ring buffer and into
+' ContentsString, without removing them. BatchN says how many went in.
+'
+' Nothing leaves the queue here. The readings are only released once the
+' endpoint has said it stored them, which is what makes a failed POST cost
+' nothing and a timeout cost one duplicate at worst.
+'
+' The length guard is what actually bounds the body -- MAX_BATCH is the second
+' line of defence. Overflow behaviour on a CRBasic string is not something to
+' rely on either way, and a truncated JSON body is a 400 for the whole batch, so
+' the check happens before the append rather than after it.
+'
+' Numbers go through Sprintf rather than being concatenated directly. Implicit
+' numeric-to-string conversion is free to pad, round or reach for scientific
+' notation, and any of the three inside a JSON literal is a rejected batch.
+'------------------------------------------------------------------------------
+Sub BuildBatch()
+  ContentsString = jEnvelope
+  BatchN = 0
+  bi = QTail
+
+  Do While bi <> QHead AND BatchN < MAX_BATCH
+    jRec = ""
+    If BatchN > 0 Then jRec = ","
+
+    sprLen = Sprintf(numStr,"%d",qAddr(bi))
+    jRec = jRec & fId & numStr
+    jRec = jRec & fTs & qStamp(bi)
+    sprLen = Sprintf(numStr,"%d",qVal(bi))
+    jRec = jRec & fVal & numStr
+    If qSus(bi) Then jRec = jRec & fSus
+    jRec = jRec & "}"
+
+    If Len(ContentsString) + Len(jRec) > CONTENT_GUARD Then ExitDo
+
+    ContentsString = ContentsString & jRec
+    BatchN = BatchN + 1
+    bi = bi + 1
+    If bi > Q_SIZE Then bi = 1
+  Loop
+
+  ContentsString = ContentsString & jTail
+EndSub
+
+'------------------------------------------------------------------------------
+' JsonInt -- the integer after "<jsonKey>": in HTTPResponse, into jsonVal.
+' -1 if the key is not there.
+'
+' A full JSON parser is not what this needs. The response is a flat object
+' written by one function -- {"accepted":1,"duplicates":0,"rejected":[],
+' "raw_id":4821} -- and the numbers this program acts on are never nested.
+'------------------------------------------------------------------------------
+Sub JsonInt()
+  jsonVal = -1
+  srcStr = HTTPResponse
+  needle = DQ & jsonKey & DQ & ":"
+  Call FindStr()
+  If foundAt > 0 Then
+    jp = foundAt + Len(needle)
+    jsonVal = 0
+    Do While jp <= Len(srcStr)
+      jd = ASCII(Mid(srcStr,jp,1))
+      If jd < 48 OR jd > 57 Then ExitDo
+      jsonVal = jsonVal * 10 + (jd - 48)
+      jp = jp + 1
+    Loop
+  EndIf
+EndSub
+
+'------------------------------------------------------------------------------
+' ParseStatus -- the HTTP status code out of RespHeader, into LastStatus.
+'
+' There is no status-code parameter on HTTPPost: it returns a socket. The status
+' arrives in the header variable, because the instruction writes the server's
+' response headers back over whatever request headers it was given -- which is
+' also why PostBatch rebuilds them every single time.
+'------------------------------------------------------------------------------
+Sub ParseStatus()
+  LastStatus = 0
+  srcStr = RespHeader
+  needle = "HTTP/"
+  Call FindStr()
+  If foundAt > 0 Then
+    pp = foundAt
+    Do While pp <= Len(srcStr)                   'step over "HTTP/1.1"
+      If Mid(srcStr,pp,1) = " " Then ExitDo
+      pp = pp + 1
+    Loop
+    pp = pp + 1
+    Do While pp <= Len(srcStr)
+      pd = ASCII(Mid(srcStr,pp,1))
+      If pd < 48 OR pd > 57 Then ExitDo
+      LastStatus = LastStatus * 10 + (pd - 48)
+      pp = pp + 1
+    Loop
+  EndIf
+EndSub
+
+'------------------------------------------------------------------------------
+' LoadToken -- the secret, out of TOKEN_FILE.
+'
+' Kept out of this program so the file can live in a public repository and be
+' loaded onto a second base station without carrying a live credential -- which
+' is what docs/ingest-http.md asks for in as many words. Kept out of the Public
+' table for the same reason: a Public token is readable by anyone who can reach
+' the logger.
+'------------------------------------------------------------------------------
+Sub LoadToken()
+  IngestToken = ""
+  TokenOK = False
+  TokenLen = 0
+  fh = FileOpen (TOKEN_FILE,"r",0)
+  If fh <> 0 Then
+    FileReadLine (fh,IngestToken,80)
+    FileClose (fh)
+
+    'Trim whatever the editor that wrote the file left on the end. A trailing
+    'newline here is not cosmetic: it would terminate the header block early and
+    'the three headers after it would never be sent.
+    Do While Len(IngestToken) > 0
+      tk = ASCII(Mid(IngestToken,Len(IngestToken),1))
+      If tk = 13 OR tk = 10 OR tk = 32 OR tk = 9 Then
+        IngestToken = Mid(IngestToken,1,Len(IngestToken) - 1)
+      Else
+        ExitDo
+      EndIf
+    Loop
+
+    TokenLen = Len(IngestToken)
+    If TokenLen > 0 Then TokenOK = True
+  EndIf
+EndSub
+
+'------------------------------------------------------------------------------
+' PostBatch -- one POST, and what came back.
+'
+' Success is "the response says accepted", not "the socket was non-zero". The
+' endpoint never answers 204 for exactly this reason: docs/ingest-http.md's rule
+' is that a logger which cannot tell stored from silently dropped produces gaps
+' nobody notices for a month. So the socket and the status code are recorded as
+' diagnostics, and the response body is what decides whether the queue advances.
+'
+' The header is rebuilt on every call, not once in BeginProg. HTTPPost writes
+' the server's response headers back into the same string it was given, so a
+' header variable built once is correct exactly once -- on the second post the
+' apikey and the token would have been replaced by whatever the server said.
+' SentHeader keeps a redacted copy of what actually went out.
+'
+' Nothing here writes a request line or a Content-Length: HTTPPost prepends the
+' one and appends the other, and a program that adds them too sends them twice.
+'------------------------------------------------------------------------------
+Sub PostBatch()
+  PostAttempts = PostAttempts + 1
+
+  HTTPHeader = "apikey: " & API_KEY & CRLF
+  HTTPHeader = HTTPHeader & "X-Ingest-Token: " & IngestToken & CRLF
+  HTTPHeader = HTTPHeader & "Content-Type: application/json" & CRLF
+  HTTPHeader = HTTPHeader & "Content-Profile: meganet" & CRLF
+
+  'What went out, with the credential replaced by its length -- enough to spot a
+  'truncated paste or a missing file, without putting the token on screen.
+  sprLen = Sprintf(numStr,"%d",TokenLen)
+  SentHeader = "apikey: " & API_KEY
+  SentHeader = SentHeader & " | X-Ingest-Token: " & numStr & " chars"
+  SentHeader = SentHeader & " | Content-Type: application/json"
+  SentHeader = SentHeader & " | Content-Profile: meganet"
+
+  HTTPResponse = ""
+  LastPayload = ContentsString
+
+  'The commas step past the four table-streaming parameters to reach TimeOut,
+  'which is the ninth. Those parameters exist to send a DataTable straight to a
+  'server as TOB1/TOA5/CSIXML/CSIJSON, and ingest_http() accepts none of those
+  'shapes -- so this program builds its own body and passes none of them.
+  LastSocket = HTTPPost (INGEST_URI,ContentsString,HTTPResponse,HTTPHeader,,,,,POST_TIMEOUT)
+
+  RespHeader = HTTPHeader                        'the response headers, now
+  Call ParseStatus()
+
+  jsonKey = "accepted"
+  Call JsonInt()
+
+  If jsonVal >= 0 Then
+    LastAccepted = jsonVal
+    Accepted = Accepted + jsonVal
+
+    jsonKey = "duplicates"
+    Call JsonInt()
+    If jsonVal < 0 Then jsonVal = 0
+    LastDuplicates = jsonVal
+    Duplicates = Duplicates + jsonVal
+
+    'Every reading in a batch is accepted, a duplicate, or rejected -- the
+    'contract leaves no fourth outcome -- so the rejected count is arithmetic
+    'and the array does not need counting. What the array is read for is the
+    'first reason, because the reasons repeat and docs/ingest-http.md tabulates
+    'what each one usually means.
+    LastRejected = BatchN - LastAccepted - LastDuplicates
+    If LastRejected < 0 Then LastRejected = 0
+    Rejected = Rejected + LastRejected
+
+    LastReject = ""
+    If LastRejected > 0 Then
+      srcStr = HTTPResponse
+      needle = DQ & "why" & DQ & ":" & DQ
+      Call FindStr()
+      If foundAt > 0 Then LastReject = Mid(HTTPResponse,foundAt + Len(needle),150)
+    EndIf
+
+    'Stored. Release exactly what was sent -- QHead may have moved on since, and
+    'the semaphore is held for these few lines only, never across the POST.
+    SemaphoreGet (1)
+      QTail = QTail + BatchN
+      Do While QTail > Q_SIZE
+        QTail = QTail - Q_SIZE
+      Loop
+    SemaphoreRelease (1)
+
+    PostOK = PostOK + 1
+    ConsecFail = 0
+    Backoff = 0
+    SecsSincePost = 0
+    If LastRejected > 0 Then
+      PostState = "accepted, some rejected"
+    Else
+      PostState = "accepted"
+    EndIf
+
+  Else
+    'No "accepted" in the body. Either the request never landed, or the endpoint
+    'refused it -- 401 for a token it does not know, 400 for a body it could not
+    'read. Both come back as a JSON error object, so the first characters of it
+    'are worth more than any code this program could invent.
+    PostFail = PostFail + 1
+    ConsecFail = ConsecFail + 1
+    LastReject = Mid(HTTPResponse,1,150)
+    LastAccepted = 0
+    LastDuplicates = 0
+    LastRejected = 0
+
+    If LastSocket = 0 Then
+      PostState = "no answer - check link and TLS"
+    ElseIf LastSocket = -2 Then
+      PostState = "HTTPPost did not execute"
+    ElseIf LastStatus = 401 Then
+      PostState = "refused - token"
+    ElseIf LastStatus = 400 Then
+      PostState = "refused - malformed body"
+    ElseIf LastStatus > 0 Then
+      sprLen = Sprintf(numStr,"%d",LastStatus)
+      PostState = "refused - HTTP " & numStr
+    Else
+      PostState = "no usable answer - see RespHeader"
+    EndIf
+
+    If Backoff = 0 Then
+      Backoff = BACKOFF_MIN
+    Else
+      Backoff = Backoff * 2
+      If Backoff > BACKOFF_MAX Then Backoff = BACKOFF_MAX
+    EndIf
+  EndIf
+
+  CallTable PostLog
+EndSub
+
+
+'==============================================================================
+' 6. MAIN PROGRAM
+'==============================================================================
+
+BeginProg
+
+  DQ = CHR(34)
+  CRLF = CHR(13) & CHR(10)
+
+  'The JSON fragments, built once. The comment beside each declaration above
+  'shows what it contains.
+  jEnvelope = "{" & DQ & "payload" & DQ & ":{"
+  jEnvelope = jEnvelope & DQ & "path" & DQ & ":" & DQ & BASE_NAME & DQ & ","
+  jEnvelope = jEnvelope & DQ & "protocol" & DQ & ":" & DQ & PROTOCOL & DQ & ","
+  jEnvelope = jEnvelope & DQ & "readings" & DQ & ":["
+  '`source` is deliberately absent: ingest_http() stamps it "http" itself, and a
+  'value repeated here could only ever disagree with the truth.
+
+  jTail = "]}}"
+  fId   = "{" & DQ & "alert_id" & DQ & ":"
+  fTs   = "," & DQ & "reading_ts" & DQ & ":" & DQ
+  fVal  = DQ & "," & DQ & "value_raw" & DQ & ":"
+  fSus  = "," & DQ & "quality" & DQ & ":" & DQ & "suspect" & DQ
+
+  'The queue always starts empty. If PreserveVariables is ever added to this
+  'program the counters above may survive a restart, but these arrays will not --
+  'so the indices have to be reset here or they would point into stale slots.
+  QHead = 1
+  QTail = 1
+  QDepth = 0
+  Backoff = 0
+  ConsecFail = 0
+  PostState = "starting"
+
+  Call LoadToken()
+
+  'Once, here -- not in the scan. Re-opening the port every second re-allocates
+  'the ring buffer and resets its pointers, discarding whatever arrived since
+  'the last call, which on a busy base station is most of it. That is the single
+  'most common bug in a program of this shape.
+  SerialOpen (RX_PORT,RX_BAUD,RX_FORMAT,0,RX_MAX * 4)
+  SerialFlush (RX_PORT)
+
+  '--- the fast half: listen --------------------------------------------------
+  Scan (1,Sec,3,0)
+
+    'PanelTemp's second parameter is the notch frequency -- the interference this
+    'measurement rejects -- so it is the local mains frequency, 50 in Australia.
+    PanelTemp (PTemp,50)
+    Battery (Batt_volt)
+    WatchdogErrs = Status.WatchdogErrors
+    SkippedScans = Status.SkippedScan
+    VarOutOfBound = Status.VarOutofBound
+    Call StampNow()
+
+    'Drain the port. SerialInRecord returns at most one record per call and more
+    'than one line can arrive between scans on a busy base, so this loops until
+    'the buffer is empty rather than taking one line and leaving the rest to go
+    'stale. The cap stops a babbling receiver holding the scan open.
+    drained = 0
+    Do
+      RxLine = ""
+      SerialInRecord (RX_PORT,RxLine,0,0,&H0A,RxBytes,01)
+      If RxBytes > 0 Then
+        SecsSinceRx = 0
+        Call ParseLine()
+        drained = drained + 1
+      EndIf
+    Loop While RxBytes > 0 AND drained < 20
+
+    If drained = 0 Then SecsSinceRx = SecsSinceRx + 1
+
+    QDepth = QHead - QTail
+    If QDepth < 0 Then QDepth = QDepth + Q_SIZE
+    If QDepth > QPeak Then QPeak = QDepth
+
+    SecsSincePost = SecsSincePost + 1
+
+    CallTable Diag
+
+  NextScan
+
+  '--- the slow half: talk ----------------------------------------------------
+  '
+  ' A sequence of its own because HTTPPost blocks until the server answers or
+  ' POST_TIMEOUT expires -- a minute -- and a base station that stops reading
+  ' its serial port for a minute has lost every transmission in that window. Nothing in
+  ' here touches the receiver, and the only state it shares with the scan above
+  ' is the ring buffer -- held under semaphore 1 for the few lines that read or
+  ' move an index, and never across the POST itself.
+  SlowSequence
+    Scan (10,Sec,3,0)
+
+      postDue = False
+      If QDepth > 0 Then
+        If ConsecFail = 0 Then
+          If SecsSincePost >= POST_EVERY Then postDue = True
+        Else
+          If SecsSincePost >= Backoff Then postDue = True
+        EndIf
+      EndIf
+
+      If NOT TokenOK Then
+        PostState = "no token - see TOKEN_FILE"
+        Call LoadToken()                 'so dropping the file in is enough,
+        postDue = False                  'with no restart
+      ElseIf NOT ClockOK Then
+        PostState = "clock not set - nothing stamped"
+        postDue = False
+      ElseIf QDepth = 0 Then
+        PostState = "idle - nothing to send"
+      EndIf
+
+      If postDue Then
+        SemaphoreGet (1)
+          Call BuildBatch()
+        SemaphoreRelease (1)
+
+        If BatchN > 0 Then
+          PostState = "posting"
+          Call PostBatch()
+        EndIf
+      EndIf
+
+    NextScan
+  EndSequence
+
+  '--- clock discipline -------------------------------------------------------
+  '
+  ' Its own sequence because NetworkTimeProtocol blocks for up to 70 seconds,
+  ' which would stall either of the two above. Five minutes between scans is
+  ' comfortably longer than that, so this never overruns.
+  '
+  ' The return value is the clock error in milliseconds BEFORE the correction,
+  ' and NAN when the sync failed. A NAN fails both halves of the range test
+  ' below, which is why the test is written as a range rather than as a
+  ' comparison against zero -- a good sync legitimately returns near zero, so
+  ' testing for zero would conflate success with failure.
+  '
+  ' If your OS does not have NetworkTimeProtocol, delete this whole sequence and
+  ' set the clock by hand or from LoggerNet; nothing else depends on it.
+  SlowSequence
+    Scan (300,Sec,1,0)
+      SecsSinceNTP = SecsSinceNTP + 300
+      If Len(NTP_SERVER) > 0 Then
+        If TimeIntoInterval(0,NTP_EVERY_HR,Hr) OR NOT ClockOK Then
+          NTPErrMs = NetworkTimeProtocol (NTP_SERVER,0,1000)
+          If NTPErrMs > -86400000 AND NTPErrMs < 86400000 Then
+            NTPLastOK = True
+            SecsSinceNTP = 0
+          Else
+            NTPLastOK = False
+          EndIf
+        EndIf
+      EndIf
+    NextScan
+  EndSequence
+
+EndProg
+
+
+'==============================================================================
+' Other dataloggers
+'==============================================================================
+'
+' CR1000X -- save as .CR1X. Check PanelTemp's second parameter against that
+'   logger's help: on the CR300 it is the notch frequency in Hz, and on other
+'   loggers the same position is an integration time or a _50Hz/_60Hz constant.
+'   Check the Status fields too -- the CR1000X has more of them, including the
+'   MemoryFree and SkippedSlowScan this program left out for the CR300's sake.
+' CR6 -- save as .CR6. The RS-232 port is ComRS232; a serial daughterboard port
+'   is ComC1 or ComC3 depending on how it is wired.
+'
+' Both have more memory than a CR300, so Q_SIZE and CONTENT_SIZE can go up.
+' Raise CONTENT_SIZE, CONTENT_GUARD and MAX_BATCH together -- a reading is up to
+' 92 characters -- and remember the endpoint's ceiling is 1000 per POST.
+'
+'==============================================================================
+' What this program deliberately does not do
+'==============================================================================
+'
+' It does not convert counts to millimetres or metres. See point 4 at the top.
+'
+' It does not decode HFEM. An HFEM line (":HS=1|I1=..|NN:") is a different
+'   format from a different kind of station, and hfem.js is the decoder for it
+'   -- one decoder, so there is never a second opinion about what T3 means. A
+'   base station relaying HFEM should publish to the MQTT bridge instead.
+'
+' It does not stream a DataTable through HTTPPost's optional parameters. Those
+'   produce TOB1, TOA5, CSIXML or CSIJSON, and ingest_http() accepts none of
+'   them -- it wants one JSON object with a `payload` key.
+'
+' It does not enforce which addresses this base may post for. Neither does the
+'   endpoint: alert_low/alert_high on the token record are a note, not a rule
+'   (db/migrations/0007_ingest_http.sql, decision 3).
