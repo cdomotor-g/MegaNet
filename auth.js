@@ -229,7 +229,18 @@ const Auth = (function () {
       // create_user true is what makes this a sign-in and a signup at once. The
       // database decides whether that signup is allowed, so "anyone can create
       // an account" is not what this line means.
-      await post('otp', { email, create_user: true });
+      //
+      // redirect_to is stated rather than left out, because leaving it out does
+      // not mean "come back here" — it means GoTrue falls back to the project's
+      // Site URL, which ships as http://localhost:3000 and sends the link to a
+      // port nothing is listening on. The session is minted and thrown at a dead
+      // page, which looks like a broken login and is not one. The app knows its
+      // own origin; a dashboard field is a worse place to keep that. This is not
+      // a loosening: Authentication → URL Configuration → Redirect URLs is what
+      // decides whether the value is honoured, and an origin not on that list is
+      // refused, not obeyed. See docs/access.md.
+      await post(`otp?redirect_to=${encodeURIComponent(location.origin + location.pathname)}`,
+                 { email, create_user: true });
     } catch (err) {
       setBusy(false);
       return setMsg('error', signInErrorText(err, email));

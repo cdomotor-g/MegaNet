@@ -198,6 +198,21 @@ https://cdomotor-g.github.io/MegaNet
 https://cdomotor-g.github.io/MegaNet/*
 ```
 
+### Site URL, and the localhost trap
+
+On the same page, **Site URL** ships as `http://localhost:3000`. `auth.js` asks
+for a `redirect_to` of its own origin, so Site URL is not what decides where the
+link lands — but it is the fallback whenever a request arrives without one, and a
+`redirect_to` that is *not* on the Redirect URLs list above falls back to it too.
+
+Left at the default, the failure is a memorable one: the code verifies, a real
+session is minted, and GoTrue sends it to a port on the operator's own phone that
+nothing is listening on. The browser shows a blank page and no error. Nothing is
+broken and nothing says so.
+
+Set Site URL to the origin the app is actually served from — `https://floodwarning.net`
+— and keep the Redirect URLs list above accurate.
+
 ---
 
 ## Proving it works
@@ -271,6 +286,19 @@ In order of likelihood:
 3. The address is not on `editor_allow`, and the signup was refused by the
    database. The panel should have said so before sending; if it did not, check
    that `0005_auth.sql` has actually been applied.
+
+### "The email arrives, but the link lands on a blank page"
+
+Look at the address bar. If it says `localhost:3000`, or any origin that is not
+the app's, the sign-in worked and the answer was delivered to the wrong door —
+see "Site URL, and the localhost trap", above. The address is on the list, the
+gate let it through, and the token was minted; nothing here needs a database
+change.
+
+Two fixes, and both are worth doing: set **Site URL** correctly, and put
+`{{ .Token }}` in the Magic Link template so there is a six-digit code to type
+when a link goes astray. A template with only a link has one way in and no
+fallback.
 
 ### "The database is refusing every write, including mine"
 
