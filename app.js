@@ -1436,7 +1436,10 @@ function renderMain() {
   // The Message Log joins them too: every row comes from the datastore, and
   // the station file is only what turns addresses into names — the log reads
   // fine before it loads, and says which names it cannot resolve yet.
-  const noDataTabs = ['packets', 'alert2', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog'];
+  // The Map Generator joins them too: contours, rivers and the graticule need
+  // no station file at all — only the pins and their names do, and the sheet
+  // simply generates without them until one loads.
+  const noDataTabs = ['packets', 'alert2', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen'];
   if (!state.data && !noDataTabs.includes(state.activeTab)) { el.innerHTML = renderEmpty(); return; }
   switch (state.activeTab) {
     case 'stations':   el.innerHTML = renderStationsHtml();  initStationFilters(); initMap(); break;
@@ -1456,6 +1459,7 @@ function renderMain() {
     // Same module, second instance — see the comment at the top of ArroData.
     case 'field':      el.innerHTML = ArroData.render('field'); ArroData.init();  break;
     case 'msglog':     el.innerHTML = MessageLog.render();      MessageLog.init(); break;
+    case 'mapgen':     el.innerHTML = MapGen.render();          MapGen.init();     break;
     case 'inspections': el.innerHTML = Inspections.render();  Inspections.init(); break;
     case 'maintenance': el.innerHTML = Maintenance.render();  Maintenance.init(); break;
     case 'history':    el.innerHTML = History.render();       History.init();      break;
@@ -1687,7 +1691,13 @@ function mapDisplayControlsHtml() {
           `<option value="${v}" ${state.mapLabelMode === v ? 'selected' : ''}>${l}</option>`).join('')}
       </select>
     </label>
-    <p class="filter-note" id="map-link-note">${mapLinkNoteHtml()}</p>`;
+    <p class="filter-note" id="map-link-note">${mapLinkNoteHtml()}</p>
+    <div class="mg-send-row">
+      <button onclick="MapGen.adoptStationsView()"
+              title="Open the Map Generator centred on this view, at this scale">
+        🖨️ Send view to Map Generator
+      </button>
+    </div>`;
 }
 
 function rerenderMapDisplayControls() {

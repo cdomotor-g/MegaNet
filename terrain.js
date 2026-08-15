@@ -274,6 +274,80 @@ const Terrain = (function () {
       });
     },
 
+    // A regular elevation lattice over one lat/lon box — what the Map
+    // Generator traces its vector contours from. nx × ny nearest-pixel
+    // samples spaced evenly in *projected* (Web-Mercator) space, not in
+    // degrees: tile pixels are mercator-even, and a lattice that is too maps
+    // linearly onto a millimetre output rectangle, so a contour traced on it
+    // needs no re-projection. Tile choice follows profile()'s rule — fine
+    // enough that no lattice node is wasted, no finer, then coarser until
+    // the tile budget holds (with a little headroom over MAX_TILES: a box is
+    // a box, not a line, and a whole-of-state sheet is a fair ask here).
+    //
+    // Resolves — never rejects — to one of:
+    //   { ok: false, error }                     nothing usable; say so
+    //   { ok: true, nx, ny, elev, min, max, … }  elev is a Float32Array, NaN
+    //                                            where a tile was missing
+    grid(box, nx, ny) {
+      const GRID_MAX_TILES = 120;
+      nx = Math.max(16, Math.min(640, Math.round(nx || 256)));
+      ny = Math.max(16, Math.min(640, Math.round(ny || nx)));
+      if (!box || !(box.east > box.west) || !(box.north > box.south)) {
+        return Promise.resolve({ ok: false, error: 'The box has no area.' });
+      }
+      const midLat = (box.south + box.north) / 2;
+      const spacing = Math.max(1, acmaHaversineKm(midLat, box.west, midLat, box.east) * 1000 / nx);
+      let z = MIN_ZOOM;
+      while (z < MAX_ZOOM && metresPerPixel(midLat, z) > spacing) z++;
+      const range = zz => {
+        const x0 = Math.floor(tileX(box.west, zz)),  x1 = Math.floor(tileX(box.east, zz));
+        const y0 = Math.floor(tileY(box.north, zz)), y1 = Math.floor(tileY(box.south, zz));
+        return { x0, x1, y0, y1, count: (x1 - x0 + 1) * (y1 - y0 + 1) };
+      };
+      let r = range(z);
+      while (z > MIN_ZOOM && r.count > GRID_MAX_TILES) { z--; r = range(z); }
+      if (r.count > GRID_MAX_TILES) {
+        return Promise.resolve({ ok: false, error: 'The box is too wide for the terrain tile budget.' });
+      }
+      const jobs = [], keys = [];
+      for (let ty = r.y0; ty <= r.y1; ty++) {
+        for (let tx = r.x0; tx <= r.x1; tx++) { keys.push(`${tx}/${ty}`); jobs.push(loadTile(z, tx, ty)); }
+      }
+      const zz = z;
+      return Promise.all(jobs).then(got => {
+        const byKey = {};
+        let missing = 0;
+        keys.forEach((k, i) => { byKey[k] = got[i]; if (!got[i]) missing++; });
+        if (missing === keys.length) {
+          return { ok: false,
+                   error: 'Terrain tiles could not be fetched — offline, blocked, or the tile service is unavailable.' };
+        }
+        const fxW = tileX(box.west, zz), fxE = tileX(box.east, zz);
+        const fyN = tileY(box.north, zz), fyS = tileY(box.south, zz);
+        const elev = new Float32Array(nx * ny);
+        let min = Infinity, max = -Infinity;
+        for (let j = 0; j < ny; j++) {
+          const fy = fyN + (fyS - fyN) * j / (ny - 1);
+          const ty = Math.floor(fy);
+          for (let i = 0; i < nx; i++) {
+            const fx = fxW + (fxE - fxW) * i / (nx - 1);
+            const tx = Math.floor(fx);
+            const px = byKey[`${tx}/${ty}`];
+            if (!px) { elev[j * nx + i] = NaN; continue; }
+            const v = readTile(px, fx, fy, tx, ty);
+            elev[j * nx + i] = v;
+            if (v < min) min = v;
+            if (v > max) max = v;
+          }
+        }
+        if (min === Infinity) {
+          return { ok: false, error: 'No terrain sample landed on a fetched tile.' };
+        }
+        return { ok: true, nx, ny, elev, min, max, zoom: zz, tiles: keys.length, missing,
+                 resolution_m: Math.round(metresPerPixel(midLat, zz)), attribution: ATTRIB };
+      });
+    },
+
     attribution: ATTRIB,
     maxTiles: MAX_TILES,
     // For the panel footer: how much of a session's terrain is already in hand.
