@@ -435,15 +435,51 @@ class Block:
         return f'{self.sheet}!{self.banner_row}'
 
 
-CBM_LABEL = re.compile(r'\b(?:CBM|CMB|BUREAU|BOM)\b\s*(?:NO\.?|NUMBER)?\s*[:.]?\s*(.*)$', re.I)
+# The label is anchored at the start of its cell. Unanchored, `BoM Abloy lock on
+# gate Nov 2022` — a note somebody parked on a banner row — reads as a Bureau
+# number label whose value is `Abloy lock on gate Nov 2022`.
+CBM_LABEL = re.compile(
+    r'^\s*(?:CBM|CMB|BUREAU|BOM)\b\s*(?:NO\.?|NUMBER)?\s*[:.]?\s*(.*)$', re.I)
 STATION_LABEL = re.compile(r'^\s*STATION\b\s*[:.]?\s*(.*)$', re.I)
 CBM_TOKEN = re.compile(r'^\d{4,8}(\.\d+)?$')
 
+# What a number is allowed to look like. `33205/33291` is one block covering two
+# numbers and `531043.2` is one of three sensors at a site, so the shape is
+# digits, dots and slashes — never coerced, never split (spec §2).
+CBM_NUMERIC = re.compile(r'^[\d./]+$')
+# …and what a number followed by somebody's note looks like: `039338 < Still
+# open as Old Range Rd Alert`, `40625 (Radar)`, `031205 OLD SITE`. The number is
+# the number; the rest is kept as a note rather than as part of it.
+CBM_LEADING = re.compile(r'^(\d{4,8}(?:[./]\d+)*)\b\s*(\S.*)$')
+
+
+def read_cbm_value(text):
+    """(cbm number, note) for a cell that should hold one.
+
+    Returns ('', '') when the cell holds no number at all, so the caller keeps
+    looking — two `CBM NO.` label cells in a row is a real layout, and taking
+    the second label as the first one's value is how `CBM NO.` ends up stored
+    as a station's Bureau number.
+    """
+    text = norm(text)
+    inner = CBM_LABEL.match(text)
+    if inner:
+        # `CBM NO.    035242` — the label repeated inside its own value cell.
+        text = inner.group(1).strip()
+    if not text:
+        return '', ''
+    if CBM_NUMERIC.match(text):
+        return text, ''
+    m = CBM_LEADING.match(text)
+    if m:
+        return m.group(1), text
+    return '', text
+
 
 def read_banner(sheet, row):
-    """(station name, cbm no) off a banner row."""
+    """(station name, cbm no, note) off a banner row."""
     cells = sheet.row_cells(row)
-    name, cbm = '', ''
+    name, cbm, note = '', '', ''
     for i, cell in enumerate(cells):
         if cell.kind != 'text':
             continue
@@ -460,17 +496,19 @@ def read_banner(sheet, row):
                     break
         break
     for i, cell in enumerate(cells):
-        if cell.kind != 'text' or not re.search(r'\b(CBM|CMB|BUREAU|BOM)\b', cell.value, re.I):
+        if cell.kind != 'text' or not CBM_LABEL.match(cell.value):
             continue
-        tail = CBM_LABEL.search(cell.value).group(1).strip()
-        if tail:
-            cbm = tail
-        else:
-            for nxt in cells[i + 1:]:
-                text = nxt.text.strip()
-                if text:
-                    cbm = text
-                    break
+        for candidate in [CBM_LABEL.match(cell.value).group(1)] + \
+                         [c.text for c in cells[i + 1:]]:
+            cbm, said = read_cbm_value(candidate)
+            # The note is whatever the banner said that was not the number, and
+            # it is kept even when a later cell supplies the number:
+            # `Burdekin!694` reads `s: SELLHEIM 34085 / SELLHEIM TM 533011/`
+            # before it reaches `533075`, and those two other numbers exist
+            # nowhere else.
+            note = note or said
+            if cbm:
+                break
         break
     if not cbm:
         # Several sheets (Ipswich throughout) print the number in a fixed column
@@ -478,7 +516,7 @@ def read_banner(sheet, row):
         tokens = [c.text.strip() for c in cells if CBM_TOKEN.match(c.text.strip())]
         if tokens:
             cbm = tokens[-1]
-    return name, cbm
+    return name, cbm, note
 
 
 def read_ids(sheet, row):
@@ -510,7 +548,12 @@ def find_blocks(sheet):
     for i, (row, family) in enumerate(banners):
         block = Block(sheet.name, i, row, family)
         block.end_row = banners[i + 1][0] - 1 if i + 1 < len(banners) else sheet.max_row
-        block.station_name, block.cbm_no = read_banner(sheet, row)
+        block.station_name, block.cbm_no, cbm_note = read_banner(sheet, row)
+        if cbm_note:
+            # The banner said something beside the number — `40625 (Radar)`, or
+            # prose where a number should be. Kept, because it is the only place
+            # it exists and #125 resolves identities by hand where this happens.
+            block.notes['cbm_note'] = cbm_note
 
         if row > 1 and OWNER_ROW.search(' '.join(c.text for c in sheet.row_cells(row - 1))):
             block.owner_row = row - 1
@@ -567,7 +610,10 @@ def find_blocks(sheet):
                     (c.col for c in sheet.row_cells(restart)
                      if c.kind == 'text' and DATE_HEADER.search(norm(c.text))),
                     block.date_col)
-            block.header, block.notes = resolve_header(sheet, block)
+            block.header, header_notes = resolve_header(sheet, block)
+            # Merged rather than assigned: the banner may already have left a
+            # `cbm_note` on the block.
+            block.notes.update(header_notes)
 
         block.rows = read_rows(sheet, block, first_data)
         blocks.append(block)

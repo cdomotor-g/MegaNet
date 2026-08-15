@@ -47,6 +47,14 @@ jobs:
       - name: Check the file against the database's document
         run: python3 tools/check_stations_doc.py stations.json
 
+      # The station crosswalk (#125) matches the historical workbook's 1,051
+      # station identities against this file, so a refreshed registry can change
+      # what is matched, what is ambiguous and what is left for a person. It is
+      # re-derived here rather than left to fail CI later, so the pull request
+      # carries both halves of the change and a reviewer sees them together.
+      - name: Re-derive the historical station crosswalk
+        run: python3 tools/ingest/crosswalk.py
+
       - name: Open pull request
         uses: peter-evans/create-pull-request@v6
         with:

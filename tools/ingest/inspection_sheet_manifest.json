@@ -34,10 +34,10 @@
       "visible_rows": 993,
       "hidden_blocks": 27,
       "visible_blocks": 26,
-      "hidden_visits": 856,
+      "hidden_visits": 846,
       "visible_visits": 1058,
       "visits_only_in_hidden": 9,
-      "visits_only_in_visible": 211,
+      "visits_only_in_visible": 221,
       "keys_only_in_hidden": [
         {
           "key": "n:saddlemt1515mhzreceivingstation",
@@ -67,9 +67,9 @@
       "visible_rows": 1285,
       "hidden_blocks": 32,
       "visible_blocks": 35,
-      "hidden_visits": 1258,
+      "hidden_visits": 1240,
       "visible_visits": 1440,
-      "visits_only_in_hidden": 111,
+      "visits_only_in_hidden": 93,
       "visits_only_in_visible": 293,
       "keys_only_in_hidden": [
         {
@@ -83,10 +83,6 @@
         {
           "key": "c:33292/533024",
           "visits": 29
-        },
-        {
-          "key": "c:s34085/533011/533075",
-          "visits": 18
         }
       ],
       "examples_only_in_hidden": [
@@ -162,21 +158,10 @@
       "visible_blocks": 48,
       "hidden_visits": 1684,
       "visible_visits": 1692,
-      "visits_only_in_hidden": 24,
-      "visits_only_in_visible": 32,
-      "keys_only_in_hidden": [
-        {
-          "key": "c:040931key92268",
-          "visits": 24
-        }
-      ],
-      "examples_only_in_hidden": [
-        "c:040931key92268 2002-05-31",
-        "c:040931key92268 2002-07-25",
-        "c:040931key92268 2002-11-28",
-        "c:040931key92268 2003-05-19",
-        "c:040931key92268 2003-07-21"
-      ]
+      "visits_only_in_hidden": 0,
+      "visits_only_in_visible": 8,
+      "keys_only_in_hidden": [],
+      "examples_only_in_hidden": []
     },
     {
       "hidden": "Mary",
@@ -187,8 +172,8 @@
       "visible_blocks": 40,
       "hidden_visits": 920,
       "visible_visits": 952,
-      "visits_only_in_hidden": 54,
-      "visits_only_in_visible": 86,
+      "visits_only_in_hidden": 46,
+      "visits_only_in_visible": 78,
       "keys_only_in_hidden": [
         {
           "key": "c:040868.",
@@ -199,20 +184,16 @@
           "visits": 10
         },
         {
-          "key": "c:040625radar",
-          "visits": 8
-        },
-        {
           "key": "n:goombooriantm",
           "visits": 6
         }
       ],
       "examples_only_in_hidden": [
-        "c:040625radar 2014-04-07",
-        "c:040625radar 2018-06-18",
-        "c:040625radar 2019-06-24",
-        "c:040625radar 2019-12-17",
-        "c:040625radar 2020-10-15"
+        "c:040868. 2003-03-05",
+        "c:040868. 2004-03-31",
+        "c:040868. 2004-11-10",
+        "c:040868. 2005-02-04",
+        "c:040868. 2005-04-13"
       ]
     },
     {
@@ -303,13 +284,9 @@
       "visible_blocks": 61,
       "hidden_visits": 1690,
       "visible_visits": 1979,
-      "visits_only_in_hidden": 17,
-      "visits_only_in_visible": 306,
+      "visits_only_in_hidden": 6,
+      "visits_only_in_visible": 295,
       "keys_only_in_hidden": [
-        {
-          "key": "c:532075",
-          "visits": 11
-        },
         {
           "key": "c:532038",
           "visits": 6

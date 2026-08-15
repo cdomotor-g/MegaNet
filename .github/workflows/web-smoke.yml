@@ -244,6 +244,13 @@ jobs:
       - name: Inspection extract — the staging rows still reconcile
         run: python3 tools/ingest/extract.py --check
 
+      # #125's crosswalk is derived from the extract *and* from stations.json,
+      # so it is the one artefact here that a change to the registry can
+      # invalidate. The weekly snapshot re-derives it in its own pull request;
+      # this check is what makes a hand edit to either side re-derive it too.
+      - name: Station crosswalk — the identities still resolve
+        run: python3 tools/ingest/crosswalk.py --check
+
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —
 # as a per-push gate it would train everyone to re-record the baseline without

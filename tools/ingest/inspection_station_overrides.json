@@ -1,0 +1,16 @@
+{
+  "_": "Station pairings decided by a person, for #125 (H3 of epic #122). This is the one file under tools/ingest/ that is edited by hand and never written by a tool: tools/ingest/crosswalk.py reads it and re-runs cannot undo a decision recorded here.",
+  "how": {
+    "key": "The workbook identity's key, as it appears in data/inspections/station_crosswalk_unmatched.json — `c:<CBM number with leading zeros stripped>` where the block has a number, `n:<normalised name>` where it does not.",
+    "station_id": "The MegaNet station's `id` from stations.json. Set it to null to record the opposite decision: this workbook station has no MegaNet counterpart and should stay unattributed. Both are decisions; only one of them is a match.",
+    "why": "Why, in a sentence. The next person to read the crosswalk sees the tier `manual` and nothing else unless this says something.",
+    "example": {
+      "c:540174": {
+        "station_id": "lyons_br_al",
+        "why": "Not a real entry — this is the shape. Delete or replace."
+      }
+    }
+  },
+  "warning": "A station id that is not in stations.json fails the crosswalk's own check rather than being ignored, so a typo here is caught rather than quietly dropping a station's history.",
+  "overrides": {}
+}

@@ -496,7 +496,7 @@
     "mace": 3,
     "campbell_datalogger": 1
   },
-  "blocks_without_cbm": 31,
+  "blocks_without_cbm": 32,
   "blocks_with_an_owner_row": 536,
   "blocks_with_a_named_owner": 311,
   "owners_taken_from_a_next_block_owner_row": 0,

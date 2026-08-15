@@ -33,9 +33,9 @@
     1980,
     2024
   ],
-  "distinct_cbm": 1123,
+  "distinct_cbm": 1118,
   "distinct_station_names": 1067,
-  "blocks_without_cbm": 44,
+  "blocks_without_cbm": 50,
   "distinct_header_labels": 388,
   "distinct_layouts": 226,
   "distinct_calibration_point_sets": 52,
@@ -118,6 +118,7 @@
     "alert_id_note": 55,
     "phone_no": 36,
     "formula_error_in_header": 20,
+    "cbm_note": 13,
     "repeater_window": 8,
     "key_number": 1,
     "frequency": 1
@@ -166,14 +167,14 @@
     {
       "figure": "distinct CBM numbers",
       "issue_122": 1098,
-      "survey": 1123,
+      "survey": 1118,
       "agrees": false,
       "note": "Depends on the extraction rule; this survey adds a positional fallback for the sheets that print the number with no label at all (Ipswich prints it in a fixed column throughout). See the spec, \"Block header extraction\"."
     },
     {
       "figure": "blocks with no CBM on the banner",
       "issue_122": 55,
-      "survey": 44,
+      "survey": 50,
       "agrees": false,
       "note": "Same cause as the line above."
     },

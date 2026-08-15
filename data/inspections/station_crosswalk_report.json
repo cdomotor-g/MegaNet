@@ -1,0 +1,45 @@
+{
+  "_": "Match rates per tier, honestly — a blended percentage would hide that a proposed name and an exact number are different claims. Written by tools/ingest/crosswalk.py; do not edit by hand.",
+  "workbook_identities": 1051,
+  "inspection_rows": 14982,
+  "registry_stations": 3174,
+  "by_tier": {
+    "number": {
+      "identities": 943,
+      "inspection_rows": 14165,
+      "identities_pct": 89.7,
+      "inspection_rows_pct": 94.5
+    },
+    "unmatched": {
+      "identities": 78,
+      "inspection_rows": 511,
+      "identities_pct": 7.4,
+      "inspection_rows_pct": 3.4
+    },
+    "name": {
+      "identities": 26,
+      "inspection_rows": 282,
+      "identities_pct": 2.5,
+      "inspection_rows_pct": 1.9
+    },
+    "ambiguous": {
+      "identities": 4,
+      "inspection_rows": 24,
+      "identities_pct": 0.4,
+      "inspection_rows_pct": 0.2
+    }
+  },
+  "attributed": {
+    "identities": 969,
+    "inspection_rows": 14447
+  },
+  "unmatched_with_a_proposal": 6,
+  "unmatched_shape": {
+    "base_station_or_repeater": 36,
+    "has_a_cbm_number_the_registry_does_not": 21,
+    "name_only": 21
+  },
+  "overrides_applied": 0,
+  "fuzzy_threshold": 0.85,
+  "note": "A proposal is never applied. To accept one, add it to tools/ingest/inspection_station_overrides.json — this tool reads that file and never writes it, so a decision made by hand survives every re-run."
+}

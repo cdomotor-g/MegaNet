@@ -1,0 +1,167 @@
+{
+  "_": "Workbook stations that match more than one MegaNet station. Listed rather than resolved arbitrarily — picking one would be a coin toss recorded as a fact. Written by tools/ingest/crosswalk.py; do not edit by hand.",
+  "count": 4,
+  "entries": [
+    {
+      "key": "c:541155",
+      "tier": "number_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "541155",
+      "candidates": [
+        "loudoun_br_al",
+        "loudoun_br_al_2"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "541155"
+        ],
+        "cbm_numbers": [
+          "541155"
+        ],
+        "names_raw": [
+          "Loudoun Bridge"
+        ],
+        "alert_ids": [
+          "6128",
+          "6129",
+          "6130"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 9,
+      "first_visit": "2015-09-14",
+      "last_visit": "2023-07-03",
+      "sheets": [
+        "Condamine!"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Condamine!:1288"
+      ],
+      "candidate_names": [
+        "Loudoun Br AL",
+        "Loudoun Br AL"
+      ]
+    },
+    {
+      "key": "c:541138",
+      "tier": "number_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "541138",
+      "candidates": [
+        "killarney_spring_ck",
+        "killarney_spring_ck_2"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "541138"
+        ],
+        "cbm_numbers": [
+          "541138"
+        ],
+        "names_raw": [
+          "Killarney(spring Ck)"
+        ],
+        "alert_ids": [
+          "6889",
+          "6890"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 8,
+      "first_visit": "2015-01-22",
+      "last_visit": "2023-02-24",
+      "sheets": [
+        "Warwick!"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Warwick!:883"
+      ],
+      "candidate_names": [
+        "Killarney (Spring Ck) AL",
+        "Killarney (Spring Ck) AL"
+      ]
+    },
+    {
+      "key": "c:40858",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "boonah",
+      "candidates": [
+        "boonah",
+        "boonah_al"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "040858"
+        ],
+        "cbm_numbers": [
+          "40858"
+        ],
+        "names_raw": [
+          "BOONAH TM"
+        ],
+        "alert_ids": [
+          "7246",
+          "7912"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 5,
+      "first_visit": "2005-05-06",
+      "last_visit": "2008-03-27",
+      "sheets": [
+        "Closed stations"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Closed stations:2"
+      ],
+      "candidate_names": [
+        "Boonah",
+        "Boonah AL"
+      ]
+    },
+    {
+      "key": "c:44158",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "dunvegan",
+      "candidates": [
+        "dunvegan_al",
+        "dunvegan_tm"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "44158"
+        ],
+        "cbm_numbers": [
+          "44158"
+        ],
+        "names_raw": [
+          "Dunvegan"
+        ],
+        "alert_ids": [
+          "4248",
+          "4249"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 2,
+      "first_visit": "2017-07-12",
+      "last_visit": "2018-03-21",
+      "sheets": [
+        "Warrego!"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Warrego!:461"
+      ],
+      "candidate_names": [
+        "Dunvegan AL",
+        "Dunvegan TM"
+      ]
+    }
+  ]
+}

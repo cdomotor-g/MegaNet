@@ -123,15 +123,31 @@ the next non-empty cell to the right that is not the CBM label.
 
 **CBM number**, in three passes, in this order:
 
-1. A cell matching `\b(CBM|CMB|BUREAU|BOM)\b\s*(NO\.?|NUMBER)?\s*[:.]?\s*(.*)` —
+1. A cell matching `^\s*(CBM|CMB|BUREAU|BOM)\b\s*(NO\.?|NUMBER)?\s*[:.]?\s*(.*)` —
    note `CMB`, which is a typo the workbook has, and take the tail if the label
-   cell carries the number (`CBM NO. 58206`).
-2. Otherwise the next non-empty cell to the right of that label.
+   cell carries the number (`CBM NO. 58206`). **Anchored at the start of the
+   cell**: unanchored, `BoM Abloy lock on gate Nov 2022` — a note somebody
+   parked on `Fitzroy!1595`'s banner — reads as a Bureau number whose value is
+   `Abloy lock on gate Nov 2022`.
+2. Otherwise each cell to the right of that label in turn, **until one holds a
+   number**. Not "the next non-empty cell": `Caboolture&Pine!1522` prints
+   `CBM NO.` twice and the number in the third cell, so the next non-empty cell
+   is another label, and taking it stores `CBM NO.` as a station's number.
 3. Otherwise — and this is the pass #122's survey lacked — **the rightmost bare
    4-to-8-digit token on the banner row.** `Ipswich` prints the number in a
    fixed column with no label at all, for all 27 of its blocks.
 
-44 blocks still have no number after all three passes. They are not an error:
+**A number is digits, dots and slashes, and nothing else** — that shape covers
+`040893`, `531043.2` and `33205/33291` without coercing any of them. A cell that
+*starts* with a number and continues into prose (`40625 (Radar)`,
+`039338 < Still open as Old Range Rd Alert`, `031205 OLD SITE`) yields the
+number, and the whole cell is kept as the block's `cbm_note`; a cell with no
+number in it yields none, and is kept as the note. Seven blocks carry such a
+note, including `Burdekin!694`, whose banner reads
+`s: SELLHEIM 34085 / SELLHEIM TM 533011/` before the cell that holds `533075` —
+two other numbers that exist nowhere else in the workbook.
+
+50 blocks still have no number after all three passes. They are not an error:
 they are blocks whose banner never had one, and #125 resolves them by name.
 
 The number is **text, not a number.** `040893` and `40893` are the same station
@@ -456,8 +472,8 @@ today.
 | Banner families | 1,286 / 131 / 2 / 1 | 1,286 / 131 / 2 / 1 | ✅ |
 | Free-text remark cells (>40 chars) | 7,932 | 7,932 | ✅ |
 | `#VALUE!` / `#REF!` | 707 / 1 | 707 / 1 | ✅ |
-| Distinct CBM numbers | 1,098 | 1,123 | ❌ |
-| Blocks with no CBM on the banner | 55 | 44 | ❌ |
+| Distinct CBM numbers | 1,098 | 1,118 | ❌ |
+| Blocks with no CBM on the banner | 55 | 50 | ❌ |
 | Distinct station names | 1,083 | 1,067 | ❌ |
 | Dated inspection rows | ~18,500 | 20,407 | ❌ |
 | Distinct column-header layouts | 61 | 226 | ❌ |
@@ -472,11 +488,19 @@ lists — `Barron`, `Burdekin`, `Burrum Cherwell`, `Don`, `Haughton`, `Herbert`,
 `Logan`, `Mary`, `Master`, `Moonie`, `Pioneer`, `Redlands`, `Townsville` — plus
 `SLS 26092023`. #122's own list has thirteen names in it.
 
-**CBM numbers (1,123 distinct, 44 unlabelled).** This survey's third pass finds
-the number on sheets that print it with no label (§2). More blocks resolve, so
-fewer are unlabelled and more distinct values appear — 1,035 if the values are
-also normalised for leading zeros and `.0` suffixes, which brackets #122's
-1,098. The number to trust is the rule, not the count; §2 states it.
+**CBM numbers (1,118 distinct, 50 unlabelled).** Two rules pull in opposite
+directions here. This survey's third pass finds the number on sheets that print
+it with no label, which resolves more blocks than #122's reader did; and §2's
+requirement that a number be number-shaped rejects the four cells where the old
+rule stored a label or a sentence as a station's Bureau number, which
+unresolves a handful. The net is 1,118 distinct values and 50 blocks with none —
+and the fifty are now genuinely unnumbered rather than partly mis-numbered,
+which is the count #125 works from. The number to trust is the rule, not the
+count; §2 states it.
+
+> These two figures were 1,123 and 44 when #123 closed, before #125 found four
+> blocks whose "number" was `CBM NO.`, `xxxxxx` or a note about a padlock. The
+> earlier pair is what an unanchored label pattern measures.
 
 **Station names (1,067).** Same extraction question plus whitespace
 normalisation, which collapses `Station:  LOAMSIDE ALERT` and
@@ -615,6 +639,43 @@ Two smaller things the extract records rather than resolves:
   voltages. The rule is applied as written; #126 should expect a small number of
   "calibration points" that are really antenna numbers, and they are visible as
   point sets with no metres-like spacing.
+
+## Attributing a block to a station — what #125 built
+
+Parsing ends at a block; #125 decides which MegaNet station that block is
+*about*. [`tools/ingest/crosswalk.py`](../tools/ingest/crosswalk.py) groups the
+extract's blocks and flat rows into **1,051 workbook station identities** —
+grouped by CBM number where there is one and by name where there is not — and
+matches them against `stations.json`, in tiers, recording which tier produced
+each match:
+
+| Tier | Identities | Visits | |
+|---|---|---|---|
+| `number` | 943 (89.7%) | 14,165 | CBM number equals a station's `station_number`, leading zeros stripped from both sides |
+| `name` | 26 (2.5%) | 282 | the name matches once case, punctuation and the `AL`/`TM` telemetry suffix are normalised off — `BAKERS BEND TM` is `Bakers Bend AL` |
+| `ambiguous` | 4 (0.4%) | 24 | matches more than one station; listed, not resolved |
+| `unmatched` | 78 (7.4%) | 511 | no confident match — 36 are base stations or repeaters, 21 carry a number the registry has never held, 21 are name-only |
+| `manual` | — | — | `tools/ingest/inspection_station_overrides.json`, read and never written, so a person's decision survives every re-run |
+
+**96.4% of the visits are attributed** and the rest are a worklist rather than a
+silence: `station_crosswalk_unmatched.json` is sorted by inspection count, and
+six entries carry a near-name proposal for a person to accept or reject.
+
+Two rules there worth stating, because both are places where a more generous
+matcher would have looked better and been wrong:
+
+- **The ALERT ids are not evidence.** #124 extracts the `ID's` line, so
+  `Rn = 5858` is available and a sensor id is more specific than a name. But the
+  ids in `stations.json` are not unique across networks: matching on them pairs
+  `CHARLEVILLE TM` with *Baulkham Hills Eucalyptus Ct* and `BAKERS BEND TM` with
+  *Northmead Bowling Club* — Sydney stations, on a Queensland workbook. It would
+  have "attributed" 20 identities. The tier was removed rather than hedged.
+- **`base station` is not suffix noise.** Stripping it makes
+  `Warwick Base Station` match `Warwick AL` — a different installation in the
+  same town. The registry holds 3,156 field sites, 88 repeaters and four base
+  stations, and none of the workbook's twenty base stations is among them. They
+  are unmatched, with `Marburg (Radar) Base Station` → *Marburg Radar* offered
+  as a proposal rather than applied as a fact.
 
 ## For #124
 
