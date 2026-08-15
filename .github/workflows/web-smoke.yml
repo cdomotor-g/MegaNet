@@ -232,6 +232,14 @@ jobs:
       - name: Inspection workbook survey — the artefacts still match the workbook
         run: python3 tools/ingest/survey.py --check
 
+      # #124's extract, on the same footing and for the same reason. The check
+      # is not only "the files still match": the run reconciles against the
+      # survey's counts and fails if a row or a cell goes missing between the
+      # workbook and the staging files, so a rule that quietly stops matching
+      # shows up here rather than in the load.
+      - name: Inspection extract — the staging rows still reconcile
+        run: python3 tools/ingest/extract.py --check
+
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —
 # as a per-push gate it would train everyone to re-record the baseline without

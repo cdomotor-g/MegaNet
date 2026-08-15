@@ -1,0 +1,553 @@
+{
+  "_": "Rows read / emitted / rejected / dropped, per sheet, and the reconciliation against tools/ingest/inspection_survey_counts.json. Written by tools/ingest/extract.py; do not edit by hand.",
+  "workbook": "archive/QLD All Site Inspections.xlsx",
+  "sheets_ingested": 42,
+  "blocks": 1093,
+  "inspection_rows": 15207,
+  "emitted": 14982,
+  "rejected": 153,
+  "rejected_blocks": 0,
+  "dropped_as_duplicates": 221,
+  "balance": {
+    "rows_classified_in_scope": 18763,
+    "emitted": 14982,
+    "rejected_rows": 153,
+    "dropped_as_duplicates": 221,
+    "not_inspection_rows": 3407,
+    "balances": true,
+    "cells_unaccounted_for": 0
+  },
+  "against_the_survey": {
+    "expected": {
+      "blocks": 1093,
+      "inspection_rows": 15207,
+      "rejects": 147
+    },
+    "measured": {
+      "blocks": 1093,
+      "inspection_rows": 15207,
+      "rejects": 147
+    },
+    "agrees": true,
+    "note": "The survey (#123) and this extractor read the same workbook through the same rules. A difference means one of the two readers changed, and it is worth knowing while the table is still empty. `inspection_rows` and `rejects` are counted the survey's way — its three reject classes, and every row it calls an inspection. This extractor rejects a further 6 rows that the survey does not count as rejects; they are in `rejects_beyond_the_survey_classes` and in rejects.jsonl like every other one.",
+    "rejects_beyond_the_survey_classes": {
+      "implausible_date": 4,
+      "undated_data": 1,
+      "orphan_identifier": 1
+    },
+    "extractor_reject_total": 153
+  },
+  "per_sheet": [
+    {
+      "sheet": "ALERTS",
+      "structure": "flat",
+      "blocks": 0,
+      "rows_read": 299,
+      "emitted": 7,
+      "rejected": 71,
+      "duplicates": 221
+    },
+    {
+      "sheet": "Barcaldine!",
+      "structure": "stacked_blocks",
+      "blocks": 5,
+      "rows_read": 24,
+      "emitted": 5,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Barron!",
+      "structure": "stacked_blocks",
+      "blocks": 26,
+      "rows_read": 636,
+      "emitted": 534,
+      "rejected": 7,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 10
+    },
+    {
+      "sheet": "Border!",
+      "structure": "stacked_blocks",
+      "blocks": 32,
+      "rows_read": 637,
+      "emitted": 537,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 1
+    },
+    {
+      "sheet": "Brisbane!",
+      "structure": "stacked_blocks",
+      "blocks": 55,
+      "rows_read": 822,
+      "emitted": 713,
+      "rejected": 3,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 10
+    },
+    {
+      "sheet": "Burdekin!",
+      "structure": "stacked_blocks",
+      "blocks": 35,
+      "rows_read": 815,
+      "emitted": 723,
+      "rejected": 1,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 1
+    },
+    {
+      "sheet": "Burnett North!",
+      "structure": "stacked_blocks",
+      "blocks": 4,
+      "rows_read": 23,
+      "emitted": 8,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Burnett&Kolan!",
+      "structure": "stacked_blocks",
+      "blocks": 43,
+      "rows_read": 437,
+      "emitted": 270,
+      "rejected": 3,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 1
+    },
+    {
+      "sheet": "Burrum Cherwell!",
+      "structure": "stacked_blocks",
+      "blocks": 19,
+      "rows_read": 346,
+      "emitted": 276,
+      "rejected": 1,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Caboolture&Pine!",
+      "structure": "stacked_blocks",
+      "blocks": 61,
+      "rows_read": 944,
+      "emitted": 692,
+      "rejected": 4,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 30
+    },
+    {
+      "sheet": "Closed stations",
+      "structure": "stacked_blocks",
+      "blocks": 49,
+      "rows_read": 724,
+      "emitted": 620,
+      "rejected": 3,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 1
+    },
+    {
+      "sheet": "Condamine!",
+      "structure": "stacked_blocks",
+      "blocks": 54,
+      "rows_read": 1019,
+      "emitted": 764,
+      "rejected": 3,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 16
+    },
+    {
+      "sheet": "Cooper!",
+      "structure": "stacked_blocks",
+      "blocks": 1,
+      "rows_read": 4,
+      "emitted": 1,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Daintree!",
+      "structure": "stacked_blocks",
+      "blocks": 1,
+      "rows_read": 4,
+      "emitted": 1,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Don!",
+      "structure": "stacked_blocks",
+      "blocks": 10,
+      "rows_read": 333,
+      "emitted": 309,
+      "rejected": 2,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 2
+    },
+    {
+      "sheet": "Fitzroy!",
+      "structure": "stacked_blocks",
+      "blocks": 103,
+      "rows_read": 1521,
+      "emitted": 1097,
+      "rejected": 3,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 10
+    },
+    {
+      "sheet": "Haughton!",
+      "structure": "stacked_blocks",
+      "blocks": 13,
+      "rows_read": 349,
+      "emitted": 300,
+      "rejected": 2,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Herbert!",
+      "structure": "stacked_blocks",
+      "blocks": 30,
+      "rows_read": 787,
+      "emitted": 677,
+      "rejected": 6,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Ipswich",
+      "structure": "stacked_blocks",
+      "blocks": 27,
+      "rows_read": 407,
+      "emitted": 397,
+      "rejected": 1,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 8
+    },
+    {
+      "sheet": "Johnstone!",
+      "structure": "stacked_blocks",
+      "blocks": 25,
+      "rows_read": 773,
+      "emitted": 670,
+      "rejected": 7,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Logan!",
+      "structure": "stacked_blocks",
+      "blocks": 48,
+      "rows_read": 1016,
+      "emitted": 848,
+      "rejected": 1,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 10
+    },
+    {
+      "sheet": "Maroochy!",
+      "structure": "stacked_blocks",
+      "blocks": 34,
+      "rows_read": 747,
+      "emitted": 639,
+      "rejected": 4,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 6
+    },
+    {
+      "sheet": "Mary!",
+      "structure": "stacked_blocks",
+      "blocks": 40,
+      "rows_read": 588,
+      "emitted": 478,
+      "rejected": 2,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 2
+    },
+    {
+      "sheet": "Mooloolah!",
+      "structure": "stacked_blocks",
+      "blocks": 19,
+      "rows_read": 223,
+      "emitted": 152,
+      "rejected": 5,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 1
+    },
+    {
+      "sheet": "Moonie!",
+      "structure": "stacked_blocks",
+      "blocks": 4,
+      "rows_read": 13,
+      "emitted": 3,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Mulgrave&Russell!",
+      "structure": "stacked_blocks",
+      "blocks": 6,
+      "rows_read": 117,
+      "emitted": 96,
+      "rejected": 2,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "NSW Lismore ",
+      "structure": "stacked_blocks",
+      "blocks": 12,
+      "rows_read": 35,
+      "emitted": 12,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "NSW McIntyre",
+      "structure": "stacked_blocks",
+      "blocks": 5,
+      "rows_read": 14,
+      "emitted": 5,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "NSW Richmond!",
+      "structure": "stacked_blocks",
+      "blocks": 2,
+      "rows_read": 9,
+      "emitted": 2,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "NSW Tweed!",
+      "structure": "stacked_blocks",
+      "blocks": 22,
+      "rows_read": 56,
+      "emitted": 12,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Nerang!",
+      "structure": "stacked_blocks",
+      "blocks": 51,
+      "rows_read": 909,
+      "emitted": 712,
+      "rejected": 1,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 39
+    },
+    {
+      "sheet": "Noosa",
+      "structure": "stacked_blocks",
+      "blocks": 19,
+      "rows_read": 220,
+      "emitted": 219,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Pioneer!",
+      "structure": "stacked_blocks",
+      "blocks": 54,
+      "rows_read": 837,
+      "emitted": 691,
+      "rejected": 2,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 11
+    },
+    {
+      "sheet": "Proserpine!",
+      "structure": "stacked_blocks",
+      "blocks": 10,
+      "rows_read": 41,
+      "emitted": 22,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Redlands!",
+      "structure": "stacked_blocks",
+      "blocks": 6,
+      "rows_read": 47,
+      "emitted": 29,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Stanthorpe!",
+      "structure": "stacked_blocks",
+      "blocks": 14,
+      "rows_read": 222,
+      "emitted": 192,
+      "rejected": 2,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "TM Only",
+      "structure": "flat",
+      "blocks": 0,
+      "rows_read": 59,
+      "emitted": 54,
+      "rejected": 4,
+      "duplicates": 0
+    },
+    {
+      "sheet": "Toowoomba!",
+      "structure": "stacked_blocks",
+      "blocks": 2,
+      "rows_read": 37,
+      "emitted": 33,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Townsville!",
+      "structure": "stacked_blocks",
+      "blocks": 61,
+      "rows_read": 1180,
+      "emitted": 992,
+      "rejected": 7,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Tully!",
+      "structure": "stacked_blocks",
+      "blocks": 19,
+      "rows_read": 385,
+      "emitted": 324,
+      "rejected": 2,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Warrego!",
+      "structure": "stacked_blocks",
+      "blocks": 39,
+      "rows_read": 388,
+      "emitted": 247,
+      "rejected": 0,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    },
+    {
+      "sheet": "Warwick!",
+      "structure": "stacked_blocks",
+      "blocks": 33,
+      "rows_read": 716,
+      "emitted": 619,
+      "rejected": 4,
+      "rejected_blocks": 0,
+      "calibration_point_rows": 0
+    }
+  ],
+  "rows_that_are_not_inspections": {
+    "marker": 1849,
+    "error_only": 629,
+    "next_block_owner": 516,
+    "annotation": 252,
+    "calibration_point_row": 159,
+    "repeat_header": 2
+  },
+  "reject_reasons": {
+    "excel_error_row": 73,
+    "undated_data": 48,
+    "malformed_date": 16,
+    "text_in_the_date_cell": 9,
+    "implausible_date": 4,
+    "repeat_header_row": 2,
+    "orphan_identifier": 1
+  },
+  "value_classes": {
+    "number": 144839,
+    "short_text": 6113,
+    "prose": 4951,
+    "qualified": 2466,
+    "status": 2073,
+    "numeric_text": 716,
+    "range": 259,
+    "number_with_unit": 204,
+    "error": 5
+  },
+  "value_cells": 161626,
+  "flags": {
+    "excel_error_in_station_name": 5
+  },
+  "blocks_with_an_inherited_header": [],
+  "blocks_by_config": {
+    "alert": 970,
+    "datalogger_old": 119,
+    "mace": 3,
+    "campbell_datalogger": 1
+  },
+  "blocks_without_cbm": 31,
+  "blocks_with_an_owner_row": 536,
+  "blocks_with_a_named_owner": 311,
+  "owners_taken_from_a_next_block_owner_row": 0,
+  "inspections_by_decade": {
+    "1980s": 37,
+    "1990s": 1399,
+    "2000s": 4649,
+    "2010s": 6589,
+    "2020s": 2308
+  },
+  "inspections_by_origin": {
+    "block": 14921,
+    "tm_only_tab": 54,
+    "alerts_tab": 7
+  },
+  "block_comments": 1,
+  "inspection_comments": 36,
+  "annotations": 252,
+  "unmapped_columns": {
+    "Putty Log": 1,
+    "Column4": 1,
+    "Column5": 1,
+    "Column6": 1,
+    "Column7": 1,
+    "Column8": 1,
+    "Column9": 1,
+    "Column10": 1
+  },
+  "calibration_readings": 28837,
+  "calibration_columns_with_a_stacked_point": 83,
+  "distinct_calibration_point_sets": 37,
+  "notes": {
+    "numeric_row_in_a_block_with_no_calibration_columns": 2
+  },
+  "sheets_read_but_not_loaded": [
+    "Barron",
+    "Burdekin",
+    "Burrum Cherwell",
+    "Don",
+    "Haughton",
+    "Herbert",
+    "Logan",
+    "Mary",
+    "Master",
+    "Master (2)",
+    "Moonie",
+    "Pioneer",
+    "Redlands",
+    "SLS 26092023",
+    "SLS OCT23",
+    "SWR",
+    "Townsville"
+  ]
+}

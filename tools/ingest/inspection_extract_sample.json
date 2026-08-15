@@ -1,0 +1,4765 @@
+{
+  "_": "The hand-checked sample #124 asks for: one block from each form family, a Mace block, a base-station row, the short and the long calibration set, a block with no CBM number, and a row carrying each class of qualified value. Each entry holds the extracted records and the workbook cells they were read from, so a drift in the reading shows up here as a diff between the two halves of the same file. Written by tools/ingest/extract.py; do not edit by hand.",
+  "workbook": "archive/QLD All Site Inspections.xlsx",
+  "checked_against_the_workbook_on": "2026-08-15",
+  "samples": [
+    {
+      "why": "ALERT — the long calibration set, a point column stacked 30 over 25, and a point row inside the data that rescales everything below it (§4)",
+      "block": {
+        "ref": "qld-all-site-inspections:Fitzroy!:2",
+        "source": "qld-all-site-inspections",
+        "origin": "import",
+        "sheet": "Fitzroy!",
+        "banner_row": 2,
+        "end_row": 34,
+        "block_index": 0,
+        "family": "ALERT",
+        "inspection_config": "alert",
+        "station_name": "Riley's Crossing",
+        "cbm_no": "535095",
+        "station_keys": [
+          "c:535095",
+          "n:rileyscrossing"
+        ],
+        "property_owner": "DERM/CHRC",
+        "owner_row": 1,
+        "ids": {
+          "orifice_level_raw": "0.844metres/ 162.694m AHD as at Aug 2020",
+          "key_number_raw": "DNR 20101"
+        },
+        "ids_raw": "ID's | Rn = | 5858 | Rv = | 5859 | Batt = | 5860 | Orifice level = 0.844metres/ 162.694m AHD as at Aug 2020 | Key# DNR 20101",
+        "notes": {
+          "stray_point_row_above_header": "row 4"
+        },
+        "header_rows": [
+          5,
+          6
+        ],
+        "date_column": "B",
+        "inherited_header": false,
+        "columns": {
+          "A": {
+            "label": "ALERT Station Number",
+            "field": "station_number"
+          },
+          "B": {
+            "label": "Inspect Date",
+            "field": "inspect_date"
+          },
+          "C": {
+            "label": "Canister No",
+            "field": "canister_no"
+          },
+          "D": {
+            "label": "Battery Voltage Stand -by",
+            "field": "battery_standby_v"
+          },
+          "E": {
+            "label": "Battery Voltage Under -load",
+            "field": "battery_under_load_v"
+          },
+          "F": {
+            "label": "Consumption Stand-by (mA)",
+            "field": "consumption_standby_ma"
+          },
+          "G": {
+            "label": "Consumption Transmit (mA)",
+            "field": "consumption_transmit_ma"
+          },
+          "H": {
+            "label": "Solar Output Voltage (v)",
+            "field": "solar_output_v"
+          },
+          "I": {
+            "label": "Solar Short Circuit (mA)",
+            "field": "solar_short_circuit_ma"
+          },
+          "J": {
+            "label": "Solar Regulated Voltage (v)",
+            "field": "solar_regulated_v"
+          },
+          "K": {
+            "label": "Solar Current Charge (mA)",
+            "field": "solar_charge_current_ma"
+          },
+          "L": {
+            "label": "Transmitter Fwd",
+            "field": "tx_forward_w"
+          },
+          "M": {
+            "label": "Transmitter Ref",
+            "field": "tx_reflected_w"
+          },
+          "N": {
+            "label": "SWR",
+            "field": "swr"
+          },
+          "O": {
+            "label": "Fade Margin (db)",
+            "field": "fade_margin_db"
+          },
+          "P": {
+            "label": "TBRG Calib",
+            "field": "tbrg_calibration_mm"
+          },
+          "Q": {
+            "label": "0",
+            "field": "river_calibration_point",
+            "point": "0"
+          },
+          "R": {
+            "label": "1",
+            "field": "river_calibration_point",
+            "point": "1"
+          },
+          "S": {
+            "label": "2",
+            "field": "river_calibration_point",
+            "point": "2"
+          },
+          "T": {
+            "label": "5",
+            "field": "river_calibration_point",
+            "point": "5"
+          },
+          "U": {
+            "label": "8",
+            "field": "river_calibration_point",
+            "point": "8"
+          },
+          "V": {
+            "label": "10",
+            "field": "river_calibration_point",
+            "point": "10"
+          },
+          "W": {
+            "label": "15",
+            "field": "river_calibration_point",
+            "point": "15"
+          },
+          "X": {
+            "label": "20",
+            "field": "river_calibration_point",
+            "point": "20"
+          },
+          "Y": {
+            "label": "30 25",
+            "field": "river_calibration_point",
+            "point": "25",
+            "point_stack": [
+              "30",
+              "25"
+            ]
+          },
+          "Z": {
+            "label": "Remarks",
+            "field": "remarks"
+          }
+        },
+        "calibration_points": [
+          "0",
+          "1",
+          "2",
+          "5",
+          "8",
+          "10",
+          "15",
+          "20",
+          "25"
+        ],
+        "calibration_columns": [
+          "Q",
+          "R",
+          "S",
+          "T",
+          "U",
+          "V",
+          "W",
+          "X",
+          "Y"
+        ],
+        "annotations": [],
+        "inspection_rows": 14
+      },
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:Fitzroy!:2:7",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Fitzroy!",
+          "banner_row": 2,
+          "row": 7,
+          "block_ref": "qld-all-site-inspections:Fitzroy!:2",
+          "from": "block",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "Riley's Crossing",
+          "cbm_no": "535095",
+          "inspected_on": "2010-05-31",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2010-05-31 00:00:00",
+          "readings": [
+            {
+              "col": "C",
+              "field": "canister_no",
+              "raw": "5102431730",
+              "class": "number",
+              "value": 5102431730
+            },
+            {
+              "col": "D",
+              "field": "battery_standby_v",
+              "raw": "12.4",
+              "class": "number",
+              "value": 12.4
+            },
+            {
+              "col": "E",
+              "field": "battery_under_load_v",
+              "raw": "12.1",
+              "class": "number",
+              "value": 12.1
+            },
+            {
+              "col": "F",
+              "field": "consumption_standby_ma",
+              "raw": "0.6",
+              "class": "number",
+              "value": 0.6
+            },
+            {
+              "col": "J",
+              "field": "solar_regulated_v",
+              "raw": "16.3",
+              "class": "number",
+              "value": 16.3
+            },
+            {
+              "col": "K",
+              "field": "solar_charge_current_ma",
+              "raw": "155",
+              "class": "number",
+              "value": 155
+            },
+            {
+              "col": "L",
+              "field": "tx_forward_w",
+              "raw": "18",
+              "class": "number",
+              "value": 18
+            },
+            {
+              "col": "M",
+              "field": "tx_reflected_w",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "N",
+              "field": "swr",
+              "raw": "1",
+              "class": "number",
+              "value": 1
+            },
+            {
+              "col": "P",
+              "field": "tbrg_calibration_mm",
+              "raw": "10.4",
+              "class": "number",
+              "value": 10.4
+            }
+          ],
+          "calibration": [
+            {
+              "col": "R",
+              "point": "1",
+              "raw": "26",
+              "class": "number",
+              "value": 26
+            },
+            {
+              "col": "S",
+              "point": "2",
+              "raw": "46",
+              "class": "number",
+              "value": 46
+            },
+            {
+              "col": "T",
+              "point": "5",
+              "raw": "107",
+              "class": "number",
+              "value": 107
+            },
+            {
+              "col": "V",
+              "point": "10",
+              "raw": "207",
+              "class": "number",
+              "value": 207
+            },
+            {
+              "col": "X",
+              "point": "20",
+              "raw": "408",
+              "class": "number",
+              "value": 408
+            },
+            {
+              "col": "Y",
+              "point": "25",
+              "raw": "507",
+              "class": "number",
+              "value": 507
+            }
+          ],
+          "remarks": "Station installed; 25W Tx; 2W panel; 30m Druck; 1.0mm TBRG"
+        },
+        {
+          "ref": "qld-all-site-inspections:Fitzroy!:2:8",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Fitzroy!",
+          "banner_row": 2,
+          "row": 8,
+          "block_ref": "qld-all-site-inspections:Fitzroy!:2",
+          "from": "block",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "Riley's Crossing",
+          "cbm_no": "535095",
+          "inspected_on": "2011-08-04",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2011-08-04 00:00:00",
+          "readings": [
+            {
+              "col": "D",
+              "field": "battery_standby_v",
+              "raw": "13.2",
+              "class": "number",
+              "value": 13.2
+            },
+            {
+              "col": "E",
+              "field": "battery_under_load_v",
+              "raw": "12.9",
+              "class": "number",
+              "value": 12.9
+            },
+            {
+              "col": "F",
+              "field": "consumption_standby_ma",
+              "raw": "0.6",
+              "class": "number",
+              "value": 0.6
+            },
+            {
+              "col": "J",
+              "field": "solar_regulated_v",
+              "raw": "15.95",
+              "class": "number",
+              "value": 15.95
+            },
+            {
+              "col": "K",
+              "field": "solar_charge_current_ma",
+              "raw": "175.3",
+              "class": "number",
+              "value": 175.3
+            },
+            {
+              "col": "L",
+              "field": "tx_forward_w",
+              "raw": ">20",
+              "class": "qualified",
+              "operator": ">",
+              "bound": 20
+            },
+            {
+              "col": "M",
+              "field": "tx_reflected_w",
+              "raw": "0.1",
+              "class": "number",
+              "value": 0.1
+            },
+            {
+              "col": "O",
+              "field": "fade_margin_db",
+              "raw": "12",
+              "class": "number",
+              "value": 12
+            },
+            {
+              "col": "P",
+              "field": "tbrg_calibration_mm",
+              "raw": "10.6",
+              "class": "number",
+              "value": 10.6
+            }
+          ],
+          "calibration": [
+            {
+              "col": "R",
+              "point": "1",
+              "raw": "20",
+              "class": "number",
+              "value": 20
+            },
+            {
+              "col": "S",
+              "point": "2",
+              "raw": "40",
+              "class": "number",
+              "value": 40
+            },
+            {
+              "col": "T",
+              "point": "5",
+              "raw": "100",
+              "class": "number",
+              "value": 100
+            },
+            {
+              "col": "V",
+              "point": "10",
+              "raw": "200",
+              "class": "number",
+              "value": 200
+            },
+            {
+              "col": "X",
+              "point": "20",
+              "raw": "400",
+              "class": "number",
+              "value": 400
+            },
+            {
+              "col": "Y",
+              "point": "25",
+              "raw": "500",
+              "class": "number",
+              "value": 500
+            }
+          ],
+          "remarks": "Analogue board recalibrated; stn flooded but no damage to AL gear"
+        },
+        {
+          "ref": "qld-all-site-inspections:Fitzroy!:2:20",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Fitzroy!",
+          "banner_row": 2,
+          "row": 20,
+          "block_ref": "qld-all-site-inspections:Fitzroy!:2",
+          "from": "block",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "Riley's Crossing",
+          "cbm_no": "535095",
+          "inspected_on": "2022-10-10",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2022-10-10 00:00:00",
+          "readings": [
+            {
+              "col": "D",
+              "field": "battery_standby_v",
+              "raw": "13.4",
+              "class": "number",
+              "value": 13.4
+            },
+            {
+              "col": "E",
+              "field": "battery_under_load_v",
+              "raw": "13.1",
+              "class": "number",
+              "value": 13.1
+            },
+            {
+              "col": "F",
+              "field": "consumption_standby_ma",
+              "raw": "<1",
+              "class": "qualified",
+              "operator": "<",
+              "bound": 1
+            },
+            {
+              "col": "J",
+              "field": "solar_regulated_v",
+              "raw": "20.3",
+              "class": "number",
+              "value": 20.3
+            },
+            {
+              "col": "K",
+              "field": "solar_charge_current_ma",
+              "raw": "85",
+              "class": "number",
+              "value": 85
+            },
+            {
+              "col": "L",
+              "field": "tx_forward_w",
+              "raw": "20",
+              "class": "number",
+              "value": 20
+            },
+            {
+              "col": "M",
+              "field": "tx_reflected_w",
+              "raw": "0.1",
+              "class": "number",
+              "value": 0.1
+            },
+            {
+              "col": "O",
+              "field": "fade_margin_db",
+              "raw": "15",
+              "class": "number",
+              "value": 15
+            },
+            {
+              "col": "P",
+              "field": "tbrg_calibration_mm",
+              "raw": "10.4",
+              "class": "number",
+              "value": 10.4
+            }
+          ],
+          "calibration": [
+            {
+              "col": "Q",
+              "point": "0",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "S",
+              "point": "0.125",
+              "raw": "75",
+              "class": "number",
+              "value": 75
+            },
+            {
+              "col": "T",
+              "point": "0.25",
+              "raw": "150",
+              "class": "number",
+              "value": 150
+            },
+            {
+              "col": "U",
+              "point": "0.5",
+              "raw": "300",
+              "class": "number",
+              "value": 300
+            },
+            {
+              "col": "V",
+              "point": "0.75",
+              "raw": "450",
+              "class": "number",
+              "value": 450
+            },
+            {
+              "col": "W",
+              "point": "1",
+              "raw": "600",
+              "class": "number",
+              "value": 600
+            }
+          ],
+          "remarks": "4mA 3665 / 20mA 19638 | Recal AI 4mA 4000 / 20mA 19999\nWeather: Cloudy"
+        }
+      ],
+      "workbook_cells": {
+        "1": {
+          "B": "Property Owner:",
+          "D": "DERM/CHRC"
+        },
+        "2": {
+          "B": "ALERT INSPECTION SUMMARY",
+          "K": "Station:",
+          "M": "Riley's Crossing",
+          "X": "CBM NO.",
+          "Z": "535095"
+        },
+        "5": {
+          "A": "Station \nNumber",
+          "B": "Inspect \nDate",
+          "C": "Canister \nNo",
+          "D": "Stand\n-by",
+          "E": "Under\n-load",
+          "F": "Stand-by (mA)",
+          "G": "Transmit (mA)",
+          "H": "Output Voltage \n(v)",
+          "I": "Short Circuit \n(mA)",
+          "J": "Regulated Voltage \n(v)",
+          "K": "Current Charge \n(mA)",
+          "L": "Fwd",
+          "M": "Ref",
+          "N": "SWR",
+          "O": "Fade \nMargin \n(db)",
+          "P": "TBRG \nCalib",
+          "Q": "0",
+          "R": "1",
+          "S": "2",
+          "T": "5",
+          "U": "8",
+          "V": "10",
+          "W": "15",
+          "X": "20",
+          "Y": "30",
+          "Z": "Remarks"
+        },
+        "6": {
+          "Q": "0",
+          "R": "1",
+          "S": "2",
+          "T": "5",
+          "U": "8",
+          "V": "10",
+          "W": "15",
+          "X": "20",
+          "Y": "25"
+        },
+        "7": {
+          "B": "2010-05-31 00:00:00",
+          "C": "5102431730",
+          "D": "12.4",
+          "E": "12.1",
+          "F": "0.6",
+          "J": "16.3",
+          "K": "155",
+          "L": "18",
+          "M": "0",
+          "N": "1",
+          "P": "10.4",
+          "R": "26",
+          "S": "46",
+          "T": "107",
+          "V": "207",
+          "X": "408",
+          "Y": "507",
+          "Z": "Station installed; 25W Tx; 2W panel; 30m Druck; 1.0mm TBRG"
+        },
+        "8": {
+          "B": "2011-08-04 00:00:00",
+          "D": "13.2",
+          "E": "12.9",
+          "F": "0.6",
+          "J": "15.95",
+          "K": "175.3",
+          "L": ">20",
+          "M": "0.1",
+          "O": "12",
+          "P": "10.6",
+          "R": "20",
+          "S": "40",
+          "T": "100",
+          "V": "200",
+          "X": "400",
+          "Y": "500",
+          "Z": "Analogue board recalibrated; stn flooded but no damage to AL gear"
+        },
+        "20": {
+          "B": "2022-10-10 00:00:00",
+          "D": "13.4",
+          "E": "13.1",
+          "F": "<1",
+          "J": "20.3",
+          "K": "85",
+          "L": "20",
+          "M": "0.1",
+          "O": "15",
+          "P": "10.4",
+          "Q": "0",
+          "S": "75",
+          "T": "150",
+          "U": "300",
+          "V": "450",
+          "W": "600",
+          "Z": "4mA 3665 / 20mA 19638 | Recal AI 4mA 4000 / 20mA 19999\nWeather: Cloudy"
+        }
+      }
+    },
+    {
+      "why": "DATA LOGGER — the second banner family, on a TM station",
+      "block": {
+        "ref": "qld-all-site-inspections:Border!:303",
+        "source": "qld-all-site-inspections",
+        "origin": "import",
+        "sheet": "Border!",
+        "banner_row": 303,
+        "end_row": 341,
+        "block_index": 11,
+        "family": "DATA LOGGER",
+        "inspection_config": "datalogger_old",
+        "station_name": "WALLANGARRA TM",
+        "cbm_no": "41547",
+        "station_keys": [
+          "c:41547",
+          "n:wallangarratm"
+        ],
+        "property_owner": "Telstra Phone:",
+        "owner_row": 302,
+        "ids": {},
+        "ids_raw": "",
+        "notes": {
+          "phone_no": "07 4684 3986",
+          "stray_point_row_above_header": "row 305"
+        },
+        "header_rows": [
+          306
+        ],
+        "date_column": "B",
+        "inherited_header": false,
+        "columns": {
+          "A": {
+            "label": "TM STATION NUMBER",
+            "field": "station_number"
+          },
+          "B": {
+            "label": "TM Inspection Date",
+            "field": "inspect_date"
+          },
+          "C": {
+            "label": "Logger No",
+            "field": "logger_no"
+          },
+          "D": {
+            "label": "Battery Voltage Stan -by",
+            "field": "battery_standby_v"
+          },
+          "E": {
+            "label": "Battery Voltage Under -Load",
+            "field": "battery_under_load_v"
+          },
+          "F": {
+            "label": "Consumption Sleep (mA)",
+            "field": "consumption_sleep_ma"
+          },
+          "G": {
+            "label": "Consumption Operating (mA)",
+            "field": "consumption_operating_ma"
+          },
+          "H": {
+            "label": "Consumption Interrogation (mA)",
+            "field": "consumption_interrogation_ma"
+          },
+          "I": {
+            "label": "Solar Output Voltage (v)",
+            "field": "solar_output_v"
+          },
+          "J": {
+            "label": "Solar Short Circuit (mA)",
+            "field": "solar_short_circuit_ma"
+          },
+          "K": {
+            "label": "Solar Regulated Voltage (v)",
+            "field": "solar_regulated_v"
+          },
+          "L": {
+            "label": "Solar Current Charge (mA)",
+            "field": "solar_charge_current_ma"
+          },
+          "M": {
+            "label": "RSSI",
+            "field": "rssi_dbm"
+          },
+          "N": {
+            "label": "Lithium Batter Voltage (v)",
+            "field": "lithium_battery_v"
+          },
+          "O": {
+            "label": "Phone Socket Voltage",
+            "field": "telephone_socket_v"
+          },
+          "P": {
+            "label": "TBRG Calib (mm)",
+            "field": "tbrg_calibration_mm"
+          },
+          "Q": {
+            "label": "0",
+            "field": "river_calibration_point",
+            "point": "0"
+          },
+          "R": {
+            "label": "1",
+            "field": "river_calibration_point",
+            "point": "1"
+          },
+          "S": {
+            "label": "2",
+            "field": "river_calibration_point",
+            "point": "2"
+          },
+          "T": {
+            "label": "5",
+            "field": "river_calibration_point",
+            "point": "5"
+          },
+          "U": {
+            "label": "8",
+            "field": "river_calibration_point",
+            "point": "8"
+          },
+          "V": {
+            "label": "10",
+            "field": "river_calibration_point",
+            "point": "10"
+          },
+          "W": {
+            "label": "15",
+            "field": "river_calibration_point",
+            "point": "15"
+          },
+          "X": {
+            "label": "20",
+            "field": "river_calibration_point",
+            "point": "20"
+          },
+          "Y": {
+            "label": "30",
+            "field": "river_calibration_point",
+            "point": "30"
+          },
+          "Z": {
+            "label": "Remarks",
+            "field": "remarks"
+          }
+        },
+        "calibration_points": [
+          "0",
+          "1",
+          "2",
+          "5",
+          "8",
+          "10",
+          "15",
+          "20",
+          "30"
+        ],
+        "calibration_columns": [
+          "Q",
+          "R",
+          "S",
+          "T",
+          "U",
+          "V",
+          "W",
+          "X",
+          "Y"
+        ],
+        "annotations": [],
+        "inspection_rows": 23
+      },
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:Border!:303:307",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Border!",
+          "banner_row": 303,
+          "row": 307,
+          "block_ref": "qld-all-site-inspections:Border!:303",
+          "from": "block",
+          "family": "DATA LOGGER",
+          "inspection_config": "datalogger_old",
+          "station_name": "WALLANGARRA TM",
+          "cbm_no": "41547",
+          "inspected_on": "2000-05-18",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2000-05-18 00:00:00",
+          "readings": [
+            {
+              "col": "C",
+              "field": "logger_no",
+              "raw": "HS-4557",
+              "class": "short_text"
+            },
+            {
+              "col": "D",
+              "field": "battery_standby_v",
+              "raw": "12.7",
+              "class": "number",
+              "value": 12.7
+            },
+            {
+              "col": "E",
+              "field": "battery_under_load_v",
+              "raw": "12.1",
+              "class": "number",
+              "value": 12.1
+            },
+            {
+              "col": "F",
+              "field": "consumption_sleep_ma",
+              "raw": "0.2",
+              "class": "number",
+              "value": 0.2
+            },
+            {
+              "col": "G",
+              "field": "consumption_operating_ma",
+              "raw": "115",
+              "class": "number",
+              "value": 115
+            },
+            {
+              "col": "H",
+              "field": "consumption_interrogation_ma",
+              "raw": "149",
+              "class": "number",
+              "value": 149
+            },
+            {
+              "col": "I",
+              "field": "solar_output_v",
+              "raw": "11.95",
+              "class": "number",
+              "value": 11.95
+            },
+            {
+              "col": "K",
+              "field": "solar_regulated_v",
+              "raw": "12.8",
+              "class": "number",
+              "value": 12.8
+            },
+            {
+              "col": "L",
+              "field": "solar_charge_current_ma",
+              "raw": "380",
+              "class": "number",
+              "value": 380
+            },
+            {
+              "col": "O",
+              "field": "telephone_socket_v",
+              "raw": "50",
+              "class": "number",
+              "value": 50
+            },
+            {
+              "col": "AC",
+              "field": null,
+              "raw": "7.5",
+              "class": "number",
+              "value": 7.5,
+              "label": "",
+              "unmapped": "no header for this column"
+            }
+          ],
+          "remarks": "Station installed"
+        },
+        {
+          "ref": "qld-all-site-inspections:Border!:303:308",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Border!",
+          "banner_row": 303,
+          "row": 308,
+          "block_ref": "qld-all-site-inspections:Border!:303",
+          "from": "block",
+          "family": "DATA LOGGER",
+          "inspection_config": "datalogger_old",
+          "station_name": "WALLANGARRA TM",
+          "cbm_no": "41547",
+          "inspected_on": "2001-02-09",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2001-02-09 00:00:00",
+          "readings": [
+            {
+              "col": "D",
+              "field": "battery_standby_v",
+              "raw": "13.6",
+              "class": "number",
+              "value": 13.6
+            },
+            {
+              "col": "E",
+              "field": "battery_under_load_v",
+              "raw": "12.9",
+              "class": "number",
+              "value": 12.9
+            },
+            {
+              "col": "F",
+              "field": "consumption_sleep_ma",
+              "raw": "0.3",
+              "class": "number",
+              "value": 0.3
+            },
+            {
+              "col": "G",
+              "field": "consumption_operating_ma",
+              "raw": "114",
+              "class": "number",
+              "value": 114
+            },
+            {
+              "col": "H",
+              "field": "consumption_interrogation_ma",
+              "raw": "148",
+              "class": "number",
+              "value": 148
+            },
+            {
+              "col": "I",
+              "field": "solar_output_v",
+              "raw": "11.1",
+              "class": "number",
+              "value": 11.1
+            },
+            {
+              "col": "K",
+              "field": "solar_regulated_v",
+              "raw": "13.3",
+              "class": "number",
+              "value": 13.3
+            },
+            {
+              "col": "L",
+              "field": "solar_charge_current_ma",
+              "raw": "88.5",
+              "class": "number",
+              "value": 88.5
+            },
+            {
+              "col": "O",
+              "field": "telephone_socket_v",
+              "raw": "50",
+              "class": "number",
+              "value": 50
+            },
+            {
+              "col": "P",
+              "field": "tbrg_calibration_mm",
+              "raw": "10",
+              "class": "number",
+              "value": 10
+            },
+            {
+              "col": "AC",
+              "field": null,
+              "raw": "7.5",
+              "class": "number",
+              "value": 7.5,
+              "label": "",
+              "unmapped": "no header for this column"
+            }
+          ]
+        }
+      ],
+      "workbook_cells": {
+        "302": {
+          "B": "Property owner: Telstra                                  Phone:"
+        },
+        "303": {
+          "B": "DATA LOGGER INSPECTION SUMMARY",
+          "K": "Station:",
+          "N": "WALLANGARRA TM",
+          "X": "CBM NO.",
+          "Z": "41547"
+        },
+        "306": {
+          "A": "TM STATION NUMBER",
+          "B": "Inspection\nDate",
+          "C": "Logger \nNo",
+          "D": "Stan\n-by",
+          "E": "Under \n-Load",
+          "F": "Sleep (mA)",
+          "G": "Operating  (mA)",
+          "H": "Interrogation  (mA)",
+          "I": "Output Voltage (v)",
+          "J": "Short Circuit (mA)",
+          "K": "Regulated Voltage (v)",
+          "L": "Current Charge (mA)",
+          "M": "RSSI",
+          "N": "Lithium Batter Voltage (v)",
+          "O": "Phone Socket Voltage",
+          "P": "TBRG Calib (mm)",
+          "Q": "0",
+          "R": "1",
+          "S": "2",
+          "T": "5",
+          "U": "8",
+          "V": "10",
+          "W": "15",
+          "X": "20",
+          "Y": "30",
+          "Z": "Remarks"
+        },
+        "307": {
+          "B": "2000-05-18 00:00:00",
+          "C": "HS-4557",
+          "D": "12.7",
+          "E": "12.1",
+          "F": "0.2",
+          "G": "115",
+          "H": "149",
+          "I": "11.95",
+          "K": "12.8",
+          "L": "380",
+          "O": "50",
+          "Z": "Station installed",
+          "AC": "7.5"
+        },
+        "308": {
+          "B": "2001-02-09 00:00:00",
+          "D": "13.6",
+          "E": "12.9",
+          "F": "0.3",
+          "G": "114",
+          "H": "148",
+          "I": "11.1",
+          "K": "13.3",
+          "L": "88.5",
+          "O": "50",
+          "P": "10",
+          "AC": "7.5"
+        }
+      }
+    },
+    {
+      "why": "CR800 — one of only two blocks in the workbook",
+      "block": {
+        "ref": "qld-all-site-inspections:Mary!:1006",
+        "source": "qld-all-site-inspections",
+        "origin": "import",
+        "sheet": "Mary!",
+        "banner_row": 1006,
+        "end_row": 1037,
+        "block_index": 34,
+        "family": "CR800",
+        "inspection_config": "campbell_datalogger",
+        "station_name": "TEDDINGTON WEIR HW TM",
+        "cbm_no": "40896",
+        "station_keys": [
+          "c:40896",
+          "n:teddingtonweirhwtm"
+        ],
+        "property_owner": "M'Bor.Council 4123 8853 Phone: [on site] Bill Gibson 4129 7299 Property owner: Nathan Bursle (Caretaker) Phone: 07 4675 1152",
+        "owner_row": 1005,
+        "ids": {},
+        "ids_raw": "",
+        "notes": {
+          "group_row_note": "AWRC",
+          "stray_point_row_above_header": "row 1007"
+        },
+        "header_rows": [
+          1009
+        ],
+        "date_column": "B",
+        "inherited_header": false,
+        "columns": {
+          "A": {
+            "label": "TM STATION NUMBER",
+            "field": "station_number"
+          },
+          "B": {
+            "label": "TM Inspection Date",
+            "field": "inspect_date"
+          },
+          "C": {
+            "label": "Logger No",
+            "field": "logger_no"
+          },
+          "D": {
+            "label": "Battery Voltage Stan -by",
+            "field": "battery_standby_v"
+          },
+          "E": {
+            "label": "Battery Voltage Under -Load",
+            "field": "battery_under_load_v"
+          },
+          "F": {
+            "label": "Consumption Sleep (mA)",
+            "field": "consumption_sleep_ma"
+          },
+          "G": {
+            "label": "Consumption Operating (mA)",
+            "field": "consumption_operating_ma"
+          },
+          "H": {
+            "label": "Consumption Interrogation (mA)",
+            "field": "consumption_interrogation_ma"
+          },
+          "I": {
+            "label": "Solar Output Voltage (v)",
+            "field": "solar_output_v"
+          },
+          "J": {
+            "label": "Solar Short Circuit (mA)",
+            "field": "solar_short_circuit_ma"
+          },
+          "K": {
+            "label": "Solar Regulated Voltage (v)",
+            "field": "solar_regulated_v"
+          },
+          "L": {
+            "label": "Solar Current Charge (mA)",
+            "field": "solar_charge_current_ma"
+          },
+          "M": {
+            "label": "RSSI",
+            "field": "rssi_dbm"
+          },
+          "N": {
+            "label": "Lithium Batter Voltage (v)",
+            "field": "lithium_battery_v"
+          },
+          "O": {
+            "label": "Phone Socket Voltage",
+            "field": "telephone_socket_v"
+          },
+          "P": {
+            "label": "TBRG Calib (mm)",
+            "field": "tbrg_calibration_mm"
+          },
+          "Q": {
+            "label": "0",
+            "field": "river_calibration_point",
+            "point": "0"
+          },
+          "R": {
+            "label": "1",
+            "field": "river_calibration_point",
+            "point": "1"
+          },
+          "S": {
+            "label": "2",
+            "field": "river_calibration_point",
+            "point": "2"
+          },
+          "T": {
+            "label": "5",
+            "field": "river_calibration_point",
+            "point": "5"
+          },
+          "U": {
+            "label": "8",
+            "field": "river_calibration_point",
+            "point": "8"
+          },
+          "V": {
+            "label": "10",
+            "field": "river_calibration_point",
+            "point": "10"
+          },
+          "W": {
+            "label": "15",
+            "field": "river_calibration_point",
+            "point": "15"
+          },
+          "X": {
+            "label": "20",
+            "field": "river_calibration_point",
+            "point": "20"
+          },
+          "Y": {
+            "label": "30",
+            "field": "river_calibration_point",
+            "point": "30"
+          },
+          "Z": {
+            "label": "Remarks",
+            "field": "remarks"
+          }
+        },
+        "calibration_points": [
+          "0",
+          "1",
+          "2",
+          "5",
+          "8",
+          "10",
+          "15",
+          "20",
+          "30"
+        ],
+        "calibration_columns": [
+          "Q",
+          "R",
+          "S",
+          "T",
+          "U",
+          "V",
+          "W",
+          "X",
+          "Y"
+        ],
+        "annotations": [
+          {
+            "row": 1019,
+            "text": "N/A No BoM inspection 2020 due to COVID restrictions"
+          }
+        ],
+        "inspection_rows": 13
+      },
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:Mary!:1006:1010",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Mary!",
+          "banner_row": 1006,
+          "row": 1010,
+          "block_ref": "qld-all-site-inspections:Mary!:1006",
+          "from": "block",
+          "family": "CR800",
+          "inspection_config": "campbell_datalogger",
+          "station_name": "TEDDINGTON WEIR HW TM",
+          "cbm_no": "40896",
+          "inspected_on": "2011-04-15",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2011-04-15 00:00:00",
+          "readings": [
+            {
+              "col": "C",
+              "field": "logger_no",
+              "raw": "1888",
+              "class": "number",
+              "value": 1888
+            },
+            {
+              "col": "D",
+              "field": "battery_standby_v",
+              "raw": "12.4",
+              "class": "number",
+              "value": 12.4
+            },
+            {
+              "col": "E",
+              "field": "battery_under_load_v",
+              "raw": "12.2",
+              "class": "number",
+              "value": 12.2
+            },
+            {
+              "col": "F",
+              "field": "consumption_sleep_ma",
+              "raw": "6.1",
+              "class": "number",
+              "value": 6.1
+            },
+            {
+              "col": "I",
+              "field": "solar_output_v",
+              "raw": "20",
+              "class": "number",
+              "value": 20
+            },
+            {
+              "col": "J",
+              "field": "solar_short_circuit_ma",
+              "raw": "360",
+              "class": "number",
+              "value": 360
+            },
+            {
+              "col": "P",
+              "field": "tbrg_calibration_mm",
+              "raw": "20.4",
+              "class": "number",
+              "value": 20.4
+            }
+          ],
+          "remarks": "Repl. Mace with Campbell. Gas 4000/550/44, new 18000/500/44"
+        },
+        {
+          "ref": "qld-all-site-inspections:Mary!:1006:1011",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Mary!",
+          "banner_row": 1006,
+          "row": 1011,
+          "block_ref": "qld-all-site-inspections:Mary!:1006",
+          "from": "block",
+          "family": "CR800",
+          "inspection_config": "campbell_datalogger",
+          "station_name": "TEDDINGTON WEIR HW TM",
+          "cbm_no": "40896",
+          "inspected_on": "2012-03-21",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2012-03-21 00:00:00",
+          "readings": [
+            {
+              "col": "D",
+              "field": "battery_standby_v",
+              "raw": "13.3",
+              "class": "number",
+              "value": 13.3
+            },
+            {
+              "col": "E",
+              "field": "battery_under_load_v",
+              "raw": "13.1",
+              "class": "number",
+              "value": 13.1
+            },
+            {
+              "col": "F",
+              "field": "consumption_sleep_ma",
+              "raw": "0.7",
+              "class": "number",
+              "value": 0.7
+            },
+            {
+              "col": "G",
+              "field": "consumption_operating_ma",
+              "raw": "27.7",
+              "class": "number",
+              "value": 27.7
+            },
+            {
+              "col": "I",
+              "field": "solar_output_v",
+              "raw": "19.1",
+              "class": "number",
+              "value": 19.1
+            },
+            {
+              "col": "J",
+              "field": "solar_short_circuit_ma",
+              "raw": "70",
+              "class": "number",
+              "value": 70
+            },
+            {
+              "col": "L",
+              "field": "solar_charge_current_ma",
+              "raw": "40.4",
+              "class": "number",
+              "value": 40.4
+            },
+            {
+              "col": "O",
+              "field": "telephone_socket_v",
+              "raw": "49.5",
+              "class": "number",
+              "value": 49.5
+            },
+            {
+              "col": "P",
+              "field": "tbrg_calibration_mm",
+              "raw": "20.6",
+              "class": "number",
+              "value": 20.6
+            }
+          ],
+          "calibration": [
+            {
+              "col": "R",
+              "point": "1",
+              "raw": "8.415",
+              "class": "number",
+              "value": 8.415
+            },
+            {
+              "col": "S",
+              "point": "2",
+              "raw": "9.41",
+              "class": "number",
+              "value": 9.41
+            },
+            {
+              "col": "T",
+              "point": "5",
+              "raw": "12.401",
+              "class": "number",
+              "value": 12.401
+            },
+            {
+              "col": "V",
+              "point": "10",
+              "raw": "17.401",
+              "class": "number",
+              "value": 17.401
+            },
+            {
+              "col": "W",
+              "point": "15",
+              "raw": "22.406",
+              "class": "number",
+              "value": 22.406
+            }
+          ],
+          "remarks": "Gas 11000/520/44; new 18500/500/44. Inst. Gas druck. Upgraded OS, logger program"
+        }
+      ],
+      "workbook_cells": {
+        "1005": {
+          "B": "Property owner: M'Bor.Council 4123 8853    Phone: [on site] Bill Gibson 4129 7299",
+          "O": "Property owner:  Nathan Bursle (Caretaker)                             Phone: 07 4675 1152"
+        },
+        "1006": {
+          "B": "CR800 INSPECTION SUMMARY",
+          "L": "Station: TEDDINGTON WEIR HW TM",
+          "X": "CBM NO.",
+          "Z": "40896"
+        },
+        "1009": {
+          "A": "TM STATION NUMBER",
+          "B": "Inspection\nDate",
+          "C": "Logger \nNo",
+          "D": "Stan\n-by",
+          "E": "Under \n-Load",
+          "F": "Sleep (mA)",
+          "G": "Operating  (mA)",
+          "H": "Interrogation  (mA)",
+          "I": "Output Voltage (v)",
+          "J": "Short Circuit (mA)",
+          "K": "Regulated Voltage (v)",
+          "L": "Current Charge (mA)",
+          "M": "RSSI",
+          "N": "Lithium Batter Voltage (v)",
+          "O": "Phone Socket Voltage",
+          "P": "TBRG Calib (mm)",
+          "Q": "0",
+          "R": "1",
+          "S": "2",
+          "T": "5",
+          "U": "8",
+          "V": "10",
+          "W": "15",
+          "X": "20",
+          "Y": "30",
+          "Z": "Remarks"
+        },
+        "1010": {
+          "B": "2011-04-15 00:00:00",
+          "C": "1888",
+          "D": "12.4",
+          "E": "12.2",
+          "F": "6.1",
+          "I": "20",
+          "J": "360",
+          "P": "20.4",
+          "Z": "Repl. Mace with Campbell. Gas 4000/550/44, new 18000/500/44"
+        },
+        "1011": {
+          "B": "2012-03-21 00:00:00",
+          "D": "13.3",
+          "E": "13.1",
+          "F": "0.7",
+          "G": "27.7",
+          "I": "19.1",
+          "J": "70",
+          "L": "40.4",
+          "O": "49.5",
+          "P": "20.6",
+          "R": "8.415",
+          "S": "9.41",
+          "T": "12.401",
+          "V": "17.401",
+          "W": "22.406",
+          "Z": "Gas 11000/520/44; new 18500/500/44. Inst. Gas druck. Upgraded OS, logger program"
+        }
+      }
+    },
+    {
+      "why": "RRDL3 — the only block in the workbook",
+      "block": {
+        "ref": "qld-all-site-inspections:Closed stations:174",
+        "source": "qld-all-site-inspections",
+        "origin": "import",
+        "sheet": "Closed stations",
+        "banner_row": 174,
+        "end_row": 185,
+        "block_index": 9,
+        "family": "RRDL3",
+        "inspection_config": "datalogger_old",
+        "station_name": "IMBIL TM",
+        "cbm_no": "040777",
+        "station_keys": [
+          "c:40777",
+          "n:imbiltm"
+        ],
+        "property_owner": "Phone:",
+        "owner_row": 173,
+        "ids": {},
+        "ids_raw": "",
+        "notes": {
+          "group_row_note": "AWRC",
+          "stray_point_row_above_header": "row 175",
+          "phone_no": ".",
+          "absorbed_value_in_header": "River Calibration (metres): 1"
+        },
+        "header_rows": [
+          177,
+          178,
+          179
+        ],
+        "date_column": "A",
+        "inherited_header": false,
+        "columns": {
+          "A": {
+            "label": "Inspect Date",
+            "field": "inspect_date"
+          },
+          "B": {
+            "label": "Logger No",
+            "field": "logger_no"
+          },
+          "C": {
+            "label": "Battery Voltage Stand -by",
+            "field": "battery_standby_v"
+          },
+          "D": {
+            "label": "Battery Under Load",
+            "field": "battery_under_load_v"
+          },
+          "E": {
+            "label": "Consumption (mA) Sleep",
+            "field": "consumption_sleep_ma"
+          },
+          "F": {
+            "label": "Consumption (mA) Operat -ing",
+            "field": "consumption_operating_ma"
+          },
+          "G": {
+            "label": "Solar (v) Open Circuit",
+            "field": "solar_output_v"
+          },
+          "H": {
+            "label": "Solar (mA) Short Circuit",
+            "field": "solar_short_circuit_ma"
+          },
+          "I": {
+            "label": "Solar (mA) Charge Current",
+            "field": "solar_charge_current_ma"
+          },
+          "J": {
+            "label": "TBRG Calb (mm)",
+            "field": "tbrg_calibration_mm"
+          },
+          "K": {
+            "label": "Phone socket Voltage (v)",
+            "field": "telephone_socket_v"
+          },
+          "L": {
+            "label": "River Calibration (metres)",
+            "field": "tbrg_calibration_mm"
+          },
+          "M": {
+            "label": "2",
+            "field": "river_calibration_point",
+            "point": "2"
+          },
+          "N": {
+            "label": "5",
+            "field": "river_calibration_point",
+            "point": "5"
+          },
+          "O": {
+            "label": "10",
+            "field": "river_calibration_point",
+            "point": "10"
+          },
+          "P": {
+            "label": "15",
+            "field": "river_calibration_point",
+            "point": "15"
+          },
+          "Q": {
+            "label": "Remarks",
+            "field": "remarks"
+          }
+        },
+        "calibration_points": [
+          "2",
+          "5",
+          "10",
+          "15"
+        ],
+        "calibration_columns": [
+          "M",
+          "N",
+          "O",
+          "P"
+        ],
+        "annotations": [
+          {
+            "row": 183,
+            "text": "Closed - now alert"
+          }
+        ],
+        "inspection_rows": 2
+      },
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:Closed stations:174:180",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Closed stations",
+          "banner_row": 174,
+          "row": 180,
+          "block_ref": "qld-all-site-inspections:Closed stations:174",
+          "from": "block",
+          "family": "RRDL3",
+          "inspection_config": "datalogger_old",
+          "station_name": "IMBIL TM",
+          "cbm_no": "040777",
+          "inspected_on": "2012-03-15",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2012-03-15 00:00:00",
+          "readings": [
+            {
+              "col": "B",
+              "field": "logger_no",
+              "raw": "HS1248",
+              "class": "short_text"
+            },
+            {
+              "col": "C",
+              "field": "battery_standby_v",
+              "raw": "12.6",
+              "class": "number",
+              "value": 12.6
+            },
+            {
+              "col": "D",
+              "field": "battery_under_load_v",
+              "raw": "12.4",
+              "class": "number",
+              "value": 12.4
+            },
+            {
+              "col": "E",
+              "field": "consumption_sleep_ma",
+              "raw": "0.4",
+              "class": "number",
+              "value": 0.4
+            },
+            {
+              "col": "F",
+              "field": "consumption_operating_ma",
+              "raw": "120",
+              "class": "number",
+              "value": 120
+            },
+            {
+              "col": "G",
+              "field": "solar_output_v",
+              "raw": "17.2",
+              "class": "number",
+              "value": 17.2
+            },
+            {
+              "col": "H",
+              "field": "solar_short_circuit_ma",
+              "raw": "175.4",
+              "class": "number",
+              "value": 175.4
+            },
+            {
+              "col": "I",
+              "field": "solar_charge_current_ma",
+              "raw": "90",
+              "class": "number",
+              "value": 90
+            },
+            {
+              "col": "J",
+              "field": "tbrg_calibration_mm",
+              "raw": "20.8",
+              "class": "number",
+              "value": 20.8
+            },
+            {
+              "col": "K",
+              "field": "telephone_socket_v",
+              "raw": "50.3",
+              "class": "number",
+              "value": 50.3
+            },
+            {
+              "col": "L",
+              "field": "tbrg_calibration_mm",
+              "raw": "1.05",
+              "class": "number",
+              "value": 1.05
+            }
+          ],
+          "calibration": [
+            {
+              "col": "M",
+              "point": "2",
+              "raw": "2.05",
+              "class": "number",
+              "value": 2.05
+            },
+            {
+              "col": "N",
+              "point": "5",
+              "raw": "5.05",
+              "class": "number",
+              "value": 5.05
+            },
+            {
+              "col": "O",
+              "point": "10",
+              "raw": "10.05",
+              "class": "number",
+              "value": 10.05
+            },
+            {
+              "col": "P",
+              "point": "15",
+              "raw": "15.05",
+              "class": "number",
+              "value": 15.05
+            }
+          ],
+          "remarks": "Replaced Mace & PHA with RRDL3 & DPX. TBRG blocked on arrival. Adj. B. -% a. +3% Gas 17000/380/128"
+        },
+        {
+          "ref": "qld-all-site-inspections:Closed stations:174:181",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Closed stations",
+          "banner_row": 174,
+          "row": 181,
+          "block_ref": "qld-all-site-inspections:Closed stations:174",
+          "from": "block",
+          "family": "RRDL3",
+          "inspection_config": "datalogger_old",
+          "station_name": "IMBIL TM",
+          "cbm_no": "040777",
+          "inspected_on": "2012-11-08",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2012-11-08 00:00:00",
+          "readings": [],
+          "remarks": "Unable to locate orifice despite use of detection equipment"
+        }
+      ],
+      "workbook_cells": {
+        "173": {
+          "A": "Property owner:                                       Phone:"
+        },
+        "174": {
+          "A": "RRDL3 INSPECTION SUMMARY",
+          "K": "Station:  IMBIL TM",
+          "Q": "CBM No.  040777"
+        },
+        "177": {
+          "A": "Inspect",
+          "B": "Logger",
+          "C": "Voltage",
+          "E": "(mA)",
+          "F": "(mA)",
+          "G": "(v)",
+          "H": "(mA)",
+          "I": "(mA)",
+          "K": "socket",
+          "L": "(metres)",
+          "Q": "Remarks"
+        },
+        "178": {
+          "A": "Date",
+          "B": "No",
+          "C": "Stand",
+          "D": "Under",
+          "E": "Sleep",
+          "F": "Operat",
+          "G": "Open",
+          "H": "Short",
+          "I": "Charge",
+          "J": "Calb",
+          "K": "Voltage"
+        },
+        "179": {
+          "C": "-by",
+          "D": "Load",
+          "F": "-ing",
+          "G": "Circuit",
+          "H": "Circuit",
+          "I": "Current",
+          "J": "(mm)",
+          "K": "(v)",
+          "L": "1",
+          "M": "2",
+          "N": "5",
+          "O": "10",
+          "P": "15"
+        },
+        "180": {
+          "A": "2012-03-15 00:00:00",
+          "B": "HS1248",
+          "C": "12.6",
+          "D": "12.4",
+          "E": "0.4",
+          "F": "120",
+          "G": "17.2",
+          "H": "175.4",
+          "I": "90",
+          "J": "20.8",
+          "K": "50.3",
+          "L": "1.05",
+          "M": "2.05",
+          "N": "5.05",
+          "O": "10.05",
+          "P": "15.05",
+          "Q": "Replaced Mace & PHA with RRDL3 & DPX. TBRG blocked on arrival. Adj. B. -% a. +3% Gas 17000/380/128"
+        },
+        "181": {
+          "A": "2012-11-08 00:00:00",
+          "Q": "Unable to locate orifice despite use of detection equipment"
+        }
+      }
+    },
+    {
+      "why": "Mace — Mace columns under a DATA LOGGER banner, which is why the configuration comes from the header and not the banner (§1)",
+      "block": {
+        "ref": "qld-all-site-inspections:Closed stations:2",
+        "source": "qld-all-site-inspections",
+        "origin": "import",
+        "sheet": "Closed stations",
+        "banner_row": 2,
+        "end_row": 18,
+        "block_index": 0,
+        "family": "DATA LOGGER",
+        "inspection_config": "mace",
+        "station_name": "BOONAH TM",
+        "cbm_no": "040858",
+        "station_keys": [
+          "c:40858",
+          "n:boonahtm"
+        ],
+        "property_owner": "Phone: Boonah Council",
+        "owner_row": 1,
+        "ids": {
+          "river_alert_id": "7246",
+          "battery_alert_id": "7912",
+          "phone_no_raw": "07 5463 2831",
+          "orifice_level_raw": "-0.003m. gauge height"
+        },
+        "ids_raw": "ID's | Rv = 7246 | Batt = 7912 | Phone No. 07 5463 2831 | Orifice Level = -0.003m. gauge height",
+        "notes": {
+          "absorbed_value_in_header": "River Calibration (metres): 0"
+        },
+        "header_rows": [
+          5,
+          6,
+          7
+        ],
+        "date_column": "A",
+        "inherited_header": false,
+        "columns": {
+          "A": {
+            "label": "Inspect Date",
+            "field": "inspect_date"
+          },
+          "B": {
+            "label": "Mace No",
+            "field": "logger_no"
+          },
+          "C": {
+            "label": "Battery Voltage Stand -by",
+            "field": "battery_standby_v"
+          },
+          "D": {
+            "label": "Battery Under Load",
+            "field": "battery_under_load_v"
+          },
+          "E": {
+            "label": "Consumption (mA) Sleep",
+            "field": "consumption_sleep_ma"
+          },
+          "F": {
+            "label": "Consumption (mA) Operat -ing",
+            "field": "consumption_operating_ma"
+          },
+          "G": {
+            "label": "Consumption (mA) Interr- ogation",
+            "field": "consumption_interrogation_ma"
+          },
+          "H": {
+            "label": "Solar (v) Open circuit",
+            "field": "solar_output_v"
+          },
+          "I": {
+            "label": "Solar (mA) Charge",
+            "field": "solar_charge_current_ma"
+          },
+          "J": {
+            "label": "Phone socket Voltage (v)",
+            "field": "telephone_socket_v"
+          },
+          "K": {
+            "label": "River Calibration (metres)",
+            "field": "tbrg_calibration_mm"
+          },
+          "L": {
+            "label": "1",
+            "field": "river_calibration_point",
+            "point": "1"
+          },
+          "M": {
+            "label": "2",
+            "field": "river_calibration_point",
+            "point": "2"
+          },
+          "N": {
+            "label": "5",
+            "field": "river_calibration_point",
+            "point": "5"
+          },
+          "O": {
+            "label": "10",
+            "field": "river_calibration_point",
+            "point": "10"
+          },
+          "P": {
+            "label": "Remarks",
+            "field": "remarks"
+          }
+        },
+        "calibration_points": [
+          "1",
+          "2",
+          "5",
+          "10"
+        ],
+        "calibration_columns": [
+          "L",
+          "M",
+          "N",
+          "O"
+        ],
+        "annotations": [],
+        "inspection_rows": 5
+      },
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:Closed stations:2:8",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Closed stations",
+          "banner_row": 2,
+          "row": 8,
+          "block_ref": "qld-all-site-inspections:Closed stations:2",
+          "from": "block",
+          "family": "DATA LOGGER",
+          "inspection_config": "mace",
+          "station_name": "BOONAH TM",
+          "cbm_no": "040858",
+          "inspected_on": "2005-05-06",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2005-05-06 00:00:00",
+          "readings": [
+            {
+              "col": "B",
+              "field": "logger_no",
+              "raw": "HS6045",
+              "class": "short_text"
+            },
+            {
+              "col": "C",
+              "field": "battery_standby_v",
+              "raw": "12.9",
+              "class": "number",
+              "value": 12.9
+            },
+            {
+              "col": "D",
+              "field": "battery_under_load_v",
+              "raw": "12.5",
+              "class": "number",
+              "value": 12.5
+            },
+            {
+              "col": "E",
+              "field": "consumption_sleep_ma",
+              "raw": "0.6",
+              "class": "number",
+              "value": 0.6
+            },
+            {
+              "col": "F",
+              "field": "consumption_operating_ma",
+              "raw": "84",
+              "class": "number",
+              "value": 84
+            },
+            {
+              "col": "G",
+              "field": "consumption_interrogation_ma",
+              "raw": "124",
+              "class": "number",
+              "value": 124
+            },
+            {
+              "col": "H",
+              "field": "solar_output_v",
+              "raw": "18.6",
+              "class": "number",
+              "value": 18.6
+            },
+            {
+              "col": "I",
+              "field": "solar_charge_current_ma",
+              "raw": "49",
+              "class": "number",
+              "value": 49
+            },
+            {
+              "col": "K",
+              "field": "tbrg_calibration_mm",
+              "raw": "-0.003",
+              "class": "number",
+              "value": -0.003
+            }
+          ],
+          "calibration": [
+            {
+              "col": "L",
+              "point": "1",
+              "raw": "1",
+              "class": "number",
+              "value": 1
+            },
+            {
+              "col": "M",
+              "point": "2",
+              "raw": "1.947",
+              "class": "number",
+              "value": 1.947
+            },
+            {
+              "col": "N",
+              "point": "5",
+              "raw": "4.947",
+              "class": "number",
+              "value": 4.947
+            },
+            {
+              "col": "O",
+              "point": "10",
+              "raw": "9.897",
+              "class": "number",
+              "value": 9.897
+            }
+          ],
+          "remarks": "Replaced mace with RRDL-3 Analogue logger Gas 4000 - repl. 18000/500/110"
+        },
+        {
+          "ref": "qld-all-site-inspections:Closed stations:2:9",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Closed stations",
+          "banner_row": 2,
+          "row": 9,
+          "block_ref": "qld-all-site-inspections:Closed stations:2",
+          "from": "block",
+          "family": "DATA LOGGER",
+          "inspection_config": "mace",
+          "station_name": "BOONAH TM",
+          "cbm_no": "040858",
+          "inspected_on": "2005-11-11",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2005-11-11 00:00:00",
+          "readings": [
+            {
+              "col": "B",
+              "field": "logger_no",
+              "raw": "HS6045",
+              "class": "short_text"
+            },
+            {
+              "col": "C",
+              "field": "battery_standby_v",
+              "raw": "12.6",
+              "class": "number",
+              "value": 12.6
+            },
+            {
+              "col": "D",
+              "field": "battery_under_load_v",
+              "raw": "12.3",
+              "class": "number",
+              "value": 12.3
+            },
+            {
+              "col": "E",
+              "field": "consumption_sleep_ma",
+              "raw": "0.4",
+              "class": "number",
+              "value": 0.4
+            },
+            {
+              "col": "F",
+              "field": "consumption_operating_ma",
+              "raw": "102",
+              "class": "number",
+              "value": 102
+            },
+            {
+              "col": "H",
+              "field": "solar_output_v",
+              "raw": "18",
+              "class": "number",
+              "value": 18
+            },
+            {
+              "col": "I",
+              "field": "solar_charge_current_ma",
+              "raw": "64",
+              "class": "number",
+              "value": 64
+            },
+            {
+              "col": "J",
+              "field": "telephone_socket_v",
+              "raw": "50.3",
+              "class": "number",
+              "value": 50.3
+            },
+            {
+              "col": "K",
+              "field": "tbrg_calibration_mm",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            }
+          ],
+          "calibration": [
+            {
+              "col": "L",
+              "point": "1",
+              "raw": "1",
+              "class": "number",
+              "value": 1
+            },
+            {
+              "col": "M",
+              "point": "2",
+              "raw": "2",
+              "class": "number",
+              "value": 2
+            },
+            {
+              "col": "N",
+              "point": "5",
+              "raw": "5",
+              "class": "number",
+              "value": 5
+            },
+            {
+              "col": "O",
+              "point": "10",
+              "raw": "9.9",
+              "class": "number",
+              "value": 9.9
+            }
+          ],
+          "remarks": "Logger jammed on and drained batt. to 5v. - Reset logger and replaced batt."
+        }
+      ],
+      "workbook_cells": {
+        "1": {
+          "A": "Property owner:                                      Phone:",
+          "C": "Boonah Council"
+        },
+        "2": {
+          "A": "DATA LOGGER INSPECTION SUMMARY",
+          "L": "Station:",
+          "N": "BOONAH TM",
+          "Q": "CBM No.  040858"
+        },
+        "5": {
+          "A": "Inspect",
+          "B": "Mace",
+          "C": "Voltage",
+          "E": "(mA)",
+          "F": "(mA)",
+          "G": "(mA)",
+          "H": "(v)",
+          "I": "(mA)",
+          "J": "socket",
+          "K": "(metres)",
+          "P": "Remarks"
+        },
+        "6": {
+          "A": "Date",
+          "B": "No",
+          "C": "Stand",
+          "D": "Under",
+          "E": "Sleep",
+          "F": "Operat",
+          "G": "Interr-",
+          "H": "Open",
+          "I": "Charge",
+          "J": "Voltage"
+        },
+        "7": {
+          "C": "-by",
+          "D": "Load",
+          "F": "-ing",
+          "G": "ogation",
+          "H": "circuit",
+          "J": "(v)",
+          "K": "0",
+          "L": "1",
+          "M": "2",
+          "N": "5",
+          "O": "10"
+        },
+        "8": {
+          "A": "2005-05-06 00:00:00",
+          "B": "HS6045",
+          "C": "12.9",
+          "D": "12.5",
+          "E": "0.6",
+          "F": "84",
+          "G": "124",
+          "H": "18.6",
+          "I": "49",
+          "K": "-0.003",
+          "L": "1",
+          "M": "1.947",
+          "N": "4.947",
+          "O": "9.897",
+          "P": "Replaced mace with RRDL-3 Analogue logger Gas 4000 - repl. 18000/500/110"
+        },
+        "9": {
+          "A": "2005-11-11 00:00:00",
+          "B": "HS6045",
+          "C": "12.6",
+          "D": "12.3",
+          "E": "0.4",
+          "F": "102",
+          "H": "18",
+          "I": "64",
+          "J": "50.3",
+          "K": "0",
+          "L": "1",
+          "M": "2",
+          "N": "5",
+          "O": "9.9",
+          "P": "Logger jammed on and drained batt. to 5v. - Reset logger and replaced batt."
+        }
+      }
+    },
+    {
+      "why": "The short calibration set, with a qualified reading (`>21`) and a status word (`U/S`) that both have to survive as themselves (§5)",
+      "block": {
+        "ref": "qld-all-site-inspections:Ipswich:2",
+        "source": "qld-all-site-inspections",
+        "origin": "import",
+        "sheet": "Ipswich",
+        "banner_row": 2,
+        "end_row": 33,
+        "block_index": 0,
+        "family": "ALERT",
+        "inspection_config": "alert",
+        "station_name": "Three Mile Bridge Alert",
+        "cbm_no": "040838",
+        "station_keys": [
+          "c:40838",
+          "n:threemilebridgealert"
+        ],
+        "property_owner": "",
+        "owner_row": null,
+        "ids": {
+          "river_alert_id": "2158",
+          "battery_alert_id": "2159",
+          "orifice_level_raw": "10.177 AHD as of 7/12/18"
+        },
+        "ids_raw": "ID's | Rv = 2158 | Batt = 2159 | Orifice level = 10.177 AHD as of 7/12/18",
+        "notes": {
+          "absorbed_value_in_header": "River Calibration (metres): 0"
+        },
+        "header_rows": [
+          5,
+          6,
+          7
+        ],
+        "date_column": "A",
+        "inherited_header": false,
+        "columns": {
+          "A": {
+            "label": "Inspect Date",
+            "field": "inspect_date"
+          },
+          "B": {
+            "label": "Canister No",
+            "field": "canister_no"
+          },
+          "C": {
+            "label": "Battery Voltage Stand -by",
+            "field": "battery_standby_v"
+          },
+          "D": {
+            "label": "Battery Under Load",
+            "field": "battery_under_load_v"
+          },
+          "E": {
+            "label": "Consu- mption Stand -by",
+            "field": "consumption_standby_ma"
+          },
+          "F": {
+            "label": "Solar (mA) Charge",
+            "field": "solar_charge_current_ma"
+          },
+          "G": {
+            "label": "Solar (v) Regul- ator",
+            "field": "solar_regulated_v"
+          },
+          "H": {
+            "label": "Fade Margin (db)",
+            "field": "fade_margin_db"
+          },
+          "I": {
+            "label": "Transmitter Power (w) Fwd",
+            "field": "tx_forward_w"
+          },
+          "J": {
+            "label": "Transmitter Ref",
+            "field": "tx_reflected_w"
+          },
+          "K": {
+            "label": "SWR",
+            "field": "swr"
+          },
+          "L": {
+            "label": "Gas kpa",
+            "field": "gas_pressure_kpa"
+          },
+          "M": {
+            "label": "River Calibration (metres)",
+            "field": "tbrg_calibration_mm"
+          },
+          "N": {
+            "label": "5",
+            "field": "river_calibration_point",
+            "point": "5"
+          },
+          "O": {
+            "label": "10",
+            "field": "river_calibration_point",
+            "point": "10"
+          },
+          "P": {
+            "label": "15",
+            "field": "river_calibration_point",
+            "point": "15"
+          },
+          "Q": {
+            "label": "20",
+            "field": "river_calibration_point",
+            "point": "20"
+          },
+          "R": {
+            "label": "Remarks",
+            "field": "remarks"
+          }
+        },
+        "calibration_points": [
+          "5",
+          "10",
+          "15",
+          "20"
+        ],
+        "calibration_columns": [
+          "N",
+          "O",
+          "P",
+          "Q"
+        ],
+        "annotations": [],
+        "inspection_rows": 20
+      },
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:Ipswich:2:20",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Ipswich",
+          "banner_row": 2,
+          "row": 20,
+          "block_ref": "qld-all-site-inspections:Ipswich:2",
+          "from": "block",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "Three Mile Bridge Alert",
+          "cbm_no": "040838",
+          "inspected_on": "2008-03-12",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2008-03-12 00:00:00",
+          "readings": [
+            {
+              "col": "C",
+              "field": "battery_standby_v",
+              "raw": "11.3",
+              "class": "number",
+              "value": 11.3
+            },
+            {
+              "col": "D",
+              "field": "battery_under_load_v",
+              "raw": "10.8",
+              "class": "number",
+              "value": 10.8
+            },
+            {
+              "col": "E",
+              "field": "consumption_standby_ma",
+              "raw": "0.8",
+              "class": "number",
+              "value": 0.8
+            },
+            {
+              "col": "F",
+              "field": "solar_charge_current_ma",
+              "raw": "15.7",
+              "class": "number",
+              "value": 15.7
+            },
+            {
+              "col": "G",
+              "field": "solar_regulated_v",
+              "raw": "13.3",
+              "class": "number",
+              "value": 13.3
+            },
+            {
+              "col": "I",
+              "field": "tx_forward_w",
+              "raw": "5",
+              "class": "number",
+              "value": 5
+            },
+            {
+              "col": "J",
+              "field": "tx_reflected_w",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "M",
+              "field": "tbrg_calibration_mm",
+              "raw": "U/S",
+              "class": "status",
+              "status": "u/s"
+            }
+          ],
+          "remarks": "WL sensor U/S, analogue plug removed at canister; battery removed"
+        },
+        {
+          "ref": "qld-all-site-inspections:Ipswich:2:23",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Ipswich",
+          "banner_row": 2,
+          "row": 23,
+          "block_ref": "qld-all-site-inspections:Ipswich:2",
+          "from": "block",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "Three Mile Bridge Alert",
+          "cbm_no": "040838",
+          "inspected_on": "2012-04-23",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2012-04-23 00:00:00",
+          "readings": [
+            {
+              "col": "C",
+              "field": "battery_standby_v",
+              "raw": "13.3",
+              "class": "number",
+              "value": 13.3
+            },
+            {
+              "col": "D",
+              "field": "battery_under_load_v",
+              "raw": "13.1",
+              "class": "number",
+              "value": 13.1
+            },
+            {
+              "col": "E",
+              "field": "consumption_standby_ma",
+              "raw": "0.5",
+              "class": "number",
+              "value": 0.5
+            },
+            {
+              "col": "F",
+              "field": "solar_charge_current_ma",
+              "raw": "5.4",
+              "class": "number",
+              "value": 5.4
+            },
+            {
+              "col": "G",
+              "field": "solar_regulated_v",
+              "raw": "13.7",
+              "class": "number",
+              "value": 13.7
+            },
+            {
+              "col": "H",
+              "field": "fade_margin_db",
+              "raw": ">21",
+              "class": "qualified",
+              "operator": ">",
+              "bound": 21
+            },
+            {
+              "col": "I",
+              "field": "tx_forward_w",
+              "raw": "19",
+              "class": "number",
+              "value": 19
+            },
+            {
+              "col": "J",
+              "field": "tx_reflected_w",
+              "raw": "0.5",
+              "class": "number",
+              "value": 0.5
+            }
+          ],
+          "remarks": "Unable to locate orifice - requested ICC to survey water level"
+        }
+      ],
+      "workbook_cells": {
+        "2": {
+          "A": "ALERT INSPECTION SUMMARY",
+          "J": "Station: Three Mile Bridge Alert",
+          "S": "CBM NO.    040838"
+        },
+        "5": {
+          "A": "Inspect",
+          "B": "Canister",
+          "C": "Voltage",
+          "E": "mption",
+          "F": "(mA)",
+          "G": "(v)",
+          "H": "Fade",
+          "I": "Power (w)",
+          "K": "SWR",
+          "L": "Gas",
+          "M": "(metres)"
+        },
+        "6": {
+          "A": "Date",
+          "B": "No",
+          "C": "Stand",
+          "D": "Under",
+          "E": "Stand",
+          "F": "Charge",
+          "G": "Regul-",
+          "H": "Margin",
+          "I": "Fwd",
+          "J": "Ref",
+          "L": "kpa",
+          "R": "Remarks"
+        },
+        "7": {
+          "C": "-by",
+          "D": "Load",
+          "E": "-by",
+          "G": "ator",
+          "H": "(db)",
+          "M": "0",
+          "N": "5",
+          "O": "10",
+          "P": "15",
+          "Q": "20"
+        },
+        "20": {
+          "A": "2008-03-12 00:00:00",
+          "C": "11.3",
+          "D": "10.8",
+          "E": "0.8",
+          "F": "15.7",
+          "G": "13.3",
+          "I": "5",
+          "J": "0",
+          "M": "U/S",
+          "R": "WL sensor U/S, analogue plug removed at canister; battery removed"
+        },
+        "23": {
+          "A": "2012-04-23 00:00:00",
+          "C": "13.3",
+          "D": "13.1",
+          "E": "0.5",
+          "F": "5.4",
+          "G": "13.7",
+          "H": ">21",
+          "I": "19",
+          "J": "0.5",
+          "R": "Unable to locate orifice - requested ICC to survey water level"
+        }
+      }
+    },
+    {
+      "why": "A block whose banner carries no CBM number at all — #125 resolves these by name (§2)",
+      "block": {
+        "ref": "qld-all-site-inspections:Border!:86",
+        "source": "qld-all-site-inspections",
+        "origin": "import",
+        "sheet": "Border!",
+        "banner_row": 86,
+        "end_row": 113,
+        "block_index": 3,
+        "family": "ALERT",
+        "inspection_config": "alert",
+        "station_name": "Coolmunda Dam TW",
+        "cbm_no": "",
+        "station_keys": [
+          "n:coolmundadamtw"
+        ],
+        "property_owner": "",
+        "owner_row": null,
+        "ids": {
+          "river_alert_id": "4517",
+          "battery_alert_id": "4518"
+        },
+        "ids_raw": "ID's | Rv = 4517 | Batt = 4518 | Orifice RL = 298.080m AHD (-1.085m GH)",
+        "notes": {
+          "stray_point_row_above_header": "row 88"
+        },
+        "header_rows": [
+          89
+        ],
+        "date_column": "B",
+        "inherited_header": false,
+        "columns": {
+          "A": {
+            "label": "ALERT Station Number",
+            "field": "station_number"
+          },
+          "B": {
+            "label": "Inspect Date",
+            "field": "inspect_date"
+          },
+          "C": {
+            "label": "Canister No",
+            "field": "canister_no"
+          },
+          "D": {
+            "label": "Battery Voltage Stand -by",
+            "field": "battery_standby_v"
+          },
+          "E": {
+            "label": "Battery Voltage Under -load",
+            "field": "battery_under_load_v"
+          },
+          "F": {
+            "label": "Consumption Stand-by (mA)",
+            "field": "consumption_standby_ma"
+          },
+          "G": {
+            "label": "Consumption Transmit (mA)",
+            "field": "consumption_transmit_ma"
+          },
+          "H": {
+            "label": "Solar Output Voltage (v)",
+            "field": "solar_output_v"
+          },
+          "I": {
+            "label": "Solar Short Circuit (mA)",
+            "field": "solar_short_circuit_ma"
+          },
+          "J": {
+            "label": "Solar Regulated Voltage (v)",
+            "field": "solar_regulated_v"
+          },
+          "K": {
+            "label": "Solar Current Charge (mA)",
+            "field": "solar_charge_current_ma"
+          },
+          "L": {
+            "label": "Transmitter Fwd",
+            "field": "tx_forward_w"
+          },
+          "M": {
+            "label": "Transmitter Ref",
+            "field": "tx_reflected_w"
+          },
+          "N": {
+            "label": "SWR",
+            "field": "swr"
+          },
+          "O": {
+            "label": "Fade Margin (db)",
+            "field": "fade_margin_db"
+          },
+          "P": {
+            "label": "TBRG Calib",
+            "field": "tbrg_calibration_mm"
+          },
+          "Q": {
+            "label": "0",
+            "field": "river_calibration_point",
+            "point": "0"
+          },
+          "R": {
+            "label": "1",
+            "field": "river_calibration_point",
+            "point": "1"
+          },
+          "S": {
+            "label": "2",
+            "field": "river_calibration_point",
+            "point": "2"
+          },
+          "T": {
+            "label": "5",
+            "field": "river_calibration_point",
+            "point": "5"
+          },
+          "U": {
+            "label": "8",
+            "field": "river_calibration_point",
+            "point": "8"
+          },
+          "V": {
+            "label": "10",
+            "field": "river_calibration_point",
+            "point": "10"
+          },
+          "W": {
+            "label": "15",
+            "field": "river_calibration_point",
+            "point": "15"
+          },
+          "X": {
+            "label": "20",
+            "field": "river_calibration_point",
+            "point": "20"
+          },
+          "Y": {
+            "label": "30",
+            "field": "river_calibration_point",
+            "point": "30"
+          },
+          "Z": {
+            "label": "Remarks",
+            "field": "remarks"
+          }
+        },
+        "calibration_points": [
+          "0",
+          "1",
+          "2",
+          "5",
+          "8",
+          "10",
+          "15",
+          "20",
+          "30"
+        ],
+        "calibration_columns": [
+          "Q",
+          "R",
+          "S",
+          "T",
+          "U",
+          "V",
+          "W",
+          "X",
+          "Y"
+        ],
+        "annotations": [],
+        "inspection_rows": 10
+      },
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:Border!:86:90",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Border!",
+          "banner_row": 86,
+          "row": 90,
+          "block_ref": "qld-all-site-inspections:Border!:86",
+          "from": "block",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "Coolmunda Dam TW",
+          "cbm_no": "",
+          "inspected_on": "2013-07-08",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2013-07-08 00:00:00",
+          "readings": [
+            {
+              "col": "C",
+              "field": "canister_no",
+              "raw": "03132432208",
+              "class": "numeric_text",
+              "value": 3132432208
+            },
+            {
+              "col": "D",
+              "field": "battery_standby_v",
+              "raw": "12.4",
+              "class": "number",
+              "value": 12.4
+            },
+            {
+              "col": "E",
+              "field": "battery_under_load_v",
+              "raw": "12.2",
+              "class": "number",
+              "value": 12.2
+            },
+            {
+              "col": "F",
+              "field": "consumption_standby_ma",
+              "raw": "0.5",
+              "class": "number",
+              "value": 0.5
+            },
+            {
+              "col": "J",
+              "field": "solar_regulated_v",
+              "raw": "15.3",
+              "class": "number",
+              "value": 15.3
+            },
+            {
+              "col": "K",
+              "field": "solar_charge_current_ma",
+              "raw": "4",
+              "class": "number",
+              "value": 4
+            },
+            {
+              "col": "L",
+              "field": "tx_forward_w",
+              "raw": "5",
+              "class": "number",
+              "value": 5
+            },
+            {
+              "col": "M",
+              "field": "tx_reflected_w",
+              "raw": "0.2",
+              "class": "number",
+              "value": 0.2
+            },
+            {
+              "col": "O",
+              "field": "fade_margin_db",
+              "raw": "15",
+              "class": "number",
+              "value": 15
+            }
+          ],
+          "calibration": [
+            {
+              "col": "Q",
+              "point": "0",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "R",
+              "point": "1",
+              "raw": "20",
+              "class": "number",
+              "value": 20
+            },
+            {
+              "col": "S",
+              "point": "2",
+              "raw": "40",
+              "class": "number",
+              "value": 40
+            },
+            {
+              "col": "T",
+              "point": "5",
+              "raw": "100",
+              "class": "number",
+              "value": 100
+            },
+            {
+              "col": "V",
+              "point": "10",
+              "raw": "200",
+              "class": "number",
+              "value": 200
+            },
+            {
+              "col": "W",
+              "point": "15",
+              "raw": "300",
+              "class": "number",
+              "value": 300
+            }
+          ],
+          "remarks": "Station installed & commissioned. TM remains as back up. Gas 11000-repl. 17800/500/38"
+        },
+        {
+          "ref": "qld-all-site-inspections:Border!:86:91",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Border!",
+          "banner_row": 86,
+          "row": 91,
+          "block_ref": "qld-all-site-inspections:Border!:86",
+          "from": "block",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "Coolmunda Dam TW",
+          "cbm_no": "",
+          "inspected_on": "2014-06-25",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2014-06-25 00:00:00",
+          "readings": [
+            {
+              "col": "D",
+              "field": "battery_standby_v",
+              "raw": "13.5",
+              "class": "number",
+              "value": 13.5
+            },
+            {
+              "col": "E",
+              "field": "battery_under_load_v",
+              "raw": "13.1",
+              "class": "number",
+              "value": 13.1
+            },
+            {
+              "col": "F",
+              "field": "consumption_standby_ma",
+              "raw": "0.5",
+              "class": "number",
+              "value": 0.5
+            },
+            {
+              "col": "J",
+              "field": "solar_regulated_v",
+              "raw": "15.9",
+              "class": "number",
+              "value": 15.9
+            },
+            {
+              "col": "K",
+              "field": "solar_charge_current_ma",
+              "raw": "86",
+              "class": "number",
+              "value": 86
+            },
+            {
+              "col": "L",
+              "field": "tx_forward_w",
+              "raw": "3",
+              "class": "number",
+              "value": 3
+            },
+            {
+              "col": "M",
+              "field": "tx_reflected_w",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "O",
+              "field": "fade_margin_db",
+              "raw": "21",
+              "class": "number",
+              "value": 21
+            }
+          ],
+          "calibration": [
+            {
+              "col": "Q",
+              "point": "0",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "R",
+              "point": "1",
+              "raw": "20",
+              "class": "number",
+              "value": 20
+            },
+            {
+              "col": "S",
+              "point": "2",
+              "raw": "40",
+              "class": "number",
+              "value": 40
+            },
+            {
+              "col": "T",
+              "point": "5",
+              "raw": "100",
+              "class": "number",
+              "value": 100
+            },
+            {
+              "col": "V",
+              "point": "10",
+              "raw": "200",
+              "class": "number",
+              "value": 200
+            },
+            {
+              "col": "W",
+              "point": "15",
+              "raw": "300",
+              "class": "number",
+              "value": 300
+            }
+          ],
+          "remarks": "Recalibrated analogue board"
+        }
+      ],
+      "workbook_cells": {
+        "86": {
+          "B": "ALERT INSPECTION SUMMARY",
+          "K": "Station:",
+          "M": "Coolmunda Dam TW",
+          "X": "CBM NO:"
+        },
+        "89": {
+          "A": "Station \nNumber",
+          "B": "Inspect \nDate",
+          "C": "Canister \nNo",
+          "D": "Stand\n-by",
+          "E": "Under\n-load",
+          "F": "Stand-by (mA)",
+          "G": "Transmit (mA)",
+          "H": "Output Voltage \n(v)",
+          "I": "Short Circuit \n(mA)",
+          "J": "Regulated Voltage \n(v)",
+          "K": "Current Charge \n(mA)",
+          "L": "Fwd",
+          "M": "Ref",
+          "N": "SWR",
+          "O": "Fade \nMargin \n(db)",
+          "P": "TBRG \nCalib",
+          "Q": "0",
+          "R": "1",
+          "S": "2",
+          "T": "5",
+          "U": "8",
+          "V": "10",
+          "W": "15",
+          "X": "20",
+          "Y": "30",
+          "Z": "Remarks"
+        },
+        "90": {
+          "B": "2013-07-08 00:00:00",
+          "C": "03132432208",
+          "D": "12.4",
+          "E": "12.2",
+          "F": "0.5",
+          "J": "15.3",
+          "K": "4",
+          "L": "5",
+          "M": "0.2",
+          "O": "15",
+          "Q": "0",
+          "R": "20",
+          "S": "40",
+          "T": "100",
+          "V": "200",
+          "W": "300",
+          "Z": "Station installed & commissioned. TM remains as back up. Gas 11000-repl. 17800/500/38"
+        },
+        "91": {
+          "B": "2014-06-25 00:00:00",
+          "D": "13.5",
+          "E": "13.1",
+          "F": "0.5",
+          "J": "15.9",
+          "K": "86",
+          "L": "3",
+          "M": "0",
+          "O": "21",
+          "Q": "0",
+          "R": "20",
+          "S": "40",
+          "T": "100",
+          "V": "200",
+          "W": "300",
+          "Z": "Recalibrated analogue board"
+        }
+      }
+    },
+    {
+      "why": "`TM Only` — the flat base-station tab, one row per inspection and the station named in a column",
+      "block": null,
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:TM Only:-:20",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "TM Only",
+          "banner_row": null,
+          "row": 20,
+          "block_ref": null,
+          "from": "tm_only_tab",
+          "family": "TM",
+          "inspection_config": "datalogger_old",
+          "station_name": "WESTWOOD TM",
+          "cbm_no": "39349",
+          "inspected_on": "2023-09-20",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2023-09-20 00:00:00",
+          "station_number_raw": "39349",
+          "readings": [
+            {
+              "col": "D",
+              "field": "logger_no",
+              "raw": "26279",
+              "class": "number",
+              "value": 26279
+            },
+            {
+              "col": "E",
+              "field": "battery_standby_v",
+              "raw": "13.65",
+              "class": "number",
+              "value": 13.65
+            },
+            {
+              "col": "F",
+              "field": "battery_under_load_v",
+              "raw": "13.4",
+              "class": "number",
+              "value": 13.4
+            },
+            {
+              "col": "N",
+              "field": "rssi_dbm",
+              "raw": "-91",
+              "class": "number",
+              "value": -91
+            },
+            {
+              "col": "O",
+              "field": "lithium_battery_v",
+              "raw": "3.38",
+              "class": "number",
+              "value": 3.38
+            },
+            {
+              "col": "Q",
+              "field": "tbrg_calibration_mm",
+              "raw": "21.2",
+              "class": "number",
+              "value": 21.2
+            }
+          ],
+          "remarks": "Due for upgrade from 3G comms to Sattelite"
+        }
+      ],
+      "workbook_cells": {
+        "20": {
+          "A": "WESTWOOD TM",
+          "B": "39349",
+          "C": "2023-09-20 00:00:00",
+          "D": "26279",
+          "E": "13.65",
+          "F": "13.4",
+          "N": "-91",
+          "O": "3.38",
+          "Q": "21.2",
+          "AA": "Due for upgrade from 3G comms to Sattelite"
+        }
+      }
+    },
+    {
+      "why": "`ALERTS` — one of the seven rows that are on no basin tab, and the one with `#N/A` where its station number should be (§7)",
+      "block": null,
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:ALERTS:-:87",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "ALERTS",
+          "banner_row": null,
+          "row": 87,
+          "block_ref": null,
+          "from": "alerts_tab",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "#N/A",
+          "cbm_no": "33286.2",
+          "inspected_on": "2023-08-23",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2023-08-23 00:00:00",
+          "station_number_raw": "33286.2",
+          "readings": [
+            {
+              "col": "E",
+              "field": "battery_standby_v",
+              "raw": "13",
+              "class": "number",
+              "value": 13
+            },
+            {
+              "col": "F",
+              "field": "battery_under_load_v",
+              "raw": "12.7",
+              "class": "number",
+              "value": 12.7
+            },
+            {
+              "col": "G",
+              "field": "consumption_standby_ma",
+              "raw": "<1ma",
+              "class": "qualified",
+              "operator": "<",
+              "bound": 1,
+              "unit": "ma"
+            },
+            {
+              "col": "I",
+              "field": "solar_output_v",
+              "raw": "19.5",
+              "class": "number",
+              "value": 19.5
+            },
+            {
+              "col": "J",
+              "field": "solar_short_circuit_ma",
+              "raw": "32",
+              "class": "number",
+              "value": 32
+            },
+            {
+              "col": "K",
+              "field": "solar_regulated_v",
+              "raw": "15.8",
+              "class": "number",
+              "value": 15.8
+            },
+            {
+              "col": "L",
+              "field": "solar_charge_current_ma",
+              "raw": "20",
+              "class": "number",
+              "value": 20
+            },
+            {
+              "col": "M",
+              "field": "tx_forward_w",
+              "raw": "24.7",
+              "class": "number",
+              "value": 24.7
+            },
+            {
+              "col": "N",
+              "field": "tx_reflected_w",
+              "raw": "0.476",
+              "class": "number",
+              "value": 0.476
+            },
+            {
+              "col": "O",
+              "field": "swr",
+              "raw": "1.32",
+              "class": "number",
+              "value": 1.32
+            },
+            {
+              "col": "P",
+              "field": "fade_margin_db",
+              "raw": "24",
+              "class": "number",
+              "value": 24
+            }
+          ],
+          "calibration": [
+            {
+              "col": "R",
+              "point": "0",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "S",
+              "point": "1",
+              "raw": "20",
+              "class": "number",
+              "value": 20
+            },
+            {
+              "col": "T",
+              "point": "2",
+              "raw": "40",
+              "class": "number",
+              "value": 40
+            },
+            {
+              "col": "U",
+              "point": "5",
+              "raw": "101",
+              "class": "number",
+              "value": 101
+            },
+            {
+              "col": "W",
+              "point": "10",
+              "raw": "201",
+              "class": "number",
+              "value": 201
+            },
+            {
+              "col": "X",
+              "point": "15",
+              "raw": "301",
+              "class": "number",
+              "value": 301
+            },
+            {
+              "col": "Y",
+              "point": "20",
+              "raw": "401",
+              "class": "number",
+              "value": 401
+            },
+            {
+              "col": "Z",
+              "point": "30",
+              "raw": "600",
+              "class": "number",
+              "value": 600
+            }
+          ],
+          "remarks": "Gas bottle empty on arrival. 30mt out by 3 counts - recal sensor.",
+          "flags": [
+            "excel_error_in_station_name"
+          ]
+        }
+      ],
+      "workbook_cells": {
+        "87": {
+          "A": "#N/A",
+          "B": "33286.2",
+          "C": "2023-08-23 00:00:00",
+          "E": "13",
+          "F": "12.7",
+          "G": "<1ma",
+          "I": "19.5",
+          "J": "32",
+          "K": "15.8",
+          "L": "20",
+          "M": "24.7",
+          "N": "0.476",
+          "O": "1.32",
+          "P": "24",
+          "R": "0",
+          "S": "20",
+          "T": "40",
+          "U": "101",
+          "W": "201",
+          "X": "301",
+          "Y": "401",
+          "Z": "600",
+          "AA": "Gas bottle empty on arrival. 30mt out by 3 counts - recal sensor."
+        }
+      }
+    },
+    {
+      "why": "A cell holding two readings (`7500/18200`), kept raw and flagged (§5)",
+      "block": {
+        "ref": "qld-all-site-inspections:Ipswich:34",
+        "source": "qld-all-site-inspections",
+        "origin": "import",
+        "sheet": "Ipswich",
+        "banner_row": 34,
+        "end_row": 69,
+        "block_index": 1,
+        "family": "ALERT",
+        "inspection_config": "alert",
+        "station_name": "One Mile Bridge Alert",
+        "cbm_no": "040836",
+        "station_keys": [
+          "c:40836",
+          "n:onemilebridgealert"
+        ],
+        "property_owner": "",
+        "owner_row": null,
+        "ids": {
+          "rain_alert_id": "2160",
+          "river_alert_id": "2163",
+          "battery_alert_id": "2161"
+        },
+        "ids_raw": "ID's | Rn=2160 Batt=2161 Rv = 2163",
+        "notes": {
+          "absorbed_value_in_header": "River Calibration (metres): 0"
+        },
+        "header_rows": [
+          37,
+          38,
+          39
+        ],
+        "date_column": "A",
+        "inherited_header": false,
+        "columns": {
+          "A": {
+            "label": "Inspect Date",
+            "field": "inspect_date"
+          },
+          "B": {
+            "label": "Canister No",
+            "field": "canister_no"
+          },
+          "C": {
+            "label": "Battery Voltage Stand -by",
+            "field": "battery_standby_v"
+          },
+          "D": {
+            "label": "Battery Under Load",
+            "field": "battery_under_load_v"
+          },
+          "E": {
+            "label": "Consu- mption Stand -by",
+            "field": "consumption_standby_ma"
+          },
+          "F": {
+            "label": "Solar (mA) Charge",
+            "field": "solar_charge_current_ma"
+          },
+          "G": {
+            "label": "Solar (v) Regul- ator",
+            "field": "solar_regulated_v"
+          },
+          "H": {
+            "label": "Fade Margin (db)",
+            "field": "fade_margin_db"
+          },
+          "I": {
+            "label": "Transmitter Power (w) Fwd",
+            "field": "tx_forward_w"
+          },
+          "J": {
+            "label": "Transmitter Ref",
+            "field": "tx_reflected_w"
+          },
+          "K": {
+            "label": "TBRG",
+            "field": "tbrg_calibration_mm"
+          },
+          "L": {
+            "label": "Gas (kpa)",
+            "field": "gas_pressure_kpa"
+          },
+          "M": {
+            "label": "River Calibration (metres)",
+            "field": "tbrg_calibration_mm"
+          },
+          "N": {
+            "label": "2",
+            "field": "river_calibration_point",
+            "point": "2"
+          },
+          "O": {
+            "label": "5",
+            "field": "river_calibration_point",
+            "point": "5"
+          },
+          "P": {
+            "label": "10",
+            "field": "river_calibration_point",
+            "point": "10"
+          },
+          "Q": {
+            "label": "15",
+            "field": "river_calibration_point",
+            "point": "15"
+          },
+          "R": {
+            "label": "Remarks",
+            "field": "remarks"
+          }
+        },
+        "calibration_points": [
+          "2",
+          "5",
+          "10",
+          "15"
+        ],
+        "calibration_columns": [
+          "N",
+          "O",
+          "P",
+          "Q"
+        ],
+        "annotations": [],
+        "inspection_rows": 21
+      },
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:Ipswich:34:55",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Ipswich",
+          "banner_row": 34,
+          "row": 55,
+          "block_ref": "qld-all-site-inspections:Ipswich:34",
+          "from": "block",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "One Mile Bridge Alert",
+          "cbm_no": "040836",
+          "inspected_on": "2009-01-21",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2009-01-21 00:00:00",
+          "readings": [
+            {
+              "col": "C",
+              "field": "battery_standby_v",
+              "raw": "13.7",
+              "class": "number",
+              "value": 13.7
+            },
+            {
+              "col": "D",
+              "field": "battery_under_load_v",
+              "raw": "13.35",
+              "class": "number",
+              "value": 13.35
+            },
+            {
+              "col": "E",
+              "field": "consumption_standby_ma",
+              "raw": "0.6",
+              "class": "number",
+              "value": 0.6
+            },
+            {
+              "col": "F",
+              "field": "solar_charge_current_ma",
+              "raw": "340",
+              "class": "number",
+              "value": 340
+            },
+            {
+              "col": "G",
+              "field": "solar_regulated_v",
+              "raw": "16.75",
+              "class": "number",
+              "value": 16.75
+            },
+            {
+              "col": "H",
+              "field": "fade_margin_db",
+              "raw": "18",
+              "class": "number",
+              "value": 18
+            },
+            {
+              "col": "I",
+              "field": "tx_forward_w",
+              "raw": "4.9",
+              "class": "number",
+              "value": 4.9
+            },
+            {
+              "col": "J",
+              "field": "tx_reflected_w",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "K",
+              "field": "tbrg_calibration_mm",
+              "raw": "10.6",
+              "class": "number",
+              "value": 10.6
+            },
+            {
+              "col": "L",
+              "field": "gas_pressure_kpa",
+              "raw": "7500/18200",
+              "class": "range",
+              "flag": "two_readings_in_one_cell"
+            },
+            {
+              "col": "M",
+              "field": "tbrg_calibration_mm",
+              "raw": "2042",
+              "class": "number",
+              "value": 2042
+            }
+          ],
+          "calibration": [
+            {
+              "col": "N",
+              "point": "2",
+              "raw": "35",
+              "class": "number",
+              "value": 35
+            },
+            {
+              "col": "O",
+              "point": "5",
+              "raw": "95",
+              "class": "number",
+              "value": 95
+            },
+            {
+              "col": "P",
+              "point": "10",
+              "raw": "196",
+              "class": "number",
+              "value": 196
+            },
+            {
+              "col": "Q",
+              "point": "15",
+              "raw": "296",
+              "class": "number",
+              "value": 296
+            }
+          ],
+          "remarks": "Adjusted TBRG buckets."
+        }
+      ],
+      "workbook_cells": {
+        "34": {
+          "A": "ALERT INSPECTION SUMMARY",
+          "J": "Station: One Mile Bridge Alert",
+          "S": "CBM NO.    040836"
+        },
+        "37": {
+          "A": "Inspect",
+          "B": "Canister",
+          "C": "Voltage",
+          "E": "mption",
+          "F": "(mA)",
+          "G": "(v)",
+          "H": "Fade",
+          "I": "Power (w)",
+          "K": "TBRG",
+          "L": "(kpa)",
+          "M": "(metres)"
+        },
+        "38": {
+          "A": "Date",
+          "B": "No",
+          "C": "Stand",
+          "D": "Under",
+          "E": "Stand",
+          "F": "Charge",
+          "G": "Regul-",
+          "H": "Margin",
+          "I": "Fwd",
+          "J": "Ref",
+          "R": "Remarks"
+        },
+        "39": {
+          "C": "-by",
+          "D": "Load",
+          "E": "-by",
+          "G": "ator",
+          "H": "(db)",
+          "M": "0",
+          "N": "2",
+          "O": "5",
+          "P": "10",
+          "Q": "15"
+        },
+        "55": {
+          "A": "2009-01-21 00:00:00",
+          "C": "13.7",
+          "D": "13.35",
+          "E": "0.6",
+          "F": "340",
+          "G": "16.75",
+          "H": "18",
+          "I": "4.9",
+          "J": "0",
+          "K": "10.6",
+          "L": "7500/18200",
+          "M": "2042",
+          "N": "35",
+          "O": "95",
+          "P": "196",
+          "Q": "296",
+          "R": "Adjusted TBRG buckets."
+        }
+      }
+    },
+    {
+      "why": "A reading with its unit in the cell (`1.3A`)",
+      "block": {
+        "ref": "qld-all-site-inspections:Noosa:31",
+        "source": "qld-all-site-inspections",
+        "origin": "import",
+        "sheet": "Noosa",
+        "banner_row": 31,
+        "end_row": 58,
+        "block_index": 1,
+        "family": "ALERT",
+        "inspection_config": "alert",
+        "station_name": "Tewantin ALERT",
+        "cbm_no": "540310",
+        "station_keys": [
+          "c:540310",
+          "n:tewantinalert"
+        ],
+        "property_owner": "",
+        "owner_row": null,
+        "ids": {
+          "rain_alert_id": "6908",
+          "river_alert_id": "6909",
+          "battery_alert_id": "6910",
+          "orifice_level_raw": "- 0.930m GH"
+        },
+        "ids_raw": "ID's | Rn = 6908 | Rv = 6909 | Batt = 6910 | Orifice level = - 0.930m GH",
+        "notes": {
+          "absorbed_value_in_header": "River Calibration (metres): 0"
+        },
+        "header_rows": [
+          34,
+          35,
+          36
+        ],
+        "date_column": "A",
+        "inherited_header": false,
+        "columns": {
+          "A": {
+            "label": "Inspect Date",
+            "field": "inspect_date"
+          },
+          "B": {
+            "label": "Canister No",
+            "field": "canister_no"
+          },
+          "C": {
+            "label": "Battery Voltage Stand -by",
+            "field": "battery_standby_v"
+          },
+          "D": {
+            "label": "Battery Under Load",
+            "field": "battery_under_load_v"
+          },
+          "E": {
+            "label": "Consu- mption Stand -by",
+            "field": "consumption_standby_ma"
+          },
+          "F": {
+            "label": "Solar (mA) Charge",
+            "field": "solar_charge_current_ma"
+          },
+          "G": {
+            "label": "Solar (v) Regul- ator",
+            "field": "solar_regulated_v"
+          },
+          "H": {
+            "label": "Fade Margin (db)",
+            "field": "fade_margin_db"
+          },
+          "I": {
+            "label": "Transmitter Power (w) Fwd",
+            "field": "tx_forward_w"
+          },
+          "J": {
+            "label": "Transmitter Ref",
+            "field": "tx_reflected_w"
+          },
+          "K": {
+            "label": "SWR",
+            "field": "swr"
+          },
+          "L": {
+            "label": "Consu- mption Trans mit",
+            "field": "consumption_transmit_ma"
+          },
+          "M": {
+            "label": "TBRG Calb (mm)",
+            "field": "tbrg_calibration_mm"
+          },
+          "N": {
+            "label": "River Calibration (metres)",
+            "field": "tbrg_calibration_mm"
+          },
+          "O": {
+            "label": "1",
+            "field": "river_calibration_point",
+            "point": "1"
+          },
+          "P": {
+            "label": "2",
+            "field": "river_calibration_point",
+            "point": "2"
+          },
+          "Q": {
+            "label": "5",
+            "field": "river_calibration_point",
+            "point": "5"
+          },
+          "R": {
+            "label": "10",
+            "field": "river_calibration_point",
+            "point": "10"
+          },
+          "S": {
+            "label": "Remarks",
+            "field": "remarks"
+          }
+        },
+        "calibration_points": [
+          "1",
+          "2",
+          "5",
+          "10"
+        ],
+        "calibration_columns": [
+          "O",
+          "P",
+          "Q",
+          "R"
+        ],
+        "annotations": [],
+        "inspection_rows": 20
+      },
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:Noosa:31:52",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Noosa",
+          "banner_row": 31,
+          "row": 52,
+          "block_ref": "qld-all-site-inspections:Noosa:31",
+          "from": "block",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "Tewantin ALERT",
+          "cbm_no": "540310",
+          "inspected_on": "2016-01-06",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2016-01-06 00:00:00",
+          "readings": [
+            {
+              "col": "C",
+              "field": "battery_standby_v",
+              "raw": "12.9",
+              "class": "number",
+              "value": 12.9
+            },
+            {
+              "col": "D",
+              "field": "battery_under_load_v",
+              "raw": "12.7",
+              "class": "number",
+              "value": 12.7
+            },
+            {
+              "col": "E",
+              "field": "consumption_standby_ma",
+              "raw": "5.4",
+              "class": "number",
+              "value": 5.4
+            },
+            {
+              "col": "F",
+              "field": "solar_charge_current_ma",
+              "raw": "1.3A",
+              "class": "number_with_unit",
+              "value": 1.3,
+              "unit": "A"
+            },
+            {
+              "col": "G",
+              "field": "solar_regulated_v",
+              "raw": "16.6",
+              "class": "number",
+              "value": 16.6
+            },
+            {
+              "col": "I",
+              "field": "tx_forward_w",
+              "raw": "4.7",
+              "class": "number",
+              "value": 4.7
+            },
+            {
+              "col": "J",
+              "field": "tx_reflected_w",
+              "raw": "0.2",
+              "class": "number",
+              "value": 0.2
+            },
+            {
+              "col": "M",
+              "field": "tbrg_calibration_mm",
+              "raw": "10.4",
+              "class": "number",
+              "value": 10.4
+            },
+            {
+              "col": "N",
+              "field": "tbrg_calibration_mm",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            }
+          ],
+          "calibration": [
+            {
+              "col": "O",
+              "point": "1",
+              "raw": "20",
+              "class": "number",
+              "value": 20
+            },
+            {
+              "col": "P",
+              "point": "2",
+              "raw": "40",
+              "class": "number",
+              "value": 40
+            },
+            {
+              "col": "Q",
+              "point": "5",
+              "raw": "100",
+              "class": "number",
+              "value": 100
+            },
+            {
+              "col": "R",
+              "point": "10",
+              "raw": "200",
+              "class": "number",
+              "value": 200
+            }
+          ]
+        }
+      ],
+      "workbook_cells": {
+        "31": {
+          "A": "ALERT INSPECTION SUMMARY",
+          "J": "Station:",
+          "L": "Tewantin ALERT",
+          "T": "CBM NO.    540310"
+        },
+        "34": {
+          "A": "Inspect",
+          "B": "Canister",
+          "C": "Voltage",
+          "E": "mption",
+          "F": "(mA)",
+          "G": "(v)",
+          "H": "Fade",
+          "I": "Power (w)",
+          "K": "SWR",
+          "L": "mption",
+          "N": "(metres)"
+        },
+        "35": {
+          "A": "Date",
+          "B": "No",
+          "C": "Stand",
+          "D": "Under",
+          "E": "Stand",
+          "F": "Charge",
+          "G": "Regul-",
+          "H": "Margin",
+          "I": "Fwd",
+          "J": "Ref",
+          "L": "Trans",
+          "M": "Calb",
+          "S": "Remarks"
+        },
+        "36": {
+          "C": "-by",
+          "D": "Load",
+          "E": "-by",
+          "G": "ator",
+          "H": "(db)",
+          "L": "mit",
+          "M": "(mm)",
+          "N": "0",
+          "O": "1",
+          "P": "2",
+          "Q": "5",
+          "R": "10"
+        },
+        "52": {
+          "A": "2016-01-06 00:00:00",
+          "C": "12.9",
+          "D": "12.7",
+          "E": "5.4",
+          "F": "1.3A",
+          "G": "16.6",
+          "I": "4.7",
+          "J": "0.2",
+          "M": "10.4",
+          "N": "0",
+          "O": "20",
+          "P": "40",
+          "Q": "100",
+          "R": "200"
+        }
+      }
+    },
+    {
+      "why": "Prose in a column with no header at all — kept, with the column's position, because it is usually the most informative thing on the row",
+      "block": {
+        "ref": "qld-all-site-inspections:Ipswich:839",
+        "source": "qld-all-site-inspections",
+        "origin": "import",
+        "sheet": "Ipswich",
+        "banner_row": 839,
+        "end_row": 848,
+        "block_index": 26,
+        "family": "ALERT",
+        "inspection_config": "alert",
+        "station_name": "Marburg (Radar) Base Station",
+        "cbm_no": "40901",
+        "station_keys": [
+          "c:40901",
+          "n:marburgradarbasestation"
+        ],
+        "property_owner": "",
+        "owner_row": null,
+        "ids": {},
+        "ids_raw": "",
+        "notes": {
+          "group_row_note": "Power"
+        },
+        "header_rows": [
+          842,
+          843,
+          844
+        ],
+        "date_column": "A",
+        "inherited_header": false,
+        "columns": {
+          "A": {
+            "label": "Inspect Date",
+            "field": "inspect_date"
+          },
+          "B": {
+            "label": "Canister Type Used",
+            "field": "canister_type"
+          },
+          "C": {
+            "label": "Transmitter 151.425 MHz Fwd",
+            "field": "tx_forward_w"
+          },
+          "D": {
+            "label": "Transmitter Ref.",
+            "field": "tx_reflected_w"
+          },
+          "E": {
+            "label": "Supply V",
+            "field": "supply_v"
+          },
+          "F": {
+            "label": "Transmitter 151.500 MHz Fwd",
+            "field": "tx_forward_w"
+          },
+          "G": {
+            "label": "Transmitter Ref.",
+            "field": "tx_reflected_w"
+          },
+          "H": {
+            "label": "Supply V",
+            "field": "supply_v"
+          },
+          "I": {
+            "label": "Transmitter 151.525 MHz Fwd",
+            "field": "tx_forward_w"
+          },
+          "J": {
+            "label": "Transmitter Ref.",
+            "field": "tx_reflected_w"
+          },
+          "K": {
+            "label": "Supply V",
+            "field": "supply_v"
+          },
+          "L": {
+            "label": "Transmitter 151.950 MHz Fwd",
+            "field": "tx_forward_w"
+          },
+          "M": {
+            "label": "Transmitter Ref.",
+            "field": "tx_reflected_w"
+          },
+          "N": {
+            "label": "Supply V",
+            "field": "supply_v"
+          },
+          "O": {
+            "label": "Transmitter 152.250 MHz Fwd",
+            "field": "tx_forward_w"
+          },
+          "P": {
+            "label": "Transmitter Ref.",
+            "field": "tx_reflected_w"
+          },
+          "Q": {
+            "label": "Supply V",
+            "field": "supply_v"
+          },
+          "R": {
+            "label": "1",
+            "field": "river_calibration_point",
+            "point": "1"
+          },
+          "S": {
+            "label": "2",
+            "field": "river_calibration_point",
+            "point": "2"
+          },
+          "T": {
+            "label": "3",
+            "field": "river_calibration_point",
+            "point": "3"
+          }
+        },
+        "calibration_points": [
+          "1",
+          "2",
+          "3"
+        ],
+        "calibration_columns": [
+          "R",
+          "S",
+          "T"
+        ],
+        "annotations": [],
+        "inspection_rows": 4
+      },
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:Ipswich:839:845",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Ipswich",
+          "banner_row": 839,
+          "row": 845,
+          "block_ref": "qld-all-site-inspections:Ipswich:839",
+          "from": "block",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "Marburg (Radar) Base Station",
+          "cbm_no": "40901",
+          "inspected_on": "2019-01-08",
+          "date_precision": "day",
+          "date_kind": "datetime",
+          "date_raw": "2019-01-08 00:00:00",
+          "readings": [
+            {
+              "col": "B",
+              "field": "canister_type",
+              "raw": "V3, 5W",
+              "class": "short_text"
+            },
+            {
+              "col": "C",
+              "field": "tx_forward_w",
+              "raw": "5",
+              "class": "number",
+              "value": 5
+            },
+            {
+              "col": "D",
+              "field": "tx_reflected_w",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "F",
+              "field": "tx_forward_w",
+              "raw": "5",
+              "class": "number",
+              "value": 5
+            },
+            {
+              "col": "G",
+              "field": "tx_reflected_w",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "I",
+              "field": "tx_forward_w",
+              "raw": "5",
+              "class": "number",
+              "value": 5
+            },
+            {
+              "col": "J",
+              "field": "tx_reflected_w",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "L",
+              "field": "tx_forward_w",
+              "raw": "6",
+              "class": "number",
+              "value": 6
+            },
+            {
+              "col": "M",
+              "field": "tx_reflected_w",
+              "raw": "0.1",
+              "class": "number",
+              "value": 0.1
+            },
+            {
+              "col": "N",
+              "field": "supply_v",
+              "raw": "22.24",
+              "class": "number",
+              "value": 22.24
+            },
+            {
+              "col": "O",
+              "field": "tx_forward_w",
+              "raw": "5",
+              "class": "number",
+              "value": 5
+            },
+            {
+              "col": "P",
+              "field": "tx_reflected_w",
+              "raw": "0",
+              "class": "number",
+              "value": 0
+            },
+            {
+              "col": "U",
+              "field": null,
+              "raw": "Unable to get various voltages due to poor access in rack",
+              "class": "prose",
+              "flag": "text_where_a_number_was_expected",
+              "label": "",
+              "unmapped": "no header for this column"
+            }
+          ],
+          "calibration": [
+            {
+              "col": "R",
+              "point": "1",
+              "raw": "22.24(151.95)",
+              "class": "short_text",
+              "flag": "text_where_a_number_was_expected"
+            }
+          ]
+        }
+      ],
+      "workbook_cells": {
+        "839": {
+          "A": "ALERT INSPECTION SUMMARY",
+          "J": "Station:",
+          "L": "Marburg (Radar) Base Station",
+          "U": "CBM NO.",
+          "V": "40901"
+        },
+        "842": {
+          "A": "Inspect",
+          "B": "Canister",
+          "C": "151.425 MHz",
+          "E": "Supply",
+          "F": "151.500 MHz",
+          "H": "Supply",
+          "I": "151.525 MHz",
+          "K": "Supply",
+          "L": "151.950 MHz",
+          "N": "Supply",
+          "O": "152.250 MHz",
+          "Q": "Supply"
+        },
+        "843": {
+          "A": "Date",
+          "B": "Type",
+          "C": "Fwd",
+          "D": "Ref.",
+          "E": "V",
+          "F": "Fwd",
+          "G": "Ref.",
+          "H": "V",
+          "I": "Fwd",
+          "J": "Ref.",
+          "K": "V",
+          "L": "Fwd",
+          "M": "Ref.",
+          "N": "V",
+          "O": "Fwd",
+          "P": "Ref.",
+          "Q": "V",
+          "R": "1",
+          "S": "2",
+          "T": "3"
+        },
+        "844": {
+          "B": "Used"
+        },
+        "845": {
+          "A": "2019-01-08 00:00:00",
+          "B": "V3, 5W",
+          "C": "5",
+          "D": "0",
+          "F": "5",
+          "G": "0",
+          "I": "5",
+          "J": "0",
+          "L": "6",
+          "M": "0.1",
+          "N": "22.24",
+          "O": "5",
+          "P": "0",
+          "R": "22.24(151.95)",
+          "U": "Unable to get various voltages due to poor access in rack"
+        }
+      }
+    },
+    {
+      "why": "A number Excel stores as text (a canister serial with a leading zero)",
+      "block": {
+        "ref": "qld-all-site-inspections:Ipswich:70",
+        "source": "qld-all-site-inspections",
+        "origin": "import",
+        "sheet": "Ipswich",
+        "banner_row": 70,
+        "end_row": 101,
+        "block_index": 2,
+        "family": "ALERT",
+        "inspection_config": "alert",
+        "station_name": "Ipswich ALERT",
+        "cbm_no": "040831",
+        "station_keys": [
+          "c:40831",
+          "n:ipswichalert"
+        ],
+        "property_owner": "",
+        "owner_row": null,
+        "ids": {
+          "river_alert_id": "2168",
+          "battery_alert_id": "2164"
+        },
+        "ids_raw": "ID's | Batt=2164 Rv = 2168",
+        "notes": {
+          "absorbed_value_in_header": "River Calibration (metres): 0"
+        },
+        "header_rows": [
+          73,
+          74,
+          75
+        ],
+        "date_column": "A",
+        "inherited_header": false,
+        "columns": {
+          "A": {
+            "label": "Inspect Date",
+            "field": "inspect_date"
+          },
+          "B": {
+            "label": "Canister No",
+            "field": "canister_no"
+          },
+          "C": {
+            "label": "Battery Voltage Stand -by",
+            "field": "battery_standby_v"
+          },
+          "D": {
+            "label": "Battery Under Load",
+            "field": "battery_under_load_v"
+          },
+          "E": {
+            "label": "Consu- mption Stand -by",
+            "field": "consumption_standby_ma"
+          },
+          "F": {
+            "label": "Solar (mA) Charge",
+            "field": "solar_charge_current_ma"
+          },
+          "G": {
+            "label": "Solar (v) Regul- ator",
+            "field": "solar_regulated_v"
+          },
+          "H": {
+            "label": "Fade Margin (db)",
+            "field": "fade_margin_db"
+          },
+          "I": {
+            "label": "Transmitter Power (w) Fwd",
+            "field": "tx_forward_w"
+          },
+          "J": {
+            "label": "Transmitter Ref",
+            "field": "tx_reflected_w"
+          },
+          "K": {
+            "label": "SWR",
+            "field": "swr"
+          },
+          "L": {
+            "label": "Gas (kpa)",
+            "field": "gas_pressure_kpa"
+          },
+          "M": {
+            "label": "River Calibration (metres)",
+            "field": "tbrg_calibration_mm"
+          },
+          "N": {
+            "label": "5",
+            "field": "river_calibration_point",
+            "point": "5"
+          },
+          "O": {
+            "label": "10",
+            "field": "river_calibration_point",
+            "point": "10"
+          },
+          "P": {
+            "label": "15",
+            "field": "river_calibration_point",
+            "point": "15"
+          },
+          "Q": {
+            "label": "20",
+            "field": "river_calibration_point",
+            "point": "20"
+          },
+          "R": {
+            "label": "Remarks",
+            "field": "remarks"
+          }
+        },
+        "calibration_points": [
+          "5",
+          "10",
+          "15",
+          "20"
+        ],
+        "calibration_columns": [
+          "N",
+          "O",
+          "P",
+          "Q"
+        ],
+        "annotations": [],
+        "inspection_rows": 20
+      },
+      "inspections": [
+        {
+          "ref": "qld-all-site-inspections:Ipswich:70:86",
+          "source": "qld-all-site-inspections",
+          "origin": "import",
+          "sheet": "Ipswich",
+          "banner_row": 70,
+          "row": 86,
+          "block_ref": "qld-all-site-inspections:Ipswich:70",
+          "from": "block",
+          "family": "ALERT",
+          "inspection_config": "alert",
+          "station_name": "Ipswich ALERT",
+          "cbm_no": "040831",
+          "inspected_on": "2006-02-14",
+          "date_precision": "day",
+          "date_kind": "text",
+          "date_raw": "14/2/2006",
+          "readings": [
+            {
+              "col": "B",
+              "field": "canister_no",
+              "raw": "09042220036",
+              "class": "numeric_text",
+              "value": 9042220036
+            },
+            {
+              "col": "C",
+              "field": "battery_standby_v",
+              "raw": "13.1",
+              "class": "number",
+              "value": 13.1
+            },
+            {
+              "col": "D",
+              "field": "battery_under_load_v",
+              "raw": "12.7",
+              "class": "number",
+              "value": 12.7
+            },
+            {
+              "col": "E",
+              "field": "consumption_standby_ma",
+              "raw": "0.8",
+              "class": "number",
+              "value": 0.8
+            },
+            {
+              "col": "F",
+              "field": "solar_charge_current_ma",
+              "raw": "60",
+              "class": "number",
+              "value": 60
+            },
+            {
+              "col": "G",
+              "field": "solar_regulated_v",
+              "raw": "19.6",
+              "class": "number",
+              "value": 19.6
+            },
+            {
+              "col": "I",
+              "field": "tx_forward_w",
+              "raw": "4",
+              "class": "number",
+              "value": 4
+            },
+            {
+              "col": "J",
+              "field": "tx_reflected_w",
+              "raw": "0.2",
+              "class": "number",
+              "value": 0.2
+            },
+            {
+              "col": "L",
+              "field": "gas_pressure_kpa",
+              "raw": "14500",
+              "class": "number",
+              "value": 14500
+            },
+            {
+              "col": "M",
+              "field": "tbrg_calibration_mm",
+              "raw": "2047",
+              "class": "number",
+              "value": 2047
+            }
+          ],
+          "calibration": [
+            {
+              "col": "N",
+              "point": "5",
+              "raw": "98",
+              "class": "number",
+              "value": 98
+            },
+            {
+              "col": "O",
+              "point": "10",
+              "raw": "198",
+              "class": "number",
+              "value": 198
+            },
+            {
+              "col": "P",
+              "point": "15",
+              "raw": "298",
+              "class": "number",
+              "value": 298
+            },
+            {
+              "col": "Q",
+              "point": "20",
+              "raw": "397",
+              "class": "number",
+              "value": 397
+            }
+          ]
+        }
+      ],
+      "workbook_cells": {
+        "70": {
+          "A": "ALERT INSPECTION SUMMARY",
+          "J": "Station: Ipswich ALERT",
+          "T": "040831"
+        },
+        "73": {
+          "A": "Inspect",
+          "B": "Canister",
+          "C": "Voltage",
+          "E": "mption",
+          "F": "(mA)",
+          "G": "(v)",
+          "H": "Fade",
+          "I": "Power (w)",
+          "K": "SWR",
+          "L": "(kpa)",
+          "M": "(metres)"
+        },
+        "74": {
+          "A": "Date",
+          "B": "No",
+          "C": "Stand",
+          "D": "Under",
+          "E": "Stand",
+          "F": "Charge",
+          "G": "Regul-",
+          "H": "Margin",
+          "I": "Fwd",
+          "J": "Ref",
+          "R": "Remarks"
+        },
+        "75": {
+          "C": "-by",
+          "D": "Load",
+          "E": "-by",
+          "G": "ator",
+          "H": "(db)",
+          "M": "0",
+          "N": "5",
+          "O": "10",
+          "P": "15",
+          "Q": "20"
+        },
+        "86": {
+          "A": "14/2/2006",
+          "B": "09042220036",
+          "C": "13.1",
+          "D": "12.7",
+          "E": "0.8",
+          "F": "60",
+          "G": "19.6",
+          "I": "4",
+          "J": "0.2",
+          "L": "14500",
+          "M": "2047",
+          "N": "98",
+          "O": "198",
+          "P": "298",
+          "Q": "397"
+        }
+      }
+    }
+  ]
+}

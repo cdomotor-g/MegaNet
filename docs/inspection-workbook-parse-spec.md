@@ -554,6 +554,68 @@ and not loaded, and that distinction only exists in the file.
 
 ---
 
+## What #124 built, and the three rules it had to add
+
+The extractor is [`tools/ingest/extract.py`](../tools/ingest/extract.py). It
+imports `survey.py` rather than copying it, so both readers implement one set of
+rules, and it writes five files:
+
+| File | What it is |
+|---|---|
+| `data/inspections/blocks.jsonl` | 1,093 station blocks — the facts that belong to the site, and the resolved column layout its rows were read under |
+| `data/inspections/inspections.jsonl` | 14,982 visits, each with the source string beside every value and a provenance ref |
+| `data/inspections/rejects.jsonl` | 153 rows that are not loaded, each with a reason that is a category |
+| `data/inspections/duplicates.jsonl` | the 221 `ALERTS` rows already recorded on a basin block |
+| `data/inspections/counts.json` | the reconciliation, per sheet and in total |
+| [`tools/ingest/inspection_extract_sample.json`](../tools/ingest/inspection_extract_sample.json) | the hand-checked sample: 13 entries, each holding the extracted records **and** the workbook cells they were read from |
+
+`python3 tools/ingest/extract.py --check` re-runs it and fails on any drift; CI
+runs that beside the survey's own check. The run fails rather than reporting
+success if the counts stop balancing, so a reconciliation that breaks breaks
+loudly.
+
+Three rules were not on this page and are now, because the workbook needs them:
+
+**A calibration-point column can be stacked, and the bottom row wins.**
+`Fitzroy!Y` carries `30` on one header row and `25` on the next — the point was
+changed and the old value left above the new one. §3's stacking rule joins them
+into `30 25`, which is not a point. The row nearest the data is the one the
+readings underneath were entered under, and the workbook proves it: `Fitzroy!`
+row 7 reads 26·46·107·207·408 at points 1·2·5·10·20, about 20 per point, and its
+last reading is 507 — point 25, not point 30. 83 columns across 32 blocks are
+stacked this way, and reading them as `30 25` would have mislabelled every one.
+
+**An all-numeric row in a block with no calibration columns is not a point
+row.** `read_rows` reaches `calibration_point_row` before it asks whether a row
+is data, so `Mooloolah!!69` — nine readings and no date — is classified as a
+point row and would have been ignored. Two rows fall through that gap and they
+are rejects, not silence.
+
+**`TM Only` is two tables, not one.** §7 describes it as the base-station form
+family, which is true of its first two rows: they sit under the header at row 3
+(`BASE STATION`, TX size, forward/reflected power ×2, SWR ×2, decoder,
+receivers). The other 52 rows sit under a **second, completely different header
+at row 19** — `TM STATION`, logger number, sleep/operating/interrogation
+current, RSSI, lithium battery, phone socket voltage, TBRG calibration and a
+river-calibration grid. Read under the first header they load a logger number as
+a transmitter size and lose five columns to Excel's `Column4`…`Column10`
+placeholders. The band nearest the data wins, exactly as it does inside a block.
+The same fix pairs both flat tabs' calibration readings with their points, which
+a single-band reader never did.
+
+Two smaller things the extract records rather than resolves:
+
+- **The one block with an inherited header is on a sheet that is not loaded.**
+  §1's `Herbert!710` is row 710 of the hidden `Herbert` sheet, not of the visible
+  `Herbert!`, so no block in #124's scope inherits a header. `counts.json` lists
+  them by ref, which is the "say so rather than silently inherit" §1 asks for.
+- **A purely numeric header is a calibration point (§4 rule 1) even where the
+  numbers are antenna positions**, which is what they are on a handful of
+  base-station blocks — `Ipswich!839` prints `1`, `2`, `3` over receiver
+  voltages. The rule is applied as written; #126 should expect a small number of
+  "calibration points" that are really antenna numbers, and they are visible as
+  point sets with no metres-like spacing.
+
 ## For #124
 
 In dependency order:
