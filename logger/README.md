@@ -148,9 +148,14 @@ Then read the Public table, in this order:
 
 | Watch | Should become |
 | --- | --- |
-| `RxLines` | `1` — the line arrived |
+| `RxBlockBytes` | `9` — bytes came off the port |
+| `RxBlockHex` | `36 32 37 30 2C 32 31 0D 0A ` — those bytes, exactly |
+| `RxLines` | `1` — a complete line was cut out of them |
 | `RxLastLine` | `6270,21` — verbatim, so you can see what the port actually received |
-| `RxReadings` | `1` — it parsed |
+| `RxLastShape` | `plain` |
+| `RxLastId` / `RxLastValue` | `6270` / `21` |
+| `RxLastJson` | `{"alert_id":6270,…}` — what will be posted |
+| `RxStep` | `7 queued` |
 | `QDepth` | `1` — it is queued |
 | `PostState` | `posting`, then `accepted` |
 | `Accepted` | `1` |
@@ -188,16 +193,41 @@ Free memory is deliberately absent: `Status.MemoryFree` is a CR1000X/CR6 field
 and is not on the CR300's own Status table, so reading it would not compile.
 Device Configuration Utility's Status tab shows it.
 
-### Is the receiver talking
+### Is the receiver talking — the serial pipeline, step by step
+
+This is the part to read first when a feed is not doing what you expect. The
+program shows the **same data in every form it passes through**, from bytes in
+the port buffer to the JSON that will be posted. Read down the list: the step
+where the display stops being what you expected is the step that is broken.
+
+| Step | Variable | Means |
+| --- | --- | --- |
+| **1 · the port** | `SecsSinceRx` | Seconds since the last *byte*. **The single most useful number here** — a base station that has gone deaf shows up here and nowhere else, because a deaf base station is not an error, it is a silence. |
+| | `RxAvail` | Bytes sitting in the port buffer, read *before* this scan took them. Should sit near zero. Parked near `RX_BUFFER` means the scan is not keeping up. |
+| | `RxBlockBytes` / `RxBytesTotal` | Bytes taken this scan, and since startup. **`RxBytesTotal` climbing while `RxLines` stays at 0 is the signature of a feed that sends no line terminator** — check `RxAccumLen`. |
+| | `RxNulls` | NUL bytes seen and skipped. Non-zero on an ASCII feed means line noise or a baud mismatch, and is the first thing to suspect when `RxBadFrames` climbs for no obvious reason. |
+| **2 · the block** | `RxBlockHex` | Every byte of this scan's read as padded hex — `41 4C 45 52 54 32 41 2C …`. This is the raw truth and it is the display to trust. |
+| | `RxBlockText` | The same bytes as text, with every control character shown as `-`, so nothing in the data can scramble the display. |
+| **3 · line assembly** | `RxAccumLen` / `RxAccumText` | What is being held while it waits for a CR or LF, and how much. Normal is near zero between transmissions and briefly non-zero when one straddles two scans. **A number that grows and never comes back is a feed with no line terminator.** |
+| | `RxLines` | Complete lines cut out since startup. |
+| | `RxOverruns` | Times the assembly buffer filled with no terminator anywhere in it and had to be discarded. |
+| **4 · the line** | `RxLastLine` / `RxLastLineHex` / `RxLastLineLen` | The last complete line verbatim, the same line in hex, and its length. Worth more than any counter when the format is not what you expected. |
+| | `RxLastShape` | What it was taken to be: `ALERT2A`, `plain`, or `unrecognised`. |
+| | `RxLastFields` | Fields the splitter found. An `ALERT2A` line with a 7-byte payload has 31. |
+| **5 · the payload** | `RxLastPayLen` / `RxLastPayHex` | The payload length from field 23, and the payload bytes after the hex fields were converted back to numbers. **If `RxLastPayHex` does not match the tail of `RxLastLineHex`, the hex decode is what is wrong** — nothing further along needs looking at. |
+| **6 · the reading** | `RxLastRecHex` | The four payload bytes this reading came out of, so the bit-unpacking can be checked by hand against the table in the program at `ParseAlert2`. |
+| | `RxLastId` / `RxLastValue` / `RxLastSuspect` | The ALERT id and 11-bit value decoded from them, and whether the value was full scale. |
+| | `RxLastStamp` | The timestamp actually attached to it. |
+| **7 · the JSON** | `RxLastJson` | That reading as it will appear in the batch, byte for byte. Built by the same code that builds the POST body, so it cannot drift from what is sent. |
+
+And the counters that say how it went:
 
 | Variable | Means |
 | --- | --- |
-| `SecsSinceRx` | Seconds since the last serial line. **The single most useful number here** — a base station that has gone deaf shows up here and nowhere else, because a deaf base station is not an error, it is a silence. |
-| `RxLines` | Lines read off the port since startup. |
+| `RxStep` | The last step the pipeline completed, in words — `3 appended to line buffer`, `5 payload decoded`, `7 queued`, `rejected: …`. **Where this stops is where to look.** |
 | `RxFrames` / `RxReadings` | Frames decoded, and readings extracted from them. One ALERT2 frame can carry several readings. |
-| `RxBadFrames` | Frames that would not decode. `RxLastBad` and `RxLastWhy` are the last one and the reason. |
+| `RxBadFrames` | Lines that would not decode. `RxLastBad` and `RxLastWhy` are the last one and the reason. |
 | `RxBadRecords` | Records inside otherwise-good frames whose status byte was non-zero. In the reference capture those also carried addresses matching no station, so they are counted and dropped. |
-| `RxLastLine` | The last line verbatim. Worth more than any counter when the format is not what you expected. |
 | `RxFrameSkew` | Seconds between the frame's own ALERT2 time and this logger's clock — see *Which clock stamps the reading*, below. |
 
 ### Is the queue draining
@@ -225,10 +255,57 @@ Device Configuration Utility's Status tab shows it.
 | `SecsSincePost` | Seconds since the last **accepted** post, not since the last attempt. |
 | `ConsecFail` / `Backoff` | Consecutive failures, and how long until the next try. |
 
-Three tables are logged as well: `Readings` (every reading, whether or not it
-ever posted), `Diag` (a five-minute heartbeat) and `PostLog` (one record per
-POST attempt — which is what answers *when did it stop working*, a question the
-five-minute averages in `Diag` erase).
+Two tables are logged as well: `Readings` (every reading, whether or not it ever
+posted) and `Diag` (a five-minute heartbeat). `Diag` carries the POST result —
+`LastStatus` and `PostState` — alongside the counters, so *when did it stop
+working* is answered from one table rather than by lining two up against each
+other.
+
+---
+
+## How the serial port is read
+
+Worth knowing before you debug a feed, because the first version of this program
+got it wrong and read nothing at all.
+
+That version called `SerialInRecord()` once per scan in a drain loop. Its last
+parameter is **`RecordsBackFromNewest`** — how many records back from the most
+recent one to hand over — and it was being passed `1`, which asks for the record
+*before* the newest and returns nothing when only one has arrived. It is also
+the wrong shape for draining a buffer: one call is meant to yield one record,
+so looping on it does not empty a port that filled between scans.
+
+This version reads the port the way the **KDO doppler driver** on our other
+loggers reads its sensor — the pattern that is known to work on this hardware:
+
+| | |
+| --- | --- |
+| 1 | `SerialInChk()` — how many bytes are sitting in the port buffer |
+| 2 | `SerialInBlock()` — take all of them, raw; it returns the byte count |
+| 3 | walk the block byte by byte with `ASCII()`, building a padded hex dump and a printable copy with control characters as `-` |
+| 4 | append to an assembly buffer and cut complete lines out of it on CR or LF |
+
+Three consequences worth knowing at the bench:
+
+- **Every step is a `Public` variable**, which is the table above. Nothing about
+  the read depends on an option code whose meaning has to be looked up.
+- **A transmission that straddles two scans is one line, not two broken ones.**
+  Step 4 is why: the leftover stays in the buffer until its terminator arrives.
+  `RxAccumLen` is that leftover, and watching it go non-zero and back to zero is
+  watching the reassembly work.
+- **The port is never flushed.** The KDO driver flushes because it owns a
+  request/response conversation and anything left over is stale by definition.
+  This program is a listener on a feed it does not drive, so a flush would throw
+  away the bytes that arrived while the scan was working. The only `SerialFlush`
+  is the one in `BeginProg`, which clears whatever accumulated before the
+  program started.
+
+The byte count from `SerialInBlock()` — not `Len()` — bounds every loop, and the
+block is copied with `MoveBytes()` rather than assigned. Both for the same
+reason: the port is open in **transparent mode** (format 3), where a NUL is an
+ordinary byte, and a CRBasic string ends at the first one. A plain assignment
+would truncate exactly the block you most need to see, and `RxNulls` would never
+count the byte that caused it.
 
 ---
 
@@ -306,17 +383,24 @@ it goes to site. It is written to make that first compile as boring as possible:
   mode available,
 - only Status fields that are on the **CR300's own** Status table are read
   (`WatchdogErrors`, `SkippedScan`, `VarOutofBound`),
+- bit fields are pulled out with `MOD` and `INT()` rather than with shift
+  operators — CRBasic has no `<<` or `>>`, and the arithmetic form is exact on
+  integers this small,
+- the serial instructions are the four the KDO driver already runs on our own
+  loggers (`SerialOpen`, `SerialInChk`, `SerialInBlock`, `MoveBytes`), passed
+  the same parameters in the same order,
+- `HTTPPost()` is called with its four required parameters and nothing else, so
+  there are no empty placeholder commas to argue with,
 - and every number that goes into the JSON goes through `Sprintf` with `%d`,
   because implicit numeric-to-string conversion is free to pad, round, or reach
   for scientific notation, and any of the three inside a JSON literal is a
   rejected batch.
 
-Three things are the most likely to need a local edit, and each carries a
-comment saying exactly what to change:
+Two things are the most likely to need a local edit, and each carries a comment
+saying exactly what to change:
 
 | If the compiler objects to | Do this |
 | --- | --- |
-| the empty commas in `HTTPPost(...,,,,,POST_TIMEOUT)` | Delete `,,,,POST_TIMEOUT` and accept the 75-second default. `TimeOut` is the ninth parameter and the commas are placeholders for the four table-streaming ones. |
 | `NetworkTimeProtocol` | Delete the whole clock-discipline `SlowSequence` and set the clock from LoggerNet. Nothing else depends on it. |
 | a `Status.` field name | Delete that line and its `Sample()` in the `Diag` table. |
 
@@ -329,7 +413,16 @@ path was exercised (wrapped line, invalid-frame flag, payload-length
 disagreement, non-hex byte, wrong element type, non-zero record status), the
 generated JSON was parsed and checked against the `ingest_http()` contract, and
 the batch sizing was checked to keep the worst-case body inside the buffer with
-a full record's headroom to spare. That is the algorithm, not the CRBasic.
+a full record's headroom to spare.
+
+The serial rewrite was checked the same way and against the cases that motivated
+it: **a line delivered in two blocks reassembles into one line** (nothing is
+dropped and nothing is doubled), several frames plus a plain line arriving in a
+single block yield three lines and three readings, NUL bytes are counted and
+skipped rather than truncating the line around them, and a feed that sends no
+terminator at all is discarded and counted at `RxOverruns` instead of wedging
+the buffer — with the assembly buffer never exceeding `RX_ACCUM` in any of them.
+That is the algorithm, not the CRBasic.
 
 ---
 
