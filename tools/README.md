@@ -48,7 +48,30 @@ The prose half — block detection, header resolution, value coercion, dates,
 provenance, and the three questions still open for @cdomotor-g — is
 [`docs/inspection-workbook-parse-spec.md`](../docs/inspection-workbook-parse-spec.md).
 
-Neither file writes to a database; #124 is the extractor. `xlsx.py` is the piece
+`ingest/extract.py` is #124's extractor and `ingest/crosswalk.py` is #125's
+station attribution; both write to `data/inspections/` and neither opens a
+database connection either. **`ingest/load.py` is where all of it reaches
+Postgres** (#126):
+
+```bash
+python3 tools/ingest/load.py \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+It emits plain SQL on stdout, the same trade `import_stations_json.py` makes: the
+output can be read before it is run. 14,982 visits, 1,093 station blocks, 151,532
+measured cells and 153 rejects, in about seven seconds — the bulk goes in through
+`COPY` into temporary tables and the permanent tables are upserted from those, so
+the logic stays at the top and the bottom of the file and the middle is data.
+
+Re-running it is a no-op. Each visit's primary key is a `uuid5` of its workbook
+address, so the same cell yields the same id on every run, and the load is a sync
+rather than an append: anything the extractor no longer emits is removed, and
+nothing with `origin = 'form'` is ever touched. Requires
+`db/migrations/0014_inspection_history.sql`, which the generated SQL asserts
+before it writes anything.
+
+Neither survey file writes to a database; #124 is the extractor. `xlsx.py` is the piece
 worth reusing: it reads merged ranges, `#VALUE!` as an error rather than as a
 blank, the real used range (`Johnstone!` declares 16,382 columns and uses 29),
 and the text of a threaded comment rather than the "your version of Excel"
@@ -206,7 +229,7 @@ Also a psql script, same shape and same guarantees.
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
 ```
 
-71 checks, one per line of #115's acceptance. Three groups are worth knowing
+86 checks, one per line of #115's acceptance. Three groups are worth knowing
 about. Ten compare a lookup table's labels, in order, against the `Dropdown`
 sheet's columns A–L — the acceptance asks for the transcribed values rather than
 a re-invented set, and this is what makes that a test instead of an intention.
@@ -220,6 +243,33 @@ table is.
 
 Run it after applying `db/migrations/0009_inspections.sql`, and again after
 touching anything in it.
+
+## `check_inspection_history.sql` — prove the historical archive
+
+Also a psql script, same shape and same guarantees.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_inspection_history.sql
+```
+
+78 checks, one per line of #126's acceptance and #122's. They come in two kinds
+and the difference is the useful part. The **shape** checks build their own data
+and pass against an empty database, so they can be run the moment `0014` is
+applied: a `>30` goes in and comes back out as `>30` rather than as 30 or null;
+a bound cannot acquire a point estimate, because a check constraint refuses one;
+a year-only row says it is a year-only row; an imported ALERT visit may carry a
+decoder test and a typed one may not; a parked visit keeps its name and number
+and `backfill_inspection_station()` attributes it later without a reload. The
+**load** checks need `tools/ingest/load.py` to have been run and say plainly that
+they were skipped rather than passing vacuously — 14,982 loaded and 153 rejected
+reconciling against #124's own counts, and every projected battery voltage
+compared against the measurement it was read from, which is the check that would
+catch the section tables and the measurements drifting apart.
+
+Run it after applying `db/migrations/0014_inspection_history.sql`. Run
+`check_inspections.sql` beside it: `0014` widens `0009`'s section matrix and
+restates its three guards, and those 86 checks are what prove it did not break
+them.
 
 ## `check_attachments.sql` — prove the attachment door
 

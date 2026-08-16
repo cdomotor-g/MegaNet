@@ -207,9 +207,13 @@ begin
         and exists (select 1 from meganet.inspection_config_section cs
                      where cs.config_key = c.key and cs.section_key = 'remarks')));
 
-  perform pg_temp.check_that('only Alert and Base Station have a radio section',
+  -- `printed` throughout this block: 0014 added retired sections to the matrix
+  -- so that an imported 1990s row can carry a block the current sheet dropped.
+  -- What each form *prints* is the claim these checks are about, and it is
+  -- unchanged.
+  perform pg_temp.check_that('only Alert and Base Station print a radio section',
     (select array_agg(config_key order by config_key) from meganet.inspection_config_section
-      where section_key = 'radio') = array['alert', 'base_station'],
+      where section_key = 'radio' and printed) = array['alert', 'base_station'],
     'Campbell reports to a base station; Mace is telephone; the old logger sheet prints no antenna block');
 
   perform pg_temp.check_that('only Alert and Campbell have a data-quality block',
@@ -226,9 +230,9 @@ begin
       where config_key = 'gas_only')
       = array['station_details', 'serial_numbers', 'gas', 'water_level', 'remarks']);
 
-  perform pg_temp.check_that('Base Station is the only form with decoder/receiver tests',
+  perform pg_temp.check_that('Base Station is the only form printing decoder/receiver tests',
     (select array_agg(config_key) from meganet.inspection_config_section
-      where section_key = 'base_tests') = array['base_station']);
+      where section_key = 'base_tests' and printed) = array['base_station']);
 
   perform pg_temp.check_that('Gas Only''s water-level section says it is one printed line',
     (select variant_note like '%Staff Gauge%' from meganet.inspection_config_section

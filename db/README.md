@@ -172,12 +172,23 @@ its cache at all (`PGRST002`).
 | `meganet.attachment` | Photos and pasted screenshots, for an inspection or a maintenance activity — exactly one of the two. The bytes are in Supabase Storage; this is the index. |
 | `meganet.attachment_type` | What may be uploaded, and how large, per content type. A vocabulary rather than a check constraint, so a new camera format is an insert. Public: it describes a blank form, not a site. The browser reads it to build the file picker and to refuse a file *before* uploading it. |
 | `meganet.attach_file(…)`, `meganet.update_attachment(uuid, jsonb)`, `meganet.detach_file(uuid)` | The attachment write path (0010). Three functions rather than a `grant`, because the object path has to agree with the owner it is filed under, the object name has to be one the app generated rather than one a phone supplied, and `uploaded_by` has to be the caller — none of which is a fact about the row. `update_attachment()` takes a patch so that clearing a caption and leaving it alone are different requests. |
-| `meganet.inspection_form` | View: one row per section a configuration prints, in that configuration's order. What a form renderer asks. |
+| `meganet.inspection_form` | View: one row per section a configuration prints *today*, in that configuration's order. What a form renderer asks. Filters on `inspection_config_section.printed`, which `0014` added: a section a form has since dropped stays in the matrix so a 1998 row can carry one, and stays off the form. |
 | `meganet.inspection_needs_maintenance` | View: visits that departed Missing or Poor, and whether a maintenance activity was ever raised against them. |
 | `meganet.inspection_doc(uuid)`, `meganet.maintenance_activity_doc(uuid)` | One record and everything under it, as one JSON document. |
 | `meganet.save_inspection(jsonb, timestamptz)`, `meganet.save_maintenance_activity(jsonb, timestamptz)` | The write paths. One call is one transaction; children are replaced, not merged; a stale write is refused with `PT409`. |
 | `meganet.delete_inspection(uuid, timestamptz)`, `meganet.delete_maintenance_activity(uuid, timestamptz)` | Soft delete, as for stations. |
 | `meganet.form_write(text, jsonb)` | Internal: inserts one section row from a JSON object, over a closed table list, skipping generated columns. Granted to nothing a browser can reach. |
+| `meganet.inspection_block` | One station block on one worksheet — the unit the historical workbook (#122) is actually built from: a banner, an `ID's` line, a stacked header, then that station's visits. Carries the resolved header it was read under, so a suspicious value can be checked without reopening a 7 MB spreadsheet. 1,093 of them. |
+| `meganet.inspection_block_fact`, `meganet.block_fact_kind` | The `ID's` line, split: rain/river/battery ALERT addresses, orifice level, key number, phone number. Per *block* rather than per station, because a station written up on two sheets in two decades may have been re-surveyed in between — which is also why the orifice level carries an `as_at`. |
+| `meganet.measurement_field` | Every field the historical extractor can emit, and the column on 0009's tables that holds the same fact. **The reason the historical load is not a parallel schema**: the correspondence is data, `project_inspection_measurements()` reads it, and the smoke test reads it. An empty `home_table` means the current form has no box for that field — a real answer, and not a reason to drop the value. |
+| `meganet.inspection_measurement` | One workbook cell — 151,532 of them — as it was written and as far as it could honestly be read. `raw` is the column of record and is never null; `value` is an interpretation and is null wherever the rules did not license one. A fade margin of `>30` is stored as operator `>`, bound 30, value null. |
+| `meganet.measurement_class`, `meganet.measurement_status` | What kind of thing a cell held (nine classes), and the closed list of status words that turn up where a reading should be. `-` is the commonest non-numeric cell in the workbook and is **not** an empty cell: empty means nobody wrote anything, `-` means there was nothing to measure. |
+| `meganet.inspection_reject`, `meganet.inspection_reject_reason` | The 153 rows the extractor would not load, with their address and their reason — in the database rather than on somebody's disk, because a rejects file cannot be reconciled against a table. |
+| `meganet.project_inspection_measurements(uuid[])` | Fills 0009's section tables from the measurements, driven by `measurement_field`. Idempotent. Projects only values that have a number: a bound or a status word has none and stays complete in `inspection_measurement`. `EXECUTE` revoked from `public`. |
+| `meganet.backfill_inspection_station(jsonb)` | Attributes parked historical visits to a station, one crosswalk key at a time. Why the load did not have to wait for #125's last 82 identities, and why deciding one later is an update rather than a reload. |
+| `meganet.inspection_history` | View: every visit a station has had, typed or imported, in one shape — with `origin` telling the two apart and `date_precision` saying how much of the date the record actually claims. What #128 renders. |
+| `meganet.inspection_measurement_off_form` | View: measurements whose section the configuration's current form no longer prints. Not an error list — it is the history the schema deliberately kept, and its size is a number the smoke test asserts. |
+| `meganet.inspection_history_reconciliation` | View, one row: loaded, rejected, blocks, cells, what is still parked. #122's acceptance as a query. |
 
 Everything is readable by `anon` **except `meganet.reading_raw` and the whole
 inspection domain**. `reading_raw` holds whatever a device or an adapter actually
@@ -843,6 +854,74 @@ script's most useful assertion is the one about a *second* save, because a
 restatement that adds the column to the insert and forgets the
 `on conflict do update set` list passes every catalogue check and loses the value
 the second time somebody presses Save.
+
+## The historical archive
+
+`0014_inspection_history.sql`, issue #126, the fourth child of #122. Thirty-five
+years of inspections — 14,982 of them, back to the 1990s — transcribed into
+`archive/QLD All Site Inspections.xlsx` and, until this migration, readable only
+in Excel. Without it, `0009`'s history view opens on an empty table for every
+station.
+
+The question the migration exists to answer is what a schema designed around the
+*current* paper form does with rows recorded on a different one. Both easy
+answers are wrong: a parallel set of `historical_*` tables would mean the history
+view queries two places, and flattening the history to fit would mean dropping
+`telephone socket voltage` because the 2024 ALERT sheet has no such box, and
+coercing a fade margin of `>30` to `30`. What it does instead:
+
+- **The historical rows go into `0009`'s own tables.** Where the workbook records
+  something the paper form never printed — standby consumption is on 10,942 rows
+  and has no column because the modern sheet stopped asking — the column is added
+  to the section table it belongs on, not to a table of its own.
+- **Every cell keeps its source string**, in `meganet.inspection_measurement`,
+  beside the number. `raw` is authoritative. `value` is an interpretation and is
+  null wherever the rules did not license one, which is 6,137 of the 151,532
+  cells. A `>30` is stored as operator `>`, bound 30, value null — and a check
+  constraint stops any later migration quietly rounding it off.
+- **A section a form has since dropped stays available to history.**
+  `inspection_config_section.printed` is the difference between "this form does
+  not have that section" and "this form no longer has that section". 264 real
+  readings depend on it: decoder and receiver tests on ALERT blocks from the
+  years when repeater sites were written up on the ALERT sheet, and radio
+  readings on DATA LOGGER blocks. `meganet.inspection_measurement_off_form` is
+  the standing list.
+- **A number can be traced to its cell**: sheet, block and row from the visit,
+  column from the measurement.
+
+Loading is `tools/ingest/load.py`, which emits SQL and opens no connection of its
+own, exactly as `tools/import_stations_json.py` does and for the same reason:
+
+```sh
+python3 tools/ingest/load.py \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+It is a sync rather than an append, and re-running it changes nothing. Each
+visit's primary key is a `uuid5` of its workbook address, so the same cell yields
+the same id on every run on any machine — which is what lets the whole load be
+one stream of SQL with nothing read back out of the database. Rows typed into
+MegaNet (`origin = 'form'`) are never touched by any statement in the output.
+
+The section tables are filled afterwards by
+`meganet.project_inspection_measurements()`, driven by `meganet.measurement_field`
+rather than by the generator — so a mis-mapped field is fixed with an update and
+one function call, not a re-extract of a 7 MB spreadsheet.
+
+### Proving it
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_inspection_history.sql
+```
+
+78 checks, in a transaction that rolls back. They split in two, and the split
+matters: the shape checks build their own data and pass against an empty
+database, so they can be run the moment `0014` is applied; the load checks need
+`load.py` to have been run and say plainly that they were skipped rather than
+passing vacuously. The sharpest of them is the round trip — `>30` goes in and
+comes back out as `>30`, not as 30 and not as null — and the one most likely to
+catch a future mistake is the comparison of every projected battery voltage
+against the measurement it was read from.
 
 ## Checking it from outside
 

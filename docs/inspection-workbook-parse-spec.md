@@ -235,10 +235,36 @@ calibration, the river calibration grid, shaft-encoder increments/revs/result/
 error, gas cylinder/feed pressure, bubble rate, gas consumption, DP counter,
 phone socket voltage, and remarks.
 
-### What #126 has to add
+### What #126 had to add — and did
 
-Three canonical fields have no home in `0009_inspections.sql` yet. They are
-named here so #126 inherits a list rather than a surprise:
+`0014_inspection_history.sql` closes the three gaps below, and found a fourth
+the survey could not have seen. **The list is kept as it was written**, with the
+answers appended, because how a prediction turned out is worth more than a
+tidied-up version of it.
+
+- **`river_calibration` is the eighth calibration kind**, section `water_level`,
+  with `expected_result` the point and `result` the reading — as predicted.
+  28,837 readings landed through it. Six more did not: they sit under a
+  calibration column whose point a point row inside the data had already
+  redefined, and the extractor declined to say which point they were taken at.
+  They are complete in `meganet.inspection_measurement` and deliberately **not**
+  projected — a calibration row that cannot say what it is a calibration *of* is
+  the silent rescaling §4 rule 3 warns about.
+- **`consumption_standby_ma` and `consumption_transmit_ma`** are columns on
+  `meganet.inspection_power`, along with `mains_charge_current_ma`,
+  `mains_regulated_v` and `inspection_radio.tx_deviation_khz`.
+- **The raw companion** is `meganet.inspection_measurement`: one row per cell
+  rather than a text column beside each numeric one, which also gives the
+  operator, the bound, the status, the unit and the source column letter their
+  own places, and gives a field with no modern column somewhere to live.
+- **The fourth thing, which was a surprise.** 264 readings are in a *section*
+  the configuration's current form no longer prints — decoder and receiver tests
+  on ALERT blocks, radio readings on DATA LOGGER blocks. `0009`'s section guard
+  would have refused every one. `inspection_config_section.printed` is the
+  resolution: the matrix keeps the row, the form filters it out, and an imported
+  visit may carry it while a form submission may not.
+
+The three gaps as they were first written:
 
 - **`river_calibration_point`** — `meganet.calibration_kind` has seven kinds and
   none of them is the river calibration grid these sheets print. It needs an
@@ -699,3 +725,35 @@ In dependency order:
    `disposition` rather than its name — twelve of the sheets the survey reads
    are deliberately not loaded, and which twelve is a decision recorded in the
    file rather than a rule you can infer from the `!` in a sheet name.
+
+---
+
+## What #126 built
+
+`db/migrations/0014_inspection_history.sql` and `tools/ingest/load.py`. The
+staging rows of §10 are now in the schema:
+
+| | Rows |
+|---|---|
+| `meganet.inspection` (`origin = 'import'`) | 14,982 |
+| `meganet.inspection_block` | 1,093 |
+| `meganet.inspection_block_fact` | 1,889 |
+| `meganet.inspection_measurement` | 151,532 |
+| `meganet.inspection_reject` | 153 |
+
+Of the measurements, **6,137 have no number** — 2,466 bounds, 2,064 status
+words, 1,113 short strings, 230 two-in-one-cell readings and 180 sentences —
+and every one of them kept the string the technician wrote. That count is the
+reason `raw` is `not null` and `value` is not: it is 4% of the archive, and a
+loader that coerced or dropped it would have lost more than most people would
+guess from reading §5's percentages.
+
+535 visits are attributed to no station: #125's 511 unmatched plus 24 ambiguous.
+They are parked rather than lost — name and CBM number intact — and
+`meganet.backfill_inspection_station()` accepts a decision later without a
+reload.
+
+The load is verified end to end by `tools/check_inspection_history.sql` (78
+checks) against a database built from `0001` through `0014`, with
+`tools/check_inspections.sql`'s 86 checks re-run beside it to prove `0009` still
+holds.
