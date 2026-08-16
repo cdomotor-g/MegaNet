@@ -237,6 +237,7 @@ function applyStationDoc(text, source) {
   state.searchIdx   = null;         // both derived from the file
   state.repeaterIdx = null;         // so is the cached repeater-only subset
   state.passRelIdx  = null;         // and so is the pass-range relation
+  state.backboneIdx = null;         // and the repeater backbone pairs built on it
   NetworkView.invalidate();         // every node in the graph was a row in the old file
   resetStationFilters();
   state.selectedId = null;
@@ -1529,6 +1530,7 @@ function renderStationsHtml() {
           <div id="leaflet-map"></div>
           <div id="map-note" class="map-note" hidden></div>
           <div id="acma-card" class="acma-card" hidden></div>
+          <div id="path-card" class="acma-card" hidden></div>
         </div>
         <div class="panel" id="path-profile-panel" hidden></div>
         <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
@@ -1656,6 +1658,11 @@ function mapDisplayControlsHtml() {
              onchange="state.mapMaxLinkKm=+this.value;refreshMapLayers()">
     </label>
     <label class="filter-check">
+      <input type="checkbox" ${state.mapShowBackbone ? 'checked' : ''}
+             onchange="state.mapShowBackbone=this.checked;rerenderMapLegend();refreshMapLayers()">
+      Repeater backbone paths
+    </label>
+    <label class="filter-check">
       <input type="checkbox" ${state.mapRivers ? 'checked' : ''}
              onchange="MapRivers.setEnabled(this.checked)">
       Highlight matching rivers
@@ -1708,15 +1715,20 @@ function rerenderMapDisplayControls() {
 // What the link controls are actually doing. Counted on the last refresh so the
 // note survives a re-render of the pane.
 function mapLinkNoteHtml() {
-  const { drawn, culled } = state.mapLinkCount;
-  if (!state.mapShowLinks) return 'Signal links are hidden.';
+  const { drawn, culled, backbone } = state.mapLinkCount;
+  // Backbone pairs are *matched* by the slider, not culled by it — the note
+  // says so in its own clause however the field links are being treated.
+  const bb = state.mapShowBackbone
+    ? ` · ${backbone || 0} backbone path${backbone === 1 ? '' : 's'} within ${state.mapMaxLinkKm} km`
+    : '';
+  if (!state.mapShowLinks) return `Signal links are hidden${bb}.`;
   const links = n => `${n} link${n === 1 ? '' : 's'}`;
   if (!state.mapKillSpaghetti) {
-    return `${links(drawn)} drawn — every pass-range path, however long.`;
+    return `${links(drawn)} drawn — every pass-range path, however long${bb}.`;
   }
   return culled
-    ? `${links(drawn)} drawn · <strong>${culled}</strong> over ${state.mapMaxLinkKm} km hidden.`
-    : `${links(drawn)} drawn · none over ${state.mapMaxLinkKm} km.`;
+    ? `${links(drawn)} drawn · <strong>${culled}</strong> over ${state.mapMaxLinkKm} km hidden${bb}.`
+    : `${links(drawn)} drawn · none over ${state.mapMaxLinkKm} km${bb}.`;
 }
 
 function mapLegendHtml() {
@@ -1738,6 +1750,11 @@ function mapLegendHtml() {
       <span class="legend-line"></span>
       <span class="small">Pass-range link</span>
     </span>
+    ${state.mapShowBackbone ? `
+    <span class="legend-item">
+      <span class="legend-line legend-line-backbone"></span>
+      <span class="small">Repeater backbone</span>
+    </span>` : ''}
     ${MapRivers.active() ? `
     <span class="legend-item">
       <span class="legend-line legend-line-river"></span>
@@ -1873,8 +1890,10 @@ function initMap() {
   if (!el) return;
   // preferCanvas: with ~3,174 station pins and ~3,141 pass-range link lines,
   // the default SVG renderer means ~6,300 SVG nodes rebuilt on every refresh.
-  // A single canvas element instead.
-  state.map = L.map('leaflet-map', { preferCanvas: true });
+  // A single canvas element instead. The renderer is created explicitly for
+  // its tolerance: radio paths are clickable now, and a canvas hit-test
+  // confined to a 1.5 px core is a target nobody lands on.
+  state.map = L.map('leaflet-map', { preferCanvas: true, renderer: L.canvas({ tolerance: 5 }) });
   // The one map still declared in the file that re-measures them all. It says
   // so the same way the other four do, so that stays true if it ever moves.
   registerLiveMap('Stations', () => state.map);
@@ -1990,6 +2009,10 @@ function mapFitKey(points) {
 const MAP_LINK_CASING_W  = 3.5;
 const MAP_LINK_CORE_W    = 1.5;
 const MAP_LINK_CASING_MIX = 0.75;   // casing opacity, as a fraction of the core's
+// Backbone paths out-weigh the field links on purpose — "more prominent" is
+// the requirement — and the wide casing doubles as the click target.
+const MAP_BACKBONE_CASING_W = 5;
+const MAP_BACKBONE_CORE_W   = 2.5;
 
 // `skipFit` clears the fit for this refresh while still recording the extent it
 // would have fitted, so the map holds the operator's pan and zoom and the next
@@ -2020,7 +2043,12 @@ function refreshMapLayers({ skipFit = false } = {}) {
     ? passRangeLinks(active ? matched.concat(related) : located) : [];
   const maxKm = state.mapKillSpaghetti ? state.mapMaxLinkKm : Infinity;
   const links = allLinks.filter(l => l.km <= maxKm);
-  state.mapLinkCount = { drawn: links.length, culled: allLinks.length - links.length };
+  // Backbone pairs take the slider as a match condition, kill-spaghetti or not
+  // — a backbone path either exists at this distance or it doesn't, so there
+  // is no culled remainder to count.
+  const backbone = state.mapShowBackbone ? backboneLinks(state.mapMaxLinkKm) : [];
+  state.mapLinkCount = { drawn: links.length, culled: allLinks.length - links.length,
+                         backbone: backbone.length };
   updateMapLinkNote();
 
   // Highlight mode keeps every pin on the map; hide mode drops the rest —
@@ -2066,6 +2094,30 @@ function refreshMapLayers({ skipFit = false } = {}) {
       line.mnLinkStationId  = l.s.id;       // and lets repeater focus restyle in place
       line.mnLinkRepeaterId = l.r.id;
       line.mnBaseOpacity    = lineOp;
+      line.on('click', MapBackbone.onLineClick);
+      state.mapLines.push(line);
+    }
+  }
+
+  // Repeater backbone paths, on top of the field links and under the pins —
+  // heavier, black, and carrying BOTH repeater ids so the focus dim can ask
+  // "is the focused repeater on either end". Clicks open the radio-path card.
+  const backboneColor = getComputedStyle(document.documentElement)
+    .getPropertyValue('--map-backbone').trim() || '#000000';
+  for (const pass of ['casing', 'core']) {
+    const casing = pass === 'casing';
+    for (const p of backbone) {
+      const lineOp = casing ? casingOp : coreOp;
+      const line = L.polyline([[p.a.lat, p.a.lon], [p.b.lat, p.b.lon]], {
+        color:   casing ? '#ffffff' : backboneColor,
+        weight:  casing ? MAP_BACKBONE_CASING_W : MAP_BACKBONE_CORE_W,
+        opacity: lineOp,
+      }).addTo(map);
+      line.mnLinkRole        = casing ? 'backbone-casing' : 'backbone';
+      line.mnLinkRepeaterId  = p.a.id;
+      line.mnLinkRepeaterId2 = p.b.id;
+      line.mnBaseOpacity     = lineOp;
+      line.on('click', MapBackbone.onLineClick);
       state.mapLines.push(line);
     }
   }
@@ -2120,6 +2172,8 @@ function refreshMapLayers({ skipFit = false } = {}) {
       ${s.roles.map(r => `<span style="background:${ROLE_COLOR[r]};color:#fff;padding:1px 5px;border-radius:999px;font-size:.78rem;margin-right:2px">${r}</span>`).join('')}<br>
       ${s.roles.includes('repeater') && repeaterPassingCount(s) != null
         ? `<span style="font-size:.83rem">passing ${repeaterPassingCount(s)}</span><br>` : ''}
+      ${s.roles.includes('repeater') && s.repeater && s.repeater.delay_ms != null
+        ? `<span style="font-size:.83rem">repeater delay ${s.repeater.delay_ms} ms</span><br>` : ''}
       ${s.station_number ? `<span style="font-size:.83rem">Stn #${esc(s.station_number)}</span><br>` : ''}
       ${idTypes.length ? `<span style="font-size:.83rem">AlertID:</span><br>${idTypes.map(t =>
         `<span style="font-size:.82rem">&nbsp;&nbsp;${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
@@ -2302,7 +2356,10 @@ function applyMapFocusStyles() {
   }
   for (const l of state.mapLines) {
     if (l.mnBaseOpacity == null) continue;
-    const dim = !!served && l.mnLinkRepeaterId !== state.mapFocusRepeaterId;
+    // A backbone line has a repeater at BOTH ends (mnLinkRepeaterId2); it stays
+    // lit when the focused repeater is either of them.
+    const dim = !!served && l.mnLinkRepeaterId !== state.mapFocusRepeaterId
+                         && l.mnLinkRepeaterId2 !== state.mapFocusRepeaterId;
     l.mnFocusDimmed = dim;
     l.setStyle({ opacity: dim ? l.mnBaseOpacity * MAP_FOCUS_DIM_LINE_MIX : l.mnBaseOpacity });
   }
@@ -2414,8 +2471,10 @@ function setMapLinkOpacity(v) {
   const label = document.getElementById('link-opacity-val');
   if (label) label.textContent = `${Math.round(v * 100)}%`;
   for (const l of state.mapLines) {
-    if (l.mnLinkRole === 'casing')    l.setStyle({ opacity: v * MAP_LINK_CASING_MIX });
-    else if (l.mnLinkRole === 'core') l.setStyle({ opacity: v });
+    if (l.mnLinkRole === 'casing' ||
+        l.mnLinkRole === 'backbone-casing') l.setStyle({ opacity: v * MAP_LINK_CASING_MIX });
+    else if (l.mnLinkRole === 'core' ||
+             l.mnLinkRole === 'backbone')   l.setStyle({ opacity: v });
   }
 }
 
@@ -2949,6 +3008,7 @@ function refreshFilterOptions() {
   state.searchIdx   = null;
   state.repeaterIdx = null;
   state.passRelIdx  = null;   // an edited pass range re-wires the relation
+  state.backboneIdx = null;   // and with it which repeater pairs share a window
   if (state.activeTab === 'stations') renderStationFilters();
 }
 

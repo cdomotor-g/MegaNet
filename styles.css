@@ -58,6 +58,9 @@
   --rx-bg: #eef4fb;
   --tx-bg: #eef8f1;
   --map-line: #ff6f00;
+  /* Repeater backbone paths. Black by request — the white casing the map draws
+     under it is what carries it on dark imagery, in both themes. */
+  --map-backbone: #000000;
   /* Watercourses matching the filter box. Deliberately not the orange of a
      pass-range link nor any station-role fill, and a deeper blue than the water
      the topo tiles already draw, so a highlighted river reads as highlighted. */
@@ -337,6 +340,7 @@
   --rx-bg: #1d3242;
   --tx-bg: #19362a;
   --map-line: #ff9f43;
+  --map-backbone: #000000;
   --map-river: #4fc3f7;
   --map-survey: #4dd0c8;
   --map-repeater: #6bb6ff;
@@ -1825,6 +1829,13 @@ hr {
 }
 
 .legend-line-river { border-top-color: var(--map-river); }
+/* Heavier than the pass-range swatch, as the path itself is; the outline is
+   the legend's stand-in for the white casing that separates black from a dark
+   basemap. */
+.legend-line-backbone {
+  border-top: 4px solid var(--map-backbone);
+  outline: 1px solid var(--border);
+}
 .legend-dot-survey { background: var(--map-survey); }
 /* SoRT's warmed burnt orange for LiDAR contour lines — a hard-coded colour on
    purpose: the swatch matches the server-rendered image (MapContours draws the

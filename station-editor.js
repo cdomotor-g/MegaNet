@@ -182,6 +182,19 @@ function editorForm(s) {
         <label>ACMA Licence<input type="text" id="ef-acma" value="${esc(s.repeater?.acma_licence || '')}"></label>
         <label>RX (MHz)<input type="number" step="any" id="ef-rx" value="${s.repeater?.rx_mhz ?? ''}"></label>
         <label>TX (MHz)<input type="number" step="any" id="ef-tx" value="${s.repeater?.tx_mhz ?? ''}"></label>
+        <label>Repeater delay (ms)
+          <input type="number" min="0" max="999" step="1" id="ef-delay"
+                 value="${s.repeater?.delay_ms ?? ''}" placeholder="not set">
+        </label>
+        <div class="full small" style="color:var(--muted);margin-top:-.35rem">
+          How long this repeater waits before re-transmitting a message its pass ranges accept.
+          Blank means not set, not zero. ${(() => {
+            const sug = suggestedRepeaterDelayMs(s);
+            return sug == null ? '' :
+              `Suggested: <strong>${sug} ms</strong> — staggered so repeaters within the backbone
+               distance whose windows share an address never hold the same delay.`;
+          })()}
+        </div>
         ${repeaterPassingSummaryHtml(s)}
         ${repeaterCarriedStationsHtml(s)}
         <label class="full">Pass Ranges (one per line: <em>low-high</em>)
@@ -360,12 +373,16 @@ function editorReadForm() {
   d.alert_ids = deriveLegacyAlertIds(sensors);
 
   if (d.roles.includes('repeater')) {
+    // d.repeater is rebuilt wholesale here — a repeater key not read (or
+    // carried, like notes) is silently erased on every save.
+    const delay = pInt(document.getElementById('ef-delay')?.value);
     d.repeater = {
       acma_licence: document.getElementById('ef-acma')?.value.trim() || '',
       rx_mhz:       pFloat(document.getElementById('ef-rx')?.value),
       tx_mhz:       pFloat(document.getElementById('ef-tx')?.value),
       pass_ranges:  parseRangeLines(document.getElementById('ef-pass')?.value || ''),
       exclusions:   parseRangeLines(document.getElementById('ef-excl')?.value || ''),
+      delay_ms:     delay == null ? null : Math.max(0, Math.min(999, delay)),
       notes:        d.repeater?.notes || '',
     };
   }

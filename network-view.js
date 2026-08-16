@@ -1198,7 +1198,11 @@ const NetworkView = (function () {
     stopNvMap();
     const el = document.getElementById('nv-map-canvas');
     if (!el) return;
-    state.nvMap = L.map('nv-map-canvas', { preferCanvas: true }).setView(MAP_HOME, 4);
+    // Explicit renderer for its tolerance: the pass-range and backbone lines
+    // are clickable, and canvas hit-testing confined to a 1.4 px stroke isn't.
+    state.nvMap = L.map('nv-map-canvas', {
+      preferCanvas: true, renderer: L.canvas({ tolerance: 5 }),
+    }).setView(MAP_HOME, 4);
     // The getter, not the map: stopNvMap() below sets this back to null, and
     // the shell has to see that rather than hold a removed map open (#142).
     registerLiveMap('NetworkView', () => state.nvMap);
@@ -1215,6 +1219,7 @@ const NetworkView = (function () {
     state.nvMapLines     = [];
     state.nvMapArrows    = [];
     state.nvMapRepeaters = [];
+    state.nvMapBackbone  = [];
   }
 
   // Redrawn whenever refresh(true) rebuilds the graph's own visible set — not on
@@ -1228,10 +1233,12 @@ const NetworkView = (function () {
     state.nvMapLines.forEach(l => l.remove());
     state.nvMapArrows.forEach(a => a.remove());
     state.nvMapRepeaters.forEach(x => x.remove());
+    (state.nvMapBackbone || []).forEach(x => x.remove());
     state.nvMapMarkers   = [];
     state.nvMapLines     = [];
     state.nvMapArrows    = [];
     state.nvMapRepeaters = [];
+    state.nvMapBackbone  = [];
 
     const V = nv.vis || computeVisible();
 
@@ -1308,11 +1315,16 @@ const NetworkView = (function () {
     // an edge of the graph". Drawn before the station pins below so a station
     // circle always ends up on top of a repeater diamond sharing its spot.
     const repeaterCoords = [];
+    // Repeaters actually on this map — as a diamond or as one of the station
+    // pins — so the backbone layer below never draws a path to an off-map end.
+    const drawnRepIds = new Set(
+      stations.filter(s => s.roles.includes('repeater')).map(s => s.id));
     for (const { station: r, stations: served } of visibleRepeaterInfo().values()) {
       if (r.lat == null || r.lon == null) continue;
       const servedLocated = [...served].filter(s => located.has(s.id));
       if (!servedLocated.length) continue;
       repeaterCoords.push([r.lat, r.lon]);
+      drawnRepIds.add(r.id);
 
       // Only pin the repeater itself if it is not already on the map as one of
       // the stations in view — a repeater that is itself a graph node keeps its
@@ -1348,8 +1360,29 @@ const NetworkView = (function () {
           opacity:   0.55,
           dashArray: '1,6',
         }).addTo(map);
+        // A radio path is a radio path on every map: clicking it answers the
+        // same questions here as on the Stations map, popup-sized, with the
+        // hand-off to the full three-card treatment inside it.
+        line.bindPopup(() => MapBackbone.popupHtml('field', s.id, r.id));
         state.nvMapRepeaters.push(line);
       }
+    }
+
+    // Repeater backbone paths (see map-backbone.js): black over the coverage
+    // lines, under the pins, and only between repeaters already on this map so
+    // the auto-fit extent stays what the graph put there.
+    const backboneColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--map-backbone').trim() || '#000000';
+    for (const p of backboneLinks(state.mapMaxLinkKm)) {
+      if (!drawnRepIds.has(p.a.id) || !drawnRepIds.has(p.b.id)) continue;
+      const casing = L.polyline([[p.a.lat, p.a.lon], [p.b.lat, p.b.lon]], {
+        color: '#ffffff', weight: 4.5, opacity: 0.7,
+      }).addTo(map);
+      const line = L.polyline([[p.a.lat, p.a.lon], [p.b.lat, p.b.lon]], {
+        color: backboneColor, weight: 2.5, opacity: 0.95,
+      }).addTo(map);
+      line.bindPopup(() => MapBackbone.popupHtml('backbone', p.a.id, p.b.id));
+      state.nvMapBackbone.push(casing, line);
     }
 
     for (const s of stations) {

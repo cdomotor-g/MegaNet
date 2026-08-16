@@ -79,8 +79,8 @@ KEY_ORDER = {
     'sensor':  ['alert_id', 'type', 'sensor_id', 'device_id'],
     'site':    ['db_id', 'number', 'name'],
     'satcom':  ['enabled', 'provider', 'terminal_id'],
-    'repeater': ['acma_licence', 'rx_mhz', 'tx_mhz', 'pass_ranges', 'exclusions',
-                 'notes'],
+    'repeater': ['acma_licence', 'rx_mhz', 'tx_mhz', 'delay_ms', 'pass_ranges',
+                 'exclusions', 'notes'],
     'range':   ['low', 'high'],
 }
 

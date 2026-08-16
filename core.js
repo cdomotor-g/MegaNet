@@ -235,6 +235,12 @@ const HELP = {
       + 'cannot may simply be past the <em>Max TX distance</em> slider; the sidebar says how many '
       + 'links were drawn and how many were culled, so check that before concluding the path '
       + 'isn\'t there.',
+      '<strong>Repeater backbone paths</strong> are the heavy black lines: two repeaters within '
+      + 'the <em>Max TX distance</em> whose pass-range windows are open to at least one common '
+      + 'ALERT address. For backbone the slider is the <em>match</em> — moving it changes which '
+      + 'pairs qualify, not just which are drawn. Clicking any radio path — field link or '
+      + 'backbone — opens a card about that hop and points the elevation profile and link budget '
+      + 'panels at it.',
       '<strong>Include related repeaters</strong> widens the match itself rather than the drawing: '
       + 'repeaters whose pass ranges cover a matched station are pulled in even though they don\'t '
       + 'match the filter text. That is why the station count can exceed the number of rows your '
@@ -756,6 +762,11 @@ const HELP = {
       'Station names manage their own overlap: each tries eight positions around its pin and a '
       + 'name that fits nowhere is dropped and counted in the notes rather than printed over a '
       + 'neighbour. Zoom the scale in and the dropped names come back.',
+      '<strong>Repeater backbone paths</strong> is its own toggle under Features, with its own '
+      + 'distance rather than a live read of the Stations tab\'s slider — a generated sheet '
+      + 'depends only on what this panel shows. The default black raster-engraves in the laser '
+      + 'modes, like the pins; recolour it blue for a faster vector engrave, and never red '
+      + 'unless you mean to cut every path through the plate.',
       'The base map, the rivers and the terrain all arrive over the network. Whatever fails, '
       + 'the sheet still generates with what did arrive, and the notes under the preview say '
       + 'what is missing — a blank-based laser plate needs none of it to be complete.',
@@ -1068,7 +1079,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 14;
+const DB_SCHEMA_VERSION = 15;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 function dbHostLabel() {
@@ -1231,6 +1242,10 @@ const state = {
   // applyMapFocusStyles. A display overlay like mapSelection, not a filter.
   mapFocusRepeaterId: null,
   mapShowLinks:   true,
+  // Repeater backbone paths: black lines between repeater pairs within
+  // mapMaxLinkKm whose pass-range windows share an ALERT address. Session-only
+  // like the rest of the map display block — see map-backbone.js.
+  mapShowBackbone: true,
   mapHideOthers:  false,   // filter box: highlight matches (default) vs hide the rest
   mapKillSpaghetti: true,  // drop pass-range links longer than mapMaxLinkKm
   mapMaxLinkKm:   120,     // km; about as far as a VHF hop plausibly reaches
@@ -1255,6 +1270,7 @@ const state = {
   mapFitKey:      null,    // extent the map was last auto-fitted to (re-fit only on change)
   mapSearchTimer: null,    // debounce for the search box → marker rebuild
   passRelIdx:     null,    // both directions of the pass-range relation, per loaded file
+  backboneIdx:    null,    // repeater backbone pairs + suggested delays, per loaded file
   splitW:         +(localStorage.getItem('mn-split') || 0) || 320,  // Stations tab column split, px
   // Left nav: an icon rail, or icons plus labels. Kept under 'mn-nav' the same
   // way the theme and the split width are. With nothing stored the window's
@@ -1337,6 +1353,7 @@ const state = {
   nvMapLines:     [],
   nvMapArrows:    [],   // direction markers on confirmed links — see refreshNvMap
   nvMapRepeaters: [],   // pass-range repeater pins + their lines — see refreshNvMap
+  nvMapBackbone:  [],   // repeater backbone paths on the mini-map — see refreshNvMap
   prFilter:       '',      // Pass Ranges tab: station number / AlertID / name filter
   // ARRO launcher. `search` drives the station lookup, `siteId`/`deviceId` are
   // the ids actually opened — a search result writes into them rather than

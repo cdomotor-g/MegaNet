@@ -471,6 +471,11 @@ const LinkBudget = (function () {
     // The profile panel finished (or failed) — the diffraction line follows it.
     profileChanged() { if (S().open) rerender(); },
 
+    // The budget as computed for the current endpoints, or null while either
+    // end is unset. Read-only: the radio-path card quotes this so the figure
+    // on the card and the figure in this panel can never disagree.
+    current() { return compute(); },
+
     // "Link budget for this path →" on the profile panel: take the drawn line's
     // two ends as the budget's endpoints.
     fromProfile() {

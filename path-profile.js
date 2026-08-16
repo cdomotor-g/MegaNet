@@ -247,8 +247,10 @@ const PathProfile = (function () {
       cur.prof   = res.ok ? res : null;
       cur.error  = res.ok ? '' : res.error;
       rerender();
-      // The budget quotes this profile's diffraction term, so it follows it.
+      // The budget quotes this profile's diffraction term, so it follows it —
+      // and so does the radio-path card, which quotes the budget.
       LinkBudget.profileChanged();
+      MapBackbone.profileChanged();
     });
   }
 

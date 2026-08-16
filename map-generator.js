@@ -88,13 +88,19 @@ const MG_BASES = {
 const MG_PALETTES = {
   print:  { contour: '#8d6e63', contourMajor: '#5d4037', river: '#1565c0', grat: '#90a0b0',
             gratText: '#5a6b7c', pinField: '#107c10', pinRepeater: '#0b5cab', pinBase: '#c7401a',
-            label: '#1a2430', title: '#1a2430', border: '#333333', align: '#0000ff' },
+            label: '#1a2430', title: '#1a2430', border: '#333333', align: '#0000ff',
+            backbone: '#000000' },
+  // Backbone black on purpose in the laser palettes too: in the K40 contract
+  // black raster-engraves, which is what the pins already do — NOT red, which
+  // would vector-CUT every backbone path through the plate.
   laser:  { contour: '#0000ff', contourMajor: '#0000ff', river: '#0000ff', grat: '#000000',
             gratText: '#000000', pinField: '#000000', pinRepeater: '#000000', pinBase: '#000000',
-            label: '#0000ff', title: '#0000ff', border: '#ff0000', align: '#0000ff' },
+            label: '#0000ff', title: '#0000ff', border: '#ff0000', align: '#0000ff',
+            backbone: '#000000' },
   layers: { contour: '#0000ff', contourMajor: '#0000ff', river: '#0000ff', grat: '#000000',
             gratText: '#000000', pinField: '#000000', pinRepeater: '#000000', pinBase: '#000000',
-            label: '#0000ff', title: '#0000ff', border: '#ff0000', align: '#0000ff' },
+            label: '#0000ff', title: '#0000ff', border: '#ff0000', align: '#0000ff',
+            backbone: '#000000' },
 };
 
 const MG_COLOR_LABELS = [
@@ -110,6 +116,7 @@ const MG_COLOR_LABELS = [
   ['title',        'Title block'],
   ['border',       'Border / cut'],
   ['align',        'Alignment engrave'],
+  ['backbone',     'Repeater backbone'],
 ];
 
 // Overpass, for the rivers — the same two mirrors MapRivers trusts, asked a
@@ -458,8 +465,12 @@ function defaults() {
       layers: { ...MG_PALETTES.layers },
     },
     f: { contours: true, rivers: true, streams: false, stations: true, labels: true,
-         graticule: true, gratLabels: true, title: true, layerTags: true },
+         graticule: true, gratLabels: true, title: true, layerTags: true, backbone: false },
     roles: { field: true, repeater: true, base: true },
+    // Repeater backbone paths (see map-backbone.js). Its own distance rather
+    // than a live read of the Stations tab's slider, so a generated sheet
+    // depends only on what this panel shows — adoptStationsView's precedent.
+    backbone: { maxKm: 120 },
     contour: { auto: true, interval: 10, datum: 0, majorEvery: 5, labels: true,
                detail: 288, smooth: 1, thick: 3 },
     pins: {
@@ -500,6 +511,7 @@ function loadSettings() {
     heal(d.contour, dd.contour, ['interval', 'datum', 'majorEvery', 'detail', 'smooth', 'thick']);
     heal(d.label, dd.label, ['sizeMm']);
     heal(d.grat, dd.grat, ['sizeMm']);
+    heal(d.backbone, dd.backbone, ['maxKm']);
     for (const r of ['field', 'repeater', 'base']) heal(d.pins[r], dd.pins[r], ['sizeMm']);
     if (!(d.scale >= 1000)) d.scale = dd.scale;
     return d;
@@ -683,7 +695,8 @@ function buildArt(fr, dem, riversRaw, base) {
   const s = mg.s;
   const vec = isVectorText();
   const art = { fr, base: base && base.href ? base : null, notes: [], dem: null,
-                contours: null, rivers: [], grat: null, pins: [], labels: [], dropped: 0 };
+                contours: null, rivers: [], backbone: [], grat: null, pins: [], labels: [],
+                dropped: 0 };
 
   // Contours.
   if ((s.f.contours || s.mode === 'layers') && dem && dem.ok) {
@@ -743,6 +756,19 @@ function buildArt(fr, dem, riversRaw, base) {
       if (riversRaw.capped) art.notes.push(`rivers capped — ${riversRaw.total - riversRaw.ways.length} smaller watercourses not drawn`);
     } else {
       art.notes.push(`rivers unavailable — ${riversRaw.error}`);
+    }
+  }
+
+  // Repeater backbone paths (see map-backbone.js). Computed from the full
+  // repeater list, not the in-frame pins: a path to a repeater just off the
+  // plate edge still draws its clipped in-frame piece. Same distance-as-match
+  // rule as the Stations map, off this tab's own persisted maxKm.
+  if (s.f.backbone) {
+    for (const p of backboneLinks(s.backbone.maxKm)) {
+      const mm = [fr.toMm(p.a.lat, p.a.lon), fr.toMm(p.b.lat, p.b.lon)];
+      for (const piece of clipPolyline(mm, fr.rect)) {
+        if (piece.length > 1) art.backbone.push({ pts: piece, km: p.km });
+      }
     }
   }
 
@@ -993,6 +1019,14 @@ function flatSvg(art, forFile) {
       out.push(textMarkup(lb.x, lb.y, lb.text, s.grat.sizeMm, colors.gratText, { vector: vec, anchor: lb.anchor, halo: !vec }));
     }
   }
+  if (s.f.backbone) {
+    // Under the pins, over everything else; 0.6 mm out-weighs every other line
+    // on the sheet (river 0.35 is the next heaviest), which is the point.
+    for (const l of art.backbone) {
+      out.push(`<path d="${pathD(l.pts)}" fill="none" stroke="${colors.backbone}"` +
+               ` stroke-width="0.6" stroke-linecap="round"/>`);
+    }
+  }
   if (s.f.stations) {
     for (const p of art.pins) out.push(pinMarkup(p, colors['pin' + p.role[0].toUpperCase() + p.role.slice(1)]));
   }
@@ -1034,6 +1068,13 @@ function layerSvg(art, k, forFile) {
     for (const r of bandPieces(art.rivers)) {
       out.push(`<path d="${pathD(r.pts)}" fill="none" stroke="${colors.river}"` +
                ` stroke-width="${r.kind === 'stream' ? 0.18 : 0.3}" stroke-linecap="round"/>`);
+    }
+  }
+  if (s.f.backbone && art.backbone.length) {
+    // Diced onto the plate visible at each point, exactly as the rivers are.
+    for (const b of bandPieces(art.backbone)) {
+      out.push(`<path d="${pathD(b.pts)}" fill="none" stroke="${colors.backbone}"` +
+               ` stroke-width="0.6" stroke-linecap="round"/>`);
     }
   }
   if (art.grat) {
@@ -1181,6 +1222,7 @@ function syncNotes(ms) {
     if (g.art.contours) bits.push(`${g.art.contours.levels.length} contour level(s) at ${g.art.contours.interval} m`);
   }
   if (mg.s.f.rivers) bits.push(`${g.art.rivers.length} river piece(s)`);
+  if (mg.s.f.backbone) bits.push(`${g.art.backbone.length} backbone path piece(s)`);
   if (mg.s.f.stations) bits.push(`${g.art.pins.length} station(s) in frame`);
   setStatus(bits.join(' · ') || 'Generated.');
   const el = document.getElementById('mg-notes');
@@ -1411,6 +1453,12 @@ function featuresPanelHtml() {
     <label class="mg-inline">Name size mm
       <input type="number" min="1" max="8" step="0.1" class="mg-num-sm" value="${s.label.sizeMm}"
              onchange="MapGen.set('label.sizeMm', this.value, 'num')"></label>`)}
+
+    <h3 class="mg-sub">Repeater backbone</h3>
+    ${checkRow('Backbone paths (repeaters sharing pass ranges)', 'f.backbone', s.f.backbone, `
+    <label class="mg-inline">Max path km
+      <input type="number" min="10" max="600" step="10" class="mg-num-sm" value="${s.backbone.maxKm}"
+             onchange="MapGen.set('backbone.maxKm', this.value, 'num')"></label>`)}
 
     <h3 class="mg-sub">Graticule</h3>
     ${checkRow('Latitude / longitude lines', 'f.graticule', s.f.graticule)}
