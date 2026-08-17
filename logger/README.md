@@ -120,14 +120,22 @@ over RS-232 — plugging DevConfig into RS-232 means unplugging the receiver.
 2. Send the program with Device Configuration Utility (**File Control**), or
    LoggerNet's Connect screen.
 3. Send `meganet_token.txt` the same way.
-4. Set the clock **to UTC**. The program keeps it there itself — it syncs against
-   `NTP_SERVER` every six hours with an NTP offset of 0, which is what UTC means
-   — but it needs to start close enough to be believed, and it will not stamp
-   anything at all until the year is at least `MIN_YEAR`. The program stamps
-   readings `…Z` and means it: a logger left on local time posts readings with
-   the right digits and the wrong instant, which nothing downstream can detect
-   or undo. Blank `NTP_SERVER` if this logger cannot reach an NTP server, and
-   set the clock from LoggerNet instead.
+4. **The clock must be UTC, and the program now insists on it.** It syncs
+   against `NTP_SERVER` on its first pass and every six hours after, with an NTP
+   offset of 0 — which is what UTC means — and **will not stamp a single reading
+   until one sync has succeeded** (`REQUIRE_NTP`). `ClockState` says which of
+   those it is doing.
+
+   This is not caution for its own sake. A logger left on local time posts
+   readings with the right digits and the wrong instant: they are accepted (the
+   endpoint's ceiling is a day), they are stored, and they are **invisible in
+   the Message Log**, because every window there ends at *now* and the readings
+   are ten hours in the future. Nothing downstream can detect that and nothing
+   can undo it. See *When readings arrive but the Message Log is empty* below.
+
+   If this logger genuinely cannot reach an NTP server, blank `NTP_SERVER` or
+   set `REQUIRE_NTP` to `False`, set the clock to UTC from LoggerNet, and accept
+   that nothing is checking it.
 5. Watch the Public table.
 
 ---
@@ -186,6 +194,8 @@ declared in the order you actually read them when something is wrong.
 | `NowISO` | The clock, formatted exactly as it is posted. If this looks wrong, everything downstream is wrong. |
 | `NTPErrMs` | How far out the clock was when NTP last corrected it, in milliseconds. Growing steadily between syncs is drift; a big jump is an RTC going. |
 | `NTPLastOK`, `SecsSinceNTP` | Whether the last sync worked, and how long ago. |
+| `ClockVerified` | NTP has succeeded at least once since startup. **Until this is true nothing is stamped or queued** — see `REQUIRE_NTP`. |
+| `ClockState` | Plain English: `ok`, `waiting for the first NTP sync - not stamping yet`, `NTP sync failed - see NTP_SERVER`, or `clock is before 2020 - check the RTC battery`. |
 | `WatchdogErrs` | Non-zero means the logger has been resetting itself. |
 | `SkippedScans` | The 1-second scan overrunning. A few at startup is normal; a rising count is not. |
 | `VarOutOfBound` | An array index that went past its dimension. Worth watching here specifically: CRBasic does not bounds-check a variable index, and this program indexes arrays from data that arrived over a serial cable. |
@@ -482,6 +492,42 @@ reason: the port is open in **transparent mode** (format 3), where a NUL is an
 ordinary byte, and a CRBasic string ends at the first one. A plain assignment
 would truncate exactly the block you most need to see, and `RxNulls` would never
 count the byte that caused it.
+
+---
+
+## When readings arrive but the Message Log is empty
+
+Two faults produced exactly this, and both are worth knowing because neither
+announces itself.
+
+**The clock was on local time.** The logger stamped `…Z` on a timestamp that was
+really AEST, so every reading landed **ten hours in the future**. The endpoint
+accepted them — its ceiling is a day, and ten hours is a normal amount for a
+field clock to be out — and they went into the database correctly. But the
+Message Log filters `reading_ts` between the start of the chosen window and
+`Date.now()`, so a reading stamped ten hours ahead is outside **every** preset
+window. The data was there the whole time and nothing in the app would ever show
+it. `REQUIRE_NTP` now stops this at the source; if you are chasing it on a logger
+that has already posted, compare `reading_ts` against `received_at` on any row.
+
+**The response parser reported every reading rejected.** Postgres renders `jsonb`
+with a space after each colon:
+
+```json
+{"accepted": 2, "duplicates": 0, "rejected": [], "raw_id": 4821}
+```
+
+The parser started reading digits at the character straight after the colon, hit
+that space, stopped, and kept the zero it had already stored. So `Accepted` sat
+at 0, `Rejected` was derived by subtraction and equalled the whole batch, and the
+`Diag` table said nothing was getting through while `PostOK` climbed and the data
+landed. **`PostOK` rising with `Accepted` at zero is the signature** — the queue
+advances in the same branch that parses the count, so the readings were always
+being released correctly. Only the counters lied.
+
+Both are fixed. The lesson worth keeping: a diagnostic that under-reports success
+is more expensive than no diagnostic, because it sends you looking in the wrong
+half of the system.
 
 ---
 

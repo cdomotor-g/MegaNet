@@ -171,6 +171,25 @@ Const BACKOFF_MAX = 900            'seconds -- 15 minutes
 Const NTP_SERVER = "au.pool.ntp.org"
 Const NTP_EVERY_HR = 6
 
+' Refuse to stamp a reading until NTP has succeeded at least once.
+'
+' This exists because of a real failure, not a hypothetical one. A logger whose
+' clock was left on local time stamped every reading with the right digits and
+' the wrong instant -- readings landed ten hours in the future, the endpoint
+' accepted them (its ceiling is a day), and they were invisible in the app
+' because every time window there ends at now. Nothing downstream can detect
+' that, and nothing can undo it afterwards.
+'
+' The old code only synced on the NTP_EVERY_HR boundary, so a logger could run
+' for hours before its first sync. It now syncs on the first pass and every
+' NTP_EVERY_HR after that, and REQUIRE_NTP makes an unverified clock refuse to
+' stamp rather than stamp something plausible.
+'
+' Set it False only if this logger genuinely cannot reach an NTP server -- then
+' set the clock to UTC by hand and accept that nothing is checking it. Blanking
+' NTP_SERVER disables the requirement too, for the same reason.
+Const REQUIRE_NTP = True
+
 ' How much unsent data to hold. Each slot is one reading; 250 slots is roughly
 ' two hours for a busy 40-station base. When it fills, the OLDEST reading is
 ' dropped and QDropped counts it -- for flood warning the newest river level
@@ -289,6 +308,11 @@ Public NowISO As String * 24       'the clock, formatted exactly as it is posted
 Public NTPErrMs                    'clock error NTP found, in ms, before it
                                    'corrected it. Growing between syncs is drift
 Public NTPLastOK As Boolean        'the last NTP sync succeeded
+Public ClockVerified As Boolean    'NTP has succeeded at least once since this
+                                   'program started, so the Z on every stamp is
+                                   'the truth rather than a claim
+Public ClockState As String * 60   'plain English: what the clock is doing, or
+                                   'why nothing is being stamped
 Public SecsSinceNTP
 
 ' Status table fields, read straight out of the Status table with
@@ -371,10 +395,12 @@ Public FrBad                       'and how many had a non-zero status byte or a
 
 '--- SERIAL, STEP 3c: one reading, byte by byte ------------------------------
 Public RdIndex                     'which record within the frame
-Public RdB0                        'the four bytes, as numbers, so the
-Public RdB1                        'bit-unpacking can be checked by hand against
-Public RdB2                        'the table at ParseAlert2
-Public RdB3
+Public RdB0 As Long                'the four bytes, as numbers, so the
+Public RdB1 As Long                'bit-unpacking can be checked by hand against
+Public RdB2 As Long                'the table at ParseAlert2. Long, not the
+Public RdB3 As Long                'default float: Sprintf's %02X reads a float
+                                   'as zero, which is why RdRecHex printed
+                                   '"00 00 00 00" beside four correct numbers
 Public RdRecHex As String * 12
 Public RdQueued As Boolean
 
@@ -469,7 +495,12 @@ Public RxBadFrames                 'lines rejected
 Public RxBadRecords                'records inside good frames whose status byte
                                    'was non-zero
 Public RxFrameSkew                 'seconds between the frame's own ALERT2 time
-                                   'and this logger's clock -- see ParseAlert2
+                                   'and this logger's clock -- see ParseAlert2.
+                                   'Logged as IEEE4, not FP2: FP2 cannot hold a
+                                   'number past 7999 and a whole-hour skew is
+                                   'tens of thousands of seconds, so an FP2
+                                   'column reports a clamped -7999 for anything
+                                   'interesting
 
 '--- SERIAL FORENSICS: what the whole feed looks like, not just the last line -
 '
@@ -730,7 +761,7 @@ Dim postDue As Boolean
 DataTable (Readings,True,20000)
   Sample (1,RxLastId,Long)
   Sample (1,RxLastValue,Long)
-  Sample (1,RxFrameSkew,FP2)
+  Sample (1,RxFrameSkew,IEEE4)
 EndTable
 
 ' One record per serial read that returned bytes: the raw block and the buffer
@@ -771,7 +802,7 @@ DataTable (FrameLog,True,400)
   Sample (1,FrGood,Long)
   Sample (1,FrBad,Long)
   Sample (1,whyCode,Long)
-  Sample (1,RxFrameSkew,FP2)
+  Sample (1,RxFrameSkew,IEEE4)
   Sample (1,FrElemHex,String)
   Sample (1,FrHex,String)
 EndTable
@@ -862,6 +893,8 @@ DataTable (Diag,True,-1)
   Sample (1,PostFail,Long)
   Sample (1,LastStatus,Long)
   Sample (1,PostState,String)
+  Sample (1,ClockState,String)
+  Sample (1,LastReject,String)
 EndTable
 
 
@@ -1286,9 +1319,16 @@ Sub StampNow()
   RealTime (rTime())
   If rTime(1) < MIN_YEAR Then
     ClockOK = False
+    ClockState = "clock is before " & MIN_YEAR & " - check the RTC battery"
+    NowISO = ""
+  ElseIf REQUIRE_NTP AND Len(NTP_SERVER) > 0 AND NOT ClockVerified Then
+    'The year is plausible, which proves nothing about the zone. See REQUIRE_NTP.
+    ClockOK = False
+    ClockState = "waiting for the first NTP sync - not stamping yet"
     NowISO = ""
   Else
     ClockOK = True
+    ClockState = "ok"
     Sprintf (NowISO,"%04d-%02d-%02dT%02d:%02d:%02dZ",rTime(1),rTime(2),rTime(3),rTime(4),rTime(5),rTime(6))
   EndIf
 EndSub
@@ -2098,8 +2138,22 @@ EndSub
 ' -1 if the key is not there.
 '
 ' A full JSON parser is not what this needs. The response is a flat object
-' written by one function -- {"accepted":1,"duplicates":0,"rejected":[],
-' "raw_id":4821} -- and the numbers this program acts on are never nested.
+' written by one function and the numbers this program acts on are never nested.
+'
+' It does have to step over whitespace, and that is not a detail. Postgres
+' renders jsonb with a space after every colon:
+'
+'   {"accepted": 1, "duplicates": 0, "rejected": [], "raw_id": 4821}
+'
+' An earlier version started reading digits at the character straight after the
+' colon, hit that space, stopped, and returned the zero it had already stored --
+' so every POST reported "accepted: 0" and, by subtraction, every reading in it
+' rejected. The data was being stored correctly the whole time; only the
+' counters were wrong, which is the worst way for a diagnostic to fail. The
+' example in docs/ingest-http.md shows the spaces, and had been all along.
+'
+' jsonVal is now only set to 0 once a digit is actually present, so "key exists
+' but its value is not a number" reports -1 rather than reporting zero.
 '------------------------------------------------------------------------------
 Sub JsonInt()
   jsonVal = -1
@@ -2108,13 +2162,23 @@ Sub JsonInt()
   Call FindStr()
   If foundAt > 0 Then
     jp = foundAt + Len(needle)
-    jsonVal = 0
     Do While jp <= Len(srcStr)
       jd = ASCII(Mid(srcStr,jp,1))
-      If jd < 48 OR jd > 57 Then ExitDo
-      jsonVal = jsonVal * 10 + (jd - 48)
+      If jd <> 32 AND jd <> 9 Then ExitDo
       jp = jp + 1
     Loop
+
+    jd = 0
+    If jp <= Len(srcStr) Then jd = ASCII(Mid(srcStr,jp,1))
+    If jd >= 48 AND jd <= 57 Then
+      jsonVal = 0
+      Do While jp <= Len(srcStr)
+        jd = ASCII(Mid(srcStr,jp,1))
+        If jd < 48 OR jd > 57 Then ExitDo
+        jsonVal = jsonVal * 10 + (jd - 48)
+        jp = jp + 1
+      Loop
+    EndIf
   EndIf
 EndSub
 
@@ -2255,10 +2319,21 @@ Sub PostBatch()
 
     LastReject = ""
     If LastRejected > 0 Then
+      'Same whitespace problem as JsonInt: the rendered body is `"why": "..."`,
+      'so the needle stops at the key and the colon, spaces and opening quote
+      'are stepped over here.
       srcStr = HTTPResponse
-      needle = DQ & "why" & DQ & ":" & DQ
+      needle = DQ & "why" & DQ
       Call FindStr()
-      If foundAt > 0 Then LastReject = Mid(HTTPResponse,foundAt + Len(needle),150)
+      If foundAt > 0 Then
+        jp = foundAt + Len(needle)
+        Do While jp <= Len(srcStr)
+          jd = ASCII(Mid(srcStr,jp,1))
+          If jd <> 58 AND jd <> 32 AND jd <> 9 AND jd <> 34 Then ExitDo
+          jp = jp + 1
+        Loop
+        LastReject = Mid(HTTPResponse,jp,150)
+      EndIf
     EndIf
 
     'Stored. Release exactly what was sent -- QHead may have moved on since, and
@@ -2484,13 +2559,19 @@ BeginProg
     Scan (300,Sec,1,0)
       SecsSinceNTP = SecsSinceNTP + 300
       If Len(NTP_SERVER) > 0 Then
-        If TimeIntoInterval(0,NTP_EVERY_HR,Hr) OR NOT ClockOK Then
+        'NOT ClockVerified is what makes the first pass sync immediately and
+        'keeps retrying every five minutes until it works. Waiting for the
+        'NTP_EVERY_HR boundary is what let a logger run for hours on a clock
+        'nothing had checked.
+        If TimeIntoInterval(0,NTP_EVERY_HR,Hr) OR NOT ClockVerified OR NOT ClockOK Then
           NTPErrMs = NetworkTimeProtocol (NTP_SERVER,0,1000)
           If NTPErrMs > -86400000 AND NTPErrMs < 86400000 Then
             NTPLastOK = True
+            ClockVerified = True
             SecsSinceNTP = 0
           Else
             NTPLastOK = False
+            ClockState = "NTP sync failed - see NTP_SERVER"
           EndIf
         EndIf
       EndIf
