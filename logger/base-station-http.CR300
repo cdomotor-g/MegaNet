@@ -101,11 +101,9 @@
 ' 1. SITE CONFIGURATION -- the part you edit
 '==============================================================================
 
-' Which ingest point this is. It lands in the reading's `path` column and is
-' what the Message Log tab shows as "which base heard it", so name it for the
-' place a person standing there would recognise. Not the name of a field
-' station it relays: a base hears forty of those.
-Const BASE_NAME = "MT_STUART"
+' Which ingest point this is is at the top of the Public table -- see
+' BASE_NAME there. It is Public rather than Const so the name can be corrected
+' at the logger without recompiling.
 
 ' The endpoint, from docs/ingest-http.md. https, so TLS turns itself on.
 Const INGEST_URI = "https://jjprlritvhdqpvphfrnu.supabase.co/rest/v1/rpc/ingest_http"
@@ -298,6 +296,21 @@ Const FRAME_LOOPS = 24             'most frames or lines taken from the buffer i
 ' "the JSON that will be posted", each one showing the same data in the form it
 ' has reached. When something is wrong with a feed, the step where the display
 ' stops being what you expected is the step that is broken.
+
+'--- which ingest point this is ----------------------------------------------
+'
+' Lands in every reading's `path` column and is what the Message Log tab shows
+' as "which base heard it", so name it for the place a person standing there
+' would recognise -- not for a field station it relays, because a base hears
+' forty of those.
+'
+' Public rather than Const, so it can be corrected at the logger without a
+' recompile. Two things follow. The value here is the default at every program
+' start, not a saved setting, so the permanent home for a site's name is still
+' this line. And the batch envelope is rebuilt per POST rather than once in
+' BeginProg, so a name changed on the bench takes effect on the next post
+' instead of at the next restart.
+Public BASE_NAME As String * 20 = "18 Bateson"
 
 '--- is the logger alive ------------------------------------------------------
 Public Batt_volt                   'V -- station supply
@@ -627,9 +640,10 @@ Dim dropN As Long                  'BufDrop
 Dim dk2 As Long
 Dim fk As Long                     'TakeFrames / DecodeFrame
 Dim frSigAt As Long
-Dim frLenByte As Long
-Dim frTotal As Long
-Dim frEnd As Long
+Dim frEnd As Long                  'FrLenByte and FrTotal are the Publics above.
+                                   'They were shadowed here by a lower-case pair
+                                   'until CRBasic's case-insensitivity made them
+                                   'the same two names declared twice
 Dim frLoops As Long
 Dim frElemAt As Long
 Dim frRec As Long
@@ -669,6 +683,9 @@ Dim fId As String * 16             '{~alert_id~:
 Dim fTs As String * 20             ',~reading_ts~:~
 Dim fVal As String * 20            '~,~value_raw~:
 Dim fSus As String * 24            ',~quality~:~suspect~
+Dim jName As String * 24           'BASE_NAME, safe to put inside a JSON literal
+Dim nk2 As Long
+Dim nc2 As Long
 Dim jRec As String * 120           'one reading, being built
 Dim numStr As String * 16          'one number, formatted
 
@@ -1766,6 +1783,11 @@ Sub TakeTextLine()
     tb = rxByte(tk2)
     If tb = 13 OR tb = 10 Then
       tEnd = tk2
+      If tb = 13 Then
+        RxTermCR = RxTermCR + 1
+      Else
+        RxTermLF = RxTermLF + 1
+      EndIf
       ExitFor
     EndIf
     If tb <> 9 AND (tb < 32 OR tb > 126) Then tOK = False
@@ -1811,8 +1833,6 @@ EndSub
 Sub DecodeFrame()
   RxFrames = RxFrames + 1
   RxFrameSeq = RxFrameSeq + 1
-  FrLenByte = frLenByte
-  FrTotal = frTotal
   FrElemOff = 0
   FrElemVia = 0
   FrElemLen = 0
@@ -2000,11 +2020,11 @@ Sub TakeFrames()
 
     Else
       RxFrameMode = "binary"
-      frLenByte = rxByte(frSigAt + SIG_LEN)
-      frTotal = SIG_LEN + frLenByte
-      frEnd = frSigAt + frTotal - 1
+      FrLenByte = rxByte(frSigAt + SIG_LEN)
+      FrTotal = SIG_LEN + FrLenByte
+      frEnd = frSigAt + FrTotal - 1
 
-      If frLenByte < FRAME_MIN_LEN OR frTotal > FRAME_MAX Then
+      If FrLenByte < FRAME_MIN_LEN OR FrTotal > FRAME_MAX Then
         'Not a length. Step past this signature byte and keep looking, rather
         'than trusting it and swallowing everything behind it.
         RxFrameBadLen = RxFrameBadLen + 1
@@ -2113,6 +2133,28 @@ EndSub
 ' the check happens before the append rather than after it.
 '------------------------------------------------------------------------------
 Sub BuildBatch()
+  'The envelope, rebuilt here rather than once in BeginProg, because BASE_NAME
+  'is Public and a name changed at the logger has to reach the next POST.
+  '
+  'Quotes, backslashes and control characters are replaced on the way in. The
+  'name lands inside a JSON string literal, and one of those typed into a Public
+  'field would turn every batch into a 400 with nothing on the logger to say
+  'why -- a failure the Const version could not have.
+  jName = ""
+  For nk2 = 1 To Len(BASE_NAME)
+    nc2 = ASCII(Mid(BASE_NAME,nk2,1))
+    If nc2 = 34 OR nc2 = 92 OR nc2 < 32 Then
+      jName = jName & "_"
+    Else
+      jName = jName & CHR(nc2)
+    EndIf
+  Next nk2
+
+  jEnvelope = "{" & DQ & "payload" & DQ & ":{"
+  jEnvelope = jEnvelope & DQ & "path" & DQ & ":" & DQ & jName & DQ & ","
+  jEnvelope = jEnvelope & DQ & "protocol" & DQ & ":" & DQ & PROTOCOL & DQ & ","
+  jEnvelope = jEnvelope & DQ & "readings" & DQ & ":["
+
   ContentsString = jEnvelope
   BatchN = 0
   bi = QTail
@@ -2399,15 +2441,13 @@ BeginProg
   DQ = CHR(34)
   CRLF = CHR(13) & CHR(10)
 
-  'The JSON fragments, built once. The comment beside each declaration above
-  'shows what it contains.
-  jEnvelope = "{" & DQ & "payload" & DQ & ":{"
-  jEnvelope = jEnvelope & DQ & "path" & DQ & ":" & DQ & BASE_NAME & DQ & ","
-  jEnvelope = jEnvelope & DQ & "protocol" & DQ & ":" & DQ & PROTOCOL & DQ & ","
-  jEnvelope = jEnvelope & DQ & "readings" & DQ & ":["
-  '`source` is deliberately absent: ingest_http() stamps it "http" itself, and a
-  'value repeated here could only ever disagree with the truth.
-
+  'The per-reading JSON fragments, built once. The comment beside each
+  'declaration above shows what it contains. jEnvelope is NOT built here -- it
+  'carries BASE_NAME, which is Public, so BuildBatch rebuilds it per POST.
+  '
+  '`source` is deliberately absent from the envelope: ingest_http() stamps it
+  '"http" itself, and a value repeated here could only ever disagree with the
+  'truth.
   jTail = "]}}"
   fId   = "{" & DQ & "alert_id" & DQ & ":"
   fTs   = "," & DQ & "reading_ts" & DQ & ":" & DQ

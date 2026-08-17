@@ -46,16 +46,24 @@ field stations ──radio──▶ ERT-A2 receiver ──RS-232──▶ CR300 
 
 Everything else in the program has a working default.
 
-**1 · `BASE_NAME`.** Near the top, under *SITE CONFIGURATION*:
+**1 · `BASE_NAME`.** At the top of the diagnostics block:
 
 ```crbasic
-Const BASE_NAME = "MT_STUART"
+Public BASE_NAME As String * 20 = "18 Bateson"
 ```
 
 This lands in every reading's `path` column and is what the Message Log tab
 shows as *which base heard it*. Name it for the ingest point — the place a
 person standing there would recognise — not for a field station it relays. A
 base hears forty of those, and "Durikai rainfall" will be wrong within a month.
+
+It is `Public`, so it can be corrected at the logger without a recompile, and
+the batch envelope is rebuilt on every POST so a change takes effect on the next
+one rather than at the next restart. **The value in the file is the default at
+every program start, not a saved setting** — the permanent home for a site's
+name is still that line. Quotes and backslashes typed into the field are
+replaced with `_` on the way into the JSON, so a stray keystroke cannot turn
+every batch into a `400`.
 
 **2 · The token file.** Mint one (`docs/ingest-http.md` § Getting a token):
 
