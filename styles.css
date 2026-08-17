@@ -5758,24 +5758,20 @@ code {
 /* The tray. Collapsed it is one summary line; open it is the plot and the map
    side by side, stacking on anything narrower than a laptop. */
 .ml-tray summary { cursor: pointer; padding: .2rem 0; }
-.ml-tray-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); padding-top: var(--sp-3); }
-.ml-plot { margin: 0; min-width: 0; }
-.ml-plot svg { width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); }
+/* The tray is the map, full width — it shared the row with a value-against-time
+   plot until that plot came out, and the height goes up with the width so the
+   map is worth the space it now has all of. */
+.ml-tray-body { padding-top: var(--sp-3); }
 .ml-mapbox { min-width: 0; }
-.ml-map { height: 300px; border: 1px solid var(--border); border-radius: var(--r-md); }
+.ml-map { height: 460px; border: 1px solid var(--border); border-radius: var(--r-md); }
 .ml-map-note { color: var(--muted); margin: .3rem 0 0; }
-.ml-key { display: inline-flex; gap: .25rem; align-items: center; margin-right: .4rem; }
-.ml-dot {
-  width: .65rem; height: .65rem; border-radius: 50%;
-  background: var(--dot, var(--accent)); display: inline-block;
-}
 
 @media (max-width: 1100px) {
-  .ml-tray-grid { grid-template-columns: 1fr; }
+  .ml-map { height: 360px; }
 }
 @media (max-width: 700px) {
   .ml-f--dates { flex-wrap: wrap; }
-  .ml-map { height: 240px; }
+  .ml-map { height: 260px; }
 }
 
 /* ══ Mobile pass ═══════════════════════════════════════════════════════════
@@ -7097,6 +7093,41 @@ code {
   background: #ffffff;
   box-shadow: var(--shadow-2);
 }
+
+/* Generating: the sheet dims and a ring turns over it. The wrapper is what
+   carries the state, so the ring holds its place over a preview that scrolls,
+   and the last sheet stays legible underneath rather than being wiped — it is
+   still the honest answer until the next one lands. */
+.mg-preview-wrap { position: relative; }
+
+.mg-preview-wrap.is-busy .mg-preview {
+  min-height: 9rem;
+  border-color: var(--accent);
+}
+
+.mg-preview-wrap.is-busy .mg-preview svg { opacity: .3; }
+
+.mg-busy-ring { display: none; }
+
+.mg-preview-wrap.is-busy .mg-busy-ring {
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: -1.375rem 0 0 -1.375rem;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: mg-busy-spin .85s linear infinite;
+  pointer-events: none;
+}
+
+/* No reduced-motion block of its own: the document-wide policy at the end of
+   this file stops the spin, and what is left still says "working" — the ring
+   sits there with its accent segment, beside #mg-status saying "Generating…". */
+@keyframes mg-busy-spin { to { transform: rotate(360deg); } }
 
 .mg-status {
   margin: var(--sp-1) 0 0;

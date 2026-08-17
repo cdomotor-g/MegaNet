@@ -153,7 +153,7 @@ const MessageLog = (() => {
       narrow: storedCols('narrow') || defaultCols('narrow'),
       wide:   storedCols('wide')   || defaultCols('wide'),
     },
-    sel:      new Set(),   // selected row keys — what the tray plots and maps
+    sel:      new Set(),   // selected row keys — what the tray maps
     openKey:  null,        // the one row whose detail drawer is open
     focusKey: null,        // a row a deep link asked for; opened when it arrives
     trayOpen: false,
@@ -645,7 +645,7 @@ const MessageLog = (() => {
           onclick="MessageLog.rowClick(event, '${escAttr(key)}')">
         <td class="ml-pick">
           <input type="checkbox" ${ml.sel.has(key) ? 'checked' : ''}
-                 aria-label="Select the ${escAttr(fmtTs(r.reading_ts))} message from ${escAttr(res.st ? res.st.name : r.addr)} for the plot and the map"
+                 aria-label="Select the ${escAttr(fmtTs(r.reading_ts))} message from ${escAttr(res.st ? res.st.name : r.addr)} for the map"
                  onclick="MessageLog.pickClick(event)"
                  onchange="MessageLog.setSel('${escAttr(key)}', this.checked)">
         </td>
@@ -672,7 +672,7 @@ const MessageLog = (() => {
           <thead><tr>
             <th scope="col" class="ml-pick">
               <input type="checkbox" ${all && ml.rows.length ? 'checked' : ''}
-                     aria-label="Select every fetched message for the plot and the map"
+                     aria-label="Select every fetched message for the map"
                      onchange="MessageLog.selAll(this.checked)">
             </th>
             ${cols.map(c => `<th scope="col" title="${escAttr(c.title)}">${esc(c.label)}</th>`).join('')}
@@ -814,28 +814,26 @@ const MessageLog = (() => {
       </div>`;
   }
 
-  // ── the tray — plot and map over the selection ─────────────────────────────
+  // ── the tray — the map over the selection ──────────────────────────────────
   // Collapsed by default so the log itself is what the tab opens on. Open, it
-  // is two views of the ticked rows: their raw values against time on the
-  // left, and on the right the Stations map's own ghosting rules — every pin
-  // stays, the selection is at full opacity and named, and the repeaters
-  // whose pass ranges carry a selected station come up with it, dashed cyan,
-  // exactly as the Stations tab draws a pass-range pull.
+  // is where the ticked rows are on the ground, under the Stations map's own
+  // ghosting rules — every pin stays, the selection is at full opacity and
+  // named, and the repeaters whose pass ranges carry a selected station come up
+  // with it, dashed cyan, exactly as the Stations tab draws a pass-range pull.
+  //
+  // It used to be half a tray: a value-against-time plot beside the map. The
+  // plot went because it answered a question this tab does not ask — raw values
+  // over a window are the Field Data tab's whole subject, and a row here has a
+  // button that opens exactly that. The map takes the width back.
 
   function trayHtml() {
     return `
       <details class="panel ml-tray" id="ml-tray" ${ml.trayOpen ? 'open' : ''}
                ontoggle="MessageLog.trayToggle(this)">
-        <summary title="Plot the selected messages and put their stations on the map — tick rows in the table below">
-          Plot &amp; map <span class="small" id="ml-tray-sum">${traySummary()}</span>
+        <summary title="Put the selected messages' stations on the map — tick rows in the table below">
+          Map <span class="small" id="ml-tray-sum">${traySummary()}</span>
         </summary>
-        <div class="ml-tray-grid">
-          <figure class="ml-plot">
-            <figcaption class="small">Raw values against reading time, one colour per address
-              <span id="ml-plot-legend"></span></figcaption>
-            <svg id="ml-plot-svg" viewBox="0 0 640 300" role="img"
-                 aria-label="Raw values of the selected messages against time"></svg>
-          </figure>
+        <div class="ml-tray-body">
           <div class="ml-mapbox">
             <div id="ml-map" class="ml-map" aria-label="Selected stations, their carrier repeaters, and the rest of the network ghosted"></div>
             <p class="small ml-map-note">Selected stations at full opacity and named; repeaters whose pass
@@ -848,123 +846,18 @@ const MessageLog = (() => {
   function traySummary() {
     return ml.sel.size
       ? `— ${ml.sel.size} message${ml.sel.size === 1 ? '' : 's'} selected`
-      : '— tick rows in the table to plot them here';
+      : '— tick rows in the table to map them here';
   }
 
   function refreshTray() {
     const sum = document.getElementById('ml-tray-sum');
     if (sum) sum.textContent = traySummary();
     if (!ml.trayOpen) return;
-    drawPlot();
     refreshTrayMap();
   }
 
   function selRows() {
     return (ml.rows || []).filter(r => ml.sel.has(rowKey(r)));
-  }
-
-  // Theme colours are read from the document rather than written as var()
-  // into the SVG — the same rule the ARRO chart follows, and the same twelve
-  // series tokens, so a selection here wears the colours a chart there would.
-  function themeColor(token, fallback) {
-    if (typeof getComputedStyle !== 'function') return fallback;
-    const v = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
-    return v || fallback;
-  }
-
-  function seriesColor(i) {
-    return themeColor(`--ad-series-${(i % 12) + 1}`, ['#0b5cab', '#c7401a', '#107c10', '#7c35a3'][i % 4]);
-  }
-
-  function niceTicks(lo, hi, n) {
-    if (!(hi > lo)) { hi = lo + 1; }
-    const span = hi - lo;
-    const step0 = span / Math.max(1, n);
-    const mag = Math.pow(10, Math.floor(Math.log10(step0)));
-    const step = [1, 2, 5, 10].map(m => m * mag).find(s => span / s <= n) || 10 * mag;
-    const t0 = Math.ceil(lo / step) * step;
-    const out = [];
-    for (let v = t0; v <= hi + 1e-9; v += step) out.push(v);
-    return out;
-  }
-
-  function drawPlot() {
-    const svg = document.getElementById('ml-plot-svg');
-    const legend = document.getElementById('ml-plot-legend');
-    if (!svg) return;
-    const rows = selRows();
-    const cText = themeColor('--text', '#16202a'), cMuted = themeColor('--muted', '#4f6478'),
-          cBorder = themeColor('--border', '#dde5ee');
-    if (!rows.length) {
-      svg.innerHTML = `<text x="320" y="150" text-anchor="middle" font-size="13" fill="${cMuted}">Nothing selected — tick rows in the table below.</text>`;
-      svg.setAttribute('aria-label', 'No messages selected');
-      if (legend) legend.innerHTML = '';
-      return;
-    }
-    // One series per address, points in reading order. Raw values, always —
-    // mixing a count series and an engineering series on one axis is exactly
-    // what the raw column protects against, so the legend names the unit gap
-    // rather than the axis hiding it.
-    const byAddr = new Map();
-    for (const r of rows) {
-      if (!byAddr.has(r.addr)) byAddr.set(r.addr, []);
-      byAddr.get(r.addr).push({ t: Date.parse(r.reading_ts), v: Number(r.value_raw) });
-    }
-    const series = [...byAddr.entries()].map(([addr, pts], i) => {
-      pts.sort((a, b) => a.t - b.t);
-      const hit = resIndex().sensors.get(+String(addr).replace(/^a:/, '')) || [];
-      const label = hit.length && String(addr).startsWith('a:')
-        ? `${addr} · ${hit[0].station.name}` : addr;
-      return { addr, pts, label, color: seriesColor(i) };
-    });
-
-    const W = 640, H = 300, L = 52, R = 12, T = 12, B = 30;
-    let t0 = Infinity, t1 = -Infinity, v0 = Infinity, v1 = -Infinity;
-    for (const s of series) for (const p of s.pts) {
-      if (p.t < t0) t0 = p.t; if (p.t > t1) t1 = p.t;
-      if (p.v < v0) v0 = p.v; if (p.v > v1) v1 = p.v;
-    }
-    if (t1 <= t0) t1 = t0 + 60000;
-    if (v1 <= v0) { v0 -= 1; v1 += 1; }
-    const pad = (v1 - v0) * 0.08;
-    v0 -= pad; v1 += pad;
-    const x = t => L + (t - t0) / (t1 - t0) * (W - L - R);
-    const y = v => H - B - (v - v0) / (v1 - v0) * (H - T - B);
-
-    const parts = [];
-    for (const v of niceTicks(v0, v1, 5)) {
-      parts.push(`<line x1="${L}" y1="${y(v)}" x2="${W - R}" y2="${y(v)}" stroke="${cBorder}" stroke-width="1"/>`);
-      parts.push(`<text x="${L - 6}" y="${y(v) + 3.5}" text-anchor="end" font-size="10" fill="${cMuted}">${+v.toPrecision(6)}</text>`);
-    }
-    const spanDays = (t1 - t0) / 86400000;
-    for (const t of niceTicks(t0, t1, 5)) {
-      const d = new Date(t);
-      const lab = spanDays > 2
-        ? `${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
-        : `${p2(d.getHours())}:${p2(d.getMinutes())}`;
-      parts.push(`<line x1="${x(t)}" y1="${H - B}" x2="${x(t)}" y2="${H - B + 4}" stroke="${cMuted}" stroke-width="1"/>`);
-      parts.push(`<text x="${x(t)}" y="${H - B + 16}" text-anchor="middle" font-size="10" fill="${cMuted}">${lab}</text>`);
-    }
-    parts.push(`<line x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}" stroke="${cText}" stroke-width="1"/>`);
-    parts.push(`<line x1="${L}" y1="${T}" x2="${L}" y2="${H - B}" stroke="${cText}" stroke-width="1"/>`);
-    for (const s of series) {
-      if (s.pts.length > 1) {
-        const d = s.pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
-        parts.push(`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="1.6" opacity=".85"/>`);
-      }
-      for (const p of s.pts) {
-        parts.push(`<circle cx="${x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3" fill="${s.color}"><title>${esc(s.addr)} · ${esc(fmtTs(p.t))} · raw ${p.v}</title></circle>`);
-      }
-    }
-    svg.innerHTML = parts.join('');
-    const n = rows.length;
-    svg.setAttribute('aria-label',
-      `Raw values of ${n} selected message${n === 1 ? '' : 's'} across ${series.length} address${series.length === 1 ? '' : 'es'}, `
-      + `${fmtTs(t0)} to ${fmtTs(t1)}`);
-    if (legend) {
-      legend.innerHTML = ' · ' + series.map(s =>
-        `<span class="ml-key"><span class="ml-dot" style="--dot:${escAttr(s.color)}"></span>${esc(s.label)}</span>`).join(' ');
-    }
   }
 
   // The map. Built when the tray opens, taken down when it closes or the tab
@@ -1180,7 +1073,6 @@ const MessageLog = (() => {
     ml.trayOpen = !!(el && el.open);
     if (ml.trayOpen) {
       buildTrayMap();
-      drawPlot();
       refreshTray();
     } else {
       stopTrayMap();
@@ -1320,7 +1212,7 @@ const MessageLog = (() => {
       // one repaint turns them into words. Nothing else moves.
       if (state.activeTab === 'msglog' && ml.rows) renderTable();
     });
-    if (ml.trayOpen) { buildTrayMap(); drawPlot(); refreshTray(); }
+    if (ml.trayOpen) { buildTrayMap(); refreshTray(); }
     if (ml.follow) armFollow();
     // The first visit fetches on its own — the tab's whole point is what has
     // just arrived, and an empty page asking to be asked is a step nobody

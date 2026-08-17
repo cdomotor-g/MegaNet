@@ -1662,7 +1662,7 @@ function mapDisplayControlsHtml() {
     <label class="filter-check">
       <input type="checkbox" ${state.mapShowBackbone ? 'checked' : ''}
              onchange="state.mapShowBackbone=this.checked;rerenderMapLegend();refreshMapLayers()">
-      Repeater backbone paths
+      Backbone paths (repeater &amp; base)
     </label>
     <label class="filter-check">
       <input type="checkbox" ${state.mapRivers ? 'checked' : ''}
@@ -1755,7 +1755,7 @@ function mapLegendHtml() {
     ${state.mapShowBackbone ? `
     <span class="legend-item">
       <span class="legend-line legend-line-backbone"></span>
-      <span class="small">Repeater backbone</span>
+      <span class="small">Backbone path</span>
     </span>` : ''}
     ${MapRivers.active() ? `
     <span class="legend-item">
@@ -2101,9 +2101,10 @@ function refreshMapLayers({ skipFit = false } = {}) {
     }
   }
 
-  // Repeater backbone paths, on top of the field links and under the pins —
-  // heavier, black, and carrying BOTH repeater ids so the focus dim can ask
-  // "is the focused repeater on either end". Clicks open the radio-path card.
+  // Backbone paths — repeater to repeater and repeater to base — on top of the
+  // field links and under the pins: heavier, black, and carrying BOTH station
+  // ids so the focus dim can ask "is the focused repeater on either end".
+  // Clicks open the radio-path card.
   const backboneColor = getComputedStyle(document.documentElement)
     .getPropertyValue('--map-backbone').trim() || '#000000';
   for (const pass of ['casing', 'core']) {

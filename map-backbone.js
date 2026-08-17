@@ -1,14 +1,16 @@
 // MegaNet — map-backbone.js
 //
-//   Repeater backbone paths: which pairs of repeaters can plausibly relay to
-//   each other, the prominent black paths that draws on the maps, the
-//   click-a-radio-path info card, and the suggested per-repeater delay that
-//   keeps neighbouring repeaters from re-transmitting on top of each other.
+//   Backbone paths: which pairs of repeaters can plausibly relay to each
+//   other, which repeaters can reach a base station, the prominent black paths
+//   that draws on the maps, the click-a-radio-path info card, and the suggested
+//   per-repeater delay that keeps neighbouring repeaters from re-transmitting
+//   on top of each other.
 //
 //   backboneIndex()            every repeater pair whose open pass-range
-//                              windows share at least one ALERT address, with
-//                              the distance between them — cached on
-//                              state.backboneIdx until the file changes.
+//                              windows share at least one ALERT address, plus
+//                              every repeater–base pair, with the distance
+//                              between them — cached on state.backboneIdx
+//                              until the file changes.
 //   backboneLinks(maxKm)       the pairs within a distance — the drawable list.
 //   suggestedRepeaterDelays()  repeater id → suggested delay in ms (< 1000).
 //   suggestedRepeaterDelayMs(station)
@@ -34,6 +36,13 @@
 // other would accept and pass on. That is a statement about the *windows*, not
 // about which stations happen to use an address today, so the test is interval
 // arithmetic rather than a walk over the sensor list.
+//
+// A repeater–base path is the other half of the backbone: where the traffic a
+// repeater relays is finally going. A base is not a repeater — it opens no
+// pass-range window of its own to intersect (the two in this network that do
+// are also repeaters, and pair by the rule above on that role) — so the only
+// condition on a repeater–base path is the distance one, the same Max TX
+// distance that matches the repeater pairs.
 
 // A repeater's open windows as a flat list of [lo, hi] integer intervals:
 // pass_ranges minus exclusions. An inverted range (high < low) matches no
@@ -68,16 +77,21 @@ function windowOverlapCount(a, b) {
   return n;
 }
 
-// Every located repeater pair whose windows overlap, resolved once per loaded
-// file — 88 repeaters is ~3,800 pairs, cheap once, not per render. Cached on
-// state.backboneIdx and invalidated exactly where state.passRelIdx is:
-// applyStationDoc and refreshFilterOptions.
+// Every located repeater pair whose windows overlap, plus every located
+// repeater–base pair, resolved once per loaded file — 88 repeaters is ~3,800
+// pairs, cheap once, not per render. Cached on state.backboneIdx and
+// invalidated exactly where state.passRelIdx is: applyStationDoc and
+// refreshFilterOptions.
 //
-//   pairs: [{ a, b, km, overlap, shared }]  a/b station records, a.id < b.id;
-//          overlap = addresses open in both windows; shared = the network's
-//          real ALERT addresses covered by both (may be empty — an overlap can
-//          sit on addresses nothing transmits on yet).
-//   cover: repeater id → Set of network ALERT addresses its windows carry.
+//   pairs: [{ kind, a, b, km, overlap, shared }]
+//          kind = 'repeater' for a repeater–repeater path, 'base' for a
+//          repeater–base one (a is always the repeater on a 'base' pair);
+//          overlap = addresses open in both windows — always > 0 on a
+//          'repeater' pair, and 0 on a 'base' pair whose base end holds no
+//          pass ranges; shared = the network's real ALERT addresses covered by
+//          both (may be empty — an overlap can sit on addresses nothing
+//          transmits on yet).
+//   cover: station id → Set of network ALERT addresses its windows carry.
 //   delays: the suggested-delay cache, filled lazily by suggestedRepeaterDelays.
 function backboneIndex() {
   if (state.backboneIdx) return state.backboneIdx;
@@ -85,15 +99,26 @@ function backboneIndex() {
   // built from the real file later — passRelationIndex's own convention.
   if (!state.data) return { pairs: [], cover: new Map(), delays: null };
   const reps = repeaterList(state.data.stations);
+  const bases = state.data.stations.filter(s => s.roles.includes('base'));
   const addresses = passRelationIndex().addresses;
   const windows = new Map();
   const cover = new Map();
-  for (const r of reps) {
+  // Bases are indexed alongside the repeaters because a base that is also a
+  // repeater has real windows worth quoting on its paths; a pure base resolves
+  // to an empty window list and an empty cover set, which is the honest answer.
+  for (const r of reps.concat(bases.filter(b => !reps.includes(b)))) {
     windows.set(r.id, repeaterOpenWindows(r.repeater));
     const set = new Set();
     for (const id of addresses) if (passRangeCoversId(r.repeater, id)) set.add(id);
     cover.set(r.id, set);
   }
+  const sharedAddrs = (aId, bId) => {
+    const ca = cover.get(aId), cb = cover.get(bId);
+    const [small, large] = ca.size <= cb.size ? [ca, cb] : [cb, ca];
+    return [...small].filter(id => large.has(id)).sort((x, y) => x - y);
+  };
+  const pairKey = (x, y) => (x < y ? x + '|' + y : y + '|' + x);
+  const seen = new Set();
   const pairs = [];
   for (let i = 0; i < reps.length; i++) {
     const a = reps[i];
@@ -105,17 +130,32 @@ function backboneIndex() {
       if (b.lat == null || b.lon == null) continue;
       const overlap = windowOverlapCount(wa, windows.get(b.id));
       if (!overlap) continue;
-      const ca = cover.get(a.id), cb = cover.get(b.id);
-      const [small, large] = ca.size <= cb.size ? [ca, cb] : [cb, ca];
-      const shared = [...small].filter(id => large.has(id)).sort((x, y) => x - y);
-      pairs.push({ a, b, km: acmaHaversineKm(a.lat, a.lon, b.lat, b.lon), overlap, shared });
+      seen.add(pairKey(a.id, b.id));
+      pairs.push({ kind: 'repeater', a, b, km: acmaHaversineKm(a.lat, a.lon, b.lat, b.lon),
+                   overlap, shared: sharedAddrs(a.id, b.id) });
+    }
+  }
+  // Repeater → base. A station that is both keeps its repeater pairs and takes
+  // base pairs only for the repeaters it did not already share a window with,
+  // so no hop is drawn — or counted — twice.
+  for (const b of bases) {
+    if (b.lat == null || b.lon == null) continue;
+    for (const a of reps) {
+      if (a.id === b.id || a.lat == null || a.lon == null) continue;
+      const key = pairKey(a.id, b.id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pairs.push({ kind: 'base', a, b, km: acmaHaversineKm(a.lat, a.lon, b.lat, b.lon),
+                   overlap: windowOverlapCount(windows.get(a.id), windows.get(b.id)),
+                   shared: sharedAddrs(a.id, b.id) });
     }
   }
   state.backboneIdx = { pairs, cover, delays: null };
   return state.backboneIdx;
 }
 
-// The drawable backbone list: pairs within `maxKm`. The distance is a *match*
+// The drawable backbone list: pairs within `maxKm` — repeater–repeater and
+// repeater–base alike, on the one distance. The distance is a *match*
 // condition here — spec'd off the Max TX distance slider — unlike the field
 // links, where the same slider only culls the drawing.
 function backboneLinks(maxKm) {
@@ -148,7 +188,11 @@ function suggestedRepeaterDelays() {
   const maxKm = state.mapMaxLinkKm;
   if (idx.delays && idx.delays.maxKm === maxKm) return idx.delays.map;
   const adj = new Map();
+  // Repeater pairs only: a base does not re-transmit, so a repeater–base path
+  // is not a collision to stagger and its base end is not a node that can hold
+  // a slot two repeaters then have to avoid.
   for (const p of backboneLinks(maxKm)) {
+    if (p.kind !== 'repeater') continue;
     if (!adj.has(p.a.id)) adj.set(p.a.id, []);
     if (!adj.has(p.b.id)) adj.set(p.b.id, []);
     adj.get(p.a.id).push(p.b.id);
@@ -272,26 +316,50 @@ const MapBackbone = (function () {
            row(`ALERT ID${ids.length === 1 ? '' : 's'} on this path`, idText);
   }
 
+  // Is this hop a repeater reaching a base rather than another repeater? The
+  // pair record says so outright — and on a 'base' pair the base is always the
+  // b end, which is what lets the rows below name the two ends by the role each
+  // is playing here rather than by every role it holds. An unindexed pair
+  // (nothing loaded, or a card left open across a file swap) falls back to the
+  // roles themselves.
+  function isBaseHop(a, b) {
+    const p = backbonePairFor(a.id, b.id);
+    return p ? p.kind === 'base' : !b.roles.includes('repeater');
+  }
+
+  // A backbone hop is repeater ⇄ repeater or repeater ⇄ base. The base end of
+  // the second kind opens no pass-range window and re-transmits nothing, so the
+  // shared-address figure says what matched instead, and neither the delay row
+  // nor the same-delay warning — both of them about re-transmission — is asked
+  // of it.
   function backboneRows(a, b) {
     const p = backbonePairFor(a.id, b.id);
-    const sharedText = p
-      ? `${p.shared.length} in use in the network` +
-        (p.shared.length ? `<br><span class="small">${p.shared.slice(0, 12).join(', ')}${
-           p.shared.length > 12 ? '…' : ''}</span>` : '') +
-        `<br><span class="small">windows overlap on ${p.overlap} address${p.overlap === 1 ? '' : 'es'}</span>`
-      : '—';
+    const toBase = isBaseHop(a, b);
+    const sharedText = !p ? '—'
+      : p.overlap
+        ? `${p.shared.length} in use in the network` +
+          (p.shared.length ? `<br><span class="small">${p.shared.slice(0, 12).join(', ')}${
+             p.shared.length > 12 ? '…' : ''}</span>` : '') +
+          `<br><span class="small">windows overlap on ${p.overlap} address${p.overlap === 1 ? '' : 'es'}</span>`
+        : `<span class="small">no pass-range window at the base end — this path is matched on
+             distance alone</span>`;
     const da = a.repeater ? a.repeater.delay_ms : null;
     const db = b.repeater ? b.repeater.delay_ms : null;
-    const clash = da != null && da === db
+    const clash = !toBase && da != null && da === db
       ? `<div class="small" style="color:var(--bad);margin-top:.35rem">⚠️ Both repeaters hold the same
            delay — a message both accept is re-transmitted at the same moment and collides at every
            receiver that hears both.</div>` : '';
+    const delays = (toBase ? [a] : [a, b]).filter(st => st.repeater)
+      .map(st => row('Delay — ' + esc(st.name), esc(repeaterDelayLabel(st)))).join('');
     return row('Repeater', stationLink(a)) +
-           row('Repeater', stationLink(b)) +
+           row(toBase ? 'Base station' : 'Repeater', stationLink(b)) +
            row('Shared ALERT IDs', sharedText) +
-           row('Delay — ' + esc(a.name), esc(repeaterDelayLabel(a))) +
-           row('Delay — ' + esc(b.name), esc(repeaterDelayLabel(b))) +
+           delays +
            clash;
+  }
+
+  function backboneTitle(a, b) {
+    return isBaseHop(a, b) ? 'Repeater to base path' : 'Repeater backbone path';
   }
 
   function cardHtml(kind, a, b) {
@@ -301,7 +369,7 @@ const MapBackbone = (function () {
     return `
       <div class="acma-card-head">
         <span>
-          <strong id="path-card-title">${backbone ? 'Repeater backbone path' : 'Radio path'}</strong><br>
+          <strong id="path-card-title">${backbone ? backboneTitle(a, b) : 'Radio path'}</strong><br>
           <span class="small txt-muted">${esc(a.name)} ⇄ ${esc(b.name)}</span>
         </span>
         <span><button type="button" onclick="MapBackbone.closeCard()"
@@ -394,10 +462,11 @@ const MapBackbone = (function () {
       const km = acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
       const m = r.margin != null ? lbMarginClass(r.margin) : null;
       return `
-        <strong>${backbone ? 'Repeater backbone path' : 'Radio path'}</strong><br>
+        <strong>${backbone ? backboneTitle(a, b) : 'Radio path'}</strong><br>
         <span style="font-size:.83rem">${esc(a.name)} ⇄ ${esc(b.name)}</span><br>
-        ${backbone && p ? `<span style="font-size:.83rem">${p.shared.length} shared ALERT ID${
-          p.shared.length === 1 ? '' : 's'} in use · windows overlap on ${p.overlap}</span><br>` : ''}
+        ${backbone && p ? `<span style="font-size:.83rem">${p.overlap
+          ? `${p.shared.length} shared ALERT ID${p.shared.length === 1 ? '' : 's'} in use · windows overlap on ${p.overlap}`
+          : 'no pass-range window at the base end — matched on distance alone'}</span><br>` : ''}
         <span style="font-size:.83rem">${fmtKm(km)} · ${r.margin == null ? 'no margin figure'
           : `${(r.margin > 0 ? '+' : '') + r.margin.toFixed(1)} dB ${m.label.toLowerCase()} (free-space)`}</span>
         <div class="mn-popup-actions">

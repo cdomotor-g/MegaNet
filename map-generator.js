@@ -116,7 +116,7 @@ const MG_COLOR_LABELS = [
   ['title',        'Title block'],
   ['border',       'Border / cut'],
   ['align',        'Alignment engrave'],
-  ['backbone',     'Repeater backbone'],
+  ['backbone',     'Backbone paths'],
 ];
 
 // Overpass, for the rivers — the same two mirrors MapRivers trusts, asked a
@@ -759,10 +759,11 @@ function buildArt(fr, dem, riversRaw, base) {
     }
   }
 
-  // Repeater backbone paths (see map-backbone.js). Computed from the full
-  // repeater list, not the in-frame pins: a path to a repeater just off the
-  // plate edge still draws its clipped in-frame piece. Same distance-as-match
-  // rule as the Stations map, off this tab's own persisted maxKm.
+  // Backbone paths — repeater to repeater and repeater to base (see
+  // map-backbone.js). Computed from the full station list, not the in-frame
+  // pins: a path to a station just off the plate edge still draws its clipped
+  // in-frame piece. Same distance-as-match rule as the Stations map, off this
+  // tab's own persisted maxKm.
   if (s.f.backbone) {
     for (const p of backboneLinks(s.backbone.maxKm)) {
       const mm = [fr.toMm(p.a.lat, p.a.lon), fr.toMm(p.b.lat, p.b.lon)];
@@ -1153,6 +1154,20 @@ async function generate() {
   const mine = ++mg.seq;
   const t0 = Date.now();
   setStatus('Generating…');
+  setBusy(true);
+  try {
+    await generateRun(mine, t0);
+  } finally {
+    // A run that has been superseded — the debounce fired again while terrain
+    // was in flight — must not take the ring off the run that replaced it.
+    if (mine === mg.seq) setBusy(false);
+  }
+}
+
+// The pipeline itself, split out only so the busy ring above has one place to
+// come off however this returns — the tab was left, the run was superseded,
+// terrain threw.
+async function generateRun(mine, t0) {
   const fr = frame();
   const s = mg.s;
   const needDem = s.f.contours || s.mode === 'layers';
@@ -1210,6 +1225,19 @@ function layerFileName(k) {
 function setStatus(text) {
   const el = document.getElementById('mg-status');
   if (el) el.textContent = text;
+}
+
+// The processing ring. The class goes on the wrapper rather than on the
+// scrolling preview itself, so the ring stays put over a sheet taller than the
+// pane instead of scrolling away with it; the sheet underneath is dimmed, not
+// cleared, because the previous render is still the honest answer until the
+// next one lands. aria-busy rides on the pane a screen reader is pointed at —
+// #mg-status, role=status, is already saying "Generating…" beside it.
+function setBusy(on) {
+  const wrap = document.getElementById('mg-preview-wrap');
+  if (wrap) wrap.classList.toggle('is-busy', !!on);
+  const el = document.getElementById('mg-preview');
+  if (el) el.setAttribute('aria-busy', on ? 'true' : 'false');
 }
 
 function syncNotes(ms) {
@@ -1454,8 +1482,8 @@ function featuresPanelHtml() {
       <input type="number" min="1" max="8" step="0.1" class="mg-num-sm" value="${s.label.sizeMm}"
              onchange="MapGen.set('label.sizeMm', this.value, 'num')"></label>`)}
 
-    <h3 class="mg-sub">Repeater backbone</h3>
-    ${checkRow('Backbone paths (repeaters sharing pass ranges)', 'f.backbone', s.f.backbone, `
+    <h3 class="mg-sub">Backbone</h3>
+    ${checkRow('Backbone paths (repeaters sharing pass ranges, and their base stations)', 'f.backbone', s.f.backbone, `
     <label class="mg-inline">Max path km
       <input type="number" min="10" max="600" step="10" class="mg-num-sm" value="${s.backbone.maxKm}"
              onchange="MapGen.set('backbone.maxKm', this.value, 'num')"></label>`)}
@@ -1560,7 +1588,10 @@ function render() {
         </div>
         <p class="mg-status" id="mg-status" role="status">Generating…</p>
         <ul class="mg-notes" id="mg-notes" hidden></ul>
-        <div class="mg-preview" id="mg-preview" aria-label="Generated map preview"></div>
+        <div class="mg-preview-wrap" id="mg-preview-wrap">
+          <div class="mg-preview" id="mg-preview" aria-label="Generated map preview"></div>
+          <div class="mg-busy-ring" aria-hidden="true"></div>
+        </div>
       </div>
       <div class="panel" id="mg-panel-export">${exportPanelHtml()}</div>
     </div>

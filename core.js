@@ -235,9 +235,11 @@ const HELP = {
       + 'cannot may simply be past the <em>Max TX distance</em> slider; the sidebar says how many '
       + 'links were drawn and how many were culled, so check that before concluding the path '
       + 'isn\'t there.',
-      '<strong>Repeater backbone paths</strong> are the heavy black lines: two repeaters within '
-      + 'the <em>Max TX distance</em> whose pass-range windows are open to at least one common '
-      + 'ALERT address. For backbone the slider is the <em>match</em> — moving it changes which '
+      '<strong>Backbone paths</strong> are the heavy black lines, and they are of two kinds: two '
+      + 'repeaters within the <em>Max TX distance</em> whose pass-range windows are open to at '
+      + 'least one common ALERT address, and every repeater within that same distance of a base '
+      + 'station — a base opens no window of its own to share, so on those the distance is the '
+      + 'whole test. For backbone the slider is the <em>match</em> — moving it changes which '
       + 'pairs qualify, not just which are drawn. Clicking any radio path — field link or '
       + 'backbone — opens a card about that hop and points the elevation profile and link budget '
       + 'panels at it.',
@@ -697,8 +699,8 @@ const HELP = {
     summary: 'The arrival log: every message the datastore accepted, newest first, one row per '
            + 'reading — who sent it, on what address, the raw value that arrived, and the pathway '
            + 'in (protocol, transport, ingress point, duplicate copies). Filter by window, by a '
-           + 'pasted list of stations or addresses, by protocol or path; tick rows to plot them '
-           + 'and map their stations in the tray above the table; open a row for the whole '
+           + 'pasted list of stations or addresses, by protocol or path; tick rows to map their '
+           + 'stations in the tray above the table; open a row for the whole '
            + 'record and its decode. <strong>Follow</strong> re-asks every 30 seconds, which is '
            + 'the mode for standing in a paddock waiting for a test transmission to land.',
     watch: [
@@ -762,7 +764,8 @@ const HELP = {
       'Station names manage their own overlap: each tries eight positions around its pin and a '
       + 'name that fits nowhere is dropped and counted in the notes rather than printed over a '
       + 'neighbour. Zoom the scale in and the dropped names come back.',
-      '<strong>Repeater backbone paths</strong> is its own toggle under Features, with its own '
+      '<strong>Backbone paths</strong> — repeater to repeater, and repeater to base station — is '
+      + 'its own toggle under Features, with its own '
       + 'distance rather than a live read of the Stations tab\'s slider — a generated sheet '
       + 'depends only on what this panel shows. The default black raster-engraves in the laser '
       + 'modes, like the pins; recolour it blue for a faster vector engrave, and never red '
@@ -1246,9 +1249,10 @@ const state = {
   // A mode on the focus, so clearing the focus clears it too.
   mapBlast: false,
   mapShowLinks:   true,
-  // Repeater backbone paths: black lines between repeater pairs within
-  // mapMaxLinkKm whose pass-range windows share an ALERT address. Session-only
-  // like the rest of the map display block — see map-backbone.js.
+  // Backbone paths: black lines between repeater pairs within mapMaxLinkKm
+  // whose pass-range windows share an ALERT address, and between a repeater and
+  // a base station within that same distance. Session-only like the rest of the
+  // map display block — see map-backbone.js.
   mapShowBackbone: true,
   mapHideOthers:  false,   // filter box: highlight matches (default) vs hide the rest
   mapKillSpaghetti: true,  // drop pass-range links longer than mapMaxLinkKm

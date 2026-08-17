@@ -85,22 +85,20 @@ screen. **Export CSV** always writes every column of every fetched row,
 whatever the views are hiding — the narrow view is a reading aid, not a
 statement about the record.
 
-## The tray — plot and map
+## The tray — the map
 
 Collapsed by default, so the log is what the tab opens on. Tick rows in the
 table (the leftmost checkbox; the header checkbox takes the whole fetch) and
-open **Plot & map**:
+open **Map**. It follows the Stations tab's own rules: every pin stays on the
+map, ghosted; the stations behind the selected rows come up at full opacity
+with their names; and the repeaters whose pass ranges carry them are pulled
+in **dashed cyan** with a dashed line to each station they serve — cyan
+meaning *a pass range named it*, never *you named it*.
 
-* **Left, the plot.** Raw values against reading time, one colour per address.
-  Raw, always — mixing a count series and an engineering series on one axis is
-  exactly the confusion the raw column exists to prevent. For the real
-  charting machinery — the 357 filter, rollups, gap handling — cross to Field
-  Data.
-* **Right, the map.** The Stations tab's own rules: every pin stays on the
-  map, ghosted; the stations behind the selected rows come up at full opacity
-  with their names; and the repeaters whose pass ranges carry them are pulled
-  in **dashed cyan** with a dashed line to each station they serve — cyan
-  meaning *a pass range named it*, never *you named it*.
+The tray used to be half a value-against-time plot beside a half-width map.
+The plot answered a question this tab does not ask — raw values across a
+window are Field Data's whole subject, and every row's detail drawer has a
+button that opens exactly that reading there. The map has the width now.
 
 ## The detail drawer
 
