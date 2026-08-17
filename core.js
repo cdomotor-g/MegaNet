@@ -1241,6 +1241,10 @@ const state = {
   // marker/link not on that repeater's own paths is dimmed — see
   // applyMapFocusStyles. A display overlay like mapSelection, not a filter.
   mapFocusRepeaterId: null,
+  // Blast radius (#161): while true, the focused repeater's links draw red and
+  // the stations it alone carries get a red dashed ring — see map-blast.js.
+  // A mode on the focus, so clearing the focus clears it too.
+  mapBlast: false,
   mapShowLinks:   true,
   // Repeater backbone paths: black lines between repeater pairs within
   // mapMaxLinkKm whose pass-range windows share an ALERT address. Session-only

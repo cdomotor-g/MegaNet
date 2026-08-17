@@ -107,6 +107,10 @@ const TEXT_PAIRS = [
 const NONTEXT_PAIRS = [
   ['--ctl-border', '--panel'], ['--ctl-border', '--bg'],
   ['--focus', '--panel'], ['--focus', '--bg'],
+  // The blast-radius pair (#161). Checked against --panel because that is
+  // where the readout card's own swatch legend draws them; on the map itself
+  // their second channels (weight, dash, growth, the focus dim) carry them.
+  ['--map-blast', '--panel'], ['--map-blast-ring', '--panel'],
 ];
 
 const AA_TEXT = 4.5;

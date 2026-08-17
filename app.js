@@ -238,6 +238,7 @@ function applyStationDoc(text, source) {
   state.repeaterIdx = null;         // so is the cached repeater-only subset
   state.passRelIdx  = null;         // and so is the pass-range relation
   state.backboneIdx = null;         // and the repeater backbone pairs built on it
+  state.blastIdx    = null;         // and the blast-radius analysis on top of both
   NetworkView.invalidate();         // every node in the graph was a row in the old file
   resetStationFilters();
   state.selectedId = null;
@@ -1546,6 +1547,7 @@ function renderStationsHtml() {
         <div class="panel" id="stations-carriers-card" ${carriers ? '' : 'hidden'}>
           ${carriers}
         </div>
+        <div class="panel" id="blast-card" hidden></div>
         <div class="panel" id="stations-editor-card">
           ${renderStationEditorCard()}
         </div>
@@ -2184,6 +2186,7 @@ function refreshMapLayers({ skipFit = false } = {}) {
            title="Select this station in the list under the map">Show in the list below ↓</a>
         <a href="#" onclick="zoomToStation('${escAttr(s.id)}');return false"
            title="Zoom the map to the ~50 km area around this station">Zoom to station</a>
+        ${MapBlast.popupLinkHtml(s)}
         ${arroUrl ? `<a href="${esc(arroUrl)}" target="_blank" rel="noopener"
            title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
            >Open in ARRO admin ↗</a>` : ''}
@@ -2324,6 +2327,11 @@ function focusedRepeaterStationIds(repeaterId) {
 function setMapFocusRepeater(id) {
   if (state.mapFocusRepeaterId === id) return;
   state.mapFocusRepeaterId = id;
+  // Blast mode is a consequence of the focus, so clearing the focus (empty-map
+  // click, Escape-shaped exits) takes the blast styling with it. Moving the
+  // focus to another repeater keeps the mode armed — the question follows the
+  // selection. See map-blast.js.
+  if (id == null) state.mapBlast = false;
   applyMapFocusStyles();
   applyMapLabels();          // the names recede with their pins (mnFocusDimmed)
   // The "Repeaters listening" card marks whichever of its rows is the focused
@@ -2363,6 +2371,10 @@ function applyMapFocusStyles() {
     l.mnFocusDimmed = dim;
     l.setStyle({ opacity: dim ? l.mnBaseOpacity * MAP_FOCUS_DIM_LINE_MIX : l.mnBaseOpacity });
   }
+  // The blast restyle rides the same passes: after every rebuild and every
+  // focus change, and only ever touching ring colour/weight/dash and line
+  // colour — the opacities above are the filter's and the focus's to decide.
+  MapBlast.applyStyles();
 }
 
 // The selection as a file — the same columns the table shows, plus the station
@@ -3009,6 +3021,7 @@ function refreshFilterOptions() {
   state.repeaterIdx = null;
   state.passRelIdx  = null;   // an edited pass range re-wires the relation
   state.backboneIdx = null;   // and with it which repeater pairs share a window
+  state.blastIdx    = null;   // and who would be stranded by a repeater's loss
   if (state.activeTab === 'stations') renderStationFilters();
 }
 

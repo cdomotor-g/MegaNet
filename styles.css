@@ -61,6 +61,15 @@
   /* Repeater backbone paths. Black by request — the white casing the map draws
      under it is what carries it on dark imagery, in both themes. */
   --map-backbone: #000000;
+  /* Blast radius (#161): the pass-range links that die with a repeater, and
+     the ring on a station with no other way in. Red as asked for, and a red
+     none of the role fills or ACMA mechanisms use; the ring is the darker of
+     the pair. Colour is not the only channel — the ring is also heavier,
+     dashed longer and grown, and the dying links are the only ones the focus
+     dim leaves at full strength. Resolved at draw time in map-blast.js
+     (Leaflet options are SVG attributes and do not take var()). */
+  --map-blast: #c62828;
+  --map-blast-ring: #b71c1c;
   /* Watercourses matching the filter box. Deliberately not the orange of a
      pass-range link nor any station-role fill, and a deeper blue than the water
      the topo tiles already draw, so a highlighted river reads as highlighted. */
@@ -341,6 +350,8 @@
   --tx-bg: #19362a;
   --map-line: #ff9f43;
   --map-backbone: #000000;
+  --map-blast: #ff6659;
+  --map-blast-ring: #ff8a80;
   --map-river: #4fc3f7;
   --map-survey: #4dd0c8;
   --map-repeater: #6bb6ff;
@@ -1835,6 +1846,26 @@ hr {
 .legend-line-backbone {
   border-top: 4px solid var(--map-backbone);
   outline: 1px solid var(--border);
+}
+
+/* The blast-radius card's inline swatches (#161) — the same two tokens the map
+   resolves at draw time, drawn on the panel, which is the surface the contract
+   pair in test/shell.mjs checks them against. The ring swatch repeats the real
+   ring's second channels: dashed and heavier than any base pin ring. */
+.blast-swatch-line {
+  width: 1.4em;
+  height: 0;
+  border-top: 3px solid var(--map-blast);
+  display: inline-block;
+  vertical-align: middle;
+}
+.blast-swatch-ring {
+  width: .8em;
+  height: .8em;
+  border-radius: 999px;
+  border: 3px dashed var(--map-blast-ring);
+  display: inline-block;
+  vertical-align: middle;
 }
 .legend-dot-survey { background: var(--map-survey); }
 /* SoRT's warmed burnt orange for LiDAR contour lines — a hard-coded colour on
