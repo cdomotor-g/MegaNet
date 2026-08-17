@@ -70,6 +70,8 @@ const SETTLE = Number(process.env.SMOKE_TAB_SETTLE || 300);
 
 const INSPECTION_ID = '00000000-0000-4000-8000-00000000a001';
 const ACTIVITY_ID   = '00000000-0000-4000-8000-00000000b001';
+const IMPORT_ID     = '00000000-0000-4000-8000-00000000c001';
+const UNMATCHED_ID  = '00000000-0000-4000-8000-00000000d001';
 
 const results = [];
 function check(name, pass, detail = '') {
@@ -107,6 +109,13 @@ function installDatastore(page, tables, records, store) {
       }
       if (fn === 'inspection_doc' || fn === 'maintenance_activity_doc') {
         const kind = fn === 'inspection_doc' ? 'inspection' : 'maintenance';
+        // An imported visit's document, as the real function would compose it:
+        // the row plus whatever the projection put in the section tables —
+        // which for the fixture's 1994 row is one battery voltage and nothing
+        // else. The `>30` and the `U/S` are deliberately NOT here; they have no
+        // number, and the transcription is where the reader must find them.
+        const imp = (records.imports || []).find(r => r.id === body.p_id);
+        if (imp && kind === 'inspection') return ok(Object.assign({}, imp, { attachments: [] }));
         const doc = records[kind];
         if (!doc || doc.id !== body.p_id) return ok(null);
         // The document as the database would compose it — the record plus the
@@ -125,16 +134,40 @@ function installDatastore(page, tables, records, store) {
 
     if (table === 'attachment') return ok(attachmentRows(store, url.search));
 
-    // The two list queries, answered off the saved records. `station_id=eq.…`
-    // is honoured because scoping the timeline to one station is half of what
-    // this tab is for.
-    if (table === 'inspection' || table === 'maintenance_activity') {
-      const kind = table === 'inspection' ? 'inspection' : 'maintenance';
-      const doc = records[kind];
+    // The list queries, answered off the saved records plus the import
+    // fixture. The filters this honours are the ones the tab actually sends:
+    // per-station scope, the unmatched scope (`station_id=is.null` +
+    // `origin=eq.import`), and the single-row provenance fetch (`id=eq.…`).
+    if (table === 'inspection') {
+      const rows = [
+        ...(records.inspection ? [records.inspection] : []),
+        ...(records.imports || []),
+      ];
+      const eqSt   = /station_id=eq\.([^&]+)/.exec(url.search);
+      const nullSt = /station_id=is\.null/.test(url.search);
+      const eqOr   = /origin=eq\.([^&]+)/.exec(url.search);
+      const eqId   = /[?&]id=eq\.([^&]+)/.exec(url.search);
+      return ok(rows.filter(r =>
+        (!eqSt || decodeURIComponent(eqSt[1]) === (r.station_id || '')) &&
+        (!nullSt || r.station_id == null) &&
+        (!eqOr || decodeURIComponent(eqOr[1]) === (r.origin || 'form')) &&
+        (!eqId || decodeURIComponent(eqId[1]) === r.id)));
+    }
+    if (table === 'maintenance_activity') {
+      const doc = records.maintenance;
       if (!doc) return ok([]);
       const want = /station_id=eq\.([^&]+)/.exec(url.search);
       if (want && decodeURIComponent(want[1]) !== (doc.station_id || '')) return ok([]);
       return ok([doc]);
+    }
+
+    // The record behind an imported visit: one row per workbook cell. The
+    // transcription table is drawn from this, so it is what carries the `>30`.
+    if (table === 'inspection_measurement') {
+      const eq = /inspection_id=eq\.([^&]+)/.exec(url.search);
+      return ok((records.measurements || [])
+        .filter(m => !eq || m.inspection_id === decodeURIComponent(eq[1]))
+        .sort((a, b) => a.ord - b.ord));
     }
 
     // 0009's own view, computed the way the view computes it: a visit whose
@@ -245,6 +278,49 @@ async function main() {
 
     const stationId = await page.evaluate(() => state.data.stations[0].id);
 
+    // ── The import fixture (#128) ──────────────────────────────────────────
+    // Two visits the loader would have written, not the form: a sparse 1994
+    // row whose date the workbook gave only as a year and whose cells include
+    // the two shapes a projection cannot carry (`>30`, `U/S`), and a parked
+    // visit #125 could not match to any station. The route fake serves both.
+    records.imports = [
+      {
+        id: IMPORT_ID, station_id: stationId, station_name: 'Test Creek',
+        cbm_no: '040001', config_key: 'alert', inspected_on: '1994-01-01',
+        inspector: '', origin: 'import', updated_at: '2026-08-17T00:00:00Z',
+        date_precision: 'year', date_raw: '1994',
+        source_workbook: 'archive/QLD All Site Inspections.xlsx',
+        source_sheet: 'Fitzroy!', source_row: 42,
+        source_block_ref: 'qld:Fitzroy!:7:1', source_ref: 'qld:Fitzroy!:7:42',
+        station_match: 'number', station_key: 'c:40001',
+        power: { battery_existing_v: 12.9 },
+      },
+      {
+        id: UNMATCHED_ID, station_id: null, station_name: 'SOMEWHERE CREEK ALERT',
+        cbm_no: '049999', config_key: 'alert', inspected_on: '2011-03-04',
+        inspector: '', origin: 'import', updated_at: '2026-08-17T00:00:00Z',
+        date_precision: 'day', date_raw: '',
+        source_workbook: 'archive/QLD All Site Inspections.xlsx',
+        source_sheet: 'Check!', source_row: 11,
+        source_block_ref: 'qld:Check!:7:1', source_ref: 'qld:Check!:7:11',
+        station_match: 'unmatched', station_key: 'c:49999',
+      },
+    ];
+    records.measurements = [
+      { inspection_id: IMPORT_ID, ord: 1, field_key: 'battery_standby_v',
+        label: 'Battery Voltage - Standby', source_col: 'C', raw: '12.9',
+        value_class: 'number', value: 12.9, unit: 'V',
+        operator: null, bound: null, status: null, flag: '' },
+      { inspection_id: IMPORT_ID, ord: 2, field_key: 'fade_margin_db',
+        label: 'Fade Margin', source_col: 'H', raw: '>30',
+        value_class: 'qualified', value: null, unit: 'dB',
+        operator: '>', bound: 30, status: null, flag: '' },
+      { inspection_id: IMPORT_ID, ord: 3, field_key: 'swr',
+        label: 'SWR', source_col: 'J', raw: 'U/S',
+        value_class: 'status', value: null, unit: '',
+        operator: null, bound: null, status: 'u/s', flag: '' },
+    ];
+
     // ── Write an inspection ────────────────────────────────────────────────
     await page.evaluate(() => switchTab('inspections'));
     await page.waitForFunction(() => state.insp.refs || state.insp.refsError,
@@ -337,10 +413,21 @@ async function main() {
     const listed = await page.evaluate(() =>
       [...document.querySelectorAll('.hist-table tbody tr')].map(tr =>
         [...tr.querySelectorAll('td')].map(td => td.textContent.replace(/\s+/g, ' ').trim())));
-    check('the timeline merges both form families, newest first',
-      listed.length === 2 && listed[0][0] === '2026-07-18' && listed[1][0] === '2026-07-04'
+    check('the timeline merges both form families and the imports, newest first',
+      listed.length === 4 && listed[0][0] === '2026-07-18' && listed[1][0] === '2026-07-04'
+      && listed[2][0] === '2011-03-04'
       && /Council Maintenance Tasks/.test(listed[0][2]) && /ALERT/i.test(listed[1][2]),
       listed.map(r => r.slice(0, 3).join(' | ')).join(' // '));
+
+    // #128: a date the workbook gave only as a year renders as the year — a
+    // full date here would assert a day the paper never said — and an imported
+    // row says it is one; the parked visit additionally says it is unmatched.
+    check('the 1994 visit lists as “1994”, marked imported',
+      listed[3] && listed[3][0] === '1994' && /imported/.test(listed[3][2]),
+      listed[3] && `${listed[3][0]} | ${listed[3][2]}`);
+    check('the parked visit keeps its workbook name and says it is not matched',
+      /SOMEWHERE CREEK ALERT/.test(listed[2][1]) && /not matched/.test(listed[2][1]),
+      listed[2][1]);
 
     // The printed instruction at the foot of the sheet, as a column. The tick
     // is there because a Council form was raised against this visit; the rating
@@ -446,8 +533,66 @@ async function main() {
       return History.exportList();
     }));
     check('the list exports as CSV, one row per record',
-      listCsv.length === 3 && listCsv[0][0] === 'date' && listCsv[1][0] === '2026-07-18',
+      listCsv.length === 5 && listCsv[0][0] === 'date' && listCsv[1][0] === '2026-07-18',
       listCsv.map(r => r[0]).join(' | '));
+
+    // ── An imported record, read back (#128) ───────────────────────────────
+    await page.evaluate(id => History.open('inspection', id), IMPORT_ID);
+    await page.waitForFunction(() =>
+      !!(state.hist.open && state.hist.open.doc && state.hist.open.cells),
+      null, { timeout: LOAD_TIMEOUT });
+    await page.waitForTimeout(SETTLE);
+
+    const imp = await page.evaluate(() => {
+      const secs = [...document.querySelectorAll('.hist-section')].map(s => s.dataset.section);
+      const trans = document.querySelector('.hist-section[data-section="_transcription"]');
+      const cells = trans
+        ? [...trans.querySelectorAll('.hist-grid-table td')].map(td => td.textContent.trim()) : [];
+      const notes = trans
+        ? [...trans.querySelectorAll('p')].map(p => p.textContent.replace(/\s+/g, ' ')).join(' ') : '';
+      const head = document.querySelector('.hist-doc-head');
+      return {
+        secs, cells, notes,
+        headText: head ? head.textContent.replace(/\s+/g, ' ') : '',
+      };
+    });
+    check('the transcription leads an imported record',
+      imp.secs[0] === '_transcription', imp.secs.join(', '));
+    check('`>30` and `U/S` read back verbatim, as themselves',
+      imp.cells.includes('>30') && imp.cells.includes('U/S'),
+      imp.cells.join(' | ').slice(0, 160));
+    check('and each says what it reads as — a bound, a status — not a number',
+      imp.cells.some(c => /a bound, not a reading/.test(c))
+      && imp.cells.some(c => /a status, not a number/.test(c)),
+      imp.cells.join(' | ').slice(0, 160));
+    check('the record names its source cell — workbook, sheet, row',
+      /Fitzroy!/.test(imp.notes) && /row 42/.test(imp.notes), imp.notes.slice(0, 160));
+    check('the heading refuses to sharpen a year into a date',
+      /1994 — recorded to the year/.test(imp.headText)
+      && !/1994-01-01/.test(imp.headText), imp.headText.slice(0, 200));
+    check('the head says it was loaded, not typed',
+      /historical workbook/i.test(imp.headText), imp.headText.slice(0, 200));
+
+    const impCsv = await capture(page, () => History.exportRecord());
+    check('the CSV carries the transcription — `>30` is in the file, dated 1994',
+      /(^|,)"?>30"?(,|$)/m.test(impCsv) && /,1994,/.test(impCsv),
+      impCsv.split('\r\n').slice(0, 3).join(' // '));
+
+    // ── The unmatched scope (#128) ─────────────────────────────────────────
+    await page.evaluate(() => { History.close(); History.showUnmatched(); });
+    await page.waitForFunction(() => !!state.hist.list && !state.hist.listBusy,
+      null, { timeout: LOAD_TIMEOUT });
+    const parked = await page.evaluate(() => ({
+      rows: [...document.querySelectorAll('.hist-table tbody tr')].map(tr =>
+        tr.textContent.replace(/\s+/g, ' ').trim()),
+      heading: document.querySelector('.hist-list-panel h3').textContent.replace(/\s+/g, ' '),
+    }));
+    check('the unmatched scope reaches the parked visit, and only it',
+      parked.rows.length === 1 && /SOMEWHERE CREEK ALERT/.test(parked.rows[0]),
+      parked.rows.join(' // ').slice(0, 160));
+    await page.evaluate(() => History.clearStation());
+    await page.waitForFunction(() => !!state.hist.list && !state.hist.listBusy,
+      null, { timeout: LOAD_TIMEOUT });
 
     // ── The Council form, read back ────────────────────────────────────────
     await page.evaluate(id => History.open('maintenance', id), ACTIVITY_ID);

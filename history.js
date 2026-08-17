@@ -86,7 +86,7 @@ const History = (function () {
   const ACROSS_ALL  = 50;
 
   const INSPECTION_COLS = 'id,station_id,station_name,cbm_no,config_key,inspected_on,'
-                        + 'inspector,origin,updated_at';
+                        + 'inspector,origin,updated_at,date_precision,date_raw';
   const ACTIVITY_COLS   = 'id,station_id,station_name,cbm_no,visited_on,recorded_by,'
                         + 'council_key,inspection_id,origin,updated_at';
 
@@ -118,20 +118,31 @@ const History = (function () {
     s.listError = null;
 
     const station = s.station;
-    const scope = station ? `&station_id=eq.${encodeURIComponent(station.id)}` : '';
-    const limit = station ? PER_STATION : ACROSS_ALL;
+    // The third scope (#128): imported visits whose station #125's crosswalk
+    // could not identify. They are invisible from every per-station view by
+    // construction — no station, no scope reaches them — so they need a door
+    // of their own or the UI implies a completeness the data does not have.
+    const unmatched = s.unmatched;
+    const scope = unmatched ? '&station_id=is.null&origin=eq.import'
+                : station  ? `&station_id=eq.${encodeURIComponent(station.id)}` : '';
+    const limit = (station || unmatched) ? PER_STATION : ACROSS_ALL;
 
     Promise.all([
       dbSelect(`inspection?select=${INSPECTION_COLS}&deleted_at=is.null${scope}`
              + `&order=inspected_on.desc&limit=${limit}`),
-      dbSelect(`maintenance_activity?select=${ACTIVITY_COLS}&deleted_at=is.null${scope}`
-             + `&order=visited_on.desc&limit=${limit}`),
+      // The Council forms are all typed in MegaNet, so the unmatched scope has
+      // nothing to ask them for — and asking with station_id=is.null would
+      // dredge up something else entirely.
+      unmatched ? Promise.resolve([])
+                : dbSelect(`maintenance_activity?select=${ACTIVITY_COLS}&deleted_at=is.null${scope}`
+                         + `&order=visited_on.desc&limit=${limit}`),
       // The departure ratings the database itself marks as needing a maintenance
       // visit. Read off 0009's own view rather than matched on the word "poor" —
       // which rating counts is `data_quality_rating.needs_maintenance`, and that
       // is a fact about the vocabulary rather than about the spelling.
-      dbSelect('inspection_needs_maintenance?select=inspection_id,parameter,'
-             + `on_departure_label,has_maintenance_activity${scope}`),
+      unmatched ? Promise.resolve([])
+                : dbSelect('inspection_needs_maintenance?select=inspection_id,parameter,'
+                         + `on_departure_label,has_maintenance_activity${scope}`),
     ])
       .then(([visits, forms, flags]) => {
         s.listBusy = false;
@@ -163,6 +174,7 @@ const History = (function () {
         // raw key for as long as that race lasted and for ever after.
         config_key: r.config_key, who: r.inspector || '',
         origin: r.origin, updated_at: r.updated_at,
+        date_precision: r.date_precision || 'day', date_raw: r.date_raw || '',
       })),
       ...forms.map(r => ({
         kind: 'maintenance', id: r.id, on: r.visited_on || '',
@@ -178,7 +190,7 @@ const History = (function () {
 
   function open(kind, id) {
     const s = S();
-    s.open = { kind, id, doc: null };
+    s.open = { kind, id, doc: null, src: null, cells: null, cellsError: null };
     s.openError = null;
     s.openBusy = true;
     s.msg = null;
@@ -193,10 +205,39 @@ const History = (function () {
         s.open.doc = doc;
         repaint();
         signPhotos(doc);
+        if (kind === 'inspection' && doc.origin === 'import') loadTranscription(id);
       })
       .catch(err => {
         s.openBusy = false;
         s.openError = `Could not open it — ${(err && err.message) || err}`;
+        repaint();
+      });
+  }
+
+  // The other half of an imported record (#128). inspection_doc() serves the
+  // *projected* numbers — the modern form's reading — and a projection has no
+  // number for `>30`, for `U/S`, or for a sentence, which is exactly right and
+  // exactly not the record. meganet.inspection_measurement is the record: one
+  // row per workbook cell, `raw` never repaired. Both are fetched and both are
+  // shown, each labelled as what it is.
+  function loadTranscription(id) {
+    const s = S();
+    const eq = encodeURIComponent(id);
+    Promise.all([
+      dbSelect(`inspection?id=eq.${eq}&select=source_workbook,source_sheet,source_row,`
+             + 'source_block_ref,source_ref,date_precision,date_raw,station_match,station_key'),
+      dbSelect(`inspection_measurement?inspection_id=eq.${eq}&select=ord,field_key,label,`
+             + 'source_col,raw,value_class,value,unit,operator,bound,status,flag&order=ord'),
+    ])
+      .then(([srcRows, cells]) => {
+        if (!s.open || s.open.id !== id) return;
+        s.open.src = srcRows[0] || null;
+        s.open.cells = cells;
+        repaint();
+      })
+      .catch(err => {
+        if (!s.open || s.open.id !== id) return;
+        s.open.cellsError = String((err && err.message) || err);
         repaint();
       });
   }
@@ -253,6 +294,7 @@ const History = (function () {
     const s = S();
     const st = ((state.data && state.data.stations) || []).find(x => x.id === stationId);
     s.station = st ? { id: st.id, name: st.name, number: st.station_number || '' } : null;
+    s.unmatched = false;
     s.query = '';
     s.list = null;
     s.open = null;
@@ -263,6 +305,20 @@ const History = (function () {
   function clearStation() {
     const s = S();
     s.station = null;
+    s.unmatched = false;
+    s.list = null;
+    s.open = null;
+    load();
+    repaint();
+  }
+
+  // The unmatched scope (#128): the 535 imported visits #125 could park but not
+  // place. No station, so no per-station view can ever reach them.
+  function showUnmatched() {
+    const s = S();
+    s.station = null;
+    s.unmatched = true;
+    s.query = '';
     s.list = null;
     s.open = null;
     load();
@@ -319,9 +375,15 @@ const History = (function () {
     return `
       <div class="panel hist-picker">
         <div class="panel-header">
-          <h3>${s.station ? esc(s.station.name) : 'Every station'}</h3>
+          <h3>${s.unmatched ? 'Imported, not yet matched to a station'
+              : s.station ? esc(s.station.name) : 'Every station'}</h3>
           <div class="hist-head-actions">
-            ${s.station ? `<button onclick="History.clearStation()">Show every station</button>` : ''}
+            ${s.station || s.unmatched
+              ? `<button onclick="History.clearStation()">Show every station</button>` : ''}
+            ${!s.unmatched
+              ? `<button onclick="History.showUnmatched()"
+                         title="Imported visits whose station the crosswalk could not identify —
+                                they keep the name and number the sheet had">Not matched</button>` : ''}
             <button onclick="History.refresh()">Refresh</button>
           </div>
         </div>
@@ -337,7 +399,13 @@ const History = (function () {
           // needs it — same arrangement as the ARRO tabs.
           : `<p class="small hist-muted">Load a station file to scope this to one station. Every
                record below reads from the datastore and needs no file.</p>`}
-        ${s.station
+        ${s.unmatched
+          ? `<p class="small hist-muted">Imported visits parked with no station: #125's crosswalk
+               could not identify these, so they are attributed to nobody and no per-station view
+               reaches them. Each keeps the name and CBM number its sheet carried, and
+               <code>meganet.backfill_inspection_station()</code> accepts a match later without a
+               reload.</p>`
+          : s.station
           ? `<p class="small hist-muted">Showing every record at
                <strong>${esc(s.station.name)}</strong>${
                s.station.number ? ` (${esc(s.station.number)})` : ''} —
@@ -384,15 +452,20 @@ const History = (function () {
     if (!s.list.length) {
       return `
         <div class="panel hist-note">
-          <p class="small hist-muted">${s.station
+          <p class="small hist-muted">${s.unmatched
+            ? 'Every imported visit is matched to a station — nothing is parked.'
+            : s.station
             ? `Nothing has been recorded at ${esc(s.station.name)} yet.`
             : 'No inspections or maintenance forms have been recorded yet.'}</p>
-          <p class="small hist-muted">Records typed on the Inspections and Site Maintenance tabs
-            appear here as soon as they are saved. The ~35 years of paper history in
-            <code>QLD All Site Inspections.xlsx</code> is issue #122's to load, and this view is
-            what will show it.</p>
+          ${s.unmatched ? '' : `<p class="small hist-muted">Records typed on the Inspections and
+            Site Maintenance tabs appear here as soon as they are saved, and the ~35 years of
+            paper history from <code>QLD All Site Inspections.xlsx</code> is loaded beside them
+            (#122) — a station showing nothing here has no record in either.</p>`}
         </div>`;
     }
+    // The archive makes sixty-visit stations ordinary, so the heading says how
+    // deep the list goes — and the earliest year is the archive's own headline.
+    const earliest = s.list[s.list.length - 1].on;
     return `
       <div class="panel hist-list-panel">
         <div class="panel-header">
@@ -400,8 +473,10 @@ const History = (function () {
                above, because the picker does not print and a printed list of
                visits that does not say whose visits they are is not much of a
                record. -->
-          <h3>${s.station ? `${esc(s.station.name)} — ` : ''}${
-            s.list.length} record${s.list.length === 1 ? '' : 's'}</h3>
+          <h3>${s.unmatched ? 'Not matched — ' : s.station ? `${esc(s.station.name)} — ` : ''}${
+            s.list.length} record${s.list.length === 1 ? '' : 's'}${
+            (s.station || s.unmatched) && s.list.length > 1 && earliest
+              ? ` <span class="small hist-muted">· back to ${esc(earliest.slice(0, 4))}</span>` : ''}</h3>
           <div class="hist-head-actions">
             <button onclick="History.exportList()">Export this list (CSV)</button>
           </div>
@@ -433,11 +508,20 @@ const History = (function () {
 
   function rowHtml(r) {
     const flags = (S().flags && S().flags[r.id]) || [];
+    // A date the workbook only half gave renders as what it gave. `1990` in
+    // this column is a claim about a year; `1990-01-01` would be the list
+    // asserting a day the paper never said (#128, 0014's date_precision).
+    const loose = r.date_precision !== 'day' && r.date_raw;
     return `
       <tr class="hist-row ${flags.length ? 'hist-row-flagged' : ''}">
-        <td class="hist-date">${esc(r.on || '—')}</td>
+        <td class="hist-date">${loose
+          ? `<span title="The workbook recorded only this — precision: ${escAttr(r.date_precision)}">${
+              esc(r.date_raw)}</span>`
+          : esc(r.on || '—')}</td>
         <td>${esc(r.station_name || r.station_id || 'Unnamed site')}${
-          r.cbm_no ? `<span class="small hist-muted"> · ${esc(r.cbm_no)}</span>` : ''}</td>
+          r.cbm_no ? `<span class="small hist-muted"> · ${esc(r.cbm_no)}</span>` : ''}${
+          r.origin === 'import' && !r.station_id
+            ? '<span class="small hist-muted"> · not matched</span>' : ''}</td>
         <td>${esc(formLabel(r))}${
           r.kind === 'maintenance' && r.from_inspection
             ? '<span class="small hist-muted"> · from an inspection</span>' : ''}${
@@ -466,9 +550,84 @@ const History = (function () {
   function model() {
     const s = S();
     if (!s.open || !s.open.doc) return null;
-    return s.open.kind === 'inspection'
+    const m = s.open.kind === 'inspection'
       ? Inspections.recordModel(s.open.doc)
       : Maintenance.recordModel(s.open.doc);
+    if (m && m.origin === 'import') amendImport(m);
+    return m;
+  }
+
+  // What is different about an imported record, put into the model rather than
+  // the renderer — so the screen, the printed page and the CSV keep being three
+  // renderings of one walk (#118's design, extended rather than forked).
+  //
+  // The transcription goes FIRST, because for an import it is the record: a
+  // 1994 row is three cells, and the modern form's sections below it are the
+  // projection of those cells into today's layout — right for comparing eras,
+  // and silent about a `>30`, a `U/S` or a sentence, each of which projects to
+  // no number on purpose (0014's check constraint). Here they read verbatim.
+  function amendImport(m) {
+    const s = S();
+    const src = s.open.src;
+    const cells = s.open.cells;
+
+    // A date the workbook only half gave. The heading must not sharpen `1990`
+    // into 1 January 1990 — and the CSV and its filename carry the same words.
+    if (src && src.date_precision && src.date_precision !== 'day' && src.date_raw) {
+      const h = m.heading.find(x => x.label === 'Date');
+      if (h) h.value = `${src.date_raw} — recorded to the ${src.date_precision}`;
+      m.dated = src.date_raw;
+    }
+
+    const sec = {
+      key: '_transcription', ord: '§', label: 'As transcribed from the workbook',
+      note: '', blocks: [], tables: [], lines: [], files: [],
+    };
+
+    if (src) {
+      sec.lines.push({ kind: 'note',
+        text: `Source: ${src.source_workbook || 'workbook'} — sheet ${src.source_sheet || '?'}, `
+            + `row ${src.source_row != null ? src.source_row : '?'}`
+            + `${src.source_ref ? ` (${src.source_ref})` : ''}. Anyone doubting a number can open `
+            + 'the cell it came from.' });
+      if (!m.station_id) {
+        sec.lines.push({ kind: 'flag',
+          text: `Not matched to a station: the sheet called it “${m.title}” and the crosswalk `
+              + `could not identify which station that is (${src.station_match || 'unmatched'}). `
+              + 'A match accepted later attributes it without a reload — '
+              + 'meganet.backfill_inspection_station().' });
+      }
+    }
+
+    if (!cells) {
+      sec.note = s.open.cellsError
+        ? `The transcription could not be read — ${s.open.cellsError}. The sections below still `
+          + 'show the numbers projected into the modern form.'
+        : 'Reading the transcription…';
+    } else {
+      sec.tables.push({
+        note: '“As written” is the record and is never repaired; “Reads as” is the interpretation '
+            + 'the loader licensed. A bound (>30), a status word (U/S) or a sentence has no '
+            + 'number, deliberately — the sections below can only show the cells that do.',
+        columns: ['Box', 'As written', 'Reads as', 'Unit'],
+        rows: cells.map(c => [
+          c.label || c.field_key || (c.source_col ? `column ${c.source_col}` : ''),
+          c.raw,
+          readsAs(c),
+          c.unit || '',
+        ]),
+      });
+    }
+
+    m.sections.unshift(sec);
+  }
+
+  function readsAs(c) {
+    if (c.value != null) return String(c.value);
+    if (c.operator != null && c.bound != null) return `${c.operator}${c.bound} — a bound, not a reading`;
+    if (c.status) return `${c.status} — a status, not a number`;
+    if (c.value_class === 'prose') return 'prose — kept whole';
+    return c.value_class || '';
   }
 
   function recordHtml() {
@@ -805,7 +964,7 @@ const History = (function () {
   }
 
   return {
-    render, init, search, pick, clearStation, open, close, refresh, retry,
+    render, init, search, pick, clearStation, showUnmatched, open, close, refresh, retry,
     print, exportList, exportRecord, edit, viewFile,
   };
 })();

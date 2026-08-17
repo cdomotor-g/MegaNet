@@ -1502,6 +1502,7 @@ const state = {
   hist: {
     query: '',           // the station picker's search box
     station: null,       // { id, name, number } the history is scoped to, or null for all
+    unmatched: false,    // the third scope (#128): imported visits parked with no station
     list: null,          // the merged inspection + maintenance timeline, newest first
     listBusy: false,
     listError: null,
