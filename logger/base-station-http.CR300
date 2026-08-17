@@ -203,6 +203,31 @@ Const MIN_YEAR = 2020
 Const N_FIELDS = 24
 Const FIELD_MAX = 60
 
+' --- the raw capture ---------------------------------------------------------
+'
+' A plain text file of every byte the port delivers, one text line per read,
+' written so it can be pulled off the logger with Device Configuration Utility
+' (File Control > Retrieve) -- the same route the token file goes on by. This is
+' the thing to send when a feed is not doing what it should: it is lossless, it
+' is before any parsing, and it survives the program being wrong.
+'
+'   # MegaNet base-station serial capture -- ComRS232 9600 format 3
+'   # started 2026-08-17T04:15:00Z (logger clock, UTC)
+'   04:15:07 n=31 41 4C 45 52 54 32 41 2C 31 2C ...
+'
+' Writes are batched: bytes accumulate in a buffer and go to flash when it is
+' nearly full or every CAP_FLUSH_SEC, rather than once a second. Flash on a
+' CR300 is not infinite, and a capture left running for a week at one write a
+' second is a real cost -- so the file also stops itself at CAPTURE_MAX bytes.
+Const CAPTURE_FILE = "CPU:rxcapture.txt"
+Const CAPTURE_MAX = 200000         'bytes, then it stops and says so. Lower this
+                                   'if CPU: is short of room -- 200 KB is about
+                                   'nine hours of a busy 40-station base
+Const CAP_BUF = 2000               'held in RAM between flushes
+Const CAP_FLUSH_SEC = 60           'flush at least this often, so a capture cut
+                                   'short by a power cycle loses a minute, not
+                                   'everything since it started
+
 ' Payload byte 0 of an ALERT2 "ALERT concentration" element. Decimal 116, which
 ' is 0x74 -- written in decimal so there is no doubt what the compiler read.
 Const ELEM_CONCENTRATION = 116
@@ -283,6 +308,26 @@ Public RxLastLineLen
 Public RxLastShape As String * 16  'what the line was taken to be: ALERT2A,
                                    'plain, or unrecognised
 Public RxLastFields                'fields the splitter found in it
+Public RxLastDelim As String * 12  'which separator the splitter used: comma,
+                                   'semicolon, tab, pipe, space, or none. "none"
+                                   'with a long line is the whole diagnosis of
+                                   'an "unrecognised line" -- see RxLastSep
+Public RxLastSep As String * 90    'what separator characters the line actually
+                                   'contained, counted:
+                                   '  comma=30 space=0 tab=0 semi=0 colon=0
+                                   '  pipe=0 eq=0 hi=0 ctl=0
+                                   'This is the one line to read when a feed
+                                   'will not parse. Every count zero means the
+                                   'line is a single unbroken token; hi>0 means
+                                   'bytes above 126, which is not ASCII at all
+Public RxLastPrefix                'bytes discarded from the front of the line
+                                   'to reach "ALERT2A". Non-zero means the
+                                   'receiver prefixes its lines with something
+Public RxLastDelimCode As Long     'the same as RxLastDelim, as a number, so the
+Public RxLastShapeCode As Long     'LineLog table can carry them: delim 0 none,
+                                   '1 comma, 2 semicolon, 3 tab, 4 pipe,
+                                   '5 space; shape 1 ALERT2A, 2 plain,
+                                   '3 unrecognised
 
 '--- SERIAL, STEP 5: the decoded payload -------------------------------------
 Public RxLastPayLen                'payload bytes, from field 23
@@ -309,6 +354,9 @@ Public RxStep As String * 40       'the last step the pipeline completed. Where
                                    'this stops is where to look
 Public RxLastWhy As String * 60    'why the last rejected line was rejected
 Public RxLastBad As String * 250   'and the line itself
+Public RxLastBadHex As String * 400 'and that line in hex, which is the copy
+                                   'that still means something when the text is
+                                   'not printable
 Public RxFrames                    'frames that decoded
 Public RxReadings                  'readings extracted from them
 Public RxBadFrames                 'lines rejected
@@ -316,6 +364,46 @@ Public RxBadRecords                'records inside good frames whose status byte
                                    'was non-zero
 Public RxFrameSkew                 'seconds between the frame's own ALERT2 time
                                    'and this logger's clock -- see ParseAlert2
+
+'--- SERIAL FORENSICS: what the whole feed looks like, not just the last line -
+'
+' These are what a capture is for. Left running for a while they answer "is this
+' ASCII at all", "which terminator does it use", "is every line the same length"
+' and "is every rejection the same rejection" -- none of which a single last-line
+' snapshot can tell you.
+
+' Every byte received since startup, sorted into eight classes. This is the
+' fastest read on the whole table: printable plus CR plus LF and nothing else is
+' an ASCII feed; anything in `high` or `ctrl-other` is not, and no amount of
+' parser work will make it one.
+Public RxByteClass(8) As Long
+Public RxByteClassName(8) As String * 12   'labels, filled in BeginProg
+
+' Every line rejected since startup, by reason. All of them landing on one
+' counter says the feed has a single consistent shape this program does not
+' know; a spread says it is being corrupted rather than misunderstood.
+Public RxWhyCount(12) As Long
+Public RxWhyName(12) As String * 30        'labels, filled in BeginProg
+
+' Line shape over the whole capture.
+Public RxLenMin                    'shortest and longest complete line seen. The
+Public RxLenMax                    'two being equal means fixed-length records
+Public RxTermCR                    'lines ended by a bare CR
+Public RxTermLF                    'lines ended by LF -- CRLF counts here, and
+                                   'the CR before it is stripped as whitespace
+Public RxFirstLine As String * 250  'the FIRST line ever seen, kept and never
+Public RxFirstLineHex As String * 400 'overwritten. Startup banners and mode
+                                   'strings appear once and are gone from the
+                                   'last-line display within a second
+
+'--- the raw capture file ----------------------------------------------------
+Public CaptureNow As Boolean       'true = append every read to CAPTURE_FILE.
+                                   'Set false to stop early; the file stays
+Public CaptureReset As Boolean     'set true to erase the file and start again.
+                                   'It clears itself once done
+Public CaptureBytes As Long        'bytes written so far, against CAPTURE_MAX
+Public CaptureState As String * 60 'plain English: capturing, full, stopped, or
+                                   'the reason it cannot write
 
 '--- is the queue draining ----------------------------------------------------
 Public QDepth                      'readings waiting to be posted
@@ -429,8 +517,30 @@ Dim dk As Long                     'DumpBytes
 Dim dc As Long
 Dim dumpLen As Long
 Dim dumpSrc As String * 256
-Dim dumpHex As String * 400
+Dim dumpHex As String * 400        'truncated at DUMP_MAX, for the display
+Dim dumpHexFull As String * 800    'never truncated, for the capture file
 Dim dumpTxt As String * 200
+Dim dumpCensus As Boolean          'true only for the block read, so the byte
+                                   'census counts each byte once
+Dim ck As Long                     'Census
+Dim cc As Long
+Dim nComma As Long
+Dim nSpace As Long
+Dim nTab As Long
+Dim nSemi As Long
+Dim nColon As Long
+Dim nPipe As Long
+Dim nEq As Long
+Dim nHigh As Long
+Dim nCtl As Long
+Dim best As Long                   'PickDelim
+Dim bestN As Long
+Dim capBuf As String * CAP_BUF     'capture bytes waiting to go to flash
+Dim capLine As String * 820        'one capture record, being built
+Dim capFh As Long
+Dim capWrote As Long
+Dim capSecs As Long
+Dim whyCode As Long                'set before every Call RejectLine()
 Dim hk As Long                     'HexByte
 Dim hn As Long
 Dim hexVal As Long
@@ -454,7 +564,27 @@ Dim pp As Long                     'ParseStatus
 Dim pd As Long
 Dim qn As Long                     'QueuePush
 Dim mi As Long                     'MakeRec -- the queue slot being rendered
-Dim tk As Long                     'ParseLine / LoadToken trimming
+Dim tk As Long                     'ParseLine trimming -- main scan only
+Dim ltk As Long                    'LoadToken trimming. A separate counter from
+                                   'tk on purpose: LoadToken runs in the POSTER
+                                   'sequence and ParseLine in the main scan, and
+                                   'a shared counter between two tasks is a
+                                   'mis-trimmed token that fails to authenticate
+                                   'once in a blue moon and never reproduces
+Dim ak As Long                     'ParseLine's own search for "ALERT2A". Not
+Dim aFound As Long                 'FindStr, for the same reason: FindStr's
+                                   'srcStr/needle/foundAt belong to the poster,
+                                   'which parses the HTTP response with them
+Dim pNum As String * 16            'the poster's number scratch. numStr is the
+                                   'main scan's, and DumpBytes writes it once
+                                   'per byte -- a JSON value built through the
+                                   'same variable would eventually be built out
+                                   'of a hex pair from the serial port
+Dim dNum As String * 16            'QueuePush's own copy of MakeRec's scratch
+Dim numIn As String * 16           'IsNum
+Dim numOK As Boolean
+Dim nk As Long
+Dim nc As Long
 Dim fh As Long                     'LoadToken -- the file handle
 Dim i As Long                      'ParseAlert2, and nothing else: the scan that
                                    'calls it must not use i for its own counter
@@ -478,6 +608,26 @@ DataTable (Readings,True,20000)
   Sample (1,RxLastId,Long)
   Sample (1,RxLastValue,Long)
   Sample (1,RxFrameSkew,FP2)
+EndTable
+
+' One record per complete line, whether it parsed or not. Numbers only, on
+' purpose: a string field big enough to hold a line would cost 250 bytes a
+' record and this table exists to be left running for hours. Five numbers say
+' what the shape of a feed is over a whole capture -- every line the same
+' length, every one splitting into one field, every one rejected for the same
+' reason -- which is exactly what a last-line snapshot in the Public table
+' cannot tell you. CAPTURE_FILE is where the bytes themselves go.
+'
+' delim  0 none  1 comma  2 semicolon  3 tab  4 pipe  5 space
+' shape  1 ALERT2A  2 plain  3 unrecognised
+' why    0 accepted, otherwise the RxWhyName() index
+DataTable (LineLog,True,5000)
+  Sample (1,RxLastLineLen,Long)
+  Sample (1,RxLastFields,Long)
+  Sample (1,RxLastDelimCode,Long)
+  Sample (1,RxLastShapeCode,Long)
+  Sample (1,whyCode,Long)
+  Sample (1,RxLastPrefix,Long)
 EndTable
 
 ' The heartbeat. Five minutes is frequent enough to see a link flapping and slow
@@ -544,17 +694,22 @@ EndTable
 '------------------------------------------------------------------------------
 Sub DumpBytes()
   dumpHex = ""
+  dumpHexFull = ""
   dumpTxt = ""
   RxClean = ""
   For dk = 1 To dumpLen
     dc = ASCII(dumpSrc(1,1,dk))
+
     If dc = 0 Then
       RxNulls = RxNulls + 1
     Else
       RxClean = RxClean & CHR(dc)
     EndIf
+
+    Sprintf (numStr,"%02X ",dc)
+    dumpHexFull = dumpHexFull & numStr
+
     If dk <= DUMP_MAX Then
-      Sprintf (numStr,"%02X ",dc)
       dumpHex = dumpHex & numStr
       If dc < 32 OR dc > 126 Then
         dumpTxt = dumpTxt & "-"
@@ -562,11 +717,230 @@ Sub DumpBytes()
         dumpTxt = dumpTxt & CHR(dc)
       EndIf
     EndIf
+
+    'The byte census, on the block read only -- this sub is also called for the
+    'assembled line and for the buffer contents, and counting those too would
+    'count most bytes three times.
+    If dumpCensus Then
+      If dc = 0 Then
+        RxByteClass(1) = RxByteClass(1) + 1
+      ElseIf dc = 13 Then
+        RxByteClass(3) = RxByteClass(3) + 1
+      ElseIf dc = 10 Then
+        RxByteClass(4) = RxByteClass(4) + 1
+      ElseIf dc = 9 Then
+        RxByteClass(5) = RxByteClass(5) + 1
+      ElseIf dc = 32 Then
+        RxByteClass(6) = RxByteClass(6) + 1
+      ElseIf dc < 32 Then
+        RxByteClass(2) = RxByteClass(2) + 1
+      ElseIf dc < 127 Then
+        RxByteClass(7) = RxByteClass(7) + 1
+      Else
+        RxByteClass(8) = RxByteClass(8) + 1
+      EndIf
+    EndIf
   Next dk
+
   If dumpLen > DUMP_MAX Then
     dumpHex = dumpHex & "..."
     dumpTxt = dumpTxt & "..."
   EndIf
+EndSub
+
+'------------------------------------------------------------------------------
+' Census -- count the separator characters in RxLine, into RxLastSep.
+'
+' The single most useful line on the whole Public table when a feed will not
+' parse, because "unrecognised line" only ever means one thing: the splitter
+' found fewer than two fields, and this says why. Every count zero and a long
+' RxLastLineLen is a line that is one unbroken token. A non-zero `hi` is a feed
+' that is not ASCII, and nothing downstream of here can help with that.
+'------------------------------------------------------------------------------
+Sub Census()
+  nComma = 0
+  nSpace = 0
+  nTab = 0
+  nSemi = 0
+  nColon = 0
+  nPipe = 0
+  nEq = 0
+  nHigh = 0
+  nCtl = 0
+  For ck = 1 To Len(RxLine)
+    cc = ASCII(Mid(RxLine,ck,1))
+    If cc = 44 Then nComma = nComma + 1
+    If cc = 32 Then nSpace = nSpace + 1
+    If cc = 9 Then nTab = nTab + 1
+    If cc = 59 Then nSemi = nSemi + 1
+    If cc = 58 Then nColon = nColon + 1
+    If cc = 124 Then nPipe = nPipe + 1
+    If cc = 61 Then nEq = nEq + 1
+    If cc > 126 Then nHigh = nHigh + 1
+    If cc < 32 AND cc <> 9 Then nCtl = nCtl + 1
+  Next ck
+  'Built in two calls rather than one nine-argument one. Sprintf's argument
+  'limit is not something this program can check, and a format string that
+  'quietly drops its tail would make the most-read diagnostic on the table the
+  'least trustworthy one.
+  Sprintf (numStr,"comma=%d ",nComma)
+  RxLastSep = numStr
+  Sprintf (numStr,"space=%d ",nSpace)
+  RxLastSep = RxLastSep & numStr
+  Sprintf (numStr,"tab=%d ",nTab)
+  RxLastSep = RxLastSep & numStr
+  Sprintf (numStr,"semi=%d ",nSemi)
+  RxLastSep = RxLastSep & numStr
+  Sprintf (numStr,"colon=%d ",nColon)
+  RxLastSep = RxLastSep & numStr
+  Sprintf (numStr,"pipe=%d ",nPipe)
+  RxLastSep = RxLastSep & numStr
+  Sprintf (numStr,"eq=%d ",nEq)
+  RxLastSep = RxLastSep & numStr
+  Sprintf (numStr,"hi=%d ",nHigh)
+  RxLastSep = RxLastSep & numStr
+  Sprintf (numStr,"ctl=%d",nCtl)
+  RxLastSep = RxLastSep & numStr
+EndSub
+
+'------------------------------------------------------------------------------
+' PickDelim -- choose the separator to split RxLine on, from what Census counted.
+'
+' Comma first and replaced only on a strictly greater count, so an ALERT2 line
+' still splits on comma even if it happens to contain as many spaces. "none"
+' leaves delim at a character that cannot appear, which yields one field and the
+' honest "unrecognised line" rather than a plausible wrong parse.
+'
+' The first version of this program tried comma, then space, and nothing else --
+' which is why a tab or semicolon separated feed came out as "unrecognised" with
+' no clue as to what it actually was.
+'
+' "none" means the caller does not split at all. An earlier draft set delim to a
+' character assumed not to occur; a binary feed containing that byte then split
+' into two fields and reached ParsePlain, which is the one outcome worse than
+' "unrecognised" -- a plausible reading for a station that never sent one.
+'------------------------------------------------------------------------------
+Sub PickDelim()
+  best = 0
+  bestN = 0
+  If nComma > bestN Then
+    bestN = nComma
+    best = 1
+  EndIf
+  If nSemi > bestN Then
+    bestN = nSemi
+    best = 2
+  EndIf
+  If nTab > bestN Then
+    bestN = nTab
+    best = 3
+  EndIf
+  If nPipe > bestN Then
+    bestN = nPipe
+    best = 4
+  EndIf
+  If nSpace > bestN Then
+    bestN = nSpace
+    best = 5
+  EndIf
+
+  RxLastDelimCode = best
+  If best = 1 Then
+    delim = ","
+    RxLastDelim = "comma"
+  ElseIf best = 2 Then
+    delim = ";"
+    RxLastDelim = "semicolon"
+  ElseIf best = 3 Then
+    delim = CHR(9)
+    RxLastDelim = "tab"
+  ElseIf best = 4 Then
+    delim = "|"
+    RxLastDelim = "pipe"
+  ElseIf best = 5 Then
+    delim = " "
+    RxLastDelim = "space"
+  Else
+    delim = ""
+    RxLastDelim = "none"
+  EndIf
+EndSub
+
+'------------------------------------------------------------------------------
+' CapFlush -- the capture buffer to flash, and nothing if it is empty.
+'
+' Open, append, close. Holding the handle open across scans would lose the whole
+' file to a power cycle, which is the one thing a capture must not do.
+'------------------------------------------------------------------------------
+Sub CapFlush()
+  capSecs = 0
+  If Len(capBuf) = 0 Then ExitSub
+  capFh = FileOpen (CAPTURE_FILE,"a",0)
+  If capFh <> 0 Then
+    capWrote = FileWrite (capFh,capBuf,Len(capBuf))
+    FileClose (capFh)
+    CaptureBytes = CaptureBytes + capWrote
+    capBuf = ""
+  Else
+    CaptureState = "cannot write " & CAPTURE_FILE
+    capBuf = ""                                  'drop it rather than wedge
+  EndIf
+EndSub
+
+'------------------------------------------------------------------------------
+' CapStart -- erase the capture file and write its header.
+'
+' Mode "w" truncates, so there is no delete to get wrong. The header records the
+' port settings the capture was taken at, because a capture of the wrong baud
+' rate looks exactly like a capture of a broken sensor.
+'------------------------------------------------------------------------------
+Sub CapStart()
+  capBuf = ""
+  CaptureBytes = 0
+  capFh = FileOpen (CAPTURE_FILE,"w",0)
+  If capFh <> 0 Then
+    Sprintf (capLine,"# MegaNet base-station serial capture -- baud %d",RX_BAUD)
+    Sprintf (numStr," format %d",RX_FORMAT)
+    capLine = capLine & numStr & CRLF
+    capLine = capLine & "# started " & NowISO & " (logger clock, UTC)" & CRLF
+    capLine = capLine & "# one record per read: hh:mm:ss n=<bytes> <hex>" & CRLF
+    capWrote = FileWrite (capFh,capLine,Len(capLine))
+    FileClose (capFh)
+    CaptureBytes = capWrote
+    CaptureState = "capturing"
+  Else
+    CaptureState = "cannot create " & CAPTURE_FILE
+  EndIf
+EndSub
+
+'------------------------------------------------------------------------------
+' CaptureBlock -- this scan's bytes into the capture buffer, verbatim.
+'
+' dumpHexFull, not dumpHex: the display copy stops at DUMP_MAX and a truncated
+' capture is worse than none, because it looks complete. Nothing here is parsed,
+' filtered or interpreted -- that is the point of it.
+'------------------------------------------------------------------------------
+Sub CaptureBlock()
+  If NOT CaptureNow Then
+    CaptureState = "stopped - set CaptureNow to resume"
+    ExitSub
+  EndIf
+  If CaptureBytes >= CAPTURE_MAX Then
+    CaptureState = "full - retrieve " & CAPTURE_FILE
+    ExitSub
+  EndIf
+
+  If ClockOK Then
+    capLine = Mid(NowISO,12,8)
+  Else
+    capLine = "--:--:--"
+  EndIf
+  Sprintf (numStr," n=%d ",RxBlockBytes)
+  capLine = capLine & numStr & dumpHexFull & CRLF
+
+  If Len(capBuf) + Len(capLine) > CAP_BUF - 4 Then Call CapFlush()
+  capBuf = capBuf & capLine
+  CaptureState = "capturing"
 EndSub
 
 '------------------------------------------------------------------------------
@@ -644,6 +1018,29 @@ Sub SplitLine()
 EndSub
 
 '------------------------------------------------------------------------------
+' IsNum -- is numIn a plain integer? Answer in numOK.
+'
+' An optional leading minus and then digits, nothing else. ParsePlain needs this
+' because CRBasic converts a string to a number on assignment and gives 0 for
+' anything it cannot read -- so ":HS=1" becomes alert id 0 silently, and a line
+' from an entirely different protocol turns into a reading rather than into a
+' rejection anyone would notice.
+'------------------------------------------------------------------------------
+Sub IsNum()
+  numOK = False
+  If Len(numIn) = 0 Then ExitSub
+  For nk = 1 To Len(numIn)
+    nc = ASCII(Mid(numIn,nk,1))
+    If nk = 1 AND nc = 45 AND Len(numIn) > 1 Then
+      'a leading minus is allowed
+    ElseIf nc < 48 OR nc > 57 Then
+      ExitSub
+    EndIf
+  Next nk
+  numOK = True
+EndSub
+
+'------------------------------------------------------------------------------
 ' StampNow -- the clock, as "2026-08-11T04:15:00Z", into NowISO.
 '
 ' The logger's clock is UTC (NTP offset 0, above), so the Z is the truth and not
@@ -670,19 +1067,24 @@ EndSub
 '------------------------------------------------------------------------------
 ' MakeRec -- queue slot `mi` rendered as one JSON object, into jRec.
 '
-' One place, so what the diagnostic shows after a reading is queued is the same
-' text that will be posted -- not a second rendering that could drift from it.
+' Called only from BuildBatch, which is to say only from the poster sequence.
+' QueuePush renders the same object for RxLastJson with its own copy of these
+' six lines rather than calling this, because the two run in different tasks and
+' sharing jRec, mi and a scratch string between them would mean a POST body
+' occasionally built out of a reading the main scan was mid-way through
+' displaying. **The two renderings must be kept identical** -- that is a cost of
+' the split, and a cheaper one than a wrong value_raw nobody can reproduce.
 '
 ' Numbers go through Sprintf rather than being concatenated directly. Implicit
 ' numeric-to-string conversion is free to pad, round or reach for scientific
 ' notation, and any of the three inside a JSON literal is a rejected batch.
 '------------------------------------------------------------------------------
 Sub MakeRec()
-  Sprintf (numStr,"%d",qAddr(mi))
-  jRec = fId & numStr
+  Sprintf (pNum,"%d",qAddr(mi))
+  jRec = fId & pNum
   jRec = jRec & fTs & qStamp(mi)
-  Sprintf (numStr,"%d",qVal(mi))
-  jRec = jRec & fVal & numStr
+  Sprintf (pNum,"%d",qVal(mi))
+  jRec = jRec & fVal & pNum
   If qSus(mi) Then jRec = jRec & fSus
   jRec = jRec & "}"
 EndSub
@@ -710,11 +1112,17 @@ Sub QueuePush()
   qSus(QHead) = (suspect = 1)
 
   'Step 6 and step 7 of the pipeline display, taken from the slot just written.
+  'These six lines are MakeRec's, deliberately copied rather than called -- see
+  'the note there. If you change one, change both.
   RxLastSuspect = (suspect = 1)
   RxLastStamp = NowISO
-  mi = QHead
-  Call MakeRec()
-  RxLastJson = jRec
+  Sprintf (dNum,"%d",RxLastId)
+  RxLastJson = fId & dNum
+  RxLastJson = RxLastJson & fTs & NowISO
+  Sprintf (dNum,"%d",RxLastValue)
+  RxLastJson = RxLastJson & fVal & dNum
+  If RxLastSuspect Then RxLastJson = RxLastJson & fSus
+  RxLastJson = RxLastJson & "}"
   RxStep = "7 queued"
 
   QHead = qn
@@ -724,11 +1132,20 @@ EndSub
 
 '------------------------------------------------------------------------------
 ' RejectLine -- one place to record a line that would not decode, so every
-' rejection leaves the same evidence behind. Reason in RxLastWhy before the call.
+' rejection leaves the same evidence behind. Reason in RxLastWhy and its number
+' in whyCode before the call.
+'
+' The hex is kept as well as the text, because a line that will not parse is
+' quite often a line whose text is not readable -- and RxWhyCount() is kept
+' because "which rejection, how many times" is the question a capture is run to
+' answer, and a last-line snapshot cannot answer it.
 '------------------------------------------------------------------------------
 Sub RejectLine()
   RxLastBad = RxLine
+  RxLastBadHex = RxLastLineHex
   RxBadFrames = RxBadFrames + 1
+  If whyCode >= 1 AND whyCode <= 12 Then RxWhyCount(whyCode) = RxWhyCount(whyCode) + 1
+  RxStep = "rejected: " & RxLastWhy
 EndSub
 
 '------------------------------------------------------------------------------
@@ -739,14 +1156,30 @@ EndSub
 ' transmission. logger/README.md walks through that test.
 '------------------------------------------------------------------------------
 Sub ParsePlain()
-  RxLastId = fld(1)                              'CRBasic converts the text on
-  RxLastValue = fld(2)                           'assignment to a numeric
   RxLastRecHex = ""
   RxLastPayLen = 0
   RxLastPayHex = ""
 
+  'Both fields must be numbers before either is read as one. See IsNum.
+  numIn = fld(1)
+  Call IsNum()
+  If numOK Then
+    numIn = fld(2)
+    Call IsNum()
+  EndIf
+  If NOT numOK Then
+    RxLastWhy = "fields are not numbers - not this protocol"
+    whyCode = 12
+    Call RejectLine()
+    ExitSub
+  EndIf
+
+  RxLastId = fld(1)                              'CRBasic converts the text on
+  RxLastValue = fld(2)                           'assignment to a numeric
+
   If RxLastId < 1 OR RxLastId > 65535 Then
     RxLastWhy = "alert id outside 1-65535"
+    whyCode = 9
     Call RejectLine()
     ExitSub
   EndIf
@@ -754,6 +1187,7 @@ Sub ParsePlain()
   Call StampNow()
   If NOT ClockOK Then
     RxLastWhy = "clock not set - not stamping"
+    whyCode = 8
     Call RejectLine()
     ExitSub
   EndIf
@@ -826,6 +1260,7 @@ Sub ParseAlert2()
 
   If nFld < N_FIELDS + 4 Then
     RxLastWhy = "short line - wrapped or truncated"
+    whyCode = 1
     Call RejectLine()
     ExitSub
   EndIf
@@ -836,6 +1271,7 @@ Sub ParseAlert2()
   frameOk = fld(18)
   If frameOk <> 1 Then
     RxLastWhy = "receiver flagged the frame invalid"
+    whyCode = 2
     Call RejectLine()
     ExitSub
   EndIf
@@ -848,16 +1284,19 @@ Sub ParseAlert2()
   RxLastPayLen = payLen
   If payLen <> nPay Then
     RxLastWhy = "payload length disagrees with the hex"
+    whyCode = 3
     Call RejectLine()
     ExitSub
   EndIf
   If nPay < 7 OR nPay > 32 Then
     RxLastWhy = "payload too short or too long"
+    whyCode = 4
     Call RejectLine()
     ExitSub
   EndIf
   If ((nPay - 3) MOD 4) <> 0 Then
     RxLastWhy = "payload is not whole records"
+    whyCode = 5
     Call RejectLine()
     ExitSub
   EndIf
@@ -870,6 +1309,7 @@ Sub ParseAlert2()
     Call HexByte()
     If hexVal < 0 OR hexVal > 255 Then
       RxLastWhy = "payload byte is not hex"
+      whyCode = 6
       Call RejectLine()
       ExitSub
     EndIf
@@ -881,6 +1321,7 @@ Sub ParseAlert2()
 
   If pay(1) <> ELEM_CONCENTRATION Then
     RxLastWhy = "not an ALERT concentration element"
+    whyCode = 7
     Call RejectLine()
     ExitSub
   EndIf
@@ -888,6 +1329,7 @@ Sub ParseAlert2()
   Call StampNow()
   If NOT ClockOK Then
     RxLastWhy = "clock not set - not stamping"
+    whyCode = 8
     Call RejectLine()
     ExitSub
   EndIf
@@ -933,6 +1375,8 @@ EndSub
 Sub ParseLine()
   RxLastWhy = ""
   RxLastShape = ""
+  RxLastPrefix = 0
+  whyCode = 0
 
   'Trim any trailing whitespace the terminator left behind, so the last field is
   'a clean number whichever of CR, LF or CRLF the receiver ends its lines with.
@@ -949,34 +1393,75 @@ Sub ParseLine()
   RxLines = RxLines + 1
   RxLastLine = RxLine
   RxLastLineLen = Len(RxLine)
+  If RxLenMin = 0 OR RxLastLineLen < RxLenMin Then RxLenMin = RxLastLineLen
+  If RxLastLineLen > RxLenMax Then RxLenMax = RxLastLineLen
 
   'The line, in hex, beside the line as text. Same loop as the block dump, so
-  'the two displays mean the same thing.
+  'the two displays mean the same thing. The census is off here -- these bytes
+  'were counted when the block they arrived in was read.
   dumpSrc = RxLine
   dumpLen = Len(RxLine)
+  dumpCensus = False
   Call DumpBytes()
   RxLastLineHex = dumpHex
-  RxStep = "4 line captured"
 
-  delim = ","
-  Call SplitLine()
-  If nFld < 2 Then
-    delim = " "                                  'the plain "<id> <value>" case
+  'The first line ever seen, kept for good. A receiver's startup banner or mode
+  'string appears once and is gone from the last-line display a second later,
+  'and it is often the line that says what the rest of the feed is.
+  If RxLines = 1 Then
+    RxFirstLine = RxLine
+    RxFirstLineHex = dumpHex
+  EndIf
+
+  'What separators the line actually contains, before anything is assumed about
+  'them, and then the one to split on.
+  Call Census()
+  Call PickDelim()
+  RxStep = "4 line captured, delim " & RxLastDelim
+
+  If RxLastDelimCode = 0 Then
+    nFld = 1                                     'nothing to split on. See the
+  Else                                           'note at PickDelim
     Call SplitLine()
   EndIf
   RxLastFields = nFld
 
-  If Mid(RxLine,1,7) = "ALERT2A" Then
+  'ALERT2A found anywhere in the line, not only at the front. A receiver that
+  'prefixes its output -- a prompt, a sequence number, a stray byte from the
+  'previous frame -- would otherwise be unrecognisable, and RxLastPrefix says
+  'how many bytes were stepped over so the prefix itself is not lost.
+  aFound = 0
+  If Len(RxLine) >= 7 Then
+    For ak = 1 To Len(RxLine) - 6
+      If Mid(RxLine,ak,7) = "ALERT2A" Then
+        aFound = ak
+        ExitFor
+      EndIf
+    Next ak
+  EndIf
+  If aFound > 0 Then
+    If aFound > 1 Then
+      RxLastPrefix = aFound - 1
+      RxLine = Mid(RxLine,aFound,Len(RxLine) - aFound + 1)
+      If RxLastDelimCode > 0 Then Call SplitLine()
+      RxLastFields = nFld
+    EndIf
     RxLastShape = "ALERT2A"
+    RxLastShapeCode = 1
     Call ParseAlert2()
   ElseIf nFld >= 2 Then
     RxLastShape = "plain"
+    RxLastShapeCode = 2
     Call ParsePlain()
   Else
     RxLastShape = "unrecognised"
+    RxLastShapeCode = 3
     RxLastWhy = "unrecognised line"
+    whyCode = 10
     Call RejectLine()
   EndIf
+
+  CallTable LineLog
 EndSub
 
 '------------------------------------------------------------------------------
@@ -998,6 +1483,11 @@ Sub TakeLines()
       lc = ASCII(Mid(RxAccum,lk,1))
       If lc = 13 OR lc = 10 Then
         lineEnd = lk
+        If lc = 13 Then
+          RxTermCR = RxTermCR + 1
+        Else
+          RxTermLF = RxTermLF + 1
+        EndIf
         ExitFor
       EndIf
     Next lk
@@ -1006,6 +1496,7 @@ Sub TakeLines()
       If Len(RxAccum) >= RX_ACCUM - RX_BLOCK Then
         RxLine = Mid(RxAccum,1,RX_MAX)
         RxLastWhy = "no line terminator - buffer discarded"
+        whyCode = 11
         Call RejectLine()
         RxAccum = ""
         RxOverruns = RxOverruns + 1
@@ -1054,10 +1545,17 @@ Sub ReadSerial()
     'in it. This is the KDO driver's instruction, used for the same reason.
     MoveBytes (dumpSrc,0,RxBuf,0,RxBlockBytes)
     dumpLen = RxBlockBytes
+    dumpCensus = True                            'the one call that counts bytes
     Call DumpBytes()
+    dumpCensus = False
     RxBlockHex = dumpHex
     RxBlockText = dumpTxt
     RxStep = "2 block dumped"
+
+    'The raw capture, before anything is assembled or parsed. dumpHexFull is
+    'still this block and only this block, so it goes out now rather than after
+    'TakeLines has called DumpBytes again for the line and the buffer.
+    Call CaptureBlock()
 
     'RxClean is this scan's bytes with NULs removed, from the same loop.
     RxAccum = RxAccum & RxClean
@@ -1074,6 +1572,7 @@ Sub ReadSerial()
   RxAccumLen = Len(RxAccum)
   dumpSrc = RxAccum
   dumpLen = RxAccumLen
+  dumpCensus = False
   Call DumpBytes()
   RxAccumText = dumpTxt
 EndSub
@@ -1188,8 +1687,8 @@ Sub LoadToken()
     'newline here is not cosmetic: it would terminate the header block early and
     'the three headers after it would never be sent.
     Do While Len(IngestToken) > 0
-      tk = ASCII(Mid(IngestToken,Len(IngestToken),1))
-      If tk = 13 OR tk = 10 OR tk = 32 OR tk = 9 Then
+      ltk = ASCII(Mid(IngestToken,Len(IngestToken),1))
+      If ltk = 13 OR ltk = 10 OR ltk = 32 OR ltk = 9 Then
         IngestToken = Mid(IngestToken,1,Len(IngestToken) - 1)
       Else
         ExitDo
@@ -1236,9 +1735,9 @@ Sub PostBatch()
 
   'What went out, with the credential replaced by its length -- enough to spot a
   'truncated paste or a missing file, without putting the token on screen.
-  Sprintf (numStr,"%d",TokenLen)
+  Sprintf (pNum,"%d",TokenLen)
   SentHeader = "apikey: " & API_KEY
-  SentHeader = SentHeader & " | X-Ingest-Token: " & numStr & " chars"
+  SentHeader = SentHeader & " | X-Ingest-Token: " & pNum & " chars"
   SentHeader = SentHeader & " | Content-Type: application/json"
   SentHeader = SentHeader & " | Content-Profile: meganet"
 
@@ -1318,8 +1817,8 @@ Sub PostBatch()
     ElseIf LastStatus = 400 Then
       PostState = "refused - malformed body"
     ElseIf LastStatus > 0 Then
-      Sprintf (numStr,"%d",LastStatus)
-      PostState = "refused - HTTP " & numStr
+      Sprintf (pNum,"%d",LastStatus)
+      PostState = "refused - HTTP " & pNum
     Else
       PostState = "no usable answer - see RespHeader"
     EndIf
@@ -1367,6 +1866,30 @@ BeginProg
   RxStep = "waiting for the first byte"
   PostState = "starting"
 
+  'Labels for the two census arrays, so they read as themselves in the Public
+  'table instead of as eight and eleven anonymous numbers.
+  RxByteClassName(1) = "NUL"
+  RxByteClassName(2) = "ctrl-other"
+  RxByteClassName(3) = "CR"
+  RxByteClassName(4) = "LF"
+  RxByteClassName(5) = "TAB"
+  RxByteClassName(6) = "space"
+  RxByteClassName(7) = "printable"
+  RxByteClassName(8) = "high >126"
+
+  RxWhyName(1)  = "1 short line"
+  RxWhyName(2)  = "2 frame flagged invalid"
+  RxWhyName(3)  = "3 payload len vs hex"
+  RxWhyName(4)  = "4 payload size"
+  RxWhyName(5)  = "5 not whole records"
+  RxWhyName(6)  = "6 payload not hex"
+  RxWhyName(7)  = "7 not concentration elem"
+  RxWhyName(8)  = "8 clock not set"
+  RxWhyName(9)  = "9 alert id out of range"
+  RxWhyName(10) = "10 unrecognised line"
+  RxWhyName(11) = "11 no line terminator"
+  RxWhyName(12) = "12 fields are not numbers"
+
   Call LoadToken()
 
   'Once, here -- not in the scan. Re-opening the port every second re-allocates
@@ -1375,6 +1898,13 @@ BeginProg
   'parameters, in the same order, as the KDO driver uses.
   SerialOpen (RX_PORT,RX_BAUD,RX_FORMAT,RX_TXDELAY,RX_BUFFER)
   SerialFlush (RX_PORT)
+
+  'The raw capture starts itself on every program start, so a logger that was
+  'power-cycled at site comes back capturing rather than waiting to be told.
+  'Set CaptureNow false to stop it; the file stays either way.
+  CaptureNow = True
+  Call StampNow()
+  Call CapStart()
 
   '--- the fast half: listen --------------------------------------------------
   Scan (1,Sec,3,0)
@@ -1389,6 +1919,16 @@ BeginProg
 
     Call StampNow()
     Call ReadSerial()
+
+    'Capture housekeeping. The flush is time-based as well as size-based so a
+    'quiet feed still commits what it has, and CaptureReset clears itself once
+    'acted on so it behaves like a button rather than a mode.
+    If CaptureReset Then
+      CaptureReset = False
+      Call CapStart()
+    EndIf
+    capSecs = capSecs + 1
+    If capSecs >= CAP_FLUSH_SEC Then Call CapFlush()
 
     QDepth = QHead - QTail
     If QDepth < 0 Then QDepth = QDepth + Q_SIZE

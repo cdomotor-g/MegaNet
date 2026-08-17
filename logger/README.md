@@ -151,6 +151,7 @@ Then read the Public table, in this order:
 | `RxBlockBytes` | `9` — bytes came off the port |
 | `RxBlockHex` | `36 32 37 30 2C 32 31 0D 0A ` — those bytes, exactly |
 | `RxLines` | `1` — a complete line was cut out of them |
+| `RxLastSep` | `comma=1 space=0 tab=0 …` — what it was split on |
 | `RxLastLine` | `6270,21` — verbatim, so you can see what the port actually received |
 | `RxLastShape` | `plain` |
 | `RxLastId` / `RxLastValue` | `6270` / `21` |
@@ -212,13 +213,78 @@ where the display stops being what you expected is the step that is broken.
 | | `RxLines` | Complete lines cut out since startup. |
 | | `RxOverruns` | Times the assembly buffer filled with no terminator anywhere in it and had to be discarded. |
 | **4 · the line** | `RxLastLine` / `RxLastLineHex` / `RxLastLineLen` | The last complete line verbatim, the same line in hex, and its length. Worth more than any counter when the format is not what you expected. |
+| | `RxLastSep` | **What separator characters the line actually contained, counted.** The first thing to read when a feed will not parse — see *When every line comes back `unrecognised`* below. |
+| | `RxLastDelim` | Which separator the splitter chose: `comma`, `semicolon`, `tab`, `pipe`, `space` or `none`. |
 | | `RxLastShape` | What it was taken to be: `ALERT2A`, `plain`, or `unrecognised`. |
 | | `RxLastFields` | Fields the splitter found. An `ALERT2A` line with a 7-byte payload has 31. |
+| | `RxLastPrefix` | Bytes discarded from the front of the line to reach `ALERT2A`. Non-zero means the receiver prefixes its output with something. |
 | **5 · the payload** | `RxLastPayLen` / `RxLastPayHex` | The payload length from field 23, and the payload bytes after the hex fields were converted back to numbers. **If `RxLastPayHex` does not match the tail of `RxLastLineHex`, the hex decode is what is wrong** — nothing further along needs looking at. |
 | **6 · the reading** | `RxLastRecHex` | The four payload bytes this reading came out of, so the bit-unpacking can be checked by hand against the table in the program at `ParseAlert2`. |
 | | `RxLastId` / `RxLastValue` / `RxLastSuspect` | The ALERT id and 11-bit value decoded from them, and whether the value was full scale. |
 | | `RxLastStamp` | The timestamp actually attached to it. |
 | **7 · the JSON** | `RxLastJson` | That reading as it will appear in the batch, byte for byte. Built by the same code that builds the POST body, so it cannot drift from what is sent. |
+
+### When every line comes back `unrecognised`
+
+**Read `RxLastSep` first.** `unrecognised line` has exactly one meaning — the
+splitter found fewer than two fields — and that variable says why:
+
+```
+comma=0 space=0 tab=30 semi=0 colon=0 pipe=0 eq=0 hi=0 ctl=0
+```
+
+| What you see | What it means |
+| --- | --- |
+| One count is high (`tab=30`, `semi=30`) | The feed uses a separator the parser can now find on its own — `RxLastDelim` should already say `tab` or `semicolon` and the line should parse. If it still doesn't, the field *layout* differs, not just the separator. |
+| **Every count zero**, `RxLastLineLen` large | The line is one unbroken token. Not a delimiter problem — a different output mode on the receiver. Send the capture. |
+| `hi` non-zero | Bytes above 126. **This is not ASCII**, so no parser setting will help: either the receiver is in a binary output mode, or the baud rate is wrong. Check `RxByteClass()` — a real baud mismatch scatters bytes across every class roughly evenly. |
+| `ctl` non-zero | Control characters inside the line, which usually means the terminator is not what the line assembler thinks it is. |
+| `eq` and `pipe` non-zero | That is HFEM framing (`:HS=1|I1=…|NN:`), not ALERT2 — a different protocol from a different kind of station. This program does not decode it; see *What it deliberately does not do*. |
+
+Then `RxByteClass()` over a few minutes, which is the whole feed rather than one
+line: `printable` + `CR` + `LF` and nothing else is ASCII. Anything landing in
+`high >126` or `ctrl-other` is not, and no amount of parser work will make it so.
+
+`RxWhyCount()` says whether every line fails the same way (one consistent shape
+this program does not know) or fails differently each time (corruption rather
+than misunderstanding). `RxFirstLine` keeps the very first line seen, which is
+often a banner naming the receiver's mode and is gone from the last-line display
+within a second.
+
+### Taking a capture to send
+
+`CPU:rxcapture.txt` is every byte the port delivered, one text line per read,
+before any parsing:
+
+```
+# MegaNet base-station serial capture -- baud 9600 format 3
+# started 2026-08-17T04:15:00Z (logger clock, UTC)
+# one record per read: hh:mm:ss n=<bytes> <hex>
+04:15:07 n=31 41 4C 45 52 54 32 41 2C 31 2C 39 39 39 39 2C ...
+```
+
+It starts itself on every program start, so a logger that was power-cycled comes
+back capturing. To take one:
+
+1. `CaptureReset` → **true** in the Public table. It erases the file, writes a
+   fresh header, and clears itself back to false.
+2. Leave it running. `CaptureState` says `capturing`; `CaptureBytes` climbs.
+   It stops on its own at `CAPTURE_MAX` (200 KB, about nine hours of a busy
+   40-station base) and says `full — retrieve …`. Set `CaptureNow` **false** to
+   stop it earlier; the file is kept either way.
+3. Device Configuration Utility → **File Control** → select `rxcapture.txt` →
+   **Retrieve**. Same route the token file goes out on.
+4. Send that file. It is plain text and carries no credential.
+
+Writes are batched — bytes accumulate in RAM and go to flash when the buffer is
+nearly full or every 60 seconds — because flash on a CR300 is not infinite and a
+capture left running for a week at one write a second is a real cost. A power
+cut loses at most the last minute.
+
+The `LineLog` table is the same evidence in a form you can graph: one record per
+complete line with its length, field count, delimiter, shape, rejection code and
+prefix length — numbers only, so 5,000 lines of history cost almost nothing.
+Collect it with LoggerNet or PC400 if that is easier than pulling a file.
 
 And the counters that say how it went:
 
@@ -226,7 +292,12 @@ And the counters that say how it went:
 | --- | --- |
 | `RxStep` | The last step the pipeline completed, in words — `3 appended to line buffer`, `5 payload decoded`, `7 queued`, `rejected: …`. **Where this stops is where to look.** |
 | `RxFrames` / `RxReadings` | Frames decoded, and readings extracted from them. One ALERT2 frame can carry several readings. |
-| `RxBadFrames` | Lines that would not decode. `RxLastBad` and `RxLastWhy` are the last one and the reason. |
+| `RxBadFrames` | Lines that would not decode. `RxLastBad`, `RxLastBadHex` and `RxLastWhy` are the last one, the same line in hex, and the reason. The hex copy matters: a line that will not parse is often a line whose text is not readable. |
+| `RxWhyCount()` / `RxWhyName()` | Every rejection since startup, by reason, self-labelled. All on one counter = one consistent shape this program does not know. Spread across several = corruption. |
+| `RxByteClass()` / `RxByteClassName()` | Every byte received, in eight classes — NUL, ctrl-other, CR, LF, TAB, space, printable, high >126. **The fastest read on the table for "is this ASCII at all".** |
+| `RxLenMin` / `RxLenMax` | Shortest and longest complete line seen. Equal means fixed-length records. |
+| `RxTermCR` / `RxTermLF` | Which terminator the feed uses. |
+| `RxFirstLine` / `RxFirstLineHex` | The first line ever seen, kept and never overwritten — startup banners appear once and are gone a second later. |
 | `RxBadRecords` | Records inside otherwise-good frames whose status byte was non-zero. In the reference capture those also carried addresses matching no station, so they are counted and dropped. |
 | `RxFrameSkew` | Seconds between the frame's own ALERT2 time and this logger's clock — see *Which clock stamps the reading*, below. |
 
@@ -293,6 +364,19 @@ Three consequences worth knowing at the bench:
   Step 4 is why: the leftover stays in the buffer until its terminator arrives.
   `RxAccumLen` is that leftover, and watching it go non-zero and back to zero is
   watching the reassembly work.
+- **The separator is found, not assumed.** The splitter counts commas,
+  semicolons, tabs, pipes and spaces in the line and uses whichever is most
+  common, reporting the choice in `RxLastDelim` and the counts in `RxLastSep`.
+  A feed that is tab- or semicolon-separated therefore parses without an edit.
+  When none of them appears the line is **not split at all** — an earlier draft
+  split on a character assumed not to occur, and a binary feed containing that
+  byte then produced a plausible reading for a station that never sent one.
+- **`ALERT2A` is found anywhere in the line, not only at the front**, so a
+  receiver that prefixes its output stays readable; `RxLastPrefix` counts the
+  bytes stepped over rather than hiding them.
+- **A `plain` line must be two actual numbers.** CRBasic reads an unconvertible
+  string as `0`, so without that check an HFEM line or a banner becomes alert id
+  0 silently. It is rejection 12 instead.
 - **The port is never flushed.** The KDO driver flushes because it owns a
   request/response conversation and anything left over is stale by definition.
   This program is a listener on a feed it does not drive, so a flush would throw
