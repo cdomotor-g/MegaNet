@@ -192,8 +192,8 @@ Const CONTENT_GUARD = 2700
 ' than dropped -- a stuck sensor is a fact about the network, not a bad row.
 Const FULL_SCALE = 2047
 
-' The clock sanity floor. The endpoint rejects anything before 1990 as "a dead
-' clock, not a reading"; this refuses to stamp one in the first place. Set well
+' The clock sanity floor. The endpoint rejects anything before 1990 as a dead
+' clock rather than a reading; this refuses to stamp one in the first place. Set
 ' above 1990 on purpose: a logger whose clock has reset can land just after
 ' 1990 and pass a literal 1990 test while still being meaningless.
 Const MIN_YEAR = 2020
@@ -312,10 +312,37 @@ Public RxLastDelim As String * 12  'which separator the splitter used: comma,
                                    'semicolon, tab, pipe, space, or none. "none"
                                    'with a long line is the whole diagnosis of
                                    'an "unrecognised line" -- see RxLastSep
-Public RxLastSep As String * 90    'what separator characters the line actually
-                                   'contained, counted:
+Public RxSepComma As Long          'the separator census as numbers, so LineLog
+Public RxSepSpace As Long          'can carry it. RxLastSep below is the same
+Public RxSepTab As Long            'thing as one readable string
+Public RxSepSemi As Long
+Public RxSepColon As Long
+Public RxSepPipe As Long
+Public RxSepEq As Long
+Public RxSepHi As Long             'bytes above 126 -- not ASCII
+Public RxSepCtl As Long            'control characters inside the line
+
+' The most common non-alphanumeric character in the line, whatever it is. The
+' counters above test a list this program guessed in advance; this one tests
+' nothing and just reports what is actually there, which is the answer when a
+' feed is delimited by something nobody thought of -- a slash, a dash, an
+' asterisk. RxTopSepDec is its byte value, so it survives being a character no
+' display can render.
+Public RxTopSep As String * 4
+Public RxTopSepDec As Long
+Public RxTopSepN As Long
+
+' The line itself, in two short printable-safe samples. These are what make
+' LineLog answer a question on its own instead of only narrowing one down: a
+' table of lengths and field counts says a feed has a shape, and the first forty
+' characters of it say what the shape IS.
+Public RxLastHead As String * 40   'the first 40 characters
+Public RxLastTail As String * 16   'and the last 16, which is where checksums and
+                                   'record terminators live
+
+Public RxLastSep As String * 90    'the whole census as one readable string:
                                    '  comma=30 space=0 tab=0 semi=0 colon=0
-                                   '  pipe=0 eq=0 hi=0 ctl=0
+                                   '  pipe=0 eq=0 hi=0 ctl=0 top=44 x30
                                    'This is the one line to read when a feed
                                    'will not parse. Every count zero means the
                                    'line is a single unbroken token; hi>0 means
@@ -367,10 +394,10 @@ Public RxFrameSkew                 'seconds between the frame's own ALERT2 time
 
 '--- SERIAL FORENSICS: what the whole feed looks like, not just the last line -
 '
-' These are what a capture is for. Left running for a while they answer "is this
-' ASCII at all", "which terminator does it use", "is every line the same length"
-' and "is every rejection the same rejection" -- none of which a single last-line
-' snapshot can tell you.
+' These are what a capture is for. Left running for a while they answer whether
+' the feed is ASCII at all, which terminator it uses, whether every line is the
+' same length, and whether every rejection is the same rejection -- none of
+' which a single last-line snapshot can tell you.
 
 ' Every byte received since startup, sorted into eight classes. This is the
 ' fastest read on the whole table: printable plus CR plus LF and nothing else is
@@ -502,12 +529,19 @@ Dim rTime(9) As Long               '1 yr, 2 mo, 3 day, 4 hr, 5 min, 6 sec,
 
 ' JSON fragments, built once in BeginProg so the per-reading concatenation in
 ' MakeRec stays legible instead of becoming a wall of CHR(34).
-Dim jEnvelope As String * 200      '{"payload":{"path":"..","protocol":"..","readings":[
+'
+' Three of these comments had no apostrophe at all -- the fragment was sitting
+' in the source as bare code -- and two more carried an odd number of double
+' quotes, which throws CRBasic Editor's syntax colouring off for everything
+' after them. So a tilde stands for a double quote below and the comments carry
+' no quote characters of their own. Every line here begins with an apostrophe,
+' which is the rule for every comment in this file.
+Dim jEnvelope As String * 200      '{~payload~:{~path~:~..~,~protocol~:~..~,~readings~:[
 Dim jTail As String * 8            ']}}
-Dim fId As String * 16             '{"alert_id":
-Dim fTs As String * 20             ,"reading_ts":"
-Dim fVal As String * 20            ","value_raw":
-Dim fSus As String * 24            ,"quality":"suspect"
+Dim fId As String * 16             '{~alert_id~:
+Dim fTs As String * 20             ',~reading_ts~:~
+Dim fVal As String * 20            '~,~value_raw~:
+Dim fSus As String * 24            ',~quality~:~suspect~
 Dim jRec As String * 120           'one reading, being built
 Dim numStr As String * 16          'one number, formatted
 
@@ -524,15 +558,11 @@ Dim dumpCensus As Boolean          'true only for the block read, so the byte
                                    'census counts each byte once
 Dim ck As Long                     'Census
 Dim cc As Long
-Dim nComma As Long
-Dim nSpace As Long
-Dim nTab As Long
-Dim nSemi As Long
-Dim nColon As Long
-Dim nPipe As Long
-Dim nEq As Long
-Dim nHigh As Long
-Dim nCtl As Long
+Dim cj As Long
+Dim charTally(126) As Long         'one counter per printable byte value, reset
+                                   'per line. 126 entries so byte 126 has a slot;
+                                   'nothing below 33 is tallied here because the
+                                   'control characters are counted as a class
 Dim best As Long                   'PickDelim
 Dim bestN As Long
 Dim capBuf As String * CAP_BUF     'capture bytes waiting to go to flash
@@ -610,24 +640,40 @@ DataTable (Readings,True,20000)
   Sample (1,RxFrameSkew,FP2)
 EndTable
 
-' One record per complete line, whether it parsed or not. Numbers only, on
-' purpose: a string field big enough to hold a line would cost 250 bytes a
-' record and this table exists to be left running for hours. Five numbers say
-' what the shape of a feed is over a whole capture -- every line the same
-' length, every one splitting into one field, every one rejected for the same
-' reason -- which is exactly what a last-line snapshot in the Public table
-' cannot tell you. CAPTURE_FILE is where the bytes themselves go.
+' One record per complete line, whether it parsed or not.
+'
+' The first version of this table was numbers only, to keep it cheap enough to
+' leave running for hours. That was the wrong trade and a real capture proved
+' it: a table of lengths and field counts establishes that a feed HAS a
+' consistent shape without ever saying what the shape IS, so the table narrowed
+' the question and could not answer it. Two short text samples cost about 56
+' bytes a record and settle it, so they are here and the record count is lower.
+'
+' The census columns are here for the same reason. RxLastDelimCode only reports
+' the five separators this program tests for; RxTopSepDec reports the most
+' common non-alphanumeric byte in the line whatever it is, which is what
+' identifies a feed delimited by something nobody thought to test.
 '
 ' delim  0 none  1 comma  2 semicolon  3 tab  4 pipe  5 space
 ' shape  1 ALERT2A  2 plain  3 unrecognised
 ' why    0 accepted, otherwise the RxWhyName() index
-DataTable (LineLog,True,5000)
+DataTable (LineLog,True,2000)
   Sample (1,RxLastLineLen,Long)
   Sample (1,RxLastFields,Long)
   Sample (1,RxLastDelimCode,Long)
   Sample (1,RxLastShapeCode,Long)
   Sample (1,whyCode,Long)
   Sample (1,RxLastPrefix,Long)
+  Sample (1,RxSepComma,Long)
+  Sample (1,RxSepSpace,Long)
+  Sample (1,RxSepColon,Long)
+  Sample (1,RxSepEq,Long)
+  Sample (1,RxSepHi,Long)
+  Sample (1,RxSepCtl,Long)
+  Sample (1,RxTopSepDec,Long)
+  Sample (1,RxTopSepN,Long)
+  Sample (1,RxLastHead,String)
+  Sample (1,RxLastTail,String)
 EndTable
 
 ' The heartbeat. Five minutes is frequent enough to see a link flapping and slow
@@ -758,48 +804,81 @@ EndSub
 ' that is not ASCII, and nothing downstream of here can help with that.
 '------------------------------------------------------------------------------
 Sub Census()
-  nComma = 0
-  nSpace = 0
-  nTab = 0
-  nSemi = 0
-  nColon = 0
-  nPipe = 0
-  nEq = 0
-  nHigh = 0
-  nCtl = 0
+  RxSepComma = 0
+  RxSepSpace = 0
+  RxSepTab = 0
+  RxSepSemi = 0
+  RxSepColon = 0
+  RxSepPipe = 0
+  RxSepEq = 0
+  RxSepHi = 0
+  RxSepCtl = 0
+  RxLastHead = ""
+  RxLastTail = ""
+  For ck = 33 To 126
+    charTally(ck) = 0
+  Next ck
+
   For ck = 1 To Len(RxLine)
     cc = ASCII(Mid(RxLine,ck,1))
-    If cc = 44 Then nComma = nComma + 1
-    If cc = 32 Then nSpace = nSpace + 1
-    If cc = 9 Then nTab = nTab + 1
-    If cc = 59 Then nSemi = nSemi + 1
-    If cc = 58 Then nColon = nColon + 1
-    If cc = 124 Then nPipe = nPipe + 1
-    If cc = 61 Then nEq = nEq + 1
-    If cc > 126 Then nHigh = nHigh + 1
-    If cc < 32 AND cc <> 9 Then nCtl = nCtl + 1
+
+    If cc = 44 Then RxSepComma = RxSepComma + 1
+    If cc = 32 Then RxSepSpace = RxSepSpace + 1
+    If cc = 9 Then RxSepTab = RxSepTab + 1
+    If cc = 59 Then RxSepSemi = RxSepSemi + 1
+    If cc = 58 Then RxSepColon = RxSepColon + 1
+    If cc = 124 Then RxSepPipe = RxSepPipe + 1
+    If cc = 61 Then RxSepEq = RxSepEq + 1
+    If cc > 126 Then RxSepHi = RxSepHi + 1
+    If cc < 32 AND cc <> 9 Then RxSepCtl = RxSepCtl + 1
+
+    If cc >= 33 AND cc <= 126 Then charTally(cc) = charTally(cc) + 1
+
+    'The two samples, from the same pass. Anything unprintable becomes a dot so
+    'the sample cannot scramble a table export.
+    If cc < 32 OR cc > 126 Then cc = 46
+    If ck <= 40 Then RxLastHead = RxLastHead & CHR(cc)
+    If ck > Len(RxLine) - 16 Then RxLastTail = RxLastTail & CHR(cc)
   Next ck
-  'Built in two calls rather than one nine-argument one. Sprintf's argument
-  'limit is not something this program can check, and a format string that
-  'quietly drops its tail would make the most-read diagnostic on the table the
-  'least trustworthy one.
-  Sprintf (numStr,"comma=%d ",nComma)
+
+  'The most common character that is neither a letter nor a digit. Whatever a
+  'feed is delimited by, this finds it without having been told to look.
+  RxTopSepDec = 0
+  RxTopSepN = 0
+  RxTopSep = ""
+  For cj = 33 To 126
+    If (cj >= 48 AND cj <= 57) OR (cj >= 65 AND cj <= 90) OR (cj >= 97 AND cj <= 122) Then
+      'a letter or a digit, so not a separator
+    ElseIf charTally(cj) > RxTopSepN Then
+      RxTopSepN = charTally(cj)
+      RxTopSepDec = cj
+    EndIf
+  Next cj
+  If RxTopSepDec > 0 Then RxTopSep = CHR(RxTopSepDec)
+
+  'Built in several calls rather than one wide one. Sprintf's argument limit is
+  'not something this program can check, and a format string that quietly drops
+  'its tail would make the most-read diagnostic on the table the least
+  'trustworthy one.
+  Sprintf (numStr,"comma=%d ",RxSepComma)
   RxLastSep = numStr
-  Sprintf (numStr,"space=%d ",nSpace)
+  Sprintf (numStr,"space=%d ",RxSepSpace)
   RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"tab=%d ",nTab)
+  Sprintf (numStr,"tab=%d ",RxSepTab)
   RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"semi=%d ",nSemi)
+  Sprintf (numStr,"semi=%d ",RxSepSemi)
   RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"colon=%d ",nColon)
+  Sprintf (numStr,"colon=%d ",RxSepColon)
   RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"pipe=%d ",nPipe)
+  Sprintf (numStr,"pipe=%d ",RxSepPipe)
   RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"eq=%d ",nEq)
+  Sprintf (numStr,"eq=%d ",RxSepEq)
   RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"hi=%d ",nHigh)
+  Sprintf (numStr,"hi=%d ",RxSepHi)
   RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"ctl=%d",nCtl)
+  Sprintf (numStr,"ctl=%d ",RxSepCtl)
+  RxLastSep = RxLastSep & numStr
+  Sprintf (numStr,"top=%d x%d",RxTopSepDec,RxTopSepN)
   RxLastSep = RxLastSep & numStr
 EndSub
 
@@ -823,24 +902,24 @@ EndSub
 Sub PickDelim()
   best = 0
   bestN = 0
-  If nComma > bestN Then
-    bestN = nComma
+  If RxSepComma > bestN Then
+    bestN = RxSepComma
     best = 1
   EndIf
-  If nSemi > bestN Then
-    bestN = nSemi
+  If RxSepSemi > bestN Then
+    bestN = RxSepSemi
     best = 2
   EndIf
-  If nTab > bestN Then
-    bestN = nTab
+  If RxSepTab > bestN Then
+    bestN = RxSepTab
     best = 3
   EndIf
-  If nPipe > bestN Then
-    bestN = nPipe
+  If RxSepPipe > bestN Then
+    bestN = RxSepPipe
     best = 4
   EndIf
-  If nSpace > bestN Then
-    bestN = nSpace
+  If RxSepSpace > bestN Then
+    bestN = RxSepSpace
     best = 5
   EndIf
 

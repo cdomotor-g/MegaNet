@@ -213,7 +213,8 @@ where the display stops being what you expected is the step that is broken.
 | | `RxLines` | Complete lines cut out since startup. |
 | | `RxOverruns` | Times the assembly buffer filled with no terminator anywhere in it and had to be discarded. |
 | **4 · the line** | `RxLastLine` / `RxLastLineHex` / `RxLastLineLen` | The last complete line verbatim, the same line in hex, and its length. Worth more than any counter when the format is not what you expected. |
-| | `RxLastSep` | **What separator characters the line actually contained, counted.** The first thing to read when a feed will not parse — see *When every line comes back `unrecognised`* below. |
+| | `RxLastSep` | **What separator characters the line actually contained, counted**, ending with `top=<byte> x<count>` — the most common non-alphanumeric byte in the line, whatever it is. The first thing to read when a feed will not parse. |
+| | `RxLastHead` / `RxLastTail` | The first 40 and last 16 characters, printable-safe. The tail is where checksums and record terminators live. |
 | | `RxLastDelim` | Which separator the splitter chose: `comma`, `semicolon`, `tab`, `pipe`, `space` or `none`. |
 | | `RxLastShape` | What it was taken to be: `ALERT2A`, `plain`, or `unrecognised`. |
 | | `RxLastFields` | Fields the splitter found. An `ALERT2A` line with a 7-byte payload has 31. |
@@ -236,7 +237,8 @@ comma=0 space=0 tab=30 semi=0 colon=0 pipe=0 eq=0 hi=0 ctl=0
 | What you see | What it means |
 | --- | --- |
 | One count is high (`tab=30`, `semi=30`) | The feed uses a separator the parser can now find on its own — `RxLastDelim` should already say `tab` or `semicolon` and the line should parse. If it still doesn't, the field *layout* differs, not just the separator. |
-| **Every count zero**, `RxLastLineLen` large | The line is one unbroken token. Not a delimiter problem — a different output mode on the receiver. Send the capture. |
+| Named counts near zero but **`top=` shows a high count** | The feed is delimited by something the named list does not test for — a slash, a dash, an asterisk. `top=45 x7` is byte 45, `-`, seven times. The named counters test a list guessed in advance; `top=` tests nothing and reports what is there, which is why it is the one to read when the others all say zero. |
+| **Every count zero including `top=`**, `RxLastLineLen` large | The line is one unbroken alphanumeric token. Not a delimiter problem — a different output mode on the receiver. Send the capture. |
 | `hi` non-zero | Bytes above 126. **This is not ASCII**, so no parser setting will help: either the receiver is in a binary output mode, or the baud rate is wrong. Check `RxByteClass()` — a real baud mismatch scatters bytes across every class roughly evenly. |
 | `ctl` non-zero | Control characters inside the line, which usually means the terminator is not what the line assembler thinks it is. |
 | `eq` and `pipe` non-zero | That is HFEM framing (`:HS=1|I1=…|NN:`), not ALERT2 — a different protocol from a different kind of station. This program does not decode it; see *What it deliberately does not do*. |
@@ -281,10 +283,28 @@ nearly full or every 60 seconds — because flash on a CR300 is not infinite and
 capture left running for a week at one write a second is a real cost. A power
 cut loses at most the last minute.
 
-The `LineLog` table is the same evidence in a form you can graph: one record per
-complete line with its length, field count, delimiter, shape, rejection code and
-prefix length — numbers only, so 5,000 lines of history cost almost nothing.
-Collect it with LoggerNet or PC400 if that is easier than pulling a file.
+### The `LineLog` table
+
+The same evidence in a form you can collect with LoggerNet or PC400 instead of
+pulling a file — one record per complete line, 2,000 of them:
+
+| Column | Means |
+| --- | --- |
+| `RxLastLineLen` | Line length after the terminator is stripped |
+| `RxLastFields` | Fields the splitter found |
+| `RxLastDelimCode` | 0 none · 1 comma · 2 semicolon · 3 tab · 4 pipe · 5 space |
+| `RxLastShapeCode` | 1 ALERT2A · 2 plain · 3 unrecognised |
+| `whyCode` | 0 accepted, otherwise the `RxWhyName()` index |
+| `RxLastPrefix` | Bytes skipped to reach `ALERT2A` |
+| `RxSepComma` `RxSepSpace` `RxSepColon` `RxSepEq` `RxSepHi` `RxSepCtl` | The census, per line |
+| `RxTopSepDec` / `RxTopSepN` | The most common non-alphanumeric byte and its count |
+| `RxLastHead` / `RxLastTail` | The first 40 and last 16 characters |
+
+**The first version of this table carried numbers only** — cheap enough to leave
+running for hours, and it established that a feed had a consistent shape without
+ever saying what the shape *was*. The two text samples cost about 56 bytes a
+record and settle it. If memory is tight, lower the 2,000 rather than dropping
+them.
 
 And the counters that say how it went:
 
