@@ -209,9 +209,17 @@ where the display stops being what you expected is the step that is broken.
 | | `RxNulls` | NUL bytes seen and skipped. Non-zero on an ASCII feed means line noise or a baud mismatch, and is the first thing to suspect when `RxBadFrames` climbs for no obvious reason. |
 | **2 · the block** | `RxBlockHex` | Every byte of this scan's read as padded hex — `41 4C 45 52 54 32 41 2C …`. This is the raw truth and it is the display to trust. |
 | | `RxBlockText` | The same bytes as text, with every control character shown as `-`, so nothing in the data can scramble the display. |
-| **3 · line assembly** | `RxAccumLen` / `RxAccumText` | What is being held while it waits for a CR or LF, and how much. Normal is near zero between transmissions and briefly non-zero when one straddles two scans. **A number that grows and never comes back is a feed with no line terminator.** |
-| | `RxLines` | Complete lines cut out since startup. |
-| | `RxOverruns` | Times the assembly buffer filled with no terminator anywhere in it and had to be discarded. |
+| **3 · byte buffer** | `RxBufLen` / `RxBufHex` / `RxBufText` | What is waiting to be framed, and how much. Near zero between transmissions, briefly non-zero when a frame straddles two scans. |
+| | `RxLines` / `RxNonText` | Text lines cut out, and runs discarded as not-text. |
+| | `RxBufDrops` | Times the buffer filled with nothing framable in it. |
+| **3b · the frame** | `RxFrameMode` | `binary` or `ascii`, decided per frame. |
+| | `FrLenByte` / `FrTotal` / `FrLeftover` | Byte 7, the frame length it implies, and what was left over afterwards. **`FrLeftover` near zero confirms the `6 + byte 7` rule frame by frame.** |
+| | `FrPre` | Bytes discarded in front of the signature — noise, or the tail of a frame that was missed. |
+| | `FrHex` | The entire frame in hex. |
+| | `FrElemVia` | How the readings element was found: `1` the `84 01 <len> 74` anchor, `2` a loose scan, **`0` not found at all** — the first thing to read when a frame yields nothing. |
+| | `FrElemOff` / `FrElemLen` / `FrElemHex` | Where it starts within the frame, its length, and its bytes. |
+| | `FrTimeSecs` / `FrRecords` / `FrGood` / `FrBad` | The frame's own clock, and how many records it carried, decoded and rejected. |
+| **3c · one reading** | `RdIndex` `RdB0` `RdB1` `RdB2` `RdB3` `RdRecHex` `RdQueued` | The four bytes as numbers, so the unpacking can be recomputed by hand: `id = (B1 MOD 32) * 256 + B0`, `value = INT(B1 / 32) * 256 + B2`. |
 | **4 · the line** | `RxLastLine` / `RxLastLineHex` / `RxLastLineLen` | The last complete line verbatim, the same line in hex, and its length. Worth more than any counter when the format is not what you expected. |
 | | `RxLastSep` | **What separator characters the line actually contained, counted**, ending with `top=<byte> x<count>` — the most common non-alphanumeric byte in the line, whatever it is. The first thing to read when a feed will not parse. |
 | | `RxLastHead` / `RxLastTail` | The first 40 and last 16 characters, printable-safe. The tail is where checksums and record terminators live. |
@@ -282,6 +290,21 @@ Writes are batched — bytes accumulate in RAM and go to flash when the buffer i
 nearly full or every 60 seconds — because flash on a CR300 is not infinite and a
 capture left running for a week at one write a second is a real cost. A power
 cut loses at most the last minute.
+
+### The capture tables
+
+Four of them, and they are meant to be read together — every row in the later
+ones is derived from bytes recorded in the first.
+
+| Table | One record per | Holds |
+| --- | --- | --- |
+| **`RawLog`** | serial read that returned bytes | `RxBlockSeq`, bytes available, bytes read, buffer occupancy before and after, cumulative NULs, and **the whole block in hex, untruncated**. This is the ground truth; if a decode looks wrong, *what actually arrived* is answered here and nowhere else. |
+| **`FrameLog`** | binary frame found, **including ones that did not decode** | Everything under *3b* above plus `whyCode`. A table holding only successes cannot answer the question these tables exist for. |
+| **`ReadingLog`** | four-byte record, decoded or not | Everything under *3c*, plus the resulting `RxLastId` / `RxLastValue` and whether it was queued. |
+| **`LineLog`** | complete text line | The text path's own forensics, below. |
+
+`RxBlockSeq` and `RxFrameSeq` appear in more than one of them so rows can be
+lined up across tables without relying on timestamps alone.
 
 ### The `LineLog` table
 
@@ -354,10 +377,53 @@ other.
 
 ---
 
+## The receiver speaks binary, not ASCII
+
+**This is the thing to understand before anything else on this page.** The
+ERT-A2 at this base station does not emit the ALERT2 ASCII lines that
+`alert2.js` documents. It emits a binary frame:
+
+```
+41 4C 45 52 54 32 | 56 | 9C 2C 02 00 01 75 ... 84 01 0B 74 5C 9E 87 09 8C 00 ...
+|____ "ALERT2" ___|  ^                         |_ anchor _||___ element _____|
+                     byte 7 is a LENGTH, not the "A" of ALERT2A
+```
+
+| Rule | Evidence |
+| --- | --- |
+| Total frame = `6 + byte 7` | `0x56` → 92 bytes, `0x52` → 88 bytes. Exact on every reference frame. |
+| Byte 7 read as text is `V`, `R`, … | Which is why a terminal shows `ALERT2V` / `ALERT2R`, and why looking for the literal text `ALERT2A` never matched one. |
+| The readings sit behind `84 01 <len> 74` | Same offset in every reference frame, and `(len-3) MOD 4 = 0` on all of them. |
+| The records are unchanged | Same four-byte shape the ASCII path decodes — so the table at `ParseAlert2` still applies. |
+
+Decoded, the reference frames give `alert_id 2439 = 140`, `2438 = 352` and
+`4134 = 140`. Real readings that were there the whole time.
+
+**Three things in the first version destroyed them**, and each was fatal on its
+own:
+
+1. **NUL bytes were stripped.** A CRBasic string ends at the first NUL, so the
+   bytes were being filtered to fit one. These frames carry **nine to eleven
+   NULs each**.
+2. **Lines were cut on CR and LF.** `0x0D` occurs *inside* a frame as ordinary
+   data — twice in the 88-byte reference frame — so one good frame became two
+   fragments of nonsense.
+3. **The text `ALERT2A` was the trigger.** Byte 7 is a length.
+
+The symptom was a `LineLog` full of 75-character "lines" with exactly one comma
+in them. That comma was byte 9 of the frame, `0x2C`, which is data.
+
+**Both forms are now handled.** The signature test looks at the two bytes after
+`ALERT2`: a letter `A` followed by a comma is the ASCII form and goes to the
+text parser; anything else is a length byte and goes to the binary decoder.
+
+---
+
 ## How the serial port is read
 
-Worth knowing before you debug a feed, because the first version of this program
-got it wrong and read nothing at all.
+Bytes go into a **numeric array**, not a string, and nothing is removed from
+them — a byte is a number and `0` is a number. That single decision is what
+makes the two problems above impossible rather than merely fixed.
 
 That version called `SerialInRecord()` once per scan in a drain loop. Its last
 parameter is **`RecordsBackFromNewest`** — how many records back from the most
@@ -374,16 +440,22 @@ loggers reads its sensor — the pattern that is known to work on this hardware:
 | 1 | `SerialInChk()` — how many bytes are sitting in the port buffer |
 | 2 | `SerialInBlock()` — take all of them, raw; it returns the byte count |
 | 3 | walk the block byte by byte with `ASCII()`, building a padded hex dump and a printable copy with control characters as `-` |
-| 4 | append to an assembly buffer and cut complete lines out of it on CR or LF |
+| 4 | append every byte to the numeric buffer, raw |
+| 5 | take binary frames out of it by signature and length; take text lines only from runs that are entirely printable |
 
 Three consequences worth knowing at the bench:
 
 - **Every step is a `Public` variable**, which is the table above. Nothing about
   the read depends on an option code whose meaning has to be looked up.
-- **A transmission that straddles two scans is one line, not two broken ones.**
-  Step 4 is why: the leftover stays in the buffer until its terminator arrives.
-  `RxAccumLen` is that leftover, and watching it go non-zero and back to zero is
-  watching the reassembly work.
+- **A transmission that straddles two scans is one frame, not two broken ones.**
+  The leftover stays in the buffer until the rest of it arrives. `RxBufLen` is
+  that leftover, and watching it go non-zero and back to zero is watching the
+  reassembly work.
+- **A text line must be entirely printable to count as one.** On a binary feed
+  some byte is eventually `0x0D`; treating it as a line end is exactly how good
+  frames became bad lines. A run that reaches a terminator carrying bytes no
+  text line can hold is counted at `RxNonText` and dropped, so an unframed
+  binary frame is reported *as binary* rather than as a malformed line.
 - **The separator is found, not assumed.** The splitter counts commas,
   semicolons, tabs, pipes and spaces in the line and uses whichever is most
   common, reporting the choice in `RxLastDelim` and the counts in `RxLastSep`.

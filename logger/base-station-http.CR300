@@ -142,10 +142,7 @@ Const RX_BUFFER = 2000             'port buffer, bytes. Two seconds of 9600 baud
                                    'worth twice over
 
 Const RX_BLOCK = 250               'most bytes taken from the port in one read
-Const RX_ACCUM = 512               'line-assembly buffer. A complete ALERT2A line
-                                   'carrying a 24-byte payload is about 180
-                                   'characters, so this holds two of them
-Const RX_MAX = 250                 'longest line this program will assemble
+Const RX_MAX = 250                 'longest text line this program will assemble
 
 ' How much of a block or a line to show in the hex and text diagnostics. The
 ' dump is 3 characters per byte, so 128 bytes is 384 characters. Longer than
@@ -232,6 +229,43 @@ Const CAP_FLUSH_SEC = 60           'flush at least this often, so a capture cut
 ' is 0x74 -- written in decimal so there is no doubt what the compiler read.
 Const ELEM_CONCENTRATION = 116
 
+' --- the ERT-A2's BINARY framing ---------------------------------------------
+'
+' The receiver on this base station does not emit the ALERT2 ASCII lines above.
+' It emits a binary frame, and a terminal capture of three of them settles the
+' layout completely:
+'
+'   41 4C 45 52 54 32 | 56 | 9C 2C 02 00 01 75 ... 84 01 0B 74 5C 9E 87 09 8C 00
+'   |___ "ALERT2" ___|  ^                          |_ anchor _||__ element ____|
+'                       byte 7 is a LENGTH, not the "A" of ALERT2A
+'
+'   total bytes = 6 + byte 7.  0x56 -> 92 bytes, 0x52 -> 88 bytes, both exact.
+'
+' Byte 7 read as text is "V" or "R", which is why a terminal shows ALERT2V and
+' ALERT2R and why this program, looking for the literal text ALERT2A, never
+' matched one. The ASCII form is still recognised -- see the mode test in
+' TakeFrames -- because "ALERT2A," is a letter A followed by a comma and a
+' length byte cannot be.
+'
+' Inside the frame, the ALERT concentration element sits behind a fixed anchor:
+'
+'   84 01 <len> 74 <time hi> <time lo> then <len-3>/4 four-byte records
+'
+' which appeared at the same place in all three reference frames and decoded to
+' sensible readings (alert_id 2438/2439 and 4134). The records are the same
+' four-byte shape the ASCII path already decodes, so ParseAlert2's table applies
+' unchanged.
+Const SIG_LEN = 6                  'the length of "ALERT2"
+Const BUF_MAX = 600                'the byte buffer, in bytes. Two frames and
+                                   'change, which is all a 1-second scan can see
+Const FRAME_MAX = 300              'a length byte claiming more than this is not
+                                   'a length byte
+Const FRAME_MIN_LEN = 12           'nor is one claiming less than this
+Const FRAME_LOOPS = 24             'most frames or lines taken from the buffer in
+                                   'one scan. A bound rather than a budget: the
+                                   'buffer holds two frames, so reaching this
+                                   'means something is looping that should not
+
 
 '==============================================================================
 ' 2. DIAGNOSTICS -- what a technician reads in the Public table
@@ -286,18 +320,63 @@ Public RxNulls                     'NUL bytes seen and skipped. Non-zero on an
 Public RxBlockHex As String * 400  'every byte of it as padded hex, exactly as
                                    'it came off the wire. This is the raw truth
                                    'and it is the display to trust
+Public RxBlockHexFull As String * 620 'the same, never truncated, for RawLog
+Public RxBufLenBefore              'buffer occupancy before this block went in
 Public RxBlockText As String * 200 'the same bytes as text, with every control
                                    'character shown as '-' so nothing in the
                                    'data can scramble the display
 
-'--- SERIAL, STEP 3: line assembly -------------------------------------------
-Public RxAccumLen                  'bytes held waiting for a CR or LF. A number
-                                   'that grows and never returns to zero means
-                                   'the feed sends no line terminator
-Public RxAccumText As String * 200 'what is being held, printable-safe
-Public RxLines                     'complete lines cut out since startup
-Public RxOverruns                  'times the assembly buffer filled with no
-                                   'terminator in it and had to be discarded
+'--- SERIAL, STEP 3: the byte buffer -----------------------------------------
+'
+' Bytes go into a numeric array, not a string, and NOTHING is removed from them.
+' The first version of this program stripped NUL bytes before assembling lines,
+' because a CRBasic string ends at the first NUL -- and the reference frames
+' carry nine and eleven NULs each, so that alone destroyed every frame. It then
+' cut lines on CR, and 0x0D occurs inside these frames as ordinary data. A
+' numeric array has neither problem: a byte is a number and 0 is a number.
+Public RxBufLen                    'bytes waiting to be framed
+Public RxBufHex As String * 400    'what is waiting, in hex
+Public RxBufText As String * 200   'and as text, printable-safe
+Public RxLines                     'complete TEXT lines cut out since startup
+Public RxNonText                   'runs discarded as not-text -- binary that
+                                   'happened to contain a CR or LF
+Public RxBufDrops                  'times the buffer filled with nothing framable
+                                   'in it and had to be discarded
+Public RxBlockSeq As Long          'increments on every serial read, so RawLog
+                                   'rows can be lined up against FrameLog rows
+
+'--- SERIAL, STEP 3b: the binary frame ---------------------------------------
+Public RxFrameMode As String * 8   'ascii or binary, decided per frame
+Public RxFrameSeq As Long          'increments per frame found
+Public RxFrameBadLen               'signatures whose length byte was implausible
+Public FrPre                       'bytes that sat in front of the signature and
+                                   'were discarded -- non-zero means noise or a
+                                   'partial previous frame
+Public FrLenByte                   'byte 7, the length
+Public FrTotal                     '6 + FrLenByte, the whole frame
+Public FrLeftover                  'bytes still in the buffer after the frame was
+                                   'taken. Near zero confirms the length rule
+Public FrHex As String * 400       'the entire frame, in hex
+Public FrElemVia                   'how the concentration element was found:
+                                   '1 the 84 01 len 74 anchor, 2 a loose scan,
+                                   '0 not found at all
+Public FrElemOff                   'where it starts, counted from the frame start
+Public FrElemLen                   'its length byte
+Public FrElemHex As String * 120   'the element itself, in hex
+Public FrTimeSecs                  'the two time bytes inside it
+Public FrRecords                   'four-byte records it carries
+Public FrGood                      'of those, how many decoded
+Public FrBad                       'and how many had a non-zero status byte or an
+                                   'out-of-range address
+
+'--- SERIAL, STEP 3c: one reading, byte by byte ------------------------------
+Public RdIndex                     'which record within the frame
+Public RdB0                        'the four bytes, as numbers, so the
+Public RdB1                        'bit-unpacking can be checked by hand against
+Public RdB2                        'the table at ParseAlert2
+Public RdB3
+Public RdRecHex As String * 12
+Public RdQueued As Boolean
 
 '--- SERIAL, STEP 4: the last complete line ----------------------------------
 Public RxLastLine As String * 250  'verbatim, terminator stripped. Worth more
@@ -409,8 +488,8 @@ Public RxByteClassName(8) As String * 12   'labels, filled in BeginProg
 ' Every line rejected since startup, by reason. All of them landing on one
 ' counter says the feed has a single consistent shape this program does not
 ' know; a spread says it is being corrupted rather than misunderstood.
-Public RxWhyCount(12) As Long
-Public RxWhyName(12) As String * 30        'labels, filled in BeginProg
+Public RxWhyCount(14) As Long
+Public RxWhyName(14) As String * 30        'labels, filled in BeginProg
 
 ' Line shape over the whole capture.
 Public RxLenMin                    'shortest and longest complete line seen. The
@@ -509,10 +588,27 @@ Dim DQ As String * 1               'a double quote. CHR(34) is the portable way
 ' the previous read left there, and a Public variable showing stale tail bytes
 ' would be a diagnostic that lies. RxBlockHex and RxBlockText are built from
 ' exactly RxBlockBytes bytes and are the ones to read.
-Dim RxBuf As String * 256
-Dim RxAccum As String * RX_ACCUM
-Dim RxLine As String * RX_MAX
-Dim RxClean As String * 256        'this scan's bytes with NULs removed
+Dim RxBuf As String * 256          'what SerialInBlock writes into
+Dim rxByte(BUF_MAX) As Long        'the byte buffer. Numeric, so a NUL is just 0
+Dim nBuf As Long
+Dim RxLine As String * RX_MAX      'one TEXT line, when there is one
+Dim dropN As Long                  'BufDrop
+Dim dk2 As Long
+Dim fk As Long                     'TakeFrames / DecodeFrame
+Dim frSigAt As Long
+Dim frLenByte As Long
+Dim frTotal As Long
+Dim frEnd As Long
+Dim frLoops As Long
+Dim frElemAt As Long
+Dim frRec As Long
+Dim tk2 As Long                    'TakeTextLine
+Dim tb As Long
+Dim tEnd As Long
+Dim tOK As Boolean
+Dim tTook As Boolean               'TakeTextLine consumed something
+Dim frDone As Boolean              'TakeFrames: this pass made no progress
+Dim frIsAscii As Boolean
 
 Dim fld(FIELD_MAX) As String * 16
 Dim nFld As Long
@@ -583,9 +679,6 @@ Dim si As Long                     'SplitLine
 Dim sStart As Long
 Dim sChar As String * 1
 Dim delim As String * 1
-Dim lk As Long                     'TakeLines
-Dim lc As Long
-Dim lineEnd As Long
 Dim jp As Long                     'JsonInt
 Dim jd As Long
 Dim jsonKey As String * 16
@@ -638,6 +731,65 @@ DataTable (Readings,True,20000)
   Sample (1,RxLastId,Long)
   Sample (1,RxLastValue,Long)
   Sample (1,RxFrameSkew,FP2)
+EndTable
+
+' One record per serial read that returned bytes: the raw block and the buffer
+' state around it. This is the table that makes the rest of them checkable --
+' every other row in every other table is derived from these bytes, so if a
+' decode looks wrong the question "what actually arrived" is answered here and
+' nowhere else. RxBlockHexFull is not truncated.
+DataTable (RawLog,True,400)
+  Sample (1,RxBlockSeq,Long)
+  Sample (1,RxAvail,Long)
+  Sample (1,RxBlockBytes,Long)
+  Sample (1,RxBufLenBefore,Long)
+  Sample (1,RxBufLen,Long)
+  Sample (1,RxNulls,Long)
+  Sample (1,RxBlockHexFull,String)
+EndTable
+
+' One record per binary frame found, INCLUDING the ones that did not decode --
+' a frame that yields nothing is the row that says why, and a table holding only
+' successes cannot answer the question this table exists for.
+'
+' FrElemVia is the one to read first when a frame does not produce readings:
+' 1 means the 84 01 <len> 74 anchor matched, 2 means only the loose scan did,
+' 0 means neither and the frame carries no concentration element at all.
+' FrLeftover near zero confirms the 6 + <length byte> rule frame by frame.
+DataTable (FrameLog,True,400)
+  Sample (1,RxFrameSeq,Long)
+  Sample (1,RxBlockSeq,Long)
+  Sample (1,FrPre,Long)
+  Sample (1,FrLenByte,Long)
+  Sample (1,FrTotal,Long)
+  Sample (1,FrLeftover,Long)
+  Sample (1,FrElemVia,Long)
+  Sample (1,FrElemOff,Long)
+  Sample (1,FrElemLen,Long)
+  Sample (1,FrTimeSecs,Long)
+  Sample (1,FrRecords,Long)
+  Sample (1,FrGood,Long)
+  Sample (1,FrBad,Long)
+  Sample (1,whyCode,Long)
+  Sample (1,RxFrameSkew,FP2)
+  Sample (1,FrElemHex,String)
+  Sample (1,FrHex,String)
+EndTable
+
+' One record per four-byte reading record, decoded or not. The four bytes are
+' here as numbers as well as hex so the bit-unpacking can be recomputed from the
+' table by hand: id = (B1 MOD 32) * 256 + B0, value = INT(B1 / 32) * 256 + B2.
+DataTable (ReadingLog,True,1000)
+  Sample (1,RxFrameSeq,Long)
+  Sample (1,RdIndex,Long)
+  Sample (1,RdB0,Long)
+  Sample (1,RdB1,Long)
+  Sample (1,RdB2,Long)
+  Sample (1,RdB3,Long)
+  Sample (1,RxLastId,Long)
+  Sample (1,RxLastValue,Long)
+  Sample (1,RdQueued,Boolean)
+  Sample (1,RdRecHex,String)
 EndTable
 
 ' One record per complete line, whether it parsed or not.
@@ -725,9 +877,9 @@ EndTable
 '------------------------------------------------------------------------------
 ' DumpBytes -- dumpLen bytes of dumpSrc, three ways at once:
 '
-'   dumpHex   "41 4C 45 52 54 32 41 2C "   padded hex, one byte per group
-'   dumpTxt   "ALERT2A,"                   printable, control characters as '-'
-'   RxClean   the same bytes with NULs removed, for the assembly buffer
+'   dumpHex     padded hex, truncated at DUMP_MAX, for the display
+'   dumpHexFull the same and never truncated, for RawLog and the capture file
+'   dumpTxt     printable, with control characters shown as a dash
 '
 ' This is the KDO driver's diagnostic loop, and it is the reason this program's
 ' serial handling can be checked rather than guessed at. Every byte goes through
@@ -742,15 +894,13 @@ Sub DumpBytes()
   dumpHex = ""
   dumpHexFull = ""
   dumpTxt = ""
-  RxClean = ""
   For dk = 1 To dumpLen
     dc = ASCII(dumpSrc(1,1,dk))
 
-    If dc = 0 Then
-      RxNulls = RxNulls + 1
-    Else
-      RxClean = RxClean & CHR(dc)
-    EndIf
+    'Counted, never removed. An earlier version dropped NUL bytes here so that
+    'the result could live in a CRBasic string; the frames this receiver sends
+    'carry nine to eleven of them, so that one line destroyed every frame.
+    If dc = 0 AND dumpCensus Then RxNulls = RxNulls + 1
 
     Sprintf (numStr,"%02X ",dc)
     dumpHexFull = dumpHexFull & numStr
@@ -1223,7 +1373,7 @@ Sub RejectLine()
   RxLastBad = RxLine
   RxLastBadHex = RxLastLineHex
   RxBadFrames = RxBadFrames + 1
-  If whyCode >= 1 AND whyCode <= 12 Then RxWhyCount(whyCode) = RxWhyCount(whyCode) + 1
+  If whyCode >= 1 AND whyCode <= 14 Then RxWhyCount(whyCode) = RxWhyCount(whyCode) + 1
   RxStep = "rejected: " & RxLastWhy
 EndSub
 
@@ -1544,53 +1694,294 @@ Sub ParseLine()
 EndSub
 
 '------------------------------------------------------------------------------
-' TakeLines -- cut every complete line out of RxAccum and parse it.
-'
-' A line is complete when a CR or an LF has arrived. Whatever is left after the
-' last terminator stays in the buffer for the next scan, which is the whole
-' point of assembling rather than parsing a block directly: a transmission that
-' straddles two scans is one line here, not two broken ones.
-'
-' If the buffer fills with no terminator anywhere in it, it is discarded whole
-' and RxOverruns counts it. Keeping it would mean never accepting another line
-' from that feed.
+' BufDrop -- remove the first dropN bytes from the byte buffer.
 '------------------------------------------------------------------------------
-Sub TakeLines()
-  Do
-    lineEnd = 0
-    For lk = 1 To Len(RxAccum)
-      lc = ASCII(Mid(RxAccum,lk,1))
-      If lc = 13 OR lc = 10 Then
-        lineEnd = lk
-        If lc = 13 Then
-          RxTermCR = RxTermCR + 1
-        Else
-          RxTermLF = RxTermLF + 1
-        EndIf
+Sub BufDrop()
+  If dropN >= nBuf Then
+    nBuf = 0
+    ExitSub
+  EndIf
+  For dk2 = 1 To nBuf - dropN
+    rxByte(dk2) = rxByte(dk2 + dropN)
+  Next dk2
+  nBuf = nBuf - dropN
+EndSub
+
+'------------------------------------------------------------------------------
+' TakeTextLine -- one printable, CR/LF-terminated run out of the byte buffer.
+'
+' Only runs that are ENTIRELY printable qualify. That guard is the lesson of the
+' first capture: on a binary feed some byte is eventually 0x0D, and treating it
+' as the end of a line turns one good frame into two lines of nonsense and two
+' rejections that describe nothing. A run that reaches a terminator carrying
+' bytes no text line can hold is counted at RxNonText and dropped, so a binary
+' frame this program failed to frame is reported as binary rather than as a
+' malformed line.
+'------------------------------------------------------------------------------
+Sub TakeTextLine()
+  tTook = False
+  tEnd = 0
+  tOK = True
+  For tk2 = 1 To nBuf
+    tb = rxByte(tk2)
+    If tb = 13 OR tb = 10 Then
+      tEnd = tk2
+      ExitFor
+    EndIf
+    If tb <> 9 AND (tb < 32 OR tb > 126) Then tOK = False
+  Next tk2
+
+  If tEnd = 0 Then
+    'Nothing complete in there. Guard the buffer so a feed that never presents
+    'anything framable cannot wedge it.
+    If nBuf > BUF_MAX - RX_BLOCK Then
+      RxBufDrops = RxBufDrops + 1
+      dropN = nBuf
+      Call BufDrop()
+      tTook = True
+    EndIf
+    ExitSub
+  EndIf
+
+  tTook = True
+  If NOT tOK Then
+    RxNonText = RxNonText + 1
+    dropN = tEnd
+    Call BufDrop()
+    ExitSub
+  EndIf
+
+  RxLine = ""
+  For tk2 = 1 To tEnd - 1
+    RxLine = RxLine & CHR(rxByte(tk2))
+  Next tk2
+  dropN = tEnd
+  Call BufDrop()
+  If Len(RxLine) > 0 Then Call ParseLine()
+EndSub
+
+'------------------------------------------------------------------------------
+' DecodeFrame -- one binary frame, from rxByte(frSigAt) to rxByte(frEnd).
+'
+' Every intermediate is written to a Public and then to FrameLog, because the
+' frame layout below is read off three reference frames rather than out of a
+' document, and a decode built on an inference has to be able to say what it
+' inferred. FrElemVia in particular records WHICH rule found the element.
+'------------------------------------------------------------------------------
+Sub DecodeFrame()
+  RxFrames = RxFrames + 1
+  RxFrameSeq = RxFrameSeq + 1
+  FrLenByte = frLenByte
+  FrTotal = frTotal
+  FrElemOff = 0
+  FrElemVia = 0
+  FrElemLen = 0
+  FrElemHex = ""
+  FrTimeSecs = 0
+  FrRecords = 0
+  FrGood = 0
+  FrBad = 0
+  whyCode = 0
+  RxLastWhy = ""
+
+  FrHex = ""
+  For fk = frSigAt To frEnd
+    Sprintf (numStr,"%02X ",rxByte(fk))
+    If Len(FrHex) <= 380 Then FrHex = FrHex & numStr
+  Next fk
+  RxStep = "5 frame captured"
+
+  'The anchor: 84 01 <len> 74. Present on every frame in the reference capture,
+  'at the same offset, and the length it carries satisfied (len-3) MOD 4 = 0 on
+  'all of them.
+  frElemAt = 0
+  For fk = frSigAt + SIG_LEN + 1 To frEnd - 4
+    If rxByte(fk) = 132 Then
+      If rxByte(fk + 1) = 1 AND rxByte(fk + 3) = ELEM_CONCENTRATION Then
+        FrElemLen = rxByte(fk + 2)
+        frElemAt = fk + 3
+        FrElemVia = 1
         ExitFor
       EndIf
-    Next lk
+    EndIf
+  Next fk
 
-    If lineEnd = 0 Then
-      If Len(RxAccum) >= RX_ACCUM - RX_BLOCK Then
-        RxLine = Mid(RxAccum,1,RX_MAX)
-        RxLastWhy = "no line terminator - buffer discarded"
-        whyCode = 11
-        Call RejectLine()
-        RxAccum = ""
-        RxOverruns = RxOverruns + 1
+  'Fallback: any 0x74 whose preceding byte is a plausible element length. Looser,
+  'and reported as such, so a frame that does not carry the anchor still yields
+  'its readings instead of yielding nothing.
+  If frElemAt = 0 Then
+    For fk = frSigAt + SIG_LEN + 2 To frEnd - 6
+      If rxByte(fk) = ELEM_CONCENTRATION Then
+        FrElemLen = rxByte(fk - 1)
+        If FrElemLen >= 7 AND FrElemLen <= 32 Then
+          If ((FrElemLen - 3) MOD 4) = 0 AND fk + FrElemLen - 1 <= frEnd Then
+            frElemAt = fk
+            FrElemVia = 2
+            ExitFor
+          EndIf
+        EndIf
       EndIf
-      ExitDo
-    EndIf
+    Next fk
+  EndIf
 
-    RxLine = Mid(RxAccum,1,lineEnd - 1)
-    If lineEnd >= Len(RxAccum) Then
-      RxAccum = ""
+  If frElemAt = 0 Then
+    RxLastWhy = "no concentration element in frame"
+    whyCode = 13
+    RxWhyCount(13) = RxWhyCount(13) + 1
+    RxBadFrames = RxBadFrames + 1
+    RxStep = "rejected: " & RxLastWhy
+    CallTable FrameLog
+    ExitSub
+  EndIf
+
+  FrElemOff = frElemAt - frSigAt + 1
+  If FrElemLen < 7 OR FrElemLen > 32 OR ((FrElemLen - 3) MOD 4) <> 0 Then
+    RxLastWhy = "element length is not whole records"
+    whyCode = 14
+    RxWhyCount(14) = RxWhyCount(14) + 1
+    RxBadFrames = RxBadFrames + 1
+    RxStep = "rejected: " & RxLastWhy
+    CallTable FrameLog
+    ExitSub
+  EndIf
+
+  For fk = frElemAt To frElemAt + FrElemLen - 1
+    Sprintf (numStr,"%02X ",rxByte(fk))
+    If Len(FrElemHex) <= 100 Then FrElemHex = FrElemHex & numStr
+  Next fk
+  RxStep = "6 element decoded"
+
+  'The frame's own clock, against ours -- the same comparison the ASCII path
+  'makes, and the same open question. See ParseAlert2.
+  FrTimeSecs = rxByte(frElemAt + 1) * 256 + rxByte(frElemAt + 2)
+  loggerSecs = rTime(4) * 3600 + rTime(5) * 60 + rTime(6)
+  RxFrameSkew = FrTimeSecs - loggerSecs
+  If RxFrameSkew > 43200 Then RxFrameSkew = RxFrameSkew - 86400
+  If RxFrameSkew < -43200 Then RxFrameSkew = RxFrameSkew + 86400
+
+  FrRecords = (FrElemLen - 3) / 4
+  RdIndex = 0
+  For frRec = frElemAt + 3 To frElemAt + FrElemLen - 1 Step 4
+    RdIndex = RdIndex + 1
+    RdB0 = rxByte(frRec)
+    RdB1 = rxByte(frRec + 1)
+    RdB2 = rxByte(frRec + 2)
+    RdB3 = rxByte(frRec + 3)
+    Sprintf (RdRecHex,"%02X %02X %02X %02X",RdB0,RdB1,RdB2,RdB3)
+
+    'Same unpacking as the ASCII path: the middle byte carries the top three
+    'bits of the value and the top five bits of the address.
+    RxLastId = (RdB1 MOD 32) * 256 + RdB0
+    RxLastValue = INT(RdB1 / 32) * 256 + RdB2
+    RxLastRecHex = RdRecHex
+    RdQueued = False
+
+    If RdB3 <> 0 Then
+      FrBad = FrBad + 1
+      RxBadRecords = RxBadRecords + 1
+    ElseIf RxLastId < 1 OR RxLastId > 65535 Then
+      FrBad = FrBad + 1
+      RxBadRecords = RxBadRecords + 1
+    ElseIf NOT ClockOK Then
+      FrBad = FrBad + 1
+      RxLastWhy = "clock not set - not stamping"
+      whyCode = 8
+      RxWhyCount(8) = RxWhyCount(8) + 1
     Else
-      RxAccum = Mid(RxAccum,lineEnd + 1,Len(RxAccum) - lineEnd)
+      suspect = 0
+      If RxLastValue = FULL_SCALE Then suspect = 1
+      Call QueuePush()
+      RdQueued = True
+      FrGood = FrGood + 1
+    EndIf
+    CallTable ReadingLog
+  Next frRec
+
+  CallTable FrameLog
+EndSub
+
+'------------------------------------------------------------------------------
+' TakeFrames -- everything framable in the byte buffer, until nothing is.
+'
+' Binary frames first, text lines only when there is no signature to work with.
+' The order matters: an ASCII feed's line also begins "ALERT2", so the mode test
+' below decides between them on the two bytes after the signature. "ALERT2A,"
+' is a letter A followed by a comma; a length byte of 65 followed by 44 would be
+' a 71-byte frame whose payload began with a comma, which no observed frame does.
+'------------------------------------------------------------------------------
+Sub TakeFrames()
+  frLoops = 0
+  Do
+    frLoops = frLoops + 1
+    If frLoops > FRAME_LOOPS Then ExitDo
+    frDone = False
+
+    frSigAt = 0
+    If nBuf >= SIG_LEN Then
+      For fk = 1 To nBuf - SIG_LEN + 1
+        If rxByte(fk) = 65 Then
+          If rxByte(fk + 1) = 76 AND rxByte(fk + 2) = 69 AND rxByte(fk + 3) = 82 Then
+            If rxByte(fk + 4) = 84 AND rxByte(fk + 5) = 50 Then
+              frSigAt = fk
+              ExitFor
+            EndIf
+          EndIf
+        EndIf
+      Next fk
     EndIf
 
-    If Len(RxLine) > 0 Then Call ParseLine()
+    'Which form is it? "ALERT2A," is a letter A followed by a comma; a binary
+    'frame's byte 7 is a length, and no observed frame has a length of 65 with a
+    'comma behind it. Worked out before the chain below so the chain stays a
+    'plain If/ElseIf -- there is no loop-continue statement in this program,
+    'deliberately, because that is one more construct that cannot be checked
+    'here before it reaches a compiler.
+    frIsAscii = False
+    If frSigAt > 0 Then
+      If nBuf >= frSigAt + SIG_LEN + 1 Then
+        If rxByte(frSigAt + SIG_LEN) = 65 AND rxByte(frSigAt + SIG_LEN + 1) = 44 Then frIsAscii = True
+      EndIf
+    EndIf
+
+    If frSigAt = 0 Then
+      'Nothing framable. Try a text line instead, and stop when a pass consumes
+      'nothing -- otherwise an empty run, such as the LF left over from a CRLF,
+      'would be found again on every iteration.
+      Call TakeTextLine()
+      If NOT tTook Then frDone = True
+
+    ElseIf nBuf < frSigAt + SIG_LEN Then
+      frDone = True                                'the length byte is not here yet
+
+    ElseIf frIsAscii Then
+      RxFrameMode = "ascii"
+      Call TakeTextLine()
+      If NOT tTook Then frDone = True
+
+    Else
+      RxFrameMode = "binary"
+      frLenByte = rxByte(frSigAt + SIG_LEN)
+      frTotal = SIG_LEN + frLenByte
+      frEnd = frSigAt + frTotal - 1
+
+      If frLenByte < FRAME_MIN_LEN OR frTotal > FRAME_MAX Then
+        'Not a length. Step past this signature byte and keep looking, rather
+        'than trusting it and swallowing everything behind it.
+        RxFrameBadLen = RxFrameBadLen + 1
+        dropN = frSigAt
+        Call BufDrop()
+      ElseIf nBuf < frEnd Then
+        frDone = True                              'wait for the rest of it
+      Else
+        FrPre = frSigAt - 1
+        Call DecodeFrame()
+        dropN = frEnd
+        Call BufDrop()
+        FrLeftover = nBuf
+      EndIf
+    EndIf
+
+    If frDone Then ExitDo
   Loop
 EndSub
 
@@ -1612,48 +2003,60 @@ Sub ReadSerial()
   RxBlockBytes = SerialInBlock (RX_PORT,RxBuf,RX_BLOCK)
 
   If RxBlockBytes > 0 Then
+    RxBlockSeq = RxBlockSeq + 1
     RxBytesTotal = RxBytesTotal + RxBlockBytes
     SecsSinceRx = 0
     RxStep = "1 bytes read"
 
     'MoveBytes, not a plain assignment. Assigning one string to another copies
-    'up to the first NUL, and the port is open in transparent mode where a NUL
-    'is an ordinary byte -- so a copy would truncate exactly the block this
-    'program most needs to see, and RxNulls would never count the byte that
-    'caused it. MoveBytes copies the count it is given and does not care what is
-    'in it. This is the KDO driver's instruction, used for the same reason.
+    'up to the first NUL, and this feed carries nine to eleven NULs per frame --
+    'so a copy would truncate exactly the data the program exists to read.
+    'MoveBytes copies the count it is given and does not care what is in it.
     MoveBytes (dumpSrc,0,RxBuf,0,RxBlockBytes)
     dumpLen = RxBlockBytes
-    dumpCensus = True                            'the one call that counts bytes
+    dumpCensus = True
     Call DumpBytes()
     dumpCensus = False
     RxBlockHex = dumpHex
     RxBlockText = dumpTxt
+    RxBlockHexFull = dumpHexFull
     RxStep = "2 block dumped"
 
-    'The raw capture, before anything is assembled or parsed. dumpHexFull is
-    'still this block and only this block, so it goes out now rather than after
-    'TakeLines has called DumpBytes again for the line and the buffer.
     Call CaptureBlock()
 
-    'RxClean is this scan's bytes with NULs removed, from the same loop.
-    RxAccum = RxAccum & RxClean
-    RxStep = "3 appended to line buffer"
+    'Into the byte buffer, raw. Every byte, including NUL, including CR -- this
+    'is the step the first version got wrong, and getting it wrong here cannot
+    'be recovered from anywhere downstream.
+    RxBufLenBefore = nBuf
+    For dk = 1 To RxBlockBytes
+      If nBuf < BUF_MAX Then
+        nBuf = nBuf + 1
+        rxByte(nBuf) = ASCII(dumpSrc(1,1,dk))
+      Else
+        RxBufDrops = RxBufDrops + 1
+      EndIf
+    Next dk
+    RxStep = "3 appended to byte buffer"
+    CallTable RawLog
   Else
     SecsSinceRx = SecsSinceRx + 1
     RxBlockHex = ""
     RxBlockText = ""
   EndIf
 
-  Call TakeLines()
+  Call TakeFrames()
 
-  'What is still waiting for a terminator, shown printable-safe.
-  RxAccumLen = Len(RxAccum)
-  dumpSrc = RxAccum
-  dumpLen = RxAccumLen
+  'What is still waiting, shown both ways.
+  RxBufLen = nBuf
+  dumpLen = nBuf
+  If dumpLen > 250 Then dumpLen = 250
+  For dk = 1 To dumpLen
+    MoveBytes (dumpSrc,dk - 1,CHR(rxByte(dk)),0,1)
+  Next dk
   dumpCensus = False
   Call DumpBytes()
-  RxAccumText = dumpTxt
+  RxBufHex = dumpHex
+  RxBufText = dumpTxt
 EndSub
 
 '------------------------------------------------------------------------------
@@ -1941,7 +2344,8 @@ BeginProg
   QDepth = 0
   Backoff = 0
   ConsecFail = 0
-  RxAccum = ""
+  nBuf = 0
+  RxFrameMode = "unknown"
   RxStep = "waiting for the first byte"
   PostState = "starting"
 
@@ -1968,6 +2372,8 @@ BeginProg
   RxWhyName(10) = "10 unrecognised line"
   RxWhyName(11) = "11 no line terminator"
   RxWhyName(12) = "12 fields are not numbers"
+  RxWhyName(13) = "13 no element in frame"
+  RxWhyName(14) = "14 element len not records"
 
   Call LoadToken()
 
