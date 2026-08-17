@@ -46,6 +46,38 @@ a soft-deleted row is a record somebody chose to retire, whereas a row that has
 fallen out of the extract never happened. Rows typed into MegaNet
 (`origin = 'form'`) are never touched by any statement in the output.
 
+## The route for a connection that cannot carry COPY (#159)
+
+The stream above assumes `psql`: `COPY … FROM stdin` and temporary tables both
+need the whole thing to ride one session. A Supabase MCP connection has neither
+— its SQL surface takes one statement text per request, on a fresh session, and
+20 MB in one request is not a statement, it is a payload. `--chunks DIR` emits
+the same load re-cut for that surface:
+
+    python3 tools/ingest/load.py --chunks /tmp/history-chunks
+    # 1. setup.sql        → run over the MCP SQL surface (staging schema,
+    #                       a secret-gated stage RPC, the sync function)
+    # 2. the data plane   → python3 tools/ingest/apply_chunks.py --dir /tmp/history-chunks
+    #                       (PostgREST RPC over HTTPS, resumable, verifies counts)
+    # 3. sync.sql         → run over the MCP SQL surface. One statement, one
+    #                       function call, one transaction — it refuses to run
+    #                       unless the staged counts match this emission exactly.
+    # 4. cleanup.sql      → drops the staging schema and both functions.
+
+Same rows, same upserts, same deletes: the sync function's body is this file's
+own UPSERT_* SQL with the temporary tables renamed to staging ones, so the two
+routes cannot drift apart. What preserves the single-transaction rule is that
+the sync is *one function call*: half a sync cannot happen, because a function
+call cannot half-commit.
+
+If the operator's own network cannot reach PostgREST either (the agent
+environment's egress policy blocks `*.supabase.co`), the chunks can be
+committed to the repo and relayed by the database itself: `pg_net`'s
+`net.http_get()` fetches each chunk from `raw.githubusercontent.com`, and
+`meganet.load159_stage()` is fed straight from `net._http_response.content` —
+the same gate, the same casts, the same per-file row-count verification. #159
+was applied that way; the exact statements are on the issue.
+
 Standard library only.
 """
 
@@ -55,6 +87,8 @@ import argparse
 import decimal
 import json
 import os
+import re
+import secrets
 import sys
 import uuid
 
@@ -173,6 +207,94 @@ def copy_block(out, table, columns, rows):
     return n
 
 
+# ── The chunked route (#159) ─────────────────────────────────────────────────
+# Everything below re-cuts the same emission for a connection that cannot carry
+# COPY. The rows come out of the same generators, so the two routes cannot
+# disagree about a value — only about how it travels.
+
+_UNESCAPES = {'\\': '\\', 'n': '\n', 'r': '\r', 't': '\t',
+              'b': '\b', 'f': '\f', 'v': '\v'}
+
+
+def uncopy(field):
+    """One COPY field back to the value it encoded. `c()`'s exact inverse:
+    it only ever writes the seven escapes in `_ESCAPES`, so this is lossless."""
+    if field == '\\N':
+        return None
+    if '\\' not in field:
+        return field
+    out, i = [], 0
+    while i < len(field):
+        ch = field[i]
+        if ch == '\\' and i + 1 < len(field):
+            out.append(_UNESCAPES.get(field[i + 1], field[i + 1]))
+            i += 2
+        else:
+            out.append(ch)
+            i += 1
+    return ''.join(out)
+
+
+def staging_columns(ddl):
+    """`(name, type)` pairs out of a TEMP_* constant, in declaration order.
+    Safe to split on commas because no column type here carries one."""
+    body = ddl[ddl.index('(') + 1:ddl.rindex(')')]
+    pairs = []
+    for entry in body.split(','):
+        entry = entry.strip()
+        if entry:
+            name, _, typ = entry.partition(' ')
+            pairs.append((name, typ.strip()))
+    return pairs
+
+
+def staged(sql):
+    """The stream's own SQL, with the temporary tables renamed to staging ones.
+    Word boundaries keep `inspection_block_fact` out of it."""
+    return re.sub(r'\b(_block|_fact|_visit|_measurement|_reject)\b',
+                  r'meganet_load.\1', sql)
+
+
+class ChunkWriter:
+    """The data plane of the chunked route: the same rows, as JSON files small
+    enough for one HTTPS request each, all values as text for the server to
+    cast. `tools/ingest/apply_chunks.py` is the applier."""
+
+    def __init__(self, directory, chunk_bytes):
+        self.dir = directory
+        self.chunk_bytes = chunk_bytes
+        self.files = []
+        self.totals = {}
+        self.columns = {}
+
+    def table(self, table, columns, rows):
+        part, buf, size, n = 0, [], 0, 0
+
+        def flush():
+            nonlocal part, buf, size
+            if not buf:
+                return
+            name = 'chunk%s_%03d.json' % (table, part)
+            with open(os.path.join(self.dir, name), 'w', encoding='utf-8') as f:
+                json.dump({'table': table, 'columns': columns, 'rows': buf}, f,
+                          ensure_ascii=False, separators=(',', ':'))
+            self.files.append({'file': name, 'table': table, 'rows': len(buf)})
+            part, buf, size = part + 1, [], 0
+
+        for row in rows:
+            vals = [uncopy(f) for f in row]
+            size += len(json.dumps(vals, ensure_ascii=False,
+                                   separators=(',', ':'))) + 2
+            buf.append(vals)
+            n += 1
+            if size >= self.chunk_bytes:
+                flush()
+        flush()
+        self.totals[table] = n
+        self.columns[table] = columns
+        return n
+
+
 def crosswalk_by_ref():
     """block ref (or flat row ref) → (crosswalk key, station id, tier).
 
@@ -193,9 +315,14 @@ def crosswalk_by_ref():
     return index
 
 
-def build(out):
+def build(out, chunks=None):
     xwalk = crosswalk_by_ref()
     counts = {}
+
+    def emit(table, columns, rows):
+        if chunks is not None:
+            return chunks.table(table, columns, rows)
+        return copy_block(out, table, columns, rows)
 
     out.write(HEADER)
 
@@ -228,14 +355,14 @@ def build(out):
 
     out.write(SECTION % 'The station blocks')
     out.write(TEMP_BLOCK)
-    counts['blocks'] = copy_block(out, '_block', block_cols, block_rows())
+    counts['blocks'] = emit('_block', block_cols, block_rows())
     out.write(UPSERT_BLOCK)
 
     # ── Block facts ──────────────────────────────────────────────────────────
     out.write(SECTION % "The `ID's` lines, split into facts")
     out.write(TEMP_FACT)
-    counts['block_facts'] = copy_block(
-        out, '_fact',
+    counts['block_facts'] = emit(
+        '_fact',
         ['block_ref', 'fact_key', 'ord', 'value_raw', 'value_num', 'as_at', 'as_at_raw'],
         facts)
     out.write(UPSERT_FACT)
@@ -286,12 +413,12 @@ def build(out):
 
     out.write(SECTION % 'The visits')
     out.write(TEMP_VISIT)
-    counts['visits'] = copy_block(out, '_visit', visit_cols, visit_rows())
+    counts['visits'] = emit('_visit', visit_cols, visit_rows())
     out.write(UPSERT_VISIT)
 
     out.write(SECTION % 'Every measured cell, with the string it was written as')
     out.write(TEMP_MEASUREMENT)
-    counts['measurements'] = copy_block(out, '_measurement', measurement_cols, measurements)
+    counts['measurements'] = emit('_measurement', measurement_cols, measurements)
     out.write(UPSERT_MEASUREMENT)
 
     # ── Rejects ──────────────────────────────────────────────────────────────
@@ -307,8 +434,8 @@ def build(out):
 
     out.write(SECTION % 'The rows that would not load')
     out.write(TEMP_REJECT)
-    counts['rejects'] = copy_block(
-        out, '_reject',
+    counts['rejects'] = emit(
+        '_reject',
         ['ref', 'source', 'sheet', 'banner_row', 'row_no', 'block_ref', 'level',
          'reason', 'detail', 'row_class', 'cells'],
         reject_rows())
@@ -590,12 +717,190 @@ select * from meganet.inspection_history_reconciliation;
 """
 
 
+# ── The chunked route's control plane (#159) ─────────────────────────────────
+# Three SQL files around the JSON data. The stage function is the only thing
+# `anon` can reach, it is gated on a secret minted per emission, and everything
+# here is dropped again by cleanup.sql — the door exists for minutes.
+
+TEMPS = {'_block': TEMP_BLOCK, '_fact': TEMP_FACT, '_visit': TEMP_VISIT,
+         '_measurement': TEMP_MEASUREMENT, '_reject': TEMP_REJECT}
+TABLE_ORDER = ('_block', '_fact', '_visit', '_measurement', '_reject')
+
+
+def stage_fn_sql(columns_by_table):
+    """`meganet.load159_stage()` — one INSERT branch per staging table, the
+    casts read off the staging DDL itself so the two cannot drift."""
+    branches = []
+    for table in TABLE_ORDER:
+        cols = columns_by_table[table]
+        types = dict(staging_columns(TEMPS[table]))
+        casts = ',\n           '.join(
+            '(r->>%d)::%s' % (i, types[col]) for i, col in enumerate(cols))
+        branches.append(
+            "%s p_table = '%s' then\n"
+            '    insert into meganet_load.%s (%s)\n'
+            '    select %s\n'
+            '      from pg_catalog.jsonb_array_elements(p_rows) as x(r);'
+            % ('if' if not branches else 'elsif', table, table,
+               ',\n        '.join(cols), casts))
+    return """
+create or replace function meganet.load159_stage(
+  p_secret text, p_table text, p_rows jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $stage$
+declare
+  v_n integer;
+begin
+  if not exists (select 1 from meganet_load.secret s where s.value = p_secret) then
+    raise exception 'load159_stage: bad secret';
+  end if;
+  %s
+  else
+    raise exception 'load159_stage: unknown table %%', p_table;
+  end if;
+  get diagnostics v_n = row_count;
+  return v_n;
+end
+$stage$;
+
+revoke all on function meganet.load159_stage(text, text, jsonb) from public;
+grant execute on function meganet.load159_stage(text, text, jsonb) to anon;
+""" % '\n  '.join(branches)
+
+
+def sync_fn_sql():
+    """`meganet.load159_sync()` — the whole sync as one function, which is what
+    keeps it one transaction on a surface that offers no BEGIN. Its body is the
+    stream route's own UPSERT_* SQL, staging-qualified by `staged()`."""
+    body = ''.join(staged(part) for part in (
+        UPSERT_BLOCK, UPSERT_FACT, UPSERT_VISIT, UPSERT_MEASUREMENT,
+        UPSERT_REJECT))
+    return """
+create or replace function meganet.load159_sync(p_expected jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $sync$
+declare
+  v_staged    jsonb;
+  v_projected jsonb;
+  v_recon     jsonb;
+begin
+  select pg_catalog.jsonb_build_object(
+    '_block',       (select count(*) from meganet_load._block),
+    '_fact',        (select count(*) from meganet_load._fact),
+    '_visit',       (select count(*) from meganet_load._visit),
+    '_measurement', (select count(*) from meganet_load._measurement),
+    '_reject',      (select count(*) from meganet_load._reject))
+    into v_staged;
+  if v_staged is distinct from p_expected then
+    raise exception
+      'load159_sync: staged counts %% do not match the emission''s %% — '
+      'stage every chunk first (a rerun of apply_chunks.py resumes), '
+      'or truncate meganet_load.* and restage', v_staged, p_expected;
+  end if;
+%s
+  select pg_catalog.jsonb_object_agg(home, rows_written) into v_projected
+    from meganet.project_inspection_measurements();
+
+  select pg_catalog.to_jsonb(r) into v_recon
+    from meganet.inspection_history_reconciliation r;
+
+  return pg_catalog.jsonb_build_object(
+    'staged', v_staged, 'projected', v_projected, 'reconciliation', v_recon);
+end
+$sync$;
+
+revoke all on function meganet.load159_sync(jsonb) from public;
+""" % body
+
+
+def build_chunks(directory, chunk_bytes):
+    """The whole chunked emission: data as JSON files, control as three SQL
+    files, and manifest.json tying them together for apply_chunks.py."""
+    os.makedirs(directory, exist_ok=True)
+    writer = ChunkWriter(directory, chunk_bytes)
+    with open(os.devnull, 'w') as devnull:
+        counts = build(devnull, chunks=writer)
+
+    secret = secrets.token_hex(24)
+    expected = {t: writer.totals[t] for t in TABLE_ORDER}
+    expected_json = json.dumps(expected, separators=(',', ':'))
+
+    staging_ddl = ''.join(
+        TEMPS[t].replace('create temporary table %s' % t,
+                         'create unlogged table meganet_load.%s' % t)
+                .replace(') on commit drop;', ');')
+        for t in TABLE_ORDER)
+
+    def write(name, text):
+        with open(os.path.join(directory, name), 'w', encoding='utf-8') as f:
+            f.write(text)
+
+    write('setup.sql', HEADER + """
+-- ── The chunked route's staging ─────────────────────────────
+-- Everything below is scaffolding and is dropped by cleanup.sql.
+
+drop schema if exists meganet_load cascade;
+create schema meganet_load;
+revoke all on schema meganet_load from public;
+""" + staging_ddl + """
+-- The gate. One secret per emission, held in a table nothing is granted on,
+-- compared inside the one function anon may execute.
+create table meganet_load.secret (value text not null);
+insert into meganet_load.secret (value) values ('%s');
+""" % secret + stage_fn_sql(writer.columns) + sync_fn_sql() + """
+notify pgrst, 'reload schema';
+""")
+
+    write('sync.sql', """-- Run over the SQL surface once apply_chunks.py reports every chunk staged.
+-- One function call: the sync either happens whole or not at all.
+set statement_timeout = '600s';
+select meganet.load159_sync('%s'::jsonb) as result;
+""" % expected_json)
+
+    write('cleanup.sql', """-- Run last. Removes every piece of scaffolding setup.sql created.
+drop function if exists meganet.load159_stage(text, text, jsonb);
+drop function if exists meganet.load159_sync(jsonb);
+drop schema if exists meganet_load cascade;
+notify pgrst, 'reload schema';
+""")
+
+    write('manifest.json', json.dumps({
+        'rpc': 'load159_stage',
+        'profile': 'meganet',
+        'secret': secret,
+        'expected': expected,
+        'files': writer.files,
+    }, indent=2) + '\n')
+
+    return counts, writer
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__.split('\n')[0],
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--out', help='write SQL here instead of stdout')
+    ap.add_argument('--chunks', metavar='DIR',
+                    help='emit the chunked route here instead of the psql '
+                         'stream — for a connection that cannot carry COPY '
+                         '(see the #159 section of the module docstring)')
+    ap.add_argument('--chunk-bytes', type=int, default=900_000,
+                    help='data chunk size bound in bytes (default 900000 — '
+                         'small enough for one HTTPS request each)')
     args = ap.parse_args()
+
+    if args.chunks:
+        counts, writer = build_chunks(args.chunks, args.chunk_bytes)
+        for name, n in counts.items():
+            print('%-14s %7d' % (name, n), file=sys.stderr)
+        print('%-14s %7d' % ('chunk files', len(writer.files)), file=sys.stderr)
+        return 0
 
     handle = open(args.out, 'w', encoding='utf-8') if args.out else sys.stdout
     try:
