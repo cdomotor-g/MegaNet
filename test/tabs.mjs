@@ -258,6 +258,34 @@ const SEED_MSGLOG = `() => {
   MessageLog.toggleRow('a:6128|2026-03-01T04:15:00+00:00|12');
 }`;
 
+// The Bit Flipper draws an ask-me state until an address is typed, and the
+// table, the ARRO link and the map markers all hang off the address. The seed
+// types one through the tab's own handler — an alert id read out of the loaded
+// data, so the variants genuinely match stations — and waits out the 250 ms
+// map-refresh debounce so the overflow pass measures a populated tab.
+const SEED_BITFLIPPER = `async () => {
+  const addr = String(state.data.stations
+    .flatMap(s => (s.sensors || []).map(x => x.alert_id))
+    .find(a => Number.isInteger(a) && a > 0 && a < 65536));
+  const input = document.getElementById('bf-addr');
+  if (input) input.value = addr;
+  onBfAddrInput(addr);
+  await new Promise(r => setTimeout(r, 300));
+}`;
+
+// The Workbench draws an intro panel until a case exists, and everything else
+// — verdict, ranking, matrix, map, timeline, both right-rail panels — only
+// once one does. The seed drives the tab's own worked-example loader, which
+// picks the best-served repeater out of the loaded data and builds a real
+// five-affected/two-good case through the same path the intro button takes.
+// The ACMA and RFC lazy loads then fire and fail (the harness blocks the
+// network), so their panels are checked in their honest failed state; the
+// wait lets those rejections re-render before anything is measured.
+const SEED_WORKBENCH = `async () => {
+  Workbench.loadExample();
+  await new Promise(r => setTimeout(r, 400));
+}`;
+
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
@@ -272,6 +300,9 @@ const CONVERTED = [
   { id: 'rfchanges',  label: 'RF Changes — onset and a series', issue: '#138', seed: SEED_RFC_ONSET },
   { id: 'msglog',     label: 'Message Log',     issue: 'new with the tab', seed: SEED_MSGLOG },
   { id: 'mapgen',     label: 'Map Generator',   issue: 'new with the tab' },
+  { id: 'bitflipper', label: 'Bit Flipper',     issue: '#139', seed: SEED_BITFLIPPER },
+  { id: 'workbench',  label: 'Interference Workbench — intro',       issue: '#139' },
+  { id: 'workbench',  label: 'Interference Workbench — worked case', issue: '#139', seed: SEED_WORKBENCH },
 ];
 
 

@@ -9,7 +9,9 @@
 // The widest reach of any module in the epic, which is what a tab that exists
 // to correlate five other tabs costs:
 //
-//   core.js       ACMA_MECH, acmaHaversineKm, buildSensorIndex, csvEscape,
+//   core.js       ACMA_MECH, acmaMechVar, acmaMechColor (#139 — the palette
+//                 reaches this tab as tokens now), acmaHaversineKm,
+//                 buildSensorIndex, csvEscape,
 //                 dlText, esc, escAttr, registerLiveMap (#142 — the case map
 //                 says so itself now), registerTabTeardown, removeMap (#143 —
 //                 and takes itself down on the way out), slug, state
@@ -47,6 +49,24 @@
 //
 // Wrapped in an IIFE and moved out of app.js by M4 (#135) of #129 — the last
 // child of that epic, and the only one that was a refactor rather than a move.
+//
+// ── The small-screen model (#139) ────────────────────────────────────────────
+// Three rails cannot coexist on a phone, and the answer is deliberate rather
+// than three independent collapses (styles.css, the .wb-layout blocks):
+//
+//   ≥ xl (1400)   three columns — setup rail · case · suspects/actions rail
+//   xl → lg       two columns — setup rail beside the case; the right rail
+//                 drops to a full-width band underneath, because suspects and
+//                 actions are read after the verdict, not beside it
+//   ≤ lg (1100)   ONE column, in investigation order: setup, then the case,
+//                 then suspects and actions — the same order the work happens
+//                 in, so a phone reads the page as the procedure it is
+//
+// Nothing collapses away: every panel of every rail is in the single column,
+// and the education layer (terms, "Why this matters", the concept drawer) is
+// untouched by width. The concept drawer is position: fixed and its own
+// stacking context at every size, and it is a labelled dialog — focus moves
+// into it on open and back to whatever opened it on close.
 
 // ── INTERFERENCE WORKBENCH tab ───────────────────────────────────────────────────
 // A single investigation surface: select the stations you believe are affected and
@@ -604,17 +624,20 @@ function wbRestoreFromUrl() {
 // ── education layer ──
 
 // Tier 1: dotted-underline tooltip; clicking through opens the concept drawer
-// (tier 3) when a concept id is given.
+// (tier 3) when a concept id is given. The tip rides inside as sr-only text as
+// well as in data-tip: the ::after tooltip is invisible to a screen reader,
+// and without the span the education layer's first tier was silent to exactly
+// the reader progressive disclosure exists for (#139's screen-reader pass).
 function wbT(text, tip, conceptId) {
   const click = conceptId ? ` onclick="Workbench.openConcept('${escAttr(conceptId)}')"` : '';
   return `<span class="wb-term${conceptId ? ' wb-term-link' : ''}" tabindex="0"` +
-         ` data-tip="${esc(tip)}"${click}>${esc(text)}</span>`;
+         ` data-tip="${esc(tip)}"${click}>${esc(text)}<span class="sr-only"> (${esc(tip)})</span></span>`;
 }
 
 // Tier 2: per-panel "Why this matters" expander.
 function wbWhy(html) {
   return `<details class="wb-why"><summary>Why this matters</summary>
-    <div class="small" style="color:var(--muted);margin-top:.35rem">${html}</div></details>`;
+    <div class="small txt-muted wb-why-body">${html}</div></details>`;
 }
 
 function wbEnsureConcepts() {
@@ -627,24 +650,43 @@ function wbEnsureConcepts() {
   return wbs.conceptsPromise;
 }
 
+// Where focus came from, so closing the drawer puts it back — the same deal
+// the transmitter card settled for the three tabs that share it (#138): a
+// keyboard user who opened a dialog must not be dropped on <body> when it
+// shuts.
+let wbDrawerOpener = null;
+
 function wbOpenConcept(id) {
   state.wb.drawerId = id || null;
   const el = document.getElementById('wb-drawer');
   if (!el) return;
+  if (el.hidden) wbDrawerOpener = document.activeElement;
   el.hidden = false;
-  el.innerHTML = '<div class="small" style="padding:1rem;color:var(--muted)">Loading concept notes…</div>';
+  el.innerHTML = '<div class="wb-drawer-body small txt-muted">Loading concept notes…</div>';
   wbEnsureConcepts().then(() => wbRenderDrawer()).catch(err => {
-    el.innerHTML = `<div style="padding:1rem">
-      <button onclick="Workbench.closeDrawer()" style="float:right">×</button>
-      <p class="small" style="color:var(--muted)">Concept notes unavailable (${esc(err.message)}) —
-      data/rf-concepts.json cannot be fetched over file://.</p></div>`;
+    el.innerHTML = `
+      <div class="wb-drawer-head">
+        <strong>RF concepts</strong>
+        <span><button onclick="Workbench.closeDrawer()" title="Close">×</button></span>
+      </div>
+      <div class="wb-drawer-body">
+        <p class="small txt-muted">Concept notes unavailable (${esc(err.message)}) —
+        data/rf-concepts.json cannot be fetched over file://.</p></div>`;
+    wbFocusDrawer(el);
   });
+}
+
+function wbFocusDrawer(el) {
+  const close = el.querySelector('.wb-drawer-head button[title="Close"]');
+  if (close) close.focus();
 }
 
 function wbCloseDrawer() {
   const el = document.getElementById('wb-drawer');
   if (el) { el.hidden = true; el.innerHTML = ''; }
   state.wb.drawerId = null;
+  if (wbDrawerOpener && document.contains(wbDrawerOpener)) wbDrawerOpener.focus();
+  wbDrawerOpener = null;
 }
 
 function wbRenderDrawer() {
@@ -664,24 +706,26 @@ function wbRenderDrawer() {
   if (!cur) {
     el.innerHTML = `${head}
       <div class="wb-drawer-body">
-        <p class="small" style="color:var(--muted)">Short, field-oriented explainers. Every entry
+        <p class="small txt-muted">Short, field-oriented explainers. Every entry
         says what the phenomenon looks like <em>in your data</em>, not just what it is.</p>
-        ${list.map(c => `<a href="#" class="wb-drawer-item"
-            onclick="Workbench.openConcept('${escAttr(c.id)}');return false">${esc(c.title)}</a>`).join('')}
+        ${list.map(c => `<button type="button" class="wb-drawer-item"
+            onclick="Workbench.openConcept('${escAttr(c.id)}')">${esc(c.title)}</button>`).join('')}
       </div>`;
+    wbFocusDrawer(el);
     return;
   }
   const also = (cur.see_also || []).map(id => {
     const t = list.find(c => c.id === id);
-    return t ? `<a href="#" onclick="Workbench.openConcept('${escAttr(id)}');return false">${esc(t.title)}</a>` : '';
+    return t ? `<button type="button" class="link-btn" onclick="Workbench.openConcept('${escAttr(id)}')">${esc(t.title)}</button>` : '';
   }).filter(Boolean).join(' · ');
   el.innerHTML = `${head}
     <div class="wb-drawer-body">
       <p>${esc(cur.what)}</p>
       <p><strong>In your data:</strong> ${esc(cur.in_your_data)}</p>
       <p><strong>What to do:</strong> ${esc(cur.next)}</p>
-      ${also ? `<p class="small" style="color:var(--muted)">See also: ${also}</p>` : ''}
+      ${also ? `<p class="small txt-muted">See also: ${also}</p>` : ''}
     </div>`;
+  wbFocusDrawer(el);
 }
 
 // ── page shell ──
@@ -694,13 +738,15 @@ function renderWorkbenchHtml() {
   state.wb.lastAnalysis = an;
   return `
     <div class="wb-page">
+      <h2 class="sr-only">Interference Workbench</h2>
       <div class="wb-layout">
-        <aside class="stack wb-rail">${wbSetupHtml(an)}</aside>
+        <aside class="stack wb-rail" aria-label="Investigation setup">${wbSetupHtml(an)}</aside>
         <div class="stack">${an ? wbCentreHtml(an) : wbIntroHtml()}</div>
-        <aside class="stack wb-rail">${wbRightHtml(an)}</aside>
+        <aside class="stack wb-rail" aria-label="Suspects and actions">${wbRightHtml(an)}</aside>
       </div>
       <div id="acma-card" class="acma-card" hidden></div>
-      <div id="wb-drawer" class="wb-drawer" hidden></div>
+      <div id="wb-drawer" class="wb-drawer" role="dialog" aria-label="RF concept notes" hidden
+           onkeydown="if(event.key==='Escape')Workbench.closeDrawer()"></div>
     </div>`;
 }
 
@@ -736,35 +782,35 @@ function wbSetupHtml(an) {
       <div class="panel-header"><h3>Investigation</h3>
         ${(wbs.affected.length || wbs.good.length) ? '<button onclick="Workbench.clearCase()">Clear</button>' : ''}
       </div>
-      <label class="small" style="display:block;margin-top:.5rem">Paste ALERT IDs
-        <textarea id="wb-paste" rows="2" style="margin-top:.3rem"
+      <label class="wb-field">Paste ALERT IDs
+        <textarea id="wb-paste" rows="2"
           placeholder="6129, 6130 2316&#10;2320 — space, comma or newline separated"></textarea>
       </label>
-      <div class="button-row" style="justify-content:flex-start;margin:.4rem 0">
+      <div class="button-group wb-block">
         <button class="primary" onclick="Workbench.addFromPaste('affected')">Add as affected</button>
         <button onclick="Workbench.addFromPaste('good')">Add as known-good</button>
       </div>
-      <label class="small" style="display:block;margin-top:.4rem">Or search stations
+      <label class="wb-field">Or search stations
         <input type="search" id="wb-pick" placeholder="Station name or number…"
-               value="${esc(wbs.pickQuery)}" style="margin-top:.3rem"
+               value="${esc(wbs.pickQuery)}"
                oninput="state.wb.pickQuery=this.value;Workbench.refreshPick()">
       </label>
       <div id="wb-pick-out">${wbPickResultsHtml()}</div>
       ${wbChipsHtml('affected', 'Affected stations')}
       ${wbChipsHtml('good', 'Known-good stations')}
-      <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+      <p class="small txt-muted wb-note">
         ${wbT('Known-good', 'Stations you have checked and found fine. Marking them sharpens specificity far more than adding affected stations does.', 'coverage_specificity')}
         stations sharpen the analysis; unselected stations are otherwise assumed good.</p>
     </div>
 
     <div class="panel">
       <div class="panel-header"><h3>Context</h3></div>
-      <div class="upload-grid" style="margin-top:.5rem">
-        <label>Onset date <span class="small" style="color:var(--muted)">(blank = unknown)</span>
+      <div class="upload-grid wb-block">
+        <label>Onset date <span class="small txt-muted">(blank = unknown)</span>
           <input type="date" value="${esc(wbs.onset)}"
                  onchange="state.wb.onset=this.value;renderMain()">
         </label>
-        <label>Onset range end <span class="small" style="color:var(--muted)">(optional)</span>
+        <label>Onset range end <span class="small txt-muted">(optional)</span>
           <input type="date" value="${esc(wbs.onsetEnd)}"
                  onchange="state.wb.onsetEnd=this.value;renderMain()">
         </label>
@@ -776,37 +822,37 @@ function wbSetupHtml(an) {
           </select>
         </label>
       </div>
-      <p class="small" style="color:var(--muted);margin:.5rem 0 0">The symptom mildly weights the
+      <p class="small txt-muted wb-note">The symptom mildly weights the
         hypothesis ranking (shown in each score's arithmetic); it never decides it.</p>
     </div>
 
     <div class="panel">
       <div class="panel-header"><h3>Save / share</h3></div>
-      <div class="upload-grid" style="margin-top:.5rem">
+      <div class="upload-grid wb-block">
         <label>Case name
           <input type="text" id="wb-case-name" value="${esc(wbs.caseName)}" placeholder="e.g. Mt Stuart June event"
                  oninput="state.wb.caseName=this.value">
         </label>
       </div>
-      <div class="button-row" style="justify-content:flex-start;margin-top:.5rem">
+      <div class="button-group wb-block">
         <button onclick="Workbench.saveCase()">Save</button>
         <button onclick="Workbench.shareLink(this)" ${wbs.affected.length ? '' : 'disabled'}>Copy share link</button>
       </div>
       ${caseNames.length ? `
-        <div style="display:flex;gap:.4rem;align-items:center;margin-top:.6rem">
+        <div class="wb-case-row">
           <select id="wb-case-sel" onchange="Workbench.loadCase(this.value)">
             <option value="">Load saved case…</option>
             ${caseNames.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}
           </select>
           <button onclick="Workbench.deleteCase()" title="Delete the case selected above">🗑</button>
         </div>` : ''}
-      <p class="small" style="color:var(--muted);margin:.5rem 0 0">Cases save to this browser;
+      <p class="small txt-muted wb-note">Cases save to this browser;
         the share link carries the whole investigation in the URL.</p>
     </div>
 
     <div class="panel">
       <div class="panel-header"><h3>Routing data quality</h3></div>
-      <p class="small" style="color:var(--muted);margin:.4rem 0 0">
+      <p class="small txt-muted wb-note">
         ${passRangeReps} of ${roleReps} repeaters have recorded pass ranges — H1 can only see
         those.${an && an.A_unrouted.length ? ` <strong>${an.A_unrouted.length}</strong> of your affected
         stations have no routing data.` : ''} If a suspect repeater is missing here, backfilling its
@@ -822,16 +868,18 @@ function wbChipsHtml(list, label) {
   const cls = list === 'affected' ? 'wb-chip-aff' : 'wb-chip-good';
   const swapTitle = list === 'affected' ? 'Move to known-good' : 'Move to affected';
   return `
-    <div style="margin-top:.6rem">
-      <div class="small" style="color:var(--muted);margin-bottom:.25rem">${label} (${ids.length})</div>
+    <div class="wb-block">
+      <div class="small txt-muted wb-chip-label">${label} (${ids.length})</div>
       <div class="wb-chips">
         ${ids.map(id => {
           const hits = idx.get(id) || [];
           const name = hits.length ? hits[0].station.name : 'not in database';
           return `<span class="wb-chip ${cls}${hits.length ? '' : ' wb-chip-miss'}" title="${esc(name)}">
             <strong>${id}</strong> <span class="wb-chip-name">${esc(name)}</span>
-            <a href="#" title="${swapTitle}" onclick="Workbench.swapId('${list}',${id});return false">⇄</a>
-            <a href="#" title="Remove" onclick="Workbench.removeId('${list}',${id});return false">×</a>
+            <button type="button" class="link-btn" title="${swapTitle}"
+                    onclick="Workbench.swapId('${list}',${id})">⇄</button>
+            <button type="button" class="link-btn" title="Remove ${id}"
+                    onclick="Workbench.removeId('${list}',${id})">×</button>
           </span>`;
         }).join('')}
       </div>
@@ -848,12 +896,12 @@ function wbPickResultsHtml() {
   if (q.length < 2) return '';
   const hits = state.data.stations.filter(s => stationAlertIds(s).length &&
     (s.name.toLowerCase().includes(q) || (s.station_number || '').includes(q))).slice(0, 8);
-  if (!hits.length) return '<p class="small" style="color:var(--muted);margin:.4rem 0 0">No stations with ALERT ids match.</p>';
+  if (!hits.length) return '<p class="small txt-muted wb-note">No stations with ALERT ids match.</p>';
   return `
     <div class="wb-pick-list">
       ${hits.map(s => `
         <div class="wb-pick-row">
-          <span>${esc(s.name)} <span class="small" style="color:var(--muted)">${stationAlertIds(s).join(', ')}</span></span>
+          <span>${esc(s.name)} <span class="small txt-muted">${stationAlertIds(s).join(', ')}</span></span>
           <span>
             <button onclick="Workbench.addStation('${escAttr(s.id)}','affected')" title="Add as affected">+ aff</button>
             <button onclick="Workbench.addStation('${escAttr(s.id)}','good')" title="Add as known-good">+ good</button>
@@ -867,14 +915,16 @@ function wbPickResultsHtml() {
 function wbIntroHtml() {
   return `
     <div class="panel">
-      <div class="panel-header"><h2>Interference Workbench</h2></div>
-      <p style="max-width:75ch">Select the stations you believe are affected (left) and the
+      <div class="panel-header"><h3>What this tab does</h3></div>
+      <p class="wb-prose">Select the stations you believe are affected (left) and the
         Workbench assembles the evidence spread across Map, Networks, Bit Flipper, RF Environment
         and RF Changes into one argued case: five competing explanations, scored, with the
         arithmetic open to inspection and the most informative next check named.</p>
-      <div class="table-wrap" style="margin-top:.5rem">
+      <div class="table-wrap wb-block">
         <table>
-          <thead><tr><th style="width:16%">Hypothesis</th><th>Signature in the selected stations</th></tr></thead>
+          <caption class="sr-only">The five hypotheses and the signature each one looks for in the selected stations</caption>
+          <colgroup><col style="width:16%"><col></colgroup>
+          <thead><tr><th scope="col">Hypothesis</th><th scope="col">Signature in the selected stations</th></tr></thead>
           <tbody>
             <tr><td><strong>H1</strong> Repeater common-mode</td><td class="small">Affected stations share a repeater path; unaffected ones mostly don't.</td></tr>
             <tr><td><strong>H2</strong> Geographic / regional</td><td class="small">Affected stations cluster spatially regardless of routing.</td></tr>
@@ -884,11 +934,11 @@ function wbIntroHtml() {
           </tbody>
         </table>
       </div>
-      <div class="button-row" style="justify-content:flex-start;margin-top:.75rem">
+      <div class="button-group wb-block">
         <button class="primary" onclick="Workbench.loadExample()">Load a worked example</button>
         <button onclick="Workbench.openConcept('')">Open the RF concept notes</button>
       </div>
-      <p class="small" style="color:var(--muted);margin-top:.6rem">The Workbench never claims a
+      <p class="small txt-muted wb-note">The Workbench never claims a
         cause. It ranks explanations by how well they fit, states its confidence, and tells you
         what would most change the answer.</p>
     </div>`;
@@ -921,7 +971,7 @@ function wbH5BannerHtml(an) {
       ${wbT('payload protection', 'The plain ALERT Binary Format has no checksum over address or data — any flipped bit is accepted as truth.', 'no_crc')}
       in ALERT Binary Format, one may be the victim of the other's corrupted packets rather than
       independently affected — which would change this entire selection.
-      <button style="margin-left:.5rem" onclick="Workbench.openBf(${p.a})">Open ${p.a} in Bit Flipper</button>
+      <button onclick="Workbench.openBf(${p.a})">Open ${p.a} in Bit Flipper</button>
     </div>`;
 }
 
@@ -937,16 +987,16 @@ function wbVerdictHtml(an) {
     ? `${lead.label} — ${esc(top.r.name)}` : lead.label;
   return `
     <div class="panel wb-verdict">
-      <div class="small" style="color:var(--muted)">Leading hypothesis — most consistent with the evidence, not a proven cause</div>
-      <h2 style="margin:.25rem 0">${title}</h2>
-      <p style="margin:.3rem 0">${esc(an.stmt[lead.key])}</p>
+      <div class="small txt-muted">Leading hypothesis — most consistent with the evidence, not a proven cause</div>
+      <h3 class="wb-verdict-title">${title}</h3>
+      <p class="wb-tight">${esc(an.stmt[lead.key])}</p>
       ${lead.key === 'h1' && top ? `
-        <p class="small" style="margin:.3rem 0">
+        <p class="small wb-tight">
           ${wbT('Coverage', 'What fraction of the affected stations pass through this repeater — does it explain all of them?', 'coverage_specificity')} ${top.coverage.toFixed(2)}
           · ${wbT('Specificity', 'How well the repeater avoids explaining stations that are fine. Low specificity: it is on almost everyone’s path, so its involvement is less informative.', 'coverage_specificity')} ${top.specificity.toFixed(2)}
           · ${wbT('Explanatory power', 'Harmonic mean (F1) of coverage and specificity — punishes a candidate weak on either.', 'coverage_specificity')} ${top.power.toFixed(2)}</p>` : ''}
-      <p style="margin:.35rem 0"><strong>Confidence: ${conf}.</strong> <span class="small">${confWhy}</span></p>
-      <p style="margin:.35rem 0"><strong>Most informative next check:</strong> ${esc(an.nextCheck)}</p>
+      <p class="wb-tight"><strong>Confidence: ${conf}.</strong> <span class="small">${confWhy}</span></p>
+      <p class="wb-tight"><strong>Most informative next check:</strong> ${esc(an.nextCheck)}</p>
       ${an.notes.length ? `<div class="wb-notes">${an.notes.map(n => `<p class="small">▸ ${esc(n)}</p>`).join('')}</div>` : ''}
     </div>`;
 }
@@ -956,17 +1006,17 @@ function wbRankingHtml(an) {
   return `
     <div class="panel">
       <div class="panel-header"><h3>Hypothesis ranking</h3>
-        <span class="small" style="color:var(--muted)">all five scored — losing hypotheses stay visible</span></div>
+        <span class="small txt-muted">all five scored — losing hypotheses stay visible</span></div>
       ${an.hyps.map((h, i) => `
         <details class="wb-hyp">
           <summary>
             <span class="wb-hyp-rank">#${i + 1}</span>
             <span class="wb-hyp-name"><strong>${h.short}</strong> ${h.label}</span>
-            <span class="wb-hyp-bar"><span style="width:${Math.round(h.score * 100)}%"></span></span>
+            <span class="wb-hyp-bar"><span style="--w:${Math.round(h.score * 100)}%"></span></span>
             <span class="wb-hyp-score">${h.score.toFixed(2)}</span>
           </summary>
           <div class="wb-hyp-body">
-            <p class="small" style="margin:.3rem 0">${esc(an.stmt[h.key])}</p>
+            <p class="small wb-tight">${esc(an.stmt[h.key])}</p>
             ${arith[h.key](an, h)}
           </div>
         </details>`).join('')}
@@ -1060,22 +1110,23 @@ function wbH5PanelHtml(an) {
   const H = an.h5;
   return `
     <div class="panel">
-      <div class="panel-header"><h3>1 · Address bit-flip check (H5)</h3>
-        <span class="small" style="${H.pairs.length ? 'color:var(--warn)' : 'color:var(--ok)'}">
+      <div class="panel-header"><h3 id="wb-h5-h">1 · Address bit-flip check (H5)</h3>
+        <span class="small ${H.pairs.length ? 'txt-warn' : 'txt-ok'}">
           ${H.pairs.length ? `${H.pairs.length} suspect pair${H.pairs.length > 1 ? 's' : ''}` : 'clear'}</span></div>
-      <p class="small" style="color:var(--muted);margin:.4rem 0">Runs first because it can invalidate
+      <p class="small txt-muted wb-tight">Runs first because it can invalidate
         the selection: with 13 unprotected address bits, a single flip re-attributes a reading to a
         station whose ID differs by a power of two. Pairwise XOR over the selected addresses,
         flagging ${wbT('Hamming distance', 'How many bits differ between two addresses. Distance 1 = reachable by a single bit error.', 'hamming')} ≤ 2.</p>
       ${H.pairs.length ? `
         <div class="table-wrap">
-          <table class="bf-table" style="min-width:560px">
-            <thead><tr><th>Address A</th><th>Address B</th><th>Distance</th><th>Differing bit(s)</th><th></th></tr></thead>
+          <table class="wb-h5-table">
+            <caption class="sr-only">Selected address pairs within two bit flips of each other</caption>
+            <thead><tr><th scope="col">Address A</th><th scope="col">Address B</th><th scope="col">Distance</th><th scope="col">Differing bit(s)</th><th scope="col"><span class="sr-only">Open in Bit Flipper</span></th></tr></thead>
             <tbody>${H.pairs.map(p => {
               const nameOf = a => { const rec = an.aff.byStation; for (const { station, addrs } of rec.values()) if (addrs.includes(a)) return station.name; return '—'; };
               return `<tr>
-                <td>${p.a} <span class="small" style="color:var(--muted)">${esc(nameOf(p.a))}</span></td>
-                <td>${p.b} <span class="small" style="color:var(--muted)">${esc(nameOf(p.b))}</span></td>
+                <td>${p.a} <span class="small txt-muted">${esc(nameOf(p.a))}</span></td>
+                <td>${p.b} <span class="small txt-muted">${esc(nameOf(p.b))}</span></td>
                 <td>${p.d}</td>
                 <td class="small mono">bit ${p.bits.join(', bit ')}</td>
                 <td><button onclick="Workbench.openBf(${p.a})">Bit Flipper →</button></td>
@@ -1083,9 +1134,9 @@ function wbH5PanelHtml(an) {
             }).join('')}</tbody>
           </table>
         </div>
-        <p class="small" style="color:var(--warn);margin:.4rem 0 0">These stations may not be
+        <p class="small txt-warn wb-note">These stations may not be
           independently affected — compare their data series before treating them as separate evidence.</p>`
-      : `<p class="small" style="color:var(--ok);margin:.4rem 0 0">✓ No selected addresses within 2 bit
+      : `<p class="small txt-ok wb-note">✓ No selected addresses within 2 bit
           flips of each other — the selection looks independently addressed, and the rest of the
           analysis can be read at face value.</p>`}
       ${wbWhy(`An operator seeing bad data at stations 2316 and 2320 may believe both are affected
@@ -1102,7 +1153,7 @@ function wbMatrixHtml(an) {
     return `
     <div class="panel">
       <div class="panel-header"><h3>2 · Routing / pass-range matrix</h3></div>
-      <p class="small" style="color:var(--muted);margin:.4rem 0 0">No documented repeater carries any
+      <p class="small txt-muted wb-note">No documented repeater carries any
         selected station, so there is no matrix to draw. That is a finding: either these stations'
         routing is undocumented (see routing data quality, left) or their paths genuinely don't
         share infrastructure — which points at H2/H4, not H1.</p>
@@ -1115,21 +1166,23 @@ function wbMatrixHtml(an) {
   return `
     <div class="panel">
       <div class="panel-header"><h3>2 · Routing / pass-range matrix</h3>
-        <span class="small" style="color:var(--muted)">● = station's ALERT id inside repeater's pass ranges</span></div>
-      <div class="table-wrap" style="margin-top:.5rem">
+        <span class="small txt-muted">● = station's ALERT id inside repeater's pass ranges</span></div>
+      <div class="table-wrap wb-block">
         <table class="wb-matrix">
+          <caption class="sr-only">Which candidate repeater carries which selected station — affected and known-good rows against the ranked candidates</caption>
           <thead><tr>
-            <th style="min-width:140px">Station</th>
-            ${cols.map(c => `<th class="wb-m-h" title="${esc(c.r.name)} — power ${c.power.toFixed(2)}"><span>${esc(c.r.name)}</span></th>`).join('')}
+            <th scope="col" class="wb-m-station">Station</th>
+            ${cols.map(c => `<th scope="col" class="wb-m-h" title="${esc(c.r.name)} — power ${c.power.toFixed(2)}"><span>${esc(c.r.name)}</span></th>`).join('')}
           </tr></thead>
           <tbody>
             ${rows.map(row => `
               <tr class="${row.cls}">
                 <td title="${row.tag}">${esc(row.s.name)}
-                  <span class="small" style="color:var(--muted)">${(stationAlertIds(row.s) || []).join(', ')}</span></td>
+                  <span class="small txt-muted">${(stationAlertIds(row.s) || []).join(', ')}</span>
+                  <span class="sr-only">(${row.tag})</span></td>
                 ${cols.map(c => {
                   const hit = an.passes(row.s, c.r);
-                  return `<td class="wb-m${hit ? ' hit' : ''}">${hit ? '●' : ''}</td>`;
+                  return `<td class="wb-m${hit ? ' hit' : ''}">${hit ? '●<span class="sr-only"> carried</span>' : ''}</td>`;
                 }).join('')}
               </tr>`).join('')}
           </tbody>
@@ -1140,7 +1193,7 @@ function wbMatrixHtml(an) {
           </tfoot>
         </table>
       </div>
-      ${an.candidates.length > cols.length ? `<p class="small" style="color:var(--muted);margin:.4rem 0 0">Top ${cols.length} of ${an.candidates.length} candidate repeaters shown, ranked by explanatory power.</p>` : ''}
+      ${an.candidates.length > cols.length ? `<p class="small txt-muted wb-note">Top ${cols.length} of ${an.candidates.length} candidate repeaters shown, ranked by explanatory power.</p>` : ''}
       ${wbWhy(`The visual pattern usually makes the answer obvious before any score is read: a solid
         column of dots on the affected (red) rows that is sparse on the known-good (green) rows IS
         the repeater hypothesis. A column solid on both is a repeater that carries everything —
@@ -1153,29 +1206,32 @@ function wbMapPanelHtml(an) {
   return `
     <div class="panel">
       <div class="panel-header"><h3>3 · Map</h3></div>
-      <div class="map-legend" style="margin:.4rem 0">
-        <span class="legend-item"><span class="legend-dot" style="background:${WB_AFFECTED_COLOR}"></span><span class="small">Affected</span></span>
-        <span class="legend-item"><span class="legend-dot" style="background:${WB_GOOD_COLOR}"></span><span class="small">Known-good</span></span>
-        <span class="legend-item"><span class="legend-dot" style="background:#0b5cab"></span><span class="small">Candidate repeater (sized by power)</span></span>
-        <span class="legend-item"><span class="legend-dot" style="background:${WB_DISC_COLOR}"></span><span class="small">Discriminating station</span></span>
-        ${state.acma.loaded && an.top ? `<span class="legend-item"><span class="legend-sq" style="background:#7b1fa2"></span><span class="small">ACMA threat (top candidate)</span></span>` : ''}
+      <div class="map-legend wb-tight">
+        <span class="legend-item"><span class="legend-dot" style="--dot:var(--bad)"></span><span class="small">Affected</span></span>
+        <span class="legend-item"><span class="legend-dot" style="--dot:var(--ok)"></span><span class="small">Known-good</span></span>
+        <span class="legend-item"><span class="legend-dot" style="--dot:var(--role-repeater)"></span><span class="small">Candidate repeater (sized by power)</span></span>
+        <span class="legend-item"><span class="legend-dot" style="--dot:var(--bf-base)"></span><span class="small">Discriminating station</span></span>
+        ${state.acma.loaded && an.top ? `<span class="legend-item"><span class="legend-sq" style="--dot:${acmaMechVar('imd3')}"></span><span class="small">ACMA threat (top candidate)</span></span>` : ''}
       </div>
-      <div id="wb-map" style="height:430px;border-radius:6px"></div>
+      <div id="wb-map" class="wb-map"
+           aria-label="Map of the investigation — affected and known-good stations, candidate repeaters and discriminating stations"></div>
       ${an.disc.length ? `
-        <div style="margin-top:.6rem">
+        <div class="wb-block">
           <div class="small"><strong>Discriminating stations</strong> — inside the affected area, routed differently; the highest-value observation available:</div>
-          <div class="table-wrap" style="margin-top:.35rem">
-            <table style="table-layout:auto"><thead><tr><th>Station</th><th>Routes via</th><th>km from cluster centre</th><th>Status</th></tr></thead>
+          <div class="table-wrap wb-tight">
+            <table class="wb-auto-table">
+            <caption class="sr-only">Discriminating stations — inside the affected area but routed through a different repeater</caption>
+            <thead><tr><th scope="col">Station</th><th scope="col">Routes via</th><th scope="col">km from cluster centre</th><th scope="col">Status</th></tr></thead>
             <tbody>${an.disc.map(d => `
               <tr><td>${esc(d.s.name)}</td><td class="small">${esc(d.via.join(', '))}</td>
                 <td class="small">${d.km.toFixed(0)}</td>
                 <td class="small">${d.status === 'known-good'
-                  ? '<span style="color:var(--ok)">known-good — already supports H1</span>'
-                  : '<span style="color:var(--warn)">unchecked — go look at its data</span>'}</td></tr>`).join('')}
+                  ? '<span class="txt-ok">known-good — already supports H1</span>'
+                  : '<span class="txt-warn">unchecked — go look at its data</span>'}</td></tr>`).join('')}
             </tbody></table>
           </div>
         </div>`
-      : an.top ? `<p class="small" style="color:var(--muted);margin:.5rem 0 0">No discriminating
+      : an.top ? `<p class="small txt-muted wb-note">No discriminating
           stations found: every routed station inside the affected area passes through
           ${esc(an.top.r.name)} too, so geography and routing cannot be separated from this
           selection alone. Widening the known-good set is the way forward.</p>` : ''}
@@ -1193,12 +1249,12 @@ function wbTimelineHtml(an) {
   const topIds = new Set(an.candidates.slice(0, 3).map(c => c.r.id));
   let body;
   if (!topIds.size) {
-    body = `<p class="small" style="color:var(--muted)">No candidate repeaters — register activity
+    body = `<p class="small txt-muted">No candidate repeaters — register activity
       cannot be anchored to a suspect. If routing data is the blocker, that comes first.</p>`;
   } else if (R.error) {
-    body = `<p class="small" style="color:var(--muted)">${esc(R.error)}</p>`;
+    body = `<p class="small txt-muted">${esc(R.error)}</p>`;
   } else if (!R.loaded) {
-    body = `<p class="small" style="color:var(--muted)">Loading register timeline…</p>`;
+    body = `<p class="small txt-muted">Loading register timeline…</p>`;
   } else {
     const onsetMid = wbs.onset
       ? (Date.parse(wbs.onset) + (wbs.onsetEnd ? Date.parse(wbs.onsetEnd) : Date.parse(wbs.onset))) / 2
@@ -1221,34 +1277,36 @@ function wbTimelineHtml(an) {
     const shown = rows.slice(0, 8);
     body = shown.length ? `
       <div class="table-wrap">
-        <table style="table-layout:auto"><thead><tr>
-          <th>Date</th>${onsetMid != null ? '<th>Δ onset</th>' : ''}<th>Licensee</th><th>Mechanism</th><th>Score</th><th>km</th><th>Near</th></tr></thead>
+        <table class="wb-auto-table">
+        <caption class="sr-only">ACMA register events near the leading candidate repeaters</caption>
+        <thead><tr>
+          <th scope="col">Date</th>${onsetMid != null ? '<th scope="col">Δ onset</th>' : ''}<th scope="col">Licensee</th><th scope="col">Mechanism</th><th scope="col">Score</th><th scope="col">km</th><th scope="col">Near</th></tr></thead>
         <tbody>${shown.map(r => `
           <tr>
             <td class="small">${esc(r.e.date)}</td>
             ${onsetMid != null ? `<td class="small">${r.days > 0 ? '+' : ''}${r.days} d</td>` : ''}
             <td class="small">${esc(r.e.client || '?')}</td>
-            <td class="small"><span class="legend-sq" style="background:${(ACMA_MECH[r.a.mech] || {}).color || '#666'}"></span> ${(ACMA_MECH[r.a.mech] || {}).label || esc(r.a.mech)}</td>
+            <td class="small"><span class="legend-sq" style="--dot:${acmaMechVar(r.a.mech)}"></span> ${(ACMA_MECH[r.a.mech] || {}).label || esc(r.a.mech)}</td>
             <td class="small">${r.a.score}</td>
             <td class="small">${r.a.km}</td>
             <td class="small">${esc(RfChanges.anchorName(r.a.id))}</td>
           </tr>`).join('')}</tbody></table>
       </div>
-      <p class="small" style="color:var(--muted);margin:.4rem 0 0">${onsetMid != null
+      <p class="small txt-muted wb-note">${onsetMid != null
         ? `Register events within ±120 days of onset, nearest first. An authorisation date is when paperwork was approved — an upper bound on when interference could have begun, never proof that it did.`
         : 'No onset date set — showing the most recent register events near the top candidates. Set an onset date (left) to rank by temporal proximity.'}</p>`
-    : `<p class="small" style="color:var(--muted)"><strong>No register events near the leading
+    : `<p class="small txt-muted"><strong>No register events near the leading
         candidates${onsetMid != null ? ' within ±120 days of onset' : ''}.</strong> That is a
         finding, not a failure: it points away from newly licensed transmitters and toward
         register-invisible sources — your own infrastructure (corrosion, equipment fault) or
         unlicensed emitters. The site-visit checklist covers those.</p>`;
-    body += `<div class="button-row" style="justify-content:flex-start;margin-top:.5rem">
+    body += `<div class="button-group wb-block">
       <button onclick="Workbench.openRfc()">Open in RF Changes →</button></div>`;
   }
   return `
     <div class="panel">
       <div class="panel-header"><h3>4 · Register activity vs onset</h3></div>
-      <p class="small" style="color:var(--muted);margin:.4rem 0">Simultaneous onset across stations
+      <p class="small txt-muted wb-tight">Simultaneous onset across stations
         argues an external event; staggered onsets argue progressive degradation such as corrosion.
         ${wbT('ACMA register', 'The Register of Radiocommunications Licences records authorisations, not what is actually radiating.', 'acma_register')}
         events near the candidates are leads to correlate, not conclusions.</p>
@@ -1267,10 +1325,10 @@ function wbStripHtml(an) {
   if (!an.top) return '';
   const A = state.acma;
   let body;
-  if (A.error)        body = `<p class="small" style="color:var(--muted)">${esc(A.error)}</p>`;
-  else if (!A.loaded) body = `<p class="small" style="color:var(--muted)">Loading ACMA carrier data…</p>`;
+  if (A.error)        body = `<p class="small txt-muted">${esc(A.error)}</p>`;
+  else if (!A.loaded) body = `<p class="small txt-muted">Loading ACMA carrier data…</p>`;
   else if (!A.anchorById[an.top.r.id]) {
-    body = `<p class="small" style="color:var(--muted)">${esc(an.top.r.name)} is not an anchor in the
+    body = `<p class="small txt-muted">${esc(an.top.r.name)} is not an anchor in the
       ACMA extract${an.top.r.repeater.rx_mhz == null ? ' — it has no recorded RX frequency, which is the same backfill gap flagged under routing data quality' : ''}.
       Re-run tools/acma_fetch.py after fixing stations.json to include it.</p>`;
   } else {
@@ -1302,7 +1360,7 @@ function wbRightHtml(an) {
     return `
       <div class="panel">
         <div class="panel-header"><h3>Suspects</h3></div>
-        <p class="small" style="color:var(--muted);margin:.4rem 0 0">Ranked repeaters and licensed
+        <p class="small txt-muted wb-note">Ranked repeaters and licensed
           interference candidates appear here once affected stations are selected.</p>
       </div>`;
   }
@@ -1322,17 +1380,17 @@ function wbRepListHtml(an) {
           <summary>
             <span class="wb-hyp-rank">#${i + 1}</span>
             <span class="wb-sus-name">${esc(c.r.name)}${c.chain.length ? ' <span class="badge">chain</span>' : ''}</span>
-            <span class="wb-hyp-bar"><span style="width:${Math.round(c.power * 100)}%"></span></span>
+            <span class="wb-hyp-bar"><span style="--w:${Math.round(c.power * 100)}%"></span></span>
             <span class="wb-hyp-score">${c.power.toFixed(2)}</span>
           </summary>
-          <div class="small" style="padding:.35rem 0 .2rem">
+          <div class="small wb-sus-body">
             coverage ${c.coverage.toFixed(2)} · specificity ${c.specificity.toFixed(2)}
             ${c.chain.length ? `<br>In series with ${esc(c.chain.join(', '))} — inspect the chain as one path.` : ''}
             <br>Carries affected: ${c.passA.map(s => esc(s.name)).join(', ')}
             <br>Also carries ${c.passUn} unaffected station${c.passUn === 1 ? '' : 's'}.
           </div>
         </details>`).join('')
-      : `<p class="small" style="color:var(--muted);margin:.4rem 0 0">No repeater carries any selected
+      : `<p class="small txt-muted wb-note">No repeater carries any selected
           station — see the routing data quality note.</p>`}
     </div>`;
 }
@@ -1341,34 +1399,34 @@ function wbAcmaSuspectsHtml(an) {
   const A = state.acma;
   let body;
   if (!an.top) {
-    body = `<p class="small" style="color:var(--muted)">Needs a leading repeater candidate.</p>`;
+    body = `<p class="small txt-muted">Needs a leading repeater candidate.</p>`;
   } else if (A.error) {
-    body = `<p class="small" style="color:var(--muted)">${esc(A.error)}</p>`;
+    body = `<p class="small txt-muted">${esc(A.error)}</p>`;
   } else if (!A.loaded) {
-    body = `<p class="small" style="color:var(--muted)">Loading ACMA threat data…</p>`;
+    body = `<p class="small txt-muted">Loading ACMA threat data…</p>`;
   } else {
     const anchor = A.anchorById[an.top.r.id];
     const threats = anchor ? anchor.threats.slice().sort((a, b) => b.score - a.score).slice(0, 8) : [];
     body = threats.length ? `
       ${threats.map(t => {
-        const m = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-        return `<a href="#" class="wb-threat" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(anchor.station_id)}');return false">
-          <span class="legend-sq" style="background:${m.color}"></span>
+        const m = ACMA_MECH[t.mechanism] || { label: t.mechanism };
+        return `<button type="button" class="wb-threat" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(anchor.station_id)}')">
+          <span class="legend-sq" style="--dot:${acmaMechVar(t.mechanism)}"></span>
           <span class="wb-threat-name">${esc(t.client || 'Unknown licensee')}
-            <span class="small" style="color:var(--muted)">${m.label} · ${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz · ' : ''}${t.distance_km} km${t.inactive ? ' · not current' : ''}</span></span>
+            <span class="small txt-muted">${m.label} · ${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz · ' : ''}${t.distance_km} km${t.inactive ? ' · not current' : ''}</span></span>
           <span class="wb-hyp-score">${t.score}</span>
-        </a>`;
+        </button>`;
       }).join('')}
-      <p class="small" style="color:var(--muted);margin:.4rem 0 0">Licensed candidates near
+      <p class="small txt-muted wb-note">Licensed candidates near
         ${esc(an.top.r.name)}, using the existing ACMA scoring — click for the full transmitter card.</p>`
-    : `<p class="small" style="color:var(--muted)">No licensed interference candidates recorded near
+    : `<p class="small txt-muted">No licensed interference candidates recorded near
         ${esc(an.top.r.name)}. A finding in itself: it shifts weight toward unlicensed emitters and
         the repeater's own hardware — both invisible to the register.</p>`;
   }
   return `
     <div class="panel">
       <div class="panel-header"><h3>Interference sources</h3></div>
-      <div style="margin-top:.4rem">${body}</div>
+      <div class="wb-block">${body}</div>
     </div>`;
 }
 
@@ -1381,7 +1439,7 @@ function wbActionsHtml(an) {
         <button onclick="Workbench.exportChecklist()">Site-visit checklist</button>
         <button onclick="Workbench.exportComplaint()">Draft ACMA complaint</button>
       </div>
-      <p class="small" style="color:var(--muted);margin:.5rem 0 0">The checklist is tailored to the
+      <p class="small txt-muted wb-note">The checklist is tailored to the
         leading mechanism; the complaint draft pre-fills the evidence and marks every inference as
         an inference.</p>
     </div>`;
@@ -1435,7 +1493,7 @@ function initWbMap() {
   const topR = an.top ? an.top.r : null;
   for (const s of an.A) {
     dot(s, WB_AFFECTED_COLOR, {}, `<strong>${esc(s.name)}</strong><br>
-      <span style="font-size:.83rem">Affected · AlertID ${stationAlertIds(s).join(', ')}</span>`);
+      <span class="small">Affected · AlertID ${stationAlertIds(s).join(', ')}</span>`);
     if (topR && topR.lat != null && s.lat != null && an.passes(s, topR)) {
       L.polyline([[s.lat, s.lon], [topR.lat, topR.lon]],
         { color: '#0b5cab', weight: 1.2, opacity: 0.45, dashArray: '5 6' }).addTo(layer);
@@ -1443,20 +1501,28 @@ function initWbMap() {
   }
   for (const s of an.G) {
     dot(s, WB_GOOD_COLOR, {}, `<strong>${esc(s.name)}</strong><br>
-      <span style="font-size:.83rem">Known-good · AlertID ${stationAlertIds(s).join(', ')}</span>`);
+      <span class="small">Known-good · AlertID ${stationAlertIds(s).join(', ')}</span>`);
   }
   for (const c of an.candidates.slice(0, 8)) {
     dot(c.r, '#0b5cab', { radius: 6 + Math.round(8 * c.power), weight: c === an.top ? 3 : 1.5 },
       `<strong>${esc(c.r.name)}</strong><br>
-       <span style="font-size:.83rem">Candidate repeater · coverage ${c.coverage.toFixed(2)}
+       <span class="small">Candidate repeater · coverage ${c.coverage.toFixed(2)}
        · specificity ${c.specificity.toFixed(2)} · power ${c.power.toFixed(2)}</span>`);
   }
   for (const d of an.disc) {
     dot(d.s, WB_DISC_COLOR, { fillOpacity: 0.25, weight: 3 },
       `<strong>${esc(d.s.name)}</strong><br>
-       <span style="font-size:.83rem">Discriminating station (${d.status}) — routes via
+       <span class="small">Discriminating station (${d.status}) — routes via
        ${esc(d.via.join(', '))}. Clean strengthens H1; affected strengthens H2.</span>`);
   }
+
+  // The map's accessible name carries the headline numbers, rebuilt whenever
+  // the map is (design-system §3, the graphic pattern's parts 1 and 2); the
+  // routing matrix above is part 3, the data one activation away.
+  el.setAttribute('aria-label',
+    `Map of the investigation — ${an.A.length} affected and ${an.G.length} known-good `
+    + `station${an.G.length === 1 ? '' : 's'}, ${Math.min(an.candidates.length, 8)} candidate `
+    + `repeater${an.candidates.length === 1 ? '' : 's'}${an.disc.length ? `, ${an.disc.length} discriminating` : ''}`);
 
   // ACMA threat squares around the leading candidate — same visual language as
   // the main map's RF layer (squares, mechanism colours).
@@ -1466,11 +1532,22 @@ function initWbMap() {
     for (const t of anchor.threats.slice().sort((a, b) => b.score - a.score).slice(0, 10)) {
       const site = A.siteById[t.site_id];
       if (!site) continue;
-      const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-      const icon = acmaSquareIcon(acmaPinPx(t.score), '', mech.color);
+      const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism };
+      // acmaMechColor, not .color: a divIcon's background is baked at build
+      // time, so resolving the token here is what lets the square follow the
+      // theme on the next draw (design-system §1).
+      const icon = acmaSquareIcon(acmaPinPx(t.score), '', acmaMechColor(t.mechanism));
       const m = L.marker([site.lat, site.lon], { icon }).addTo(layer);
+      // A divIcon marker is keyboard-focusable (Leaflet puts tabindex on it,
+      // and Enter opens the popup), so it needs a name — Leaflet's own `alt`
+      // option only reaches IMG icons, hence the attribute by hand (#139).
+      const iconEl = m.getElement();
+      if (iconEl) {
+        iconEl.setAttribute('aria-label',
+          `${t.client || 'Unknown licensee'} — ${mech.label || t.mechanism}, score ${t.score}`);
+      }
       m.bindPopup(`<strong>${esc(t.client || 'Unknown licensee')}</strong> · score ${t.score}<br>
-        <span style="font-size:.83rem">${mech.label} · ${esc(t.detail)}</span><br>
+        <span class="small">${mech.label} · ${esc(t.detail)}</span><br>
         <a href="#" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(anchor.station_id)}');return false">Full details →</a>`);
     }
   }

@@ -85,6 +85,13 @@
   --role-repeater: #0b5cab;
   --role-base: #c7401a;
   --role-satcom: #7c35a3;
+  /* Bit Flipper's station-of-interest hue (#139): an identity colour, not a
+     status — it ties the pinned table row (.bf-row-base) to the halo and pin
+     on the map below, so it is one value in both themes and deliberately out
+     of the contrast contract like the other categorical hues. bit-flipper.js
+     resolves it with cssVar() for the Leaflet options, which cannot take
+     var(). */
+  --bf-base: #ff8c00;
   --accent: #0b5cab;
   --ok:   #107c10;
   --bad:  #c7401a;
@@ -1536,10 +1543,26 @@ tr.selected mark.hit {
   width: 5rem;
 }
 
+/* A checkbox with its caption beside it — the one label shape .control-row's
+   stack-text-over-control grid gets wrong. Third tab to need it (#139, after
+   .check-inline in the modal form and .ml-check on the Message Log), which is
+   the sign it is the system's: one inline-flex row, the caption in a <span>
+   so the input does not stretch, and the whole label is the pointer target. */
+.check-label {
+  display: inline-flex;
+  gap: var(--sp-1);
+  align-items: center;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+.check-label input { width: auto; }
+
 @media (pointer: coarse) {
   .control-row > label > input,
   .control-row > label > select,
-  .control-row > button {
+  .control-row > button,
+  .check-label {
     min-height: 2.75rem;
   }
 }
@@ -1606,13 +1629,58 @@ td {
 }
 
 /* Station-of-interest row (the entered ALERT address) pinned at the top of the
-   Bit Flipper table, tinted to match the map's orange "exact match" marker. */
+   Bit Flipper table, tinted to match the map's orange "exact match" marker —
+   the same --bf-base token the halo and pin resolve (#139). */
 .bf-table tr.bf-row-base td {
-  background: color-mix(in srgb, #ff8c00 12%, transparent);
+  background: color-mix(in srgb, var(--bf-base) 12%, transparent);
 }
 .bf-table tr.bf-row-base:hover td {
-  background: color-mix(in srgb, #ff8c00 18%, transparent);
+  background: color-mix(in srgb, var(--bf-base) 18%, transparent);
 }
+
+/* The rest of the Bit Flipper tab's own classes (#139), replacing the inline
+   styles the conversion removed. */
+
+/* #bf-results is the re-render boundary — a bare div between .page and the
+   panel, so keystrokes replace the results without touching the inputs above
+   them. As a grid item it needs the same min-width: 0 the .panel rule gives
+   panels sitting directly under .page; without it, its min-content (the
+   unwrapped control row inside) becomes the page's width and the whole
+   document scrolls sideways at 375 px. */
+#bf-results { min-width: 0; }
+
+.bf-addr { width: 9rem; }
+
+.bf-arro-label {
+  flex: 1;
+  min-width: 15rem;
+}
+
+.bf-map {
+  height: 420px;
+  border-radius: var(--r-md);
+  margin-top: var(--sp-2);
+}
+
+.bf-td-match { text-align: center; }
+
+/* Role and station-of-interest pills inside the map popups. The hue arrives as
+   --pill, and it is ROLE_COLOR's / --bf-base's stable literal on purpose: the
+   pill is its own ground in both themes, and var(--role-*) here would put
+   white text on the dark theme's light hues (design-system §1, the ACMA
+   boundary's reasoning applied one tab over). */
+.bf-pill {
+  background: var(--pill, var(--muted));
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: var(--r-pill);
+  font-size: .76rem;
+  margin-right: 2px;
+}
+.bf-pill--base { margin-left: 4px; margin-right: 0; }
+
+.bf-pop-sub  { font-size: .82rem; }
+.bf-pop-block { margin-top: 4px; display: block; }
 
 th {
   position: sticky;
@@ -4712,6 +4780,70 @@ code {
 
 .wb-rail { min-width: 0; }
 
+/* #139's conversion classes — the spellings the tab's 97 inline styles kept
+   re-deriving, named once. */
+.wb-field {                       /* a stacked label + control in the setup rail */
+  display: grid;
+  gap: var(--sp-1);
+  margin-top: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.wb-field > input,
+.wb-field > textarea { color: var(--text); }
+.wb-note  { margin: var(--sp-2) 0 0; }   /* the footnote under a panel's content */
+.wb-tight { margin: var(--sp-1) 0; }     /* body lines inside a dense panel */
+.wb-block { margin-top: var(--sp-2); }   /* a sub-section within a panel */
+.wb-case-row {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  margin-top: var(--sp-2);
+}
+.wb-chip-label { margin-bottom: var(--sp-1); }
+.wb-sus-body { padding: var(--sp-1) 0; }
+.wb-why-body { margin-top: var(--sp-1); }
+.wb-verdict-title {
+  margin: var(--sp-1) 0;
+  font-size: var(--fs-xl);
+}
+.wb-prose { max-width: 75ch; }
+.wb-map {
+  height: 430px;
+  border-radius: var(--r-md);
+}
+.wb-m-station { min-width: 140px; }
+.wb-banner button { margin-left: var(--sp-2); }
+
+/* The H5 pair table: same shape as .bf-table (auto layout inside a scrolling
+   wrapper) at the width its five columns need. */
+.wb-h5-table {
+  table-layout: auto;
+  min-width: 560px;
+}
+.wb-auto-table { table-layout: auto; }
+
+/* The map legend takes its dot colours as --dot, the way every .legend-sq in
+   the app does since #138 — scoped here rather than changed globally, because
+   the shared .legend-dot still lets its role classes win elsewhere. */
+.wb-page .legend-dot { background: var(--dot, var(--muted)); }
+
+@media (pointer: coarse) {
+  /* EPIC #107's 44 px floor for this tab's own tap targets (#139): the chips'
+     swap/remove, the picker's add buttons, the threat rows and the concept
+     drawer's list — an investigation gets tapped through in a vehicle as much
+     as any filter bar does. align-items keeps a short chip's text centred in
+     the taller box rather than floating at its top (design-system §4). */
+  .wb-chip .link-btn,
+  .wb-pick-row button,
+  .wb-threat,
+  .wb-drawer-item,
+  .wb-drawer-head button {
+    min-height: 2.75rem;
+  }
+  .wb-chip { align-items: center; }
+}
+
 @media (max-width: 1400px) {
   .wb-layout { grid-template-columns: 300px minmax(0, 1fr); }
   .wb-layout > aside:last-child { grid-column: 1 / -1; }
@@ -4776,6 +4908,7 @@ code {
 .wb-hyp-bar > span {
   display: block;
   height: 100%;
+  width: var(--w, 0%);   /* the score reaches CSS as a token, not an inline width (#139) */
   background: var(--accent);
   border-radius: 999px;
 }
@@ -4806,16 +4939,25 @@ code {
 .wb-sus-name { font-size: .9rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ACMA suspect rows */
+/* A <button> since #139 (the action is in-page — pattern: .link-btn's
+   argument), styled as the row it always was, so the resets undo the app's
+   button chrome rather than restate the row. */
 .wb-threat {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr) 2.6rem;
   gap: .5rem;
   align-items: center;
+  width: 100%;
   padding: .3rem .2rem;
+  border: none;
+  background: none;
   border-radius: 6px;
   color: var(--text);
+  text-align: left;
   text-decoration: none;
+  font: inherit;
   font-size: .9rem;
+  cursor: pointer;
 }
 .wb-threat:hover { background: var(--subtle); }
 .wb-threat-name { min-width: 0; }
@@ -4957,15 +5099,21 @@ code {
 .wb-drawer-head button { padding: 0 .5rem; font-size: 1rem; }
 .wb-drawer-body { padding: .6rem .8rem 1rem; }
 .wb-drawer-body p { margin: .5rem 0; }
+/* A <button> since #139 — same reasoning as .wb-threat. */
 .wb-drawer-item {
   display: block;
+  width: 100%;
   padding: .4rem .5rem;
   margin: .15rem 0;
   border: 1px solid var(--border);
+  background: none;
   border-radius: 8px;
   color: var(--accent);
+  text-align: left;
   text-decoration: none;
+  font: inherit;
   font-size: .88rem;
+  cursor: pointer;
 }
 .wb-drawer-item:hover { background: var(--subtle); }
 

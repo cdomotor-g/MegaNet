@@ -23,8 +23,8 @@ Three files hold the system itself, and this document explains them:
 
 And two files check it: `test/shell.mjs` (`npm run shell`) holds the system
 against the shell, and `test/tabs.mjs` (`npm run tabs`, added by #137) holds it
-against every tab a U-issue has converted — **nine of the nineteen, 154
-assertions, as of #138**. Both run in CI on every push that
+against every tab a U-issue has converted — **eleven of the nineteen (plus the
+two tabs born converted), 219 assertions, as of #139**. Both run in CI on every push that
 touches the app; what each enforces is listed in §5 and §6 at the bottom of this
 page. Every claim below that *can* be checked mechanically is
 checked — this repo has a habit of that, and the reason is in constraint 1 of
@@ -337,6 +337,15 @@ and every tab that needed a small one had written `style="width:4.5rem"`.
 it holds a value worth copying, but it must not look like somewhere to type.
 Labels go in `.form-grid` / `.upload-grid`, which give a `label` a `display:
 grid` with the control under the text.
+
+**`.check-label`** (#139) is a checkbox with its caption beside it — the one
+label shape the stack-text-over-control grids get wrong. It was the third tab
+to write it out by hand (`.check-inline` in the modal form and `.ml-check` on
+the Message Log came first), which is the three-strikes sign it belongs here:
+inline-flex, the caption in a `<span>` so the input does not stretch, the whole
+label the pointer target, and the 2.75 rem floor under a coarse pointer. The
+two older spellings stay where they are — converting other tabs' markup is not
+what adding a primitive is for.
 
 ### Tables — there is one pattern
 
@@ -819,10 +828,32 @@ it leaves behind is in its own two files:
 - **Three changes to `npm run tabs`** (§6): seeds are awaited, seeds run in the
   overflow pass, and a tab with two mutually exclusive views gets two entries.
 
-**Ten tabs to go, across #136 (Stations), #139 (Workbench, Bit Flipper) and
-#140 (Ghosting Graph, ALERT Packets, ALERT2, Serial Monitor).**
+**#139 has since taken the Bit Flipper and the Interference Workbench** — the
+three-rail investigation surface, the hardest non-map layout in the app. What
+it leaves the rest:
 
-Worth knowing before picking up one of the three that are left:
+- **`.check-label`** — the checkbox-with-caption-beside-it primitive (§3, Form
+  fields), the third tab to have written it out by hand.
+- **A divIcon marker is a keyboard stop, and Leaflet's `alt` option cannot
+  name it** — `alt` reaches only IMG icons; a div icon takes `tabindex="0"`
+  and announces as nothing. Set `aria-label` on `marker.getElement()` after
+  adding it. The Workbench's ACMA threat squares are the worked example.
+- **A CSS-only tooltip is silent** — `::after` content from a `data-*`
+  attribute never reaches the accessibility tree. The Workbench's education
+  terms carry the tip as `.sr-only` text inside the term as well, so the first
+  tier of progressive disclosure reads to exactly the reader it exists for.
+- **A bare re-render-boundary div between `.page` and a panel needs
+  `min-width: 0` of its own** — the `.panel` rule cannot see through it, and
+  its min-content (an unwrapped control row) becomes the page's width on a
+  phone. Found on the Bit Flipper's `#bf-results`.
+- **The three-rail small-screen model, documented** in `workbench.js`'s
+  header: three columns at `xl`, the right rail dropping to a full-width band
+  to `lg`, then one column in investigation order — nothing collapses away.
+
+**Eight tabs to go. The two issues still open — #136 (Stations) and #140
+(Network View, ALERT Packets, ALERT2, Serial Monitor) — own five of them.**
+
+Worth knowing before picking up one of the two that are left:
 
 - **The heading assertion was blind, and probably still is in your tab.** It
   read the whole document, and the nav's five `h2`s meant a tab opening at `h3`
@@ -849,8 +880,9 @@ Worth knowing before picking up one of the three that are left:
   decision. **Five surfaces #138 deliberately left**, all of them somebody
   else's and none of them broken today, because `.legend-sq` still lets a
   literal `background:` win:
-  - `workbench.js` — a `#7b1fa2` literal in its legend and two
-    `ACMA_MECH[…].color` reads (**#139**).
+  - ~~`workbench.js` — a `#7b1fa2` literal in its legend and two
+    `ACMA_MECH[…].color` reads~~ (**done by #139**, plus the threat-square
+    divIcon moved to `acmaMechColor()`).
   - `app.js` — the ACMA map pin's divIcon `background` and the popup's
     mechanism pill (**#136**). Both are CSS contexts, so both take
     `acmaMechVar()`. The pill also puts `color:#fff` on a categorical hue,

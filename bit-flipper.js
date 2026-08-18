@@ -6,7 +6,7 @@
 //   arithmetic behind them
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, ROLE_COLOR, ARRO_DEFAULT_BASE,
+// Reaches back to core.js for state, esc, cssVar, ROLE_COLOR, ARRO_DEFAULT_BASE,
 // registerLiveMap (#142 — this file now says its map exists, instead of being
 // named in app.js's list of them), registerTabTeardown and removeMap (#143 —
 // and now says when to take it down, and takes it down the one way that
@@ -25,9 +25,12 @@
 // ── BIT FLIPPER tab ────────────────────────────────────────────────────────────
 
 const BF_MAX_RENDER_ROWS = 2000;   // safety cap for very large N-bit expansions
-// Station of interest — the entered address. Ties the pinned table row (see
-// .bf-row-base in styles.css) to its highlighted pin on the map below.
-const BF_BASE_COLOR      = '#ff8c00';
+// Station of interest — the entered address. The hue lives in the token block
+// as --bf-base (#139), which is what ties the pinned table row (.bf-row-base,
+// a color-mix over the same token) to the highlighted pin on the map below.
+// Resolved with cssVar() at draw time because Leaflet options become SVG
+// presentation attributes, where var() resolves to nothing (design-system §1).
+function bfBaseColor() { return cssVar('--bf-base', '#ff8c00'); }
 
 // All combinations of `k` bit positions chosen from 0..width-1 (lexicographic).
 function bitCombos(width, k) {
@@ -82,40 +85,40 @@ function dedupeMatches(matches) {
 
 // Static shell — rendered once when the tab opens. Control inputs live here and
 // are NOT re-rendered on keystrokes, so focus is never stolen; only #bf-results
-// updates as the user types.
+// updates as the user types. Converted by #139 (U4): the page/panel/control-row
+// patterns from docs/design-system.md, no inline style but a token override.
 function renderBitFlipperHtml() {
   return `
-    <div style="max-width:1000px;margin:auto;padding:1rem;display:grid;gap:1rem">
+    <div class="page" style="--page-max:1000px">
       <div class="panel">
         <div class="panel-header"><h2>Bit Flipper</h2></div>
-        <p class="small" style="color:var(--muted);margin:.5rem 0">
+        <p class="small txt-muted">
           Enter an ALERT decimal address to see its bit-flip variants and cross-reference them
           against the station database. Sensor type, Sensor ID and ARRO graph links are sourced
           from the enriched station data.
         </p>
-        <div id="bf-controls" style="display:flex;flex-wrap:wrap;gap:1rem 1.25rem;align-items:flex-end;margin-top:.5rem">
-          <label style="font-size:.9rem;color:var(--muted)">
+        <div id="bf-controls" class="control-row">
+          <label>
             ALERT decimal address
-            <input id="bf-addr" type="number" min="1" max="65535" value="${esc(state.bfInput)}" placeholder="e.g. 6129"
-                   style="width:170px;margin-top:.3rem;display:block"
+            <input id="bf-addr" class="bf-addr" type="number" min="1" max="65535"
+                   value="${esc(state.bfInput)}" placeholder="e.g. 6129"
                    oninput="onBfAddrInput(this.value)">
           </label>
-          <label style="font-size:.9rem;color:var(--muted)">
+          <label>
             Bits to flip
-            <input id="bf-bits" type="number" min="1" max="16" value="${esc(String(bfBitsToFlip()))}"
-                   style="width:100px;margin-top:.3rem;display:block"
+            <input id="bf-bits" class="field-num" type="number" min="1" max="16"
+                   value="${esc(String(bfBitsToFlip()))}"
                    oninput="onBfBitsInput(this.value)">
           </label>
-          <label style="font-size:.9rem;color:var(--muted);display:flex;gap:.4rem;align-items:center;padding-bottom:.4rem">
+          <label class="check-label">
             <input id="bf-only" type="checkbox" ${state.bfOnlyMatches ? 'checked' : ''}
                    onchange="onBfOnlyMatches(this.checked)">
-            Show only matched addresses
+            <span>Show only matched addresses</span>
           </label>
-          <label style="font-size:.9rem;color:var(--muted);flex:1;min-width:240px"
+          <label class="bf-arro-label"
                  title="Its host is what every ARRO link in the app is built on — map popups, the station editor and the ARRO Launcher tab included">
-            ARRO base URL <span style="font-weight:400">— sets the host app-wide</span>
+            ARRO base URL — sets the host app-wide
             <input id="bf-arro" type="text" value="${esc(state.bfArroBase || ARRO_DEFAULT_BASE)}"
-                   style="width:100%;margin-top:.3rem;display:block"
                    oninput="onBfArroInput(this.value)">
           </label>
         </div>
@@ -124,8 +127,9 @@ function renderBitFlipperHtml() {
       <div id="bf-results">${renderBitFlipperResults()}</div>
 
       <div class="panel">
-        <div class="panel-header"><h3>Map</h3></div>
-        <div id="bf-map" style="height:420px;border-radius:6px;margin-top:.5rem"></div>
+        <div class="panel-header"><h3 id="bf-map-h">Map</h3></div>
+        <div id="bf-map" class="bf-map"
+             aria-label="Map of stations matching the current bit-flip variants — enter an address above"></div>
       </div>
     </div>`;
 }
@@ -134,7 +138,7 @@ function renderBitFlipperHtml() {
 function renderBitFlipperResults() {
   const base = bfBaseId();
   if (base == null) {
-    return `<div class="panel"><p class="small" style="color:var(--muted)">Enter a valid ALERT address (1–65535) above.</p></div>`;
+    return `<div class="panel"><p class="small txt-muted">Enter a valid ALERT address (1–65535) above.</p></div>`;
   }
 
   const idx      = buildSensorIndex();
@@ -186,7 +190,7 @@ function renderBitFlipperResults() {
   const rowsHtml = rows.map(v => {
     const ms  = dedupeMatches(v.isBase ? v.matches : rowMatches(v));
     const hit = ms.length > 0;
-    const dash = '<span style="color:var(--muted)">—</span>';
+    const dash = '<span class="txt-muted">—</span>';
     const stationBadges = hit
       ? [...new Set(ms.map(m => m.station.name))].map(n => `<span class="badge">${esc(n)}</span>`).join(' ')
       : dash;
@@ -212,7 +216,7 @@ function renderBitFlipperResults() {
         <td class="small mono">${bitsCell}</td>
         <td>${v.value}</td>
         <td class="small mono">${v.binary}</td>
-        <td style="text-align:center">${hit ? '✓' : ''}</td>
+        <td class="bf-td-match">${hit ? '✓<span class="sr-only"> match</span>' : ''}</td>
         <td>${stationBadges}</td>
         <td class="small">${sensorTypes}</td>
         <td class="small mono">${sensorIds}</td>
@@ -222,40 +226,41 @@ function renderBitFlipperResults() {
 
   return `
     <div class="panel">
-      <div class="panel-header" style="flex-wrap:wrap;gap:.5rem">
-        <h3>Bit-Flip Variants</h3>
-        <span class="small" style="color:var(--muted)">
+      <div class="panel-header">
+        <h3 id="bf-variants-h">Bit-Flip Variants</h3>
+        <span class="small txt-muted">
           ${variants.length} variant${variants.length === 1 ? '' : 's'} · ${matchedCount} matched
         </span>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;margin:.5rem 0">
+      <div class="control-row">
         ${types.length ? `
-          <label class="small" style="color:var(--muted)">Filter by sensor:
-            <select onchange="onBfSensorFilter(this.value)" style="margin-left:.3rem">
+          <label>Filter by sensor
+            <select onchange="onBfSensorFilter(this.value)">
               <option value=""${!filter ? ' selected' : ''}>All sensors</option>
               ${types.map(t => `<option value="${esc(t)}"${filter === t ? ' selected' : ''}>${esc(t)}</option>`).join('')}
             </select>
           </label>` : ''}
         <span id="bf-arro-link">${arro
           ? `<a href="${esc(arro.url)}" target="_blank" rel="noopener">Open ARRO graph (${arro.count} sensor${arro.count === 1 ? '' : 's'})</a>`
-          : `<span class="small" style="color:var(--muted)">No ARRO-linkable sensors in current matches</span>`}</span>
+          : `<span class="small txt-muted">No ARRO-linkable sensors in current matches</span>`}</span>
       </div>
-      ${truncated ? `<p class="small" style="color:#b8860b">Showing first ${BF_MAX_RENDER_ROWS} of ${totalToShow} rows — reduce the bit count or use the sensor filter to narrow.</p>` : ''}
+      ${truncated ? `<p class="small txt-warn">Showing first ${BF_MAX_RENDER_ROWS} of ${totalToShow} rows — reduce the bit count or use the sensor filter to narrow.</p>` : ''}
       ${rows.length ? `
-        <div class="table-wrap tall">
+        <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="bf-variants-h">
           <table class="bf-table">
+            <caption class="sr-only">Bit-flip variants of the entered ALERT address, with the stations, sensors and repeaters behind each matched address</caption>
             <colgroup>
               <col style="width:8%"><col style="width:8%"><col style="width:13%"><col style="width:5%">
               <col style="width:24%"><col style="width:10%"><col style="width:15%"><col style="width:17%">
             </colgroup>
             <thead><tr>
-              <th>Bit(s)</th><th>Decimal</th><th>Binary</th><th>Match</th>
-              <th>Station(s)</th><th>Sensor</th><th>Sensor ID</th><th>Repeater(s)</th>
+              <th scope="col">Bit(s)</th><th scope="col">Decimal</th><th scope="col">Binary</th><th scope="col">Match</th>
+              <th scope="col">Station(s)</th><th scope="col">Sensor</th><th scope="col">Sensor ID</th><th scope="col">Repeater(s)</th>
             </tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>`
-      : `<p class="small" style="color:var(--muted)">No ${filter ? esc(filter) + ' ' : ''}matches for these variants.</p>`}
+      : `<p class="small txt-muted table-empty">No ${filter ? esc(filter) + ' ' : ''}matches for these variants.</p>`}
     </div>`;
 }
 
@@ -340,7 +345,14 @@ function refreshBitFlipperMap() {
   layer.clearLayers();
 
   const base = bfBaseId();
-  if (base == null) return;
+  const mapEl = document.getElementById('bf-map');
+  if (base == null) {
+    if (mapEl) {
+      mapEl.setAttribute('aria-label',
+        'Map of stations matching the current bit-flip variants — enter an address above');
+    }
+    return;
+  }
 
   const idx = buildSensorIndex();
 
@@ -379,17 +391,18 @@ function refreshBitFlipperMap() {
 
   const bounds = [];
   const baseMarkers = [];
+  const baseColor = bfBaseColor();
   for (const { station: s, addrs, bits, isBase } of stationInfo.values()) {
     if (s.lat == null || s.lon == null) continue;
     const role  = primaryRole(s);
-    const color = isBase ? BF_BASE_COLOR : (ROLE_COLOR[role] || ROLE_COLOR.field);
+    const color = isBase ? baseColor : (ROLE_COLOR[role] || ROLE_COLOR.field);
 
     // The station of interest gets a halo behind its pin and its name on the
     // map, so it can be picked out of a scatter of flip matches at a glance.
     if (isBase) {
       L.circleMarker([s.lat, s.lon], {
-        radius: 17, color: BF_BASE_COLOR, weight: 2, opacity: 0.9,
-        fillColor: BF_BASE_COLOR, fillOpacity: 0.18, interactive: false,
+        radius: 17, color: baseColor, weight: 2, opacity: 0.9,
+        fillColor: baseColor, fillOpacity: 0.18, interactive: false,
       }).addTo(layer);
     }
 
@@ -400,17 +413,21 @@ function refreshBitFlipperMap() {
       weight: isBase ? 3 : 1.5,
     }).addTo(layer);
 
+    // The pills take ROLE_COLOR's light literals via a --pill custom property
+    // — the same deal ACMA_MECH[k].color has (design-system §1): the pill is
+    // its own ground in both themes, so the stable literal is the correct one,
+    // where var(--role-*) would put white text on the dark theme's light hues.
     const bitsLabel = bits.size
-      ? `<br><span style="font-size:.82rem">Flipped bits: ${[...bits].join(', ')}</span>`
+      ? `<br><span class="bf-pop-sub">Flipped bits: ${[...bits].join(', ')}</span>`
       : '';
     const baseLabel = isBase
-      ? `<span style="background:${BF_BASE_COLOR};color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem;margin-left:4px">station of interest</span>`
+      ? `<span class="bf-pill bf-pill--base" style="--pill:${baseColor}">station of interest</span>`
       : '';
     marker.bindPopup(`
       <strong>${esc(s.name)}</strong>${baseLabel}<br>
-      ${s.roles.map(r => `<span style="background:${ROLE_COLOR[r]};color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem;margin-right:2px">${r}</span>`).join('')}
+      ${s.roles.map(r => `<span class="bf-pill" style="--pill:${ROLE_COLOR[r] || ROLE_COLOR.field}">${esc(r)}</span>`).join('')}
       ${bitsLabel}
-      <br><span style="font-size:.82rem">AlertID: ${[...addrs].sort((a, b) => a - b).join(', ')}</span>
+      <br><span class="bf-pop-sub">AlertID: ${[...addrs].sort((a, b) => a - b).join(', ')}</span>
     `);
     if (isBase) {
       marker.bindTooltip(esc(s.name), {
@@ -437,8 +454,8 @@ function refreshBitFlipperMap() {
       const served = fieldStations.map(fs => esc(fs.name)).join(', ');
       rMarker.bindPopup(`
         <strong>${esc(r.name)}</strong><br>
-        <span style="background:${ROLE_COLOR.repeater};color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem">repeater</span>
-        <br><span style="font-size:.82rem;margin-top:4px;display:block">Open to: ${served}</span>
+        <span class="bf-pill" style="--pill:${ROLE_COLOR.repeater}">repeater</span>
+        <br><span class="bf-pop-sub bf-pop-block">Open to: ${served}</span>
       `);
       bounds.push([r.lat, r.lon]);
     }
@@ -458,6 +475,16 @@ function refreshBitFlipperMap() {
   // Repeater pins and link lines were added after the station pins, so lift the
   // station of interest back above them.
   baseMarkers.forEach(m => m.bringToFront());
+
+  // The map's accessible name carries the headline numbers and is rebuilt
+  // whenever the map is (design-system §3: parts 1 and 2 of the graphic
+  // pattern). Part 3 — the data, one activation away — is the variants table
+  // directly above this panel.
+  if (mapEl) {
+    mapEl.setAttribute('aria-label',
+      `Map of ${stationInfo.size} station${stationInfo.size === 1 ? '' : 's'} matching `
+      + `bit-flip variants of ${base}, with ${repeaterInfo.size} repeater${repeaterInfo.size === 1 ? '' : 's'} open to them`);
+  }
 
   if (bounds.length) state.bfMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
 }
