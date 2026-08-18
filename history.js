@@ -240,6 +240,25 @@ const History = (function () {
         s.open.cellsError = String((err && err.message) || err);
         repaint();
       });
+
+    // #127's derived events, on their own request and their own catch: a
+    // database from before 0016 has no table to ask, and the transcription
+    // must not be lost to that. The vocabulary rides along once per session.
+    const vocab = s.eventTypes
+      ? Promise.resolve(s.eventTypes)
+      : dbSelect('inspection_event_type?select=key,label,note&order=ord')
+          .then(rows => { s.eventTypes = rows; return rows; });
+    Promise.all([
+      vocab,
+      dbSelect(`inspection_event?inspection_id=eq.${eq}`
+             + '&select=ord,event_type,confidence,rule,quote,detail&order=ord'),
+    ])
+      .then(([, events]) => {
+        if (!s.open || s.open.id !== id) return;
+        s.open.events = events;
+        repaint();
+      })
+      .catch(() => { /* pre-0016 database, or events not loaded — the record stands without them */ });
   }
 
   // One signed URL per image, taken out when the record opens so that the page
@@ -620,6 +639,33 @@ const History = (function () {
     }
 
     m.sections.unshift(sec);
+
+    // The derived events (#127), after the transcription they were read from.
+    // Marked as what they are: readings by rules, not technician entries, and
+    // every one shows the words it was read from — the issue's discipline that
+    // the prose stays the source of truth wherever an extraction appears.
+    const events = s.open.events;
+    if (events && events.length) {
+      const types = Object.fromEntries((s.eventTypes || []).map(t => [t.key, t.label]));
+      m.sections.splice(1, 0, {
+        key: '_events', ord: '§', label: 'Derived events',
+        note: 'Read from the remarks by rules (tools/ingest/remarks.py), not entered by a '
+            + 'technician. Each event names the words it was read from; the remark itself is '
+            + 'the record.',
+        blocks: [], lines: [], files: [],
+        tables: [{
+          columns: ['Event', 'Confidence', 'Read from'],
+          rows: events.map(e => [
+            (types[e.event_type] || e.event_type)
+              + (e.detail && e.detail.equipment ? ` — ${e.detail.equipment}` : '')
+              + (e.detail && e.detail.figures ? ` (${e.detail.figures.join(', ')}` +
+                 (e.detail.figures_meaning === 'unconfirmed' ? ' — figures unconfirmed)' : ')') : ''),
+            e.confidence,
+            e.quote,
+          ]),
+        }],
+      });
+    }
   }
 
   function readsAs(c) {

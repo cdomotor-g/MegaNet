@@ -251,6 +251,14 @@ jobs:
       - name: Station crosswalk — the identities still resolve
         run: python3 tools/ingest/crosswalk.py --check
 
+      # #127's derived events, on the same footing: events.jsonl is what the
+      # rules derive from the extraction, coverage is a counted claim (every
+      # remark classified, observed or unclassified — no silent skips), and a
+      # rule edit that changes the reading re-derives the artefact or fails
+      # here.
+      - name: Remarks mining — the derived events still match the rules
+        run: python3 tools/ingest/remarks.py --check
+
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —
 # as a per-push gate it would train everyone to re-record the baseline without

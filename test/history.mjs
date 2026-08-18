@@ -170,6 +170,20 @@ function installDatastore(page, tables, records, store) {
         .sort((a, b) => a.ord - b.ord));
     }
 
+    // #127's derived events and their public vocabulary.
+    if (table === 'inspection_event') {
+      const eq = /inspection_id=eq\.([^&]+)/.exec(url.search);
+      return ok((records.events || [])
+        .filter(e => !eq || e.inspection_id === decodeURIComponent(eq[1]))
+        .sort((a, b) => a.ord - b.ord));
+    }
+    if (table === 'inspection_event_type') {
+      return ok([
+        { key: 'equipment_replaced', label: 'Equipment replaced', note: '' },
+        { key: 'gas_service', label: 'Gas service', note: '' },
+      ]);
+    }
+
     // 0009's own view, computed the way the view computes it: a visit whose
     // departure rating is one the ratings table marks as needing maintenance.
     if (table === 'inspection_needs_maintenance') {
@@ -305,6 +319,14 @@ async function main() {
         source_block_ref: 'qld:Check!:7:1', source_ref: 'qld:Check!:7:11',
         station_match: 'unmatched', station_key: 'c:49999',
       },
+    ];
+    records.events = [
+      { inspection_id: IMPORT_ID, ord: 1, event_type: 'equipment_replaced',
+        confidence: 'high', rule: 'equip+replace-verb',
+        quote: 'Battery replaced 12.9', detail: { equipment: 'battery' } },
+      { inspection_id: IMPORT_ID, ord: 2, event_type: 'gas_service',
+        confidence: 'high', rule: 'gas-figures', quote: 'gas 17000/500/40',
+        detail: { figures: ['17000/500/40'], figures_meaning: 'unconfirmed' } },
     ];
     records.measurements = [
       { inspection_id: IMPORT_ID, ord: 1, field_key: 'battery_standby_v',
@@ -572,6 +594,26 @@ async function main() {
       && !/1994-01-01/.test(imp.headText), imp.headText.slice(0, 200));
     check('the head says it was loaded, not typed',
       /historical workbook/i.test(imp.headText), imp.headText.slice(0, 200));
+
+    // #127: the derived events sit after the transcription, say they are
+    // readings by rules, and each shows the words it was read from — with the
+    // gas figures explicitly unconfirmed.
+    const derived = await page.evaluate(() => {
+      const el = document.querySelector('.hist-section[data-section="_events"]');
+      if (!el) return null;
+      return {
+        note: (el.querySelector('.hist-variant') || {}).textContent || '',
+        cells: [...el.querySelectorAll('.hist-grid-table td')].map(td => td.textContent.trim()),
+      };
+    });
+    check('the derived events render, marked as readings by rules',
+      !!derived && /rules/.test(derived.note) && /remark itself is\s+the record/.test(derived.note),
+      derived ? derived.note.slice(0, 120) : 'no _events section');
+    check('each event names its equipment or figures and the words it was read from',
+      !!derived && derived.cells.some(c => /Equipment replaced — battery/.test(c))
+      && derived.cells.some(c => /figures unconfirmed/.test(c))
+      && derived.cells.includes('Battery replaced 12.9'),
+      derived ? derived.cells.join(' | ').slice(0, 160) : '');
 
     const impCsv = await capture(page, () => History.exportRecord());
     check('the CSV carries the transcription — `>30` is in the file, dated 1994',
