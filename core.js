@@ -127,6 +127,8 @@ const TABS = [
       find: 'decoder decode encoder encode erts message frame crc check bits hex payload spec' },
     { id: 'alert2',     label: 'ALERT2 / ERT-A2',        icon: '🛰️',
       find: 'erta2 elpro decode ports capture sample' },
+    { id: 'hfem',       label: 'HFEM Messages',          icon: '🌊',
+      find: 'hydro field event message bom bureau meteorology decode paste site sensor scheme timestamp maintenance builder logger' },
     { id: 'serial',     label: 'Serial Monitor',         icon: '🔌',
       find: 'com port web serial live stream terminal baud log' },
   ] },
@@ -577,6 +579,42 @@ const HELP = {
       + 'and says so.',
     ],
     related: ['serial', 'packets'],
+  },
+
+  hfem: {
+    summary: 'Decodes the Bureau of Meteorology\'s Hydro Field Event Message format — the ASCII '
+           + 'name-value line a logger pushes when a sensor trips or an inactivity timer expires. '
+           + 'Paste one or a whole capture; each is decoded, matched to a station where the site '
+           + 'number allows it, and reported honestly where it cannot be.',
+    watch: [
+      '<strong>The <code>T3</code> timestamp is the one to check.</strong> Its offset is the hours '
+      + 'to <em>add</em> to reach UTC, which is the opposite of ISO 8601 and of every convention a '
+      + 'reader is likely to have met: <code>20100727130000-10</code> is 03:00 UTC, not 23:00. The '
+      + 'tab always shows the resolved instant beside the stamp as written so the arithmetic can '
+      + 'be checked by eye, and it badges a computed UTC as computed.',
+      '<strong>Raw and translated are different claims.</strong> Scheme <code>R_1-0</code> and '
+      + 'scheme <code>R_1-6</code> both say rainfall: one is an integer counter whose engineering '
+      + 'meaning is a site configuration that is <em>not in the message</em>, the other is '
+      + 'millimetres as the logger scaled them. Nothing here converts a counter — a value shown '
+      + 'with a unit was transmitted with that unit.',
+      '<strong><code>M=1</code> is a property of the message, not of a reading.</strong> It means '
+      + 'the station was in maintenance and the spec\'s meaning is "do not use this in '
+      + 'production" — a technician may have been tipping the gauge. It is drawn as a banner '
+      + 'across the whole message rather than as a column, because a column is what the eye skips.',
+      'A raw counter carries the ceiling it wraps at, and the tab flags one within 5% of it. A '
+      + 'rainfall counter at 2,043 of 2,047 is about to roll, and "the counter wrapped" and "the '
+      + 'sensor jumped" are the same two numbers if you find out afterwards.',
+      '<strong>HFEM has no checksum.</strong> The <code>|NN:</code> footer is the only integrity '
+      + 'check the format has, so a structurally faulty line is rejected outright with the '
+      + 'decoder\'s reason rather than half-decoded — a truncated message with three of five '
+      + 'sensors intact must not land three readings. Every other message in the capture decodes '
+      + 'independently of it.',
+    ],
+    related: ['alert2', 'packets', 'msglog'],
+    links: [
+      { label: 'HFEM ingest — the wire formats and what the bridge does with them', href: 'docs/ingest-hfem.md' },
+      { label: 'BoM HFEM v1.0 — the specification this decoder implements', href: 'archive/BoM HFEM v1.0.pdf' },
+    ],
   },
 
   serial: {
@@ -1372,6 +1410,27 @@ const state = {
     lastDecode: null,   // last decoded input string (for replay after re-render)
     lastEncode: false,  // whether an encode result should be replayed
     enc: { format: 'eif', id: 2784, data: 1599, polarity: 'negative', b: 0, hd: 0, bs: 0, vco: 0, de: 0 },
+  },
+  // HFEM tab (#154). The pasted capture is the only thing worth keeping across a
+  // tab switch — the decode is recomputed from it and cached against the text
+  // it was made from, the same trade a2 makes below and for the same reason.
+  // The builder's fields are kept too: a message half-built is worth as much as
+  // a capture half-read, and losing it on a tab switch would be the same bug.
+  hfem: {
+    text:      '',      // pasted capture, verbatim
+    parsed:    null,    // last HfemTab.parse() result
+    parsedKey: '',      // the text that parse was made from
+    builder: {
+      site: '123456',
+      tscheme: 'T1',
+      stamp: '20260818030000',
+      offset: 10,
+      maintenance: false,
+      sensors: [
+        { cls: 'R', instance: 1, scheme: 6,  value: '12.4' },
+        { cls: 'H', instance: 1, scheme: 16, value: '1.482' },
+      ],
+    },
   },
   // ALERT2 / ERT-A2 tab. The capture text is the only thing worth keeping across
   // a tab switch — everything derived from it is recomputed by parse(), which is

@@ -193,6 +193,10 @@
   <script src="packets.js?v=20260818h"></script>
   <script src="alert2.js?v=20260818h"></script>
   <script src="hfem.js?v=20260818h"></script>
+  <!-- After hfem.js, which it renders the output of. Neither executes at load,
+       so nothing would actually break the other way round — the order is here
+       because it states the dependency, which is what this list is for (#154). -->
+  <script src="hfem-tab.js?v=20260818h"></script>
   <script src="network-maps.js?v=20260818h"></script>
   <script src="serial.js?v=20260818h"></script>
   <script src="message-log.js?v=20260818h"></script>

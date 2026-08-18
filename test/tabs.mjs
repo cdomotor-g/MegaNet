@@ -367,6 +367,19 @@ const SEED_STATIONS_PATH = `async () => {
   await new Promise(r => setTimeout(r, 500));
 }`;
 
+// The HFEM tab (#154) — the first tab in this repo born converted rather than
+// brought to the system later, so it joins CONVERTED in its own first commit.
+// Two entries because it has two states worth holding, and they are not
+// mutually exclusive so much as empty-and-full: the paste box with the builder
+// and the reference under it, and the same page with a capture decoded — which
+// is where the summary, the measurements table and the per-message cards live.
+// The capture is the spec's own ten worked examples, so what the check measures
+// is what test/hfem.mjs holds the codec to.
+const SEED_HFEM = `() => {
+  HfemTab.loadSample('spec');
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
@@ -393,6 +406,8 @@ const CONVERTED = [
   { id: 'stations',   label: 'Stations — empty of everything the harness cannot reach', issue: '#136' },
   { id: 'stations',   label: 'Stations — ACMA on, a station selected, a map selection', issue: '#136', seed: SEED_STATIONS },
   { id: 'stations',   label: 'Stations — a drawn path, its profile and its link budget', issue: '#136', seed: SEED_STATIONS_PATH },
+  { id: 'hfem',       label: 'HFEM Messages — empty, with the builder and the reference', issue: 'born converted at #154' },
+  { id: 'hfem',       label: 'HFEM Messages — the spec\'s ten examples decoded', issue: 'born converted at #154', seed: SEED_HFEM },
 ];
 
 

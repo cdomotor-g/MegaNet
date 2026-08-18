@@ -1441,7 +1441,7 @@ function renderMain() {
   // The Map Generator joins them too: contours, rivers and the graticule need
   // no station file at all — only the pins and their names do, and the sheet
   // simply generates without them until one loads.
-  const noDataTabs = ['packets', 'alert2', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen'];
+  const noDataTabs = ['packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen'];
   if (!state.data && !noDataTabs.includes(state.activeTab)) { el.innerHTML = renderEmpty(); return; }
   switch (state.activeTab) {
     case 'stations':   el.innerHTML = renderStationsHtml();  initStationFilters(); initMap(); break;
@@ -1455,6 +1455,7 @@ function renderMain() {
     case 'network':    el.innerHTML = NetworkView.render();  NetworkView.init();  break;
     case 'packets':    el.innerHTML = Packets.render();       Packets.init();      break;
     case 'alert2':     el.innerHTML = Alert2.render();        Alert2.init();       break;
+    case 'hfem':       el.innerHTML = HfemTab.render();       HfemTab.init();      break;
     case 'serial':     el.innerHTML = Serial.render();        Serial.init();       break;
     case 'arro':       el.innerHTML = renderArroHtml();      initArro();  break;
     case 'arrodata':   el.innerHTML = ArroData.render();      ArroData.init();     break;

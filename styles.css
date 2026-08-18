@@ -4280,6 +4280,71 @@ code {
   .pkt .lblrow span { width: 19px; font-size: 8px; }
 }
 
+/* ── HFEM tab (#154) ──────────────────────────────────────────────────────────
+   Shares the .pkt shell with the two ALERT decoders — same panels, badges,
+   field tables and disclosure cards — because it is the same kind of tab and a
+   third visual language for "here is a decoded message" would be a cost with
+   no buyer. Everything below is what this format needs that those two do not. */
+
+/* The line as it arrived, above everything derived from it. Same treatment the
+   ERT-A2 tab gives a raw frame. */
+.hf .hf-raw {
+  background: var(--subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  font-size: .82rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.hf h5.hf-h,
+.hf h4.hf-h {
+  margin: var(--sp-3) 0 var(--sp-1);
+  font-size: .82rem;
+  letter-spacing: .4px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* M=1 is a property of the whole message, so it is drawn across the whole
+   message. A column would be the version of this the eye skips. */
+.hf .hf-banner { margin-bottom: var(--sp-3); }
+
+.hf .fmtcard.hf-maint { border-color: var(--warn); }
+.hf .fmtcard.hf-bad   { border-color: var(--bad); }
+
+/* A row whose reading was taken in maintenance, in the flat measurements
+   table. Tinted rather than coloured: the row still has to be readable, and
+   the M badge beside the site is what actually says it — colour is the second
+   channel here, never the only one. */
+.hf .hf-row-maint td { background: color-mix(in srgb, var(--warn) 8%, transparent); }
+
+.hf .hf-notes { margin: var(--sp-1) 0 0; padding-left: 1.1rem; }
+.hf .hf-notes li { margin: var(--sp-1) 0; color: var(--muted); font-size: .85rem; }
+
+.hf .hf-plain { margin: 0; padding-left: 1.1rem; }
+.hf .hf-plain li { margin: 2px 0; }
+
+.hf .hf-stn { font-weight: 600; }
+
+.hf .hf-del { padding: .1rem .45rem; line-height: 1; }
+
+@media (pointer: coarse) {
+  /* This tab's own controls at the 44 px floor EPIC #107's Definition of Done
+     sets — applied here from the first commit rather than from a conversion,
+     which is what "born converted" is supposed to mean. */
+  .hf .hf-del,
+  .hf .link-btn,
+  .hf .pkt-summary {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
 /* ── ALERT2 / ERT-A2 tab ────────────────────────────────────────────────────── */
 /* Shares the .pkt shell — same panels, buttons, badges, field tables and bit
    cells. Everything below is what a whole serial line needs that a single 32-bit
