@@ -421,7 +421,23 @@ const LinkBudget = (function () {
 
   function rerender() {
     const el = document.getElementById('link-budget-panel');
-    if (el) el.innerHTML = panelHtml();
+    if (!el) return;
+    const d = el.querySelector(':scope > details.lb-panel');
+    // First paint only — after this the element is never replaced (#160).
+    if (!d) { el.innerHTML = panelHtml(); return; }
+    // Replacing an open <details> re-fires toggle on insertion in current
+    // Chromium — the self-sustaining loop setOpen's guard breaks — and
+    // replacing it in the same breath as a click eats the click. So from here
+    // on only the body is repainted, and the element's own `open` is
+    // authoritative: the browser writes it on the user's gesture before any
+    // handler runs, so a repaint that disagrees has stale state and ADOPTS
+    // the element's answer rather than overriding the person.
+    if (d.open !== S().open) {
+      S().open = d.open;
+      S().picking = d.open;
+    }
+    const body = d.querySelector(':scope > .lb-body');
+    if (body) body.innerHTML = S().open ? bodyHtml() : '';
   }
 
   return {
@@ -444,6 +460,16 @@ const LinkBudget = (function () {
     panelHtml, rerender,
 
     setOpen(v) {
+      // Idempotent, and that is load-bearing rather than tidy (#160): current
+      // Chromium fires a toggle event when a parsed `<details open>` is
+      // *inserted*, and rerender() replaces the whole details. Without this
+      // guard the open panel re-enters itself — toggle → setOpen → rerender →
+      // insert open details → toggle — thousands of times a second: the CPU
+      // pegs, every click lands on a just-detached summary, and the panel
+      // "won't collapse", with nothing thrown anywhere. The browser has
+      // already flipped the element by the time this runs; when the recorded
+      // state matches, there is nothing to do.
+      if (S().open === !!v) return;
       S().open = !!v;
       // Expanding the card arms the pick; collapsing it disarms, so a stray map
       // click doesn't quietly move an endpoint on a card nobody is looking at.
@@ -491,6 +517,11 @@ const LinkBudget = (function () {
       S().a = pick(0); S().b = pick(1);
       fillGround(S().a); fillGround(S().b);
       drawMarkers();
+      // The one programmatic opener, so it writes the element as well as the
+      // state — rerender() treats the element as authoritative and would
+      // otherwise adopt its closed answer right back (#160).
+      const d = document.querySelector('#link-budget-panel > details.lb-panel');
+      if (d && !d.open) d.open = true;
       rerender();
       const el = document.getElementById('link-budget-panel');
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
