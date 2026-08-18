@@ -1882,6 +1882,54 @@ hr {
   color: var(--map-river);
 }
 
+/* #150: the permanent name a named river carries on the map. Unlike the sticky
+   hover tooltip above, this sits on the line over both basemaps, so it takes
+   the pin-label deal: its own near-white ground with fixed dark-blue ink —
+   AA against its own box in either theme, the same argument #151 measured for
+   station names. Italic is the cartographic convention for water. */
+.leaflet-tooltip.mn-river-label-fixed {
+  background: rgba(255, 255, 255, .93);
+  color: #0d47a1;
+  font-style: italic;
+  border: 1px solid rgba(13, 71, 161, .35);
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  padding: 0 5px;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.leaflet-tooltip.mn-river-label-fixed::before {
+  display: none;               /* no callout arrow — the name sits on its line */
+}
+
+/* #150 A4: the river list in #map-river-note — one real button per named
+   river drawn, which is the keyboard and touch path to the callout. App-wide
+   2 rem floor; 2.75 rem under a coarse pointer, the same floor #137 set for
+   map-adjacent controls tapped in a vehicle (docs/design-system.md §Touch). */
+.mn-river-note-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem;
+  margin-top: .25rem;
+}
+.mn-river-note-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0 .55rem;
+  font-size: .78rem;
+  color: var(--map-river);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.mn-river-note-btn:hover { border-color: var(--map-river); }
+@media (pointer: coarse) {
+  .mn-river-note-btn { min-height: 2.75rem; }
+}
+
 /* ── Map pins ────────────────────────────────────────────────────────────── */
 
 /* Every station pin is drawn with a white ring (set in app.js) so it separates

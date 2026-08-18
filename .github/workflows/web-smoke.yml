@@ -204,6 +204,14 @@ jobs:
         working-directory: test
         run: npm run tabs
 
+      # Overpass is external and the harness blocks the network, so the rivers
+      # check seeds geometry through MapRivers.seed() and asserts what #150
+      # shipped: grouping, permanent labels, the map-delegated callout, and —
+      # the assertion that matters — a real control in the DOM per named river.
+      - name: Rivers — named, labelled, clickable, and reachable without a mouse
+        working-directory: test
+        run: npm run rivers
+
       # Not a check about code at all: the help panel's *content*. Smoke asserts
       # every tab has a HELP entry, which stops the rail rendering blank and
       # says nothing about what is behind the key. A doc link pointing at a file

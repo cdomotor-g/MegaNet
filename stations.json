@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "1.2",
-    "description": "MegaNet station database. catchments[] is the Queensland drainage-basin vocabulary used by the Network Maps navigator; per-station catchment_ids are not yet populated (see README).",
+    "description": "MegaNet station database. catchments[] is the Queensland drainage-basin vocabulary used by the Network Maps navigator; per-station catchment_ids are populated for stations whose location is inside a basin polygon (see README).",
     "updated": "2026-07-31",
     "rm_paths": {
       "map": "c:\\program files (x86)\\radio mobile 11.6.6\\networks\\meganet\\net1.map",

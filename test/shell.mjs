@@ -99,6 +99,11 @@ const TEXT_PAIRS = [
   ['--role-base', '--panel'], ['--role-satcom', '--panel'],
   ['--hit-text', '--hit-bg'],
   ['--primary-text', '--primary'],
+  // The river-note buttons (#150 A4): river-blue text on the panel they sit
+  // on. The permanent map label is NOT a pair here — like the pin labels it
+  // paints its own fixed near-white ground with fixed ink, so its contrast is
+  // constant by construction rather than theme-dependent.
+  ['--map-river', '--panel'],
   // The banner writes `color: white` as a literal, so the pair is stated as a
   // literal too rather than pretending there is a token for it.
   ['#ffffff', '--header'],
