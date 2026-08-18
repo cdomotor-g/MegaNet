@@ -27,18 +27,23 @@ const { createLogger } = require('../src/log');
 
 const QUIET = { write() {} }; // the bridge's logs, not the test runner's problem
 
-async function startBroker(port = 0) {
+async function startBroker(port = 0, opts = {}) {
   // createBroker(), not `new Aedes()`: the constructor leaves the persistence
   // uninitialised and the broker silently never answers a CONNECT.
-  const broker = await Aedes.createBroker();
+  const broker = await Aedes.createBroker(opts);
   const subscribed = new Set();
   const acks = [];
-  broker.on('subscribe', (_subs, client) => subscribed.add(client.id));
+  let subscribes = 0;
+  broker.on('subscribe', (_subs, client) => { subscribed.add(client.id); subscribes += 1; });
   // The acknowledgement that actually matters. A publisher's own PUBACK comes
   // from the *broker* and says nothing about the bridge; this one is the bridge
   // telling the broker it may forget the message, which it must not do until the
   // reading is stored.
-  broker.on('ack', (packet, client) => acks.push({ client: client.id, topic: packet.topic }));
+  // packet is undefined for a message acked out of the offline queue (the
+  // persistence layer clears it by id without rehydrating the whole packet),
+  // which is exactly the no-loss test's path — an ack with no topic is still
+  // an ack.
+  broker.on('ack', (packet, client) => acks.push({ client: client.id, topic: packet ? packet.topic : null }));
   const server = net.createServer(broker.handle);
   await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve));
   return {
@@ -46,6 +51,7 @@ async function startBroker(port = 0) {
     subscribed,
     acks,
     bridgeAcks: () => acks.filter((a) => a.client === 'test-bridge'),
+    get subscribes() { return subscribes; },
     port: server.address().port,
     async close() {
       await new Promise((resolve) => broker.close(resolve));
@@ -57,13 +63,18 @@ async function startBroker(port = 0) {
 async function startApi() {
   const calls = [];
   let mode = 'ok';
+  // Per-function transient failures: set `failures.mqtt_status = 2` and the
+  // next two calls to that function answer 503, then it recovers. This is how
+  // the mid-connection retry test makes the sink blink without going down.
+  const failures = {};
   const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', (c) => { body += c; });
     req.on('end', () => {
       const fn = req.url.split('/').pop();
       calls.push({ fn, body: JSON.parse(body || '{}'), token: req.headers['x-ingest-token'] });
-      if (mode === 'down' && fn === 'ingest_http') {
+      if ((mode === 'down' && fn === 'ingest_http') || failures[fn] > 0) {
+        if (failures[fn] > 0) failures[fn] -= 1;
         res.writeHead(503, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ message: 'the database is having a moment' }));
         return;
@@ -77,12 +88,13 @@ async function startApi() {
     calls,
     of: (fn) => calls.filter((c) => c.fn === fn),
     set mode(value) { mode = value; },
+    failures,
     url: `http://127.0.0.1:${server.address().port}/rest/v1`,
     close: () => new Promise((resolve) => server.close(resolve)),
   };
 }
 
-function startBridge(brokerPort, apiUrl, extra = {}) {
+function startBridge(brokerPort, apiUrl, extra = {}, stream = QUIET) {
   const config = loadConfig({
     MQTT_URL: `mqtt://127.0.0.1:${brokerPort}`,
     MQTT_ALLOW_INSECURE: '1',
@@ -97,10 +109,24 @@ function startBridge(brokerPort, apiUrl, extra = {}) {
     ...extra,
   });
   const bridge = createBridge(config, {
-    log: createLogger({ level: 'error', bridgeId: 'test-bridge', stream: QUIET }),
+    log: createLogger({ level: 'error', bridgeId: 'test-bridge', stream }),
   });
   bridge.start();
   return bridge;
+}
+
+/** A log stream that keeps every line as a parsed object, for asserting on. */
+function captureLog() {
+  const lines = [];
+  return {
+    lines,
+    write(chunk) {
+      for (const line of String(chunk).split('\n')) {
+        if (line.trim()) { try { lines.push(JSON.parse(line)); } catch { /* not ours */ } }
+      }
+    },
+    of: (event) => lines.filter((l) => l.event === event),
+  };
 }
 
 const open = [];
@@ -390,4 +416,146 @@ test('an HFEM line published to …/reading/hfem lands decoded, mapped and frame
   // Both messages acked: the poison one by the bridge's own hand, the good one
   // because its readings were stored.
   await waitFor(() => broker.bridgeAcks().length === 2, { what: 'both HFEM messages to be acked' });
+});
+
+test('a bridge that was down loses nothing: the broker held the hour and hands it back (#163)', async (t) => {
+  const broker = await startBroker();
+  const api = await startApi();
+  t.after(async () => {
+    await closeStations();
+    await api.close();
+    await broker.close();
+  });
+
+  // A first bridge connects — which is what creates the persistent session and
+  // its subscriptions on the broker — and then goes away. clean: false plus the
+  // stable client id is the whole promise under test: the broker must keep the
+  // session, and queue QoS 1 messages for it, while nothing is connected.
+  const first = startBridge(broker.port, api.url);
+  await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the first bridge to subscribe' });
+  await first.stop();
+
+  // Into the absence: five readings and a retained status.
+  const station = await connectStation(broker.port, 'outage_al');
+  const published = [6201, 6202, 6203, 6204, 6205];
+  for (const id of published) {
+    await station.publishAsync(
+      'meganet/v1/outage_al/logger/reading',
+      JSON.stringify({ alert_id: id, reading_ts: '2026-08-18T02:00:00Z', value_raw: id - 6200 }),
+      { qos: 1 },
+    );
+  }
+  await station.publishAsync(
+    'meganet/v1/outage_al/status',
+    JSON.stringify({ online: true, battery_v: 12.1 }),
+    { qos: 1, retain: true },
+  );
+  // Only the bridge's own heartbeats (one at start, one at stop) may have
+  // reached the API — no reading and no status, because nothing was connected
+  // to relay them.
+  assert.equal(api.of('ingest_http').length + api.of('mqtt_status').length, 0,
+    'a reading or status reached the API while no bridge was running');
+
+  // The replacement process connects with the same client id — a restart, a
+  // redeploy, a rescheduled container — and the broker hands over the backlog.
+  const second = startBridge(broker.port, api.url);
+  t.after(async () => { await second.stop(); });
+
+  await waitFor(() => {
+    const got = api.of('ingest_http').flatMap((c) => c.body.payload.readings.map((r) => r.alert_id));
+    return published.every((id) => got.includes(id)) ? got : null;
+  }, { timeout: 10_000, what: 'every queued reading to be stored' });
+
+  // Stored exactly once each, per the acceptance: count what was stored, not
+  // what was delivered. (Redeliveries would be eaten by the primary key in
+  // production; here even the delivery count should be clean, since nothing
+  // was acked and nothing was duplicated.)
+  const stored = api.of('ingest_http').flatMap((c) => c.body.payload.readings.map((r) => r.alert_id));
+  assert.deepEqual([...stored].sort(), published.map(String).map(Number).sort(),
+    'every reading published into the outage stored, none twice');
+
+  const status = await waitFor(() => api.of('mqtt_status')[0], { what: 'the retained status' });
+  assert.equal(status.body.payload.station, 'outage_al');
+  assert.equal(status.body.payload.online, true);
+});
+
+test('a broker granting QoS 0 is called out loud — subscribe_downgraded (#163)', async (t) => {
+  // A broker configured (or misconfigured) to cap subscriptions at QoS 0 has
+  // quietly turned off at-least-once delivery; the bridge cannot fix that, but
+  // it must say so at a level somebody's alerting can key on. aedes cannot be
+  // made to answer a SUBACK with a downgraded grant (this version captures the
+  // granted QoS before authorizeSubscribe can lower it), so the downgrade is
+  // played by a fake client — which is the exact surface bridge.js reads: the
+  // granted array of its subscribe callback.
+  const api = await startApi();
+  const logs = captureLog();
+  const handlers = {};
+  const client = {
+    options: {},
+    on(ev, fn) { (handlers[ev] = handlers[ev] || []).push(fn); return this; },
+    subscribe(subs, cb) {
+      cb(null, Object.keys(subs).map((topic) => ({ topic, qos: 0 })));
+    },
+    end(_force, _opts, done) { if (done) done(); },
+  };
+  const config = loadConfig({
+    MQTT_URL: 'mqtt://127.0.0.1:1',
+    MQTT_ALLOW_INSECURE: '1',
+    MQTT_CLIENT_ID: 'test-bridge',
+    MEGANET_API_URL: api.url,
+    MEGANET_API_KEY: 'test-publishable-key',
+    MEGANET_INGEST_TOKEN: 'mgn_test_token',
+    BRIDGE_HEARTBEAT_MS: '0',
+  });
+  const bridge = createBridge(config, {
+    log: createLogger({ level: 'error', bridgeId: 'test-bridge', stream: logs }),
+    connect: () => client,
+  });
+  bridge.start();
+  t.after(async () => { await bridge.stop(); await api.close(); });
+
+  for (const fn of handlers.connect) fn({ sessionPresent: false });
+
+  const downgraded = logs.of('subscribe_downgraded');
+  assert.equal(downgraded.length, 3, 'one line per downgraded subscription');
+  assert.ok(downgraded.every((l) => l.level === 'error' && l.granted_qos === 0));
+  assert.deepEqual(downgraded.map((l) => l.topic).sort(), [
+    'meganet/v1/+/+/reading',
+    'meganet/v1/+/+/reading/hfem',
+    'meganet/v1/+/status',
+  ]);
+});
+
+test('a status deferred by a blinking sink is retried in-process, not parked until reconnect (#163)', async (t) => {
+  const broker = await startBroker();
+  const api = await startApi();
+  const bridge = startBridge(broker.port, api.url);
+  t.after(async () => {
+    await closeStations();
+    await bridge.stop();
+    await api.close();
+    await broker.close();
+  });
+
+  await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the bridge to subscribe' });
+  const subscribesBefore = broker.subscribes;
+
+  // The sink blinks: the next two mqtt_status calls fail 503, then it recovers.
+  api.failures.mqtt_status = 2;
+
+  const station = await connectStation(broker.port, 'blink_al');
+  await station.publishAsync(
+    'meganet/v1/blink_al/status',
+    JSON.stringify({ online: false }),
+    { qos: 1 },
+  );
+
+  // Three calls — two refused, one stored — without any reconnect. Before the
+  // #102 fix this offline marker would have sat unacked until the next session
+  // resume, whenever that happened to be.
+  await waitFor(() => api.of('mqtt_status').length >= 3, { timeout: 15_000, what: 'the in-process retry' });
+  await waitFor(() => broker.bridgeAcks().some((a) => a.topic === 'meganet/v1/blink_al/status'),
+    { timeout: 15_000, what: 'the status to be acked after the retry' });
+  assert.equal(broker.subscribes, subscribesBefore, 'the retry must not ride a reconnect');
+  assert.equal(api.of('mqtt_status').at(-1).body.payload.online, false);
 });
