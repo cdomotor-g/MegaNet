@@ -85,7 +85,16 @@ function createSink({ apiUrl, apiKey, ingestToken, timeoutMs = 15_000, fetchFn =
     // 400 and 422 are PostgREST saying the *request* is wrong: a malformed
     // envelope, a batch over the limit. Retrying it produces the same 400 next
     // time, so it is permanent and the caller treats the message as poison.
-    if (res.status === 400 || res.status === 404 || res.status === 422) {
+    //
+    // 404 is deliberately NOT in that list (#102). PostgREST answers 404 when
+    // the function is missing from its schema cache — a migration not yet
+    // applied, a cache not yet reloaded after a deploy, a mistyped API URL —
+    // which is a fact about the server, not about the message. This exact
+    // condition has occurred in production (the whole of 0008 sat unapplied
+    // while the bridge was deployed — roadmap revision 29), and classifying it
+    // as poison would have acked and dropped every reading that arrived until
+    // somebody noticed. Nothing about the message is wrong; retry.
+    if (res.status === 400 || res.status === 422) {
       throw new SinkError(`${fn}: ${res.status} — ${describe(body) || text.slice(0, 200)}`, {
         status: res.status,
         retryable: false,

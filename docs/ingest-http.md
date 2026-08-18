@@ -109,7 +109,7 @@ and let the addresses sort it out.
 | `station_number` | one of `alert_id` or `station_number` | A satellite or cellular station's number, if it has no ALERT address. |
 | `channel` | with `station_number` | Which sensor at that station number — e.g. `"rain"`, `"level"`. Not used alongside `alert_id`. |
 | `reading_ts` | yes | When the device took the reading. ISO 8601 (`"2026-08-11T04:15:00Z"`), or epoch seconds/milliseconds as a number. |
-| `value_raw` | yes | The value as your device measured it — a raw count, or an engineering value if that is all your device has. |
+| `value_raw` | yes* | The value as your device measured it — a raw count, or an engineering value if that is all your device has. *A reading carrying only `value` is accepted — `value` stands in as the raw record — but send `value_raw` where the device has one; a row with neither is rejected. |
 | `value`, `unit` | no | The converted engineering value and its unit, if your device (or you) already did the conversion. Units are from a fixed list — `mm`, `m`, `V`, `degC`, `NTU`, and others; an unrecognised one is a rejected row, not a silent guess. |
 | `quality` | no | `good`, `suspect`, `estimated`, `bad`, or `missing`. Defaults to unstated. |
 

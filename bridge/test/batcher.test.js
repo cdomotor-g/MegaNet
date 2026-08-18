@@ -76,15 +76,21 @@ test('a message is acked only after the batch is stored', async () => {
   assert.equal(a.acked, 1);
 });
 
-test('a full batch goes early, without waiting out the timer', async () => {
+test('a full batch goes early, and no call exceeds the reading limit', async () => {
   const f = fakes();
   const b = build(f, { maxWaitMs: 60_000, maxReadings: 10 });
   b.add(item('one_al', 6));
   assert.equal(f.calls.length, 0);
   b.add(item('two_al', 6));
   await b.flush();
-  assert.equal(f.calls.length, 1);
-  assert.equal(f.calls[0].readings.length, 12);
+  // The limit is a cap on the call, not just a flush trigger (#102): the
+  // database refuses a batch over maxReadings outright, so 6+6 under a limit
+  // of 10 is two deliverable calls, never one refusable one. The old
+  // behaviour — one 12-reading POST — was exactly the request 0007 answers
+  // with a 400, which made bisection the routine recovery after any backlog.
+  assert.equal(f.calls.length, 2);
+  assert.deepEqual(f.calls.map((c) => c.readings.length), [6, 6]);
+  for (const c of f.calls) assert.ok(c.readings.length <= 10);
 });
 
 test('several messages become one call, and one call carries source: mqtt', async () => {

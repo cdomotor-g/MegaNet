@@ -11,9 +11,10 @@
 //
 // One module, two consumers, on purpose (#153's design decision): the HFEM tab
 // (#154) reads the `HFEM` global this classic script declares, and the bridge
-// (#155, CommonJS under bridge/) `require()`s this same file — the guarded
-// `module.exports` at the foot is that registration, and bridge/Dockerfile
-// copies this file into the image so it is actually there. One decoder, so
+// (#155, CommonJS under bridge/) will `require()` this same file when #155
+// wires it — the guarded `module.exports` at the foot is ready for that, and
+// bridge/Dockerfile carries a ⚠ note on the COPY that has to happen with it
+// (nothing requires or copies it yet). One decoder, so
 // there is never a second opinion about what `T3` means — a second opinion is
 // exactly the drift bridge/src/messages.js says it was built to avoid.
 //

@@ -51,7 +51,8 @@ segment rather than a payload field because it says *who published*, not what wa
 measured — the reading carries its own address (`alert_id`, or `station_number`
 and `channel`), and that is what MegaNet stores against.
 
-Both segments accept letters, digits, dot, dash and underscore, up to 64
+Both segments must start with a letter or digit, then accept letters,
+digits, dot, dash and underscore, up to 64
 characters. No spaces, no `+`, no `#`, nothing starting with `$`.
 
 **Why the version is in the topic.** `v1` costs nothing today and is the only way
@@ -92,8 +93,9 @@ object with a `readings` array plus shared defaults:
 
 Every field, and what happens to a bad one, is in
 [`ingest-http.md`](ingest-http.md#payload-shape). The limits the bridge adds: at
-most **1,000 readings** and **256 KiB** per message, both matching the HTTP
-endpoint's own.
+most **1,000 readings** per message, matching the HTTP endpoint's own batch
+limit, and **256 KiB** per message — the bridge's own bound, chosen here; the
+HTTP path enforces no byte limit of its own.
 
 **Retrying is safe.** The same reading published twice — same address, same
 `reading_ts`, same `value_raw` — is stored once, and the second copy is counted
@@ -103,10 +105,15 @@ already have an idempotent retry.
 **There is no reply.** MQTT gives a device no response channel, so a station
 cannot be told its reading was stored. The QoS 1 PUBACK it gets back is from the
 *broker*, and means the broker has the message — not that MegaNet has it. That is
-the honest picture, and it is why the bridge never acknowledges a message to the
-broker until the database has actually stored it: if the bridge or the database
-is down, the broker keeps the message and hands it back when things recover. A
-station that publishes and gets its PUBACK has done its job and can sleep.
+the honest picture, and it is why the bridge never acknowledges a *storable*
+message to the broker until the database has actually stored it: if the bridge
+or the database is down, the broker keeps the message and hands it back when
+things recover. The deliberate exceptions are messages that can never be
+stored — an unparseable, oversized or empty payload, a topic outside the
+scheme, or a batch the database refuses outright (400/422) — which are acked,
+logged and counted as rejected, because an unacked poison message is
+redelivered forever with the whole backlog stuck behind it. A station that
+publishes and gets its PUBACK has done its job and can sleep.
 
 ---
 

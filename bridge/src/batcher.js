@@ -58,9 +58,19 @@ function createBatcher({
 }) {
   let queue = [];
   let queuedReadings = 0;
+  let inFlight = 0; // messages taken off the queue and not yet acked (#102)
   let timer = null;
   let running = null;
   let closed = false;
+
+  // The pending gauge counts everything the broker has not been told about:
+  // waiting AND in flight. An earlier version reported queue.length from two
+  // call sites, and any add() during an outage overwrote the gauge with the
+  // waiting count alone — hiding exactly the stuck batch the gauge exists to
+  // show (#102).
+  function updatePending() {
+    health.setPending(queue.length + inFlight);
+  }
   const seenSent = new Map(); // station → ms of the last mqtt_seen we sent
 
   function add(item) {
@@ -72,7 +82,7 @@ function createBatcher({
     }
     queue.push(item);
     queuedReadings += item.readings.length;
-    health.setPending(queue.length);
+    updatePending();
 
     if (queuedReadings >= maxReadings) {
       kick();
@@ -97,9 +107,11 @@ function createBatcher({
       const batch = queue;
       queue = [];
       queuedReadings = 0;
-      health.setPending(queue.length + batch.length);
+      inFlight = batch.length;
+      updatePending();
       await deliver(batch);
-      health.setPending(queue.length);
+      inFlight = 0;
+      updatePending();
     }
   }
 
@@ -112,7 +124,16 @@ function createBatcher({
     if (items.length === 0) return;
 
     for (const group of groupByEnvelope(items)) {
-      await deliverGroup(group.envelope, group.items);
+      // The database refuses a batch over maxReadings outright, so a backlog
+      // is delivered in chunks under the limit rather than as one refusable
+      // call. The limit used to be only a flush trigger, which made the
+      // 400-and-bisect path the routine recovery after any queue build-up —
+      // and bisection is for poison, not for volume (#102). Chunking also
+      // bounds the outgoing body: many 256 KiB messages no longer merge into
+      // one arbitrarily large POST.
+      for (const chunk of chunkByReadings(group.items, maxReadings)) {
+        await deliverGroup(group.envelope, chunk);
+      }
     }
   }
 
@@ -254,6 +275,29 @@ function createBatcher({
 }
 
 /**
+ * Split a group into runs whose reading totals stay within `limit`. A single
+ * message never exceeds the limit on its own — messages.js refuses over-limit
+ * payloads as poison before they reach the queue — so every chunk here is
+ * deliverable, and a chunk is never empty.
+ */
+function chunkByReadings(items, limit) {
+  const chunks = [];
+  let current = [];
+  let count = 0;
+  for (const item of items) {
+    if (current.length && count + item.readings.length > limit) {
+      chunks.push(current);
+      current = [];
+      count = 0;
+    }
+    current.push(item);
+    count += item.readings.length;
+  }
+  if (current.length) chunks.push(current);
+  return chunks;
+}
+
+/**
  * Readings from different messages go in one call only when they share an
  * envelope — `path`, `protocol`, `received_at` are batch defaults in the ingest
  * contract, and merging two messages that disagree about them would attribute
@@ -274,4 +318,4 @@ function stableKey(envelope) {
   return JSON.stringify(keys.map((k) => [k, envelope[k]]));
 }
 
-module.exports = { createBatcher, groupByEnvelope };
+module.exports = { createBatcher, groupByEnvelope, chunkByReadings };

@@ -47,6 +47,13 @@ on:
       - 'tools/ingest/**'
       - 'data/inspections/**'
       - 'archive/QLD All Site Inspections.xlsx'
+      # The bridge's own tests and the database checks run here too (#102) —
+      # a push touching either surface has to run them, or the one push that
+      # can break the bridge is the one push that does not test it.
+      - 'bridge/**'
+      - 'tools/check_*.sql'
+      - 'tools/ci/**'
+      - 'tools/import_stations_json.py'
       - '.github/workflows/web-smoke.yml'
   pull_request:
     paths:
@@ -75,6 +82,13 @@ on:
       - 'tools/ingest/**'
       - 'data/inspections/**'
       - 'archive/QLD All Site Inspections.xlsx'
+      # The bridge's own tests and the database checks run here too (#102) —
+      # a push touching either surface has to run them, or the one push that
+      # can break the bridge is the one push that does not test it.
+      - 'bridge/**'
+      - 'tools/check_*.sql'
+      - 'tools/ci/**'
+      - 'tools/import_stations_json.py'
       - '.github/workflows/web-smoke.yml'
   workflow_dispatch:
 
@@ -263,3 +277,77 @@ jobs:
 # against a recorded snapshot, so any honest change to app.js makes it stale —
 # as a per-push gate it would train everyone to re-record the baseline without
 # reading it. It is a milestone tool for the #129 split; see test/README.md.
+
+  # ── The bridge's tests (#102) ─────────────────────────────────────────────
+  # 45 tests, in-process broker, no database and no network — they were green
+  # and run by nobody: no workflow watched bridge/** at all, so a push
+  # touching the bridge shipped untested. Now it cannot.
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: bridge/package-lock.json
+      - name: Install the bridge
+        working-directory: bridge
+        run: npm ci
+      - name: Bridge tests
+        working-directory: bridge
+        run: npm test
+
+  # ── The database checks, against a real Postgres (#102) ──────────────────
+  # tools/check_*.sql were built to run in a workflow — a row per check,
+  # non-zero on failure — and nothing ran them: they need a database, and no
+  # job had one. This one does: a fresh Postgres 16, the Supabase-shaped
+  # scaffold (tools/ci/pg_scaffold.sql), every migration in order, the real
+  # stations.json — the exact recipe #146/#149/#159 proved by hand. The two
+  # load-dependent suites report `skip` rows here rather than failing, which
+  # is their own honest design; what this job proves on every push is that
+  # the migration chain applies from zero and every shape/permission claim
+  # holds. check_attachments.sql stays by-hand: it exercises the Supabase
+  # storage surface the scaffold only sketches.
+  db-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: meganet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: meganet
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scaffold the Supabase-shaped surface
+        run: psql -v ON_ERROR_STOP=1 -q -f tools/ci/pg_scaffold.sql
+      - name: Apply every migration, in order, from zero
+        run: |
+          for f in db/migrations/0*.sql; do
+            echo "== $f"
+            psql -v ON_ERROR_STOP=1 --single-transaction -q -f "$f"
+          done
+      - name: Load stations.json
+        run: python3 tools/import_stations_json.py | psql -v ON_ERROR_STOP=1 --single-transaction -q
+      - name: check_ingest.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest.sql
+      - name: check_mqtt.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_mqtt.sql
+      - name: check_inspections.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
+      - name: check_inspection_history.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_inspection_history.sql

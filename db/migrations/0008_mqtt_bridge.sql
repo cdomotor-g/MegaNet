@@ -85,9 +85,11 @@ begin
             hint    = 'see docs/ingest-mqtt.md';
   end if;
 
-  -- Same as ingest_http(): stamped whether or not what follows turns out to be
-  -- any good, because "has this credential stopped being used" is the question
-  -- the column exists to answer.
+  -- Same as ingest_http(): stamped before what follows is judged. One honest
+  -- caveat (#102): the stamp rides the request's own transaction, so a request
+  -- that errors after this point rolls the stamp back with it — last_used_at
+  -- records the last *successful* use, which is still the answer "has this
+  -- credential stopped being used" needs, just with failed attempts invisible.
   update meganet.ingest_token set last_used_at = pg_catalog.now() where id = v_id;
 
   return v_id;

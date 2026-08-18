@@ -12,7 +12,7 @@ const { createBatcher } = require('./batcher');
 const { createHealth } = require('./health');
 const { createSink } = require('./sink');
 const { createLogger } = require('./log');
-const { backoffMs } = require('./backoff');
+const { backoffMs, sleep } = require('./backoff');
 
 const VERSION = require('../package.json').version;
 
@@ -31,6 +31,7 @@ function createBridge(config, deps = {}) {
   let heartbeatTimer = null;
   let closeHealthServer = () => {};
   let reconnectAttempt = 0;
+  let stopping = false; // ends the status retry loop when the process is asked to stop
 
   const batcher = createBatcher({
     sink,
@@ -106,10 +107,13 @@ function createBridge(config, deps = {}) {
       reconnectAttempt += 1;
       // MQTT.js reconnects on a fixed period; this makes it exponential with
       // jitter, so a broker coming back does not meet the whole fleet at once.
-      client.options.reconnectPeriod = backoffMs(reconnectAttempt, {
+      // Floored at one second (#102): full jitter can land on 0, and MQTT.js
+      // reads reconnectPeriod 0 as "do not reconnect" — a 1-in-baseMs chance
+      // per disconnect of a bridge that silently never comes back.
+      client.options.reconnectPeriod = Math.max(1000, backoffMs(reconnectAttempt, {
         baseMs: config.mqtt.reconnectBaseMs,
         maxMs: config.mqtt.reconnectMaxMs,
-      });
+      }));
       log.warn('broker_reconnecting', {
         attempt: reconnectAttempt,
         next_delay_ms: client.options.reconnectPeriod,
@@ -234,10 +238,42 @@ function createBridge(config, deps = {}) {
         done(); // will never be accepted; acking stops it coming back forever
         return;
       }
-      // Left unacked: the broker redelivers, and the retained message is
-      // replayed on the next connect regardless. Losing a status update is
-      // cheap, but not losing it is free here.
+      // Left unacked — but an unacked QoS 1 PUBLISH is only re-sent on
+      // session *resume*, not mid-connection (#102), so waiting for the
+      // broker means an offline marker recorded at the next reconnect,
+      // whenever that is. A short in-process retry closes that gap; if the
+      // process dies first, the unacked message comes back on resume anyway,
+      // and a retained status is replayed on every connect regardless.
       log.warn('status_deferred', { err, station: status.station });
+      for (let attempt = 1; attempt <= 10 && !stopping; attempt += 1) {
+        await sleep(backoffMs(attempt, { maxMs: 60_000 }));
+        if (stopping) break;
+        try {
+          await sink.postStatus({
+            station: status.station,
+            online: status.online,
+            at: status.at,
+            status: status.status,
+            bridge: config.bridge.id,
+          });
+          log.info('status_stored', {
+            station: status.station,
+            online: status.online,
+            retained: packet.retain || false,
+            attempt: attempt + 1,
+          });
+          done();
+          return;
+        } catch (retryErr) {
+          health.errored(retryErr.message);
+          if (retryErr.retryable === false) {
+            log.error('status_refused', { err: retryErr, station: status.station });
+            done();
+            return;
+          }
+          log.warn('status_deferred', { err: retryErr, station: status.station, attempt: attempt + 1 });
+        }
+      }
     }
   }
 
@@ -254,6 +290,7 @@ function createBridge(config, deps = {}) {
   }
 
   async function stop() {
+    stopping = true;
     log.info('bridge_stopping', {});
     if (heartbeatTimer) clearInterval(heartbeatTimer);
 
