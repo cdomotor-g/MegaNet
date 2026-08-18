@@ -331,6 +331,42 @@ const SEED_NETWORK = `async () => {
   await new Promise(r => setTimeout(r, 500));
 }`;
 
+// The Stations tab draws three things the harness never reaches on its own,
+// and each is most of a surface: the ACMA transmitter layer and its options
+// (lazily fetched, so an unseeded visit measures the master toggle and nothing
+// under it), a selected station (the editor card and the "repeaters listening"
+// table below the map), and a map selection (the selection bar above the
+// table). This seed produces all three, through the tab's own handlers.
+const SEED_STATIONS = `async () => {${SEED_ACMA}
+  // A station with an ALERT address, so the carriers card has rows to draw
+  // rather than its no-address note.
+  const withId = state.data.stations.find(s =>
+    s.lat != null && (s.sensors || []).some(x => Number.isInteger(x.alert_id)));
+  if (withId) selectStation(withId.id);
+  addToMapSelection(state.data.stations.slice(0, 3).map(s => s.id));
+  rerenderStations();
+  for (const d of document.querySelectorAll('#station-filters details, #acma-filter-block details')) d.open = true;
+  await new Promise(r => setTimeout(r, 350));
+}`;
+
+// The Stations tab's third state, and the one nothing else reaches: a radio
+// path. Draw & measure, the terrain profile and the link budget all hang off a
+// two-point line, and the harness has no way to draw one with a mouse. The
+// seed puts a real line between two located stations through MapDraw's own
+// public seam — the same call the link budget's "Profile this path" makes —
+// and then asks the budget to adopt it, which is the tab's own button. Terrain
+// tiles are blocked here, so the two panels are checked in their honest
+// no-terrain state, the way #139 checked the Workbench's ACMA panels.
+const SEED_STATIONS_PATH = `async () => {
+  const located = state.data.stations.filter(s => s.lat != null && s.lon != null);
+  const a = located.find(s => s.roles.includes('repeater')) || located[0];
+  const b = located.find(s => s !== a && Math.abs(s.lat - a.lat) + Math.abs(s.lon - a.lon) > 0.05);
+  MapDraw.addLine([[a.lat, a.lon], [b.lat, b.lon]], [a.id, b.id]);
+  PathProfile.setOpen(true);
+  LinkBudget.fromProfile();
+  await new Promise(r => setTimeout(r, 500));
+}`;
+
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
@@ -354,6 +390,9 @@ const CONVERTED = [
   { id: 'alert2',     label: 'ALERT2 Decoder — readings and map',  issue: '#140', seed: SEED_ALERT2 },
   { id: 'alert2',     label: 'ALERT2 Decoder — frame anatomy',     issue: '#140', seed: SEED_ALERT2_FRAMES },
   { id: 'network',    label: 'Ghosting Graph',  issue: '#140', seed: SEED_NETWORK },
+  { id: 'stations',   label: 'Stations — empty of everything the harness cannot reach', issue: '#136' },
+  { id: 'stations',   label: 'Stations — ACMA on, a station selected, a map selection', issue: '#136', seed: SEED_STATIONS },
+  { id: 'stations',   label: 'Stations — a drawn path, its profile and its link budget', issue: '#136', seed: SEED_STATIONS_PATH },
 ];
 
 

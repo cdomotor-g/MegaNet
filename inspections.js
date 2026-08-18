@@ -1087,7 +1087,7 @@ const Inspections = (function () {
         everything typed is kept while you do, and drafts save to this device regardless.</span>`;
     }
     if (!Auth.mayWrite()) {
-      return `<span style="color:var(--warn)">Signed in as ${esc(Auth.email() || 'you')}, but this
+      return `<span class="txt-warn">Signed in as ${esc(Auth.email() || 'you')}, but this
         address is not on the editors list, so a save will be refused. An administrator has to add
         it (see <code>docs/access.md</code>). Drafts still save to this device.</span>`;
     }

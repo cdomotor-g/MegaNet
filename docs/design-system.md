@@ -23,8 +23,8 @@ Three files hold the system itself, and this document explains them:
 
 And two files check it: `test/shell.mjs` (`npm run shell`) holds the system
 against the shell, and `test/tabs.mjs` (`npm run tabs`, added by #137) holds it
-against every tab a U-issue has converted — **fifteen of the nineteen (plus the
-two tabs born converted), 297 assertions, as of #140**. Both run in CI on every push that
+against every tab a U-issue has converted — **all nineteen (plus the two tabs
+born converted), 336 assertions, as of #136**. Both run in CI on every push that
 touches the app; what each enforces is listed in §5 and §6 at the bottom of this
 page. Every claim below that *can* be checked mechanically is
 checked — this repo has a habit of that, and the reason is in constraint 1 of
@@ -789,7 +789,13 @@ Plus two claims that belong to a pattern rather than to a tab:
   change now reaches the chart" is a claim about a second file that nothing
   holds.
 
-## 7. What #109 deliberately did not do
+## 7. What #109 deliberately did not do — and what the six U-issues then did
+
+> **Complete as of #136.** The system was applied to the shell and one tab by
+> #109; the six per-tab issues carried it across the other eighteen, and the
+> last of them closed with #136. Everything below is the record of what each one
+> found, kept because the lessons are about the *system* rather than about a
+> tab — and the next thing built in this app will meet them again.
 
 The system was applied to the shell and to **one** tab — Networks, the smallest
 in the app. It was not rolled out across the other eighteen, because doing it
@@ -893,9 +899,52 @@ bytes rather than stations. What it leaves the rest:
   the real pipeline, so what the harness holds to the Definition of Done is the
   live card rather than a mock-up of it.
 
-**Four tabs to go, and #136 (Stations) owns one of them.**
+**#136 has since taken Stations** — the largest and most interactive surface in
+the app, and the last of EPIC #107's nineteen. **The epic is complete.** What it
+leaves behind:
 
-Worth knowing before picking up what is left:
+- **`.legend-dot` takes `--dot` now, everywhere.** The Stations legend and the
+  filter rows' role swatches were the last callers writing a literal
+  `background:`, so the scoped `.wb-page .legend-dot` override #139 needed is
+  gone with them — and `roleVar()` / `roleColor()` join `acmaMechVar()` /
+  `acmaMechColor()` in `core.js`. That was the **fifth and last** palette in a
+  JavaScript file that could not follow the theme.
+- **A categorical palette has no single legible ink.** The ACMA map popup wrote
+  `color: #fff` over all seven mechanism hues and four of them failed AA doing
+  it; white fails four, near-black fails three, and there is no third option.
+  Each hue now carries a paired `--acma-mech-*-ink`, picked per colour, the way
+  `--c-*-t` is paired with `--c-*`. If you are filling a shape with a
+  categorical colour and writing on it, the ink is part of the token, not a
+  decision you get to make once.
+- **`1fr` is `minmax(auto, 1fr)`, and that is a trap for any grid holding a
+  control.** `width: 100%` sets the used width and leaves the intrinsic minimum
+  alone, so a `<textarea>`'s `cols` default — about 426 px — became the width of
+  a one-column form grid inside a 375 px phone. Two fixes, both kept: the
+  responsive override says `minmax(0, 1fr)` like the base rule always did, and
+  every control in the shared input rule now carries `min-width: 0`.
+- **`visibility: hidden` is not "invisible", it is "gone".** The filter rows'
+  *only* shortcut hid that way under `@media (hover: hover)` with a
+  `.filter-only:focus` rule meant to bring it back — and that rule could never
+  fire, because a visibility-hidden element cannot take focus. On every
+  hover-capable device, which is every desktop, the shortcut was unreachable by
+  keyboard. `opacity: 0` keeps it focusable; reveal on `:focus-visible`.
+- **A canvas map answers the chart pattern by naming what it draws and
+  pointing at the text.** The Stations map has ~3,174 pins and no DOM to
+  annotate, so its accessible name carries the counts, rebuilt on every layer
+  refresh, and an `aria-describedby` note says in as many words that the
+  station table below is the same filtered set, row by row, with a button on
+  each row that selects it on the map.
+- **Name a slider once, not on every step.** Rolling a live readout into a
+  control's label renames the control as it is dragged, where the value is
+  already announced as the value. The readout is `aria-hidden`, the control
+  carries a stable `aria-label`, and the units go in `aria-valuetext`.
+- **Say where keyboard parity stops.** `map-draw.js`'s header now does: every
+  shape that exists is fully operable, and every shape can be *created* by
+  typing its geometry — what has no keyboard equivalent is dragging a pointer
+  over a map to place something by eye, which is a feature rather than a fix.
+
+**All nineteen tabs are converted.** What follows applies to whatever comes
+next rather than to a tab still waiting:
 
 - **The heading assertion was blind, and probably still is in your tab.** It
   read the whole document, and the nav's five `h2`s meant a tab opening at `h3`

@@ -233,10 +233,10 @@ const LinkBudget = (function () {
           ? `Station${e.sysName ? ` · ${esc(e.sysName)}` : ''}${e.freq ? ` · repeater ${e.freq} MHz` : ''}`
           : 'Hypothetical point — nothing is written back to the station data'}</p>
         <p class="small lb-src">Ground ${e.ground != null
-          ? `${e.ground.toFixed(1)} m <span style="color:var(--muted)">${esc(e.groundSrc || '')}</span>`
+          ? `${e.ground.toFixed(1)} m <span class="txt-muted">${esc(e.groundSrc || '')}</span>`
           : (e.groundSrc === 'unavailable'
-              ? '<span style="color:var(--bad)">unavailable — no terrain tile for this point</span>'
-              : '<span style="color:var(--muted)">sampling…</span>')}</p>
+              ? '<span class="txt-bad">unavailable — no terrain tile for this point</span>'
+              : '<span class="txt-muted">sampling…</span>')}</p>
         <div class="lb-fields">
           ${f('tx_w',     'TX power',        '0.1',  'W')}
           ${f('gain_dbi', 'Antenna gain',    '0.05', 'dBi')}
@@ -254,7 +254,7 @@ const LinkBudget = (function () {
     const sub = /^=/.test(label);
     return `
       <tr class="${cls || ''}">
-        <th>${esc(label)}</th>
+        <th scope="row">${esc(label)}</th>
         <td class="lb-num">${value == null ? '—'
           : (value > 0 && !sub ? '+' : '') + value.toFixed(2)}</td>
         <td class="lb-unit">${esc(unit || '')}</td>
@@ -271,7 +271,9 @@ const LinkBudget = (function () {
     // stays as computed — but it does not get to read "Good".
     const blocked = !!(r.an && r.an.verdict === 'obstructed') && r.margin != null;
     return `
+      <div class="table-wrap">
       <table class="lb-table">
+        <caption class="sr-only">The link budget, term by term — each gain and loss between the transmitter and the receiver, and the margin they add up to</caption>
         <tbody>
           ${budgetRow('TX power', r.txDbm, 'dBm', r.txW != null ? `${r.txW} W at ${esc(a.name)}` : 'no TX power set')}
           ${budgetRow('TX antenna gain', val(a, 'gain_dbi'), 'dBi', '')}
@@ -280,7 +282,7 @@ const LinkBudget = (function () {
           ${budgetRow('Free-space path loss', -r.fspl, 'dB',
             `${r.fMhz.toFixed(3)} MHz over ${fmtKm(r.dKm)}`)}
           ${r.diff == null
-            ? `<tr class="lb-missing"><th>Diffraction proxy</th><td class="lb-num">—</td><td class="lb-unit">dB</td>
+            ? `<tr class="lb-missing"><th scope="row">Diffraction proxy</th><td class="lb-num">—</td><td class="lb-unit">dB</td>
                  <td class="small lb-note">No terrain profile for these two points —
                  <strong>this result is free-space only</strong> and ignores the ground entirely.
                  ${S().a && S().b ? '<button class="lb-link" onclick="LinkBudget.profileThis()">Profile this path</button>' : ''}</td></tr>`
@@ -309,6 +311,7 @@ const LinkBudget = (function () {
           </tr>
         </tfoot>
       </table>
+      </div>
       ${r.an ? `
         <p class="small lb-eval">Terrain says <strong>${PATH_VERDICT[r.an.verdict].label.toLowerCase()}</strong>:
           ${esc(PATH_VERDICT[r.an.verdict].note)}
@@ -367,9 +370,12 @@ const LinkBudget = (function () {
           treat a good margin as permission to model the path properly, never as a result.</p>
         <div class="table-wrap">
           <table class="lb-compare-table">
-            <thead><tr><th></th><th>MegaNet indicative</th><th>Radio Mobile (ITM / Longley–Rice)</th></tr></thead>
+            <caption class="sr-only">What this indicative budget models against what a full propagation study models, term by term</caption>
+            <thead><tr><th scope="col"><span class="sr-only">Term</span></th>
+              <th scope="col">MegaNet indicative</th>
+              <th scope="col">Radio Mobile (ITM / Longley–Rice)</th></tr></thead>
             <tbody>${rows.map(([k, mine, rm]) =>
-              `<tr><th>${k}</th><td>${mine}</td><td>${rm}</td></tr>`).join('')}</tbody>
+              `<tr><th scope="row">${k}</th><td>${mine}</td><td>${rm}</td></tr>`).join('')}</tbody>
           </table>
         </div>
       </details>`;

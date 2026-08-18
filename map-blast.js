@@ -162,12 +162,12 @@ const MapBlast = (function () {
 
     const header = `
       <div class="panel-header">
-        <h2>Blast radius — ${esc(R.name)}</h2>
+        <h3>Blast radius — ${esc(R.name)}</h3>
         <span class="badge" title="Field stations with no other repeater to fall back to">${a.stranded.length}</span>
         <button type="button" onclick="MapBlast.disarm()"
                 title="Take the blast styling off the map">Clear</button>
       </div>
-      <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+      <p class="small st-note">
         If <strong>${esc(R.name)}</strong> goes dark, its ${a.carried.length} pass-range
         link${a.carried.length === 1 ? '' : 's'} die
         (<span class="blast-swatch-line" aria-hidden="true"></span> on the map) and the stations
@@ -179,26 +179,31 @@ const MapBlast = (function () {
 
     if (!a.carried.length) {
       return `${header}
-        <p class="small" style="margin:.5rem 0 0"><strong>Nothing breaks.</strong>
+        <p class="small st-note"><strong>Nothing breaks.</strong>
         ${esc(R.name)} carries no field stations under this rule, so there is nothing to strand.</p>`;
     }
     if (!a.stranded.length) {
       return `${header}
-        <p class="small" style="margin:.5rem 0 0"><strong>Nothing goes dark.</strong>
+        <p class="small st-note"><strong>Nothing goes dark.</strong>
         Every one of the ${a.carried.length} stations this repeater carries can reach at least one
         other repeater under this rule — 63 of the network's 88 repeaters give this same answer.</p>`;
     }
 
     return `${header}
-      <div class="table-wrap medium" style="margin-top:.5rem">
+      <div class="table-wrap medium st-note" role="region" tabindex="0"
+           aria-label="Stations stranded if ${escAttr(R.name)} goes dark — ${a.stranded.length}">
         <table>
+          <caption class="sr-only">Every field station that would have no repeater left if this one went dark, with its ALERT addresses, radio network and distance</caption>
           <colgroup><col style="width:44%"><col style="width:20%"><col style="width:20%"><col style="width:16%"></colgroup>
-          <thead><tr><th>Stranded station</th><th>ALERT ID(s)</th><th>Network</th><th>Distance</th></tr></thead>
+          <thead><tr><th scope="col">Stranded station</th><th scope="col">ALERT ID(s)</th>
+            <th scope="col">Network</th><th scope="col">Distance</th></tr></thead>
           <tbody>
             ${a.stranded.map(({ s, km }) => `
-              <tr onclick="zoomToStation('${escAttr(s.id)}')" style="cursor:pointer"
+              <tr class="row-link" onclick="zoomToStation('${escAttr(s.id)}')"
                   title="Zoom the map to ${escAttr(s.name)}">
-                <td><span class="stn-name role-field">${esc(s.name)}</span></td>
+                <td><button type="button" class="row-open stn-name role-field"
+                      onclick="event.stopPropagation();zoomToStation('${escAttr(s.id)}')"
+                      title="Zoom the map to ${escAttr(s.name)}">${esc(s.name)}</button></td>
                 <td class="small">${stationAlertIds(s).join(', ')}</td>
                 <td class="small">${(s.radio_network_ids || []).map(nid => netName(nid)).join(', ')}</td>
                 <td class="small">${km == null ? '—' : fmtKm(km)}</td>
@@ -206,10 +211,10 @@ const MapBlast = (function () {
           </tbody>
         </table>
       </div>
-      <p class="small" style="margin:.5rem 0 0">
-        <a href="#" onclick="MapBlast.exportCsv();return false"
+      <p class="small st-note">
+        <button type="button" class="link-btn" onclick="MapBlast.exportCsv()"
            title="The stranded list as a CSV file — same columns as this table, plus the station id">
-          Download the stranded list (CSV)</a>
+          Download the stranded list (CSV)</button>
       </p>`;
   }
 

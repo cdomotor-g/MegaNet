@@ -229,9 +229,9 @@ const MapSurvey = (function () {
       m.bindTooltip(esc(label), { direction: 'top', offset: [0, -10] });
       m.bindPopup(`
         <strong>${esc(label)}</strong><br>
-        <span style="font-size:.83rem">${isCors ? 'CORS site' : 'Survey control mark'}</span><br>
-        <span style="font-size:.83rem">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span>
-        ${p.ahd != null ? `<br><span style="font-size:.83rem">${p.ahd} m AHD</span>` : ''}
+        <span class="mn-pop-line">${isCors ? 'CORS site' : 'Survey control mark'}</span><br>
+        <span class="mn-pop-line">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span>
+        ${p.ahd != null ? `<br><span class="mn-pop-line">${p.ahd} m AHD</span>` : ''}
       `, { maxWidth: 260 });
     }
     rerenderMapLegend();

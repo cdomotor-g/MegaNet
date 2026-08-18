@@ -533,7 +533,7 @@ function editorStatusHtml() {
   // which is different depending on where the list on screen came from and
   // whether this browser holds a session.
   if (!editorWritesGoToDatabase()) {
-    return `<span style="color:var(--warn)">Showing ${esc(SOURCE_LABELS[state.dataSource?.kind] || 'a file')} rather than the datastore —
+    return `<span class="txt-warn">Showing ${esc(SOURCE_LABELS[state.dataSource?.kind] || 'a file')} rather than the datastore —
       <a href="#" onclick="reloadFromDatastore();return false">load from the datastore</a> before editing,
       or Save would write what is on screen over whatever the database now holds.</span>`;
   }
@@ -545,7 +545,7 @@ function editorStatusHtml() {
   // Worth saying here rather than letting Save be the one to find out, because
   // the answer will not change by trying again.
   if (!Auth.mayWrite()) {
-    return `<span style="color:var(--warn)">Signed in as ${esc(Auth.email() || 'you')}, but this address is not on the
+    return `<span class="txt-warn">Signed in as ${esc(Auth.email() || 'you')}, but this address is not on the
       editors list — saving will be refused. An administrator has to add it (see <code>docs/access.md</code>).</span>`;
   }
   return '';

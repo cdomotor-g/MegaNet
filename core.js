@@ -1810,6 +1810,32 @@ function acmaMechColor(mech) {
   return cssVar((ACMA_MECH[mech] || {}).token, (ACMA_MECH[mech] || {}).color || '#666');
 }
 
+// The same pair for station roles (#136), and the last palette in the app that
+// could not follow the theme. ROLE_COLOR's four literals stay, and stay light,
+// for the same reason ACMA_MECH[k].color did: the map's pins are Leaflet
+// options, which become presentation attributes, and a pin is drawn on tiles
+// behind a white ring rather than on the page's own ground.
+//
+// Everything drawn *on the page* — the legend dots, the filter rows' role
+// swatches, the popup's role pills — takes roleVar() instead, and follows the
+// theme. --role-* has a dark set; ROLE_COLOR does not and cannot.
+// The ink a filled mechanism pill takes (#136). A categorical palette has no
+// single legible ink over all of it — white fails four of these seven and
+// near-black fails three — so each hue is paired with its own, in the token
+// block beside the hue itself.
+function acmaMechInkVar(mech) {
+  const t = (ACMA_MECH[mech] || {}).token;
+  return t ? `var(${t}-ink, var(--acma-mech-ink))` : 'var(--text)';
+}
+
+function roleVar(role) {
+  return ROLE_LABEL[role] ? `var(--role-${role})` : 'var(--muted)';
+}
+
+function roleColor(role) {
+  return cssVar(ROLE_LABEL[role] ? `--role-${role}` : null, ROLE_COLOR[role] || '#666');
+}
+
 // What a token resolves to *right now*, for the places a `var()` cannot go: an
 // SVG presentation attribute, a canvas fill, a Leaflet option. Six files had
 // written this line out by hand before #138 (app.js, arro-data.js twice,

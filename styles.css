@@ -207,6 +207,25 @@
   --acma-mech-harmonic:       #0288d1;
   --acma-mech-cosite-desense: #6d4c41;
 
+  /* …and the ink each one takes when it is a filled pill rather than a swatch
+     (#136, the contrast question #138 handed over). The map popup wrote
+     `color:#fff` over all seven, and four of the seven failed AA doing it —
+     adjacent at 2.70:1, imd5 at 2.39:1, imd3-triple at 3.68:1, harmonic at
+     3.86:1. There is no single ink that works: white fails four of them and
+     near-black fails three. So the ink is paired with the hue, the way
+     --c-*-t is paired with --c-* for the packet bit cells, and picked per
+     colour as whichever of the two clears by the most. Worst pair here is
+     4.67:1. On the dark theme every hue is a light one, so all seven take the
+     dark ink — which is why only the exceptions are restated there. */
+  --acma-mech-ink:                #12171d;
+  --acma-mech-co-channel-ink:     #ffffff;   /* 4.98:1 */
+  --acma-mech-adjacent-ink:       #12171d;   /* 6.66:1 */
+  --acma-mech-imd3-ink:           #ffffff;   /* 8.20:1 */
+  --acma-mech-imd5-ink:           #12171d;   /* 7.54:1 */
+  --acma-mech-imd3-triple-ink:    #12171d;   /* 4.89:1 */
+  --acma-mech-harmonic-ink:       #12171d;   /* 4.67:1 */
+  --acma-mech-cosite-desense-ink: #ffffff;   /* 7.61:1 */
+
   /* The RF Changes timeline's data-quality series — the pasted corruption
      counts, up to eight at once. Same argument as --ad-series-*, one tab over:
      they were RFC_SERIES_COLORS, an array in rf-changes.js, drawn as a
@@ -453,6 +472,13 @@
   --acma-mech-imd3-triple:    #b3a4e8;
   --acma-mech-harmonic:       #6bb6ff;
   --acma-mech-cosite-desense: #c9a894;
+
+  /* Every dark-theme hue above is a light one, so every pill takes the dark
+     ink here — 6.49:1 at worst (co-channel). Only the two the light theme set
+     to white need restating. */
+  --acma-mech-co-channel-ink:     #12171d;   /* 6.49:1 */
+  --acma-mech-imd3-ink:           #12171d;   /* 7.90:1 */
+  --acma-mech-cosite-desense-ink: #12171d;   /* 8.16:1 */
 
   /* The eight RF Changes series, lifted for a dark page. Same eight values the
      twelve ARRO series use for their first eight, and deliberately so: the two
@@ -1013,6 +1039,14 @@ input[type="number"],
 textarea,
 select {
   width: 100%;
+  /* …and no wider than the column it is in (#136). `width: 100%` sets the
+     *used* width and leaves the intrinsic minimum alone: a <textarea> still
+     reports its `cols` default — about 426 px here — as min-content, and a
+     grid track written `1fr` is `minmax(auto, 1fr)`, so one textarea in a
+     one-column form grid made the whole column 426 px wide inside a 375 px
+     phone. Every control in this rule is already `width: 100%`; none of them
+     has any business setting a floor under its container. */
+  min-width: 0;
   padding: .55rem .65rem;
   border: 1px solid var(--ctl-border);
   border-radius: var(--r-md);
@@ -1144,6 +1178,9 @@ details.filter-block[open] > .filter-head .filter-title::before {
    addresses keeps its line breaks; it opens one line tall and app.js grows it
    to fit the paste, up to a cap, after which it scrolls. */
 .filter-search {
+  /* autoGrowSearch measures the pasted content and hands the answer over as
+     --grow (#136). `auto` while it measures, then the pixel height. */
+  height: var(--grow, auto);
   min-height: 2.4rem;
   max-height: 170px;
   padding: .5rem .6rem;
@@ -1254,10 +1291,26 @@ details.filter-block[open] > .filter-head .filter-title::before {
 
 /* Where there is a pointer the "only" shortcut stays out of the way until the
    row is hovered; touch screens get it permanently, since they never hover. */
+/* The "only" shortcut is revealed on hover where there is a pointer, and is
+   always there where there is not. It used to hide with `visibility: hidden`,
+   and the `:focus` rule underneath it could never fire (#136): a
+   visibility-hidden element is not focusable, so on every hover-capable
+   device — which is every desktop — the shortcut was unreachable by keyboard
+   entirely. `opacity: 0` keeps it in the focus order and in the accessibility
+   tree, so tabbing into it reveals it, which is what the rule always meant.
+   Kept out of the flow's hit-testing while invisible so a stray click on the
+   row does not land on it. */
 @media (hover: hover) {
-  .filter-only { visibility: hidden; }
+  .filter-only {
+    opacity: 0;
+    pointer-events: none;
+  }
   .filter-row:hover .filter-only,
-  .filter-only:focus { visibility: visible; }
+  .filter-only:focus-visible,
+  .filter-only:focus {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 /* The table under the map is listing stations picked off the map, not the
@@ -1889,6 +1942,106 @@ h2.h-bad {
   grid-column: 1 / -1;
 }
 
+/* ── Station editor (#136) ───────────────────────────────────────────────────
+   Thirty-four inline styles, all of them one of five things: a hint under a
+   field, a sub-heading inside a section, a flex row, a destructive button, or
+   the sensor row's column widths. Stated once here. */
+.ef-head    { margin-bottom: var(--sp-1); }
+.ef-status  { margin-bottom: var(--sp-2); }
+.ef-lead    { margin: var(--sp-1) 0 var(--sp-2); }
+.ef-block   { margin: 0 0 var(--sp-2); }
+.ef-flush   { margin: 0; }
+.ef-section { margin-top: var(--sp-2); }
+.ef-actions { margin-top: var(--sp-2); }
+.ef-h       { margin: var(--sp-2) 0 var(--sp-3); }
+.ef-note    { margin-top: var(--sp-1); }
+.ef-plain   { font-weight: 400; }
+.ef-sub     { font-weight: 600; margin-bottom: var(--sp-1); }
+
+/* A hint that belongs to the field above it, so it rides up into the grid gap
+   rather than reading as a paragraph of its own. */
+.ef-hint { margin-top: -.35rem; }
+
+.ef-links {
+  display: flex;
+  gap: var(--sp-4);
+  margin-top: -.35rem;
+}
+
+.ef-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+
+.ef-roles {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  margin-top: var(--sp-1);
+}
+
+/* The role checkboxes sit inside a <label> that is already bold; these are the
+   values under it, not headings of their own. */
+.ef-role    { font-weight: normal; color: inherit; }
+.ef-enabled { grid-column: 1; }
+
+/* The carried-stations list caps its height, so it scrolls — which is why it
+   is a named region in the markup (pattern 7a, for something that is not a
+   table). Its rows are .link-btn buttons: each one opens a station. */
+.ef-carried {
+  max-height: 11rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: var(--sp-1) var(--sp-2);
+}
+
+.ef-carried-row {
+  display: block;
+  width: 100%;
+  padding: .1rem 0;
+  color: inherit;
+}
+.ef-carried-row:hover { color: var(--accent); }
+
+/* One sensor: address, type, the ARRO link, remove. */
+.sensor-row {
+  display: flex;
+  gap: var(--sp-1);
+  align-items: center;
+  margin-bottom: var(--sp-1);
+}
+
+.sensor-row .sensor-aid  { flex: 0 0 7.5rem; width: 7.5rem; }
+.sensor-row .sensor-type { flex: 1 1 auto; width: auto; min-width: 0; }
+.sensor-row .sensor-arro { flex: 0 0 4.2rem; text-align: right; }
+.sensor-row .sensor-del  { flex: 0 0 auto; padding: .2rem .55rem; line-height: 1; }
+
+/* Delete, and the sensor row's ×. The destructive action reads as destructive
+   without being red-filled — an outline in the base-station orange, which is
+   the app's existing "this one is different" hue and clears AA as text on both
+   themes (it is --role-base, checked by shell.mjs's contrast contract). */
+.btn-danger {
+  border-color: var(--role-base);
+  color: var(--role-base);
+}
+
+@media (pointer: coarse) {
+  /* EPIC #107's 44 px floor for the editor's own controls (#136). A form
+     filled in on a phone at a station site is the case this is for. */
+  .sensor-row .sensor-del,
+  .ef-carried-row,
+  .ef-section-head button {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+  }
+  .ef-carried-row { justify-content: flex-start; }
+}
+
 hr {
   border: 0;
   border-top: 1px solid var(--border);
@@ -1916,19 +2069,17 @@ hr {
   gap: .35rem;
 }
 
+/* Colour arrives as --dot, the .legend-sq convention (#138), applied to the
+   shared dot at #136 — the Stations map's legend and the filter rows' role
+   swatches were the last callers writing a literal `background:` here, so the
+   scoped `.wb-page .legend-dot` override #139 needed is gone with them.
+   The two role classes below it went with them too: nothing rendered them. */
 .legend-dot {
   width: 10px;
   height: 10px;
   border-radius: 999px;
   display: inline-block;
-}
-
-.legend-dot.repeater {
-  background: var(--map-repeater);
-}
-
-.legend-dot.field {
-  background: var(--map-field);
+  background: var(--dot, var(--muted));
 }
 
 .legend-line {
@@ -2332,8 +2483,10 @@ hr {
   white-space: nowrap;
 }
 
+/* The shape's own colour arrives as --ink (#136); --draw is the fallback for
+   a row drawn before one has been picked. */
 .draw-row-icon {
-  color: var(--draw);
+  color: var(--ink, var(--draw));
   flex-shrink: 0;
 }
 
@@ -2864,7 +3017,14 @@ hr {
    map and against each other. 1px of it, not the station pins' 2 — at half a
    field pin the mark is ~5px across, and a 2px ring on each side would read as
    a white blob rather than a mechanism-coloured square. */
+/* Size and colour arrive as tokens (#136): the square is sized by threat score
+   and coloured by mechanism, and both are data. --dot carries a `var()` now
+   rather than a resolved literal, which is what a real style attribute on a
+   divIcon lets you do — so the squares follow the theme without a redraw. */
 .acma-sq {
+  width: var(--sq, 10px);
+  height: var(--sq, 10px);
+  background: var(--dot, var(--muted));
   border: 1px solid rgba(0, 0, 0, .55);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, .95), 0 0 2px 1px rgba(0, 0, 0, .3);
   box-sizing: border-box;
@@ -2876,6 +3036,22 @@ hr {
   outline: 2px dashed #0b5cab;
   outline-offset: 2px;         /* clear of the white ring */
 }
+
+/* The ACMA filter block's own rows (#136). The five hand-written flex labels
+   here were the fourth copy of the .check-label primitive #139 added; this is
+   the tab-local spacing that goes with it, and nothing else. */
+.acma-check { margin: var(--sp-1) 0; }
+/* …and NOT .acma-row: that name is already taken, by the transmitter card's
+   key/value row two hundred lines up, which is display:flex with a nowrap
+   first span. Reusing it here put the "showing 500 of 2287 transmitters"
+   note in a flex row that would not wrap, and 444 px of it hung off a 375 px
+   phone (#136). */
+.acma-note  { margin: var(--sp-1) 0; }
+.acma-field { display: block; margin: var(--sp-2) 0; }
+.acma-group { margin: var(--sp-2) 0; }
+.acma-range { width: 100%; }
+.acma-summary { cursor: pointer; }
+.acma-help { margin-top: var(--sp-1); }
 
 /* ── Survey marks & CORS sites (#120) ────────────────────────────────────────
    A CSS-border triangle rather than a circle (station pins) or a square (ACMA
@@ -3258,6 +3434,47 @@ hr {
 /* One action per line. Both are nowrap, and side by side they would stretch the
    popup past Leaflet's 300 px to fit "Show in the list below ↓  Open in ARRO
    admin ↗" on one row. */
+/* Station popup (#136). The lines inside a popup were eight repetitions of an
+   inline `font-size: .83rem`; the role pills were a literal background with
+   white ink written per role.
+
+   The pill keeps ROLE_COLOR's literal, through --pill, for the reason the Bit
+   Flipper's do: a pill is its own ground, white ink over all four clears AA
+   (5.03:1 at worst, the base-station orange), and var(--role-*) would put that
+   same white text on the dark theme's *light* hues. Everything drawn on the
+   page's own ground takes roleVar() instead. */
+.mn-pop-line {
+  font-size: .83rem;
+}
+
+.mn-pop-indent {
+  padding-left: 1.1em;
+}
+
+.mn-pop-pill {
+  background: var(--pill, var(--muted));
+  /* White by default — every role hue clears AA with it (5.03:1 at worst).
+     The ACMA mechanism pills pass --pill-ink instead, because a categorical
+     palette has no single legible ink; see --acma-mech-*-ink (#136). */
+  color: var(--pill-ink, #fff);
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: .78rem;
+  margin-right: 2px;
+}
+
+/* A note under a card's heading, and the same standing on its own in an empty
+   card. `.small` already carries the muted colour. */
+.st-note { margin: var(--sp-2) 0 0; }
+.st-note-pad { padding: var(--sp-2) 0; margin: 0; }
+
+/* The load-a-file page, and the field that needs a gap above it. */
+.empty-page { margin: var(--sp-6) auto; }
+.empty-card { text-align: center; padding: var(--sp-6) var(--sp-5); }
+.empty-card h2 { margin: 0 0 var(--sp-3); }
+.empty-actions { margin-top: var(--sp-5); }
+.filter-field--spaced { margin-top: var(--sp-2); }
+
 .mn-popup-actions {
   margin-top: .45rem;
   padding-top: .4rem;
@@ -3331,8 +3548,13 @@ hr {
    with nothing behind it. Two values twenty pixels apart, in a file where five
    other blocks already said 700, were never two decisions. */
 @media (max-width: 700px) {
+  /* minmax(0, 1fr), not 1fr — the base rule two hundred lines up is careful to
+     write it that way and this override had dropped it (#136). `1fr` alone is
+     `minmax(auto, 1fr)`, which lets the widest item's min-content set the
+     track: the station editor's notes textarea took the one-column form to
+     426 px on a 375 px screen, and the page scrolled sideways. */
   .form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .map-canvas {
@@ -3919,6 +4141,15 @@ hr {
 /* The Stations map. Sized here rather than inline on the element, so that the
    phone breakpoint can have an opinion about it — 62vh of map plus a 360 px
    floor left a 664 px screen with barely a band of page under it. */
+/* The panel the map sits in (#136). `position: relative` is what the map note,
+   the transmitter card and the path card are positioned against; the tighter
+   padding is the map's own, because a map does not want a panel's gutter
+   around it. Was an inline style on the div. */
+.map-panel {
+  padding: var(--sp-2);
+  position: relative;
+}
+
 #leaflet-map {
   height: min(62vh, 720px);
   min-height: 360px;
@@ -4895,11 +5126,6 @@ code {
   min-width: 560px;
 }
 .wb-auto-table { table-layout: auto; }
-
-/* The map legend takes its dot colours as --dot, the way every .legend-sq in
-   the app does since #138 — scoped here rather than changed globally, because
-   the shared .legend-dot still lets its role classes win elsewhere. */
-.wb-page .legend-dot { background: var(--dot, var(--muted)); }
 
 @media (pointer: coarse) {
   /* EPIC #107's 44 px floor for this tab's own tap targets (#139): the chips'
@@ -6834,6 +7060,24 @@ code {
      no hover here, and the rule above it already says so — this just makes
      sure the row leaves it space. */
   .filter-row-side { gap: .4rem; }
+
+  /* EPIC #107's 44 px floor for the Stations tab's own controls (#136): the
+     filter rows (a whole panel of them, and the thing most often tapped in a
+     vehicle), the two clear buttons above them, the map display's checkboxes
+     and the legend's own toggles. The station table's names already have it —
+     .row-open is up at the top of this block, put there by #137. */
+  .filter-row,
+  .filter-check,
+  .filter-actions button,
+  .filter-resets button,
+  .acma-check {
+    min-height: 2.75rem;
+    align-items: center;
+  }
+
+  /* A filter row's own label is the tap target, and it must fill the row it is
+     in rather than leaving the taller box only partly live. */
+  .filter-row-label { min-height: 2.75rem; display: flex; align-items: center; }
 
   /* A range slider is a 16 px-tall target dragged sideways. Give the thumb
      something to hold onto. */

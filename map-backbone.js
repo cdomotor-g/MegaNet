@@ -296,7 +296,7 @@ const MapBackbone = (function () {
     const blocked = !!(r.an && r.an.verdict === 'obstructed');
     const m = lbMarginClass(r.margin);
     const cls = blocked ? 'bad' : m.cls;
-    return `<strong style="color:var(--${cls})">${(r.margin > 0 ? '+' : '') + r.margin.toFixed(1)} dB</strong>
+    return `<strong class="txt-${cls}">${(r.margin > 0 ? '+' : '') + r.margin.toFixed(1)} dB</strong>
       <span class="small"> — ${blocked ? 'obstructed' : m.label.toLowerCase()}${
         r.fsplOnly ? ' · free-space only' : ''}</span>`;
   }
@@ -346,7 +346,7 @@ const MapBackbone = (function () {
     const da = a.repeater ? a.repeater.delay_ms : null;
     const db = b.repeater ? b.repeater.delay_ms : null;
     const clash = !toBase && da != null && da === db
-      ? `<div class="small" style="color:var(--bad);margin-top:.35rem">⚠️ Both repeaters hold the same
+      ? `<div class="small txt-bad mn-pop-warn">⚠️ Both repeaters hold the same
            delay — a message both accept is re-transmitted at the same moment and collides at every
            receiver that hears both.</div>` : '';
     const delays = (toBase ? [a] : [a, b]).filter(st => st.repeater)
@@ -463,11 +463,11 @@ const MapBackbone = (function () {
       const m = r.margin != null ? lbMarginClass(r.margin) : null;
       return `
         <strong>${backbone ? backboneTitle(a, b) : 'Radio path'}</strong><br>
-        <span style="font-size:.83rem">${esc(a.name)} ⇄ ${esc(b.name)}</span><br>
-        ${backbone && p ? `<span style="font-size:.83rem">${p.overlap
+        <span class="mn-pop-line">${esc(a.name)} ⇄ ${esc(b.name)}</span><br>
+        ${backbone && p ? `<span class="mn-pop-line">${p.overlap
           ? `${p.shared.length} shared ALERT ID${p.shared.length === 1 ? '' : 's'} in use · windows overlap on ${p.overlap}`
           : 'no pass-range window at the base end — matched on distance alone'}</span><br>` : ''}
-        <span style="font-size:.83rem">${fmtKm(km)} · ${r.margin == null ? 'no margin figure'
+        <span class="mn-pop-line">${fmtKm(km)} · ${r.margin == null ? 'no margin figure'
           : `${(r.margin > 0 ? '+' : '') + r.margin.toFixed(1)} dB ${m.label.toLowerCase()} (free-space)`}</span>
         <div class="mn-popup-actions">
           <a href="#" onclick="MapBackbone.openOnStations('${backbone ? 'backbone' : 'field'}','${escAttr(aId)}','${escAttr(bId)}');return false"

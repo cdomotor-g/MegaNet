@@ -122,6 +122,27 @@ const TEXT_PAIRS = [
   // of its gradient, which is a literal in the stylesheet and so is a literal
   // here (.a2 .r-pack).
   ['#ffffff', '--c-data'], ['#ffffff', '--c-addr'],
+  // The ACMA mechanism pills (#136) — the contrast question #138 handed over
+  // with the palette. The map popup wrote `color: #fff` over all seven hues and
+  // four of them failed AA doing it, so each hue now carries its own ink and
+  // both are checked as a pair. This is also the check that keeps them paired:
+  // an eighth mechanism added without an ink resolves to --acma-mech-ink and
+  // shows up here rather than on a map.
+  ['--acma-mech-co-channel-ink', '--acma-mech-co-channel'],
+  ['--acma-mech-adjacent-ink', '--acma-mech-adjacent'],
+  ['--acma-mech-imd3-ink', '--acma-mech-imd3'],
+  ['--acma-mech-imd5-ink', '--acma-mech-imd5'],
+  ['--acma-mech-imd3-triple-ink', '--acma-mech-imd3-triple'],
+  ['--acma-mech-harmonic-ink', '--acma-mech-harmonic'],
+  ['--acma-mech-cosite-desense-ink', '--acma-mech-cosite-desense'],
+  // …and the station role pills in the map popup. Stated as literals, because
+  // that is what is drawn: a pill is its own ground, so it takes ROLE_COLOR's
+  // stable light values through --pill rather than var(--role-*) — the same
+  // reasoning the Bit Flipper's pills carry. Against the *dark* theme's role
+  // tokens white ink would be 1.88:1; against these it is 5.03:1 at worst, in
+  // both themes, because the ground does not move.
+  ['#ffffff', '#107c10'], ['#ffffff', '#0b5cab'],
+  ['#ffffff', '#c7401a'], ['#ffffff', '#7c35a3'],
 ];
 
 const NONTEXT_PAIRS = [

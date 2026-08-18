@@ -34,6 +34,30 @@
 // Nothing is saved. The shapes live as long as the page does — a tab switch
 // rebuilds them from state.draw.shapes, a reload clears them — and the export
 // is the operating system's screen-clipping tool.
+//
+// ── Keyboard parity, and where it stops (#136) ───────────────────────────────
+// Stated rather than left to be discovered, because the honest answer is not
+// "yes" and EPIC #107's Definition of Done asks for the boundary to be named.
+//
+// Fully keyboard-operable: every shape that exists. The panel lists them, and
+// each row is a real button — select and centre, "Select inside", delete —
+// alongside the colour swatches, the tool buttons and the edit form, where a
+// shape's numbers (centre, radius, length, bearing, the note's text) are typed
+// and take effect on change. That is the whole of the *editing* surface.
+//
+// And this is the point that matters: a shape can be **created** without a
+// mouse too, because every tool accepts its geometry as numbers — the "type it
+// in" path is not an accessibility afterthought bolted onto a drawing tool, it
+// is the same door the tool was built with, for the operator who has a grid
+// reference rather than a pixel.
+//
+// What is *not* keyboard-operable is dragging the pointer over the map to
+// place a shape by eye: arming a tool and clicking latitude/longitude out of
+// the map is a pointer gesture, and there is no keyboard equivalent of "about
+// here". Adding one — a crosshair the arrow keys walk, in a projection whose
+// step size changes with the zoom — is a feature, not a fix, and it is not in
+// this issue. The typed path is the equivalent that exists today, and it is
+// reachable from the same panel.
 
 const DRAW_TOOLS = {
   pin:    { icon: '📍', label: 'Pin',       hint: 'Click the map to drop a pin. Keeps going until you pick another tool.' },
@@ -688,7 +712,7 @@ const MapDraw = (function () {
         <div class="draw-row${sel ? ' sel' : ''}">
           <button class="draw-row-main" onclick="MapDraw.select('${escAttr(sh.id)}')"
                   title="Select and centre on it">
-            <span class="draw-row-icon" style="color:${colourOf(sh)}">${DRAW_TOOLS[sh.kind].icon}</span>
+            <span class="draw-row-icon" style="--ink:${colourOf(sh)}">${DRAW_TOOLS[sh.kind].icon}</span>
             <span class="draw-row-text">${esc(rowText(sh))}</span>
           </button>
           ${canPick ? `

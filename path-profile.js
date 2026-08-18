@@ -350,7 +350,12 @@ const PathProfile = (function () {
     return `
       <div class="path-chart-wrap">
         <svg viewBox="0 0 ${W} ${H}" class="path-chart" role="img"
-             aria-label="Terrain profile with line of sight and 60% Fresnel zone">
+             aria-label="Terrain profile over ${fmtKm(D / 1000)} — ${esc((PATH_VERDICT[an.verdict] || {}).label || an.verdict)}${
+               w && w.clearance != null
+                 ? (w.clearance >= 0
+                     ? `, worst clearance ${Math.round(w.clearance)} m under the line at ${fmtKm(w.d1 / 1000)}`
+                     : `, terrain ${Math.round(-w.clearance)} m above the line at ${fmtKm(w.d1 / 1000)}`)
+                 : ''}. The same figures are listed under the chart.">
           ${grid.join('')}
           ${radio}
           ${ground}
@@ -390,8 +395,8 @@ const PathProfile = (function () {
           <div><dt>Frequency</dt><dd>${an.fMhz.toFixed(3)} MHz</dd></div>
           <div><dt>Worst clearance</dt><dd>${w.clearance >= 0
             ? `${Math.round(w.clearance)} m under the line · ${w.ratio.toFixed(2)}&nbsp;F1`
-            : `<span style="color:var(--bad)">${Math.round(-w.clearance)} m above the line</span>`}
-            <span class="small" style="color:var(--muted)">at ${fmtKm(w.d1 / 1000)}</span></dd></div>
+            : `<span class="txt-bad">${Math.round(-w.clearance)} m above the line</span>`}
+            <span class="small">at ${fmtKm(w.d1 / 1000)}</span></dd></div>
           <div><dt>Into 60% zone</dt><dd>${an.intrusion_m > 0
             ? `${Math.round(an.intrusion_m)} m` : 'nothing'}</dd></div>
           <div><dt>Diffraction proxy</dt><dd>${an.diffraction_db > 0.05

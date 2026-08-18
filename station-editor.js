@@ -62,7 +62,7 @@ function repeaterPassingSummaryHtml(s) {
   const span = repeaterPassRangeSpan(s);
   const pct  = span ? Math.round((addr / span) * 100) : 0;
   return `
-        <p class="full small" style="margin:.1rem 0 .5rem">
+        <p class="full small ef-lead">
           <strong>Passing ${addr} ALERT address${addr === 1 ? '' : 'es'} across ${stns} station${stns === 1 ? '' : 's'}</strong>,
           in ${ranges.length} range${ranges.length === 1 ? '' : 's'} spanning ${span.toLocaleString()} address${span === 1 ? '' : 'es'}
           (${pct}% used).
@@ -85,17 +85,21 @@ function repeaterCarriedStationsHtml(s) {
     .filter(r => r.ids.length)
     .sort((a, b) => a.ids[0] - b.ids[0]);
   if (!rows.length) {
-    return `<p class="full small" style="color:var(--muted);margin:0 0 .6rem">No stations currently fall inside these pass ranges.</p>`;
+    return `<p class="full small ef-block">No stations currently fall inside these pass ranges.</p>`;
   }
   return `
-        <div class="full small" style="margin:0 0 .6rem">
-          <div style="font-weight:600;margin-bottom:.3rem">ALERT IDs in range → stations</div>
-          <div style="max-height:11rem;overflow:auto;border:1px solid var(--border);border-radius:4px;padding:.4rem .6rem">
+        <div class="full small ef-block">
+          <div class="ef-sub">ALERT IDs in range → stations</div>
+          <!-- Pattern 7a's reasoning for something that is not a table: it caps
+               its own height, so it is a named region and a tab stop, or the
+               names past the fold are unreachable without a mouse (#136). -->
+          <div class="ef-carried" role="region" tabindex="0"
+               aria-label="Stations inside these pass ranges — ${rows.length}">
             ${rows.map(({ st, ids }) => `
-              <div style="cursor:pointer;padding:.1rem 0" onclick="goToStation('${escAttr(st.id)}')"
+              <button type="button" class="link-btn ef-carried-row" onclick="goToStation('${escAttr(st.id)}')"
                    title="Open ${escAttr(st.name)} on the Stations tab">
                 <strong>${ids.join(', ')}</strong> — ${esc(st.name)}
-              </div>`).join('')}
+              </button>`).join('')}
           </div>
         </div>`;
 }
@@ -105,9 +109,9 @@ function editorForm(s) {
   const sensors = stationSensors(s).slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0));
   const dbId    = arroSiteId(s);
   return `
-    <div class="panel-header" style="margin-bottom:.35rem">
-      <h2>${esc(s.name) || 'New Station'}</h2>
-      <div style="display:flex;gap:.5rem">
+    <div class="panel-header ef-head">
+      <h3>${esc(s.name) || 'New Station'}</h3>
+      <div class="button-group">
         <!-- Signed out, the button is not disabled and does not fail at the
              network: it says what is missing and opens the panel that supplies
              it. A greyed-out Save with no explanation is the version of this
@@ -115,33 +119,33 @@ function editorForm(s) {
         ${dbCanWrite()
           ? `<button class="primary" id="ef-save" onclick="editorSave()" ${state.editorBusy ? 'disabled' : ''}>Save</button>`
           : `<button class="primary" id="ef-save" onclick="Auth.open()" title="Saving needs a signed-in session">Sign in to save</button>`}
-        ${s.id ? `<button id="ef-delete" onclick="editorDelete()" ${state.editorBusy ? 'disabled' : ''}
-                          style="border-color:#c7401a;color:#c7401a">Delete</button>` : ''}
+        ${s.id ? `<button id="ef-delete" class="btn-danger" onclick="editorDelete()" ${state.editorBusy ? 'disabled' : ''}
+                          >Delete</button>` : ''}
       </div>
     </div>
     <!-- Save writes to the database and waits for it, so this line is where the
          answer arrives: saved and when, refused and why. A failed save leaves
          everything below untouched — the typing is the thing being protected. -->
-    <div id="ef-status" class="small" style="margin-bottom:.6rem">${editorStatusHtml()}</div>
+    <div id="ef-status" class="small ef-status">${editorStatusHtml()}</div>
     <div class="form-grid">
       <label>Name<input type="text" id="ef-name" value="${esc(s.name)}"></label>
       <label>Station Number<input type="text" id="ef-stnno" value="${esc(s.station_number || '')}"></label>
       <label>Latitude<input type="number" step="any" id="ef-lat" value="${s.lat ?? ''}"></label>
       <label>Longitude<input type="number" step="any" id="ef-lon" value="${s.lon ?? ''}"></label>
-      ${stationMapLinkUrls(s) ? `<div class="full small" style="display:flex;gap:1rem;margin-top:-.35rem">${mapLinksHtml(s)}</div>` : ''}
+      ${stationMapLinkUrls(s) ? `<div class="full small ef-links">${mapLinksHtml(s)}</div>` : ''}
       <label>Elevation AHD (m)<input type="number" step="any" id="ef-elev" value="${s.elevation_ahd ?? ''}"></label>
       <label>RM System ID<input type="number" id="ef-rmsys" value="${s.rm_system_id || 1}"></label>
       <label>TBRG bucket size (mm/tip)
         <input type="number" step="0.1" min="0" id="ef-bucket" value="${s.TBRGbucketSize ?? ''}" placeholder="not recorded">
       </label>
-      <div class="full small" style="color:var(--muted);margin-top:-.35rem">
+      <div class="full small ef-hint">
         Blank means not recorded, not zero — the app falls back to an assumed 0.2 mm/tip wherever it
         converts a rain gauge count and says so. ${bucketSizeGapNote()}
       </div>
       <label class="full">Roles
-        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:.35rem">
+        <div class="ef-roles">
           ${Object.keys(ROLE_LABEL).map(r => `
-            <label style="font-weight:normal;display:flex;gap:.35rem;align-items:center">
+            <label class="check-label ef-role">
               <input type="checkbox" name="ef-roles" value="${r}" ${s.roles.includes(r) ? 'checked' : ''}> ${r}
             </label>`).join('')}
         </div>
@@ -149,20 +153,20 @@ function editorForm(s) {
       <label class="full">Telemetry / inspection form
         <select id="ef-insp-config">${editorInspConfigOptions(s.inspection_config_key)}</select>
       </label>
-      <div class="full small" style="color:var(--muted);margin-top:-.35rem">
+      <div class="full small ef-hint">
         Which of the six inspection sheets a crew prints at this site — the Inspections tab
         pre-selects its form from this. “Not recorded” means nobody has said yet, and the form
         asks rather than guesses; leave it that way unless you know the site's telemetry.
       </div>
-      <div class="full" style="margin-top:.4rem">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.45rem">
-          <div style="font-weight:600">ALERT IDs / Sensors${sensors.length ? ` <span class="small" style="font-weight:400">— ${sensors.length}</span>` : ''}</div>
+      <div class="full ef-section">
+        <div class="ef-section-head">
+          <div class="ef-sub">ALERT IDs / Sensors${sensors.length ? ` <span class="small ef-plain">— ${sensors.length}</span>` : ''}</div>
           <button type="button" onclick="editorAddSensorRow()">+ Add sensor</button>
         </div>
         <div id="ef-sensors">
           ${sensors.map(se => sensorRowHtml(se, dbId)).join('')}
         </div>
-        <div class="small" style="color:var(--muted);margin-top:.2rem">
+        <div class="small ef-note">
           One row per ALERT address and what it measures — rainfall, water level, battery, etc.${
             dbId != null ? ' Rows whose sensor carries an ARRO device id link straight to its admin page.' : ''}
         </div>
@@ -170,14 +174,14 @@ function editorForm(s) {
           ${['Rainfall', 'Rainfall Increment', 'Water Level', 'Water Level - AHD', 'Battery', 'Air Temperature', 'Relative Humidity', 'Wind Speed', 'Wind Gust', 'Wind Direction', 'pH', 'Conductivity', 'Dissolved Oxygen', 'Water Temperature', 'Turbidity'].map(t => `<option value="${esc(t)}">`).join('')}
         </datalist>
       </div>
-      <label style="display:flex;gap:.45rem;align-items:center;grid-column:1">
+      <label class="check-label ef-enabled">
         <input type="checkbox" id="ef-enabled" ${s.enabled ? 'checked' : ''}> Enabled
       </label>
       <label class="full">Notes<textarea id="ef-notes">${esc(s.notes || '')}</textarea></label>
     </div>
     ${hasRep ? `
       <hr>
-      <h3 style="margin:.5rem 0 .75rem">Repeater Configuration</h3>
+      <h4 class="ef-h">Repeater Configuration</h3>
       <div class="form-grid">
         <label>ACMA Licence<input type="text" id="ef-acma" value="${esc(s.repeater?.acma_licence || '')}"></label>
         <label>RX (MHz)<input type="number" step="any" id="ef-rx" value="${s.repeater?.rx_mhz ?? ''}"></label>
@@ -186,7 +190,7 @@ function editorForm(s) {
           <input type="number" min="0" max="999" step="1" id="ef-delay"
                  value="${s.repeater?.delay_ms ?? ''}" placeholder="not set">
         </label>
-        <div class="full small" style="color:var(--muted);margin-top:-.35rem">
+        <div class="full small ef-hint">
           How long this repeater waits before re-transmitting a message its pass ranges accept.
           Blank means not set, not zero. ${(() => {
             const sug = suggestedRepeaterDelayMs(s);
@@ -248,8 +252,8 @@ function editorArroSection(s, sensors) {
   if (dbId == null) {
     return `
       <hr>
-      <h3 style="margin:.5rem 0 .75rem">ARRO</h3>
-      <p class="small" style="color:var(--muted);margin:0">
+      <h4 class="ef-h">ARRO</h3>
+      <p class="small ef-flush">
         <strong>No ARRO site id recorded</strong> for this station, so there is no admin page to
         link to. 390 of 3,174 stations are in the same position — the site id arrives with the
         ARRO sensor export (<code>tools/import_arro_sensors.py</code>) and a station missing from
@@ -259,25 +263,25 @@ function editorArroSection(s, sensors) {
 
   return `
     <hr>
-    <h3 style="margin:.5rem 0 .75rem">ARRO</h3>
+    <h4 class="ef-h">ARRO</h4>
     <div class="form-grid">
-      <label>ARRO site id <span class="small" style="font-weight:400">— ARRO's key, not BoM's</span>
+      <label>ARRO site id <span class="small ef-plain">— ARRO's key, not BoM's</span>
         <input type="text" readonly value="${esc(dbId)}" title="site.db_id — the id every ARRO URL takes">
       </label>
-      <label>Station number <span class="small" style="font-weight:400">— BoM's</span>
+      <label>Station number <span class="small ef-plain">— BoM's</span>
         <input type="text" readonly value="${esc(site.number || s.station_number || '—')}">
       </label>
       <label class="full">Site name in ARRO
         <input type="text" readonly value="${esc(site.name || '—')}">
       </label>
     </div>
-    <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.6rem">
+    <div class="button-group ef-actions">
       <a class="btn-link" href="${esc(admin)}" target="_blank" rel="noopener"
          title="Site administration page in ARRO">Open site in ARRO admin ↗</a>
       ${graph ? `<a class="btn-link" href="${esc(graph.url)}" target="_blank" rel="noopener"
          title="Last 7 days for ${graph.count} sensor${graph.count !== 1 ? 's' : ''}">Graph last 7 days ↗</a>` : ''}
     </div>
-    <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+    <p class="small st-note">
       ${withDev
         ? `${withDev} of ${sensors.length} sensor${sensors.length !== 1 ? 's' : ''} carry an ARRO device id —
            each of those rows above links to its own sensor admin page.`
@@ -296,19 +300,18 @@ function sensorRowHtml(se, dbId) {
   se = se || {};
   const url = arroSensorUrl(dbId, se.device_id);
   return `
-    <div class="sensor-row" data-sensor-id="${esc(se.sensor_id || '')}" data-device-id="${se.device_id ?? ''}"
-         style="display:flex;gap:.4rem;align-items:center;margin-bottom:.35rem">
+    <div class="sensor-row" data-sensor-id="${esc(se.sensor_id || '')}" data-device-id="${se.device_id ?? ''}">
       <input type="number" class="sensor-aid" value="${se.alert_id ?? ''}" placeholder="ALERT ID"
-             style="flex:0 0 7.5rem;width:7.5rem">
+             aria-label="ALERT address">
       <input type="text" class="sensor-type" list="ef-sensor-types" value="${esc(se.type || '')}"
-             placeholder="Sensor type (e.g. Rainfall)" style="flex:1 1 auto;width:auto;min-width:0">
-      <span class="sensor-arro small" style="flex:0 0 4.2rem;text-align:right">${url
+             aria-label="Sensor type"
+             placeholder="Sensor type (e.g. Rainfall)">
+      <span class="sensor-arro small">${url
         ? `<a href="${esc(url)}" target="_blank" rel="noopener"
              title="ARRO admin for device ${esc(se.device_id)} on site ${esc(dbId)}">ARRO ↗</a>`
         : ''}</span>
-      <button type="button" class="sensor-del" title="Remove this sensor"
-              onclick="this.closest('.sensor-row').remove()"
-              style="flex:0 0 auto;border-color:#c7401a;color:#c7401a;padding:.2rem .55rem;line-height:1">×</button>
+      <button type="button" class="sensor-del btn-danger" title="Remove this sensor"
+              onclick="this.closest('.sensor-row').remove()"><span aria-hidden="true">×</span></button>
     </div>`;
 }
 

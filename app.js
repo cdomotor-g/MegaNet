@@ -1466,7 +1466,7 @@ function renderMain() {
     case 'maintenance': el.innerHTML = Maintenance.render();  Maintenance.init(); break;
     case 'history':    el.innerHTML = History.render();       History.init();      break;
     case 'export':     el.innerHTML = renderExportHtml();     initExport();     break;
-    default:           el.innerHTML = '<p style="padding:1rem">Unknown tab</p>';
+    default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }
   updateChromeHeight();     // the Stations panes size themselves off it
 }
@@ -1475,13 +1475,13 @@ function renderMain() {
 
 function renderEmpty() {
   return `
-    <div style="max-width:600px;margin:3rem auto;padding:1rem">
-      <div class="panel" style="text-align:center;padding:2.5rem 2rem">
-        <h2 style="margin:0 0 .75rem">No data loaded</h2>
-        <p style="color:var(--muted)">Load a <strong>stations.json</strong> file to get started.
+    <div class="page empty-page" style="--page-max:600px">
+      <div class="panel empty-card">
+        <h2>No data loaded</h2>
+        <p class="small">Load a <strong>stations.json</strong> file to get started.
           If you haven't created one yet, use the
           <a href="migrate.html">Migration Tool</a> to convert your existing CSVs.</p>
-        <div style="margin-top:1.25rem">
+        <div class="empty-actions">
           <button class="primary" onclick="document.getElementById('file-input').click()">
             Load stations.json
           </button>
@@ -1502,7 +1502,12 @@ function renderStationsHtml() {
   const carriers = stationCarriersHtml();
   return `
     <div class="layout map-layout">
-      <aside class="sidebar stack map-pane" id="stations-left">
+      <!-- The tab's own heading (#136). Every panel below is a level under it,
+           which is what makes the outline step by one; it is sr-only because
+           the nav and the header already say where you are, and this tab has
+           less vertical room to spare than any other. -->
+      <h2 class="sr-only">Stations — filters, map and station list</h2>
+      <aside class="sidebar stack map-pane" id="stations-left" aria-label="Filters and map display">
         <div class="panel filter-panel" id="station-filters">
           ${stationFiltersHtml()}
         </div>
@@ -1527,8 +1532,24 @@ function renderStationsHtml() {
            onpointerdown="splitDragStart(event)" ondblclick="setSplitWidth(320,true)"
            onkeydown="splitKey(event)"></div>
       <div class="stack map-pane" id="stations-right">
-        <div class="panel" style="padding:.6rem;position:relative">
-          <div id="leaflet-map"></div>
+        <div class="panel map-panel">
+          <!-- The map is a canvas: ~3,174 pins and ~3,141 link lines drawn as
+               pixels, with no DOM per station to annotate. So it answers the
+               chart pattern (design-system §3) rather than pretending to be
+               markup — its accessible name carries what it is showing, rebuilt
+               on every refresh, and it points at the two places the same
+               information exists as text: the note under it, and the station
+               table further down, which is the same filtered set row by row. -->
+          <div id="leaflet-map" aria-label="Map of the stations in the loaded file"
+               aria-describedby="map-alt"></div>
+          <p id="map-alt" class="sr-only">
+            This map is drawn as a picture and has no per-station markup. The same set it is
+            showing is listed as text below it: the match note directly under the map says how
+            many stations matched and how many were pulled in by a pass range, and the
+            <strong>Stations</strong> table lower down the page is the same filtered set, one row
+            per station, with the name, number, roles, network, ALERT addresses and position of
+            each — and a button on every row that selects it here.
+          </p>
           <div id="map-note" class="map-note" hidden></div>
           <div id="acma-card" class="acma-card" hidden></div>
           <div id="path-card" class="acma-card" hidden></div>
@@ -1537,10 +1558,14 @@ function renderStationsHtml() {
         <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
         <div class="panel">
           <div class="panel-header">
-            <h2>Stations <span class="badge" id="st-count">${stations.length}</span></h2>
+            <h3 id="stations-table-h">Stations <span class="badge" id="st-count">${stations.length}</span></h3>
             <button onclick="editorNew()">+ New</button>
           </div>
-          <div class="table-wrap tall" id="stations-table-wrap">
+          <!-- Pattern 7a: the wrapper caps its own height, so it is a named
+               scroll region. Named by the heading above it, which carries the
+               row count — so the name says how much is in here, live. -->
+          <div class="table-wrap tall" id="stations-table-wrap"
+               role="region" tabindex="0" aria-labelledby="stations-table-h">
             ${stationsTable(stations)}
           </div>
         </div>
@@ -1561,6 +1586,22 @@ function renderStationsHtml() {
 // sidebar scrolled the map out of sight. Each column now fills the space under
 // the header and scrolls inside itself, and the divider between them drags to
 // re-split the width.
+//
+// The small-screen model, stated because it is a decision rather than a
+// consequence (#136). Below `lg` (1100 px) the split is not narrowed, it is
+// abandoned: two scrollers inside a phone screen is worse than one, so the
+// panes stack, each returns to `height: auto`, the page scrolls as a whole
+// again and the divider is `display: none` — which also takes it out of the
+// tab order, since a control that splits nothing must not be a stop on the way
+// to the map. The order is deliberate too: the map goes *first* and the filter
+// rail second (`order: 2`), because the map is the point of the tab and a
+// phone screen holds about one panel. Nothing is hidden or collapsed away at
+// any width — every control in the rail is still there, below the map.
+//
+// `state.splitW` and `--mn-split` are kept across the fold rather than reset:
+// the operator's chosen split is theirs, and a phone visit in the middle of a
+// desktop session must not silently discard it. The variable simply stops
+// being read while the layout is one column.
 
 // How much vertical room the header takes. Measured rather than assumed: its
 // title and its row of buttons wrap on a narrow window, and the panes size
@@ -1641,10 +1682,11 @@ function mapDisplayControlsHtml() {
       Show signal links
     </label>
     <label class="filter-range${state.mapShowLinks ? '' : ' is-off'}">
-      <span>Link opacity <strong id="link-opacity-val">${Math.round(state.mapLinkOpacity * 100)}%</strong></span>
+      <span>Link opacity <strong id="link-opacity-val" aria-hidden="true">${Math.round(state.mapLinkOpacity * 100)}%</strong></span>
       <input type="range" min="0.1" max="1" step="0.05" value="${state.mapLinkOpacity}"
+             aria-label="Link opacity" aria-valuetext="${Math.round(state.mapLinkOpacity * 100)} per cent"
              ${state.mapShowLinks ? '' : 'disabled'}
-             oninput="document.getElementById('link-opacity-val').textContent=Math.round(this.value*100)+'%'"
+             oninput="document.getElementById('link-opacity-val').textContent=Math.round(this.value*100)+'%';this.setAttribute('aria-valuetext',Math.round(this.value*100)+' per cent')"
              onchange="setMapLinkOpacity(+this.value)">
     </label>
     <label class="filter-check">
@@ -1653,10 +1695,11 @@ function mapDisplayControlsHtml() {
       Kill spaghetti
     </label>
     <label class="filter-range${on ? '' : ' is-off'}">
-      <span>Max TX distance <strong id="max-tx-val">${state.mapMaxLinkKm} km</strong></span>
+      <span>Max TX distance <strong id="max-tx-val" aria-hidden="true">${state.mapMaxLinkKm} km</strong></span>
       <input type="range" min="0" max="${MAX_LINK_KM_CAP}" step="10" value="${state.mapMaxLinkKm}"
+             aria-label="Maximum transmission distance" aria-valuetext="${state.mapMaxLinkKm} kilometres"
              ${on ? '' : 'disabled'}
-             oninput="document.getElementById('max-tx-val').textContent=this.value+' km'"
+             oninput="document.getElementById('max-tx-val').textContent=this.value+' km';this.setAttribute('aria-valuetext',this.value+' kilometres')"
              onchange="state.mapMaxLinkKm=+this.value;refreshMapLayers()">
     </label>
     <label class="filter-check">
@@ -1691,7 +1734,7 @@ function mapDisplayControlsHtml() {
       </select>
     </label>
     <p class="filter-note" id="map-contour-note">${MapContours.noteHtml()}</p>
-    <label class="filter-field" style="margin-top:.5rem">
+    <label class="filter-field filter-field--spaced">
       <span>Station names</span>
       <select onchange="setMapLabelMode(this.value)">
         ${[['auto', 'Auto — when few enough are in view'],
@@ -1737,15 +1780,15 @@ function mapLegendHtml() {
   return `
     ${Object.entries(ROLE_LABEL).map(([k, v]) => `
       <span class="legend-item">
-        <span class="legend-dot" style="background:${ROLE_COLOR[k]}"></span>
+        <span class="legend-dot" style="--dot:${roleVar(k)}"></span>
         <span class="small">${v}</span>
       </span>`).join('')}
     <span class="legend-item">
-      <span class="legend-dot legend-dot-hit" style="background:${ROLE_COLOR.field}"></span>
+      <span class="legend-dot legend-dot-hit" style="--dot:${roleVar('field')}"></span>
       <span class="small">Matches filter</span>
     </span>
     <span class="legend-item">
-      <span class="legend-dot legend-dot-rel" style="background:${ROLE_COLOR.repeater}"></span>
+      <span class="legend-dot legend-dot-rel" style="--dot:${roleVar('repeater')}"></span>
       <span class="small">Related by pass range</span>
     </span>
     <span class="legend-item">
@@ -1777,7 +1820,7 @@ function mapLegendHtml() {
         <span class="legend-sq" style="--dot:${acmaMechVar(k)}"></span>
         <span class="small">${m.label}</span>
       </span>`).join('') + `
-    <span class="legend-item"><span class="small" style="color:var(--muted)">ACMA RRL data (CC BY 4.0)${state.acma.threats ? ' · ' + esc(state.acma.threats.meta.source_date) : ''}</span></span>` : ''}`;
+    <span class="legend-item"><span class="small">ACMA RRL data (CC BY 4.0)${state.acma.threats ? ' · ' + esc(state.acma.threats.meta.source_date) : ''}</span></span>` : ''}`;
 }
 
 function rerenderMapLegend() {
@@ -2172,15 +2215,15 @@ function refreshMapLayers({ skipFit = false } = {}) {
       const arroUrl = arroSiteUrl(arroSiteId(s));
       return `
       <strong>${esc(s.name)}</strong><br>
-      ${s.roles.map(r => `<span style="background:${ROLE_COLOR[r]};color:#fff;padding:1px 5px;border-radius:999px;font-size:.78rem;margin-right:2px">${r}</span>`).join('')}<br>
+      ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${r}</span>`).join('')}<br>
       ${s.roles.includes('repeater') && repeaterPassingCount(s) != null
-        ? `<span style="font-size:.83rem">passing ${repeaterPassingCount(s)}</span><br>` : ''}
+        ? `<span class="mn-pop-line">passing ${repeaterPassingCount(s)}</span><br>` : ''}
       ${s.roles.includes('repeater') && s.repeater && s.repeater.delay_ms != null
-        ? `<span style="font-size:.83rem">repeater delay ${s.repeater.delay_ms} ms</span><br>` : ''}
-      ${s.station_number ? `<span style="font-size:.83rem">Stn #${esc(s.station_number)}</span><br>` : ''}
-      ${idTypes.length ? `<span style="font-size:.83rem">AlertID:</span><br>${idTypes.map(t =>
-        `<span style="font-size:.82rem">&nbsp;&nbsp;${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
-      ${s.elevation_ahd != null ? `<span style="font-size:.83rem">Elev: ${s.elevation_ahd} m AHD</span>` : ''}
+        ? `<span class="mn-pop-line">repeater delay ${s.repeater.delay_ms} ms</span><br>` : ''}
+      ${s.station_number ? `<span class="mn-pop-line">Stn #${esc(s.station_number)}</span><br>` : ''}
+      ${idTypes.length ? `<span class="mn-pop-line">AlertID:</span><br>${idTypes.map(t =>
+        `<span class="mn-pop-line mn-pop-indent">${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
+      ${s.elevation_ahd != null ? `<span class="mn-pop-line">Elev: ${s.elevation_ahd} m AHD</span>` : ''}
       ${acmaRepeaterPopupExtra(s)}
       <div class="mn-popup-actions">
         <a href="#" onclick="focusStation('${escAttr(s.id)}');return false"
@@ -2213,6 +2256,8 @@ function refreshMapLayers({ skipFit = false } = {}) {
   // Zoom to the matches (all of them, not just the first) and to the repeaters
   // pulled in behind them — a path with its far end off-screen explains
   // nothing. Or to everything, when no filter is running.
+  updateMapAltName(stations.length, links.length, backbone.length, matched.length, related.length);
+
   const fitSet = active && matched.length ? matched.concat(related) : stations;
   const fitTo  = fitSet.map(s => [s.lat, s.lon]);
   const key    = mapFitKey(fitTo);
@@ -2223,6 +2268,25 @@ function refreshMapLayers({ skipFit = false } = {}) {
     if (!skipFit) map.fitBounds(fitTo, { padding: [24, 24], maxZoom: fitTo.length === 1 ? 14 : 12 });
   }
   applyMapLabels();
+}
+
+// Parts 1 and 2 of the graphic pattern: the picture's name says what it is
+// showing, and it is rebuilt wherever the picture changes rather than where it
+// was first drawn (the lesson #141 wrote into design-system.md §3). Part 3 —
+// the same data as text — is the note under the map and the station table
+// below it, which #map-alt names and aria-describedby points at.
+function updateMapAltName(pins, links, backbone, matched, related) {
+  const el = document.getElementById('leaflet-map');
+  if (!el) return;
+  const bits = [`${pins} station pin${pins === 1 ? '' : 's'}`];
+  if (matched) {
+    bits.push(`${matched} highlighted as filter matches`);
+    if (related) bits.push(`${related} more pulled in by a pass range`);
+  }
+  if (links)    bits.push(`${links} pass-range link${links === 1 ? '' : 's'}`);
+  if (backbone) bits.push(`${backbone} backbone path${backbone === 1 ? '' : 's'}`);
+  el.setAttribute('aria-label', 'Station map — ' + bits.join(', ')
+    + '. The same stations are listed in the table below.');
 }
 
 // ── Map selection ────────────────────────────────────────────────────────────
@@ -2531,7 +2595,7 @@ function selectionBarHtml() {
 function stationsTable(allStations) {
   const selBar = selectionBarHtml();
   if (!allStations.length) {
-    return selBar + `<p style="padding:.75rem;color:var(--muted)">${selBar
+    return selBar + `<p class="small table-empty">${selBar
       ? 'None of the selected stations are in the loaded file.'
       : 'No stations match current filters.'}</p>`;
   }
@@ -2547,26 +2611,32 @@ function stationsTable(allStations) {
     ${selBar}
     ${capped ? `
       <p class="filter-note">Showing ${STATIONS_ROW_CAP} of ${allStations.length} —
-        narrow the filter or <a href="#" onclick="state.stationsShowAll=true;rerenderStations();return false">show all</a>.</p>
+        narrow the filter or <button type="button" class="link-btn"
+          onclick="state.stationsShowAll=true;rerenderStations()">show all</button>.</p>
     ` : ''}
     <table>
       <colgroup>
         <col style="width:22%"><col style="width:8%"><col style="width:13%"><col style="width:13%">
         <col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:6%">
       </colgroup>
+      <caption class="sr-only">Every station the filter matched — name, number, roles, radio network, ALERT addresses, position and whether it is enabled</caption>
       <thead>
         <tr>
-          <th>Name</th><th>Stn #</th><th>Roles</th><th>Network</th>
-          <th>AlertID</th><th>Lat</th><th>Lon</th><th>Elev (AHD)</th><th>On</th>
+          <th scope="col">Name</th><th scope="col">Stn #</th><th scope="col">Roles</th><th scope="col">Network</th>
+          <th scope="col">AlertID</th><th scope="col">Lat</th><th scope="col">Lon</th>
+          <th scope="col">Elev (AHD)</th><th scope="col">On</th>
         </tr>
       </thead>
       <tbody>
         ${stations.map(s => {
           const aids = stationAlertIds(s);
           return `
-            <tr class="${state.selectedId === s.id ? 'selected' : ''}" data-sid="${escAttr(s.id)}"
-                onclick="selectStation('${escAttr(s.id)}')" style="cursor:pointer">
-              <td title="${esc(s.id)}"><span class="stn-name role-${primaryRole(s)}">${markHits(s.name, terms)}</span></td>
+            <tr class="row-link ${state.selectedId === s.id ? 'selected' : ''}" data-sid="${escAttr(s.id)}"
+                onclick="selectStation('${escAttr(s.id)}')">
+              <td title="${esc(s.id)}"><button type="button" class="row-open stn-name role-${primaryRole(s)}"
+                    aria-pressed="${state.selectedId === s.id}"
+                    onclick="event.stopPropagation();selectStation('${escAttr(s.id)}')"
+                    >${markHits(s.name, terms)}</button></td>
               <td class="small">${markHits(s.station_number || '', terms)}</td>
               <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}${
                 s.roles.includes('repeater') && repeaterPassingCount(s) != null
@@ -2733,8 +2803,8 @@ function editorActive() {
 function renderStationEditorCard() {
   if (!editorActive()) {
     return `
-      <div class="panel-header"><h2>Station Editor</h2></div>
-      <p style="color:var(--muted);padding:.5rem 0">
+      <div class="panel-header"><h3>Station Editor</h3></div>
+      <p class="small st-note-pad">
         Select a station in the list above to view and edit it, or click
         <em>+ New</em> to add one.
       </p>`;
@@ -2806,7 +2876,7 @@ function stationCarriersHtml() {
 
   const header = `
     <div class="panel-header">
-      <h2>Repeaters listening</h2>
+      <h3>Repeaters listening</h3>
       <span class="badge" title="Repeaters with a pass range open to this station">${rows.length}</span>
     </div>`;
 
@@ -2817,44 +2887,50 @@ function stationCarriersHtml() {
   // tab flags orphans in.
   if (!ids.length) {
     return `${header}
-      <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+      <p class="small st-note">
         <strong>${esc(s.name)}</strong> has no ALERT address recorded, so there is nothing for a
         pass range to be open to. Telemetry-only stations reach the base another way.
       </p>`;
   }
   if (!rows.length) {
     return `${header}
-      <p class="small" style="color:#c7401a;margin:.5rem 0 0">
+      <p class="small st-note txt-bad">
         <strong>No repeater's pass ranges cover ${ids.length === 1 ? 'address' : 'addresses'}
         ${ids.join(', ')}</strong> — this station is orphaned, and nothing is listening for it.
       </p>`;
   }
 
   return `${header}
-    <p class="small" style="color:var(--muted);margin:.5rem 0 0">
+    <p class="small st-note">
       Pass ranges open to ${ids.length === 1 ? 'address' : 'addresses'} <strong>${ids.join(', ')}</strong>.
       Click a row to put the map on that repeater and dim everything off its own paths — the
       filters, the picked selection and the station in the editor below all stay as they are.
       Clicking it again puts the map back.
     </p>
-    <div class="table-wrap medium">
+    <div class="table-wrap medium" role="region" tabindex="0"
+         aria-label="Repeaters listening to ${escAttr(s.name)} — ${rows.length} repeater${rows.length === 1 ? '' : 's'}">
       <table>
+        <caption class="sr-only">Every repeater whose pass ranges are open to this station's ALERT addresses, with what each one carries and how far away it is</caption>
         <colgroup>
           <col style="width:28%"><col style="width:18%"><col style="width:14%">
           <col style="width:18%"><col style="width:11%"><col style="width:11%">
         </colgroup>
         <thead>
           <tr>
-            <th>Repeater</th><th>Network</th><th>Carries</th>
-            <th>In pass range</th><th>Distance</th><th>Passing</th>
+            <th scope="col">Repeater</th><th scope="col">Network</th><th scope="col">Carries</th>
+            <th scope="col">In pass range</th><th scope="col">Distance</th><th scope="col">Passing</th>
           </tr>
         </thead>
         <tbody>
           ${rows.map(({ r, ids: carried, ranges, km }) => `
-            <tr class="${state.mapFocusRepeaterId === r.id ? 'rpt-focused' : ''}"
-                onclick="focusRepeaterOnMap('${escAttr(r.id)}')" style="cursor:pointer"
+            <tr class="row-link ${state.mapFocusRepeaterId === r.id ? 'rpt-focused' : ''}"
+                onclick="focusRepeaterOnMap('${escAttr(r.id)}')"
                 title="Put the map on ${escAttr(r.name)} — nothing else on this page moves">
-              <td><span class="stn-name role-repeater">${esc(r.name)}</span></td>
+              <td><button type="button" class="row-open stn-name role-repeater"
+                    aria-pressed="${state.mapFocusRepeaterId === r.id}"
+                    onclick="event.stopPropagation();focusRepeaterOnMap('${escAttr(r.id)}')"
+                    title="Put the map on ${escAttr(r.name)} — nothing else on this page moves"
+                    >${esc(r.name)}</button></td>
               <td class="small">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
               <td class="small">${carried.join(', ')}</td>
               <td class="small">${ranges.join(', ')}</td>
@@ -2986,12 +3062,16 @@ function initStationFilters() {
 
 const SEARCH_MAX_PX = 170;   // ~8 lines; past that the box scrolls instead
 
+// The measured height goes on as a custom property rather than as `height`
+// (#136): a measurement is data, and the stylesheet is where the decision to
+// honour it lives (`.filter-search { height: var(--grow, auto) }`). It is also
+// the only inline style the per-tab check permits, and for the same reason.
 function autoGrowSearch(el) {
-  el.style.height = 'auto';
+  el.style.setProperty('--grow', 'auto');
   // Boxes are border-box here but scrollHeight excludes the border, so the
   // frame has to be added back or every growth step clips by a couple of pixels.
   const frame = el.offsetHeight - el.clientHeight;
-  el.style.height = Math.min(el.scrollHeight + frame, SEARCH_MAX_PX) + 'px';
+  el.style.setProperty('--grow', Math.min(el.scrollHeight + frame, SEARCH_MAX_PX) + 'px');
 }
 
 function clearSearch() {
@@ -3057,7 +3137,7 @@ function filterRowHtml(key, o, cfg) {
   const set  = state.filters[key];
   const on   = !set.size || set.has(o.value);
   const dot  = cfg.dots && ROLE_COLOR[o.value]
-    ? `<span class="legend-dot" style="background:${ROLE_COLOR[o.value]}"></span>` : '';
+    ? `<span class="legend-dot" style="--dot:${roleVar(o.value)}"></span>` : '';
   const none = o.value === FILTER_NONE ? ' filter-row-none' : '';
   return `
     <div class="filter-row">
@@ -3388,7 +3468,7 @@ function acmaPinPx(score) {
 function acmaSquareIcon(size, extraClass, color) {
   return L.divIcon({
     className: 'acma-div',
-    html: `<div class="acma-sq${extraClass}" style="width:${size}px;height:${size}px;background:${color}"></div>`,
+    html: `<div class="acma-sq${extraClass}" style="--sq:${size}px;--dot:${color}"></div>`,
     iconSize:   [ACMA_PIN_HIT_PX, ACMA_PIN_HIT_PX],
     iconAnchor: [ACMA_PIN_HIT_PX / 2, ACMA_PIN_HIT_PX / 2],
   });
@@ -3507,11 +3587,11 @@ function acmaFilterHeadHtml() {
       <input type="checkbox" ${f.show ? 'checked' : ''} onchange="toggleAcmaShow(this.checked)">
       Show ACMA licensed transmitters
     </label>
-    ${A.error ? `<div class="small" style="color:var(--muted)">${esc(A.error)}</div>` : ''}
-    ${A.loading ? `<div class="small" style="color:var(--muted)">Loading ACMA data…</div>` : ''}
+    ${A.error ? `<div class="small">${esc(A.error)}</div>` : ''}
+    ${A.loading ? `<div class="small">Loading ACMA data…</div>` : ''}
     ${f.show && A.loaded ? `
       <details ${A.uiOpen ? 'open' : ''} ontoggle="state.acma.uiOpen=this.open">
-        <summary class="small" style="cursor:pointer;color:var(--muted)">ACMA / RF Environment options</summary>
+        <summary class="small acma-summary">ACMA / RF Environment options</summary>
         <div id="acma-filter-body">${acmaFilterBodyHtml()}</div>
       </details>` : ''}`;
 }
@@ -3522,67 +3602,68 @@ function acmaFilterBodyHtml() {
 
   const meta = A.threats.meta;
   const anchorChip = A.selectedAnchorId ? `
-    <div class="small" style="margin:.25rem 0">
+    <div class="small acma-note">
       Filtering to <strong>${esc((A.anchorById[A.selectedAnchorId] || {}).name || A.selectedAnchorId)}</strong>
-      <a href="#" onclick="acmaSelectAnchor('');return false">×&nbsp;clear</a>
+      <button type="button" class="link-btn" onclick="acmaSelectAnchor('')">×&nbsp;clear</button>
     </div>` : '';
 
   return `
-    <div class="small" style="color:var(--muted);margin:.2rem 0">
+    <div class="small acma-note">
       ACMA data: ${esc(meta.source_date)} · <span id="acma-shown"></span>
     </div>
     ${anchorChip}
-    <div style="margin:.4rem 0">
+    <div class="acma-group" role="group" aria-label="Interference mechanisms to show">
       ${Object.entries(ACMA_MECH).filter(([k]) => A.mechCounts[k]).map(([k, m]) => `
-        <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.15rem 0">
+        <label class="check-label acma-check">
           <input type="checkbox" ${f.mechanisms.has(k) ? 'checked' : ''}
                  onchange="toggleFilter('acmaMechanisms','${k}',this.checked);refreshAcmaLayer()">
           <span class="legend-sq" style="--dot:${acmaMechVar(k)}"></span>
           ${m.label} (${A.mechCounts[k]})
         </label>`).join('')}
     </div>
-    <label class="small" style="display:block;margin:.4rem 0">
-      Minimum score <strong id="acma-minscore-val">${f.minScore}</strong>
-      <input type="range" min="0" max="100" step="5" value="${f.minScore}" style="width:100%"
+    <label class="small acma-field">
+      Minimum score <strong id="acma-minscore-val" aria-hidden="true">${f.minScore}</strong>
+      <input type="range" class="acma-range" min="0" max="100" step="5" value="${f.minScore}"
+             aria-label="Minimum interference score"
              oninput="state.filters.acma.minScore=+this.value;document.getElementById('acma-minscore-val').textContent=this.value"
              onchange="refreshAcmaLayer()">
     </label>
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+    <label class="check-label acma-check">
       <input type="checkbox" ${f.losOnly ? 'checked' : ''}
              onchange="state.filters.acma.losOnly=this.checked;refreshAcmaLayer()">
-      Line-of-sight only <span class="small" style="color:var(--muted)">(not yet assessed — hides all)</span>
+      Line-of-sight only <span class="small">(not yet assessed — hides all)</span>
     </label>
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+    <label class="check-label acma-check">
       <input type="checkbox" ${f.activeOnly ? 'checked' : ''}
              onchange="state.filters.acma.activeOnly=this.checked;refreshAcmaLayer()">
       Current licences only
     </label>
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+    <label class="check-label acma-check">
       <input type="checkbox" ${f.hideMeganet ? 'checked' : ''}
              onchange="state.filters.acma.hideMeganet=this.checked;refreshAcmaLayer()">
       Hide MegaNet's own licences
     </label>
-    <label class="small" style="display:block;margin:.35rem 0">
+    <label class="small acma-field">
       Search radius
       <select onchange="state.filters.acma.radiusKm=+this.value;refreshAcmaLayer()">
         ${[10, 25, 50, 100].map(r => `
           <option value="${r}" ${f.radiusKm === r ? 'selected' : ''}>${r} km</option>`).join('')}
       </select>
-      <span style="color:var(--muted)">(data extends to ${meta.radius_km} km)</span>
+      <span class="small">(data extends to ${meta.radius_km} km)</span>
     </label>
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+    <label class="check-label acma-check">
       <input type="checkbox" ${f.showBeams ? 'checked' : ''}
              onchange="state.filters.acma.showBeams=this.checked;refreshAcmaLayer()">
       Show antenna beam wedges
     </label>
-    <label style="display:flex;gap:.45rem;align-items:center;font-size:.88rem;margin:.2rem 0">
+    <label class="check-label acma-check">
       <input type="checkbox" ${f.showLinks ? 'checked' : ''}
              onchange="state.filters.acma.showLinks=this.checked;refreshAcmaLayer()">
       Show threat links
     </label>
-    <details style="margin:.4rem 0">
-      <summary class="small" style="cursor:pointer">? What the mechanisms mean</summary>
-      <div class="small" style="color:var(--muted);margin-top:.3rem">
+    <details class="acma-field">
+      <summary class="small acma-summary">? What the mechanisms mean</summary>
+      <div class="small acma-help">
         <p><strong>Co-channel</strong>: transmits on the repeater's RX frequency — direct
         collisions and capture. <strong>Adjacent</strong>: within 50 kHz — splatter raises the
         noise floor until marginal packets flip bits. <strong>Harmonic</strong>: a transmitter at
@@ -3639,8 +3720,8 @@ function acmaRepeaterPopupExtra(s) {
   if (!state.filters.acma.show || !A.loaded) return '';
   const a = A.anchorById[s.id];
   if (!a || !a.threats.length) return '';
-  return `<br><a href="#" style="font-size:.83rem"
-    onclick="acmaSelectAnchor('${escAttr(s.id)}');return false">⚠ ${a.threats.length} RF threat candidates — filter map</a>`;
+  return `<br><button type="button" class="link-btn mn-pop-line"
+    onclick="acmaSelectAnchor('${escAttr(s.id)}')">⚠ ${a.threats.length} RF threat candidates — filter map</button>`;
 }
 
 // ── map layer ──
@@ -3713,11 +3794,20 @@ function refreshAcmaLayer() {
     const site = A.siteById[t.site_id];
     if (!site) continue;
     const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
-    const icon = acmaSquareIcon(acmaPinPx(t.score), t.meganet ? ' mn' : '', mech.color);
+    const icon = acmaSquareIcon(acmaPinPx(t.score), t.meganet ? ' mn' : '', acmaMechVar(t.mechanism));
     const m = L.marker([site.lat, site.lon], { icon }).addTo(A.layer);
     m.bindPopup(acmaPopupHtml(d, site), { maxWidth: 300 });
     m.on('click', () => acmaHighlightDevice(t.device_id));
     m.bindTooltip(`${esc(t.client || 'Unknown licensee')} · ${mech.label} · ${t.score}`);
+    // A divIcon marker is a keyboard stop Leaflet's `alt` option cannot name —
+    // `alt` reaches IMG icons only, and this one is a <div>. Up to 500 of these
+    // are on the map at once, so unnamed they are 500 unnamed tab stops between
+    // the map and everything under it (#139 found the same on the Workbench's
+    // threat squares; #140 again on the Ghosting Graph's repeaters).
+    const pinEl = m.getElement();
+    if (pinEl) pinEl.setAttribute('aria-label',
+      `${t.client || 'Unknown licensee'} — ${mech.label}, score ${t.score}, `
+      + `${t.distance_km} km from ${t.anchor_name}`);
     acmaPins.push(m);
   }
   // Several licensed devices commonly share one site, so these are the pins that
@@ -3732,7 +3822,7 @@ function refreshAcmaLayer() {
       const site = A.siteById[t.site_id], a = A.anchorById[t.anchor_id];
       if (!site || !a) continue;
       L.polyline([[site.lat, site.lon], [a.lat, a.lon]], {
-        color: (ACMA_MECH[t.mechanism] || {}).color || '#666',
+        color: acmaMechColor(t.mechanism),
         weight: 1.2, dashArray: '4 4',
         opacity: 0.15 + 0.55 * Math.min(1, t.score / 70),
       }).addTo(A.linkLayer);
@@ -3752,7 +3842,7 @@ function refreshAcmaLayer() {
         const poly = acmaBeamPolygon(site.lat, site.lon, dev.az, Math.min(ant.h_bw, 120),
                                      acmaBeamRangeKm(dev.eirp_w));
         L.polygon(poly, {
-          color: (ACMA_MECH[d.top.mechanism] || {}).color || '#666',
+          color: acmaMechColor(d.top.mechanism),
           weight: 1, fillOpacity: 0.08, opacity: 0.5,
         }).addTo(A.beamLayer);
       }
@@ -3795,7 +3885,7 @@ function acmaHighlightDevice(deviceId) {
     const site = A.siteById[t.site_id], a = A.anchorById[t.anchor_id];
     if (!site || !a) continue;
     L.polyline([[site.lat, site.lon], [a.lat, a.lon]], {
-      color: (ACMA_MECH[t.mechanism] || {}).color || '#666',
+      color: acmaMechColor(t.mechanism),
       weight: 3, opacity: 0.9,
     }).addTo(A.hiLayer);
   }
@@ -3813,14 +3903,14 @@ function acmaPopupHtml(d, site) {
   const others = d.all.length - 1;
   return `
     <strong>${esc((site && site.name) || 'Unknown site')}</strong><br>
-    <span style="font-size:.83rem">${esc(t.client || 'Unknown licensee')} · score ${t.score}</span><br>
-    <span style="background:${mech.color};color:#fff;padding:1px 6px;border-radius:999px;font-size:.78rem">${mech.label}</span>
+    <span class="mn-pop-line">${esc(t.client || 'Unknown licensee')} · score ${t.score}</span><br>
+    <span class="mn-pop-pill" style="--pill:${acmaMechVar(t.mechanism)};--pill-ink:${acmaMechInkVar(t.mechanism)}">${mech.label}</span>
     ${t.meganet ? '<span class="badge">MegaNet licence</span>' : ''}<br>
-    <span style="font-size:.83rem">${esc(t.detail)}</span><br>
-    <span style="font-size:.83rem">${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz · ' : ''}${t.distance_km} km @ ${t.bearing_deg}° from ${esc(t.anchor_name)}</span><br>
-    <span style="font-size:.83rem">Licence ${esc(t.lic || '?')}${t.expiry ? ' · expires ' + esc(t.expiry) : ''}${t.inactive ? ' · <strong>not current</strong>' : ''}</span>
-    ${others > 0 ? `<br><span style="font-size:.8rem;color:#888">+${others} more mechanism/repeater match${others > 1 ? 'es' : ''}</span>` : ''}<br>
-    <a href="#" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(t.anchor_id)}');return false">Full details →</a>`;
+    <span class="mn-pop-line">${esc(t.detail)}</span><br>
+    <span class="mn-pop-line">${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz · ' : ''}${t.distance_km} km @ ${t.bearing_deg}° from ${esc(t.anchor_name)}</span><br>
+    <span class="mn-pop-line">Licence ${esc(t.lic || '?')}${t.expiry ? ' · expires ' + esc(t.expiry) : ''}${t.inactive ? ' · <strong>not current</strong>' : ''}</span>
+    ${others > 0 ? `<br><span class="small">+${others} more mechanism/repeater match${others > 1 ? 'es' : ''}</span>` : ''}<br>
+    <button type="button" class="link-btn" onclick="showAcmaCard('${escAttr(t.device_id)}','${escAttr(t.anchor_id)}')">Full details →</button>`;
 }
 
 // ── the transmitter card, and where it belongs (#138) ────────────────────────
