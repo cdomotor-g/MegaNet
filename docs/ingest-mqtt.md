@@ -5,9 +5,19 @@ and for whoever has to decide where the broker lives. If you are changing how th
 bridge itself works, that is [`bridge/README.md`](../bridge/README.md); the
 database side is `db/migrations/0008_mqtt_bridge.sql` and `db/README.md`.
 
+> **Keeping this page true.** The payload examples here are the exact shapes
+> `bridge/test/` publishes through a real in-process broker on every CI run,
+> and the #102 audit re-checked every claim on this page against the code —
+> two of them were wrong and are fixed below, which is the argument for
+> checking. If you change an example, run it (the bridge's integration test
+> is the cheapest live-shaped target); prose alone let #99's wrong `curl`
+> survive review.
+
 If your device speaks plain HTTP, use [`ingest-http.md`](ingest-http.md) instead
 — it needs no broker and no bridge, and it posts the same reading object to the
-same contract. MQTT earns its extra moving parts on links where a device cannot
+same contract. **The whole picture — both paths converging on one contract,
+and where duplicates die — is drawn at the top of
+[`ingest-http.md`](ingest-http.md#the-whole-picture).** MQTT earns its extra moving parts on links where a device cannot
 hold a TCP connection open long enough for a request/response, on radios where
 1 byte of overhead matters, and — the real reason — because of what it gives back
 in return: **you find out when a station stops talking**, for free.
@@ -115,6 +125,34 @@ logged and counted as rejected, because an unacked poison message is
 redelivered forever with the whole backlog stuck behind it. A station that
 publishes and gets its PUBACK has done its job and can sleep.
 
+The sequence, because prose about acknowledgement order is exactly the kind
+of claim that drifts (#99's lesson, and this page had drifted twice before
+the #102 audit caught it):
+
+```mermaid
+sequenceDiagram
+    participant S as Station
+    participant B as Broker
+    participant G as Bridge
+    participant M as MegaNet (ingest_http)
+
+    S->>B: PUBLISH reading (QoS 1)
+    B-->>S: PUBACK — the broker has it, MegaNet does not yet
+    B->>G: deliver
+    Note over G: batch up to 1,000 readings,<br/>up to 1 s
+    G->>M: POST /rpc/ingest_http (bridge's token)
+    alt stored (200 — even if some rows rejected)
+        M-->>G: accepted / duplicates / rejected
+        G-->>B: PUBACK — only now
+    else database or network down (5xx, timeout, 404)
+        M--xG: error
+        Note over G: retry forever, exponential + jitter,<br/>nothing acked — the broker still owns it
+    else the request itself is wrong (400/422)
+        M--xG: refused
+        Note over G: bisect to isolate the poison message,<br/>ack it, log it, count it rejected
+    end
+```
+
 ---
 
 ## Saying whether you are alive
@@ -154,6 +192,28 @@ the station beyond one field at connect time.
 For firmware that cannot build JSON, the status payload may also be the plain
 text `online` / `offline` (or `up` / `down`, or `1` / `0`). An empty payload
 clears the retained message and means "forget what I said", not "I am down".
+
+The offline detection, end to end — a station's crash is the one event the
+station cannot report, which is what the broker's Last Will exists for:
+
+```mermaid
+sequenceDiagram
+    participant S as Station
+    participant B as Broker
+    participant G as Bridge
+    participant M as MegaNet (mqtt_status)
+
+    S->>B: CONNECT (LWT = status topic, {"online": false}, retained)
+    S->>B: PUBLISH status {"online": true} (retained)
+    B->>G: deliver status
+    G->>M: POST /rpc/mqtt_status
+    Note over M: station_status — `since` moves only<br/>when the state actually changes
+    S--xB: connection lost, no DISCONNECT
+    B->>G: broker publishes the LWT on the station's behalf
+    G->>M: POST /rpc/mqtt_status {"online": false}
+    Note over M: offline, since = when the broker noticed
+    Note over B,G: retained → replayed to the bridge on every<br/>reconnect, so a bridge restart keeps the picture
+```
 
 Both appear in `meganet.station_health`:
 

@@ -6,6 +6,46 @@ that you have read this repository. If you are changing how the endpoint itself
 works, the database side is `db/migrations/0007_ingest_http.sql`,
 `db/migrations/0012_base_station_tokens.sql` and `db/README.md`.
 
+> **Keeping this page true.** Every example here has been run against the live
+> project (the #102 audit re-ran them all after its fixes). If you change an
+> example, run it first — #99 existed because a wrong `curl` could survive
+> review, and nothing forced anyone to execute it. The database checks CI runs
+> on every push (`tools/check_ingest.sql`) hold the *contract*; only running
+> the examples holds the *page*.
+
+## The whole picture
+
+Two ways in, one contract, one place where duplicates die. Whatever the
+transport, every reading ends up as the same call:
+
+```mermaid
+flowchart LR
+    FS[Field station<br/>radio / satellite / serial] --> BS[Base station or gateway<br/>where it becomes TCP/IP]
+    BS -- "HTTPS POST + token<br/>(this page)" --> IH["meganet.ingest_http()"]
+    BS -- "MQTT publish, QoS 1<br/>(ingest-mqtt.md)" --> BR[broker]
+    BR -- "subscribe" --> BG[bridge<br/>bridge/README.md]
+    BG -- "the same HTTPS POST,<br/>with the bridge's token" --> IH
+    IH --> ING["meganet.ingest()<br/>0006 — the shared contract"]
+    ING --> DB[(readings<br/>dedup on station + timestamp + raw value<br/>then roll-up and retention)]
+```
+
+What the two paths share is everything that matters: the payload shape, the
+1,000-reading batch limit, the unit vocabulary, the rejection reasons, and the
+token model — the bridge is just another ingest point holding another token.
+**Deduplication happens in one place**, inside `meganet.ingest()`: the same
+reading arriving twice — same address, same `reading_ts`, same `value_raw` —
+is stored once, whichever door it came through, which is why retrying is safe
+on both paths and why the two can even run side by side during a migration.
+What the MQTT path adds is presence: a broker knows when a station stops
+talking, and the HTTP path has no way to say so.
+
+What is automated versus manual today, honestly: CI applies every migration
+from zero and runs the ingest and MQTT check suites on every relevant push,
+and the bridge's own tests run the same way — but `meganet.retain()` (the
+retention sweep) is still run by hand, and the bridge itself is
+complete-and-tested but not yet deployed anywhere. The readings you POST are
+kept raw as well as resolved either way.
+
 ## One token per ingest point
 
 **A token belongs to the base station, not to a field station.** Mint one token
