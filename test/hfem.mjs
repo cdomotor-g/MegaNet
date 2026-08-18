@@ -248,6 +248,42 @@ rejects(':HS=1|I1=123456|T2=20100727130000+15|R_1-0=1|NN:', 'beyond UTC±14', 'a
         !encBad.ok && encBad.error.includes('scheme 5'));
 }
 
+// ── The ingest mapping (#155) — toReadings, the table both adapters share ────
+
+{
+  const line = ':HS=1|M=1|I1=123456|T3=20100727130000-10|R_1-0=1055|DO_1-16=8.3|NN:';
+  const d = HFEM.decode(line);
+  const m = HFEM.toReadings(d.message, { line });
+  check('toReadings: maps a decoded message', m.ok, m.ok ? '' : m.error);
+  if (m.ok) {
+    check('toReadings: the envelope is protocol hfem with the wire line as frame',
+          m.envelope.protocol === 'hfem' && m.envelope.frame === line);
+    check('toReadings: T3 resolved to the UTC instant, not the local stamp (#152 trap 1)',
+          m.readings.every(r => r.reading_ts === '2010-07-27T03:00:00Z'));
+    check('toReadings: a raw scheme is value_raw in counts — no engineering unit invented',
+          m.readings[0].value_raw === 1055 && m.readings[0].unit === 'count'
+          && !('value' in m.readings[0]));
+    check('toReadings: a translated scheme is value AND value_raw — it still transmitted something',
+          m.readings[1].value === 8.3 && m.readings[1].value_raw === 8.3);
+    check('toReadings: ppm becomes mg/L — one quantity, one unit key (0018 records why)',
+          m.readings[1].unit === 'mg/L');
+    check('toReadings: M=1 marks every reading maintenance',
+          m.readings.every(r => r.quality === 'maintenance'));
+    check('toReadings: channel is class_instance — the scheme digit is representation, not identity',
+          m.readings[0].channel === 'R_1' && m.readings[1].channel === 'DO_1');
+  }
+
+  const noTime = HFEM.decode(':HS=1|I1=5|R_1-0=3|NN:');
+  const refused = HFEM.toReadings(noTime.message);
+  check('toReadings: a timestampless message without receivedAt is a refusal, never a guess',
+        !refused.ok && refused.error.includes('receivedAt'));
+  const stamped = HFEM.toReadings(noTime.message, { receivedAt: '2026-08-18T01:02:03Z' });
+  check('toReadings: receivedAt stands in as reading_ts when the message carries no T',
+        stamped.ok && stamped.readings[0].reading_ts === '2026-08-18T01:02:03Z');
+  check('toReadings: a hand-built message without a line gets encode()\'s canonical frame',
+        stamped.ok && stamped.envelope.frame === ':HS=1|I1=5|R_1-0=3|NN:');
+}
+
 // ── Verdict ──────────────────────────────────────────────────────────────────
 
 const failed = results.filter(r => !r.pass);

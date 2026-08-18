@@ -287,3 +287,34 @@ test('groupByEnvelope treats key order as the same envelope', () => {
   ]);
   assert.equal(groups.length, 1);
 });
+
+test('an HFEM batch never merges into a JSON batch (#155)', async () => {
+  // The hfem envelope carries protocol and frame; the JSON one carries
+  // neither. groupByEnvelope must keep them apart — one POST that mixed them
+  // would stamp JSON readings with another message's frame and protocol.
+  const f = fakes();
+  const batcher = build(f);
+  const json = item('a_al', 2);
+  const hfem = item('b_al', 2, { protocol: 'hfem', frame: ':HS=1|I1=7|R_1-0=3|NN:' });
+  batcher.add(json);
+  batcher.add(hfem);
+  await batcher.flush();
+
+  assert.equal(f.calls.length, 2);
+  const hfemCall = f.calls.find((c) => c.protocol === 'hfem');
+  const jsonCall = f.calls.find((c) => c.protocol === undefined);
+  assert.ok(hfemCall && jsonCall, 'one call per envelope');
+  assert.equal(hfemCall.frame, ':HS=1|I1=7|R_1-0=3|NN:');
+  assert.equal(hfemCall.readings.length, 2);
+  assert.equal(jsonCall.frame, undefined);
+  assert.equal(json.acked, 1);
+  assert.equal(hfem.acked, 1);
+
+  // And two hfem messages are two groups too: frame differs per message, and
+  // the frame belongs to exactly the readings decoded out of it.
+  const groups = groupByEnvelope([
+    item('c_al', 1, { protocol: 'hfem', frame: ':A:' }),
+    item('d_al', 1, { protocol: 'hfem', frame: ':B:' }),
+  ]);
+  assert.equal(groups.length, 2);
+});

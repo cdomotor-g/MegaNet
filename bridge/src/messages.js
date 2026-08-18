@@ -24,6 +24,11 @@
 // Getting that backwards in either direction is a data-loss bug, so it is one
 // decision made in one place rather than an `if` in the middle of the client.
 
+// The one decoder (#153, #155): hfem.js lives at the repo root so the browser
+// and this process read the same file. bridge/Dockerfile builds from the repo
+// root and copies it to where this path resolves inside the image.
+const HFEM = require('../../hfem.js');
+
 // The database refuses a batch over 1,000 (0007) — matching it here means a
 // station gets a clear answer from the bridge rather than a 400 relayed back to
 // nobody, since MQTT has no reply channel.
@@ -59,9 +64,19 @@ function parseReadings(payload) {
   }
 
   let body;
+  const text = payload.toString('utf8');
   try {
-    body = JSON.parse(payload.toString('utf8'));
+    body = JSON.parse(text);
   } catch (err) {
+    // The diagnostic that makes a misconfigured logger visible (#155): an HFEM
+    // line on the JSON topic is poison either way — the sniff picks the log
+    // line's words, never the parser — but "not JSON" hides exactly what went
+    // wrong, and the fix is one topic segment away.
+    if (text.trimStart().startsWith(':')) {
+      throw new PoisonMessage(
+        'looks like an HFEM line on the JSON reading topic — HFEM publishes to …/reading/hfem (misconfigured logger?)',
+      );
+    }
     throw new PoisonMessage(`not JSON: ${err.message}`);
   }
 
@@ -97,6 +112,51 @@ function parseReadings(payload) {
     : {};
 
   return { readings, envelope };
+}
+
+/**
+ * Parse an HFEM-topic payload — a raw `:HS=1|…|NN:` line — into the same
+ * `{readings, envelope}` shape parseReadings() produces, so the batcher never
+ * knows which wire format a message arrived in.
+ *
+ * The decode is hfem.js's (#153) and the mapping to the ingest contract is
+ * hfem.js's too (toReadings, #155) — this function only draws the poison
+ * line: a malformed HFEM line will never parse, however often the broker
+ * redelivers it, so it is poison exactly as a non-JSON payload on the JSON
+ * topic is. The reason string names the offending token because the logger's
+ * author will only ever see it in this bridge's log — MQTT has no reply
+ * channel.
+ *
+ * `receivedAt` stands in as reading_ts for a message with no T parameter (an
+ * event stamped by its own arrival — see hfem.js toReadings). Injectable for
+ * tests; defaults to now.
+ */
+function parseHfem(payload, receivedAt = () => new Date().toISOString()) {
+  if (payload == null || payload.length === 0) {
+    throw new PoisonMessage('empty payload');
+  }
+  if (payload.length > MAX_BYTES) {
+    throw new PoisonMessage(`payload is ${payload.length} bytes, over the ${MAX_BYTES}-byte limit`);
+  }
+
+  const line = payload.toString('utf8').trim();
+  const decoded = HFEM.decode(line);
+  if (!decoded.ok) {
+    throw new PoisonMessage(`HFEM: ${decoded.error}`);
+  }
+
+  const mapped = HFEM.toReadings(decoded.message, { line, receivedAt: receivedAt() });
+  if (!mapped.ok) {
+    throw new PoisonMessage(`HFEM: ${mapped.error}`);
+  }
+  if (mapped.readings.length > MAX_READINGS) {
+    // A line under 256 KiB can still carry thousands of one-byte sensor tags.
+    throw new PoisonMessage(
+      `HFEM message maps to ${mapped.readings.length} readings, over the ${MAX_READINGS}-reading limit`,
+    );
+  }
+
+  return { readings: mapped.readings, envelope: mapped.envelope };
 }
 
 /**
@@ -167,4 +227,4 @@ function truncate(text, n) {
   return text.length <= n ? text : `${text.slice(0, n)}…`;
 }
 
-module.exports = { MAX_READINGS, MAX_BYTES, PoisonMessage, parseReadings, parseStatus };
+module.exports = { MAX_READINGS, MAX_BYTES, PoisonMessage, parseReadings, parseHfem, parseStatus };

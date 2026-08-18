@@ -5,8 +5,13 @@ const { parseTopic, readingTopic, statusTopic, stationAcl, SUBSCRIPTIONS } = req
 
 test('builds the topics a station publishes to', () => {
   assert.equal(readingTopic('loudoun_br_al', 'logger'), 'meganet/v1/loudoun_br_al/logger/reading');
+  assert.equal(readingTopic('loudoun_br_al', 'logger', 'hfem'), 'meganet/v1/loudoun_br_al/logger/reading/hfem');
   assert.equal(statusTopic('loudoun_br_al'), 'meganet/v1/loudoun_br_al/status');
   assert.equal(stationAcl('loudoun_br_al'), 'meganet/v1/loudoun_br_al/#');
+});
+
+test('refuses to build a reading topic for a format nobody parses', () => {
+  assert.throws(() => readingTopic('x_al', 'logger', 'csv'), /unknown reading format/);
 });
 
 test('refuses to build a topic out of something that is not a segment', () => {
@@ -20,7 +25,21 @@ test('parses a reading topic', () => {
     kind: 'reading',
     station: 'loudoun_br_al',
     device: 'logger',
+    format: 'json',
   });
+});
+
+test('parses an HFEM reading topic (#155)', () => {
+  assert.deepEqual(parseTopic('meganet/v1/loudoun_br_al/logger/reading/hfem'), {
+    kind: 'reading',
+    station: 'loudoun_br_al',
+    device: 'logger',
+    format: 'hfem',
+  });
+  // A format segment nobody taught messages.js: unknown, with the segment named.
+  const got = parseTopic('meganet/v1/loudoun_br_al/logger/reading/csv');
+  assert.equal(got.kind, 'unknown');
+  assert.match(got.why, /csv/);
 });
 
 test('parses a status topic', () => {
@@ -49,9 +68,10 @@ test('a topic outside the scheme is unknown, never a throw', () => {
   }
 });
 
-test('the subscriptions cover both topic kinds, at QoS 1', () => {
+test('the subscriptions cover all three topic kinds, at QoS 1', () => {
   assert.deepEqual(SUBSCRIPTIONS, [
     { topic: 'meganet/v1/+/+/reading', qos: 1 },
+    { topic: 'meganet/v1/+/+/reading/hfem', qos: 1 },
     { topic: 'meganet/v1/+/status', qos: 1 },
   ]);
 });
@@ -63,9 +83,15 @@ test('the subscription wildcards match what the builders produce', () => {
     if (f.length !== t.length) return false;
     return f.every((seg, i) => seg === '+' || seg === t[i]);
   };
-  assert.ok(matches(SUBSCRIPTIONS[0].topic, readingTopic('x_al', 'logger')));
-  assert.ok(matches(SUBSCRIPTIONS[1].topic, statusTopic('x_al')));
-  // and do not overlap: a status message must never arrive on the reading path
-  assert.ok(!matches(SUBSCRIPTIONS[0].topic, statusTopic('x_al')));
-  assert.ok(!matches(SUBSCRIPTIONS[1].topic, readingTopic('x_al', 'logger')));
+  const [json, hfem, status] = SUBSCRIPTIONS;
+  assert.ok(matches(json.topic, readingTopic('x_al', 'logger')));
+  assert.ok(matches(hfem.topic, readingTopic('x_al', 'logger', 'hfem')));
+  assert.ok(matches(status.topic, statusTopic('x_al')));
+  // and do not overlap: `+` matches exactly one level, so the three
+  // subscriptions are disjoint — a payload can never arrive on the wrong
+  // parser because two filters both matched its topic.
+  assert.ok(!matches(json.topic, statusTopic('x_al')));
+  assert.ok(!matches(json.topic, readingTopic('x_al', 'logger', 'hfem')));
+  assert.ok(!matches(hfem.topic, readingTopic('x_al', 'logger')));
+  assert.ok(!matches(status.topic, readingTopic('x_al', 'logger')));
 });

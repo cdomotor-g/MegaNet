@@ -39,6 +39,13 @@ on both paths and why the two can even run side by side during a migration.
 What the MQTT path adds is presence: a broker knows when a station stops
 talking, and the HTTP path has no way to say so.
 
+A device that speaks **HFEM** — the BoM field-event line format — enters by
+either door too: the raw line publishes to its own MQTT topic segment and the
+bridge decodes it, or a gateway decodes it and posts the JSON over HTTP with
+`protocol: "hfem"` and the line kept in `frame`. Either way it converges on
+the same `meganet.ingest()` call as everything above —
+[`ingest-hfem.md`](ingest-hfem.md) is that page.
+
 What is automated versus manual today, honestly: CI applies every migration
 from zero and runs the ingest and MQTT check suites on every relevant push,
 and the bridge's own tests run the same way — but `meganet.retain()` (the

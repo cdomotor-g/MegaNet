@@ -11,10 +11,10 @@
 //
 // One module, two consumers, on purpose (#153's design decision): the HFEM tab
 // (#154) reads the `HFEM` global this classic script declares, and the bridge
-// (#155, CommonJS under bridge/) will `require()` this same file when #155
-// wires it — the guarded `module.exports` at the foot is ready for that, and
-// bridge/Dockerfile carries a ⚠ note on the COPY that has to happen with it
-// (nothing requires or copies it yet). One decoder, so
+// (#155, CommonJS under bridge/) `require()`s this same file — the guarded
+// `module.exports` at the foot is what lets it, bridge/src/messages.js is the
+// consumer, and bridge/Dockerfile builds from the repo root so the image
+// carries this file at the path that require resolves to. One decoder, so
 // there is never a second opinion about what `T3` means — a second opinion is
 // exactly the drift bridge/src/messages.js says it was built to avoid.
 //
@@ -462,7 +462,83 @@ const HFEM = (function () {
     return { ok: true, line: `:${parts.join('|')}:` };
   }
 
-  return { decode, encode, SENSOR_CLASSES, SCHEMES, FIELD_PROVENANCE };
+  // ── The ingest mapping (#155) ──────────────────────────────────────────────
+  //
+  // One decoded message → the readings meganet.ingest() accepts, plus the
+  // envelope keys that describe the whole batch. It lives here, beside the
+  // decoder, because both adapters need the same table — the bridge maps an
+  // MQTT payload with it, and a logger author posting HTTP JSON follows it
+  // out of docs/ingest-hfem.md — and a second opinion about what R_1-0=1055
+  // becomes is the drift one decoder exists to prevent.
+  //
+  //   site (I1 or I2, the wire value)  → station_number (alert_id stays null)
+  //   class + instance                 → channel — "R_1". The scheme digit is
+  //                                      representation, not identity, and the
+  //                                      wire text survives in frame.
+  //   T1/T2/T3, resolved               → reading_ts (UTC — decodeTime's job)
+  //   raw scheme (0-4, 10-14, 20-24)   → value_raw, unit 'count'
+  //   translated (6, 16, 26)           → value AND value_raw, unit from the
+  //                                      class — a translated scheme still
+  //                                      transmitted something, and that
+  //                                      something is value_raw (0006's
+  //                                      decision 5, used as intended)
+  //   M=1                              → quality 'maintenance' on every row
+  //
+  // ppm → mg/L happens here and nowhere else: numerically equivalent in fresh
+  // water, and 0018 records the equivalence rather than seeding a second unit
+  // key for one quantity.
+  //
+  // A message with no T parameter is an event stamped by its own arrival —
+  // omitting the time is what an event-push protocol means by "now" — so the
+  // caller passes receivedAt and it stands in as reading_ts. Refusing instead
+  // would turn every timestampless logger into silent data loss; inventing a
+  // clock here without being handed one would be worse.
+  function toReadings(msg, opts = {}) {
+    if (!msg || typeof msg !== 'object' || !msg.site
+        || !Array.isArray(msg.sensors) || !msg.sensors.length) {
+      return fail('not a decoded HFEM message');
+    }
+    const ts = msg.time ? msg.time.utc : (opts.receivedAt || null);
+    if (!ts) {
+      return fail('message has no observation timestamp — pass receivedAt to stand in for one');
+    }
+    const station = msg.site.scheme === 'I2'
+      ? `${msg.site.agency}-${msg.site.id}`   // the wire value, unique across agencies
+      : msg.site.id;
+
+    const readings = msg.sensors.map((s) => {
+      const r = {
+        station_number: station,
+        channel: `${s.cls}_${s.instance}`,
+        reading_ts: ts,
+      };
+      if (s.representation === 'raw') {
+        r.value_raw = s.value;
+        r.unit = 'count';
+      } else {
+        r.value = s.value;
+        r.value_raw = s.value;
+        r.unit = s.unit === 'ppm' ? 'mg/L' : s.unit;
+      }
+      if (msg.maintenance) r.quality = 'maintenance';
+      return r;
+    });
+
+    // The whole line rides beside the readings so the decode is auditable
+    // against the wire. A hand-built message without one gets encode()'s —
+    // the same canonical text the validator would emit.
+    let frame = opts.line;
+    if (frame == null) {
+      const e = encode(msg);
+      if (e.ok) frame = e.line;
+    }
+    const envelope = { protocol: 'hfem' };
+    if (frame != null) envelope.frame = frame;
+
+    return { ok: true, envelope, readings };
+  }
+
+  return { decode, encode, toReadings, SENSOR_CLASSES, SCHEMES, FIELD_PROVENANCE };
 })();
 
 // The bridge is CommonJS and require()s this same file — see the header, and

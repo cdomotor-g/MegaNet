@@ -15,7 +15,10 @@ database side is `db/migrations/0008_mqtt_bridge.sql` and `db/README.md`.
 
 If your device speaks plain HTTP, use [`ingest-http.md`](ingest-http.md) instead
 — it needs no broker and no bridge, and it posts the same reading object to the
-same contract. **The whole picture — both paths converging on one contract,
+same contract. If it speaks **HFEM** — the BoM field-event line format — that is
+[`ingest-hfem.md`](ingest-hfem.md): the raw line publishes to its own topic
+segment (`…/reading/hfem`, in the scheme below) and the bridge decodes it into
+this same contract. **The whole picture — both paths converging on one contract,
 and where duplicates die — is drawn at the top of
 [`ingest-http.md`](ingest-http.md#the-whole-picture).** MQTT earns its extra moving parts on links where a device cannot
 hold a TCP connection open long enough for a request/response, on radios where
@@ -46,8 +49,9 @@ Design it once. Topics get burned into logger firmware, and changing one means
 visiting sites.
 
 ```
-meganet/v1/<station>/<device>/reading      device → us, QoS 1
-meganet/v1/<station>/status                retained, and the LWT topic
+meganet/v1/<station>/<device>/reading        device → us, QoS 1 (JSON)
+meganet/v1/<station>/<device>/reading/hfem   device → us, QoS 1 (a raw HFEM line)
+meganet/v1/<station>/status                  retained, and the LWT topic
 ```
 
 `<station>` is the **stations.json slug** — `loudoun_br_al`, `abercorn_al` — the

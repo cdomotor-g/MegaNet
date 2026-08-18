@@ -7,7 +7,7 @@
 const mqtt = require('mqtt');
 
 const { SUBSCRIPTIONS, parseTopic } = require('./topics');
-const { parseReadings, parseStatus, PoisonMessage } = require('./messages');
+const { parseReadings, parseHfem, parseStatus, PoisonMessage } = require('./messages');
 const { createBatcher } = require('./batcher');
 const { createHealth } = require('./health');
 const { createSink } = require('./sink');
@@ -168,7 +168,12 @@ function createBridge(config, deps = {}) {
 
     let parsed;
     try {
-      parsed = parseReadings(packet.payload);
+      // The topic says which wire format the payload is (topics.js) — the
+      // parsers converge on one {readings, envelope} shape, so nothing past
+      // this line knows HFEM exists.
+      parsed = route.format === 'hfem'
+        ? parseHfem(packet.payload)
+        : parseReadings(packet.payload);
     } catch (err) {
       if (err instanceof PoisonMessage) {
         health.rejected(1);
@@ -184,6 +189,7 @@ function createBridge(config, deps = {}) {
       topic,
       station: route.station,
       device: route.device,
+      format: route.format,
       readings: parsed.readings.length,
       dup: packet.dup || false,
     });

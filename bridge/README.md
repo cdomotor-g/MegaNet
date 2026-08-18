@@ -36,11 +36,12 @@ validator behind it. The bridge adds no second opinion about what a timestamp
 is; it decides only what to relay, when to acknowledge it, and what to say in
 the log.
 
-Two subscriptions, both QoS 1:
+Three subscriptions, all QoS 1:
 
 | Topic | What it carries |
 | --- | --- |
-| `meganet/v1/+/+/reading` | Readings — one, an array, or `{readings: […]}` |
+| `meganet/v1/+/+/reading` | JSON readings — one, an array, or `{readings: […]}` |
+| `meganet/v1/+/+/reading/hfem` | A raw HFEM line, `:HS=1\|…\|NN:` — decoded by `hfem.js`, mapped to the same contract (#155; docs/ingest-hfem.md) |
 | `meganet/v1/+/status` | A station's retained status, and its Last Will |
 
 ---
@@ -56,21 +57,23 @@ cp .env.example .env      # then fill in MQTT_PASSWORD and MEGANET_INGEST_TOKEN
 node --env-file=.env index.js
 ```
 
-Or in a container:
+Or in a container — **from the repo root**, because the image carries the HFEM
+decoder (`hfem.js`, which lives at the root so the browser reads the same file
+— see the Dockerfile's header):
 
 ```sh
-docker build -t meganet-bridge bridge/
+docker build -t meganet-bridge -f bridge/Dockerfile .
 docker run --env-file bridge/.env meganet-bridge
 ```
 
 On Fly, which is the cheapest way to get a always-on process with a TLS-capable
-outbound and no server to patch:
+outbound and no server to patch — again from the repo root, with the config
+telling Fly where the Dockerfile is:
 
 ```sh
-cd bridge
-fly launch --no-deploy            # one machine, no public services needed
+fly launch --no-deploy --dockerfile bridge/Dockerfile   # one machine, no public services
 fly secrets set MQTT_PASSWORD=… MEGANET_INGEST_TOKEN=…
-fly deploy
+fly deploy --dockerfile bridge/Dockerfile
 ```
 
 It needs no inbound network access at all — it makes two outbound connections
@@ -165,14 +168,14 @@ of lines a minute at `info`.
 | --- | --- | --- |
 | `bridge_started` | info | The process is up. Not yet connected to anything. |
 | `broker_connected` | info | Connected. `session_present: false` after a *restart of the bridge* means the broker had no session for this client id — a new client id, an expired session, or a broker that lost its state. Anything it was holding for us is gone; that is the one case where the broker can lose a reading. |
-| `subscribed` | info | Both topics granted. Nothing arrives before this. |
+| `subscribed` | info | All three topics granted. Nothing arrives before this. |
 | `batch_stored` | info | A batch landed. `accepted`/`duplicates`/`rejected` are `ingest()`'s own counts — a batch of 60 that is all duplicates is a station resending, not a fault. |
 | `station_status` | info | A station's status or LWT was recorded. `online: false` is a station that dropped. |
 | `reading_rejected` | warn | The database refused a reading, with its reason. A dead clock or an unknown unit — a *station* problem, not a bridge problem. See docs/ingest-http.md's table of reasons. |
 | `batch_retrying` | warn | An insert failed and will be tried again. One or two of these is a database blinking. |
 | `sink_unavailable` | **error** | Inserts have failed five times running, and are still being retried. This is the one to alert on: readings are piling up in memory and nothing has been acked. If `credential: true`, the ingest token was refused — it will not clear on its own, so check `revoked_at` and mint a new one. |
 | `message_refused` | **error** | One message will never be accepted (a 400 from PostgREST). It has been acked and dropped so the queue behind it can move. The message is named by station and topic; it is the only case where the bridge discards data, and it does so loudly. |
-| `message_unparseable` | **error** | The payload was not JSON, or not a readings shape. Acked, for the same reason. Almost always a firmware change nobody mentioned. |
+| `message_unparseable` | **error** | The payload was not JSON, not a readings shape, or (on the HFEM topic) not a well-formed HFEM line — the reason names the offending token. Acked, for the same reason. Almost always a firmware change nobody mentioned. One reason to know by name: *looks like an HFEM line on the JSON reading topic* means a logger is publishing HFEM one topic segment short of where it lands — point it at `…/reading/hfem`. |
 | `topic_ignored` | warn | Something published outside the scheme. Harmless; if it is constant, a station has a typo in its topic. |
 | `subscribe_downgraded` | **error** | The broker granted QoS 0 where QoS 1 was asked for. At-least-once delivery is off and acknowledgement means nothing — fix the broker's configuration. |
 | `broker_reconnecting` | warn | Lost the broker; backing off and retrying. Expect these on any link. |

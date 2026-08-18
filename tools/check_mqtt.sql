@@ -356,6 +356,66 @@ begin
 end
 $$;
 
+-- ── An HFEM message, as the bridge posts it (#155) ───────────────────────────
+-- The decode and the mapping live at the edge (hfem.js, one file for the
+-- browser and the bridge; bridge/src/messages.js routes to it by topic) and
+-- are proven in bridge/test. What is proved HERE is the database half of
+-- #155's acceptance: the vocabulary rows exist (0018), the mapped readings
+-- land with protocol 'hfem' and quality 'maintenance', and the raw line is
+-- kept in reading_raw.frame beside its decode.
+
+do $$
+declare
+  v jsonb;
+  v_frame text := ':HS=1|M=1|I1=64302|T3=20260817130000-10|R_1-0=1055|B_1-16=13.9|NN:';
+  v_raw bigint;
+begin
+  perform pg_temp.check_that('0018 landed whole: protocol hfem, quality maintenance, W/m2 and MPa',
+    exists (select 1 from meganet.protocol where code = 4 and key = 'hfem')
+      and exists (select 1 from meganet.quality where code = 6 and key = 'maintenance')
+      and (select count(*) = 2 from meganet.unit where key in ('W/m2', 'MPa')));
+
+  -- The exact shape bridge/src/messages.js parseHfem() emits for v_frame — the
+  -- station number is 64302 rather than the spec's 123456 only to stay inside
+  -- this script's address range. T3 is local 13:00 at UTC+10 written HFEM's
+  -- way (offset sign inverted), so the stored instant must be 03:00 UTC.
+  v := meganet.ingest_http(jsonb_build_object(
+    'source', 'mqtt', 'protocol', 'hfem', 'frame', v_frame,
+    'readings', jsonb_build_array(
+      jsonb_build_object('station_number', '64302', 'channel', 'R_1',
+        'reading_ts', '2026-08-17T03:00:00Z', 'value_raw', 1055, 'unit', 'count',
+        'quality', 'maintenance'),
+      jsonb_build_object('station_number', '64302', 'channel', 'B_1',
+        'reading_ts', '2026-08-17T03:00:00Z', 'value', 13.9, 'value_raw', 13.9,
+        'unit', 'V', 'quality', 'maintenance'))));
+  perform pg_temp.check_that('an HFEM message lands whole through ingest_http()',
+    (v ->> 'accepted')::int = 2, v::text);
+
+  perform pg_temp.check_that('both rows carry protocol hfem and quality maintenance',
+    (select count(*) = 2 from meganet.reading r
+      where r.station_number = '64302'
+        and r.protocol = (select code from meganet.protocol where key = 'hfem')
+        and r.quality  = (select code from meganet.quality  where key = 'maintenance')));
+
+  perform pg_temp.check_that('the raw scheme kept its count and the translated one both its values',
+    (select r.value_raw = 1055 and r.value is null and r.unit = 'count'
+       from meganet.reading r where r.addr = 's:64302/R_1')
+    and (select r.value = 13.9 and r.value_raw = 13.9 and r.unit = 'V'
+       from meganet.reading r where r.addr = 's:64302/B_1'));
+
+  select r.raw_id into v_raw from meganet.reading r where r.addr = 's:64302/R_1';
+  perform pg_temp.check_that('the wire line rides beside its decode',
+    (select frame = v_frame from meganet.reading_raw where id = v_raw),
+    'the decode is auditable against what was actually transmitted');
+
+  perform pg_temp.check_that('maintenance readings are distinguishable in one query',
+    (select count(*) = 2 from meganet.reading r
+      join meganet.quality q on q.code = r.quality
+      where r.station_number = '64302' and q.key = 'maintenance'),
+    '#155 acceptance: a technician''s bucket test is not weather');
+end
+$$;
+
 -- ── A revoked token stops working immediately ───────────────────────────────
 
 do $$

@@ -354,3 +354,40 @@ test('a broker restart is survived without an operator', async (t) => {
   const call = await waitFor(() => api.of('ingest_http')[0], { what: 'a reading after the restart' });
   assert.equal(call.body.payload.readings[0].alert_id, 6132);
 });
+
+test('an HFEM line published to …/reading/hfem lands decoded, mapped and framed (#155)', async (t) => {
+  const broker = await startBroker();
+  const api = await startApi();
+  const bridge = startBridge(broker.port, api.url);
+  t.after(async () => {
+    await closeStations();
+    await bridge.stop();
+    await api.close();
+    await broker.close();
+  });
+
+  await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the bridge to subscribe' });
+
+  const station = await connectStation(broker.port, 'gairloch_wharf');
+  const line = ':HS=1|M=1|I1=123456|T3=20100727130000-10|R_1-0=1055|B_1-16=13.9|NN:';
+  // A malformed line first — truncated mid-message, no NN footer. The bridge
+  // must ack it itself (it will never parse) so the good line behind it moves.
+  await station.publishAsync('meganet/v1/gairloch_wharf/logger/reading/hfem', ':HS=1|I1=123456|R_1-0=', { qos: 1 });
+  await station.publishAsync('meganet/v1/gairloch_wharf/logger/reading/hfem', line, { qos: 1 });
+
+  const call = await waitFor(() => api.of('ingest_http')[0], { what: 'the decoded readings' });
+  assert.equal(call.body.payload.source, 'mqtt');
+  assert.equal(call.body.payload.protocol, 'hfem');
+  assert.equal(call.body.payload.frame, line);
+  assert.deepEqual(call.body.payload.readings, [
+    { station_number: '123456', channel: 'R_1', reading_ts: '2010-07-27T03:00:00Z',
+      value_raw: 1055, unit: 'count', quality: 'maintenance' },
+    { station_number: '123456', channel: 'B_1', reading_ts: '2010-07-27T03:00:00Z',
+      value: 13.9, value_raw: 13.9, unit: 'V', quality: 'maintenance' },
+  ]);
+  assert.equal(api.of('ingest_http').length, 1, 'the malformed line reached the database');
+
+  // Both messages acked: the poison one by the bridge's own hand, the good one
+  // because its readings were stored.
+  await waitFor(() => broker.bridgeAcks().length === 2, { what: 'both HFEM messages to be acked' });
+});

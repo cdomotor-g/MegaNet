@@ -1,8 +1,18 @@
 // topics.js — The topic scheme, in one file, because it is the part that gets
 // burned into logger firmware and changing it means visiting sites.
 //
-//   meganet/v1/<station>/<device>/reading    device → us, QoS 1
-//   meganet/v1/<station>/status              retained, and the LWT topic
+//   meganet/v1/<station>/<device>/reading        device → us, QoS 1 (JSON)
+//   meganet/v1/<station>/<device>/reading/hfem   device → us, QoS 1 (an HFEM
+//                                                line — #155; hfem.js decodes)
+//   meganet/v1/<station>/status                  retained, and the LWT topic
+//
+// The payload format is a topic segment, not a content sniff, for the same
+// reason the version is: the bridge's validation is deliberately thin and the
+// database judges (messages.js), so the bridge choosing a protocol by looking
+// at bytes would be an opinion it says it does not take — and a segment is
+// ACL-able per station, which a sniff never is. `+/+/reading` and
+// `+/+/reading/hfem` are disjoint subscriptions (`+` matches exactly one
+// level), so the two shapes cannot arrive on each other's parser.
 //
 // <station> is the stations.json slug — `loudoun_br_al` — because that is
 // already the station's identity in the app, in URLs and in the database, and a
@@ -33,11 +43,25 @@ function isSegment(value) {
   return typeof value === 'string' && SEGMENT.test(value);
 }
 
-/** The topic a device publishes readings to. */
-function readingTopic(station, device) {
+// The payload formats a reading topic may carry. 'json' is the bare topic;
+// anything else is a suffix segment. Growing this set means teaching
+// messages.js the shape first — the subscription without the parser is a
+// message the bridge acks nothing about.
+const READING_FORMATS = ['json', 'hfem'];
+
+/**
+ * The topic a device publishes readings to. `format` defaults to 'json' — the
+ * bare `…/reading` topic; 'hfem' appends the segment that routes the payload
+ * to the HFEM decoder.
+ */
+function readingTopic(station, device, format = 'json') {
   assertSegment(station, 'station');
   assertSegment(device, 'device');
-  return `${PREFIX}/${station}/${device}/reading`;
+  if (!READING_FORMATS.includes(format)) {
+    throw new Error(`unknown reading format ${JSON.stringify(format)} — one of: ${READING_FORMATS.join(', ')}`);
+  }
+  const base = `${PREFIX}/${station}/${device}/reading`;
+  return format === 'json' ? base : `${base}/${format}`;
 }
 
 /** The topic a device publishes its status to, retained, and wills to on death. */
@@ -56,16 +80,18 @@ function stationAcl(station) {
   return `${PREFIX}/${station}/#`;
 }
 
-/** What the bridge subscribes to. Two subscriptions, both QoS 1. */
+/** What the bridge subscribes to. Three subscriptions, all QoS 1. */
 const SUBSCRIPTIONS = [
   { topic: `${PREFIX}/+/+/reading`, qos: 1 },
+  { topic: `${PREFIX}/+/+/reading/hfem`, qos: 1 },
   { topic: `${PREFIX}/+/status`, qos: 1 },
 ];
 
 /**
  * Parse a received topic.
  *
- * Returns `{kind: 'reading', station, device}`, `{kind: 'status', station}`, or
+ * Returns `{kind: 'reading', station, device, format}` (format 'json' for the
+ * bare topic, 'hfem' for the suffixed one), `{kind: 'status', station}`, or
  * `{kind: 'unknown', why}`. Never throws: a topic is remote input, and the
  * bridge's response to a topic it does not understand is a log line, not a
  * crash.
@@ -79,10 +105,18 @@ function parseTopic(topic) {
     return { kind: 'unknown', why: `not a ${PREFIX}/… topic` };
   }
 
-  if (parts.length === 5 && parts[4] === 'reading') {
+  if ((parts.length === 5 || parts.length === 6) && parts[4] === 'reading') {
     if (!isSegment(parts[2])) return { kind: 'unknown', why: `bad station segment: ${parts[2]}` };
     if (!isSegment(parts[3])) return { kind: 'unknown', why: `bad device segment: ${parts[3]}` };
-    return { kind: 'reading', station: parts[2], device: parts[3] };
+    if (parts.length === 6 && parts[5] !== 'hfem') {
+      // A format segment nobody taught messages.js to parse. Unknown → acked
+      // and logged (bridge.js), which is the right end for it — but the
+      // subscription list above never matches one, so seeing this log line
+      // means somebody published past the subscriptions, not through them.
+      return { kind: 'unknown', why: `unknown reading format segment: ${parts[5]}` };
+    }
+    return { kind: 'reading', station: parts[2], device: parts[3],
+             format: parts.length === 6 ? parts[5] : 'json' };
   }
 
   if (parts.length === 4 && parts[3] === 'status') {
@@ -105,6 +139,7 @@ module.exports = {
   ROOT,
   VERSION,
   PREFIX,
+  READING_FORMATS,
   SUBSCRIPTIONS,
   isSegment,
   parseTopic,

@@ -92,6 +92,14 @@ begin
     not has_function_privilege('anon', 'meganet.ingest(jsonb)', 'execute'),
     'a grant here would make the readings table writable from a published key');
 
+  -- 0018 (#155): a wire protocol is rows, not DDL, and these are the rows.
+  -- The full HFEM acceptance — a mapped message landing with them — is in
+  -- check_mqtt.sql, on the route the bridge actually posts through.
+  perform pg_temp.check_that('the HFEM vocabulary is present (0018)',
+    exists (select 1 from meganet.protocol where code = 4 and key = 'hfem')
+      and exists (select 1 from meganet.quality where code = 6 and key = 'maintenance')
+      and (select count(*) = 2 from meganet.unit where key in ('W/m2', 'MPa')));
+
   perform pg_temp.check_that('reading_raw is not readable by anon',
     not has_table_privilege('anon', 'meganet.reading_raw', 'select'),
     'a submission is whatever a device sent, unread');
