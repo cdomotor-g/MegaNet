@@ -306,6 +306,18 @@ def build(data, out):
     out.write('--   stations %d · sensors %d · repeaters %d · pass ranges %d\n'
               % (len(stations), len(sensors), len(repeaters), len(ranges)))
 
+    # A registry sync is the event that makes a previously unresolvable health
+    # key resolvable, so it is where the fold runs (#162). Guarded, so this
+    # emitted SQL still applies to a database that predates 0019.
+    out.write('\n-- Fold station-health rows whose identity this sync just resolved (#162).\n')
+    out.write('do $conv$\n')
+    out.write('begin\n')
+    out.write("  if pg_catalog.to_regprocedure('meganet.station_status_converge()') is not null then\n")
+    out.write('    perform meganet.station_status_converge();\n')
+    out.write('  end if;\n')
+    out.write('end\n')
+    out.write('$conv$;\n')
+
     return {
         'stations': len(stations), 'sensors': len(sensors),
         'repeaters': len(repeaters), 'ranges': len(ranges),

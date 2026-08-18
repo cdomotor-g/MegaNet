@@ -416,6 +416,73 @@ begin
 end
 $$;
 
+-- ── One station, one health row (#162) ───────────────────────────────────────
+-- A station heard before the registry knows it accrues rows under its
+-- transport identities — the topic segment from MQTT, the a:/s: address form
+-- from HTTP — and registration used to leave those twins diverging beside the
+-- canonical row. station_status_converge() (0019) folds them, with the same
+-- out-of-order discipline mqtt_status applies per row; the stations loader
+-- runs it after every registry sync.
+
+do $$
+declare
+  v jsonb;
+  v_row meganet.station_status%rowtype;
+begin
+  -- A station nobody has registered yet speaks through both doors: readings
+  -- over HTTP under an alert address, and a status over MQTT under its topic
+  -- segment. Two honest rows, two identities, one physical site.
+  perform meganet.ingest_http(jsonb_build_object('source', 'mqtt', 'readings',
+    jsonb_build_array(jsonb_build_object(
+      'alert_id', 64351,
+      'reading_ts', date_trunc('second', now() - interval '30 minutes'),
+      'value_raw', 3))));
+  perform meganet.mqtt_status(jsonb_build_object(
+    'station', '_check_mqtt_conv', 'online', false,
+    'at', now() - interval '2 hours', 'bridge', '_check_mqtt_bridge'));
+
+  perform pg_temp.check_that('an unregistered station holds twin rows — the defect, reproduced',
+    exists (select 1 from meganet.station_status where station_key = 'a:64351')
+      and exists (select 1 from meganet.station_status where station_key = '_check_mqtt_conv'),
+    'one physical site, two station_key rows, and station_health joins whichever it hits');
+
+  -- The registry learns about the station: id = the topic segment (the topic
+  -- scheme defines the segment to BE the id), carrying the alert address.
+  insert into meganet.rm_system (id, ord, name)
+  values (-995, -995, 'check_mqtt placeholder')
+  on conflict (id) do nothing;
+  insert into meganet.station (id, ord, name, station_number, rm_system_id)
+  values ('_check_mqtt_conv', -995, 'Check Convergence', '999095', -995);
+  insert into meganet.sensor (station_id, sensor_id, type, ord, alert_id)
+  values ('_check_mqtt_conv', '999095.0.R.64351', 'Rainfall', 0, 64351);
+
+  v := meganet.station_status_converge();
+  perform pg_temp.check_that('registration + converge folds the twins into the id row',
+    (v ->> 'folded')::int >= 1
+      and not exists (select 1 from meganet.station_status where station_key = 'a:64351')
+      and (select count(*) from meganet.station_status
+            where station_key = '_check_mqtt_conv') = 1,
+    v::text);
+
+  select * into v_row from meganet.station_status where station_key = '_check_mqtt_conv';
+  perform pg_temp.check_that('the folded row keeps the opinion and the honest clocks',
+    v_row.station_id = '_check_mqtt_conv'
+      and v_row.online = false                                -- the only opinion came from MQTT
+      and v_row.last_reading_at is not null                   -- the HTTP twin's stored reading survives
+      and v_row.last_seen_at >= now() - interval '31 minutes' -- the later word: the HTTP batch
+      and v_row.since <= now() - interval '119 minutes',      -- offline since the LWT said so, not since the fold
+    format('online=%s since=%s last_seen=%s last_reading=%s',
+           v_row.online, v_row.since, v_row.last_seen_at, v_row.last_reading_at));
+
+  perform pg_temp.check_that('a key that still resolves to nothing is left alone',
+    exists (select 1 from meganet.station_status where station_key = '_check_mqtt_b'),
+    'an unknown station is a fact, not a defect — the honest partial identity stays');
+
+  perform pg_temp.check_that('converge is idempotent',
+    (meganet.station_status_converge() ->> 'folded')::int = 0);
+end
+$$;
+
 -- ── A revoked token stops working immediately ───────────────────────────────
 
 do $$
