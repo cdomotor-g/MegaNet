@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 this body lives at `roadmap/roadmap-113.md` in the repo and is synced here by `.github/workflows/roadmap-sync.yml` — edit the file, not this box, or the next sync overwrites the edit.**
 
-Snapshot taken: **2026-08-18** (revision 55 — see "What changed" at the bottom).
+Snapshot taken: **2026-08-18** (revision 56 — see "What changed" at the bottom).
 
 ---
 
@@ -402,6 +402,12 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## Resource allocation summary
 
+> ## ⬛ Every AI row is empty. The board is five `[Human]` issues.
+>
+> **At revision 56 there is no open issue an agent can pick up.** #66, #156, #157 and #158 each need something an agent does not have — a browser session against a third-party host, a dashboard login, a judgment call about scope, or a drive to a site with a logger in the back — and #113 is this document, which is a living tracker and never closes.
+>
+> That is a state worth naming rather than leaving to be inferred from four empty tables. It is also a state that ends the moment somebody files something: the constraints below, the sequencing snapshot and the per-file contention table are all still live and still the thing to read before allocating whatever comes next.
+
 > Read the five cross-cutting constraints at the top before assigning any of these. **Constraint 1 is resolved and, since M4, materially stronger** — the net now resolves every rendered inline handler on every tab, which is the check most useful to the six U-issues in #107. Everything below has it (`cd test && npm run all`); run it before and after your change, and read what it still does *not* cover before treating green as proof. **Constraints 2, 3 and 5 changed shape when #129 closed** — constraint 2 in particular now says which three issues can still collide in `app.js`, rather than warning that everything can.
 
 ### AI agent — Opus5
@@ -483,6 +489,13 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 56 — 2026-08-18: the board is down to five Human issues, and every AI row is empty
+
+- **No open issue on this board can be picked up by an agent.** #107 (the UI overhaul, nineteen tabs) closed at revision 54 and #152 (HFEM ingest, three children) at revision 55; with them went the last of the work that was agent-shaped. What remains is #66 (does ARRO/Contrail answer a browser at all — needs a real session against a third-party host), #156 (which Message Log follow-ons are worth doing — a scope judgment), #157 (commission the base-station logger at its first site — a drive and a screwdriver), #158 (point Supabase's auth URLs at the app — a dashboard login), and this document.
+- **Stated in the allocation summary rather than left to be inferred** from four empty tables, because "no rows" and "nothing to do" read the same at a glance and only one of them is true: the constraints, the sequencing snapshot and the per-file contention table are all still live, and they are what to read before allocating whatever is filed next.
+- **What the two closed epics leave for that next thing.** `docs/design-system.md` §7 is the record of what all six per-tab issues found, and it is the thing to read before building any new front end here — the HFEM tab (#154) is the worked example of a tab that started there and passed all seven per-tab checks first time. And on the ingest side, one decoder serves the bridge and the tab both, which is the shape to copy for a third wire format rather than the shape to argue about.
+- **The suite as it stands: 14 checks over 42 scripts and 22 tabs**, `npm run tabs` at 362 assertions across 27 converted views, `npm run shell`'s contrast contract at 48 text pairs and 16 non-text pairs in both themes.
 
 ### Revision 55 — 2026-08-18: #154 closed and EPIC #152 with it — HFEM now goes wire → database → screen through one decoder, and the first tab is born converted
 
