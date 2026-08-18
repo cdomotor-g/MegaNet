@@ -107,6 +107,21 @@ const TEXT_PAIRS = [
   // The banner writes `color: white` as a literal, so the pair is stated as a
   // literal too rather than pretending there is a token for it.
   ['#ffffff', '--header'],
+  // The packet bit cells (#140). These are the one family that paints its own
+  // ground *and* its own ink, so the pair is the cell against itself and the
+  // answer does not depend on the theme — which is exactly why nobody had
+  // measured them: three of the nine were under AA on 11-13 px type and had
+  // been since the tab was written. Stated here so the next hue that looks
+  // right on a designer's screen has to clear the bar before it ships.
+  ['--c-frame-t', '--c-frame'], ['--c-addr-t', '--c-addr'],
+  ['--c-data-t', '--c-data'],   ['--c-ident-t', '--c-ident'],
+  ['--c-crc-t', '--c-crc'],     ['--c-batt-t', '--c-batt'],
+  ['--c-hd-t', '--c-hd'],       ['--c-time-t', '--c-time'],
+  ['--c-status-t', '--c-status'],
+  // …and the white ink the ALERT2 packed-byte cell writes over the two halves
+  // of its gradient, which is a literal in the stylesheet and so is a literal
+  // here (.a2 .r-pack).
+  ['#ffffff', '--c-data'], ['#ffffff', '--c-addr'],
 ];
 
 const NONTEXT_PAIRS = [
@@ -116,6 +131,16 @@ const NONTEXT_PAIRS = [
   // where the readout card's own swatch legend draws them; on the map itself
   // their second channels (weight, dash, growth, the focus dim) carry them.
   ['--map-blast', '--panel'], ['--map-blast-ring', '--panel'],
+  // The ERT-A2 decoder's RSSI scale (#140). Unlike the bit cells above, these
+  // are drawn *on the page* — a 3 px bar beside a number, a legend dot, a map
+  // pin — so each step has to hold 3:1 against the ground of whichever theme is
+  // up. As literals they did not: "weak" was 2.46:1 on the dark panel. They are
+  // tokens now, stated per theme, and this is what holds them there.
+  ['--rssi-strong', '--panel'],   ['--rssi-strong', '--panel-sub'],
+  ['--rssi-good', '--panel'],     ['--rssi-good', '--panel-sub'],
+  ['--rssi-fair', '--panel'],     ['--rssi-fair', '--panel-sub'],
+  ['--rssi-marginal', '--panel'], ['--rssi-marginal', '--panel-sub'],
+  ['--rssi-weak', '--panel'],     ['--rssi-weak', '--panel-sub'],
 ];
 
 const AA_TEXT = 4.5;

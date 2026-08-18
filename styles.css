@@ -246,16 +246,39 @@
   --chart-marker: #c62828;
   --chart-marker-band: rgba(198, 40, 40, .09);
 
-  /* ALERT packet bit-field colours (self-contained: mid-tone bg + light text, theme-independent) */
-  --c-frame: #4a5568; --c-frame-t: #eef1f5;
-  --c-addr:  #2f6fb8; --c-addr-t:  #eaf3ff;
-  --c-data:  #2e8b57; --c-data-t:  #e8fbf1;
-  --c-ident: #8a6300; --c-ident-t: #fff3d2;
-  --c-crc:   #6d51ad; --c-crc-t:   #efe8ff;
-  --c-batt:  #b04a5a; --c-batt-t:  #ffe6ea;
-  --c-hd:    #0f8a8a; --c-hd-t:    #e2fafa;
-  --c-time:   #a8562a; --c-time-t:   #fff0e6;
-  --c-status: #5a6b7d; --c-status-t: #eef3f8;
+  /* ALERT packet bit-field colours (self-contained: mid-tone bg + light text,
+     theme-independent — the cell paints its own ground and its own ink, so one
+     pair serves both themes and the contrast is whatever the pair is).
+     Three of the nine were measured under AA in #140 and did not clear it:
+     --c-data at 3.94:1, --c-hd at 3.84:1 and --c-batt at 4.47:1 against their
+     own ink, on bit cells that are 11-13 px type. Each ground is darkened just
+     far enough to clear 4.5 with headroom, hue and saturation untouched, so a
+     packet reads the same and the labels on it are legible. The white ink on
+     the .r-pack gradient was under too (4.25:1 over the green half) and comes
+     out at 5.01:1 on the darker ground. */
+  --c-frame: #4a5568; --c-frame-t: #eef1f5;   /* 6.64:1 */
+  --c-addr:  #2f6fb8; --c-addr-t:  #eaf3ff;   /* 4.59:1 */
+  --c-data:  #2a7e4f; --c-data-t:  #e8fbf1;   /* 4.65:1 (was #2e8b57, 3.94:1) */
+  --c-ident: #8a6300; --c-ident-t: #fff3d2;   /* 4.92:1 */
+  --c-crc:   #6d51ad; --c-crc-t:   #efe8ff;   /* 5.15:1 */
+  --c-batt:  #ac4858; --c-batt-t:  #ffe6ea;   /* 4.65:1 (was #b04a5a, 4.47:1) */
+  --c-hd:    #0e7c7c; --c-hd-t:    #e2fafa;   /* 4.60:1 (was #0f8a8a, 3.84:1) */
+  --c-time:   #a8562a; --c-time-t:   #fff0e6;  /* 4.68:1 */
+  --c-status: #5a6b7d; --c-status-t: #eef3f8;  /* 4.91:1 */
+
+  /* RSSI bands — the ERT-A2 decoder's signal scale (#140). Tokens rather than
+     the literals alert2.js used to carry, because unlike the bit cells above
+     these are drawn *on the page's own ground*: a 3 px bar beside a number, a
+     legend dot, a map pin. WCAG 1.4.11 asks 3:1 of a graphic that carries
+     meaning, and measured on the dark theme the darkest two did not have it —
+     "weak" at 2.46:1 and "strong" at 2.97:1 against the dark panel — while in
+     the light theme "fair" sat at 2.99:1. So the scale is stated twice: the
+     same five steps, each tuned to the ground it is actually drawn on. */
+  --rssi-strong:   #137a3b;   /* 5.32:1 on light */
+  --rssi-good:     #5a9e18;   /* 3.25:1 */
+  --rssi-fair:     #b98511;   /* 3.21:1 (was #c08a12, 2.99:1) */
+  --rssi-marginal: #d4691f;   /* 3.53:1 */
+  --rssi-weak:     #b3261e;   /* 6.41:1 */
 
   /* ── Control surfaces (#109) ───────────────────────────────────────────────
      Buttons, inputs, selects and textareas had their border written out three
@@ -343,6 +366,14 @@
 }
 
 [data-theme="dark"] {
+  /* The two ends of the RSSI scale, lifted off the dark panel — see the light
+     theme's block for what each number is and why the scale is stated twice.
+     The middle three already clear 3:1 here and are left where they are, so
+     the scale reads the same on both themes. */
+  --rssi-strong: #14803e;   /* 3.21:1 on dark (light theme's #137a3b was 2.97:1) */
+  --rssi-fair:   #c08a12;   /* 5.27:1 — the light theme's own value is the one that had to move */
+  --rssi-weak:   #d42d24;   /* 3.22:1 (light theme's #b3261e was 2.46:1) */
+
   --bg: #0f1720;
   --panel: #18222d;
   --panel-sub: #111923;
@@ -3958,7 +3989,10 @@ code {
 
 /* legend */
 .pkt .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: .78rem; color: var(--muted); }
-.pkt .legend i { display: inline-block; width: 13px; height: 13px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; }
+/* The swatches take their colour as --dot (#140), the .legend-sq convention. */
+.pkt .legend i { display: inline-block; width: 13px; height: 13px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; background: var(--dot, var(--muted)); }
+.pkt .pkt-block { margin-top: var(--sp-3); }
+.pkt .pkt-sub-follow { margin-top: 0; }
 
 /* field table */
 .pkt table.fields { border-collapse: collapse; width: 100%; table-layout: auto; margin-top: 14px; font-size: .85rem; }
@@ -3975,19 +4009,22 @@ code {
 .pkt table.fields tr.frow { cursor: pointer; }
 .pkt table.fields tr.frow:hover td { background: var(--subtle); }
 .pkt table.fields code { font-family: ui-monospace, Menlo, Consolas, monospace; }
-.pkt .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+.pkt .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; background: var(--dot, var(--muted)); }
 .pkt .val { font-weight: 700; font-size: 1rem; }
 .pkt .stn { color: var(--ok); font-weight: 600; }
 .pkt .stn.none { color: var(--muted); font-weight: 400; }
 
 /* decode result cards */
+/* A <details> since #140 — the div-with-onclick it replaced was mouse-only.
+   The [open] behaviour is the element's own, so the old .open display rules
+   are gone rather than restated. */
 .pkt .fmtcard { border: 1px solid var(--border); border-radius: 10px; margin-top: 16px; overflow: hidden; }
 .pkt .fmtcard.best { border-color: var(--ok); }
-.pkt .fmthead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; background: var(--subtle); cursor: pointer; }
-.pkt .fmthead h3 { margin: 0; font-size: .98rem; flex: 1; }
+.pkt .fmthead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; background: var(--subtle); cursor: pointer; list-style: none; }
+.pkt .fmthead::-webkit-details-marker { display: none; }
+.pkt .fmthead h4 { margin: 0; font-size: .98rem; flex: 1; }
 .pkt .caret { color: var(--muted); font-size: 12px; }
-.pkt .fmtbody { padding: 6px 16px 18px; display: none; }
-.pkt .fmtcard.open .fmtbody { display: block; }
+.pkt .fmtbody { padding: 6px 16px 18px; }
 
 /* status badges (override the global pill colours within the packet tab) */
 .pkt .badge { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; background: transparent; color: inherit; }
@@ -4071,8 +4108,11 @@ code {
 }
 .a2 tr.a2-row.sel td:first-child { box-shadow: inset 1px 1px 0 var(--accent), inset 0 -1px 0 var(--accent); }
 .a2 tr.a2-row.sel td:last-child  { box-shadow: inset -1px 1px 0 var(--accent), inset 0 -1px 0 var(--accent); }
-.a2 a.a2-stlink { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; cursor: pointer; }
-.a2 a.a2-stlink:hover { text-decoration: none; border-bottom-style: solid; }
+/* A .link-btn button since #140 (the action is in-page); the dotted underline
+   stays, because it is what separates "this name goes somewhere" from the
+   selection the row itself carries. */
+.a2 .a2-stlink { color: var(--accent); text-decoration: none; border-bottom: 1px dotted currentColor; cursor: pointer; }
+.a2 .a2-stlink:hover { text-decoration: none; border-bottom-style: solid; }
 
 /* RSSI, coloured on the same scale as the map pins */
 .a2 .a2-rssi {
@@ -4086,7 +4126,8 @@ code {
 .a2 .a2-map { height: 420px; border-radius: 8px; border: 1px solid var(--border); }
 .a2 .a2-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 8px; font-size: .78rem; }
 .a2 .a2-lkey { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
-.a2 .a2-lkey i { width: 11px; height: 11px; border-radius: 50%; border: 1px solid #fff; display: inline-block; }
+/* Colour arrives as --dot (#140), the .legend-sq convention. */
+.a2 .a2-lkey i { width: 11px; height: 11px; border-radius: 50%; border: 1px solid #fff; display: inline-block; background: var(--dot, var(--muted)); }
 
 /* the two capture methods, side by side at the top of the reference */
 .a2 .a2-methods { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin: 4px 0 14px; }
@@ -4100,7 +4141,8 @@ code {
 
 /* binary frame anatomy: one row per TLV element, indented by nesting */
 .a2 .a2-tlv { display: grid; gap: 4px; margin: 8px 0; }
-.a2 .a2-tlvrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .82rem; }
+/* Nesting depth arrives as --depth (#140) — the indent is layout, the depth is data. */
+.a2 .a2-tlvrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .82rem; margin-left: calc(var(--depth, 0) * 22px); }
 .a2 .a2-tlvrow .a2-chip { min-width: 58px; }
 .a2 .a2-tlvlen { font-size: .72rem; color: var(--muted); min-width: 34px; }
 .a2 .a2-tlvval { min-width: 0; overflow-x: auto; }
@@ -4152,7 +4194,28 @@ code {
 .a2 .a2-raw { background: var(--subtle); border-radius: 8px; padding: 8px 12px; margin-top: 10px; overflow-x: auto; }
 .a2 .a2-raw code { font-size: .78rem; white-space: pre; }
 .a2 .a2-warn { margin: 8px 0 0; padding-left: 18px; font-size: .82rem; color: var(--warn); }
-.a2 h4.a2-h { margin: 16px 0 0; font-size: .82rem; letter-spacing: .4px; color: var(--muted); text-transform: uppercase; }
+/* h4 in the reference panel, h5 inside a frame card (#140 — the cards sit a
+   level deeper, under the Decoded panel's h3 and their own summary h4). */
+.a2 h4.a2-h, .a2 h5.a2-h { margin: 16px 0 0; font-size: .82rem; letter-spacing: .4px; color: var(--muted); text-transform: uppercase; }
+
+/* The engineering value under a reading's raw count. */
+.a2 .a2-follow { margin-top: 2px; }
+
+/* The binary element reference's TAG column — indent by nesting depth, which
+   arrives as --depth like the tlv rows above. */
+.a2 .a2-el-tag { padding-left: calc(6px + var(--depth, 0) * 18px); }
+
+/* EPIC #107's 44 px floor for this tab's own tap targets (#140): the mode and
+   view tabs and the option checkboxes are the controls a capture is worked
+   through with. .row-open already has its floor app-wide. */
+@media (pointer: coarse) {
+  .a2 .a2-vtab {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+  }
+  .a2 .a2-cb { min-height: 2.75rem; }
+}
 
 /* ambiguous-address picker */
 .a2 .a2-ambig { display: flex; gap: 14px; padding: 10px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
@@ -4532,6 +4595,16 @@ code {
 .serial { max-width: 1100px; margin: auto; padding: 1rem; display: grid; gap: 1rem; }
 .serial .sub { color: var(--muted); font-size: .92rem; margin: .35rem 0 0; max-width: 90ch; }
 .serial .panel-header h2 { margin: 0; }
+
+/* #140's conversion classes — the spellings the tab's inline styles kept
+   re-deriving, named once. */
+.ser-build { opacity: .55; font-weight: normal; }
+.ser-known { margin-top: var(--sp-2); font-size: var(--fs-xs); }
+.ser-known-label { opacity: .7; }
+.ser-port-status { font-size: var(--fs-xs); margin-top: var(--sp-1); }
+.ser-f-port--wide { grid-column: 1 / -1; }
+.ser-help-p  { margin: var(--sp-1) 0 0; }
+.ser-help-ol { margin: var(--sp-1) 0 0 1.1rem; padding: 0; }
 
 .serial button.ghost {
   background: transparent; color: var(--accent); border: 1px solid var(--accent);
@@ -5188,6 +5261,7 @@ code {
   display: block;
   width: 12px;
   height: 12px;
+  background: var(--dot, var(--muted));
   transform: rotate(45deg);
   border: 2px solid #fff;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .35);
@@ -5499,6 +5573,38 @@ code {
   border-radius: 50%;
   display: inline-block;
   margin-right: .35rem;
+  background: var(--dot, var(--muted));
+}
+
+/* Paragraph spacing in the rail and the cards (#140). Eight ad-hoc margins
+   between .15rem and .6rem became these three, off the token scale: a note
+   under the thing it explains, the same with room for what follows, and one
+   standing on its own between two blocks. `.small` already carries the muted
+   colour, so the inline `color: var(--muted)` that rode with every one of them
+   was restating what the class had already said. */
+.nv-p       { margin: var(--sp-1) 0 0; }
+.nv-p-lead  { margin: var(--sp-1) 0 var(--sp-2); }
+.nv-p-tight { margin: var(--sp-1) 0; }
+.nv-row-lead { margin-bottom: var(--sp-2); }
+.nv-select  { margin-top: var(--sp-1); }
+
+/* The direction marker's rotation is data — the bearing from candidate to
+   target — so it arrives as a token and the rule does the drawing. */
+.nv-map-arrow svg { transform: rotate(var(--rot, 0deg)); }
+
+/* The repeater popup's "pass range" tag, and the sentence under it. */
+.nv-pop-pill {
+  background: var(--dot, var(--muted));
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: .76rem;
+  margin-left: 4px;
+}
+.nv-pop-sub {
+  display: block;
+  font-size: .82rem;
+  margin-top: 4px;
 }
 
 .nv-drop {
@@ -6611,6 +6717,26 @@ code {
   /* Network View sets its own 16 px boxes; the finger does not care which
      panel it is in. */
   .nv-check input[type="checkbox"] { width: 1.15rem; height: 1.15rem; }
+
+  /* …and #140's own controls at 44 px, the floor EPIC #107's Definition of
+     Done sets for the tab being converted: the neighbour chips, the detail
+     card's close, the filter group headers, the check rows and the ARRO link
+     out. inline-flex with centred content for the same reason #137's chips
+     take it — without it a 26 px chip inside a 44 px box has its text at the
+     top and the bottom of the target reads as a gap. The facet summary keeps
+     its own display, because changing it takes the disclosure marker with it. */
+  .nv-chip,
+  .nv-close,
+  .nv-link {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nv-facet > summary,
+  .nv-check {
+    min-height: 2.75rem;
+  }
 
   /* Buttons that were sized to sit inside a dense row still have to be hit.
      The visual size is unchanged where it already cleared the bar; these only

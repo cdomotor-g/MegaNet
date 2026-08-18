@@ -1036,7 +1036,7 @@ const NetworkView = (function () {
         <span class="small">ALERT ${o.addr}${o.types.length ? ' · ' + esc(o.types[0]) : ''}</span>
         ${l.evidence.length ? `<span class="small nv-ev">${esc(l.evidence.join(', '))}</span>` : ''}
       </div>`;
-    }).join('') : '<p class="small" style="color:var(--muted);margin:.2rem 0">None</p>';
+    }).join('') : '<p class="small nv-p-tight">None</p>';
 
     const site = (n.stationId && state.data) ? state.data.stations.find(s => s.id === n.stationId) : null;
     const arro = site ? arroSiteUrl(arroSiteId(site)) : null;
@@ -1045,7 +1045,7 @@ const NetworkView = (function () {
     el.innerHTML = `
       <button class="nv-close" onclick="NetworkView.select(null)" title="Close" aria-label="Close">×</button>
       <h3>${esc(n.name)}</h3>
-      <p class="small" style="color:var(--muted);margin:.15rem 0 .6rem">
+      <p class="small nv-p-lead">
         ALERT <strong>${n.addr}</strong>${n.number ? ` · Site ${esc(n.number)}` : ''}
         ${n.types.length ? `<br>${esc(n.types.join(' · '))}` : ''}
         ${n.role ? `<br>${esc(ROLE_LABEL[n.role] || n.role)}` : ''}
@@ -1055,7 +1055,7 @@ const NetworkView = (function () {
       ${n.unresolved
         ? `<p class="small nv-warn">This end of a confirmed relationship has no match in the loaded
              station file — it can be read here, but it cannot be shown on the map.</p>`
-        : `<div class="button-row" style="margin-bottom:.6rem">
+        : `<div class="button-row nv-row-lead">
              <button class="primary" onclick="NetworkView.showOnMap('${escAttr(n.key)}')">Show on map</button>
              ${arro ? `<a class="nv-link" href="${esc(arro)}" target="_blank" rel="noopener">ARRO site ↗</a>` : ''}
            </div>`}
@@ -1066,8 +1066,8 @@ const NetworkView = (function () {
         ? `<div class="nv-neigh">${neigh.slice(0, 24).map(o =>
             `<button class="nv-chip" onclick="NetworkView.focus('${escAttr(o.key)}')"
                      title="${escAttr(o.name)}">${o.addr} <span>${esc(o.name)}</span></button>`).join('')}
-           ${neigh.length > 24 ? `<p class="small" style="color:var(--muted)">…and ${neigh.length - 24} more</p>` : ''}</div>`
-        : '<p class="small" style="color:var(--muted);margin:.2rem 0">No address in the file is one bit from this one.</p>'}`;
+           ${neigh.length > 24 ? `<p class="small">…and ${neigh.length - 24} more</p>` : ''}</div>`
+        : '<p class="small nv-p-tight">No address in the file is one bit from this one.</p>'}`;
   }
 
   // Jump the graph to another node: select it, and make sure it is on screen by
@@ -1154,21 +1154,24 @@ const NetworkView = (function () {
     const info = [...visibleRepeaterInfo().values()]
       .sort((a, b) => a.station.name.localeCompare(b.station.name));
     if (!info.length) {
-      return `<p class="small" style="color:var(--muted)">
+      return `<p class="small">
         No repeater's pass ranges cover an ALERT address currently in view.
       </p>`;
     }
     return `
-      <div class="table-wrap medium">
+      <div class="table-wrap medium" role="region" tabindex="0"
+           aria-label="Repeaters open to the stations in view — ${info.length} repeater${info.length === 1 ? '' : 's'}">
         <table>
-          <thead><tr><th>Repeater</th><th>Open to (in view)</th><th>Addresses carried</th></tr></thead>
+          <caption class="sr-only">Repeaters whose pass ranges carry an ALERT address currently in view, and which of those stations each one is open to</caption>
+          <thead><tr><th scope="col">Repeater</th><th scope="col">Open to (in view)</th><th scope="col">Addresses carried</th></tr></thead>
           <tbody>
             ${info.map(({ station: r, stations, addrs }) => {
               const served = [...stations].sort((a, b) => a.name.localeCompare(b.name));
               return `
-              <tr onclick="goToStation('${escAttr(r.id)}')" style="cursor:pointer"
+              <tr class="row-link" onclick="goToStation('${escAttr(r.id)}')"
                   title="Open ${escAttr(r.name)} on the Stations tab">
-                <td>${esc(r.name)}</td>
+                <td><button type="button" class="row-open" onclick="event.stopPropagation();goToStation('${escAttr(r.id)}')"
+                            title="Open ${escAttr(r.name)} on the Stations tab">${esc(r.name)}</button></td>
                 <td class="small">${served.map(s => esc(s.name)).join(', ')}</td>
                 <td class="small">${[...addrs].sort((a, b) => a - b).join(', ')}</td>
               </tr>`;
@@ -1176,6 +1179,61 @@ const NetworkView = (function () {
           </tbody>
         </table>
       </div>`;
+  }
+
+  // ── the graph, as data ──────────────────────────────────────────────────────
+  // Part 3 of the graphic pattern (design-system §3): a force-directed drawing
+  // is a picture of a relationship set, and a picture is the one thing a screen
+  // reader cannot read. This is the same visible set — same filters, same cap,
+  // same nv.vis the graph and the map both draw from, so it cannot drift out of
+  // agreement with either — one row per address, ranked the way the graph ranks
+  // them. Each row carries the same select the node itself does, which is what
+  // makes the drawing optional rather than merely described.
+  const NV_TABLE_CAP = 200;
+
+  function nodesTableHtml() {
+    const V = nv.vis;
+    if (!V || !V.nodes.length) {
+      return '<p class="small">Nothing in view — this table lists whatever the graph is drawing.</p>';
+    }
+    const rows = [...V.nodes].sort((a, b) =>
+      ((V.deg.get(b.key) || 0) - (V.deg.get(a.key) || 0)) || (a.addr - b.addr));
+    const shown = rows.slice(0, NV_TABLE_CAP);
+    return `
+      <div class="table-wrap medium" role="region" tabindex="0"
+           aria-label="Addresses in view — ${rows.length} address${rows.length === 1 ? '' : 'es'}">
+        <table>
+          <caption class="sr-only">Every ALERT address the graph is drawing, most-connected first, with the station behind it and how many links it holds in view</caption>
+          <thead><tr>
+            <th scope="col">ALERT</th><th scope="col">Station</th><th scope="col">Sensor</th>
+            <th scope="col">Links in view</th><th scope="col">Confirmed</th>
+          </tr></thead>
+          <tbody>
+            ${shown.map(n => {
+              const deg  = V.deg.get(n.key) || 0;
+              const conf = (n.confirmed || []).length;
+              return `
+              <tr class="row-link" onclick="NetworkView.select('${escAttr(n.key)}')">
+                <td><button type="button" class="row-open" onclick="event.stopPropagation();NetworkView.select('${escAttr(n.key)}')"
+                            title="Select ${escAttr(n.name)} — the same as clicking its node">${n.addr}</button></td>
+                <td>${esc(n.name)}${n.number ? ` <span class="small">${esc(n.number)}</span>` : ''}${
+                  n.unresolved ? ' <span class="small">not in the loaded station file</span>' : ''}</td>
+                <td class="small">${esc(n.types.join(', ')) || '—'}</td>
+                <td>${deg}</td>
+                <td>${conf || '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${rows.length > shown.length
+        ? `<p class="small nv-p">Listing the ${NV_TABLE_CAP} best-connected of ${rows.length.toLocaleString()} addresses in view — narrow the filters or search to bring the rest into the list.</p>`
+        : ''}`;
+  }
+
+  function updateAddressCard() {
+    const el = document.getElementById('nv-addresses');
+    if (el) el.innerHTML = nodesTableHtml();
   }
 
   // Called wherever nv.vis changes — see updateChrome, which every path that
@@ -1297,7 +1355,7 @@ const NetworkView = (function () {
         const arrow = L.marker(mid, {
           icon: L.divIcon({
             className: 'nv-map-arrow',
-            html: `<svg width="14" height="14" viewBox="0 0 14 14" style="transform:rotate(${(brg - 90).toFixed(1)}deg)"><path d="M1,1 L13,7 L1,13 Z" fill="${lineColor}"/></svg>`,
+            html: `<svg width="14" height="14" viewBox="0 0 14 14" style="--rot:${(brg - 90).toFixed(1)}deg"><path d="M1,1 L13,7 L1,13 Z" fill="${lineColor}"/></svg>`,
             iconSize: [14, 14],
             iconAnchor: [7, 7],
           }),
@@ -1333,7 +1391,7 @@ const NetworkView = (function () {
         const marker = L.marker([r.lat, r.lon], {
           icon: L.divIcon({
             className: 'nv-repeater-pin',
-            html: `<span style="background:${NV_REPEATER_COLOR}"></span>`,
+            html: `<span style="--dot:${NV_REPEATER_COLOR}"></span>`,
             iconSize: [14, 14],
             iconAnchor: [7, 7],
           }),
@@ -1343,13 +1401,22 @@ const NetworkView = (function () {
         });
         marker.bindPopup(`
           <strong>${esc(r.name)}</strong>
-          <span style="background:${NV_REPEATER_COLOR};color:#fff;padding:1px 5px;border-radius:999px;font-size:.76rem;margin-left:4px">pass range</span>
-          <br><span style="font-size:.82rem;margin-top:4px;display:block">
+          <span class="nv-pop-pill" style="--dot:${NV_REPEATER_COLOR}">pass range</span>
+          <br><span class="nv-pop-sub">
             Open to ${servedLocated.map(s => esc(s.name)).join(', ')} by pass range —
             not a ghosting relationship.
           </span>
         `);
         marker.on('click', () => goToStation(r.id));
+        // A divIcon marker is a keyboard stop Leaflet's own `alt` option cannot
+        // name — `alt` reaches IMG icons only, and this one is a <span> in a
+        // <div> (#139 found the same thing on the Workbench's threat squares).
+        // Named on the element, or it is one of a dozen unnamed tab stops
+        // between the map and whatever follows it.
+        const relEl = marker.getElement();
+        if (relEl) relEl.setAttribute('aria-label',
+          `${r.name} — repeater, pass-range coverage of ${servedLocated.length} station`
+          + `${servedLocated.length === 1 ? '' : 's'} in view. Not a ghosting link.`);
         state.nvMapRepeaters.push(marker);
       }
 
@@ -1634,8 +1701,8 @@ const NetworkView = (function () {
     if (!el) return;
     const opts = facetOptions()[nv.colourBy] || [];
     el.innerHTML = opts.slice(0, 10).map(([v]) =>
-      `<span><i class="nv-dot" style="background:${colourFor(v, nv.colourBy)}"></i>${esc(v)}</span>`).join('')
-      + (opts.length > 10 ? `<span class="small" style="color:var(--muted)">+${opts.length - 10} more</span>` : '');
+      `<span><i class="nv-dot" style="--dot:${colourFor(v, nv.colourBy)}"></i>${esc(v)}</span>`).join('')
+      + (opts.length > 10 ? `<span class="small">+${opts.length - 10} more</span>` : '');
   }
 
   // The confirmed relationships arrive after the page is built, and they bring a
@@ -1664,7 +1731,7 @@ const NetworkView = (function () {
               <span>${esc(v)}</span><span class="small">${n}</span>
             </label>`).join('')}
           ${list.length > shown.length
-            ? `<p class="small" style="color:var(--muted);margin:.3rem 0 0">
+            ? `<p class="small nv-p">
                  ${list.length - shown.length} rarer value${list.length - shown.length === 1 ? '' : 's'} not listed — use the search box.</p>`
             : ''}
         </details>`;
@@ -1704,7 +1771,20 @@ const NetworkView = (function () {
     }
     const st = document.getElementById('nv-stats');
     if (st) st.innerHTML = statsHtml();
+    updateAddressCard();
     updateRepeaterCard();
+    // The graph's accessible name carries what it is showing, rebuilt on every
+    // change of the visible set — parts 1 and 2 of the graphic pattern, with
+    // the table above as part 3.
+    const svg = document.getElementById('nv-svg');
+    if (svg && V) {
+      const conf = V.edges.filter(e => e.confirmed).length;
+      svg.setAttribute('aria-label',
+        `Ghosting relationship graph — ${V.nodes.length} address${V.nodes.length === 1 ? '' : 'es'}, `
+        + `${V.edges.length} link${V.edges.length === 1 ? '' : 's'}`
+        + (conf ? `, ${conf} of them confirmed` : '')
+        + '. The same set is listed as a table below.');
+    }
     const src = document.getElementById('nv-source-note');
     if (src) {
       src.innerHTML = nv.confState === 'loading' ? 'Loading confirmed relationships…'
@@ -1717,10 +1797,10 @@ const NetworkView = (function () {
     buildGraph();
     return `
       <div class="nv-layout">
-        <aside class="nv-side stack">
+        <aside class="nv-side stack" aria-label="Graph controls">
           <div class="panel">
             <div class="panel-header"><h2>Ghosting Graph</h2></div>
-            <p class="small" style="color:var(--muted);margin:.4rem 0 0">
+            <p class="small nv-p">
               ALERT addresses one bit apart, drawn as a graph. Grey-blue links are
               computed from the loaded file; solid arrows are relationships that were
               actually observed, candidate → target.
@@ -1732,8 +1812,9 @@ const NetworkView = (function () {
           <div class="panel">
             <div class="panel-header"><h3>Find and focus</h3></div>
             <input id="nv-search" type="search" placeholder="Station, number or ALERT address"
+                   aria-label="Find a station, site number or ALERT address"
                    value="${escAttr(nv.search)}" oninput="NetworkView.onSearch(this.value)">
-            <p class="small" style="color:var(--muted);margin:.35rem 0 .5rem">
+            <p class="small nv-p-lead">
               Several addresses at once: paste them separated by spaces or commas.
             </p>
             <div class="button-row">
@@ -1763,8 +1844,8 @@ const NetworkView = (function () {
 
           <div class="panel">
             <div class="panel-header"><h3>Layout</h3></div>
-            <label class="small" style="color:var(--muted)">Colour by
-              <select id="nv-colour" onchange="NetworkView.setColourBy(this.value)" style="margin-top:.3rem">
+            <label class="small">Colour by
+              <select id="nv-colour" class="nv-select" onchange="NetworkView.setColourBy(this.value)">
                 ${NV_FACETS.map(f => `<option value="${escAttr(f.key)}" ${nv.colourBy === f.key ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}
               </select>
             </label>
@@ -1786,7 +1867,7 @@ const NetworkView = (function () {
           <div class="panel">
             <div class="panel-header"><h3>To the map, and out</h3></div>
             <button class="primary" onclick="NetworkView.showAllOnMap()">Show these on the map</button>
-            <p class="small" style="color:var(--muted);margin:.35rem 0 .6rem">
+            <p class="small nv-p-lead">
               Hands every address in view to the Stations map as a selection.
             </p>
             <button onclick="NetworkView.exportVisible()">Export visible links</button>
@@ -1798,7 +1879,7 @@ const NetworkView = (function () {
             <input id="nv-file" type="file" accept=".csv" multiple hidden
                    onchange="NetworkView.importFiles(this.files)">
             <button onclick="document.getElementById('nv-file').click()">Open CSV file(s)</button>
-            <p class="small" style="color:var(--muted);margin:.35rem 0 0">
+            <p class="small nv-p">
               Needs <code>source_alert</code> and <code>target_alert</code>; <code>evidence_files</code>,
               <code>reciprocal</code> and <code>same_site</code> are used when present. Station names and
               sensor types come from the loaded file, not the CSV.
@@ -1813,7 +1894,7 @@ const NetworkView = (function () {
               <span class="nv-pill" id="nv-visible"></span>
               <span class="nv-pill nv-pill--quiet">Arrows point candidate → target</span>
             </div>
-            <svg id="nv-svg" role="img" aria-label="Ghosting relationship graph">
+            <svg id="nv-svg" role="group" aria-label="Ghosting relationship graph">
               <defs>
                 <marker id="nv-arrow" viewBox="0 -5 10 10" refX="4" markerWidth="5" markerHeight="5" orient="auto">
                   <path d="M0,-5L10,0L0,5" class="nv-arrowhead"/>
@@ -1826,7 +1907,7 @@ const NetworkView = (function () {
               </g>
             </svg>
             <div class="nv-tip" id="nv-tip" hidden></div>
-            <aside class="nv-detail" id="nv-detail" hidden></aside>
+            <aside class="nv-detail" id="nv-detail" aria-label="Selected address" hidden></aside>
             <p class="nv-cap small" id="nv-cap" hidden></p>
           </div>
 
@@ -1835,7 +1916,7 @@ const NetworkView = (function () {
               <span class="nv-pill" id="nv-map-note"></span>
               <span class="nv-pill nv-pill--quiet">Arrows point candidate → target</span>
               <span class="nv-pill nv-pill--quiet">
-                <i class="nv-repeater-pin nv-repeater-pin--legend"><span style="background:${NV_REPEATER_COLOR}"></span></i>
+                <i class="nv-repeater-pin nv-repeater-pin--legend"><span style="--dot:${NV_REPEATER_COLOR}"></span></i>
                 Repeater pass-range coverage — not a ghosting link
               </span>
             </div>
@@ -1844,9 +1925,19 @@ const NetworkView = (function () {
         </div>
       </div>
 
+      <div class="panel" id="nv-addresses-panel">
+        <div class="panel-header"><h3>The addresses in view, as a table</h3></div>
+        <p class="small nv-p-lead">
+          The same set the graph is drawing, ranked the way it ranks them — most links in view
+          first. Every row selects its address exactly as clicking its node does, so the graph is
+          readable and operable without entering the drawing.
+        </p>
+        <div id="nv-addresses">${nodesTableHtml()}</div>
+      </div>
+
       <div class="panel" id="nv-repeaters-panel">
         <div class="panel-header"><h3>Repeaters open to the stations in view</h3></div>
-        <p class="small" style="color:var(--muted);margin:.4rem 0 .6rem">
+        <p class="small nv-p-lead">
           Every repeater whose pass ranges carry an ALERT address currently in view above,
           per the same test the Pass Ranges and Bit Flipper tabs use. This is a pass-range
           relationship, not a ghosting one — these repeaters are candidate carriers for the

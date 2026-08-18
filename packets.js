@@ -301,7 +301,7 @@ const Packets = (function () {
   const SWATCH = { A: 'addr', D: 'data', K: 'ident', R: 'crc', C: 'crc', B: 'batt', BS: 'batt', VCO: 'batt', DE: 'batt', HD: 'hd', S: 'status', frame: 'frame' };
 
   function legendHtml(fields) {
-    return '<div class="legend">' + fields.map(f => '<span><i style="background:var(--c-' + SWATCH[f] + ')"></i>' + esc(FIELD_META[f].label) + '</span>').join('') + '</div>';
+    return '<div class="legend">' + fields.map(f => '<span><i style="--dot:var(--c-' + SWATCH[f] + ')"></i>' + esc(FIELD_META[f].label) + '</span>').join('') + '</div>';
   }
 
   function fieldRows(fmtKey, dec) {
@@ -323,19 +323,22 @@ const Packets = (function () {
       }
       if (f === 'HD') extra = '<div class="spec">Full 16-bit value = HD × 2048 + last transmitted 11-bit data value = ' + (v * 2048) + ' + data.</div>';
       if (f === 'S') extra = '<div class="spec">' + (v === 0
-        ? '<span style="color:var(--ok)">0 — the value every valid record carries ✓</span>'
-        : '<span style="color:var(--bad)">non-zero ✗</span> — records with a non-zero status byte in the reference capture also carried addresses matching no station, so treat the reading as corrupt.') + '</div>';
+        ? '<span class="txt-ok">0 — the value every valid record carries ✓</span>'
+        : '<span class="txt-bad">non-zero ✗</span> — records with a non-zero status byte in the reference capture also carried addresses matching no station, so treat the reading as corrupt.') + '</div>';
       if ((f === 'R' || f === 'C') && dec.crcExpected !== undefined) {
         extra = '<div class="spec">Computed ' + (f === 'R' ? 'FCS' : 'CRC') + ': ' + dec.crcExpected + ' — '
-          + (dec.crcOk ? '<span style="color:var(--ok)">matches ✓</span>' : '<span style="color:var(--bad)">mismatch ✗</span>')
+          + (dec.crcOk ? '<span class="txt-ok">matches ✓</span>' : '<span class="txt-bad">mismatch ✗</span>')
           + (dec.crcAssumed ? ' (algorithm assumed, see note below; for wind sensors these bits are gust data instead)' : '') + '</div>';
       }
       rows.push('<tr class="frow" data-f="' + f + '">'
-        + '<td><span class="swatch" style="background:var(--c-' + SWATCH[f] + ')"></span>' + esc(FIELD_META[f].label) + '</td>'
+        + '<td><span class="swatch" style="--dot:var(--c-' + SWATCH[f] + ')"></span>' + esc(FIELD_META[f].label) + '</td>'
         + '<td><code>' + binMsb + '</code><div class="spec">' + nbits + ' bit' + (nbits > 1 ? 's' : '') + ', sent ' + ((f === 'R' || f === 'C') ? 'MSB' : 'LSB') + ' first</div></td>'
         + '<td><span class="val">' + v + '</span>' + extra + '</td></tr>');
     }
-    return '<table class="fields"><thead><tr><th>FIELD</th><th>BITS (MSB→LSB)</th><th>VALUE</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+    return '<div class="table-wrap"><table class="fields">'
+      + '<caption class="sr-only">The decoded fields — each field’s bits and value</caption>'
+      + '<thead><tr><th scope="col">FIELD</th><th scope="col">BITS (MSB→LSB)</th><th scope="col">VALUE</th></tr></thead>'
+      + '<tbody>' + rows.join('') + '</tbody></table></div>';
   }
 
   function attachHover(container) {
@@ -359,7 +362,7 @@ const Packets = (function () {
     const n = normaliseInput(input);
     if (!n.ok) { errEl.textContent = n.error; errEl.hidden = false; return; }
     if (n.framing.present) {
-      frEl.innerHTML = 'Framing: ' + (n.framing.valid ? '<b style="color:var(--ok)">valid</b> — ' : '<b style="color:var(--warn)">inconsistent</b> — ') + esc(n.framing.detail)
+      frEl.innerHTML = 'Framing: ' + (n.framing.valid ? '<b class="txt-ok">valid</b> — ' : '<b class="txt-warn">inconsistent</b> — ') + esc(n.framing.detail)
         + '. Payload (32 bits): <code>' + n.bits32 + '</code>';
     } else {
       frEl.innerHTML = '32-bit payload supplied (no start/stop bits).';
@@ -396,12 +399,16 @@ const Packets = (function () {
         body += '<button class="ghost" onclick="Packets.prefillEncoder(\'' + r.format + '\',' + r.values.A + ',' + r.values.D + ')">Open in encoder</button>';
       if (fmt.bytesOnly)
         body += '<button class="ghost" onclick="switchTab(\'alert2\')">Decode a whole ERT-A2 line ▸</button>';
+      // A <details>, not a div with a click handler (#140): the card's whole
+      // job is progressive disclosure, and a div's onclick is a mouse-only
+      // affordance — no tab stop, no role, no announced state. The summary is
+      // a real disclosure a keyboard and a screen reader both get for free.
       resEl.insertAdjacentHTML('beforeend',
-        '<div class="fmtcard' + (r.format === best ? ' best' : '') + (open ? ' open' : '') + '" id="pkt-card-' + r.format + '">'
-        + '<div class="fmthead" onclick="this.parentElement.classList.toggle(\'open\')">'
-        + '<h3>' + esc(fmt.name) + '</h3>' + badges.join(' ')
-        + '<span class="caret">' + esc(summary) + ' ▾</span></div>'
-        + '<div class="fmtbody">' + body + '</div></div>');
+        '<details class="fmtcard' + (r.format === best ? ' best' : '') + '"' + (open ? ' open' : '') + ' id="pkt-card-' + r.format + '">'
+        + '<summary class="fmthead">'
+        + '<h4>' + esc(fmt.name) + '</h4>' + badges.join(' ')
+        + '<span class="caret">' + esc(summary) + ' ▾</span></summary>'
+        + '<div class="fmtbody">' + body + '</div></details>');
     });
     attachHover(resEl);
     if (scroll) resEl.scrollIntoView({ behavior: 'smooth' });
@@ -447,7 +454,7 @@ const Packets = (function () {
     const wrap = document.getElementById('pkt-encExtras');
     if (wrap) wrap.innerHTML = encExtrasHtml(fmt);
     const dataWrap = document.getElementById('pkt-encDataWrap');
-    if (dataWrap) dataWrap.style.display = fmt === 'bcc' ? 'none' : '';
+    if (dataWrap) dataWrap.hidden = fmt === 'bcc';
     const idInput = document.getElementById('pkt-encId');
     if (idInput) idInput.max = (1 << FORMATS[fmt].abits) - 1;
     refreshStation();
@@ -527,7 +534,7 @@ const Packets = (function () {
     const fmt = e.format;
     const abits = FORMATS[fmt].abits;
     return `
-    <div class="pkt" style="max-width:1280px;margin:auto;padding:1rem;display:grid;gap:1rem">
+    <div class="pkt page" style="--page-max:1280px">
 
       <div class="panel">
         <div class="panel-header"><h2>ALERT / ERTS Packet Tool</h2></div>
@@ -535,10 +542,10 @@ const Packets = (function () {
           Meteorology <em>ERTS Data Formats</em> specification (July 2003) — ALERT Binary (ABF), BCC Extended
           Check, Enhanced ALERT Binary (EAF) and Enhanced IFLOWS (EIF). Decoded addresses are matched against
           the loaded MegaNet station database first, then the bundled national address file.</p>
-        <p class="sub" style="margin-top:-.4rem">A fifth layout, <b>A2C</b>, joins them for 32-bit input: the
+        <p class="sub pkt-sub-follow">A fifth layout, <b>A2C</b>, joins them for 32-bit input: the
           four-byte form the same address and value take inside an ALERT2 “ALERT concentration” payload, which
           is what an ELPRO ERT-A2 puts on RS232. Paste whole serial lines on the
-          <a href="javascript:void 0" onclick="switchTab('alert2')">ALERT2 / ERT-A2</a> tab instead — this page
+          <button type="button" class="link-btn" onclick="switchTab('alert2')">ALERT2 / ERT-A2</button> tab instead — this page
           decodes one reading at a time.</p>
       </div>
 
@@ -582,7 +589,7 @@ const Packets = (function () {
             <input type="number" id="pkt-encId" min="0" max="${(1 << abits) - 1}" value="${esc(e.id)}"
                    oninput="Packets.setEnc('id',this.value)">
           </div>
-          <div id="pkt-encDataWrap" style="display:${fmt === 'bcc' ? 'none' : ''}">
+          <div id="pkt-encDataWrap" ${fmt === 'bcc' ? 'hidden' : ''}>
             <label for="pkt-encData">Data value</label>
             <input type="number" id="pkt-encData" min="0" max="2047" value="${esc(e.data)}"
                    oninput="Packets.setEnc('data',this.value)">
@@ -595,9 +602,9 @@ const Packets = (function () {
             </select>
           </div>
         </div>
-        <div class="row" id="pkt-encExtras" style="margin-top:10px">${encExtrasHtml(fmt)}</div>
-        <div class="note compact" id="pkt-encStation" style="margin-top:.75rem"></div>
-        <div class="row" style="margin-top:14px">
+        <div class="row pkt-block" id="pkt-encExtras">${encExtrasHtml(fmt)}</div>
+        <div class="note compact pkt-block" id="pkt-encStation"></div>
+        <div class="row pkt-block">
           <div class="fit"><button class="primary" onclick="Packets.encode()">Encode</button></div>
         </div>
         <div id="pkt-encError" class="err" hidden></div>
@@ -618,10 +625,10 @@ const Packets = (function () {
               address bits 12–8), the data low byte, then a status byte that is 0 on every valid record. Offered
               only for 32-bit input, since these bytes come out of an ALERT2 payload rather than off the air as
               async words. An ERT-A2 concatenates several of them behind a three-byte header —
-              see the <a href="javascript:void 0" onclick="switchTab('alert2')">ALERT2 / ERT-A2</a> tab.</li>
+              see the <button type="button" class="link-btn" onclick="switchTab('alert2')">ALERT2 / ERT-A2</button> tab.</li>
           </ul>
         </details>
-        <p class="spec" style="margin-top:.75rem">
+        <p class="spec pkt-block">
           Bit-field layouts from BoM <em>ERTS Data Formats</em> v1.0 (July 2003) —
           <a href="${encodeURI('docs/BOM spec erts_data_formats_doc.pdf')}" target="_blank" rel="noopener">specification PDF</a>.
           Station names from <a href="${encodeURI('data/All 2021 Working 2.txt')}" target="_blank" rel="noopener">All 2021 Working 2.txt</a>.

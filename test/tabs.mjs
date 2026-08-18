@@ -286,6 +286,51 @@ const SEED_WORKBENCH = `async () => {
   await new Promise(r => setTimeout(r, 400));
 }`;
 
+// The ALERT Packets tab renders its decoder and encoder shells with no result
+// cards until something decodes. The seed drives the tab's own example button,
+// which runs the real message through the real codec — the result cards, the
+// bit grids and the field tables are then the ones an operator sees.
+const SEED_PACKETS = `() => { Packets.loadExample(); }`;
+
+// The Serial Monitor's live card only exists with a connection, and a headless
+// browser has no serial hardware. Serial.addDemo() is the tab's own "Show a
+// demo connection" button (#140): the sample bytes run through the real
+// pipeline — handleChunk, the three mode framers, the shared Packets codec —
+// so the card being held to the Definition of Done is the live view, not a
+// mock-up of it.
+const SEED_SERIAL_DEMO = `() => { Serial.addDemo(); }`;
+
+// The ALERT2 tab, twice, on the tab's own sample-capture button — real binary
+// frames off a test ERT-A2's USB port, so the RSSI columns, the coverage map
+// and the ambiguity panel all populate. The two entries split on the view
+// toggle: Readings is the table half, Frame anatomy is the byte-by-byte half
+// with the TLV chips, payload strips and per-reading maths — mutually
+// exclusive views, so one entry cannot check both (design-system §6).
+const SEED_ALERT2 = `async () => {
+  Alert2.loadSample('bin');
+  await new Promise(r => setTimeout(r, 50));
+}`;
+const SEED_ALERT2_FRAMES = `async () => {
+  Alert2.loadSample('bin');
+  Alert2.setView('frames');
+  await new Promise(r => setTimeout(r, 50));
+}`;
+
+// The Ghosting Graph starts from the confirmed relationships in
+// data/ghosting-links.json, which is fetched after init() returns — a seed
+// that does not wait for it measures an empty stage. Searching for an address
+// out of the loaded file gives the graph a starting point of its own either
+// way, so the check holds whether or not that file is there.
+const SEED_NETWORK = `async () => {
+  const addr = String(state.data.stations
+    .flatMap(s => (s.sensors || []).map(x => x.alert_id))
+    .find(a => Number.isInteger(a) && a > 0 && a < 65536));
+  const box = document.getElementById('nv-search');
+  if (box) box.value = addr;
+  NetworkView.onSearch(addr);
+  await new Promise(r => setTimeout(r, 500));
+}`;
+
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
@@ -303,6 +348,12 @@ const CONVERTED = [
   { id: 'bitflipper', label: 'Bit Flipper',     issue: '#139', seed: SEED_BITFLIPPER },
   { id: 'workbench',  label: 'Interference Workbench — intro',       issue: '#139' },
   { id: 'workbench',  label: 'Interference Workbench — worked case', issue: '#139', seed: SEED_WORKBENCH },
+  { id: 'packets',    label: 'ALERT Packets',   issue: '#140', seed: SEED_PACKETS },
+  { id: 'serial',     label: 'Serial Monitor — no connection', issue: '#140' },
+  { id: 'serial',     label: 'Serial Monitor — demo stream',   issue: '#140', seed: SEED_SERIAL_DEMO },
+  { id: 'alert2',     label: 'ALERT2 Decoder — readings and map',  issue: '#140', seed: SEED_ALERT2 },
+  { id: 'alert2',     label: 'ALERT2 Decoder — frame anatomy',     issue: '#140', seed: SEED_ALERT2_FRAMES },
+  { id: 'network',    label: 'Ghosting Graph',  issue: '#140', seed: SEED_NETWORK },
 ];
 
 

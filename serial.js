@@ -51,7 +51,7 @@ const Serial = (function () {
   // Bumped whenever the Serial Monitor changes. Shown in the tab header so it is
   // possible to confirm at a glance which build of app.js the browser actually
   // loaded — a stale, cached app.js is the usual reason a "fixed" bug persists.
-  const SERIAL_BUILD = '2026-07-16e';
+  const SERIAL_BUILD = '2026-08-18a';
 
   function loadDefaults() {
     let d = {};
@@ -112,13 +112,16 @@ const Serial = (function () {
     if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
-  // Write a short status line beneath the "Choose COM port…" button. Colour is
-  // set inline so the message is legible regardless of the stylesheet.
+  // Write a short status line beneath the "Choose COM port…" button. The
+  // colour is a pattern-9 class (#140): an inline color was a decision the
+  // contrast check could not see, and the literals it used were the status
+  // tokens' values written out by hand.
   function setPortStatus(conn, msg, kind) {
     const el = document.getElementById('ser-port-status-' + conn.id);
     if (!el) return;
     el.textContent = msg || '';
-    el.style.color = kind === 'err' ? '#c7401a' : kind === 'warn' ? '#b26a00' : '';
+    el.classList.toggle('txt-bad', kind === 'err');
+    el.classList.toggle('txt-warn', kind === 'warn');
   }
 
   // requestPort() rejects with the SAME NotFoundError whether the user cancelled
@@ -219,21 +222,21 @@ const Serial = (function () {
     // not squeeze into (and collide with) the narrow settings columns. The next
     // renderList() rebuilds the DOM and resets this automatically.
     const cell = el.closest ? el.closest('.ser-f-port') : null;
-    if (cell) cell.style.gridColumn = '1 / -1';
+    if (cell) cell.classList.add('ser-f-port--wide');
     const isEdge = /Edg\//.test(navigator.userAgent);
     const policyPage = isEdge ? 'edge://policy' : 'chrome://policy';
     const granted = knownPorts.length
-      ? '<p style="margin:.35rem 0 0"><strong>' + knownPorts.length + ' pre-approved port'
+      ? '<p class="ser-help-p"><strong>' + knownPorts.length + ' pre-approved port'
         + (knownPorts.length > 1 ? 's are' : ' is') + ' available</strong> under “Previously allowed” '
         + 'above — use that button instead of the picker.</p>'
       : '';
-    el.style.color = '#c7401a';
+    el.classList.add('txt-bad');
     el.innerHTML =
         '<strong>The browser refused to show the port picker.</strong> It rejected the request instantly, '
       + 'so no dialog was ever displayed — this is a browser or IT-policy block, not an empty device list. '
       + '(If you did see a picker and closed it, ignore this and just click the button again.)'
       + granted
-      + '<ol style="margin:.35rem 0 0 1.1rem;padding:0">'
+      + '<ol class="ser-help-ol">'
       + '<li>Open <code>' + policyPage + '</code> and search for <code>serial</code>. '
       +   '<code>DefaultSerialGuardSetting = 2</code>, or this site listed under <code>SerialBlockedForUrls</code>, '
       +   'means your organisation blocks Web Serial — IT must add this site to <code>SerialAskForUrls</code>.</li>'
@@ -350,6 +353,10 @@ const Serial = (function () {
     emitSys(conn, 'Opened ' + conn.portLabel + ' @ ' + conn.settings.baudRate + ' baud, '
       + conn.settings.dataBits + fmtParity(conn.settings.parity) + conn.settings.stopBits
       + ', flow ' + conn.settings.flowControl + ' — mode: ' + MODE_LABEL[conn.mode], 'sys');
+    // The live-region policy for a streaming surface (#140, design-system §4):
+    // the stream announces when it starts and stops and never per frame — the
+    // frames live in the log region, read at the reader's own pace.
+    announce(conn.name + ' — serial port open, streaming');
     conn.readLoopPromise = readLoop(conn);
     renderList();
   }
@@ -379,6 +386,10 @@ const Serial = (function () {
       conn.phase = 'error';
       conn.err = 'Device disconnected';
       emitSys(conn, 'Device disconnected', 'err');
+      // The stop half of the start/stop policy. Not user-initiated, but it is
+      // the end of a stream the user started, and the alternative is a reader
+      // listening to silence with no idea the port died.
+      announce(conn.name + ' — device disconnected, stream stopped');
       flushPartials(conn);
       renderList();
     }
@@ -409,7 +420,10 @@ const Serial = (function () {
     flushPartials(conn);
     conn.phase = 'closed';
     emitSys(conn, 'Port closed', 'sys');
-    if (!(opts && opts.silent)) renderList();
+    if (!(opts && opts.silent)) {
+      announce(conn.name + ' — serial port closed');
+      renderList();
+    }
   }
 
   async function removeConn(id) {
@@ -427,6 +441,45 @@ const Serial = (function () {
     // reset counters for the new session; keep the scrollback
     conn.bytes = 0; conn.count = 0;
     openConn(id);
+  }
+
+  // A demo connection: the live card — toolbar, stats, log, the works — with
+  // nothing plugged in. Two consumers on purpose (#140): a person on a machine
+  // with no serial device (or behind a blocked picker) can see what the tab
+  // does before fighting IT for a COM port, and the test harness can hold the
+  // live view to the per-tab Definition of Done, which no headless browser
+  // could otherwise reach without hardware. The sample bytes run through the
+  // real pipeline — handleChunk → the mode framers → the shared Packets codec
+  // — so what the demo shows is what a device produces, not a mock-up.
+  function addDemo() {
+    const d = loadDefaults();
+    const conn = {
+      id: 'c' + (nextId++),
+      name: 'Demo connection',
+      phase: 'closed',
+      port: null,
+      portLabel: 'Demo (no device attached)',
+      settings: { baudRate: d.baudRate, dataBits: d.dataBits, stopBits: d.stopBits,
+                  parity: d.parity, flowControl: d.flowControl },
+      mode: 'text',
+      entries: [], bytes: 0, count: 0, openedAt: null,
+      paused: false, autoscroll: true, timestamps: true, err: null,
+      decoder: new TextDecoder(), textBuf: '', hexBuf: [], hexOffset: 0, alertBuf: [],
+      reader: null, writer: null, keepReading: false, readLoopPromise: null,
+      flushTimer: null, statsPending: false,
+    };
+    conns.push(conn);
+    emitSys(conn, 'Demo connection — sample data, no device attached', 'sys');
+    handleChunk(conn, new TextEncoder().encode('MegaNet serial demo — plain text mode\r\n'));
+    conn.mode = 'hex';
+    handleChunk(conn, new TextEncoder().encode('hex dump demo bytes'));
+    conn.mode = 'alert';
+    handleChunk(conn, new Uint8Array([0x07, 0xD5, 0xF8, 0xFE]));
+    flushPartials(conn);
+    emitSys(conn, 'End of demo — Remove this card and Add connection to open a real port', 'sys');
+    renderList();
+    const el = document.getElementById('ser-card-' + conn.id);
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
   // ── incoming data handling ────────────────────────────────────────────────────
@@ -492,13 +545,13 @@ const Serial = (function () {
         + '<span class="ser-badge ok">' + r.format.toUpperCase() + '</span> '
         + '<span class="ser-alert-id">ID ' + r.values.A + '</span>' + val + ' '
         + '<span class="ser-alert-stn' + (st.none ? ' none' : '') + '">' + esc(st.text) + '</span>'
-        + ' <a class="ser-link" onclick="Serial.openInPackets(\'' + hex + '\')">details ▸</a>';
+        + ' <button type="button" class="link-btn ser-link" onclick="Serial.openInPackets(\'' + hex + '\')">details ▸</button>';
       raw = hex + '  ' + r.format.toUpperCase() + '  ID ' + r.values.A
         + (r.values.D !== undefined ? '  val ' + r.values.D : '') + '  ' + st.text;
     } else {
       body = '<span class="ser-alert-hex">' + hex + '</span> '
         + '<span class="ser-badge bad">no ALERT match</span>'
-        + ' <a class="ser-link" onclick="Serial.openInPackets(\'' + hex + '\')">inspect ▸</a>';
+        + ' <button type="button" class="link-btn ser-link" onclick="Serial.openInPackets(\'' + hex + '\')">inspect ▸</button>';
       raw = hex + '  no ALERT match';
     }
     emit(conn, { ts: Date.now(), cls: 'alert', body, raw });
@@ -586,6 +639,7 @@ const Serial = (function () {
     if (!conn) return;
     conn.paused = !conn.paused;
     if (!conn.paused) repaintLog(conn);
+    announce(conn.name + (conn.paused ? ' — display paused; the port stays open' : ' — display resumed'));
     renderList();
   }
   function clearLog(id) {
@@ -701,8 +755,8 @@ const Serial = (function () {
     // Ports already granted in a previous pick — one click to reconnect without
     // the picker. Shown only before a port is chosen for this connection.
     const knownHtml = (!conn.port && knownPorts.length)
-      ? '<div class="ser-known" style="margin-top:.4rem;font-size:.8rem">'
-        + '<span style="opacity:.7">Previously allowed:</span> '
+      ? '<div class="ser-known">'
+        + '<span class="ser-known-label">Previously allowed:</span> '
         + knownPorts.map((p, i) => '<button class="ghost" onclick="Serial.useKnownPort(\''
             + conn.id + '\',' + i + ')">' + esc(portLabel(p)) + '</button>').join(' ')
         + '</div>'
@@ -714,7 +768,7 @@ const Serial = (function () {
       + '  </label>'
       + '  <div class="ser-f-port"><label>COM port</label><div class="ser-port-row">' + portBtn + '</div>'
       + knownHtml
-      + '    <div class="ser-port-status" id="ser-port-status-' + conn.id + '" style="font-size:.8rem;margin-top:.35rem"></div></div>'
+      + '    <div class="ser-port-status" id="ser-port-status-' + conn.id + '"></div></div>'
       + '  <label>Baud rate'
       + '    <input type="number" list="ser-bauds" value="' + esc(s.baudRate) + '" min="1"'
       + '           oninput="Serial.setSetting(\'' + conn.id + '\',\'baudRate\',this.value)">'
@@ -768,14 +822,23 @@ const Serial = (function () {
     const stats = '<div class="ser-substats"><span class="ser-cfg">' + esc(cfg) + '</span>'
       + '<span class="ser-stats" id="ser-stats-' + conn.id + '">' + esc(statsText(conn)) + '</span></div>';
 
-    const log = '<div class="ser-log' + (conn.mode === 'text' ? ' ser-log-text' : '') + '" id="ser-log-' + conn.id + '"></div>';
+    // The log is a fixed-height scroller, so it is a named region with a tab
+    // stop (pattern 7 — overflow: auto is keyboard-scrollable in Firefox and
+    // nothing else). It is deliberately NOT a live region: at 9600 baud a
+    // role="log" would announce every line, which is the unusable half of the
+    // aria-live failure mode. The policy (design-system §4): announce start
+    // and stop, keep the stream in a region the reader visits at their own
+    // pace, with the stats line beside it as the on-demand summary.
+    const log = '<div class="ser-log' + (conn.mode === 'text' ? ' ser-log-text' : '') + '" id="ser-log-' + conn.id + '"'
+      + ' role="region" tabindex="0" aria-label="Received data — ' + esc(conn.name) + '"></div>';
 
     let send = '';
     if (isOpen) {
       send = '<div class="ser-send">'
         + '<input type="text" id="ser-send-' + conn.id + '" placeholder="Send to device…"'
+        + ' aria-label="Text to send to the device"'
         + ' onkeydown="if(event.key===\'Enter\')Serial.sendData(\'' + conn.id + '\')">'
-        + '<select id="ser-send-end-' + conn.id + '">'
+        + '<select id="ser-send-end-' + conn.id + '" aria-label="Line ending">'
         +   '<option value="lf">\\n (LF)</option><option value="crlf">\\r\\n (CRLF)</option>'
         +   '<option value="cr">\\r (CR)</option><option value="none">no line ending</option>'
         + '</select>'
@@ -801,7 +864,10 @@ const Serial = (function () {
     if (!host) return;
     if (!conns.length) {
       host.innerHTML = '<div class="panel ser-empty"><p>No connections yet. Click '
-        + '<strong>+ Add connection</strong> to choose a COM port and open a serial device.</p></div>';
+        + '<strong>+ Add connection</strong> to choose a COM port and open a serial device.</p>'
+        + '<div class="button-group">'
+        + '<button class="ghost" onclick="Serial.addDemo()">Show a demo connection</button>'
+        + '</div></div>';
       return;
     }
     host.innerHTML = conns.map(connCardHtml).join('');
@@ -825,7 +891,7 @@ const Serial = (function () {
     return '<div class="serial">' + bauds
       + '<div class="panel">'
       + '  <div class="panel-header"><h2>Serial Monitor '
-      + '<span class="small" style="opacity:.55;font-weight:normal">build ' + SERIAL_BUILD + '</span></h2>'
+      + '<span class="small ser-build">build ' + SERIAL_BUILD + '</span></h2>'
       + '    <button class="primary" onclick="Serial.addConnection()"' + (supported ? '' : ' disabled') + '>+ Add connection</button>'
       + '  </div>'
       + '  <p class="sub">Connect physical serial devices to your computer’s COM ports and watch their output live. '
@@ -848,7 +914,7 @@ const Serial = (function () {
   }
 
   return {
-    render, init, addConnection, choosePort, useKnownPort, openConn, closeConn, removeConn, reopenConn,
+    render, init, addConnection, addDemo, choosePort, useKnownPort, openConn, closeConn, removeConn, reopenConn,
     togglePause, clearLog, saveLog, toggleFlag, sendData, resync, openInPackets,
     setName, setSetting, setMode,
   };

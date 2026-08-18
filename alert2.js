@@ -924,13 +924,26 @@ const Alert2 = (function () {
   // an ERT-A2 is usable to about −115, so the scale is laid out over the range a
   // real network actually occupies. It colours the map pins and the table cells,
   // and it is deliberately the same scale in both.
+  //
+  // The colours are tokens, not literals (#140). These are drawn on the page's
+  // own ground — a bar beside a number, a legend dot, a map pin — so unlike the
+  // bit cells, which paint their own ground, they have to clear 3:1 against
+  // whichever theme is up, and measured they did not: "weak" was 2.46:1 on the
+  // dark panel. `token` is what the CSS reads; `color` stays as the light
+  // theme's literal, and is the fallback for the one consumer that cannot take
+  // a var() — Leaflet, which needs a resolved colour for the pin fill.
   const RSSI_BANDS = [
-    { max: Infinity, min: -90,      color: '#137a3b', label: 'strong',   note: 'above −90 dBm' },
-    { max: -90,      min: -100,     color: '#5a9e18', label: 'good',     note: '−90 to −100 dBm' },
-    { max: -100,     min: -107,     color: '#c08a12', label: 'fair',     note: '−100 to −107 dBm' },
-    { max: -107,     min: -112,     color: '#d4691f', label: 'marginal', note: '−107 to −112 dBm' },
-    { max: -112,     min: -Infinity, color: '#b3261e', label: 'weak',    note: 'below −112 dBm' },
+    { max: Infinity, min: -90,      token: '--rssi-strong',   color: '#137a3b', label: 'strong',   note: 'above −90 dBm' },
+    { max: -90,      min: -100,     token: '--rssi-good',     color: '#5a9e18', label: 'good',     note: '−90 to −100 dBm' },
+    { max: -100,     min: -107,     token: '--rssi-fair',     color: '#b98511', label: 'fair',     note: '−100 to −107 dBm' },
+    { max: -107,     min: -112,     token: '--rssi-marginal', color: '#d4691f', label: 'marginal', note: '−107 to −112 dBm' },
+    { max: -112,     min: -Infinity, token: '--rssi-weak',    color: '#b3261e', label: 'weak',    note: 'below −112 dBm' },
   ];
+
+  // In CSS, the token itself — so a theme change repaints the bar and the dot
+  // without this tab re-rendering. Resolved to a literal only for Leaflet.
+  const bandVar   = b => 'var(' + b.token + ')';
+  const bandColor = b => cssVar(b.token, b.color);
   function rssiBand(v) {
     if (v == null) return null;
     return RSSI_BANDS.find(b => v > b.min && v <= b.max) || RSSI_BANDS[RSSI_BANDS.length - 1];
@@ -938,7 +951,7 @@ const Alert2 = (function () {
   function rssiCell(v) {
     if (v == null) return '<span class="spec">—</span>';
     const b = rssiBand(v);
-    return '<span class="a2-rssi" style="--rssi:' + b.color + '" title="' + esc(b.label + ' — ' + b.note) + '">'
+    return '<span class="a2-rssi" style="--rssi:' + bandVar(b) + '" title="' + esc(b.label + ' — ' + b.note) + '">'
          + v + '<i>dBm</i></span>';
   }
 
@@ -966,16 +979,19 @@ const Alert2 = (function () {
   // stopPropagation because these rows are themselves clickable: without it,
   // following the link would also fire the row's own map selection on the way
   // out of a tab that is about to be replaced.
+  //
+  // A button, not an href-less anchor (#140): the action is in-page, and an
+  // anchor without a real href is invisible to the keyboard.
   function stationLink(st) {
-    return '<a class="stn a2-stlink" href="javascript:void 0" onclick="event.stopPropagation();goToStation(\''
+    return '<button type="button" class="link-btn stn a2-stlink" onclick="event.stopPropagation();goToStation(\''
          + escAttr(st.id) + '\')" title="Open ' + escAttr(st.name) + ' on the Stations tab">'
-         + esc(st.name) + '</a>';
+         + esc(st.name) + '</button>';
   }
 
   function valueCell(row) {
     const full = row.r.value === FULL_SCALE
       ? ' <span class="badge warn" title="11 bits all set — over-range, or a sensor reading nothing">full scale</span>' : '';
-    const eng = row.eng ? '<div class="spec" style="margin-top:2px" title="' + esc(row.eng.rule) + '">' + esc(row.eng.text) + '</div>' : '';
+    const eng = row.eng ? '<div class="spec a2-follow" title="' + esc(row.eng.rule) + '">' + esc(row.eng.text) + '</div>' : '';
     return '<span class="val">' + row.r.value + '</span>' + full + eng;
   }
 
@@ -1015,7 +1031,7 @@ const Alert2 = (function () {
       const role = spec ? spec.role : 'bad';
       const label = spec ? spec.label : 'unknown element';
       const note = spec ? spec.note : 'Not an element this decoder has seen; its bytes are shown raw.';
-      html += '<div class="a2-tlvrow" style="margin-left:' + (e.depth * 22) + 'px">'
+      html += '<div class="a2-tlvrow" style="--depth:' + e.depth + '">'
             + '<span class="a2-chip r-' + role + (spec && spec.sure ? '' : ' unsure')
             + '" title="' + esc(label + ' — ' + note) + '"><b>' + e.tag + '</b><i>' + esc(label) + '</i></span>'
             + '<code class="a2-tlvlen">' + e.len + ' B</code>'
@@ -1100,15 +1116,15 @@ const Alert2 = (function () {
       + '<div class="a2-rec-body">'
       +   '<div class="a2-rec-bits">' + packedBits(b1) + '<div class="spec">the packed byte</div></div>'
       +   '<div class="a2-rec-maths">'
-      +     '<div><span class="swatch" style="background:var(--c-addr)"></span>ALERT id'
+      +     '<div><span class="swatch" style="--dot:var(--c-addr)"></span>ALERT id'
       +       ' <code>(0x' + hx(b1) + ' &amp; 0x1F) &lt;&lt; 8 | 0x' + hx(b0) + '</code> = <span class="val">' + r.alertId + '</span>'
       +       ' &nbsp;' + stationCell(info) + typeCellInline(info) + '</div>'
-      +     '<div><span class="swatch" style="background:var(--c-data)"></span>Value'
+      +     '<div><span class="swatch" style="--dot:var(--c-data)"></span>Value'
       +       ' <code>(0x' + hx(b1) + ' &gt;&gt; 5) &lt;&lt; 8 | 0x' + hx(b2) + '</code> = <span class="val">' + r.value + '</span>'
       +       (eng ? ' &nbsp;<b>' + esc(eng.text) + '</b> <span class="spec">(' + esc(eng.rule) + ')</span>' : '')
       +       (r.value === FULL_SCALE ? ' <span class="badge warn">full scale</span>' : '') + '</div>'
-      +     '<div><span class="swatch" style="background:var(--c-status)"></span>Status <code>0x' + hx(b3) + '</code> — '
-      +       (r.ok ? '<span style="color:var(--ok)">valid</span>' : '<span style="color:var(--bad)">non-zero, treat the reading as corrupt</span>') + '</div>'
+      +     '<div><span class="swatch" style="--dot:var(--c-status)"></span>Status <code>0x' + hx(b3) + '</code> — '
+      +       (r.ok ? '<span class="txt-ok">valid</span>' : '<span class="txt-bad">non-zero, treat the reading as corrupt</span>') + '</div>'
       +   '</div>'
       + '</div></div>';
   }
@@ -1146,14 +1162,14 @@ const Alert2 = (function () {
     if (f.warn.length) body += '<ul class="a2-warn">' + f.warn.map(w => '<li>' + esc(w) + '</li>').join('') + '</ul>';
     if (!f.error) {
       if (bin) {
-        body += '<h4 class="a2-h">Frame elements</h4>' + tlvChips(f);
+        body += '<h5 class="a2-h">Frame elements</h5>' + tlvChips(f);
         body += '<div class="spec">Tag, length, value — nesting shown by indent. Faded chips are elements that were '
               + 'constant across every frame cross-checked against Ranger, so their meaning is recorded but not established.</div>';
       } else {
-        body += '<h4 class="a2-h">Header fields</h4>' + fieldChips(f);
+        body += '<h5 class="a2-h">Header fields</h5>' + fieldChips(f);
         body += '<div class="spec">Faded chips are fields that were constant across every frame in the reference capture, so their meaning is recorded but not established.</div>';
       }
-      body += '<h4 class="a2-h">Payload — ALERT concentration, ' + f.payload.bytes.length + ' bytes</h4>' + payloadStrip(f);
+      body += '<h5 class="a2-h">Payload — ALERT concentration, ' + f.payload.bytes.length + ' bytes</h5>' + payloadStrip(f);
       body += '<div class="spec">Frame time <b>' + hms(f.payload.sod) + '</b> (' + f.payload.sod
             + ' s since midnight, from the two time bytes). '
             + (bin
@@ -1164,11 +1180,14 @@ const Alert2 = (function () {
       body += f.records.map((r, i) => recordBlock(r, i, res)).join('');
       if (!f.records.length) body += '<p class="spec">No complete readings in this payload.</p>';
     }
-    return '<div class="fmtcard' + (open ? ' open' : '') + '">'
-      + '<div class="fmthead" onclick="this.parentElement.classList.toggle(\'open\')">'
-      + '<h3>' + (bin ? 'Frame ' + (f.seq + 1) : 'Line ' + f.lineNo) + '</h3>' + badges.join(' ')
-      + '<span class="caret">' + esc(summary.slice(0, 400)) + ' ▾</span></div>'
-      + '<div class="fmtbody">' + body + '</div></div>';
+    // A <details>, not a div with a click handler (#140): same reasoning as the
+    // ALERT Packets cards — a div's onclick is a mouse-only affordance, where
+    // the summary is a disclosure a keyboard and a screen reader get for free.
+    return '<details class="fmtcard"' + (open ? ' open' : '') + '>'
+      + '<summary class="fmthead">'
+      + '<h4>' + (bin ? 'Frame ' + (f.seq + 1) : 'Line ' + f.lineNo) + '</h4>' + badges.join(' ')
+      + '<span class="caret">' + esc(summary.slice(0, 400)) + ' ▾</span></summary>'
+      + '<div class="fmtbody">' + body + '</div></details>';
   }
 
   // ── rendering: panels ─────────────────────────────────────────────────────────
@@ -1217,7 +1236,7 @@ const Alert2 = (function () {
       const spread = steady
         ? (s.skewSpread ? ' (spread ' + Math.round(s.skewSpread) + ' s, which is receive latency)' : '')
         : ', though it ranges over ' + durText(s.skewSpread) + ' — the offset is not constant, so the clock drifted or was reset part-way through this capture';
-      clock = '<div class="note compact" style="margin-top:.8rem">'
+      clock = '<div class="note compact pkt-block">'
         + (Math.abs(s.skew) < 2
             ? 'The ERT-A2 clock <b>agrees</b> with the ALERT2 frame time to within a couple of seconds across '
               + s.skewN + ' frame' + (s.skewN === 1 ? '' : 's') + '.'
@@ -1249,7 +1268,7 @@ const Alert2 = (function () {
       <div class="panel">
         <div class="panel-header"><h3>Capture summary</h3></div>
         <div class="a2-stats">${chips}</div>
-        ${ingest.length ? '<div class="spec" style="margin-top:.6rem">' + ingest.join(' · ') + '.</div>' : ''}
+        ${ingest.length ? '<div class="spec pkt-block">' + ingest.join(' · ') + '.</div>' : ''}
         ${rssiNote}
         ${span}
         ${anchors}
@@ -1275,33 +1294,46 @@ const Alert2 = (function () {
          + ' data-key="' + escAttr(key) + '" onclick="Alert2.select(\'' + escAttr(key) + '\')"';
   }
 
+  // The keyboard's way onto a clickable row (#140, pattern 7b): the ALERT id
+  // cell is a .row-open button doing what a click anywhere on the row does.
+  // A station link is not enough — an unmatched address has no station link,
+  // and that row would be reachable by mouse only.
+  function rowOpenBtn(key, label) {
+    return '<button type="button" class="row-open" onclick="event.stopPropagation();Alert2.select(\''
+         + escAttr(key) + '\')" title="Select — highlight this address in the table and on the map">'
+         + label + '</button>';
+  }
+
   function readingsView(p, res) {
     const a = state.a2;
     const c = cols(p);
     const rows = rowsFor(p, res);
     const shown = rows.slice(0, a.limit);
-    let html = '<div class="a2-tablewrap"><table class="fields a2-table"><thead><tr>'
-      + '<th>FRAME TIME</th>' + (c.clock ? '<th>ERT-A2 CLOCK</th>' : '')
-      + '<th>ALERT ID</th><th>STATION</th><th>SENSOR</th><th>VALUE</th>'
-      + (c.rssi ? '<th>RSSI</th>' : '') + '<th>' + (p.stats.mode === 'bin' ? 'FRAME' : 'LINE') + '</th>'
+    let html = '<div class="table-wrap a2-tablewrap"><table class="fields a2-table">'
+      + '<caption class="sr-only">Decoded readings — one row per reading, in capture order</caption>'
+      + '<thead><tr>'
+      + '<th scope="col">FRAME TIME</th>' + (c.clock ? '<th scope="col">ERT-A2 CLOCK</th>' : '')
+      + '<th scope="col">ALERT ID</th><th scope="col">STATION</th><th scope="col">SENSOR</th><th scope="col">VALUE</th>'
+      + (c.rssi ? '<th scope="col">RSSI</th>' : '') + '<th scope="col">' + (p.stats.mode === 'bin' ? 'FRAME' : 'LINE') + '</th>'
       + '</tr></thead><tbody>';
     shown.forEach(row => {
       html += '<tr' + rowAttrs(row.key, row.r.ok ? '' : 'a2-badrow') + '>'
         + '<td><code>' + hms(row.f.payload.sod) + '</code></td>'
         + (c.clock ? '<td><span class="spec">' + esc(clockText(row.f.hdr.clockMs)) + '</span></td>' : '')
-        + '<td><b>' + row.r.alertId + '</b></td>'
+        + '<td>' + rowOpenBtn(row.key, '<b>' + row.r.alertId + '</b>') + '</td>'
         + '<td>' + stationCell(row.info) + '</td>'
         + '<td>' + typeCell(row.info) + '</td>'
         + '<td>' + valueCell(row) + '</td>'
         + (c.rssi ? '<td>' + rssiCell(row.f.hdr.rssi) + '</td>' : '')
-        + '<td><a class="a2-link" onclick="event.stopPropagation();Alert2.openFrame(' + row.f.seq + ')">'
-        + (p.stats.mode === 'bin' ? row.f.seq + 1 : row.f.lineNo) + ' ▸</a></td>'
+        + '<td><button type="button" class="link-btn a2-link" onclick="event.stopPropagation();Alert2.openFrame(' + row.f.seq + ')" '
+        + 'title="Open this frame in the anatomy view">'
+        + (p.stats.mode === 'bin' ? row.f.seq + 1 : row.f.lineNo) + ' ▸</button></td>'
         + '</tr>';
     });
     html += '</tbody></table></div>';
     if (!rows.length) html += '<p class="spec">No readings match the current filters.</p>';
     if (rows.length > shown.length)
-      html += '<div style="margin-top:12px"><button class="ghost" onclick="Alert2.more()">Show '
+      html += '<div class="pkt-block"><button class="ghost" onclick="Alert2.more()">Show '
             + Math.min(ROW_STEP, rows.length - shown.length) + ' more</button> '
             + '<span class="spec">showing ' + shown.length + ' of ' + rows.length + ' readings</span></div>';
     return html;
@@ -1313,13 +1345,16 @@ const Alert2 = (function () {
     let html = '<p class="sub">One row per ALERT address heard, newest value last. This is the view that answers '
              + '“is that station still reporting, and what is it saying”'
              + (c.rssi ? ' — and, from the USB capture, how well it is being heard.' : '.') + '</p>'
-             + '<div class="a2-tablewrap"><table class="fields a2-table"><thead><tr>'
-             + '<th>ALERT ID</th><th>STATION</th><th>SENSOR</th><th>HEARD</th><th>FIRST → LAST</th><th>RANGE</th><th>LATEST</th>'
-             + (c.rssi ? '<th>RSSI MEDIAN</th><th>BEST / WORST</th>' : '')
+             + '<div class="table-wrap a2-tablewrap"><table class="fields a2-table">'
+             + '<caption class="sr-only">Stations heard — one row per ALERT address, newest value last</caption>'
+             + '<thead><tr>'
+             + '<th scope="col">ALERT ID</th><th scope="col">STATION</th><th scope="col">SENSOR</th><th scope="col">HEARD</th>'
+             + '<th scope="col">FIRST → LAST</th><th scope="col">RANGE</th><th scope="col">LATEST</th>'
+             + (c.rssi ? '<th scope="col">RSSI MEDIAN</th><th scope="col">BEST / WORST</th>' : '')
              + '</tr></thead><tbody>';
     roll.forEach(e => {
       html += '<tr' + rowAttrs(e.key) + '>'
-        + '<td><b>' + e.aid + '</b></td>'
+        + '<td>' + rowOpenBtn(e.key, '<b>' + e.aid + '</b>') + '</td>'
         + '<td>' + stationCell(e.info) + '</td>'
         + '<td>' + typeCell(e.info) + '</td>'
         + '<td>' + e.n + '</td>'
@@ -1345,7 +1380,7 @@ const Alert2 = (function () {
     html += shown.map(f => frameCard(f, res, f.seq === a.frameIdx)).join('');
     if (!list.length) html += '<p class="spec">No frames match the current filter.</p>';
     if (list.length > shown.length)
-      html += '<div style="margin-top:12px"><button class="ghost" onclick="Alert2.more()">Show more</button> '
+      html += '<div class="pkt-block"><button class="ghost" onclick="Alert2.more()">Show more</button> '
             + '<span class="spec">showing ' + shown.length + ' of ' + list.length + ' frames</span></div>';
     return html;
   }
@@ -1379,7 +1414,7 @@ const Alert2 = (function () {
       html += '</div></div>';
     });
     if (Object.keys(state.a2.picks).length)
-      html += '<div style="margin-top:10px"><button class="ghost" onclick="Alert2.clearPicks()">Clear all pinned choices</button></div>';
+      html += '<div class="pkt-block"><button class="ghost" onclick="Alert2.clearPicks()">Clear all pinned choices</button></div>';
     html += '</div>';
     return html;
   }
@@ -1434,7 +1469,7 @@ const Alert2 = (function () {
 
     const legend = withRssi
       ? '<div class="a2-legend"><span class="spec">Pin colour — RSSI</span>'
-        + RSSI_BANDS.map(b => '<span class="a2-lkey" title="' + esc(b.note) + '"><i style="background:' + b.color + '"></i>' + esc(b.label) + '</span>').join('')
+        + RSSI_BANDS.map(b => '<span class="a2-lkey" title="' + esc(b.note) + '"><i style="--dot:' + bandVar(b) + '"></i>' + esc(b.label) + '</span>').join('')
         + '<span class="spec">bands are indicative; pin size is how many readings the station sent</span></div>'
       : '<div class="a2-legend"><span class="spec">Pin size is how many readings the station sent. '
         + 'Paste a USB capture instead and the pins colour by RSSI.</span></div>';
@@ -1444,7 +1479,7 @@ const Alert2 = (function () {
         <div class="panel-header"><h3>Where these packets came from <span class="badge ok">${pts.length} station${pts.length === 1 ? '' : 's'}</span></h3></div>
         <p class="sub">Every station this receiver heard in the capture. Click a pin to light up its readings in the
           table below; click a reading and its pin lights up here. The station name in either place opens it on the
-          <a href="javascript:void 0" onclick="switchTab('stations')">Stations</a> tab.</p>
+          <button type="button" class="link-btn" onclick="switchTab('stations')">Stations</button> tab.</p>
         <div id="a2-map" class="a2-map"></div>
         ${legend}
         ${pts.length ? '' : '<div class="note compact">None of the addresses in this capture resolved to a station with coordinates, so there is nothing to draw yet.</div>'}
@@ -1469,6 +1504,14 @@ const Alert2 = (function () {
     // The getter, not the map: stopMap() sets this back to null on the way out
     // of the tab, and the shell has to see that (#142).
     registerLiveMap('Alert2', () => state.a2.map);
+    // Leaflet's keyboard handler makes the container a tab stop, so it needs a
+    // name — and the name carries the counts, parts 1–2 of the graphic pattern
+    // (design-system §3); part 3, the data itself, is the table below the map.
+    const withRssi = pts.filter(e => e.rssiMed != null).length;
+    el.setAttribute('aria-label',
+      'Coverage map — ' + pts.length + ' station' + (pts.length === 1 ? '' : 's')
+      + ' this receiver heard, pin size by readings sent'
+      + (withRssi ? ', pin colour by signal strength' : ''));
     // A view before any layer is added: Leaflet defers layer adds until the map
     // has one, and a deferred add can otherwise run against a renderer that has
     // not been set up. Replaced by the fit below on the same tick.
@@ -1483,10 +1526,10 @@ const Alert2 = (function () {
       const m = L.circleMarker([e.st.lat, e.st.lon], {
         radius: 5 + 5 * Math.sqrt(e.n / most),
         color: '#fff', weight: 1.5,
-        fillColor: band ? band.color : '#5a6b7d', fillOpacity: .85,
+        fillColor: band ? bandColor(band) : cssVar('--muted', '#5a6b7d'), fillOpacity: .85,
       });
       m.a2Key = e.key;
-      m.a2Base = { fill: band ? band.color : '#5a6b7d' };
+      m.a2Base = { fill: band ? bandColor(band) : cssVar('--muted', '#5a6b7d') };
       m.bindPopup(mapPopup(e));
       m.on('click', () => select(e.key, 'map'));
       m.addTo(a.mapLayer);
@@ -1517,7 +1560,7 @@ const Alert2 = (function () {
       + (e.rssiMed != null
           ? '<br>RSSI <b>' + e.rssiMed + ' dBm</b> median, ' + e.rssiBest + ' best / ' + e.rssiWorst + ' worst'
           : '')
-      + '<br><a href="javascript:void 0" onclick="goToStation(\'' + escAttr(e.st.id) + '\')">Open on the Stations tab →</a>';
+      + '<br><button type="button" class="link-btn" onclick="goToStation(\'' + escAttr(e.st.id) + '\')">Open on the Stations tab →</button>';
   }
 
   function stopMap() {
@@ -1569,14 +1612,14 @@ const Alert2 = (function () {
   function referencePanel() {
     const rows = FIELDS.map((spec, i) => '<tr>'
       + '<td><b>' + (i + 1) + '</b></td>'
-      + '<td><span class="swatch" style="background:var(--c-' + ROLE_VAR[spec.role] + ')"></span>' + esc(spec.label) + '</td>'
+      + '<td><span class="swatch" style="--dot:var(--c-' + ROLE_VAR[spec.role] + ')"></span>' + esc(spec.label) + '</td>'
       + '<td>' + (spec.sure ? '<span class="badge ok">established</span>' : '<span class="badge warn">constant only</span>') + '</td>'
       + '<td class="spec">' + esc(spec.note || '') + '</td></tr>').join('');
     const binRows = BIN_ORDER.map(([tag, depth]) => {
       const spec = BIN_TAGS[tag];
       return '<tr>'
-        + '<td style="padding-left:' + (6 + depth * 18) + 'px"><code>' + tag + '</code></td>'
-        + '<td><span class="swatch" style="background:' + (spec.role === 'rssi' ? 'var(--ok)' : 'var(--c-' + ROLE_VAR[spec.role] + ')') + '"></span>' + esc(spec.label) + '</td>'
+        + '<td class="a2-el-tag" style="--depth:' + depth + '"><code>' + tag + '</code></td>'
+        + '<td><span class="swatch" style="--dot:' + (spec.role === 'rssi' ? 'var(--ok)' : 'var(--c-' + ROLE_VAR[spec.role] + ')') + '"></span>' + esc(spec.label) + '</td>'
         + '<td>' + (spec.sure ? '<span class="badge ok">established</span>' : '<span class="badge warn">constant only</span>') + '</td>'
         + '<td class="spec">' + esc(spec.note || '') + '</td></tr>';
     }).join('');
@@ -1637,8 +1680,10 @@ const Alert2 = (function () {
             hex bytes — one field per byte. Field 23 gives the payload length, which is what distinguishes a
             complete line from one the terminal wrapped or cut short.</p>
 
-          <div class="a2-tablewrap"><table class="fields a2-table"><thead><tr>
-            <th>#</th><th>FIELD</th><th>CONFIDENCE</th><th>NOTES</th>
+          <div class="table-wrap a2-tablewrap"><table class="fields a2-table">
+            <caption class="sr-only">The 24 fields of an ALERT2 ASCII line, in order, with how well each meaning is established</caption>
+            <thead><tr>
+            <th scope="col">#</th><th scope="col">FIELD</th><th scope="col">CONFIDENCE</th><th scope="col">NOTES</th>
           </tr></thead><tbody>${rows}</tbody></table></div>
         </details>
 
@@ -1650,8 +1695,10 @@ const Alert2 = (function () {
             bit set is the first of a two-byte tag; otherwise the tag is that single byte. Length is always one
             byte. Two elements are containers whose value is more elements — shown indented below.</p>
 
-          <div class="a2-tablewrap"><table class="fields a2-table"><thead><tr>
-            <th>TAG</th><th>ELEMENT</th><th>CONFIDENCE</th><th>NOTES</th>
+          <div class="table-wrap a2-tablewrap"><table class="fields a2-table">
+            <caption class="sr-only">The elements of the ELPRO binary framing, in wire order, nesting shown by indent</caption>
+            <thead><tr>
+            <th scope="col">TAG</th><th scope="col">ELEMENT</th><th scope="col">CONFIDENCE</th><th scope="col">NOTES</th>
           </tr></thead><tbody>${binRows}</tbody></table></div>
 
           <h4 class="a2-h">The same PDU, twice</h4>
@@ -1834,9 +1881,10 @@ const Alert2 = (function () {
           ${modeBtn('bin', 'USB hex', 'The binary framing the USB port emits — the one with RSSI in it')}
         </div>
         <textarea id="a2-text" class="a2-input" spellcheck="false" rows="7"
+                  aria-label="Capture — paste an ALERT2 ASCII log or USB hex here"
                   placeholder="ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00&#10;41 4C 45 52 54 32 4D 75 01 01 18 02 27 0F 77 05 45 4C 50 52 4F …"
                   oninput="state.a2.text=this.value">${esc(a.text)}</textarea>
-        <div class="row" style="margin-top:12px">
+        <div class="row pkt-block">
           <div class="fit"><button class="primary" onclick="Alert2.decode()">Decode</button></div>
           <div class="fit"><button class="ghost" onclick="Alert2.chooseFile()">Choose log file…</button></div>
           ${canWatch ? '<div class="fit"><button class="ghost" onclick="Alert2.' + (w ? 'stopWatching()">Stop watching ' + esc(w.name) : 'watchFile()">Watch a log file…') + '</button></div>' : ''}
@@ -1845,14 +1893,17 @@ const Alert2 = (function () {
           <div class="fit"><button class="ghost" onclick="Alert2.clear()">Clear</button></div>
         </div>
         <input type="file" id="a2-file" accept=".txt,.log,.csv,.hex,.dat,text/plain" hidden onchange="Alert2.onFile(this)">
-        <div id="a2-status" class="note compact" style="margin-top:.75rem"${a.source ? '' : ' hidden'}>${esc(a.source)}</div>
-        ${a.watchErr ? '<div class="note compact warn" style="margin-top:.75rem">' + a.watchErr + '</div>' : ''}
+        <div id="a2-status" class="note compact pkt-block"${a.source ? '' : ' hidden'}>${esc(a.source)}</div>
+        ${a.watchErr ? '<div class="note compact warn pkt-block">' + a.watchErr + '</div>' : ''}
         ${!canWatch ? '<div class="spec">Watching a log file as it grows needs the File System Access API — a Chromium browser (Chrome, Edge) over https or localhost. Choosing a file still works everywhere; it reads the file once, as it stands.</div>' : ''}
       </div>`;
   }
 
+  // aria-pressed, because .on is a colour: the pressed state has to reach a
+  // reader that never sees the accent background (#140).
   function modeBtn(id, label, title) {
-    return '<button class="a2-vtab' + (state.a2.mode === id ? ' on' : '') + '" title="' + esc(title)
+    const on = state.a2.mode === id;
+    return '<button class="a2-vtab' + (on ? ' on' : '') + '" aria-pressed="' + on + '" title="' + esc(title)
          + '" onclick="Alert2.setMode(\'' + id + '\')">' + esc(label) + '</button>';
   }
 
@@ -1864,17 +1915,19 @@ const Alert2 = (function () {
       + cb('onlyErrors', 'Only problems', 'Show just the frames and readings something is wrong with')
       + cb('hideUnknown', 'Hide unmatched addresses', 'Drop readings whose ALERT address matches no station in the database')
       + cb('eng', 'Engineering values', 'Convert battery and rainfall counts, using the scales below')
-      + '<span class="a2-num" title="Fallback only — a station carrying a recorded TBRGbucketSize uses that instead">'
+      // Labels, not spans: the caption beside a number box has to *be* its name,
+      // or the box announces as an unlabelled spinbutton (#140).
+      + '<label class="a2-num" title="Fallback only — a station carrying a recorded TBRGbucketSize uses that instead">'
       + 'mm per tip (fallback) <input type="number" step="0.1" min="0" value="' + a.mmPerTip
-      + '" oninput="Alert2.setOpt(\'mmPerTip\',this.value)"></span>'
-      + '<span class="a2-num">battery ÷ <input type="number" step="1" min="1" value="' + a.battDiv
-      + '" oninput="Alert2.setOpt(\'battDiv\',this.value)"></span>'
+      + '" oninput="Alert2.setOpt(\'mmPerTip\',this.value)"></label>'
+      + '<label class="a2-num">battery ÷ <input type="number" step="1" min="1" value="' + a.battDiv
+      + '" oninput="Alert2.setOpt(\'battDiv\',this.value)"></label>'
       + '</div>';
   }
 
   function viewPanel(p, res) {
     const a = state.a2;
-    const tab = (id, label) => '<button class="a2-vtab' + (a.view === id ? ' on' : '') + '" onclick="Alert2.setView(\'' + id + '\')">' + esc(label) + '</button>';
+    const tab = (id, label) => '<button class="a2-vtab' + (a.view === id ? ' on' : '') + '" aria-pressed="' + (a.view === id) + '" onclick="Alert2.setView(\'' + id + '\')">' + esc(label) + '</button>';
     let body;
     if (a.view === 'frames')        body = framesView(p, res);
     else if (a.view === 'stations') body = stationsView(p, res);
@@ -1896,7 +1949,7 @@ const Alert2 = (function () {
     const p = current();
     const res = p ? resolve(p) : null;
     return `
-    <div class="pkt a2" style="max-width:1280px;margin:auto;padding:1rem;display:grid;gap:1rem">
+    <div class="pkt a2 page" style="--page-max:1280px">
 
       <div class="panel">
         <div class="panel-header"><h2>ALERT2 / ERT-A2 Serial Decoder</h2></div>
@@ -1904,7 +1957,7 @@ const Alert2 = (function () {
           timestamp, the signal level it came in at, and the ALERT readings packed into its payload — each one
           matched back to a station in the MegaNet database and put on the map. The readings inside are ordinary
           13-bit ALERT addresses and 11-bit values, the same ones the
-          <a href="javascript:void 0" onclick="switchTab('packets')">ALERT Packets</a> tab decodes one at a time.</p>
+          <button type="button" class="link-btn" onclick="switchTab('packets')">ALERT Packets</button> tab decodes one at a time.</p>
         ${state.data ? '' : '<div class="note compact">No station file loaded — addresses will decode but nothing will be named or mapped. Load <b>stations.json</b> from the header to see station names.</div>'}
       </div>
 
@@ -1971,7 +2024,7 @@ const Alert2 = (function () {
     state.a2.frameIdx = seq;
     refresh();
     setTimeout(() => {
-      const card = document.querySelector('#a2-view .fmtcard.open');
+      const card = document.querySelector('#a2-view details.fmtcard[open]');
       if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 0);
   }
@@ -2094,11 +2147,18 @@ const Alert2 = (function () {
         stopWatch();
         a.watchErr = '<b>Stopped watching ' + esc(name) + '.</b> <span class="spec">'
                    + esc((e && e.name ? e.name + ': ' : '') + ((e && e.message) || e)) + '</span>';
+        announce('Stopped watching ' + name);
         if (state.activeTab === 'alert2') refresh();
       }
     };
     await tick();
-    if (a.watch) a.watch.timer = setInterval(tick, a.watchMs);
+    if (a.watch) {
+      a.watch.timer = setInterval(tick, a.watchMs);
+      // The live-surface policy (design-system §4): a stream announces when it
+      // starts and stops, never per re-read — the status line under the box
+      // updates every tick and is read on demand.
+      announce('Watching ' + a.watch.name + ' — decoding as the log grows');
+    }
     refresh();
   }
 
@@ -2111,7 +2171,13 @@ const Alert2 = (function () {
 
   // The button's own handler. stopWatch alone left the button still reading
   // "Stop watching …" until something else happened to re-render.
-  function stopWatching() { stopWatch(); state.a2.watchErr = ''; refresh(); }
+  function stopWatching() {
+    const w = state.a2.watch;
+    stopWatch();
+    state.a2.watchErr = '';
+    if (w) announce('Stopped watching ' + w.name);
+    refresh();
+  }
 
   // ── export ────────────────────────────────────────────────────────────────────
 

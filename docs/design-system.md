@@ -23,8 +23,8 @@ Three files hold the system itself, and this document explains them:
 
 And two files check it: `test/shell.mjs` (`npm run shell`) holds the system
 against the shell, and `test/tabs.mjs` (`npm run tabs`, added by #137) holds it
-against every tab a U-issue has converted — **eleven of the nineteen (plus the
-two tabs born converted), 219 assertions, as of #139**. Both run in CI on every push that
+against every tab a U-issue has converted — **fifteen of the nineteen (plus the
+two tabs born converted), 297 assertions, as of #140**. Both run in CI on every push that
 touches the app; what each enforces is listed in §5 and §6 at the bottom of this
 page. Every claim below that *can* be checked mechanically is
 checked — this repo has a habit of that, and the reason is in constraint 1 of
@@ -850,10 +850,52 @@ it leaves the rest:
   header: three columns at `xl`, the right rail dropping to a full-width band
   to `lg`, then one column in investigation order — nothing collapses away.
 
-**Eight tabs to go. The two issues still open — #136 (Stations) and #140
-(Network View, ALERT Packets, ALERT2, Serial Monitor) — own five of them.**
+**#140 has since taken ALERT Packets, the ALERT2 / ERT-A2 decoder, the Serial
+Monitor and the Ghosting Graph** — the four protocol tabs, where the app draws
+bytes rather than stations. What it leaves the rest:
 
-Worth knowing before picking up one of the two that are left:
+- **A `<div>` with an `onclick` that opens a card is a `<details>`.** Both
+  decoders had one, and neither was a tab stop, had a role, or announced its
+  state. `<details class="fmtcard"><summary class="fmthead">` is the same card
+  with the disclosure a keyboard and a screen reader get for free — and the
+  `[open]` attribute replaces the `.open` class the CSS was toggling.
+- **`role="img"` over a graphic whose children are focusable is a lie that
+  costs you the children.** The Ghosting Graph's SVG carried it while its
+  nodes carried `tabindex="0"` and an `aria-label` each: `role="img"` makes the
+  whole subtree presentational, so every one of those names was thrown away.
+  `role="group"` keeps them. If the picture has tab stops in it, it is not an
+  image.
+- **A force-directed graph needs part 3 of the graphic pattern like any chart
+  does** (§3). The Ghosting Graph now renders *the addresses in view, as a
+  table* — same `nv.vis`, so it cannot drift from the drawing — and every row
+  carries the same select the node does. That is the difference between a
+  picture that is described and one that is optional.
+- **Colours that paint their own ground still have to be measured.** The nine
+  packet bit-field pairs (`--c-*` / `--c-*-t`) are theme-independent by
+  construction, which is exactly why nobody had ever checked them: three were
+  under AA on 11–13 px type, and the white ink on the packed-byte gradient was
+  too. All twelve pairs are in `shell.mjs`'s contrast contract now.
+- **…and a scale drawn *on* the page has to be measured per theme.** The
+  ERT-A2's five RSSI bands were literals in `alert2.js`; two of them were under
+  1.4.11's 3:1 on the dark panel, one on the light. They are `--rssi-*` tokens
+  now, stated per theme, read as `var()` by the CSS and resolved through
+  `cssVar()` for the one consumer that cannot take one — Leaflet's pin fill.
+  That is the *fifth* time a palette in a JavaScript file could not follow the
+  theme.
+- **A live surface announces its start and its stop, and nothing in between**
+  (§4). The Serial Monitor's stream and the ALERT2 tab's file watch both do;
+  the log itself is a named `role="region"` read on demand, never a `role="log"`
+  that would narrate every frame.
+- **A test seam is usually a missing feature.** `Serial.addDemo()` exists
+  because a headless browser has no serial port — and because a person on a
+  machine with no device, or behind a blocked picker, could not see what the tab
+  does either. It is a button on the tab now, and the sample bytes run through
+  the real pipeline, so what the harness holds to the Definition of Done is the
+  live card rather than a mock-up of it.
+
+**Four tabs to go, and #136 (Stations) owns one of them.**
+
+Worth knowing before picking up what is left:
 
 - **The heading assertion was blind, and probably still is in your tab.** It
   read the whole document, and the nav's five `h2`s meant a tab opening at `h3`
