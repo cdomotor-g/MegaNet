@@ -446,8 +446,9 @@ begin
       and exists (select 1 from meganet.station_status where station_key = '_check_mqtt_conv'),
     'one physical site, two station_key rows, and station_health joins whichever it hits');
 
-  -- The registry learns about the station: id = the topic segment (the topic
-  -- scheme defines the segment to BE the id), carrying the alert address.
+  -- The registry learns about the station, carrying the alert address. Its id
+  -- is the topic segment here because it has no bureau number — the fallback
+  -- half of the 0020 rule; the number half is proved in its own section below.
   insert into meganet.rm_system (id, ord, name)
   values (-995, -995, 'check_mqtt placeholder')
   on conflict (id) do nothing;
@@ -480,6 +481,97 @@ begin
 
   perform pg_temp.check_that('converge is idempotent',
     (meganet.station_status_converge() ->> 'folded')::int = 0);
+end
+$$;
+
+-- ── The publisher is the bureau station number (#166, 0020) ──────────────────
+-- The <station> topic segment names who published. Until 0020 it was the
+-- stations.json slug — a MegaNet artifact derived from the station's name,
+-- which nobody outside this app knows and which moves when the name is edited.
+-- It is now the bureau (BoM/CBM) number, falling back to the station id for the
+-- sites that legitimately have none: repeaters, radars, base stations.
+
+do $$
+declare
+  v jsonb;
+  v_row meganet.station_status%rowtype;
+begin
+  insert into meganet.station (id, ord, name, station_number, rm_system_id)
+  values ('_check_mqtt_num', -994, 'Check Bureau Number', '999094', -995),
+         ('_check_mqtt_nonum', -993, 'Check No Number', '', -995);
+
+  -- 1. The number resolves; so does the id, for a site without a number.
+  perform pg_temp.check_that('the bureau number names its station',
+    meganet.resolve_publisher('999094') = '_check_mqtt_num'
+      and meganet.resolve_publisher(' 999094 ') = '_check_mqtt_num',
+    'the segment a logger publishes under is the number on the site card');
+
+  perform pg_temp.check_that('a site with no bureau number falls back to its id',
+    meganet.resolve_publisher('_check_mqtt_nonum') = '_check_mqtt_nonum'
+      and meganet.resolve_publisher('') is null
+      and meganet.resolve_publisher(null) is null,
+    'repeaters, radars and base stations have no bureau number and still have to publish');
+
+  -- 2. A status published under the NUMBER keys by the station id, not the
+  --    number. This is the whole point: one health row per site, whatever the
+  --    transport called it.
+  perform meganet.mqtt_status(jsonb_build_object(
+    'station', '999094', 'online', true,
+    'status', jsonb_build_object('battery_v', 12.9),
+    'bridge', '_check_mqtt_bridge'));
+
+  perform pg_temp.check_that('publishing under the number keys by the station id',
+    exists (select 1 from meganet.station_status
+             where station_key = '_check_mqtt_num' and station_id = '_check_mqtt_num')
+      and not exists (select 1 from meganet.station_status where station_key = '999094'),
+    'the number is how it published; station.id is how it is stored (0019)');
+
+  -- 3. mqtt_seen resolves the same way — a reading arriving over MQTT stamps
+  --    the same single row, not a second one keyed by the number.
+  perform meganet.mqtt_seen('999094');
+  perform pg_temp.check_that('a reading under the number stamps that same row',
+    (select count(*) from meganet.station_status
+      where station_key in ('_check_mqtt_num', '999094')) = 1
+      and (select last_reading_at is not null from meganet.station_status
+            where station_key = '_check_mqtt_num'),
+    'mqtt_status and mqtt_seen agree about who the publisher is');
+
+  -- 4. An unregistered number stays the honest partial identity, and folds the
+  --    moment the registry learns it — the same contract 0019 wrote for the
+  --    a:/s: address forms, now reaching a bare number.
+  perform meganet.mqtt_status(jsonb_build_object(
+    'station', '999093', 'online', false,
+    'at', now() - interval '3 hours', 'bridge', '_check_mqtt_bridge'));
+
+  perform pg_temp.check_that('a number the registry does not know yet is kept as it arrived',
+    (select station_id is null from meganet.station_status where station_key = '999093'),
+    'a station heard before it is registered is exactly the one whose silence matters (0008)');
+
+  insert into meganet.station (id, ord, name, station_number, rm_system_id)
+  values ('_check_mqtt_late', -992, 'Check Late Registration', '999093', -995);
+
+  v := meganet.station_status_converge();
+  select * into v_row from meganet.station_status where station_key = '_check_mqtt_late';
+  perform pg_temp.check_that('registering the number folds its row into the station id',
+    (v ->> 'folded')::int >= 1
+      and not exists (select 1 from meganet.station_status where station_key = '999093')
+      and v_row.station_id = '_check_mqtt_late'
+      and v_row.online = false
+      and v_row.since <= now() - interval '179 minutes',
+    'without this the number row would sit beside the canonical one forever — #162 through the front door');
+
+  -- 5. The number has to stay unique to be a key. A duplicate would make BOTH
+  --    stations unroutable, silently, because resolve_station() refuses to
+  --    guess between them. 0020 turns that into a failed write instead.
+  perform pg_temp.check_that('a duplicate bureau number is refused',
+    pg_temp.sqlstate_of($q$insert into meganet.station (id, ord, name, station_number, rm_system_id)
+                           values ('_check_mqtt_dup', -991, 'Check Duplicate', '999094', -995)$q$) = '23505',
+    'the failure belongs at the registry, not in the telemetry');
+
+  perform pg_temp.check_that('but any number of sites may have no bureau number',
+    pg_temp.sqlstate_of($q$insert into meganet.station (id, ord, name, station_number, rm_system_id)
+                           values ('_check_mqtt_nonum2', -990, 'Check No Number 2', '', -995)$q$) = 'none',
+    'many repeaters and radars honestly have none — '''' is not a value that can collide');
 end
 $$;
 

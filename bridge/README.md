@@ -14,6 +14,9 @@ that job allows.
 - The **topic scheme, the broker choice, and how to point a station at it** are
   in [`docs/ingest-mqtt.md`](../docs/ingest-mqtt.md) — that is the page for
   whoever is configuring a logger.
+- **Standing the broker and this process up from nothing** — the signup, the
+  credentials, the secrets, the first reading — is
+  [`docs/mqtt-provisioning.md`](../docs/mqtt-provisioning.md).
 - The **tables it writes** are in
   [`db/migrations/0008_mqtt_bridge.sql`](../db/migrations/0008_mqtt_bridge.sql).
 - This page is for whoever is **running** it.
@@ -248,8 +251,8 @@ With the station's own credentials, not the bridge's — publishing successfully
 with them is the proof that the broker's ACL is right:
 
 ```sh
-MQTT_URL=mqtts://…  MQTT_USERNAME=station-loudoun_br_al  MQTT_PASSWORD=… \
-  npm run publish-sample -- --station loudoun_br_al --alert-id 6128 --value 42
+MQTT_URL=mqtts://…  MQTT_USERNAME=station-541155  MQTT_PASSWORD=… \
+  npm run publish-sample -- --station 541155 --alert-id 6128 --value 42
 ```
 
 It publishes a retained status and one reading, with a Last Will set, and prints

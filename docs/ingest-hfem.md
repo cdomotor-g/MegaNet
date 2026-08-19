@@ -53,11 +53,11 @@ meganet/v1/<station>/<device>/reading/hfem      the raw HFEM line, QoS 1
 ```
 
 `<station>` and `<device>` mean exactly what they mean in
-[`ingest-mqtt.md`](ingest-mqtt.md) — the stations.json slug, and which box is
+[`ingest-mqtt.md`](ingest-mqtt.md) — the bureau station number, and which box is
 talking. Publish the line as the payload, nothing around it:
 
 ```
-topic:    meganet/v1/gairloch_wharf/logger/reading/hfem
+topic:    meganet/v1/541155/logger/reading/hfem
 payload:  :HS=1|M=1|I1=123456|T3=20100727130000-10|R_1-0=1055|B_1-16=13.9|NN:
 ```
 

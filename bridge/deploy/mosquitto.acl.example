@@ -22,22 +22,36 @@ user meganet-bridge
 topic read meganet/v1/#
 
 # ── A station ────────────────────────────────────────────────────────────────
-# One block per station, generated rather than hand-written once there are more
-# than a handful of them:
+# One block per station, keyed by its BUREAU STATION NUMBER (0020) — or by its
+# station id for the sites that have none, which is what the coalesce below
+# says. Generated rather than hand-written once there are more than a handful:
 #
-#   for id in $(psql -tAc "select id from meganet.station where enabled"); do
-#     printf 'user station-%s\ntopic write meganet/v1/%s/#\n\n' "$id" "$id"
+#   psql -tAc "select coalesce(nullif(station_number, ''), id)
+#                from meganet.station
+#               where enabled and deleted_at is null
+#               order by 1" |
+#   while read -r pub; do
+#     printf 'user station-%s\ntopic write meganet/v1/%s/#\n\n' "$pub" "$pub"
 #   done > /etc/mosquitto/aclfile
+#
+# Generating it from the same column the database resolves against is what
+# makes a mistyped number loud: a credential may only write the topic its own
+# number spells, so a logger flashed with `041564` instead of `41564` is
+# refused by the broker rather than filed under an identity nobody claims.
 #
 # `write`, not `readwrite`: a logger has nothing to read here. If a future
 # ticket adds commands to stations — a request to re-send yesterday, a
 # configuration change — that is a second topic branch and a second, explicit
 # `topic read` line, not a widening of this one.
-user station-loudoun_br_al
-topic write meganet/v1/loudoun_br_al/#
+user station-541155
+topic write meganet/v1/541155/#
 
-user station-abercorn_al
-topic write meganet/v1/abercorn_al/#
+user station-539218
+topic write meganet/v1/539218/#
+
+# A repeater has no bureau number, so it publishes under its station id.
+user station-mt_mowbullan_rptr
+topic write meganet/v1/mt_mowbullan_rptr/#
 
 # ── Nothing else ─────────────────────────────────────────────────────────────
 # Mosquitto denies by default once an ACL file is in place, so there is no

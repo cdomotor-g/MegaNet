@@ -124,7 +124,7 @@ its cache at all (`PGRST002`).
 | `meganet` | The schema. Everything MegaNet owns lives here, not in `public`. |
 | `meganet.touch_updated_at()` | `BEFORE UPDATE` trigger function stamping `updated_at`. Every table with that column hangs it off this one. |
 | `meganet.app_meta` | Key/value facts about the database itself. `schema_version` is the number of the highest migration applied. Readable by anyone, writable by no one holding the anon key. |
-| `meganet.station` | One row per station, 3,174 of them. `id` is the `stations.json` slug — also the app's `selectedId`, and in URLs. `deleted_at` is the soft delete: null means live. `inspection_config_key` (`0013`, #147) names which of the six inspection sheets the site's telemetry answers to — FK into `meganet.inspection_config`, null until somebody who knows the site says; deliberately not backfilled, because a wrong pre-selected form is worse than being asked. |
+| `meganet.station` | One row per station, 3,174 of them. `id` is the `stations.json` slug — also the app's `selectedId`, and in URLs. `station_number` is the bureau (BoM/CBM) number, unique among the 3,156 that have one and the identity a station publishes under over MQTT (`0020`). `deleted_at` is the soft delete: null means live. `inspection_config_key` (`0013`, #147) names which of the six inspection sheets the site's telemetry answers to — FK into `meganet.inspection_config`, null until somebody who knows the site says; deliberately not backfilled, because a wrong pre-selected form is worse than being asked. |
 | `meganet.sensor` | 8,815 rows. Natural key `(station_id, sensor_id, type)`: one SSR carries several measurements. Indexed on `alert_id`, which is what the search box matches. |
 | `meganet.repeater` | Repeater detail for the 88 stations carrying the role. One-to-one with `station`. |
 | `meganet.pass_range` | The ALERT ranges a repeater passes or excludes, as rows with an `int4range` and a GiST index — so "which repeaters cover address N" is a lookup, not 88 × 10 ranges walked in JavaScript. |
@@ -664,15 +664,26 @@ to `ingest_http()`, exactly as an HTTP logger does. It holds an ordinary
 `meganet.ingest_token` and no service key: three RPCs, and `revoked_at` turns all
 three off at once. The bridge is not more trusted than the loggers it relays for.
 
-**`meganet.station_status` is keyed by the topic segment, not `station.id`.**
-Same reasoning as `reading.station_id` having no foreign key: a station that
-starts publishing before MegaNet has been told about it is exactly the one whose
-silence matters, and a foreign key would refuse to record it. `station_id` is
-resolved where the key names a live station and left null where it does not.
-Since `0012` this table is no longer MQTT's alone — HTTP ingest writes here too,
-keyed by station id or by address where an address resolves to no one station —
-so a `station_key` is "the identity whatever spoke for this station gave us",
-which for MQTT is still the topic segment.
+**The `<station>` topic segment is the bureau station number** (`0020`). It was
+the stations.json slug until then, which was a MegaNet artifact derived from the
+station's name: nobody outside this app knows it, and renaming a station moves it
+in the one copy — logger firmware — that costs a site visit to change. Sites with
+no bureau number (repeaters, radars, base stations — 18 of 3,174) publish under
+their station id, resolved by `meganet.resolve_publisher()`. The number is unique
+among live stations that have one, enforced by `station_number_unique_idx`,
+because a duplicate would make *both* stations unroutable in silence.
+
+**`meganet.station_status` is keyed by whatever identity spoke, until it
+resolves.** Same reasoning as `reading.station_id` having no foreign key: a
+station that starts publishing before MegaNet has been told about it is exactly
+the one whose silence matters, and a foreign key would refuse to record it.
+`station_id` is resolved where the key names a live station and left null where
+it does not. Since `0012` this table is no longer MQTT's alone — HTTP ingest
+writes here too, keyed by station id or by address where an address resolves to
+no one station. From the moment the identity resolves the key is `station.id`
+(`0019`), so an MQTT station's row is keyed by its id even though it published
+under its number; a row still keyed by a bare number is one the registry cannot
+yet name, and `station_status_converge()` folds it when it can.
 
 **`online` is what the broker last said; staleness is computed, not stored.** The
 LWT says a station's connection dropped, which is not the same as a station

@@ -10,6 +10,31 @@ test('builds the topics a station publishes to', () => {
   assert.equal(stationAcl('loudoun_br_al'), 'meganet/v1/loudoun_br_al/#');
 });
 
+test('a bureau station number is a station segment', () => {
+  // The publisher identity since 0020. A number leads with a digit, which the
+  // grammar has always allowed — this test is here so that stops being an
+  // accident of the regex and starts being a promise.
+  assert.equal(readingTopic('541155', 'logger'), 'meganet/v1/541155/logger/reading');
+  assert.equal(readingTopic('422001A', 'logger'), 'meganet/v1/422001A/logger/reading');
+  assert.equal(statusTopic('541155'), 'meganet/v1/541155/status');
+  assert.equal(stationAcl('541155'), 'meganet/v1/541155/#');
+  assert.deepEqual(parseTopic('meganet/v1/541155/logger/reading'), {
+    kind: 'reading', station: '541155', device: 'logger', format: 'json',
+  });
+  assert.deepEqual(parseTopic('meganet/v1/541155/status'), {
+    kind: 'status', station: '541155',
+  });
+
+  // A site with no bureau number publishes under its station id — the fallback
+  // half of the rule, and the reason the slug shape still has to parse.
+  assert.equal(statusTopic('mt_mowbullan_rptr'), 'meganet/v1/mt_mowbullan_rptr/status');
+
+  // Leading zeros are part of the segment, not decoration: the database
+  // resolves the number by exact match, so these are two different publishers
+  // and the broker ACL is what stops the wrong one from being flashed.
+  assert.notEqual(statusTopic('041564'), statusTopic('41564'));
+});
+
 test('refuses to build a reading topic for a format nobody parses', () => {
   assert.throws(() => readingTopic('x_al', 'logger', 'csv'), /unknown reading format/);
 });

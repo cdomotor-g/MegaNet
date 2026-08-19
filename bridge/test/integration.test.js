@@ -172,11 +172,11 @@ test('a test client publishing to meganet/v1/… results in a stored reading', a
 
   await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the bridge to subscribe' });
 
-  const station = await connectStation(broker.port, 'loudoun_br_al');
+  const station = await connectStation(broker.port, '541155');
   let acked = false;
   await new Promise((resolve, reject) => {
     station.publish(
-      'meganet/v1/loudoun_br_al/logger/reading',
+      'meganet/v1/541155/logger/reading',
       JSON.stringify({ alert_id: 6128, reading_ts: '2026-08-12T04:15:00Z', value_raw: 301 }),
       { qos: 1 },
       (err) => { if (err) reject(err); else { acked = true; resolve(); } },
@@ -193,7 +193,10 @@ test('a test client publishing to meganet/v1/… results in a stored reading', a
 
   // and the station is recorded as having been heard from
   const seen = await waitFor(() => api.of('mqtt_seen')[0], { what: 'mqtt_seen' });
-  assert.equal(seen.body.p_station, 'loudoun_br_al');
+  // The segment travels verbatim: the bridge takes no view on identity,
+  // and meganet.resolve_publisher() folds the number to the station id
+  // in the database (0020).
+  assert.equal(seen.body.p_station, '541155');
 
 });
 
@@ -210,9 +213,11 @@ test('a station going offline is visible via its LWT', async (t) => {
 
   await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the bridge to subscribe' });
 
-  const station = await connectStation(broker.port, 'abercorn_al', {
+  // A repeater: no bureau number, so it publishes under its station id —
+  // the fallback half of the 0020 rule.
+  const station = await connectStation(broker.port, 'mt_mowbullan_rptr', {
     will: {
-      topic: 'meganet/v1/abercorn_al/status',
+      topic: 'meganet/v1/mt_mowbullan_rptr/status',
       payload: JSON.stringify({ online: false }),
       qos: 1,
       retain: true,
@@ -220,14 +225,14 @@ test('a station going offline is visible via its LWT', async (t) => {
   });
 
   await station.publishAsync(
-    'meganet/v1/abercorn_al/status',
+    'meganet/v1/mt_mowbullan_rptr/status',
     JSON.stringify({ online: true, battery_v: 12.9 }),
     { qos: 1, retain: true },
   );
 
   const up = await waitFor(() => api.of('mqtt_status')[0], { what: 'the status message' });
   assert.equal(up.body.payload.online, true);
-  assert.equal(up.body.payload.station, 'abercorn_al');
+  assert.equal(up.body.payload.station, 'mt_mowbullan_rptr');
   assert.deepEqual(up.body.payload.status, { battery_v: 12.9 });
 
   // The station's link drops without a DISCONNECT — a radio going quiet, not a
@@ -236,7 +241,7 @@ test('a station going offline is visible via its LWT', async (t) => {
 
   const down = await waitFor(() => api.of('mqtt_status').find((c) => c.body.payload.online === false),
     { what: 'the last will' });
-  assert.equal(down.body.payload.station, 'abercorn_al');
+  assert.equal(down.body.payload.station, 'mt_mowbullan_rptr');
 });
 
 test('the database failing does not ack, and the reading lands when it returns', async (t) => {

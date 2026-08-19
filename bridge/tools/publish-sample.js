@@ -26,7 +26,7 @@ async function main() {
   const station = arg('station');
   if (!station) {
     process.stderr.write(
-      'usage: node tools/publish-sample.js --station <slug> [--device logger]\n' +
+      'usage: node tools/publish-sample.js --station <bureau number> [--device logger]\n' +
       '                                    [--alert-id 6128 | --station-number 541155 --channel rain]\n' +
       '                                    [--value 42] [--offline]\n');
     process.exit(2);

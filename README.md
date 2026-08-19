@@ -120,6 +120,7 @@ MegaNet/
 │   ├── access.md                           (who gets in, who may edit, and recovery)
 │   ├── ingest-http.md                      (posting readings from a field station — #B5)
 │   ├── ingest-mqtt.md                      (topic scheme, broker choice, station credentials — #B6)
+│   ├── mqtt-provisioning.md                (standing the broker and bridge up — the clicks)
 │   ├── message-log.md                      (the Message Log tab — columns, uses, edges)
 │   ├── floodwarning-net.md                 (moving the domain to MegaNet — runbook)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
@@ -444,6 +445,11 @@ meganet/v1/<station>/<device>/reading      QoS 1
 meganet/v1/<station>/status                retained, and the Last Will topic
 ```
 
+`<station>` is the **bureau station number** — `541155` — not the app's slug: it
+is the identifier the site card carries, and unlike a name-derived slug it is not
+ours to move. The sites that have no bureau number, being repeaters and radars,
+publish under their station id instead (`0020`).
+
 **Postgres cannot subscribe to MQTT**, and Supabase does not host a broker, so
 this is the first piece of MegaNet that needs a process running somewhere
 permanently: [`bridge/`](bridge/README.md), a small Node subscriber that
@@ -478,7 +484,10 @@ form.
 [`docs/ingest-mqtt.md`](docs/ingest-mqtt.md) is the page for whoever is
 configuring a logger or choosing a broker — the topic scheme and why it is shaped
 that way, per-station credentials and ACLs, and how to prove the whole path from
-a laptop. [`bridge/README.md`](bridge/README.md) is for whoever runs the process;
+a laptop. [`docs/mqtt-provisioning.md`](docs/mqtt-provisioning.md) is the provisioning run
+itself — signing up for the broker, minting the token, deploying the bridge, and
+the checks that say which step broke. [`bridge/README.md`](bridge/README.md) is
+for whoever runs the process;
 `db/migrations/0008_mqtt_bridge.sql` and `tools/check_mqtt.sql` are the database
 side.
 

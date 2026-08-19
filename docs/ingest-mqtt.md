@@ -54,10 +54,34 @@ meganet/v1/<station>/<device>/reading/hfem   device → us, QoS 1 (a raw HFEM li
 meganet/v1/<station>/status                  retained, and the LWT topic
 ```
 
-`<station>` is the **stations.json slug** — `loudoun_br_al`, `abercorn_al` — the
-same identity the station has in the app, in URLs and in the database. Using
-anything else would create a second identifier for the same site and a mapping
-table somebody has to keep in step.
+`<station>` is the **bureau station number** — `541155` — the number on the site
+card, in the Bureau's systems and on the paperwork the site already generates.
+
+> This was the stations.json slug (`loudoun_br_al`) until `0020`, on the
+> reasoning that the slug was already the station's identity in the app and that
+> a second identifier would mean a mapping table somebody has to keep in step.
+> The reasoning stands; the identifier was the wrong one. The slug is derived
+> from the station's *name* — it exists because somebody typed "Loudoun Br AL"
+> into this app. Nobody standing at the site knows it, and renaming the station
+> moves it, in the one copy that costs a site visit to change. The bureau number
+> is not ours to move, which is exactly what makes it a key.
+
+**Sites with no bureau number publish under their station id.** Repeaters,
+radars, base stations and the test rig have no bureau number and never will — 18
+of 3,174 stations, and not one of them a gauging station. This is still one rule
+rather than two identifiers: a site has a bureau number or it has not, and
+`meganet.resolve_publisher()` (`0020`) resolves either without a mapping table.
+The two namespaces are disjoint on the live registry — no station id is purely
+numeric, and no id equals another station's number — and the number is unique
+among the stations that have one, so *number first, then id* is a preference
+order and never a guess.
+
+**Publish the number exactly as the registry holds it** — `41564`, not `041564`.
+The database resolves it by exact match, and a mistyped segment is loud rather
+than silent: the broker ACL is generated from that same column, so a credential
+may only write the topic its own number spells and the broker refuses the
+publish. A wrong number never reaches MegaNet to be quietly filed under an
+identity nobody claims.
 
 `<device>` is **which box at the site is talking**: `logger` for the usual case
 of one, `logger_backup` or `rain` where a site has more than one. It is a topic
@@ -84,7 +108,7 @@ marginal radio link and buys nothing that the primary key does not already give.
 ## Publishing a reading
 
 ```
-topic:   meganet/v1/loudoun_br_al/logger/reading
+topic:   meganet/v1/541155/logger/reading
 qos:     1
 retain:  false
 payload: {"alert_id": 6128, "reading_ts": "2026-08-12T04:15:00Z", "value_raw": 301}
@@ -168,7 +192,7 @@ it with two features that cost a logger almost nothing.
 **A retained status message**, published on connect:
 
 ```
-topic:   meganet/v1/loudoun_br_al/status
+topic:   meganet/v1/541155/status
 qos:     1
 retain:  true
 payload: {"online": true, "battery_v": 12.9, "fw": "2.1"}
@@ -182,7 +206,7 @@ logger can start reporting a new field without a migration or a bridge release.
 **A Last Will and Testament**, set in the CONNECT packet:
 
 ```
-will topic:   meganet/v1/loudoun_br_al/status
+will topic:   meganet/v1/541155/status
 will qos:     1
 will retain:  true
 will payload: {"online": false}
@@ -245,8 +269,8 @@ credential that can publish as any station is a credential that can rewrite the
 network's record.
 
 ```
-user station-loudoun_br_al
-topic write meganet/v1/loudoun_br_al/#
+user station-541155
+topic write meganet/v1/541155/#
 ```
 
 `write`, not `readwrite` — a logger has nothing to read here. A worked example
@@ -282,6 +306,11 @@ wait out.
 The bridge has to exist either way, so the question is only whether you also run
 the broker. **For the pilot: a managed free tier**, because running one process
 beats running two.
+
+> Choosing is this section. **Doing it is
+> [`mqtt-provisioning.md`](mqtt-provisioning.md)** — the signup clicks, the two
+> credentials, the ingest token, the bridge on Fly.io, and a check after each
+> part so a failure names its own step.
 
 | Option | Notes |
 | --- | --- |
@@ -321,8 +350,8 @@ that the ACL is right:
 ```sh
 cd bridge && npm install
 MQTT_URL=mqtts://your-broker:8883 \
-MQTT_USERNAME=station-loudoun_br_al MQTT_PASSWORD=… \
-  npm run publish-sample -- --station loudoun_br_al --alert-id 6128 --value 42
+MQTT_USERNAME=station-541155 MQTT_PASSWORD=… \
+  npm run publish-sample -- --station 541155 --alert-id 6128 --value 42
 ```
 
 Then, within seconds:
@@ -334,6 +363,13 @@ select addr, reading_ts, value_raw, source from meganet.reading
 select station_key, online, since, last_reading_at
   from meganet.station_health where station_key = 'loudoun_br_al';
 ```
+
+**Note which identifier that last query uses.** The station published under
+`541155`; `station_status` stores it under the station *id*, because the
+canonical key is `station.id` from the moment the identity resolves (`0019`).
+The number is how it announced itself on the wire; the id is how MegaNet files
+it. A row still keyed by a bare number means that number resolves to no station
+— check it against `meganet.station.station_number`.
 
 Kill the sample publisher with `SIGKILL` rather than Ctrl-C and the station
 should show `online = false` within seconds — that is the Last Will working, and

@@ -14,9 +14,29 @@
 // `+/+/reading/hfem` are disjoint subscriptions (`+` matches exactly one
 // level), so the two shapes cannot arrive on each other's parser.
 //
-// <station> is the stations.json slug — `loudoun_br_al` — because that is
-// already the station's identity in the app, in URLs and in the database, and a
-// second identifier for the same site is a mapping table somebody has to keep.
+// <station> is the BUREAU STATION NUMBER — `541155` — the number on the site
+// card, in the Bureau's systems and on the paperwork. It was the stations.json
+// slug until 0020, on the reasoning that the slug was already the station's
+// identity in the app and a second identifier is a mapping table somebody has
+// to keep. The reasoning was right and the identifier was wrong: the slug is
+// derived from the station's NAME by core.js `slug()`, so it exists because
+// somebody typed "Loudoun Br AL" into this app. Nobody at the site knows it,
+// and editing the name moves it — in the one copy that costs a site visit to
+// change. The bureau number is not ours to move, which is what makes it a key.
+//
+// Sites that have no bureau number — repeaters, radars, base stations, a test
+// rig — publish under their station id instead. That is one rule, not two
+// identifiers: a site has a number or it has not, and the database resolves
+// either without a mapping table (meganet.resolve_publisher, 0020). The two
+// namespaces are disjoint on the live registry, and the bureau number is unique
+// among stations that have one, so "number first, then id" cannot be a guess.
+//
+// Publish the number exactly as meganet.station.station_number holds it —
+// `41564`, not `041564`. A mistyped segment is loud rather than silent: the
+// broker ACL is generated from that same column (deploy/mosquitto.acl.example),
+// so a credential may only write the topic its number actually spells, and the
+// broker refuses the publish rather than the database quietly filing it under
+// an identity nobody claims.
 //
 // <device> is which box at the site is talking: `logger`, `logger_backup`,
 // `rain`. Most sites have one and call it `logger`. It is a topic segment rather
