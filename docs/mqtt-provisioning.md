@@ -469,6 +469,7 @@ commissioning one site.
 
 [`elpro115e_mqtt.md`](elpro115e_mqtt.md) is that work for one device — an ELPRO
 115E-2 gateway — split into the sysadmin's half and the technician's half, with
-the credentials sheet that passes between them. Read its opening section before
-buying any: a stock 115E-2 publishes Sparkplug B or an undocumented "standard
-MQTT" payload, and neither reaches this bridge as-is.
+the credentials sheet that passes between them. With Sparkplug turned off the
+device publishes JSON under a free-form topic prefix, so it can be pointed at
+this scheme exactly; what it cannot do is name the payload's keys, which is one
+parser in `bridge/` and the page says which.

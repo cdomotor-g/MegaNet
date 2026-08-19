@@ -21,87 +21,151 @@ is how the broker and bridge get stood up, which is a prerequisite for this page
 is not repeated here. [`bridge/README.md`](../bridge/README.md) is the subscriber's
 own manual.
 
-**Source and citation convention.** Every ELPRO fact below is cited to a **PDF page
-number** of [`archive/EL-115E-2_User-Manual_April26.pdf`](../archive/EL-115E-2_User-Manual_April26.pdf)
-(76 pages), written `(p.40)`. Do **not** use the manual's own table of contents or
-cross-references: they run as much as 12 pages out from the printed page numbers, and one
-cross-reference reads "see 'Feature license keys' on page 4461". MegaNet facts are
-cited to `file:line`.
+**Two ELPRO source documents, cited differently.**
+
+| Cite | Document | Covers |
+|---|---|---|
+| `(p.40)` | [`archive/EL-115E-2_User-Manual_April26.pdf`](../archive/EL-115E-2_User-Manual_April26.pdf), 76 pages | The **115E-2 hardware** — connecting, networking, users, registers, ALERT2 gateway, diagnostics. Its MQTT chapter is two pages and defers everything to the second document. |
+| `(MQTT p.4)` | [`archive/ELPRO_x15U_MQTT-SpB-Gateway_Config_v1.0.pdf`](../archive/ELPRO_x15U_MQTT-SpB-Gateway_Config_v1.0.pdf), 24 pages, Nov 2021 | The **MQTT gateway itself** — topic assembly, payload format, every broker and input field, queuing, TLS, diagnostics. |
+
+Both cites are **PDF page numbers**. Do not use the 115E-2 manual's own table of contents
+or cross-references: they run as much as 12 pages out from the printed page numbers, and
+one reads "see 'Feature license keys' on page 4461". MegaNet facts are cited to `file:line`.
+
+> **Read the hardware caveat before you rely on the second document.** It is written for
+> the **x15U** family — 215U-2-BGN, 415U-E-Cx, 415U-2-Cx and 915U-2 (MQTT p.1) — and does
+> **not** name the 115E-2. What makes it usable here is that the 115E-2 manual describes
+> the same feature set in the same words: MQTT Enable, Enable Sparkplug, Node Update and
+> Topic Prefix as the four basic items; Device, Broker, Inputs, Outputs and Security as the
+> configuration areas; up to four brokers; and CA Certificate, Client Certificate and Client
+> Private Key as the three TLS files (p.40–41). That is the same gateway, exposed through a
+> slightly different menu layout. **Treat everything below as ELPRO's documented design and
+> confirm it against the actual 115E-2 on the bench** — which is one afternoon, not a
+> research project, now that you know what to look for.
 
 ---
 
 ## Read this before you buy anything
 
-**A 115E-2 in its default MQTT configuration cannot deliver a reading to MegaNet.**
-This is not a tuning problem, and it is the single most important thing on this page.
-There are two independent blocks, and each is enough on its own.
+**The 115E-2 can be made to publish something MegaNet stores, and it needs one small,
+idiomatic change to the bridge to do it.** That is a change of verdict from the first
+version of this page, and it comes from ELPRO's MQTT Gateway Configuration Guide, which
+answers the questions the hardware manual left open.
 
-**1 · The topic.** MegaNet's bridge subscribes to exactly three filters and nothing
-else ([`bridge/src/topics.js:104-108`](../bridge/src/topics.js)):
+Three facts decide it:
+
+**1 · The Topic Prefix is genuinely free-form.** "The MQTT Topic Prefix can take any form
+using / symbol for logical system separations" (MQTT p.6). The full published topic is
+simply the prefix plus the **Device** name: "The Device is added to the topic prefix at top
+of table to form the overall topic to this payload" (MQTT p.10). So the device can be made
+to publish any topic you can spell — including MegaNet's.
+
+**2 · Plain MQTT is JSON, not protobuf.** With Sparkplug *off*, the gateway publishes
+(MQTT p.4):
 
 ```
-meganet/v1/+/+/reading
-meganet/v1/+/+/reading/hfem
-meganet/v1/+/status
+Topic:   ELPRO/FLOOD/GATEWAY/Georges Crossing/Register
+Payload: {"timestamp":954711743792, "River Level":17.61, "Battery Voltage":13.8356}
 ```
 
-The `meganet/v1` prefix is a compile-time constant (`topics.js:51-53`), not a
-setting — there is no environment variable, config key or flag for it anywhere in
-the bridge. A message published outside those filters is never forwarded to the
-bridge by the broker at all: not rejected, not logged, not counted. And the
-per-station broker ACL is `topic write meganet/v1/<publisher>/#`
-([`bridge/deploy/mosquitto.acl.example:46-54`](../bridge/deploy/mosquitto.acl.example)),
-so the broker refuses the publish before it is even accepted.
+Documented structure: `{"timestamp":[linux EPOCH time ms], "DataValueLabel":value}`, and
+"for each payload there can be multiple time stamped DataValueLabel/value sets with a
+single message transmission" (MQTT p.4). **`timestamp` is epoch milliseconds, which
+`meganet.ingest()` already accepts as a `reading_ts`.**
 
-**2 · The payload.** The bridge runs `JSON.parse()` on the body and treats a failure
-as a permanently unstorable message ([`bridge/src/messages.js:66-81`](../bridge/src/messages.js)).
-Sparkplug B — which is what ELPRO promotes for this device (p.6, p.40) — is Google
-Protocol Buffers, i.e. binary. `JSON.parse()` throws on it every time. The bridge then
-acknowledges the message, discards it, logs `message_unparseable` at error level and
-counts it rejected. **There is no Sparkplug, protobuf or `spBv1` code anywhere in this
-repository**, and the design says so on purpose: growing the accepted format list
-"means teaching messages.js the shape first" (`topics.js:66-70`).
+**3 · The value label is free text you choose per input.** "Payload Prefix: Enter here the
+name of the input that is to be used in the MQTT message… Do not use # or + as they are
+illegal characters" (MQTT p.11, p.19).
 
-> **This is not a new discovery, it is a repeat.** MegaNet's one working MQTT base
-> station is a Campbell CR300, and its commissioning notes say of the vendor's own
-> built-in publisher: "**Automatic publishing / publish tables — Off.** It emits
-> CSIJSON on the base topic, which is neither the scheme nor the payload the bridge
-> accepts — every message it sends is one the bridge logs as unparseable and counts
-> as rejected" ([`logger/README.md:220`](../logger/README.md)). That base station
-> works only because its CRBasic program builds the whole topic and the whole JSON
-> body itself, bypassing the vendor publisher entirely.
+So the gap between ELPRO and MegaNet is no longer a wall. It is a key-name difference:
+ELPRO says `{"timestamp": …, "<label>": value}`, MegaNet wants
+`{"alert_id": …, "reading_ts": …, "value_raw": …}`. That is a parser, not a redesign.
 
-### The question that decides everything, and how to answer it
+### Sparkplug is still a hard no
 
-The 115E-2's other mode — "standard MQTT" with a configurable **Topic Prefix** — might
-work. Three things must all be true, and **the ELPRO manual answers none of them**,
-because it defers every operational MQTT detail to a *separate MQTT Configuration
-manual* (p.40 once, p.41 three times — with no document number, version or URL given).
+Leave **Enable Sparkplug** off. With it on, the topic is forced to
+`spBv1.0/GROUP/STATE/NODE` (MQTT p.6) — outside `meganet/v1/#`, so the broker never
+forwards it and the station ACL refuses the publish — and "the payload is encoded as part
+of the Sparkplug standard" (MQTT p.4), i.e. protobuf, which `JSON.parse()` rejects every
+time. Both blocks from the previous version of this page stand, for Sparkplug only.
 
-| # | Must be true | What the manual says |
+### The recommended path: one format segment, one parser
+
+This is the design's own extension point, already used once for HFEM
+(`READING_FORMATS = ['json', 'hfem']`, [`bridge/src/topics.js:66-70`](../bridge/src/topics.js)).
+Adding a third costs a subscription line and a parser:
+
+| On the 115E-2 | Value |
+|---|---|
+| **Topic Prefix** | `meganet/v1/<station>/logger/reading/` |
+| **Device** name | `elpro` |
+| Resulting topic | **`meganet/v1/<station>/logger/reading/elpro`** |
+| **Payload Prefix** per input | the reading's **ALERT2 address**, e.g. `6128` |
+
+| In `bridge/` | Change |
+|---|---|
+| `src/topics.js` | add `'elpro'` to `READING_FORMATS`, and `meganet/v1/+/+/reading/elpro` at QoS 1 to `SUBSCRIPTIONS` |
+| `src/messages.js` | add `parseElpro()`: take `timestamp` as `reading_ts`, and turn every other key/value pair into `{alert_id: <key>, reading_ts, value_raw: <value>}` |
+
+Why the address goes in the Payload Prefix rather than a lookup table: **the label
+auto-increments**. "If an input count of greater than 1 is used, then a count number will
+be appended to the payload name. For a payload name that contains a number as the last
+digit, then this input count will increment from this number" (MQTT p.11). A Payload Prefix
+of `6128` with an Input Count of 3 publishes `6128`, `6129`, `6130` against three
+consecutive registers — which is exactly how a block of consecutive ALERT2 addresses maps
+to a block of consecutive registers. One configuration line covers a whole sensor block,
+and no mapping table exists for anyone to keep in step.
+
+> **Check this one on the bench before committing to it.** The manual states the
+> increment rule for the payload *name*; confirm on real hardware that a purely numeric
+> prefix increments the way a trailing-digit name does, and that the emitted key is the
+> bare number rather than something decorated. If it decorates, the parser strips it —
+> still a parser, still cheap.
+
+### The paths, and what each now costs
+
+| | Path | Verdict |
 |---|---|---|
-| a | The device can emit the **full literal five-segment topic** `meganet/v1/<station>/<device>/reading` — not a prefix with vendor structure appended. A sixth segment is accepted only when it is `hfem`; any other sixth segment, or a seventh, parses as `unknown` and is dropped. | Only "Topic Prefix — For standard MQTT, you need to configure a topic" (p.40). **No example topic string anywhere**, and no statement of what is appended below the prefix. |
-| b | The body is JSON carrying `alert_id` (or `station_number` + `channel`), `reading_ts` and `value_raw` under **those exact key names**. The bridge does no renaming and no unit inference. | **The payload format is never specified anywhere in the manual** — not JSON, not protobuf, not raw values, for either mode. |
-| c | QoS 1, retain off, ≤1,000 readings and ≤256 KiB per message. | The Broker tab section names **no** QoS, retain, client-id, keep-alive or Last Will field (p.41). |
+| **A** | **Emit MegaNet's contract exactly, with no bridge change.** | **Not possible.** The topic can be spelled exactly, but the payload cannot: the gateway always emits `timestamp` plus label/value pairs, with no template for key names. Ruled out by MQTT p.4. |
+| **B** | **A format segment plus a parser** (above). | **Recommended.** Idiomatic, ~1 subscription + 1 parser, keeps every per-station ACL and the one-contract property intact. |
+| **C** | **A translation service** republishing into the scheme. | Now unnecessary. Costs a second always-on process, a credential that can write as other stations, and it breaks the Last Will. Keep only if the bridge must not change at all. |
+| **D** | **Sparkplug B decoding.** | Still net-new engineering, and now clearly avoidable — plain mode gives JSON. Revisit only if a Sparkplug fleet arrives. |
+| **E** | **Skip MQTT, poll Modbus TCP.** | Still viable and still carries no device-side unknowns, but it forfeits store-and-forward, which is the best thing the ELPRO gateway offers (below). |
+| **F** | **Do the status half separately.** | **Still needed, and still open** — see the Last Will gap below. The reading path and the liveness path remain independent. |
 
-**Resolve this on a bench before you buy a fleet or write a runbook.** Put one unit
-in standard-MQTT mode, point it at a *plaintext* scratch broker on 1883, and capture
-what it actually sends. That single test — an hour's work — tells you which of the
-paths below you are on.
+### What ELPRO gives you that MegaNet's own loggers do not
 
-### The paths, and what each costs
+**Store-and-forward, up to 10,000 messages.** "Queuing or Historian store-and-forward is a
+mode that allows the remote node to be able to hold messages when there is a break in
+communications and then transmit these once communications is reestablished. This will
+allow the historical data to be 'back filled' to prevent the loss of data" (MQTT p.13).
+FIFO or LIFO; a **Queue Delay** rate-limits the flood on reconnect; the queue is shared
+across all configured brokers; and messages for a common topic are concentrated into a
+single message on the way out (MQTT p.14).
 
-| | Path | Cost | When it is right |
-|---|---|---|---|
-| **A** | **Configure the 115E-2 to emit the contract exactly.** | Zero MegaNet code. | If the bench test says the device can express a full five-segment topic *and* template its payload. By far the best outcome — get the separate ELPRO MQTT manual and check this first. |
-| **B** | **Add a format segment + parser to the bridge**, in the spirit of `READING_FORMATS = ['json','hfem']`. | Small, idiomatic change. | If the device can hit `meganet/v1/<station>/<device>/reading/<newformat>` but not the JSON body. The design anticipates exactly this shape of change. |
-| **C** | **A translation service** subscribing to the ELPRO's native topics and republishing into the scheme. | A second always-on process; a credential that can write as other stations, weakening per-station containment. **Breaks the Last Will** — the retained `{"online": false}` becomes the *adapter's* death, so a dead 115E-2 behind a live adapter looks online. | Works regardless of what the device can emit. The fallback, not the first choice. |
-| **D** | **Sparkplug B decoding in the bridge.** | Net-new: protobuf dependency, `spBv1.0/#` subscription, a metric-name → address mapping table somebody maintains, NBIRTH/NDEATH reconciliation. Breaks the ACL model. | Only if a Sparkplug fleet is coming. The manual names no Group ID / Edge Node ID / Device ID field, so this cannot even be scoped from it today. |
-| **E** | **Skip MQTT — poll the 115E-2 over Modbus TCP** and post to the existing HTTP ingest. | A poller that does not exist; polling not push; no Last-Will offline detection. | The register map *is* fully documented (pp.60–62) where MQTT is not. This is the only path whose device side carries no unknowns. |
-| **F** | **Split the problem — do the status half separately.** | — | The status topic is only four segments and `parseStatus()` accepts plain `online`/`offline` text (`messages.js:189-200`). If the device can set an arbitrary will topic, QoS 1 and retain on, **offline detection can work even when the reading path cannot**. The two halves fail independently; test them independently. |
+This covers the outage case from the device side, which is worth more here than the QoS
+argument: a 115E-2 that loses the broker for an hour backfills, and MegaNet's primary key
+eats any duplicates the backfill creates. **The queue is held in RAM and is lost on power
+failure** (MQTT p.14) — so it protects against a comms outage, not a flat battery.
 
-Everything after this point assumes you have chosen a path. The checklists are written
-for path A or B, and remain almost entirely correct for C.
+### The two things that are still genuinely missing
+
+1. **No Last Will you can configure.** The broker table's columns are Enabled, Client ID,
+   IP/Name, Port, Historian, Keep Alive, Clean Session, User name, Password, Queue Size,
+   Queue Delay and TLS (MQTT p.8) — **there is no will topic, will payload, will QoS or
+   will retain field**, even though the Keep Alive description refers to "the configured
+   last will and testament". For Sparkplug that will is NDEATH, defined by the standard;
+   for plain MQTT the document never says what, if anything, is sent. So MegaNet's
+   `{"online": false}` on `meganet/v1/<station>/status` **cannot be produced by
+   configuration**, and station-offline detection has to come from
+   `station_health.minutes_since_seen` — which the view already exposes and deliberately
+   leaves you to threshold per station.
+2. **No QoS or retain control on publishes.** Neither table has a QoS or retain column; only
+   the *output* (subscribe) table has a QoS field, "usually set to 1" (MQTT p.13). The
+   publish QoS is not stated anywhere and must be observed on the wire. If it turns out to
+   be QoS 0, at-least-once is not in force between device and broker — but store-and-forward
+   covers the outage case that matters, so this is a thing to measure, not a blocker.
+
 
 ---
 
@@ -119,8 +183,8 @@ flowchart LR
       A2["ALERT2 Incoming<br/>I/O Mappings"] --> REG["I/O store<br/>Modbus registers"]
       REG --> MQ["MQTT client<br/>Inputs tab"]
     end
-    MQ -- "MQTT/TLS 8883, QoS 1" --> BR["Broker"]
-    BR -- "meganet/v1/#" --> BG["bridge/"]
+    MQ -- "MQTT/TLS 8883<br/>{timestamp, label:value}" --> BR["Broker"]
+    BR -- "meganet/v1/+/+/reading/elpro" --> BG["bridge/<br/>parseElpro()"]
     BG -- "HTTPS + ingest token" --> PG["meganet.ingest_http()<br/>Supabase"]
 ```
 
@@ -128,12 +192,14 @@ Three joins have to be right, and they are owned by different people:
 
 1. **ALERT2 → register.** The technician maps each ALERT2 station address and sensor
    ID to a Modbus register (p.51). Sysadmin decides the map; technician types it.
-2. **Register → published value.** The MQTT **Inputs** tab publishes "a block of
-   inputs ... by setting the count" (p.41). That is the entire documented description.
+2. **Register → published value.** An Input Configuration row names the register, the
+   **Payload Prefix** that becomes the JSON key, and what triggers a publish
+   (MQTT p.10–12).
 3. **Published value → MegaNet address.** Every reading MegaNet stores needs an
-   `alert_id` (1–65535) or a `station_number` + `channel`. Something has to carry that
-   through. **This is the join the manual gives you nothing for**, and it is why the
-   register→reading map on the handover sheet exists.
+   `alert_id` (1–65535) or a `station_number` + `channel`. **Put the ALERT2 address in
+   the Payload Prefix** and the key on the wire *is* the address — which is why the
+   register→reading map on the handover sheet has a Payload Prefix column, and why no
+   mapping table needs maintaining anywhere.
 
 > **Note what does *not* need solving.** A base station may publish readings for many
 > field stations under its own topic. The reading carries its own address
@@ -169,8 +235,7 @@ shared defaults. Limits: **1,000 readings** and **256 KiB** per message
 | `value_raw` | yes | The value as measured. A reading carrying only `value` is accepted; one with neither is rejected. |
 | `value`, `unit`, `quality` | no | `unit` comes from a fixed list (`mm`, `m`, `V`, `degC`, `NTU`, …) — an unrecognised one is a rejected row, not a guess. |
 
-**Status and Last Will** — the half that is more likely to be achievable, and the
-reason MQTT earns its moving parts at all:
+**Status and Last Will** — what MegaNet wants, and what a 115E-2 cannot currently give it:
 
 | | Value |
 |---|---|
@@ -180,11 +245,15 @@ reason MQTT earns its moving parts at all:
 | Live payload | `{"online": true, "battery_v": 12.9}` — or just the text `online` |
 | Will payload | `{"online": false}` — or just the text `offline` |
 
-> **Both common defaults are wrong for us, and quietly.** A will at QoS 0 can be lost
-> on the hop that matters; a will left *do not retain* is discarded the moment the
-> bridge reconnects, so a bridge restart silently resurrects every dead station
-> (`logger/README.md:240-244`). If the 115E-2 exposes Last Will fields at all, these
-> two are the ones to get right.
+> **The ELPRO gateway has no configurable Last Will.** The broker table's twelve columns
+> carry no will topic, payload, QoS or retain (MQTT p.8), and no retain control exists for
+> ordinary publishes either. So this table describes the target, not a setting you can
+> enter, and **offline detection for a 115E-2 comes from staleness** —
+> `station_health.minutes_since_seen` against that station's Update Time — until the bench
+> test in [D4](#d4--find-out-what-the-last-will-actually-does) proves otherwise.
+>
+> The reading path does not depend on any of this. The two halves fail independently,
+> which is why they are tested independently.
 
 **`<station>`** is the **bureau station number** for a gauging station. A base station
 is an ingest point, never has a bureau number and never will, so it publishes under its
@@ -204,11 +273,21 @@ Items 1–3 are a gate. Do not order hardware or brief a technician past them.
 
 ### A0 · The gate
 
-1. **Get the separate ELPRO MQTT Configuration manual.** The 115E-2 manual defers to it
-   four times (p.40, p.41 ×3) with no document number, version or URL.
-   elprotech.com → Resources → 115E-2 → Documentation; raise a support ticket if it is
-   not published. **Every operationally useful MQTT detail is in that document, not the
-   one in `archive/`.**
+1. **Confirm the gateway behaves on 115E-2 hardware as the x15U guide documents.**
+   ~~Obtain the separate MQTT manual~~ — done, it is
+   [`archive/ELPRO_x15U_MQTT-SpB-Gateway_Config_v1.0.pdf`](../archive/ELPRO_x15U_MQTT-SpB-Gateway_Config_v1.0.pdf).
+   What remains is a bench session against one real 115E-2, answering five questions:
+
+   | Question | Why it matters |
+   |---|---|
+   | Does the MQTT I/O page carry the same **Input Configuration** columns (Device, IO-Type, Local Input, Payload Prefix, Register, Input Count, Sensitivity, Update Time, Scaling, Offset)? | The whole register→reading map assumes them (MQTT p.10). |
+   | Does the **Topic Prefix** accept `meganet/v1/<station>/logger/reading/` verbatim, and does the Device name land as the final segment? | The recommended path depends on it (MQTT p.6, p.10). |
+   | What **QoS and retain** does it actually publish with? | Not configurable and never stated (MQTT p.8). Observe it on the wire. |
+   | Does a purely numeric **Payload Prefix** auto-increment, and is the emitted key the bare number? | Decides whether the parser needs to strip decoration (MQTT p.11). |
+   | Is there **any** Last Will behaviour in plain MQTT mode? | Decides whether offline detection is config or staleness (MQTT p.8). |
+
+   Capture the topic string and payload bytes against a plaintext broker on 1883 while you
+   are there — that is the artefact everything else is written against.
 
 2. **Resolve the Feature Key question in writing.** Page 5 reads: "The 115E-2 comes from
    the factory with ELPRO WIB, Modbus TCP/RTU, DNP3 (requires Feature Key), MQTT and
@@ -223,9 +302,13 @@ Items 1–3 are a gate. Do not order hardware or brief a technician past them.
    **The ALERT2 gateway is definitely licensed** (p.49) and needs firmware ≥ 2.33.
    If you are relaying ALERT2, budget for it.
 
-3. **Run the bench test from ["Read this before you buy anything"](#read-this-before-you-buy-anything)
-   and choose a path.** Record the choice and the captured topic string and payload
-   bytes. This is the highest-value hour in the whole project.
+3. **Confirm the path and schedule the bridge change.** Path B is the recommendation and
+   the change is small — a `'elpro'` entry in `READING_FORMATS`, a fourth subscription, and
+   a `parseElpro()` alongside `parseHfem()`. It should be written against the payload bytes
+   captured in item 1, not against this page, and it wants a `bridge/test/` case in the same
+   shape as the HFEM one. Decide who owns it before a technician is booked, because a
+   provisioned unit publishing to a topic nothing subscribes to looks identical to a broken
+   one.
 
 ### A1 · Fleet standards
 
@@ -291,22 +374,31 @@ The full run is [`mqtt-provisioning.md`](mqtt-provisioning.md). What matters her
 
 ### A3 · The two decisions the manual will not make for you
 
-11. **The TLS posture — and state it unambiguously on the sheet.** The manual
-    contradicts itself: p.41 says brokers "will normally require **either** TLS **or**
-    Username/Password", then immediately requires, for **each** TLS broker, a **CA
-    Certificate file**, a **Client Certificate file** *and* a **Client Private Key
-    file**. Server-only TLS is never confirmed as supported.
+11. **The TLS posture — and state it unambiguously on the sheet.** Both ELPRO documents
+    say the same thing and neither resolves the ambiguity. The 115E-2 manual says brokers
+    "will normally require **either** TLS **or** Username/Password" (p.41), then requires
+    three files for each TLS broker. The MQTT guide repeats it: "To use TLS with the MQTT
+    gateway broker/server connection there are 3 certifications required: Certificate
+    Authority (CA), Client Certificate (using CA above), Client Private Key" — and adds the
+    one genuinely new fact, that **they must be x.509 files** uploaded through the MQTT
+    Security page (MQTT p.14). **Server-only TLS is still never confirmed as supported.**
 
     Decide which you are provisioning:
-    - **(a) Server-only TLS + username/password** — one CA bundle for the fleet. Cheap.
-    - **(b) Mutual TLS** — a certificate and private key issued per device. That is a
-      PKI programme with issuance, expiry monitoring and rotation, for units that will
-      outlive their certificates.
+    - **(a) Server-only TLS + username/password** — one CA bundle for the fleet. Cheap, and
+      the first thing the technician should try, because it is the difference between a
+      shared password and a PKI programme.
+    - **(b) Mutual TLS** — a certificate and private key per device, with issuance, expiry
+      monitoring and rotation for units that will outlive their certificates.
 
     **Name the CA bundle the device must trust**, in a file, on the sheet. Nothing in
     this repo specifies this for a third-party device — `MQTT_CA_FILE` covers only the
     bridge's own trust store. The technician's returned record settles which posture the
     hardware actually accepts.
+
+    > **Port 8883 is fine.** The broker table has a **Port** column, "Default is 1883"
+    > (MQTT p.8), and the documented example rows use 1884 as well as 1883 — so the port is
+    > free text, not a fixed pair. That closes an open question from the first version of
+    > this page.
 
 12. **Build the register → reading map.** One row per published point. This is the join
     nothing else supplies:
@@ -513,28 +605,41 @@ pages can do it, in either direction, and the web role-privileges table has no M
 18. **In CConfig**, add the unit if it is not already in the project (Units → **Add a new
     Unit**), configure it as a **base station**, then select **MQTT** on the tree view.
 
-19. **Basic Configuration Items** — the four named fields (p.40):
+19. **Basic Configuration Items** (p.40; MQTT p.6):
 
     | Field | Set to | Note |
     |---|---|---|
     | **MQTT Enable** | on | MQTT, like every protocol on this device, is **disabled by default** (p.66). |
-    | **Enable Sparkplug** | **off**, unless the sheet explicitly says otherwise | MegaNet cannot decode Sparkplug B. With Sparkplug on, the topic is generated automatically and you cannot author it. |
-    | **Node Update** | the value on the sheet | "The update time for statistics, including device status." **No units, range or default are documented — record what the field shows and what you typed.** |
-    | **Topic Prefix** | the literal string on the sheet | Then check what the device *actually* publishes (step 30). The manual never states what gets appended below the prefix. |
+    | **Enable Sparkplug** | **off** | Not optional. With Sparkplug on the topic is forced to `spBv1.0/GROUP/STATE/NODE` and the payload becomes protobuf — MegaNet can store neither (MQTT p.4, p.6). |
+    | **Owner Name (Group)** / **Device Name (Node)** | from the sheet | Pulled from Module Information; editable here (MQTT p.6). With Sparkplug off these do not appear in the topic, but they are reported in the node's own status messages. |
+    | **Topic Prefix** | `meganet/v1/<station>/logger/reading/` — exactly, from the sheet | Free-form, `/` allowed anywhere (MQTT p.6). The **Device** name from step 22 becomes the final segment, giving the full topic. |
+    | **Queuing Mode** | **FIFO** unless the sheet says otherwise | FIFO replays an outage in the order it happened, which is what you want for a backfill (MQTT p.7). |
+    | **Node Update** | the value on the sheet, in **seconds** (the documented example is 600) | The regular status/statistics update interval (MQTT p.6). |
 
-20. **Broker tab** (p.41): enter the broker hostname, port **8883**, username
-    `station-<publisher>` and the password from the sheet. Up to four brokers are
-    supported; you need one. Wherever the tab exposes them, also set the **client id** to
-    the unique value on the sheet, **clean session off**, the **keep-alive** on the sheet,
-    and readings to **QoS 1, retain off**. If a field on the sheet has no counterpart on
-    the tab, **write that down** — it is one of the answers the sysadmin is waiting for.
+20. **Broker configuration table** (p.41; MQTT p.8). Up to four brokers; you need one. The
+    documented columns, in order, and what to put in them:
 
-    > **The manual names no field labels at all for this tab.** Write down the actual
-    > labels you see, and specifically whether there is a **port** field, and whether
-    > there are **client id**, **keep-alive**, **clean session**, **QoS**, **retain** or
-    > **Last Will** fields. If Last Will fields exist, set will topic
-    > `meganet/v1/<station>/status`, will QoS **1**, will retain **on**, will payload
-    > `{"online": false}`.
+    | Column | Value |
+    |---|---|
+    | **Enabled** | ticked |
+    | **Client ID** | the unique value on the sheet — "This MUST be unique in this broker" |
+    | **IP/Name** | the broker hostname (DNS name is fine — see the DNS note below) |
+    | **Port** | **8883** |
+    | **Historian** | **ticked** — flags messages that were queued during an outage |
+    | **Keep Alive(Sec)** | the sheet's value; 20–60 s is the documented range for Ethernet |
+    | **Clean Session** | **unticked** — "Leave off to preserve data for a persistent data configuration" |
+    | **User name** / **Password** | `station-<publisher>` and its password |
+    | **Queue Size (Max)** | the sheet's value; the maximum is 10,000 shared across all brokers |
+    | **Queue Delay (s)** | **0** for an Ethernet link |
+    | **TLS** | ticked, with the certificates loaded first (step 21) |
+
+    > **There is no QoS, retain or Last Will column** — publishes are not configurable in
+    > those respects (MQTT p.8). Do not go looking for them; **do** record it if this
+    > 115E-2's page has them and the x15U guide's does not.
+    >
+    > If the broker is reached by hostname, the unit needs DNS: **Network** page →
+    > Advanced Networking → Default Gateway, Primary DNS, Secondary DNS, then **Save
+    > Changes and Reset** (MQTT p.15).
 
 21. **Security tab** (p.41): add the **CA Certificate file** from the sheet. If the sheet
     specifies **mutual TLS**, also add the **Client Certificate file** and the **Client
@@ -550,13 +655,35 @@ pages can do it, in either direction, and the web role-privileges table has no M
     > whether the tab holds one file set for the whole device or one per broker. The
     > manual states none of this, and the answer decides whether the fleet needs a PKI.
 
-22. **Device tab** (p.40–41): create the logical device(s) named on the sheet.
+22. **Device configuration** (p.40–41; MQTT p.7–8): add the logical device(s) named on the
+    sheet. **The Device name becomes the final topic segment**, so for the recommended
+    setup this is the single entry `elpro`, with **Device Type** = *General Purpose* (which
+    gives the `Register` IO-Type). Slave address 0 — only 115S expansion units need one.
 
-23. **Inputs tab** (p.41): set the **count** for each block of inputs to publish, per the
-    sheet's register map. The manual documents only a count — "You can configure a block
-    of inputs to be published by setting the count" — and never says how the block's
-    **starting** register is chosen. **Record whether a start-address field exists, what
-    it is labelled, and if there is none, which registers the tab actually publishes.**
+23. **Input Configuration** (p.41; MQTT p.10–12) — one row per line on the sheet's register
+    map. The documented columns:
+
+    | Column | Value |
+    |---|---|
+    | **Enabled** | ticked |
+    | **Device** | `elpro` |
+    | **IO-Type** | `Register` |
+    | **Local Input** | `Register` |
+    | **Payload Prefix** | the reading's **ALERT2 address**, e.g. `6128`. No `#` or `+`. |
+    | **Register** | the ELPRO register holding that value |
+    | **Input Count** | how many consecutive registers this row covers — the Payload Prefix increments with them |
+    | **Sensitivity** | change threshold before a publish; **0 means never publish on change** |
+    | **Update Time (sec)** | regular publish interval; **0 means never publish on a timer** |
+    | **Scaling** / **Offset** | from the sheet; `1.0` and `0` leave the value untouched |
+
+    > **Set at least one of Sensitivity and Update Time to a non-zero value**, or the row
+    > never publishes at all (MQTT p.11–12). Selecting a row displays the full topic below
+    > the table — **read it back and check it against the sheet before saving.**
+    >
+    > **Save often.** "There is an activity timeout on configuration menus" (MQTT p.10).
+    >
+    > For more than a handful of rows use **Export Table / Import Table** — the CSV
+    > round-trip below the table (MQTT p.18–19, and step 32).
 
 24. **Outputs tab** (p.41): leave it alone unless the sheet says otherwise. MegaNet's
     bridge publishes nothing and sends no commands, so there is nothing to subscribe to.
@@ -576,10 +703,24 @@ pages can do it, in either direction, and the web role-privileges table has no M
 28. **Statistics page → TCP/UDP Statistics** — "This section lists all open ports" (p.66).
     Record what is listening; confirm nothing unexpected is.
 
-29. **CConfig → MQTT Comms** (p.16) — the only MQTT-specific diagnostic on the device:
-    it "allows you to monitor MQTT traffic received and transmitted by the device's
-    Ethernet and Radio ports". **Record its output verbatim.** The manual says nothing
-    else about it, so what you write down here is the documentation.
+29. **Monitor MQTT Comms** — the single most useful screen on the unit, and much better
+    documented than the 115E-2 manual's one sentence suggests. Network Diagnostics →
+    **Monitor MQTT Comms** (p.16; MQTT p.17–18). Pick the broker; monitoring **starts
+    automatically** when the page opens, with **Stop** and **Clear** buttons. Each line
+    shows:
+
+    > broker name or IP · date/time · **Tx** or **Rx** · **MQTT topic** · **MQTT payload**
+    > (Sparkplug is decoded automatically for display)
+
+    **Copy the lines out and paste them into the returned record.** This is where you read
+    the real topic and the real payload without a packet capture — it shows MQTT messages
+    only, not the connection handshake.
+
+    Cross-check the connection itself two ways: the **Connectivity** page shows broker
+    state, uptime, reconnect count, Tx/Rx messages and bytes, queue size and error count
+    (MQTT p.16); and registers **30430** (broker 1), **30445**, **30460**, **30475** carry
+    the same as numbers — offset 0 is connected yes/no, 1 is link count, 2 is uptime in
+    seconds, 8 is **messages currently sitting in the queue** (MQTT p.16, p.20–21).
 
 30. **Capture IP Comms** (p.54): Network Diagnostics → **Capture IP Comms** → **Start**,
     trigger a publish, then **Stop and Download** and open the file in Wireshark. Capture
@@ -599,10 +740,20 @@ pages can do it, in either direction, and the web role-privileges table has no M
     Record the raw values and any flags. This is what lets the sysadmin check the value on
     the wire against the value in the device.
 
-32. **Export the configuration.** System Tools → **Read Configuration File** → **Entire
-    unit Configuration** → **Download** (p.47). This is the unit's backup and the seed for
-    the next one. Record the filename and the **Config Version** timestamp from Module
-    Information.
+32. **Export the configuration, twice.** (p.47; MQTT p.16–18)
+    - System Tools → **Read Configuration File** → **Entire unit Configuration** →
+      **Download** — the unit's full backup. Record the filename and the **Config Version**
+      timestamp from Module Information.
+    - **Export Table** below the Input Configuration — the register map as CSV. This is the
+      seed for every subsequent unit: edit the Payload Prefixes and Registers, then
+      **Import Table** on the next one.
+
+    > **Two things must change per unit when you reuse either file: the broker Client ID
+    > and the Topic Prefix.** ELPRO is explicit about the first — "ensure that the ClientID
+    > used in the broker configuration is changed so that it is unique in the system.
+    > Failing to do so will lead to the broker denying the connection" (MQTT p.17) — and
+    > the second carries the station segment, so cloning it publishes one station's data
+    > under another's name, which the broker ACL will refuse.
 
 33. **Ring the sysadmin and stay on the line** while they run the SQL in
     [Part D](#part-d--proving-it-works). **Do not pack the unit until they confirm a row.**
@@ -629,13 +780,16 @@ guess at the bench.
 - Status and Last Will: `meganet/v1/<station>/status`, **QoS 1**, **retain on**,
   will payload `{"online": false}`
 
-**Broker**
-- Hostname; port `8883`; TLS 1.2 minimum
-- Username `station-<publisher>` and password
-- MQTT client id — **unique network-wide**; two clients sharing one id knock each other
-  off the broker in a loop
-- Clean session **off**; keep-alive value
-- Readings: QoS **1**, retain **off**
+**Broker** — one value per column of the unit's broker table
+- **IP/Name** (hostname) and **Port** `8883`; TLS 1.2 minimum
+- **User name** `station-<publisher>` and **Password**
+- **Client ID** — **unique network-wide**; ELPRO warns that a duplicate makes the broker
+  deny the connection, and two clients sharing one id knock each other off in a loop
+- **Clean Session** off; **Keep Alive** value; **Historian** on
+- **Queue Size (Max)** and **Queue Delay (s)** — 0 delay on Ethernet
+- DNS servers, if the broker is named rather than numbered
+- *(QoS and retain are not configurable on this device — do not put them on the sheet as
+  instructions; they belong in the returned record as observations.)*
 
 **TLS material**
 - CA bundle: filename, how supplied, expected format
@@ -649,20 +803,35 @@ guess at the bench.
 - Whether Remote access (Ethernet configuration) is to be enabled
 
 **Device MQTT settings**
-- Topic Prefix — the literal string to type
-- Enable Sparkplug — **off**, or the explicit exception
-- Node Update — the value to enter
-- Logical device(s) for the Device tab
+- **Topic Prefix** — the literal string, ending in `/`:
+  `meganet/v1/<station>/logger/reading/`
+- **Device** name — `elpro`, type *General Purpose*, slave address 0. This becomes the
+  final topic segment, so the full topic is `meganet/v1/<station>/logger/reading/elpro`
+- **Enable Sparkplug** — **off**
+- **Owner Name (Group)** and **Device Name (Node)**
+- **Queuing Mode** — FIFO
+- **Node Update** — value in **seconds**
 
 **ALERT2 gateway**, if applicable
 - Port (RS-232 / RS-485), baud, data format, ALERT Protocol Mode
 - One row per mapping: ALERT2 station address, up to four sensor IDs (255 for unused),
   starting Modbus register, scale, offset
 
-**Register → reading map**, one row per published point
-- ELPRO register, ALERT2 address/sensor, name, type, unit, MegaNet address
-- The required JSON key names spelled out: `alert_id`, `reading_ts`, `value_raw`, and
-  optionally `value`, `unit`, `quality`
+**Register → reading map** — give this as the Input Configuration table the technician
+will type or import, one row per block:
+
+| Payload Prefix | Register | Input Count | Sensitivity | Update Time (sec) | Scaling | Offset | (what it is) |
+|---|---|---|---|---|---|---|---|
+| `6128` | `46009` | 1 | 0.01 | 900 | 1.0 | 0 | Loudoun Br river level, m |
+
+- **Payload Prefix is the ALERT2 address**, and it auto-increments with Input Count — so a
+  block of consecutive addresses against consecutive registers is one row.
+- At least one of **Sensitivity** and **Update Time** must be non-zero or the row never
+  publishes.
+- Supply it as a **CSV** for import where there are more than a handful of rows; the column
+  order is `Enabled, Device, IO-Type, Local Input, Payload Prefix, Register, Input Count,
+  Sensitivity, Update Time (sec), Scaling, Offset`, with Device as its table line number
+  minus one, IO-Type `0`, Local Input `0` for General Purpose registers (MQTT p.18–19).
 
 **Credentials and policy**
 - New Admin and Manager passwords, or the policy plus a sealed envelope
@@ -793,15 +962,43 @@ gives `message_unparseable`.
 channel — the PUBACK it receives is from the *broker*, and means the broker has the
 message, not that MegaNet does.
 
-### D4 · Fire a Last Will deliberately
+### D4 · Find out what the Last Will actually does
 
-Do this once before the unit goes to the field. It is the whole reason MQTT earns its
-extra moving parts here: offline detection with no polling. Kill the device's connection
-ungracefully — pull the Ethernet cable, do not disconnect cleanly — and confirm that
-`station_health.online` goes false and `since` moves to the moment the broker noticed.
+On a MegaNet logger this step confirms offline detection works. **On a 115E-2 it is an
+experiment**, because the broker table has no will fields at all (MQTT p.8) and nothing
+documents what plain MQTT mode emits on an ungraceful disconnect.
 
-> A clean disconnect tells the broker **not** to send the will, which is correct
-> behaviour and exactly not what you are testing.
+Subscribe to `meganet/v1/#` in the broker's web client, then pull the Ethernet cable —
+do **not** disconnect cleanly, since a clean disconnect tells the broker not to send a
+will, which is correct behaviour and exactly not what you are testing. Wait out the
+Keep Alive interval and watch what arrives.
+
+- **Something lands on `meganet/v1/<station>/status`** — unlikely, but it would mean
+  offline detection works by configuration after all. Record the exact payload.
+- **Something lands on another topic** — record the topic and payload; a will exists but
+  points somewhere else, and a bridge subscription could reach it.
+- **Nothing arrives** — the expected result. Offline detection comes from staleness
+  instead:
+
+  ```sql
+  select station_key, station_name, online, since,
+         round(minutes_since_seen) as quiet_for_minutes
+    from meganet.station_health
+   where minutes_since_seen > 180
+   order by minutes_since_seen desc;
+  ```
+
+  `station_health` applies no staleness threshold of its own on purpose — every station's
+  reporting interval is different — so pick a threshold per station from its **Update
+  Time**. A unit publishing every 900 s is not late at 20 minutes.
+
+> **Do not let store-and-forward fool you into thinking a station is fine.** The queue
+> replays on reconnect with the *original* timestamps (MQTT p.13), so `reading_ts` stays
+> honest, but `last_reading_at` jumps forward when the backlog lands. A station that was
+> dark for six hours and then backfills looks healthy on the next query. The
+> `isHistorical` flag exists for exactly this, but only under Sparkplug — which we are not
+> using — so in plain mode the backfill is indistinguishable from live data at the
+> database. Watch `minutes_since_seen` continuously rather than sampling it.
 
 ---
 
@@ -810,24 +1007,43 @@ ungracefully — pull the Ethernet cable, do not disconnect cleanly — and conf
 Nothing in this section may be presented to anyone as known. It is here so that a gap is
 recognised as a gap rather than mistaken for something you failed to find.
 
-### E1 · MQTT
+### E1 · MQTT — what the gateway guide answered
 
-| Unknown | Why it blocks work |
+Twelve of the fourteen unknowns in the first version of this page are now closed. Kept
+here as a record, because knowing a question is *settled* is worth as much as the answer:
+
+| Was unknown | Answer | Cite |
+|---|---|---|
+| The payload format | Plain MQTT is **JSON**: `{"timestamp":[epoch ms], "DataValueLabel":value}`, multiple label/value sets per message. Sparkplug is protobuf. | MQTT p.4 |
+| The topic grammar below Topic Prefix | Full topic = **Topic Prefix + `/` + Device name**. The prefix is free-form. | MQTT p.6, p.10 |
+| Every Broker field name | Enabled, Client ID, IP/Name, Port, Historian, Keep Alive(Sec), Clean Session, User name, Password, Queue Size (Max), Queue Delay (s), TLS | MQTT p.8 |
+| Whether the port is configurable | **Yes** — a Port column, default 1883; documented examples use 1884 too. | MQTT p.8 |
+| Certificate format | **x.509 files**, uploaded via the MQTT Security page with "Choose File"; the unit validates them and reports errors. | MQTT p.14 |
+| Sparkplug identity | GROUP = the unit's **Owner**, NODE = its **Device Name**, both from Module Information. STATE is fixed by the standard. | MQTT p.6 |
+| How Inputs map to registers | A full column list — Device, IO-Type, Local Input, Payload Prefix, Register, Input Count, Sensitivity, Update Time, Scaling, Offset — with an index table per device type. | MQTT p.10–12, p.19 |
+| Whether scaling applies | **Yes** — Scaling and Offset per row; a non-1.0 scale converts the value to float. | MQTT p.12 |
+| What triggers a publish | **Sensitivity** (change threshold) and **Update Time** (timer). Either at zero disables that trigger; both at zero means the row never publishes. | MQTT p.11–12 |
+| Node Update units | **Seconds** — documented example 600. | MQTT p.6 |
+| MQTT diagnostics | A **Monitor MQTT Comms** page showing topic and payload per message, a Connectivity page with per-broker statistics, and **broker status registers at 30430 / 30445 / 30460 / 30475**. | MQTT p.16–18, p.20–21 |
+| Store-and-forward | **Yes** — up to 10,000 queued messages shared across brokers, FIFO or LIFO, rate-limited on reconnect, flagged `isHistorical` when Historian is ticked. **Held in RAM; lost on power failure.** | MQTT p.7, p.13–14 |
+
+**Still open, and these two matter:**
+
+| Still unknown | Why it matters |
 |---|---|
-| **The payload format** — no statement of JSON, protobuf or raw values, for either mode, anywhere in the manual. | The highest-priority unknown. Ingest cannot be written or tested against an unknown wire format. |
-| **The topic grammar below Topic Prefix** — no example topic string; no statement of what segments are appended, in what order. The Outputs tab's "defined subscribe topic" is never defined. | Decides outright whether path A is possible. |
-| **Every Broker tab field name** — no host, port, client id, username, password, keep-alive, QoS, retain, clean session, Last Will, reconnect or retry field is named. | No click-by-click instruction can be written for the one screen that matters most. |
-| **Whether the MQTT port is configurable.** 1883/8883 appear only in the p.66 firewall table and — unlike Modbus, DNP3 and serial — carry **no "(Default, Configurable)"** annotation. | If the broker ever moves off 8883, it is unknown whether the device can follow. |
-| **TLS detail** — no file format (PEM/DER/PKCS#12), no size limit, no upload control, no statement of whether the file set is global or per-broker, no TLS version, no cipher suite, no hostname-verification statement, nothing on passphrase-protected keys. | Certificates must be issued in a format the device accepts. Getting it wrong is a site revisit. |
-| **Whether mutual TLS is mandatory** (the p.41 contradiction). | Decides whether this is a shared-password rollout or a per-device PKI programme. Highest-impact ambiguity for effort. |
-| **Whether MQTT needs a Feature Key** (the p.5 ambiguity). | If licensed, every unit needs a serial-bound purchased key — a procurement lead time. |
-| **Whether MQTT is configurable from the web pages**, and which role may change it. | Decides whether field staff need a Windows laptop with CConfig at every site. |
-| **Sparkplug identity** — no Group ID / Edge Node ID / Device ID field named, no namespace derivation, no spec version, no NBIRTH/NDEATH behaviour. | Path D cannot be scoped from this manual. |
-| **How Inputs map to registers** — "a block of inputs" with a "count" is the entire description. No start-address form, no data types, no statement of whether scaling applies (as it explicitly does for DNP3, p.39), no statement of whether change-of-state drives MQTT publishing or only WIB. | This is the join between the I/O store and MegaNet, and it is one sentence long. |
-| **Node Update** — no units, no range, no default. Nor a default for MQTT Enable or Enable Sparkplug, nor a maximum number of logical devices. | Message rate — so broker load and row volume — cannot be predicted. |
-| **MQTT diagnostics** — MQTT Comms is one sentence, with no field list, no error codes and no connection-state indicator. There is **no MQTT connection-status register** anywhere in the register map, **no MQTT LED**, and no statement of whether MQTT failures reach the system log or can drive a Comms Fail output — although WIB mappings, Modbus client mappings and expansion I/O all have such registers. | A technician cannot answer "is this unit connected to the broker right now?" from the device. Nothing device-side can be alarmed on. |
-| **Store-and-forward.** DNP3 is credited with "timestamped data and history backfill" (p.6); nothing says whether MQTT publications are timestamped or buffered while the broker is unreachable. | Decides whether MegaNet sees gaps or backfill after an outage. |
-| **Whether certificates and keys survive a factory reset, a firmware patch or a config restore**, and whether private keys travel inside the exported XML. Feature keys are stated to survive; certificates are never mentioned. | Decides whether a field reset costs a re-provisioning visit, and whether a decommissioned unit still holds a live key. |
+| **Publish QoS and retain.** Neither is a configurable field, and the guide never states what the gateway publishes with. Only the *subscribe* (output) side has a QoS field, "usually set to 1" (MQTT p.13). | If publishes are QoS 0, at-least-once does not hold between device and broker. Store-and-forward covers the outage case, so measure it rather than assume it — capture on the bench. |
+| **Last Will in plain MQTT mode.** The broker table has no will topic, payload, QoS or retain field, yet the Keep Alive description refers to "the configured last will and testament" (MQTT p.8). For Sparkplug the will is NDEATH; for plain MQTT nothing is documented. | MegaNet's retained `{"online": false}` cannot be produced by configuration, so offline detection falls back to `station_health.minutes_since_seen`. Confirm on the bench whether *any* will is emitted, and to what topic. |
+
+**Two more that the guide does not touch, and the hardware manual did not either:**
+
+| Still unknown | Why it matters |
+|---|---|
+| **Whether MQTT needs a Feature Key on the 115E-2** (the p.5 ambiguity). Note the x15U guide says the gateway "is available either through firmware upgrade or in new units" (MQTT p.1) — which is about availability, not licensing, and does not settle it. | If licensed, every unit needs a serial-bound key before it can talk at all. |
+| **Whether certificates and keys survive a factory reset, a firmware patch or a config restore**, and whether private keys travel inside the exported configuration. | Decides whether a field reset costs a re-provisioning visit, and whether a decommissioned unit still holds a live key. |
+
+> **The 115E-2 hardware caveat applies to this whole table.** Every row is documented for
+> the x15U family. The bench session in [A0 item 1](#a0--the-gate) is what turns it from
+> ELPRO's design into this fleet's facts.
 
 ### E2 · General provisioning
 
@@ -882,8 +1098,14 @@ recognised as a gap rather than mistaken for something you failed to find.
 
 ### E3 · Not in MegaNet either
 
-- **No topic prefix, rewrite or template setting exists in the bridge.** If the device
-  cannot emit the literal topic, that is a code change, not a provisioning task.
+- **No `elpro` parser yet.** `READING_FORMATS = ['json', 'hfem']`, and the third entry
+  this page recommends does not exist. The bridge will ignore
+  `meganet/v1/+/+/reading/elpro` until it is written — the subscription and the parser go
+  in together, because "the subscription without the parser is a message the bridge acks
+  nothing about" (`bridge/src/topics.js:66-70`).
+- **No topic prefix, rewrite or template setting exists in the bridge**, and none is
+  needed now that the device's prefix is free-form — but it does mean the device must
+  spell MegaNet's topic exactly, not approximately.
 - **No Sparkplug B / protobuf decoder**, and no vendor-payload key-mapping layer. The
   bridge deliberately does no renaming and no content sniffing.
 - **No ELPRO precedent at all.** The only worked MQTT base station in this repo is a
@@ -892,19 +1114,27 @@ recognised as a gap rather than mistaken for something you failed to find.
   Last Will scheme is per-`<station>` topic segment, so a base station's will covers only
   **the base station**. Readings for many field stations flow fine underneath it, but
   whether those stations get their own liveness identity is undecided — and the same gap
-  exists for the CR300.
+  exists for the CR300. For a 115E-2 this bites harder, because it has no configurable
+  will even for itself.
+- **No staleness thresholds anywhere.** `station_health` exposes `minutes_since_seen` and
+  deliberately applies no threshold. With no Last Will available on this hardware, that
+  view becomes the *only* offline signal, so somebody has to choose a number per station
+  and something has to watch it.
 - **No statement of which CA a third-party device must trust** for the managed broker.
 
 ### E4 · Decisions only a person can make
 
-1. Which path (A–F) is funded and owned.
+1. Who writes and owns the bridge's `elpro` parser, and by when. Path B is chosen; the
+   work is not scheduled.
 2. Whether client certificates are required per device — and therefore whether a PKI
    programme is in scope.
 3. Who owns certificate issuance, expiry monitoring and rotation for units that will
    outlive their certificates.
 4. The publisher segment for each base station, and who confirms it in `meganet.station`
    before it is flashed into the device and the broker ACL.
-5. Whether field stations behind a relay get their own status identity.
+5. Whether field stations behind a relay get their own status identity — and, given there
+   is no configurable Last Will, what the staleness threshold per station should be
+   instead.
 6. The fleet firmware version and the patch-management SLA.
 7. Publish cadence, and the Supabase row budget that follows from it.
 8. Whether provisioning is USB-only on the bench or staged over Ethernet — the manual
@@ -962,6 +1192,67 @@ ERT-A2 recommended ranges: **16-bit** `40401`–`46000`, **32-bit** `46009`–`4
 **float** `48005`–`49999`. **32-bit values sit in two 16-bit registers and read only on
 odd addresses** — `46009`, then `46011`, then `46013`; reading `46012` is an address error.
 
+### The ELPRO MQTT gateway, at a glance (MQTT p.4–21)
+
+**Topic assembly (Sparkplug off)**
+
+```
+<Topic Prefix>  +  "/"  +  <Device name>
+```
+
+Both are free text; the prefix may contain any number of `/`. For MegaNet:
+`meganet/v1/<station>/logger/reading/` + `elpro`.
+
+**Payload (Sparkplug off)**
+
+```json
+{"timestamp": 954711743792, "River Level": 17.61, "Battery Voltage": 13.8356}
+```
+
+`timestamp` is Linux epoch **milliseconds**. Every other key is a **Payload Prefix** you
+chose. Multiple label/value sets may share one message, and the queue concentrates
+same-topic payloads into single messages on replay.
+
+**Broker table columns** — Enabled · Client ID · IP/Name · Port · Historian ·
+Keep Alive(Sec) · Clean Session · User name · Password · Queue Size (Max) ·
+Queue Delay (s) · TLS. **No QoS, retain or Last Will.**
+
+**Input Configuration columns** — Enabled · Device · IO-Type · Local Input ·
+Payload Prefix · Register · Input Count · Sensitivity · Update Time (sec) · Scaling ·
+Offset. Export/Import as CSV below the table; max 1,000 rows.
+
+**Device types** → IO-Types available:
+
+| Device Type | IO-Type |
+|---|---|
+| Local-IO | IO-Digital, IO-Analog, **Diagnostics** |
+| General Purpose | **Register** ← use this for ALERT2 and gateway registers |
+| 115S-11 / 115S-12 | IO-Digital, IO-Analog |
+| 115S-13 | IO-Digital |
+
+**Broker status registers** — broker 1 at `30430`, broker 2 `30445`, broker 3 `30460`,
+broker 4 `30475`, each with the same offsets:
+
+| Offset | Meaning |
+|---|---|
+| 0 | Connected: 0 = no, 1 = yes |
+| 1 | Link count — times the link has been made |
+| 2 | Current uptime, seconds (32-bit, 2 words) |
+| 4 | MQTT packets transmitted (32-bit) |
+| 6 | MQTT packets received (32-bit) |
+| **8** | **Messages currently queued** |
+| 9 | Bytes transmitted (32-bit) |
+| 11 | Bytes received (32-bit) |
+
+**Queuing** — up to **10,000** messages total across all brokers, FIFO or LIFO,
+**held in RAM and lost on power failure**. Queue Delay rate-limits the replay.
+
+**Node metrics** published on birth and at each Node Update: serial number, owner,
+contact, device name, description, location, host and radio firmware versions, MAC and IP
+address; battery and supply voltage, RSSI, link count, Tx-fail count, unit and module
+uptime, channel utilisation, antenna VSWR; and per broker — IP address, connected,
+connection count, uptime, messages Tx/Rx/queued.
+
 ### Recovering a unit
 
 - **Web:** System Tools → **Clear Configuration and Reset** (listed on the System Tools
@@ -994,14 +1285,32 @@ odd addresses** — `46009`, then `46011`, then `46013`; reading `46012` is an a
 | A register reads with `*` beside it | The register is at its fail-safe value. It will still be sent. |
 | `PT401` from any RPC | The bridge's ingest token is wrong or revoked. Re-mint it (A10). |
 | Firmware upgrade interrupted | The module may be unserviceable and has to go back to ELPRO. Never interrupt power during a USB upgrade. |
+| MQTT enabled, broker connected, but nothing ever publishes | An input row has **Sensitivity 0 and Update Time 0** — both triggers disabled, so that row never sends (MQTT p.11–12). Set one of them. |
+| A row publishes but the key in the payload is not the address you expected | The **Payload Prefix** auto-increments when Input Count > 1, starting from the trailing digits of the name (MQTT p.11). Check that the block's first address and first register line up. |
+| Values arrive but are wrong by a constant factor | **Scaling** or **Offset** on that input row. A scale other than 1.0 also converts the value to floating point (MQTT p.12). |
+| Broker refuses the connection right after cloning a config to a second unit | Duplicate **Client ID** — ELPRO warns about exactly this (MQTT p.17). It must be unique per unit, and so must the Topic Prefix's station segment. |
+| Readings arrive in a burst, hours late, with old timestamps | Store-and-forward replaying a queue after an outage. Working as designed — `reading_ts` stays honest, `dup_count` absorbs any overlap. Check queue depth at register `30438` (broker 1). |
+| A unit lost power and the backlog never arrived | The queue is held in **RAM** and does not survive a power failure (MQTT p.14). Only a comms outage is covered, not a flat battery. |
 
 ---
 
 ## What is still a person's job
 
-The gate at the top of this page is not rhetorical. Until one 115E-2 has been put on a
-bench, pointed at a plaintext broker and made to show what it actually publishes, this
-document describes a provisioning process whose central step — *what do you type into
-Topic Prefix, and what comes out the other side* — is unanswerable from the manufacturer's
-own manual. Everything else here is ready to use; that one hour is what turns it from a
-plan into a runbook.
+The first version of this page could not say whether a 115E-2 would ever work, because
+ELPRO's hardware manual answered none of the questions that decide it. The MQTT Gateway
+Configuration Guide answers almost all of them, and the answer is yes: plain MQTT is JSON,
+the Topic Prefix is free-form, and the gap between ELPRO's `{"timestamp": …, "label":
+value}` and MegaNet's reading object is a parser of a shape this bridge already has one of.
+
+Two things stand between that and a provisioned station.
+
+**One bench session**, to confirm the x15U guide describes the 115E-2's gateway and not
+just its cousins' — five questions, listed in [A0](#a0--the-gate), answered in an
+afternoon with a plaintext broker and a laptop.
+
+**One parser**, `parseElpro()`, written against the bytes that session captures rather
+than against this page. Until it exists, a correctly provisioned 115E-2 and a broken one
+look exactly alike from the field: both publish, and neither lands a row.
+
+Neither is research. Both are somebody's afternoon, and the order matters — do the bench
+session first, because it is what the parser is written against.
