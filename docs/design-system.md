@@ -118,16 +118,21 @@ overrides it with one selector and no `!important`. What a component may **not**
 do is remove it.
 
 **Never `outline: none` without a replacement that is at least as visible.**
-There are exactly two allowlisted exceptions in the app, both of which replace
-the ring with a shape change on the element that has focus:
+There is exactly one allowlisted exception in the app, and it replaces the ring
+with a shape change on the element that has focus:
 
-- `.map-split` — a 3 px hairline the height of the page. A ring around it reads
-  as a second divider; focus turns the bar itself the accent colour instead.
 - `.nv-node` — an SVG `<g>` has no box, so the browser rings the group's
   bounding box, which on a force-directed graph is a rectangle nowhere near the
   node. The node's own circle takes the accent stroke at 3 px.
 
-`npm run shell` holds that allowlist. A third exception has to be argued into
+There were two until #165. The other was `.map-split`, the Stations tab's
+draggable divider — a 3 px hairline the height of the page, where a ring read as
+a second divider. The divider went with the two-pane split and its exception
+went with it, **and the check is what remembered**: `npm run shell` fails on a
+stale allowlist entry exactly as it fails on an unlisted `outline: none`, so
+deleting the rule could not quietly leave the exception behind.
+
+`npm run shell` holds that allowlist. A second exception has to be argued into
 it.
 
 ### Contrast

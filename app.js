@@ -1469,7 +1469,7 @@ function renderMain() {
     case 'export':     el.innerHTML = renderExportHtml();     initExport();     break;
     default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }
-  updateChromeHeight();     // the Stations panes size themselves off it
+  updateChromeHeight();     // three tabs size their own scrollers off it
 }
 
 // ── Empty state ────────────────────────────────────────────────────────────────
@@ -1507,21 +1507,16 @@ function renderStationsHtml() {
            which is what makes the outline step by one; it is sr-only because
            the nav and the header already say where you are, and this tab has
            less vertical room to spare than any other. -->
-      <h2 class="sr-only">Stations — filters, map and station list</h2>
-      <!-- Filters, and only filters, since #164. Map display, Draw & measure
-           and the legend used to be three more panels down here; they are on
-           the map itself now, as icons in its top-right corner beside the
-           base-map picker — see stationsMapPanels() and map-controls.js. -->
-      <aside class="sidebar stack map-pane" id="stations-left" aria-label="Station filters">
-        <div class="panel filter-panel" id="station-filters">
-          ${stationFiltersHtml()}
-        </div>
-      </aside>
-      <div class="map-split" id="stations-split" role="separator" aria-orientation="vertical"
-           aria-label="Resize the filter pane" tabindex="0" title="Drag to resize · double-click to reset"
-           onpointerdown="splitDragStart(event)" ondblclick="setSplitWidth(320,true)"
-           onkeydown="splitKey(event)"></div>
-      <div class="stack map-pane" id="stations-right">
+      <h2 class="sr-only">Stations — map, filters and station list</h2>
+      <!-- One column since #165. This tab spent its whole life as a two-pane
+           split: a filter rail on the left, the map and the table on the right,
+           a draggable divider between them and a scroller inside each. #164
+           took Map display, Draw & measure and the legend out of that rail and
+           put them on the map; this takes the last thing left in it — the
+           filters — and puts it under the map as a collapsible card, which
+           leaves nothing on the left to keep a column for. The map is ~320 px
+           wider on every screen as a result, which is the point. -->
+      <div class="stack" id="stations-main">
         <div class="panel map-panel">
           <!-- The map is a canvas: ~3,174 pins and ~3,141 link lines drawn as
                pixels, with no DOM per station to annotate. So it answers the
@@ -1543,6 +1538,22 @@ function renderStationsHtml() {
           <div id="map-note" class="map-note" hidden></div>
           <div id="acma-card" class="acma-card" hidden></div>
           <div id="path-card" class="acma-card" hidden></div>
+        </div>
+        <!-- Directly under the map, and the same <details> the Path profile and
+             Link budget cards below it are (#165). The summary carries the match
+             note, so a shut card still says what the filters are doing — which
+             is the whole condition for letting it shut at all. -->
+        <div class="panel" id="stations-filter-card">
+          <details class="filter-card" ${state.filtersOpen ? 'open' : ''}
+                   ontoggle="setStationFiltersOpen(this.open)">
+            <summary>
+              <h3>Filters</h3>
+              <span class="small" id="map-match-note">${mapMatchNoteHtml()}</span>
+            </summary>
+            <div class="filter-panel" id="station-filters">
+              ${stationFiltersHtml()}
+            </div>
+          </details>
         </div>
         <div class="panel" id="path-profile-panel" hidden></div>
         <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
@@ -1570,33 +1581,34 @@ function renderStationsHtml() {
     </div>`;
 }
 
-// ── Stations tab: the two panes ──────────────────────────────────────────────
-// The filter pane and the map/table column are both taller than the screen, and
-// while the page scrolled as one piece, reaching a filter at the bottom of the
-// sidebar scrolled the map out of sight. Each column now fills the space under
-// the header and scrolls inside itself, and the divider between them drags to
-// re-split the width.
+// ── Stations tab: one column ─────────────────────────────────────────────────
+// It was two, from #136 until #165: a filter rail on the left, the map and the
+// table on the right, a divider that dragged to re-split the width, and a
+// scroller inside each column. Every part of that existed to serve a rail that
+// was taller than the screen and had to stay beside a map that must not scroll
+// away from it.
 //
-// The small-screen model, stated because it is a decision rather than a
-// consequence (#136). Below `lg` (1100 px) the split is not narrowed, it is
-// abandoned: two scrollers inside a phone screen is worse than one, so the
-// panes stack, each returns to `height: auto`, the page scrolls as a whole
-// again and the divider is `display: none` — which also takes it out of the
-// tab order, since a control that splits nothing must not be a stop on the way
-// to the map. The order is deliberate too: the map goes *first* and the filter
-// rail second (`order: 2`), because the map is the point of the tab and a
-// phone screen holds about one panel. Nothing is hidden or collapsed away at
-// any width — every control in the rail is still there, below the map.
+// The rail is gone. #164 moved Map display, Draw & measure and the legend onto
+// the map itself; #165 moved the filters under it, as a collapsible card. With
+// nothing on the left there is no second column to size, so the divider, the
+// stored width and the two inner scrollers went with it, and the page scrolls
+// as one piece at every width — which is what it already did below `lg`.
 //
-// `state.splitW` and `--mn-split` are kept across the fold rather than reset:
-// the operator's chosen split is theirs, and a phone visit in the middle of a
-// desktop session must not silently discard it. The variable simply stops
-// being read while the layout is one column.
+// **The one thing that was genuinely lost, said out loud rather than left to be
+// discovered:** the split existed because "reaching a filter at the bottom of
+// the sidebar dragged the map off the top", and scrolling to a filter now
+// scrolls the map away above it. Three things make that a smaller problem than
+// it was rather than the same one moved: the filters are a single card
+// immediately under the map instead of a rail longer than the viewport, the
+// card shuts, and its summary carries the live match note — so what the filters
+// are doing is readable without opening them, and reading it does not cost the
+// map.
 
 // How much vertical room the header takes. Measured rather than assumed: its
-// title and its row of buttons wrap on a narrow window, and the panes size
-// themselves off what's left. The nav used to be counted here too; it sits
-// beside the main area now, so it costs the panes no height at all.
+// title and its row of buttons wrap on a narrow window, and the tabs that size
+// themselves off what's left read it as --mn-chrome. The Stations panes were
+// the first callers and are gone (#165); the Message Log, Network View and the
+// Map Generator still size their own scrollers off it.
 function updateChromeHeight() {
   const hdr = document.querySelector('header');
   const bar = document.getElementById('mem-bar');
@@ -1604,46 +1616,19 @@ function updateChromeHeight() {
   document.documentElement.style.setProperty('--mn-chrome', `${h}px`);
 }
 
-// `save` is left off while a drag is in flight — the width is written once the
-// operator lets go, not sixty times a second.
-function setSplitWidth(px, save) {
-  state.splitW = Math.round(Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, px)));
-  document.documentElement.style.setProperty('--mn-split', `${state.splitW}px`);
-  if (save) localStorage.setItem('mn-split', state.splitW);
-}
-
-function splitDragStart(e) {
-  const bar    = e.currentTarget;
-  const layout = bar.parentElement;
-  if (!layout) return;
-  const left = layout.getBoundingClientRect().left;
-  bar.classList.add('dragging');
-  bar.setPointerCapture(e.pointerId);
-  const move = ev => setSplitWidth(ev.clientX - left);
-  const done = () => {
-    bar.classList.remove('dragging');
-    bar.removeEventListener('pointermove', move);
-    bar.removeEventListener('pointerup', done);
-    bar.removeEventListener('pointercancel', done);
-    setSplitWidth(state.splitW, true);
-    // The map just changed width underneath Leaflet, which only watches the window.
-    if (state.map) state.map.invalidateSize();
-  };
-  bar.addEventListener('pointermove', move);
-  bar.addEventListener('pointerup', done);
-  bar.addEventListener('pointercancel', done);
-  e.preventDefault();
-}
-
-// Keyboard equivalent of the drag, so the split isn't mouse-only.
-function splitKey(e) {
-  const step = e.shiftKey ? 48 : 16;
-  if (e.key === 'ArrowLeft')       setSplitWidth(state.splitW - step, true);
-  else if (e.key === 'ArrowRight') setSplitWidth(state.splitW + step, true);
-  else if (e.key === 'Home')       setSplitWidth(320, true);
-  else return;
-  e.preventDefault();
-  if (state.map) state.map.invalidateSize();
+// The filters card, open or shut. Remembered between visits, which is the
+// difference between this card and the two below it: Path profile and Link
+// budget are things you open to answer one question and close again, and the
+// filters are how this tab is *operated*. An operator who wants the map to have
+// the whole screen shuts this once and means it.
+//
+// It writes state and nothing else — no re-render. #160's lockup was an
+// ontoggle handler that replaced its own <details>, and the element's own
+// `open` is authoritative here for the same reason: the browser sets it on the
+// gesture before this runs.
+function setStationFiltersOpen(open) {
+  state.filtersOpen = !!open;
+  localStorage.setItem('mn-filters', state.filtersOpen ? 'open' : 'closed');
 }
 
 // ── The Stations map's own controls (#164) ───────────────────────────────────
@@ -3011,10 +2996,30 @@ const FILTER_GROUPS = {
 // Contents of the Filters panel. Search on top, then one block per question the
 // operator is actually asking (what kind of site, what does it measure, whose
 // network, where), then the data-completeness block for finding gaps.
+// No heading of its own since #165: the card this renders into is a <details>
+// and its <summary> carries the title. The match note went up there with it —
+// it is the one line that has to be readable while the card is shut.
+//
+// The search block leads and spans the whole card; the grouped filters below it
+// flow into as many columns as the width allows. In a 320 px rail there was one
+// arrangement; across the page there is a better one, and six full-width blocks
+// down a 1400 px page would waste exactly the room #165 set out to reclaim.
 function stationFiltersHtml() {
   return `
-    <div class="panel-header">
-      <h3>Filters</h3>
+    <div class="filter-lead">
+      <div class="filter-block filter-block--lead">
+        <div class="filter-head">
+          <span class="filter-title">Search</span>
+          <button class="filter-clear" id="search-clear" onclick="clearSearch()"
+                  ${state.filters.search.trim() ? '' : 'hidden'}>clear</button>
+        </div>
+        <p class="filter-hint">Name, station # or ALERT address — or paste a list of them,
+          separated by commas, spaces or new lines.</p>
+        <textarea id="station-search" class="filter-search" rows="1" spellcheck="false"
+                  placeholder="e.g. 6128, 6129 — or paste from a telemetry log"
+                  oninput="mapSearchInput(this.value);autoGrowSearch(this)">${esc(state.filters.search)}</textarea>
+        <p class="filter-note" id="search-terms-note">${searchTermsNoteHtml()}</p>
+      </div>
       <span class="filter-resets">
         <button class="filter-reset" onclick="clearStationFilters(false)"
                 title="Put every station back at full opacity, without moving the map"
@@ -3024,23 +3029,11 @@ function stationFiltersHtml() {
                 ${anyStationFilterActive() ? '' : 'disabled'}>Clear &amp; zoom out</button>
       </span>
     </div>
-    <div class="filter-block">
-      <div class="filter-head">
-        <span class="filter-title">Search</span>
-        <button class="filter-clear" id="search-clear" onclick="clearSearch()"
-                ${state.filters.search.trim() ? '' : 'hidden'}>clear</button>
-      </div>
-      <p class="filter-hint">Name, station # or ALERT address — or paste a list of them,
-        separated by commas, spaces or new lines.</p>
-      <textarea id="station-search" class="filter-search" rows="1" spellcheck="false"
-                placeholder="e.g. 6128, 6129 — or paste from a telemetry log"
-                oninput="mapSearchInput(this.value);autoGrowSearch(this)">${esc(state.filters.search)}</textarea>
-      <p class="filter-note" id="search-terms-note">${searchTermsNoteHtml()}</p>
-      <p class="filter-note" id="map-match-note">${mapMatchNoteHtml()}</p>
-    </div>
-    ${Object.keys(FILTER_GROUPS).map(filterGroupHtml).join('')}
-    ${filterAreaHtml()}
-    ${filterDataHtml()}`;
+    <div class="filter-groups">
+      ${Object.keys(FILTER_GROUPS).map(filterGroupHtml).join('')}
+      ${filterAreaHtml()}
+      ${filterDataHtml()}
+    </div>`;
 }
 
 function renderStationFilters() {

@@ -753,23 +753,35 @@ saying so over the map; *Off* draws none at all. Filter matches are always
 named in Auto and On.
 
 **Map and table together.** The map and the station table share the Stations
-tab and the one filter pane: a search term, role or network narrows the table to
+tab and the one filter card: a search term, role or network narrows the table to
 the matching rows while the map highlights (or, with *Hide stations that don't
 match*, drops) the same set. Picking a row pans the map to that station and
 opens its pin, so the list and the map never disagree about which site is being
 looked at.
 
-**Two panes, two scrollbars.** The filter pane and the map/table column are
-each taller than the screen. They scroll separately — reaching a filter at the
-bottom of the sidebar no longer drags the map off the top — and the divider
-between them drags (or takes ←/→, Home to reset) to re-split the width, which
-is remembered between visits. On a phone the two stack and the page scrolls as
-one again.
+**One column, since #165.** The tab was a two-pane split from #136 until then:
+a filter rail on the left, the map and the table on the right, a divider that
+dragged to re-split the width, and a scroller inside each column. Every part of
+that served a rail taller than the screen that had to stay beside the map.
 
-The left rail is **filters, and only filters**, since #164. Map display, Draw &
-measure and the legend were three more panels down there; all three are on the
-map itself now, which is both where they belong and what gives the rail room to
-stop scrolling.
+There is no rail. #164 put Map display, Draw & measure and the legend on the map
+itself, and #165 put the filters under it as a collapsible card — so the map is
+about 320 px wider on every screen, and the page scrolls as one piece at every
+width, which is what it already did on a phone.
+
+**What that costs, stated rather than left to be found.** The split existed
+because reaching a filter at the bottom of the rail dragged the map off the top,
+and scrolling to a filter now scrolls the map away above it. Three things make
+that a smaller problem than the one the split was solving: the filters are a
+single card immediately under the map rather than a rail longer than the
+viewport, the card collapses, and its summary line carries the live match count
+— so what the filters are doing is readable without opening them, and reading it
+costs you nothing of the map.
+
+Inside the card the search box leads and spans, and the six filter groups flow
+into as many columns as the window allows — four on a wide screen, two at 768 px,
+one on a phone. A 320 px rail had one sensible arrangement; a card the width of
+the page has a better one.
 
 **Signal links and *Kill spaghetti*.** Links are drawn from each field station
 to every repeater whose pass ranges cover one of its ALERT addresses, which
@@ -1234,15 +1246,14 @@ rail, both of which open the nav with the cursor already in it.
 - **Collapses to an icon rail**, not to nothing — icons and tooltips stay, only
   the labels go. On the rail a tooltip names the group as well as the tab, since
   the heading giving it that context is clipped. The state is kept in
-  `localStorage` under `mn-nav`, alongside `mn-theme` and `mn-split`.
-- **Starts collapsed under 900 px**, on a first visit only. The Stations tab
-  already gives a permanent column to its resizable filter pane; a second
-  permanent column on a laptop is one too many. A stored preference always wins.
+  `localStorage` under `mn-nav`, alongside `mn-theme` and `mn-filters`.
+- **Starts collapsed under 900 px**, on a first visit only. The Stations tab is
+  one long column already; a second permanent column on a laptop is one too
+  many. A stored preference always wins.
 - **Under 560 px it opens as a drawer over the content**, not as a column beside
-  it. 236 px of nav plus a filter pane that won't compress below ~225 px does
-  not fit in a 390 px phone at any setting, so the rail keeps its place in the
-  layout and the expanded nav floats above — then closes itself once a tab has
-  been picked.
+  it. 236 px of nav plus a page that wants the rest of a 390 px phone does not
+  fit at any setting, so the rail keeps its place in the layout and the expanded
+  nav floats above — then closes itself once a tab has been picked.
 - Keyboard-driven: ↑/↓ walk the tabs and the find box as one column, and the
   active tab carries `aria-current`. Each group is a `role="group"` labelled by
   its own heading, so the rail is still five groups to a screen reader after the
@@ -1775,7 +1786,7 @@ summary says so rather than inventing one.
 A right-hand rail that says what the open tab is for and what to watch out for
 on it. It exists because a real amount of explanation was already scattered
 through the app — the 357 filter modal, `docs/serial-help.html`, the ARRO id
-disambiguation copy in the station editor, the hints in the Stations filter pane
+disambiguation copy in the station editor, the hints in the Stations filter card
 — with no single surface a first-time user could open to find any of it.
 
 `HELP` in `core.js` is the single description of its content, keyed by the same
@@ -1817,13 +1828,13 @@ was decided per item, and the decisions are recorded above `HELP` in `core.js`:
 the 357 modal and `docs/serial-help.html` are linked rather than moved (one
 would drift, the other exists to be forwarded to an IT department and needs a
 URL of its own); the station editor's ARRO id labels stay where the typing
-happens and the rule is restated in the panel; and the filter pane's inline
+happens and the rule is restated in the panel; and the filter card's inline
 hints stay, because they are generated from the loaded file and cannot be lifted
 into a static string.
 
 It borrows the nav's interaction contract on purpose (§14): it collapses to a
 strip rather than to nothing, keeps its state in `localStorage` under `mn-help`
-beside `mn-nav` / `mn-theme` / `mn-split`, and re-measures every Leaflet map
+beside `mn-nav` / `mn-theme` / `mn-filters`, and re-measures every Leaflet map
 once its width transition has finished rather than during it. Three places it
 deliberately differs, because a reference surface is not a navigation one:
 
@@ -1840,9 +1851,9 @@ deliberately differs, because a reference surface is not a navigation one:
   looking for it. So the strip becomes a fixed tab on the screen edge instead:
   still always present, costing no layout width.
 
-The widths in between need no special case. The Stations tab already drops to a
-single column at 1100 px (§4), so the nav, the filter pane and this panel only
-hold width together above that — where there is width to hold. `--mn-help`
+The widths in between need no special case. The Stations tab is a single column
+at every width since #165, so the nav and this panel are the only two things
+holding width beside it. `--mn-help`
 narrows from 300 px to 260 px below 1400 px all the same, so the map keeps a
 usable share of a laptop with everything open.
 
@@ -1879,7 +1890,7 @@ Tabs / panels:
   a **Repeaters listening** card between the two, listing every repeater with a
   pass range open to that station's addresses (nearest first); clicking a row
   puts the map on that repeater without touching the filters or the selection.
-  The filter pane on the left drives the map and the table together
+  The filter card under the map drives the map and the table together
 - **Radio Path Maps** — Queensland basin explorer + bundled Radio-path PDF maps, with station-aware search
 - **Networks** — radio network cluster management
 - **Pass Ranges** — pass-range matching and hop-chain view; rows link through to

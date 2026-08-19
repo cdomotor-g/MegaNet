@@ -345,7 +345,10 @@ const SEED_STATIONS = `async () => {${SEED_ACMA}
   if (withId) selectStation(withId.id);
   addToMapSelection(state.data.stations.slice(0, 3).map(s => s.id));
   rerenderStations();
-  for (const d of document.querySelectorAll('#station-filters details, #acma-filter-block details')) d.open = true;
+  // The filter card itself since #165 — the filters are a collapsible under the
+  // map now, and a shut <details> takes every control in it out of this check.
+  for (const d of document.querySelectorAll(
+    '#stations-filter-card details, #station-filters details, #acma-filter-block details')) d.open = true;
   await new Promise(r => setTimeout(r, 350));
 }`;
 

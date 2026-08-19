@@ -66,14 +66,17 @@ function check(name, pass, detail = '') {
 }
 
 // ── The `outline: none` allowlist ────────────────────────────────────────────
-// Two entries, and each is here because the element has no box worth ringing.
-// Both replace the outline with a shape change on the thing that has focus,
-// which is the condition for being in this list at all — "it looked bad" is
-// not. Adding a third means editing this file and saying why, which is the
-// point: the cost of the exception is visible.
+// Each entry is here because the element has no box worth ringing, and each
+// replaces the outline with a shape change on the thing that has focus, which
+// is the condition for being in this list at all — "it looked bad" is not.
+// Adding one means editing this file and saying why, which is the point: the
+// cost of the exception is visible.
+//
+// It held a third until #165: `.map-split:focus-visible`, the Stations tab's
+// draggable divider. The divider is gone with the two-pane split and so is its
+// exception — and this check is what remembered, because it fails on a stale
+// entry exactly as it fails on an unlisted removal.
 const OUTLINE_NONE_ALLOWED = [
-  { selector: '.map-split:focus-visible',
-    because: 'a 3px page-height hairline; focus turns the bar itself the accent colour' },
   { selector: '.nv-node:focus-visible',
     because: 'an SVG <g> has no box; the node\'s own circle takes a 3px accent stroke' },
   { selector: '#main-content:focus',

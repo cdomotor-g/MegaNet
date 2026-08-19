@@ -329,10 +329,12 @@
      control that is itself accent-coloured.
 
      The rule: never `outline: none` without a replacement that is at least as
-     visible. There are two allowlisted exceptions in this file (.map-split and
-     .nv-node) and both replace the outline with a shape change on the thing
-     being focused; `npm run shell` holds the allowlist, so a third one has to
-     be argued for rather than added. */
+     visible. There is one allowlisted exception in this file (.nv-node) and it
+     replaces the outline with a shape change on the thing being focused;
+     `npm run shell` holds the allowlist, so a second one has to be argued for
+     rather than added. (There were two until #165 deleted the Stations
+     divider, and the check is what remembered that its exception had to go
+     with it — a stale entry fails it exactly as an unlisted removal does.) */
   --focus: var(--accent);
   --focus-width: 2px;
   --focus-offset: 2px;
@@ -822,72 +824,27 @@ header p {
   height: fit-content;
 }
 
-/* ── Stations tab: two panes that scroll on their own ──────────────────────
-   The filter pane and the map/table column are each taller than the screen,
-   and while the page scrolled as one piece, reaching a filter at the bottom
-   of the sidebar dragged the map off the top. Each column now fills the space
-   under the header and scrolls inside itself; the divider between them drags
-   to re-split the width (--mn-split, kept in localStorage), and --mn-chrome is
-   the measured height of the header plus tab bar, set by app.js because both
-   wrap on a narrow window. */
+/* ── Stations tab: one column ──────────────────────────────────────────────
+   Two, from #136 until #165: a filter rail, a draggable divider, and a
+   scroller inside each column so that reaching a filter at the bottom of the
+   rail did not drag the map off the top. Every part of that served a rail
+   taller than the screen that had to stay beside the map.
+
+   #164 moved Map display, Draw & measure and the legend onto the map itself
+   and #165 moved the filters under it, so there is no rail, no second column
+   to size, and nothing for a divider to divide. The page scrolls as one piece
+   at every width now, which is what it already did below `lg`. What went with
+   the split: --mn-split, .map-split and its `outline: none` exception, and
+   both inner scrollers.
+
+   `.map-layout` still overrides `.layout` because `.layout` is a 320 px rail
+   plus a column, and the one child left here would otherwise be laid out in
+   the rail. minmax(0, 1fr) rather than 1fr: `1fr` is `minmax(auto, 1fr)`, and
+   a station table's min-content would set the column's width and take the
+   page sideways with it. */
 
 .map-layout {
-  grid-template-columns: var(--mn-split, 320px) 14px minmax(0, 1fr);
-  gap: 0;
-  align-items: start;
-}
-
-.map-layout > .map-pane {
-  height: calc(100dvh - var(--mn-chrome, 150px) - 2rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  min-width: 0;
-  padding-bottom: .25rem;
-}
-
-/* The left pane owns its own scrolling now, so the sticky trick it used to
-   need would only pin it inside its own scroller. */
-.map-layout > .sidebar.map-pane {
-  position: static;
-  height: calc(100dvh - var(--mn-chrome, 150px) - 2rem);
-  padding-right: .4rem;      /* clear of the scrollbar */
-}
-
-.map-split {
-  align-self: stretch;
-  height: calc(100dvh - var(--mn-chrome, 150px) - 2rem);
-  position: relative;
-  cursor: col-resize;
-  touch-action: none;        /* the pointer drag owns the gesture */
-}
-
-.map-split::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 3px;
-  margin-left: -1.5px;
-  border-radius: 2px;
-  background: var(--border);
-  transition: background .12s ease;
-}
-
-.map-split:hover::before,
-.map-split:focus-visible::before,
-.map-split.dragging::before {
-  background: var(--accent);
-}
-
-/* Allowlisted `outline: none` #1 of 2 (#109's focus policy). The divider is a
-   3 px hairline the full height of the page; a 2 px ring offset 2 px around it
-   is a 7 px-wide box that reads as a second divider. The replacement is the
-   rule directly above — focus turns the bar itself the accent colour, which is
-   the same signal at the same contrast on the same pixels. `npm run shell`
-   holds this allowlist; a third exception has to be argued into it. */
-.map-split:focus-visible {
-  outline: none;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .stack {
@@ -1112,6 +1069,64 @@ input[readonly] {
   border-top: 1px solid var(--border);
   margin-top: .7rem;
   padding-top: .6rem;
+}
+
+/* ── The filter card's own layout (#165) ──────────────────────────────────
+   These filters spent their life in a 320 px rail, where a single column was
+   the only arrangement there was. They are a card the width of the page now,
+   and six full-width blocks stacked down a 1400 px screen would waste exactly
+   the room #165 set out to reclaim. So: the search leads and spans, and the
+   grouped filters flow into as many columns as the width allows.
+
+   `auto-fill` with a 15rem floor rather than a fixed count — the card is as
+   wide as the window minus the nav and the help rail, both of which slide, so
+   the number of columns is a consequence rather than a decision. */
+
+/* Flex rather than two grid columns, and the basis is the whole trick: the
+   search box asks for 24rem and the two reset buttons are unshrinkable, so on
+   any card too narrow to hold both the buttons wrap to their own row instead of
+   squeezing the search box to a slot too small to read a pasted address in.
+   That is a phone, and it needs no breakpoint to say so. */
+.filter-lead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  align-items: flex-start;
+}
+
+.filter-lead > .filter-block--lead {
+  flex: 1 1 24rem;
+  min-width: 0;
+}
+
+.filter-lead > .filter-resets {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* First thing in the card: the rule the block pattern draws above itself would
+   be a line under the summary's own, for nothing. */
+.filter-block--lead {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.filter-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--sp-3) var(--sp-4);
+  align-items: start;
+  margin-top: var(--sp-2);
+}
+
+/* The blocks carry their own top margin for the stacked case; inside the grid
+   the gap does that job and the margin would only make the rows uneven. The
+   rule above each stays — in columns it reads as the block's own header rule
+   rather than as a separator between two stacked things, which is the same
+   thing it was doing before. */
+.filter-groups > .filter-block {
+  margin-top: 0;
 }
 
 .filter-head {
@@ -2832,6 +2847,7 @@ hr {
   --terrain-line: #7d7259;
 }
 
+.filter-card > summary,
 .path-panel > summary,
 .lb-panel > summary {
   display: flex;
@@ -2842,6 +2858,7 @@ hr {
   padding: .1rem 0;
 }
 
+.filter-card > summary::before,
 .path-panel > summary::before,
 .lb-panel > summary::before {
   content: '▸';
@@ -2849,18 +2866,22 @@ hr {
   font-size: .85rem;
 }
 
+.filter-card[open] > summary::before,
 .path-panel[open] > summary::before,
 .lb-panel[open] > summary::before { content: '▾'; }
 
+.filter-card > summary h3,
 .path-panel > summary h3,
 .lb-panel > summary h3 {
   margin: 0;
   font-size: .95rem;
 }
 
+.filter-card > summary span,
 .path-panel > summary span,
 .lb-panel > summary span { color: var(--muted); }
 
+.filter-card > .filter-panel,
 .path-body,
 .lb-body { padding-top: .5rem; }
 
@@ -3763,31 +3784,6 @@ hr {
 
   .sidebar {
     position: static;
-  }
-
-  /* One column: the panes stack and the page scrolls as a whole again — two
-     scrollers inside a phone screen is worse than one. The divider has nothing
-     left to split. */
-  .map-layout {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
-  .map-split {
-    display: none;
-  }
-
-  .map-layout > .map-pane,
-  .map-layout > .sidebar.map-pane {
-    height: auto;
-    overflow: visible;
-    padding-right: 0;
-  }
-
-  /* On a phone the map is the point of the map tab — the filter panel and the
-     (long) legend go below it rather than pushing it off the first screen. */
-  .map-layout > .sidebar {
-    order: 2;
   }
 }
 

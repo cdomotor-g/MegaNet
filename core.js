@@ -15,7 +15,7 @@
 //   APP_VERSION         read from this file's own ?v= — so keep the stamp on it
 //   GITHUB_REPO, GITHUB_* , ARRO_*, AUTH_URL, DB_*   endpoints and identifiers
 //   recordError, _errorLog                           uncaught-error ring buffer
-//   SPLIT_MIN / SPLIT_MAX, state                     every mutable thing there is
+//   state                                            every mutable thing there is
 //   esc, escAttr, csvEscape, netName, pFloat, pInt, parseRangeLines, slug, dlText
 //   KM_PER_DEG_LAT, kmPerDegLon, bearingDeg, destPoint, fmtKm, acmaHaversineKm
 //   ACMA_MECH           interference-mechanism labels and colours
@@ -223,10 +223,11 @@ const TAB_LIST = TABS.flatMap(g => g.tabs);
 //    yet" bucket is ticked by default.
 const HELP = {
   stations: {
-    summary: 'The station list and the map, side by side. The <strong>Filters</strong> pane on the '
-           + 'left drives both at once, and is built from whatever <code>stations.json</code> holds '
-           + '— every option carries the number of stations behind it, and nothing is offered that '
-           + 'no station uses. The map carries its own controls in its top-right corner, as four '
+    summary: 'The map, the filters and the station list, down one column. The '
+           + '<strong>Filters</strong> card under the map drives the map and the list at once, and '
+           + 'is built from whatever <code>stations.json</code> holds — every option carries the '
+           + 'number of stations behind it, and nothing is offered that no station uses. It '
+           + 'collapses, and its summary line says what the filters are doing while it is shut. The map carries its own controls in its top-right corner, as four '
            + 'icons that open when the pointer is on them and can be pinned open: the base map, '
            + '<strong>Map display</strong>, <strong>Draw &amp; measure</strong> and the legend. '
            + 'The elevation profile and link budget sit under the map. Selecting a '
@@ -238,8 +239,8 @@ const HELP = {
       '<strong>Kill spaghetti</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
       + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 70 km; '
-      + 'the <strong>Map display</strong> panel says how many links were drawn and how many were '
-      + 'culled, so check that before concluding the path isn\'t there.',
+      + 'the <strong>Map display</strong> panel on the map says how many links were drawn and how '
+      + 'many were culled, so check that before concluding the path isn\'t there.',
       '<strong>Backbone paths</strong> are the heavy black lines, and they are of two kinds: two '
       + 'repeaters within the <em>Max TX distance</em> whose pass-range windows are open to at '
       + 'least one common ALERT address, and every repeater within that same distance of a base '
@@ -257,7 +258,7 @@ const HELP = {
       + 'so a pin still on screen has not necessarily matched anything. <em>Hide stations that '
       + 'don\'t match</em>, in the map\'s <strong>Map display</strong> panel, is the subtractive '
       + 'behaviour if '
-      + 'that is what you want. Names are capped at 60 either way, and the pane says when the cap '
+      + 'that is what you want. Names are capped at 60 either way, and the panel says when the cap '
       + 'is in effect.',
       'Every tick-box block ends with a <strong>Not recorded yet</strong> bucket, and it is ticked '
       + 'like everything else — which is why the opening view is the whole network. Most stations '
@@ -981,9 +982,9 @@ const BREAKPOINTS = { xl: 1400, lg: 1100, md: 900, sm: 700, xs: 560, xxs: 380 };
 const NAV_TRANSITION_MS = 160;
 
 // Below this the nav starts collapsed, on first visit only. The Stations tab
-// already gives a permanent column to its resizable filter pane, and on a
-// laptop a second permanent column is one too many. Named off the scale rather
-// than repeated as a literal — this is what `md` *means*.
+// is one long column on a laptop already, and a second permanent column beside
+// it is one too many. Named off the scale rather than repeated as a literal —
+// this is what `md` *means*.
 const NAV_AUTO_COLLAPSE_PX = BREAKPOINTS.md;
 
 // The help panel's own width transition, and it plays exactly the role
@@ -1224,10 +1225,6 @@ if (typeof window !== 'undefined') {
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
-// Bounds on the Stations tab's column split. Up here because the opening
-// render reads a stored width through setSplitWidth before the map code runs.
-const SPLIT_MIN = 240, SPLIT_MAX = 720;
-
 const state = {
   data:       null,   // parsed stations.json
   // Byte sizes recorded at load/fetch time — see MemMeter. Free to keep:
@@ -1330,14 +1327,20 @@ const state = {
   mapPanelsPinned: new Set((localStorage.getItem('mn-map-panels') || '')
                              .split(',').map(s => s.trim()).filter(Boolean)),
   mapMatchLabels: new Set(),  // ids the current filter earned a label (see mapLabelIds)
-  mapLinkCount:   { drawn: 0, culled: 0 },   // last refresh, for the sidebar note
+  mapLinkCount:   { drawn: 0, culled: 0 },   // last refresh, for the map-display note
   mapFitKey:      null,    // extent the map was last auto-fitted to (re-fit only on change)
   mapSearchTimer: null,    // debounce for the search box → marker rebuild
   passRelIdx:     null,    // both directions of the pass-range relation, per loaded file
   backboneIdx:    null,    // repeater backbone pairs + suggested delays, per loaded file
-  splitW:         +(localStorage.getItem('mn-split') || 0) || 320,  // Stations tab column split, px
+  // The Stations tab's filter card, open or shut (#165). Remembered, and it is
+  // the one collapsible on that tab that is: Path profile and Link budget are
+  // opened to answer a question and closed again, while the filters are how the
+  // tab is operated — so an operator who shuts them to give the map the screen
+  // means it. Open on a first visit, because the search box is the most-used
+  // control on the page and a tab that opens hiding it reads as broken.
+  filtersOpen:    (localStorage.getItem('mn-filters') || 'open') === 'open',
   // Left nav: an icon rail, or icons plus labels. Kept under 'mn-nav' the same
-  // way the theme and the split width are. With nothing stored the window's
+  // way the theme and the filter card are. With nothing stored the window's
   // width decides, so a first visit on a laptop isn't handed two sidebars.
   navCollapsed:   (localStorage.getItem('mn-nav')
                    || (window.innerWidth < NAV_AUTO_COLLAPSE_PX ? 'collapsed' : 'expanded')) === 'collapsed',
