@@ -2559,24 +2559,41 @@ hr {
                 reported by aria-expanded, and that is correct rather than an
                 omission — nobody reading this page through a screen reader is
                 hovering it.
-     :focus-within on the body — the safety net, and the reason it is not
-                optional: while a panel is open on hover alone, its controls
-                are in the tab order. Tab into one, move the mouse, and without
-                this the panel goes display:none *with focus inside it* — focus
-                lands back on <body> and the keyboard user is at the top of the
-                document. #136 met this exact defect in a hover gate elsewhere
-                in the app. map-controls.js also promotes such a panel to
-                .is-open when focus arrives, so the state and what is on screen
-                stay in step; this rule is what holds it open in the frame
-                before that happens. */
+     :has(:focus-visible) on the body — the safety net, and the reason it is
+                not optional: while a panel is open on hover alone, its
+                controls are in the tab order. Tab into one, move the mouse,
+                and without this the panel goes display:none *with focus inside
+                it* — focus lands back on <body> and the keyboard user is at
+                the top of the document. #136 met this exact defect in a hover
+                gate elsewhere in the app. map-controls.js also promotes such a
+                panel to .is-open when keyboard focus arrives, so the state and
+                what is on screen stay in step; this rule is what holds it open
+                in the frame before that happens.
+
+                `:focus-visible` and not the `:focus-within` this was until the
+                panels stopped going away, and the difference is the whole of
+                that defect: a *click* on a checkbox inside the panel focuses it
+                as surely as Tab does, so `:focus-within` held every flyout open
+                for as long as that click's focus lasted — and the promotion in
+                map-controls.js turned those few hundred milliseconds into open
+                for good. One tick of "Snap to stations" and the panel would not
+                leave the map. Keyboard focus is what needs a net here; a
+                pointer that focused something is a pointer that can leave. */
 .mn-mapctl.is-open > .mn-mapctl-body,
 .mn-mapctl.is-pinned > .mn-mapctl-body,
-.mn-mapctl-body:focus-within {
+.mn-mapctl-body:has(:focus-visible) {
   display: block;
 }
 
 @media (hover: hover) {
   .mn-mapctl:hover > .mn-mapctl-body { display: block; }
+
+  /* Clicking the icon of a panel that is already on screen shuts it — and on a
+     mouse the pointer is necessarily still on that icon, so the rule above
+     would put it straight back and the click would read as having done
+     nothing. map-controls.js drops .is-shut the moment the pointer leaves, so
+     the next hover opens the panel again; nothing here is remembered. */
+  .mn-mapctl.is-shut:hover > .mn-mapctl-body { display: none; }
 }
 
 /* An armed draw tool turns the whole map into a crosshair, this panel

@@ -212,6 +212,20 @@ jobs:
         working-directory: test
         run: npm run rivers
 
+      # The on-map panels (#164), and the one thing about them nothing else can
+      # see. Every check above reaches the app through switchTab() and
+      # page.evaluate(); this one moves a real pointer, clicks a real checkbox
+      # inside a flyout, moves the pointer away and asks whether the flyout went
+      # with it. It did not — clicking any control inside a panel focused it,
+      # and an ungated focusin promoted the panel to open-for-real, so ordinary
+      # use of Draw & measure, Base map or Map display welded that panel to the
+      # map until its icon was found and clicked again. Nothing threw, no
+      # handler went unresolved, no contrast moved: a mouse leaving is the only
+      # witness there is.
+      - name: On-map panels — they put themselves away, and only the pin keeps one
+        working-directory: test
+        run: npm run mapctl
+
       # Not a check about code at all: the help panel's *content*. Smoke asserts
       # every tab has a HELP entry, which stops the rail rendering blank and
       # says nothing about what is behind the key. A doc link pointing at a file

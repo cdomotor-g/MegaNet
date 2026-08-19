@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the twelve that run in CI
+npm run all                       # the fifteen that run in CI
 ```
 
 | Command | What it does |
@@ -25,17 +25,20 @@ npm run all                       # the twelve that run in CI
 | `npm run check` | `node --check` over every script `index.html` loads |
 | `npm run names` | no duplicate top-level declarations across those scripts |
 | `npm run toplevel` | `init.js` is still the only file that executes at load |
+| `npm run hfem` | the HFEM codec against the spec's own ten worked examples, its timestamp table and its undefined-scheme list — round trips byte-for-byte, every rejection asserting its reason |
 | `npm run smoke` | loads the page in Chromium, opens all 20 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
 | `npm run nav` | every tab is in the left nav exactly once, under one heading, and findable by its own label and by what it does |
 | `npm run shell` | the shell's landmarks, skip link, focus policy and disclosure state; the six-step breakpoint scale; and WCAG contrast for every token pair in both themes |
 | `npm run tabs` | EPIC #107's per-tab Definition of Done, per tab that claims to have been through a U-issue: no inline styles, tables wrapped/captioned/scoped, scroll regions named, clickable rows keyboard-reachable, landmarks and controls named, headings stepping by one, and no sideways scroll at 375/768/1440 in both themes — plus the two pattern-level claims (the basin drawing's shortcut condition, and the ARRO chart's palette round trip) |
+| `npm run rivers` | the rivers layer on the Stations map: named, grouped, labelled, and every named river reachable as a real control without a mouse — with the geometry seeded, because Overpass is off-origin |
+| `npm run mapctl` | the on-map panels put themselves away: a real pointer clicks a control inside Base map / Map display / Draw & measure, moves off, and the flyout has to go with it — plus the icon toggle, the keyboard's safety net, and the pin as the only thing that persists |
 | `npm run help` | every tab's help entry is real content, every link out of the panel lands, and each walkthrough names itself and fits the rail |
 | `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
 | `npm run maint` | the Council Maintenance Tasks form renders what the workbook's own filled sheet says — with the fixture read out of the `.xlsx` |
 | `npm run history` | a saved record reads back as the sheet it was written on, and exports as it reads — with the records written by the app during the run |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the twelve that run in CI |
+| `npm run all` | the fifteen that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
 `toplevel`, `registry`, `nav`, `shell`, `tabs` and `help` take `-v` too, to list what
@@ -357,6 +360,45 @@ by #141 and both fixed there:
 The generalisable half is the same shape as `maint`'s and `history`'s findings:
 *a check is only as good as the state it is run against*. Uniform fixtures hide
 rules about the non-uniform case; empty states hide everything.
+
+### `mapctl.mjs` — the half nothing here has a pointer for
+
+Every other check in this directory reaches the app the way a script does:
+`switchTab(id)`, `page.evaluate()`, a `.focus()` and a keypress. That is the
+right instrument for almost everything, and it is *structurally* blind to one
+class of defect — anything whose only symptom is what happens when a **mouse
+moves away**.
+
+The on-map panels (#164) live entirely inside that blind spot. Four icons in the
+Stations map's top-right corner, each opening a flyout over the map, and the
+whole design rests on one promise: **the pin is the only way a panel stays.**
+When that promise broke, nothing else here noticed. Nothing threw, every `on*=`
+handler still resolved, contrast was unchanged, the tab still rendered, and the
+keyboard path `rivers.mjs` already checks — focus the icon, press Enter — went
+on working perfectly. The app was simply unusable with a mouse: clicking any
+control inside a panel focused that control, an ungated `focusin` promoted the
+panel to open-for-real on that focus, and so ticking one checkbox welded the
+panel to the map until its icon was hunted down and clicked again.
+
+Two things follow for anything added here later:
+
+- **The assertions ask about pixels, not classes.** `shown` is measured off
+  `getClientRects()`, because a class reading "open" about an invisible panel —
+  and an invisible panel with no class set — are both failures this file exists
+  to name. A check written against `classList` would have passed throughout.
+- **Each "it closes" assertion is paired with an "it stays" one.** A fix that
+  made panels close on click would have satisfied the first half and broken the
+  control. The pair is what pins the behaviour down from both sides, and it is
+  the same reason §6 re-asserts the keyboard net that §2 narrows: a panel that
+  vanishes out from under a Tab is not an improvement on one that will not go
+  away.
+
+The compounding failure is asserted directly, because it is what the bug looked
+like when it was reported: two panels open at once, overlapping. Flyouts open at
+the top of their *own* icon, and the icons are ~46 px apart while the panels are
+150–450 px tall — so a second stuck panel lies **across** the first, the later
+control paints on top, and a click aimed at a checkbox in the panel underneath
+lands on the panel above it instead.
 
 ### `inspections.mjs` — the half the network policy hides
 

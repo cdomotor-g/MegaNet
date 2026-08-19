@@ -42,6 +42,23 @@
 // in use should not be sharing pixels with the map underneath it if it can be
 // helped. The pin is remembered between visits (see state.mapPanelsPinned) —
 // an operator who pins the legend means it.
+//
+// ── And why the third state has to be "shut" ─────────────────────────────────
+// The pin is the *only* way a panel stays on the map, and that is the contract
+// rather than an implementation detail: a map is the one surface in this app
+// where the content is the whole panel, so anything covering a corner of it
+// without being asked to is in the way. Everything below that keeps a flyout
+// open is therefore written to expire — hover ends when the pointer moves, the
+// click toggle shuts what it can see, and the focus promotion fires only for
+// focus the *keyboard* moved.
+//
+// That last clause is load-bearing, and it was missing. Clicking any control
+// inside a panel focuses it, an ungated focusin promoted the panel to open-for-
+// real on that focus, and so the ordinary act of using Draw & measure, Base map
+// or Map display left its flyout on the map for good — three of them stacked
+// over the corner, none of them asked for. The rule to hold to when editing
+// this file: **a pointer gesture inside a panel must never leave state behind
+// that outlives the pointer.** Only the pin and the icon may do that.
 
 // ── The base-map set ─────────────────────────────────────────────────────────
 // Fresh tile-layer instances for the shared base-map set. A Leaflet layer can
@@ -135,6 +152,15 @@ const MapChrome = (function () {
     }
   }
 
+  // Is this control on screen *because the pointer is on it*? Asked before the
+  // click handler decides which way to toggle, and gated on the same media
+  // query the hover rule in styles.css is gated on — a touch screen reports a
+  // stale `:hover` on whatever was tapped last, and reading that would have the
+  // first tap on an icon count as "already open" and shut it again.
+  function hoverShows(wrap) {
+    return window.matchMedia('(hover: hover)').matches && wrap.matches(':hover');
+  }
+
   return {
     // Radio groups and body ids have to be unique across every map on the page.
     uid() { return ++seq; },
@@ -204,8 +230,22 @@ const MapChrome = (function () {
         // also how a keyboard opens it — the button is a button, so Enter and
         // Space already arrive here. It is a plain disclosure, in other words,
         // and `is-open` is the state aria-expanded reports.
+        //
+        // What it toggles against is what is **on screen**, not the class on its
+        // own. On a mouse the icon cannot be clicked without being hovered
+        // first, so the panel is already open by the time the click lands: a
+        // bare `toggle('is-open')` there looked like it did nothing, and left
+        // the panel open for good — the class it had just set outlived the hover
+        // that was doing the showing, and only a second click on the icon could
+        // undo it. Clicking a panel you can see shuts it, and `is-shut` is what
+        // holds it shut under a pointer that has not moved away yet; the
+        // pointerleave below drops that class so the next hover opens it again.
         L.DomEvent.on(btn, 'click', L.DomEvent.stop).on(btn, 'click', () => {
-          wrap.classList.toggle('is-open');
+          const hovered = hoverShows(wrap);
+          const showing = !wrap.classList.contains('is-shut')
+                       && (wrap.classList.contains('is-open') || hovered);
+          wrap.classList.toggle('is-open', !showing);
+          wrap.classList.toggle('is-shut', showing && hovered);
           apply(wrap);
         });
 
@@ -214,8 +254,25 @@ const MapChrome = (function () {
         // is the one that matters: aria-expanded would read "false" about a
         // panel the operator is typing in, and the panel would shut the moment
         // the mouse moved — with focus inside it, which drops focus to the top
-        // of the document. The CSS holds it open (.mn-mapctl-body:focus-within)
-        // and this is what makes the state agree with the pixels.
+        // of the document. The CSS holds it open while that is settled
+        // (.mn-mapctl-body:has(:focus-visible)) and this is what makes the state
+        // agree with the pixels.
+        //
+        // **Keyboard focus only**, and that qualifier is the bug this gate
+        // fixes rather than a refinement of it. A *click* on a checkbox, a
+        // colour swatch or a draw tool inside the panel focuses that control
+        // too, so an ungated promotion fired on every ordinary use of the panel
+        // and made it permanent: one tick of "Snap to stations" in Draw &
+        // measure, one radio in Base map, one checkbox in Map display, and the
+        // flyout stayed on the map until its icon was found and clicked again.
+        // That is not a disclosure, it is a panel that will not go away, and
+        // with three of them on one corner they stack up over the map.
+        //
+        // `:focus-visible` is the browser's own answer to "did the keyboard put
+        // focus here", so the safety net keeps every case it was built for —
+        // including the one that is not a keypress: a text or number field
+        // matches it whatever focused it, so the "Place by numbers" inputs still
+        // hold their panel open while they are being typed into.
         //
         // The button is excluded on purpose: clicking it focuses it *and* fires
         // the toggle above, and a focusin that opened first would have that
@@ -223,8 +280,26 @@ const MapChrome = (function () {
         L.DomEvent.on(wrap, 'focusin', e => {
           if (e.target === btn) return;
           if (wrap.classList.contains('is-open') || state.mapPanelsPinned.has(id)) return;
+          if (!(e.target.matches && e.target.matches(':focus-visible'))) return;
           wrap.classList.add('is-open');
           apply(wrap);
+        });
+
+        // The pointer leaving does two things, both about the frame after it.
+        // It clears the shut-by-click suppression above, so the icon opens on
+        // hover again. And it takes focus off whatever inside the panel a
+        // *click* left it on, because the hover rule is about to hide that
+        // element with focus still in it — which drops focus to <body> and
+        // starts the next Tab at the top of the document. That is the same
+        // defect the promotion above exists to prevent, arriving by the door the
+        // :focus-visible gate deliberately leaves open. The icon is where the
+        // focus came from and where Tab should carry on from, and moving it
+        // there after a pointer gesture draws no focus ring.
+        L.DomEvent.on(wrap, 'pointerleave', () => {
+          wrap.classList.remove('is-shut');
+          if (wrap.classList.contains('is-open') || state.mapPanelsPinned.has(id)) return;
+          const active = document.activeElement;
+          if (active && active !== btn && wrap.contains(active)) btn.focus({ preventScroll: true });
         });
 
         // Without these, ticking a checkbox in the panel also drops a draw pin
