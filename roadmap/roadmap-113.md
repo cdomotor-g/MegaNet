@@ -1,8 +1,8 @@
 This is a living tracking issue, not a task to complete. It's the single point of truth for what's open, who/what it's allocated to (AI agent + model/effort, or human), and how work sequences. It does not replace, close, or duplicate any other issue — it's a summary extracted from each issue's own recommendation line and dependency notes.
 
-**Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 this body lives at `roadmap/roadmap-113.md` in the repo and is synced here by `.github/workflows/roadmap-sync.yml` — edit the file, not this box, or the next sync overwrites the edit.**
+**Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-08-19** (revision 63 — see "What changed" at the bottom).
+Snapshot taken: **2026-08-19** (revision 64 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -516,6 +516,18 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 64 — 2026-08-19: this board had been lying for three weeks, and the sync was green the whole time
+
+- **Issue #113's body had not changed since 16 August — revision 38 — while seven consecutive sync runs reported success.** Every revision from 39 to 63 landed in `roadmap/roadmap-113.md` and none of them reached the issue. The file's own header says "If this looks stale, that's a bug in that process — flag it"; this is that flag, raised by the process rather than by a person noticing, which is the only reason it was caught at all.
+- **The cause is size. A GitHub issue body is capped at 65,536 characters and this file is ~384,000** — about six times over, and it passed the limit long ago. `## What changed` alone is 192,000 of it: half the roadmap is revision history that nobody opens the issue to read.
+- **The reason it stayed hidden for three weeks is the more useful half.** `github.rest.issues.update()` returned 2xx, `github-script` did not throw, the workflow logged `issue #113 body updated (383814 bytes)` and the run went green. **Every observable signal said it worked.** The API accepted the request; the body did not change. A workflow that reports what it *attempted* rather than what it *achieved* is indistinguishable from one that works, right up until somebody reads the thing it was supposed to be writing.
+- **So the fix is two changes, and the second is the one worth keeping.**
+  1. The issue now carries a **bounded excerpt**: the header, the allocation summary, priority and the sequencing snapshot — ~34k of ~65k, with the rest named and linked. Sections are added whole, in priority order, until the budget is spent; nothing is cut mid-section, and whatever did not fit is listed under *What is not in this box* rather than silently dropped. As sections shrink the excerpt widens by itself.
+  2. The workflow **reads the issue back and compares it to what it sent**, and fails the run if they differ. Retried four times with a backoff, because a verify that goes red on replication lag is a verify people learn to ignore — which would put us back here, only noisier.
+- **The generalisable lesson, and it is not about GitHub's limits.** *A write that is not read back is a claim, not a fact.* This repo already knew that in another form — `#99`'s wrong `curl` survived review because prose was checked instead of run, and `docs/ingest-mqtt.md` now says every example must be executed. The same rule applied to a workflow: it asserted "body updated" from the fact that a function returned, and the assertion was false for three weeks. **Anything that claims to have changed something outside itself should check.**
+- **What the excerpt costs, stated plainly:** the issue is no longer a complete copy of the roadmap, so a reader who wants the epics, the standalone entries, the cross-cutting constraints or the history follows one link to the file. That is a real loss of the "front door holds everything" property, and it is the right trade — a complete copy that silently stops updating is worth less than a partial one that provably does.
+- **Checked before pushing rather than after**, which is the same lesson applied to the fix: the composition was run against the real file (34k, every section accounted for), the embedded script was syntax-checked inside `github-script`'s async wrapper, and the whole script was dry-run against three mocked outcomes — a normal write, a **silent no-op** (the actual bug), and a truncating write. The first passes; the other two fail loudly with the character counts in the message. A fix for an undetectable failure that had not itself been tested against that failure would have been the same mistake twice.
 
 ### Revision 63 — 2026-08-19: the vendor manual that was missing turned up, and it turned a wall into a parser
 

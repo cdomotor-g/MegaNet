@@ -1,14 +1,35 @@
-# Push roadmap/roadmap-113.md into issue #113's body whenever it changes on
-# main — so the roadmap is edited the way everything else in this repo is
-# edited: as a file, with a diff, in a commit.
+# Push a bounded excerpt of roadmap/roadmap-113.md into issue #113's body
+# whenever the file changes on main — so the roadmap is edited the way
+# everything else in this repo is edited: as a file, with a diff, in a commit.
 #
-# Why this exists (revision 29): #113's body is ~200 KB and its own header
+# Why this exists (revision 29): #113's body is the board, and its own header
 # says a stale board is a bug in the maintenance process. The old process WAS
-# the bug — the only way to update the body was to round-trip the whole
-# 200 KB through one API call, which no session does twice and some cannot do
-# once. The file is the working copy; the issue stays the front door; this
-# workflow keeps them identical. An edit typed straight into the issue box is
-# overwritten by the next file-driven sync — edit the file.
+# the bug — the only way to update the body was to round-trip the whole file
+# through one API call, which no session does twice and some cannot do once.
+# The file is the working copy; the issue stays the front door.
+#
+# Why it changed (revision 64): the file outgrew what an issue body can hold.
+# **A GitHub issue body is capped at 65,536 characters**; roadmap-113.md passed
+# that months ago and reached ~384,000. The PATCH kept returning 2xx and the
+# workflow kept reporting success, so seven consecutive runs went green while
+# the issue sat at revision 38 — the exact failure the file's own header tells
+# people to flag. Two changes follow from that, and the second matters more
+# than the first:
+#
+#   1. The body is now a **bounded excerpt**, not the whole file. Sections are
+#      added in priority order until the budget is spent, and whatever did not
+#      fit is named with a link rather than silently dropped. `## What changed`
+#      is never included — it is 190k of history that belongs in git, and it is
+#      what pushed the file over the limit in the first place.
+#
+#   2. The workflow **reads the issue back and compares it** to what it sent,
+#      and fails the run if they differ. A sync that cannot prove it landed is
+#      the thing that hid this for three weeks; "the API returned 2xx" is not
+#      the same claim as "the board is current", and only one of them is worth
+#      a green tick.
+#
+# An edit typed straight into the issue box is overwritten by the next
+# file-driven sync — edit the file.
 #
 # GITHUB_TOKEN only, scoped to issues: write. Nothing else in the repo is
 # reachable with what this workflow holds.
@@ -21,6 +42,7 @@ on:
     paths:
       - 'roadmap/roadmap-113.md'
       - '.github/workflows/roadmap-sync.yml'
+  workflow_dispatch:
 
 permissions:
   issues: write
@@ -37,11 +59,132 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const body = fs.readFileSync('roadmap/roadmap-113.md', 'utf8');
-            await github.rest.issues.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: 113,
-              body,
-            });
-            core.info(`issue #113 body updated (${body.length} bytes)`);
+
+            const FILE = 'roadmap/roadmap-113.md';
+            const ISSUE = 113;
+
+            // GitHub's hard cap on an issue body. Budget under it so the
+            // banner, the omissions list and a revision's growth all fit.
+            const LIMIT = 65536;
+            const BUDGET = 58000;
+
+            // Section order for the front door: what is open and who has it,
+            // then how it sequences, then the detail. `## What changed` is
+            // deliberately absent — history lives in git.
+            const WANTED = [
+              '## Resource allocation summary',
+              '## Priority (as stated on each epic/issue, where given)',
+              '## Sequencing snapshot (dependency chain)',
+              '## Standalone issues',
+              '## Epics & their sub-issues',
+              '## ⚠️ Cross-cutting constraints — read before allocating anything',
+            ];
+
+            const file = fs.readFileSync(FILE, 'utf8');
+            const { owner, repo } = context.repo;
+            const fileUrl = `https://github.com/${owner}/${repo}/blob/main/${FILE}`;
+
+            // Split on top-level headings, keeping each heading with its body.
+            const parts = file.split(/^(## .*)$/m);
+            const header = parts[0].trimEnd();
+            const sections = new Map();
+            const order = [];
+            for (let i = 1; i < parts.length; i += 2) {
+              const title = parts[i].trim();
+              sections.set(title, (parts[i] + (parts[i + 1] ?? '')).trimEnd());
+              order.push(title);
+            }
+            if (!sections.size) {
+              core.setFailed(`${FILE}: no '## ' sections found — has the file's shape changed?`);
+              return;
+            }
+
+            const banner = [
+              '> [!IMPORTANT]',
+              `> **This body is a generated excerpt. The roadmap itself is [\`${FILE}\`](${fileUrl}) — edit that, not this box.**`,
+              `> The full roadmap is ~${Math.round(file.length / 1000)}k characters and a GitHub issue body caps at ${LIMIT.toLocaleString()}, so what follows is the allocation and sequencing view. Everything omitted is named at the bottom and is one click away.`,
+            ].join('\n');
+
+            // Take whole sections in priority order; never cut one in half.
+            const chosen = [];
+            const omitted = [];
+            let used = header.length + banner.length + 2000; // 2000 ≈ footer
+            for (const title of WANTED) {
+              const body = sections.get(title);
+              if (body == null) continue;
+              if (used + body.length + 2 <= BUDGET) {
+                chosen.push(title);
+                used += body.length + 2;
+              } else {
+                omitted.push(title);
+              }
+            }
+            // Anything in the file that this workflow does not know about.
+            for (const title of order) {
+              if (!WANTED.includes(title) && !omitted.includes(title)) omitted.push(title);
+            }
+
+            const footer = [
+              '---',
+              '',
+              '## What is not in this box',
+              '',
+              ...omitted.map((t) => `- **${t.replace(/^## /, '')}** — [read it in the file](${fileUrl})`),
+              '',
+              `*Synced from \`${FILE}\` at [\`${context.sha.slice(0, 7)}\`](https://github.com/${owner}/${repo}/commit/${context.sha}) by \`.github/workflows/roadmap-sync.yml\`.*`,
+            ].join('\n');
+
+            const body = [banner, header, ...chosen.map((t) => sections.get(t)), footer]
+              .join('\n\n')
+              .replace(/\n{3,}/g, '\n\n');
+
+            if (body.length > LIMIT) {
+              core.setFailed(
+                `composed body is ${body.length} characters, over GitHub's ${LIMIT} limit — ` +
+                `lower BUDGET or drop a section from WANTED.`,
+              );
+              return;
+            }
+
+            await github.rest.issues.update({ owner, repo, issue_number: ISSUE, body });
+
+            // Read it back. The PATCH returning 2xx is not evidence the body
+            // landed — that assumption is what let this sit broken for three
+            // weeks with a green tick on every run.
+            //
+            // Retried a few times because a read straight after a write can be
+            // served stale, and a verify that goes red on replication lag is a
+            // verify people learn to ignore — which would put us back where we
+            // started, only noisier.
+            const norm = (s) => (s ?? '').replace(/\r\n/g, '\n').trim();
+            let landed = false;
+            let seen = null;
+            for (let attempt = 1; attempt <= 4; attempt++) {
+              const { data: after } = await github.rest.issues.get({ owner, repo, issue_number: ISSUE });
+              seen = after.body ?? '';
+              if (norm(seen) === norm(body)) { landed = true; break; }
+              core.info(`verify attempt ${attempt}: read back ${seen.length} characters, expected ${body.length} — retrying`);
+              await new Promise((r) => setTimeout(r, attempt * 2000));
+            }
+            if (!landed) {
+              core.setFailed(
+                `issue #${ISSUE} did not take the update: sent ${body.length} characters, ` +
+                `read back ${seen.length}. The body on the issue is NOT what this run composed — ` +
+                `the board is stale and this run is why.`,
+              );
+              return;
+            }
+
+            core.info(`issue #${ISSUE} updated and verified — ${body.length} characters`);
+            core.info(`included: ${chosen.join(', ') || '(none)'}`);
+            core.info(`omitted:  ${omitted.join(', ') || '(none)'}`);
+            await core.summary
+              .addHeading('Roadmap sync', 3)
+              .addRaw(`Issue #${ISSUE} updated and **verified** at ${body.length} / ${LIMIT} characters.`)
+              .addBreak()
+              .addRaw(`Source file is ${file.length} characters.`)
+              .addTable([
+                [{ data: 'Section', header: true }, { data: 'In the issue', header: true }],
+                ...order.map((t) => [t.replace(/^## /, ''), chosen.includes(t) ? 'yes' : 'no — in the file']),
+              ])
+              .write();
