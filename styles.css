@@ -2044,6 +2044,180 @@ h2.h-bad {
   color: var(--role-base);
 }
 
+/* ── The Inspections section at the foot of the editor card ─────────────────
+   Everything here is inside the station editor's own panel, so it borrows that
+   card's ground rather than drawing a second one — no background of its own on
+   anything but the picker, which needs to read as a control surface.
+
+   No dark-theme block. Every colour below is a token, and the tokens are the
+   ones the dark block at the top of this file already redefines. The chart is
+   the one exception and it cannot be solved here: an SVG presentation attribute
+   does not resolve a var(), so station-inspections.js reads the palette off the
+   document with cssVar() at draw time — the arrangement #141 arrived at, and
+   the reason a theme switch reaches the picture on its next repaint. */
+.si-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.si-h    { margin-bottom: 0; }
+.si-lead { margin: var(--sp-1) 0 var(--sp-3); }
+
+/* The door into the Inspection History tab. A pill rather than a plain button
+   because it leaves this card for another tab, which is a different kind of
+   action from Save and Delete beside it — and an outline rather than a fill,
+   because a filled pill next to the card's one primary button reads as a second
+   primary. */
+.si-pill {
+  border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--accent);
+  padding: .3rem .85rem;
+  font-size: .85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.si-pill:hover { background: var(--accent); color: var(--panel); }
+
+.si-muted { color: var(--muted); }
+.si-bad   { color: var(--bad); }
+.si-flush { margin: var(--sp-2) 0 0; }
+.si-gate  { margin: 0 0 var(--sp-2); }
+
+/* ── The parameter picker ──────────────────────────────────────────────────── */
+.si-picker {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--subtle);
+  margin-bottom: var(--sp-3);
+}
+
+.si-picker > summary {
+  cursor: pointer;
+  padding: var(--sp-2) var(--sp-3);
+  font-weight: 600;
+}
+.si-picker > summary .small { font-weight: 400; }
+
+.si-picker-body {
+  padding: 0 var(--sp-3) var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+.si-picker-actions {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  padding: var(--sp-2) 0;
+}
+
+/* One <fieldset> per section of the paper sheet, so the legend is a real group
+   name rather than a bold line above a list of unrelated checkboxes. */
+.si-group {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0;
+  padding: var(--sp-2) 0 0;
+}
+
+.si-group > legend {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 0;
+}
+
+.si-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: .15rem var(--sp-4) .15rem 0;
+  font-size: .85rem;
+  font-weight: 400;
+}
+.si-opt input { margin: 0; }
+
+.si-picker-note { margin: var(--sp-3) 0 0; }
+
+/* ── The chart ─────────────────────────────────────────────────────────────── */
+/* Scales with the card, and keeps its aspect: the viewBox is 760x250 and the
+   SVG is the picture, not the control — the operable version is the checkbox
+   list above it and the table below, which is what lets this be role="img"
+   (docs/design-system.md §3, pattern 8's conditions). */
+.si-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 760px;
+  margin: 0 auto;
+  overflow: visible;
+}
+
+/* ── The legend ────────────────────────────────────────────────────────────── */
+/* Real DOM rather than text inside the SVG: it wraps on a phone, it is
+   selectable, and each line's own range is what replaces "which line is
+   higher" once there are two axes. */
+.si-legend {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: .2rem;
+}
+
+.si-legend > li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  font-size: .85rem;
+}
+
+.si-key      { flex: 0 0 auto; align-self: center; }
+.si-key-svg  { display: block; width: 26px; height: 10px; }
+.si-legend-name { font-weight: 600; }
+
+.si-notdrawn { margin: var(--sp-2) 0 0; }
+.si-notdrawn p { margin: 0 0 var(--sp-1); }
+.si-notdrawn p:last-child { margin-bottom: 0; }
+
+/* ── The readings table (part 3 of the chart pattern) ──────────────────────── */
+.si-table {
+  margin-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-2);
+}
+
+.si-table > summary { cursor: pointer; font-weight: 600; }
+.si-table > summary .small { font-weight: 400; }
+
+.si-table-grid {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: .85rem;
+  margin-top: var(--sp-2);
+}
+
+.si-table-grid th,
+.si-table-grid td {
+  border: 1px solid var(--border);
+  padding: .25rem .45rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* The numbers are right-aligned so a column of them lines up on the decimal
+   point; the two columns that say which visit a row is are not numbers. */
+.si-table-grid thead th { background: var(--subtle); text-align: right; }
+.si-table-grid tbody th { text-align: left; font-weight: 600; }
+.si-table-grid tr > :nth-child(-n+2) { text-align: left; }
+
 @media (pointer: coarse) {
   /* EPIC #107's 44 px floor for the editor's own controls (#136). A form
      filled in on a phone at a station site is the case this is for. */
@@ -2055,6 +2229,20 @@ h2.h-bad {
     align-items: center;
   }
   .ef-carried-row { justify-content: flex-start; }
+
+  /* …and the same floor for this section's own controls. The parameter
+     checkboxes are the case that matters: forty of them at .85rem is a target
+     nobody hits with a thumb. */
+  .si-pill,
+  .si-picker > summary,
+  .si-table > summary,
+  .si-opt {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+  }
+  .si-picker > summary,
+  .si-table > summary { display: flex; }
 }
 
 hr {

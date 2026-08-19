@@ -15,10 +15,12 @@
 // updateHeaderStats, findStationMatches, stationAlertIds, passRangeCoversId,
 // repeaterPassingCount and repeaterPassRangeSpan; to auth.js for Auth; and to
 // datastore.js for dbCanWrite, dbSaveStation, dbDeleteStation, setEditorStatus,
-// editorStatusHtml and editorWritesGoToDatabase; and to inspections.js for
+// editorStatusHtml and editorWritesGoToDatabase; to inspections.js for
 // Inspections.configs and Inspections.ensureRefs — the telemetry pick-list
 // (#147) reads the same meganet.inspection_config list the Inspections tab
-// renders its form from, rather than keeping a second copy.
+// renders its form from, rather than keeping a second copy; and to
+// station-inspections.js for StationInspections.sectionHtml, the Inspections
+// section under the ARRO block at the foot of the form.
 //
 // This file is the form, not its host. The card is rendered by the Stations
 // tab, which is frozen in app.js for the whole of #129 — so a change to where
@@ -208,7 +210,8 @@ function editorForm(s) {
           <textarea id="ef-excl" rows="3">${(s.repeater?.exclusions || []).map(r => `${r.low}-${r.high}`).join('\n')}</textarea>
         </label>
       </div>` : ''}
-    ${editorArroSection(s, sensors)}`;
+    ${editorArroSection(s, sensors)}
+    ${StationInspections.sectionHtml(s)}`;
 }
 
 // The telemetry-type pick-list (#147). The six configurations come from

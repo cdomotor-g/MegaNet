@@ -171,7 +171,7 @@ of the contrast contract for the same reason:
 | Set | Where it is drawn |
 |---|---|
 | `--maps-region-*` (8) | Radio Path Maps' basin drawing and its chips (#137) |
-| `--ad-series-*` (12) | the ARRO / Field Data chart (#141) |
+| `--ad-series-*` (12) | the ARRO / Field Data chart (#141), and the station card's inspection-history chart, which draws from the first eight |
 | `--acma-mech-*` (7) | interference mechanisms — RF Environment, RF Changes, the transmitter card, the Workbench, the Stations map (#138) |
 | `--rfc-series-*` (8), `--rfc-class-*` (8) | the RF Changes timeline's data-quality series, and the snapshot-diff change classes (#138) |
 
@@ -531,6 +531,25 @@ both generalise:
   crosshair move. `ArroData.drawOv()` is the one function that runs on a view
   change and on nothing else, which is where the name, the readings table and
   the comparison panes are all refreshed from.
+
+**A third thing, learned by the second chart to carry more than one unit.**
+The Stations tab's inspection-history chart plots any of 37 recorded parameters
+against time, and they are in volts, decibels, milliamps, watts and kilopascals.
+Two answers were available and both are worse than the one taken:
+
+- *One axis for everything.* Volts (11–14) and milliamps (0–500) on one scale
+  draw a flat line under a mountain and imply the two are comparable.
+- *Normalise each series to its own 0–1 band.* This fits any number of units on
+  one picture, and the cost is that every gridline becomes a lie — the shape is
+  then the only true thing left, and the numbers on the frame say nothing about
+  any of the lines.
+
+So: **one axis per unit, at most two — left and right — and a parameter in a
+third unit is named under the chart as not drawn.** The bound is on the
+*picture*, never on the data: the table under it lists every parameter the
+operator ticked, drawn or not, which is what makes "not drawn" a routing
+decision rather than a refusal. Same principle as the capped table below, one
+level up.
 
 **And part 3 has a floor: a capped table says so.** The readings table is up to
 300 rows and the window can hold a hundred thousand; it prints which it is and

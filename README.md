@@ -552,8 +552,38 @@ nobody filled it in, a section the sheet does not print at all is listed under
 *Not on this form*, and the two are different sentences because they are
 different facts.
 
+The other way in is from the **station itself**. Under the ARRO block at the foot
+of the station editor card on the Stations tab there is an **Inspections**
+section: a pill that opens the Inspection History tab with that station already
+in its filter box, and a chart of what its past visits actually measured. It
+opens on **fade margin** and **battery voltage under load** — the two the field
+crews reach for first, and the two the archive has most of (7,322 and 13,199
+readings across 14,982 imported visits) — and any of the other 35 recorded
+parameters can be ticked instead.
+
+That chart is not built on `meganet.inspection_measurement`, which would be the
+obvious source and is the wrong one: it holds only the imported visits, so the
+picture would stop dead at the import and show nothing typed since. It reads the
+**section tables** — `inspection_power`, `inspection_radio`, `inspection_gas`,
+`inspection_water_level`, `inspection_data` and `inspection_fade_margin` — which
+is where both origins live, because `project_inspection_measurements()` writes
+every imported measurement that has a home into exactly those columns. The
+parameter list is `meganet.measurement_field` itself, so it is the database's own
+vocabulary rather than a copy of it, and a field added there appears in the
+picker with no code change.
+
+Two things it will not do, and says so on screen rather than quietly. It draws
+**two axes and never a third**: volts and milliamps on one scale draw a flat line
+under a mountain and call them comparable, and normalising every series to its
+own band would fit any number of units on one picture at the cost of making every
+gridline a lie — so a parameter in a third unit is named under the chart as *not
+drawn*, and is still in the table below it. And it does not plot **calibration
+grids or serial numbers**: a tip test is a grid per visit, not a number, and
+which column holds the reading depends on the kind — reducing one to a single dot
+would be inventing a measurement. Those are read in full on the history tab.
+
 The schema is the whole of #115; the two forms that write it are #116
-(Inspections) and #117 (Site Maintenance), the history view is #118, and the
+(Inspections) and #117 (Site Maintenance), the history view is #118, the
 ~35-year backfill out of the second workbook is epic #122. [`db/README.md`](db/README.md#station-inspections-and-maintenance-activities)
 has the design decisions and the write path; `tools/check_inspections.sql` proves
 it in 86 checks.

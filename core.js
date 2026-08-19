@@ -234,7 +234,11 @@ const HELP = {
            + 'station opens <strong>Repeaters listening</strong> between the list and the editor: '
            + 'every repeater with a pass range open to that station\'s addresses, nearest first. '
            + 'Clicking one puts the map on it and dims everything off its paths — the filters, the '
-           + 'picked selection and the station being edited all stay where they are.',
+           + 'picked selection and the station being edited all stay where they are. At the foot of '
+           + 'the editor, under ARRO, <strong>Inspections</strong> charts what that station\'s past '
+           + 'visits measured — fade margin and battery under load to begin with, any of the other '
+           + '35 recorded parameters on request — and the pill beside the heading opens the full '
+           + 'records on the Inspection History tab with this station already in its filter box.',
     watch: [
       '<strong>Kill spaghetti</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
@@ -272,6 +276,16 @@ const HELP = {
       + 'been told. Two people editing one station is <strong>refused, not merged</strong>: you '
       + 'are asked to reload rather than quietly overwriting somebody\'s afternoon, and a failed '
       + 'save never clears what you typed.',
+      'The <strong>Inspections</strong> chart draws <strong>two axes and never a third</strong>. '
+      + 'Volts and milliamps on one scale would draw a flat line under a mountain and imply they '
+      + 'are comparable, so a parameter in a third unit is listed under the chart as <em>not '
+      + 'drawn</em> rather than squeezed onto somebody else\'s scale — untick one to make room. '
+      + 'Everything ticked is in <em>Readings as a table</em> underneath either way, drawn or not. '
+      + 'A <strong>hollow marker</strong> is a visit the archive dates only to a month or a year: '
+      + 'it is plotted at the start of that period, because a 1990 row is an event in 1990 and not '
+      + 'the first of January. And calibration grids — the rain-gauge tip test, the shaft-encoder '
+      + 'and receiver grids — are deliberately not on the parameter list: they are a grid per '
+      + 'visit rather than one number, and they are read in full on the Inspection History tab.',
       'The editor\'s two ARRO numbers are <strong>not the same number</strong>. <code>ARRO site '
       + 'id</code> is ARRO\'s own database key and the only one its URLs accept; <code>station '
       + 'number</code> is BoM\'s. The boxes sit side by side and are labelled, because handing '
@@ -1599,6 +1613,36 @@ const state = {
     // longer. A signed URL is only as private as the path it signs (#149), so
     // it is never written anywhere that outlives the view.
     urls: {},
+  },
+  // The Inspections section at the foot of the station editor card
+  // (station-inspections.js). Per station and re-read when the selection moves:
+  // a station's inspection record is somebody else's to change, and holding a
+  // second station's numbers would only ever be a chance to draw the wrong one.
+  //
+  // `params` is session state and deliberately *not* per station — an operator
+  // comparing battery voltage across three sites should not have to re-tick it
+  // at each one. It survives a tab switch and not a reload.
+  stationInsp: {
+    stationId:  null,   // the station the rows below belong to
+    visits:     null,   // meganet.inspection rows for it, oldest first, or null while loading
+    busy:       false,
+    capped:     false,  // more visits than the chart will hold — said out loud, not hidden
+    error:      null,
+    // home table → { busy, rows, error }. Fetched per table as a parameter from
+    // it is first ticked, and dropped whole when the station changes.
+    byHome:     {},
+    // meganet.measurement_field, filtered to the fields that are one number per
+    // visit. The vocabulary is public, so this loads signed out even though the
+    // readings do not.
+    fields:     null,
+    fieldsBusy: false,
+    fieldsError: null,
+    // The ticked parameters, in the order they were ticked. The two defaults
+    // are named in station-inspections.js, which is also where the reason they
+    // are these two is written down.
+    params:     ['fade_margin_db', 'battery_under_load_v'],
+    pickerOpen: false,
+    tableOpen:  false,
   },
   // Attachments (#149 — shared by the two form tabs above; see attachments.js
   // for why one file rather than a panel copied into each). One record's worth
