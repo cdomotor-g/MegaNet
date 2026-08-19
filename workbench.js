@@ -17,13 +17,15 @@
 //                 and takes itself down on the way out), slug, state
 //   app.js        acmaEnsureCore, acmaEnsureDevices, acmaFetchJson, acmaPinPx,
 //                 acmaSquareIcon (the case map's threat squares are the main
-//                 map's, at the same half-a-field-pin size), addBaseLayers,
+//                 map's, at the same half-a-field-pin size),
 //                 passRangeCoversId, renderMain, renderTabs,
 //                 rfStripPlotHtml, stationAlertIds, switchTab — and
 //                 showAcmaCard, which it reaches *only* from two inline
 //                 onclick strings, so no AST walk over this file will find it
 //   rf-changes.js RfChanges, for its data loader, its repeater names and its
 //                 blind-spots copy
+//   map-controls.js addBaseLayers — the shared base-map set and its picker,
+//                 which lived in app.js until #164
 //   Leaflet       the case map, via addBaseLayers
 //
 // Two of those are worth flagging for whoever picks up #138: rfStripPlotHtml

@@ -35,6 +35,15 @@
 // rebuilds them from state.draw.shapes, a reload clears them — and the export
 // is the operating system's screen-clipping tool.
 //
+// Where the panel is drawn changed at #164 and nothing else did. It was a panel
+// in the Stations sidebar; it is a MapChrome flyout on the map itself now
+// (map-controls.js), opened from the ✏️ icon in the map's top-right corner and
+// pinnable open — which is the shape this tool always wanted, since every one
+// of its controls is about something you are doing on the map a few hundred
+// pixels away. panelHtml() still renders into #map-draw-panel and
+// rerenderPanel() still finds it there; the only edit to this file was dropping
+// the heading, because the flyout carries the title now.
+//
 // ── Keyboard parity, and where it stops (#136) ───────────────────────────────
 // Stated rather than left to be discovered, because the honest answer is not
 // "yes" and EPIC #107's Definition of Done asks for the boundary to be named.
@@ -747,8 +756,11 @@ const MapDraw = (function () {
   function panelHtml() {
     const D_ = D();
     return `
-      <div class="panel-header">
-        <h3>Draw &amp; measure</h3>
+      <!-- No heading of its own since #164: this panel is drawn inside a
+           MapChrome flyout on the map, and that flyout already carries the
+           title. Two would be one too many, and the second would be the one
+           a screen reader read out. -->
+      <div class="draw-head">
         <button class="filter-reset" onclick="MapDraw.clearAll()"
                 ${D_.shapes.length ? '' : 'disabled'}>Clear all</button>
       </div>

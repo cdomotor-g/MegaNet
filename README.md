@@ -711,7 +711,10 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Draw and measure over the map: pins, lines, circles, rectangles and text, placed by hand or by coordinates and km, in a colour of your choosing
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
-- Leaflet.js with a base-map picker (top-right): OSM-Topo (default), OpenStreetMap, or Satellite
+- Leaflet.js, with the map's own controls stacked in its top-right corner as four icons — base
+  map (OSM-Topo by default, OpenStreetMap or Satellite), **Map display**, **Draw & measure** and
+  the **legend**. Each is an icon and nothing else until you point at it, click it or tab to it,
+  and each can be pinned open — a pin that is remembered between visits
 
 **Reading the map.** Every pin carries a white ring so it separates from the
 base map and from its neighbours; ACMA transmitter squares carry the same ring.
@@ -719,15 +722,15 @@ The filter box **highlights instead of hiding**: all pins stay on the map,
 matches get an amber ring, their names appear underneath, and the map zooms to
 the extent of the matches so every one of them is on screen. Typing narrows the
 highlight live. Labels are capped at the 60 matches nearest the middle of that
-extent (the filter pane says when the cap is in effect). Tick *Hide stations
-that don't match*, under **Map display**, for the old subtractive behaviour —
+extent (the **Map display** panel says when the cap is in effect). Tick *Hide
+stations that don't match*, in that same panel, for the old subtractive behaviour —
 which still keeps the repeater at the far end of any drawn signal link, since a
 TX path with its destination receiver hidden is the one station you most wanted
 to see.
 
 **Who carries this station?** Finding a station on the map is half the
 question; the other half is which repeaters carry it. *Include related
-repeaters* (under **Map display**, on by default) answers both at once: filter
+repeaters* (in the map's **Map display** panel, on by default) answers both at once: filter
 for a station and every repeater whose pass ranges cover one of its ALERT
 addresses comes with it — drawn at full opacity with a **dashed cyan ring**,
 listed in the table below with a *via pass range* badge, linked to the station
@@ -763,15 +766,28 @@ between them drags (or takes ←/→, Home to reset) to re-split the width, whic
 is remembered between visits. On a phone the two stack and the page scrolls as
 one again.
 
+The left rail is **filters, and only filters**, since #164. Map display, Draw &
+measure and the legend were three more panels down there; all three are on the
+map itself now, which is both where they belong and what gives the rail room to
+stop scrolling.
+
 **Signal links and *Kill spaghetti*.** Links are drawn from each field station
 to every repeater whose pass ranges cover one of its ALERT addresses, which
 across the whole network is 3000-plus lines, many of them running the length of
 the country because two distant sites happen to share an address window.
 *Kill spaghetti* (on by default) drops any link longer than **Max TX distance**
-— 120 km by default, adjustable from 0 to 600 km, which is the range a VHF hop
-plausibly covers. The pane says what it is removing ("1938 links drawn · 1203
-over 120 km hidden"), so a link that vanished is never a mystery. Untick it to
+— 70 km by default, adjustable from 0 to 600 km, which is the range a VHF hop
+plausibly covers. The panel says what it is removing ("1537 links drawn · 1604
+over 70 km hidden"), so a link that vanished is never a mystery. Untick it to
 see every path however long, at any distance.
+
+> The default was 120 km until #164 and is 70 km now, by request. 120 was the
+> *ceiling* — about as far as a VHF hop plausibly reaches — and a map that opens
+> at the ceiling opens as spaghetti: 1938 of 3141 paths drawn. 70 km draws 1537
+> of them and is where the great majority of this network's real hops sit. It
+> also halves the backbone: 183 qualifying pairs at 120 km, 96 at 70. Nothing is
+> lost either way — the slider still runs to 600 km, and *Kill spaghetti* off
+> draws every path however long.
 
 Each link is drawn twice — a wide white casing underneath and the coloured line
 on top — so it stays legible over satellite imagery and topo shading, where a
@@ -780,9 +796,9 @@ when the lines are burying the pins they are meant to explain.
 
 **Highlighting rivers.** Half this network is named after the river it sits on,
 so typing `burdekin` into the filter box lights up the Burdekin and its named
-tributaries as well as the stations on it. *Highlight matching rivers* (under
-**Map display**, on by default, and the one map switch remembered between
-visits) is the control. The rivers are **context, not matches**: they draw
+tributaries as well as the stations on it. *Highlight matching rivers* (in the
+map's **Map display** panel, on by default, and the one map *display* switch
+remembered between visits) is the control. The rivers are **context, not matches**: they draw
 beneath the pins and the signal links in their own blue, they carry the river
 name as a hover label, they never move the map's zoom or centre, and they have
 no say whatever in which stations the filter selects — untick the box and the
@@ -795,9 +811,11 @@ more (a bare number in that box is an ALERT address, and is treated as one), it
 waits for your typing to pause, it is capped at 250 river segments per view, and
 answers are cached by term and rounded map extent — so retyping the same word,
 or nudging the map, costs no request at all. Zoom out past a 12° view and it
-stops asking rather than pull half a continent of geometry. The filter pane says
-what happened each time: how many segments were drawn, how many were over the
-cap, or that OpenStreetMap could not be reached. That last case is the whole
+stops asking rather than pull half a continent of geometry. The **Map display**
+panel says what happened each time: how many segments were drawn, how many were
+over the cap, or that OpenStreetMap could not be reached — and lists each named
+river it found as a button that opens that river's callout, so the layer is
+usable without a mouse. That last case is the whole
 failure mode — no network means no rivers, and nothing else on the tab changes.
 
 > The bundled `assets/geo/Qld Major Streams_reduced.svg` is deliberately **not**
@@ -808,7 +826,9 @@ failure mode — no network means no rivers, and nothing else on the tab changes
 > real coordinates would make it a good offline layer; until then it stays out of
 > this. See issue #84.
 
-**Draw & measure.** A sketching layer over the network map, for the picture
+**Draw & measure.** A sketching layer over the network map, opened from the
+pencil icon in the map's top-right corner — and pinnable open, which is what you
+want while you are actually drawing. It is for the picture
 that goes into an email or an incident note: **pins**, **lines**, **circles**,
 **rectangles** and free **text annotations**. Every shape can be drawn by
 clicking on the map — click the circle's centre then its radius, click opposite

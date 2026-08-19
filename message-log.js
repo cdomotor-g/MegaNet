@@ -6,8 +6,9 @@
 //
 // After core.js and app.js, before init.js — index.html holds the order.
 // Reaches back to core.js for state, esc/escAttr/csvEscape, dbSelect,
-// buildSensorIndex, announce, the registries and removeMap; across to app.js
-// for switchTab, addBaseLayers, findRepeaterMatches, primaryRole,
+// buildSensorIndex, announce, the registries and removeMap; to map-controls.js
+// for addBaseLayers (in app.js until #164); across to app.js
+// for switchTab, findRepeaterMatches, primaryRole,
 // stationAlertIds and the MAP_FOCUS_DIM_* opacity rules; and across to
 // arro-data.js (fieldShow), packets.js (prefillEncoder) and alert2.js for the
 // three deep links out of the detail drawer.

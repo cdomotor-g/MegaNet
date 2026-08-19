@@ -2251,6 +2251,244 @@ hr {
   pointer-events: none;
 }
 
+/* ── On-map control panels (#164) ────────────────────────────────────────────
+   The Stations map's own furniture: base map, map display, draw & measure and
+   the legend, as four icons stacked in the map's top-right corner. Built by
+   MapChrome (map-controls.js) and available to the app's other six Leaflet
+   maps on the same terms.
+
+   The rule the whole thing turns on: **an icon is all there is until you ask
+   for more.** A map is the one surface in this app where the content is the
+   whole panel, so a control that permanently covers a corner of it is a
+   control that is permanently in the way. Everything below is in service of
+   that — the panel opens on hover, and on a click, a tap or Enter, and it
+   shuts again on its own.
+
+   Two open states, because they answer two different questions:
+
+     hovered / clicked   a flyout. `position: absolute`, opening leftward out
+                         of its own icon, so it covers the map and *nothing
+                         moves*. That last part is the reason it is not simply
+                         expanded in place the way Leaflet's own layers control
+                         is: with four controls in one corner, expanding in
+                         place shoves the three icons below it down the screen
+                         the instant the pointer crosses the first — which puts
+                         the icon you were reaching for somewhere else.
+
+     pinned              docked. `position: static`, so the panel takes its
+                         space in the corner's own column and two pinned panels
+                         stack instead of overlapping. Pinning is the operator
+                         saying "I am working in this one", and a tool in use
+                         should not be sharing pixels with the map under it.
+                         Remembered between visits — see state.mapPanelsPinned.
+
+   Neither state is a modal and neither traps focus: this is a disclosure, the
+   button says so with aria-expanded, and Shift+Tab off the first control in
+   the panel lands back on the icon that opened it. */
+
+.mn-mapctl {
+  /* Narrow enough to leave the map readable beside it, wide enough for the
+     "Max TX distance" slider and its label on one line. Falls back to the
+     viewport on a phone, where 19rem plus the icon column is the whole screen. */
+  --mn-mapctl-w: min(19rem, calc(100vw - 7rem));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+}
+
+/* The icon, and — while the panel is shut — the entire control. */
+.mn-mapctl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  font-size: 1.05rem;
+  line-height: 1;
+  box-shadow: var(--shadow-2);
+}
+
+.mn-mapctl-ico {
+  /* Emoji ride high in most families; this is what centres them in the box. */
+  display: block;
+  transform: translateY(.5px);
+}
+
+.mn-mapctl-body {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: calc(100% + var(--sp-2));
+  width: var(--mn-mapctl-w);
+  padding: var(--sp-3);
+  text-align: left;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+}
+
+/* The gap between the icon and the flyout is a hole the pointer falls through
+   on the way across. This bridges it — invisible, and only as wide as the gap
+   it covers. It is on the body rather than on the wrapper because the wrapper
+   is what the *unopened* icon is, and a control that eats clicks 8 px to its
+   left while showing nothing is a control that swallows map clicks. */
+.mn-mapctl-body::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 100%;
+  width: var(--sp-2);
+}
+
+/* Open. Three ways in, and they are three different users.
+
+     .is-open   clicked, tapped, or opened with Enter or Space on the icon —
+                a plain disclosure, the same contract <summary> has, and the
+                only way in without a pointer that hovers. It is the state the
+                button's aria-expanded reports, and map-controls.js is what
+                sets it, so the two cannot disagree.
+     :hover     the headline behaviour, on pointers that have one. Not
+                reported by aria-expanded, and that is correct rather than an
+                omission — nobody reading this page through a screen reader is
+                hovering it.
+     :focus-within on the body — the safety net, and the reason it is not
+                optional: while a panel is open on hover alone, its controls
+                are in the tab order. Tab into one, move the mouse, and without
+                this the panel goes display:none *with focus inside it* — focus
+                lands back on <body> and the keyboard user is at the top of the
+                document. #136 met this exact defect in a hover gate elsewhere
+                in the app. map-controls.js also promotes such a panel to
+                .is-open when focus arrives, so the state and what is on screen
+                stay in step; this rule is what holds it open in the frame
+                before that happens. */
+.mn-mapctl.is-open > .mn-mapctl-body,
+.mn-mapctl.is-pinned > .mn-mapctl-body,
+.mn-mapctl-body:focus-within {
+  display: block;
+}
+
+@media (hover: hover) {
+  .mn-mapctl:hover > .mn-mapctl-body { display: block; }
+}
+
+/* An armed draw tool turns the whole map into a crosshair, this panel
+   included — and the panel is the one part of it you are not about to draw
+   on. */
+.leaflet-container.mn-drawing .mn-mapctl {
+  cursor: auto;
+}
+
+/* Pinned: back into the flow of the corner's column, so panels stack rather
+   than overlap. The icon goes while it is docked — it said "there is a Legend
+   behind here", and the panel now says that itself, in words, with its own pin
+   in the corner to put it back. Vertical room in that column is the scarce
+   thing the moment two panels are pinned, and an icon that repeats the heading
+   two lines above it is the first thing that should give it up. */
+.mn-mapctl.is-pinned > .mn-mapctl-btn {
+  display: none;
+}
+
+.mn-mapctl.is-pinned > .mn-mapctl-body {
+  position: static;
+  width: var(--mn-mapctl-w);
+}
+
+.mn-mapctl.is-pinned > .mn-mapctl-body::after { content: none; }
+
+.mn-mapctl-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  padding-bottom: var(--sp-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.mn-mapctl-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-tight);
+}
+
+/* Pressed is not carried by opacity alone: the border and the fill change with
+   it, and aria-pressed carries it to anything not reading pixels. */
+.mn-mapctl-pin {
+  flex: 0 0 auto;
+  padding: .2rem .4rem;
+  font-size: .85rem;
+  line-height: 1;
+  border-radius: var(--r-sm);
+  opacity: .6;
+}
+
+.mn-mapctl-pin[aria-pressed="true"] {
+  opacity: 1;
+  border-color: var(--accent);
+  background: var(--subtle);
+}
+
+/* The panel scrolls inside itself rather than growing off the map. Two caps,
+   because a docked panel is sharing the corner with the others and a flyout is
+   not. Scroll here rather than on .mn-mapctl-body so the title and the pin stay
+   put, and so the hover bridge above is not clipped by an overflow context. */
+.mn-mapctl-content {
+  /* 42vh rather than something rounder: the map itself is 62vh (52dvh on a
+     phone), and a flyout taller than the map it hangs off is a flyout with its
+     last control cut off by the map's own edge. This leaves room for the
+     heading, the padding and Leaflet's 10 px corner margin at both ends. */
+  max-height: min(24rem, 42vh);
+  overflow-y: auto;
+}
+
+/* Tighter docked than floating, and deliberately: a flyout has the map to
+   itself for as long as the pointer is on it, while two docked panels are
+   dividing one column between them and the map underneath. Past two the column
+   runs out of map and Leaflet clips it — which is the honest failure, and the
+   reason the cap is here rather than left to the content. */
+.mn-mapctl.is-pinned .mn-mapctl-content {
+  max-height: min(11rem, 18vh);
+}
+
+/* The legend reads as a list in a column this narrow, not as a wrapped row. */
+.mn-mapctl .map-legend {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+}
+
+/* Below `md` the map itself shrinks to 52dvh (see the breakpoint block at the
+   foot of this file), so the flyout's share of the viewport has to come down
+   with it or the panel is taller than the map it hangs off. */
+@media (max-width: 900px) {
+  .mn-mapctl-content {
+    max-height: min(24rem, 34vh);
+  }
+
+  .mn-mapctl.is-pinned .mn-mapctl-content {
+    max-height: min(11rem, 15vh);
+  }
+}
+
+/* A finger is not a mouse pointer, and on a touch screen the tap target *is*
+   the control: EPIC #107's 44 px floor, the same one #137's map chips take. */
+@media (pointer: coarse) {
+  .mn-mapctl-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .mn-mapctl-pin {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+}
+
 /* ── My location + heading (mobile only) ─────────────────────────────────── */
 
 .mn-locate a {
@@ -2378,6 +2616,15 @@ hr {
 .leaflet-tooltip.mn-draw-label::before { display: none; }
 
 /* tool picker */
+/* "Clear all", on its own row. It was the right-hand half of a .panel-header
+   until #164 took the heading away — the MapChrome flyout this panel lives in
+   carries the title now, and a header row with nothing at the left-hand end is
+   not a header. */
+.draw-head {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .draw-tools {
   display: flex;
   flex-wrap: wrap;

@@ -1508,24 +1508,13 @@ function renderStationsHtml() {
            the nav and the header already say where you are, and this tab has
            less vertical room to spare than any other. -->
       <h2 class="sr-only">Stations — filters, map and station list</h2>
-      <aside class="sidebar stack map-pane" id="stations-left" aria-label="Filters and map display">
+      <!-- Filters, and only filters, since #164. Map display, Draw & measure
+           and the legend used to be three more panels down here; they are on
+           the map itself now, as icons in its top-right corner beside the
+           base-map picker — see stationsMapPanels() and map-controls.js. -->
+      <aside class="sidebar stack map-pane" id="stations-left" aria-label="Station filters">
         <div class="panel filter-panel" id="station-filters">
           ${stationFiltersHtml()}
-        </div>
-        <div class="panel">
-          <div class="panel-header"><h3>Map display</h3></div>
-          <div class="filter-block" id="map-display-block">
-            ${mapDisplayControlsHtml()}
-          </div>
-          <div class="filter-block">
-            ${acmaFilterBlockHtml()}
-          </div>
-        </div>
-        <div class="panel" id="map-draw-panel">
-          ${MapDraw.panelHtml()}
-        </div>
-        <div class="panel">
-          <div class="map-legend" id="map-legend">${mapLegendHtml()}</div>
         </div>
       </aside>
       <div class="map-split" id="stations-split" role="separator" aria-orientation="vertical"
@@ -1655,6 +1644,33 @@ function splitKey(e) {
   else return;
   e.preventDefault();
   if (state.map) state.map.invalidateSize();
+}
+
+// ── The Stations map's own controls (#164) ───────────────────────────────────
+// Map display, Draw & measure and the legend, as three icons in the map's
+// top-right corner under the base-map picker. They were three panels in the
+// sidebar until #164; what moved is where they are drawn, not what they are —
+// every one of them keeps the id it had, so mapDisplayControlsHtml(),
+// MapDraw.rerenderPanel() and rerenderMapLegend() go on finding their own
+// markup and re-rendering it in place without knowing it has moved.
+//
+// Rebuilt with the map, on every render of the tab: initMap() calls this after
+// addBaseLayers() and before the modules attach.
+function stationsMapPanels(map) {
+  MapChrome.panel(map, {
+    id: 'display', icon: '👁️', title: 'Map display',
+    html: () => `
+      <div id="map-display-block">${mapDisplayControlsHtml()}</div>
+      <div class="filter-block">${acmaFilterBlockHtml()}</div>`,
+  });
+  MapChrome.panel(map, {
+    id: 'draw', icon: '✏️', title: 'Draw & measure',
+    html: () => `<div id="map-draw-panel">${MapDraw.panelHtml()}</div>`,
+  });
+  MapChrome.panel(map, {
+    id: 'legend', icon: '🔑', title: 'Legend',
+    html: () => `<div class="map-legend" id="map-legend">${mapLegendHtml()}</div>`,
+  });
 }
 
 // ── Map display block ────────────────────────────────────────────────────────
@@ -1861,34 +1877,10 @@ function mapSearchInput(value) {
 }
 
 // ── Base map layers ─────────────────────────────────────────────────────────
-// Fresh tile-layer instances for the shared base-map set. A Leaflet layer can
-// only live on one map at a time, so every map gets its own instances. The
-// first entry (OSM-Topo) is the default base layer.
-function makeBaseLayers() {
-  return {
-    'OSM-Topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-      attribution: 'Map data: © OpenStreetMap contributors, SRTM | Style: © OpenTopoMap (CC-BY-SA)',
-      maxZoom: 17,
-    }),
-    'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors', maxZoom: 19,
-    }),
-    'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
-      maxZoom: 19,
-    }),
-  };
-}
-
-// Add the shared base-layer set to a map, switch it to the default (OSM-Topo)
-// and drop a base-map picker in the top-right corner.
-function addBaseLayers(map) {
-  const layers = makeBaseLayers();
-  const [, defaultLayer] = Object.entries(layers)[0];
-  defaultLayer.addTo(map);
-  L.control.layers(layers, null, { position: 'topright' }).addTo(map);
-  return layers;
-}
+// makeBaseLayers() and addBaseLayers() moved to map-controls.js at #164, with
+// the rest of the furniture the seven Leaflet maps share. Nothing about them
+// changed here: this file still calls addBaseLayers(state.map) in initMap()
+// below, exactly as the other six maps call it.
 
 // Take the Stations map down: on the way out of the tab, and again at the top
 // of every render of it.
@@ -1951,6 +1943,10 @@ function initMap() {
   state.map.setView(MAP_HOME, 4);
   state.mapFitKey = null;              // a fresh map always fits its contents once
   addBaseLayers(state.map);
+  // The three panels that used to sit in the sidebar. Built before the modules
+  // attach, because MapDraw.attach() can rerender its own panel and it has to
+  // have somewhere to render it to.
+  stationsMapPanels(state.map);
   MapSpider.attach(state.map);
   MapLocate.attach(state.map);
   MapDraw.attach(state.map);

@@ -12,8 +12,9 @@
 // and now says when to take it down, and takes it down the one way that
 // survives a zoom in flight), buildArroUrl and buildSensorIndex — the last three hosted here for five other
 // sections until M1 (#132) moved them out, which is what let this module leave
-// on its own. Across to app.js for addBaseLayers, primaryRole,
-// findRepeaterMatches and repeaterPassingCount.
+// on its own. Across to app.js for primaryRole, findRepeaterMatches and
+// repeaterPassingCount, and to map-controls.js for addBaseLayers — which was
+// in app.js until #164.
 //
 // For the record, since #134's body says otherwise and someone will read it:
 // this module carries no NUL bytes and never has. All three of app.js's were in

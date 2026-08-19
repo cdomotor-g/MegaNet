@@ -114,7 +114,32 @@ try {
   check('the note counts rivers as well as segments', /2\s+named rivers/.test(noteText)
     && /5\s+segments drawn/.test(noteText), noteText.trim().slice(0, 120));
 
-  // Activate a note button with the keyboard alone: focus, then Enter.
+  // Activate a note button with the keyboard alone: open the panel it lives in,
+  // focus the button, then Enter.
+  //
+  // The extra step is #164: the note is inside the map-display panel, and that
+  // panel is an icon on the map rather than a block in the sidebar now. So the
+  // keyboard path this check exists to prove is one step longer than it was —
+  // reach the icon, open it, then the buttons are there — and proving the whole
+  // of it is the point. Enter on the icon rather than a class set by script:
+  // the disclosure has to actually work from the keyboard, or the note behind
+  // it is unreachable however real its buttons are.
+  await page.evaluate(() => {
+    document.querySelector('.mn-mapctl[data-panel="display"] .mn-mapctl-btn').focus();
+  });
+  await page.keyboard.press('Enter');
+  const opened = await page.evaluate(() => {
+    const wrap = document.querySelector('.mn-mapctl[data-panel="display"]');
+    const btn  = wrap.querySelector('.mn-mapctl-btn');
+    const body = wrap.querySelector('.mn-mapctl-body');
+    return {
+      expanded: btn.getAttribute('aria-expanded'),
+      visible: !!(body.offsetWidth || body.offsetHeight || body.getClientRects().length),
+    };
+  });
+  check('Enter on the map-display icon opens its panel and says so',
+    opened.visible && opened.expanded === 'true', JSON.stringify(opened));
+
   await page.evaluate(() => {
     [...document.querySelectorAll('.mn-river-note-btn')]
       .find((b) => b.dataset.river === 'Burdekin River').focus();

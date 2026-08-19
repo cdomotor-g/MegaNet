@@ -226,7 +226,10 @@ const HELP = {
     summary: 'The station list and the map, side by side. The <strong>Filters</strong> pane on the '
            + 'left drives both at once, and is built from whatever <code>stations.json</code> holds '
            + '— every option carries the number of stations behind it, and nothing is offered that '
-           + 'no station uses. Draw, measure and terrain tools sit under the map. Selecting a '
+           + 'no station uses. The map carries its own controls in its top-right corner, as four '
+           + 'icons that open when the pointer is on them and can be pinned open: the base map, '
+           + '<strong>Map display</strong>, <strong>Draw &amp; measure</strong> and the legend. '
+           + 'The elevation profile and link budget sit under the map. Selecting a '
            + 'station opens <strong>Repeaters listening</strong> between the list and the editor: '
            + 'every repeater with a pass range open to that station\'s addresses, nearest first. '
            + 'Clicking one puts the map on it and dims everything off its paths — the filters, the '
@@ -234,9 +237,9 @@ const HELP = {
     watch: [
       '<strong>Kill spaghetti</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
-      + 'cannot may simply be past the <em>Max TX distance</em> slider; the sidebar says how many '
-      + 'links were drawn and how many were culled, so check that before concluding the path '
-      + 'isn\'t there.',
+      + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 70 km; '
+      + 'the <strong>Map display</strong> panel says how many links were drawn and how many were '
+      + 'culled, so check that before concluding the path isn\'t there.',
       '<strong>Backbone paths</strong> are the heavy black lines, and they are of two kinds: two '
       + 'repeaters within the <em>Max TX distance</em> whose pass-range windows are open to at '
       + 'least one common ALERT address, and every repeater within that same distance of a base '
@@ -252,7 +255,8 @@ const HELP = {
       'The search box <strong>highlights rather than hides</strong>. Every station stays on the '
       + 'map; matches take an amber ring, get their names drawn, and the map zooms to fit them — '
       + 'so a pin still on screen has not necessarily matched anything. <em>Hide stations that '
-      + 'don\'t match</em>, under <strong>Map display</strong>, is the subtractive behaviour if '
+      + 'don\'t match</em>, in the map\'s <strong>Map display</strong> panel, is the subtractive '
+      + 'behaviour if '
       + 'that is what you want. Names are capped at 60 either way, and the pane says when the cap '
       + 'is in effect.',
       'Every tick-box block ends with a <strong>Not recorded yet</strong> bucket, and it is ticked '
@@ -300,8 +304,10 @@ const HELP = {
         <text x="228" y="44" font-size="9" text-anchor="middle" fill="var(--muted)">repeater</text>
       </svg>`,
       steps: [
-        'Open <strong>Draw &amp; measure</strong> under the map and pick <em>Line</em>. The cursor '
-        + 'becomes a crosshair and clicks pass through the pins to the map underneath.',
+        'Open <strong>Draw &amp; measure</strong> from the pencil icon in the map\'s top-right '
+        + 'corner and pick <em>Line</em>. The cursor becomes a crosshair and clicks pass through '
+        + 'the pins to the map underneath. The panel closes again when the pointer leaves it — '
+        + 'the pin in its corner keeps it open while you work.',
         'Click near one station, then near the other, and double-click (or <em>Finish</em>) to end '
         + 'the line. Within about 15 px of a pin the click <strong>snaps</strong> to that '
         + 'station\'s exact coordinates — the ring in the drawing is what says the next click will.',
@@ -1294,7 +1300,12 @@ const state = {
   mapShowBackbone: true,
   mapHideOthers:  false,   // filter box: highlight matches (default) vs hide the rest
   mapKillSpaghetti: true,  // drop pass-range links longer than mapMaxLinkKm
-  mapMaxLinkKm:   120,     // km; about as far as a VHF hop plausibly reaches
+  // km. Lowered from 120 at #164, by request: 120 was "about as far as a VHF
+  // hop plausibly reaches", which is the ceiling rather than the working
+  // figure, and a map that opens at the ceiling opens as spaghetti. 70 km is
+  // where the great majority of this network's real hops sit; the slider still
+  // runs to MAX_LINK_KM_CAP for the ones that do not.
+  mapMaxLinkKm:   70,
   mapLinkOpacity: 0.8,     // pass-range lines: 0.1–1.0, applied over their casing
   mapLabelMode:   'auto',  // station name labels: 'auto' (fit the viewport) | 'on' | 'off'
   mapRelated:     true,    // pull pass-range-related repeaters in with the matches
@@ -1311,6 +1322,13 @@ const state = {
   // SoRT's experience picked as the sane fast one.
   mapContours:        false,
   mapContourInterval: '5',
+  // Which on-map control panels (see MapChrome, map-controls.js) the operator
+  // has pinned open. Persisted, and the one thing about those panels that is:
+  // a pin is a standing preference about how this operator reads a map, not
+  // something they are doing right now. Everything else about a panel — which
+  // one is hovered, which one was clicked open — dies with the map it was on.
+  mapPanelsPinned: new Set((localStorage.getItem('mn-map-panels') || '')
+                             .split(',').map(s => s.trim()).filter(Boolean)),
   mapMatchLabels: new Set(),  // ids the current filter earned a label (see mapLabelIds)
   mapLinkCount:   { drawn: 0, culled: 0 },   // last refresh, for the sidebar note
   mapFitKey:      null,    // extent the map was last auto-fitted to (re-fit only on change)

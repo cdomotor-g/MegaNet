@@ -572,6 +572,59 @@ sets `--basin` to a `var(…)` rather than to a colour. They are deliberately
 two themes is eight near-blacks that no longer tell each other apart, and what
 carries the meaning here is the region's name on the chip, not the hue.
 
+### On-map controls — one icon, one flyout, one pin
+
+*(Pattern 9, added by #164.)* Seven Leaflet maps, and every one of them wants
+controls in its corners. There is one control for that: `MapChrome.panel()` in
+`map-controls.js`, which the base-map picker and the Stations map's Map display,
+Draw & measure and legend panels are all four built out of. A tab adding a fifth
+uses it rather than writing a Leaflet control of its own.
+
+**The rule it exists to enforce: on a map, an icon is all there is until
+somebody asks for more.** A map is the one surface in this app where the content
+*is* the whole panel, so a control permanently parked in a corner is permanently
+in the way.
+
+Three ways to ask, and they are three different users — a panel that answers
+only the first is a panel a keyboard cannot open:
+
+| in | what it is |
+|---|---|
+| `:hover` | the headline behaviour, on pointers that have one. Deliberately **not** reported by `aria-expanded`: nobody reading the page through a screen reader is hovering it |
+| `.is-open` | a click, a tap, or Enter/Space on the icon — a plain disclosure, the same contract `<summary>` has. The JS owns this class and `aria-expanded` reports it, so the two cannot disagree |
+| `.mn-mapctl-body:focus-within` | the safety net. While a panel is open on hover alone its controls are in the tab order; Tab into one, move the mouse, and without this it goes `display: none` **with focus inside it** — focus drops to `<body>` and the keyboard user is at the top of the document. #136 met this exact defect in a hover gate elsewhere. A `focusin` handler also promotes such a panel to `.is-open`, so the state catches up with the pixels |
+
+**The `display: none` is load-bearing, in both directions.** A collapsed panel's
+controls must not be tab stops for something invisible — which is why it is
+`display: none` and not `opacity: 0` — and that is exactly what makes the
+`:focus-within` net necessary once it *is* open.
+
+**Two open states, and the difference is not decoration.** *Hovered* is a
+flyout: absolutely positioned, opening leftward out of its own icon, so nothing
+else moves. That is why these are not simply expanded in place the way Leaflet's
+own layers control is — with four controls in one corner, expanding in place
+shoves the three icons below down the screen the moment the pointer crosses the
+first, and the icon you were reaching for is somewhere else. *Pinned* is docked:
+back into the corner's own column, so two pinned panels stack instead of
+overlapping, and the icon is dropped while it is docked. Pinning is remembered
+(`state.mapPanelsPinned`, one localStorage key); nothing else about a panel is.
+
+Three things that are not optional:
+
+1. **The title is one string** — the button's `aria-label`, its tooltip and the
+   panel's `<h3>`. Panel content supplies no heading of its own; `MapDraw` had
+   one and lost it at #164, because two headings means the second is the one a
+   screen reader reads.
+2. **`L.DomEvent.disableClickPropagation` and `disableScrollPropagation` on the
+   wrapper.** Without them, ticking a checkbox in the panel also drops a draw
+   pin on the map underneath it, and scrolling a long panel zooms the map.
+3. **Content keeps its own id.** `#map-display-block`, `#map-draw-panel` and
+   `#map-legend` are what they were in the sidebar, so the functions that
+   re-render them did not have to learn that they had moved.
+
+Not a modal, and it does not trap focus: it is a disclosure, `aria-expanded`
+says so, and Shift+Tab off the first control lands back on the icon.
+
 ---
 
 ## 4. Accessibility primitives

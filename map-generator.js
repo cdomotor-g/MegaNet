@@ -9,7 +9,8 @@
 // After core.js and app.js, before init.js — index.html holds the order.
 // Reaches back to core.js for state, esc, escAttr, slug, announce,
 // registerTabTeardown, registerLiveMap, removeMap and acmaHaversineKm; across
-// to app.js for switchTab, addBaseLayers and primaryRole; and across to
+// to app.js for switchTab and primaryRole; to map-controls.js for
+// addBaseLayers (in app.js until #164); and across to
 // terrain.js for Terrain.grid — the DEM lattice the contours are traced from.
 // app.js reaches back the other way once: the Stations tab's "Send view to
 // Map Generator" button calls MapGen.adoptStationsView().
@@ -66,7 +67,8 @@ const MG_PRESETS = {
   custom: { label: 'Custom size…',                w: 200, h: 200, margin: 0  },
 };
 
-// The same base set the Stations map offers (makeBaseLayers, app.js), plus
+// The same base set the Stations map offers (makeBaseLayers,
+// map-controls.js), plus
 // "None" — a laser file wants no raster under it, and the option to turn the
 // base off entirely is part of the brief. Raw URL templates rather than
 // Leaflet layers because these tiles are composed onto a canvas and embedded
