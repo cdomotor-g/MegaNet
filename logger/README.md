@@ -1,30 +1,57 @@
-# logger/ — the base station's side of HTTP ingest
+# logger/ — the base station's side of ingest, over both paths
 
 A CRBasic program for a Campbell Scientific datalogger sitting at a radio base
-station. It reads what the ALERT2 receiver hears off RS-232 and posts it to
-MegaNet's ingest endpoint.
-
-**This is the inbound path that needs no process running anywhere.**
-[`bridge/`](../bridge/README.md) is the other one, and it exists because
-Postgres cannot subscribe to MQTT so *something* has to hold the subscription.
-Nothing has to hold this: the datalogger is already at the site, already
-powered, already on a network, and `HTTPPost()` is an instruction it has had
-since OS 4. If a base station can reach the internet, this program is the whole
-integration.
+station. It reads what the ALERT2 receiver hears off RS-232 and sends it to
+MegaNet **twice**: a POST to the ingest endpoint, and a publish to the MQTT
+broker that [`bridge/`](../bridge/README.md) subscribes to.
 
 ```
 field stations ──radio──▶ ERT-A2 receiver ──RS-232──▶ CR300 running this program
                                                                    │
-                                                                 HTTPS
+                                            ┌──────────────────────┴───────────┐
+                                          HTTPS                          MQTT QoS 1
+                                            │                                  │
+                                            ▼                                  ▼
+                                   meganet.ingest_http()                     broker
+                                            │                                  │
+                                            │                               bridge/
+                                            │                                  │
+                                            └──────────────────────┬───────────┘
                                                                    ▼
-                                                        meganet.ingest_http()
-                                                                   │
                                                           meganet.ingest()
 ```
+
+**Sending everything twice is the design, not a mistake.** `meganet.reading`'s
+primary key is (address, instant, value), so the second copy of a reading is
+stored zero times and counted as a duplicate — both contracts say so in as many
+words. Whichever copy lands first sets the row's `source` (`http` or `mqtt`);
+the other is counted and discarded. So the cost of a path being down is its own
+duplicates and nothing else, and there is no acknowledgement protocol between
+the two halves to get wrong.
+
+What each path is *for* is different, and that is why a base station runs both:
+
+| | HTTP | MQTT |
+| --- | --- | --- |
+| Needs a process running somewhere | no | yes — a broker, and `bridge/` |
+| Needs a credential on the logger | the token file | broker username/password, in the settings |
+| Tells you the station stopped talking | no | **yes — the broker's Last Will, for free** |
+| Survives the database being down | retries from the queue | the broker holds the message |
+| Overhead per reading | an HTTPS request | a publish on a held connection |
+
+The last-but-one row is the reason MQTT is worth its moving parts. *Which sites
+stopped talking overnight* is the morning question, and HTTP has no way to
+answer it: a base station that has died posts nothing, and so does a base
+station with nothing to report. The broker knows the difference because it
+holds the connection, and it says so on this station's behalf when the
+connection drops.
 
 - The **endpoint, the payload shape, and how to mint and revoke a token** are in
   [`docs/ingest-http.md`](../docs/ingest-http.md) — read that first; this page
   assumes it.
+- The **topic scheme, the status message and the broker** are in
+  [`docs/ingest-mqtt.md`](../docs/ingest-mqtt.md), and the click-by-click
+  provisioning is [`docs/mqtt-provisioning.md`](../docs/mqtt-provisioning.md).
 - The **serial format** the program decodes is the ELPRO ERT-A2's ALERT2 ASCII
   protocol, documented field by field in `alert2.js` and in the README's
   [ALERT2 / ERT-A2 Serial Decoder](../README.md#19-alert2--ert-a2-serial-decoder)
@@ -37,12 +64,12 @@ field stations ──radio──▶ ERT-A2 receiver ──RS-232──▶ CR300 
 
 | File | What it is |
 | --- | --- |
-| `base-station-http.CR300` | The program. Written for a CR300-series; the foot of the file says what to change for a CR1000X or CR6. |
+| `base-station-http.CR300` | The program — both paths, despite the name, which is kept because it is the name loaded on every logger already running it. Written for a CR300-series; the foot of the file says what to change for a CR1000X or CR6. |
 | `meganet_token.example.txt` | The shape of the token file. One line, the token, nothing else. |
 
 ---
 
-## Three things to change, and only three
+## Four things to change, and only four
 
 Everything else in the program has a working default.
 
@@ -87,7 +114,35 @@ fills its `Readings` table, and says `no token — see TOKEN_FILE` in `PostState
 Dropping the file in is enough — it retries the load every slow scan, so there
 is no need to restart the program.
 
-**3 · `PROTOCOL`, if your receiver is not an ERT-A2.**
+**3 · `MQTT_STATION` — who this base station is on the wire.**
+
+```crbasic
+Const MQTT_STATION = "18_bateson"
+Const MQTT_DEVICE  = "logger"
+```
+
+This is the `<station>` segment of the topic, and it is the **bureau station
+number** — `541155`, exactly as `meganet.station.station_number` holds it, not
+`0541155`. Sites that have no bureau number publish under their **station id**
+instead. That is one rule rather than two identifiers: a site has a number or it
+has not, and the database resolves either without a mapping table.
+
+A base station never has a bureau number — it is an ingest point, not a gauging
+station — so it is always the id here. `18 Bateson` is `18_bateson` in
+`stations.json`, which is what the shipped default says.
+
+**Change this and the broker's ACL together.** The ACL is generated from that
+same column, so a credential may only write the topic its own identifier spells,
+and a mistyped segment is refused by the broker rather than quietly filed under
+an identity nobody claims. That is the scheme working, but only if the two
+agree — check `MqttTopic` in the Public table against the ACL line before you
+leave site.
+
+Set `MQTT_ENABLE = False` on a base station with no broker credential; the HTTP
+half is unaffected. It does **not** help on a logger whose operating system
+predates `MQTTPublish()` — see *Compiling it*.
+
+**4 · `PROTOCOL`, if your receiver is not an ERT-A2.**
 
 ```crbasic
 Const PROTOCOL = "alert2"      '"alert" for legacy ALERT, "unknown" to not claim
@@ -95,7 +150,7 @@ Const PROTOCOL = "alert2"      '"alert" for legacy ALERT, "unknown" to not claim
 
 ---
 
-## Before it can post: two settings outside the program
+## Before it can post: two HTTP settings outside the program
 
 Both are one-time, both are in Device Configuration Utility, and **neither is
 visible from inside CRBasic** — a program that is otherwise perfect will fail
@@ -115,6 +170,91 @@ itself is not supported at all on OS 3 or earlier.
 If a post still fails after both, turn on **IP Trace Code** in the Settings
 Editor tab — `IPTrace()` writes nothing until that setting is enabled, and TLS
 negotiation failures are exactly what it is for.
+
+---
+
+## Before it can publish: the MQTT settings
+
+**The broker connection is not in the program.** There is no CRBasic instruction
+that opens it: the operating system holds the session, and everything about it —
+address, port, TLS, credentials, session type, and the Last Will — is a block of
+settings in Device Configuration Utility → **Settings Editor** → *MQTT*. The
+program only chooses topics and decides when to publish.
+
+That split is worth knowing before you debug anything: a wrong topic is the
+program's fault and visible in `MqttTopic`, and **everything else is a setting**.
+`MqttState` saying `broker refused or unreachable` with a plausible `MqttTopic`
+is almost always this page, not the program.
+
+Get the credentials from [`docs/mqtt-provisioning.md`](../docs/mqtt-provisioning.md)
+first — it walks through the broker signup, the two credentials and the ACL. A
+station's credential is `station-<publisher>` with **Publish** permission on
+`meganet/v1/<publisher>/#`; for this base station that is `station-18_bateson`
+and `meganet/v1/18_bateson/#`.
+
+**TLS first.** MQTT on 8883 is a TLS client connection, and the CR300 manual
+lists `MQTTConnect()` and the publish instructions among the TLS client
+applications (§7.1.6, printed p. 92). So **Max TLS Server Connections** has to be
+non-zero — the same counter-intuitively named setting the HTTP section above
+already asks for, and if you set it there you have already done this.
+
+> **Where these setting names come from, since the manual does not have them.**
+> `archive/cr300.pdf` is the CR300 product manual and it does **not** document
+> the MQTT settings: §16.3 points at *"MQTT settings (p. 1)"*, which is a broken
+> cross-reference to a section the PDF does not contain, and none of its 323
+> pages mentions a broker, client id, clean session, base topic, or a will. The
+> names below are Campbell's published MQTT settings documentation. **Expect the
+> labels in your Device Configuration Utility to differ slightly by OS version;
+> what each one is for is what matters.**
+
+| Setting | What to put in it |
+| --- | --- |
+| **MQTT Enable** | On. Off by default. |
+| **Broker / endpoint URL** | Your cluster host, e.g. `<something>.s1.eu.hivemq.cloud`. |
+| **Port** | `8883` — MQTT over TLS. Not 8884, which is the WebSocket port a browser uses and a logger cannot. |
+| **Client ID** | Unique across the whole network. `18_bateson-base` does. **Two clients sharing one id knock each other off the broker in a loop**, which on a cellular link is an expensive way to send nothing. |
+| **Username / Password** | The station's credential, not the bridge's. The bridge's can read everything and must never be on a pole. |
+| **Clean Session** | Off (a persistent session), so messages queued for this station survive a reconnect. |
+| **Keep Alive** | The default is fine. It is how quickly the broker notices a dead connection, and therefore how quickly the Last Will fires. |
+| **Base Topic** | **Unused — leave it.** `MQTTPublish()` takes a whole topic and does not inherit it. |
+| **Automatic publishing / publish tables** | **Off.** It emits CSIJSON on the base topic, which is neither the scheme nor the payload the bridge accepts — every message it sends is one the bridge logs as unparseable and counts as rejected. |
+
+### The Last Will, which is most of the point
+
+Four more settings, and they are the ones worth checking twice, because
+**getting them wrong costs nothing visible until the day the station dies** —
+which is the day they exist for.
+
+| Setting | What to put in it | Default |
+| --- | --- | --- |
+| **Last Will Topic** | `meganet/v1/18_bateson/status` — exactly what `MqttStatusTopic` shows in the Public table | empty |
+| **Last Will Message** | `{"online": false}` | empty |
+| **Last Will QoS** | `1` | `0` |
+| **Last Will Retained** | **Retain** | *Do Not Retain* |
+
+The broker publishes that message *on this station's behalf* when the connection
+drops without a clean disconnect — the one event a station cannot report itself.
+The program publishes the other half, `{"online": true, …}`, retained, at
+startup, every fifteen minutes, and immediately after any failure.
+
+**Both of the defaults are wrong for us, and quietly.** A will at QoS 0 can be
+lost on the hop that matters; a will left *Do Not Retain* is discarded the moment
+the bridge reconnects, so a bridge restart silently resurrects every dead
+station. Retained is what makes the broker replay the picture to a bridge that
+has just come back.
+
+To prove it works, do the thing that feels wrong: **pull the power, or kill the
+link, without stopping the program.** A clean shutdown sends a DISCONNECT and no
+will. Then:
+
+```sql
+select station_key, online, since, round(minutes_since_seen) as quiet_for
+  from meganet.station_health where station_key = '18_bateson';
+```
+
+`online` should go `false` within a keep-alive or two. This is the single thing
+most worth testing before a station goes in the field, and the only one that
+cannot be tested by watching it work.
 
 ---
 
@@ -174,16 +314,37 @@ Then read the Public table, in this order:
 | `RxLastJson` | `{"alert_id":6270,…}` — what will be posted |
 | `RxStep` | `7 queued` |
 | `QDepth` | `1` — it is queued |
+| `QDepthHttp` / `QDepthMqtt` | `1` and `1` — both paths owe it |
 | `PostState` | `posting`, then `accepted` |
 | `Accepted` | `1` |
-| `QDepth` | back to `0` |
+| `MqttState` | `publishing`, then `published` |
+| `MqttPublished` | `1` |
+| `QDepth` | back to `0` — **only once both have sent it** |
 
 Then find it in MegaNet: the **Message Log** tab, filtered to your `path`. A
 reading that got as far as `Accepted` is in the database.
 
 Type the same line again and `Duplicates` goes to `1` while `Accepted` stays at
-`1` — that is the endpoint's idempotency, and it is what makes the retry
-behaviour below safe rather than merely optimistic.
+`1` — that is the endpoint's idempotency, and it is what makes both the retry
+behaviour below and the whole dual-path arrangement safe rather than merely
+optimistic.
+
+**Which path won the race is visible, and either answer is correct:**
+
+```sql
+select addr, reading_ts, value_raw, source, received_at
+  from meganet.reading order by received_at desc limit 5;
+```
+
+`source` is `http` or `mqtt` depending on which copy landed first; the other was
+counted as a duplicate and discarded. If you only ever see one of the two over
+many readings, the other path is not working — check `PostState` and `MqttState`
+against each other, and the two queue depths, which is the fastest read on the
+table for *which half is broken*.
+
+The two depths are also how you test each path in isolation without touching the
+program: pull the credential for one and watch its depth climb while the other
+keeps sawtoothing.
 
 ---
 
@@ -364,11 +525,23 @@ And the counters that say how it went:
 
 ### Is the queue draining
 
+One ring buffer, two readers, and a slot is only reused once **both** have
+passed it.
+
 | Variable | Means |
 | --- | --- |
-| `QDepth` | Readings waiting to post. Sawtooth is healthy; a rising line is not. |
+| `QDepthHttp` | Readings waiting to POST. Sawtooth is healthy; a rising line is not. |
+| `QDepthMqtt` | Readings waiting to publish. Same reading. |
+| `QDepth` | The greater of the two — what the buffer is actually still holding, and therefore the only one of the three to read `QPeak` and `Q_SIZE` against. |
 | `QPeak` | The deepest it has been. Sets how much outage the current `Q_SIZE` actually buys. |
-| `QDropped` | Readings lost because the queue filled. **Non-zero means the link has been down longer than the buffer holds** — raise `Q_SIZE` or fix the link. |
+| `QDropped` | Readings lost because the queue filled. **Non-zero means a link has been down longer than the buffer holds** — raise `Q_SIZE` or fix the link. |
+
+**The pair diverging is the diagnostic.** `QDepthHttp` at 0 and `QDepthMqtt`
+climbing says the broker is the problem and the readings are safe; the reverse
+says the endpoint is. Neither can pin the other: the two positions are
+independent, so a path that is down does not stop the other from draining, and
+a reading dropped from a stalled path was already delivered by the healthy one
+if the healthy one had reached it.
 
 ### Did the last POST work
 
@@ -387,11 +560,45 @@ And the counters that say how it went:
 | `SecsSincePost` | Seconds since the last **accepted** post, not since the last attempt. |
 | `ConsecFail` / `Backoff` | Consecutive failures, and how long until the next try. |
 
+### Did the last PUBLISH work
+
+The same questions asked of the other path, deliberately in the same order and
+the same words so the two blocks can be read side by side.
+
+| Variable | Means |
+| --- | --- |
+| `MqttState` | Plain English. `idle - nothing to send`, `publishing`, `published`, `broker refused or unreachable - code <n>`, `clock not set`, `disabled - see MQTT_ENABLE`. |
+| `MqttTopic` | The reading topic this station publishes on, built from `MQTT_STATION` and `MQTT_DEVICE`. **Check this against the broker's ACL line at commissioning** — it is the whole of the topic check. |
+| `MqttStatusTopic` | The status topic, which is also what the **Last Will Topic** setting has to be set to. |
+| `MqttResult` | `MQTTPublish()`'s own return: `0` is success, anything else is its error code. Non-zero with a plausible `MqttTopic` is almost always the broker connection — the MQTT settings, not the program. |
+| `MqttOK` / `MqttFail` / `MqttAttempts` | Messages accepted, refused, and tried. |
+| `MqttPublished` | Readings handed to the broker, cumulative. **Not readings stored** — see below. |
+| `MqttLastBatch` | How many were in the last published message. |
+| `MqttLastPayload` | The first 200 characters of it, verbatim. |
+| `SecsSinceMqtt` | Seconds since the last **successful** publish. |
+| `SecsSinceTry` | Seconds since the last **attempt** of any kind. The two diverging is a broker being knocked on and not answering. |
+| `MqttConsecFail` / `MqttBackoff` | Consecutive failures, and how long until the next try. Doubles from 30 s to 15 min. |
+| `SecsSinceStatus` / `MqttStatusBody` / `MqttStatusResult` | The retained status message: how long since it went out, what it said, and how that went. |
+
+**There is no accepted / duplicates / rejected row here, and that absence is the
+honest one.** MQTT gives a publisher no response channel at all. The PUBACK
+behind `MqttResult = 0` is from the *broker*, and means the broker has the
+message — not that MegaNet has it. Anything more would be the program inventing
+a confirmation nobody sent it.
+
+Where the readings actually went is answerable, just not from the logger: the
+bridge logs every message it acks, and it deliberately does not ack a storable
+message until the database has stored it, so a bridge or database outage leaves
+messages queued at the broker rather than losing them.
+[`docs/ingest-mqtt.md`](../docs/ingest-mqtt.md) § *Proving it end to end* walks
+through checking it from the database side.
+
 Two tables are logged as well: `Readings` (every reading, whether or not it ever
-posted) and `Diag` (a five-minute heartbeat). `Diag` carries the POST result —
-`LastStatus` and `PostState` — alongside the counters, so *when did it stop
-working* is answered from one table rather than by lining two up against each
-other.
+left the logger) and `Diag` (a five-minute heartbeat). `Diag` carries **both**
+paths' results — `LastStatus` and `PostState`, `MqttResult` and `MqttState` —
+alongside the counters and both queue depths, so *when did it stop working, and
+which half of it* is answered from one table rather than by lining two up
+against each other.
 
 ---
 
@@ -541,20 +748,38 @@ half of the system.
 
 ## What it does when things break
 
-**The link goes down.** Readings queue. The POST retries with a backoff that
+**The link goes down.** Readings queue. Both paths retry with a backoff that
 doubles from 30 seconds to 15 minutes, so a base station does not spend an
-outage hammering a dead endpoint. Nothing leaves the queue until the endpoint
-says it stored it.
+outage hammering a dead endpoint or a dead broker. Nothing leaves the queue
+until it has been delivered.
 
-**A POST times out after the request was sent.** The same batch is sent again
-and the endpoint stores it once — `docs/ingest-http.md` guarantees that same
+**One path goes down and the other does not.** The healthy one carries on
+untouched — that is what the two independent positions in the queue are for.
+Its depth stays a sawtooth while the broken one's climbs, which is the fastest
+read on the table for *which half is broken*. Every reading the healthy path
+delivered is in the database, so a long single-path outage costs the duplicates
+that were never sent and nothing else.
+
+**A POST times out after the request was sent**, or a publish does. The same
+batch is sent again and it is stored once — both contracts guarantee that same
 address + same `reading_ts` + same `value_raw` deduplicates. You will see
 `Duplicates` climb, which is the system working, not a fault. **Do not build an
-acknowledgement protocol on top of this.**
+acknowledgement protocol on top of this**, between the logger and either
+endpoint or between the two paths.
 
 **The queue fills.** The oldest reading is dropped and `QDropped` counts it. For
 flood warning the current river level matters more than the one before it, so
-the newest reading always gets a slot.
+the newest reading always gets a slot. A slot is only reused once **both** paths
+have passed it, so what fills the buffer is the slower of the two — and what is
+dropped from a stalled path has usually already been delivered by the healthy
+one.
+
+**The broker connection drops without a clean disconnect** — power cut, aerial
+off, cellular gone. The broker publishes the Last Will on this station's behalf
+and `meganet.station_health` shows it offline within a keep-alive or two. This
+is the one failure the station cannot report itself, and the reason MQTT is
+here. When it comes back, the program republishes its retained `online: true`
+on the first successful publish rather than waiting for the backlog to drain.
 
 **The RTC loses power.** `ClockOK` goes false and the program stops queueing
 rather than posting a thousand readings stamped 1970 — which the endpoint would
@@ -621,6 +846,9 @@ it goes to site. It is written to make that first compile as boring as possible:
   the same parameters in the same order,
 - `HTTPPost()` is called with its four required parameters and nothing else, so
   there are no empty placeholder commas to argue with,
+- `MQTTPublish()` likewise — `MQTTPublish(topic, payload, qos, retain)`, all
+  four, no optional tail, and its result taken as a return value rather than
+  through a destination parameter,
 - and every number that goes into the JSON goes through `Sprintf` with `%d`,
   because implicit numeric-to-string conversion is free to pad, round, or reach
   for scientific notation, and any of the three inside a JSON literal is a
@@ -633,6 +861,36 @@ saying exactly what to change:
 | --- | --- |
 | `NetworkTimeProtocol` | Delete the whole clock-discipline `SlowSequence` and set the clock from LoggerNet. Nothing else depends on it. |
 | a `Status.` field name | Delete that line and its `Sample()` in the `Diag` table. |
+| `MQTTPublish` — *unknown instruction* | The operating system predates MQTT. **`MQTT_ENABLE = False` does not help — the compiler reads the whole program.** Delete `PublishBatch`, `PublishStatus`, `MqttFailed`, `MqttWorked` and the *path 2* block in the slow sequence; what is left is the HTTP-only program. Then update the OS: MQTT is the reason to. |
+| `MQTTPublish` — *wrong number of arguments* | Check the argument order against **CRBasic Editor's own help for your OS** and fix the two call sites (`PublishBatch`, `PublishStatus`). See the note below. |
+
+> **The one instruction in this file whose signature is not settled, and what
+> the manual does and does not settle about it.** Every other instruction here
+> has been in this program since it was written and has run on the bench.
+> `MQTTPublish()` is new. `archive/cr300.pdf` — the CR300 product manual — was
+> checked against it, page by page, and the result is worth stating precisely:
+>
+> - **It confirms the instruction exists on this hardware.** §13.3 lists
+>   `MQTTPublish()` among the CR300's internet-communications instructions
+>   (printed p. 149), alongside `MQTTConnect()`, `MQTTPublishTable()`,
+>   `MQTTPublishConstTable()` and `MQTTPublishMeta()`. So the program is not
+>   calling something the CR300 does not have.
+> - **It confirms MQTT is a TLS client**, which is the *Max TLS Server
+>   Connections* requirement above (§7.1.6, printed p. 92).
+> - **It does not contain the instruction reference at all.** §13.3 defers to
+>   *"the CRBasic help"* and to Campbell's *Using MQTT with Campbell Scientific
+>   Data Loggers* technical paper, and neither is reachable from the environment
+>   this was written in — the toolchain constraint #157 has named since it was
+>   opened. So the signature used here,
+>   `Result = MQTTPublish(topic, payload, qos, retain)` returning `0` on success,
+>   comes from Campbell's published documentation as indexed rather than from a
+>   page anyone has read.
+>
+> It is one line in each of two subroutines. **Open CRBasic Editor's help on
+> `MQTTPublish`, check the four parameters and their order, and compile before
+> going to site** — which is what this whole section asks you to do anyway. If
+> the order differs, only those two lines change; nothing else in the program
+> depends on it.
 
 **What has been checked, since the compiler has not.** The ALERT2 decode was run
 against the reference line in
@@ -654,6 +912,36 @@ terminator at all is discarded and counted at `RxOverruns` instead of wedging
 the buffer — with the assembly buffer never exceeding `RX_ACCUM` in any of them.
 That is the algorithm, not the CRBasic.
 
+**The MQTT half was checked the same way, and against the bridge itself.** The
+message the program builds was transcribed out of `BuildBatch` and `MakeRec`
+character for character and fed to `bridge/src/messages.js` and
+`bridge/src/topics.js` — the real parsers, not a description of them. They
+accept it: the topic parses as a v1 reading topic for `18_bateson`/`logger`, the
+readings arrive with their `alert_id`, `reading_ts`, numeric `value_raw` and the
+`suspect` flag intact, and the envelope carries `path` and `protocol` and
+nothing else. The HTTP body was checked to still be byte-identical to what it
+was before, with the MQTT message exactly the same object minus the twelve
+characters of `payload` wrapper. The retained status message parses to
+`online = true` with `battery_v` and `fw` surviving into `last_status`, the will
+payload parses to `online = false`, and a battery reading of `NAN` drops the
+field rather than putting the word `NAN` inside a JSON number.
+
+**The two-tail ring buffer was the part most worth proving, so it was.** The
+arithmetic from `QueuePush`, `BuildBatch`, `PostBatch` and `PublishBatch` was
+run over 200,000 randomised steps with both paths failing independently: no path
+ever handed out a slot twice, went backwards, or read a slot the scan had
+overwritten; both tails stayed inside the ring; and with either path stalled for
+400 consecutive readings the other still delivered **all 400** — which is the
+failure a single shared position would have caused, and the reason there are
+two. The publisher's backoff was run against a broker down for an hour with an
+empty queue: 8 attempts rather than 360, doubling 30 s → 15 min, recovering on
+the first attempt after the broker returns, and republishing the retained status
+on the first successful batch rather than after the backlog drains.
+
+Those are simulations of the algorithm in another language, and they are worth
+exactly what that is worth: they cannot tell you the CRBasic compiles, only that
+what it is trying to do is right.
+
 ---
 
 ## What it deliberately does not do
@@ -666,11 +954,39 @@ no bucket size — MegaNet does the conversion where it knows the sensor.
 **It does not decode HFEM.** An HFEM line (`:HS=1|I1=…|NN:`) is a different
 format from a different kind of station, and [`hfem.js`](../hfem.js) is the
 decoder for it — one decoder, so there is never a second opinion about what `T3`
-means. A base station relaying HFEM should publish to the MQTT bridge instead.
+means. A base station relaying HFEM publishes the raw line to the bridge's own
+`…/reading/hfem` topic and lets `hfem.js` decode it there.
 
 **It does not stream a DataTable through `HTTPPost()`'s optional parameters.**
 Those produce TOB1, TOA5, CSIXML or CSIJSON, and `ingest_http()` accepts none of
 them — it wants one JSON object with a `payload` key.
+
+**It does not use `MQTTPublishTable()` or the logger's automatic publishing.**
+Those emit CSIJSON or GeoJSON on the `MQTTBaseTopic`, and the bridge subscribes
+to a topic scheme and a payload contract that is neither. Leave the automatic
+publishing off: everything it would send is a message the bridge acks, logs as
+unparseable and counts as rejected. `MQTTPublish()`, which this program uses,
+takes a whole topic of its own and does not inherit the base topic.
+
+**It does not set the Last Will.** There is no CRBasic instruction for it — the
+will is sent in the CONNECT packet, which the operating system builds from the
+MQTT settings. All the program can do is publish the other half of the pair, and
+say loudly (above, and in the file) that a base station whose will is unset or
+left un-retained has no offline detection at all, which is most of what MQTT was
+added for.
+
+**It does not subscribe to anything.** The station's broker credential is
+*Publish* and not *Publish & Subscribe*, so there is nothing to read. Commands to
+stations would be a second topic branch and an explicit widening of that rule,
+not a quiet one.
+
+**It does not call `MQTTConnect()`.** The operating system opens and holds the
+session on its own once MQTT is enabled in the settings, and reconnects it. That
+instruction exists to *force* an attempt, which is what a program that powers a
+modem down between transmissions needs. This base station is mains-powered and
+listening continuously, so there is nothing to force — a logger that switches its
+modem on the hour wants `PingIP()` and then `MQTTConnect()`, and that is a
+different program rather than a setting on this one.
 
 **It does not enforce which addresses this base may post for.** Neither does the
 endpoint: `alert_low`/`alert_high` on the token record are a note, not a rule

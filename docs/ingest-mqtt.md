@@ -13,6 +13,15 @@ database side is `db/migrations/0008_mqtt_bridge.sql` and `db/README.md`.
 > is the cheapest live-shaped target); prose alone let #99's wrong `curl`
 > survive review.
 
+**A logger that publishes this already exists**: [`logger/`](../logger/README.md)
+is a CRBasic program for the Campbell datalogger at a radio base station, and it
+sends every reading it hears over *both* paths — a POST and a publish. That is
+not hedging: the primary key eats the second copy, so the duplicates are free,
+and what the second path buys is the section on being alive below. Its
+`README.md` is the commissioning guide, including the Device Configuration
+Utility settings that hold the broker connection and the Last Will, none of
+which CRBasic can see.
+
 If your device speaks plain HTTP, use [`ingest-http.md`](ingest-http.md) instead
 — it needs no broker and no bridge, and it posts the same reading object to the
 same contract. If it speaks **HFEM** — the BoM field-event line format — that is
@@ -68,7 +77,10 @@ card, in the Bureau's systems and on the paperwork the site already generates.
 
 **Sites with no bureau number publish under their station id.** Repeaters,
 radars, base stations and the test rig have no bureau number and never will — 18
-of 3,174 stations, and not one of them a gauging station. This is still one rule
+of 3,174 stations, and not one of them a gauging station. The base station in
+[`logger/`](../logger/README.md) is one of them: it publishes as `18_bateson`,
+which is its `stations.json` id, because an ingest point is not a gauging
+station and never acquires a number. This is still one rule
 rather than two identifiers: a site has a bureau number or it has not, and
 `meganet.resolve_publisher()` (`0020`) resolves either without a mapping table.
 The two namespaces are disjoint on the live registry — no station id is purely

@@ -139,9 +139,9 @@ MegaNet/
 │   ├── deploy/                             (mosquitto.conf + ACL examples for the self-hosted case)
 │   └── tools/publish-sample.js             (a test client, for proving the path from a laptop)
 │
-├── logger/                 ← the base station's side of HTTP ingest (CRBasic; no process to run)
+├── logger/                 ← the base station's side of ingest, over BOTH paths (CRBasic)
 │   ├── README.md                           (loading it, commissioning it, what its diagnostics mean)
-│   ├── base-station-http.CR300             (ERT-A2 ALERT2 ASCII off RS-232 → ingest_http(), with store-and-forward)
+│   ├── base-station-http.CR300             (ERT-A2 ALERT2 ASCII off RS-232 → ingest_http() AND the MQTT bridge, with store-and-forward)
 │   └── meganet_token.example.txt           (the token file's shape — the secret is never in the program)
 │
 ├── data/                   ← source + bundled data files
@@ -430,11 +430,17 @@ is the database side.
 **A base station that speaks this already exists**: [`logger/`](logger/README.md)
 holds a CRBasic program for the datalogger at the base — it reads the ALERT2
 ASCII the ERT-A2 puts on its RS-232 port (the same lines the ALERT2 / ERT-A2 tab
-decodes), queues what it hears, and posts it. It is the one inbound path that
+decodes), queues what it hears, and posts it. This is the one inbound path that
 needs **no process running anywhere**: the logger is already at the site, and
 the endpoint's idempotent retry means a dropped link costs a duplicate rather
 than a reading. The token lives in a file on the logger rather than in the
 program, so the program itself is in this repository with nothing redacted.
+
+**That same program also publishes over MQTT**, to the topic scheme below, and
+it does both for every reading rather than choosing. The primary key stores the
+second copy zero times and counts it as a duplicate, so the belt and the braces
+cost only the duplicates — and what the second path buys is knowing when the
+base station itself stops talking, which no amount of HTTP can tell you.
 
 ### Posting readings over MQTT, and knowing which stations went quiet
 

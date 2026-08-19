@@ -1,30 +1,52 @@
 'MegaNet -- base-station-http.CR300
 '
-'   A radio base station's half of MegaNet's HTTP ingest: read what the ALERT2
-'   receiver hears off RS-232, and POST it to meganet.ingest_http().
+'   A radio base station's half of MegaNet's ingest: read what the ALERT2
+'   receiver hears off RS-232, and send it to MegaNet over BOTH inbound paths --
+'   POST to meganet.ingest_http(), and publish to the MQTT bridge.
 '
 ' Target: CR300-series. "Other dataloggers" at the foot says what to change for
-' a CR1000X or a CR6. docs/ingest-http.md is the contract this program has to
-' satisfy; logger/README.md is the commissioning guide, including the two Device
-' Configuration Utility settings that have to be right before any of this can
-' post at all.
+' a CR1000X or a CR6. docs/ingest-http.md and docs/ingest-mqtt.md are the two
+' contracts this program has to satisfy; logger/README.md is the commissioning
+' guide, including the Device Configuration Utility settings that have to be
+' right before either half of this can deliver anything at all.
 '
 ' --- What this is -----------------------------------------------------------
 '
-' bridge/ is MQTT -> MegaNet, and it exists because Postgres cannot subscribe to
-' MQTT so something has to hold the subscription. This is the other inbound path
-' and it needs no process anywhere: the datalogger is already at the site.
+' MegaNet has two inbound paths and they converge on one contract. HTTP needs no
+' process anywhere: the datalogger posts straight at the database. MQTT needs a
+' broker and bridge/ -- a subscriber that holds the subscription Postgres cannot
+' hold -- and pays for them with what it gives back: the broker's Last Will says
+' when this base station stopped talking, which no amount of HTTP tells anybody.
+'
+' This program does both, for the same readings, from one queue:
 '
 '   field stations --radio--> ERT-A2 receiver --RS-232--> THIS PROGRAM
 '                                                            |
-'                                                          HTTPS
-'                                                            v
-'                                                 meganet.ingest_http()
+'                                          +-----------------+-----------------+
+'                                          |                                   |
+'                                        HTTPS                         MQTT (QoS 1)
+'                                          |                                   |
+'                                          v                                   v
+'                               meganet.ingest_http()                       broker
+'                                          |                                   |
+'                                          |                                bridge/
+'                                          |                                   |
+'                                          +-----------------+-----------------+
 '                                                            |
 '                                                    meganet.ingest()
 '
-' One token, one base station, every station it can hear -- docs/ingest-http.md
-' explains why the token belongs to the ingest point rather than to a site.
+' **Sending the same reading twice is not a mistake, it is the design.**
+' meganet.reading's primary key is (address, instant, value), so the second copy
+' of a reading is stored zero times and counted as a duplicate -- both contracts
+' say so in as many words, which is what makes a belt-and-braces base station
+' possible without an acknowledgement protocol between the two paths. Whichever
+' copy lands first sets the row's `source` ("http" or "mqtt"); the other is
+' counted and discarded. A path being down costs nothing but its own duplicates.
+'
+' One token and one broker credential, one base station, every station it can
+' hear -- docs/ingest-http.md explains why the token belongs to the ingest point
+' rather than to a site, and the same reasoning gives this base station one
+' publisher identity of its own on the topic scheme.
 '
 ' --- How the serial port is read, and why it changed ------------------------
 '
@@ -60,11 +82,19 @@
 '    until the server answers and a base station that stops reading its serial
 '    port for a minute has lost every transmission in that window.
 '
-' 2. It never throws a reading away because the link was down. Parsed readings
-'    go into a ring buffer and stay there until the endpoint says "accepted".
-'    A failed POST is retried with backoff and the same batch is sent again --
-'    docs/ingest-http.md guarantees that re-posting the same reading stores it
-'    once, so there is no acknowledgement protocol to build here.
+' 2. It never throws a reading away because a link was down. Parsed readings go
+'    into a ring buffer and stay there until they have been delivered. A failed
+'    attempt is retried with backoff and the same batch is sent again -- both
+'    contracts guarantee that re-sending the same reading stores it once, so
+'    there is no acknowledgement protocol to build here.
+'
+'    The buffer has TWO readers, one per path, each with its own position in it,
+'    its own backoff and its own idea of what it has delivered. A slot is only
+'    reused once BOTH have passed it. That is what stops a broker outage from
+'    stalling the POSTs, an HTTP outage from stalling the publishes, and -- the
+'    failure a single shared position would have caused -- a stuck path from
+'    pinning the other one to the same twenty-five readings while newer ones
+'    pile up behind it and fall off the end unsent.
 '
 ' 3. It does not trust a clock it cannot check. The endpoint rejects anything
 '    stamped before 1990, and the usual cause is an RTC that lost power. This
@@ -148,7 +178,7 @@ Const RX_MAX = 250                 'longest text line this program will assemble
 ' what you can read on screen.
 Const DUMP_MAX = 128
 
-' --- posting -----------------------------------------------------------------
+' --- posting over HTTP -------------------------------------------------------
 
 ' How often to try a POST, and how many readings may go in one. The endpoint's
 ' own limit is 1000 per batch, which is not the binding one here: a reading is
@@ -162,6 +192,89 @@ Const MAX_BATCH = 25               'readings per POST
 ' Retry backoff after a failed POST: doubles from BACKOFF_MIN up to BACKOFF_MAX.
 Const BACKOFF_MIN = 30             'seconds
 Const BACKOFF_MAX = 900            'seconds -- 15 minutes
+
+' --- publishing over MQTT ----------------------------------------------------
+'
+' The second path. docs/ingest-mqtt.md is the contract; the broker connection
+' itself is NOT configured here -- it is a block of Device Configuration Utility
+' settings (broker URL, port, TLS, client id, username, password, clean session,
+' keep alive, and the Last Will) that CRBasic can neither read nor set.
+' logger/README.md lists every one of them and what to put in it. This section
+' is only the part that belongs to the program: which topics, how often, and how
+' hard to retry.
+'
+' Set MQTT_ENABLE False on a base station that has no broker credential, or on a
+' logger whose operating system predates MQTTPublish() -- on that logger the
+' program will not compile at all and the MQTT subroutines have to be deleted,
+' which is the one change this flag cannot make for you.
+Const MQTT_ENABLE = True
+
+' WHO THIS BASE STATION IS ON THE WIRE. The <station> topic segment: the BUREAU
+' STATION NUMBER, exactly as meganet.station.station_number holds it -- `541155`,
+' not `0541155`. Sites that have no bureau number publish under their station id
+' instead, which is one rule rather than two identifiers, and a base station
+' never has a bureau number: it is an ingest point, not a gauging station.
+'
+' "18 Bateson" is stations.json id `18_bateson`, station_number "". So the id is
+' what goes here, and it is what the broker ACL for this credential spells --
+' change BOTH together or the broker refuses the publish, which is the loud
+' failure the scheme is built to produce (docs/ingest-mqtt.md, 0020).
+'
+' Letters, digits, dot, dash and underscore only, starting with a letter or a
+' digit, up to 64 characters. bridge/src/topics.js is the same rule in code.
+Const MQTT_STATION = "18_bateson"
+
+' WHICH BOX AT THE SITE IS TALKING. `logger` for the usual case of one. It says
+' who published, not what was measured -- the readings carry their own
+' addresses, which is what MegaNet stores against.
+Const MQTT_DEVICE = "logger"
+
+' QoS 1, not 2. At-least-once means duplicates are guaranteed, and the primary
+' key already eats them; exactly-once costs two extra round trips per message
+' over a marginal link and buys nothing. QoS 2 is not supported by the
+' instruction in any case.
+'
+' MQTTPublish() BLOCKS at QoS 1 -- it waits for the broker's PUBACK or a timeout
+' -- which is why it lives in the same SlowSequence as HTTPPost and not in the
+' scan that reads the serial port.
+Const MQTT_QOS = 1
+
+' Retain flags, written as the numbers the instruction takes rather than as True
+' and False: CRBasic's True is -1, and -1 in a retain parameter is not something
+' to find out about from a broker.
+Const MQTT_KEEP = 1                'retained -- the status topic
+Const MQTT_DROP = 0                'not retained -- readings
+
+' How often to publish, and the retry backoff, with the same shape and the same
+' defaults as the POST above. They are separate constants rather than shared
+' ones because the two paths fail independently and at different rates: a
+' cellular link that is too poor for a 2 KB POST body will often still carry a
+' publish, and tuning one should not move the other.
+Const MQTT_EVERY = 30              'seconds between publish attempts
+Const MQTT_BACKOFF_MIN = 30        'seconds
+Const MQTT_BACKOFF_MAX = 900       'seconds -- 15 minutes
+
+' How often to re-publish the retained status message.
+'
+' This is the half of MQTT that is arguably worth more than the readings.
+' "Which sites stopped talking overnight" is the morning question, and the
+' broker answers it with the Last Will -- set in Device Configuration Utility,
+' published by the BROKER on this station's behalf when the connection drops
+' without a clean disconnect, which is exactly the case a station cannot report
+' itself. All this program has to do is publish the other half: a retained
+' {"online": true, ...} saying it is here.
+'
+' Re-published on a timer rather than only at startup because a logger that
+' reconnects after an outage has to overwrite the will the broker published for
+' it, and there is no connect event in CRBasic to hang that on. Fifteen minutes
+' is one small retained message an hour and a bit -- cheap on any link that can
+' carry readings at all.
+Const MQTT_STATUS_EVERY = 900      'seconds
+
+' Reported in the status message, so "which loggers are still on the old
+' program" is answerable from the database rather than from a site visit. Bump
+' it when you change this file in a way a field technician would care about.
+Const FW_VERSION = "2.0"
 
 ' Clock discipline. NTPOffset is seconds of offset from UTC, so 0 means the
 ' logger's clock runs in UTC -- which is what lets the timestamps below end in
@@ -556,12 +669,24 @@ Public CaptureState As String * 60 'plain English: capturing, full, stopped, or
                                    'the reason it cannot write
 
 '--- is the queue draining ----------------------------------------------------
-Public QDepth                      'readings waiting to be posted
+'
+' One ring buffer, two readers. QDepthHttp and QDepthMqtt are how far behind
+' each path is; QDepth is the greater of the two, which is what the buffer
+' actually still has to hold and therefore the only one of the three that
+' QDropped can be reasoned about from.
+'
+' The pair being far apart is the diagnostic: it says one path is down and which
+' one, at a glance, before anything else is read.
+Public QDepth                      'readings the buffer is still holding for at
+                                   'least one of the two paths
+Public QDepthHttp                  'readings waiting to be POSTed
+Public QDepthMqtt                  'readings waiting to be published
 Public QPeak                       'the deepest it has ever been, which is what
                                    'says how much outage Q_SIZE actually buys
 Public QDropped                    'readings lost to a full queue. Non-zero means
-                                   'the link has been down longer than the buffer
-                                   'holds
+                                   'a link has been down longer than the buffer
+                                   'holds -- and, with the two depths above, says
+                                   'which link that was
 
 '--- did the last POST work ---------------------------------------------------
 Public PostState As String * 40    'plain English: what the poster is doing, or
@@ -597,32 +722,103 @@ Public SentHeader As String * 200  'the request headers as built, TOKEN REDACTED
 Public RespHeader As String * 300  'what came back in their place -- see PostBatch
 Public LastPayload As String * 200 'the first 200 characters of the last body sent
 
+'--- did the last PUBLISH work ------------------------------------------------
+'
+' The same questions as the POST block above, asked of the other path, and
+' deliberately in the same order and the same words so the two can be read side
+' by side. What is missing is the row of accepted/duplicates/rejected counters,
+' and that absence is the honest one: MQTT gives a publisher no response channel
+' at all. The PUBACK behind MqttResult = 0 is from the BROKER, and means the
+' broker has the message -- not that MegaNet has it. Anything more would be this
+' program inventing a confirmation nobody sent it.
+'
+' Where the readings went is answerable, just not from here: the bridge logs
+' every message it acks, and meganet.station_health carries what the status
+' topic said. docs/ingest-mqtt.md walks through proving it end to end.
+Public MqttState As String * 40    'plain English: what the publisher is doing,
+                                   'or why it is not
+Public MqttTopic As String * 100   'the reading topic this station publishes on,
+                                   'built at startup. Read it once at
+                                   'commissioning and check it against the ACL
+Public MqttStatusTopic As String * 100 'and the status topic, which is also the
+                                   'one the Last Will has to be set to
+Public MqttAttempts
+Public MqttOK
+Public MqttFail
+Public MqttConsecFail              'consecutive failures -- resets on success
+Public MqttBackoff                 'seconds until the next attempt, when failing
+Public SecsSinceMqtt               'seconds since the last SUCCESSFUL publish,
+                                   'not since the last attempt
+Public SecsSinceTry                'and seconds since the last ATTEMPT of any
+                                   'kind, which is the one the backoff is
+                                   'measured against. The pair diverging is a
+                                   'broker being knocked on and not answering
+Public MqttPublished               'readings handed to the broker, cumulative.
+                                   'NOT readings stored -- see the note above
+Public MqttLastBatch               'how many were in the last published message
+Public MqttResult As Long          'MQTTPublish's own return: 0 is success and
+                                   'anything else is the instruction's error
+                                   'code. Non-zero with a plausible topic is
+                                   'almost always the broker connection -- the
+                                   'MQTT settings, not this program
+Public MqttStatusResult As Long    'the same, for the retained status message
+Public SecsSinceStatus             'seconds since the status message was last
+                                   'published. It is retained, so the broker
+                                   'holds it between these
+Public MqttStatusBody As String * 100 'what was last published to the status
+                                   'topic, verbatim
+Public MqttLastPayload As String * 200 'the first 200 characters of the last
+                                   'reading message published
+
 
 '==============================================================================
 ' 3. WORKING VARIABLES
 '==============================================================================
 
-' The unsent-readings ring buffer. QHead is the next slot to write, QTail the
-' next to send; empty when they are equal, so capacity is Q_SIZE - 1.
+' The unsent-readings ring buffer. QHead is the next slot to write; each path
+' has its own next-to-send. A path is caught up when its tail equals QHead, so
+' capacity is Q_SIZE - 1 for whichever path is furthest behind.
+'
+' ONE buffer and two tails rather than two buffers, because the readings are the
+' same readings: a CR300 has no memory to hold a second copy of them, and two
+' copies would be two things that could disagree about what was heard.
 '
 ' No semaphore guards it, and that is deliberate rather than an omission. The
-' main scan only ever writes QHead and the poster only ever writes QTail, so
-' neither can see the other half-updated -- which is the whole property a
-' single-producer, single-consumer ring buffer is chosen for.
+' main scan owns QHead; the poster sequence owns both tails, and it is a single
+' sequence rather than one per path precisely so that stays true -- the two
+' halves of it run one after the other and never interleave, so neither tail nor
+' the scratch they share can be seen half-updated.
+'
+' The one crossing is on overflow: QueuePush, in the main scan, drops the oldest
+' reading and has to move the tail sitting on it. That was true of the single
+' tail before it was true of two, and the comment here used to claim otherwise.
+' The window is one instruction wide and needs the buffer to fill in the same
+' moment a send completes; what it costs when it is lost is one reading sent
+' twice or one dropped a scan early, and a reading sent twice is free by
+' contract. A semaphore against that would cost every scan.
 Dim qAddr(Q_SIZE) As Long
 Dim qVal(Q_SIZE) As Long
 Dim qStamp(Q_SIZE) As String * 24
 Dim qSus(Q_SIZE) As Boolean
 Dim QHead As Long
-Dim QTail As Long
+Dim QTailHttp As Long              'the next slot to POST
+Dim QTailMqtt As Long              'the next slot to publish
+Dim qLag As Long                   'scratch, for the depth arithmetic in the scan
 
 ' Dim, not Public, on purpose: a Public token is readable by anyone who can
 ' reach the logger, which is the whole thing the token file was for.
 Dim IngestToken As String * 80
 
+' One body buffer, shared by both paths. They are built in the same sequence,
+' one after the other, and each is handed to its instruction before the next is
+' built -- so a second CONTENT_SIZE buffer would be 3 KB of a CR300's memory
+' spent holding a string nothing is reading.
 Dim ContentsString As String * CONTENT_SIZE
 Dim HTTPHeader As String * 300
 Dim BatchN As Long                 'readings in the batch currently in flight
+Dim bWrap As Boolean               'BuildBatch's two inputs, set by the caller
+Dim bFrom As Long                  'immediately before the call: which envelope
+                                   'to build, and which tail to build it from
 Dim CRLF As String * 2
 Dim DQ As String * 1               'a double quote. CHR(34) is the portable way
                                    'to get one into a CRBasic string
@@ -677,8 +873,9 @@ Dim rTime(9) As Long               '1 yr, 2 mo, 3 day, 4 hr, 5 min, 6 sec,
 ' after them. So a tilde stands for a double quote below and the comments carry
 ' no quote characters of their own. Every line here begins with an apostrophe,
 ' which is the rule for every comment in this file.
-Dim jEnvelope As String * 200      '{~payload~:{~path~:~..~,~protocol~:~..~,~readings~:[
-Dim jTail As String * 8            ']}}
+Dim jEnvelope As String * 200      '~path~:~..~,~protocol~:~..~,~readings~:[
+Dim jTail As String * 8            ']}} -- closes the HTTP payload wrapper too
+Dim jTailBare As String * 8        ']} -- the MQTT one, which has no wrapper
 Dim fId As String * 16             '{~alert_id~:
 Dim fTs As String * 20             ',~reading_ts~:~
 Dim fVal As String * 20            '~,~value_raw~:
@@ -761,6 +958,15 @@ Dim i As Long                      'ParseAlert2, and nothing else: the scan that
                                    'calls it must not use i for its own counter
 Dim bi As Long                     'BuildBatch
 Dim postDue As Boolean
+Dim mqttWait As Long               'seconds the broker is to be left alone for
+Dim mqttSent As Boolean            'this tick's publish actually went out
+Dim mNum As String * 16            'the publisher's number scratch. A third one,
+                                   'for the same reason pNum is a second: it is
+                                   'written while ContentsString is being handed
+                                   'to an instruction, and sharing it with the
+                                   'poster is a status message eventually built
+                                   'out of half a reading
+Dim statusDue As Boolean
 
 
 '==============================================================================
@@ -877,10 +1083,12 @@ DataTable (LineLog,True,2000)
 EndTable
 
 ' The heartbeat. Five minutes is frequent enough to see a link flapping and slow
-' enough to keep months on a CR300. It carries the POST result as well as the
-' counters, which is what answers "when did it stop working" -- there is no
-' separate per-attempt log table, on purpose: one table read in one place beats
-' two that have to be lined up against each other.
+' enough to keep months on a CR300. It carries BOTH paths' results as well as the
+' counters, which is what answers "when did it stop working, and which half of
+' it" -- there is no separate per-attempt log table and no second table for the
+' publisher, on purpose: one table read in one place beats two that have to be
+' lined up against each other, and lining the two paths up against each other is
+' the entire question this table now exists to answer.
 '
 ' Counters are Long, not FP2: FP2 carries four significant digits and cannot
 ' hold an integer above 7999 exactly, so a POST counter stored as FP2 starts
@@ -901,6 +1109,8 @@ DataTable (Diag,True,-1)
   Sample (1,RxBadFrames,Long)
   Sample (1,SecsSinceRx,Long)
   Sample (1,QDepth,Long)
+  Sample (1,QDepthHttp,Long)
+  Sample (1,QDepthMqtt,Long)
   Sample (1,QPeak,Long)
   Sample (1,QDropped,Long)
   Sample (1,Accepted,Long)
@@ -909,7 +1119,12 @@ DataTable (Diag,True,-1)
   Sample (1,PostOK,Long)
   Sample (1,PostFail,Long)
   Sample (1,LastStatus,Long)
+  Sample (1,MqttOK,Long)
+  Sample (1,MqttFail,Long)
+  Sample (1,MqttPublished,Long)
+  Sample (1,MqttResult,Long)
   Sample (1,PostState,String)
+  Sample (1,MqttState,String)
   Sample (1,ClockState,String)
   Sample (1,LastReject,String)
 EndTable
@@ -1379,17 +1594,32 @@ EndSub
 ' QueuePush -- one reading into the ring buffer. Address in RxLastId, value in
 ' RxLastValue, suspect flag in `suspect`.
 '
-' Called from the main scan, which is the only writer of QHead. The poster in
-' the SlowSequence is the only writer of QTail. See the note at the declaration.
+' Called from the main scan, which is the only writer of QHead. The poster
+' sequence advances both tails as it delivers; this is the one place outside it
+' that touches them, and only when the buffer is full. See the note at the
+' declaration for why that crossing is left unguarded.
 '------------------------------------------------------------------------------
 Sub QueuePush()
   qn = QHead + 1
   If qn > Q_SIZE Then qn = 1
-  If qn = QTail Then
-    'Full. Drop the oldest rather than refuse the newest -- at a flood warning
-    'base the current river level is the reading that matters.
-    QTail = QTail + 1
-    If QTail > Q_SIZE Then QTail = 1
+  If qn = QTailHttp OR qn = QTailMqtt Then
+    'Full for whichever path is furthest behind. Drop the oldest rather than
+    'refuse the newest -- at a flood warning base the current river level is the
+    'reading that matters.
+    '
+    'Every tail sitting on the dropped slot moves, and only those: if HTTP has
+    'already sent this reading and MQTT has not, HTTP's tail is somewhere ahead
+    'and has no business moving. A tail left pointing at a slot the scan has
+    'just overwritten is the one bug this arrangement can produce, and it is a
+    'silent one -- that path would wake up and send a reading nobody heard.
+    If qn = QTailHttp Then
+      QTailHttp = QTailHttp + 1
+      If QTailHttp > Q_SIZE Then QTailHttp = 1
+    EndIf
+    If qn = QTailMqtt Then
+      QTailMqtt = QTailMqtt + 1
+      If QTailMqtt > Q_SIZE Then QTailMqtt = 1
+    EndIf
     QDropped = QDropped + 1
   EndIf
   qAddr(QHead) = RxLastId
@@ -2123,14 +2353,33 @@ EndSub
 ' BuildBatch -- up to MAX_BATCH readings out of the ring buffer and into
 ' ContentsString, without removing them. BatchN says how many went in.
 '
-' Nothing leaves the queue here. The readings are only released once the
-' endpoint has said it stored them, which is what makes a failed POST cost
-' nothing and a timeout cost one duplicate at worst.
+' Two callers, one body, one difference between them, and it is the wrapper:
+'
+'   HTTP  {"payload":{"path":..,"protocol":..,"readings":[..]}}
+'   MQTT            {"path":..,"protocol":..,"readings":[..]}
+'
+' PostgREST maps an RPC body's top-level keys to the function's arguments, so
+' ingest_http() -- whose one argument is called `payload` -- has to be handed an
+' object with a `payload` key. The bridge calls that same function itself and
+' builds the wrapper on this station's behalf, so a message that arrived
+' carrying one would be a payload nested inside a payload. Hence bWrap, set by
+' the caller: the same readings, addressed to the two things that receive them.
+'
+' bFrom is the tail to start from, because the two paths are at different points
+' in the buffer whenever one of them is behind.
+'
+' Nothing leaves the queue here. Readings are only released once the path in
+' question has confirmed them -- the endpoint saying it stored them, or the
+' broker returning a PUBACK -- which is what makes a failed attempt cost nothing
+' and a timeout cost one duplicate at worst.
 '
 ' The length guard is what actually bounds the body -- MAX_BATCH is the second
 ' line of defence. Overflow behaviour on a CRBasic string is not something to
 ' rely on either way, and a truncated JSON body is a 400 for the whole batch, so
-' the check happens before the append rather than after it.
+' the check happens before the append rather than after it. The guard is the
+' same for both paths: the MQTT message is two characters shorter than the POST
+' body and the broker's own ceiling is 256 KiB, so this buffer is the only bound
+' that ever binds.
 '------------------------------------------------------------------------------
 Sub BuildBatch()
   'The envelope, rebuilt here rather than once in BeginProg, because BASE_NAME
@@ -2150,14 +2399,18 @@ Sub BuildBatch()
     EndIf
   Next nk2
 
-  jEnvelope = "{" & DQ & "payload" & DQ & ":{"
-  jEnvelope = jEnvelope & DQ & "path" & DQ & ":" & DQ & jName & DQ & ","
+  jEnvelope = DQ & "path" & DQ & ":" & DQ & jName & DQ & ","
   jEnvelope = jEnvelope & DQ & "protocol" & DQ & ":" & DQ & PROTOCOL & DQ & ","
   jEnvelope = jEnvelope & DQ & "readings" & DQ & ":["
 
-  ContentsString = jEnvelope
+  If bWrap Then
+    ContentsString = "{" & DQ & "payload" & DQ & ":{" & jEnvelope
+  Else
+    ContentsString = "{" & jEnvelope
+  EndIf
+
   BatchN = 0
-  bi = QTail
+  bi = bFrom
 
   Do While bi <> QHead AND BatchN < MAX_BATCH
     mi = bi
@@ -2172,7 +2425,11 @@ Sub BuildBatch()
     If bi > Q_SIZE Then bi = 1
   Loop
 
-  ContentsString = ContentsString & jTail
+  If bWrap Then
+    ContentsString = ContentsString & jTail
+  Else
+    ContentsString = ContentsString & jTailBare
+  EndIf
 EndSub
 
 '------------------------------------------------------------------------------
@@ -2378,11 +2635,12 @@ Sub PostBatch()
       EndIf
     EndIf
 
-    'Stored. Release exactly what was sent -- QHead may have moved on since, and
-    'this sequence is the only writer of QTail.
-    QTail = QTail + BatchN
-    Do While QTail > Q_SIZE
-      QTail = QTail - Q_SIZE
+    'Stored. Release exactly what was sent, from THIS path's tail -- QHead may
+    'have moved on since, and the publisher's tail is none of this sequence's
+    'business at this point in the scan.
+    QTailHttp = QTailHttp + BatchN
+    Do While QTailHttp > Q_SIZE
+      QTailHttp = QTailHttp - Q_SIZE
     Loop
 
     PostOK = PostOK + 1
@@ -2431,6 +2689,139 @@ Sub PostBatch()
   EndIf
 EndSub
 
+'------------------------------------------------------------------------------
+' MqttFailed / MqttWorked -- what a refused or accepted publish costs, in one
+' place, because BOTH messages this program sends are evidence about the same
+' broker connection. A status message that got through says the readings can go
+' too; readings that got through say the station is in a position to say hello.
+' Two separate backoffs would have each path relearning the same fact.
+'------------------------------------------------------------------------------
+Sub MqttFailed()
+  MqttFail = MqttFail + 1
+  MqttConsecFail = MqttConsecFail + 1
+
+  'The session is gone or was never made, so whatever the broker is holding as
+  'this station's retained status is now the Last Will. Re-publishing it is how
+  'the station says it is back, and there is no connect event in CRBasic to hang
+  'that on.
+  statusDue = True
+
+  If MqttBackoff = 0 Then
+    MqttBackoff = MQTT_BACKOFF_MIN
+  Else
+    MqttBackoff = MqttBackoff * 2
+    If MqttBackoff > MQTT_BACKOFF_MAX Then MqttBackoff = MQTT_BACKOFF_MAX
+  EndIf
+EndSub
+
+Sub MqttWorked()
+  MqttConsecFail = 0
+  MqttBackoff = 0
+EndSub
+
+'------------------------------------------------------------------------------
+' PublishBatch -- one MQTT message, and what the broker did with it.
+'
+' Called immediately after BuildBatch has built the unwrapped envelope, in the
+' same sequence and with nothing in between: it takes the batch size out of
+' BatchN, which the next BuildBatch of either path will overwrite.
+'
+' MQTTPublish returns 0 for success and its own error code otherwise. At QoS 1
+' that success means the broker sent a PUBACK, so this is a genuine
+' acknowledgement from the far end of the link and not merely "the instruction
+' ran" -- which is exactly the distinction docs/ingest-http.md insists on for the
+' other path, and the reason the tail advances here rather than optimistically.
+'
+' What it does NOT mean is that MegaNet has the reading. MQTT gives a publisher
+' no response channel: the PUBACK is the broker's, and the bridge only acks a
+' storable message to the broker once the database has actually stored it, so a
+' bridge or database outage leaves the message queued at the broker rather than
+' losing it. That is the contract's guarantee and there is nothing this program
+' can or should do to check it -- which is why MqttPublished counts readings
+' handed over, and is named for that rather than for readings stored.
+'
+' Nothing here is retried by hand. A failure leaves the tail where it is, and
+' the next attempt rebuilds the same batch from the same slot.
+'------------------------------------------------------------------------------
+Sub PublishBatch()
+  MqttAttempts = MqttAttempts + 1
+  MqttLastBatch = BatchN
+  MqttLastPayload = Mid(ContentsString,1,200)
+  SecsSinceTry = 0
+
+  MqttResult = MQTTPublish (MqttTopic,ContentsString,MQTT_QOS,MQTT_DROP)
+
+  If MqttResult = 0 Then
+    'Handed over. Release exactly what was published, from this path's tail.
+    QTailMqtt = QTailMqtt + MqttLastBatch
+    Do While QTailMqtt > Q_SIZE
+      QTailMqtt = QTailMqtt - Q_SIZE
+    Loop
+
+    MqttOK = MqttOK + 1
+    MqttPublished = MqttPublished + MqttLastBatch
+    SecsSinceMqtt = 0
+    MqttState = "published"
+    Call MqttWorked()
+  Else
+    Sprintf (mNum,"%d",MqttResult)
+    MqttState = "broker refused or unreachable - code " & mNum
+    Call MqttFailed()
+  EndIf
+EndSub
+
+'------------------------------------------------------------------------------
+' PublishStatus -- the retained "I am here" message.
+'
+' Half of the offline detection. The other half is the Last Will, which this
+' program cannot set: it is a Device Configuration Utility setting (Last Will
+' Topic, Message, QoS and Retained), the broker publishes it on this station's
+' behalf when the connection drops without a clean disconnect, and it has to
+' name the SAME topic as MqttStatusTopic below and be marked retained. A will
+' left at the default "Do Not Retain" is a will that vanishes the moment the
+' bridge reconnects, which is the failure this whole mechanism exists to survive.
+' logger/README.md lists the settings; docs/ingest-mqtt.md explains the shape.
+'
+' Retained, so the broker replays it to the bridge on every reconnect and a
+' bridge restart does not lose the picture. Anything beyond `online` is kept
+' verbatim in meganet.station_status.last_status, so a field added here needs no
+' migration and no bridge release -- which is why the firmware version is worth
+' sending: "which loggers are still on the old program" becomes a query.
+'
+' Batt_volt is range-tested rather than trusted. A NAN fails both halves of the
+' test, the same way the NTP result is tested in the clock sequence, and the
+' field is dropped rather than sent -- the word NAN inside a JSON number is a
+' message the bridge can only reject, and it would be rejected retained.
+'------------------------------------------------------------------------------
+Sub PublishStatus()
+  MqttStatusBody = "{" & DQ & "online" & DQ & ":true"
+  If Batt_volt > 0 AND Batt_volt < 100 Then
+    Sprintf (mNum,"%.2f",Batt_volt)
+    MqttStatusBody = MqttStatusBody & "," & DQ & "battery_v" & DQ & ":" & mNum
+  EndIf
+  MqttStatusBody = MqttStatusBody & "," & DQ & "fw" & DQ & ":" & DQ & FW_VERSION & DQ
+  MqttStatusBody = MqttStatusBody & "}"
+
+  MqttAttempts = MqttAttempts + 1
+  SecsSinceTry = 0
+
+  MqttStatusResult = MQTTPublish (MqttStatusTopic,MqttStatusBody,MQTT_QOS,MQTT_KEEP)
+
+  If MqttStatusResult = 0 Then
+    SecsSinceStatus = 0
+    statusDue = False
+    Call MqttWorked()
+  Else
+    'Counted into the same backoff as a failed batch, and this is the case that
+    'needs it most: a base station with an empty queue has no readings to knock
+    'on the broker with, so this message IS the probe, and an un-backed-off
+    'probe is a blocking publish every slow scan for as long as the broker is
+    'down. MqttState is left saying whatever the readings last said, because a
+    'failed status message adds nothing a failed batch has not already said.
+    Call MqttFailed()
+  EndIf
+EndSub
+
 
 '==============================================================================
 ' 6. MAIN PROGRAM
@@ -2449,20 +2840,46 @@ BeginProg
   '"http" itself, and a value repeated here could only ever disagree with the
   'truth.
   jTail = "]}}"
+  jTailBare = "]}"
   fId   = "{" & DQ & "alert_id" & DQ & ":"
   fTs   = "," & DQ & "reading_ts" & DQ & ":" & DQ
   fVal  = DQ & "," & DQ & "value_raw" & DQ & ":"
   fSus  = "," & DQ & "quality" & DQ & ":" & DQ & "suspect" & DQ
 
+  'The topics, built once from the two segments in section 1 rather than typed
+  'out, so the scheme appears in this program exactly once. They are Public: at
+  'commissioning, reading MqttTopic off the logger and checking it against the
+  'line in the broker's ACL is the whole of the topic check, and it is the check
+  'worth doing before anyone drives home -- a wrong segment is refused by the
+  'broker rather than filed under an identity nobody claims.
+  MqttTopic = "meganet/v1/" & MQTT_STATION & "/" & MQTT_DEVICE & "/reading"
+  MqttStatusTopic = "meganet/v1/" & MQTT_STATION & "/status"
+
   QHead = 1
-  QTail = 1
+  QTailHttp = 1
+  QTailMqtt = 1
   QDepth = 0
+  QDepthHttp = 0
+  QDepthMqtt = 0
   Backoff = 0
   ConsecFail = 0
+  MqttBackoff = 0
+  MqttConsecFail = 0
+  SecsSinceTry = MQTT_EVERY          'so the first status message goes out on the
+                                     'first slow scan rather than 30 seconds in
   nBuf = 0
   RxFrameMode = "unknown"
   RxStep = "waiting for the first byte"
   PostState = "starting"
+
+  'Say hello as soon as there is a session to say it on. A restart is exactly
+  'when the broker is still holding a will that says this station is down.
+  statusDue = True
+  If MQTT_ENABLE Then
+    MqttState = "starting"
+  Else
+    MqttState = "disabled - see MQTT_ENABLE"
+  EndIf
 
   'Labels for the two census arrays, so they read as themselves in the Public
   'table instead of as eight and eleven anonymous numbers.
@@ -2530,28 +2947,63 @@ BeginProg
     capSecs = capSecs + 1
     If capSecs >= CAP_FLUSH_SEC Then Call CapFlush()
 
-    QDepth = QHead - QTail
-    If QDepth < 0 Then QDepth = QDepth + Q_SIZE
+    'How far behind each path is, and how much the buffer is therefore still
+    'holding. QDepth is the greater of the two because a slot is only reusable
+    'once BOTH have passed it -- so it, and not either half, is what QPeak and
+    'Q_SIZE have to be read against.
+    QDepthHttp = QHead - QTailHttp
+    If QDepthHttp < 0 Then QDepthHttp = QDepthHttp + Q_SIZE
+    QDepthMqtt = QHead - QTailMqtt
+    If QDepthMqtt < 0 Then QDepthMqtt = QDepthMqtt + Q_SIZE
+
+    If MQTT_ENABLE Then
+      qLag = QDepthMqtt
+    Else
+      'Nothing is draining the publisher's tail, so counting it would report a
+      'buffer that only fills. QueuePush still moves that tail out of the way.
+      qLag = 0
+    EndIf
+    QDepth = QDepthHttp
+    If qLag > QDepth Then QDepth = qLag
     If QDepth > QPeak Then QPeak = QDepth
 
     SecsSincePost = SecsSincePost + 1
+    SecsSinceMqtt = SecsSinceMqtt + 1
+    SecsSinceTry = SecsSinceTry + 1
+    SecsSinceStatus = SecsSinceStatus + 1
 
     CallTable Diag
 
   NextScan
 
-  '--- the slow half: talk ----------------------------------------------------
+  '--- the slow half: talk, both ways -----------------------------------------
   '
-  ' A sequence of its own because HTTPPost blocks until the server answers or
-  ' the timeout expires, and a base station that stops reading its serial port
-  ' for that long has lost every transmission in the window. Nothing in here
-  ' touches the receiver, and the only state it shares with the scan above is
-  ' the ring buffer -- whose two ends have one writer each.
+  ' A sequence of its own because BOTH of the instructions in it block: HTTPPost
+  ' sits there until the server answers or its 75-second timeout expires, and
+  ' MQTTPublish at QoS 1 waits for the broker's PUBACK. A base station that stops
+  ' reading its serial port for that long has lost every transmission in the
+  ' window. Nothing in here touches the receiver, and the only state it shares
+  ' with the scan above is the ring buffer.
+  '
+  ' ONE sequence for both paths rather than one each, and that is the load-
+  ' bearing decision in this file. Two sequences would let a slow POST and a slow
+  ' publish overlap, and the two halves share BuildBatch, ContentsString, BatchN
+  ' and MakeRec's scratch -- so overlapping them means a message occasionally
+  ' built out of half of the other path's batch. That is the failure mode this
+  ' program spends its scratch-variable comments avoiding, and it would be
+  ' invisible: a well-formed batch of the wrong readings.
+  '
+  ' What it costs is that a stalled POST delays a publish by up to 75 seconds.
+  ' What it does not cost is progress, which is the thing that matters: the two
+  ' tails are independent, so the delayed path resumes from where it was and
+  ' catches up in batches of MAX_BATCH. An HTTP outage does not stop the
+  ' publishing, and a broker outage does not stop the POSTs.
   SlowSequence
     Scan (10,Sec,3,0)
 
+      '--- path 1: POST ---------------------------------------------------
       postDue = False
-      If QDepth > 0 Then
+      If QDepthHttp > 0 Then
         If ConsecFail = 0 Then
           If SecsSincePost >= POST_EVERY Then postDue = True
         Else
@@ -2566,15 +3018,78 @@ BeginProg
       ElseIf NOT ClockOK Then
         PostState = "clock not set - nothing stamped"
         postDue = False
-      ElseIf QDepth = 0 Then
+      ElseIf QDepthHttp = 0 Then
         PostState = "idle - nothing to send"
       EndIf
 
       If postDue Then
+        bWrap = True                     'ingest_http() wants the payload wrapper
+        bFrom = QTailHttp
         Call BuildBatch()
         If BatchN > 0 Then
           PostState = "posting"
           Call PostBatch()
+        EndIf
+      EndIf
+
+      '--- path 2: PUBLISH ------------------------------------------------
+      '
+      ' No token test here, and that is not an omission: the bridge holds the
+      ' ingest token for this path, and what this station needs instead is a
+      ' broker credential, which lives in the MQTT settings where CRBasic cannot
+      ' see it. A publish that fails for want of one fails at MQTTPublish and
+      ' says so in MqttState.
+      If MQTT_ENABLE Then
+        'The status message is due on its own timer, and after any failure --
+        'armed here whether or not the broker is going to be touched this tick,
+        'so that arming it never depends on the thing it is waiting for.
+        If SecsSinceStatus >= MQTT_STATUS_EVERY Then statusDue = True
+
+        'ONE gate over both messages: how long the broker is left alone. Both
+        'are blocking publishes to the same connection, so letting either past
+        'the backoff on its own would be a knock every ten seconds at exactly
+        'the moment the link can least carry one.
+        '
+        'Measured from the last attempt rather than the last success, because a
+        'backoff measured from a success that has not happened for an hour has
+        'already expired every time it is read.
+        mqttWait = MQTT_EVERY
+        If MqttConsecFail > 0 Then mqttWait = MqttBackoff
+
+        If SecsSinceTry >= mqttWait Then
+          mqttSent = False
+
+          If NOT ClockOK Then
+            'Belt and braces: QueuePush will not have queued anything unstamped.
+            MqttState = "clock not set - nothing stamped"
+          ElseIf QDepthMqtt > 0 Then
+            bWrap = False                'the bridge builds the wrapper itself
+            bFrom = QTailMqtt
+            Call BuildBatch()
+            If BatchN > 0 Then
+              MqttState = "publishing"
+              Call PublishBatch()
+              mqttSent = True
+            EndIf
+          Else
+            MqttState = "idle - nothing to send"
+          EndIf
+
+          'Readings first, then the status -- but only when the tick has not
+          'already spent a blocking publish on a broker that refused it. The two
+          'ways through are the two things this message is for:
+          '
+          '  nothing was sent    -- it is the probe that finds out the broker is
+          '                         back, on a station with no readings to find
+          '                         that out with
+          '  a batch just landed -- the broker is demonstrably up, so say the
+          '                         station is here NOW rather than after the
+          '                         backlog drains, which is minutes of a
+          '                         station showing offline while it is plainly
+          '                         posting readings
+          If statusDue Then
+            If NOT mqttSent OR MqttConsecFail = 0 Then Call PublishStatus()
+          EndIf
         EndIf
       EndIf
 
@@ -2635,7 +3150,25 @@ EndProg
 '
 ' Both have more memory than a CR300, so Q_SIZE, RX_BUFFER and CONTENT_SIZE can
 ' go up. Raise CONTENT_SIZE, CONTENT_GUARD and MAX_BATCH together -- a reading
-' is up to 92 characters -- and remember the endpoint's ceiling is 1000 per POST.
+' is up to 92 characters -- and remember the ceiling is 1000 readings per
+' message on BOTH paths: the endpoint's own limit, and the one bridge/ matches
+' it with so that a station gets a clear answer rather than a 400 relayed to
+' nobody. Q_SIZE is now read by two paths, so size it against the longer of the
+' two outages you want to survive, not against either one.
+'
+' MQTTPublish() is the one instruction here that is not on every operating
+' system. It IS on a CR300: the product manual (archive/cr300.pdf, section 13.3,
+' printed page 149) lists it among the internet-communications instructions. A
+' logger too old for it will not compile this file at all, and MQTT_ENABLE
+' cannot help -- the compiler reads the whole program. On such a logger delete
+' MqttFailed, MqttWorked, PublishBatch, PublishStatus and the "path 2" block in
+' the slow sequence, and the HTTP half is exactly the program it was before.
+'
+' What that manual does NOT carry is the instruction reference -- section 13.3
+' defers to the CRBasic help -- so the four parameters below are taken from
+' Campbell's published documentation rather than from a page anyone has read.
+' Check them in CRBasic Editor's own help when you compile; it is two call
+' sites and nothing else in this program depends on the answer.
 '
 '==============================================================================
 ' What this program deliberately does not do
@@ -2653,11 +3186,39 @@ EndProg
 ' It does not decode HFEM. An HFEM line (":HS=1|I1=..|NN:") is a different
 '   format from a different kind of station, and hfem.js is the decoder for it
 '   -- one decoder, so there is never a second opinion about what T3 means. A
-'   base station relaying HFEM should publish to the MQTT bridge instead.
+'   base station relaying HFEM publishes the raw line to the bridge's own
+'   .../reading/hfem topic and lets hfem.js decode it there.
 '
 ' It does not stream a DataTable through HTTPPost's optional parameters. Those
 '   produce TOB1, TOA5, CSIXML or CSIJSON, and ingest_http() accepts none of
 '   them -- it wants one JSON object with a `payload` key.
+'
+' It does not use MQTTPublishTable, or the logger's own automatic publishing.
+'   Those emit CSIJSON or GeoJSON on the MQTTBaseTopic, and the bridge subscribes
+'   to a topic scheme and a payload contract that is neither. Leave the automatic
+'   publishing turned off: everything it would send is a message the bridge acks,
+'   logs as unparseable and counts as rejected. MQTTPublish, which this program
+'   uses, takes a topic of its own and does not inherit MQTTBaseTopic.
+'
+' It does not set the Last Will. There is no CRBasic instruction for it -- the
+'   will is sent in the CONNECT packet, which the operating system builds from
+'   the MQTT settings. All this program can do is publish the other half of the
+'   pair, and say loudly here and in logger/README.md that a base station whose
+'   will is unset or left un-retained has no offline detection at all, which is
+'   most of what MQTT was added for.
+'
+' It does not subscribe to anything. The bridge's ACL gives a station `write`
+'   and not `readwrite`, so there is nothing to read; commands to stations would
+'   be a second topic branch and an explicit widening of that rule, not a
+'   quiet one.
+'
+' It does not call MQTTConnect. The operating system opens and holds the session
+'   on its own once MQTT is enabled in the settings, and reconnects it; the
+'   instruction exists to FORCE an attempt, which is for programs that power a
+'   modem down between transmissions. This base station is mains-powered and
+'   listening continuously, so there is nothing to force. A logger that switches
+'   its modem on the hour wants MQTTConnect after the link is up, and a PingIP
+'   before it -- that is a different program, not a setting on this one.
 '
 ' It does not enforce which addresses this base may post for. Neither does the
 '   endpoint: alert_low/alert_high on the token record are a note, not a rule
