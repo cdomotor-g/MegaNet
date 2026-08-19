@@ -466,3 +466,9 @@ site visit. The base-station logger in [`logger/`](../logger/README.md) speaks
 HTTP today and does not speak MQTT at all; a base station relaying HFEM should
 publish to this bridge instead. That work is separate and starts with
 commissioning one site.
+
+[`elpro115e_mqtt.md`](elpro115e_mqtt.md) is that work for one device — an ELPRO
+115E-2 gateway — split into the sysadmin's half and the technician's half, with
+the credentials sheet that passes between them. Read its opening section before
+buying any: a stock 115E-2 publishes Sparkplug B or an undocumented "standard
+MQTT" payload, and neither reaches this bridge as-is.

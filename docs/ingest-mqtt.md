@@ -322,7 +322,10 @@ beats running two.
 > Choosing is this section. **Doing it is
 > [`mqtt-provisioning.md`](mqtt-provisioning.md)** — the signup clicks, the two
 > credentials, the ingest token, the bridge on Fly.io, and a check after each
-> part so a failure names its own step.
+> part so a failure names its own step. **Putting one particular box on the air
+> is [`elpro115e_mqtt.md`](elpro115e_mqtt.md)** — an ELPRO 115E-2 gateway, in
+> two halves: what the system administrator mints and decides, and what the
+> technician types into the unit.
 
 | Option | Notes |
 | --- | --- |

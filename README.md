@@ -492,7 +492,10 @@ configuring a logger or choosing a broker — the topic scheme and why it is sha
 that way, per-station credentials and ACLs, and how to prove the whole path from
 a laptop. [`docs/mqtt-provisioning.md`](docs/mqtt-provisioning.md) is the provisioning run
 itself — signing up for the broker, minting the token, deploying the bridge, and
-the checks that say which step broke. It assumes a browser and nothing else: the
+the checks that say which step broke. [`docs/elpro115e_mqtt.md`](docs/elpro115e_mqtt.md)
+takes one device the rest of the way: provisioning an ELPRO 115E-2 base station to
+publish into that bridge, enumerated separately for the system administrator and
+for the technician holding the unit. It assumes a browser and nothing else: the
 bridge deploys from a button in Actions
 ([`deploy-bridge.yml`](.github/workflows/deploy-bridge.yml)), because "install
 this CLI" is not an instruction this project's operator can follow. [`bridge/README.md`](bridge/README.md) is
