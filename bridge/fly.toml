@@ -1,0 +1,57 @@
+# fly.toml — the MQTT bridge as one Fly machine.
+#
+# Deployed by .github/workflows/deploy-bridge.yml, not by a person at a
+# terminal. That is deliberate: this project is operated entirely from a
+# browser, so "run flyctl" is not an instruction that can be followed here, and
+# a deploy nobody can perform is a deploy that does not happen.
+#
+# This file holds no secrets and is safe to commit. The secrets live in GitHub
+# Actions secrets and are pushed to Fly by the workflow.
+#
+# NOTE ON PATHS: the Docker build context must be the REPO ROOT, because
+# bridge/src/messages.js requires hfem.js from there (#153 put one HFEM decoder
+# where both the browser and the bridge can reach it). So the workflow runs
+# flyctl from the repo root with `--config bridge/fly.toml --dockerfile
+# bridge/Dockerfile`, and this file deliberately carries no [build] dockerfile
+# key: a relative path there resolves against this file's directory in some
+# flyctl versions and the working directory in others, and the failure mode is
+# an image built from the wrong context — the quiet kind.
+
+app = "meganet-bridge"
+primary_region = "syd"
+
+# No [http_service] and no [[services]] — on purpose, and this is the block
+# somebody will be tempted to add back.
+#
+# The bridge listens for nothing. It dials the broker and it dials PostgREST;
+# both are outbound. A public address would publish a process that holds an
+# ingest token and has no authentication of its own — attack surface bought for
+# no capability. If you want the health endpoint one day, set
+# BRIDGE_HEALTH_PORT and reach it over `fly ssh` or the private network, rather
+# than opening a public service.
+#
+# It also means there is nothing to wake the machine with a request, which is
+# why nothing here autostops it. A stopped bridge is a bridge whose broker
+# session is quietly expiring.
+
+[env]
+  # Non-secret runtime settings only. Everything secret is a Fly secret, set by
+  # the workflow from GitHub Actions secrets — never written here.
+  LOG_LEVEL = "info"
+
+  # The session's name, and the thing that makes "no acked message is lost"
+  # true. The broker holds this bridge's queued QoS 1 messages while it is
+  # away, and the queue is keyed by CLIENT ID. A Fly machine gets a new
+  # hostname on every deploy, so the bridge's default id
+  # (meganet-bridge-<hostname>) would change on each deploy and orphan the
+  # previous session's queue. Pinning it here is what stops that.
+  #
+  # Do not change this string. From the broker's side, changing it is
+  # indistinguishable from a brand-new subscriber, and the old session's queued
+  # readings are discarded when it expires.
+  MQTT_CLIENT_ID = "meganet-bridge-prod"
+  BRIDGE_ID = "meganet-bridge-prod"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

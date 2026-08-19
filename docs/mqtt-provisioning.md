@@ -1,4 +1,4 @@
-# Standing MQTT up: the broker, the bridge, and the first reading
+# Standing MQTT up, from a browser
 
 [`ingest-mqtt.md`](ingest-mqtt.md) is the design — the topic scheme, the payload,
 why QoS 1. [`bridge/README.md`](../bridge/README.md) is the subscriber's own
@@ -6,8 +6,12 @@ manual. **This page is the provisioning run**: the clicks, in order, from nothin
 to a reading in the database, with a check after each part so you find out where
 it went wrong at the step that broke rather than at the end.
 
-Budget about an hour. Nothing here is irreversible, and nothing here costs money
-at the sizes MegaNet is at.
+**Everything here happens in a web browser.** No terminal, no `npm install`, no
+`flyctl`. That is a hard constraint of how this project is operated, and it is
+the reason the bridge deploys from a GitHub Actions button rather than a command
+line — see [`.github/workflows/deploy-bridge.yml`](../.github/workflows/deploy-bridge.yml).
+
+Budget about an hour. Nothing here is irreversible.
 
 ---
 
@@ -23,60 +27,92 @@ flowchart LR
 Two things get provisioned, because Postgres cannot subscribe to MQTT and
 Supabase does not host a broker:
 
-| | What | Where | Cost |
-|---|---|---|---|
-| **Broker** | HiveMQ Cloud Serverless | hivemq.com, managed | Free to 100 connections |
-| **Bridge** | `bridge/`, one container | Fly.io, one machine | Free to ~$2/mo |
+| | What | Where | Cost | Operated from |
+|---|---|---|---|---|
+| **Broker** | HiveMQ Cloud Serverless | hivemq.com | Free to 100 connections | its own console |
+| **Bridge** | `bridge/`, one container | Fly.io | Free to ~$2/mo | **GitHub Actions** |
 
-The broker is a product you sign up for. The bridge is this repository's own
-code, deployed. They are independent — a broker with no bridge is a broker
-quietly holding messages, which is a fine state to be in for an hour.
+**Before you start you need:** a browser, a GitHub account with write access to
+this repository, the Supabase SQL editor, and an email address. Fly.io asks for a
+card.
 
-**Before you start you need:** the `MEGANET_DB_URL` psql connection string (or
-the Supabase SQL editor), a terminal with `git` and Node 20+, and an email
-address. No credit card for the broker; Fly.io asks for one.
+### The four browser tabs you will use
+
+| Tab | For |
+|---|---|
+| `console.hivemq.cloud` | the broker, its credentials, and its built-in MQTT Web Client |
+| Supabase → SQL editor | minting the ingest token, and every query below |
+| `github.com/cdomotor-g/MegaNet` → Settings, then Actions | the secrets, and the deploy button |
+| `fly.io/dashboard` | watching the bridge's logs, stopping and starting it |
+
+---
+
+## Part 0 — Clean up the accidental Fly app
+
+**Do this first, and do not skip it.** A `fly launch` run from the repository
+root builds and deploys *the repository*, not the bridge — the whole MegaNet
+tree, with whatever start command Fly guessed. That app is not the bridge, it
+cannot become the bridge, and while it exists it may be running a machine you are
+paying for.
+
+1. Go to **<https://fly.io/dashboard>** and sign in.
+2. You will see the app that got created — probably named `meganet` or something
+   generated from the directory name. **It is not `meganet-bridge`.** Click it.
+3. Open its **Settings** (left sidebar).
+4. Scroll to the bottom, to the destructive section, and **delete the app**.
+   Fly asks you to type the app name to confirm.
+5. Back on the dashboard, confirm the list is now empty, or contains only apps
+   you meant to create.
+
+> **Nothing was lost.** No secrets were on that app, no data was in it, and
+> deleting it does not touch your Fly account, your card, or anything in this
+> repository. The only trace it leaves is a line in your Fly billing history.
+
+**This is why the rest of this page does not use `fly launch`.** That command
+reads the directory it is standing in and makes decisions on your behalf, which
+is fine when you know exactly what it will find and a trap when you do not. The
+workflow in Part 3 names the Dockerfile, the config and the build context
+explicitly, every time, and it cannot pick up anything else.
 
 ---
 
 ## Part 1 — The broker
 
+*You have already done this part. It is here so the page is complete, and so
+§1.4 gives you a way to check it that needs no terminal.*
+
 ### 1.1 Create the cluster
 
-1. Go to **<https://console.hivemq.cloud/>** and sign up. Email + password, or
+1. Go to **<https://console.hivemq.cloud/>** and sign up. Email and password, or
    GitHub/Google. Confirm the email.
 2. On first sign-in it offers to create a cluster. Choose **Serverless** — the
-   free plan. If it does not offer, click **Create New Cluster** → **Serverless**.
+   free plan.
 3. Pick the region **closest to where the bridge will run**, not to the stations.
-   The stations' hop to the broker is one TLS connection they hold open; the
-   bridge's hop is every message. Choose **AWS ap-southeast-2 (Sydney)** if
-   offered — Supabase's MegaNet project is already in `ap-southeast-2`.
-4. **Create**. It is ready in under a minute.
+   A station's hop is one TLS connection it holds open; the bridge's hop is every
+   message. Take **AWS ap-southeast-2 (Sydney)** if offered — the MegaNet
+   Supabase project is already in `ap-southeast-2`.
+4. **Create.** Ready in under a minute.
 
-You land on the cluster's **Overview**. Copy two things into a scratch file:
+From the cluster's **Overview**, copy the hostname. You need it twice: once as a
+GitHub variable in Part 3, and once in the Web Client below.
 
 ```
 Cluster URL   <something>.s1.eu.hivemq.cloud     ← yours will differ
-Port          8883
+Port          8883      MQTT over TLS   — what the bridge and loggers use
+Port          8884      MQTT over WSS   — what the Web Client uses
 ```
-
-That hostname plus port is `MQTT_URL=mqtts://<hostname>:8883` later. Note it is
-`mqtts://`, not `mqtt://` — the bridge refuses a plaintext URL unless
-`MQTT_ALLOW_INSECURE=1` is set, and the reason is that a plain connection sends
-the broker password in clear text across the internet.
 
 ### 1.2 Two credentials, not one
 
-Open **Access Management** (called *Credentials* in some versions of the
-console). Create **two**, and give them different passwords:
+Open **Access Management**. Create **two**, with different passwords:
 
-| Username | Password | Permission |
-|---|---|---|
-| `meganet-bridge` | generate a long one | **Subscribe** to `meganet/v1/#` |
-| `station-541155` | generate a long one | **Publish** to `meganet/v1/541155/#` |
+| Username | Password | Permission | Topic filter |
+|---|---|---|---|
+| `meganet-bridge` | generate a long one | **Subscribe** | `meganet/v1/#` |
+| `station-541155` | generate a long one | **Publish** | `meganet/v1/541155/#` |
 
-Use a real bureau station number for the second one — whichever station you are
-going to test with. `541155` is Loudoun Br AL and is used as the example
-throughout this repo.
+Use a real bureau station number for the second one. `541155` is Loudoun Br AL
+and is the example used throughout this repository.
 
 **Why the bridge may not publish.** A bridge that can publish is a bridge that
 can fabricate a reading, and it has no reason to. Subscribe only.
@@ -86,38 +122,57 @@ later ticket adds commands to stations — re-send yesterday, change a
 configuration — that is a second topic branch and a second explicit permission,
 not a widening of this one.
 
-If the console's permission editor only offers a topic filter and a
-Publish/Subscribe/Both radio, that is the same thing: filter `meganet/v1/#` +
-Subscribe for the bridge, filter `meganet/v1/541155/#` + Publish for the station.
+**Write both passwords down now.** HiveMQ shows a generated password once.
 
-> **The ACL is generated, not hand-written.** Two credentials are fine to click.
-> Three thousand are not, and hand-maintained ACLs drift from the registry. Once
-> this works, generate them from the database — the exact query is in
-> [`bridge/deploy/mosquitto.acl.example`](../bridge/deploy/mosquitto.acl.example),
-> and it emits the bureau number, falling back to the station id for the sites
-> that have none. Generating from the same column the database resolves against
-> is what makes a mistyped number *loud*: the broker refuses a publish to a topic
-> the credential does not own, instead of MegaNet quietly filing a reading under
-> an identity nobody claims.
+### 1.3 One credential per station, generated
 
-### 1.3 Check: the broker is real
+Two credentials are fine to click. Three thousand are not, and hand-maintained
+ACLs drift from the registry. Once this works, generate them from the database —
+the query is in
+[`bridge/deploy/mosquitto.acl.example`](../bridge/deploy/mosquitto.acl.example),
+and it emits the bureau number, falling back to the station id for the sites that
+have none.
 
-From the repo, with the **station's** credentials — publishing successfully with
-them is the proof the permission is right, and it costs nothing to find out now:
+Generating from the same column the database resolves against is what makes a
+mistyped number **loud**: a credential may only write the topic its own number
+spells, so a logger flashed with `041564` instead of `41564` is refused by the
+broker rather than filed under an identity nobody claims.
 
-```sh
-cd bridge && npm install
-MQTT_URL=mqtts://<your-cluster>:8883 \
-MQTT_USERNAME=station-541155 MQTT_PASSWORD='<the station password>' \
-  npm run publish-sample -- --station 541155 --alert-id 6128 --value 42
-```
+### 1.4 Check — the broker works, from the browser
 
-Expect it to connect and publish. Nothing is listening yet, so nothing lands in
-MegaNet — that is correct at this step.
+HiveMQ Cloud has an MQTT client built into the console. **Web Client** tab, on
+your cluster.
 
-If it hangs or is refused, the cause is one of three things, in this order:
-wrong hostname, wrong password, or a permission whose topic filter does not
-cover `meganet/v1/541155/#`.
+1. Open the **Web Client** tab.
+2. In **Connection Settings**, enter the **station** credential —
+   `station-541155` and its password. (The tab can also generate a throwaway
+   credential for you; use your real one, because testing the credential is the
+   point.)
+3. **Connect Client.** It connects over WebSocket on 8884.
+4. In the publish box:
+
+   | Field | Value |
+   |---|---|
+   | Topic | `meganet/v1/541155/logger/reading` |
+   | QoS | `1` |
+   | Retain | off |
+   | Message | `{"alert_id": 6128, "reading_ts": "2026-08-19T04:15:00Z", "value_raw": 301}` |
+
+5. **Publish.**
+
+**Expected:** it publishes without error. Nothing lands in MegaNet yet — nothing
+is subscribed. That is correct at this step.
+
+Now prove the ACL is doing its job, which is the half nobody tests:
+
+6. Change the topic to `meganet/v1/999999/logger/reading` and publish again.
+   **This should fail or be silently dropped by the broker**, because the
+   credential may only write `meganet/v1/541155/#`. If it *succeeds*, the
+   credential's permission is too wide — go back to §1.2 and narrow it.
+
+> If it hangs or is refused on step 5, the cause is one of three things in this
+> order: wrong hostname, wrong password, or a topic filter that does not cover
+> `meganet/v1/541155/#`.
 
 ---
 
@@ -128,16 +183,17 @@ ordinary ingest token, no service key. Three RPCs, and `revoked_at` turns all
 three off at once. **The bridge is not more trusted than the loggers it relays
 for.**
 
-Against the database (psql, or the Supabase SQL editor):
+In the **Supabase SQL editor**:
 
 ```sql
 select meganet.create_ingest_token('mqtt bridge');
 ```
 
-**The token is shown once.** It starts `mgn_`. Copy it into your scratch file
-now; only its hash is stored, so a lost token is re-minted, never recovered.
+**The token is shown once.** It starts `mgn_`. Copy it somewhere you can paste
+from in Part 3 — only its hash is stored, so a lost token is re-minted, never
+recovered.
 
-If you ever need to pull it: you cannot. Revoke and re-mint:
+If you lose it, you cannot retrieve it. Revoke and re-mint:
 
 ```sql
 update meganet.ingest_token set revoked_at = now() where label = 'mqtt bridge';
@@ -146,97 +202,86 @@ select meganet.create_ingest_token('mqtt bridge');
 
 ---
 
-## Part 3 — The bridge on Fly.io
+## Part 3 — The bridge, from a GitHub button
 
-### 3.1 Install and sign in
+This is the part that used to say "install flyctl". It does not any more. The
+deploy is
+[`.github/workflows/deploy-bridge.yml`](../.github/workflows/deploy-bridge.yml),
+and it names the Dockerfile, the config and the build context explicitly, so it
+cannot deploy the wrong thing the way Part 0's app happened.
 
-```sh
-curl -L https://fly.io/install.sh | sh     # or: brew install flyctl
-fly auth signup                            # or: fly auth login
-```
+### 3.1 Get a Fly token
 
-Fly asks for a card. One shared-CPU machine with 256 MB sits inside the free
-allowance; the bridge is one Node process with one dependency.
+1. Go to **<https://fly.io/dashboard>**, signed in.
+2. Click **your account** (top-right avatar) → **Personal Access Tokens** in the
+   sidebar. The direct link is usually
+   <https://fly.io/user/personal_access_tokens>.
+3. **Create token.** Name it `meganet-bridge deploy`. Take the default expiry.
+4. **Copy it immediately** — it is shown once, and it starts `Fly`.
 
-### 3.2 Create the app without deploying it
+> This token can create and manage apps in your Fly account, which is what lets
+> the workflow create `meganet-bridge` on its first run without you touching a
+> terminal. If you would rather it could only touch one app, create the app in
+> the Fly dashboard first and then use that app's **Tokens** tab for a
+> deploy-scoped token instead.
 
-**From the repository root** — not from `bridge/`. The Dockerfile's build context
-must be the repo root, because `src/messages.js` requires `hfem.js` from there
-(one HFEM decoder for both the browser and the bridge). A context of `bridge/`
-fails at the `COPY hfem.js` line, which is the loud version of that mistake.
+### 3.2 Put the five values into GitHub
 
-```sh
-fly launch --no-deploy --dockerfile bridge/Dockerfile
-```
+Go to the repository → **Settings** → **Secrets and variables** → **Actions**.
+There are two tabs on that page and you need both.
 
-Answer its prompts:
+**Secrets tab** → *New repository secret*, three times:
 
-- **App name** — `meganet-bridge`, or accept the generated one.
-- **Region** — Sydney (`syd`). Same reasoning as the broker's region.
-- **Postgres / Redis / Tigris** — **No** to all three. The bridge is stateless;
-  its state is the broker's session and MegaNet's database.
-- **Deploy now?** — **No**. Secrets first.
+| Name | Value |
+|---|---|
+| `FLY_API_TOKEN` | the token from §3.1 |
+| `MQTT_PASSWORD` | the **`meganet-bridge`** credential's password (not the station's) |
+| `MEGANET_INGEST_TOKEN` | the `mgn_…` token from Part 2 |
 
-Then open the generated `fly.toml` and **delete the entire `[http_service]` (or
-`[[services]]`) block**. The bridge listens for nothing — it makes two outbound
-connections and serves no traffic. A public address on it is attack surface with
-no purpose.
+**Variables tab** → *New repository variable*, twice:
 
-```toml
-app = "meganet-bridge"
-primary_region = "syd"
+| Name | Value |
+|---|---|
+| `MQTT_URL` | `mqtts://<your-cluster>.hivemq.cloud:8883` |
+| `MQTT_USERNAME` | `meganet-bridge` |
 
-[build]
-  dockerfile = "bridge/Dockerfile"
+> **Why two of them are variables rather than secrets.** Neither is sensitive,
+> and a hostname you cannot read back is a hostname you cannot check when the
+> bridge will not connect. Secrets are write-only in the GitHub UI — you would be
+> debugging a typo you are not allowed to look at.
+>
+> `MEGANET_API_URL` and `MEGANET_API_KEY` are not on this list at all. They are
+> the publishable pair `core.js` already ships to every browser, so the workflow
+> carries them as literals.
 
-# No [http_service]: the bridge serves nothing. It dials the broker and the
-# database, and both connections are outbound.
+### 3.3 Press the button
 
-[[vm]]
-  size = "shared-cpu-1x"
-  memory = "256mb"
-```
+1. Repository → **Actions** tab.
+2. **Deploy the MQTT bridge**, in the left sidebar.
+3. **Run workflow** (right-hand side) → leave `meganet-bridge` and `syd` as they
+   are → **Run workflow**.
+4. Click into the run and watch it.
 
-`fly.toml` is safe to commit — it holds no secrets.
+The first step checks all five values are present and **names every one that is
+missing at once**, rather than failing on the first. If it stops there, fix what
+it names and press the button again — nothing was created.
 
-### 3.3 Set the secrets
+**On the first run it creates the Fly app.** On every run after that it finds the
+existing app and leaves it alone.
 
-```sh
-fly secrets set \
-  MQTT_URL='mqtts://<your-cluster>:8883' \
-  MQTT_USERNAME='meganet-bridge' \
-  MQTT_PASSWORD='<the bridge password>' \
-  MQTT_CLIENT_ID='meganet-bridge-prod' \
-  MEGANET_API_URL='https://jjprlritvhdqpvphfrnu.supabase.co/rest/v1' \
-  MEGANET_API_KEY='sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY' \
-  MEGANET_INGEST_TOKEN='mgn_<the token from Part 2>'
-```
+### 3.4 Check — the bridge is connected
 
-Two of those are secret — `MQTT_PASSWORD` and `MEGANET_INGEST_TOKEN`. The API URL
-and publishable key are the same pair `core.js` carries in the browser and are
-not.
+The workflow's summary page prints `fly status` when it finishes. For the log
+lines that actually matter:
 
-> **`MQTT_CLIENT_ID` is not optional here, and it is the whole reason "no acked
-> message is lost" is true.** The bridge connects with `clean: false`, so the
-> broker holds its queue while it is away. The queue is keyed by client id. A
-> Fly machine gets a new hostname on every deploy, so without this set, the
-> default `meganet-bridge-<hostname>` changes on each deploy and **every deploy
-> orphans the previous session's queued messages**. Set it once, never change it.
-
-### 3.4 Deploy
-
-```sh
-fly deploy --dockerfile bridge/Dockerfile
-fly logs
-```
-
-A healthy start looks like a connect, then a subscribe at QoS 1:
+1. **<https://fly.io/dashboard>** → **meganet-bridge** → **Live Logs**.
+2. A healthy start is a connect, then three subscribes at QoS 1:
 
 ```
-info  connected to broker           clientId=meganet-bridge-prod
-info  subscribed                    topic=meganet/v1/+/+/reading qos=1
-info  subscribed                    topic=meganet/v1/+/+/reading/hfem qos=1
-info  subscribed                    topic=meganet/v1/+/status qos=1
+info  connected to broker    clientId=meganet-bridge-prod
+info  subscribed             topic=meganet/v1/+/+/reading qos=1
+info  subscribed             topic=meganet/v1/+/+/reading/hfem qos=1
+info  subscribed             topic=meganet/v1/+/status qos=1
 ```
 
 **Read the granted QoS, do not assume it.** If you see `subscribe_downgraded`
@@ -248,75 +293,118 @@ reconnect. That is a broker configuration problem, not a bridge one.
 
 ## Part 4 — Prove it end to end
 
-Publish as the station again, now that something is listening:
+Back to the **HiveMQ Web Client** (§1.4), connected as `station-541155`.
 
-```sh
-cd bridge
-MQTT_URL=mqtts://<your-cluster>:8883 \
-MQTT_USERNAME=station-541155 MQTT_PASSWORD='<the station password>' \
-  npm run publish-sample -- --station 541155 --alert-id 6128 --value 42
-```
+### A reading
 
-Within seconds:
+Publish, exactly as in §1.4 — but **change the timestamp** from the one you used
+there:
+
+| Field | Value |
+|---|---|
+| Topic | `meganet/v1/541155/logger/reading` |
+| QoS | `1` |
+| Retain | off |
+| Message | `{"alert_id": 6128, "reading_ts": "2026-08-19T05:30:00Z", "value_raw": 301}` |
+
+Then, in the **Supabase SQL editor**, within seconds:
 
 ```sql
-select addr, reading_ts, value_raw, source
+select addr, reading_ts, value_raw, source, dup_count
   from meganet.reading order by received_at desc limit 5;
+```
 
+> **Republish the identical message and the row does not duplicate — `dup_count`
+> increments instead.** That is `meganet.reading`'s primary key (address,
+> instant, value) doing the job that makes QoS 1 safe to use: at-least-once
+> delivery guarantees duplicates, and the key eats them and counts them. Worth
+> doing once, because it is the reason the whole design does not need QoS 2.
+
+### The station's health row
+
+```sql
 select station_key, station_id, online, since, last_reading_at
   from meganet.station_health where station_id = 'loudoun_br_al';
 ```
 
-**The station published under `541155`; the health row comes back keyed
-`loudoun_br_al`.** That is correct and is the point of the identity work in
+**The station published under `541155`; the row comes back keyed
+`loudoun_br_al`.** That is correct, and it is the point of the identity work in
 `0020`: the bureau number is how a station announces itself on the wire, and
 `station.id` is how MegaNet files it once the identity resolves. A row still
 keyed by a bare number is one the registry cannot name — check that number
 against `meganet.station.station_number`.
 
-And the bridge's own pulse, which is how you tell "no readings since Tuesday"
-apart from "the relay died on Tuesday":
+### The bridge's own pulse
+
+How you tell "no readings since Tuesday" apart from "the relay died on Tuesday":
 
 ```sql
 select bridge_id, connected, last_message_at, readings_accepted, errors_total
   from meganet.bridge_health;
 ```
 
-### The Last Will
+### The Last Will — and how to fire one without a terminal
 
-Kill the sample publisher with **`SIGKILL`, not Ctrl-C** — a clean disconnect
-tells the broker not to send the will, which is exactly right and exactly not
-what you are testing:
+This is the single thing most worth testing before a station goes in the field,
+because it is the whole reason MQTT earns its place here: offline detection with
+no polling and one field in the logger's CONNECT packet.
 
-```sh
-kill -9 %1        # or: pkill -9 -f publish-sample
-```
+The Web Client needs to connect **with a will set**, which the HiveMQ console's
+client may not expose. If it has no Last-Will fields, use
+**<https://web.mqttx.app/>** instead — same thing, in a browser, and its
+connection dialog has them.
 
-The station should show `online = false` within seconds. **This is the single
-thing most worth testing before a station goes in the field**, because it is the
-whole reason MQTT earns its place here: offline detection with no polling and one
-field in the logger's CONNECT packet.
+1. Connect as `station-541155` to `wss://<your-cluster>.hivemq.cloud:8884`, with:
+
+   | Last Will field | Value |
+   |---|---|
+   | Will topic | `meganet/v1/541155/status` |
+   | Will QoS | `1` |
+   | Will retain | **on** |
+   | Will payload | `{"online": false}` |
+
+2. Once connected, publish the *live* status — topic
+   `meganet/v1/541155/status`, QoS 1, **retain on**, payload
+   `{"online": true, "battery_v": 12.9}`.
+3. Check it landed:
+
+   ```sql
+   select station_key, online, since from meganet.station_health
+    where station_id = 'loudoun_br_al';
+   ```
+
+4. **Now close the browser tab.** Do not click Disconnect.
+
+> **Closing the tab is the browser's `kill -9`.** A clean disconnect tells the
+> broker *not* to send the will, which is exactly right and exactly not what you
+> are testing. Killing the tab drops the WebSocket without a DISCONNECT packet,
+> the broker calls it an ungraceful disconnect, and the will fires — the same
+> path a station losing power takes.
+
+5. Re-run the query. `online` should be `false` within seconds, and `since`
+   should be the moment the tab closed.
 
 ---
 
-## Part 5 — The one thing the free tier might not give you
+## Part 5 — The one thing to verify
 
 The bridge's "no acked message is lost" guarantee rests on **persistent
 sessions**: `clean: false`, a stable client id, and a broker that holds QoS 1
 messages for a subscriber that is away. `bridge/test/integration.test.js` proves
-the bridge's half against a real broker — mutating `clean: false` to `true` makes
-that test time out waiting for readings the broker threw away.
+the bridge's half against a real broker on every CI run — mutating
+`clean: false` to `true` makes that test time out waiting for readings the broker
+threw away.
 
 HiveMQ Cloud Serverless publishes its limits as 100 connections, 10 GB of traffic
 a month, 5 MB messages and up to three days of retention. **What it grants for
 session expiry on the free plan is not something this page can promise** — verify
-it, once, in about two minutes:
+it, once, in about two minutes, all from the browser:
 
-1. `fly machine stop` the bridge (or `fly scale count 0`).
-2. Publish a reading as the station, exactly as in Part 4. It is now queued at
-   the broker with nowhere to go.
-3. `fly machine start` (or `fly scale count 1`).
-4. Query `meganet.reading` for that reading.
+1. **Fly dashboard** → `meganet-bridge` → **Machines** → stop the machine.
+2. **HiveMQ Web Client** → publish a reading as in Part 4, with a new timestamp.
+   It is now queued at the broker with nowhere to go.
+3. **Fly dashboard** → start the machine again.
+4. **Supabase SQL editor** → query `meganet.reading` for that reading.
 
 **If it arrives, persistent sessions work and you are done.** If it does not, the
 broker dropped the session while the bridge was away, and you have a real choice
@@ -325,6 +413,13 @@ broker to EMQX Serverless or a Mosquitto VPS where
 `persistent_client_expiration` is yours to set
 ([`bridge/deploy/mosquitto.conf.example`](../bridge/deploy/mosquitto.conf.example)).
 Better to learn that now than after forty stations are flashed.
+
+> **This is also why `MQTT_CLIENT_ID` is pinned in
+> [`bridge/fly.toml`](../bridge/fly.toml) rather than left to default.** The
+> broker's queue is keyed by client id, and a Fly machine gets a new hostname on
+> every deploy. Left to default, every deploy would orphan the previous session's
+> queued messages — the exact guarantee this part exists to protect. Do not
+> change that string.
 
 ---
 
@@ -349,13 +444,17 @@ arrive.
 
 | Symptom | Cause, in the order worth checking |
 |---|---|
-| Publisher hangs or is refused | Hostname; password; the credential's topic filter does not cover `meganet/v1/<number>/#`. |
+| Workflow fails on its first step | One of the five values is unset. It names every missing one at once — set them and press the button again. Nothing was created. |
+| Workflow fails at `apps create` | The Fly token is wrong, expired, or scoped to a single app that does not exist yet. Re-read §3.1. |
+| Web Client will not connect | Use port **8884** and `wss://`, not 8883 — 8883 is the TLS port for native MQTT clients and a browser cannot speak it. |
+| Publish refused | The credential's topic filter does not cover the topic. A station credential may only write `meganet/v1/<its own number>/#`. |
 | Bridge logs `subscribe_downgraded` | The broker granted QoS 0. At-least-once is not in force — fix at the broker. |
-| Bridge connects, no readings | The station is publishing to a topic the bridge does not subscribe to. Check the segment count: `meganet/v1/<station>/<device>/reading` is five, and the device segment is not optional. |
-| Readings land, `station_health` row keyed by a bare number | That number resolves to no station. Compare against `meganet.station.station_number` — most likely a leading zero (`041564` vs `41564`). |
+| Bridge connects, no readings | The station is publishing to a topic the bridge does not subscribe to. Count the segments: `meganet/v1/<station>/<device>/reading` is five, and the device segment is not optional. |
+| Reading lands, but `dup_count` rises and no new row | Working as designed — you republished an identical (address, instant, value). Change the timestamp. |
+| `station_health` row keyed by a bare number | That number resolves to no station. Compare against `meganet.station.station_number` — most likely a leading zero (`041564` vs `41564`). |
 | `PT401` from any RPC | The ingest token is wrong or revoked. Re-mint (Part 2). |
 | PostgREST 404 | The function is not in the schema cache — usually a migration that has not been applied. Check `select value from meganet.app_meta where key = 'schema_version'`. |
-| Every deploy loses queued messages | `MQTT_CLIENT_ID` is unset, so the client id moves with the hostname. §3.3. |
+| Every deploy loses queued messages | `MQTT_CLIENT_ID` has been changed or unset. It is pinned in `bridge/fly.toml` — put it back. |
 
 ---
 
@@ -365,5 +464,5 @@ Provisioning the broker and the bridge does not put a station on the air. A fiel
 station still has to be told to publish — which is firmware, a credential, and a
 site visit. The base-station logger in [`logger/`](../logger/README.md) speaks
 HTTP today and does not speak MQTT at all; a base station relaying HFEM should
-publish to this bridge instead. That work is separate and starts with commissioning
-one site.
+publish to this bridge instead. That work is separate and starts with
+commissioning one site.

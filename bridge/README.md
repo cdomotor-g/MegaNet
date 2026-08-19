@@ -16,7 +16,10 @@ that job allows.
   whoever is configuring a logger.
 - **Standing the broker and this process up from nothing** — the signup, the
   credentials, the secrets, the first reading — is
-  [`docs/mqtt-provisioning.md`](../docs/mqtt-provisioning.md).
+  [`docs/mqtt-provisioning.md`](../docs/mqtt-provisioning.md). It is written for
+  a browser and no terminal: the deploy is a button in GitHub Actions
+  ([`deploy-bridge.yml`](../.github/workflows/deploy-bridge.yml)), the machine is
+  [`fly.toml`](fly.toml), and the tests use the broker's own MQTT Web Client.
 - The **tables it writes** are in
   [`db/migrations/0008_mqtt_bridge.sql`](../db/migrations/0008_mqtt_bridge.sql).
 - This page is for whoever is **running** it.

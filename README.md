@@ -120,7 +120,7 @@ MegaNet/
 │   ├── access.md                           (who gets in, who may edit, and recovery)
 │   ├── ingest-http.md                      (posting readings from a field station — #B5)
 │   ├── ingest-mqtt.md                      (topic scheme, broker choice, station credentials — #B6)
-│   ├── mqtt-provisioning.md                (standing the broker and bridge up — the clicks)
+│   ├── mqtt-provisioning.md                (standing the broker and bridge up — browser only)
 │   ├── message-log.md                      (the Message Log tab — columns, uses, edges)
 │   ├── floodwarning-net.md                 (moving the domain to MegaNet — runbook)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
@@ -486,7 +486,10 @@ configuring a logger or choosing a broker — the topic scheme and why it is sha
 that way, per-station credentials and ACLs, and how to prove the whole path from
 a laptop. [`docs/mqtt-provisioning.md`](docs/mqtt-provisioning.md) is the provisioning run
 itself — signing up for the broker, minting the token, deploying the bridge, and
-the checks that say which step broke. [`bridge/README.md`](bridge/README.md) is
+the checks that say which step broke. It assumes a browser and nothing else: the
+bridge deploys from a button in Actions
+([`deploy-bridge.yml`](.github/workflows/deploy-bridge.yml)), because "install
+this CLI" is not an instruction this project's operator can follow. [`bridge/README.md`](bridge/README.md) is
 for whoever runs the process;
 `db/migrations/0008_mqtt_bridge.sql` and `tools/check_mqtt.sql` are the database
 side.

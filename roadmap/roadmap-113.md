@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 this body lives at `roadmap/roadmap-113.md` in the repo and is synced here by `.github/workflows/roadmap-sync.yml` — edit the file, not this box, or the next sync overwrites the edit.**
 
-Snapshot taken: **2026-08-19** (revision 60 — see "What changed" at the bottom).
+Snapshot taken: **2026-08-19** (revision 61 — see "What changed" at the bottom).
 
 ---
 
@@ -504,6 +504,18 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 61 — 2026-08-19: the bridge deploys from a button, because "install this CLI" is not an instruction this project can follow
+
+- **`.github/workflows/deploy-bridge.yml` is new, and `bridge/fly.toml` with it.** Revision 59's provisioning runbook assumed a terminal — `fly launch`, `npm install`, `npm run publish-sample`. **The operator of this project works entirely in a browser**, so none of those are instructions that can be followed here, and the first attempt to follow them **deployed the whole MegaNet repository to Fly by accident**: `fly launch` reads the directory it is standing in and decides on your behalf, which is fine when you know exactly what it will find and a trap when you do not.
+- **So the deploy is a workflow, triggered by `workflow_dispatch`.** *Actions → Deploy the MQTT bridge → Run workflow*. It names the Dockerfile, the config and the build context explicitly on every run, so it cannot pick up anything else — the accidental-deploy failure mode is structurally absent rather than warned against.
+- **Five values, set once in the GitHub UI**: `FLY_API_TOKEN`, `MQTT_PASSWORD` and `MEGANET_INGEST_TOKEN` as secrets; `MQTT_URL` and `MQTT_USERNAME` as **variables**. The split is deliberate and the reason generalises: **a hostname you cannot read back is a hostname you cannot check** when the thing will not connect, and secrets are write-only in that UI — you would be debugging a typo you are not allowed to look at. `MEGANET_API_URL`/`MEGANET_API_KEY` are literals in the workflow, being the publishable pair `core.js` already ships to every browser.
+- **The workflow refuses to start rather than half-finish.** Its first step checks all five and **names every missing one at once** instead of failing on the first, because a deploy that authenticates halfway leaves a Fly app behind with no secrets on it — which reads as a broken bridge rather than an unfinished setup.
+- **Two hardening decisions worth keeping.** Every secret reaches the shell through `env:`, never `${{ }}` interpolation into the script text: interpolation puts the literal value into the source, so **a password containing a quote would end the string early** and the deploy would fail on the *contents* of a password. And app existence is asked with `flyctl status`, not by grepping `apps list --json` — the JSON key for the name has been both `Name` and `name` across flyctl versions, and a grep that silently stops matching would try to create the app on every run.
+- **`MQTT_CLIENT_ID` is pinned in `bridge/fly.toml`, and that file explains why at length.** The broker's queue is keyed by client id and a Fly machine gets a new hostname on every deploy, so the default `meganet-bridge-<hostname>` would orphan the previous session's queued messages **on every deploy** — the exact guarantee #163 exists to protect, lost to a hostname nobody thinks about.
+- **Every test in the runbook is now browser-native.** The broker's own **Web Client** tab (WebSocket, port 8884 — not 8883, which a browser cannot speak) replaces `publish-sample.js`; the Supabase SQL editor was always web. **The Last Will test found the nicest substitution**: closing the browser tab *is* `kill -9` — an abrupt tab close drops the WebSocket without a DISCONNECT packet, so the broker calls it ungraceful and fires the will, which is the same path a station losing power takes.
+- **Two checks were added that the CLI version did not have**, both because the browser makes them cheap: publish to a topic the credential does not own and confirm the broker **refuses** it (the ACL half nobody tests), and republish an identical reading to watch `dup_count` increment instead of a row duplicating — which is the primary key doing the job that makes QoS 1 safe and QoS 2 unnecessary.
+- **Part 0 is deleting the accidental Fly app**, with the note that nothing was lost and the reason the rest of the page never calls `fly launch`.
+
 ### Revision 60 — 2026-08-19: the on-map panels put themselves away again, and the harness grows the pointer it never had
 
 - **Reported as "the Draw & measure pane persists when I would expect it to disappear", and it was all four panels, not one.** #164's contract is that the pin is the *only* way an on-map panel stays — a map is the one surface in this app where the content is the whole panel, so a flyout covering a corner uninvited is in the way. Clicking any control **inside** a panel focused that control, an ungated `focusin` promoted the panel to open-for-real on that focus, and `:focus-within` held it there meanwhile. So one tick of "Snap to stations", one base-layer radio, one Map display checkbox welded that panel to the map until its icon was found and clicked again.
@@ -513,6 +525,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 - **`npm run mapctl` is the fifteenth CI check, and constraint 1's table is why it had to exist.** Fourteen checks and not one of them moves a pointer: nothing threw, every `on*=` handler resolved, contrast was unchanged, the tab rendered, and the keyboard path `rivers` already covers went on working perfectly. **30 assertions, seven of which fail on the code as it was** — the defect is held by a check that would have caught it, not by a comment. Its assertions read pixels (`getClientRects()`), never classes, because a class saying "open" about an invisible panel is itself one of the failures; and every "it closes" is paired with an "it stays", so a fix that merely made panels close on click cannot pass.
 - **Two counts in this issue were already stale and are corrected here rather than left to make the new one wrong too**: `npm run rivers` (#150) has run in CI since revision 51 and never had a row in constraint 1's table, and `test/README.md` said "the twelve that run in CI" while `npm run all` ran fourteen. Both now say fifteen, and the README gained rows for `hfem`, `rivers` and `mapctl`.
 - **Proof:** all fifteen web checks green, including `tabs` (362 assertions across 27 views), `shell`, `rivers` and `registry` unchanged. Nothing outside `map-controls.js` and the `.mn-mapctl` block in `styles.css` was touched, so the other six Leaflet maps get the fix without knowing about it.
+
 
 ### Revision 59 — 2026-08-19: the MQTT publisher identity is the bureau station number, not the slug — and the provisioning run is written down
 

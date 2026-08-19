@@ -1,0 +1,191 @@
+# Deploy the MQTT bridge to Fly.io — from a button in this browser tab.
+#
+# Why this exists. Everything else in this repo can be operated from a web
+# interface: the app is static files on Pages, the database has the Supabase
+# SQL editor, the broker has a console. The bridge was the one piece that said
+# "install flyctl and run it", which is an instruction this project's operator
+# cannot follow — and an attempt to follow it once deployed the whole MegaNet
+# repository to Fly by accident, which is exactly the failure mode a
+# point-and-shoot CLI has when you are not sure what it is reading.
+#
+# So the deploy is a workflow. It is explicit about what it builds, it holds
+# the secrets in one place, and it is re-runnable by clicking the same button
+# again. Nobody has to know what the working directory was.
+#
+#   Actions → Deploy the MQTT bridge → Run workflow
+#
+# WHAT YOU MUST SET FIRST — Settings → Secrets and variables → Actions:
+#
+#   Secrets tab            what it is
+#   ─────────────────────  ────────────────────────────────────────────────
+#   FLY_API_TOKEN          fly.io → Your Account → Personal Access Tokens
+#   MQTT_PASSWORD          the `meganet-bridge` broker credential's password
+#   MEGANET_INGEST_TOKEN   select meganet.create_ingest_token('mqtt bridge')
+#
+#   Variables tab          what it is
+#   ─────────────────────  ────────────────────────────────────────────────
+#   MQTT_URL               mqtts://<your-cluster>.hivemq.cloud:8883
+#   MQTT_USERNAME          meganet-bridge
+#
+# The two variables are deliberately NOT secrets: they are not sensitive, and a
+# hostname you cannot read back is a hostname you cannot check when the bridge
+# will not connect. MEGANET_API_URL and MEGANET_API_KEY are not here at all —
+# they are the publishable pair core.js already carries in the browser, so the
+# workflow passes them as literals below.
+#
+# Manual trigger only. A push trigger would mean every commit touching bridge/
+# redeploys — which is reasonable continuous deployment and is a two-line
+# change (add the `push:` block), but it is not what you want while you are
+# still learning what a deploy does.
+
+name: Deploy the MQTT bridge
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Fly app name (must match app= in bridge/fly.toml)'
+        required: true
+        default: 'meganet-bridge'
+      region:
+        description: 'Fly region — syd is Sydney, nearest the Supabase project'
+        required: true
+        default: 'syd'
+
+# Read-only on the repo. The workflow's power is the Fly token, not anything
+# it can do here.
+permissions:
+  contents: read
+
+# Two deploys at once would race for the same machine and the same broker
+# client id. Queue them.
+concurrency:
+  group: deploy-bridge
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      APP: ${{ inputs.app_name }}
+
+    steps:
+      - name: Refuse to run without the secrets, and say which are missing
+        # A deploy that gets halfway and then cannot authenticate leaves a Fly
+        # app behind with no secrets on it, which looks like a broken bridge
+        # rather than an unfinished setup. Check first, name everything that is
+        # missing at once, and change nothing.
+        #
+        # Every value arrives through `env:` rather than being pasted into the
+        # script by ${{ }}. Interpolation would put the literal secret into the
+        # shell source, so a password containing a quote would end the string
+        # early — a deploy that fails on the *contents* of a password is a very
+        # bad afternoon.
+        env:
+          S_FLY:   ${{ secrets.FLY_API_TOKEN }}
+          S_PASS:  ${{ secrets.MQTT_PASSWORD }}
+          S_TOKEN: ${{ secrets.MEGANET_INGEST_TOKEN }}
+          V_URL:   ${{ vars.MQTT_URL }}
+          V_USER:  ${{ vars.MQTT_USERNAME }}
+        run: |
+          missing=0
+          note() { echo "  - $1"; missing=1; }
+          echo "Checking what is set…"
+          [ -n "$S_FLY"   ] || note "secret FLY_API_TOKEN — fly.io → Your Account → Personal Access Tokens"
+          [ -n "$S_PASS"  ] || note "secret MQTT_PASSWORD — the meganet-bridge broker credential"
+          [ -n "$S_TOKEN" ] || note "secret MEGANET_INGEST_TOKEN — select meganet.create_ingest_token('mqtt bridge')"
+          [ -n "$V_URL"   ] || note "variable MQTT_URL — mqtts://<your-cluster>.hivemq.cloud:8883"
+          [ -n "$V_USER"  ] || note "variable MQTT_USERNAME — meganet-bridge"
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Set the values listed above under Settings → Secrets and variables → Actions, then run this workflow again."
+            exit 1
+          fi
+          case "$V_URL" in
+            mqtts://*|wss://*) : ;;
+            *) echo "::error::MQTT_URL must start with mqtts:// or wss://. A plain mqtt:// URL sends the broker password in clear text, and the bridge refuses it." ; exit 1 ;;
+          esac
+          echo "All five are set."
+
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Create the app if this is the first run
+        # `apps create` fails when the app already exists, which is the normal
+        # case on every run after the first. That is not an error here, so the
+        # existence check comes first and the create is only attempted when the
+        # app genuinely is not there.
+        #
+        # Asked with `status` rather than by parsing `apps list --json`: the
+        # JSON key for the name has been both `Name` and `name` across flyctl
+        # versions, and a grep that silently stops matching would try to create
+        # the app on every run.
+        run: |
+          if flyctl status --app "$APP" >/dev/null 2>&1; then
+            echo "App $APP already exists — leaving it alone."
+          else
+            echo "No app named $APP — creating it."
+            flyctl apps create "$APP" --org personal
+          fi
+
+      - name: Stage the secrets on the app
+        # --stage writes them without triggering a deploy of its own; the
+        # deploy step below picks them up. Without it, `secrets set` starts its
+        # own release and the next step races it.
+        #
+        # These are the only values that are secret. MEGANET_API_URL and
+        # MEGANET_API_KEY are the publishable pair the browser app already
+        # ships, so they are literals rather than repository secrets — see
+        # core.js and bridge/.env.example.
+        #
+        # Values arrive through `env:` and are referenced as shell variables,
+        # never interpolated into the script text — same reason as the check
+        # step above. flyctl accepts NAME=value pairs, and the shell expands
+        # each one safely because it is quoted here rather than pasted.
+        env:
+          V_URL:   ${{ vars.MQTT_URL }}
+          V_USER:  ${{ vars.MQTT_USERNAME }}
+          S_PASS:  ${{ secrets.MQTT_PASSWORD }}
+          S_TOKEN: ${{ secrets.MEGANET_INGEST_TOKEN }}
+        run: |
+          flyctl secrets set --app "$APP" --stage \
+            MQTT_URL="$V_URL" \
+            MQTT_USERNAME="$V_USER" \
+            MQTT_PASSWORD="$S_PASS" \
+            MEGANET_API_URL='https://jjprlritvhdqpvphfrnu.supabase.co/rest/v1' \
+            MEGANET_API_KEY='sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY' \
+            MEGANET_INGEST_TOKEN="$S_TOKEN"
+
+      - name: Deploy
+        # Run from the REPO ROOT so the Docker build context is the repo root —
+        # bridge/src/messages.js requires ../../hfem.js, and a context of
+        # bridge/ fails at the COPY line. --remote-only builds on Fly's
+        # builders rather than this runner, which is what Fly's own CI guidance
+        # recommends and keeps the runner out of the Docker business entirely.
+        run: |
+          flyctl deploy . \
+            --config bridge/fly.toml \
+            --dockerfile bridge/Dockerfile \
+            --app "$APP" \
+            --primary-region '${{ inputs.region }}' \
+            --remote-only \
+            --wait-timeout 300
+
+      - name: Say what is running, and what to look for
+        if: always()
+        run: |
+          echo "### MQTT bridge deploy" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          flyctl status --app "$APP" >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
+          {
+            echo ""
+            echo "**Next:** open the app's Live Logs in the Fly dashboard. A healthy start is"
+            echo "\`connected to broker\` followed by three \`subscribed … qos=1\` lines."
+            echo ""
+            echo "If you see \`subscribe_downgraded\` at error level, the broker granted QoS 0"
+            echo "where the bridge asked for 1 — at-least-once delivery is not in force, and"
+            echo "that is a broker setting, not a bridge one."
+          } >> "$GITHUB_STEP_SUMMARY"
