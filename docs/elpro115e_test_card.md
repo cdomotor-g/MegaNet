@@ -2,8 +2,12 @@
 
 **For the technician configuring the test unit.** One sitting, about an hour.
 You do not need to know anything about MegaNet, and you should not need to read
-anything else. If a value is not on this card it will be on the **blanks sheet**
-that came with it.
+anything else. If a value is not on this card it will be on the **settings sheet**
+that came with it — every `▢` below is a line on that sheet.
+
+*(Sending this to someone? The sheet is built from
+[`elpro115e_blanks_sheet.md`](elpro115e_blanks_sheet.md) — fill it in, then send its
+last section along with this card.)*
 
 **What success looks like:** you press *Save and Activate*, ring the contact on
 the sheet, and within a minute they tell you a reading from your unit has
@@ -21,7 +25,7 @@ appeared in their system. That is the whole test.
 
 | You need | Notes |
 |---|---|
-| The **blanks sheet** | Broker address, passwords, IP settings. Every `▢` below is on it. |
+| The **settings sheet** | Broker address, passwords, IP settings. Every `▢` below is on it. |
 | A **115E-2**, powered | Firmware **V2.33 or later** — check the home page. Below that it cannot do MQTT at all. |
 | **USB-A → USB-B cable** | The unit's port is USB-B, on the bottom. |
 | A **Windows laptop** with **CConfig** | Version 2.1.0.72 or later. From elprotech.com → Resources → 115E-2 → Software. |

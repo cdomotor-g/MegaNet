@@ -16,7 +16,10 @@ Part A produces a **credentials sheet**; Part B consumes it and produces a
 to understand the other's tools — that is the point of splitting them.
 
 > ### Running the trial with a technician you cannot stand next to?
-> **[`elpro115e_test_card.md`](elpro115e_test_card.md) is the page to send them.**
+> **[`elpro115e_test_card.md`](elpro115e_test_card.md) is the page to send them**, and
+> **[`elpro115e_blanks_sheet.md`](elpro115e_blanks_sheet.md) is the one you fill in first** —
+> every value the card asks for, with where to find it, and the three rows that are the
+> other office's to supply rather than yours.
 > It is one sitting, assumes no MegaNet knowledge, and gets a real reading into
 > the database against the `elpro_test` station — which exists in the registry for
 > exactly this (`db/migrations/0021_elpro_test_station.sql`, publisher `elpro_test`,
