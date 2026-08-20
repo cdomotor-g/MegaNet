@@ -15,6 +15,15 @@ Part A produces a **credentials sheet**; Part B consumes it and produces a
 **returned record**. Neither half can finish without the other, and neither needs
 to understand the other's tools — that is the point of splitting them.
 
+> ### Running the trial with a technician you cannot stand next to?
+> **[`elpro115e_test_card.md`](elpro115e_test_card.md) is the page to send them.**
+> It is one sitting, assumes no MegaNet knowledge, and gets a real reading into
+> the database against the `elpro_test` station — which exists in the registry for
+> exactly this (`db/migrations/0021_elpro_test_station.sql`, publisher `elpro_test`,
+> addresses `9001`–`9003`). This page stays the reference behind it: it says *why*
+> each setting is what it is, and it is what you read when the card's last section
+> comes back with an answer that surprises you.
+
 **Related pages.** [`ingest-mqtt.md`](ingest-mqtt.md) is the design — the topic
 scheme and why it is shaped the way it is. [`mqtt-provisioning.md`](mqtt-provisioning.md)
 is how the broker and bridge get stood up, which is a prerequisite for this page and
@@ -102,10 +111,10 @@ Adding a third costs a subscription line and a parser:
 | Resulting topic | **`meganet/v1/<station>/logger/reading/elpro`** |
 | **Payload Prefix** per input | the reading's **ALERT2 address**, e.g. `6128` |
 
-| In `bridge/` | Change |
+| In `bridge/` | Status |
 |---|---|
-| `src/topics.js` | add `'elpro'` to `READING_FORMATS`, and `meganet/v1/+/+/reading/elpro` at QoS 1 to `SUBSCRIPTIONS` |
-| `src/messages.js` | add `parseElpro()`: take `timestamp` as `reading_ts`, and turn every other key/value pair into `{alert_id: <key>, reading_ts, value_raw: <value>}` |
+| `src/topics.js` | **done** — `'elpro'` is in `READING_FORMATS`, and `meganet/v1/+/+/reading/elpro` is subscribed at QoS 1 |
+| `src/messages.js` | **done** — `parseElpro()` takes `timestamp` as `reading_ts` and turns every address-keyed pair into `{alert_id, reading_ts, value_raw}`. **A payload it cannot read is captured, not discarded**: zero readings, raw bytes in `frame`, which reaches `meganet.reading_raw` because `ingest_http()` writes the raw row before it validates any reading |
 
 Why the address goes in the Payload Prefix rather than a lookup table: **the label
 auto-increments**. "If an input count of greater than 1 is used, then a count number will
@@ -302,13 +311,13 @@ Items 1–3 are a gate. Do not order hardware or brief a technician past them.
    **The ALERT2 gateway is definitely licensed** (p.49) and needs firmware ≥ 2.33.
    If you are relaying ALERT2, budget for it.
 
-3. **Confirm the path and schedule the bridge change.** Path B is the recommendation and
-   the change is small — a `'elpro'` entry in `READING_FORMATS`, a fourth subscription, and
-   a `parseElpro()` alongside `parseHfem()`. It should be written against the payload bytes
-   captured in item 1, not against this page, and it wants a `bridge/test/` case in the same
-   shape as the HFEM one. Decide who owns it before a technician is booked, because a
-   provisioned unit publishing to a topic nothing subscribes to looks identical to a broken
-   one.
+3. ~~**Confirm the path and schedule the bridge change.**~~ — **done.** Path B shipped:
+   `READING_FORMATS` carries `elpro`, the bridge subscribes to
+   `meganet/v1/+/+/reading/elpro`, and `parseElpro()` sits beside `parseHfem()` with unit
+   and integration tests. **It is deliberately permissive** — a payload it cannot read
+   returns zero readings and puts the raw bytes in the envelope's `frame`, so an
+   undocumented shape lands in `meganet.reading_raw` instead of an ephemeral container log.
+   That is what makes a remote test safe to run before anyone has seen this hardware.
 
 ### A1 · Fleet standards
 
@@ -1098,11 +1107,13 @@ here as a record, because knowing a question is *settled* is worth as much as th
 
 ### E3 · Not in MegaNet either
 
-- **No `elpro` parser yet.** `READING_FORMATS = ['json', 'hfem']`, and the third entry
-  this page recommends does not exist. The bridge will ignore
-  `meganet/v1/+/+/reading/elpro` until it is written — the subscription and the parser go
-  in together, because "the subscription without the parser is a message the bridge acks
-  nothing about" (`bridge/src/topics.js:66-70`).
+- ~~**No `elpro` parser yet.**~~ — shipped. `READING_FORMATS = ['json', 'hfem', 'elpro']`,
+  the fourth subscription is live, and `parseElpro()` decodes `timestamp` plus
+  address-keyed values. One latent bug came out with it: `parseTopic()` gated the sixth
+  topic segment on a hard-coded `!== 'hfem'`, so a correctly-subscribed `…/reading/elpro`
+  would have parsed as *unknown* and been dropped with the subscription looking right in
+  the log. It reads from `READING_SUFFIXES` now, and a test asserts the two lists agree
+  rather than asserting one string.
 - **No topic prefix, rewrite or template setting exists in the bridge**, and none is
   needed now that the device's prefix is free-form — but it does mean the device must
   spell MegaNet's topic exactly, not approximately.

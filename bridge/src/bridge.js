@@ -7,7 +7,7 @@
 const mqtt = require('mqtt');
 
 const { SUBSCRIPTIONS, parseTopic } = require('./topics');
-const { parseReadings, parseHfem, parseStatus, PoisonMessage } = require('./messages');
+const { parseReadings, parseHfem, parseElpro, parseStatus, PoisonMessage } = require('./messages');
 const { createBatcher } = require('./batcher');
 const { createHealth } = require('./health');
 const { createSink } = require('./sink');
@@ -173,7 +173,9 @@ function createBridge(config, deps = {}) {
       // this line knows HFEM exists.
       parsed = route.format === 'hfem'
         ? parseHfem(packet.payload)
-        : parseReadings(packet.payload);
+        : route.format === 'elpro'
+          ? parseElpro(packet.payload)
+          : parseReadings(packet.payload);
     } catch (err) {
       if (err instanceof PoisonMessage) {
         health.rejected(1);

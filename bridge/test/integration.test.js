@@ -23,6 +23,7 @@ const mqtt = require('mqtt');
 
 const { loadConfig } = require('../src/config');
 const { createBridge } = require('../src/bridge');
+const { SUBSCRIPTIONS } = require('../src/topics');
 const { createLogger } = require('../src/log');
 
 const QUIET = { write() {} }; // the bridge's logs, not the test runner's problem
@@ -423,6 +424,58 @@ test('an HFEM line published to …/reading/hfem lands decoded, mapped and frame
   await waitFor(() => broker.bridgeAcks().length === 2, { what: 'both HFEM messages to be acked' });
 });
 
+test('an ELPRO payload lands decoded, and an unreadable one still lands its bytes (#166/#167)', async (t) => {
+  const broker = await startBroker();
+  const api = await startApi();
+  const bridge = startBridge(broker.port, api.url);
+  t.after(async () => {
+    await closeStations();
+    await bridge.stop();
+    await api.close();
+    await broker.close();
+  });
+
+  await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the bridge to subscribe' });
+
+  const station = await connectStation(broker.port, 'elpro_test');
+  const topic = 'meganet/v1/elpro_test/logger/reading/elpro';
+
+  // What the device sends when it has been configured off the test card: the
+  // Payload Prefix is the ALERT address, so the JSON key IS the address.
+  const good = '{"timestamp":954711743792,"9001":17.61,"9003":13.8356}';
+  // And what it might send instead. This is the whole reason the elpro parser
+  // does not throw: nobody here has had a 115E-2 on a bench, so a shape the
+  // vendor's guide did not describe must reach the database rather than an
+  // ephemeral container log. Zero readings, bytes preserved.
+  const unreadable = 'ELPRO 115E-2 <not json at all>';
+
+  await station.publishAsync(topic, good, { qos: 1 });
+  await station.publishAsync(topic, unreadable, { qos: 1 });
+
+  // One POST each: `frame` differs per message, so groupByEnvelope never merges
+  // two ELPRO messages — merging them would merge the evidence.
+  await waitFor(() => api.of('ingest_http').length === 2, { what: 'both ELPRO messages to reach the database' });
+  const calls = api.of('ingest_http').map((c) => c.body.payload);
+
+  const decoded = calls.find((p) => p.frame === good);
+  assert.ok(decoded, 'the readable payload reached the database');
+  assert.equal(decoded.source, 'mqtt');
+  assert.equal(decoded.protocol, 'elpro');
+  assert.deepEqual(decoded.readings, [
+    { alert_id: 9001, reading_ts: 954711743792, value_raw: 17.61 },
+    { alert_id: 9003, reading_ts: 954711743792, value_raw: 13.8356 },
+  ]);
+
+  const captured = calls.find((p) => p.frame === unreadable);
+  assert.ok(captured, 'the unreadable payload reached the database anyway');
+  assert.equal(captured.protocol, 'elpro');
+  assert.deepEqual(captured.readings, [], 'nothing claimed, everything kept');
+
+  // Both acked — the second one because its bytes were stored, not because the
+  // bridge gave up on it.
+  await waitFor(() => broker.bridgeAcks().length === 2, { what: 'both ELPRO messages to be acked' });
+});
+
 test('a bridge that was down loses nothing: the broker held the hour and hands it back (#163)', async (t) => {
   const broker = await startBroker();
   const api = await startApi();
@@ -521,14 +574,16 @@ test('a broker granting QoS 0 is called out loud — subscribe_downgraded (#163)
 
   for (const fn of handlers.connect) fn({ sessionPresent: false });
 
+  // Counted and named off SUBSCRIPTIONS rather than pinned to a literal list:
+  // adding the elpro format made a hard-coded 3 fail here, in a test about QoS
+  // downgrades, which says nothing about what actually changed.
   const downgraded = logs.of('subscribe_downgraded');
-  assert.equal(downgraded.length, 3, 'one line per downgraded subscription');
+  assert.equal(downgraded.length, SUBSCRIPTIONS.length, 'one line per downgraded subscription');
   assert.ok(downgraded.every((l) => l.level === 'error' && l.granted_qos === 0));
-  assert.deepEqual(downgraded.map((l) => l.topic).sort(), [
-    'meganet/v1/+/+/reading',
-    'meganet/v1/+/+/reading/hfem',
-    'meganet/v1/+/status',
-  ]);
+  assert.deepEqual(
+    downgraded.map((l) => l.topic).sort(),
+    SUBSCRIPTIONS.map((s) => s.topic).sort(),
+  );
 });
 
 test('a status deferred by a blinking sink is retried in-process, not parked until reconnect (#163)', async (t) => {

@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { parseTopic, readingTopic, statusTopic, stationAcl, SUBSCRIPTIONS } = require('../src/topics');
+const { parseTopic, readingTopic, statusTopic, stationAcl, SUBSCRIPTIONS , READING_SUFFIXES } = require('../src/topics');
 
 test('builds the topics a station publishes to', () => {
   assert.equal(readingTopic('loudoun_br_al', 'logger'), 'meganet/v1/loudoun_br_al/logger/reading');
@@ -93,10 +93,11 @@ test('a topic outside the scheme is unknown, never a throw', () => {
   }
 });
 
-test('the subscriptions cover all three topic kinds, at QoS 1', () => {
+test('the subscriptions cover every topic kind, at QoS 1', () => {
   assert.deepEqual(SUBSCRIPTIONS, [
     { topic: 'meganet/v1/+/+/reading', qos: 1 },
     { topic: 'meganet/v1/+/+/reading/hfem', qos: 1 },
+    { topic: 'meganet/v1/+/+/reading/elpro', qos: 1 },
     { topic: 'meganet/v1/+/status', qos: 1 },
   ]);
 });
@@ -108,15 +109,57 @@ test('the subscription wildcards match what the builders produce', () => {
     if (f.length !== t.length) return false;
     return f.every((seg, i) => seg === '+' || seg === t[i]);
   };
-  const [json, hfem, status] = SUBSCRIPTIONS;
+  // Found by filter rather than by position: destructuring the array meant
+  // adding a fourth subscription silently re-pointed `status` at the new one,
+  // and the test failed somewhere unrelated to what changed.
+  const byTopic = (t) => SUBSCRIPTIONS.find((s) => s.topic === t);
+  const json = byTopic('meganet/v1/+/+/reading');
+  const hfem = byTopic('meganet/v1/+/+/reading/hfem');
+  const elpro = byTopic('meganet/v1/+/+/reading/elpro');
+  const status = byTopic('meganet/v1/+/status');
   assert.ok(matches(json.topic, readingTopic('x_al', 'logger')));
   assert.ok(matches(hfem.topic, readingTopic('x_al', 'logger', 'hfem')));
+  assert.ok(matches(elpro.topic, readingTopic('x_al', 'logger', 'elpro')));
   assert.ok(matches(status.topic, statusTopic('x_al')));
-  // and do not overlap: `+` matches exactly one level, so the three
-  // subscriptions are disjoint — a payload can never arrive on the wrong
-  // parser because two filters both matched its topic.
-  assert.ok(!matches(json.topic, statusTopic('x_al')));
-  assert.ok(!matches(json.topic, readingTopic('x_al', 'logger', 'hfem')));
-  assert.ok(!matches(hfem.topic, readingTopic('x_al', 'logger')));
-  assert.ok(!matches(status.topic, readingTopic('x_al', 'logger')));
+  // and do not overlap: `+` matches exactly one level, so every subscription is
+  // disjoint from every other — a payload can never arrive on the wrong parser
+  // because two filters both matched its topic.
+  for (const a of SUBSCRIPTIONS) {
+    for (const b of SUBSCRIPTIONS) {
+      if (a === b) continue;
+      assert.ok(!matches(a.topic, b.topic.replace(/\+/g, 'x_al')),
+        `${a.topic} must not also match ${b.topic}`);
+    }
+  }
+});
+
+// ── The third reading format (#167) ──────────────────────────────────────────
+
+test('elpro rides as a topic suffix, and is subscribed to', () => {
+  assert.deepEqual(parseTopic('meganet/v1/elpro_test/logger/reading/elpro'), {
+    kind: 'reading', station: 'elpro_test', device: 'logger', format: 'elpro',
+  });
+  assert.ok(
+    SUBSCRIPTIONS.some((s) => s.topic === 'meganet/v1/+/+/reading/elpro' && s.qos === 1),
+    'the parser without the subscription is a message nobody receives',
+  );
+});
+
+test('every subscribed suffix parses — the check the hard-coded literal skipped', () => {
+  // parseTopic gated the sixth segment on `!== 'hfem'` until the third format
+  // arrived. A correctly-subscribed …/reading/elpro would have parsed as
+  // unknown and been acked-and-dropped, with the subscription looking right in
+  // the log. This asserts the two lists agree rather than that one string does.
+  for (const format of READING_SUFFIXES) {
+    const topic = `meganet/v1/s/logger/reading/${format}`;
+    assert.equal(parseTopic(topic).format, format, `${topic} must parse`);
+    assert.ok(
+      SUBSCRIPTIONS.some((s) => s.topic === `meganet/v1/+/+/reading/${format}`),
+      `${format} parses but is not subscribed`,
+    );
+  }
+});
+
+test('json is not spellable as a suffix', () => {
+  assert.equal(parseTopic('meganet/v1/s/logger/reading/json').kind, 'unknown');
 });

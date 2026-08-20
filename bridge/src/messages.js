@@ -227,4 +227,84 @@ function truncate(text, n) {
   return text.length <= n ? text : `${text.slice(0, n)}…`;
 }
 
-module.exports = { MAX_READINGS, MAX_BYTES, PoisonMessage, parseReadings, parseHfem, parseStatus };
+/**
+ * Parse an ELPRO-topic payload — what a 115E-2 (or any x15U gateway) publishes
+ * in plain, non-Sparkplug MQTT mode:
+ *
+ *   {"timestamp": 954711743792, "River Level": 17.61, "Battery Voltage": 13.8}
+ *
+ * `timestamp` is Linux epoch MILLISECONDS, which meganet.as_ts() already takes
+ * as a number (it divides anything >= 1e11 by 1000). Every other key is a
+ * "Payload Prefix" chosen per input on the device's MQTT I/O page, and the
+ * provisioning card asks for it to be the reading's ALERT address — so the key
+ * IS the address, and no mapping table exists for anybody to keep in step.
+ *
+ * **This parser never throws for a payload it cannot read**, which is the one
+ * place it deliberately differs from parseReadings() and parseHfem(). Those two
+ * decode formats this project defined; this one decodes a format a vendor
+ * controls, from a device nobody here has ever had on a bench. A message that
+ * arrives in a shape the documentation did not describe is the single most
+ * valuable thing this path can produce, and throwing PoisonMessage would ack it,
+ * log a line to an ephemeral container log, and lose the bytes.
+ *
+ * So an unreadable payload returns zero readings and an envelope carrying the
+ * raw text in `frame`. ingest_http() writes meganet.reading_raw BEFORE it
+ * validates any row, so the bytes land in the database either way — and
+ * `reading_raw.frame` is documented for exactly this ("the MQTT topic and
+ * bytes"). Zero readings is a well-formed batch, not an error: raw stored,
+ * nothing claimed.
+ *
+ * The size and count limits still throw, because those are the two cases where
+ * accepting the message is what causes harm rather than what preserves evidence.
+ */
+function parseElpro(payload, receivedAt = () => new Date().toISOString()) {
+  if (payload == null || payload.length === 0) {
+    throw new PoisonMessage('empty payload');
+  }
+  if (payload.length > MAX_BYTES) {
+    throw new PoisonMessage(`payload is ${payload.length} bytes, over the ${MAX_BYTES}-byte limit`);
+  }
+
+  const text = payload.toString('utf8');
+  // `frame` is per-message, so batcher.groupByEnvelope() gives every ELPRO
+  // message its own POST and therefore its own reading_raw row. That is the
+  // point: merging two messages would merge the evidence.
+  const envelope = { protocol: 'elpro', frame: text };
+
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return { readings: [], envelope };
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { readings: [], envelope };
+  }
+
+  const stamp = typeof body.timestamp === 'number' && Number.isFinite(body.timestamp)
+    ? body.timestamp
+    : receivedAt();
+
+  const readings = [];
+  for (const [key, value] of Object.entries(body)) {
+    if (key === 'timestamp') continue;
+    // Anything that is not an address-shaped key over a finite number is left
+    // in the frame rather than guessed at. A label like "River Level" is a
+    // device configured against the documentation instead of against the card;
+    // the raw row says so, and nothing is invented to cover it.
+    const alertId = Number(key);
+    if (!Number.isInteger(alertId) || alertId < 1 || alertId > 65535) continue;
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    readings.push({ alert_id: alertId, reading_ts: stamp, value_raw: value });
+  }
+
+  if (readings.length > MAX_READINGS) {
+    throw new PoisonMessage(
+      `ELPRO message maps to ${readings.length} readings, over the ${MAX_READINGS}-reading limit`,
+    );
+  }
+
+  return { readings, envelope };
+}
+
+module.exports = { MAX_READINGS, MAX_BYTES, PoisonMessage, parseReadings, parseHfem, parseElpro, parseStatus };

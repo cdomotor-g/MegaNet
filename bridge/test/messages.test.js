@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { parseReadings, parseHfem, parseStatus, PoisonMessage, MAX_READINGS } = require('../src/messages');
+const { parseReadings, parseHfem, parseElpro, parseStatus, PoisonMessage, MAX_READINGS } = require('../src/messages');
 
 const buf = (value) => Buffer.from(typeof value === 'string' ? value : JSON.stringify(value));
 
@@ -174,4 +174,71 @@ test('hfem: an oversized payload is refused without being parsed', () => {
 
 test('an HFEM line on the JSON topic is poison that says where to publish instead', () => {
   assert.throws(() => parseReadings(buf(HFEM_LINE)), /reading\/hfem/);
+});
+
+// ── ELPRO plain MQTT (#166/#167) ─────────────────────────────────────────────
+// The documented payload (ELPRO x15U MQTT gateway guide, p.4) is a JSON object
+// of `timestamp` in epoch milliseconds plus free-text label/value pairs. The
+// provisioning card asks for the label to be the reading's ALERT address, which
+// is what makes the key the address and removes the mapping table.
+
+test('elpro: decodes timestamp and address-keyed values', () => {
+  const { readings, envelope } = parseElpro(
+    buf({ timestamp: 954711743792, 9001: 17.61, 9003: 13.8356 }),
+  );
+  assert.deepEqual(readings, [
+    { alert_id: 9001, reading_ts: 954711743792, value_raw: 17.61 },
+    { alert_id: 9003, reading_ts: 954711743792, value_raw: 13.8356 },
+  ]);
+  assert.equal(envelope.protocol, 'elpro');
+  assert.match(envelope.frame, /954711743792/);
+});
+
+test('elpro: the raw text is always in the envelope frame, verbatim', () => {
+  const raw = '{"timestamp":1,"9001":2}';
+  assert.equal(parseElpro(Buffer.from(raw)).envelope.frame, raw);
+});
+
+test('elpro: a payload it cannot read is captured, never thrown away', () => {
+  // The whole point of the hardening: a shape the documentation did not
+  // describe is the most valuable thing this path can produce, so it must reach
+  // meganet.reading_raw rather than an ephemeral container log.
+  for (const bad of ['not json at all', '[1,2,3]', '"a string"', '42']) {
+    const { readings, envelope } = parseElpro(Buffer.from(bad));
+    assert.deepEqual(readings, [], `${bad} should yield no readings`);
+    assert.equal(envelope.frame, bad, `${bad} should survive in the frame`);
+    assert.equal(envelope.protocol, 'elpro');
+  }
+});
+
+test('elpro: documented human labels yield no readings but keep the evidence', () => {
+  // A device configured against ELPRO's own example rather than against our
+  // card. Nothing is guessed; the raw row says exactly what arrived.
+  const { readings, envelope } = parseElpro(
+    buf({ timestamp: 954711743792, 'River Level': 17.61 }),
+  );
+  assert.deepEqual(readings, []);
+  assert.match(envelope.frame, /River Level/);
+});
+
+test('elpro: skips keys outside the alert_id range and non-numeric values', () => {
+  const { readings } = parseElpro(
+    buf({ timestamp: 1, 0: 5, 65536: 5, 9001: 'twelve', 9002: null, 9003: 7 }),
+  );
+  assert.deepEqual(readings, [{ alert_id: 9003, reading_ts: 1, value_raw: 7 }]);
+});
+
+test('elpro: falls back to receipt time when timestamp is missing or unusable', () => {
+  const at = () => '2026-08-19T05:30:00Z';
+  assert.equal(parseElpro(buf({ 9001: 1 }), at).readings[0].reading_ts, at());
+  assert.equal(parseElpro(buf({ timestamp: 'yesterday', 9001: 1 }), at).readings[0].reading_ts, at());
+});
+
+test('elpro: still throws for the two cases where accepting causes the harm', () => {
+  assert.throws(() => parseElpro(Buffer.alloc(0)), PoisonMessage);
+  assert.throws(() => parseElpro(Buffer.alloc(300 * 1024, 0x20)), PoisonMessage);
+
+  const many = { timestamp: 1 };
+  for (let i = 1; i <= MAX_READINGS + 1; i += 1) many[i] = i;
+  assert.throws(() => parseElpro(buf(many)), PoisonMessage);
 });

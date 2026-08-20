@@ -67,7 +67,13 @@ function isSegment(value) {
 // anything else is a suffix segment. Growing this set means teaching
 // messages.js the shape first — the subscription without the parser is a
 // message the bridge acks nothing about.
-const READING_FORMATS = ['json', 'hfem'];
+const READING_FORMATS = ['json', 'hfem', 'elpro'];
+
+// The formats that ride as a trailing topic segment. 'json' is the bare
+// `…/reading` topic and is deliberately not spellable as a suffix — a publisher
+// that sent `…/reading/json` would be describing the default, and two topics
+// meaning the same thing is a diagnosis nobody wants to make at 2am.
+const READING_SUFFIXES = READING_FORMATS.filter((f) => f !== 'json');
 
 /**
  * The topic a device publishes readings to. `format` defaults to 'json' — the
@@ -104,6 +110,7 @@ function stationAcl(station) {
 const SUBSCRIPTIONS = [
   { topic: `${PREFIX}/+/+/reading`, qos: 1 },
   { topic: `${PREFIX}/+/+/reading/hfem`, qos: 1 },
+  { topic: `${PREFIX}/+/+/reading/elpro`, qos: 1 },
   { topic: `${PREFIX}/+/status`, qos: 1 },
 ];
 
@@ -128,11 +135,17 @@ function parseTopic(topic) {
   if ((parts.length === 5 || parts.length === 6) && parts[4] === 'reading') {
     if (!isSegment(parts[2])) return { kind: 'unknown', why: `bad station segment: ${parts[2]}` };
     if (!isSegment(parts[3])) return { kind: 'unknown', why: `bad device segment: ${parts[3]}` };
-    if (parts.length === 6 && parts[5] !== 'hfem') {
+    if (parts.length === 6 && !READING_SUFFIXES.includes(parts[5])) {
       // A format segment nobody taught messages.js to parse. Unknown → acked
       // and logged (bridge.js), which is the right end for it — but the
       // subscription list above never matches one, so seeing this log line
       // means somebody published past the subscriptions, not through them.
+      //
+      // Read from READING_SUFFIXES rather than compared against a literal: this
+      // line said `!== 'hfem'` until the third format arrived, which would have
+      // made a correctly-subscribed `…/reading/elpro` message parse as unknown
+      // and be dropped — a new format that fails by being silently ignored is
+      // the worst shape of all, since the subscription looks right in the log.
       return { kind: 'unknown', why: `unknown reading format segment: ${parts[5]}` };
     }
     return { kind: 'reading', station: parts[2], device: parts[3],
@@ -160,6 +173,7 @@ module.exports = {
   VERSION,
   PREFIX,
   READING_FORMATS,
+  READING_SUFFIXES,
   SUBSCRIPTIONS,
   isSegment,
   parseTopic,
