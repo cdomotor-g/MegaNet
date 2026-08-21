@@ -78,23 +78,63 @@ has the reasoning.
 |---|---|---|
 | **IP/Name** (broker hostname) | ▢ | GitHub → this repo → **Settings** → **Secrets and variables** → **Actions** → the **Variables** tab → `MQTT_URL`. It reads `mqtts://<something>.hivemq.cloud:8883`; **the sheet wants just the hostname**, without `mqtts://` and without `:8883`. It is a *variable* rather than a secret exactly so you can read it back — see [`mqtt-provisioning.md`](mqtt-provisioning.md) §3.2. Failing that, the cluster's **Overview** page in the HiveMQ console shows it. |
 
-### B3 · TLS
+### B3 · TLS — and the two files that do not exist
 
-HiveMQ Cloud requires TLS, so this section applies.
+**A technician will ask you for three files. Two of them are not things.**
 
-| Field | Value | Where to get it |
-|---|---|---|
-| **CA certificate file** | ▢ *(attach the file)* | The root certificate of whoever signed your broker's certificate. HiveMQ Cloud uses a public CA, so this is a download from that CA rather than something you generate. Find it from the cluster's connection-settings page in the HiveMQ console, or open `https://<your-broker-host>` in a browser and inspect the certificate chain — the topmost certificate is the root you need, in **PEM** form. |
-| **Client certificate** | ▢ *(usually leave blank)* | Only if you are doing mutual TLS. HiveMQ Cloud's normal setup does not need one. |
-| **Client private key** | ▢ *(usually leave blank)* | As above. |
+| What they ask for | The answer |
+|---|---|
+| **Client certificate** | **Does not exist.** Do not go looking. |
+| **Client private key** | **Does not exist.** Do not go looking. |
+| **CA certificate** | Real, public, not a secret — and quite possibly not needed either. |
 
-> **This is the row most likely to need a second go, and the card is written for that.**
-> ELPRO's documentation demands all three files whenever TLS is ticked, but also says a
-> username and password may be enough — and nobody has yet run a 115E-2 to find out which
-> is true. **The card asks the technician to try the CA certificate on its own first and
-> tell us what happened.** If it refuses, that is a real finding, not a failure: it means
-> every future unit needs its own issued certificate, which is a much bigger programme, and
-> better to learn now on one unit than later on forty.
+**Why.** The client certificate and key are for **mutual TLS**, where the broker
+makes each device prove its identity with a certificate issued to it. HiveMQ Cloud
+does not work that way: the device proves who it is with the **username and
+password** from §B1. There is nothing to issue and nothing to send.
+
+The **CA certificate** does the opposite job — it is how the *device* checks that
+whatever answers on port 8883 really is your broker, rather than something sitting
+in the middle. Because your broker's certificate is signed by a **public** CA, the
+root is a public download, not something you generate.
+
+**Tell the technician to work down this ladder** (the card already does):
+
+1. **Tick TLS and upload nothing.** Many devices carry the common public roots
+   built in. If it connects, there is nothing to send and nothing to do.
+2. **CA certificate only**, if step 1 is refused.
+3. **Stop and ring**, if step 2 is refused. Do not improvise a client certificate.
+
+#### Getting the CA certificate, if step 2 is reached
+
+Three ways, easiest first. All give the same file: the **root** certificate, in
+**PEM / Base-64** form (a text file starting `-----BEGIN CERTIFICATE-----`).
+
+**(a) From the Windows certificate store** — no downloads, no tools, and the
+technician can do it on the laptop already in front of them:
+
+  `Win+R` → `certmgr.msc` → **Trusted Root Certification Authorities** →
+  **Certificates** → find the CA that signed your broker (see (c) to identify it) →
+  right-click → **All Tasks** → **Export** → **Base-64 encoded X.509 (.CER)**.
+
+**(b) From the HiveMQ console.** Your cluster's connection/getting-started page
+names the CA it uses and generally links the download.
+
+**(c) Read it off the broker directly**, which also tells you *which* CA to look
+for in (a). From any machine with OpenSSL — Git Bash, WSL or macOS:
+
+```sh
+openssl s_client -connect <your-broker-host>:8883 -showcerts </dev/null 2>/dev/null \
+  | openssl x509 -noout -issuer -subject
+```
+
+The **issuer** of the last certificate in the chain is the root you need. To save
+that chain to a file, drop the second pipe and copy the final
+`-----BEGIN CERTIFICATE-----` block.
+
+> **Do not send a `.pfx`, a `.p12`, or anything you had to type a password to
+> open.** Those carry private keys. The CA certificate is public — if what you are
+> about to attach is secret, it is the wrong file.
 
 ### B4 · Identity labels
 
@@ -171,8 +211,10 @@ BROKER
   User name  station-elpro_test
   Password  .......................................
   Client ID  .......................................
-  TLS  yes — CA certificate attached
-       (try the CA on its own first; tell us if it insists on a client cert)
+  TLS  yes
+       Try connecting with NO certificate files first (see card 3.3).
+       If refused, ask for the CA certificate. There is no client
+       certificate and no client private key — they do not exist.
   Keep Alive 60   Clean Session OFF   Historian ON
   Queue Size 3000   Queue Delay 0
 

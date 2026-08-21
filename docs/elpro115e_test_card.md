@@ -30,7 +30,7 @@ appeared in their system. That is the whole test.
 | **USB-A → USB-B cable** | The unit's port is USB-B, on the bottom. |
 | A **Windows laptop** with **CConfig** | Version 2.1.0.72 or later. From elprotech.com → Resources → 115E-2 → Software. |
 | The **USB driver**, if you want the web pages | `Inst_Elpro_USB_Driver_2.0.0.2.exe_zip`, same place. Installing CConfig usually installs it. |
-| The **CA certificate file** | On or with the sheet. Only needed if the sheet says TLS. |
+| The **CA certificate file** | *Possibly not needed at all* — see 3.3. Try connecting with no certificate files first. |
 
 **Write the serial number off the side label before the unit is racked.** You
 will need it if the unit ever has to be reset, and the reset asks you to type it.
@@ -116,7 +116,7 @@ One broker. Fill the row across:
 | **User name** / **Password** | ▢ / ▢ |
 | **Queue Size (Max)** | `3000` |
 | **Queue Delay (s)** | `0` |
-| **TLS** | ✓ if the sheet says so — load the certificates first (3.3) |
+| **TLS** | ✓ — but read 3.3 first; you may not need to upload anything |
 
 If the broker is given by name rather than by number, the unit also needs DNS:
 **Network** page → Advanced Networking → Default Gateway, Primary DNS ▢,
@@ -126,18 +126,34 @@ Secondary DNS ▢ → *Save Changes and Reset*.
 > — do not go looking. If your unit *does* have them, that is a genuine finding
 > and we want to know.
 
-### 3.3 Certificates (only if the sheet says TLS)
+### 3.3 Certificates — try it with none first
 
-**MQTT Security** page → *Choose File* for each:
+> **There is no client certificate and no client private key for this broker, and
+> you have not been sent them because they do not exist.** Those two are for
+> *mutual TLS*, where the broker makes the device prove who it is with a
+> certificate of its own. Our broker does not do that — the unit proves who it is
+> with the **username and password** in 3.2. Leave both boxes empty.
 
-- **CA Certificate** ▢
-- **Client Certificate** ▢ — only if the sheet provides one
-- **Client Private Key** ▢ — only if the sheet provides one
+That leaves the **CA certificate**, which does the opposite job: it is how the
+115E-2 checks that the thing answering on port 8883 really is our broker. It is a
+public certificate, not a secret, and it may already be built into the unit.
 
-**Try the CA certificate on its own first.** ELPRO's documentation demands all
-three but also says a username and password may be enough, and nobody here knows
-which is true on this hardware. **Whichever way it goes, write it down** — it
-decides how much work every future unit is.
+**Work down this ladder and stop at the first one that connects:**
+
+1. **Tick TLS, upload nothing.** Username and password only, all three file boxes
+   empty. Save and activate, then look at the Connectivity page. **If it connects,
+   you are done** — skip the rest.
+2. **If it refuses**, load the **CA certificate** on the **MQTT Security** page
+   (*Choose File*), leaving the client certificate and key empty. Ask your contact
+   for the file if you do not already have it — §3.3 of their sheet says how they
+   get it, and it is about a two-minute job.
+3. **If it still refuses**, stop and ring. Do not go hunting for a client
+   certificate — if it turns out one is genuinely required, that is a decision
+   about every future unit, not something to solve on this one.
+
+**Write down which rung worked.** It is one of the most useful things this whole
+exercise produces: it decides whether rolling out forty of these is a shared
+password or a certificate-per-device programme.
 
 ### 3.4 The device
 
