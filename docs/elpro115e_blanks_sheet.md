@@ -107,34 +107,37 @@ root is a public download, not something you generate.
 
 #### Getting the CA certificate, if step 2 is reached
 
-Three ways, easiest first. All give the same file: the **root** certificate, in
-**PEM / Base-64** form (a text file starting `-----BEGIN CERTIFICATE-----`).
+**Easiest first — the script.** [`tools/get-broker-ca.ps1`](../tools/get-broker-ca.ps1)
+runs on any Windows machine with nothing installed. It opens the real connection to the
+real broker on the real port, asks Windows to build the certificate chain, and writes the
+root out as a PEM file:
 
-**(a) From the Windows certificate store** — no downloads, no tools, and the
-technician can do it on the laptop already in front of them:
-
-  `Win+R` → `certmgr.msc` → **Trusted Root Certification Authorities** →
-  **Certificates** → find the CA that signed your broker (see (c) to identify it) →
-  right-click → **All Tasks** → **Export** → **Base-64 encoded X.509 (.CER)**.
-
-**(b) From the HiveMQ console.** Your cluster's connection/getting-started page
-names the CA it uses and generally links the download.
-
-**(c) Read it off the broker directly**, which also tells you *which* CA to look
-for in (a). From any machine with OpenSSL — Git Bash, WSL or macOS:
-
-```sh
-openssl s_client -connect <your-broker-host>:8883 -showcerts </dev/null 2>/dev/null \
-  | openssl x509 -noout -issuer -subject
+```powershell
+powershell -ExecutionPolicy Bypass -File .\get-broker-ca.ps1 `
+    -BrokerHost your-cluster.s1.eu.hivemq.cloud
 ```
 
-The **issuer** of the last certificate in the chain is the root you need. To save
-that chain to a file, drop the second pipe and copy the final
-`-----BEGIN CERTIFICATE-----` block.
+It prints the chain, names the root, and writes two files beside itself:
+`<host>-ca-root.crt` (send this one first) and `<host>-ca-chain.crt` (only if the root
+alone is refused — some devices want the intermediates too).
 
-> **Do not send a `.pfx`, a `.p12`, or anything you had to type a password to
-> open.** Those carry private keys. The CA certificate is public — if what you are
-> about to attach is secret, it is the wrong file.
+> **If the script cannot connect, that is a finding, not a failure.** It means the machine
+> cannot reach the broker on 8883 — and the 115E-2 on the same network will not be able to
+> either. Check the firewall allows outbound TCP 8883 before anyone blames the device.
+
+**If you would rather not run a script**, two manual routes, both giving the same file — a
+text file starting `-----BEGIN CERTIFICATE-----`:
+
+- **The HiveMQ console.** Your cluster's connection / getting-started page names the CA it
+  uses and generally links the download.
+- **The Windows certificate store**, once you know which CA to look for (the script or the
+  console tells you): `Win+R` → `certmgr.msc` → **Trusted Root Certification Authorities**
+  → **Certificates** → find it → right-click → **All Tasks** → **Export** → **Base-64
+  encoded X.509 (.CER)**.
+
+> **Do not send a `.pfx`, a `.p12`, or anything you had to type a password to open.** Those
+> carry private keys. A CA certificate is public — if what you are about to attach is
+> secret, it is the wrong file.
 
 ### B4 · Identity labels
 
