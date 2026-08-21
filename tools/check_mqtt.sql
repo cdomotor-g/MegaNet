@@ -591,6 +591,60 @@ begin
 end
 $$;
 
+-- ── The test station survives a stations load (#169 follow-up, 0022) ────────
+-- This runs after the stations.json load step, which is the whole point of it
+-- being here rather than in the migration's own "did it take" block. 0021 was
+-- asserted at migration time and passed; what nothing asked was whether the row
+-- was still there once the loader had run. It was not — load_stations_doc() and
+-- import_stations_json.py are *syncs*, and elpro_test is the first station no
+-- document carries, so both deleted it and neither said so.
+--
+-- Four checks rather than one, because the failure that actually happened was
+-- partial: guarding the station prune alone left the row present and its sensors
+-- gone, which resolves no address at all and reads as "working" in every query
+-- that only looks at meganet.station.
+
+do $$
+begin
+  perform pg_temp.check_that('elpro_test survives the stations load',
+    exists (select 1 from meganet.station
+             where id = 'elpro_test' and deleted_at is null),
+    'the row is gone — a station prune has stopped respecting document_managed');
+
+  perform pg_temp.check_that('elpro_test is not document-managed',
+    exists (select 1 from meganet.station
+             where id = 'elpro_test' and not document_managed),
+    'the flag is what stops the loader deleting it; true here means the next load removes the row');
+
+  perform pg_temp.check_that('its three addresses survive too',
+    (select count(*) from meganet.sensor where station_id = 'elpro_test') = 3,
+    format('%s of 3 sensors left — resolve_station() matches addresses against these, so a station with none resolves nothing',
+           (select count(*) from meganet.sensor where station_id = 'elpro_test')));
+
+  perform pg_temp.check_that('and the trial address still resolves',
+    meganet.resolve_station(9003, null) is not distinct from 'elpro_test',
+    format('resolve_station(9003) = %s',
+           coalesce(meganet.resolve_station(9003, null), '(null)')));
+end
+$$;
+
+-- A station may now have no radio system (0022), and exactly one does. Asserted
+-- because the nullable column is what replaced a `not null` that Postgres used
+-- to enforce: if a real station ever arrives here with a null preset, that is a
+-- stations.json that lost the key, and this is the only thing left watching.
+
+do $$
+declare
+  n integer;
+begin
+  select count(*) into n from meganet.station
+   where rm_system_id is null and document_managed;
+  perform pg_temp.check_that('no document station has a null rm_system_id',
+    n = 0,
+    format('%s document-managed station(s) have no radio system — check_references() should have refused that file', n));
+end
+$$;
+
 -- ── The verdict ─────────────────────────────────────────────────────────────
 
 select lpad(ord::text, 2) as "#",

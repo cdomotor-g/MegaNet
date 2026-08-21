@@ -108,12 +108,18 @@ def qjson(value):
 
 # ── Table sync ───────────────────────────────────────────────────────────────
 
-def emit_sync(out, table, columns, key, rows, batch=500):
+def emit_sync(out, table, columns, key, rows, batch=500, prune_where=None):
     """Emit upsert-everything + delete-what-is-missing for one table.
 
-    columns  every data column, in order, as it appears in `rows`
-    key      the primary key columns — the conflict target and the delete match
-    rows     list of tuples of already-quoted SQL literals
+    columns      every data column, in order, as it appears in `rows`
+    key          the primary key columns — the conflict target and the delete match
+    rows         list of tuples of already-quoted SQL literals
+    prune_where  extra SQL predicate on `t` restricting what the delete may
+                 remove. Only meganet.station passes one, and it is the same
+                 clause 0022 put in load_stations_doc(): a row this file never
+                 described is not a row it may delete. Without it, loading
+                 stations.json removes every migration-created station — which
+                 is exactly what happened to elpro_test (#169 follow-up).
     """
     data_cols = [c for c in columns if c not in key]
     collist = ', '.join(columns)
@@ -139,19 +145,38 @@ def emit_sync(out, table, columns, key, rows, batch=500):
 
     # Delete what the file no longer carries. Written as a NOT EXISTS against a
     # VALUES list so it stays one statement whatever the row count.
+    guard = 'where %s\n  and ' % prune_where if prune_where else 'where '
     if rows:
         keyed = [tuple(r[columns.index(k)] for k in key) for r in rows]
-        out.write('delete from meganet.%s t where not exists (\n' % table)
+        out.write('delete from meganet.%s t %snot exists (\n' % (table, guard))
         out.write('  select 1 from (values\n')
         out.write(',\n'.join('    (%s)' % ', '.join(k) for k in keyed))
         out.write('\n  ) as v(%s)\n' % ', '.join(key))
         out.write('  where %s\n);\n' % ' and '.join(
             't.%s = v.%s' % (k, k) for k in key))
+    elif prune_where:
+        out.write('delete from meganet.%s t where %s;\n' % (table, prune_where))
     else:
         out.write('delete from meganet.%s;\n' % table)
 
 
 IMPORT_TAG = 'import_stations_json.py'
+
+
+def owned_by_document(station_col):
+    """The prune guard for a table hanging off a station, as SQL on alias `t`.
+
+    A sensor, repeater or pass range belongs to a station, so it is the
+    *station's* provenance that decides whether this file may delete it. Guarding
+    only meganet.station is worse than guarding nothing here: the station
+    survives the load and its sensors do not, which leaves a row that resolves no
+    address at all — found by running the load rather than by reading it.
+
+    Mirrors the same four guards in load_stations_doc() (0022). Two loaders, one
+    rule, and they have to stay in step.
+    """
+    return ('exists (select 1 from meganet.station st\n'
+            '                 where st.id = t.%s and st.document_managed)' % station_col)
 
 
 def check_references(data):
@@ -173,7 +198,12 @@ def check_references(data):
         if s['id'] in seen:
             problems.append('duplicate station id: %s' % s['id'])
         seen.add(s['id'])
-        if s.get('rm_system_id') not in systems:
+        # Null is legitimate since 0022: a row that is not a radio station has no
+        # preset, for the same reason it has no lat/lon. An id that is *present*
+        # and unknown is still an error, and this is now the only thing checking
+        # it — the column stopped being `not null` and Postgres stopped being the
+        # backstop.
+        if s.get('rm_system_id') is not None and s.get('rm_system_id') not in systems:
             problems.append('%s: unknown rm_system_id %r' % (s['id'], s.get('rm_system_id')))
         for n in s.get('radio_network_ids') or []:
             if n not in networks:
@@ -272,7 +302,8 @@ def build(data, out):
                 q(bool(s.get('enabled'))), q(s.get('notes', '')),
                 q(s.get('legacy_unit_id')), qjson(s.get('site')), q(s.get('lga')),
                 q(s.get('basin')), qarray(s.get('location_types'))]
-               for i, s in enumerate(stations)])
+               for i, s in enumerate(stations)],
+              prune_where='t.document_managed')
 
     sensors = []
     for s in stations:
@@ -282,7 +313,8 @@ def build(data, out):
                             q(sensor.get('alert_id')), q(sensor.get('device_id'))])
     emit_sync(out, 'sensor',
               ['station_id', 'sensor_id', 'type', 'ord', 'alert_id', 'device_id'],
-              ['station_id', 'sensor_id', 'type'], sensors)
+              ['station_id', 'sensor_id', 'type'], sensors,
+              prune_where=owned_by_document('station_id'))
 
     repeaters, ranges = [], []
     for s in stations:
@@ -297,10 +329,12 @@ def build(data, out):
 
     emit_sync(out, 'repeater',
               ['station_id', 'acma_licence', 'rx_mhz', 'tx_mhz', 'notes'],
-              ['station_id'], repeaters)
+              ['station_id'], repeaters,
+              prune_where=owned_by_document('station_id'))
     emit_sync(out, 'pass_range',
               ['repeater_id', 'kind', 'lo', 'hi', 'ord'],
-              ['repeater_id', 'kind', 'lo', 'hi'], ranges)
+              ['repeater_id', 'kind', 'lo', 'hi'], ranges,
+              prune_where=owned_by_document('repeater_id'))
 
     out.write('\n-- Row counts after this file, for the record:\n')
     out.write('--   stations %d · sensors %d · repeaters %d · pass ranges %d\n'

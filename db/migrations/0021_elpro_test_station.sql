@@ -66,31 +66,19 @@ on conflict (code) do update set key = excluded.key, label = excluded.label;
 -- `ord` is presentation order only and never identity (0002), so it goes on the
 -- end. `roles` is `base` rather than `field`: a 115E-2 is a gateway, and the one
 -- thing this test is not is a gauging station.
-insert into meganet.station
-  (id, ord, name, station_number, roles, rm_system_id, enabled, notes)
-select
-  'elpro_test',
-  coalesce(max(s.ord), 0) + 1,
-  'ELPRO 115E-2 test unit',
-  '999999',
-  array['base']::text[],
-  1,
-  true,
-  'Bench/test gateway, not a site. Exists so the 115E-2 MQTT trial has somewhere '
-  || 'to land that a person can read: see docs/elpro115e_test_card.md for the '
-  || 'technician''s half and docs/elpro115e_mqtt.md for the full provisioning '
-  || 'guide. Publishes as elpro_test on meganet/v1/elpro_test/logger/reading/elpro. '
-  || 'No lat/lon on purpose — there is no site. Retire with '
-  || 'update meganet.station set deleted_at = now() where id = ''elpro_test''.'
-from meganet.station s
-on conflict (id) do update
-  set name           = excluded.name,
-      station_number = excluded.station_number,
-      roles          = excluded.roles,
-      enabled        = excluded.enabled,
-      notes          = excluded.notes,
-      deleted_at     = null,
-      updated_at     = now();
+-- ⚠️ The insert that used to be here has MOVED TO 0022, and this is not a
+-- tidy-up: it could not run. It hard-coded `rm_system_id = 1`, and
+-- meganet.rm_system is populated only inside load_stations_doc(), so on a
+-- database built from zero — which is what CI does — there was no row 1 to point
+-- at and this migration aborted on the foreign key. It also created the first
+-- station stations.json does not carry, which load_stations_doc() then deleted
+-- on the next load, because that function is a sync.
+--
+-- 0022 makes `rm_system_id` nullable, adds `document_managed` so a row can say
+-- the document does not own it, teaches the loader to respect that, and inserts
+-- the station with both set. Everything above this line — why the row exists,
+-- why the identifiers are the ones they are, and what the row is not — is still
+-- the account of it, and is why that half stayed here.
 
 -- ── The sensors ──────────────────────────────────────────────────────────────
 -- `resolve_station()` matches an incoming `alert_id` against meganet.sensor, not
@@ -99,30 +87,11 @@ on conflict (id) do update
 -- asks the technician to publish three values: a level, a rainfall count and the
 -- unit's own supply voltage. The last one is the useful one to start with, since
 -- the gateway can report its own battery without anything being wired to it.
-insert into meganet.sensor (station_id, sensor_id, type, ord, alert_id) values
-  ('elpro_test', 'elpro_test_level',   'Water Level', 1, 9001),
-  ('elpro_test', 'elpro_test_rain',    'Rainfall',    2, 9002),
-  ('elpro_test', 'elpro_test_battery', 'Battery',     3, 9003)
-on conflict (station_id, sensor_id, type) do update
-  set alert_id   = excluded.alert_id,
-      ord        = excluded.ord,
-      updated_at = now();
-
--- ── Check ────────────────────────────────────────────────────────────────────
--- Fail the migration rather than leave a half-made station behind: a test rig
--- that silently did not resolve would send the technician looking at the device.
-do $$
-begin
-  if meganet.resolve_station(9003, null) is distinct from 'elpro_test' then
-    raise exception 'elpro_test did not take: resolve_station(9003) = %',
-      coalesce(meganet.resolve_station(9003, null), '(null)');
-  end if;
-  if meganet.resolve_publisher('elpro_test') is distinct from 'elpro_test' then
-    raise exception 'resolve_publisher(''elpro_test'') = %',
-      coalesce(meganet.resolve_publisher('elpro_test'), '(null)');
-  end if;
-end
-$$;
+-- ⚠️ The sensor rows and the resolve check that used to be here have MOVED TO
+-- 0022 as well, for the same reason as the station: they reference a station row
+-- that could not be created until that file's two columns existed. The paragraph
+-- above still explains why there are three and why the battery one is the useful
+-- one to start with.
 
 -- ── Schema version ───────────────────────────────────────────────────────────
 -- DB_SCHEMA_VERSION in core.js goes 20 → 21 in the same commit as this file.

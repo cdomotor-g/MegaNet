@@ -241,6 +241,16 @@ a *sync* rather than an append (every row in the document upserted, every row no
 in it deleted), and both are idempotent down to `updated_at`: a second run over
 the same document changes nothing and restamps nothing.
 
+**One exception, and it is a column rather than a convention.** A station with
+`document_managed = false` is a row no document describes — created by a
+migration, like `elpro_test` (`0021`, `0022`) — and neither loader may delete it,
+nor its sensors, repeater or pass ranges. Everything that came out of
+`stations.json` has the flag true and is synced exactly as above. This is the
+same shape as `origin = 'form'` on the inspection tables further down: a loader
+that owns most of a table must be told which rows it does not own, or the first
+row somebody adds by another route disappears at the next load without a word.
+`0022` exists because that is precisely what happened to `elpro_test`.
+
 **From the SQL editor, with nothing installed.** The database fetches
 `stations.json` from the repo itself, so the 3.5 MB never goes near a browser:
 
