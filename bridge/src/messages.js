@@ -229,30 +229,47 @@ function truncate(text, n) {
 
 /**
  * Parse an ELPRO-topic payload — what a 115E-2 (or any x15U gateway) publishes
- * in plain, non-Sparkplug MQTT mode:
+ * in plain, non-Sparkplug MQTT mode.
  *
- *   {"timestamp": 954711743792, "River Level": 17.61, "Battery Voltage": 13.8}
+ * **Two payload shapes, because the documentation and the hardware disagree and
+ * both are real.** ELPRO's MQTT Gateway guide (p.4) documents one flat object
+ * whose keys are the per-input "Payload Prefix":
+ *
+ *   {"timestamp": 954711743792, "9003": 137}
+ *
+ * The 115E-2's ALERT2 relay path sends an array instead, and puts the address in
+ * a field rather than in the key (#169, captured on the bench during #166):
+ *
+ *   [{"timestamp": 1787288492180, "Sensor": 13, "Value": 243.600006}]
+ *
+ * Both are "multiple time stamped DataValueLabel/value sets with a single
+ * message transmission", which is what the guide says a payload is — the array
+ * is the multiple-sets case written out, and `Sensor`/`Value` is what the
+ * gateway calls the pair when the label is not the operator's to choose. So this
+ * reads an array as a list of payload objects and a bare object as a list of
+ * one, and each object by whichever of the two shapes it is in.
  *
  * `timestamp` is Linux epoch MILLISECONDS, which meganet.as_ts() already takes
- * as a number (it divides anything >= 1e11 by 1000). Every other key is a
- * "Payload Prefix" chosen per input on the device's MQTT I/O page, and the
- * provisioning card asks for it to be the reading's ALERT address — so the key
- * IS the address, and no mapping table exists for anybody to keep in step.
+ * as a number (it divides anything >= 1e11 by 1000).
  *
  * **This parser never throws for a payload it cannot read**, which is the one
  * place it deliberately differs from parseReadings() and parseHfem(). Those two
  * decode formats this project defined; this one decodes a format a vendor
- * controls, from a device nobody here has ever had on a bench. A message that
- * arrives in a shape the documentation did not describe is the single most
- * valuable thing this path can produce, and throwing PoisonMessage would ack it,
- * log a line to an ephemeral container log, and lose the bytes.
+ * controls. A message that arrives in a shape the documentation did not describe
+ * is the single most valuable thing this path can produce — that is not a
+ * hypothetical, it is how #169 was diagnosed — and throwing PoisonMessage would
+ * ack it, log a line to an ephemeral container log, and lose the bytes.
  *
  * So an unreadable payload returns zero readings and an envelope carrying the
  * raw text in `frame`. ingest_http() writes meganet.reading_raw BEFORE it
  * validates any row, so the bytes land in the database either way — and
  * `reading_raw.frame` is documented for exactly this ("the MQTT topic and
  * bytes"). Zero readings is a well-formed batch, not an error: raw stored,
- * nothing claimed.
+ * nothing claimed. That is also what makes the gateway's own chatter safe to
+ * subscribe to at all: a site that points its Topic Prefix one level deeper so
+ * the whole ELPRO tree lands (the optional variant in docs/elpro115e_mqtt.md)
+ * sends its `Broker Diagnostics`, `System Info` and `Diagnostics` devices here
+ * too, and their human-labelled payloads become raw rows claiming nothing.
  *
  * The size and count limits still throw, because those are the two cases where
  * accepting the message is what causes harm rather than what preserves evidence.
@@ -277,25 +294,20 @@ function parseElpro(payload, receivedAt = () => new Date().toISOString()) {
   } catch {
     return { readings: [], envelope };
   }
-  if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return { readings: [], envelope };
-  }
 
-  const stamp = typeof body.timestamp === 'number' && Number.isFinite(body.timestamp)
-    ? body.timestamp
-    : receivedAt();
-
+  // One receipt instant for the whole message rather than one per object: a
+  // message is received once, and stamping two objects from the same publish a
+  // millisecond apart would invent a difference the wire did not carry.
+  const arrivedAt = receivedAt();
   const readings = [];
-  for (const [key, value] of Object.entries(body)) {
-    if (key === 'timestamp') continue;
-    // Anything that is not an address-shaped key over a finite number is left
-    // in the frame rather than guessed at. A label like "River Level" is a
-    // device configured against the documentation instead of against the card;
-    // the raw row says so, and nothing is invented to cover it.
-    const alertId = Number(key);
-    if (!Number.isInteger(alertId) || alertId < 1 || alertId > 65535) continue;
-    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
-    readings.push({ alert_id: alertId, reading_ts: stamp, value_raw: value });
+  // `set` rather than `frame`: ELPRO calls these label/value *sets*, and this
+  // file already uses `frame` for the raw bytes in the envelope.
+  for (const set of Array.isArray(body) ? body : [body]) {
+    if (!set || typeof set !== 'object' || Array.isArray(set)) continue;
+    const stamp = typeof set.timestamp === 'number' && Number.isFinite(set.timestamp)
+      ? set.timestamp
+      : arrivedAt;
+    readings.push(...elproReadings(set, stamp));
   }
 
   if (readings.length > MAX_READINGS) {
@@ -305,6 +317,65 @@ function parseElpro(payload, receivedAt = () => new Date().toISOString()) {
   }
 
   return { readings, envelope };
+}
+
+/**
+ * The readings in one ELPRO payload object, by whichever of the two shapes it
+ * is in. Anything that is neither is left in the frame rather than guessed at —
+ * a label like "River Level" is a device configured against ELPRO's own example
+ * instead of against our card, and the raw row says so without inventing an
+ * address to cover it.
+ */
+function elproReadings(set, stamp) {
+  // Shape 1: an explicit address field. Checked first and taken exclusively,
+  // because an object that names its own address is not *also* describing
+  // addresses in its other key names — scanning on would turn a stray numeric
+  // key into a second reading nobody sent.
+  const address = elproNumber(set, 'sensor');
+  const value = elproNumber(set, 'value');
+  if (address !== null && value !== null) {
+    return isAlertId(address) ? [{ alert_id: address, reading_ts: stamp, value_raw: value }] : [];
+  }
+
+  // Shape 2: the key IS the address, which is what the provisioning card asks
+  // for and why no mapping table exists for anybody to keep in step.
+  const readings = [];
+  for (const [key, v] of Object.entries(set)) {
+    if (key === 'timestamp') continue;
+    const alertId = Number(key);
+    if (!isAlertId(alertId)) continue;
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    readings.push({ alert_id: alertId, reading_ts: stamp, value_raw: v });
+  }
+  return readings;
+}
+
+/**
+ * A finite number under `name`, matched case-insensitively, or null.
+ *
+ * Case-insensitive because the capitalisation is the vendor's and costs nothing
+ * to be forgiving about: the card requires a Payload Prefix to be the numeric
+ * address, so a key literally spelled `value` was never going to be read as an
+ * address by the other shape anyway. Numeric strings are accepted for the same
+ * reason — which of `13` and `"13"` a gateway's JSON encoder emits is not
+ * something to lose a reading over.
+ */
+function elproNumber(set, name) {
+  for (const [key, value] of Object.entries(set)) {
+    if (key.toLowerCase() !== name) continue;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
+  }
+  return null;
+}
+
+/** ALERT addresses are 16-bit and 0 is not one. */
+function isAlertId(n) {
+  return Number.isInteger(n) && n >= 1 && n <= 65535;
 }
 
 module.exports = { MAX_READINGS, MAX_BYTES, PoisonMessage, parseReadings, parseHfem, parseElpro, parseStatus };

@@ -58,10 +58,24 @@ Design it once. Topics get burned into logger firmware, and changing one means
 visiting sites.
 
 ```
-meganet/v1/<station>/<device>/reading        device → us, QoS 1 (JSON)
-meganet/v1/<station>/<device>/reading/hfem   device → us, QoS 1 (a raw HFEM line)
-meganet/v1/<station>/status                  retained, and the LWT topic
+meganet/v1/<station>/<device>/reading          device → us, QoS 1 (JSON)
+meganet/v1/<station>/<device>/reading/hfem     device → us, QoS 1 (a raw HFEM line)
+meganet/v1/<station>/<device>/reading/elpro/…  device → us, QoS 1 (an ELPRO x15U
+                                               gateway's plain-MQTT JSON)
+meganet/v1/<station>/status                    retained, and the LWT topic
 ```
+
+That trailing `…` on the ELPRO topic is deliberate, and it is the one place the
+scheme hands a level away. Every other topic here is spelled by firmware this
+project can ask for changes to; an ELPRO gateway assembles its own topic as
+`<Topic Prefix><MSGTYPE>/<Device>/<Sub-device>` and none of those three are ours
+to name. So the Topic Prefix is set to end at `…/reading/elpro/` and everything
+the gateway puts below that is carried as **opaque provenance** — recorded as the
+raw row's `path`, never parsed, never resolved by. On the bench that tail was
+`Station 1003`: the relayed ALERT2 station, which is real information the payload
+does not carry (#169). The segment rules below deliberately do **not** apply to
+it — `Station 1003` has a space in it, and a rule written to keep MegaNet's own
+identifiers boring has no business being applied to a name a vendor chose.
 
 `<station>` is the **bureau station number** — `541155` — the number on the site
 card, in the Bureau's systems and on the paperwork the site already generates.

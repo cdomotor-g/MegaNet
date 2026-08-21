@@ -165,10 +165,19 @@ Add one entry:
 | **Device Type** | **General Purpose** |
 | **Slave address** | `0` |
 
-> The device name becomes the last part of the topic. With the prefix from 3.1,
-> the unit will publish to
-> `meganet/v1/elpro_test/logger/reading/elpro` — please check it reads exactly
-> that where the screen shows you the full topic.
+> The device name becomes part of the topic. With the prefix from 3.1, the unit
+> will publish to `meganet/v1/elpro_test/logger/reading/elpro` **plus whatever
+> the unit adds after it** — please copy down what the screen shows as the full
+> topic, exactly as it reads.
+>
+> **If the topic has more on the end than that, it is fine.** A 115E-2 relaying
+> ALERT2 adds the source station itself, so
+> `meganet/v1/elpro_test/logger/reading/elpro/Station 1003` is a working topic
+> and we file the `Station 1003` part as useful information about where the
+> reading came from. What matters is that the part **up to and including
+> `elpro`** reads exactly as above. If `elpro` is not the sixth part of the
+> topic — if something has been inserted before it — that one will not land, and
+> it is worth a phone call rather than a guess.
 
 ### 3.5 One input, to begin with
 
@@ -218,8 +227,19 @@ the unit restarted and how long it was away.
    meganet/v1/elpro_test/logger/reading/elpro   {"timestamp":1787…,"9003":137}
    ```
 
+   or, if the unit is relaying ALERT2 and adds the source station and its own
+   field names, like this — also fine, also lands:
+
+   ```
+   meganet/v1/elpro_test/logger/reading/elpro/Station 1003
+   [{"timestamp":1787288492180, "Sensor":13, "Value":243.600006}]
+   ```
+
    **Copy a couple of those lines out and keep them** — paste them into Notepad.
-   They are the single most useful thing you can send back.
+   They are the single most useful thing you can send back, and they are how the
+   two shapes above came to be understood in the first place. **Send them even
+   if everything looks like it is working**, and especially if the topic or the
+   message does not look like either example.
 3. **Connectivity** page → the broker should show connected, with the message
    count climbing.
 

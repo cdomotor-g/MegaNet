@@ -476,6 +476,45 @@ test('an ELPRO payload lands decoded, and an unreadable one still lands its byte
   await waitFor(() => broker.bridgeAcks().length === 2, { what: 'both ELPRO messages to be acked' });
 });
 
+test('a 115E-2 publishing what it really publishes lands a reading (#169)', async (t) => {
+  // The end-to-end case the bench found and neither half of the docs predicted:
+  // the gateway appends its own tree below the format segment, and wraps the
+  // payload in an array with the address in a `Sensor` field. Before this test
+  // the topic matched no subscription at all, so the broker never forwarded it
+  // — nothing reached the bridge, nothing reached its log, and a correctly
+  // provisioned unit was indistinguishable from a broken one.
+  const broker = await startBroker();
+  const api = await startApi();
+  const bridge = startBridge(broker.port, api.url);
+  t.after(async () => {
+    await closeStations();
+    await bridge.stop();
+    await api.close();
+    await broker.close();
+  });
+
+  await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the bridge to subscribe' });
+  const station = await connectStation(broker.port, 'elpro_test');
+
+  const topic = 'meganet/v1/elpro_test/logger/reading/elpro/Station 1003';
+  const payload = '[{"timestamp":1787288492180, "Sensor":13, "Value":243.600006}]';
+  await station.publishAsync(topic, payload, { qos: 1 });
+
+  await waitFor(() => api.of('ingest_http').length === 1, { what: 'the reading to reach the database' });
+  const body = api.of('ingest_http')[0].body.payload;
+  assert.equal(body.protocol, 'elpro');
+  assert.deepEqual(body.readings, [
+    { alert_id: 13, reading_ts: 1787288492180, value_raw: 243.600006 },
+  ]);
+  assert.equal(body.frame, payload);
+  // The relayed station is provenance the payload does not carry, so the raw row
+  // has to say it — otherwise the only record of which station a reading came
+  // off is a debug log line that ages out.
+  assert.equal(body.path, topic);
+
+  await waitFor(() => broker.bridgeAcks().length === 1, { what: 'the message to be acked' });
+});
+
 test('a bridge that was down loses nothing: the broker held the hour and hands it back (#163)', async (t) => {
   const broker = await startBroker();
   const api = await startApi();

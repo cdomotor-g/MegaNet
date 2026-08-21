@@ -275,12 +275,13 @@ The workflow's summary page prints `fly status` when it finishes. For the log
 lines that actually matter:
 
 1. **<https://fly.io/dashboard>** → **meganet-bridge** → **Live Logs**.
-2. A healthy start is a connect, then three subscribes at QoS 1:
+2. A healthy start is a connect, then four subscribes at QoS 1:
 
 ```
 info  connected to broker    clientId=meganet-bridge-prod
 info  subscribed             topic=meganet/v1/+/+/reading qos=1
 info  subscribed             topic=meganet/v1/+/+/reading/hfem qos=1
+info  subscribed             topic=meganet/v1/+/+/reading/elpro/# qos=1
 info  subscribed             topic=meganet/v1/+/status qos=1
 ```
 

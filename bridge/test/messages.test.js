@@ -234,6 +234,84 @@ test('elpro: falls back to receipt time when timestamp is missing or unusable', 
   assert.equal(parseElpro(buf({ timestamp: 'yesterday', 9001: 1 }), at).readings[0].reading_ts, at());
 });
 
+// ── What the hardware actually sends (#169) ──────────────────────────────────
+// Captured on the bench during #166. The gateway's ALERT2 relay path wraps the
+// payload in an array and puts the address in a `Sensor` field instead of in
+// the key — neither of which ELPRO's own guide describes.
+
+test('elpro: reads the array-wrapped Sensor/Value shape the 115E-2 sends', () => {
+  const raw = '[{"timestamp":1787288492180, "Sensor":13, "Value":243.600006}]';
+  const { readings, envelope } = parseElpro(Buffer.from(raw));
+  assert.deepEqual(readings, [
+    { alert_id: 13, reading_ts: 1787288492180, value_raw: 243.600006 },
+  ]);
+  assert.equal(envelope.frame, raw, 'the bytes survive whatever the parser made of them');
+});
+
+test('elpro: an array is a list of payload objects, each with its own stamp', () => {
+  // "For each payload there can be multiple time stamped DataValueLabel/value
+  // sets with a single message transmission" (MQTT p.4) — the array is that
+  // sentence written out, so every element is read on its own terms.
+  const { readings } = parseElpro(buf([
+    { timestamp: 1, Sensor: 13, Value: 1.5 },
+    { timestamp: 2, Sensor: 14, Value: 2.5 },
+    { timestamp: 3, 9001: 7 },
+  ]));
+  assert.deepEqual(readings, [
+    { alert_id: 13, reading_ts: 1, value_raw: 1.5 },
+    { alert_id: 14, reading_ts: 2, value_raw: 2.5 },
+    { alert_id: 9001, reading_ts: 3, value_raw: 7 },
+  ]);
+});
+
+test('elpro: an explicit address field is taken exclusively', () => {
+  // An object that names its own address is not also describing addresses in
+  // its other key names, so the key scan must not run on and invent a second
+  // reading nobody sent.
+  const { readings } = parseElpro(buf({ timestamp: 1, Sensor: 13, Value: 1.5, 9001: 99 }));
+  assert.deepEqual(readings, [{ alert_id: 13, reading_ts: 1, value_raw: 1.5 }]);
+});
+
+test('elpro: the address field is matched however the gateway capitalises it', () => {
+  for (const frame of [
+    { timestamp: 1, sensor: 13, value: 1.5 },
+    { timestamp: 1, SENSOR: 13, VALUE: 1.5 },
+    // Which of `13` and `"13"` a vendor's JSON encoder emits is not something
+    // to lose a reading over.
+    { timestamp: 1, Sensor: '13', Value: '1.5' },
+  ]) {
+    assert.deepEqual(parseElpro(buf(frame)).readings,
+      [{ alert_id: 13, reading_ts: 1, value_raw: 1.5 }], JSON.stringify(frame));
+  }
+});
+
+test('elpro: a half-written Sensor/Value pair claims nothing and keeps the bytes', () => {
+  for (const frame of [
+    { timestamp: 1, Sensor: 13 },                 // no value
+    { timestamp: 1, Value: 1.5 },                 // no address
+    { timestamp: 1, Sensor: 0, Value: 1.5 },      // 0 is not an ALERT address
+    { timestamp: 1, Sensor: 70000, Value: 1.5 },  // nor is anything over 16 bits
+    { timestamp: 1, Sensor: 'thirteen', Value: 1.5 },
+  ]) {
+    const { readings, envelope } = parseElpro(buf(frame));
+    assert.deepEqual(readings, [], JSON.stringify(frame));
+    assert.equal(envelope.protocol, 'elpro');
+    assert.ok(envelope.frame, 'the evidence survives');
+  }
+});
+
+test('elpro: the gateway diagnostic devices file as raw, claiming nothing', () => {
+  // A site that points its Topic Prefix one level deeper so the whole ELPRO
+  // tree lands (#169) sends the unit's own Broker Diagnostics / System Info
+  // devices to this parser too. Human labels, no addresses: raw stored, nothing
+  // claimed, which is the honest answer for them.
+  const { readings, envelope } = parseElpro(
+    buf({ timestamp: 1787289025017, 'IP Address': '10.0.0.4', 'Battery Voltage': 13.8 }),
+  );
+  assert.deepEqual(readings, []);
+  assert.match(envelope.frame, /IP Address/);
+});
+
 test('elpro: still throws for the two cases where accepting causes the harm', () => {
   assert.throws(() => parseElpro(Buffer.alloc(0)), PoisonMessage);
   assert.throws(() => parseElpro(Buffer.alloc(300 * 1024, 0x20)), PoisonMessage);

@@ -111,13 +111,13 @@ Adding a third costs a subscription line and a parser:
 |---|---|
 | **Topic Prefix** | `meganet/v1/<station>/logger/reading/` |
 | **Device** name | `elpro` |
-| Resulting topic | **`meganet/v1/<station>/logger/reading/elpro`** |
+| Resulting topic | **`meganet/v1/<station>/logger/reading/elpro`**, plus anything the gateway appends below it — see [What the bench found](#what-the-bench-found-169) |
 | **Payload Prefix** per input | the reading's **ALERT2 address**, e.g. `6128` |
 
 | In `bridge/` | Status |
 |---|---|
-| `src/topics.js` | **done** — `'elpro'` is in `READING_FORMATS`, and `meganet/v1/+/+/reading/elpro` is subscribed at QoS 1 |
-| `src/messages.js` | **done** — `parseElpro()` takes `timestamp` as `reading_ts` and turns every address-keyed pair into `{alert_id, reading_ts, value_raw}`. **A payload it cannot read is captured, not discarded**: zero readings, raw bytes in `frame`, which reaches `meganet.reading_raw` because `ingest_http()` writes the raw row before it validates any reading |
+| `src/topics.js` | **done** — `'elpro'` is in `READING_FORMATS`, and `meganet/v1/+/+/reading/elpro/#` is subscribed at QoS 1. The `#` is what lets the gateway keep its own tree below the format segment (#169) |
+| `src/messages.js` | **done** — `parseElpro()` takes `timestamp` as `reading_ts` and turns both the documented address-keyed pair and the `Sensor`/`Value` pair the hardware really sends into `{alert_id, reading_ts, value_raw}`, array-wrapped or not. **A payload it cannot read is captured, not discarded**: zero readings, raw bytes in `frame`, which reaches `meganet.reading_raw` because `ingest_http()` writes the raw row before it validates any reading |
 
 Why the address goes in the Payload Prefix rather than a lookup table: **the label
 auto-increments**. "If an input count of greater than 1 is used, then a count number will
@@ -133,6 +133,68 @@ and no mapping table exists for anyone to keep in step.
 > prefix increments the way a trailing-digit name does, and that the emitted key is the
 > bare number rather than something decorated. If it decorates, the parser strips it —
 > still a parser, still cheap.
+
+### What the bench found (#169)
+
+A technician ran the card against a real 115E-2 relaying ALERT2 (#166). It published,
+the broker accepted it, and **nothing reached the bridge** — the symptom the card warns
+about, arriving for a reason neither this page nor the card predicted. Both of the
+following are now handled; they are recorded because they are the only first-hand
+account of this hardware anyone here has.
+
+**1 · The gateway appends its own tree below the Device name.** Documented assembly is
+prefix + Device (MQTT p.6, p.10). The real unit publishes prefix + `[MSGTYPE/]` + Device
++ `/Sub-device`, and the sub-device is the **relayed ALERT2 station**:
+
+```
+meganet/v1/elpro_test/logger/reading/elpro/Station 1003          a reading
+meganet/v1/elpro_test/logger/reading/DBIRTH/elpro/Station 1003   its birth certificate
+meganet/v1/elpro_test/logger/reading/Broker Diagnostics          the unit's own devices
+meganet/v1/elpro_test/logger/reading/System Info
+meganet/v1/elpro_test/logger/reading/Diagnostics
+```
+
+That extra level is why nothing landed: `+` matches exactly one topic level, so
+`meganet/v1/+/+/reading/elpro` matched **none** of these and the broker never forwarded
+them. Not a rejection — a non-delivery, with nothing in the bridge log to see, which is
+exactly the row in the troubleshooting table below that says to capture the actual topic
+string. **The fix was to subscribe `meganet/v1/+/+/reading/elpro/#`** and carry the tail
+as provenance, because the relayed station is real information the payload does not
+carry. Note `Station 1003` has a space in it: the tail is deliberately *not* held to the
+segment grammar, which exists for identifiers MegaNet resolves things by.
+
+**No device-side change was needed.** A unit configured off the card — prefix
+`meganet/v1/<station>/logger/reading/`, Device `elpro` — publishes readings to
+`…/reading/elpro/<source station>`, which the `#` covers. The card is unchanged on this
+point.
+
+**2 · The payload is not the documented one on the ALERT2 relay path.** MQTT p.4 shows a
+flat object whose keys are the Payload Prefix. The relay path sends an array, and puts
+the address in a field instead of in the key:
+
+```json
+[{"timestamp":1787288492180, "Sensor":13, "Value":243.600006}]
+```
+
+`parseElpro()` reads both shapes. This is the second blocker, and it is worth
+understanding that it was *independent* of the first: fixing only the topic would have
+moved this from "nothing anywhere" to "raw rows, no readings", which looks like progress
+and is not.
+
+**3 · Two things the guide says do not exist, do.** The unit publishes at **QoS 1 with
+retain set** (`sending PUBLISH (d0, q1, r1, m5, …)`), where MQTT p.17's broker table has
+no QoS or retain column. Harmless — the bridge asks for QoS 1 anyway, and a retained
+reading only means a new subscriber sees the last one — but it means the guide's field
+list is not exhaustive for the 115E-2, so trust the unit over the document.
+
+**Optional: capture the whole ELPRO tree.** Setting the Topic Prefix one level deeper —
+`meganet/v1/<station>/logger/reading/elpro/` — puts *everything* the gateway emits under
+the subscribed filter, including the DBIRTH copies and the diagnostic devices. It is not
+the default and it is not needed for readings: DBIRTH duplicates a reading the unit is
+about to publish anyway (MegaNet's primary key absorbs it, `dup_count` rises), and the
+diagnostic devices are human-labelled, so they become raw rows claiming nothing. Worth it
+only where somebody wants the gateway's own chatter in `reading_raw`, and worth knowing
+about because it explains why a site's topics may be one level deeper than this page.
 
 ### The paths, and what each now costs
 
@@ -196,7 +258,7 @@ flowchart LR
       REG --> MQ["MQTT client<br/>Inputs tab"]
     end
     MQ -- "MQTT/TLS 8883<br/>{timestamp, label:value}" --> BR["Broker"]
-    BR -- "meganet/v1/+/+/reading/elpro" --> BG["bridge/<br/>parseElpro()"]
+    BR -- "meganet/v1/+/+/reading/elpro/#" --> BG["bridge/<br/>parseElpro()"]
     BG -- "HTTPS + ingest token" --> PG["meganet.ingest_http()<br/>Supabase"]
 ```
 
@@ -316,7 +378,7 @@ Items 1–3 are a gate. Do not order hardware or brief a technician past them.
 
 3. ~~**Confirm the path and schedule the bridge change.**~~ — **done.** Path B shipped:
    `READING_FORMATS` carries `elpro`, the bridge subscribes to
-   `meganet/v1/+/+/reading/elpro`, and `parseElpro()` sits beside `parseHfem()` with unit
+   `meganet/v1/+/+/reading/elpro/#`, and `parseElpro()` sits beside `parseHfem()` with unit
    and integration tests. **It is deliberately permissive** — a payload it cannot read
    returns zero readings and puts the raw bytes in the envelope's `frame`, so an
    undocumented shape lands in `meganet.reading_raw` instead of an ephemeral container log.
@@ -818,7 +880,8 @@ guess at the bench.
 - **Topic Prefix** — the literal string, ending in `/`:
   `meganet/v1/<station>/logger/reading/`
 - **Device** name — `elpro`, type *General Purpose*, slave address 0. This becomes the
-  final topic segment, so the full topic is `meganet/v1/<station>/logger/reading/elpro`
+  sixth topic segment, so the full topic starts `meganet/v1/<station>/logger/reading/elpro`
+  — and may carry more after it, which is expected (#169)
 - **Enable Sparkplug** — **off**
 - **Owner Name (Group)** and **Device Name (Node)**
 - **Queuing Mode** — FIFO
@@ -1119,7 +1182,9 @@ here as a record, because knowing a question is *settled* is worth as much as th
   rather than asserting one string.
 - **No topic prefix, rewrite or template setting exists in the bridge**, and none is
   needed now that the device's prefix is free-form — but it does mean the device must
-  spell MegaNet's topic exactly, not approximately.
+  spell MegaNet's topic exactly, not approximately, **up to and including the `elpro`
+  segment**. Below that segment the gateway spells what it likes and the bridge carries
+  it as provenance (#169).
 - **No Sparkplug B / protobuf decoder**, and no vendor-payload key-mapping layer. The
   bridge deliberately does no renaming and no content sniffing.
 - **No ELPRO precedent at all.** The only worked MQTT base station in this repo is a
@@ -1227,6 +1292,13 @@ Both are free text; the prefix may contain any number of `/`. For MegaNet:
 chose. Multiple label/value sets may share one message, and the queue concentrates
 same-topic payloads into single messages on replay.
 
+The ALERT2 relay path sends a second shape the guide does not document — an array, with
+the address in a field rather than in the key (#169). `parseElpro()` reads both:
+
+```json
+[{"timestamp": 1787288492180, "Sensor": 13, "Value": 243.600006}]
+```
+
 **Broker table columns** — Enabled · Client ID · IP/Name · Port · Historian ·
 Keep Alive(Sec) · Clean Session · User name · Password · Queue Size (Max) ·
 Queue Delay (s) · TLS. **No QoS, retain or Last Will.**
@@ -1289,8 +1361,9 @@ connection count, uptime, messages Tx/Rx/queued.
 | MQTT settings look right, nothing on the broker | MQTT Enable is off, or the protocol was never enabled — every protocol is disabled by default. Confirm 8883 outbound is open, and check the Statistics page for what is actually listening. |
 | The broker refuses the connection | Wrong credential, or TLS. Capture IP Comms will show whether the handshake completed. Check the device clock — an out-of-date clock fails certificate validation, and the RTC only holds time for a few days without power. |
 | The broker refuses the *publish* | The credential's topic filter does not cover the topic. A station credential may only write `meganet/v1/<its own segment>/#`. Compare the Topic Prefix against the segment the credential was minted for. |
-| Publishes succeed; **nothing in the bridge log at all** | The topic is outside `meganet/v1/…`, so the broker never forwards it. This is the gate question — capture the actual topic string. |
-| Bridge logs `topic_ignored` | The segment count is right but a segment is not usable — a space, a `$`, a leading dot or dash, or over 64 characters. A topic with the *wrong* segment count matches no subscription and leaves **nothing in the log at all** (the row above): `meganet/v1/<station>/<device>/reading` is **five**, and the device segment is not optional. |
+| Publishes succeed; **nothing in the bridge log at all** | The topic matches no subscription, so the broker never forwards it — a non-delivery, not a rejection, and the bridge cannot log what it never receives. This is the gate question, and the only way to answer it is to **capture the actual topic string** off Monitor MQTT Comms or a broker client subscribed to `#`. The two ways to land here: the topic is outside `meganet/v1/…` entirely, or a segment before `elpro` is wrong or missing — `meganet/v1/<station>/<device>/reading/elpro` puts `elpro` **sixth**, and a message-type level inserted ahead of it (`…/reading/DBIRTH/elpro/…`) pushes it seventh and matches nothing (#169). |
+| Messages visible in the broker, none in `meganet.reading` | Two independent causes, and it is worth checking them in this order. First the topic, per the row above. Then the payload: an ELPRO message whose shape `parseElpro()` cannot read is stored as a `reading_raw` row with **zero readings**, so the bytes are safe and nothing is claimed. `select frame from meganet.reading_raw order by received_at desc limit 5` shows what actually arrived. |
+| Bridge logs `topic_ignored` | The segment count is right but a segment is not usable — a space, a `$`, a leading dot or dash, or over 64 characters. This applies to the station and device segments, **not** to anything below `…/reading/elpro/`, which is the gateway's to spell and is carried verbatim (#169). A topic with the *wrong* segment count matches no subscription and leaves nothing in the log at all (two rows above). |
 | Bridge logs `message_unparseable` | The topic matched, the body did not — not JSON, wrong shape, oversized or empty. Capture the payload bytes against a plaintext broker on 1883 and compare against [the contract](#the-contract-the-device-has-to-hit). |
 | Bridge logs `subscribe_downgraded` | The broker granted QoS 0. At-least-once delivery is not in force — fix it at the broker, not the bridge. |
 | Reading lands, `dup_count` rises, no new row | Working as designed. You republished an identical (address, instant, value). Change the timestamp. |
@@ -1312,19 +1385,27 @@ connection count, uptime, messages Tx/Rx/queued.
 
 The first version of this page could not say whether a 115E-2 would ever work, because
 ELPRO's hardware manual answered none of the questions that decide it. The MQTT Gateway
-Configuration Guide answers almost all of them, and the answer is yes: plain MQTT is JSON,
-the Topic Prefix is free-form, and the gap between ELPRO's `{"timestamp": …, "label":
-value}` and MegaNet's reading object is a parser of a shape this bridge already has one of.
+Configuration Guide answered almost all of them, and a technician on real hardware (#166,
+#169) answered the rest. **A 115E-2 relaying ALERT2 lands readings in `meganet.reading`.**
 
-Two things stand between that and a provisioned station.
+The two things this section used to list are done. The bench session happened, and the
+parser was written against the bytes it captured rather than against this page — which
+was the whole point of doing them in that order, because both of the things that actually
+blocked it were things this page had guessed wrong: the gateway appends its own tree below
+the Device name, and the ALERT2 relay path sends a payload shape the vendor's own guide
+does not document. See [What the bench found](#what-the-bench-found-169).
 
-**One bench session**, to confirm the x15U guide describes the 115E-2's gateway and not
-just its cousins' — five questions, listed in [A0](#a0--the-gate), answered in an
-afternoon with a plaintext broker and a laptop.
+What is left is ordinary provisioning, and one open question that only a person can close:
 
-**One parser**, `parseElpro()`, written against the bytes that session captures rather
-than against this page. Until it exists, a correctly provisioned 115E-2 and a broken one
-look exactly alike from the field: both publish, and neither lands a row.
+**Which sensor is which.** The bench unit published `243.600006` against `Sensor 13` on
+`Station 1003`. Nothing in this repo knows what sensor 13 on that station measures, or in
+what units, and the parser is right not to guess — it files the address and the value and
+lets `meganet.resolve_station()` do the rest. Before a real site is commissioned,
+somebody has to map each relayed station and sensor ID to the ALERT2 address MegaNet
+should store it under, which is join 1 of the three joins under
+[What you are actually building](#what-you-are-actually-building) and is sysadmin's to
+decide rather than the technician's to type.
 
-Neither is research. Both are somebody's afternoon, and the order matters — do the bench
-session first, because it is what the parser is written against.
+**The rest is the fleet questions in [A1](#a1--fleet-standards)** — the TLS rung that
+worked, whether a shared password or a certificate per device, and how many of these are
+being bought. None of them are research; all of them are decisions.

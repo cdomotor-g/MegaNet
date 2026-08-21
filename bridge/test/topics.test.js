@@ -1,7 +1,28 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { parseTopic, readingTopic, statusTopic, stationAcl, SUBSCRIPTIONS , READING_SUFFIXES } = require('../src/topics');
+const {
+  parseTopic, readingTopic, statusTopic, stationAcl,
+  SUBSCRIPTIONS, READING_SUFFIXES, READING_TAIL_FORMATS, MAX_TAIL,
+} = require('../src/topics');
+
+/**
+ * Does an MQTT filter match a topic? The broker's rule, not an approximation of
+ * it: `+` matches exactly one level, and `#` matches the level it sits at and
+ * every level below — so `a/#` matches `a` as well as `a/b` (MQTT 3.1.1
+ * §4.7.1.2). The tests below turn on that second clause, so it is written out
+ * here rather than assumed.
+ */
+function matches(filter, topic) {
+  const f = filter.split('/');
+  const t = topic.split('/');
+  for (let i = 0; i < f.length; i += 1) {
+    if (f[i] === '#') return true;
+    if (i >= t.length) return false;
+    if (f[i] !== '+' && f[i] !== t[i]) return false;
+  }
+  return f.length === t.length;
+}
 
 test('builds the topics a station publishes to', () => {
   assert.equal(readingTopic('loudoun_br_al', 'logger'), 'meganet/v1/loudoun_br_al/logger/reading');
@@ -97,39 +118,44 @@ test('the subscriptions cover every topic kind, at QoS 1', () => {
   assert.deepEqual(SUBSCRIPTIONS, [
     { topic: 'meganet/v1/+/+/reading', qos: 1 },
     { topic: 'meganet/v1/+/+/reading/hfem', qos: 1 },
-    { topic: 'meganet/v1/+/+/reading/elpro', qos: 1 },
+    { topic: 'meganet/v1/+/+/reading/elpro/#', qos: 1 },
     { topic: 'meganet/v1/+/status', qos: 1 },
   ]);
 });
 
-test('the subscription wildcards match what the builders produce', () => {
-  const matches = (filter, topic) => {
-    const f = filter.split('/');
-    const t = topic.split('/');
-    if (f.length !== t.length) return false;
-    return f.every((seg, i) => seg === '+' || seg === t[i]);
-  };
-  // Found by filter rather than by position: destructuring the array meant
-  // adding a fourth subscription silently re-pointed `status` at the new one,
-  // and the test failed somewhere unrelated to what changed.
-  const byTopic = (t) => SUBSCRIPTIONS.find((s) => s.topic === t);
-  const json = byTopic('meganet/v1/+/+/reading');
-  const hfem = byTopic('meganet/v1/+/+/reading/hfem');
-  const elpro = byTopic('meganet/v1/+/+/reading/elpro');
-  const status = byTopic('meganet/v1/+/status');
-  assert.ok(matches(json.topic, readingTopic('x_al', 'logger')));
-  assert.ok(matches(hfem.topic, readingTopic('x_al', 'logger', 'hfem')));
-  assert.ok(matches(elpro.topic, readingTopic('x_al', 'logger', 'elpro')));
-  assert.ok(matches(status.topic, statusTopic('x_al')));
-  // and do not overlap: `+` matches exactly one level, so every subscription is
-  // disjoint from every other — a payload can never arrive on the wrong parser
-  // because two filters both matched its topic.
-  for (const a of SUBSCRIPTIONS) {
-    for (const b of SUBSCRIPTIONS) {
-      if (a === b) continue;
-      assert.ok(!matches(a.topic, b.topic.replace(/\+/g, 'x_al')),
-        `${a.topic} must not also match ${b.topic}`);
-    }
+test('the bare elpro filter is gone, not kept beside the wildcard (#169)', () => {
+  // `…/reading/elpro/#` already matches `…/reading/elpro`. Listing the exact
+  // filter as well would make a bare-topic message match two subscriptions, and
+  // a broker may deliver it once per match — a duplicate reading with nothing in
+  // any log to explain it, which is why this is asserted rather than remembered.
+  assert.ok(
+    !SUBSCRIPTIONS.some((s) => s.topic === 'meganet/v1/+/+/reading/elpro'),
+    'the exact elpro filter must not sit beside the wildcard one',
+  );
+  assert.ok(matches('meganet/v1/+/+/reading/elpro/#', 'meganet/v1/s/logger/reading/elpro'));
+});
+
+test('every topic the scheme can produce matches exactly one subscription', () => {
+  // Replaces a pairwise filter-against-filter check, which cannot express what
+  // the `#` made possible: two filters overlapping *below* a segment rather than
+  // at it. Exactly-one is the property that matters at both ends — none means a
+  // publisher the broker never forwards (#169, and the reason this took a
+  // screenshot of the broker to diagnose), two means a duplicate delivery.
+  const topics = [
+    readingTopic('x_al', 'logger'),
+    readingTopic('541155', 'logger'),
+    readingTopic('x_al', 'logger', 'hfem'),
+    readingTopic('x_al', 'logger', 'elpro'),
+    // What the 115E-2 actually publishes, tails and all.
+    readingTopic('elpro_test', 'logger', 'elpro', 'Station 1003'),
+    readingTopic('elpro_test', 'logger', 'elpro', 'DBIRTH/elpro/Station 1003'),
+    readingTopic('elpro_test', 'logger', 'elpro', 'Broker Diagnostics'),
+    statusTopic('x_al'),
+  ];
+  for (const topic of topics) {
+    const hit = SUBSCRIPTIONS.filter((s) => matches(s.topic, topic));
+    assert.equal(hit.length, 1,
+      `${topic} matched ${hit.length} subscriptions: ${hit.map((h) => h.topic).join(', ') || 'none'}`);
   }
 });
 
@@ -140,9 +166,63 @@ test('elpro rides as a topic suffix, and is subscribed to', () => {
     kind: 'reading', station: 'elpro_test', device: 'logger', format: 'elpro',
   });
   assert.ok(
-    SUBSCRIPTIONS.some((s) => s.topic === 'meganet/v1/+/+/reading/elpro' && s.qos === 1),
+    SUBSCRIPTIONS.some((s) => matches(s.topic, 'meganet/v1/elpro_test/logger/reading/elpro') && s.qos === 1),
     'the parser without the subscription is a message nobody receives',
   );
+});
+
+// ── The gateway's own tree below the format segment (#169) ───────────────────
+
+test('an elpro topic carries the gateway tail as source, spaces and all', () => {
+  // The topic the bench unit actually published. `Station 1003` is the relayed
+  // ALERT2 station, and the space in it is why the tail is never run through
+  // isSegment(): the rule that keeps MegaNet's own segments boring would throw
+  // away every reading this device sends.
+  assert.deepEqual(parseTopic('meganet/v1/elpro_test/logger/reading/elpro/Station 1003'), {
+    kind: 'reading', station: 'elpro_test', device: 'logger', format: 'elpro',
+    source: 'Station 1003',
+  });
+  // A deeper tail is one string, not a second parse — nothing resolves by it.
+  assert.equal(
+    parseTopic('meganet/v1/elpro_test/logger/reading/elpro/DBIRTH/elpro/Station 1000').source,
+    'DBIRTH/elpro/Station 1000',
+  );
+});
+
+test('source is absent, not empty, when there is no tail', () => {
+  // So `if (route.source)` is the whole test bridge.js needs, and the two
+  // formats that never carry one parse to exactly what they always did.
+  assert.ok(!('source' in parseTopic('meganet/v1/s/logger/reading/elpro')));
+  assert.ok(!('source' in parseTopic('meganet/v1/s/logger/reading/hfem')));
+  assert.ok(!('source' in parseTopic('meganet/v1/s/logger/reading')));
+});
+
+test('only the formats that own a tail may carry one', () => {
+  assert.deepEqual(READING_TAIL_FORMATS, ['elpro']);
+  // Reachable only by publishing past the subscriptions — the HFEM filter is
+  // exact — so it is somebody's diagnostic, and it should name what it saw.
+  const got = parseTopic('meganet/v1/s/logger/reading/hfem/Station 1003');
+  assert.equal(got.kind, 'unknown');
+  assert.match(got.why, /takes no tail/);
+  assert.throws(() => readingTopic('s', 'logger', 'hfem', 'Station 1003'), /takes no tail/);
+});
+
+test('a tail is bounded, because it reaches a log line and a database column', () => {
+  const long = 'x'.repeat(MAX_TAIL + 1);
+  const got = parseTopic(`meganet/v1/s/logger/reading/elpro/${long}`);
+  assert.equal(got.kind, 'unknown');
+  assert.match(got.why, /over the 256-char limit/);
+  assert.equal(parseTopic(`meganet/v1/s/logger/reading/elpro/${'x'.repeat(MAX_TAIL)}`).kind, 'reading');
+  assert.throws(() => readingTopic('s', 'logger', 'elpro', long), /over the 256-char limit/);
+});
+
+test('a station ACL still covers everything the gateway publishes', () => {
+  // The tail sits under the station segment, so the per-station credential that
+  // 0020 generates needs no widening to permit it — which is the property that
+  // made putting the vendor's tree below our format segment safe in the first
+  // place.
+  assert.ok(matches(stationAcl('elpro_test'),
+    'meganet/v1/elpro_test/logger/reading/elpro/DBIRTH/elpro/Station 1003'));
 });
 
 test('every subscribed suffix parses — the check the hard-coded literal skipped', () => {
@@ -153,8 +233,10 @@ test('every subscribed suffix parses — the check the hard-coded literal skippe
   for (const format of READING_SUFFIXES) {
     const topic = `meganet/v1/s/logger/reading/${format}`;
     assert.equal(parseTopic(topic).format, format, `${topic} must parse`);
+    // Asserted by matching rather than by string equality, so that a format
+    // gaining or losing a tail is not also a rewrite of this check.
     assert.ok(
-      SUBSCRIPTIONS.some((s) => s.topic === `meganet/v1/+/+/reading/${format}`),
+      SUBSCRIPTIONS.some((s) => matches(s.topic, topic)),
       `${format} parses but is not subscribed`,
     );
   }

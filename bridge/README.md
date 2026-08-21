@@ -42,13 +42,23 @@ validator behind it. The bridge adds no second opinion about what a timestamp
 is; it decides only what to relay, when to acknowledge it, and what to say in
 the log.
 
-Three subscriptions, all QoS 1:
+Four subscriptions, all QoS 1:
 
 | Topic | What it carries |
 | --- | --- |
 | `meganet/v1/+/+/reading` | JSON readings — one, an array, or `{readings: […]}` |
 | `meganet/v1/+/+/reading/hfem` | A raw HFEM line, `:HS=1\|…\|NN:` — decoded by `hfem.js`, mapped to the same contract (#155; docs/ingest-hfem.md) |
+| `meganet/v1/+/+/reading/elpro/#` | What an ELPRO x15U gateway publishes in plain, non-Sparkplug mode — decoded by `parseElpro()` (#167; docs/elpro115e_mqtt.md) |
 | `meganet/v1/+/status` | A station's retained status, and its Last Will |
+
+**Only the ELPRO filter ends in `#`, and only because the gateway assembles the
+topic below that segment itself** — `…/reading/elpro/Station 1003` is the relayed
+ALERT2 station, `…/reading/elpro/DBIRTH/elpro/Station 1003` its birth
+certificate. Everything below the format segment is carried as opaque
+provenance and recorded as the raw row's `path`; nothing resolves by it (#169).
+Note that `#` matches the parent level too, so this one filter also covers the
+bare `…/reading/elpro` — do not add the exact filter beside it, or a bare-topic
+message matches two subscriptions and may be delivered twice.
 
 ---
 

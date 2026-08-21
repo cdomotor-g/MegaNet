@@ -187,11 +187,19 @@ function createBridge(config, deps = {}) {
       throw err;
     }
 
+    // The gateway's own topic tail is provenance the payload does not carry —
+    // which relayed ALERT2 station this reading came off (#169). `path` is
+    // reading_raw's column for where a submission came from, so recording it
+    // there makes the raw row explain itself instead of leaving somebody to
+    // reconstruct the topic from a log line that has since aged out.
+    if (route.source) parsed.envelope.path = topic;
+
     log.debug('message_queued', {
       topic,
       station: route.station,
       device: route.device,
       format: route.format,
+      source: route.source,
       readings: parsed.readings.length,
       dup: packet.dup || false,
     });

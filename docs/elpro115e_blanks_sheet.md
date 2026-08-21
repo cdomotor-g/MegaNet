@@ -21,8 +21,8 @@ you can see what has already been fixed by the MegaNet end.
 
 | Field | Value | Why it is this |
 |---|---|---|
-| **Topic Prefix** | `meganet/v1/elpro_test/logger/reading/` | Must be exact, trailing `/` included. The bridge subscribes to `meganet/v1/+/+/reading/elpro` and nothing else. |
-| **Device name** | `elpro` | Becomes the final topic segment, giving `meganet/v1/elpro_test/logger/reading/elpro`. |
+| **Topic Prefix** | `meganet/v1/elpro_test/logger/reading/` | Must be exact, trailing `/` included. The bridge subscribes to `meganet/v1/+/+/reading/elpro/#` and nothing else. |
+| **Device name** | `elpro` | Gives `meganet/v1/elpro_test/logger/reading/elpro`. Anything the unit appends after that — `/Station 1003`, the relayed ALERT2 station — is expected and lands; the `#` covers it (#169). |
 | **Device Type** | `General Purpose` | The type that exposes the `Register` IO-Type, which is how raw registers get published. |
 | **Slave address** | `0` | Only 115S expansion units need one. |
 | **Enable Sparkplug** | **OFF** | Not negotiable — see the card. With it on, the topic and payload both become something MegaNet cannot read, and it looks like it is working from the device end. |
@@ -195,7 +195,7 @@ All three should come back naming `elpro_test`. If they do not, the migration ha
 applied to this database — `db/migrations/0021_elpro_test_station.sql`.
 
 **2 · Confirm the bridge is subscribed to four topics, not three.** The connect log should
-show `meganet/v1/+/+/reading/elpro` among them. If it shows three, the bridge is running an
+show `meganet/v1/+/+/reading/elpro/#` among them. If it shows three, the bridge is running an
 older build and the messages will arrive at the broker and go nowhere.
 
 ---
@@ -233,6 +233,7 @@ MQTT
 DEVICE
   Name  elpro     Type  General Purpose     Slave address  0
   Full topic should read: meganet/v1/elpro_test/logger/reading/elpro
+                          (plus anything the unit appends, e.g. /Station 1003)
 
 INPUT ROWS   (start with row 1 only)
   #  Payload Prefix  Register  Count  Sensitivity  Update Time  Scale  Offset
