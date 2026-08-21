@@ -1,0 +1,3 @@
+# Certificates are byte-exact material: keep LF on every platform so a Windows
+# checkout does not hand CRLF to a firmware toolchain that will not take it.
+*.pem text eol=lf
