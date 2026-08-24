@@ -269,11 +269,19 @@ Three joins have to be right, and they are owned by different people:
 2. **Register → published value.** An Input Configuration row names the register, the
    **Payload Prefix** that becomes the JSON key, and what triggers a publish
    (MQTT p.10–12).
-3. **Published value → MegaNet address.** Every reading MegaNet stores needs an
-   `alert_id` (1–65535) or a `station_number` + `channel`. **Put the ALERT2 address in
-   the Payload Prefix** and the key on the wire *is* the address — which is why the
-   register→reading map on the handover sheet has a Payload Prefix column, and why no
-   mapping table needs maintaining anywhere.
+3. **Published value → MegaNet address.** A reading MegaNet stores needs an `alert_id`
+   (1–65535), a relayed ALERT2 **station address + sensor slot**, or a `station_number` +
+   `channel`. Which of the first two you get depends on which path the value took, and
+   the device decides that, not you:
+
+   - **Direct, off a register.** **Put the ALERT2 address in the Payload Prefix** and the
+     key on the wire *is* the address, stored as `a:6128`. This is what the
+     register→reading map's Payload Prefix column is for.
+   - **Relayed ALERT2.** The gateway sends `{"Sensor": 13, "Value": …}` under a topic
+     tail naming the relayed station, and MegaNet stores the **pair** — `a2:1003/13`
+     (#172). Nothing has to be mapped for the reading to land; what is mapped is which
+     *station* ALERT2 address 1003 is, and that is done once, in MegaNet, either on the
+     station card or by claiming the address off a message in the Message Log.
 
 > **Note what does *not* need solving.** A base station may publish readings for many
 > field stations under its own topic. The reading carries its own address
@@ -480,6 +488,13 @@ The full run is [`mqtt-provisioning.md`](mqtt-provisioning.md). What matters her
     | ELPRO register | ALERT2 addr / sensor ID | Name | Type | Unit | MegaNet address |
     |---|---|---|---|---|---|
     | `46009` | `1234` / `1` | Loudoun Br river level | S-4 | `m` | `alert_id: 6128` |
+
+    That last column is only needed for rows the unit publishes **off a register**, where
+    you choose the Payload Prefix and it becomes the address. A row that reaches MegaNet
+    down the **relay** path already has an address of its own — `a2:1234/1`, the pair in
+    columns two and three — so leave the column blank for those and record what the sensor
+    measures instead. It is the same question, asked once in MegaNet rather than encoded
+    into the device (#172).
 
     Recommended ELPRO register ranges for ERT-A2 work (p.51):
 
@@ -1293,11 +1308,23 @@ chose. Multiple label/value sets may share one message, and the queue concentrat
 same-topic payloads into single messages on replay.
 
 The ALERT2 relay path sends a second shape the guide does not document — an array, with
-the address in a field rather than in the key (#169). `parseElpro()` reads both:
+a sensor field rather than a key (#169). `parseElpro()` reads both:
 
 ```json
 [{"timestamp": 1787288492180, "Sensor": 13, "Value": 243.600006}]
 ```
+
+**`Sensor` is not an address.** It is a slot within the relayed station, and the station
+half of the identity is in the topic tail and nowhere else — so the two are read together
+and stored as a pair, `a2:1003/13` (#172). Reading the slot as an ALERT address, which is
+what #169 shipped, put `Sensor 10` from Station 1000 and `Sensor 10` from Station 1001
+under one identity, and would have attached both to whatever real station owned ALERT
+address 10 the day somebody added it.
+
+Slots are **0–254**. Zero is a real sensor — unlike an ALERT address, where zero is
+nothing — and **255 is the unused-slot marker** from the four sensor-ID columns on the
+Incoming I/O Mappings page, so a 255 on the wire means a mapping line was left half
+filled rather than that an instrument spoke.
 
 **Broker table columns** — Enabled · Client ID · IP/Name · Port · Historian ·
 Keep Alive(Sec) · Clean Session · User name · Password · Queue Size (Max) ·
@@ -1399,12 +1426,28 @@ What is left is ordinary provisioning, and one open question that only a person 
 
 **Which sensor is which.** The bench unit published `243.600006` against `Sensor 13` on
 `Station 1003`. Nothing in this repo knows what sensor 13 on that station measures, or in
-what units, and the parser is right not to guess — it files the address and the value and
-lets `meganet.resolve_station()` do the rest. Before a real site is commissioned,
-somebody has to map each relayed station and sensor ID to the ALERT2 address MegaNet
-should store it under, which is join 1 of the three joins under
-[What you are actually building](#what-you-are-actually-building) and is sysadmin's to
-decide rather than the technician's to type.
+what units, and no code can find out: it is a fact about an instrument in a paddock.
+
+What has changed since that was first written is what it takes to answer it, and it is now
+much less. This page used to say somebody had to map each relayed station and sensor ID to
+an ALERT2 address MegaNet would store the reading under. **That mapping is gone** (#172).
+A relayed reading is stored as the pair that arrived — `a2:1003/13` — so the traffic lands,
+is visible, and is countable before anybody has decided anything. Two smaller answers
+replace the one big one, and neither is a prerequisite for the data arriving:
+
+1. **Which station is ALERT2 station 1003?** One answer per relayed station. Set the
+   **ALERT2 station address** on that station's card, or — faster, and the way round this
+   is worth doing — open one of its messages on the **Message Log** tab and use
+   *Attribute to a station…*. Either way every reading already stored under that address
+   is back-filled, and later ones resolve as they arrive.
+2. **What does slot 13 measure, and in what units?** One answer per sensor, and the only
+   part that genuinely needs somebody who has seen the site. Once the station is claimed,
+   its card lists the slots that station has actually been heard on, with a **Name it**
+   button on each one nobody has claimed — so the question is asked with the evidence
+   beside it rather than from a blank form.
+
+Neither is the technician's to type. Both are sysadmin's, both are done in MegaNet rather
+than on the device, and neither blocks a trial.
 
 **The rest is the fleet questions in [A1](#a1--fleet-standards)** — the TLS rung that
 worked, whether a shared password or a certificate per device, and how many of these are
