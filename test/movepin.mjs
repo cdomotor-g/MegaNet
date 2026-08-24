@@ -235,13 +235,28 @@ async function main() {
     // mouse takes *viewport* coordinates, so the handle is measured with
     // getBoundingClientRect() rather than with locator.boundingBox(), which is
     // relative to the page. And selecting a station renders the editor card
-    // below the map, which reflows everything above it — so the position has to
-    // be read after that has settled, or the pointer goes down on empty ground
-    // 200 px from the pin and the drag silently does nothing.
-    await page.waitForTimeout(600);
-    const handle = await page.evaluate(() => {
-      const r = document.querySelector('.mn-movepin-icon').getBoundingClientRect();
-      return { cx: r.x + r.width / 2, cy: r.y + r.height / 2 };
+    // below the map, which reflows everything above it — so the pin is still
+    // moving when the drag would start, and the pointer goes down on empty
+    // ground 200 px away and does nothing at all, silently.
+    //
+    // A fixed wait is what found that and is the wrong fix for it: it is a
+    // guess about a slower machine. Waiting for the position to *stop changing*
+    // is the same assertion without the guess — two consecutive frames agreeing
+    // is what "settled" means.
+    const handle = await page.evaluate(async () => {
+      const at = () => {
+        const r = document.querySelector('.mn-movepin-icon').getBoundingClientRect();
+        return { cx: r.x + r.width / 2, cy: r.y + r.height / 2 };
+      };
+      const frame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 50)));
+      let prev = at();
+      for (let i = 0; i < 60; i++) {
+        await frame();
+        const now = at();
+        if (Math.abs(now.cx - prev.cx) < 0.5 && Math.abs(now.cy - prev.cy) < 0.5) return now;
+        prev = now;
+      }
+      return prev;
     });
     await page.mouse.move(handle.cx, handle.cy);
     await page.mouse.down();
