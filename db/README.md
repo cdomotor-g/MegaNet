@@ -174,6 +174,7 @@ its cache at all (`PGRST002`).
 | `meganet.attach_file(…)`, `meganet.update_attachment(uuid, jsonb)`, `meganet.detach_file(uuid)` | The attachment write path (0010). Three functions rather than a `grant`, because the object path has to agree with the owner it is filed under, the object name has to be one the app generated rather than one a phone supplied, and `uploaded_by` has to be the caller — none of which is a fact about the row. `update_attachment()` takes a patch so that clearing a caption and leaving it alone are different requests. |
 | `meganet.inspection_form` | View: one row per section a configuration prints *today*, in that configuration's order. What a form renderer asks. Filters on `inspection_config_section.printed`, which `0014` added: a section a form has since dropped stays in the matrix so a 1998 row can carry one, and stays off the form. |
 | `meganet.inspection_needs_maintenance` | View: visits that departed Missing or Poor, and whether a maintenance activity was ever raised against them. |
+| `meganet.inspection_chart_visit`, `meganet.inspection_chart_power`, `meganet.inspection_chart_radio`, `meganet.inspection_chart_gas`, `meganet.inspection_chart_water_level`, `meganet.inspection_chart_data`, `meganet.inspection_chart_fade_margin` | Views (`0023`): the numeric half of a station's visits, plus the date each one happened — and no column anybody wrote. The only objects in the inspection domain `anon` may read besides the vocabularies, and what lets the station card's chart draw without a sign-in. Soft-deleted visits are filtered out here rather than by the caller. The repo's only views that are **not** `security_invoker`, deliberately: reading past the base tables' editors-only policy is the request, not a side effect. |
 | `meganet.inspection_doc(uuid)`, `meganet.maintenance_activity_doc(uuid)` | One record and everything under it, as one JSON document. |
 | `meganet.save_inspection(jsonb, timestamptz)`, `meganet.save_maintenance_activity(jsonb, timestamptz)` | The write paths. One call is one transaction; children are replaced, not merged; a stale write is refused with `PT409`. |
 | `meganet.delete_inspection(uuid, timestamptz)`, `meganet.delete_maintenance_activity(uuid, timestamptz)` | Soft delete, as for stations. |
@@ -191,14 +192,18 @@ its cache at all (`PGRST002`).
 | `meganet.inspection_history_reconciliation` | View, one row: loaded, rejected, blocks, cells, what is still parked. #122's acceptance as a query. |
 
 Everything is readable by `anon` **except `meganet.reading_raw` and the whole
-inspection domain**. `reading_raw` holds whatever a device or an adapter actually
+inspection domain — bar the numbers, which `0023` publishes as views**. `reading_raw` holds whatever a device or an adapter actually
 sent, unread — a debugging artefact rather than a publication, and the day an
 adapter puts a header or a device key in its payload is the day the difference
 matters. The inspection tables are withheld for a different reason: the Council
 form carries landowner names, emails and phone numbers, and inspection remarks
 carry site access notes. Editors and `service_role` can read both. The inspection
 domain's *vocabularies* — the pick-lists and the form matrix — are public, because
-they are the words printed on a blank form and say nothing about a site.
+they are the words printed on a blank form and say nothing about a site. So are
+the *readings*, since `0023`: `meganet.inspection_chart_visit` and the six
+`inspection_chart_*` views beside it carry the numbers a visit recorded and the
+date it happened, and no column anybody wrote. The tables under them are as
+private as they ever were.
 
 Nothing is *writable* by `anon` or by `authenticated`: no table grants either of
 them a write verb, and the only ways in are the functions above — see **Writing**
@@ -820,13 +825,24 @@ this domain holds landowner contact details and site access notes. Editors only 
 which is who fills the forms in. The vocabularies and the form matrix *are*
 public: they are the words on a blank form.
 
+**And, since `0023`, the numbers.** Seven `inspection_chart_*` views publish what
+a visit *measured* — battery volts, fade margin, solar current, gas pressure —
+with the date it happened and nothing anybody wrote: no remarks, no inspector, no
+`comments` column, no Council form, and a soft-deleted visit filtered out. That is
+what makes the chart on the station editor card readable without signing in. The
+seventeen tables above are untouched: no grant to `anon`, no anon policy, and
+`tools/check_inspections.sql` asserts both halves — that the views publish, and
+that the records still do not. They are the repo's only views that are *not*
+`security_invoker`, because reading past the policy is the whole request rather
+than a side effect of it; the head of `0023` argues that at length.
+
 ### Proving it
 
 ```sh
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
 ```
 
-86 checks, in a transaction that rolls back, so it is safe against the live
+90 checks, in a transaction that rolls back, so it is safe against the live
 database. Ten of them compare a lookup table against the `Dropdown` sheet's
 columns verbatim; eleven check the section matrix against what the six sheets
 actually print; fifteen are `0011`'s (below); the rest exercise the guard, the two

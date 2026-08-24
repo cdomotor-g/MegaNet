@@ -234,10 +234,13 @@ const MapBlast = (function () {
     popupLinkHtml(s) {
       if (!s.roles.includes('repeater') || !s.repeater) return '';
       const on = armedId() === s.id;
-      return `<a href="#" onclick="MapBlast.toggle('${escAttr(s.id)}');return false"
+      // A pill since #170, and a <button> with it: the action is in-page, so
+      // this is the element #138 named — not an `<a href="#">` that navigates
+      // to the top of the document if the handler ever throws.
+      return `<button type="button" class="pill" onclick="MapBlast.toggle('${escAttr(s.id)}')"
         title="${on ? 'Take the blast styling off the map'
                     : 'Red links and rings: what stops getting in if this repeater dies'}"
-        >${on ? 'Hide blast radius' : 'Show blast radius'}</a>`;
+        >${on ? 'Hide blast radius' : 'Show blast radius'}</button>`;
     },
 
     toggle(id) {

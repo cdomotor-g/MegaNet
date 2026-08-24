@@ -1881,13 +1881,14 @@ function mapSearchInput(value) {
 // render of the tab already — this relocates that rebuild to leave-time rather
 // than adding one.
 //
-// The five modules go first, while the map they were attached to is still
-// alive: each detach() is written against a live map (MapRivers and LinkBudget
-// call map.off(), MapDraw clears a ghost layer), and each is self-contained, so
-// they may run in any order and twice over.
+// The modules go first, while the map they were attached to is still alive:
+// each detach() is written against a live map (MapRivers and LinkBudget call
+// map.off(), MapDraw clears a ghost layer, MapMovePin removes its own control),
+// and each is self-contained, so they may run in any order and twice over.
 function stopStationsMap() {
   MapSpider.detach();
   MapLocate.detach();
+  MapMovePin.detach();
   MapDraw.detach();
   LinkBudget.detach();
   MapRivers.detach();
@@ -1934,6 +1935,10 @@ function initMap() {
   stationsMapPanels(state.map);
   MapSpider.attach(state.map);
   MapLocate.attach(state.map);
+  // Nothing on screen until it is armed from the editor card or a callout, so
+  // it is attached for the same reason MapSpider is: it needs to know which map
+  // it would be moving a pin on before anybody asks it to.
+  MapMovePin.attach(state.map);
   MapDraw.attach(state.map);
   LinkBudget.attach(state.map);
   // Before the first refresh, so the fit that refresh performs is the view the
@@ -2192,6 +2197,14 @@ function refreshMapLayers({ skipFit = false } = {}) {
 
     // bindPopup takes a function so the HTML is built when the popup opens,
     // not for all ~3,174 markers on every refresh.
+    //
+    // The actions below are a row of pills now (#170), and there can be nine of
+    // them, each one `nowrap` and ~160 px wide. `maxWidth` alone does nothing
+    // for that: Leaflet sizes a popup to its *content*, and the flex row is
+    // happy to be as narrow as it is given, so at Leaflet's default the pills
+    // wrap one per line and the callout is 520 px tall. `minWidth` is what
+    // actually hands the row two columns' worth of room. 330/340 sits inside a
+    // 375 px phone, which is the width that decides how wide this may get.
     marker.bindPopup(() => {
       const idTypes = stationAlertIdTypes(s);
       const arroUrl = arroSiteUrl(arroSiteId(s));
@@ -2207,19 +2220,27 @@ function refreshMapLayers({ skipFit = false } = {}) {
         `<span class="mn-pop-line mn-pop-indent">${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
       ${s.elevation_ahd != null ? `<span class="mn-pop-line">Elev: ${s.elevation_ahd} m AHD</span>` : ''}
       ${acmaRepeaterPopupExtra(s)}
-      <div class="mn-popup-actions">
-        <a href="#" onclick="focusStation('${escAttr(s.id)}');return false"
-           title="Select this station in the list under the map">Show in the list below ↓</a>
-        <a href="#" onclick="zoomToStation('${escAttr(s.id)}');return false"
-           title="Zoom the map to the ~50 km area around this station">Zoom to station</a>
+      <!-- Every action on this callout is a pill (#170): they are a row of
+           equal things — two that move the map, one that arms the blast
+           styling, and four or five that leave for somewhere else — and a
+           stack of underlined text read as a menu nobody asked for. The two
+           in-page ones are <button>s, which is what #138 says they always
+           should have been: the action happens here, so the element is a
+           button dressed as one, not a link to nowhere. -->
+      <div class="mn-popup-actions pill-row">
+        <button type="button" class="pill" onclick="focusStation('${escAttr(s.id)}')"
+           title="Select this station in the list under the map">Show in the list below ↓</button>
+        <button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
+           title="Zoom the map to the ~50 km area around this station">Zoom to station</button>
         ${MapBlast.popupLinkHtml(s)}
-        ${arroUrl ? `<a href="${esc(arroUrl)}" target="_blank" rel="noopener"
+        ${MapMovePin.popupLinkHtml(s)}
+        ${arroUrl ? `<a class="pill" href="${esc(arroUrl)}" target="_blank" rel="noopener"
            title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
            >Open in ARRO admin ↗</a>` : ''}
         ${mapLinksHtml(s)}
       </div>
     `;
-    });
+    }, { minWidth: 330, maxWidth: 340 });
     // Leaflet opens a bound popup on every click of its layer. Take that over,
     // so a modifier-click can mean "put this in the selection" without a popup
     // opening and closing again — a closed popup leaves its container fading

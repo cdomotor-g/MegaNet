@@ -469,10 +469,15 @@ const MapBackbone = (function () {
           : 'no pass-range window at the base end — matched on distance alone'}</span><br>` : ''}
         <span class="mn-pop-line">${fmtKm(km)} · ${r.margin == null ? 'no margin figure'
           : `${(r.margin > 0 ? '+' : '') + r.margin.toFixed(1)} dB ${m.label.toLowerCase()} (free-space)`}</span>
-        <div class="mn-popup-actions">
-          <a href="#" onclick="MapBackbone.openOnStations('${backbone ? 'backbone' : 'field'}','${escAttr(aId)}','${escAttr(bId)}');return false"
-             title="Open this path on the Stations map with the elevation profile and fade margin cards">
-            Open on the Stations map ↗</a>
+        <!-- The same row of pills a station callout carries (#170), and the
+             same reason its two in-page actions became buttons: this one is
+             in-page too — it switches tab and opens a card — so the anchor it
+             used to be was announcing a link to nowhere. -->
+        <div class="mn-popup-actions pill-row">
+          <button type="button" class="pill"
+             onclick="MapBackbone.openOnStations('${backbone ? 'backbone' : 'field'}','${escAttr(aId)}','${escAttr(bId)}')"
+             title="Open this path on the Stations map with the elevation profile and fade margin cards"
+             >Open on the Stations map ↗</button>
         </div>`;
     },
 

@@ -8,8 +8,10 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr and cssVar; across to app.js
 // for switchTab from an inline handler, so at click time; to datastore.js for
-// dbSelect and dbCanWrite; and to history.js for History.pick(), which is the
-// Inspection History tab's own station scope rather than a second copy of it.
+// dbSelect and dbCanWrite — the second only to say, in the lead paragraph, that
+// the chart needs no session and the records behind the pill do; and to
+// history.js for History.pick(), which is the Inspection History tab's own
+// station scope rather than a second copy of it.
 // One file reaches into this one: station-editor.js, which calls sectionHtml()
 // from editorForm() — this section is a part of that card's contents, and by
 // #129's division that makes it the editor's business where it appears and this
@@ -44,6 +46,21 @@
 // has a home into exactly those columns; the migration calls that projection
 // "the reason the historical load is not a parallel schema", and this is the
 // first thing to take it at its word.
+//
+// Since 0023 it reads them through the `inspection_chart_*` views rather than
+// off those tables directly, and that is what makes this section visible
+// without a sign-in. The tables are still editors-only and nothing here changed
+// that: 0009 withholds them because an inspection's remarks carry site-access
+// notes and the Council form carries landowner phone numbers, which is a fact
+// about the *words* on a visit. The views carry the numbers and the date and
+// nothing else — no remarks, no inspector, no comments column — so there is
+// nothing left in them to withhold. What they contain, and the two assertions
+// that keep it true, are written out at the head of that migration.
+//
+// The pill above the chart still goes somewhere editors-only: Inspection
+// History renders the sheets as they were written, which is the half that
+// carries the words. The lead paragraph says so when nobody is signed in,
+// rather than letting the pill lead to a locked door without warning.
 //
 // What decides *which* parameters can be plotted is `meganet.measurement_field`
 // — the same table the projection reads. It carries the label, the unit and the
@@ -132,13 +149,20 @@ const StationInspections = (function () {
   // typed sheet and an imported one mean the same thing on this chart. The
   // `original` phase is what the link *was* on some earlier visit and would
   // plot the same historical fact twice, so only `this_visit` is read.
+  //   view     what is actually read. The section tables themselves are
+  //            editors-only under 0009 and stay that way; `inspection_chart_*`
+  //            (0023) is the numeric half of each, published to everybody —
+  //            see the head of that migration for what is in them and what is
+  //            deliberately not. Named per table rather than derived from the
+  //            table name, because a rule that computes an identifier is a rule
+  //            somebody has to reverse before they can grep for the view.
   const HOMES = {
-    inspection_power:       { filter: '' },
-    inspection_radio:       { filter: '' },
-    inspection_gas:         { filter: '' },
-    inspection_water_level: { filter: '' },
-    inspection_data:        { filter: '&phase=eq.initial' },
-    inspection_fade_margin: { filter: '&phase=eq.this_visit', fold: Math.max },
+    inspection_power:       { view: 'inspection_chart_power',       filter: '' },
+    inspection_radio:       { view: 'inspection_chart_radio',       filter: '' },
+    inspection_gas:         { view: 'inspection_chart_gas',         filter: '' },
+    inspection_water_level: { view: 'inspection_chart_water_level', filter: '' },
+    inspection_data:        { view: 'inspection_chart_data',        filter: '&phase=eq.initial' },
+    inspection_fade_margin: { view: 'inspection_chart_fade_margin', filter: '&phase=eq.this_visit', fold: Math.max },
   };
 
   // The two home columns in those tables that are text rather than numeric.
@@ -164,8 +188,8 @@ const StationInspections = (function () {
   //
   // meganet.measurement_field is granted to `anon` as well as to editors — it
   // is the list of things a form has boxes for, which is public in the same way
-  // the blank sheet is. So the picker fills in signed out; it is the readings
-  // behind it that do not (0009's foot, and the gate in bodyHtml).
+  // the blank sheet is. Since 0023 so are the readings behind it, through the
+  // `inspection_chart_*` views, so the whole section fills in signed out.
 
   function loadFields() {
     const s = S();
@@ -224,13 +248,17 @@ const StationInspections = (function () {
       s.busy      = false;
     }
     if (!s.fields && !s.fieldsBusy && !s.fieldsError) loadFields();
-    if (!dbCanWrite()) return;            // the gate says so; nothing to fetch
     if (s.visits || s.busy) { fill(); return; }
 
     s.busy  = true;
     s.error = null;
-    dbSelect('inspection?select=id,inspected_on,date_precision,date_raw,origin,config_key'
-           + `&station_id=eq.${encodeURIComponent(stationId)}&deleted_at=is.null`
+    // `inspection_chart_visit` rather than `inspection`, and no `deleted_at`
+    // filter with it: the view is live visits only, so the soft delete is
+    // honoured by the database rather than by this file remembering to ask.
+    // `date_raw` and `config_key` went with the move — both were selected and
+    // neither was ever read.
+    dbSelect('inspection_chart_visit?select=id,inspected_on,date_precision,origin'
+           + `&station_id=eq.${encodeURIComponent(stationId)}`
            + `&order=inspected_on.asc&limit=${VISIT_CAP + 1}`)
       .then(rows => {
         if (S().stationId !== stationId) return;      // the operator moved on
@@ -284,7 +312,7 @@ const StationInspections = (function () {
       for (let i = 0; i < ids.length; i += ID_CHUNK) chunks.push(ids.slice(i, i + ID_CHUNK));
 
       Promise.all(chunks.map(chunk =>
-        dbSelect(`${table}?select=inspection_id,${cols.join(',')}`
+        dbSelect(`${HOMES[table].view}?select=inspection_id,${cols.join(',')}`
                + `${HOMES[table].filter}&inspection_id=in.(${chunk.join(',')})`)))
         .then(parts => {
           if (S().stationId !== stationId) return;
@@ -426,7 +454,10 @@ const StationInspections = (function () {
     <p class="small ef-flush si-lead">
       Every visit this station has had, typed here or imported from the archive workbook, charted by
       the numbers each one recorded. The pill above opens the full records — the sheets as they were
-      written, printable and exportable — with this station already in the history's filter box.
+      written, printable and exportable — with this station already in the history's filter box.${
+        dbCanWrite() ? '' : `
+      The chart needs no sign-in; the full records do, because an inspection's remarks carry
+      site-access notes.`}
     </p>
     <div id="si-body">${bodyHtml()}</div>`;
   }
@@ -434,15 +465,6 @@ const StationInspections = (function () {
   // Everything below the lead paragraph. Rebuilt on its own, by repaint().
   function bodyHtml() {
     const s = S();
-    if (!dbCanWrite()) {
-      return `
-        <p class="small si-muted si-gate">
-          <strong>Past inspections are editors-only.</strong> An inspection's remarks carry
-          site-access notes, so 0009 grants the records to editors and to nobody else — and the anon
-          key this app ships with is published.
-          <a href="#" onclick="Auth.open();return false">Sign in</a> to chart them.
-        </p>`;
-    }
     if (s.error) {
       return `
         <p class="small si-bad si-gate">${esc(s.error)}

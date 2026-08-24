@@ -12,8 +12,11 @@
 // arroSiteId, arroSiteUrl, arroSensorUrl, buildArroUrl, bucketSizeGapNote and
 // ROLE_LABEL; across to app.js for the Stations tab's rerender hooks —
 // rerenderStations, rerenderStationEditorCard, refreshFilterOptions,
-// updateHeaderStats, findStationMatches, stationAlertIds, passRangeCoversId,
-// repeaterPassingCount and repeaterPassRangeSpan; to auth.js for Auth; and to
+// refreshMapLayers, updateHeaderStats, findStationMatches, stationAlertIds,
+// passRangeCoversId, repeaterPassingCount and repeaterPassRangeSpan; to
+// map-move-pin.js for the button that moves this station's pin on the map above
+// the card, which writes back into the two coordinate boxes; to auth.js for
+// Auth; and to
 // datastore.js for dbCanWrite, dbSaveStation, dbDeleteStation, setEditorStatus,
 // editorStatusHtml and editorWritesGoToDatabase; to inspections.js for
 // Inspections.configs and Inspections.ensureRefs — the telemetry pick-list
@@ -110,6 +113,11 @@ function editorForm(s) {
   const hasRep  = s.roles.includes('repeater');
   const sensors = stationSensors(s).slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0));
   const dbId    = arroSiteId(s);
+  // The row of pills under the coordinate boxes. Read once rather than twice —
+  // a station with no position still has the two document searches, so what
+  // decides whether the row is drawn is whether it came back with anything.
+  const links   = mapLinksHtml(s);
+  const movePin = MapMovePin.editorButtonHtml(s);
   return `
     <div class="panel-header ef-head">
       <h3>${esc(s.name) || 'New Station'}</h3>
@@ -134,7 +142,11 @@ function editorForm(s) {
       <label>Station Number<input type="text" id="ef-stnno" value="${esc(s.station_number || '')}"></label>
       <label>Latitude<input type="number" step="any" id="ef-lat" value="${s.lat ?? ''}"></label>
       <label>Longitude<input type="number" step="any" id="ef-lon" value="${s.lon ?? ''}"></label>
-      ${stationMapLinkUrls(s) ? `<div class="full small ef-links">${mapLinksHtml(s)}</div>` : ''}
+      <!-- Typing a coordinate is the exact form of this that nobody can check.
+           The button arms map-move-pin.js: the pin comes off the map, goes where
+           the station is, and writes these two boxes on the way back. -->
+      ${movePin ? `<div class="full ef-movepin">${movePin}</div>` : ''}
+      ${links ? `<div class="full small ef-links">${links}</div>` : ''}
       <label>Elevation AHD (m)<input type="number" step="any" id="ef-elev" value="${s.elevation_ahd ?? ''}"></label>
       <label>RM System ID<input type="number" id="ef-rmsys" value="${s.rm_system_id || 1}"></label>
       <label>TBRG bucket size (mm/tip)
@@ -464,6 +476,12 @@ async function editorSave() {
   updateHeaderStats();
   refreshFilterOptions();      // an edited role / network changes the option counts
   rerenderStations();
+  // And the map, which draws from the same state.data this just replaced. A
+  // moved pin, a renamed station and a role that changed colour all sat at
+  // their old values until something else happened to refresh the layers;
+  // `skipFit` because the operator is looking at a place they chose, and a save
+  // that re-fits the view to the whole network moves the ground under them.
+  if (state.map) refreshMapLayers({ skipFit: true });
   rerenderStationEditorCard();
   setEditorStatus({
     kind: 'ok',

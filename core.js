@@ -238,7 +238,12 @@ const HELP = {
            + 'the editor, under ARRO, <strong>Inspections</strong> charts what that station\'s past '
            + 'visits measured — fade margin and battery under load to begin with, any of the other '
            + '35 recorded parameters on request — and the pill beside the heading opens the full '
-           + 'records on the Inspection History tab with this station already in its filter box.',
+           + 'records on the Inspection History tab with this station already in its filter box. '
+           + 'That chart needs no sign-in; the records behind the pill do. Under the coordinate '
+           + 'boxes, and on every station\'s map callout, is a row of pills: Street View, Google '
+           + 'Earth and Apple Maps at that position, and searches of the <strong>FWIN</strong> and '
+           + '<strong>OOHB</strong> document libraries for that station. Beside them, '
+           + '<strong>Move pin on map</strong>.',
     watch: [
       '<strong>Kill spaghetti</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
@@ -286,6 +291,24 @@ const HELP = {
       + 'the first of January. And calibration grids — the rain-gauge tip test, the shaft-encoder '
       + 'and receiver grids — are deliberately not on the parameter list: they are a grid per '
       + 'visit rather than one number, and they are read in full on the Inspection History tab.',
+      '<strong>Move pin on map</strong> is how a coordinate gets fixed without typing one. It '
+      + 'arms for the one station whose card is open — pins are not draggable otherwise, because '
+      + 'a map you pan by dragging and 3,174 draggable pins is a gauge moved 40 m into a river by '
+      + 'a mis-started pan. Drag the pin, or click the map where the station should be; the '
+      + 'station\'s old pin stays put as a "was here" mark, with a dashed line to the new '
+      + 'position and the distance between them on the panel. <em>Save position</em> puts the new '
+      + 'coordinates in the two boxes on the form and saves the station exactly as the card\'s own '
+      + 'Save would — so it needs the same signed-in session. <em>Cancel</em>, or Escape, leaves '
+      + 'the station where it was.',
+      'The two <strong>document searches</strong> do not send the station\'s name as written. A '
+      + 'library search box requires <em>every</em> word to match, and there is no way to ask it '
+      + 'for either spelling of a word from a link — so a site filed as "Upper Sandy Ck" would be '
+      + 'unreachable from a search that said "Creek". The link drops the telemetry suffix '
+      + '(<code>AL</code>, <code>TM</code>), the bracketed part of the name, and the generic '
+      + 'words that get abbreviated — Ck/Creek, Rd/Road, Mt/Mount, Br/Bridge — and searches the '
+      + 'distinctive ones: <em>Upper Sandy Creek AL</em> is searched as <code>upper sandy</code>. '
+      + 'Hover a pill to see exactly what it will search for. If it is too broad, the words are in '
+      + 'the library\'s own search box when you land, ready to be narrowed.',
       'The editor\'s two ARRO numbers are <strong>not the same number</strong>. <code>ARRO site '
       + 'id</code> is ARRO\'s own database key and the only one its URLs accept; <code>station '
       + 'number</code> is BoM\'s. The boxes sit side by side and are labelled, because handing '
@@ -1083,31 +1106,154 @@ function bucketSizeGapNote() {
   return `${missing.toLocaleString()} of ${all.length.toLocaleString()} stations carry no recorded bucket size.`;
 }
 
-// Street View / Apple Maps links for a station's coordinates, or null when it
-// has none. Google's Maps URLs API drops the viewer on the nearest available
-// panorama — on farm tracks and hilltops with no coverage it lands on the map
-// instead, which is why the link's title spells that out. Apple publishes no
-// URL scheme for opening Look Around at a coordinate, so the Apple link is a
-// map pin, not a panorama, and is labelled "Apple Maps" rather than
-// "Apple Street View" because it isn't one.
+// ── Where else to look at a station ──────────────────────────────────────────
+// Five links out of one station: three ways to look at where it is, and the two
+// SharePoint libraries the network's paperwork actually lives in. They are
+// written once, here, because the map popup and the station editor card render
+// the same row and two copies of a URL shape drift the moment one is edited.
+
+// The two document libraries, up to and including the `q=`. Everything before
+// it — the site, the library, the `viewid` of the view that lists everything,
+// and `view=7` — is what a browser puts in the address bar when somebody opens
+// that library and types in its search box, kept verbatim rather than rebuilt
+// from parts we would be guessing at.
+const FWIN_DOC_SEARCH_URL =
+  'https://bom365.sharepoint.com/sites/int-FloodWarningInfrastructureNetworkProgram2'
+  + '/Shared%20Documents/Forms/Default.aspx'
+  + '?viewid=d017a792%2Db4d7%2D44f1%2Daa85%2D5417f09fbd0c&view=7&q=';
+const OOHB_DOC_SEARCH_URL =
+  'https://bom365.sharepoint.com/sites/OOHB/FWN%20Library/Forms/AllItems.aspx'
+  + '?viewid=3c588f77%2D6255%2D435e%2D9e1c%2Dc04e596dfb5e&view=7&q=';
+
+// What a station's name says about its telemetry rather than about where it is.
+// 1,332 of the 3,174 names end in AL (with -B, -P and -P2 variants), 237 in TM,
+// and nothing in either library is filed under either — they are the kind of
+// site it is, and the search box does not care.
+const DOC_SEARCH_SUFFIX_RE = /[\s(]*\b(?:AL(?:[-\s]?[A-Z]\d?)?|TM|ALERT|TBRG)\b[\s)]*$/i;
+
+// The words a document is as likely to abbreviate as to spell out. "Upper Sandy
+// Creek" is filed as "Upper Sandy Ck" as often as not, and 243 station names
+// say Ck where 218 say Creek — so whichever one we send, half the library is
+// unreachable. A SharePoint search box ANDs its terms and there is no way to
+// ask it for *either* spelling from a URL, so the pair is dropped and the
+// distinctive words carry the search. That is also what a person does by hand:
+// the worked example this was built from searched "Upper Sandy Creek AL" as
+// `upper sandy`, and found what they were after.
+//
+// Only the generic half of a name is in here. Nothing that tells two sites
+// apart is ever dropped — "Upper", "North", "Seven Mile" and every proper noun
+// stay, which is what keeps the query from matching the whole library.
+const DOC_SEARCH_GENERIC = new Set([
+  'ck', 'creek', 'crk', 'cr',
+  'river', 'riv', 'rv', 'rvr',
+  'rd', 'road', 'st', 'street', 'ave', 'avenue', 'ln', 'lane', 'dr', 'drive',
+  'hwy', 'hway', 'highway',
+  'mt', 'mount', 'mtn',
+  'br', 'bridge', 'xing', 'crossing',
+  'res', 'reservoir', 'stn', 'station',
+  // Not a place at all: the kind of telemetry, and the words that join two
+  // halves of a name together. `tbrg` and `alert` are the mid-name versions of
+  // the suffix above — "Greenough Rvr TBRG @ Yuin" is a rain gauge at Yuin.
+  'al', 'tm', 'alert', 'tbrg', 'rep', 'repeater',
+  'at', 'the', 'and', 'of', 'no',
+]);
+
+// Turn a station name into the words to search a document library for.
+//
+//   1. The parenthetical goes. It is the river a site is on, or the road it is
+//      off, or the word "Repeater" — supplementary, and 122 names carry one.
+//      Every extra term is another thing every hit has to match.
+//   2. The telemetry suffix goes (above).
+//   3. Punctuation becomes space, so "O'Shannassy" and "D/S" break into words
+//      rather than into things no index holds.
+//   4. Single letters go — what is left of D/S, U/S, W/L and the bare "@".
+//      Digits stay: the 8 in "Swansea No. 8" is the whole point of that name.
+//   5. The generic half goes (above). "St" is the one word whose position
+//      decides what it is: leading it is Saint, anywhere else it is Street.
+//   6. A word said twice is said once — "Cudgewa Creek @ Cudgewa North" is two
+//      terms, not three.
+//   7. Five terms at most, and never nothing — a search that ANDs eight words
+//      finds an empty library, and a search with no words is not a link.
+function docSearchTerms(name) {
+  const raw = String(name || '').trim();
+  if (!raw) return '';
+
+  const head = raw.split('(')[0].trim() || raw.replace(/[()]/g, ' ');
+  const bare = head.replace(DOC_SEARCH_SUFFIX_RE, '').trim() || head;
+
+  const words = bare.toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(w => w && !(w.length === 1 && /[a-z]/.test(w)));
+
+  // `st` leading is Saint and names the place; `st` anywhere else is Street and
+  // does not. It is the one word in the list whose position changes what it is.
+  const kept = words.filter((w, i) => !DOC_SEARCH_GENERIC.has(w) || (w === 'st' && i === 0));
+  const terms = [...new Set(kept.length ? kept : words)].slice(0, 5);
+  return terms.join(' ') || bare.toLowerCase();
+}
+
+// The document-library searches for a station, or null when it has no name to
+// search for. Both libraries take the same words: the question is "what has
+// anyone filed about this site", and it is asked of each of them in turn.
+function stationDocSearchUrls(s) {
+  const q = docSearchTerms(s && s.name);
+  if (!q) return null;
+  const enc = encodeURIComponent(q);
+  return { fwin: FWIN_DOC_SEARCH_URL + enc, oohb: OOHB_DOC_SEARCH_URL + enc, q };
+}
+
+// Street View / Google Earth / Apple Maps links for a station's coordinates, or
+// null when it has none. Google's Maps URLs API drops the viewer on the nearest
+// available panorama — on farm tracks and hilltops with no coverage it lands on
+// the map instead, which is why the link's title spells that out. Earth is the
+// same place from above: the camera form (`@lat,lon,0a,2000d,…`) rather than a
+// search, so it flies to the coordinate itself and not to whatever a geocoder
+// makes of the name. Apple publishes no URL scheme for opening Look Around at a
+// coordinate, so the Apple link is a map pin, not a panorama, and is labelled
+// "Apple Maps" rather than "Apple Street View" because it isn't one.
 function stationMapLinkUrls(s) {
   if (s == null || s.lat == null || s.lon == null) return null;
   const coord = `${s.lat},${s.lon}`;
   return {
     google: `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${encodeURIComponent(coord)}`,
+    earth:  `https://earth.google.com/web/@${encodeURIComponent(s.lat)},${encodeURIComponent(s.lon)},0a,2000d,35y,0h,0t,0r`,
     apple:  `https://maps.apple.com/?ll=${encodeURIComponent(coord)}&q=${encodeURIComponent(s.name || '')}`,
   };
 }
 
-// The two links above, rendered as the anchors used in both the map popup
-// and the station editor card — one place a URL shape is written, not two.
+// The links above, rendered as the row of pills used in both the map popup and
+// the station editor card — one place a URL shape is written, not two, and one
+// place they are dressed.
+//
+// Pills rather than a stack of underlined text (#170): every one of these
+// leaves the app for somewhere else, they are the same *kind* of thing as each
+// other, and a column of five links reads as a menu nobody asked for. `.pill`
+// is `.btn-link`'s shape at a link's weight — see styles.css.
+//
+// A station with no coordinates still gets the document searches: the two
+// libraries are searched by name, and a site nobody has surveyed yet is exactly
+// the one whose paperwork is worth finding.
 function mapLinksHtml(s) {
   const urls = stationMapLinkUrls(s);
-  if (!urls) return '';
-  return `<a href="${esc(urls.google)}" target="_blank" rel="noopener"
-       title="Opens the nearest Google Street View panorama; sites with no coverage open the map at this location instead">Google Street View ↗</a>
-    <a href="${esc(urls.apple)}" target="_blank" rel="noopener"
-       title="Opens Apple Maps at this location; Look Around is one tap away where Apple has coverage">Apple Maps ↗</a>`;
+  const docs = stationDocSearchUrls(s);
+  const out  = [];
+  if (urls) {
+    out.push(`<a class="pill" href="${esc(urls.google)}" target="_blank" rel="noopener"
+       title="Opens the nearest Google Street View panorama; sites with no coverage open the map at this location instead">Google Street View ↗</a>`);
+    out.push(`<a class="pill" href="${esc(urls.earth)}" target="_blank" rel="noopener"
+       title="Opens Google Earth looking straight down on this location from about 2 km up">Google Earth ↗</a>`);
+    out.push(`<a class="pill" href="${esc(urls.apple)}" target="_blank" rel="noopener"
+       title="Opens Apple Maps at this location; Look Around is one tap away where Apple has coverage">Apple Maps ↗</a>`);
+  }
+  if (docs) {
+    out.push(`<a class="pill" href="${esc(docs.fwin)}" target="_blank" rel="noopener"
+       title="Searches the Flood Warning Infrastructure Network Program library for &quot;${escAttr(docs.q)}&quot;">Search FWIN docs ↗</a>`);
+    out.push(`<a class="pill" href="${esc(docs.oohb)}" target="_blank" rel="noopener"
+       title="Searches the OOHB FWN Library for &quot;${escAttr(docs.q)}&quot;">Search OOHB docs ↗</a>`);
+  }
+  return out.join('\n    ');
 }
 
 // ── Datastore ─────────────────────────────────────────────────────────────────
@@ -1141,7 +1287,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 22;
+const DB_SCHEMA_VERSION = 23;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 function dbHostLabel() {

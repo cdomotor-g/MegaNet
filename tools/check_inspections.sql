@@ -732,6 +732,13 @@ $$;
 -- records are not. Checked as grants rather than by reasoning about them, and
 -- checked for both halves — a schema that refuses the wrong things is as broken
 -- as one that permits them.
+--
+-- 0023 opened one door in that wall and it is checked here too: seven views
+-- carrying the numbers a visit recorded and the date it happened, and nothing a
+-- person wrote. The records themselves are as private as they were — the
+-- assertions below say both, because "the chart works signed out" and "the
+-- remarks are still not published" are two claims and this file is where they
+-- are kept true together.
 
 do $$
 declare
@@ -746,6 +753,12 @@ declare
     'inspection_gas', 'inspection_radio', 'inspection_fade_margin',
     'inspection_calibration', 'inspection_data_quality', 'inspection_admin',
     'maintenance_activity', 'maintenance_asset', 'maintenance_data_quality', 'attachment'];
+  -- 0023. Not tables: the numeric half of six of the private tables above, plus
+  -- the dates, published as views so the station card's chart needs no sign-in.
+  v_charts text[] := array[
+    'inspection_chart_visit', 'inspection_chart_power', 'inspection_chart_radio',
+    'inspection_chart_gas', 'inspection_chart_water_level',
+    'inspection_chart_data', 'inspection_chart_fade_margin'];
 begin
   if not exists (select 1 from pg_catalog.pg_roles where rolname = 'anon') then
     perform pg_temp.check_that('no anon role — grant checks skipped', true,
@@ -794,6 +807,48 @@ begin
   perform pg_temp.check_that('an editor may read the records',
     (select bool_and(has_table_privilege('authenticated', 'meganet.' || t, 'select'))
        from unnest(v_private) t));
+
+  -- 0023's chart views: the one door in the wall above, and the three things
+  -- that have to stay true about it. The first two are the feature — a signed
+  -- out reader can chart what a station has measured. The third is the fence:
+  -- every column of every one of them is a number, a date or a uuid, bar four
+  -- named discriminators, so nothing anybody wrote on a sheet can leave this
+  -- way. 0023 asserts the same thing at apply time; it is here as well because
+  -- the leak this prevents would be added by a *later* migration.
+  perform pg_temp.check_that('anon may read every inspection chart view',
+    (select bool_and(has_table_privilege('anon', 'meganet.' || v, 'select'))
+       from unnest(v_charts) v),
+    (select string_agg(v, ', ') from unnest(v_charts) v
+      where not has_table_privilege('anon', 'meganet.' || v, 'select')));
+
+  perform pg_temp.check_that('and so may an editor, so the chart is one code path',
+    (select bool_and(has_table_privilege('authenticated', 'meganet.' || v, 'select'))
+       from unnest(v_charts) v));
+
+  perform pg_temp.check_that('a chart view carries no column anybody wrote',
+    not exists (
+      select 1 from information_schema.columns c
+       where c.table_schema = 'meganet'
+         and c.table_name = any (v_charts)
+         and c.data_type not in ('numeric', 'integer', 'bigint', 'smallint',
+                                 'double precision', 'real', 'date', 'uuid',
+                                 'timestamp with time zone')
+         and c.column_name not in ('station_id', 'date_precision', 'origin', 'phase')),
+    (select string_agg(format('%s.%s (%s)', c.table_name, c.column_name, c.data_type), ', ')
+       from information_schema.columns c
+      where c.table_schema = 'meganet'
+        and c.table_name = any (v_charts)
+        and c.data_type not in ('numeric', 'integer', 'bigint', 'smallint',
+                                'double precision', 'real', 'date', 'uuid',
+                                'timestamp with time zone')
+        and c.column_name not in ('station_id', 'date_precision', 'origin', 'phase')));
+
+  perform pg_temp.check_that('and no chart view is security_invoker',
+    (select bool_and(not coalesce(c.reloptions, '{}') @> array['security_invoker=true'])
+       from pg_catalog.pg_class c
+       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'meganet' and c.relname = any (v_charts)),
+    'they run as their owner on purpose — an invoker view returns anon nothing at all');
 end
 $$;
 

@@ -952,6 +952,69 @@ button.primary {
   pointer-events: none;
 }
 
+/* …and the small one. `.pill` is `.btn-link` at a footnote's size: the shape a
+   row of *equal* things takes when there are four or five of them and they are
+   all the same kind of move — the links out of a station callout, the two that
+   move the map under it, the two document libraries. #170 made that row pills
+   because a stack of underlined text read as a menu, and because half of it was
+   already `<a href="#" onclick=…>` — the thing #138 named. A pill looks like a
+   button, so the ones whose action is in-page are buttons now.
+
+   Both elements take it: an <a> leaving the site and a <button> doing something
+   here look identical on purpose, because to the hand they are the same target.
+   What they announce themselves as still differs, which is the half that
+   matters. `border-radius` is --r-pill rather than --r-md — the one visual
+   difference from .btn-link, and what makes five of them read as a set. */
+.pill,
+button.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-pill);
+  background: var(--panel);
+  color: var(--accent);
+  padding: .2rem .6rem;
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pill:hover {
+  border-color: var(--accent);
+  background: var(--subtle);
+}
+
+/* A pill that is currently *on* — the blast styling armed, the pin being moved.
+   Filled rather than outlined, which is the same distinction .si-pill makes
+   between its resting and hover states, so "this one is live" reads without
+   needing the label to say so twice. */
+.pill.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--panel);
+}
+
+.pill[disabled] {
+  color: var(--muted);
+  opacity: .55;
+  pointer-events: none;
+}
+
+/* The row they sit in. Wraps, because the widest of these rows is inside a
+   Leaflet popup ~300 px across and the narrowest phone is narrower than that. */
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .3rem;
+}
+
 /* …and its opposite, which the app needed just as often and had never named
    (#138). `.btn-link` is an <a> that reads as a button, for leaving the site.
    `.link-btn` is a <button> that reads as a link, for the thing the app writes
@@ -1977,9 +2040,14 @@ h2.h-bad {
    rather than reading as a paragraph of its own. */
 .ef-hint { margin-top: -.35rem; }
 
+/* The links out of the station in the editor card: the same row of pills the
+   map callout carries, from the same mapLinksHtml(). Wraps — five pills do not
+   fit across the form's left column on a phone. */
 .ef-links {
   display: flex;
-  gap: var(--sp-4);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .3rem;
   margin-top: -.35rem;
 }
 
@@ -2755,6 +2823,114 @@ hr {
   -webkit-mask: radial-gradient(circle at 50% 50%, transparent 9px, #000 10px);
   mask: radial-gradient(circle at 50% 50%, transparent 9px, #000 10px);
 }
+
+/* ── Move pin (map-move-pin.js) ──────────────────────────────────────────── */
+/* The one draggable marker on the Stations map, and the panel that says where
+   it has got to. A divIcon rather than Leaflet's default image icon, for the
+   reason .mn-loc gives one line up: the default resolves its PNGs against the
+   stylesheet's own URL, and this app is expected to open off a laptop with no
+   network.
+
+   Amber, which on this map means "the filter picked this one out" — the same
+   thing it means here: of 3,174 pins, this is the one being operated. It is
+   drawn over its own station's circle (zIndexOffset 3000), and the circle stays
+   put as the "was here" mark. */
+.mn-movepin-icon {
+  background: none;
+  border: none;
+  cursor: grab;
+}
+
+.mn-movepin-icon:active { cursor: grabbing; }
+
+.mn-movepin {
+  position: relative;
+  width: 34px;
+  height: 34px;
+}
+
+.mn-movepin-ring {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  /* MAP_PIN_HIT's amber, written out rather than tokenised: app.js holds that
+     colour as a JS constant because a canvas pin's stroke is a string and not a
+     `var()`, and a second copy in :root that nothing reads back would be one
+     more pair to keep in step. Kept here, named there. */
+  border: 2px dashed #ffc400;
+  background: rgba(255, 196, 0, .16);
+  animation: mn-movepin-pulse 1.8s ease-in-out infinite;
+}
+
+.mn-movepin-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: #ffc400;
+  box-shadow: 0 0 0 3px #fff, 0 0 4px 3px rgba(0, 0, 0, .35);
+}
+
+/* The one animation on this map, and it earns its place: it is what tells the
+   operator the mode is armed when the panel is scrolled out of view. Decorative
+   — the dashed amber ring says which pin it is standing perfectly still — so it
+   is left to the document's one reduced-motion policy at the foot of this file
+   rather than given a second block of its own. There is exactly one such block
+   and `npm run shell` counts them. */
+@keyframes mn-movepin-pulse {
+  0%, 100% { transform: scale(1);    opacity: 1; }
+  50%      { transform: scale(1.18); opacity: .75; }
+}
+
+/* Bottom left of the map, where nothing else on it lives. */
+.mn-movepin-panel {
+  min-width: 15rem;
+  max-width: 17rem;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .22);
+  font-size: .85rem;
+}
+
+.mn-movepin-head {
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+  margin-bottom: var(--sp-1);
+}
+
+.mn-movepin-name { color: var(--muted); }
+
+.mn-movepin-hint {
+  margin: 0 0 var(--sp-2);
+  color: var(--muted);
+  font-size: .8rem;
+}
+
+/* Label / value pairs, not a table: three facts, and a <dl> is what three
+   labelled facts are. */
+.mn-movepin-read {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .1rem var(--sp-2);
+  margin: 0 0 var(--sp-2);
+}
+
+.mn-movepin-read dt { color: var(--muted); }
+
+.mn-movepin-read dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The card's own arming button, on its own line under the coordinate boxes. */
+.ef-movepin { margin-top: -.35rem; }
 
 /* ── Draw & measure ──────────────────────────────────────────────────────── */
 
@@ -3896,10 +4072,22 @@ hr {
   background: var(--subtle);
 }
 
-.leaflet-popup-content-wrapper,
-.leaflet-popup-tip {
+/* Leaflet's own stylesheet is linked *after* this one in index.html, and it
+   sets `background: white; color: #333` on both of these at the same
+   specificity — so the two rules below have been losing the cascade since the
+   day they were written, and every popup in the app has been white in the dark
+   theme. `.leaflet-container` in front of each is the whole fix: same colours,
+   one class more specific, no `!important`. Found at #170, when the callout's
+   new pills — which do take the tokens — turned up dark on a white ground. */
+.leaflet-container .leaflet-popup-content-wrapper,
+.leaflet-container .leaflet-popup-tip {
   background: var(--panel);
   color: var(--text);
+}
+
+/* And the close button with them, which takes Leaflet's #757575 on white. */
+.leaflet-container .leaflet-popup-close-button {
+  color: var(--muted);
 }
 
 /* Footer action row on a station popup ("Show in the list below"), ruled off
@@ -3948,20 +4136,13 @@ hr {
 .empty-actions { margin-top: var(--sp-5); }
 .filter-field--spaced { margin-top: var(--sp-2); }
 
+/* A wrapping row of pills since #170, not a column of links — the layout comes
+   from .pill-row, which this carries alongside; what is left here is the rule
+   that separates the actions from the station's own details above them. */
 .mn-popup-actions {
   margin-top: .45rem;
   padding-top: .4rem;
   border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: .25rem;
-}
-
-.mn-popup-actions a {
-  font-size: .83rem;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .leaflet-control-attribution,

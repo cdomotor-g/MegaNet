@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the fifteen that run in CI
+npm run all                       # the sixteen that run in CI
 ```
 
 | Command | What it does |
@@ -37,8 +37,9 @@ npm run all                       # the fifteen that run in CI
 | `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
 | `npm run maint` | the Council Maintenance Tasks form renders what the workbook's own filled sheet says — with the fixture read out of the `.xlsx` |
 | `npm run history` | a saved record reads back as the sheet it was written on, and exports as it reads — with the records written by the app during the run |
+| `npm run movepin` | the Stations tab's links and its move-pin mode: five pills in the callout and the editor card, the two document searches carrying the *reduced* station name rather than the raw one, and the mode armed, dragged with a real pointer, read back, cancelled and saved — plus the map's other interactive modes taken off on the way in |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the fifteen that run in CI |
+| `npm run all` | the sixteen that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
 `toplevel`, `registry`, `nav`, `shell`, `tabs` and `help` take `-v` too, to list what
@@ -48,7 +49,7 @@ colour has before it stops clearing AA, and `nav -v` prints what each search
 probe actually found, which is the fastest way to see why a `find` word is not
 doing its job.
 
-CI runs `check`, `names`, `toplevel`, `smoke`, `registry`, `nav`, `shell`, `help`, `insp`, `maint` and `history` on every push that touches a root `*.js`,
+CI runs `check`, `names`, `toplevel`, `smoke`, `registry`, `nav`, `shell`, `help`, `insp`, `maint`, `history` and `movepin` on every push that touches a root `*.js`,
 `index.html`, `styles.css`, `stations.json`, `db/migrations/`, `test/` or the
 inspection workbook in `archive/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's

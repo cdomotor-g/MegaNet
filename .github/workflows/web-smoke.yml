@@ -264,6 +264,16 @@ jobs:
         working-directory: test
         run: npm run history
 
+      # Smoke opens the Stations tab and asserts nothing threw — which a pill row
+      # missing two pills, a document search sending the raw station name, and a
+      # Save that writes null over a coordinate all pass cleanly. This one drives
+      # the mode: arm it, drag the pin with a real pointer, read the coordinates
+      # back off the panel, cancel, save, and assert the map's other interactive
+      # modes were taken off on the way in (#170).
+      - name: Move pin and the station's links — the mode, the drag, and the pills
+        working-directory: test
+        run: npm run movepin
+
       # Python, no browser, no dependencies, and the only check in this file
       # that is about a *data* artefact rather than about the app: #123's sheet
       # manifest, field map and layout table are derived from the historical

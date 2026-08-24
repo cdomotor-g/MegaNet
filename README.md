@@ -85,6 +85,8 @@ MegaNet/
 ├── map-rivers.js           ← MapRivers — OSM watercourses under the station pins
 ├── map-spider.js           ← MapSpider — fans overlapping pins out on leader lines
 ├── map-locate.js           ← MapLocate — GPS dot, accuracy ring, compass cone
+├── map-move-pin.js         ← MapMovePin — drag one station's pin to where the
+│                             station is, and save the coordinates
 ├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
 ├── modal.js                ← Modal     — the shared dialog shell
 ├── packets.js              ← Packets   — ALERT / ERTS codec, and its tab
@@ -178,7 +180,7 @@ MegaNet/
 ├── tools/                  ← command-line helpers (needs Python; see tools/README.md)
 │   ├── check_ingest.sql     (psql: prove the telemetry contract — 48 checks, rolls back)
 │   ├── check_mqtt.sql       (psql: prove the MQTT bridge's database half — 39 checks)
-│   ├── check_inspections.sql (psql: prove the inspection schema — 86 checks, rolls back)
+│   ├── check_inspections.sql (psql: prove the inspection schema — 90 checks, rolls back)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
 │   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
@@ -556,7 +558,12 @@ to point at.
 Unlike the station list and the readings, **none of this is readable with the
 published anon key**: the council form carries landowner contact details and
 inspection remarks carry site access notes. The pick-lists and the form matrix
-are public — they are the words on a blank form.
+are public — they are the words on a blank form. So is one more thing since
+`0023`: the **numbers** a visit recorded, and the date it happened, through
+seven `inspection_chart_*` views that carry no free text at all. That is what
+lets the station card's chart draw without a sign-in while the records behind it
+stay editors-only — the words are what was being withheld, and a fade margin of
+18 dB in 1997 says nothing about who owns the paddock.
 
 Reading one back is the **Inspection History** tab. A station's past visits and
 Council forms are one timeline, newest first, with the departure ratings that met
@@ -583,13 +590,21 @@ crews reach for first, and the two the archive has most of (7,322 and 13,199
 readings across 14,982 imported visits) — and any of the other 35 recorded
 parameters can be ticked instead.
 
+**The chart needs no sign-in.** The pill beside it does — Inspection History
+renders the sheets as they were written, which is the half that carries the
+remarks — and the section says so on screen rather than letting the pill lead to
+a locked door.
+
 That chart is not built on `meganet.inspection_measurement`, which would be the
 obvious source and is the wrong one: it holds only the imported visits, so the
 picture would stop dead at the import and show nothing typed since. It reads the
 **section tables** — `inspection_power`, `inspection_radio`, `inspection_gas`,
-`inspection_water_level`, `inspection_data` and `inspection_fade_margin` — which
-is where both origins live, because `project_inspection_measurements()` writes
-every imported measurement that has a home into exactly those columns. The
+`inspection_water_level`, `inspection_data` and `inspection_fade_margin` —
+through `0023`'s `inspection_chart_*` views of them, which is where both origins
+live, because `project_inspection_measurements()` writes every imported
+measurement that has a home into exactly those columns. Those views are the
+numeric half of each table and nothing else: no remarks, no inspector, no
+comments column, and a soft-deleted visit is gone from them. The
 parameter list is `meganet.measurement_field` itself, so it is the database's own
 vocabulary rather than a copy of it, and a field added there appears in the
 picker with no code change.
@@ -608,7 +623,8 @@ The schema is the whole of #115; the two forms that write it are #116
 (Inspections) and #117 (Site Maintenance), the history view is #118, the
 ~35-year backfill out of the second workbook is epic #122. [`db/README.md`](db/README.md#station-inspections-and-maintenance-activities)
 has the design decisions and the write path; `tools/check_inspections.sql` proves
-it in 86 checks.
+it in 90 checks — including that the chart views publish the numbers and that
+the records behind them are still not readable with the anon key.
 
 ---
 
@@ -2237,7 +2253,8 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Nine checks, in ascending order of cost:
+Sixteen checks. The ten below are the ones a change to the front end meets
+first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |
 |---|---|
@@ -2250,6 +2267,7 @@ Nine checks, in ascending order of cost:
 | `npm run insp` | the Inspections form drawn against the schema's own seed data, on all six sheets. Smoke cannot see this one: it blocks the datastore, and this tab renders from it |
 | `npm run maint` | the Council Maintenance Tasks form drawn against the workbook's own filled sheet, read out of the `.xlsx` in `archive/`. Every cell where that sheet differs from the blank template has to be either on screen or named as having no column |
 | `npm run history` | a saved record reading back as the sheet it was written on. The fixture is not a file: the check fills a sheet in, saves it, and serves that document back — so the round trip is what is tested, and the read-only view is compared against the *editable* form's own section list |
+| `npm run movepin` | a station's links and its move-pin mode. The five pills in the callout and in the editor card, the two document searches carrying the *reduced* station name rather than the raw one, and the mode armed, dragged **with a real pointer**, read back, cancelled and saved. Smoke sees none of it: a pill row missing two pills and a Save that writes null over a coordinate both open a tab with a clean console |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and
@@ -2267,14 +2285,14 @@ then clicks its way through the RF Changes and Interference Workbench controls,
 keyed by the handler each one names rather than by its label. See
 `test/lib/controls.mjs`.
 
-CI runs all nine on any push touching a root `*.js`, `index.html`, `styles.css`,
+CI runs all sixteen on any push touching a root `*.js`, `index.html`, `styles.css`,
 `stations.json`, `db/migrations/`, `test/` or the inspection workbook in
 `archive/`. The filter is a glob rather than a list of filenames
 because the app's script list grew with every milestone of the split — a named
 list would have to be edited by every milestone, and the one that forgot would
 quietly stop being tested.
 
-There is a tenth, `npm run concat`, which is not in CI: it concatenates the
+There is one more, `npm run concat`, which is not in CI: it concatenates the
 scripts `index.html` loads and compares the bytes against a recorded snapshot.
 That is the check that proves an `app.js` split moved code without changing it,
 and the only one that catches the four literal NUL bytes the app carries inside
