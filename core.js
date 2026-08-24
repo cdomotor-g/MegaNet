@@ -301,14 +301,17 @@ const HELP = {
       + 'Save would — so it needs the same signed-in session. <em>Cancel</em>, or Escape, leaves '
       + 'the station where it was.',
       'The two <strong>document searches</strong> do not send the station\'s name as written. A '
-      + 'library search box requires <em>every</em> word to match, and there is no way to ask it '
-      + 'for either spelling of a word from a link — so a site filed as "Upper Sandy Ck" would be '
-      + 'unreachable from a search that said "Creek". The link drops the telemetry suffix '
-      + '(<code>AL</code>, <code>TM</code>), the bracketed part of the name, and the generic '
-      + 'words that get abbreviated — Ck/Creek, Rd/Road, Mt/Mount, Br/Bridge — and searches the '
-      + 'distinctive ones: <em>Upper Sandy Creek AL</em> is searched as <code>upper sandy</code>. '
-      + 'Hover a pill to see exactly what it will search for. If it is too broad, the words are in '
-      + 'the library\'s own search box when you land, ready to be narrowed.',
+      + 'library search box requires <em>every</em> term to match, so a site filed as "Upper Sandy '
+      + 'Ck" would be unreachable from a search that said "Creek" — the wrong half of the pair '
+      + 'does not merely fail to help, it excludes every hit. So the link drops the telemetry '
+      + 'suffix (<code>AL</code>, <code>TM</code>, <code>TBRG</code>) and the bracketed part of '
+      + 'the name, and asks for the words that have two spellings as <em>either</em>: '
+      + '<em>Upper Sandy Creek AL</em> is searched as '
+      + '<code>upper sandy (creek OR ck OR crk)</code>. Ck/Creek, Rd/Road, Mt/Mount, Br/Bridge, '
+      + 'St/Street and the rest are all handled that way. <strong>Hover a pill to see exactly '
+      + 'what it will search for</strong> — and if a library turns out not to read the '
+      + '<code>OR</code>s, that is the fastest way to tell, because the query is in the box when '
+      + 'you land and can be edited there.',
       'The editor\'s two ARRO numbers are <strong>not the same number</strong>. <code>ARRO site '
       + 'id</code> is ARRO\'s own database key and the only one its URLs accept; <code>station '
       + 'number</code> is BoM\'s. The boxes sit side by side and are labelled, because handing '
@@ -1132,49 +1135,74 @@ const OOHB_DOC_SEARCH_URL =
 const DOC_SEARCH_SUFFIX_RE = /[\s(]*\b(?:AL(?:[-\s]?[A-Z]\d?)?|TM|ALERT|TBRG)\b[\s)]*$/i;
 
 // The words a document is as likely to abbreviate as to spell out. "Upper Sandy
-// Creek" is filed as "Upper Sandy Ck" as often as not, and 243 station names
-// say Ck where 218 say Creek — so whichever one we send, half the library is
-// unreachable. A SharePoint search box ANDs its terms and there is no way to
-// ask it for *either* spelling from a URL, so the pair is dropped and the
-// distinctive words carry the search. That is also what a person does by hand:
-// the worked example this was built from searched "Upper Sandy Creek AL" as
-// `upper sandy`, and found what they were after.
+// Creek" is filed as "Upper Sandy Ck" as often as not — 243 station names say Ck
+// where 218 say Creek — so a query naming one spelling cannot reach a document
+// written with the other, and a search box ANDs its terms: the wrong half of the
+// pair does not merely fail to help, it excludes every hit.
 //
-// Only the generic half of a name is in here. Nothing that tells two sites
-// apart is ever dropped — "Upper", "North", "Seven Mile" and every proper noun
-// stay, which is what keeps the query from matching the whole library.
-const DOC_SEARCH_GENERIC = new Set([
-  'ck', 'creek', 'crk', 'cr',
-  'river', 'riv', 'rv', 'rvr',
-  'rd', 'road', 'st', 'street', 'ave', 'avenue', 'ln', 'lane', 'dr', 'drive',
-  'hwy', 'hway', 'highway',
-  'mt', 'mount', 'mtn',
-  'br', 'bridge', 'xing', 'crossing',
-  'res', 'reservoir', 'stn', 'station',
-  // Not a place at all: the kind of telemetry, and the words that join two
-  // halves of a name together. `tbrg` and `alert` are the mid-name versions of
-  // the suffix above — "Greenough Rvr TBRG @ Yuin" is a rain gauge at Yuin.
+// So the pair is not dropped, it is *asked for as either*. `(creek OR ck)` is
+// KQL, which is what SharePoint's search box parses, and it keeps the recall of
+// dropping the word and the precision of keeping it.
+//
+// **If the libraries turn out not to honour the operators from a URL, this is
+// the one place to change**: `docSearchQuery()` below renders each group, and
+// rendering a group as nothing instead — dropping the generic word, which is
+// what a person does by hand — is a one-line edit there. Every pill's tooltip
+// carries the query it will send, so which of the two is happening is visible
+// on screen rather than something to reason about.
+//
+// Keyed by the spelling to search for first; the values are what the same word
+// is written as elsewhere. Nothing that tells two sites apart is in here — only
+// the generic half of a name, so "Upper", "North", "Seven Mile" and every proper
+// noun are searched as themselves.
+const DOC_SEARCH_VARIANTS = [
+  ['creek', 'ck', 'crk'],
+  ['river', 'rv', 'rvr', 'riv'],
+  ['road', 'rd'],
+  ['street', 'st'],
+  ['mount', 'mt'],
+  ['bridge', 'br'],
+  ['crossing', 'xing'],
+  ['reservoir', 'res'],
+  ['station', 'stn'],
+  ['avenue', 'ave'],
+  ['lane', 'ln'],
+  ['drive', 'dr'],
+  ['highway', 'hwy', 'hway'],
+];
+
+// word → the group it belongs to, built once from the table above.
+const DOC_SEARCH_GROUP = new Map(
+  DOC_SEARCH_VARIANTS.flatMap(g => g.map(w => [w, g])));
+
+// Words that are not a place at all, and are dropped rather than expanded: the
+// kind of telemetry a site is, and the words that join two halves of a name
+// together. `tbrg` and `alert` are the mid-name versions of the suffix above —
+// "Greenough Rvr TBRG @ Yuin" is a rain gauge at Yuin. The joiners are stop
+// words the index drops anyway; taking them out here keeps the query readable.
+const DOC_SEARCH_NOISE = new Set([
   'al', 'tm', 'alert', 'tbrg', 'rep', 'repeater',
   'at', 'the', 'and', 'of', 'no',
 ]);
 
-// Turn a station name into the words to search a document library for.
+// Turn a station name into a query for a document library.
 //
 //   1. The parenthetical goes. It is the river a site is on, or the road it is
 //      off, or the word "Repeater" — supplementary, and 122 names carry one.
 //      Every extra term is another thing every hit has to match.
-//   2. The telemetry suffix goes (above).
+//   2. The telemetry suffix goes (above), and so do the noise words.
 //   3. Punctuation becomes space, so "O'Shannassy" and "D/S" break into words
 //      rather than into things no index holds.
 //   4. Single letters go — what is left of D/S, U/S, W/L and the bare "@".
 //      Digits stay: the 8 in "Swansea No. 8" is the whole point of that name.
-//   5. The generic half goes (above). "St" is the one word whose position
-//      decides what it is: leading it is Saint, anywhere else it is Street.
-//   6. A word said twice is said once — "Cudgewa Creek @ Cudgewa North" is two
-//      terms, not three.
-//   7. Five terms at most, and never nothing — a search that ANDs eight words
-//      finds an empty library, and a search with no words is not a link.
-function docSearchTerms(name) {
+//   5. A word with other spellings becomes `(this OR that)`. "St" is the one
+//      whose position decides what it is: leading it is Saint and names the
+//      place, so it is searched as itself; anywhere else it is Street.
+//   6. A term said twice is said once — "Cudgewa Creek @ Cudgewa North" is
+//      three terms, not four.
+//   7. Five terms at most, and never nothing — a search that ANDs eight terms
+//      finds an empty library, and a search with no terms is not a link.
+function docSearchQuery(name) {
   const raw = String(name || '').trim();
   if (!raw) return '';
 
@@ -1187,10 +1215,17 @@ function docSearchTerms(name) {
     .split(/\s+/)
     .filter(w => w && !(w.length === 1 && /[a-z]/.test(w)));
 
-  // `st` leading is Saint and names the place; `st` anywhere else is Street and
-  // does not. It is the one word in the list whose position changes what it is.
-  const kept = words.filter((w, i) => !DOC_SEARCH_GENERIC.has(w) || (w === 'st' && i === 0));
-  const terms = [...new Set(kept.length ? kept : words)].slice(0, 5);
+  const kept = words.filter(w => !DOC_SEARCH_NOISE.has(w));
+  const terms = [];
+  const seen = new Set();
+  for (const [i, w] of (kept.length ? kept : words).entries()) {
+    const group = (w === 'st' && i === 0) ? null : DOC_SEARCH_GROUP.get(w);
+    const term  = group ? `(${group.join(' OR ')})` : w;
+    if (seen.has(term)) continue;
+    seen.add(term);
+    terms.push(term);
+    if (terms.length === 5) break;
+  }
   return terms.join(' ') || bare.toLowerCase();
 }
 
@@ -1198,7 +1233,7 @@ function docSearchTerms(name) {
 // search for. Both libraries take the same words: the question is "what has
 // anyone filed about this site", and it is asked of each of them in turn.
 function stationDocSearchUrls(s) {
-  const q = docSearchTerms(s && s.name);
+  const q = docSearchQuery(s && s.name);
   if (!q) return null;
   const enc = encodeURIComponent(q);
   return { fwin: FWIN_DOC_SEARCH_URL + enc, oohb: OOHB_DOC_SEARCH_URL + enc, q };

@@ -37,7 +37,7 @@ npm run all                       # the sixteen that run in CI
 | `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
 | `npm run maint` | the Council Maintenance Tasks form renders what the workbook's own filled sheet says — with the fixture read out of the `.xlsx` |
 | `npm run history` | a saved record reads back as the sheet it was written on, and exports as it reads — with the records written by the app during the run |
-| `npm run movepin` | the Stations tab's links and its move-pin mode: five pills in the callout and the editor card, the two document searches carrying the *reduced* station name rather than the raw one, and the mode armed, dragged with a real pointer, read back, cancelled and saved — plus the map's other interactive modes taken off on the way in |
+| `npm run movepin` | the Stations tab's links and its move-pin mode: five pills in the callout and the editor card, the two document searches carrying the *reduced* station name rather than the raw one and asking for both spellings of the words that have two, and the mode armed, dragged with a real pointer, read back, cancelled and saved — plus the map's other interactive modes taken off on the way in |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
 | `npm run all` | the sixteen that run in CI |
 

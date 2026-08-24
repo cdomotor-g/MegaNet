@@ -2,8 +2,9 @@
 //
 //   1. The row of pills a station's callout and its editor card both carry —
 //      that every one of them is there, that the two document searches carry
-//      the reduced name rather than the raw one, and that a station with no
-//      coordinates still gets the searches.
+//      the *reduced* name rather than the raw one and ask for both spellings of
+//      the words that have two, and that a station with no coordinates still
+//      gets the searches.
 //   2. Move pin: arm it, drag the pin, read the coordinates back, cancel — and
 //      the same again with Save, which has to reach the form's own boxes.
 //   3. That arming takes the map's other interactive modes off, because a draw
@@ -15,6 +16,11 @@
 // renders a page that looks entirely correct. A pill row missing two pills, a
 // document search that sends the raw station name, a Save that writes null over
 // a coordinate — none of them is an error in the console.
+//
+// What this cannot check is whether SharePoint honours `(creek OR ck)` from a
+// URL: the libraries are behind the tenant's sign-in and unreachable from here.
+// What it does check is that the query we send is the query we meant to, which
+// is the half that is ours.
 //
 // The datastore is off-origin and refused under this harness (lib/network.mjs),
 // so nothing here signs in and nothing is saved to a database. What is checked
@@ -66,36 +72,46 @@ async function main() {
     log('\nThe document search is the name a person would have typed\n');
 
     const terms = await page.evaluate(() => ({
-      sandy:   docSearchTerms('Upper Sandy Creek AL'),
-      mt:      docSearchTerms('Mt Hallen (Sandy'),
-      mount:   docSearchTerms('Mount Isa TM'),
-      ck:      docSearchTerms('Sandy Ck Tm'),
-      saint:   docSearchTerms('St Marys AL'),
-      street:  docSearchTerms('Bathurst Stanley Street (Macquarie River)'),
-      dupe:    docSearchTerms('Cudgewa Creek @ Cudgewa North'),
-      digits:  docSearchTerms('Swansea No. 8 WWPS'),
-      empty:   docSearchTerms(''),
-      // Every name in the file, so "never nothing" is a fact about the data
-      // rather than about the eight examples above it.
-      blanks:  state.data.stations.filter(s => s.name && !docSearchTerms(s.name)).length,
+      sandy:   docSearchQuery('Upper Sandy Creek AL'),
+      mt:      docSearchQuery('Mt Hallen (Sandy'),
+      mount:   docSearchQuery('Mount Isa TM'),
+      ck:      docSearchQuery('Sandy Ck Tm'),
+      saint:   docSearchQuery('St Marys AL'),
+      street:  docSearchQuery('Bathurst Stanley Street (Macquarie River)'),
+      dupe:    docSearchQuery('Cudgewa Creek @ Cudgewa North'),
+      digits:  docSearchQuery('Swansea No. 8 WWPS'),
+      suffix:  docSearchQuery('Greenough Rvr TBRG @ Yuin'),
+      empty:   docSearchQuery(''),
+      // Every name in the file, so "never nothing" and "never longer than a URL
+      // wants to be" are facts about the data rather than about the examples
+      // above them.
+      blanks:  state.data.stations.filter(s => s.name && !docSearchQuery(s.name)).length,
+      longest: Math.max(...state.data.stations.filter(s => s.name)
+                          .map(s => docSearchQuery(s.name).length)),
       total:   state.data.stations.length,
     }));
 
-    check('the worked example reduces the way the request did', terms.sandy === 'upper sandy',
-      `got ${JSON.stringify(terms.sandy)}`);
-    check('Mt and Mount both go, wherever they sit',
-      terms.mt === 'hallen' && terms.mount === 'isa',
+    check('the worked example asks for both spellings of the word that has two',
+      terms.sandy === 'upper sandy (creek OR ck OR crk)', JSON.stringify(terms.sandy));
+    check('Ck and Creek are the same question, whichever the station was named with',
+      terms.ck === 'sandy (creek OR ck OR crk)', JSON.stringify(terms.ck));
+    check('so are Mt and Mount, wherever in the name they sit',
+      terms.mt === '(mount OR mt) hallen' && terms.mount === '(mount OR mt) isa',
       `${JSON.stringify(terms.mt)} / ${JSON.stringify(terms.mount)}`);
-    check('so do Ck and Creek', terms.ck === 'sandy', JSON.stringify(terms.ck));
-    check('St leading is Saint and stays; St trailing is Street and goes',
-      terms.saint === 'st marys' && terms.street === 'bathurst stanley',
+    check('St leading is Saint and is searched as itself; St elsewhere is Street',
+      terms.saint === 'st marys' && terms.street === 'bathurst stanley (street OR st)',
       `${JSON.stringify(terms.saint)} / ${JSON.stringify(terms.street)}`);
-    check('a word said twice is said once', terms.dupe === 'cudgewa north', JSON.stringify(terms.dupe));
+    check('a term said twice is said once', terms.dupe === 'cudgewa (creek OR ck OR crk) north',
+      JSON.stringify(terms.dupe));
     check('a digit is not a stray letter and stays', terms.digits === 'swansea 8 wwps',
       JSON.stringify(terms.digits));
+    check('the telemetry words go rather than expanding — TBRG is not a place',
+      terms.suffix === 'greenough (river OR rv OR rvr OR riv) yuin', JSON.stringify(terms.suffix));
     check('no name in the file reduces to nothing', terms.blanks === 0,
       `${terms.blanks} of ${terms.total} came back empty`);
-    check('and a station with no name asks for no search', terms.empty === '');
+    check('and none of them builds a query longer than a URL wants to be',
+      terms.longest <= 120, `longest is ${terms.longest} characters`);
+    check('a station with no name asks for no search', terms.empty === '');
 
     // ── 2. The pills ──────────────────────────────────────────────────────
     log('\nEvery link out of a station is a pill, in both places that draw them\n');
@@ -118,7 +134,7 @@ async function main() {
         fwin: hrefs.find(h => h.includes('FloodWarningInfrastructure')) || '',
         oohb: hrefs.find(h => h.includes('/sites/OOHB/')) || '',
         earth: hrefs.find(h => h.includes('earth.google.com')) || '',
-        q: docSearchTerms(s.name),
+        q: docSearchQuery(s.name),
         noCoordsCount: noCoords.children.length,
         noCoordsLabels: [...noCoords.children].map(e => e.textContent.trim()),
       };
