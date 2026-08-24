@@ -645,6 +645,185 @@ begin
 end
 $$;
 
+-- ── The relayed ALERT2 pair (0024 / #172) ───────────────────────────────────
+-- #169 taught the bridge where the ALERT2 station address lives and then stored
+-- only the sensor slot, as though it were an ALERT address. The checks below are
+-- the three defects that produced, each asserted as behaviour rather than as
+-- schema: two stations must not share one address, slot zero must survive, and
+-- ELPRO's unused-slot marker must not become a reading.
+--
+-- ALERT2 station addresses 64380-64389 here, the same reasoning as the 64301+
+-- ALERT addresses above: inside the range, far from anything real, rolled back
+-- regardless.
+
+do $$
+declare
+  v      jsonb;
+  n      integer;
+  a_1000 text;
+  a_1001 text;
+begin
+  insert into meganet.station (id, ord, name, station_number, rm_system_id)
+  values ('_check_mqtt_a2',  -992, 'Check ALERT2',       '999092', -995),
+         ('_check_mqtt_a2b', -991, 'Check ALERT2 Other', '999091', -995);
+
+  -- The collision. Slot 10 arrives from two different relayed stations, which is
+  -- exactly what the live bench feed does, and used to produce one `a:10`.
+  v := meganet.ingest(jsonb_build_object(
+        'source', 'mqtt', 'protocol', 'elpro',
+        'path', 'meganet/v1/elpro_test/logger/reading/elpro/Station 64380',
+        'readings', jsonb_build_array(jsonb_build_object(
+          'a2_station', 64380, 'a2_sensor', 10,
+          'reading_ts', '2026-08-23T23:53:10Z', 'value_raw', -101))));
+  v := meganet.ingest(jsonb_build_object(
+        'source', 'mqtt', 'protocol', 'elpro',
+        'path', 'meganet/v1/elpro_test/logger/reading/elpro/Station 64381',
+        'readings', jsonb_build_array(jsonb_build_object(
+          'a2_station', 64381, 'a2_sensor', 10,
+          'reading_ts', '2026-08-23T23:53:10Z', 'value_raw', -90))));
+
+  select addr into a_1000 from meganet.reading where a2_station = 64380 and a2_sensor = 10;
+  select addr into a_1001 from meganet.reading where a2_station = 64381 and a2_sensor = 10;
+
+  perform pg_temp.check_that('the same sensor slot on two relayed stations is two addresses',
+    a_1000 = 'a2:64380/10' and a_1001 = 'a2:64381/10',
+    format('got %s and %s — one address for two instruments is #169''s defect',
+           coalesce(a_1000, '(none)'), coalesce(a_1001, '(none)')));
+
+  -- Slot 0. isAlertId() rejected it because zero is not an ALERT address; a slot
+  -- is not an address, and the bench station has been reporting one all along.
+  v := meganet.ingest(jsonb_build_object(
+        'protocol', 'elpro', 'readings', jsonb_build_array(jsonb_build_object(
+          'a2_station', 64380, 'a2_sensor', 0,
+          'reading_ts', '2026-08-23T23:53:11Z', 'value_raw', 1690))));
+  perform pg_temp.check_that('sensor slot 0 is a sensor',
+    (v ->> 'accepted')::integer = 1
+      and exists (select 1 from meganet.reading where addr = 'a2:64380/0'),
+    v::text);
+
+  -- And 255 is not, because ELPRO writes it into an unused mapping row.
+  v := meganet.ingest(jsonb_build_object(
+        'protocol', 'elpro', 'readings', jsonb_build_array(jsonb_build_object(
+          'a2_station', 64380, 'a2_sensor', 255,
+          'reading_ts', '2026-08-23T23:53:12Z', 'value_raw', 1))));
+  perform pg_temp.check_that('slot 255 is the unused marker, not a reading',
+    (v ->> 'accepted')::integer = 0
+      and (v -> 'rejected' -> 0 ->> 'why') like '%unused-slot marker%',
+    v::text);
+
+  -- Half a pair names nothing, and naming a reading twice is two opinions.
+  v := meganet.ingest(jsonb_build_object(
+        'protocol', 'elpro', 'readings', jsonb_build_array(jsonb_build_object(
+          'a2_sensor', 13, 'reading_ts', '2026-08-23T23:53:13Z', 'value_raw', 1))));
+  perform pg_temp.check_that('a sensor slot with no station is refused',
+    (v ->> 'accepted')::integer = 0, v::text);
+
+  v := meganet.ingest(jsonb_build_object(
+        'protocol', 'elpro', 'readings', jsonb_build_array(jsonb_build_object(
+          'alert_id', 64301, 'a2_station', 64380, 'a2_sensor', 13,
+          'reading_ts', '2026-08-23T23:53:14Z', 'value_raw', 1))));
+  perform pg_temp.check_that('an ALERT address and an ALERT2 pair together are refused',
+    (v ->> 'accepted')::integer = 0, v::text);
+
+  -- Nobody has claimed 64380 yet, so nothing resolves. That is the normal state
+  -- for traffic from a site MegaNet has not been told about.
+  perform pg_temp.check_that('an unclaimed ALERT2 station resolves to nobody',
+    meganet.resolve_a2_station(64380) is null,
+    format('resolve_a2_station(64380) = %s', coalesce(meganet.resolve_a2_station(64380), '(null)')));
+
+  -- The claim, which is the whole point: one action, and every reading that
+  -- shares the identity moves — not only the one somebody was looking at.
+  v := meganet.claim_a2_station(64380, '_check_mqtt_a2');
+  perform pg_temp.check_that('claiming a relayed station back-fills every reading it ever sent',
+    (v ->> 'claimed')::integer = 2
+      and (select count(*) from meganet.reading
+            where a2_station = 64380 and station_id = '_check_mqtt_a2') = 2,
+    v::text);
+
+  perform pg_temp.check_that('and the claim is what makes the address resolve',
+    meganet.resolve_a2_station(64380) = '_check_mqtt_a2',
+    format('resolve_a2_station(64380) = %s', coalesce(meganet.resolve_a2_station(64380), '(null)')));
+
+  -- Two stations on one address would resolve to neither, so taking it needs
+  -- saying so out loud.
+  perform pg_temp.check_that('a second station cannot take the address by accident',
+    pg_temp.sqlstate_of(
+      $q$select meganet.claim_a2_station(64380, '_check_mqtt_a2b')$q$) = '23505');
+
+  v := meganet.claim_a2_station(64380, '_check_mqtt_a2b', true);
+  perform pg_temp.check_that('p_replace moves the address and takes the readings with it',
+    (v ->> 'replaced') = '_check_mqtt_a2'
+      and (select count(*) from meganet.reading
+            where a2_station = 64380 and station_id = '_check_mqtt_a2b') = 2,
+    v::text);
+
+  -- The other door: an ALERT address claimed from a message row.
+  insert into meganet.reading (alert_id, channel, reading_ts, received_at, value_raw, protocol, source)
+  values (64382, '', '2026-08-23T10:00:00Z', now(), 1.23, 1, 2),
+         (64382, '', '2026-08-23T10:15:00Z', now(), 1.24, 1, 2);
+  v := meganet.claim_alert_address(64382, '_check_mqtt_a2', 'Water Level');
+  perform pg_temp.check_that('claiming an ALERT address back-fills its readings too',
+    (v ->> 'claimed')::integer = 2
+      and meganet.resolve_station(64382, null) = '_check_mqtt_a2',
+    v::text);
+
+  perform pg_temp.check_that('but not one another station already holds',
+    pg_temp.sqlstate_of(
+      $q$select meganet.claim_alert_address(64382, '_check_mqtt_a2b', 'Water Level')$q$) = '23505');
+
+  -- What has been heard but not named — the list the station editor offers.
+  select count(*) into n from meganet.a2_sensor_seen where a2_station = 64380;
+  perform pg_temp.check_that('every slot heard from a relayed station is listed',
+    n = 2, format('%s slots listed for 64380, expected 2', n));
+end
+$$;
+
+-- The generated column is the identity, and rebuilding it is the one destructive
+-- thing 0024 does. A column that came back plain would accept every future insert
+-- without a word and store nulls where the primary key used to be.
+
+do $$
+declare
+  v_expr text;
+begin
+  select pg_get_expr(d.adbin, d.adrelid) into v_expr
+    from pg_attribute a
+    join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
+   where a.attrelid = 'meganet.reading'::regclass
+     and a.attname = 'addr' and a.attgenerated = 's';
+
+  perform pg_temp.check_that('addr is still a stored generated column, and knows the ALERT2 shape',
+    v_expr is not null and v_expr like '%a2:%',
+    coalesce(v_expr, 'addr is not generated any more'));
+
+  perform pg_temp.check_that('and it is still the primary key',
+    exists (select 1 from pg_constraint
+             where conrelid = 'meganet.reading'::regclass and contype = 'p'
+               and pg_get_constraintdef(oid) = 'PRIMARY KEY (addr, reading_ts, value_raw)'),
+    (select coalesce(pg_get_constraintdef(oid), '(no primary key)') from pg_constraint
+      where conrelid = 'meganet.reading'::regclass and contype = 'p'));
+end
+$$;
+
+-- The loader is a sync, and 0022 taught it not to prune what the document does
+-- not own. An ALERT2 slot is the second kind of row it does not own: stations.json
+-- has no column for one, so a reload would delete every slot somebody named.
+
+do $$
+begin
+  insert into meganet.sensor (station_id, sensor_id, type, ord, alert2_sensor_id, updated_by)
+  values ('_check_mqtt_a2', '_check_mqtt_a2:a2:7', 'Rainfall', 9, 7, 'check_mqtt.sql');
+
+  perform meganet.load_stations_doc(
+    (select doc from meganet.stations_json));
+
+  perform pg_temp.check_that('a stations load does not delete an ALERT2 sensor slot',
+    exists (select 1 from meganet.sensor
+             where station_id = '_check_mqtt_a2' and alert2_sensor_id = 7),
+    'the slot is gone — the loader is pruning rows the document cannot express');
+end
+$$;
+
 -- ── The verdict ─────────────────────────────────────────────────────────────
 
 select lpad(ord::text, 2) as "#",
