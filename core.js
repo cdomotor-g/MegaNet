@@ -806,6 +806,13 @@ const HELP = {
       + 'datastore backfills <code>station_id</code> where the address is unambiguous; where it '
       + 'is not, the row shows the first candidate and says how many more share the address — '
       + '604 of 5,122 ALERT addresses belong to more than one station.',
+      '<strong>An unresolved row can name its own station.</strong> Open it and the drawer offers '
+      + 'to attribute the message: pick a station and the address is attached to it, every '
+      + 'reading already stored under that address is backfilled, and the tab says how many. '
+      + 'That is the reverse of going to the Stations tab to type an address in, and it is the '
+      + 'faster way round when the traffic is what you are looking at. It claims the '
+      + '<em>address</em>, not the row — and for a relayed ALERT2 message that means the whole '
+      + 'station, whose individual sensor slots are then named on the station card.',
       '<strong>Raw readings age out at about 90 days</strong>, so a window into last winter '
       + 'comes back empty here — the hourly and daily rollups that survive live on the Field '
       + 'Data tab. The submission a reading arrived on ages out faster (~30 days) and needs a '

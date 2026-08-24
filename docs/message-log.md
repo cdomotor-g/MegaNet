@@ -70,9 +70,44 @@ unknown). Where the datastore has backfilled `station_id`, that wins; failing
 that the tab matches the ALERT address, then the station number, against the
 loaded station file. 604 of 5,122 ALERT addresses belong to more than one
 station, so an address match names the first candidate and says how many more
-share the address. An **unresolved** row is not an error — a new site reports
-before anyone adds it to MegaNet, and the reading is kept rather than dropped.
-The *unresolved address only* filter is how those are found and claimed.
+share the address. A relayed ALERT2 row matches on its **station address**
+instead, which one station holds and no other may, so that tier never reports a
+tie. An **unresolved** row is not an error — a new site reports before anyone
+adds it to MegaNet, and the reading is kept rather than dropped. The
+*unresolved address only* filter is how those are found.
+
+### Claiming one
+
+Open an unresolved row and its detail drawer offers **Attribute to a station…**
+— a search box over the station list, the same one the Inspection History and
+Maintenance tabs use. Picking a station is the reverse of the way this has
+always worked: instead of remembering the address, going to the Stations tab,
+finding the station and typing it in, the message names the station it came
+from.
+
+Three things are worth knowing about what that click does.
+
+**It claims the address, not the row.** A message is one instant; the thing that
+wants claiming is the identity every message like it shares. So the write
+back-fills every reading already stored under that address, and the tab reports
+how many — *"relayed ALERT2 station 1003 attributed to Loudoun Br. 183 readings
+claimed."* Readings that arrive afterwards resolve on their own.
+
+**It writes the registry, not the readings.** `reading.station_id` is resolved
+from the address and never taken from a payload. The claim puts the address on
+the station — an ALERT2 station address on the station itself, an ALERT address
+as a sensor row — and lets resolution follow.
+
+**It will not create an ambiguity.** Two stations on one ALERT address resolve
+to neither, so claiming an address another station already holds is refused, and
+the message says which station holds it. Moving one is the station editor's job.
+A relayed ALERT2 station is refused the same way, and the datastore's
+`claim_a2_station(…, p_replace => true)` is what deliberately moves it.
+
+Signed out, the drawer says so rather than offering a button that would produce
+a 401. What a relayed row claims is the **whole ALERT2 station**, not the one
+sensor slot on screen — which slot is which is then named on the station card,
+where the slots that station has actually been heard on are listed for you.
 
 ## Narrow and wide
 

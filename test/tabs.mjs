@@ -254,6 +254,17 @@ const SEED_MSGLOG = `() => {
       received_at: '2026-03-01T04:10:05+00:00', value_raw: 1.842, value: null,
       unit: 'm', conversion: null, quality: 1, protocol: 0, source: 1,
       path: null, dup_count: 0, dup_paths: [], last_dup_at: null, raw_id: null },
+    // A relayed ALERT2 pair (#172) — the third address shape, so the AlertID
+    // cell's a2 rendering and the unresolved drawer's claim affordance are both
+    // on screen for the eight per-tab checks rather than only in the one place
+    // that seeds them deliberately.
+    { addr: 'a2:1003/13', alert_id: null, a2_station: 1003, a2_sensor: 13,
+      station_number: null, channel: '', station_id: null,
+      reading_ts: '2026-03-01T04:05:00+00:00', received_at: '2026-03-01T04:05:03+00:00',
+      value_raw: 155.6, value: null, unit: null, conversion: null,
+      quality: 0, protocol: 5, source: 2,
+      path: 'meganet/v1/elpro_test/logger/reading/elpro/Station 1003',
+      dup_count: 0, dup_paths: [], last_dup_at: null, raw_id: null },
   ]);
   MessageLog.toggleRow('a:6128|2026-03-01T04:15:00+00:00|12');
 }`;

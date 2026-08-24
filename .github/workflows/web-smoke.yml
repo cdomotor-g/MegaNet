@@ -274,6 +274,18 @@ jobs:
         working-directory: test
         run: npm run movepin
 
+      # The database half of the claim is proven against a real Postgres by
+      # tools/check_mqtt.sql, which CI cannot run — it needs a connection. What
+      # this covers is the half that only exists in a browser: that an
+      # unresolved relayed row offers the claim at all, that the picker sends
+      # the ALERT2 *station address* rather than the sensor slot, that the count
+      # the database returns is what gets announced, and that the form comes
+      # down on the write rather than on the read after it. Two defects were
+      # found writing it and neither was visible to any other check here.
+      - name: Claim an address from the message that arrived on it
+        working-directory: test
+        run: npm run claim
+
       # Python, no browser, no dependencies, and the only check in this file
       # that is about a *data* artefact rather than about the app: #123's sheet
       # manifest, field map and layout table are derived from the historical

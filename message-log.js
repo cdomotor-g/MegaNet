@@ -6,7 +6,9 @@
 //
 // After core.js and app.js, before init.js — index.html holds the order.
 // Reaches back to core.js for state, esc/escAttr/csvEscape, dbSelect,
-// buildSensorIndex, announce, the registries and removeMap; to map-controls.js
+// buildSensorIndex, announce, the registries and removeMap; to datastore.js for
+// dbCanWrite and dbRpc — this tab is otherwise read-only, and those two are here
+// only for the claim in the detail drawer (#172); to map-controls.js
 // for addBaseLayers (in app.js until #164); across to app.js
 // for switchTab, findRepeaterMatches, primaryRole,
 // stationAlertIds and the MAP_FOCUS_DIM_* opacity rules; and across to
@@ -58,7 +60,8 @@ const MessageLog = (() => {
   // Everything meganet.reading holds about a message, minus the generated addr
   // parts the columns below re-derive. One string so the query and the CSV
   // cannot disagree about what came down.
-  const ML_SELECT = 'addr,alert_id,station_number,channel,station_id,reading_ts,received_at,'
+  const ML_SELECT = 'addr,alert_id,a2_station,a2_sensor,station_number,channel,station_id,'
+                  + 'reading_ts,received_at,'
                   + 'value_raw,value,unit,conversion,quality,protocol,source,path,'
                   + 'dup_count,dup_paths,last_dup_at,raw_id';
 
@@ -67,7 +70,7 @@ const MessageLog = (() => {
   // not a deploy) — these are the fallback when the fetch fails, so the codes
   // still read as words offline.
   const ML_SEED = {
-    protocol: { 0: 'unknown', 1: 'alert', 2: 'alert2', 3: 'arro' },
+    protocol: { 0: 'unknown', 1: 'alert', 2: 'alert2', 3: 'arro', 4: 'hfem', 5: 'elpro' },
     source:   { 0: 'unknown', 1: 'http', 2: 'mqtt', 3: 'manual', 4: 'backfill', 5: 'serial' },
     quality:  { 0: 'unqualified', 1: 'good', 2: 'suspect', 3: 'estimated', 4: 'bad', 5: 'missing' },
   };
@@ -89,7 +92,7 @@ const MessageLog = (() => {
     { key: 'name',     label: 'Station',  narrow: true,
       title: 'The resolved station. An address owned by more than one station shows the first and says how many more.' },
     { key: 'alert',    label: 'AlertID',  narrow: true,
-      title: 'The ALERT address the message was addressed to. Empty for satellite/cellular messages, which report under a station number and channel.' },
+      title: 'The ALERT address the message was addressed to. A relayed ALERT2 message shows "a2 station/slot" instead — its identity is the pair, not an address. Empty for satellite/cellular messages, which report under a station number and channel.' },
     { key: 'channel',  label: 'Channel',  narrow: false,
       title: 'Which sensor spoke, for messages addressed by station number. An ALERT address is the sensor, so radio rows have no channel.' },
     { key: 'raw',      label: 'Raw',      narrow: true,
@@ -163,6 +166,10 @@ const MessageLog = (() => {
     follow:   false,
     followTimer: null,
     raw:      new Map(),   // raw_id → reading_raw row | 'gone' | 'denied'
+    // The claim, when one is open: which row started it, what is typed in the
+    // picker, whether a write is in flight, and what the database said. One at a
+    // time, because it hangs off the one open detail drawer.
+    claim:    null,        // { key, query, busy, msg }
   };
 
   // ── small helpers ──────────────────────────────────────────────────────────
@@ -231,6 +238,15 @@ const MessageLog = (() => {
     const ri = resIndex();
     if (r.station_id && ri.byId.has(r.station_id)) {
       return { st: ri.byId.get(r.station_id), how: 'resolved by the datastore', others: 0 };
+    }
+    // The relayed ALERT2 station address, before the ALERT one — a row carrying
+    // a pair carries no ALERT address, so these are disjoint rather than ranked.
+    // An address belongs to one station (a unique index says so), which is why
+    // this tier never reports `others`.
+    if (r.a2_station != null) {
+      const st = ((state.data && state.data.stations) || [])
+        .find(x => x.alert2_station_id === r.a2_station);
+      if (st) return { st, how: 'matched on the relayed ALERT2 station address', others: 0 };
     }
     if (r.alert_id != null) {
       const sts = [...new Set((ri.sensors.get(r.alert_id) || []).map(h => h.station))];
@@ -608,7 +624,17 @@ const MessageLog = (() => {
         return `<td class="ml-name" title="${escAttr(res.st ? `${res.st.name} — ${res.how}` : 'No station on file claims this message')}">${
           name ? esc(name) + extra : '<span class="small">—</span>'}</td>`;
       }
-      case 'alert':    return `<td class="small mono">${r.alert_id != null ? r.alert_id : '—'}</td>`;
+      case 'alert': {
+        // A relayed ALERT2 reading has no ALERT address at all: its identity is
+        // the station it came off and the slot within it, and showing the slot
+        // alone in this column is exactly the mistake the wire format invites.
+        if (r.a2_station != null) {
+          return `<td class="small mono" title="${escAttr(
+            `Relayed ALERT2: station ${r.a2_station}, sensor slot ${r.a2_sensor}. Not an ALERT address — a slot only means something inside its station.`)
+          }">a2 ${esc(String(r.a2_station))}/${esc(String(r.a2_sensor))}</td>`;
+        }
+        return `<td class="small mono">${r.alert_id != null ? r.alert_id : '—'}</td>`;
+      }
       case 'channel':  return `<td class="small">${esc(r.channel || '—')}</td>`;
       case 'raw':      return `<td class="mono ml-raw">${esc(fmtNum(r.value_raw))}</td>`;
       case 'value':    return `<td class="small">${r.value != null ? `${esc(fmtNum(r.value))} ${esc(r.unit || '')}` : '—'}</td>`;
@@ -785,7 +811,8 @@ const MessageLog = (() => {
             <span class="small">${esc(res.how)}${res.others ? ` — ${res.others} more station${res.others === 1 ? ' shares' : 's share'} this address` : ''}</span>
             <button class="ml-btn" onclick="MessageLog.showStation('${escAttr(res.st.id)}')"
                     title="Open this station on the Stations tab — the map, the editor and the repeaters listening">Show on the Stations tab</button>`
-          : `<b>unresolved</b> <span class="small">no station on file claims this address — a new site reports before anyone adds it, and the reading is kept rather than dropped</span>`}
+          : `<b>unresolved</b> <span class="small">no station on file claims this address — a new site reports before anyone adds it, and the reading is kept rather than dropped</span>
+             ${claimHtml(r)}`}
         </div>
         <div><span>Read</span><b class="mono">${esc(fmtTs(r.reading_ts))}</b>
           <span class="small">the device's own clock</span></div>
@@ -813,6 +840,180 @@ const MessageLog = (() => {
                   title="Chart this address' raw readings around this moment on the Field Data tab — the 357 filter, the gaps and the rollups live there">
             Chart <span class="mono">${esc(fieldAddr)}</span> around this reading</button></div>
       </div>`;
+  }
+
+  // ── claiming an address ────────────────────────────────────────────────────
+  // The reverse of the way attribution has always worked here. Until now the
+  // only route was forward: notice the traffic, remember the address, go to the
+  // Stations tab, find the station, type it in, come back and see whether it
+  // took. This is the same act done from the end you are already looking at.
+  //
+  // Three things make it more than a shortcut:
+  //
+  //   * **The unit of work is the address, not the row.** A message is one
+  //     instant; the thing that wants claiming is the identity every message
+  //     like it shares. So the claim back-fills — the RPC returns how many
+  //     readings moved, and that count is the sentence worth showing.
+  //   * **It writes the registry, not the reading.** `reading.station_id` is
+  //     resolved from the address and never taken from a payload (0006). This
+  //     puts the address on the station and lets resolution follow, which is
+  //     also why the next reading to arrive lands attributed without anybody
+  //     coming back.
+  //   * **It refuses to create an ambiguity.** Two stations on one ALERT address
+  //     resolve to neither, so claiming one another station holds is an error
+  //     with a name in it rather than a silent un-attribution of somebody else's
+  //     traffic.
+  //
+  // A dedicated RPC rather than save_station(): that one rebuilds the repeater
+  // object wholesale from what the form sent, and takes an optimistic-lock stamp
+  // this tab has no reason to be holding.
+
+  function claimable(r) {
+    if (!r) return null;
+    if (r.a2_station != null) {
+      return { kind: 'a2', label: `relayed ALERT2 station ${r.a2_station}`,
+               note: `every slot on station ${r.a2_station}, not only slot ${r.a2_sensor}` };
+    }
+    if (r.alert_id != null) {
+      return { kind: 'alert', label: `ALERT address ${r.alert_id}`,
+               note: 'every reading ever heard on this address' };
+    }
+    // A station-number-and-channel row names a station MegaNet does not have.
+    // Adding one is the Stations tab's job, not a one-click action from here.
+    return null;
+  }
+
+  function claimHtml(r) {
+    const what = claimable(r);
+    if (!what) return '';
+    if (!dbCanWrite()) {
+      return `<span class="small ml-claim-note">Sign in as an editor to attribute this to a station.</span>`;
+    }
+    const key = rowKey(r);
+    const c = ml.claim && ml.claim.key === key ? ml.claim : null;
+    if (!c) {
+      return `<button class="ml-btn" onclick="MessageLog.claimOpen('${escAttr(key)}')"
+                title="Attach ${escAttr(what.label)} to a station — and back-fill ${escAttr(what.note)}">
+                Attribute to a station…</button>`;
+    }
+    return `
+      <div class="ml-claim">
+        <label class="small">Which station is ${esc(what.label)}?
+          <input type="text" id="ml-claim-q" value="${escAttr(c.query || '')}"
+                 placeholder="name, station number or ALERT address"
+                 oninput="MessageLog.claimSearch(this.value)" ${c.busy ? 'disabled' : ''}>
+        </label>
+        <div id="ml-claim-hits">${claimHitsHtml(r)}</div>
+        <p class="small ml-claim-note">This attributes ${esc(what.note)} — past and future.</p>
+        ${c.msg ? `<p class="small ${c.msg.kind === 'error' ? 'txt-bad' : 'txt-ok'}">${esc(c.msg.text)}</p>` : ''}
+        <button class="ml-btn" onclick="MessageLog.claimClose()" ${c.busy ? 'disabled' : ''}>Cancel</button>
+      </div>`;
+  }
+
+  function claimHitsHtml(r) {
+    const c = ml.claim;
+    if (!c) return '';
+    if (c.busy) return '<p class="small">Attributing…</p>';
+    const q = (c.query || '').trim().toLowerCase();
+    if (!q) return '';
+    const all = (state.data && state.data.stations) || [];
+    // The same three ways of naming a station the other pickers accept
+    // (history.js, inspections.js, maintenance.js), so one habit works
+    // everywhere.
+    const hits = all.filter(st =>
+      (st.name || '').toLowerCase().includes(q) ||
+      (st.station_number || '').toLowerCase().includes(q) ||
+      Object.values(st.alert_ids || {}).some(id => String(id) === q)
+    ).slice(0, 25);
+    if (!hits.length) return `<p class="small">No station matches “${esc(c.query)}”.</p>`;
+    return `<div class="ml-claim-hits">${hits.map(st => `
+      <button class="ml-claim-hit" onclick="MessageLog.claimPick('${escAttr(st.id)}')">
+        <span>${esc(st.name)}</span>
+        <span class="small mono">${esc(st.station_number || '—')}</span>
+      </button>`).join('')}</div>`;
+  }
+
+  function claimOpen(key) {
+    ml.claim = { key, query: '', busy: false, msg: null };
+    renderTable();
+    document.getElementById('ml-claim-q')?.focus();
+  }
+
+  function claimClose() {
+    ml.claim = null;
+    renderTable();
+  }
+
+  function claimSearch(q) {
+    if (!ml.claim) return;
+    ml.claim.query = q;
+    // Only the hit list is repainted: repainting the drawer would take the box
+    // the operator is typing in out from under them.
+    const el = document.getElementById('ml-claim-hits');
+    const r = (ml.rows || []).find(x => rowKey(x) === ml.claim.key);
+    if (el && r) el.innerHTML = claimHitsHtml(r);
+  }
+
+  async function claimPick(stationId) {
+    const c = ml.claim;
+    if (!c || c.busy) return;
+    const r = (ml.rows || []).find(x => rowKey(x) === c.key);
+    const what = claimable(r);
+    if (!r || !what) return;
+    const st = ((state.data && state.data.stations) || []).find(x => x.id === stationId);
+
+    c.busy = true;
+    c.msg = null;
+    renderTable();
+
+    let out;
+    try {
+      // Write, wait, and only then touch what is on screen — station-editor.js's
+      // rule, and for its reason: the count below comes from what the database
+      // did, not from what this tab asked for.
+      out = what.kind === 'a2'
+        ? await dbRpc('claim_a2_station', { p_a2_station: r.a2_station, p_station_id: stationId })
+        : await dbRpc('claim_alert_address', {
+            p_alert_id: r.alert_id, p_station_id: stationId,
+            p_type: 'Unknown' });
+    } catch (err) {
+      c.busy = false;
+      c.msg = { kind: 'error', text: claimErrorText(err) };
+      renderTable();
+      return;
+    }
+
+    const n = (out && out.claimed) || 0;
+    const name = (out && out.name) || (st && st.name) || stationId;
+    ml.claim = null;
+    // The registry changed under the datastore's copy of it, so put the address
+    // where the row-resolver will find it rather than making the operator
+    // reload. resIndex() is rebuilt from state.data on the next render.
+    if (st) {
+      if (what.kind === 'a2') st.alert2_station_id = r.a2_station;
+      else {
+        st.sensors = st.sensors || [];
+        if (out && out.sensor_id && !st.sensors.some(x => x.alert_id === r.alert_id)) {
+          st.sensors.push({ sensor_id: out.sensor_id, type: 'Unknown', alert_id: r.alert_id });
+        }
+      }
+    }
+    // Repaint before the re-query, not after it. The write has already landed;
+    // leaving the picker on screen until a *read* comes back means a datastore
+    // that has gone away since holds open a form for a claim that succeeded.
+    renderTable();
+    announce(`${what.label} attributed to ${name}. ${n} reading${n === 1 ? '' : 's'} claimed.`);
+    // Then re-run rather than patch the rows on screen: the back-fill touched
+    // every matching reading in the window, not only the ones this page shows.
+    run({ silent: true });
+  }
+
+  function claimErrorText(err) {
+    if (err && err.denied) return 'You are not signed in as an editor, so this was refused.';
+    const m = (err && (err.message || err.details)) || '';
+    // PostgREST hands the database's own sentence back, and these are written to
+    // be read by whoever is looking at the message.
+    return m ? String(m).replace(/^[a-z]+:\s*/i, '') : 'The datastore refused the claim.';
   }
 
   // ── the tray — the map over the selection ──────────────────────────────────
@@ -1241,6 +1442,7 @@ const MessageLog = (() => {
     setFollow, setView, setCol, resetCols,
     rowClick, toggleRow, pickClick, setSel, selAll, clearSel, trayToggle,
     fetchRaw, showStation, openInField, openInPackets, openInAlert2, showReading,
+    claimOpen, claimClose, claimSearch, claimPick,
     exportCsv, adoptRows,
   };
 })();

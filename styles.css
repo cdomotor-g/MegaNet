@@ -7005,6 +7005,54 @@ code {
 }
 .ml-frame { white-space: normal; word-break: break-all; }
 
+/* Claiming an address from the drawer (#172). It sits inside the Station cell of
+   the detail grid, which is a flex row of baseline-aligned pieces — so this takes
+   the whole width and stacks, or the picker would try to share a line with the
+   sentence explaining why the row is unresolved. No panel of its own: the drawer
+   is already a surface, and a second one inside it reads as a dialog that is not
+   one. */
+.ml-claim {
+  flex: 1 0 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+}
+
+.ml-claim label { display: flex; flex-direction: column; gap: .15rem; }
+.ml-claim input { width: 100%; max-width: 26rem; }
+.ml-claim-note { color: var(--muted); margin: 0; }
+
+/* The hit list. Capped in height rather than in nothing: 25 matches is the cap
+   the other pickers use and 25 rows would push the rest of the drawer off the
+   screen on a phone. */
+.ml-claim-hits {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 12rem;
+  overflow-y: auto;
+  max-width: 26rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.ml-claim-hit {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  align-items: baseline;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  padding: .25rem .45rem;
+  background: transparent;
+}
+
+.ml-claim-hit:hover,
+.ml-claim-hit:focus-visible { background: var(--subtle); }
+
 /* The tray. Collapsed it is one summary line; open it is the plot and the map
    side by side, stacking on anything narrower than a laptop. */
 .ml-tray summary { cursor: pointer; padding: .2rem 0; }
