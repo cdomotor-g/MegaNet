@@ -2822,6 +2822,10 @@ function renderStationEditorCard() {
 function rerenderStationEditorCard() {
   const el = document.getElementById('stations-editor-card');
   if (el) el.innerHTML = renderStationEditorCard();
+  // The slots this station's relayed ALERT2 address has actually been heard on
+  // (#172). A background fill, like the editor stamp: it reads the readings
+  // rather than the registry, so it cannot come out of state.data.
+  if (el) editorRefreshA2Seen();
   // The card below the table follows the same selection, so every caller that
   // reloads the editor reloads it too — there is no path that changes the
   // selected station without going through here.

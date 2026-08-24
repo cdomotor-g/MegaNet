@@ -13,12 +13,15 @@
 // ROLE_LABEL; across to app.js for the Stations tab's rerender hooks —
 // rerenderStations, rerenderStationEditorCard, refreshFilterOptions,
 // refreshMapLayers, updateHeaderStats, findStationMatches, stationAlertIds,
-// passRangeCoversId, repeaterPassingCount and repeaterPassRangeSpan; to
+// passRangeCoversId, repeaterPassingCount and repeaterPassRangeSpan — and back
+// the other way, rerenderStationEditorCard() calls editorRefreshA2Seen() here
+// once the card is on screen, because the heard-slots list reads the readings
+// rather than state.data; to
 // map-move-pin.js for the button that moves this station's pin on the map above
 // the card, which writes back into the two coordinate boxes; to auth.js for
 // Auth; and to
-// datastore.js for dbCanWrite, dbSaveStation, dbDeleteStation, setEditorStatus,
-// editorStatusHtml and editorWritesGoToDatabase; to inspections.js for
+// datastore.js for dbCanWrite, dbSaveStation, dbDeleteStation, dbSelect,
+// setEditorStatus, editorStatusHtml and editorWritesGoToDatabase; to inspections.js for
 // Inspections.configs and Inspections.ensureRefs — the telemetry pick-list
 // (#147) reads the same meganet.inspection_config list the Inspections tab
 // renders its form from, rather than keeping a second copy; and to
@@ -184,6 +187,18 @@ function editorForm(s) {
           One row per ALERT address and what it measures — rainfall, water level, battery, etc.${
             dbId != null ? ' Rows whose sensor carries an ARRO device id link straight to its admin page.' : ''}
         </div>
+        <label class="full">ALERT2 station address
+          <input type="number" id="ef-a2stn" min="1" max="65535" value="${s.alert2_station_id ?? ''}"
+                 placeholder="none — this station is not relayed over ALERT2"
+                 onchange="editorRefreshA2Seen()">
+        </label>
+        <div class="small ef-note">
+          Set this only when the station's readings reach MegaNet relayed over ALERT2 — an
+          ELPRO 115E-2 publishes them under this address, and it is what attributes them here.
+          The <b>A2 slot</b> on each row above then says which of that station's sensors the row is.
+          One address belongs to one station: claiming one another station holds is refused.
+        </div>
+        <div id="ef-a2-seen" class="small ef-note"></div>
         <datalist id="ef-sensor-types">
           ${['Rainfall', 'Rainfall Increment', 'Water Level', 'Water Level - AHD', 'Battery', 'Air Temperature', 'Relative Humidity', 'Wind Speed', 'Wind Gust', 'Wind Direction', 'pH', 'Conductivity', 'Dissolved Oxygen', 'Water Temperature', 'Turbidity'].map(t => `<option value="${esc(t)}">`).join('')}
         </datalist>
@@ -305,8 +320,16 @@ function editorArroSection(s, sensors) {
     </p>`;
 }
 
-// One editable sensor row: ALERT id + type, with the national-export metadata
-// (sensor_id, device_id) preserved on data-attributes so a round-trip keeps it.
+// One editable sensor row: ALERT id, ALERT2 slot and type, with the
+// national-export metadata (sensor_id, device_id) preserved on data-attributes
+// so a round-trip keeps it.
+//
+// Two address boxes rather than one, because they are two different things. An
+// ALERT address is global and identifies the sensor on its own; an ALERT2 slot
+// is a position inside whichever relayed station this row's station is, and only
+// means anything alongside the station address above. A sensor may have either,
+// or both — an instrument that reports over the radio and is also relayed is one
+// instrument, and one row.
 //
 // `dbId` is the station's ARRO site id, passed in because a sensor record has
 // only half of what an ARRO sensor page needs. When both keys are present the
@@ -318,6 +341,10 @@ function sensorRowHtml(se, dbId) {
     <div class="sensor-row" data-sensor-id="${esc(se.sensor_id || '')}" data-device-id="${se.device_id ?? ''}">
       <input type="number" class="sensor-aid" value="${se.alert_id ?? ''}" placeholder="ALERT ID"
              aria-label="ALERT address">
+      <input type="number" class="sensor-a2id" value="${se.alert2_sensor_id ?? ''}" placeholder="A2 slot"
+             min="0" max="254"
+             aria-label="ALERT2 sensor slot"
+             title="The sensor slot within the relayed ALERT2 station, 0-254. Leave empty unless this station's readings arrive over an ELPRO ALERT2 relay.">
       <input type="text" class="sensor-type" list="ef-sensor-types" value="${esc(se.type || '')}"
              aria-label="Sensor type"
              placeholder="Sensor type (e.g. Rainfall)">
@@ -330,11 +357,72 @@ function sensorRowHtml(se, dbId) {
     </div>`;
 }
 
-function editorAddSensorRow() {
+function editorAddSensorRow(a2Slot) {
   const box = document.getElementById('ef-sensors');
   if (!box) return;
-  box.insertAdjacentHTML('beforeend', sensorRowHtml({}));
-  box.querySelector('.sensor-row:last-child .sensor-aid')?.focus();
+  const slot = a2Slot == null ? null : pInt(a2Slot);
+  box.insertAdjacentHTML('beforeend', sensorRowHtml(slot == null ? {} : { alert2_sensor_id: slot }));
+  const row = box.querySelector('.sensor-row:last-child');
+  // A row added from the heard-slots list below already knows its address; what
+  // it is waiting for is what the thing measures, so that is where the cursor
+  // goes. An empty row still starts at the ALERT box.
+  row?.querySelector(slot == null ? '.sensor-aid' : '.sensor-type')?.focus();
+  if (slot != null) editorRefreshA2Seen();
+}
+
+// What the relayed ALERT2 station has actually sent, whether or not anybody has
+// named it.
+//
+// This is the second half of claiming a station: the address on its own says
+// whose the traffic is, and this says which slots it arrived on — 0-254 with no
+// list anywhere on the wire, so without it naming a sensor means guessing at a
+// number or reading the Message Log with a notepad. meganet.a2_sensor_seen is a
+// view over the readings themselves, so it states what happened rather than what
+// somebody expected.
+//
+// Filled in the background the way fetchEditorStamp() is, and for the same
+// reason: nothing here should make the operator wait before typing.
+async function editorFillA2Seen(a2) {
+  const box = document.getElementById('ef-a2-seen');
+  if (!box) return;
+  state.editorA2For = a2;
+  if (a2 == null) { box.innerHTML = ''; return; }
+
+  let rows;
+  try {
+    rows = await dbSelect(`a2_sensor_seen?a2_station=eq.${encodeURIComponent(a2)}` +
+                          '&select=a2_sensor,n,last_ts,last_value,named_as&order=a2_sensor.asc');
+  } catch (_) {
+    // Silent. This is a convenience over live data, and the form works without
+    // it — an offline editor should not grow an error where a hint used to be.
+    rows = null;
+  }
+  // The operator may have moved to another station, or changed the address, in
+  // the time the round trip took.
+  if (state.editorA2For !== a2) return;
+  const el = document.getElementById('ef-a2-seen');
+  if (!el) return;
+  if (!rows || !rows.length) { el.innerHTML = ''; return; }
+
+  const named = new Set([...document.querySelectorAll('#ef-sensors .sensor-a2id')]
+    .map(i => pInt(i.value)).filter(v => v != null));
+  const items = rows.map(r => {
+    const has = named.has(r.a2_sensor) || r.named_as;
+    const last = r.last_value == null ? '' : ` · last ${esc(String(r.last_value))}`;
+    return `<li>slot <b>${esc(String(r.a2_sensor))}</b> — ${esc(String(r.n))} reading${r.n === 1 ? '' : 's'}${last}
+      ${has ? '· named above'
+            : `<button type="button" onclick="editorAddSensorRow(${escAttr(String(r.a2_sensor))})">Name it</button>`}</li>`;
+  }).join('');
+
+  el.innerHTML = `Heard from ALERT2 station ${esc(String(a2))}:
+    <ul class="ef-a2-list">${items}</ul>`;
+}
+
+// Re-read the address box and refill the list under it. Called when the address
+// changes and after a slot is named, so the list and the rows above it never
+// disagree about what is still waiting.
+function editorRefreshA2Seen() {
+  editorFillA2Seen(pInt(document.getElementById('ef-a2stn')?.value));
 }
 
 // Best-effort legacy `alert_ids` object derived from the sensor rows, so exports
@@ -344,6 +432,11 @@ function deriveLegacyAlertIds(sensors) {
   const out = {};
   const wl = [];
   sensors.forEach(se => {
+    // ALERT addresses only. A relayed sensor has an ALERT2 slot and no address,
+    // and this object is the legacy `alert_ids` shape — putting an undefined in
+    // it would write `"rainfall": null` into the document for a station whose
+    // rain gauge is simply reached another way.
+    if (se.alert_id == null) return;
     const t = (se.type || '').toLowerCase();
     if (t.includes('rain'))       { if (out.rainfall == null) out.rainfall = se.alert_id; }
     else if (t.includes('batt'))  { if (out.battery  == null) out.battery  = se.alert_id; }
@@ -366,7 +459,11 @@ function editorReadForm() {
   d.lat            = pFloat(document.getElementById('ef-lat')?.value);
   d.lon            = pFloat(document.getElementById('ef-lon')?.value);
   d.elevation_ahd  = pFloat(document.getElementById('ef-elev')?.value);
-  d.rm_system_id   = parseInt(document.getElementById('ef-rmsys')?.value) || 1;
+  // Empty stays empty. This read `|| 1` until #172: 0022 made rm_system_id
+  // nullable for the station that has no radio system, and `parseInt('') || 1`
+  // put 1 back on every save — silently, since the box shows 1 either way.
+  // save_station() stopped defaulting it in the same change.
+  d.rm_system_id   = pInt(document.getElementById('ef-rmsys')?.value);
   const bucket = pFloat(document.getElementById('ef-bucket')?.value);
   if (bucket != null && bucket > 0) d.TBRGbucketSize = bucket; else delete d.TBRGbucketSize;
   d.enabled        = document.getElementById('ef-enabled')?.checked ?? true;
@@ -374,12 +471,25 @@ function editorReadForm() {
   d.roles          = [...document.querySelectorAll('input[name="ef-roles"]:checked')].map(b => b.value);
   const inspCfg = document.getElementById('ef-insp-config')?.value || '';
   if (inspCfg) d.inspection_config_key = inspCfg; else delete d.inspection_config_key;
+  // Absent rather than null when the box is empty, so a station that is not
+  // relayed carries no ALERT2 key at all — the same shape station_json emits.
+  const a2stn = pInt(document.getElementById('ef-a2stn')?.value);
+  if (a2stn != null) d.alert2_station_id = a2stn; else delete d.alert2_station_id;
 
-  // ALERT sensors — read the editable rows, preserving national-export metadata.
+  // Sensors — read the editable rows, preserving national-export metadata.
+  //
+  // A row survives if it carries *either* address. It used to need an ALERT id,
+  // which would have thrown away every relayed sensor silently: an instrument
+  // that only ever arrives over an ALERT2 relay has a slot and no ALERT address
+  // at all, and the row would have looked saved and simply not been there on the
+  // next render.
   const sensors = [...document.querySelectorAll('#ef-sensors .sensor-row')].map(row => {
     const id = pInt(row.querySelector('.sensor-aid')?.value);
-    if (id == null) return null;
-    const rec = { alert_id: id, type: row.querySelector('.sensor-type')?.value.trim() || '' };
+    const a2 = pInt(row.querySelector('.sensor-a2id')?.value);
+    if (id == null && a2 == null) return null;
+    const rec = { type: row.querySelector('.sensor-type')?.value.trim() || '' };
+    if (id != null) rec.alert_id = id;
+    if (a2 != null) rec.alert2_sensor_id = a2;
     const sid = row.getAttribute('data-sensor-id');
     const did = row.getAttribute('data-device-id');
     if (sid) rec.sensor_id = sid;
