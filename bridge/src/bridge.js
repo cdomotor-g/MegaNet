@@ -174,7 +174,10 @@ function createBridge(config, deps = {}) {
       parsed = route.format === 'hfem'
         ? parseHfem(packet.payload)
         : route.format === 'elpro'
-          ? parseElpro(packet.payload)
+          // The relayed ALERT2 station address, off the topic tail. Undefined
+          // becomes null inside, and a message whose tail names no station
+          // mints no ALERT2 reading — the raw row still keeps every byte.
+          ? parseElpro(packet.payload, undefined, route.sourceStation ?? null)
           : parseReadings(packet.payload);
     } catch (err) {
       if (err instanceof PoisonMessage) {
@@ -200,6 +203,7 @@ function createBridge(config, deps = {}) {
       device: route.device,
       format: route.format,
       source: route.source,
+      sourceStation: route.sourceStation,
       readings: parsed.readings.length,
       dup: packet.dup || false,
     });

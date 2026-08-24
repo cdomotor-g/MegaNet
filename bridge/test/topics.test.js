@@ -181,11 +181,41 @@ test('an elpro topic carries the gateway tail as source, spaces and all', () => 
   assert.deepEqual(parseTopic('meganet/v1/elpro_test/logger/reading/elpro/Station 1003'), {
     kind: 'reading', station: 'elpro_test', device: 'logger', format: 'elpro',
     source: 'Station 1003',
+    // The half MegaNet resolves things by, read back out of the vendor's name.
+    // `source` still says exactly what the gateway published.
+    sourceStation: 1003,
   });
   // A deeper tail is one string, not a second parse — nothing resolves by it.
   assert.equal(
     parseTopic('meganet/v1/elpro_test/logger/reading/elpro/DBIRTH/elpro/Station 1000').source,
     'DBIRTH/elpro/Station 1000',
+  );
+});
+
+test('the relayed ALERT2 station address is read out of the tail, or not at all', () => {
+  const at = (tail) => parseTopic(`meganet/v1/elpro_test/logger/reading/elpro/${tail}`).sourceStation;
+
+  // The spelling the bench unit publishes, and the one an operator who renamed
+  // the sub-device to the bare address would produce.
+  assert.equal(at('Station 1003'), 1003);
+  assert.equal(at('station 1003'), 1003);
+  assert.equal(at('STATION 1003'), 1003);
+  assert.equal(at('1003'), 1003);
+  assert.equal(at('  Station 1003  '), 1003);
+
+  // Everything else names no station, and the field is absent rather than
+  // guessed at — these are the gateway's own devices, which claim nothing.
+  for (const tail of ['Broker Diagnostics', 'System Info', 'Diagnostics',
+                      'Station', 'Station 0', 'Station 70000', 'Loudoun Br',
+                      'DBIRTH/elpro/Station 1000']) {
+    assert.equal(at(tail), undefined, tail);
+  }
+
+  // And the raw tail survives regardless — provenance is not conditional on
+  // anything being readable in it.
+  assert.equal(
+    parseTopic('meganet/v1/elpro_test/logger/reading/elpro/Broker Diagnostics').source,
+    'Broker Diagnostics',
   );
 });
 

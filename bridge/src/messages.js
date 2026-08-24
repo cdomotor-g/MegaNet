@@ -274,7 +274,7 @@ function truncate(text, n) {
  * The size and count limits still throw, because those are the two cases where
  * accepting the message is what causes harm rather than what preserves evidence.
  */
-function parseElpro(payload, receivedAt = () => new Date().toISOString()) {
+function parseElpro(payload, receivedAt = () => new Date().toISOString(), a2Station = null) {
   if (payload == null || payload.length === 0) {
     throw new PoisonMessage('empty payload');
   }
@@ -307,7 +307,7 @@ function parseElpro(payload, receivedAt = () => new Date().toISOString()) {
     const stamp = typeof set.timestamp === 'number' && Number.isFinite(set.timestamp)
       ? set.timestamp
       : arrivedAt;
-    readings.push(...elproReadings(set, stamp));
+    readings.push(...elproReadings(set, stamp, a2Station));
   }
 
   if (readings.length > MAX_READINGS) {
@@ -326,15 +326,24 @@ function parseElpro(payload, receivedAt = () => new Date().toISOString()) {
  * instead of against our card, and the raw row says so without inventing an
  * address to cover it.
  */
-function elproReadings(set, stamp) {
-  // Shape 1: an explicit address field. Checked first and taken exclusively,
-  // because an object that names its own address is not *also* describing
+function elproReadings(set, stamp, a2Station) {
+  // Shape 1: an explicit `Sensor` field. Checked first and taken exclusively,
+  // because an object that names its own sensor is not *also* describing
   // addresses in its other key names — scanning on would turn a stray numeric
   // key into a second reading nobody sent.
+  //
+  // This is the ALERT2 relay path, and `Sensor` is a **slot within the relayed
+  // station**, not an ALERT address. #169 read it as one, so `Sensor 10` off
+  // Station 1000 and `Sensor 10` off Station 1001 both became `a:10` — two
+  // instruments under one identity, and liable to attach themselves to whatever
+  // real station owns ALERT address 10 the day somebody adds it. The station
+  // half comes from the topic tail (topics.js), which is the only place it
+  // exists, so without it there is no address here to file anything under.
   const address = elproNumber(set, 'sensor');
   const value = elproNumber(set, 'value');
   if (address !== null && value !== null) {
-    return isAlertId(address) ? [{ alert_id: address, reading_ts: stamp, value_raw: value }] : [];
+    if (a2Station === null || !isA2Sensor(address)) return [];
+    return [{ a2_station: a2Station, a2_sensor: address, reading_ts: stamp, value_raw: value }];
   }
 
   // Shape 2: the key IS the address, which is what the provisioning card asks
@@ -376,6 +385,21 @@ function elproNumber(set, name) {
 /** ALERT addresses are 16-bit and 0 is not one. */
 function isAlertId(n) {
   return Number.isInteger(n) && n >= 1 && n <= 65535;
+}
+
+/**
+ * ALERT2 sensor slots are 0-254, and the difference from isAlertId() is the
+ * whole point of having two functions.
+ *
+ * A slot is a position in the relayed station's I/O mapping, not an address, so
+ * **zero is a real sensor** — the bench unit's Station 1001 has been reporting
+ * one every cycle since 21 August, and isAlertId() dropped every one of them.
+ * At the other end ELPRO writes **255** into an unused mapping slot
+ * (docs/elpro115e_mqtt.md, the four sensor-ID columns), so a 255 on the wire
+ * means somebody left a line half-filled rather than that an instrument spoke.
+ */
+function isA2Sensor(n) {
+  return Number.isInteger(n) && n >= 0 && n <= 254;
 }
 
 module.exports = { MAX_READINGS, MAX_BYTES, PoisonMessage, parseReadings, parseHfem, parseElpro, parseStatus };

@@ -105,6 +105,32 @@ const READING_TAIL_FORMATS = ['elpro'];
 // the longest seen on the bench, `DBIRTH/elpro/Station 1003`, is 25 characters.
 const MAX_TAIL = 256;
 
+// The relayed ALERT2 station address, dug back out of the tail.
+//
+// #169 carried the tail as provenance and stopped there, which is how a reading
+// ended up filed under half its own address: `Sensor 13` is a slot *within*
+// `Station 1003`, and the station half exists nowhere else on the wire. So the
+// tail has to be read, not merely recorded.
+//
+// Two spellings, and neither is guessed at. `Station 1003` is what the bench
+// unit publishes — the sub-device name ELPRO derives from the ALERT2 source
+// address. A bare `1003` is accepted too, because the sub-device name is
+// operator-editable and the address on its own is the obvious thing to type.
+// Anything else — `Broker Diagnostics`, `System Info`, a site name somebody
+// preferred — returns null, and messages.js then mints no reading rather than
+// inventing an address to cover it.
+const A2_TAIL = /^(?:station\s+)?(\d{1,5})$/i;
+
+function a2StationOf(tail) {
+  if (typeof tail !== 'string') return null;
+  const m = A2_TAIL.exec(tail.trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  // Same range as an ALERT address and for the same reason: the ALERT2 source
+  // address is a u16, and zero is not one.
+  return Number.isInteger(n) && n >= 1 && n <= 65535 ? n : null;
+}
+
 /**
  * The topic a device publishes readings to. `format` defaults to 'json' — the
  * bare `…/reading` topic; 'hfem' appends the segment that routes the payload
@@ -241,7 +267,15 @@ function parseTopic(topic) {
     // segments boring would throw away every reading the gateway sends. The rule
     // is right for the segments MegaNet resolves things by and has no business
     // being applied to a name a vendor chose.
-    return { kind: 'reading', station: parts[2], device: parts[3], format, source };
+    //
+    // `sourceStation` is the half of that name MegaNet *does* resolve things by,
+    // and it is a separate field rather than a reinterpretation of `source`:
+    // the raw tail stays exactly what the gateway said, whether or not anything
+    // could be read out of it.
+    const route = { kind: 'reading', station: parts[2], device: parts[3], format, source };
+    const a2 = a2StationOf(source);
+    if (a2 !== null) route.sourceStation = a2;
+    return route;
   }
 
   if (parts.length === 4 && parts[3] === 'status') {

@@ -503,13 +503,86 @@ test('a 115E-2 publishing what it really publishes lands a reading (#169)', asyn
   await waitFor(() => api.of('ingest_http').length === 1, { what: 'the reading to reach the database' });
   const body = api.of('ingest_http')[0].body.payload;
   assert.equal(body.protocol, 'elpro');
+  // The identity is the pair. `Sensor 13` is a slot inside the relayed station,
+  // and the station half exists only in that topic tail — which is why #169
+  // storing the slot alone put two instruments under one address.
   assert.deepEqual(body.readings, [
-    { alert_id: 13, reading_ts: 1787288492180, value_raw: 243.600006 },
+    { a2_station: 1003, a2_sensor: 13, reading_ts: 1787288492180, value_raw: 243.600006 },
   ]);
   assert.equal(body.frame, payload);
   // The relayed station is provenance the payload does not carry, so the raw row
   // has to say it — otherwise the only record of which station a reading came
   // off is a debug log line that ages out.
+  assert.equal(body.path, topic);
+
+  await waitFor(() => broker.bridgeAcks().length === 1, { what: 'the message to be acked' });
+});
+
+test('two relayed stations sending the same sensor slot stay two readings (#172)', async (t) => {
+  // The defect this pair exists to close, end to end. The live bench feed sends
+  // slot 10 from Station 1000 and slot 10 from Station 1001 — an RSSI at each of
+  // two sites. Read as ALERT addresses they are both `a:10`: 385 rows in the
+  // live database, two instruments, one identity, and nothing able to tell them
+  // apart afterwards.
+  const broker = await startBroker();
+  const api = await startApi();
+  const bridge = startBridge(broker.port, api.url);
+  t.after(async () => {
+    await closeStations();
+    await bridge.stop();
+    await api.close();
+    await broker.close();
+  });
+
+  await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the bridge to subscribe' });
+  const station = await connectStation(broker.port, 'elpro_test');
+
+  const base = 'meganet/v1/elpro_test/logger/reading/elpro';
+  // Station 1001's frame also carries slot 0, which isAlertId() dropped on every
+  // cycle for being "not an address". A slot is not an address.
+  await station.publishAsync(`${base}/Station 1000`,
+    '[{"timestamp":1787529190675,"Sensor":10,"Value":-101}]', { qos: 1 });
+  await station.publishAsync(`${base}/Station 1001`,
+    '[{"timestamp":1787527586386,"Sensor":10,"Value":-90},{"timestamp":1787527586385,"Sensor":0,"Value":1690}]',
+    { qos: 1 });
+
+  await waitFor(() => api.of('ingest_http').length === 2,
+    { what: 'both relayed stations to reach the database' });
+
+  const posted = api.of('ingest_http').flatMap((c) => c.body.payload.readings);
+  const identity = (r) => `${r.a2_station}/${r.a2_sensor}`;
+  assert.deepEqual(posted.map(identity).sort(), ['1000/10', '1001/0', '1001/10']);
+  assert.equal(new Set(posted.map(identity)).size, 3, 'three slots, three identities');
+  assert.ok(posted.every((r) => r.alert_id === undefined),
+    'a relayed slot is never posted as an ALERT address');
+});
+
+test('a tail that names no relayed station mints no reading, and keeps every byte (#172)', async (t) => {
+  // The gateway publishes its own devices down the same tree — `Broker
+  // Diagnostics`, `System Info`. There is no station address to be had from
+  // those, and inventing one is what #169 effectively did. The raw row still
+  // gets the bytes, which is the whole reason reading_raw exists.
+  const broker = await startBroker();
+  const api = await startApi();
+  const bridge = startBridge(broker.port, api.url);
+  t.after(async () => {
+    await closeStations();
+    await bridge.stop();
+    await api.close();
+    await broker.close();
+  });
+
+  await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the bridge to subscribe' });
+  const station = await connectStation(broker.port, 'elpro_test');
+
+  const topic = 'meganet/v1/elpro_test/logger/reading/elpro/Broker Diagnostics';
+  const payload = '[{"timestamp":1787529190675,"Sensor":10,"Value":-101}]';
+  await station.publishAsync(topic, payload, { qos: 1 });
+
+  await waitFor(() => api.of('ingest_http').length === 1, { what: 'the raw row to be posted' });
+  const body = api.of('ingest_http')[0].body.payload;
+  assert.deepEqual(body.readings, [], 'nothing is claimed');
+  assert.equal(body.frame, payload, 'the evidence survives');
   assert.equal(body.path, topic);
 
   await waitFor(() => broker.bridgeAcks().length === 1, { what: 'the message to be acked' });

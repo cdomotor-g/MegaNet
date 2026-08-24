@@ -54,11 +54,24 @@ Four subscriptions, all QoS 1:
 **Only the ELPRO filter ends in `#`, and only because the gateway assembles the
 topic below that segment itself** — `…/reading/elpro/Station 1003` is the relayed
 ALERT2 station, `…/reading/elpro/DBIRTH/elpro/Station 1003` its birth
-certificate. Everything below the format segment is carried as opaque
-provenance and recorded as the raw row's `path`; nothing resolves by it (#169).
+certificate. The whole tail is recorded verbatim as the raw row's `path`.
 Note that `#` matches the parent level too, so this one filter also covers the
 bare `…/reading/elpro` — do not add the exact filter beside it, or a bare-topic
 message matches two subscriptions and may be delivered twice.
+
+**The tail is also half the address, which #169 did not realise (#172).** On the
+ALERT2 relay path a reading is identified by a *pair*: the relayed station
+address, which appears only in that tail, and the sensor slot, which appears in
+the payload as `Sensor`. `parseTopic()` reads `Station 1003` (or a bare `1003`)
+back out as `route.sourceStation`, and `parseElpro()` emits
+`{a2_station, a2_sensor}` for the `Sensor`/`Value` shape — stored by
+`meganet.ingest()` as `a2:1003/13`. A slot is **0–254**: zero is a real sensor,
+unlike an ALERT address, and 255 is ELPRO's unused-slot marker. A tail naming no
+station mints no reading; the raw row still keeps every byte.
+
+The other ELPRO payload shape is unchanged. Where the JSON *key* is the address,
+that key is the Payload Prefix a technician typed and is a real ALERT address, so
+it still becomes `alert_id`.
 
 ---
 

@@ -241,9 +241,11 @@ test('elpro: falls back to receipt time when timestamp is missing or unusable', 
 
 test('elpro: reads the array-wrapped Sensor/Value shape the 115E-2 sends', () => {
   const raw = '[{"timestamp":1787288492180, "Sensor":13, "Value":243.600006}]';
-  const { readings, envelope } = parseElpro(Buffer.from(raw));
+  // 1003 is the relayed ALERT2 station, off the topic tail — `Sensor` is a slot
+  // within it, and the pair is the identity. #169 stored the slot alone.
+  const { readings, envelope } = parseElpro(Buffer.from(raw), undefined, 1003);
   assert.deepEqual(readings, [
-    { alert_id: 13, reading_ts: 1787288492180, value_raw: 243.600006 },
+    { a2_station: 1003, a2_sensor: 13, reading_ts: 1787288492180, value_raw: 243.600006 },
   ]);
   assert.equal(envelope.frame, raw, 'the bytes survive whatever the parser made of them');
 });
@@ -256,10 +258,13 @@ test('elpro: an array is a list of payload objects, each with its own stamp', ()
     { timestamp: 1, Sensor: 13, Value: 1.5 },
     { timestamp: 2, Sensor: 14, Value: 2.5 },
     { timestamp: 3, 9001: 7 },
-  ]));
+  ]), undefined, 1003);
+  // The two shapes stay apart: a `Sensor` field is a slot in the relayed
+  // station, a numeric *key* is the Payload Prefix the technician typed and is
+  // a real ALERT address.
   assert.deepEqual(readings, [
-    { alert_id: 13, reading_ts: 1, value_raw: 1.5 },
-    { alert_id: 14, reading_ts: 2, value_raw: 2.5 },
+    { a2_station: 1003, a2_sensor: 13, reading_ts: 1, value_raw: 1.5 },
+    { a2_station: 1003, a2_sensor: 14, reading_ts: 2, value_raw: 2.5 },
     { alert_id: 9001, reading_ts: 3, value_raw: 7 },
   ]);
 });
@@ -268,8 +273,8 @@ test('elpro: an explicit address field is taken exclusively', () => {
   // An object that names its own address is not also describing addresses in
   // its other key names, so the key scan must not run on and invent a second
   // reading nobody sent.
-  const { readings } = parseElpro(buf({ timestamp: 1, Sensor: 13, Value: 1.5, 9001: 99 }));
-  assert.deepEqual(readings, [{ alert_id: 13, reading_ts: 1, value_raw: 1.5 }]);
+  const { readings } = parseElpro(buf({ timestamp: 1, Sensor: 13, Value: 1.5, 9001: 99 }), undefined, 1003);
+  assert.deepEqual(readings, [{ a2_station: 1003, a2_sensor: 13, reading_ts: 1, value_raw: 1.5 }]);
 });
 
 test('elpro: the address field is matched however the gateway capitalises it', () => {
@@ -280,8 +285,8 @@ test('elpro: the address field is matched however the gateway capitalises it', (
     // to lose a reading over.
     { timestamp: 1, Sensor: '13', Value: '1.5' },
   ]) {
-    assert.deepEqual(parseElpro(buf(frame)).readings,
-      [{ alert_id: 13, reading_ts: 1, value_raw: 1.5 }], JSON.stringify(frame));
+    assert.deepEqual(parseElpro(buf(frame), undefined, 1003).readings,
+      [{ a2_station: 1003, a2_sensor: 13, reading_ts: 1, value_raw: 1.5 }], JSON.stringify(frame));
   }
 });
 
@@ -289,11 +294,12 @@ test('elpro: a half-written Sensor/Value pair claims nothing and keeps the bytes
   for (const frame of [
     { timestamp: 1, Sensor: 13 },                 // no value
     { timestamp: 1, Value: 1.5 },                 // no address
-    { timestamp: 1, Sensor: 0, Value: 1.5 },      // 0 is not an ALERT address
-    { timestamp: 1, Sensor: 70000, Value: 1.5 },  // nor is anything over 16 bits
+    { timestamp: 1, Sensor: 255, Value: 1.5 },    // ELPRO's unused-slot marker
+    { timestamp: 1, Sensor: 70000, Value: 1.5 },  // no slot is over 8 bits
+    { timestamp: 1, Sensor: -1, Value: 1.5 },
     { timestamp: 1, Sensor: 'thirteen', Value: 1.5 },
   ]) {
-    const { readings, envelope } = parseElpro(buf(frame));
+    const { readings, envelope } = parseElpro(buf(frame), undefined, 1003);
     assert.deepEqual(readings, [], JSON.stringify(frame));
     assert.equal(envelope.protocol, 'elpro');
     assert.ok(envelope.frame, 'the evidence survives');
