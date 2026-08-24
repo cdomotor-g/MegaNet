@@ -68,8 +68,37 @@
 --   8. load_stations_doc() stops deleting sensor rows it did not write, which it
 --      would otherwise do to every ALERT2 sensor added through the editor.
 --
--- Applying this needs 0022 and 0023 applied first; the live database was still at
--- 21 when this was written, and #171 covers the catch-up.
+-- Applying this needs 0022 applied first, and that is checked below rather than
+-- assumed. #171 covers the catch-up.
+
+-- ── Is 0022 actually here? ───────────────────────────────────────────────────
+-- Not a version check. `meganet.app_meta('schema_version')` is one integer, and
+-- one integer cannot say *which* migrations ran — so a chain applied out of order
+-- reads as complete. That is not hypothetical: the live database was found at
+-- schema_version 23 with 0023's seven views present and **0022 never applied**,
+-- because 0023 was pasted into the SQL editor on its own and its last line wrote
+-- 23 over the gap.
+--
+-- This file would have made that worse quietly. It restates load_stations_doc(),
+-- and 0022's version of that function reads `station.document_managed` — a
+-- column 0022 creates. A plpgsql body is not resolved against the catalogue when
+-- it is created, only when it runs, so `create or replace function` would have
+-- succeeded here and the next stations load would have failed on a column that
+-- does not exist. The check is therefore for the *column*, which is the thing
+-- actually depended on, rather than for a number somebody could have written.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+     where table_schema = 'meganet' and table_name = 'station'
+       and column_name = 'document_managed') then
+    raise exception
+      '0024 needs 0022 first: meganet.station.document_managed does not exist'
+      using hint = 'apply db/migrations/0022_stations_outside_the_document.sql, then this file. '
+                 || 'schema_version may say otherwise — it is one integer and cannot record a gap.';
+  end if;
+end
+$$;
 
 -- ── The registry learns the ALERT2 pair ──────────────────────────────────────
 -- On the station, because the ALERT2 station address identifies the station and
