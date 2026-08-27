@@ -83,15 +83,26 @@ nameservers need to point at Cloudflare first, and that is a 24-hour change.
 Dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
 
 - Repository: `cdomotor-g/MegaNet`
+- Project name: `meganet` — must exactly match the `name` in `wrangler.toml`
+  at the repo root, or the build fails.
 - Production branch: `main`
 - Framework preset: **None**
 - Build command: *(leave empty)*
-- Build output directory: `/`
+- Deploy command: `npx wrangler deploy` — the prefilled default. The current
+  dashboard flow marks this field required; it cannot be left empty the way
+  the build command is.
+- Build output directory (only if the flow asks for one): `/`
 
 MegaNet is static files with no build step. An empty build command is correct,
-not a placeholder.
+not a placeholder. The required deploy command is answered by two files at the
+repo root: `wrangler.toml` tells Wrangler this project is assets-only — no
+Worker script, the whole repository root served as static files — and
+`.assetsignore` keeps `.git/` and other non-site files out of the upload.
+Neither changes what is served: the full tree, exactly as GitHub Pages serves
+it today.
 
-Deploy. It comes up on `<project>.pages.dev` — check the app loads there and the
+Deploy. It comes up on `meganet.<account>.workers.dev` (or `<project>.pages.dev`
+if the flow created a classic Pages project) — check the app loads there and the
 station list arrives from Supabase **before** attaching the real name.
 
 ### 3. Attach the domain

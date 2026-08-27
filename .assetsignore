@@ -1,0 +1,10 @@
+# Kept out of the Cloudflare static-asset upload. Classic Pages excluded
+# .git and friends automatically; Workers static assets does not, and
+# wrangler.toml points it at the repo root. Parity only — everything else
+# stays served exactly as GitHub Pages serves it today.
+.git
+.github
+node_modules
+.DS_Store
+wrangler.toml
+.assetsignore

@@ -6,9 +6,12 @@ spectra_rrl.zip
 acma_subset/
 
 # The web-app test harness (test/) pulls playwright-core, acorn and a local copy
-# of Leaflet. Deliberately not at the repo root: docs/floodwarning-net.md:90
-# depends on MegaNet staying "static files with no build step", and Cloudflare
-# Pages must keep seeing an empty build command. See test/README.md.
+# of Leaflet. Deliberately not at the repo root: docs/floodwarning-net.md
+# ("Create the Pages project") depends on MegaNet staying "static files with no
+# build step", and Cloudflare must keep seeing an empty build command. The
+# deploy command Cloudflare *does* require is satisfied by wrangler.toml and
+# .assetsignore at the root, which ship the tree as-is without introducing a
+# build. See test/README.md.
 test/node_modules/
 
 # tools/ingest/ is plain scripts run with python3, not a package. The bytecode

@@ -1,0 +1,13 @@
+# Cloudflare deploy config. The dashboard's git-connect flow ("Workers Builds")
+# requires a deploy command — the default `npx wrangler deploy` — and that
+# command needs this file to know what to deploy. MegaNet is assets-only: no
+# Worker script (no `main`), the whole repository root served as static files,
+# same as GitHub Pages serves it. See docs/floodwarning-net.md.
+#
+# `name` must exactly match the project name in the Cloudflare dashboard or
+# the build fails.
+name = "meganet"
+compatibility_date = "2026-08-27"
+
+[assets]
+directory = "."
