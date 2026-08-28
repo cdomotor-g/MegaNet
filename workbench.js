@@ -200,12 +200,14 @@ function wbBitsDiff(a, b) {
   return out;
 }
 
-// Deep-link into the existing Bit Flipper rather than reimplementing it.
+// Deep-link into the existing Bit Flipper rather than reimplementing it. Two
+// bits and matches-only because that is the question a flagged pair asks: these
+// two addresses are two flips apart, so what else is within reach of them and
+// actually belongs to a station? openBitFlipper() in bit-flipper.js owns what
+// the rest of "open the tab at an address" means — this file used to set the
+// three state keys itself, which is one copy of that per caller.
 function wbOpenBf(addr) {
-  state.bfInput = String(addr);
-  state.bfBits = '2';
-  state.bfOnlyMatches = true;
-  switchTab('bitflipper');
+  openBitFlipper(addr, { bits: '2', onlyMatches: true });
 }
 
 // ── analysis core ──

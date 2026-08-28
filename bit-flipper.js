@@ -43,9 +43,17 @@ function bitCombos(width, k) {
   return res;
 }
 
+// What counts as an ALERT address here: 16 bits, and 0 is not one of them. The
+// tab applies it to what is typed into the box (bfBaseId below); the places that
+// offer to *open* the tab at an address they already hold apply the same rule
+// before offering, so a deep link never lands on "enter a valid ALERT address".
+function isBfAddress(id) {
+  return Number.isInteger(id) && id > 0 && id < 65536;
+}
+
 function bfBaseId() {
   const id = parseInt(state.bfInput, 10);
-  return (!isNaN(id) && id > 0 && id < 65536) ? id : null;
+  return isBfAddress(id) ? id : null;
 }
 
 function bfBitsToFlip() {
@@ -306,6 +314,37 @@ function onBfArroInput(val) {
 function onBfSensorFilter(val) {
   state.bfSensorFilter = val;
   refreshBfResults();
+}
+
+// ── Opening the tab from somewhere else ─────────────────────────────────────
+// The single definition of "show me this address in the Bit Flipper", so the
+// places that offer it cannot drift apart on what opening it means. Two of them
+// so far: the Workbench's flagged pairs, which are a two-bit question and say
+// so, and each ALERT row in the station editor, which is not asking anything in
+// particular yet.
+//
+// A caller passes only what its own question needs. Everything else — the bit
+// count, the "only matched" checkbox, the ARRO base — is left exactly as the
+// operator had it, because those are their settings and arriving from another
+// tab is not a reason to reset them.
+//
+// The sensor filter is the one exception, cleared for the reason
+// onBfAddrInput() clears it: it names a sensor type found under the *previous*
+// address, and carried across it can hide every row the new one has.
+function openBitFlipper(addr, { bits, onlyMatches } = {}) {
+  state.bfInput = String(addr);
+  state.bfSensorFilter = '';
+  if (bits != null)        state.bfBits = String(bits);
+  if (onlyMatches != null) state.bfOnlyMatches = !!onlyMatches;
+  switchTab('bitflipper');
+  // Focus follows the link. A deep link fired from inside another tab leaves
+  // focus on a button that renderMain() has just deleted, which drops it to
+  // <body> and starts the next Tab press at the top of the document (see
+  // refocusAfterTabSwitch — it only re-homes focus that came from the shell).
+  // The address box is both where the answer arrived and the thing anyone
+  // changes next, and it reads as "ALERT decimal address, 6129" — which says
+  // where you landed and with what, rather than leaving it to the announcement.
+  document.getElementById('bf-addr')?.focus();
 }
 
 // Leaving the tab takes the map with it (#143). renderMain() is about to

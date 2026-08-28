@@ -243,7 +243,11 @@ const HELP = {
            + 'boxes, and on every station\'s map callout, is a row of pills: Street View, Google '
            + 'Earth and Apple Maps at that position, and searches of the <strong>FWIN</strong> and '
            + '<strong>OOHB</strong> document libraries for that station. Beside them, '
-           + '<strong>Move pin on map</strong>.',
+           + '<strong>Move pin on map</strong>. In the editor\'s <strong>ALERT IDs / Sensors</strong> '
+           + 'list, each row carries a <strong>Flip</strong> link that opens the Bit Flipper on that '
+           + 'row\'s address — what else it could have been, one or more bit-flips away. It reads '
+           + 'the address out of the box rather than off the saved record, so a row you have '
+           + 'retyped sends you to the number on screen.',
     watch: [
       '<strong>Kill spaghetti</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
@@ -536,7 +540,9 @@ const HELP = {
 
   bitflipper: {
     summary: 'What else could this ALERT address have been? Flips one bit up to N bits of a decimal '
-           + 'address and cross-references every variant against the station file, live as you type.',
+           + 'address and cross-references every variant against the station file, live as you type. '
+           + 'Two ways in: the address box here, or the <strong>Flip</strong> link on any sensor row '
+           + 'in the station editor, which arrives with that row\'s address already entered.',
     watch: [
       'Flipping more bits is combinatorial — <code>C(16, N)</code> variants. Past two or three bits '
       + 'the useful view is <em>show only matched addresses</em>; the render cap is there to stop '

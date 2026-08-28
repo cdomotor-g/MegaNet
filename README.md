@@ -1108,6 +1108,27 @@ Export is scoped to the current filter selection so users can generate per-catch
   to them.
 - Replaces the standalone `BitFlipper.html`.
 
+**Two ways in.** The address box on this tab is one. The other is the **ALERT
+IDs / Sensors** list in the station editor, where every row carries a *Flip*
+link that opens this tab on that row's address — so "what else could this
+address have been?" can be asked of the sensor in front of you rather than by
+copying a number between two tabs.
+
+The link reads the address out of the *box* at click time, not off the saved
+record: a row retyped from 6129 to 6130 and not yet saved takes you to 6130,
+which is the number the person is looking at. A row with no address yet, or one
+outside 1–65535, shows the link greyed rather than offering one that lands on
+*"enter a valid ALERT address"* — and it wakes up as soon as the box holds one.
+
+It sets the address and nothing else. The bit count, *show only matched
+addresses* and the ARRO base URL stay exactly as they were left, because those
+are the operator's settings and arriving from another tab is not a reason to
+reset them. The one thing cleared is the sensor-type filter, which names a type
+found under the *previous* address and can otherwise hide every row the new one
+has. The Workbench's flagged pairs come in through the same door
+(`openBitFlipper` in `bit-flipper.js`) and do set the bit count, to two, because
+two bits is the question a flagged pair is asking.
+
 ### 7. ALERT / ERTS Packet Decoder & Encoder (Integrated)
 Ported from the standalone [ALERT_PACKETS](https://github.com/cdomotor-g/ALERT_PACKETS) tool and
 available on the **ALERT Packets** tab. Based on the Bureau of Meteorology *ERTS Data Formats*

@@ -184,7 +184,9 @@ function editorForm(s) {
           ${sensors.map(se => sensorRowHtml(se, dbId)).join('')}
         </div>
         <div class="small ef-note">
-          One row per ALERT address and what it measures — rainfall, water level, battery, etc.${
+          One row per ALERT address and what it measures — rainfall, water level, battery, etc.
+          <b>Flip</b> takes the row's address to the Bit Flipper, which says what else it could
+          have been.${
             dbId != null ? ' Rows whose sensor carries an ARRO device id link straight to its admin page.' : ''}
         </div>
         <label class="full">ALERT2 station address
@@ -340,7 +342,7 @@ function sensorRowHtml(se, dbId) {
   return `
     <div class="sensor-row" data-sensor-id="${esc(se.sensor_id || '')}" data-device-id="${se.device_id ?? ''}">
       <input type="number" class="sensor-aid" value="${se.alert_id ?? ''}" placeholder="ALERT ID"
-             aria-label="ALERT address">
+             aria-label="ALERT address" oninput="editorSyncSensorFlip(this)">
       <input type="number" class="sensor-a2id" value="${se.alert2_sensor_id ?? ''}" placeholder="A2 slot"
              min="0" max="254"
              aria-label="ALERT2 sensor slot"
@@ -348,6 +350,10 @@ function sensorRowHtml(se, dbId) {
       <input type="text" class="sensor-type" list="ef-sensor-types" value="${esc(se.type || '')}"
              aria-label="Sensor type"
              placeholder="Sensor type (e.g. Rainfall)">
+      <button type="button" class="link-btn sensor-flip" onclick="editorOpenSensorFlip(this)"
+              ${isBfAddress(pInt(se.alert_id)) ? '' : 'disabled'}
+              aria-label="Open this row's ALERT address in the Bit Flipper"
+              title="Open this row's ALERT address in the Bit Flipper — what else it could be, one or more bit-flips away">Flip</button>
       <span class="sensor-arro small">${url
         ? `<a href="${esc(url)}" target="_blank" rel="noopener"
              title="ARRO admin for device ${esc(se.device_id)} on site ${esc(dbId)}">ARRO ↗</a>`
@@ -355,6 +361,37 @@ function sensorRowHtml(se, dbId) {
       <button type="button" class="sensor-del btn-danger" title="Remove this sensor"
               onclick="this.closest('.sensor-row').remove()"><span aria-hidden="true">×</span></button>
     </div>`;
+}
+
+// The Bit Flipper, asked of the row you are looking at. A mis-set dip switch or
+// a flipped bit on the wire turns one ALERT address into another that is one bit
+// away, so "what else could this address be?" is a question about a specific
+// sensor — and until now answering it meant reading the number off this row,
+// switching tabs and typing it back in.
+//
+// The address is read out of the box at click time rather than baked into the
+// button, because the box is editable and the record behind it may be minutes
+// old: a row retyped from 6129 to 6130 and not yet saved would otherwise send
+// you to the address you just stopped believing in, which is the one kind of
+// wrong a link like this must not be.
+//
+// Switching tabs discards anything typed into this form and not saved — the
+// editor card is redrawn from the stored record on the way back, the same as it
+// is for the "ALERT IDs in range → stations" links above.
+function editorOpenSensorFlip(el) {
+  const id = pInt(el.closest('.sensor-row')?.querySelector('.sensor-aid')?.value);
+  if (!isBfAddress(id)) return;
+  openBitFlipper(id);
+}
+
+// …and what keeps that button honest while the box is being typed into. Rendering
+// alone is not enough: a new row starts with no address at all, and a half-typed
+// one is not an address either. Disabled is the truthful state for both — a
+// control that is offered and then does nothing when pressed is worse than one
+// that says it has nothing to act on.
+function editorSyncSensorFlip(input) {
+  const btn = input.closest('.sensor-row')?.querySelector('.sensor-flip');
+  if (btn) btn.disabled = !isBfAddress(pInt(input.value));
 }
 
 function editorAddSensorRow(a2Slot) {

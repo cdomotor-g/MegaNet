@@ -2096,14 +2096,25 @@ h2.h-bad {
 }
 .ef-carried-row:hover { color: var(--accent); }
 
-/* One sensor: address, type, the ARRO link, remove. */
+/* One sensor: address, slot, type, the Bit Flipper link, the ARRO link, remove. */
 .sensor-row {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--sp-1);
   align-items: center;
-  margin-bottom: var(--sp-1);
+  /* Deliberately more than the gap above rather than equal to it: on a narrow
+     screen the row wraps, and a row separated from the next one by exactly the
+     distance that separates its own two lines reads as twice as many rows. */
+  margin-bottom: var(--sp-2);
 }
 
+/* Wrapping, because the fixed-width half of this row is wider than a phone once
+   the Bit Flipper link is in it. The two address boxes, the two links and the
+   remove button come to ~350 px between them before the type box has any width
+   at all, so unwrapped the row pushed the whole document sideways by ten of them
+   at 375 px — `npm run tabs` measures exactly that. Wrapped, the type box takes
+   the second line with the links beside it and nothing overflows; on any screen
+   wide enough the row is still one line, exactly as it was. */
 .sensor-row .sensor-aid  { flex: 0 0 7.5rem; width: 7.5rem; }
 /* Narrower than the ALERT box on purpose: a slot is 0-254 and three digits is
    the whole of it, so the row still reads as one wide field (the type) between
@@ -2112,6 +2123,22 @@ h2.h-bad {
 .sensor-row .sensor-type { flex: 1 1 auto; width: auto; min-width: 0; }
 .sensor-row .sensor-arro { flex: 0 0 4.2rem; text-align: right; }
 .sensor-row .sensor-del  { flex: 0 0 auto; padding: .2rem .55rem; line-height: 1; }
+
+/* The row's own deep link: this address, in the Bit Flipper. A .link-btn and
+   not a .btn-link because it goes to another tab of this app rather than off
+   the site — and deliberately not also `.small`, which would repaint it in
+   --muted and take the one thing that says it is a link. */
+.sensor-row .sensor-flip { flex: 0 0 auto; font-size: .82rem; }
+
+/* Disabled is the row's honest state until there is an address to flip: an
+   empty box on a new row, or a half-typed one. Says so rather than sitting
+   there looking pressable. */
+.sensor-row .sensor-flip[disabled] {
+  color: var(--muted);
+  cursor: default;
+}
+
+.sensor-row .sensor-flip[disabled]:hover { text-decoration: none; }
 
 /* The slots a relayed ALERT2 station has been heard on but nobody has named.
    A plain list inside the editor's own note text — it is a hint about live data,
@@ -2324,6 +2351,7 @@ h2.h-bad {
   /* EPIC #107's 44 px floor for the editor's own controls (#136). A form
      filled in on a phone at a station site is the case this is for. */
   .sensor-row .sensor-del,
+  .sensor-row .sensor-flip,
   .ef-carried-row,
   .ef-section-head button {
     min-height: 2.75rem;
