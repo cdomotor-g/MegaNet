@@ -827,6 +827,22 @@ match*, drops) the same set. Picking a row pans the map to that station and
 opens its pin, so the list and the map never disagree about which site is being
 looked at.
 
+**The ARRO column.** The last column on every row is a link straight out to that
+station's ARRO (Contrail) site admin page — the place its telemetry actually
+lives. It exists because the key ARRO takes is `site.db_id`, an arbitrary
+database index, and it is *not* the BoM station number over on the left, so
+there is no way to get from the table to the telemetry by hand. The link opens
+in a new tab and is remembered in the ARRO Launcher's recents, so a page opened
+from here and one opened from there are the same visit. Clicking it does not
+select the row or move the map.
+
+The 390 of 3,174 stations that carry no `site.db_id` show an em dash rather than
+a dead link — the site id arrives with the ARRO sensor export
+(`tools/import_arro_sensors.py`), and a station missing from that export has
+none here either. The column follows the Bit Flipper's **ARRO base URL** box
+like every other ARRO link in the app: point that at another ARRO and these go
+there too.
+
 **One column, since #165.** The tab was a two-pane split from #136 until then:
 a filter rail on the left, the map and the table on the right, a divider that
 dragged to re-split the width, and a scroller inside each column. Every part of

@@ -2619,20 +2619,31 @@ function stationsTable(allStations) {
     ` : ''}
     <table>
       <colgroup>
-        <col style="width:22%"><col style="width:8%"><col style="width:13%"><col style="width:13%">
-        <col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:6%">
+        <col style="width:20%"><col style="width:8%"><col style="width:12%"><col style="width:12%">
+        <col style="width:11%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:6%">
+        <col style="width:7%">
       </colgroup>
-      <caption class="sr-only">Every station the filter matched — name, number, roles, radio network, ALERT addresses, position and whether it is enabled</caption>
+      <caption class="sr-only">Every station the filter matched — name, number, roles, radio network, ALERT addresses, position, whether it is enabled, and a link to its ARRO admin page</caption>
       <thead>
         <tr>
           <th scope="col">Name</th><th scope="col">Stn #</th><th scope="col">Roles</th><th scope="col">Network</th>
           <th scope="col">AlertID</th><th scope="col">Lat</th><th scope="col">Lon</th>
-          <th scope="col">Elev (AHD)</th><th scope="col">On</th>
+          <th scope="col">Elev (AHD)</th><th scope="col">On</th><th scope="col">ARRO</th>
         </tr>
       </thead>
       <tbody>
         ${stations.map(s => {
           const aids = stationAlertIds(s);
+          // The ARRO column: telemetry lives in ARRO and the only key it takes
+          // is site.db_id, which is *not* the station number two cells to the
+          // left — so the link is built here from the id the file already
+          // carries, rather than sending the operator to the ARRO Launcher tab
+          // to look one station up by hand. 390 of 3,174
+          // stations carry no site id and get an em dash: saying "this one has
+          // no ARRO record" beats a dead link, and beats an empty cell that
+          // reads as a rendering fault.
+          const arroId  = arroSiteId(s);
+          const arroUrl = arroSiteUrl(arroId);
           return `
             <tr class="row-link ${state.selectedId === s.id ? 'selected' : ''}" data-sid="${escAttr(s.id)}"
                 onclick="selectStation('${escAttr(s.id)}')">
@@ -2654,6 +2665,18 @@ function stationsTable(allStations) {
               <td class="small">${s.lon != null ? s.lon.toFixed(4) : ''}</td>
               <td class="small">${s.elevation_ahd != null ? s.elevation_ahd : ''}</td>
               <td>${s.enabled ? '✓' : ''}</td>
+              <!-- stopPropagation because the whole row is a select: without it
+                   a click here opens ARRO *and* pans the map to the station,
+                   which is a second thing nobody asked for. Remembering it in
+                   the launcher's recents is the one side effect that is wanted
+                   — the same page opened from either tab is the same visit. -->
+              <td class="small">${arroUrl
+                ? `<a class="stn-arro" href="${esc(arroUrl)}" target="_blank" rel="noopener"
+                     title="ARRO site ${esc(arroId)} — the telemetry admin page for this station"
+                     aria-label="Open the ARRO admin page for ${escAttr(s.name)} in a new tab"
+                     onclick="event.stopPropagation();arroRememberStation('${escAttr(s.id)}')"
+                     >ARRO ↗</a>`
+                : `<span class="txt-muted" title="No ARRO site id recorded for this station">—</span>`}</td>
             </tr>`;
         }).join('')}
       </tbody>

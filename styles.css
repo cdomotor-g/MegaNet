@@ -1987,6 +1987,12 @@ h2.h-bad {
 .stn-name.role-base     { color: var(--role-base); }
 .stn-name.role-satcom   { color: var(--role-satcom); }
 
+/* The station table's ARRO column — one link per row, out to that station's
+   telemetry admin page. `nowrap` because the cell is 7 % wide and "ARRO ↗"
+   broken over two lines is both ugly and a wider row: the arrow is part of the
+   label (it is what says the link leaves the app), not punctuation after it. */
+.stn-arro { white-space: nowrap; }
+
 .rx-cell {
   background: var(--rx-bg);
 }
@@ -7799,6 +7805,7 @@ code {
   .ad-tool-grp button,
   .arro-btn-sm,
   .arro-row-acts a,
+  .stn-arro,
   .exp-btn-sm,
   .db-reload {
     min-height: 2.75rem;
