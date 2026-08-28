@@ -194,9 +194,15 @@ app's origin, or the link in the email will refuse to come back:
 ```
 https://floodwarning.net
 https://floodwarning.net/*
+https://www.floodwarning.net
+https://www.floodwarning.net/*
 https://cdomotor-g.github.io/MegaNet
 https://cdomotor-g.github.io/MegaNet/*
 ```
+
+The github.io pair leaves the list when GitHub Pages is retired
+([`floodwarning-net.md` → step 6](floodwarning-net.md#6-retire-the-second-door));
+the `www.` pair is only needed while `www.floodwarning.net` is attached.
 
 ### Site URL, and the localhost trap
 

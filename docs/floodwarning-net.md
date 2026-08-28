@@ -131,9 +131,19 @@ Dashboard → **Authentication → URL Configuration → Redirect URLs**, add:
 ```
 https://floodwarning.net
 https://floodwarning.net/*
+https://www.floodwarning.net
+https://www.floodwarning.net/*
 ```
 
-Miss this and sign-in fails in a way that looks like a broken email.
+— the `www.` pair only if step 3 added that domain. On the same page, set
+**Site URL** to `https://floodwarning.net`: it is the fallback for any sign-in
+request without a redirect of its own, and it ships as `http://localhost:3000`
+(see [`access.md` → the localhost trap](access.md#site-url-and-the-localhost-trap)).
+
+Miss this and sign-in fails in a way that looks like a broken email — but only
+the emailed *link* is affected. Typing the six-digit code from the same email
+verifies in place, with no redirect involved, so the code path working while
+the link path lands somewhere wrong is the signature of this list being stale.
 
 ### 6. Retire the second door
 
@@ -141,6 +151,11 @@ Once `floodwarning.net` serves the app and the gate works, GitHub Pages is a
 duplicate of the site with no gate on it.
 
 GitHub → repo **Settings → Pages → Source → None**.
+
+The Workers deploy opened a second ungated duplicate of its own:
+`meganet.<account>.workers.dev`, the preview URL from step 2. Access on the
+`floodwarning.net` zone does not cover it. Once the real name works, switch it
+off: Worker → **Settings** → **Domains & Routes** → `workers.dev` → **Disable**.
 
 Optional but kind: before switching it off, replace what it serves with a one-
 page redirect so an old bookmark lands somewhere useful rather than on a 404.
