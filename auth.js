@@ -42,12 +42,17 @@
 // operator gets depends on a template in a dashboard, and an app that only
 // handles one of them is an app that breaks when somebody edits it.
 //
-// **sessionStorage, not localStorage.** #B8 said localStorage, matching the
-// mn-theme pattern; 0004 had already chosen sessionStorage for the access token
-// with a reason that still holds — a token that outlives the tab it was obtained
-// in is a token left behind on a shared machine, and these are shared machines.
-// The cost is a fresh sign-in per tab, which behind Access is a keystroke. If
-// that is ever judged the wrong trade, this is the only place it is decided.
+// **localStorage, not sessionStorage — the trade was re-judged.** 0004 and the
+// original #B8 build kept this per-tab: a token that outlives the tab it was
+// obtained in is a token left behind on a shared machine. That priced sign-in
+// at a fresh code per tab, and once floodwarning.net went behind Cloudflare
+// Access (Aug 2026) the operator judged it the wrong trade — a machine that can
+// reach this page has already passed the gate, so the session now sticks and
+// sign-in happens once per browser. The lingering-session cost on a shared
+// machine is accepted, not solved; #173 retires it properly by minting the
+// session from the gate's own identity, with no second sign-in at all. This is
+// still the only place the trade is decided: datastore.js keeps its per-tab
+// mirror of the bare access token, and adopt() repopulates that from here.
 const Auth = (function () {
 
   // The whole session, not just the token: the refresh token and the expiry are
@@ -71,15 +76,15 @@ const Auth = (function () {
 
   function load() {
     try {
-      const raw = sessionStorage.getItem(KEY);
+      const raw = localStorage.getItem(KEY);
       return raw ? JSON.parse(raw) : null;
     } catch (_) { return null; }
   }
 
   function store(s) {
     try {
-      if (s) sessionStorage.setItem(KEY, JSON.stringify(s));
-      else sessionStorage.removeItem(KEY);
+      if (s) localStorage.setItem(KEY, JSON.stringify(s));
+      else localStorage.removeItem(KEY);
     } catch (_) { /* private mode; this session lives in memory only */ }
   }
 

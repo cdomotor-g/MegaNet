@@ -264,8 +264,10 @@ async function snapshotStationsJson() {
 // correctly, not a bug: the gate is server-side, so it does not matter that the
 // browser has no sign-in screen yet.
 //
-// sessionStorage rather than localStorage: a token outliving the tab it was
-// obtained in is a token left on a shared machine.
+// sessionStorage on purpose, even though auth.js now keeps the *session*
+// per-device (the trade is recorded there): this is only a same-tab bridge
+// across reloads, repopulated from the restored session on start, and a bare
+// access token with no refresh half gains nothing from outliving its tab.
 const DB_TOKEN_KEY = 'meganet.access_token';
 
 let _dbToken = (() => {

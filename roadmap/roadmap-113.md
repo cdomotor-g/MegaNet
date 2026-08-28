@@ -422,6 +422,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 
 
+- #173 `[Standalone]` **[Fable5/High]** Auto sign-in through the front gate — exchange the Cloudflare Access identity for the Supabase session. The second sign-in exists because the gate protects the site while the committed anon key leaves the database reachable directly, so RLS + `editor_allow` must keep deciding who edits; #173 retires the *asking* without touching the deciding — a Worker route verifies `Cf-Access-Jwt-Assertion` against the team JWKS and mints a real GoTrue session (service-role key as a Worker secret), so `auth_user_gate()` and `editor_allow` still gate exactly as today. The stopgap shipped alongside its filing: the session now persists per device (`localStorage`; the per-tab trade re-judged and re-recorded at the top of `auth.js`). Blocked only by two human dashboard steps on the issue body — the `workers.dev` route disabled or Access-covered first, and the three Worker secrets added. The email+code flow stays as the fallback until GitHub Pages retires, which is what keeps #158 relevant meanwhile.
+
 ## Resource allocation summary
 
 > ## ⬛ Every AI row is empty again. The board is six `[Human]` issues.
@@ -463,9 +465,9 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Fable5
 | Effort | Issues |
 |---|---|
-| — | *(empty)* |
+| High | #173 |
 
-*(New column at revision 38; empty again at revision 41 — #159 closed. It was rated for the route judgment rather than the size, and the judgment turned out to be the whole issue: neither `COPY` nor the sketched PostgREST fallback could reach the live database from the session, and the route that worked — the database pulling public chunks from the repo over `pg_net`, with an atomic sync as one function call — is written up on the issue and in `tools/ingest/load.py`'s docstring for the next load this shape.)*
+*(Refilled at revision 72 with #173 — rated like #159 was: for the route judgment (Worker ↔ Access JWKS ↔ GoTrue admin, with a service-role key in play) rather than the line count. New column at revision 38; empty again at revision 41 — #159 closed. It was rated for the route judgment rather than the size, and the judgment turned out to be the whole issue: neither `COPY` nor the sketched PostgREST fallback could reach the live database from the session, and the route that worked — the database pulling public chunks from the repo over `pg_net`, with an atomic sync as one function call — is written up on the issue and in `tools/ingest/load.py`'s docstring for the next load this shape.)*
 
 ### Human
 | Issues |
@@ -517,6 +519,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 24. ~~**#166 (bench a 115E-2) feeds #167 (the `elpro` parser) — and the order is a cost argument, not a correctness one.**~~ — **spent at revision 65, and the cost argument was taken in the cheaper direction than it proposed.** #167 was written first, *before* any capture, and made safe against being wrong rather than made to wait: an unreadable payload returns zero readings and keeps its bytes, so a device that emits something the vendor's guide did not describe produces evidence instead of a dropped message. That inverted the dependency — #166 no longer gates #167, it *verifies* it, and #166 shrank from a bench session to a phone call because the verification now arrives as rows rather than as observations. **The generalisable half: when the unknown is what a third party will send, building tolerantly is cheaper than waiting to find out.** The original item: #167 can be written today: ELPRO's guide documents the payload shape well enough to write the parser and its tests against, and the bridge already has the pattern from #153. What #166 supplies is the two things the guide cannot — **the exact topic the device produces** and **the exact form of the emitted key** (bare `6128`, or decorated). Both are cheap to absorb if the parser is written knowing they are pending, and expensive if it is written assuming them. So: **either order works, but a parser written first should be written defensively and re-checked against #166's capture before it is called done.** Neither blocks the other from starting.
     - **What is deliberately *not* sequenced here:** the staleness-threshold work. If #166's question 5 comes back "nothing arrived", every 115E-2 loses Last-Will offline detection and something has to watch `station_health.minutes_since_seen` per station instead. That is real work and it is **not filed**, because whether it exists at all depends on an answer nobody has yet — filing it now would be inventing a dependency out of a coin toss. #166 says to report the answer; the issue gets filed when the answer is in.
 
+25. **#173 (gate-identity sign-in) is blocked by its own two dashboard steps and by nothing on this board** — the `workers.dev` route closed or Access-covered (docs/floodwarning-net.md step 6), and the Worker secrets added. It gates nothing; what it retires is the per-device stopgap recorded in `auth.js`, and once its fallback flow goes with GitHub Pages, #158 thins to the email-template half.
 
 ## Priority (as stated on each epic/issue, where given)
 - **P2:** ~~#100 (epic) → #102/#103~~ — **the whole epic is closed**; ~~#152 (epic) → #153/#154/#155~~ — **that epic is closed too, at revision 55**; ~~#78 (epic) → #115/#116/#117/#149/#146/#148/#118~~ — **EPIC #78 is closed out; every child of it is shut**; ~~#122 (epic) → #123/#124/#125/#126/#159/#128/#127~~ — **the whole epic is closed**; ~~#129 (epic) → #130/#132/#133/#134/#135~~ — **all closed**
@@ -529,6 +532,12 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 72 — 2026-08-28: the site moved behind the gate, and signing in became once per browser
+
+- **The cutover ran.** `floodwarning.net` and `www` now serve from Cloudflare with Access in front. The dashboard's git-connect flow required a deploy command, answered by a new root `wrangler.toml` (assets-only, the whole tree, name `meganet`) plus `.assetsignore`; `docs/floodwarning-net.md` steps 2, 5 and 6 were rewritten to match the flow that actually shipped — including the door the deploy itself opened (`meganet.<account>.workers.dev`, closing documented in step 6) and the `www.` pair the Supabase redirect lists did not know about. GitHub Pages stays up, deliberately, until the operator decides.
+- **The second sign-in is per-device now.** `auth.js` keeps the session in `localStorage`; the per-tab trade it replaced was re-judged by the operator once every page sat behind the gate, and the comment at the top of `auth.js` records the new one. `datastore.js`'s bare-token mirror deliberately stays per-tab. `npm run check` / `names` / `toplevel` / `smoke` all green after the flip.
+- **#173 opened** — `[Standalone]` `[Fable5/High]`, the real fix: a Worker route exchanges the gate's own verified identity for the GoTrue session, so the second sign-in happens zero times instead of once per browser. Sequencing item 25; Fable5 column refilled. #158 stays open — the email flow remains the fallback until GitHub Pages retires.
 
 ### Revision 71 — 2026-08-24: 0022 and 0024 applied, and the database fetched one of them itself
 

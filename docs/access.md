@@ -106,8 +106,10 @@ somebody who has bypassed Cloudflare entirely by using the github.io URL.
 
 - The sign-in panel (`Auth` in `auth.js`) asks Supabase Auth (GoTrue) to email a
   link and a six-digit code. No password is stored anywhere, because none exists.
-- Verifying mints a JWT. The app keeps it in `sessionStorage` and sends it as a
-  bearer token on every write.
+- Verifying mints a JWT. The app keeps the session in `localStorage` — signing
+  in is once per browser, a trade re-judged when the site went behind Access
+  and recorded at the top of `auth.js` — and sends it as a bearer token on
+  every write.
 - `meganet.is_editor()` — see `0004_station_writes.sql` — decides. It refuses
   `anon` unconditionally, and for an authenticated request it checks the token's
   verified email against **`meganet.editor_allow`**.
