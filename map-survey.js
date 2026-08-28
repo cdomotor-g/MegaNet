@@ -21,6 +21,14 @@
 // divIcon marker is styled from styles.css (var(--map-survey)) rather than
 // drawn into an SVG with a colour baked in at fetch time, so a theme switch
 // repaints it for free.
+//
+// Pointer interaction is delegated through the map's own click and mousemove,
+// hit-tested against the drawn points, for the reason MapRivers' pointer-
+// conventions header records as a discovered fact: the shared pins-and-links
+// canvas lives in the overlay pane ABOVE this one and owns every DOM event on
+// the map, so a tooltip or popup bound to a marker in this pane is bound to
+// nothing. The markers are therefore explicitly non-interactive, and the
+// hover name and callout ride the map-level hit test instead.
 const MapSurvey = (function () {
   // The full survey-control service. Several sublayers (CORS, survey control
   // marks split by datum, AHD heights split by how they were derived,
@@ -52,24 +60,33 @@ const MapSurvey = (function () {
   const TIMEOUT_MS   = 20000;
   const BBOX_STEP    = 0.05;   // deg (~5 km) — tighter than rivers' 0.25, points are denser
   const BBOX_MAX     = 3;      // deg — a belt-and-braces backstop behind MIN_ZOOM
-  const PER_LAYER_CAP = 200;   // resultRecordCount asked of each sublayer query
   const MAX_MARKS    = 400;    // rendered per view, across every sublayer combined
+  const HIT_PX       = 8;      // px around a mark that the map-level hover/click hit-test accepts
   const CACHE_MAX    = 30;
   const FAIL_TTL     = 60000;
 
   let map = null, layer = null, timer = null, seq = 0, failedAt = 0;
   let resolved = null, resolving = null;   // sublayer resolution — see resolveLayers()
+  let drawnKey = null;       // which cache entry is on the map, so a pan is not a redraw
+  let drawnPoints = [];      // what draw() put there — the map-level hit test reads these
+  let projected = null;      // drawnPoints in layer space, rebuilt on zoom
+  let hoverTip = null, cursorSet = false, moveRaf = null;
+  let popup = null;          // the open callout, if any — ours to close on clear
   const cache = new Map();   // 's,w,n,e' → { points, capped, total }
   let note = { kind: 'off', drawn: 0, total: 0, capped: false };
 
-  // Best-effort field matching. The environment this was built in can't reach
-  // spatial-gis.information.qld.gov.au (see #119's "shared open risk"), so the
-  // exact attribute names on each sublayer were never confirmed — these are
-  // patterns broad enough to catch the field-naming conventions Queensland's
-  // other open-data services use, not names lifted from a live response.
-  // Flagged for the live-browser spot-check #119 asks for.
-  const REGISTER_KEYS = [/^reg(ister)?[_ ]?no/i, /^mark[_ ]?no/i, /^psm[_ ]?no/i, /station[_ ]?name/i, /^name$/i, /^label$/i];
-  const AHD_KEYS       = [/ahd/i];
+  // Field matching, checked against the live service (the spot-check #119
+  // asks for). Every attribute on the SurveyControl sublayers arrives
+  // join-prefixed — 'sirpub.prop.qld_surveycontrol_scdb.mrk_id',
+  // '…scdb.ahdheight' — so the first patterns anchor on the key's *last*
+  // segment rather than its start; the broader unanchored ones stay behind
+  // them for the fallback layer, whose field names were never captured.
+  const REGISTER_KEYS = [/(^|\.)mrk_id$/i, /(^|\.)reg(ister)?[_ ]?no/i, /(^|\.)mark[_ ]?no/i, /(^|\.)psm[_ ]?no/i, /station[_ ]?name/i, /(^|\.)name$/i, /(^|\.)label$/i];
+  // The exact live field first, and nothing looser than "ahd height" behind
+  // it: the same rows carry 'ahdadj_dt', an epoch-milliseconds adjustment
+  // date that a bare /ahd/ numeric pick can land on whenever 'ahdheight' is
+  // null — and a date printed as "m AHD" is worse than no height at all.
+  const AHD_KEYS       = [/(^|\.)ahdheight$/i, /ahd[_ ]?height/i];
 
   function pickField(attrs, patterns) {
     if (!attrs) return null;
@@ -132,6 +149,12 @@ const MapSurvey = (function () {
         const mark = [], cors = [];
         for (const l of layers) {
           const name = l.name || '';
+          // Only real feature layers are worth asking. The service also lists
+          // Group Layers ('Survey control marks', 'GDA coordinates') whose
+          // names pass the tests below but whose /query endpoint can only
+          // answer with a 400 error body — asked anyway, they just burn a
+          // request and vanish into the per-sublayer catch.
+          if (l.type && l.type !== 'Feature Layer') continue;
           if (/destroyed/i.test(name) || /cadastral/i.test(name)) continue;
           if (/cors/i.test(name)) cors.push(l.id);
           else if (/(gda|control mark|survey control)/i.test(name)) mark.push(l.id);
@@ -147,6 +170,14 @@ const MapSurvey = (function () {
     return resolving;
   }
 
+  // Deliberately NO resultRecordCount here. The live SurveyControl feature
+  // layers (ArcGIS 11.5, joined tables) answer any query carrying that
+  // parameter with an empty feature set — HTTP 200, no error field, nothing
+  // for askJson to throw on — so a per-layer cap sent to the server made
+  // every mark invisible while the note kept counting the CORS sites, the
+  // one sublayer that honours the parameter. Nothing unbounded gets through
+  // without it: the server still stops at its own maxRecordCount, and
+  // MAX_MARKS caps what run() will draw.
   function queryUrl(base, id, b) {
     const params = new URLSearchParams({
       f: 'json', where: '1=1',
@@ -155,7 +186,6 @@ const MapSurvey = (function () {
       inSR: '4326', outSR: '4326',
       spatialRel: 'esriSpatialRelIntersects',
       outFields: '*', returnGeometry: 'true',
-      resultRecordCount: String(PER_LAYER_CAP),
     });
     return `${id == null ? base : `${base}/${id}`}/query?${params}`;
   }
@@ -204,6 +234,11 @@ const MapSurvey = (function () {
   // while the toggle is — the same "claim it while you're using it" reading
   // the legend entry already applies via active().
   function clearLayer() {
+    if (popup) { popup.remove(); popup = null; }
+    clearHover();
+    drawnKey = null;
+    drawnPoints = [];
+    projected = null;
     if (!layer) return;
     layer.remove();
     layer = null;
@@ -211,8 +246,13 @@ const MapSurvey = (function () {
     rerenderMapLegend();
   }
 
-  function draw(points) {
+  function markLabel(p) {
+    return p.register || (p.category === 'cors' ? 'CORS site' : 'Survey mark');
+  }
+
+  function draw(points, key) {
     clearLayer();
+    drawnKey = key || null;
     if (!map || !points.length) return;
     layer = L.layerGroup().addTo(map);
     if (map.attributionControl) map.attributionControl.addAttribution(ATTRIBUTION);
@@ -224,23 +264,103 @@ const MapSurvey = (function () {
         iconSize:   isCors ? [14, 13] : [10, 9],
         iconAnchor: isCors ? [7, 10]  : [5, 7],
       });
-      const label = p.register || (isCors ? 'CORS site' : 'Survey mark');
-      const m = L.marker([p.lat, p.lon], { pane: PANE, icon }).addTo(layer);
-      m.bindTooltip(esc(label), { direction: 'top', offset: [0, -10] });
-      m.bindPopup(`
-        <strong>${esc(label)}</strong><br>
+      // Explicitly non-interactive, with nothing bound to the marker: the
+      // shared pins-and-links canvas above this pane owns every DOM event on
+      // the map (the header, and MapRivers' pointer conventions), so a
+      // tooltip or popup bound here would be unreachable. The hover name and
+      // the callout ride the map-level hit test below instead.
+      L.marker([p.lat, p.lon], { pane: PANE, icon, interactive: false, keyboard: false }).addTo(layer);
+    }
+    drawnPoints = points;
+    reproject();
+    rerenderMapLegend();
+  }
+
+  // ── Delegated hover and callout — MapRivers' pattern, on points ───────────
+  // Layer points survive a pan and change on zoom, so zoomend is the one
+  // reprojection trigger, exactly as in map-rivers.js. Points are cheaper
+  // than polylines: nearest drawn mark within HIT_PX, no bounding boxes.
+
+  function reproject() {
+    projected = null;
+    if (!map || !drawnPoints.length) return;
+    projected = drawnPoints.map(p => ({ p, pt: map.latLngToLayerPoint([p.lat, p.lon]) }));
+  }
+
+  function markAtPoint(layerPt) {
+    if (!projected) return null;
+    let best = null, bestD = HIT_PX * HIT_PX;
+    for (const m of projected) {
+      const dx = m.pt.x - layerPt.x, dy = m.pt.y - layerPt.y;
+      const d = dx * dx + dy * dy;
+      if (d <= bestD) { bestD = d; best = m.p; }
+    }
+    return best;
+  }
+
+  function clearHover() {
+    if (hoverTip) { hoverTip.remove(); hoverTip = null; }
+    if (cursorSet && map) { map.getContainer().style.cursor = ''; cursorSet = false; }
+  }
+
+  function onMapClick(e) {
+    if (!layer) return;
+    if (state.draw.tool) return;                    // an armed draw tool owns the click
+    if (state.link && state.link.picking) return;   // so does a link-budget pick
+    const p = markAtPoint(e.layerPoint);
+    if (!p) return;
+    const isCors = p.category === 'cors';
+    if (popup) { popup.remove(); popup = null; }
+    popup = L.popup({ maxWidth: 260 })
+      .setLatLng([p.lat, p.lon])
+      .setContent(`
+        <strong>${esc(markLabel(p))}</strong><br>
         <span class="mn-pop-line">${isCors ? 'CORS site' : 'Survey control mark'}</span><br>
         <span class="mn-pop-line">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span>
         ${p.ahd != null ? `<br><span class="mn-pop-line">${p.ahd} m AHD</span>` : ''}
-      `, { maxWidth: 260 });
-    }
-    rerenderMapLegend();
+      `)
+      .openOn(map);
+  }
+
+  function onMapMove(e) {
+    if (!layer || moveRaf) return;
+    moveRaf = requestAnimationFrame(() => {
+      moveRaf = null;
+      if (!map || !layer) return;
+      const p = state.draw.tool ? null : markAtPoint(e.layerPoint);
+      if (!p) { clearHover(); return; }
+      map.getContainer().style.cursor = 'pointer';
+      cursorSet = true;
+      // Anchored on the mark itself rather than the pointer, so the name
+      // floats over the pin the way the old marker-bound tooltip meant to.
+      if (!hoverTip) {
+        hoverTip = L.tooltip({ className: 'mn-survey-label', direction: 'top',
+                               offset: [0, -10], interactive: false })
+          .setContent(esc(markLabel(p))).setLatLng([p.lat, p.lon]).addTo(map);
+      } else {
+        hoverTip.setLatLng([p.lat, p.lon]).setContent(esc(markLabel(p)));
+      }
+    });
+  }
+
+  // Only what the viewport actually shows counts as "in view". The fetch's
+  // bbox is rounded outward up to BBOX_STEP (~5 km) past the screen edges,
+  // and counting everything fetched let the note claim "1 mark in view"
+  // while the one mark sat in that off-screen margin — the most confusing
+  // face of the invisible-marks bug. The off-screen points still draw, so a
+  // small pan reveals them without a refetch; they just aren't counted.
+  function inViewCount(points) {
+    if (!map) return 0;
+    const b = map.getBounds();
+    let n = 0;
+    for (const p of points) if (b.contains([p.lat, p.lon])) n++;
+    return n;
   }
 
   function setNote(kind, entry) {
     note = {
       kind,
-      drawn:  entry ? entry.points.length : 0,
+      drawn:  entry ? inViewCount(entry.points) : 0,
       total:  entry ? entry.total : 0,
       capped: !!(entry && entry.capped),
     };
@@ -271,7 +391,16 @@ const MapSurvey = (function () {
 
     const key = [b.s, b.w, b.n, b.e].map(v => v.toFixed(2)).join(',');
     const hit = cacheGet(key);
-    if (hit) { draw(hit.points); setNote('ok', hit); return; }
+    if (hit) {
+      // A pan inside the same rounded bbox is not a redraw (MapRivers' A2
+      // shortcut): the marks on screen already are this entry, so only the
+      // note's in-view count moves. This is also what lets a callout's
+      // auto-pan survive — tearing the layer down here would take the open
+      // popup with it on the very moveend that opened it.
+      if (key !== drawnKey || !layer) draw(hit.points, key);
+      setNote('ok', hit);
+      return;
+    }
     if (Date.now() - failedAt < FAIL_TTL) { clearLayer(); setNote('fail'); return; }
 
     const mine = ++seq;
@@ -289,7 +418,7 @@ const MapSurvey = (function () {
         const capped = all.length > MAX_MARKS;
         const entry = { points: capped ? all.slice(0, MAX_MARKS) : all, capped, total: all.length };
         cachePut(key, entry);
-        draw(entry.points);
+        draw(entry.points, key);
         setNote('ok', entry);
       });
     }).catch(() => {
@@ -310,12 +439,23 @@ const MapSurvey = (function () {
       map = m;
       if (!m.getPane(PANE)) m.createPane(PANE).style.zIndex = PANE_Z;
       m.on('moveend', sync);
+      // The delegated interaction — see the header for why the markers
+      // themselves cannot take these. Same trio as MapRivers.attach().
+      m.on('click', onMapClick);
+      m.on('mousemove', onMapMove);
+      m.on('zoomend', reproject);
       sync();
     },
 
     detach() {
       clearTimeout(timer);
-      if (map) map.off('moveend', sync);
+      if (moveRaf) { cancelAnimationFrame(moveRaf); moveRaf = null; }
+      if (map) {
+        map.off('moveend', sync);
+        map.off('click', onMapClick);
+        map.off('mousemove', onMapMove);
+        map.off('zoomend', reproject);
+      }
       clearLayer();
       map = null;
       seq++;
