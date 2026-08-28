@@ -127,8 +127,13 @@ const Auth = (function () {
     } catch (_) {
       // A refresh token is single-use and expires; a failure here means the
       // session is over, and pretending otherwise leaves the app showing a name
-      // for someone the database will refuse. Sign out quietly — nobody asked
-      // for this request, so nobody is waiting for an error about it.
+      // for someone the database will refuse. Behind the gate that is not the
+      // end of anything — Access can prove who this is again without a person
+      // typing — so try that before giving up.
+      const s = await gateSession();
+      if (s) { adopt(s); return true; }
+      // Sign out quietly — nobody asked for this request, so nobody is waiting
+      // for an error about it.
       await signOut({ announce: false });
       return false;
     }
@@ -185,6 +190,44 @@ const Auth = (function () {
       // header simply does not claim to know who they are.
       return null;
     }
+  }
+
+  // ── the gate ──
+  //
+  // Cloudflare Access proved who this is before the page loaded. Asking a second
+  // time was friction, not security: `meganet.editor_allow` is the Access policy
+  // written again, so everyone the door admits is already an editor.
+  // worker/index.js verifies that proof against Access's own public keys and
+  // mints an ordinary Supabase session from it; this is the browser half.
+  //
+  // What does *not* change is who may write. The token minted is the person's,
+  // not the Worker's, so meganet.is_editor() reads it exactly as it reads one
+  // from the email flow and meganet.actor() still attributes the save.
+  //
+  // Every failure is silent, because none of the common ones is a fault: 401 on
+  // an origin Access does not cover (github.io, workers.dev, file://), 404 where
+  // no Worker is deployed, 503 before its secrets are set, 403 for an address
+  // the gate admits and the editors list does not. All of them mean the same
+  // thing to the app — no gate here — and leave the email flow below in charge.
+  const NO_GATE_KEY = 'meganet.no-gate';
+
+  function gateSuppressed() {
+    try { return sessionStorage.getItem(NO_GATE_KEY) === '1'; } catch (_) { return false; }
+  }
+
+  async function gateSession() {
+    if (location.protocol === 'file:' || gateSuppressed()) return null;
+    try {
+      const res = await fetch('/api/session', { method: 'POST', cache: 'no-store' });
+      if (!res.ok) return null;
+      const body = await res.json();
+      if (!body || !body.access_token) return null;
+      const s = fromTokenResponse(body, body.email);
+      // Remembered so the panel can say how this session was obtained, and so
+      // signing out can explain what it does and does not undo.
+      s.via = 'gate';
+      return s;
+    } catch (_) { return null; }
   }
 
   // ── sign in ──
@@ -309,8 +352,17 @@ const Auth = (function () {
     return `Could not send the code — ${m}`;
   }
 
-  async function signOut({ announce = true } = {}) {
+  // `suppressGate` follows `announce` because the two callers differ in exactly
+  // that way: a person clicking Sign out means it, and must not be signed back
+  // in by the gate a moment later; the internal callers (a refresh that failed,
+  // a token the database disowns) are cleaning up and should still be allowed
+  // to recover through the door. Per tab, because the gate *is* the identity
+  // now — leaving for good means logging out of Access, which the panel says.
+  async function signOut({ announce = true, suppressGate = announce } = {}) {
     const token = session && session.access_token;
+    if (suppressGate) {
+      try { sessionStorage.setItem(NO_GATE_KEY, '1'); } catch (_) { /* memory only */ }
+    }
     adopt(null);
     who = null;
     ui  = { step: 'email', email: '', code: '', busy: false, msg: null };
@@ -398,7 +450,11 @@ const Auth = (function () {
                 ? 'Edits to stations will be saved to the database and attributed to this address.'
                 : 'The database did not answer when asked what this session may do; saving will tell you.'
           }</p>
-          <p class="small">This session ends when this tab is closed.</p>
+          <p class="small">${
+            session && session.via === 'gate'
+              ? 'Signed in automatically, because this site is behind Cloudflare Access. Signing out here applies to this tab; to leave for good, log out of Access.'
+              : 'This session is remembered on this device until you sign out.'
+          }</p>
         </div>
         <div class="modal-foot">
           <button onclick="Auth.close()">Close</button>
@@ -510,9 +566,16 @@ const Auth = (function () {
       else if (s) store(null);
     }
     syncHeader();
-    if (!session) return;
 
     (async () => {
+      // Nothing stored, or nothing worth keeping. Ask the gate before the header
+      // offers a sign-in link to somebody who signed in at the door already.
+      if (!session) {
+        const s = await gateSession();
+        if (!s) return;
+        adopt(s);
+        syncHeader();
+      }
       if (session.expires_at <= Date.now() && !await refresh()) return;
       who = await whoami();
       // A token the database will not honour is worse than no token: the editor

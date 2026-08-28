@@ -12,7 +12,7 @@
     "toplevel": "node toplevel.mjs",
     "registry": "node registry.mjs",
     "concat": "node concat-verify.mjs",
-    "all": "npm run check && npm run names && npm run toplevel && npm run hfem && npm run smoke && npm run registry && npm run nav && npm run shell && npm run tabs && npm run rivers && npm run mapctl && npm run help && npm run insp && npm run maint && npm run history && npm run movepin && npm run claim",
+    "all": "npm run check && npm run names && npm run toplevel && npm run hfem && npm run smoke && npm run registry && npm run nav && npm run shell && npm run tabs && npm run rivers && npm run mapctl && npm run help && npm run insp && npm run maint && npm run history && npm run movepin && npm run claim && npm run gate",
     "rivers": "node rivers.mjs",
     "mapctl": "node mapctl.mjs",
     "hfem": "node hfem.mjs",
@@ -24,7 +24,8 @@
     "maint": "node maintenance.mjs",
     "history": "node history.mjs",
     "movepin": "node movepin.mjs",
-    "claim": "node claim.mjs"
+    "claim": "node claim.mjs",
+    "gate": "node gate-session.mjs"
   },
   "devDependencies": {
     "acorn": "8.15.0",

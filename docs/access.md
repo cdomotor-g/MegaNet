@@ -96,6 +96,62 @@ widening a domain rule for one contractor.
 
 ---
 
+## Between the layers — the gate signs you in (#173)
+
+There is one sign-in, not two. Layer 1 and Layer 2 both still decide exactly what
+they decided before; what changed is that nobody is asked twice.
+
+The two lists were always the same people. `editor_allow` is `@bom.gov.au` plus
+the owner — the Access policy written a second time — so the email-and-code panel
+was asking somebody who had just proved their identity at the door to prove it
+again to a different desk.
+
+`worker/index.js` closes that gap:
+
+1. Access attaches a signed identity token (`Cf-Access-Jwt-Assertion`) to every
+   request that gets through Layer 1.
+2. The Worker verifies it against the team's own public key set — signature,
+   `aud` (this application, not merely some application on this team), expiry
+   and issuer. `test/gate-session.mjs` asserts each of those refusals, because
+   every one of them fails *silently* if the verifier is wrong.
+3. It exchanges the verified address for an ordinary GoTrue session, using the
+   admin API with a key held as a Worker secret, and hands the browser the
+   session — not the secret.
+4. `auth.js` adopts it before drawing anything, so the header shows the person's
+   address and the sign-in panel never appears.
+
+**Nothing here weakens Layer 2, and it is worth being precise about why.** The
+token minted is *the person's*, not the Worker's: `role: authenticated` with
+their verified email, exactly the shape the email flow produced. So
+`meganet.is_editor()` still decides every write from the token's own claims, and
+`meganet.actor()` still records who made it — a save is attributed to the
+operator, never to the Worker. A service-role token, which would have bypassed
+every policy in the database, is deliberately *not* what the browser receives.
+
+**Why an ungated origin cannot use this.** A session is minted only for a request
+carrying an Access token the Worker has verified. `workers.dev`, the github.io
+copy and a local `file://` page carry none, get 401, and fall back to the
+email-and-code flow, which is still there and still works. That property is
+structural rather than configured: switching Access off does not quietly turn
+this into an open door, it turns it off.
+
+### Its three secrets
+
+Cloudflare dashboard → the `meganet` Worker → **Settings → Variables and
+Secrets**. All three as **Secrets** — a secret survives a redeploy, a plain
+variable can be overwritten by one.
+
+| Name | Where to find it |
+|---|---|
+| `SUPABASE_SECRET_KEY` | Supabase → Project Settings → API Keys → the `service_role` / secret key |
+| `ACCESS_TEAM_DOMAIN` | Zero Trust → Settings → the team domain, `<team>.cloudflareaccess.com` |
+| `ACCESS_AUD` | Zero Trust → Access → Applications → this app → Overview → **Application Audience (AUD) Tag** |
+
+Until all three are set the Worker answers 503 and the app shows the old
+sign-in panel. That is the designed failure: no breakage, just no improvement.
+
+---
+
 ## Layer 2 — Supabase Auth and the editors list
 
 This is the lock that matters. It is enforced inside Postgres, so it holds
@@ -104,6 +160,9 @@ somebody who has bypassed Cloudflare entirely by using the github.io URL.
 
 ### How it fits together
 
+- Behind Access the session arrives from the section above and none of this is
+  seen. What follows is the fallback path, which still serves the ungated
+  origins — and is the path every rule below is enforced on either way.
 - The sign-in panel (`Auth` in `auth.js`) asks Supabase Auth (GoTrue) to email a
   link and a six-digit code. No password is stored anywhere, because none exists.
 - Verifying mints a JWT. The app keeps the session in `localStorage` — signing

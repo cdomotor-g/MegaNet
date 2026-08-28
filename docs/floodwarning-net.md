@@ -145,6 +145,16 @@ the emailed *link* is affected. Typing the six-digit code from the same email
 verifies in place, with no redirect involved, so the code path working while
 the link path lands somewhere wrong is the signature of this list being stale.
 
+### 5a. Set the Worker's three secrets
+
+The app asks for one login, not two: `worker/index.js` exchanges the Cloudflare
+Access identity for the Supabase session. It needs three values, all set as
+**Secrets** on the Worker (Settings → Variables and Secrets) — the table and the
+reasoning are in [`access.md` → Between the layers](access.md#between-the-layers--the-gate-signs-you-in-173).
+
+Skip this and nothing breaks: the Worker answers 503 and the old email-and-code
+panel keeps working.
+
 ### 6. Retire the second door
 
 Once `floodwarning.net` serves the app and the gate works, GitHub Pages is a

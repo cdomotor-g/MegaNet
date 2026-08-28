@@ -1,13 +1,20 @@
 # Cloudflare deploy config. The dashboard's git-connect flow ("Workers Builds")
 # requires a deploy command — the default `npx wrangler deploy` — and that
-# command needs this file to know what to deploy. MegaNet is assets-only: no
-# Worker script (no `main`), the whole repository root served as static files,
-# same as GitHub Pages serves it. See docs/floodwarning-net.md.
+# command needs this file to know what to deploy. MegaNet is very nearly
+# assets-only — the whole repository root served as static files, same as GitHub
+# Pages serves it — plus the single Worker route named below.
+# See docs/floodwarning-net.md.
 #
 # `name` must exactly match the project name in the Cloudflare dashboard or
 # the build fails.
 name = "meganet"
 compatibility_date = "2026-08-27"
+
+# The one route that is not a static file: /api/session, which exchanges the
+# Cloudflare Access identity for a Supabase session so the app asks for one
+# login rather than two. Assets are still served first, so only paths that are
+# not files in this repo ever reach the Worker. See worker/index.js and #173.
+main = "worker/index.js"
 
 [assets]
 directory = "."

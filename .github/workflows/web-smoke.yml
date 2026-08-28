@@ -27,6 +27,10 @@ on:
       - 'styles.css'
       - 'stations.json'
       - 'test/**'
+      # The Access-to-Supabase exchange and the config that routes to it: the
+      # gate check is the only thing asserting the verifier still refuses (#173).
+      - 'worker/**'
+      - 'wrangler.toml'
       # The Inspections check reads its fixture out of the migration, so a
       # change to the matrix has to re-run it (#116).
       - 'db/migrations/**'
@@ -62,6 +66,10 @@ on:
       - 'styles.css'
       - 'stations.json'
       - 'test/**'
+      # The Access-to-Supabase exchange and the config that routes to it: the
+      # gate check is the only thing asserting the verifier still refuses (#173).
+      - 'worker/**'
+      - 'wrangler.toml'
       # The Inspections check reads its fixture out of the migration, so a
       # change to the matrix has to re-run it (#116).
       - 'db/migrations/**'
@@ -285,6 +293,17 @@ jobs:
       - name: Claim an address from the message that arrived on it
         working-directory: test
         run: npm run claim
+
+      # The only check here that guards a *server-side* door. worker/index.js
+      # turns a Cloudflare Access token into a Supabase session, so its verifier
+      # is what stands between the front gate and a token that can write. Each
+      # way past it — forged signature, another application's token, expired,
+      # `alg: none` — fails silently if the verifier is wrong: the app signs in
+      # and works, which is the problem. Keys are generated in-process, so this
+      # needs no network and no real team (#173).
+      - name: The gate's door check — the Access verifier refuses what it must
+        working-directory: test
+        run: npm run gate
 
       # Python, no browser, no dependencies, and the only check in this file
       # that is about a *data* artefact rather than about the app: #123's sheet
