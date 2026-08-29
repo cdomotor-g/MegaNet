@@ -530,7 +530,9 @@ const Auth = (function () {
     document.getElementById(ui.step === 'code' ? 'au-code' : 'au-email')?.focus();
   }
 
-  function onKey(e) { if (e.key === 'Escape') close(); }
+  // preventDefault claims the key (the Modal contract), so dismissing the
+  // sign-in cannot also drop a fullscreen map out from under it.
+  function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); close(); } }
 
   function close() {
     const root = document.getElementById('auth-modal');

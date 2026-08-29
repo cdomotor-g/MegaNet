@@ -47,6 +47,11 @@
   // only closes by picking a tab is a trap — Escape backs out of either.
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape' || !isPhoneNav()) return;
+    // Claim the key only when a drawer actually closes (the Modal contract):
+    // the fullscreen map's Escape stands down for a claimed key, and an
+    // Escape that closed nothing here should still be free to mean something
+    // to whoever else is listening.
+    if (!state.navCollapsed || !state.helpCollapsed) e.preventDefault();
     if (!state.navCollapsed)  setNavCollapsed(true);
     if (!state.helpCollapsed) setHelpCollapsed(true);
   });

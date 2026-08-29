@@ -220,6 +220,17 @@ jobs:
         working-directory: test
         run: npm run rivers
 
+      # The QLD SurveyControl service answers any query carrying
+      # resultRecordCount with an empty feature set — HTTP 200, no error field
+      # — so a per-layer cap made every mark invisible while the note counted
+      # the off-screen margin as "in view" (#120's live spot-check). The check
+      # stubs that exact quirk, plus the group layers that only 400 and the
+      # join-prefixed field names, and asserts the parameter stays gone, the
+      # marks draw, the count is honest, and the map-delegated callout works.
+      - name: Survey marks — drawn, counted honestly, reachable through the map
+        working-directory: test
+        run: npm run survey
+
       # The on-map panels (#164), and the one thing about them nothing else can
       # see. Every check above reaches the app through switchTab() and
       # page.evaluate(); this one moves a real pointer, clicks a real checkbox

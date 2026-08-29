@@ -3,6 +3,7 @@
   "scripts": [
     "maps-data.js",
     "core.js",
+    "map-controls.js",
     "app.js",
     "rf-changes.js",
     "workbench.js",
@@ -20,6 +21,7 @@
     "datastore.js",
     "export.js",
     "station-editor.js",
+    "station-inspections.js",
     "attachments.js",
     "inspections.js",
     "maintenance.js",
@@ -27,13 +29,19 @@
     "map-rivers.js",
     "map-survey.js",
     "map-contours.js",
+    "map-wind.js",
     "map-spider.js",
+    "map-backbone.js",
+    "map-blast.js",
     "map-locate.js",
+    "map-move-pin.js",
     "terrain.js",
+    "map-los.js",
     "modal.js",
     "packets.js",
     "alert2.js",
     "hfem.js",
+    "hfem-tab.js",
     "network-maps.js",
     "serial.js",
     "message-log.js",
@@ -41,6 +49,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 483,
-  "distinct": 483
+  "total": 525,
+  "distinct": 525
 }

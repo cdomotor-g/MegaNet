@@ -1517,7 +1517,7 @@ function renderStationsHtml() {
            leaves nothing on the left to keep a column for. The map is ~320 px
            wider on every screen as a result, which is the point. -->
       <div class="stack" id="stations-main">
-        <div class="panel map-panel">
+        <div class="panel map-panel${state.mapFullscreen ? ' is-full' : ''}">
           <!-- The map is a canvas: ~3,174 pins and ~3,141 link lines drawn as
                pixels, with no DOM per station to annotate. So it answers the
                chart pattern (design-system §3) rather than pretending to be
@@ -1631,6 +1631,75 @@ function setStationFiltersOpen(open) {
   localStorage.setItem('mn-filters', state.filtersOpen ? 'open' : 'closed');
 }
 
+// ── Full-screen map ──────────────────────────────────────────────────────────
+// Not a modal, and deliberately not Modal: Modal.close() wipes its innerHTML
+// down all three of its exits, which would destroy a live Leaflet map's DOM
+// mid-flight. Instead the existing .map-panel — the positioning anchor every
+// map overlay (map-note, ACMA and path cards, corner controls) already hangs
+// off — is fixed to the viewport with a class, so the whole working surface
+// comes along and the map object is never moved or rebuilt. The flag lives in
+// state so renderStationsHtml() re-emits the class across in-tab re-renders
+// (which rebuild the map); the Escape listener is transient and dies with the
+// map in stopStationsMap(), then syncMapFullEsc() in initMap() re-arms it.
+let mapFullEscListener = null;
+
+function toggleMapFullscreen(on) {
+  state.mapFullscreen = on == null ? !state.mapFullscreen : !!on;
+  const el = document.getElementById('leaflet-map');
+  const panel = el && el.closest ? el.closest('.map-panel') : null;
+  if (panel) panel.classList.toggle('is-full', state.mapFullscreen);
+  const b = document.querySelector('.mn-map-full');
+  if (b) syncMapFullBtn(b);
+  syncMapFullEsc();
+  // No CSS transition on the class, so the container is already its new size.
+  invalidateMapSizes(0);
+  announce(state.mapFullscreen
+    ? 'Map is full screen. Press Escape to exit.'
+    : 'Map back in the page.');
+}
+
+function syncMapFullBtn(b) {
+  const full = state.mapFullscreen;
+  b.textContent = '⛶';
+  b.setAttribute('aria-pressed', String(full));
+  const label = full ? 'Exit full screen (Escape)' : 'Full screen';
+  b.title = label;
+  b.setAttribute('aria-label', label);
+}
+
+function syncMapFullEsc() {
+  if (state.mapFullscreen && !mapFullEscListener) {
+    mapFullEscListener = e => {
+      // Modal's capture-phase handler preventDefaults Escape without stopping
+      // propagation — so a dialog opened over the full-screen map takes the
+      // key and the map stays full; only an unclaimed Escape exits. The other
+      // Escape consumers (bug reporter, draw tools, mem panel, sign-in, the
+      // phone drawers) claim the key the same way.
+      if (e.defaultPrevented) return;
+      if (e.key === 'Escape') { e.preventDefault(); toggleMapFullscreen(false); return; }
+      // Tab cycles within the panel while it owns the viewport — Modal's own
+      // walls, borrowed. Without this, Tab walks off into the station table,
+      // the nav and the mem-bar, all invisibly underneath the fixed panel
+      // (and the mem panel opens at z 1500, *below* it — a dialog a keyboard
+      // user could enter and never see).
+      if (e.key !== 'Tab') return;
+      const panel = document.querySelector('.map-panel.is-full');
+      if (!panel) return;
+      const items = [...panel.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])')]
+        .filter(n => n.offsetParent !== null);
+      if (!items.length) return;
+      const at = items.indexOf(document.activeElement);
+      if (e.shiftKey) { if (at <= 0) { e.preventDefault(); items[items.length - 1].focus(); } }
+      else if (at < 0 || at === items.length - 1) { e.preventDefault(); items[0].focus(); }
+    };
+    document.addEventListener('keydown', mapFullEscListener);
+  } else if (!state.mapFullscreen && mapFullEscListener) {
+    document.removeEventListener('keydown', mapFullEscListener);
+    mapFullEscListener = null;
+  }
+}
+
 // ── The Stations map's own controls (#164) ───────────────────────────────────
 // Map display, Draw & measure and the legend, as three icons in the map's
 // top-right corner under the base-map picker. They were three panels in the
@@ -1656,6 +1725,23 @@ function stationsMapPanels(map) {
     id: 'legend', icon: '🔑', title: 'Legend',
     html: () => `<div class="map-legend" id="map-legend">${mapLegendHtml()}</div>`,
   });
+
+  // Full screen — a plain corner button, not a MapChrome panel: it discloses
+  // nothing, it does one thing, and test/mapctl.mjs iterates .mn-mapctl
+  // wrappers, which this deliberately is not. Rebuilt with the map on every
+  // render; renderStationsHtml() emits the is-full class from state, so the
+  // button always sits inside a panel that already tells the truth.
+  const full = L.control({ position: 'topright' });
+  full.onAdd = () => {
+    const b = L.DomUtil.create('button', 'mn-mapctl-btn mn-map-full');
+    b.type = 'button';
+    syncMapFullBtn(b);
+    L.DomEvent.disableClickPropagation(b);
+    L.DomEvent.on(b, 'click', L.DomEvent.stop);
+    L.DomEvent.on(b, 'click', () => toggleMapFullscreen());
+    return b;
+  };
+  full.addTo(map);
 }
 
 // ── Map display block ────────────────────────────────────────────────────────
@@ -1736,6 +1822,18 @@ function mapDisplayControlsHtml() {
       </select>
     </label>
     <p class="filter-note" id="map-contour-note">${MapContours.noteHtml()}</p>
+    <label class="filter-check">
+      <input type="checkbox" ${state.mapWind ? 'checked' : ''}
+             onchange="MapWind.setEnabled(this.checked)">
+      Wind regions (AS/NZS 1170.2)
+    </label>
+    <p class="filter-note" id="map-wind-note">${MapWind.noteHtml()}</p>
+    <label class="filter-check">
+      <input type="checkbox" ${state.mapLos ? 'checked' : ''}
+             onchange="MapLos.setEnabled(this.checked)">
+      Check line of sight on links
+    </label>
+    <p class="filter-note" id="map-los-note">${MapLos.noteHtml()}</p>
     <label class="filter-field filter-field--spaced">
       <span>Station names</span>
       <select onchange="setMapLabelMode(this.value)">
@@ -1894,11 +1992,25 @@ function stopStationsMap() {
   MapRivers.detach();
   MapSurvey.detach();
   MapContours.detach();
+  MapWind.detach();
+  // Not a detach — MapLos holds no layer — but the same duty: the queue is
+  // for lines on the map this function is destroying, so clear it and bump
+  // the generation, or four-at-a-time terrain fetches carry on for minutes
+  // behind whatever tab replaced this one.
+  MapLos.newGeneration();
   state.map = removeMap(state.map);
   state.mapMarkers = [];
   state.mapLines   = [];
   // The old map (if any) owned these layer groups — they die with it.
   state.acma.layer = state.acma.beamLayer = state.acma.linkLayer = state.acma.hiLayer = null;
+  // The full-screen Escape listener dies with the map; the *flag* does not —
+  // initMap()'s syncMapFullEsc() re-arms it, and renderStationsHtml() has
+  // already re-emitted the is-full class, so full screen survives the in-tab
+  // re-renders that rebuild this map.
+  if (mapFullEscListener) {
+    document.removeEventListener('keydown', mapFullEscListener);
+    mapFullEscListener = null;
+  }
 }
 
 function initMap() {
@@ -1933,6 +2045,9 @@ function initMap() {
   // attach, because MapDraw.attach() can rerender its own panel and it has to
   // have somewhere to render it to.
   stationsMapPanels(state.map);
+  // Re-arm the full-screen Escape listener if the flag survived a rebuild —
+  // the class is already on the panel, renderStationsHtml() emitted it.
+  syncMapFullEsc();
   MapSpider.attach(state.map);
   MapLocate.attach(state.map);
   // Nothing on screen until it is armed from the editor card or a callout, so
@@ -1946,6 +2061,7 @@ function initMap() {
   MapRivers.attach(state.map);
   MapSurvey.attach(state.map);
   MapContours.attach(state.map);
+  MapWind.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
   // show on the map that has just been rebuilt.
   PathProfile.sync();
@@ -2057,6 +2173,8 @@ function refreshMapLayers({ skipFit = false } = {}) {
   state.mapLines.forEach(l => l.remove());
   state.mapMarkers = [];
   state.mapLines   = [];
+  // The lines those in-flight LOS checks were painting are gone with them.
+  MapLos.newGeneration();
 
   const located  = state.data.stations.filter(s => s.lat != null && s.lon != null);
   const active   = mapFilterActive();
@@ -2126,8 +2244,12 @@ function refreshMapLayers({ skipFit = false } = {}) {
       line.mnLinkStationId  = l.s.id;       // and lets repeater focus restyle in place
       line.mnLinkRepeaterId = l.r.id;
       line.mnBaseOpacity    = lineOp;
+      // What a restyle should put back when it lets go — MapLos may repaint
+      // this to the obstructed colour, and MapBlast restores to it.
+      line.mnBaseColor      = casing ? '#ffffff' : lineColor;
       line.on('click', MapBackbone.onLineClick);
       state.mapLines.push(line);
+      if (!casing) MapLos.classify(line, l.s, l.r);
     }
   }
 
@@ -2150,10 +2272,15 @@ function refreshMapLayers({ skipFit = false } = {}) {
       line.mnLinkRepeaterId  = p.a.id;
       line.mnLinkRepeaterId2 = p.b.id;
       line.mnBaseOpacity     = lineOp;
+      line.mnBaseColor       = casing ? '#ffffff' : backboneColor;
       line.on('click', MapBackbone.onLineClick);
       state.mapLines.push(line);
+      if (!casing) MapLos.classify(line, p.a, p.b);
     }
   }
+
+  // Every line is queued; now the four profile slots can work the whole list.
+  MapLos.kick();
 
   for (const s of stations) {
     const role   = primaryRole(s);
@@ -2219,6 +2346,14 @@ function refreshMapLayers({ skipFit = false } = {}) {
       ${idTypes.length ? `<span class="mn-pop-line">AlertID:</span><br>${idTypes.map(t =>
         `<span class="mn-pop-line mn-pop-indent">${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
       ${s.elevation_ahd != null ? `<span class="mn-pop-line">Elev: ${s.elevation_ahd} m AHD</span>` : ''}
+      ${(() => {
+        // Only when the wind layer has fetched its data — the callout claims a
+        // region only while the polygons that claim it are on hand, and being
+        // ~1 km simplified the claim stays indicative (MapWind's note says so).
+        const wr = MapWind.regionAt(s.lat, s.lon);
+        return wr ? `<br><span class="mn-pop-line">Wind region: ${esc(wr.region)}${
+          wr.area ? ` (${esc(wr.area)})` : ''} — indicative</span>` : '';
+      })()}
       ${acmaRepeaterPopupExtra(s)}
       <!-- Every action on this callout is a pill (#170): they are a row of
            equal things — two that move the map, one that arms the blast

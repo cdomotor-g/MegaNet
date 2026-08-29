@@ -1527,6 +1527,17 @@ const state = {
   // SoRT's experience picked as the sane fast one.
   mapContours:        false,
   mapContourInterval: '5',
+  // AS/NZS 1170.2 wind loading regions (see MapWind). Off by default and not
+  // persisted, for MapSurvey's reasons — it fetches a 650 KB file on enable.
+  mapWind:        false,
+  // Line-of-sight check on drawn links (see MapLos). Off by default and not
+  // persisted, for MapSurvey's reasons — it fetches terrain tiles on enable.
+  mapLos:         false,
+  // The map fills the viewport (see toggleMapFullscreen, app.js). Session-only
+  // for mapSurvey's reasons: full screen is something an operator is doing
+  // right now, not a standing preference — and a page that *opens* with a
+  // full-screen map has hidden its own navigation.
+  mapFullscreen:  false,
   // Which on-map control panels (see MapChrome, map-controls.js) the operator
   // has pinned open. Persisted, and the one thing about those panels that is:
   // a pin is a standing preference about how this operator reads a map, not

@@ -261,7 +261,9 @@ const MemMeter = (function () {
     }
   }
 
-  function onKey(e) { if (e.key === 'Escape') closePanel(); }
+  // preventDefault claims the key (the Modal contract), so dismissing this
+  // panel cannot also drop a fullscreen map out from under it.
+  function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); closePanel(); } }
 
   function closePanel() {
     panelOpen = false;

@@ -201,7 +201,7 @@ function renderBitFlipperResults() {
     const hit = ms.length > 0;
     const dash = '<span class="txt-muted">—</span>';
     const stationBadges = hit
-      ? [...new Set(ms.map(m => m.station.name))].map(n => `<span class="badge">${esc(n)}</span>`).join(' ')
+      ? [...new Set(ms.map(m => m.station.name))].map(n => `<span class="badge badge--field">${esc(n)}</span>`).join(' ')
       : dash;
     const sensorTypes = hit ? ms.map(m => esc(m.sensor.type)).join('<br>') : dash;
     const sensorIds   = hit ? ms.map(m => esc(m.sensor.sensor_id || '—')).join('<br>') : dash;

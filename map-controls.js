@@ -73,8 +73,11 @@ function makeBaseLayers() {
     'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors', maxZoom: 19,
     }),
+    // The labels credit covers the two Reference/* services that ride along
+    // with the imagery (see the label layers in addBaseLayers) — they carry no
+    // attribution of their own because they are only ever on when this is.
     'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+      attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community | Labels © Esri, HERE, Garmin, © OpenStreetMap contributors',
       maxZoom: 19,
     }),
   };
@@ -94,8 +97,46 @@ function addBaseLayers(map) {
   const layers  = makeBaseLayers();
   const names   = Object.keys(layers);
   const group   = `mn-base-${MapChrome.uid()}`;   // radios only group within one map
+
+  // ── Names over the imagery ─────────────────────────────────────────────────
+  // The Satellite layer is bare imagery — no town names, no roads — which
+  // makes it near-useless for orienting around a station. These two Esri
+  // reference services, from the same host as the imagery itself, paint the
+  // missing names over it: Boundaries_and_Places carries localities and place
+  // names down to street level, Transportation carries roads with their names
+  // and route shields. Both serve native tiles past our maxZoom of 19.
+  //
+  // Esri's third reference service, World_Reference_Overlay, was tried and
+  // rejected: it repeats the place names and roads these two already draw
+  // (misregistered doubles read as a bug), its tiles stop at level 13 and go
+  // blank over Australia from about level 9 anyway. River names are already
+  // better served on the Stations map by the Waterways overlay (map-rivers.js),
+  // which labels every named river in view and draws above these tiles.
+  //
+  // They live in their own pane just above Leaflet's tilePane (200) so they
+  // cover the imagery but stay under every overlay — the overlay budget
+  // (map-survey.js) starts at mnContours' 335. Add/remove tracks the picker
+  // exactly: these are on when — and only when — Satellite is the base.
+  if (!map.getPane('mnBaseLabels')) {
+    map.createPane('mnBaseLabels').style.zIndex = 250;
+  }
+  const satLabels = [
+    'Reference/World_Boundaries_and_Places',
+    'Reference/World_Transportation',
+  ].map(svc => L.tileLayer(
+    `https://server.arcgisonline.com/ArcGIS/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`,
+    { pane: 'mnBaseLabels', maxZoom: 19 }   // attribution rides on the Satellite layer
+  ));
+  function syncSatLabels() {
+    for (const l of satLabels) {
+      if (current === 'Satellite') { if (!map.hasLayer(l)) l.addTo(map); }
+      else if (map.hasLayer(l)) map.removeLayer(l);
+    }
+  }
+
   let current   = names[0];
   layers[current].addTo(map);
+  syncSatLabels();   // a no-op while the default is OSM-Topo, correct if it ever isn't
 
   MapChrome.panel(map, {
     id:    'basemap',
@@ -105,7 +146,8 @@ function addBaseLayers(map) {
       <label class="filter-check">
         <input type="radio" name="${group}" value="${escAttr(n)}" ${n === current ? 'checked' : ''}>
         ${esc(n)}
-      </label>`).join(''),
+      </label>`).join('') +
+      `<p class="filter-note">Satellite includes place &amp; road names.</p>`,
     // A real listener rather than an inline handler: `layers` is this map's own
     // set of tile layers and there is no global to reach it through.
     onMount(body) {
@@ -115,6 +157,7 @@ function addBaseLayers(map) {
         map.removeLayer(layers[current]);
         layers[name].addTo(map);
         current = name;
+        syncSatLabels();
       });
     },
   });

@@ -111,6 +111,31 @@ const MessageLog = (() => {
       title: 'How many times this reading was heard in total. Three copies is one transmission heard direct and via two repeaters — the network working.' },
   ];
 
+  // The table wrapper's height, as three named steps rather than a drag edge —
+  // a draggable edge on a box that already scrolls two ways is a fight with the
+  // scrollbar, and three sizes cover the three postures: the shared 42vh cap
+  // every other tall table gets, most of a screen, and nearly all of one. Tall
+  // is the default because this tab *is* its rows and 42vh shows barely a
+  // dozen of them. Max stops short of 100vh so the header and filters stay in
+  // reach above a table that scrolls inside itself anyway. Each entry is
+  // [key, label, height, title]; the key is what `mn-ml-height` remembers.
+  const ML_HEIGHTS = [
+    ['short', 'Short', '42vh', 'The shared table height — a dozen rows, most of the page left for the filters'],
+    ['tall',  'Tall',  '68vh', 'Most of the screen for rows — the default here'],
+    ['max',   'Max',   '85vh', 'Nearly the whole screen; the table scrolls inside itself, so the filters stay reachable above it'],
+  ];
+
+  // Floors for a dragged column, in pixels. The general floor is about three
+  // characters plus the cell padding — enough to keep a column findable rather
+  // than readable, which is the dragger's choice to make. Time gets its own,
+  // much higher floor: its cell is the row's expand button, and a timestamp
+  // clipped to "2026-08-…" takes the keyboard path's label with it. The
+  // ceiling only exists so a slip of the hand cannot park a kilometre of one
+  // column in localStorage.
+  const ML_COLW_MIN    = 44;
+  const ML_COLW_MIN_TS = 160;
+  const ML_COLW_MAX    = 1000;
+
   // Carrier repeaters on the tray map take the Stations tab's dashed-cyan
   // treatment: cyan means "a pass range pulled this in", never "you named it".
   const ML_CARRIER_RING = '#00acc1';
@@ -127,6 +152,32 @@ const MessageLog = (() => {
       if (!raw) return null;
       const keys = JSON.parse(raw).filter(k => ML_COLS.some(c => c.key === k));
       return keys.length ? [...new Set(['ts', ...keys])] : null;
+    } catch (_) { return null; }
+  }
+
+  // Dragged column widths, remembered the way the column sets are: per view,
+  // because narrow and wide are different tables to the eye and a width picked
+  // for one is wrong in the other. Keyed by ML_COLS key so a hidden column
+  // keeps its width for the day it is shown again. Anything that is not a
+  // positive number — old data, hand-edited storage — is dropped on the way in.
+  function storedWidths(view) {
+    try {
+      const raw = localStorage.getItem(`mn-ml-colw-${view}`);
+      if (!raw) return null;
+      const stored = JSON.parse(raw);
+      const out = {};
+      for (const c of ML_COLS) {
+        const n = Number(stored[c.key]);
+        if (Number.isFinite(n) && n > 0) out[c.key] = Math.round(n);
+      }
+      return out;
+    } catch (_) { return null; }
+  }
+
+  function storedHeight() {
+    try {
+      const k = localStorage.getItem('mn-ml-height');
+      return ML_HEIGHTS.some(h => h[0] === k) ? k : null;
     } catch (_) { return null; }
   }
 
@@ -157,6 +208,12 @@ const MessageLog = (() => {
       narrow: storedCols('narrow') || defaultCols('narrow'),
       wide:   storedCols('wide')   || defaultCols('wide'),
     },
+    colw: {
+      narrow: storedWidths('narrow') || {},
+      wide:   storedWidths('wide')   || {},
+    },
+    height: storedHeight() || 'tall',  // an ML_HEIGHTS key
+    colDrag: null,   // { key, w } while a column grip is held; gates re-renders
     sel:      new Set(),   // selected row keys — what the tray maps
     openKey:  null,        // the one row whose detail drawer is open
     focusKey: null,        // a row a deep link asked for; opened when it arrives
@@ -464,6 +521,12 @@ const MessageLog = (() => {
                         title="The full record — protocol, transport, ingress path, copies"
                         onclick="MessageLog.setView('wide')">Wide</button>
               </span>
+              <span class="ml-viewswitch" role="group" aria-label="Table height">
+                ${ML_HEIGHTS.map(([k, label, , title]) => `
+                <button class="ml-seg${ml.height === k ? ' ml-seg--on' : ''}"
+                        aria-pressed="${ml.height === k}" title="${escAttr(title)}"
+                        onclick="MessageLog.setHeight('${k}')">${esc(label)}</button>`).join('')}
+              </span>
               ${colChooserHtml()}
               <button class="ml-btn" onclick="MessageLog.exportCsv()"
                       title="Every fetched row, every column, whatever the views are showing">Export CSV</button>
@@ -576,6 +639,8 @@ const MessageLog = (() => {
             </label>`).join('')}
           <button class="ml-btn" onclick="MessageLog.resetCols()"
                   title="Back to the default set for this view">Reset</button>
+          <button class="ml-btn" onclick="MessageLog.resetWidths()"
+                  title="Forget the dragged column widths for this view — back to sharing the space evenly">Reset widths</button>
         </div>
       </details>`;
   }
@@ -692,17 +757,33 @@ const MessageLog = (() => {
     }
     const cols = visibleCols();
     const all = ml.rows.every(r => ml.sel.has(rowKey(r)));
+    // Height rides on the wrapper as a custom property (the --dot pattern:
+    // the system reaching the element), read by the CSS var the ml wrapper's
+    // max-height rule takes. Widths ride on <col> elements — the one place an
+    // inline width is sanctioned — so table-layout:fixed honours them above
+    // 900px and the phone pass's `col { width:auto !important }` neutralises
+    // them below, exactly as it already does for every static colgroup. The
+    // grip is pointer furniture only, aria-hidden so the th keeps its label;
+    // the Columns chooser remains the keyboard path to a readable table.
+    const widths = ml.colw[ml.view];
+    const hEntry = ML_HEIGHTS.find(h => h[0] === ml.height) || ML_HEIGHTS[1];
     return `
-      <div class="table-wrap tall" role="region" tabindex="0" aria-label="The message log — one row per reading the datastore accepted">
+      <div class="table-wrap tall" role="region" tabindex="0" style="--ml-h:${hEntry[2]}"
+           aria-label="The message log — one row per reading the datastore accepted">
         <table class="ml-table">
           <caption class="sr-only">Messages received by the datastore, one row per reading, ${esc(ml.q.order.startsWith('received') ? 'in arrival order' : 'in reading order')}</caption>
+          <colgroup>
+            <col>
+            ${cols.map(c => `<col data-mlcol="${c.key}"${widths[c.key] ? ` style="width:${widths[c.key]}px"` : ''}>`).join('')}
+          </colgroup>
           <thead><tr>
             <th scope="col" class="ml-pick">
               <input type="checkbox" ${all && ml.rows.length ? 'checked' : ''}
                      aria-label="Select every fetched message for the map"
                      onchange="MessageLog.selAll(this.checked)">
             </th>
-            ${cols.map(c => `<th scope="col" title="${escAttr(c.title)}">${esc(c.label)}</th>`).join('')}
+            ${cols.map(c => `<th scope="col" title="${escAttr(c.title)}">${esc(c.label)}<span class="ml-col-grip" aria-hidden="true"
+                onpointerdown="MessageLog.colGrip(event, '${c.key}')"></span></th>`).join('')}
           </tr></thead>
           <tbody>${ml.rows.map(r => rowHtml(r, cols)).join('')}</tbody>
         </table>
@@ -710,6 +791,12 @@ const MessageLog = (() => {
   }
 
   function renderTable() {
+    // A repaint mid-drag destroys the captured grip, and a removed capture
+    // target gets no pointerup — so any drag still held is committed first,
+    // or ml.colDrag would stay set forever and silently gate the Follow poll
+    // for the rest of the session. The gesture visually ends here; the width
+    // it had reached is kept.
+    commitColDrag();
     const el = document.getElementById('ml-table');
     if (el) el.innerHTML = tableHtml();
   }
@@ -1201,7 +1288,9 @@ const MessageLog = (() => {
   function armFollow() {
     disarmFollow();
     ml.followTimer = setInterval(() => {
-      if (!ml.loading && state.activeTab === 'msglog') run({ silent: true });
+      // Not while a column grip is held: run() ends in renderTable(), which
+      // would replace the very elements the pointer capture is dragging.
+      if (!ml.loading && !ml.colDrag && state.activeTab === 'msglog') run({ silent: true });
     }, ML_FOLLOW_MS);
   }
 
@@ -1232,6 +1321,76 @@ const MessageLog = (() => {
     ml.cols[ml.view] = defaultCols(ml.view);
     try { localStorage.removeItem(`mn-ml-cols-${ml.view}`); } catch (_) {}
     rerender();
+  }
+
+  function setHeight(k) {
+    ml.height = ML_HEIGHTS.some(h => h[0] === k) ? k : 'tall';
+    try { localStorage.setItem('mn-ml-height', ml.height); } catch (_) {}
+    rerender();
+  }
+
+  function resetWidths() {
+    ml.colw[ml.view] = {};
+    try { localStorage.removeItem(`mn-ml-colw-${ml.view}`); } catch (_) {}
+    renderTable();
+  }
+
+  // The one committer for a held column drag. Idempotent, because it has
+  // three callers with overlapping lifetimes: the grip's own release (or its
+  // lostpointercapture, which is all a grip removed from the DOM ever gets),
+  // and the top of renderTable(), which absorbs the race where a repaint
+  // lands mid-drag. No re-render on commit — the <col> already carries the
+  // width, and rebuilding the table here would throw away the scroll
+  // position of a reader hundreds of rows deep. A drag that never moved
+  // commits nothing: a click on a grip is not a resize, and must not park
+  // "whatever width the browser had settled on" in localStorage.
+  function commitColDrag() {
+    const d = ml.colDrag;
+    if (!d) return;
+    ml.colDrag = null;
+    if (!d.moved) return;
+    ml.colw[ml.view][d.key] = d.w;
+    try { localStorage.setItem(`mn-ml-colw-${ml.view}`, JSON.stringify(ml.colw[ml.view])); } catch (_) {}
+  }
+
+  // A held grip resizes its column live and commits on release. The grip owns
+  // the whole gesture through pointer capture, so no document-level listeners
+  // are installed and nothing outlives the pointer; the width is written onto
+  // the <col> element as the pointer moves (cheap — no re-render) and goes to
+  // state + localStorage once, through commitColDrag(). The Follow poll
+  // checks ml.colDrag before it repaints, and renderTable() commits a drag
+  // it would otherwise orphan, so the 30-second refresh can neither yank the
+  // header out from under the hand nor be silently disabled by one.
+  function colGrip(e, key) {
+    if (!e || e.button) return;   // the primary button drags; others are not a grab
+    e.preventDefault();
+    e.stopPropagation();
+    const grip = e.currentTarget || e.target;
+    const col = document.querySelector(`#ml-table col[data-mlcol="${CSS.escape(key)}"]`);
+    const th = grip.closest ? grip.closest('th') : null;
+    if (!col || !th) return;
+    const min = key === 'ts' ? ML_COLW_MIN_TS : ML_COLW_MIN;
+    const x0 = e.clientX;
+    const w0 = th.offsetWidth;
+    ml.colDrag = { key, w: Math.max(min, w0), moved: false };
+    try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+    grip.onpointermove = ev => {
+      if (!ml.colDrag) return;
+      if (!ml.colDrag.moved && Math.abs(ev.clientX - x0) <= 2) return;
+      ml.colDrag.moved = true;
+      const w = Math.max(min, Math.min(ML_COLW_MAX, Math.round(w0 + ev.clientX - x0)));
+      ml.colDrag.w = w;
+      col.style.width = w + 'px';
+    };
+    const done = () => {
+      grip.onpointermove = grip.onpointerup = grip.onpointercancel = grip.onlostpointercapture = null;
+      commitColDrag();
+    };
+    grip.onpointerup = done;
+    grip.onpointercancel = done;
+    // A grip that a repaint removed from the DOM fires only this — pointerup
+    // hit-tests against the new table, where nothing is captured.
+    grip.onlostpointercapture = done;
   }
 
   function rowClick(e, key) {
@@ -1439,7 +1598,7 @@ const MessageLog = (() => {
   return {
     render, init, stop, run,
     setWin, setDate, setFind, findKey, setCode, setText, setFlag, setOrder, loadMore,
-    setFollow, setView, setCol, resetCols,
+    setFollow, setView, setCol, resetCols, setHeight, resetWidths, colGrip,
     rowClick, toggleRow, pickClick, setSel, selAll, clearSel, trayToggle,
     fetchRaw, showStation, openInField, openInPackets, openInAlert2, showReading,
     claimOpen, claimClose, claimSearch, claimPick,

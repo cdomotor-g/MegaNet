@@ -157,6 +157,7 @@ MegaNet/
 │   ├── acma-snapshots.json / acma-changes.json      (snapshot index + precomputed diffs)
 │   ├── acma-licence-suggestions.csv  (repeater ↔ ACMA licence review file)
 │   ├── ghosting-links.json           (observed candidate → target ghosting links, Ghosting Graph)
+│   ├── wind-regions-as1170-2021.geojson  (AS/NZS 1170.2 wind regions — GA eCat 146359, CC-BY 4.0, ~1 km simplified)
 │   └── rf-concepts.json              (RF explainer entries for the Workbench concept drawer)
 │
 ├── radio-mobile/           ← self-contained Radio Mobile desktop project
@@ -486,8 +487,14 @@ datastore accepted, newest first, with the ingress pathway (protocol,
 transport, which base heard it, how many further copies by which other paths)
 as columns, a plot-and-map tray over any selection, a decode drawer per row,
 and a Follow switch for watching a field test land. Each page links to the
-other per reading. [`docs/message-log.md`](docs/message-log.md) is the long
-form.
+other per reading. The log is its rows, so it gets most of a screen: a
+Short / Tall / Max switch in the panel header sets how much of one (Tall —
+most of it — is the default), and each column header carries a grip that
+drags the column's width, remembered on the device per view and per column,
+with a *Reset widths* button in the Columns chooser. On a phone neither
+applies — the columns share the width evenly, and the Columns chooser is the
+path that works at that size. [`docs/message-log.md`](docs/message-log.md) is
+the long form.
 
 [`docs/ingest-mqtt.md`](docs/ingest-mqtt.md) is the page for whoever is
 configuring a logger or choosing a broker — the topic scheme and why it is shaped
@@ -580,6 +587,16 @@ flattening them: a section the sheet prints with no row saved against it says
 nobody filled it in, a section the sheet does not print at all is listed under
 *Not on this form*, and the two are different sentences because they are
 different facts.
+
+On screen, what the technician actually recorded is set apart from the
+furniture around it: every filled value renders green and a touch bolder, so
+the recorded numbers can be found without reading the whole page. The
+headings, box labels and hints stay plain, as do the label columns inside the
+grid tables, and a blank box keeps its muted em dash. Green here means *this
+is the data*, not *this value is fine*. On paper the record stays monochrome
+as the print block intends — the green becomes black and keeps only the
+weight — and the CSV is untouched by construction, since it reads the record
+model rather than the screen.
 
 The other way in is from the **station itself**. Under the ARRO block at the foot
 of the station editor card on the Stations tab there is an **Inspections**
@@ -867,6 +884,18 @@ into as many columns as the window allows — four on a wide screen, two at 768 
 one on a phone. A 320 px rail had one sensible arrangement; a card the width of
 the page has a better one.
 
+**Full screen.** The ⛶ button in the map's top-right corner, under the four
+panel icons, fixes the map's panel to the viewport — the match note, the ACMA
+and path cards and the corner controls all ride along, because they are all
+positioned inside that panel. Press it again, or Escape, to put the page back;
+Escape defers to any dialog open over the map, and the bug reporter still
+opens on top. It is deliberately not a modal, though "a modal map" is how the
+ask arrives: the shared dialog shell wipes its content on every exit, which
+would destroy a live Leaflet map mid-flight, whereas adding a class to the
+panel and removing it later never moves or rebuilds the map at all. Full
+screen is something an operator is doing, not a preference, so it lasts the
+session and is not remembered.
+
 **Signal links and *Kill spaghetti*.** Links are drawn from each field station
 to every repeater whose pass ranges cover one of its ALERT addresses, which
 across the whole network is 3000-plus lines, many of them running the length of
@@ -889,6 +918,18 @@ Each link is drawn twice — a wide white casing underneath and the coloured lin
 on top — so it stays legible over satellite imagery and topo shading, where a
 single thin orange line disappears. **Link opacity** fades the pair together
 when the lines are burying the pins they are meant to explain.
+
+**Names on the satellite view.** The Satellite base is Esri's World_Imagery,
+and bare imagery gives no way to orient around a station without flipping back
+to OSM-Topo — so whenever Satellite is the chosen base, on every map that
+shares the base-map picker, two of Esri's reference tile services ride along
+with it: place and locality names down to street level, and roads with their
+names and route shields. The picker says so in a note, and the Satellite
+layer's attribution credits them. Esri's third reference service,
+World_Reference_Overlay, was evaluated and turned down — it re-draws the same
+names slightly misregistered, its tile cache stops at level 13, and over
+Australia it goes blank from about level 9 anyway. River names over imagery
+stay the rivers layer's job, drawn above these tiles.
 
 **Highlighting rivers.** Half this network is named after the river it sits on,
 so typing `burdekin` into the filter box lights up the Burdekin and its named
@@ -921,6 +962,60 @@ failure mode — no network means no rivers, and nothing else on the tab changes
 > useless for drawing a line over a topographic basemap. Re-exporting it with
 > real coordinates would make it a good offline layer; until then it stays out of
 > this. See issue #84.
+
+**Survey marks.** *Survey marks & CORS sites (Qld)*, in the same **Map
+display** panel, draws the Department of Resources' permanent survey marks and
+CORS sites once you are zoomed in close enough for them to be more than
+scatter — for the field crew doing a height or levelling check near a site,
+each mark carries its register number and AHD height. The layer spent a while
+answering "marks in view" while drawing almost none of them, and the repair is
+worth recording because no part of it surfaced as an error: the live
+SurveyControl service answers any query carrying a `resultRecordCount`
+parameter with HTTP 200 and an empty feature set, so the app drew the ~100
+statewide CORS sites — the one sublayer that honours the parameter — and not
+one of the ~166,000 marks. The parameter is gone now; the service's group
+layers, whose `/query` can only return 400, are skipped; the join-prefixed
+attribute names it returns (`sirpub.….mrk_id`) are matched by their last
+segment, so marks are labelled with register number and height rather than a
+generic "Survey mark"; and the "in view" count counts what the viewport
+actually holds rather than everything the padded fetch box returned. Epic
+#119 closed leaving a live-browser spot-check of this overlay as a human step
+— that check has since been made against the live service, and the service's
+behaviour, quirks included, is pinned by `test/survey.mjs`.
+
+**Wind loading regions.** *Wind regions (AS/NZS 1170.2)*, another **Map
+display** switch, draws the Standard's wind loading regions — A0–A5, B1, B2,
+C and D — under the pins, on the severity ramp the Standard's own map uses:
+green temperate through amber and orange to cyclonic red, with the Pilbara's
+D in purple. Once the layer has loaded, every station callout names its
+region, so "what wind region is that site in?" — the first question of every
+mast and aerial conversation — is answered where the sites are. The polygons
+are Geoscience Australia's machine-readable interpretation of the 2021
+boundaries (eCat 146359, **CC-BY 4.0**), simplified to about 1 km and bundled
+at `data/wind-regions-as1170-2021.geojson`, so there is no live service to be
+down; the file is fetched once, on first enable, never at page load. GA is
+blunt that the dataset is **indicative and not for design use**, and the note
+under the switch and the callout line both say so.
+
+**Line of sight, for every link at once.** The Path profile tool answers
+"does this hop clear the terrain?" for the one line an operator drew; *Check
+line of sight on links* asks the same question — the same analysis, at 64
+samples — of every drawn field and backbone link, and colours the obstructed
+ones crimson. That is its own red, not the one the blast-radius mode paints
+(pick a repeater, see what goes dark if it dies): a blast is something an
+operator armed and will disarm, an obstruction is a property of the ground,
+and both can be on screen at once. Verdicts are cached in the browser
+keyed by the physics inputs alone — both ends' coordinates, surveyed
+elevations, filed antenna heights and the frequency — so a moved pin or an
+edited elevation misses the cache naturally, and a network is profiled once
+ever rather than once per session; misses trickle through four profiles at a
+time. Two honesty rules carry over from the tools it borrows: a profile with
+missing terrain tiles can prove an obstruction but never clearance, and the
+map states the network *as filed* — the profile card's what-if antenna and
+frequency overrides deliberately do not reach it. The note under the switch
+carries the verdict counts and the same k=4/3 earth / ~30 m terrain /
+no-trees caveats the profile card owns up to. Like the other layers that cost
+requests, it is off by default and not remembered between visits.
 
 **Draw & measure.** A sketching layer over the network map, opened from the
 pencil icon in the map's top-right corner — and pinnable open, which is what you
@@ -1128,6 +1223,11 @@ found under the *previous* address and can otherwise hide every row the new one
 has. The Workbench's flagged pairs come in through the same door
 (`openBitFlipper` in `bit-flipper.js`) and do set the bit count, to two, because
 two bits is the question a flagged pair is asking.
+
+The results table's badges now agree with the Stations tab: a field station's
+name chip is in the green family and a repeater's in the blue, the same
+`ROLE_COLOR` families the pins and the legend read from — they were the other
+way round until recently.
 
 ### 7. ALERT / ERTS Packet Decoder & Encoder (Integrated)
 Ported from the standalone [ALERT_PACKETS](https://github.com/cdomotor-g/ALERT_PACKETS) tool and
@@ -1743,15 +1843,32 @@ which is the opposite of the point. Which scale is the toolbar's existing
 the record, **Kept** is what stops it flattening the filtered pane.
 
 **The chart is hand-rolled SVG**, like the rest of the app's charts — no
-library. It carries wheel zoom, drag to pan, drag-to-select zoom, an overview
-strip of the whole record with the visible window on it, a crosshair with a
-hover readout, keyboard pan/zoom, per-series colour and visibility, solo and
-fit, light/dark repaint, and SVG/PNG download. Three readings of the data
+library. It carries wheel zoom, drag to pan, drag-to-select zoom on either or
+both axes, an overview strip of the whole record with the visible window on it
+— movable, and resizable by its edges — a crosshair with a hover readout,
+keyboard pan/zoom, per-series colour and visibility, solo and fit, light/dark
+repaint, and SVG/PNG download. Three readings of the data
 (value, increment, rate per hour), three chart styles (line, step, points) and
 four vertical scales — including **Kept**, which scales to the surviving
 readings so a single 2014 mm spike stops flattening a 300 mm trace, and draws
 the removals that fall outside as triangles on the top edge rather than hiding
 them.
+
+**Three ways into a closer look.** *Drag zooms* (or Shift held) draws a box,
+and the window becomes the box — both axes now, not just time. A flat sweep
+stays the time-only zoom years of use have taught, and the rubber band says
+which it will be before the button comes up: full height for a flat sweep, the
+box itself otherwise. *Drag zooms y* (or Alt held, so neither zoom ever needs
+the toolbar) is the other direction: time stays put and the vertical axis
+becomes the dragged span. And the overview's window is no longer
+drag-to-recentre only — each edge carries a grip that drags that edge alone,
+so the window resizes as well as moves. What the drag zooms do to the vertical
+axis is not private state: they commit through the toolbar's own axis mode —
+*Fixed*, with the min/max boxes holding the dragged numbers — so the committed
+range is visible, editable, and honest about what happened. Double-click, or
+the 0 key, resets both axes and restores whatever vertical mode was chosen
+before the first zoom; choosing a mode by hand drops that memory, because the
+operator has spoken since and reset must not overrule them.
 
 **Scale is handled by drawing pixels, not points.** Each pixel column keeps its
 first, minimum, maximum and last value, so a spike survives at any zoom while
@@ -2290,7 +2407,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Sixteen checks. The ten below are the ones a change to the front end meets
+Seventeen checks. The ten below are the ones a change to the front end meets
 first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |
@@ -2322,7 +2439,7 @@ then clicks its way through the RF Changes and Interference Workbench controls,
 keyed by the handler each one names rather than by its label. See
 `test/lib/controls.mjs`.
 
-CI runs all sixteen on any push touching a root `*.js`, `index.html`, `styles.css`,
+CI runs all seventeen on any push touching a root `*.js`, `index.html`, `styles.css`,
 `stations.json`, `db/migrations/`, `test/` or the inspection workbook in
 `archive/`. The filter is a glob rather than a list of filenames
 because the app's script list grew with every milestone of the split — a named

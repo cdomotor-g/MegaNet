@@ -155,6 +155,7 @@ const NONTEXT_PAIRS = [
   // where the readout card's own swatch legend draws them; on the map itself
   // their second channels (weight, dash, growth, the focus dim) carry them.
   ['--map-blast', '--panel'], ['--map-blast-ring', '--panel'],
+  ['--map-line-blocked', '--panel'],
   // The ERT-A2 decoder's RSSI scale (#140). Unlike the bit cells above, these
   // are drawn *on the page* — a 3 px bar beside a number, a legend dot, a map
   // pin — so each step has to hold 3:1 against the ground of whichever theme is

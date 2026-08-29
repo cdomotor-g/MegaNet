@@ -1500,7 +1500,7 @@ function initWbMap() {
       <span class="small">Affected · AlertID ${stationAlertIds(s).join(', ')}</span>`);
     if (topR && topR.lat != null && s.lat != null && an.passes(s, topR)) {
       L.polyline([[s.lat, s.lon], [topR.lat, topR.lon]],
-        { color: '#0b5cab', weight: 1.2, opacity: 0.45, dashArray: '5 6' }).addTo(layer);
+        { color: ROLE_COLOR.repeater, weight: 1.2, opacity: 0.45, dashArray: '5 6' }).addTo(layer);
     }
   }
   for (const s of an.G) {
@@ -1508,7 +1508,7 @@ function initWbMap() {
       <span class="small">Known-good · AlertID ${stationAlertIds(s).join(', ')}</span>`);
   }
   for (const c of an.candidates.slice(0, 8)) {
-    dot(c.r, '#0b5cab', { radius: 6 + Math.round(8 * c.power), weight: c === an.top ? 3 : 1.5 },
+    dot(c.r, ROLE_COLOR.repeater, { radius: 6 + Math.round(8 * c.power), weight: c === an.top ? 3 : 1.5 },
       `<strong>${esc(c.r.name)}</strong><br>
        <span class="small">Candidate repeater · coverage ${c.coverage.toFixed(2)}
        · specificity ${c.specificity.toFixed(2)} · power ${c.power.toFixed(2)}</span>`);

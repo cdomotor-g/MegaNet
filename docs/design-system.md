@@ -212,6 +212,28 @@ drawn between *kinds of thing* rather than down the middle of one:
 - **Everything else on the map is #136's**: the filters panel, the layer, the
   pins, the beams, the legend and the popup.
 
+### Two colour decisions from the map's later overlays
+
+**`--map-line-blocked`** is the crimson the line-of-sight layer paints a link
+whose path the terrain blocks, and it is a token in the contrast contract
+rather than a fifth categorical set: the colour *is* the verdict, which is
+exactly the 1.4.11 case, so it holds 3:1 against `--panel` in both themes and
+`shell.mjs` measures it. It is deliberately not a reuse of `--map-blast` — a
+blast is something an operator armed and will disarm, an obstruction is a
+property of the ground, and both reds can be on screen at once, which two
+meanings on one token would forbid. The layer reads it through `cssVar()`,
+Leaflet's path options being the consumer that cannot take a `var()`.
+
+**The wind-region fills in `map-wind.js` are literal hexes**, and that is the
+categorical doctrine applied rather than defied: they are Leaflet path
+options, which cannot take `var()`; the ramp is the one AS/NZS 1170.2's own
+map has taught, so the hues belong to the dataset rather than to the theme;
+and at fill-opacity .2 over map tiles neither theme needs its own set. What
+carries the meaning without colour is the region letter — in the switch's
+legend, whose dots take the hex through `--dot` like every other swatch, and
+in every station callout once the layer has loaded — the same argument
+`--maps-region-*` records.
+
 ---
 
 ## 2. Breakpoints
@@ -465,6 +487,35 @@ to write it down rather than let each of them re-derive a different half.
     `style="fill:var(--muted)"` on every label, which is an inline style the
     check cannot see past.
 
+12. **A drag-resizable column is a grip in the header, writing to the `<col>`**
+    *(added by the Message Log)*. The grip is a slim strip on the `<th>`'s
+    right edge, `aria-hidden` and outside the tab order — pointer furniture,
+    not a control with a keyboard duty, because the width it adjusts is a
+    convenience whose no-pointer path already sits beside it (the Columns
+    chooser, with a *Reset widths* button in it). While the pointer is held it
+    writes the width straight to the `<col>` element — the one width channel
+    `table-layout: fixed` reads, and the one inline style §6 already exempts —
+    so a live drag costs no re-render; on release the width is committed to
+    state and localStorage, **per view and keyed by column**, so narrow and
+    wide keep their own shapes and a hidden column keeps its width for the day
+    it returns. Three guards travel with the pattern: a floor per column so
+    none can be dragged out of findability, any poll that re-renders the table
+    checks for a held grip first (a repaint mid-drag yanks the header out from
+    under the hand), and below `md` nothing has to be done at all — the
+    `col { width: auto !important }` rule that makes pattern 2 happen
+    neutralises the stored widths, and the grips hide with them.
+
+13. **A wrapper that needs more height than the shared cap takes named steps,
+    not a drag edge** *(added by the Message Log)*. A draggable edge on a box
+    that already scrolls two ways is a fight with the scrollbar, so the height
+    is a Short / Tall / Max switch — 42vh (the shared cap), 68vh, 85vh, with
+    Max stopping short of the viewport so the panel header and filters stay in
+    reach. The chosen step rides the wrapper as a custom property (`--ml-h` on
+    the Message Log) — the `--dot` pattern again: a custom property is the
+    system reaching the element — scoped under the tab's own class so every
+    other `.tall` wrapper keeps the shared cap, and with the property's
+    fallback equal to the default step so a wrapper missing it looks the same.
+
 **An implementation note that bit #138, and will bit anything that puts a
 `.sr-only` in a table cell.** `overflow` clips a descendant only when the scroll
 container is that descendant's **containing block**, and an absolutely
@@ -564,6 +615,22 @@ marker shapes cycled with the twelve colours — off when only one series is
 shown, because a lone dashed line says "provisional" and means nothing of the
 kind.
 
+**A zoom gesture is a modifier first and a toggle second, and it commits
+through controls that already exist.** The ARRO chart's two drag zooms — the
+box, and the vertical band that rescales the y axis alone — each have a
+toolbar toggle and a held key (Shift and Alt), and the keys outrank the
+toggles, so neither gesture ever needs a trip to the toolbar mid-thought.
+Neither leaves private state behind: both commit through the axis-mode
+control the toolbar already offers — manual, with the min/max inputs holding
+the dragged numbers — so the committed range is visible, editable, and honest
+about what happened. Reset (double-click, or the 0 key) restores **both
+axes** and the vertical mode the operator had chosen before the first
+gesture; choosing a mode by hand drops that stash, because the operator has
+spoken since and reset must not overrule them. And the second lesson above
+applies verbatim as gestures accumulate: the stage's and the overview's
+accessible names are rebuilt where the view changes, so a name that says what
+dragging does goes on saying the truth after the gesture set has grown.
+
 ### …and the one graphic that is allowed to be `role="img"` while being clicked
 
 *(Pattern 8, added by #137.)* The rule above has an edge, and Radio Path Maps'
@@ -648,6 +715,31 @@ Three things that are not optional:
 
 Not a modal, and it does not trap focus: it is a disclosure, `aria-expanded`
 says so, and Shift+Tab off the first control lands back on the icon.
+
+### Full screen — fix the anchor, never reparent
+
+*(Added by the Stations map's ⛶ button.)* When a surface needs to become the
+screen, put a `position: fixed; inset: 0` class on its own positioning anchor
+and take the class off to exit — never reparent it, and least of all into
+`Modal`, which wipes its `innerHTML` down all three of its exits and would
+destroy a live Leaflet map's DOM mid-flight. The Stations map's `.map-panel`
+is already the containing block for everything that works over the map — the
+match note, the ACMA and path cards, the corner controls — so one class takes
+the whole working surface along and back with nothing moved or rebuilt; a
+Leaflet map needs one `invalidateSize()` after the toggle and nothing else.
+
+**z-index 1900 is the slot**: above the header (1300), the drawers (1200) and
+the mem modal (1500), below `#app-modal` (2000), so a dialog opened over the
+full-screen surface still opens on top of it.
+
+The toggle carries `aria-pressed`, names both directions, and announces the
+change through the live region (§4). **Escape exits, and defers to dialogs**:
+`Modal`'s capture-phase handler claims the key first, so only an unclaimed
+Escape drops the surface back into the page. The flag is session state, never
+a preference — full screen is something an operator is *doing* — and the
+Escape listener is transient by the teardown discipline: it dies with the
+tab's teardown and is re-armed on init, so it cannot outlive the surface it
+serves.
 
 ---
 

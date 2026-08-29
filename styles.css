@@ -58,6 +58,11 @@
   --rx-bg: #eef4fb;
   --tx-bg: #eef8f1;
   --map-line: #ff6f00;
+  /* A link whose terrain profile says the path is obstructed (MapLos).
+     Crimson rather than the blast red above it: a blast is something an
+     operator armed and will disarm, an obstruction is a property of the
+     ground, and the two can be on screen at once. */
+  --map-line-blocked: #d81b60;
   /* Repeater backbone paths. Black by request — the white casing the map draws
      under it is what carries it on dark imagery, in both themes. */
   --map-backbone: #000000;
@@ -408,6 +413,7 @@
   --rx-bg: #1d3242;
   --tx-bg: #19362a;
   --map-line: #ff9f43;
+  --map-line-blocked: #ff6090;
   --map-backbone: #000000;
   --map-blast: #ff6659;
   --map-blast-ring: #ff8a80;
@@ -1931,12 +1937,29 @@ h2.h-bad {
   color: #9fd0ff;
 }
 
+/* Station-typed badges. The Stations tab is the source of truth for what a
+   role looks like — field is green, repeater is blue (ROLE_COLOR in core.js,
+   mirrored by --role-field/--role-repeater above). These two classes carry
+   that meaning into table chips; the pairs stay literal, tint-plus-ink chosen
+   for AA on panel backgrounds, but each family is the same family as its
+   role token. The generic .badge above is NOT part of this contract — it is a
+   neutral count chip used across half the tabs and happens to be blue. */
 .badge--repeater {
+  background: #e8f3ff;
+  color: #0b5cab;
+}
+
+[data-theme="dark"] .badge--repeater {
+  background: #183350;
+  color: #9fd0ff;
+}
+
+.badge--field {
   background: #e8f7ee;
   color: #1a6b35;
 }
 
-[data-theme="dark"] .badge--repeater {
+[data-theme="dark"] .badge--field {
   background: #0e3320;
   color: #7dd6a0;
 }
@@ -4847,6 +4870,28 @@ hr {
   border-radius: 6px;
 }
 
+/* Full screen: the whole working surface — map, match note, ACMA and path
+   cards, the corner controls — is positioned inside .map-panel, so fixing the
+   panel to the viewport takes everything along and the Leaflet map is never
+   moved or rebuilt (toggleMapFullscreen, app.js). 1900 sits above the header
+   (1300), the drawers (1200) and the mem modal (1500) but below #app-modal
+   (2000), so the bug reporter still opens on top of a full-screen map. The
+   #leaflet-map selector carries the id so it outweighs the phone height
+   override, which is also id-only. */
+.map-panel.is-full {
+  position: fixed;
+  inset: 0;
+  z-index: 1900;
+  margin: 0;
+  border-radius: 0;
+}
+
+.map-panel.is-full #leaflet-map {
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+}
+
 /* Code elements */
 code {
   font-family: monospace;
@@ -6822,12 +6867,19 @@ code {
 .ad-stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ad-stage svg { display: block; width: 100%; height: 100%; cursor: crosshair; }
 
+/* The overview reads as three grips and the cursor names each before it is
+   pressed: pointer on the open strip (press jumps the window there), grab on
+   the window itself (drag moves it), ew-resize on the invisible zones drawn
+   over its edges (drag widens or narrows it). The zone rects come from
+   drawOv() carrying only a class — hit shapes, painted at fill-opacity 0. */
 .ad-ov {
   display: block; width: 100%; height: 56px;
   margin-top: .4rem;
   border: 1px solid var(--border); border-radius: 7px;
-  background: var(--panel); cursor: ew-resize;
+  background: var(--panel); cursor: pointer;
 }
+.ad-ov-mid  { cursor: grab; }
+.ad-ov-edge { cursor: ew-resize; }
 
 .ad-tip {
   position: absolute; z-index: 5; pointer-events: none;
@@ -7008,10 +7060,34 @@ code {
 .ml-note { margin: .2rem 0 var(--sp-2); }
 .ml-flush { color: var(--muted); padding: var(--sp-3) 0; }
 
+/* The wrapper's height comes from the tab's own Short/Tall/Max switch,
+   emitted as --ml-h on the element (the --dot pattern: a custom property is
+   the system reaching the element). Scoped under .ml-wrap so every other
+   height-capped table keeps the shared 42vh; the fallback matches the
+   default step so a wrapper missing the property looks the same. */
+.ml-wrap .table-wrap.tall { max-height: var(--ml-h, 68vh); }
+
 /* The table. Time is the leftmost data column and its cell is the row's
    expand button; the station name is capped so it cannot spend the whole of
    a phone's width on one long site name. */
 .ml-table td, .ml-table th { white-space: nowrap; }
+
+/* Column grips — a slim strip on each header's right edge that drags the
+   column's width. Inside the th (which clips overflow) rather than straddling
+   the border, wide enough to hit with a mouse, and visible only when pointed
+   at: a faint bar says "this edge moves". The phone pass hides them below
+   900px, where dragged widths are neutralised anyway. */
+.ml-table th { position: relative; }
+.ml-col-grip {
+  position: absolute; top: 0; right: 0; width: 9px; height: 100%;
+  cursor: col-resize; touch-action: none;
+}
+.ml-col-grip::after {
+  content: ''; position: absolute; top: 18%; bottom: 18%; right: 3px;
+  width: 2px; border-radius: 1px; background: transparent;
+}
+.ml-col-grip:hover::after,
+.ml-col-grip:active::after { background: var(--ctl-border); }
 .ml-pick { width: 1.6rem; text-align: center; }
 .ml-ts { padding-right: .4rem; }
 .ml-expand {
@@ -7967,6 +8043,11 @@ code {
      proportions above --bp-md, where they are right. */
   .table-wrap col { width: auto !important; }
 
+  /* The rule above just neutralised dragged column widths, so the grips that
+     set them go too — a 9px strip is no target for a finger, and the Columns
+     chooser is the path that works here. */
+  .ml-col-grip { display: none; }
+
   /* Sideways scroll is invisible until you try it, so the wrapper says it is
      there: the shadow only paints while there is more table to the right. */
   .table-wrap {
@@ -8261,9 +8342,25 @@ code {
   border-bottom: 1px solid var(--border);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+  /* The recorded value is the one thing on this page the reader came for, and
+     it is outnumbered ten to one by labels and boilerplate. Green and a little
+     bolder means the eye can sweep a record and land only on what was written
+     down. --ok here means "this is the data", not "this value is fine" — the
+     blank-box rule below keeps the em dashes muted, so only filled boxes pop. */
+  color: var(--ok);
+  font-weight: 600;
 }
 
-.hist-field-blank .hist-value { color: var(--muted); }
+.hist-field-blank .hist-value { color: var(--muted); font-weight: 400; }
+
+/* The same emphasis for values inside a record's grid tables, where cells are
+   wrapped individually because not every column is a value — the transcription
+   table's Box column and the QC tables' parameter column are labels, and
+   history.js knows which is which (tableHtml's labelCols). */
+.hist-cell-value {
+  color: var(--ok);
+  font-weight: 600;
+}
 
 .hist-empty {
   margin: .2rem 0 0;
@@ -8696,7 +8793,12 @@ code {
   .hist-brand-mark { color: #0b5cab; }
 
   .hist-label, .hist-hint, .hist-muted, .hist-empty, .hist-block { color: #444; }
-  .hist-value { border-bottom: 1px solid #999; }
+  /* On paper the record stays monochrome — the whole print block is a
+     conversion to the A4 form's ink — so the on-screen green becomes black
+     and keeps only the weight. Values still stand out from the #444 labels
+     without spending colour ink. */
+  .hist-value { border-bottom: 1px solid #999; color: #000; font-weight: 700; }
+  .hist-cell-value { color: #000; font-weight: 700; }
 
   /* The Open button is the one cell in the timeline that means nothing on
      paper. Its column stays, so the header row and the body still line up. */
