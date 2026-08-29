@@ -1517,7 +1517,7 @@ function renderStationsHtml() {
            leaves nothing on the left to keep a column for. The map is ~320 px
            wider on every screen as a result, which is the point. -->
       <div class="stack" id="stations-main">
-        <div class="panel map-panel">
+        <div class="panel map-panel${state.mapFullscreen ? ' is-full' : ''}">
           <!-- The map is a canvas: ~3,174 pins and ~3,141 link lines drawn as
                pixels, with no DOM per station to annotate. So it answers the
                chart pattern (design-system §3) rather than pretending to be
@@ -1631,6 +1631,58 @@ function setStationFiltersOpen(open) {
   localStorage.setItem('mn-filters', state.filtersOpen ? 'open' : 'closed');
 }
 
+// ── Full-screen map ──────────────────────────────────────────────────────────
+// Not a modal, and deliberately not Modal: Modal.close() wipes its innerHTML
+// down all three of its exits, which would destroy a live Leaflet map's DOM
+// mid-flight. Instead the existing .map-panel — the positioning anchor every
+// map overlay (map-note, ACMA and path cards, corner controls) already hangs
+// off — is fixed to the viewport with a class, so the whole working surface
+// comes along and the map object is never moved or rebuilt. The flag lives in
+// state so renderStationsHtml() re-emits the class across in-tab re-renders
+// (which rebuild the map); the Escape listener is transient and dies with the
+// map in stopStationsMap(), then syncMapFullEsc() in initMap() re-arms it.
+let mapFullEscListener = null;
+
+function toggleMapFullscreen(on) {
+  state.mapFullscreen = on == null ? !state.mapFullscreen : !!on;
+  const el = document.getElementById('leaflet-map');
+  const panel = el && el.closest ? el.closest('.map-panel') : null;
+  if (panel) panel.classList.toggle('is-full', state.mapFullscreen);
+  const b = document.querySelector('.mn-map-full');
+  if (b) syncMapFullBtn(b);
+  syncMapFullEsc();
+  // No CSS transition on the class, so the container is already its new size.
+  invalidateMapSizes(0);
+  announce(state.mapFullscreen
+    ? 'Map is full screen. Press Escape to exit.'
+    : 'Map back in the page.');
+}
+
+function syncMapFullBtn(b) {
+  const full = state.mapFullscreen;
+  b.textContent = '⛶';
+  b.setAttribute('aria-pressed', String(full));
+  const label = full ? 'Exit full screen (Escape)' : 'Full screen';
+  b.title = label;
+  b.setAttribute('aria-label', label);
+}
+
+function syncMapFullEsc() {
+  if (state.mapFullscreen && !mapFullEscListener) {
+    mapFullEscListener = e => {
+      // Modal's capture-phase handler preventDefaults Escape without stopping
+      // propagation — so a dialog opened over the full-screen map takes the
+      // key and the map stays full; only an unclaimed Escape exits.
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      toggleMapFullscreen(false);
+    };
+    document.addEventListener('keydown', mapFullEscListener);
+  } else if (!state.mapFullscreen && mapFullEscListener) {
+    document.removeEventListener('keydown', mapFullEscListener);
+    mapFullEscListener = null;
+  }
+}
+
 // ── The Stations map's own controls (#164) ───────────────────────────────────
 // Map display, Draw & measure and the legend, as three icons in the map's
 // top-right corner under the base-map picker. They were three panels in the
@@ -1656,6 +1708,23 @@ function stationsMapPanels(map) {
     id: 'legend', icon: '🔑', title: 'Legend',
     html: () => `<div class="map-legend" id="map-legend">${mapLegendHtml()}</div>`,
   });
+
+  // Full screen — a plain corner button, not a MapChrome panel: it discloses
+  // nothing, it does one thing, and test/mapctl.mjs iterates .mn-mapctl
+  // wrappers, which this deliberately is not. Rebuilt with the map on every
+  // render; renderStationsHtml() emits the is-full class from state, so the
+  // button always sits inside a panel that already tells the truth.
+  const full = L.control({ position: 'topright' });
+  full.onAdd = () => {
+    const b = L.DomUtil.create('button', 'mn-mapctl-btn mn-map-full');
+    b.type = 'button';
+    syncMapFullBtn(b);
+    L.DomEvent.disableClickPropagation(b);
+    L.DomEvent.on(b, 'click', L.DomEvent.stop);
+    L.DomEvent.on(b, 'click', () => toggleMapFullscreen());
+    return b;
+  };
+  full.addTo(map);
 }
 
 // ── Map display block ────────────────────────────────────────────────────────
@@ -1899,6 +1968,14 @@ function stopStationsMap() {
   state.mapLines   = [];
   // The old map (if any) owned these layer groups — they die with it.
   state.acma.layer = state.acma.beamLayer = state.acma.linkLayer = state.acma.hiLayer = null;
+  // The full-screen Escape listener dies with the map; the *flag* does not —
+  // initMap()'s syncMapFullEsc() re-arms it, and renderStationsHtml() has
+  // already re-emitted the is-full class, so full screen survives the in-tab
+  // re-renders that rebuild this map.
+  if (mapFullEscListener) {
+    document.removeEventListener('keydown', mapFullEscListener);
+    mapFullEscListener = null;
+  }
 }
 
 function initMap() {
@@ -1933,6 +2010,9 @@ function initMap() {
   // attach, because MapDraw.attach() can rerender its own panel and it has to
   // have somewhere to render it to.
   stationsMapPanels(state.map);
+  // Re-arm the full-screen Escape listener if the flag survived a rebuild —
+  // the class is already on the panel, renderStationsHtml() emitted it.
+  syncMapFullEsc();
   MapSpider.attach(state.map);
   MapLocate.attach(state.map);
   // Nothing on screen until it is armed from the editor card or a callout, so

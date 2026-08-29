@@ -4864,6 +4864,28 @@ hr {
   border-radius: 6px;
 }
 
+/* Full screen: the whole working surface — map, match note, ACMA and path
+   cards, the corner controls — is positioned inside .map-panel, so fixing the
+   panel to the viewport takes everything along and the Leaflet map is never
+   moved or rebuilt (toggleMapFullscreen, app.js). 1900 sits above the header
+   (1300), the drawers (1200) and the mem modal (1500) but below #app-modal
+   (2000), so the bug reporter still opens on top of a full-screen map. The
+   #leaflet-map selector carries the id so it outweighs the phone height
+   override, which is also id-only. */
+.map-panel.is-full {
+  position: fixed;
+  inset: 0;
+  z-index: 1900;
+  margin: 0;
+  border-radius: 0;
+}
+
+.map-panel.is-full #leaflet-map {
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+}
+
 /* Code elements */
 code {
   font-family: monospace;
