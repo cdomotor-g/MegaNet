@@ -162,7 +162,9 @@ const ArroData = (function () {
       pin:       null,           // clicked point: {key,i}
       drag:      null,
       brush:     false,          // brush-to-zoom armed (else drag pans)
-      ovDrag:    null,
+      yDrag:     false,          // drag rescales the vertical axis (else drag pans)
+      yStash:    null,           // {yMode,yMin,yMax} from before a zoom gesture forced 'manual'
+      ovDrag:    null,           // 'pan' | 'left' | 'right' while the overview is held
       w: 900, h: 380,
       ro:        null,
       sensorIdx: null,
@@ -2327,7 +2329,9 @@ const ArroData = (function () {
   // name rather than a caption.
   function chartName() {
     const f = chartFacts();
-    const how = 'Drag to pan, scroll or + and − to zoom, arrow keys to step, 0 to reset. '
+    const how = 'Drag to pan, scroll or + and − to zoom, Shift+drag a box to zoom to it, '
+              + 'Alt+drag up or down to rescale the vertical axis, arrow keys to step, '
+              + '0 to reset both axes. '
               + 'Every value is in the readings table below the chart.';
     if (!f) return `Chart, empty — no series is shown. ${how}`;
     const shape = ad.chartType === 'dots' ? 'Point chart' : ad.chartType === 'step' ? 'Step chart' : 'Line chart';
@@ -2346,7 +2350,8 @@ const ArroData = (function () {
     const v = view();
     return `Overview of the whole record, ${fmtFull(ex.t0)} to ${fmtFull(ex.t1)}. `
          + `The box marks the window drawn on the chart above, `
-         + `${fmtFull(v.t0)} to ${fmtFull(v.t1)}.`;
+         + `${fmtFull(v.t0)} to ${fmtFull(v.t1)}. `
+         + `Drag the box to move the window, or drag either edge to resize it.`;
   }
 
   function mainHtml() {
@@ -2364,7 +2369,7 @@ const ArroData = (function () {
            picture while being clicked (pattern 8), and this is not that shape —
            arbitrary pan and zoom exist nowhere else on the tab. -->
       <div class="ad-stage" id="ad-stage" tabindex="0"
-           aria-label="Chart window — arrow keys to step, + and − to zoom, 0 to reset, Escape to unpin">
+           aria-label="Chart window — arrow keys to step, + and − to zoom, 0 to reset both axes, Escape to unpin">
         <svg id="ad-svg" role="img" aria-label="${escAttr(chartName())}"></svg>
         <div class="ad-tip" id="ad-tip" hidden></div>
       </div>
@@ -2626,9 +2631,12 @@ const ArroData = (function () {
           <label class="ad-chk" title="Mark where an accumulator wrap was corrected">
             <input type="checkbox" ${ad.showRollover ? 'checked' : ''}
                    onchange="ArroData.setFlag('showRollover', this.checked)"> rollovers</label>
-          <label class="ad-chk" title="Drag to select a time range instead of panning">
+          <label class="ad-chk" title="Drag a box to zoom to it — time and value together. Or hold Shift while dragging">
             <input type="checkbox" ${ad.brush ? 'checked' : ''}
                    onchange="ArroData.setFlag('brush', this.checked)"> drag zooms</label>
+          <label class="ad-chk" title="Drag up or down to rescale the vertical axis to that span; time stays put. Or hold Alt while dragging">
+            <input type="checkbox" ${ad.yDrag ? 'checked' : ''}
+                   onchange="ArroData.setFlag('yDrag', this.checked)"> drag zooms y</label>
         </span>
         <span class="ad-tool-grp" role="group" aria-label="Jump the window">
           ${[['all', 'All'], ['24h', '24h'], ['7d', '7d'], ['30d', '30d'], ['90d', '90d']]
@@ -2837,6 +2845,11 @@ const ArroData = (function () {
 
   const PADL = 64, PADR = 18, PADT = 14, PADB = 30;
   const MARK_CAP = 2500;      // removed-point markers drawn before we stop
+  // Vertical throw, in viewBox px, below which a zoom box means "time only".
+  // Years of x-only brushing taught a flat sweep across the chart; a hand that
+  // wobbles a few pixels while making one must not be answered with a squashed
+  // vertical axis it never asked for.
+  const AD_BOX_EPS = 8;
 
   function measure() {
     const stage = document.getElementById('ad-stage');
@@ -2858,7 +2871,8 @@ const ArroData = (function () {
     const x = t => PADL + (t - v.t0) / (v.t1 - v.t0) * pw;
     const y = val => PADT + (1 - (val - yr.lo) / (yr.hi - yr.lo)) * ph;
     const tOf = px => v.t0 + (px - PADL) / pw * (v.t1 - v.t0);
-    return { v, w, h, pw, ph, yr, x, y, tOf };
+    const valOf = py => yr.hi - (py - PADT) / ph * (yr.hi - yr.lo);
+    return { v, w, h, pw, ph, yr, x, y, tOf, valOf };
   }
 
   function draw() {
@@ -2999,10 +3013,26 @@ const ArroData = (function () {
                         stroke="${c.accent}" stroke-width="2"/>`;
       }
     }
-    if (ad.drag && ad.drag.brush) {
+    // The rubber band, in three shapes matching the three committed gestures:
+    // a vertical-axis drag shows a full-width band, a box brush shows the box
+    // it will zoom to — unless its vertical throw is under AD_BOX_EPS, in
+    // which case the feedback goes full-height, honestly promising the x-only
+    // zoom the commit will deliver.
+    if (ad.drag && ad.drag.mode !== 'pan') {
+      const cl = p => Math.max(PADT, Math.min(g.h - PADB, p));
       const a = Math.min(ad.drag.x0, ad.drag.x1), b = Math.max(ad.drag.x0, ad.drag.x1);
-      out += `<rect x="${a.toFixed(1)}" y="${PADT}" width="${(b - a).toFixed(1)}" height="${g.ph}"
-                    fill="${c.accent}" opacity=".14"/>`;
+      const ya = cl(Math.min(ad.drag.y0, ad.drag.y1)), yb = cl(Math.max(ad.drag.y0, ad.drag.y1));
+      if (ad.drag.mode === 'y') {
+        out += `<rect x="${PADL}" y="${ya.toFixed(1)}" width="${g.pw}" height="${(yb - ya).toFixed(1)}"
+                      fill="${c.accent}" opacity=".14"/>`;
+      } else if (Math.abs(ad.drag.y1 - ad.drag.y0) <= AD_BOX_EPS) {
+        out += `<rect x="${a.toFixed(1)}" y="${PADT}" width="${(b - a).toFixed(1)}" height="${g.ph}"
+                      fill="${c.accent}" opacity=".14"/>`;
+      } else {
+        out += `<rect x="${a.toFixed(1)}" y="${ya.toFixed(1)}" width="${(b - a).toFixed(1)}"
+                      height="${(yb - ya).toFixed(1)}" fill="${c.accent}" opacity=".14"
+                      stroke="${c.accent}" stroke-width="1"/>`;
+      }
     }
 
     out += `<line x1="${PADL}" y1="${g.h - PADB}" x2="${g.w - PADR}" y2="${g.h - PADB}"
@@ -3066,8 +3096,25 @@ const ArroData = (function () {
             <rect x="${b.toFixed(1)}" y="4" width="${Math.max(0, w - PADR - b).toFixed(1)}" height="${h - 16}"
                   fill="${c.muted}" opacity=".22"/>
             <rect x="${a.toFixed(1)}" y="4" width="${Math.max(1, b - a).toFixed(1)}" height="${h - 16}"
-                  fill="none" stroke="${c.accent}" stroke-width="1.4"/>
-            <text x="${PADL - 6}" y="${h - 5}" font-size="9" text-anchor="end" fill="${c.muted}">whole record</text>
+                  fill="none" stroke="${c.accent}" stroke-width="1.4"/>`;
+    // Cursor affordances for the three overview gestures. The rects paint
+    // nothing (fill-opacity 0 keeps them hit-testable, which fill="none" would
+    // not be) — they exist so the pointer says what a press here will do: grab
+    // over the window's middle, ew-resize over its edges. The small accent
+    // pills are the visible half of the same promise. The edge zones come
+    // last so they win where they overlap the middle, matching the JS
+    // hit-test's own edge-first order.
+    out += `<rect class="ad-ov-mid" x="${a.toFixed(1)}" y="4"
+                  width="${Math.max(1, b - a).toFixed(1)}" height="${h - 16}"
+                  fill="${c.accent}" fill-opacity="0"/>`;
+    const hy = 4 + (h - 16) / 2;
+    for (const e of [a, b]) {
+      out += `<rect x="${(e - 1.25).toFixed(1)}" y="${(hy - 7).toFixed(1)}" width="2.5" height="14"
+                    rx="1.2" fill="${c.accent}"/>
+              <rect class="ad-ov-edge" x="${(e - 6).toFixed(1)}" y="4" width="12" height="${h - 16}"
+                    fill="${c.accent}" fill-opacity="0"/>`;
+    }
+    out += `<text x="${PADL - 6}" y="${h - 5}" font-size="9" text-anchor="end" fill="${c.muted}">whole record</text>
             <text x="${PADL}" y="${h - 5}" font-size="9" fill="${c.muted}">${esc(fmtFull(ex.t0).slice(0, 10))}</text>
             <text x="${w - PADR}" y="${h - 5}" font-size="9" text-anchor="end" fill="${c.muted}">${esc(fmtFull(ex.t1).slice(0, 10))}</text>`;
     svg.innerHTML = out;
@@ -3263,6 +3310,37 @@ const ArroData = (function () {
     tip.style.top  = Math.min(r.height - tip.offsetHeight - 8, ly + 14) + 'px';
   }
 
+  // A zoom gesture that lands a vertical range speaks through the same manual
+  // mechanism the toolbar's Fixed mode offers — yMode='manual' plus the two
+  // string fields the inputs echo — rather than through some second override
+  // yRange() would have to consult. Before the first such commit, whatever
+  // axis mode the operator had chosen is stashed, so reset can put it back;
+  // repeat zooms keep the original stash, because "before any of this" is the
+  // state reset should mean.
+  function commitY(lo, hi) {
+    if (!isFinite(lo) || !isFinite(hi)) return false;
+    // Six significant figures keeps the inputs readable; the guard below is
+    // yRange()'s own (parse, and max strictly above min), re-checked after
+    // rounding so a hair-thin band cannot commit a range that then no-ops.
+    const a = String(+lo.toPrecision(6)), b = String(+hi.toPrecision(6));
+    if (!(parseFloat(b) > parseFloat(a))) return false;
+    if (!ad.yStash) ad.yStash = { yMode: ad.yMode, yMin: ad.yMin, yMax: ad.yMax };
+    ad.yMode = 'manual';
+    ad.yMin = a; ad.yMax = b;
+    return true;
+  }
+
+  // The other half of the bargain: undo a gesture's manual takeover. Returns
+  // whether anything was restored, so callers know the toolbar changed.
+  function restoreY() {
+    if (!ad.yStash) return false;
+    ad.yMode = ad.yStash.yMode;
+    ad.yMin = ad.yStash.yMin;
+    ad.yMax = ad.yStash.yMax;
+    ad.yStash = null;
+    return true;
+  }
+
   function bind() {
     const stage = document.getElementById('ad-stage');
     const svg = document.getElementById('ad-svg');
@@ -3273,7 +3351,7 @@ const ArroData = (function () {
       const r = svg.getBoundingClientRect();
       const py = (ev.clientY - r.top) * (ad.h / r.height);
       if (ad.drag) {
-        if (ad.drag.brush) { ad.drag.x1 = px; draw(); return; }
+        if (ad.drag.mode !== 'pan') { ad.drag.x1 = px; ad.drag.y1 = py; draw(); return; }
         const g = geom();
         if (!g) return;
         const dt = (ad.drag.px - px) / g.pw * (ad.drag.t1 - ad.drag.t0);
@@ -3297,28 +3375,57 @@ const ArroData = (function () {
       if (!g) return;
       svg.setPointerCapture?.(ev.pointerId);
       const px = localX(ev, svg);
-      ad.drag = { px, x0: px, x1: px, t0: g.v.t0, t1: g.v.t1, brush: ad.brush || ev.shiftKey, moved: false };
+      const r = svg.getBoundingClientRect();
+      const py = (ev.clientY - r.top) * (ad.h / r.height);
+      // Which gesture this press begins. The modifiers outrank the checkboxes
+      // so a keyboard hand can always reach either zoom without touching the
+      // toolbar: Alt means the vertical axis, Shift means a box, and only
+      // then do the armed toggles speak — else the drag pans, as ever.
+      const mode = ev.altKey ? 'y' : ev.shiftKey ? 'box'
+                 : ad.yDrag ? 'y' : ad.brush ? 'box' : 'pan';
+      ad.drag = { px, py, x0: px, y0: py, x1: px, y1: py, t0: g.v.t0, t1: g.v.t1, mode };
     };
     svg.onpointerup = ev => {
       const d = ad.drag;
       ad.drag = null;
       if (!d) return;
+      const g = geom();
+      if (!g) return;
       const px = localX(ev, svg);
-      const moved = Math.abs(px - d.x0) > 3;
-      if (d.brush && moved) {
-        const g = geom();
+      const r = svg.getBoundingClientRect();
+      const py = (ev.clientY - r.top) * (ad.h / r.height);
+      // Movement on either axis makes a drag. Judging by x alone — as this
+      // once did — reads a purely vertical zoom stroke as a click and pins a
+      // reading nobody pointed at.
+      const dx = Math.abs(px - d.x0), dy = Math.abs(py - d.y0);
+      const moved = dx > 3 || dy > 3;
+      const cl = p => Math.max(PADT, Math.min(g.h - PADB, p));
+      let yDone = false;
+      if (moved && d.mode === 'box') {
         const a = g.v.t0 + (Math.min(d.x0, px) - PADL) / g.pw * (g.v.t1 - g.v.t0);
         const b = g.v.t0 + (Math.max(d.x0, px) - PADL) / g.pw * (g.v.t1 - g.v.t0);
         if (b - a > 1000) ad.view = { t0: a, t1: b };
+        // The vertical side only commits past AD_BOX_EPS — a flat sweep stays
+        // the x-only zoom it always was.
+        if (dy > AD_BOX_EPS) {
+          yDone = commitY(g.valOf(cl(Math.max(d.y0, py))), g.valOf(cl(Math.min(d.y0, py))));
+        }
+      } else if (moved && d.mode === 'y') {
+        if (dy > AD_BOX_EPS) {
+          yDone = commitY(g.valOf(cl(Math.max(d.y0, py))), g.valOf(cl(Math.min(d.y0, py))));
+        }
       } else if (!moved) {
         // A click pins the nearest reading, so it can be read in full and
         // its verdict explained.
-        const r = svg.getBoundingClientRect();
-        const py = (ev.clientY - r.top) * (ad.h / r.height);
         const h = hoverAt(px, py);
         if (h && h.rows.length) ad.pin = { key: h.rows[0].key, i: h.rows[0].i };
         else ad.pin = null;
       }
+      // A committed vertical range changes the toolbar — the Fixed segment
+      // lights and the min/max inputs appear holding the dragged numbers — so
+      // the pane re-renders whole; init() inside it draws chart, overview and
+      // readout, which is the same trio every other gesture ends on.
+      if (yDone) { renderMainOnly(); return; }
       draw(); drawOv(); renderReadout();
     };
     svg.addEventListener('wheel', ev => {
@@ -3330,7 +3437,15 @@ const ArroData = (function () {
       ad.view = { t0: t - (t - g.v.t0) * z, t1: t + (g.v.t1 - t) * z };
       draw(); drawOv(); renderReadout();
     }, { passive: false });
-    svg.ondblclick = () => { ad.view = null; ad.pin = null; draw(); drawOv(); renderReadout(); };
+    // Reset means both axes: the window goes, and the vertical mode goes back
+    // to whatever the operator had before a zoom gesture commandeered it.
+    // Restoring can change the toolbar (the Fixed segment and its inputs), so
+    // that path re-renders the pane instead of just redrawing.
+    svg.ondblclick = () => {
+      ad.view = null; ad.pin = null;
+      if (restoreY()) { renderMainOnly(); return; }
+      draw(); drawOv(); renderReadout();
+    };
 
     stage.onkeydown = ev => {
       const g = geom();
@@ -3346,7 +3461,18 @@ const ArroData = (function () {
         case 'ArrowRight': pan(span * 0.2);  break;
         case '+': case '=': zoom(0.6); break;
         case '-': case '_': zoom(1.7); break;
-        case '0': ad.view = null; break;
+        case '0':
+          ad.view = null;
+          // Same both-axes reset as double-click — but this hand is on the
+          // keyboard, so after the pane re-renders the stage takes focus back
+          // rather than dropping it on the floor.
+          if (restoreY()) {
+            ev.preventDefault();
+            renderMainOnly();
+            document.getElementById('ad-stage')?.focus();
+            return;
+          }
+          break;
         case 'Escape': ad.pin = null; break;
         default: return;
       }
@@ -3354,24 +3480,61 @@ const ArroData = (function () {
       draw(); drawOv(); renderReadout();
     };
 
-    // Overview: drag anywhere on it to centre the window there.
+    // Overview: press inside the window (or anywhere off it) to centre the
+    // window there and drag it along — or take the window by an edge, within
+    // AD_OV_GRIP viewBox px of it, and drag that edge alone: the other end
+    // holds still and the window's *width* changes. The same 1000ms floor
+    // view() enforces applies here, so an edge can never be dragged through
+    // its partner into a zero-width window.
     const ov = document.getElementById('ad-ov');
     if (ov) {
+      const AD_OV_GRIP = 6;
+      const ovPx = ev => {
+        const r = ov.getBoundingClientRect();
+        return (ev.clientX - r.left) * (ad.w / r.width);
+      };
+      const tAt = (px, ex) => ex.t0 + (px - PADL) / (ad.w - PADL - PADR) * (ex.t1 - ex.t0);
       const jump = ev => {
         const ex = extent();
         if (!ex) return;
-        const r = ov.getBoundingClientRect();
-        const px = (ev.clientX - r.left) * (ad.w / r.width);
-        const t = ex.t0 + (px - PADL) / (ad.w - PADL - PADR) * (ex.t1 - ex.t0);
+        const t = tAt(ovPx(ev), ex);
         const v = view();
         const half = (v.t1 - v.t0) / 2;
         ad.view = { t0: t - half, t1: t + half };
         draw(); drawOv(); renderReadout();
       };
-      ov.onpointerdown = ev => { ov.setPointerCapture?.(ev.pointerId); ad.ovDrag = true; jump(ev); };
-      ov.onpointermove = ev => { if (ad.ovDrag) jump(ev); };
-      ov.onpointerup = () => { ad.ovDrag = false; };
-      ov.onpointerleave = () => { ad.ovDrag = false; };
+      const resize = ev => {
+        const ex = extent();
+        if (!ex) return;
+        const v = view();
+        const t = tAt(ovPx(ev), ex);
+        if (ad.ovDrag === 'left') {
+          ad.view = { t0: Math.max(ex.t0, Math.min(t, v.t1 - 1000)), t1: v.t1 };
+        } else {
+          ad.view = { t0: v.t0, t1: Math.min(ex.t1, Math.max(t, v.t0 + 1000)) };
+        }
+        draw(); drawOv(); renderReadout();
+      };
+      ov.onpointerdown = ev => {
+        const ex = extent();
+        if (!ex) return;
+        ov.setPointerCapture?.(ev.pointerId);
+        const v = view();
+        const pw = ad.w - PADL - PADR;
+        const px = ovPx(ev);
+        const da = Math.abs(px - (PADL + (v.t0 - ex.t0) / (ex.t1 - ex.t0) * pw));
+        const db = Math.abs(px - (PADL + (v.t1 - ex.t0) / (ex.t1 - ex.t0) * pw));
+        // Nearer edge wins when the window is so narrow both are in reach.
+        ad.ovDrag = da <= AD_OV_GRIP && da <= db ? 'left'
+                  : db <= AD_OV_GRIP ? 'right' : 'pan';
+        if (ad.ovDrag === 'pan') jump(ev); else resize(ev);
+      };
+      ov.onpointermove = ev => {
+        if (ad.ovDrag === 'pan') jump(ev);
+        else if (ad.ovDrag) resize(ev);
+      };
+      ov.onpointerup = () => { ad.ovDrag = null; };
+      ov.onpointerleave = () => { ad.ovDrag = null; };
     }
 
     const drop = document.getElementById('ad-drop');
@@ -3509,8 +3672,11 @@ const ArroData = (function () {
   function setMode(v)      { ad.mode = v; renderMainOnly(); }
   function setTransform(v) { ad.transform = v; for (const s of ad.series) s.tracks = null; renderMainOnly(); }
   function setChart(v)     { ad.chartType = v; renderMainOnly(); }
-  function setY(v)         { ad.yMode = v; renderMainOnly(); }
-  function setYRange(which, v) { if (which === 'min') ad.yMin = v; else ad.yMax = v; draw(); }
+  // Choosing an axis mode — or typing into the range inputs — by hand drops
+  // any stash a zoom gesture left behind: the operator has spoken since, and
+  // reset must not overrule them with older state.
+  function setY(v)         { ad.yMode = v; ad.yStash = null; renderMainOnly(); }
+  function setYRange(which, v) { if (which === 'min') ad.yMin = v; else ad.yMax = v; ad.yStash = null; draw(); }
   function setFlag(k, v)   { ad[k] = v; renderMainOnly(); }
   function unpin()         { ad.pin = null; draw(); renderReadout(); }
 

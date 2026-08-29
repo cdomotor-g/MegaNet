@@ -6839,12 +6839,19 @@ code {
 .ad-stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ad-stage svg { display: block; width: 100%; height: 100%; cursor: crosshair; }
 
+/* The overview reads as three grips and the cursor names each before it is
+   pressed: pointer on the open strip (press jumps the window there), grab on
+   the window itself (drag moves it), ew-resize on the invisible zones drawn
+   over its edges (drag widens or narrows it). The zone rects come from
+   drawOv() carrying only a class — hit shapes, painted at fill-opacity 0. */
 .ad-ov {
   display: block; width: 100%; height: 56px;
   margin-top: .4rem;
   border: 1px solid var(--border); border-radius: 7px;
-  background: var(--panel); cursor: ew-resize;
+  background: var(--panel); cursor: pointer;
 }
+.ad-ov-mid  { cursor: grab; }
+.ad-ov-edge { cursor: ew-resize; }
 
 .ad-tip {
   position: absolute; z-index: 5; pointer-events: none;
