@@ -629,6 +629,7 @@ const History = (function () {
             + 'the loader licensed. A bound (>30), a status word (U/S) or a sentence has no '
             + 'number, deliberately — the sections below can only show the cells that do.',
         columns: ['Box', 'As written', 'Reads as', 'Unit'],
+        labelCols: [0], // Box names the sheet's field — a label, not a reading
         rows: cells.map(c => [
           c.label || c.field_key || (c.source_col ? `column ${c.source_col}` : ''),
           c.raw,
@@ -655,6 +656,7 @@ const History = (function () {
         blocks: [], lines: [], files: [],
         tables: [{
           columns: ['Event', 'Confidence', 'Read from'],
+          labelCols: [2], // the quote is the remark's prose, not a value
           rows: events.map(e => [
             (types[e.event_type] || e.event_type)
               + (e.detail && e.detail.equipment ? ` — ${e.detail.equipment}` : '')
@@ -810,6 +812,15 @@ const History = (function () {
   }
 
   function tableHtml(t) {
+    // Which columns are labels rather than recorded values. A table can say so
+    // itself (labelCols, used by the transcription and derived-events tables
+    // below); the ones the two recordModel()s emit don't, so the tell is the
+    // header: an unnamed first column or a '#' is the sheet's own row label
+    // (the QC tables' parameter names, a calibration block's row number), and
+    // colouring those green would light up exactly the words the highlight
+    // exists to get past. Everything else in a row is what the visit recorded.
+    const labelCols = new Set(t.labelCols
+      || (t.columns.length && (t.columns[0] === '' || t.columns[0] === '#') ? [0] : []));
     return `
       ${t.title ? `<h4 class="hist-block">${esc(t.title)}</h4>` : ''}
       ${t.note ? `<p class="small hist-muted">${esc(t.note)}</p>` : ''}
@@ -817,8 +828,10 @@ const History = (function () {
         <table class="hist-table hist-grid-table">
           <thead><tr>${t.columns.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
           <tbody>
-            ${t.rows.map(r => `<tr>${r.map(c =>
-              `<td>${c === '' || c == null ? '<span class="hist-muted">—</span>' : esc(c)}</td>`
+            ${t.rows.map(r => `<tr>${r.map((c, i) =>
+              `<td>${c === '' || c == null ? '<span class="hist-muted">—</span>'
+                : labelCols.has(i) ? esc(c)
+                : `<span class="hist-cell-value">${esc(c)}</span>`}</td>`
             ).join('')}</tr>`).join('')}
           </tbody>
         </table>

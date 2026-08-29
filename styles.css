@@ -8278,9 +8278,25 @@ code {
   border-bottom: 1px solid var(--border);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+  /* The recorded value is the one thing on this page the reader came for, and
+     it is outnumbered ten to one by labels and boilerplate. Green and a little
+     bolder means the eye can sweep a record and land only on what was written
+     down. --ok here means "this is the data", not "this value is fine" — the
+     blank-box rule below keeps the em dashes muted, so only filled boxes pop. */
+  color: var(--ok);
+  font-weight: 600;
 }
 
-.hist-field-blank .hist-value { color: var(--muted); }
+.hist-field-blank .hist-value { color: var(--muted); font-weight: 400; }
+
+/* The same emphasis for values inside a record's grid tables, where cells are
+   wrapped individually because not every column is a value — the transcription
+   table's Box column and the QC tables' parameter column are labels, and
+   history.js knows which is which (tableHtml's labelCols). */
+.hist-cell-value {
+  color: var(--ok);
+  font-weight: 600;
+}
 
 .hist-empty {
   margin: .2rem 0 0;
@@ -8713,7 +8729,12 @@ code {
   .hist-brand-mark { color: #0b5cab; }
 
   .hist-label, .hist-hint, .hist-muted, .hist-empty, .hist-block { color: #444; }
-  .hist-value { border-bottom: 1px solid #999; }
+  /* On paper the record stays monochrome — the whole print block is a
+     conversion to the A4 form's ink — so the on-screen green becomes black
+     and keeps only the weight. Values still stand out from the #444 labels
+     without spending colour ink. */
+  .hist-value { border-bottom: 1px solid #999; color: #000; font-weight: 700; }
+  .hist-cell-value { color: #000; font-weight: 700; }
 
   /* The Open button is the one cell in the timeline that means nothing on
      paper. Its column stays, so the header row and the body still line up. */
