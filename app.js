@@ -1805,6 +1805,12 @@ function mapDisplayControlsHtml() {
       </select>
     </label>
     <p class="filter-note" id="map-contour-note">${MapContours.noteHtml()}</p>
+    <label class="filter-check">
+      <input type="checkbox" ${state.mapWind ? 'checked' : ''}
+             onchange="MapWind.setEnabled(this.checked)">
+      Wind regions (AS/NZS 1170.2)
+    </label>
+    <p class="filter-note" id="map-wind-note">${MapWind.noteHtml()}</p>
     <label class="filter-field filter-field--spaced">
       <span>Station names</span>
       <select onchange="setMapLabelMode(this.value)">
@@ -1963,6 +1969,7 @@ function stopStationsMap() {
   MapRivers.detach();
   MapSurvey.detach();
   MapContours.detach();
+  MapWind.detach();
   state.map = removeMap(state.map);
   state.mapMarkers = [];
   state.mapLines   = [];
@@ -2026,6 +2033,7 @@ function initMap() {
   MapRivers.attach(state.map);
   MapSurvey.attach(state.map);
   MapContours.attach(state.map);
+  MapWind.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
   // show on the map that has just been rebuilt.
   PathProfile.sync();
@@ -2299,6 +2307,14 @@ function refreshMapLayers({ skipFit = false } = {}) {
       ${idTypes.length ? `<span class="mn-pop-line">AlertID:</span><br>${idTypes.map(t =>
         `<span class="mn-pop-line mn-pop-indent">${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
       ${s.elevation_ahd != null ? `<span class="mn-pop-line">Elev: ${s.elevation_ahd} m AHD</span>` : ''}
+      ${(() => {
+        // Only when the wind layer has fetched its data — the callout claims a
+        // region only while the polygons that claim it are on hand, and being
+        // ~1 km simplified the claim stays indicative (MapWind's note says so).
+        const wr = MapWind.regionAt(s.lat, s.lon);
+        return wr ? `<br><span class="mn-pop-line">Wind region: ${esc(wr.region)}${
+          wr.area ? ` (${esc(wr.area)})` : ''} — indicative</span>` : '';
+      })()}
       ${acmaRepeaterPopupExtra(s)}
       <!-- Every action on this callout is a pill (#170): they are a row of
            equal things — two that move the map, one that arms the blast
