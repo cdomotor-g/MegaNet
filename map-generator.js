@@ -89,7 +89,7 @@ const MG_BASES = {
 // `align` is layered mode's next-level-up engrave.
 const MG_PALETTES = {
   print:  { contour: '#8d6e63', contourMajor: '#5d4037', river: '#1565c0', grat: '#90a0b0',
-            gratText: '#5a6b7c', pinField: '#107c10', pinRepeater: '#0b5cab', pinBase: '#c7401a',
+            gratText: '#5a6b7c', pinField: ROLE_COLOR.field, pinRepeater: ROLE_COLOR.repeater, pinBase: ROLE_COLOR.base,
             label: '#1a2430', title: '#1a2430', border: '#333333', align: '#0000ff',
             backbone: '#000000' },
   // Backbone black on purpose in the laser palettes too: in the K40 contract

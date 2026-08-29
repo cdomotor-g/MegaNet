@@ -1931,12 +1931,29 @@ h2.h-bad {
   color: #9fd0ff;
 }
 
+/* Station-typed badges. The Stations tab is the source of truth for what a
+   role looks like — field is green, repeater is blue (ROLE_COLOR in core.js,
+   mirrored by --role-field/--role-repeater above). These two classes carry
+   that meaning into table chips; the pairs stay literal, tint-plus-ink chosen
+   for AA on panel backgrounds, but each family is the same family as its
+   role token. The generic .badge above is NOT part of this contract — it is a
+   neutral count chip used across half the tabs and happens to be blue. */
 .badge--repeater {
+  background: #e8f3ff;
+  color: #0b5cab;
+}
+
+[data-theme="dark"] .badge--repeater {
+  background: #183350;
+  color: #9fd0ff;
+}
+
+.badge--field {
   background: #e8f7ee;
   color: #1a6b35;
 }
 
-[data-theme="dark"] .badge--repeater {
+[data-theme="dark"] .badge--field {
   background: #0e3320;
   color: #7dd6a0;
 }
