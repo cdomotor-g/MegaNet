@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
   <meta name="theme-color" content="#0b5cab">
-  <link rel="stylesheet" href="styles.css?v=20260824b">
+  <link rel="stylesheet" href="styles.css?v=20260829a">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -158,74 +158,74 @@
        APP_VERSION reads it back off this very tag, and an unstamped core.js
        makes every bug report say 'dev'. -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="maps-data.js?v=20260824b"></script>
-  <script src="core.js?v=20260824b"></script>
+  <script src="maps-data.js?v=20260829a"></script>
+  <script src="core.js?v=20260829a"></script>
   <!-- The furniture the seven Leaflet maps share: the base-map picker, and the
        on-map panel every other control on a map is built out of (#164). Above
        app.js because that is where it reads — the first map in the list is the
        Stations map and this is what its corner is made of — not because it has
        to be: like every other module here it only declares. -->
-  <script src="map-controls.js?v=20260824b"></script>
-  <script src="app.js?v=20260824b"></script>
-  <script src="rf-changes.js?v=20260824b"></script>
-  <script src="workbench.js?v=20260824b"></script>
-  <script src="mem-meter.js?v=20260824b"></script>
-  <script src="auth.js?v=20260824b"></script>
-  <script src="map-draw.js?v=20260824b"></script>
-  <script src="path-profile.js?v=20260824b"></script>
-  <script src="link-budget.js?v=20260824b"></script>
-  <script src="networks.js?v=20260824b"></script>
-  <script src="pass-ranges.js?v=20260824b"></script>
-  <script src="bit-flipper.js?v=20260824b"></script>
-  <script src="network-view.js?v=20260824b"></script>
-  <script src="arro-launcher.js?v=20260824b"></script>
-  <script src="arro-data.js?v=20260824b"></script>
-  <script src="datastore.js?v=20260824b"></script>
-  <script src="export.js?v=20260824b"></script>
-  <script src="station-editor.js?v=20260824b"></script>
+  <script src="map-controls.js?v=20260829a"></script>
+  <script src="app.js?v=20260829a"></script>
+  <script src="rf-changes.js?v=20260829a"></script>
+  <script src="workbench.js?v=20260829a"></script>
+  <script src="mem-meter.js?v=20260829a"></script>
+  <script src="auth.js?v=20260829a"></script>
+  <script src="map-draw.js?v=20260829a"></script>
+  <script src="path-profile.js?v=20260829a"></script>
+  <script src="link-budget.js?v=20260829a"></script>
+  <script src="networks.js?v=20260829a"></script>
+  <script src="pass-ranges.js?v=20260829a"></script>
+  <script src="bit-flipper.js?v=20260829a"></script>
+  <script src="network-view.js?v=20260829a"></script>
+  <script src="arro-launcher.js?v=20260829a"></script>
+  <script src="arro-data.js?v=20260829a"></script>
+  <script src="datastore.js?v=20260829a"></script>
+  <script src="export.js?v=20260829a"></script>
+  <script src="station-editor.js?v=20260829a"></script>
   <!-- The Inspections section at the foot of the card station-editor.js
        renders: the door into Inspection History for one station, and the chart
        of what its past visits measured. After station-editor.js because that is
        where it is called from, not because it has to be — like every other
        module here it only declares. -->
-  <script src="station-inspections.js?v=20260824b"></script>
-  <script src="attachments.js?v=20260824b"></script>
-  <script src="inspections.js?v=20260824b"></script>
-  <script src="maintenance.js?v=20260824b"></script>
-  <script src="history.js?v=20260824b"></script>
-  <script src="map-rivers.js?v=20260824b"></script>
-  <script src="map-survey.js?v=20260824b"></script>
-  <script src="map-contours.js?v=20260824b"></script>
-  <script src="map-wind.js?v=20260824b"></script>
-  <script src="map-spider.js?v=20260824b"></script>
-  <script src="map-backbone.js?v=20260824b"></script>
-  <script src="map-blast.js?v=20260824b"></script>
-  <script src="map-locate.js?v=20260824b"></script>
+  <script src="station-inspections.js?v=20260829a"></script>
+  <script src="attachments.js?v=20260829a"></script>
+  <script src="inspections.js?v=20260829a"></script>
+  <script src="maintenance.js?v=20260829a"></script>
+  <script src="history.js?v=20260829a"></script>
+  <script src="map-rivers.js?v=20260829a"></script>
+  <script src="map-survey.js?v=20260829a"></script>
+  <script src="map-contours.js?v=20260829a"></script>
+  <script src="map-wind.js?v=20260829a"></script>
+  <script src="map-spider.js?v=20260829a"></script>
+  <script src="map-backbone.js?v=20260829a"></script>
+  <script src="map-blast.js?v=20260829a"></script>
+  <script src="map-locate.js?v=20260829a"></script>
   <!-- Armed from the station editor card and from the map callout, both of
        which are rendered elsewhere; this only declares the mode. After
        map-blast.js because it is the same kind of thing — a mode on the
        Stations map that one station at a time is in. -->
-  <script src="map-move-pin.js?v=20260824b"></script>
-  <script src="terrain.js?v=20260824b"></script>
+  <script src="map-move-pin.js?v=20260829a"></script>
+  <script src="terrain.js?v=20260829a"></script>
   <!-- After terrain.js because that is what it asks for tiles through, and
        after path-profile.js (further up) whose pathAnalyse and endpoint rules
        it borrows — the same physics, so the map and the profile card cannot
        argue about "obstructed". Neither executes at load, so the order only
        states the dependency (#154). -->
-  <script src="map-los.js?v=20260824b"></script>
-  <script src="modal.js?v=20260824b"></script>
-  <script src="packets.js?v=20260824b"></script>
-  <script src="alert2.js?v=20260824b"></script>
-  <script src="hfem.js?v=20260824b"></script>
+  <script src="map-los.js?v=20260829a"></script>
+  <script src="modal.js?v=20260829a"></script>
+  <script src="packets.js?v=20260829a"></script>
+  <script src="alert2.js?v=20260829a"></script>
+  <script src="hfem.js?v=20260829a"></script>
   <!-- After hfem.js, which it renders the output of. Neither executes at load,
        so nothing would actually break the other way round — the order is here
        because it states the dependency, which is what this list is for (#154). -->
-  <script src="hfem-tab.js?v=20260824b"></script>
-  <script src="network-maps.js?v=20260824b"></script>
-  <script src="serial.js?v=20260824b"></script>
-  <script src="message-log.js?v=20260824b"></script>
-  <script src="bug-report.js?v=20260824b"></script>
-  <script src="map-generator.js?v=20260824b"></script>
-  <script src="init.js?v=20260824b"></script>
+  <script src="hfem-tab.js?v=20260829a"></script>
+  <script src="network-maps.js?v=20260829a"></script>
+  <script src="serial.js?v=20260829a"></script>
+  <script src="message-log.js?v=20260829a"></script>
+  <script src="bug-report.js?v=20260829a"></script>
+  <script src="map-generator.js?v=20260829a"></script>
+  <script src="init.js?v=20260829a"></script>
 </body>
 </html>
