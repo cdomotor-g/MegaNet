@@ -135,7 +135,10 @@ const BugReport = (function () {
     if (ta) ta.focus();
   }
 
-  function onKey(e) { if (e.key === 'Escape') close(); }
+  // preventDefault marks the key claimed: the fullscreen map's own Escape
+  // listener stands down for a claimed key, so closing this dialog cannot
+  // also drop the map out of full screen behind it (the Modal contract).
+  function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); close(); } }
 
   function close() {
     const root = document.getElementById('bugreport-modal');

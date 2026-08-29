@@ -37,13 +37,16 @@ const MapLos = (function () {
                             // the profile card's bill; the signature carries it,
                             // so a future change re-computes rather than lies
   const CONCURRENCY = 4;    // profiles in flight; Terrain dedups tiles beneath
-  const CAP         = 2000; // persisted verdicts kept
+  const CAP         = 5000; // persisted verdicts kept — above the ~3,100 links
+                            // this network draws with filters off, because a
+                            // cap below the working set turns the cache into a
+                            // treadmill (~120 bytes an entry; ~600 KB at cap)
 
   let mem = null;           // Map sig → { v: verdict, r: worstRatio, t: stampMs }
   let gen = 0;              // refreshMapLayers generation; stale results still
                             // cache, they just stop touching dead lines
   let queue = [], running = 0, persistTimer = null;
-  let note = { pending: 0, obstructed: 0, done: 0 };
+  let note = { pending: 0, obstructed: 0, done: 0, failed: 0 };
 
   function hydrate() {
     if (mem) return;
@@ -57,17 +60,21 @@ const MapLos = (function () {
   }
 
   // Writes are debounced: a cold sweep lands results in bursts, and one
-  // stringify of 2,000 entries per burst beats one per link.
+  // stringify of a few thousand entries per burst beats one per link. Only
+  // the *persisted* copy is pruned — evicting from the live Map would throw
+  // away verdicts for lines still on screen and turn the next filter change
+  // into a re-sweep; cache hits refresh their stamp, so what survives the
+  // prune is the working set, not whatever happened to land first.
   function persistSoon() {
     clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
       try {
-        while (mem.size > CAP) {
-          let oldest = null, oldestT = Infinity;
-          for (const [k, v] of mem) if ((v.t || 0) < oldestT) { oldest = k; oldestT = v.t || 0; }
-          mem.delete(oldest);
+        let entries = [...mem.entries()];
+        if (entries.length > CAP) {
+          entries.sort((a, b) => (b[1].t || 0) - (a[1].t || 0));
+          entries = entries.slice(0, CAP);
         }
-        localStorage.setItem(STORE, JSON.stringify(Object.fromEntries(mem)));
+        localStorage.setItem(STORE, JSON.stringify(Object.fromEntries(entries)));
       } catch (_) {}
     }, 2000);
   }
@@ -130,6 +137,7 @@ const MapLos = (function () {
       const job = queue.shift();
       const hit = mem.get(job.sig);
       if (hit) {
+        hit.t = Date.now();
         if (job.gen === gen) { paint(job.line, hit.v); note.done++; if (hit.v === 'obstructed') note.obstructed++; }
         note.pending--;
         continue;
@@ -153,14 +161,23 @@ const MapLos = (function () {
           mem.set(job.sig, { v, r: null, t: Date.now() });
           persistSoon();
         }
-        if (job.gen === gen && v) {
-          paint(job.line, v);
-          note.done++;
-          if (v === 'obstructed') note.obstructed++;
+        // The generation guard everywhere below: a rebuild has already reset
+        // the counters and destroyed this job's line, so a stale result may
+        // land in the cache (it did real work) but not on the ledger.
+        if (job.gen === gen) {
+          if (v) {
+            paint(job.line, v);
+            note.done++;
+            if (v === 'obstructed') note.obstructed++;
+          } else {
+            note.failed++;
+          }
         }
-      }).catch(() => {}).finally(() => {
+      }).catch(() => {
+        if (job.gen === gen) note.failed++;
+      }).finally(() => {
         running--;
-        note.pending--;
+        if (job.gen === gen) note.pending--;
         setNote();
         pump();
       });
@@ -177,8 +194,12 @@ const MapLos = (function () {
     }
     const bits = [];
     if (note.obstructed) bits.push(`<span class="txt-bad">${note.obstructed} obstructed</span>`);
+    else if (note.done) bits.push(`${note.done} checked, none obstructed`);
     if (note.pending) bits.push(`${note.pending} still checking…`);
-    if (!note.obstructed && !note.pending) bits.push('no obstructed links among those drawn');
+    // The loud-failure rule reaches the note too: zero completed checks must
+    // never read as an all-clear, so failures say so in as many words.
+    if (note.failed) bits.push(`<span class="txt-warn">${note.failed} could not be checked — terrain tiles unreachable?</span>`);
+    if (!bits.length) bits.push('no links drawn to check');
     return `${bits.join(' · ')}<br>${caveat}`;
   }
 
@@ -189,7 +210,7 @@ const MapLos = (function () {
     newGeneration() {
       gen++;
       queue = [];
-      note = { pending: 0, obstructed: 0, done: 0 };
+      note = { pending: 0, obstructed: 0, done: 0, failed: 0 };
     },
 
     // Called for every core (non-casing) line as refreshMapLayers draws it.
@@ -202,6 +223,7 @@ const MapLos = (function () {
       const sig = sigFor(a, b);
       const hit = mem.get(sig);
       if (hit) {
+        hit.t = Date.now();
         paint(line, hit.v);
         note.done++;
         if (hit.v === 'obstructed') note.obstructed++;

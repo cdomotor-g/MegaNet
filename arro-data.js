@@ -3371,6 +3371,7 @@ const ArroData = (function () {
       draw(); renderReadout();
     };
     svg.onpointerdown = ev => {
+      if (ev.button) return;   // the primary button gestures; a right-click is the menu
       const g = geom();
       if (!g) return;
       svg.setPointerCapture?.(ev.pointerId);
@@ -3516,6 +3517,7 @@ const ArroData = (function () {
         draw(); drawOv(); renderReadout();
       };
       ov.onpointerdown = ev => {
+        if (ev.button) return;   // as on the stage: only the primary button drags
         const ex = extent();
         if (!ex) return;
         ov.setPointerCapture?.(ev.pointerId);

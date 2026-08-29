@@ -791,6 +791,12 @@ const MessageLog = (() => {
   }
 
   function renderTable() {
+    // A repaint mid-drag destroys the captured grip, and a removed capture
+    // target gets no pointerup — so any drag still held is committed first,
+    // or ml.colDrag would stay set forever and silently gate the Follow poll
+    // for the rest of the session. The gesture visually ends here; the width
+    // it had reached is kept.
+    commitColDrag();
     const el = document.getElementById('ml-table');
     if (el) el.innerHTML = tableHtml();
   }
@@ -1329,13 +1335,32 @@ const MessageLog = (() => {
     renderTable();
   }
 
+  // The one committer for a held column drag. Idempotent, because it has
+  // three callers with overlapping lifetimes: the grip's own release (or its
+  // lostpointercapture, which is all a grip removed from the DOM ever gets),
+  // and the top of renderTable(), which absorbs the race where a repaint
+  // lands mid-drag. No re-render on commit — the <col> already carries the
+  // width, and rebuilding the table here would throw away the scroll
+  // position of a reader hundreds of rows deep. A drag that never moved
+  // commits nothing: a click on a grip is not a resize, and must not park
+  // "whatever width the browser had settled on" in localStorage.
+  function commitColDrag() {
+    const d = ml.colDrag;
+    if (!d) return;
+    ml.colDrag = null;
+    if (!d.moved) return;
+    ml.colw[ml.view][d.key] = d.w;
+    try { localStorage.setItem(`mn-ml-colw-${ml.view}`, JSON.stringify(ml.colw[ml.view])); } catch (_) {}
+  }
+
   // A held grip resizes its column live and commits on release. The grip owns
   // the whole gesture through pointer capture, so no document-level listeners
   // are installed and nothing outlives the pointer; the width is written onto
   // the <col> element as the pointer moves (cheap — no re-render) and goes to
-  // state + localStorage once, on release, when renderTable() re-emits it the
-  // durable way. The Follow poll checks ml.colDrag before it repaints, so the
-  // 30-second refresh cannot yank the dragged header out from under the hand.
+  // state + localStorage once, through commitColDrag(). The Follow poll
+  // checks ml.colDrag before it repaints, and renderTable() commits a drag
+  // it would otherwise orphan, so the 30-second refresh can neither yank the
+  // header out from under the hand nor be silently disabled by one.
   function colGrip(e, key) {
     if (!e || e.button) return;   // the primary button drags; others are not a grab
     e.preventDefault();
@@ -1347,24 +1372,25 @@ const MessageLog = (() => {
     const min = key === 'ts' ? ML_COLW_MIN_TS : ML_COLW_MIN;
     const x0 = e.clientX;
     const w0 = th.offsetWidth;
-    ml.colDrag = { key, w: Math.max(min, w0) };
+    ml.colDrag = { key, w: Math.max(min, w0), moved: false };
     try { grip.setPointerCapture(e.pointerId); } catch (_) {}
     grip.onpointermove = ev => {
       if (!ml.colDrag) return;
+      if (!ml.colDrag.moved && Math.abs(ev.clientX - x0) <= 2) return;
+      ml.colDrag.moved = true;
       const w = Math.max(min, Math.min(ML_COLW_MAX, Math.round(w0 + ev.clientX - x0)));
       ml.colDrag.w = w;
       col.style.width = w + 'px';
     };
     const done = () => {
-      grip.onpointermove = grip.onpointerup = grip.onpointercancel = null;
-      if (!ml.colDrag) return;
-      ml.colw[ml.view][key] = ml.colDrag.w;
-      ml.colDrag = null;
-      try { localStorage.setItem(`mn-ml-colw-${ml.view}`, JSON.stringify(ml.colw[ml.view])); } catch (_) {}
-      renderTable();
+      grip.onpointermove = grip.onpointerup = grip.onpointercancel = grip.onlostpointercapture = null;
+      commitColDrag();
     };
     grip.onpointerup = done;
     grip.onpointercancel = done;
+    // A grip that a repaint removed from the DOM fires only this — pointerup
+    // hit-tests against the new table, where nothing is captured.
+    grip.onlostpointercapture = done;
   }
 
   function rowClick(e, key) {

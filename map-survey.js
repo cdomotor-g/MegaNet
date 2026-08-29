@@ -146,7 +146,7 @@ const MapSurvey = (function () {
     resolving = askJson(SERVICE_URL + '/layers?f=json')
       .then(json => {
         const layers = (json && json.layers) || [];
-        const mark = [], cors = [];
+        const mark = [], cors = [], fields = {};
         for (const l of layers) {
           const name = l.name || '';
           // Only real feature layers are worth asking. The service also lists
@@ -158,9 +158,21 @@ const MapSurvey = (function () {
           if (/destroyed/i.test(name) || /cadastral/i.test(name)) continue;
           if (/cors/i.test(name)) cors.push(l.id);
           else if (/(gda|control mark|survey control)/i.test(name)) mark.push(l.id);
+          else continue;
+          // This same metadata lists each layer's fields, and the app reads
+          // exactly two of the live service's 54 — a register number and an
+          // AHD height. Asking only for the names the label patterns would
+          // match cuts a dense-area response by an order of magnitude (the
+          // join-prefixed keys alone are ~40 characters each). The FULL
+          // prefixed names, verbatim: the joined layers refuse short ones.
+          // No match, or no metadata (the fallback service), stays '*'.
+          const wanted = (l.fields || [])
+            .map(f => f && f.name)
+            .filter(n => n && (REGISTER_KEYS.some(re => re.test(n)) || AHD_KEYS.some(re => re.test(n))));
+          if (wanted.length) fields[l.id] = wanted.join(',');
         }
         if (!mark.length && !cors.length) throw new Error('no recognisable sublayer names');
-        resolved = { mode: 'probed', mark, cors };
+        resolved = { mode: 'probed', mark, cors, fields };
         return resolved;
       })
       .catch(() => {
@@ -178,14 +190,19 @@ const MapSurvey = (function () {
   // one sublayer that honours the parameter. Nothing unbounded gets through
   // without it: the server still stops at its own maxRecordCount, and
   // MAX_MARKS caps what run() will draw.
-  function queryUrl(base, id, b) {
+  function queryUrl(base, id, b, outFields) {
     const params = new URLSearchParams({
       f: 'json', where: '1=1',
       geometry:     `${b.w},${b.s},${b.e},${b.n}`,
       geometryType: 'esriGeometryEnvelope',
       inSR: '4326', outSR: '4326',
       spatialRel: 'esriSpatialRelIntersects',
-      outFields: '*', returnGeometry: 'true',
+      // The probed sublayers pass the two field names the labels actually
+      // read (resolveLayers picked them out of the metadata); '*' is only
+      // for a service whose fields nobody captured. Five decimal places of
+      // geometry is ~1 m — the marks are benchmarks, not centimetre survey.
+      outFields: outFields || '*', returnGeometry: 'true',
+      geometryPrecision: '5',
     });
     return `${id == null ? base : `${base}/${id}`}/query?${params}`;
   }
@@ -211,9 +228,10 @@ const MapSurvey = (function () {
     if (layers.mode === 'fallback') {
       return [{ url: queryUrl(FALLBACK_URL, null, b), category: 'mark' }];
     }
+    const fieldsFor = id => layers.fields && layers.fields[id];
     return [
-      ...layers.mark.map(id => ({ url: queryUrl(SERVICE_URL, id, b), category: 'mark' })),
-      ...layers.cors.map(id => ({ url: queryUrl(SERVICE_URL, id, b), category: 'cors' })),
+      ...layers.mark.map(id => ({ url: queryUrl(SERVICE_URL, id, b, fieldsFor(id)), category: 'mark' })),
+      ...layers.cors.map(id => ({ url: queryUrl(SERVICE_URL, id, b, fieldsFor(id)), category: 'cors' })),
     ];
   }
 

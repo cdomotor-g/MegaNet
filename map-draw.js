@@ -461,7 +461,11 @@ const MapDraw = (function () {
   }
 
   function onKey(e) {
-    if (e.key === 'Escape') { if (pending) cancelPending(); else setTool(''); }
+    // This listener only exists while a tool is armed, so Escape here always
+    // acts — and preventDefault says so, which keeps the fullscreen map's own
+    // Escape from also firing: cancelling a half-drawn line must not throw
+    // the operator out of full screen mid-measurement.
+    if (e.key === 'Escape') { e.preventDefault(); if (pending) cancelPending(); else setTool(''); }
     else if (e.key === 'Enter' && pending && pending.kind === 'line') finishLine();
   }
 

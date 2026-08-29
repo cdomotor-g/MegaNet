@@ -1672,9 +1672,26 @@ function syncMapFullEsc() {
     mapFullEscListener = e => {
       // Modal's capture-phase handler preventDefaults Escape without stopping
       // propagation — so a dialog opened over the full-screen map takes the
-      // key and the map stays full; only an unclaimed Escape exits.
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
-      toggleMapFullscreen(false);
+      // key and the map stays full; only an unclaimed Escape exits. The other
+      // Escape consumers (bug reporter, draw tools, mem panel, sign-in, the
+      // phone drawers) claim the key the same way.
+      if (e.defaultPrevented) return;
+      if (e.key === 'Escape') { e.preventDefault(); toggleMapFullscreen(false); return; }
+      // Tab cycles within the panel while it owns the viewport — Modal's own
+      // walls, borrowed. Without this, Tab walks off into the station table,
+      // the nav and the mem-bar, all invisibly underneath the fixed panel
+      // (and the mem panel opens at z 1500, *below* it — a dialog a keyboard
+      // user could enter and never see).
+      if (e.key !== 'Tab') return;
+      const panel = document.querySelector('.map-panel.is-full');
+      if (!panel) return;
+      const items = [...panel.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])')]
+        .filter(n => n.offsetParent !== null);
+      if (!items.length) return;
+      const at = items.indexOf(document.activeElement);
+      if (e.shiftKey) { if (at <= 0) { e.preventDefault(); items[items.length - 1].focus(); } }
+      else if (at < 0 || at === items.length - 1) { e.preventDefault(); items[0].focus(); }
     };
     document.addEventListener('keydown', mapFullEscListener);
   } else if (!state.mapFullscreen && mapFullEscListener) {
@@ -1976,6 +1993,11 @@ function stopStationsMap() {
   MapSurvey.detach();
   MapContours.detach();
   MapWind.detach();
+  // Not a detach — MapLos holds no layer — but the same duty: the queue is
+  // for lines on the map this function is destroying, so clear it and bump
+  // the generation, or four-at-a-time terrain fetches carry on for minutes
+  // behind whatever tab replaced this one.
+  MapLos.newGeneration();
   state.map = removeMap(state.map);
   state.mapMarkers = [];
   state.mapLines   = [];
