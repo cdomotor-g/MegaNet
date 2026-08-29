@@ -58,6 +58,11 @@
   --rx-bg: #eef4fb;
   --tx-bg: #eef8f1;
   --map-line: #ff6f00;
+  /* A link whose terrain profile says the path is obstructed (MapLos).
+     Crimson rather than the blast red above it: a blast is something an
+     operator armed and will disarm, an obstruction is a property of the
+     ground, and the two can be on screen at once. */
+  --map-line-blocked: #d81b60;
   /* Repeater backbone paths. Black by request — the white casing the map draws
      under it is what carries it on dark imagery, in both themes. */
   --map-backbone: #000000;
@@ -408,6 +413,7 @@
   --rx-bg: #1d3242;
   --tx-bg: #19362a;
   --map-line: #ff9f43;
+  --map-line-blocked: #ff6090;
   --map-backbone: #000000;
   --map-blast: #ff6659;
   --map-blast-ring: #ff8a80;

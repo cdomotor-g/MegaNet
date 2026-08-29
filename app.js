@@ -1811,6 +1811,12 @@ function mapDisplayControlsHtml() {
       Wind regions (AS/NZS 1170.2)
     </label>
     <p class="filter-note" id="map-wind-note">${MapWind.noteHtml()}</p>
+    <label class="filter-check">
+      <input type="checkbox" ${state.mapLos ? 'checked' : ''}
+             onchange="MapLos.setEnabled(this.checked)">
+      Check line of sight on links
+    </label>
+    <p class="filter-note" id="map-los-note">${MapLos.noteHtml()}</p>
     <label class="filter-field filter-field--spaced">
       <span>Station names</span>
       <select onchange="setMapLabelMode(this.value)">
@@ -2145,6 +2151,8 @@ function refreshMapLayers({ skipFit = false } = {}) {
   state.mapLines.forEach(l => l.remove());
   state.mapMarkers = [];
   state.mapLines   = [];
+  // The lines those in-flight LOS checks were painting are gone with them.
+  MapLos.newGeneration();
 
   const located  = state.data.stations.filter(s => s.lat != null && s.lon != null);
   const active   = mapFilterActive();
@@ -2214,8 +2222,12 @@ function refreshMapLayers({ skipFit = false } = {}) {
       line.mnLinkStationId  = l.s.id;       // and lets repeater focus restyle in place
       line.mnLinkRepeaterId = l.r.id;
       line.mnBaseOpacity    = lineOp;
+      // What a restyle should put back when it lets go — MapLos may repaint
+      // this to the obstructed colour, and MapBlast restores to it.
+      line.mnBaseColor      = casing ? '#ffffff' : lineColor;
       line.on('click', MapBackbone.onLineClick);
       state.mapLines.push(line);
+      if (!casing) MapLos.classify(line, l.s, l.r);
     }
   }
 
@@ -2238,10 +2250,15 @@ function refreshMapLayers({ skipFit = false } = {}) {
       line.mnLinkRepeaterId  = p.a.id;
       line.mnLinkRepeaterId2 = p.b.id;
       line.mnBaseOpacity     = lineOp;
+      line.mnBaseColor       = casing ? '#ffffff' : backboneColor;
       line.on('click', MapBackbone.onLineClick);
       state.mapLines.push(line);
+      if (!casing) MapLos.classify(line, p.a, p.b);
     }
   }
+
+  // Every line is queued; now the four profile slots can work the whole list.
+  MapLos.kick();
 
   for (const s of stations) {
     const role   = primaryRole(s);

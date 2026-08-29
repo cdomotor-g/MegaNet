@@ -207,6 +207,12 @@
        Stations map that one station at a time is in. -->
   <script src="map-move-pin.js?v=20260824b"></script>
   <script src="terrain.js?v=20260824b"></script>
+  <!-- After terrain.js because that is what it asks for tiles through, and
+       after path-profile.js (further up) whose pathAnalyse and endpoint rules
+       it borrows — the same physics, so the map and the profile card cannot
+       argue about "obstructed". Neither executes at load, so the order only
+       states the dependency (#154). -->
+  <script src="map-los.js?v=20260824b"></script>
   <script src="modal.js?v=20260824b"></script>
   <script src="packets.js?v=20260824b"></script>
   <script src="alert2.js?v=20260824b"></script>

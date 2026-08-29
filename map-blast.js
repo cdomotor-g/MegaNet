@@ -136,7 +136,10 @@ const MapBlast = (function () {
       if (l.mnLinkRole !== 'core') continue;
       const red = !!id && l.mnLinkRepeaterId === id && !l.mnLinkRepeaterId2;
       if (red) l.setStyle({ color: lineColor });
-      else if (l.mnBlastRed) l.setStyle({ color: restore });
+      // Restore to the line's own colour, not the global token: MapLos may
+      // have painted this line obstructed-red, and disarming a blast must
+      // not quietly declare its path clear.
+      else if (l.mnBlastRed) l.setStyle({ color: l.mnBaseColor || restore });
       l.mnBlastRed = red;
     }
 
