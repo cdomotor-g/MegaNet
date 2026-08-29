@@ -7025,10 +7025,34 @@ code {
 .ml-note { margin: .2rem 0 var(--sp-2); }
 .ml-flush { color: var(--muted); padding: var(--sp-3) 0; }
 
+/* The wrapper's height comes from the tab's own Short/Tall/Max switch,
+   emitted as --ml-h on the element (the --dot pattern: a custom property is
+   the system reaching the element). Scoped under .ml-wrap so every other
+   height-capped table keeps the shared 42vh; the fallback matches the
+   default step so a wrapper missing the property looks the same. */
+.ml-wrap .table-wrap.tall { max-height: var(--ml-h, 68vh); }
+
 /* The table. Time is the leftmost data column and its cell is the row's
    expand button; the station name is capped so it cannot spend the whole of
    a phone's width on one long site name. */
 .ml-table td, .ml-table th { white-space: nowrap; }
+
+/* Column grips — a slim strip on each header's right edge that drags the
+   column's width. Inside the th (which clips overflow) rather than straddling
+   the border, wide enough to hit with a mouse, and visible only when pointed
+   at: a faint bar says "this edge moves". The phone pass hides them below
+   900px, where dragged widths are neutralised anyway. */
+.ml-table th { position: relative; }
+.ml-col-grip {
+  position: absolute; top: 0; right: 0; width: 9px; height: 100%;
+  cursor: col-resize; touch-action: none;
+}
+.ml-col-grip::after {
+  content: ''; position: absolute; top: 18%; bottom: 18%; right: 3px;
+  width: 2px; border-radius: 1px; background: transparent;
+}
+.ml-col-grip:hover::after,
+.ml-col-grip:active::after { background: var(--ctl-border); }
 .ml-pick { width: 1.6rem; text-align: center; }
 .ml-ts { padding-right: .4rem; }
 .ml-expand {
@@ -7983,6 +8007,11 @@ code {
      specificity fight with another rule. It does not remove the columns'
      proportions above --bp-md, where they are right. */
   .table-wrap col { width: auto !important; }
+
+  /* The rule above just neutralised dragged column widths, so the grips that
+     set them go too — a 9px strip is no target for a finger, and the Columns
+     chooser is the path that works here. */
+  .ml-col-grip { display: none; }
 
   /* Sideways scroll is invisible until you try it, so the wrapper says it is
      there: the shadow only paints while there is more table to the right. */
