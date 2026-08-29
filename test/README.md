@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the sixteen that run in CI
+npm run all                       # the seventeen that run in CI
 ```
 
 | Command | What it does |
@@ -32,6 +32,7 @@ npm run all                       # the sixteen that run in CI
 | `npm run shell` | the shell's landmarks, skip link, focus policy and disclosure state; the six-step breakpoint scale; and WCAG contrast for every token pair in both themes |
 | `npm run tabs` | EPIC #107's per-tab Definition of Done, per tab that claims to have been through a U-issue: no inline styles, tables wrapped/captioned/scoped, scroll regions named, clickable rows keyboard-reachable, landmarks and controls named, headings stepping by one, and no sideways scroll at 375/768/1440 in both themes — plus the two pattern-level claims (the basin drawing's shortcut condition, and the ARRO chart's palette round trip) |
 | `npm run rivers` | the rivers layer on the Stations map: named, grouped, labelled, and every named river reachable as a real control without a mouse — with the geometry seeded, because Overpass is off-origin |
+| `npm run survey` | the survey-marks layer on the Stations map: marks drawn, labelled with their register numbers and AHD heights, and the note counting only what the viewport actually holds — against a stub that answers exactly as the live SurveyControl service does: empty feature sets for any query carrying `resultRecordCount`, group layers whose `/query` can only 400, and every field name join-prefixed |
 | `npm run mapctl` | the on-map panels put themselves away: a real pointer clicks a control inside Base map / Map display / Draw & measure, moves off, and the flyout has to go with it — plus the icon toggle, the keyboard's safety net, and the pin as the only thing that persists |
 | `npm run help` | every tab's help entry is real content, every link out of the panel lands, and each walkthrough names itself and fits the rail |
 | `npm run insp` | the Inspections form renders what `meganet.inspection_form` says, on all six sheets — with the datastore answered out of the migration |
@@ -39,7 +40,7 @@ npm run all                       # the sixteen that run in CI
 | `npm run history` | a saved record reads back as the sheet it was written on, and exports as it reads — with the records written by the app during the run |
 | `npm run movepin` | the Stations tab's links and its move-pin mode: five pills in the callout and the editor card, the two document searches carrying the *reduced* station name rather than the raw one and asking for both spellings of the words that have two, and the mode armed, dragged with a real pointer, read back, cancelled and saved — plus the map's other interactive modes taken off on the way in |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the sixteen that run in CI |
+| `npm run all` | the seventeen that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
 `toplevel`, `registry`, `nav`, `shell`, `tabs` and `help` take `-v` too, to list what
