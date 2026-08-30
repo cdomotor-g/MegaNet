@@ -6,10 +6,11 @@
 //               height/levelling check near a site (#120, part of #119).
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for `state`; across to app.js for rerenderMapLegend
-// and esc. Both are only called from inside MapSurvey's own functions, so
-// this file's position among the modules is free, the same way #133 left it
-// for MapRivers.
+// Reaches back to core.js for `state`, `esc` and `stationMapLinkUrls` (the
+// Street View link on the callout is the station popup's own, so the URL shape
+// is written once); across to app.js for rerenderMapLegend. All of them are
+// only called from inside MapSurvey's own functions, so this file's position
+// among the modules is free, the same way #133 left it for MapRivers.
 //
 // The shape below mirrors MapRivers deliberately (#119's own integration
 // notes ask for it): bbox rounding, an LRU cache keyed by view, a debounced
@@ -21,6 +22,22 @@
 // divIcon marker is styled from styles.css (var(--map-survey)) rather than
 // drawn into an SVG with a colour baked in at fetch time, so a theme switch
 // repaints it for free.
+//
+// Each mark's callout carries a launch link to its Survey Control Mark Report
+// (#174): a PDF holding the administrative details, the coordinate and AHD
+// blocks, the survey connections and — when the mark carries a Form 6 sketch —
+// the dimensioned sketch that ties it to the road edge, a fence corner or a
+// building. That sketch is the thing a crew actually needs to find the mark on
+// the ground, and it is why the link is the first pill on the callout.
+//
+// The details beside it (mark type, condition, last visit, locality, AHD class
+// and order, the free-text remarks) are NOT carried in the bbox query. They are
+// fetched for one mark when its callout opens, because the join-prefixed keys
+// alone cost ~40 bytes per field per feature and a dense view crosses seven
+// sublayers: measured against the live service, the fields this callout reads
+// take one 177-mark response from 30 kB to 180 kB, per sublayer, per view — to
+// show data for the single mark anybody clicks. So the layer query stays as
+// lean as #120 left it and the callout pays for itself.
 //
 // Pointer interaction is delegated through the map's own click and mousemove,
 // hit-tested against the drawn points, for the reason MapRivers' pointer-
@@ -42,6 +59,21 @@ const MapSurvey = (function () {
   // hardcoded entry in MARK_NAME/CORS_NAME below.
   const FALLBACK_URL = 'https://spatial-gis.information.qld.gov.au/arcgis/rest/services/Basemaps/FoundationData/FeatureServer/8';
   const ATTRIBUTION  = '© State of Queensland (Department of Resources)';
+  // Where a mark's own report lives. The SurveyControl sublayers carry the
+  // full URL in a joined field ('…rpt_link.report_url'), which is the one the
+  // callout uses when it has it; this base is for deriving the same URL from a
+  // mark number when it doesn't — the fallback FeatureServer below publishes
+  // mrk_id but no report link at all, and the callout wants a working link
+  // before the detail lookup lands. The shape was checked against the live
+  // service over 328 marks and CORS sites (Brisbane, plus every CORS site in
+  // Queensland): SCR + the mark number left-padded to six digits + '.pdf',
+  // matching the joined field exactly every time.
+  const REPORT_BASE  = 'https://qspatial.information.qld.gov.au/SurveyReport/';
+  // …and the only origin an href on this callout is allowed to point at. The
+  // report URL is a value from a third-party service, so it is checked against
+  // this rather than trusted into an href; anything else falls back to the
+  // derived URL.
+  const REPORT_ORIGIN = 'https://qspatial.information.qld.gov.au/';
 
   const PANE        = 'mnSurvey';
   // Sits between the river pane (340) and the leader lines (350) in the
@@ -63,7 +95,16 @@ const MapSurvey = (function () {
   const MAX_MARKS    = 400;    // rendered per view, across every sublayer combined
   const HIT_PX       = 8;      // px around a mark that the map-level hover/click hit-test accepts
   const CACHE_MAX    = 30;
+  // One entry per mark clicked, not per view, so this is a much smaller number
+  // than CACHE_MAX would suggest: a crew opens a handful of callouts in a
+  // session and re-opening one should cost nothing.
+  const DETAIL_MAX   = 60;
   const FAIL_TTL     = 60000;
+  // How much of the free-text remarks the callout prints before it truncates.
+  // Some marks carry a paragraph of visit history and sky obstructions, which
+  // at the callout's width is three lines and past that is a wall — the whole
+  // of it is on the `title`, and all of it is in the report.
+  const NOTE_CHARS   = 120;
 
   let map = null, layer = null, timer = null, seq = 0, failedAt = 0;
   let resolved = null, resolving = null;   // sublayer resolution — see resolveLayers()
@@ -72,7 +113,15 @@ const MapSurvey = (function () {
   let projected = null;      // drawnPoints in layer space, rebuilt on zoom
   let hoverTip = null, cursorSet = false, moveRaf = null;
   let popup = null;          // the open callout, if any — ours to close on clear
+  let popupMark = null;      // which mark that callout is about
   const cache = new Map();   // 's,w,n,e' → { points, capped, total }
+  // Per-mark detail, keyed by mark number so the same mark costs one lookup no
+  // matter which sublayer it was drawn from (a mark with a datum GDA lineage
+  // and a levelled AHD lineage is returned by two of them). Only answers are
+  // kept: a failed lookup is not cached, so re-opening the callout retries it,
+  // which is the right cost for something a person just asked for.
+  const detail = new Map();     // mark number → attribute object
+  const detailPending = new Map();   // mark number → in-flight promise
   let note = { kind: 'off', drawn: 0, total: 0, capped: false };
 
   // Field matching, checked against the live service (the spot-check #119
@@ -87,6 +136,34 @@ const MapSurvey = (function () {
   // date that a bare /ahd/ numeric pick can land on whenever 'ahdheight' is
   // null — and a date printed as "m AHD" is worse than no height at all.
   const AHD_KEYS       = [/(^|\.)ahdheight$/i, /ahd[_ ]?height/i];
+
+  // What the callout reads once a mark is clicked, in the order it prints
+  // them, matched the same way as the two above — on the key's LAST segment,
+  // because every attribute on the live joined layers arrives prefixed. Names
+  // are the live service's own (checked against /layers on the SurveyControl
+  // MapServer and against the Survey Control Mark Report the link opens, whose
+  // headings these fields are: "Mark Type", "Mark Condition", "Last Visited",
+  // "Locality Description", "Sketch Available", "Related Information").
+  //
+  // Deliberately short. The service publishes 54 fields per mark and the whole
+  // of it is one click away in the report — what earns a place here is what a
+  // crew standing at the site needs before they open a PDF on a phone: what
+  // the mark physically is, whether it was there last time anyone looked, what
+  // street it is on, and whether its height is good enough for the levelling
+  // check that brought them.
+  const DETAIL_KEYS = {
+    report:    /(^|\.)report_url$/i,      // the launch link, straight from the service
+    markType:  /(^|\.)mrktype_de$/i,      // STAND, R/INF, "BRASS PLAQUE IN CONC" …
+    condition: /(^|\.)mrkcnd_de$/i,       // GOOD / NOT FOUND / DISTURBED / DAMAGED
+    lastVisit: /(^|\.)lastvisit_dt$/i,    // epoch ms, UTC midnight of the local date
+    locality:  /(^|\.)locality_de$/i,     // 'MUSGRAVE TCE/LLOYD ST-ALDERLEY'
+    town:      /(^|\.)town_nm$/i,         // stands in for locality on CORS rows
+    altName:   /(^|\.)alt1_nm$/i,         // 'AUSCOPE MLAP', council mark numbers
+    sketch:    /(^|\.)form6_fg$/i,        // 'Y' when the report carries a sketch
+    ahdClass:  /(^|\.)ahdcls_de$/i,       // 'Class D'
+    ahdOrder:  /(^|\.)ahdacc_de$/i,       // '4th ORDER'
+    notes:     /(^|\.)relinfo_de$/i,      // visit history, obstructions, what it looks like
+  };
 
   function pickField(attrs, patterns) {
     if (!attrs) return null;
@@ -146,7 +223,7 @@ const MapSurvey = (function () {
     resolving = askJson(SERVICE_URL + '/layers?f=json')
       .then(json => {
         const layers = (json && json.layers) || [];
-        const mark = [], cors = [], fields = {};
+        const mark = [], cors = [], fields = {}, detailFields = {}, idFields = {};
         for (const l of layers) {
           const name = l.name || '';
           // Only real feature layers are worth asking. The service also lists
@@ -159,20 +236,31 @@ const MapSurvey = (function () {
           if (/cors/i.test(name)) cors.push(l.id);
           else if (/(gda|control mark|survey control)/i.test(name)) mark.push(l.id);
           else continue;
-          // This same metadata lists each layer's fields, and the app reads
-          // exactly two of the live service's 54 — a register number and an
-          // AHD height. Asking only for the names the label patterns would
+          // This same metadata lists each layer's fields, and the *bbox* query
+          // reads exactly two of the live service's 54 — a register number and
+          // an AHD height. Asking only for the names the label patterns would
           // match cuts a dense-area response by an order of magnitude (the
           // join-prefixed keys alone are ~40 characters each). The FULL
           // prefixed names, verbatim: the joined layers refuse short ones.
           // No match, or no metadata (the fallback service), stays '*'.
-          const wanted = (l.fields || [])
-            .map(f => f && f.name)
-            .filter(n => n && (REGISTER_KEYS.some(re => re.test(n)) || AHD_KEYS.some(re => re.test(n))));
+          const names  = (l.fields || []).map(f => f && f.name).filter(Boolean);
+          const wanted = names.filter(n => REGISTER_KEYS.some(re => re.test(n)) || AHD_KEYS.some(re => re.test(n)));
           if (wanted.length) fields[l.id] = wanted.join(',');
+          // The same trick again for the one-mark lookup behind a callout —
+          // the header's arithmetic is why this list is asked for a single
+          // mark and never for a viewport. It carries the bbox fields too, so
+          // one response answers the whole callout.
+          const extra = names.filter(n => !wanted.includes(n)
+                                       && Object.values(DETAIL_KEYS).some(re => re.test(n)));
+          if (extra.length) detailFields[l.id] = wanted.concat(extra).join(',');
+          // Which field the lookup's WHERE clause names. Taken from the
+          // service's own metadata rather than assembled from a prefix, for
+          // the reason the sublayer ids are probed rather than guessed.
+          const idField = names.find(n => REGISTER_KEYS[0].test(n));
+          if (idField) idFields[l.id] = idField;
         }
         if (!mark.length && !cors.length) throw new Error('no recognisable sublayer names');
-        resolved = { mode: 'probed', mark, cors, fields };
+        resolved = { mode: 'probed', mark, cors, fields, detailFields, idFields };
         return resolved;
       })
       .catch(() => {
@@ -210,15 +298,22 @@ const MapSurvey = (function () {
   // Esri JSON straight to the {lat, lon, …} shape draw() wants — building an
   // actual GeoJSON object here would only be decomposed right back out for
   // L.marker, so that intermediate step is skipped.
-  function pointsFromEsriJson(json, category) {
+  //
+  // `layerId` rides along so a callout can go back to the sublayer this mark
+  // came from for its details. And when the response already carries them —
+  // the fallback service is asked with outFields '*', so it always does — they
+  // are kept on the point itself rather than looked up again: an answer that
+  // has already been paid for should not be re-bought because it arrived early.
+  function pointsFromEsriJson(json, category, layerId) {
     const out = [];
     for (const f of (json && json.features) || []) {
       const g = f.geometry;
       if (!g || g.x == null || g.y == null) continue;
       out.push({
-        lat: g.y, lon: g.x, category,
+        lat: g.y, lon: g.x, category, layerId,
         register: pickField(f.attributes, REGISTER_KEYS),
         ahd:      pickNumericField(f.attributes, AHD_KEYS),
+        detail:   hasDetail(f.attributes) ? detailFrom(f.attributes) : null,
       });
     }
     return out;
@@ -226,12 +321,12 @@ const MapSurvey = (function () {
 
   function queriesFor(layers, b) {
     if (layers.mode === 'fallback') {
-      return [{ url: queryUrl(FALLBACK_URL, null, b), category: 'mark' }];
+      return [{ url: queryUrl(FALLBACK_URL, null, b), category: 'mark', id: null }];
     }
     const fieldsFor = id => layers.fields && layers.fields[id];
     return [
-      ...layers.mark.map(id => ({ url: queryUrl(SERVICE_URL, id, b, fieldsFor(id)), category: 'mark' })),
-      ...layers.cors.map(id => ({ url: queryUrl(SERVICE_URL, id, b, fieldsFor(id)), category: 'cors' })),
+      ...layers.mark.map(id => ({ url: queryUrl(SERVICE_URL, id, b, fieldsFor(id)), category: 'mark', id })),
+      ...layers.cors.map(id => ({ url: queryUrl(SERVICE_URL, id, b, fieldsFor(id)), category: 'cors', id })),
     ];
   }
 
@@ -253,6 +348,7 @@ const MapSurvey = (function () {
   // the legend entry already applies via active().
   function clearLayer() {
     if (popup) { popup.remove(); popup = null; }
+    popupMark = null;
     clearHover();
     drawnKey = null;
     drawnPoints = [];
@@ -264,8 +360,141 @@ const MapSurvey = (function () {
     rerenderMapLegend();
   }
 
+  // The hover name: the mark number on its own, because that is what the pin
+  // is and a floating label has room for nothing else.
   function markLabel(p) {
     return p.register || (p.category === 'cors' ? 'CORS site' : 'Survey mark');
+  }
+
+  // The callout's heading, where there IS room to say what the number is. The
+  // word is the report's own — its first field is "Mark Number".
+  function calloutTitle(p) {
+    if (!p.register) return p.category === 'cors' ? 'CORS site' : 'Survey mark';
+    return `${p.category === 'cors' ? 'CORS' : 'Mark'} ${p.register}`;
+  }
+
+  // ── One mark's own detail ────────────────────────────────────────────────
+  // Fetched when a callout opens, never for a viewport — see the header for
+  // the arithmetic. Everything below is about one mark at a time.
+
+  // Does this row carry detail at all? The mark-type field is the test: it is
+  // published by both services, read by the callout, and never asked for by
+  // the bbox query — so its presence means "this row came from somewhere that
+  // answered with everything", and its absence means the callout still has a
+  // lookup to do. Testing the *key* rather than a value, because a mark with
+  // no recorded type is still a row that was answered in full.
+  function hasDetail(attrs) {
+    return !!attrs && Object.keys(attrs).some(n => DETAIL_KEYS.markType.test(n));
+  }
+
+  // DETAIL_KEYS applied to a row, keeping only what is actually there.
+  // Normalised at the door rather than at render time so what is held onto is
+  // a dozen short strings and not the 54-field row they arrived in.
+  function detailFrom(attrs) {
+    const out = {};
+    const names = Object.keys(attrs || {});
+    for (const k of Object.keys(DETAIL_KEYS)) {
+      const n = names.find(n => DETAIL_KEYS[k].test(n));
+      const v = n == null ? null : attrs[n];
+      if (v != null && v !== '') out[k] = v;
+    }
+    return out;
+  }
+
+  // What the callout knows about this mark right now: what its own row came
+  // with (the fallback service answers with '*', so there it is always
+  // everything), else whatever a previous callout looked up. Null means the
+  // lookup has not happened yet.
+  function markDetail(p) {
+    return (p && p.detail) || (p && p.register ? detail.get(p.register) || null : null);
+  }
+
+  // The one-mark lookup, or null when this mark cannot be looked up — no
+  // probed sublayer behind it, no id field in the service's metadata, or a
+  // mark number that is not a mark number.
+  function detailUrl(layers, p) {
+    if (!layers || layers.mode !== 'probed' || p.layerId == null) return null;
+    const idField = layers.idFields && layers.idFields[p.layerId];
+    if (!idField) return null;
+    // Digits and nothing else go into the WHERE clause, checked here, so
+    // there is no quoting question to get wrong. Every mark number the live
+    // service returned across the sample was of this shape.
+    if (!/^\d+$/.test(p.register || '')) return null;
+    const params = new URLSearchParams({
+      f: 'json',
+      where: `${idField}='${p.register}'`,
+      outFields: (layers.detailFields && layers.detailFields[p.layerId]) || '*',
+      returnGeometry: 'false',
+    });
+    return `${SERVICE_URL}/${p.layerId}/query?${params}`;
+  }
+
+  // Resolves to the detail object, or to null when there is none to be had.
+  // Never rejects: a callout that cannot fill itself in says so and keeps the
+  // report link, which is the part that matters.
+  function loadDetail(p) {
+    const have = markDetail(p);
+    if (have) return Promise.resolve(have);
+    const key = p.register;
+    if (!key) return Promise.resolve(null);
+    if (detailPending.has(key)) return detailPending.get(key);
+    const job = resolveLayers()
+      .then(layers => {
+        const url = detailUrl(layers, p);
+        if (!url) return null;
+        return askJson(url).then(json => {
+          const features = (json && json.features) || [];
+          if (!features.length) return null;
+          const d = detailFrom(features[0].attributes);
+          detail.set(key, d);
+          while (detail.size > DETAIL_MAX) detail.delete(detail.keys().next().value);
+          return d;
+        });
+      })
+      .catch(() => null)
+      .then(d => { detailPending.delete(key); return d; });
+    detailPending.set(key, job);
+    return job;
+  }
+
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // The service's dates are epoch milliseconds at UTC midnight of the day the
+  // report prints: 1698969600000 against mark 43906's "Last Visited
+  // 03-Nov-2023". Read back in UTC for exactly that reason — a local-time read
+  // west of Greenwich would print the day before the report does.
+  function fmtDate(v) {
+    if (typeof v !== 'number' || !isFinite(v)) return null;
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return null;
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  }
+
+  // The mark's report. The service's own link when there is one and it points
+  // where it should — an href is not the place to trust a third party's
+  // string — and otherwise the same URL derived from the mark number, which
+  // is what the fallback service's marks and every callout opened before its
+  // lookup lands are left with.
+  function reportUrl(p, d) {
+    const given = d && d.report;
+    if (typeof given === 'string' && given.startsWith(REPORT_ORIGIN)) return given;
+    return /^\d+$/.test(p.register || '')
+      ? `${REPORT_BASE}SCR${String(p.register).padStart(6, '0')}.pdf`
+      : null;
+  }
+
+  // Free text off the service. The remarks arrive as a paragraph of run-on
+  // visit history with the line breaks of whatever screen they were typed on,
+  // so they are collapsed to one line before anything else happens to them —
+  // the whole of that line rides on the element's title, and `clip` is what
+  // goes on screen. All of it is in the report either way.
+  function collapse(v) {
+    return String(v).replace(/\s+/g, ' ').trim();
+  }
+
+  function clip(t) {
+    return t.length > NOTE_CHARS ? `${t.slice(0, NOTE_CHARS - 1).trimEnd()}…` : t;
   }
 
   function draw(points, key) {
@@ -321,23 +550,97 @@ const MapSurvey = (function () {
     if (cursorSet && map) { map.getContainer().style.cursor = ''; cursorSet = false; }
   }
 
+  // The callout. `status` is where the one-mark lookup has got to — 'ok' once
+  // it has landed (or was never needed), 'loading' while it is out, 'fail'
+  // when it came back with nothing. Only the middle block moves: the heading,
+  // the coordinates and the report link are all built from what drawing the
+  // mark already knew, so the callout is never empty and never waits to be
+  // useful.
+  function calloutHtml(p, status) {
+    const d       = markDetail(p) || {};
+    const isCors  = p.category === 'cors';
+    const kind    = isCors ? 'CORS site' : 'Survey control mark';
+    const where   = d.locality || d.town;
+    const visited = fmtDate(d.lastVisit);
+    const grade   = [d.ahdClass, d.ahdOrder].filter(Boolean).join(' / ');
+    const url     = reportUrl(p, d);
+    const links   = stationMapLinkUrls({ lat: p.lat, lon: p.lon, name: calloutTitle(p) });
+    const line    = (html, cls) => `<span class="mn-pop-line${cls ? ' ' + cls : ''}">${html}</span><br>`;
+    const out = [`<strong>${esc(calloutTitle(p))}</strong><br>`];
+
+    // What it is, and — once known — what it physically is. 'STAND', 'R/INF',
+    // 'BRASS PLAQUE IN CONC': the difference between looking for a lid at
+    // ground level and looking at a wall.
+    out.push(line(esc(kind + (d.markType ? ` · ${d.markType}` : ''))));
+    if (where)      out.push(line(esc(where)));
+    if (d.altName)  out.push(line(`Also ${esc(d.altName)}`));
+    out.push(line(`${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`));
+    // The height and how far it can be trusted, together — a benchmark's
+    // class and order are the whole question in a levelling check.
+    if (p.ahd != null) out.push(line(esc(`${p.ahd} m AHD${grade ? ` · ${grade}` : ''}`)));
+    // Whether it was still there the last time anybody looked. A mark last
+    // visited in 1998 and a mark recorded NOT FOUND are both worth knowing
+    // before driving out to it.
+    if (d.condition || visited) {
+      out.push(line(esc([d.condition, visited && `last visited ${visited}`]
+        .filter(Boolean).join(' · '))));
+    }
+    if (d.notes) {
+      const notes = collapse(d.notes);
+      out.push(line(`<span title="${esc(notes)}">${esc(clip(notes))}</span>`, 'txt-muted'));
+    }
+    if (status === 'loading') out.push(line('Looking up mark details…', 'txt-muted'));
+    if (status === 'fail')    out.push(line('Mark details unavailable.', 'txt-muted'));
+
+    // The links, as the row of pills every other callout in the app ends with
+    // (#170). The report first: it is the reason this callout exists.
+    const pills = [];
+    if (url) {
+      const sketch = d.sketch === 'Y';
+      const what = 'The Queensland Survey Control Mark Report for this mark — administrative detail,'
+        + ' GDA2020 and AHD blocks, survey connections'
+        + (sketch ? ', and the Form 6 sketch dimensioning the mark to what is around it' : '');
+      pills.push(`<a class="pill" href="${esc(url)}" target="_blank" rel="noopener"
+         title="${esc(what)}">Mark report (PDF${sketch ? ', with sketch' : ''}) ↗</a>`);
+    }
+    if (links) {
+      pills.push(`<a class="pill" href="${esc(links.google)}" target="_blank" rel="noopener"
+         title="Opens the nearest Google Street View panorama; sites with no coverage open the map at this location instead"
+         >Google Street View ↗</a>`);
+    }
+    if (pills.length) out.push(`<div class="mn-popup-actions pill-row">${pills.join('\n')}</div>`);
+    return out.join('\n');
+  }
+
+  function openCallout(p) {
+    if (popup) { popup.remove(); popup = null; }
+    popupMark = p;
+    let status = markDetail(p) ? 'ok' : 'loading';
+    // Content as a function, not a string: when the lookup lands, Leaflet's
+    // own popup.update() calls it again and re-lays-out and re-positions the
+    // callout in one step. Writing into the open popup's DOM instead would be
+    // undone by the next update() Leaflet does for its own reasons.
+    popup = L.popup({ maxWidth: 300, minWidth: 240 })
+      .setLatLng([p.lat, p.lon])
+      .setContent(() => calloutHtml(p, status))
+      .openOn(map);
+    if (status === 'ok') return;
+    loadDetail(p).then(d => {
+      // Only if this is still the callout that asked. A second click before
+      // the first lookup returns is the ordinary case, not the exotic one.
+      if (popupMark !== p || !popup || !popup.isOpen()) return;
+      status = d ? 'ok' : 'fail';
+      popup.update();
+    });
+  }
+
   function onMapClick(e) {
     if (!layer) return;
     if (state.draw.tool) return;                    // an armed draw tool owns the click
     if (state.link && state.link.picking) return;   // so does a link-budget pick
     const p = markAtPoint(e.layerPoint);
     if (!p) return;
-    const isCors = p.category === 'cors';
-    if (popup) { popup.remove(); popup = null; }
-    popup = L.popup({ maxWidth: 260 })
-      .setLatLng([p.lat, p.lon])
-      .setContent(`
-        <strong>${esc(markLabel(p))}</strong><br>
-        <span class="mn-pop-line">${isCors ? 'CORS site' : 'Survey control mark'}</span><br>
-        <span class="mn-pop-line">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span>
-        ${p.ahd != null ? `<br><span class="mn-pop-line">${p.ahd} m AHD</span>` : ''}
-      `)
-      .openOn(map);
+    openCallout(p);
   }
 
   function onMapMove(e) {
@@ -427,7 +730,7 @@ const MapSurvey = (function () {
       if (mine !== seq || !map) return;
       const queries = queriesFor(layers, b);
       return Promise.all(queries.map(q =>
-        askJson(q.url).then(json => pointsFromEsriJson(json, q.category)).catch(() => null)
+        askJson(q.url).then(json => pointsFromEsriJson(json, q.category, q.id)).catch(() => null)
       )).then(results => {
         if (mine !== seq || !map) return;
         // One bad sublayer doesn't sink the rest; every sublayer failing does.

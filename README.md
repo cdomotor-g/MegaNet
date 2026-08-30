@@ -983,6 +983,30 @@ actually holds rather than everything the padded fetch box returned. Epic
 — that check has since been made against the live service, and the service's
 behaviour, quirks included, is pinned by `test/survey.mjs`.
 
+Clicking a mark opens its callout, and since #174 the callout's first action is a link to
+that mark's own **Survey Control Mark Report** — the Department's PDF, holding
+the administrative detail, the GDA2020 and AHD blocks, the survey connections
+and, on most marks, the Form 6 sketch that dimensions the mark to the road
+edge, a fence corner or a building. That sketch is the thing that gets a crew
+from a coordinate to the actual lid in the grass, which is why the link leads.
+The link is the one the service publishes; where a mark's row carries none —
+the fallback point layer publishes no report link at all — it is derived from
+the mark number, `SCR` + six digits, a shape checked against 328 live marks and
+CORS sites before it was relied on. Beside it, Street View at the mark's own
+coordinates.
+
+The callout also names what the mark physically is (`STAND`, `R/INF`, `BRASS
+PLAQUE IN CONC`), its locality description, its condition and when anybody last
+visited it, the AHD height with its class and order, and the Department's own
+remarks. **None of that is fetched for the map** — the service publishes 54
+fields per mark behind join-prefixed keys ~40 characters long, and asking for
+what the callout reads takes a 177-mark viewport response from 30 kB to 180 kB,
+per sublayer, per view. So the viewport query stays at the two fields it always
+asked for, and one mark's full row is fetched when its callout opens and cached
+against re-opening. A callout is useful before that lands and stays useful if it
+never does: the heading, the coordinates, the height and the report link are all
+built from what drawing the mark already knew.
+
 **Wind loading regions.** *Wind regions (AS/NZS 1170.2)*, another **Map
 display** switch, draws the Standard's wind loading regions — A0–A5, B1, B2,
 C and D — under the pins, on the severity ramp the Standard's own map uses:
