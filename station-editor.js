@@ -121,6 +121,11 @@ function editorForm(s) {
   // decides whether the row is drawn is whether it came back with anything.
   const links   = mapLinksHtml(s);
   const movePin = MapMovePin.editorButtonHtml(s);
+  // The wind region the station's coordinate falls in — the same answer its map
+  // callout gives, so the card and the callout never disagree. Read now, and
+  // filled in when the polygons land if this page has not needed them yet.
+  const wind    = MapWind.regionState(s.lat, s.lon);
+  MapWind.askRegion('ef-wind', s.lat, s.lon);
   return `
     <div class="panel-header ef-head">
       <h3>${esc(s.name) || 'New Station'}</h3>
@@ -151,6 +156,17 @@ function editorForm(s) {
       ${movePin ? `<div class="full ef-movepin">${movePin}</div>` : ''}
       ${links ? `<div class="full small ef-links">${links}</div>` : ''}
       <label>Elevation AHD (m)<input type="number" step="any" id="ef-elev" value="${s.elevation_ahd ?? ''}"></label>
+      <!-- Read-only because it is not a property of the station: it is where the
+           station's coordinate falls on AS/NZS 1170.2's map, so moving the pin
+           above changes it and typing in it could only ever be wrong. A field
+           rather than a note all the same — it holds a value worth copying into
+           a mast calculation, which is exactly what input[readonly] is for
+           (design-system.md §3). Filled in behind the fetch when the polygons
+           are not on hand yet; see MapWind.askRegion(). -->
+      <label>Wind region (AS/NZS 1170.2)
+        <input type="text" id="ef-wind" readonly value="${escAttr(wind.text)}"
+               data-mn-wind="${escAttr(`${s.lat},${s.lon}`)}" title="${escAttr(wind.title)}">
+      </label>
       <label>RM System ID<input type="number" id="ef-rmsys" value="${s.rm_system_id || 1}"></label>
       <label>TBRG bucket size (mm/tip)
         <input type="number" step="0.1" min="0" id="ef-bucket" value="${s.TBRGbucketSize ?? ''}" placeholder="not recorded">

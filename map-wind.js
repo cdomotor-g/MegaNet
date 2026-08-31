@@ -142,6 +142,70 @@ const MapWind = (function () {
     return null;
   }
 
+  // ── "What wind region is this?" without the layer being on ────────────────
+  //
+  // The station callout and the station editor card both ask this, and neither
+  // can wait for somebody to tick the layer on first — a mast conversation
+  // starts from the station, not from the map display panel. So an ask fetches
+  // the same file the layer draws.
+  //
+  // That is a deliberate softening of the rule the header states, not a
+  // forgetting of it: nothing is fetched at *page load*, which is the half that
+  // mattered. Opening a station's callout is an ask, one cached file (650 kB of
+  // continent, ~135 kB over the wire) is what the answer costs, and every later
+  // ask — every other station, every re-render of the card — is free.
+
+  const ASK_TITLE = 'AS/NZS 1170.2:2021 wind region, from Geoscience Australia’s reading of the '
+    + 'Standard (~1 km boundaries). Indicative — not a design determination.';
+
+  // Remembered so the line can say "unavailable" rather than sit on
+  // "looking up…" forever. Not a lockout: the next ask tries again, the same
+  // way the layer's checkbox is its own retry.
+  let askFailed = false;
+
+  // What the line should read *right now*, from whatever is on hand. Callers
+  // render this synchronously, so a station opened after the polygons have
+  // landed shows its region with no flash of placeholder text.
+  function regionState(lat, lon) {
+    if (lat == null || lon == null) {
+      return { text: '—', title: 'This station has no position recorded, so there is nothing to look up.' };
+    }
+    if (data) {
+      const wr = regionAt(lat, lon);
+      return wr
+        ? { text: `${wr.region}${wr.area ? ` (${wr.area})` : ''}`, title: ASK_TITLE }
+        : { text: 'outside the mapped regions',
+            title: 'This position falls outside every polygon in the dataset — offshore, or outside Australia.' };
+    }
+    if (askFailed) {
+      return { text: 'unavailable', title: 'The wind regions file could not be read — offline, or the app is '
+                                         + 'running from file://. It is tried again on the next station.' };
+    }
+    return { text: 'looking up…', title: ASK_TITLE };
+  }
+
+  // Fill an element with the region at a point once the polygons are on hand.
+  // A no-op when they already are — the caller rendered the answer itself — so
+  // this only ever runs after a fetch, which is always after the markup it
+  // writes into has reached the DOM.
+  //
+  // `data-mn-wind` on that element carries the point it was rendered for, and
+  // is checked before writing: a card that re-rendered for a different station
+  // while the file was in flight keeps its element id, and the answer to the
+  // old question must not land in the new one.
+  function askRegion(elId, lat, lon) {
+    if (data || lat == null || lon == null) return;
+    const key = `${lat},${lon}`;
+    const fill = () => {
+      const el = document.getElementById(elId);
+      if (!el || el.dataset.mnWind !== key) return;
+      const st = regionState(lat, lon);
+      if (el.tagName === 'INPUT') el.value = st.text; else el.textContent = st.text;
+      el.title = st.title;
+    };
+    ensureData().then(fill, () => { askFailed = true; fill(); });
+  }
+
   function noteHtml() {
     const key = Object.entries(REGION_COLOR).map(([r, c]) =>
       `<span class="legend-dot" style="--dot:${c}"></span>&nbsp;${r === 'A' ? 'A0–A5' : r}`).join(' &nbsp;');
@@ -183,6 +247,12 @@ const MapWind = (function () {
     // What wind region a point sits in, from the loaded data — null until the
     // layer has fetched it. The station callout asks this.
     regionAt,
+
+    // The pair the station callout and the station editor card use: what the
+    // line reads now, and the fill that follows if the polygons are not on
+    // hand yet. See the block above regionState().
+    regionState,
+    askRegion,
 
     // Off by default, not persisted — MapSurvey's reasoning: a layer that
     // costs a network request stays off until asked for, and a fresh page

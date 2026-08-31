@@ -565,8 +565,10 @@ function stationAlertIds(s) {
 }
 
 // ALERT ids grouped with their sensor type(s), sorted by id — for displays
-// where the reading kind matters (e.g. map popups: "Rainfall — 6128"). Uses the
-// normalized sensor list so battery / rainfall / water-level labels come through.
+// where the reading kind matters (e.g. map popups: "6128 — Rainfall"). Uses the
+// normalized sensor list so battery / rainfall / water-level labels come
+// through. The id leads, because the id is what the list is sorted by and what
+// anybody scanning a callout is looking for; the reading kind qualifies it.
 function stationAlertIdTypes(s) {
   const byId = new Map();
   stationSensors(s).forEach(se => {
@@ -2335,6 +2337,12 @@ function refreshMapLayers({ skipFit = false } = {}) {
     marker.bindPopup(() => {
       const idTypes = stationAlertIdTypes(s);
       const arroUrl = arroSiteUrl(arroSiteId(s));
+      // The wind region is answered whether or not the wind layer is drawn: the
+      // first callout that asks pays for the polygons, every one after it is
+      // free, and this line fills itself in when they land (MapWind.askRegion).
+      const windId  = `mn-wind-${s.id}`;
+      const wind    = MapWind.regionState(s.lat, s.lon);
+      MapWind.askRegion(windId, s.lat, s.lon);
       return `
       <strong>${esc(s.name)}</strong><br>
       ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${r}</span>`).join('')}<br>
@@ -2344,16 +2352,11 @@ function refreshMapLayers({ skipFit = false } = {}) {
         ? `<span class="mn-pop-line">repeater delay ${s.repeater.delay_ms} ms</span><br>` : ''}
       ${s.station_number ? `<span class="mn-pop-line">Stn #${esc(s.station_number)}</span><br>` : ''}
       ${idTypes.length ? `<span class="mn-pop-line">AlertID:</span><br>${idTypes.map(t =>
-        `<span class="mn-pop-line mn-pop-indent">${t.types.length ? esc(t.types.join(' / ')) + ' — ' : ''}${t.id}</span>`).join('<br>')}<br>` : ''}
+        `<span class="mn-pop-line mn-pop-indent">${t.id}${t.types.length ? ' — ' + esc(t.types.join(' / ')) : ''}</span>`).join('<br>')}<br>` : ''}
       ${s.elevation_ahd != null ? `<span class="mn-pop-line">Elev: ${s.elevation_ahd} m AHD</span>` : ''}
-      ${(() => {
-        // Only when the wind layer has fetched its data — the callout claims a
-        // region only while the polygons that claim it are on hand, and being
-        // ~1 km simplified the claim stays indicative (MapWind's note says so).
-        const wr = MapWind.regionAt(s.lat, s.lon);
-        return wr ? `<br><span class="mn-pop-line">Wind region: ${esc(wr.region)}${
-          wr.area ? ` (${esc(wr.area)})` : ''} — indicative</span>` : '';
-      })()}
+      <br><span class="mn-pop-line">Wind region: <span id="${escAttr(windId)}"
+        data-mn-wind="${escAttr(`${s.lat},${s.lon}`)}"
+        title="${escAttr(wind.title)}">${esc(wind.text)}</span> <span class="mn-pop-note">indicative</span></span>
       ${acmaRepeaterPopupExtra(s)}
       <!-- Every action on this callout is a pill (#170): they are a row of
            equal things — two that move the map, one that arms the blast

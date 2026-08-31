@@ -967,7 +967,13 @@ failure mode — no network means no rivers, and nothing else on the tab changes
 display** panel, draws the Department of Resources' permanent survey marks and
 CORS sites once you are zoomed in close enough for them to be more than
 scatter — for the field crew doing a height or levelling check near a site,
-each mark carries its register number and AHD height. The layer spent a while
+each mark carries its register number and AHD height. **On by default**, and
+remembered between visits the way the rivers switch is: a crew standing at a
+site should not have to go find a checkbox first, and an operator who switches
+the marks off means it. Default-on still costs nothing at page load — the
+minimum zoom gates the fetch and the Stations map opens fitted to the whole
+network, an extent far wider than that, so the layer's opening state is *zoom
+in to look them up* and no request is made until somebody zooms to a site. The layer spent a while
 answering "marks in view" while drawing almost none of them, and the repair is
 worth recording because no part of it surfaced as an error: the live
 SurveyControl service answers any query carrying a `resultRecordCount`
@@ -1011,15 +1017,29 @@ built from what drawing the mark already knew.
 display** switch, draws the Standard's wind loading regions — A0–A5, B1, B2,
 C and D — under the pins, on the severity ramp the Standard's own map uses:
 green temperate through amber and orange to cyclonic red, with the Pilbara's
-D in purple. Once the layer has loaded, every station callout names its
-region, so "what wind region is that site in?" — the first question of every
-mast and aerial conversation — is answered where the sites are. The polygons
-are Geoscience Australia's machine-readable interpretation of the 2021
-boundaries (eCat 146359, **CC-BY 4.0**), simplified to about 1 km and bundled
-at `data/wind-regions-as1170-2021.geojson`, so there is no live service to be
-down; the file is fetched once, on first enable, never at page load. GA is
-blunt that the dataset is **indicative and not for design use**, and the note
-under the switch and the callout line both say so.
+D in purple.
+
+"What wind region is that site in?" — the first question of every mast and
+aerial conversation — is answered whether or not that layer is drawn. Every
+station callout carries a **Wind region** line, and the station editor card
+below the table carries it as a read-only field beside the elevation: read-only
+because it is not a property of the station but of where the station's
+coordinate falls, so moving the pin changes it and typing in it could only ever
+be wrong. Asking is what fetches the polygons — the callout opens on *looking
+up…* and fills itself in — and every station after the first is free. Nothing
+is fetched at page load, which was always the half of that rule that mattered.
+
+The polygons are Geoscience Australia's machine-readable interpretation of the
+2021 boundaries (eCat 146359, **CC-BY 4.0**), simplified to about 1 km and
+bundled at `data/wind-regions-as1170-2021.geojson`, so there is no live service
+to be down — 650 kB of continent, about 135 kB over the wire, once per browser.
+GA is blunt that the dataset is **indicative and not for design use**, and the
+note under the switch, the callout line and the field's own tooltip all say so.
+
+**The callout's ALERT ids lead.** `6143 — Battery`, not `Battery — 6143`. The
+list is sorted by id, and an id is what somebody opening a callout came for, so
+the number sits at the left edge where a sorted column belongs and the reading
+kind qualifies it rather than hiding it.
 
 **Line of sight, for every link at once.** The Path profile tool answers
 "does this hop clear the terrain?" for the one line an operator drew; *Check
@@ -1878,13 +1898,28 @@ readings so a single 2014 mm spike stops flattening a 300 mm trace, and draws
 the removals that fall outside as triangles on the top edge rather than hiding
 them.
 
-**Three ways into a closer look.** *Drag zooms* (or Shift held) draws a box,
-and the window becomes the box — both axes now, not just time. A flat sweep
+**The toolbar over it is three captioned rows**, and the split is the whole of
+it: *what the chart draws* (Series · Reading · Style · Vertical axis), then *the
+window and what happens over it* (Window · Mark · Drag to zoom), then *Export*.
+Before that it was fourteen controls in one wrapping run — four identically
+styled segmented controls with nothing but a tooltip to say which governed
+what, five bare checkboxes of two different kinds mixed together (three that put
+marks on the chart, two that change what a drag means), and `90d` the same shape
+of button as `PNG`, a jump-the-window control and a download reading as
+siblings. Rows rather than one run because a flat run re-groups itself at every
+width: at 1440 the checkboxes sat beside the axis buttons and at 1100 they did
+not, so what looked like a group was an accident of the viewport. Each caption
+is the group's accessible name as well as its visible one — `role="group"` with
+`aria-labelledby` — so the eye and a screen reader are told the same thing.
+Nothing about what any control *does* changed.
+
+**Three ways into a closer look.** *Drag to zoom → box* (or Shift held) draws a
+box, and the window becomes the box — both axes now, not just time. A flat sweep
 stays the time-only zoom years of use have taught, and the rubber band says
 which it will be before the button comes up: full height for a flat sweep, the
-box itself otherwise. *Drag zooms y* (or Alt held, so neither zoom ever needs
-the toolbar) is the other direction: time stays put and the vertical axis
-becomes the dragged span. And the overview's window is no longer
+box itself otherwise. *Drag to zoom → vertical* (or Alt held, so neither zoom
+ever needs the toolbar) is the other direction: time stays put and the vertical
+axis becomes the dragged span. And the overview's window is no longer
 drag-to-recentre only — each edge carries a grip that drags that edge alone,
 so the window resizes as well as moves. What the drag zooms do to the vertical
 axis is not private state: they commit through the toolbar's own axis mode —

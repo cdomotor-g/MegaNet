@@ -2453,8 +2453,8 @@ const ArroData = (function () {
       <p class="small ad-table-note" id="ad-table-note">
         ${capped
           ? `The first ${rows.length.toLocaleString()} of ${total.toLocaleString()} readings in this
-             window. Zoom in for fewer, or use <b>Export kept</b> / <b>Export + verdict</b> in the
-             toolbar for all of them.`
+             window. Zoom in for fewer, or use <b>Kept CSV</b> / <b>All + verdict CSV</b> under
+             <b>Export</b> in the toolbar for all of them.`
           : `All ${total.toLocaleString()} reading${total === 1 ? '' : 's'} in this window.`}
       </p>
       <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="ad-table-note">
@@ -2580,82 +2580,137 @@ const ArroData = (function () {
   // aria-pressed, because "on" was a background colour and nothing else: a
   // screen reader was given four identically-announced buttons and no way to
   // tell which one the chart was currently obeying (#137 made the same fix on
-  // the region chips).
+  // the region chips). The group's own name is the caption grp() draws above
+  // it, so this is only the run of buttons.
   const seg = (group, cur, opts, fn) => `
-    <div class="ad-seg" role="group" aria-label="${escAttr(group)}">
+    <div class="ad-seg">
       ${opts.map(([v, label, tip]) => `
         <button class="${cur === v ? 'on' : ''}" title="${escAttr(tip || label)}"
                 aria-pressed="${cur === v}" aria-label="${escAttr(group)}: ${escAttr(label)}"
                 onclick="ArroData.${fn}('${v}')">${esc(label)}</button>`).join('')}
     </div>`;
 
+  // One captioned group on the toolbar. The caption is the group's accessible
+  // name as well as its visible one — aria-labelledby rather than a repeated
+  // aria-label — so the eye and a screen reader are told the same thing.
+  //
+  // Captions are the whole point of this arrangement. Before them the toolbar
+  // was fourteen controls in one flat wrapping run: four identically-styled
+  // segmented controls with nothing but a tooltip to say which governed what,
+  // five bare checkboxes of two different kinds mixed together, and "90d" the
+  // same shape of button as "PNG" — a jump-the-window control and a download
+  // reading as siblings. Naming each cluster, splitting the checkboxes by what
+  // they actually do, and putting a rule between "what is drawn" and "what is
+  // shown and taken away" is the whole fix; nothing here changes what any
+  // control does.
+  //
+  // Ids are static and the tab renders one chart at a time (both instances
+  // share ad-stage / ad-svg), so they cannot collide.
+  const grpId = name => 'ad-grp-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const grp = (name, body, cls) => `
+    <div class="ad-grp${cls ? ' ' + cls : ''}" role="group" aria-labelledby="${grpId(name)}">
+      <span class="ad-grp-cap" id="${grpId(name)}">${esc(name)}</span>
+      <div class="ad-grp-body">${body}</div>
+    </div>`;
+
   function toolbarHtml() {
     const anyFilt = ad.mode !== 'raw';
     return `
       <div class="ad-toolbar">
-        ${seg('Which series', ad.mode, [
-          ['raw', 'Raw', 'Everything as exported'],
-          ['filtered', 'Filtered', 'Only what passed the 357 test'],
-          ['both', 'Both', 'Filtered over raw, so removals show'],
-        ], 'setMode')}
-        ${seg('Reading', ad.transform, [
-          ['value', 'Value', 'The reading itself'],
-          ['increment', 'Increment', 'Step between consecutive readings'],
-          ['rate', 'Rate/h', 'Step divided by the hours between readings'],
-        ], 'setTransform')}
-        ${seg('Chart style', ad.chartType, [
-          ['line', 'Line', 'Straight between readings'],
-          ['step', 'Step', 'Hold each reading until the next — how an accumulator behaves'],
-          ['dots', 'Points', 'One mark per reading, nothing joined'],
-        ], 'setChart')}
-        ${seg('Vertical axis', ad.yMode, [
-          ['auto', 'Auto', 'Fit everything on screen, spikes included'],
-          ['kept', 'Kept', 'Fit the readings that passed the filter — removals run off the top'],
-          ['zero', 'Zero', 'Always include zero'],
-          ['manual', 'Fixed', 'Type your own range'],
-        ], 'setY')}
-        ${ad.yMode === 'manual' ? `
-          <span class="ad-tool-grp">
-            <input type="number" class="ad-num" value="${escAttr(ad.yMin)}" placeholder="min"
-                   onchange="ArroData.setYRange('min', this.value)">
-            <input type="number" class="ad-num" value="${escAttr(ad.yMax)}" placeholder="max"
-                   onchange="ArroData.setYRange('max', this.value)">
-          </span>` : ''}
-        <span class="ad-tool-grp" role="group" aria-label="What to mark on the chart">
-          <label class="ad-chk${anyFilt ? '' : ' ad-chk--off'}" title="Mark every reading the filter rejected">
-            <input type="checkbox" ${ad.showRemoved ? 'checked' : ''} ${anyFilt ? '' : 'disabled'}
-                   onchange="ArroData.setFlag('showRemoved', this.checked)"> removed</label>
-          <label class="ad-chk" title="Mark repeat timestamps dropped before filtering">
-            <input type="checkbox" ${ad.showDupes ? 'checked' : ''}
-                   onchange="ArroData.setFlag('showDupes', this.checked)"> repeats</label>
-          <label class="ad-chk" title="Mark where an accumulator wrap was corrected">
-            <input type="checkbox" ${ad.showRollover ? 'checked' : ''}
-                   onchange="ArroData.setFlag('showRollover', this.checked)"> rollovers</label>
-          <label class="ad-chk" title="Drag a box to zoom to it — time and value together. Or hold Shift while dragging">
-            <input type="checkbox" ${ad.brush ? 'checked' : ''}
-                   onchange="ArroData.setFlag('brush', this.checked)"> drag zooms</label>
-          <label class="ad-chk" title="Drag up or down to rescale the vertical axis to that span; time stays put. Or hold Alt while dragging">
-            <input type="checkbox" ${ad.yDrag ? 'checked' : ''}
-                   onchange="ArroData.setFlag('yDrag', this.checked)"> drag zooms y</label>
-        </span>
-        <span class="ad-tool-grp" role="group" aria-label="Jump the window">
-          ${[['all', 'All'], ['24h', '24h'], ['7d', '7d'], ['30d', '30d'], ['90d', '90d']]
-            .map(([k, l]) => `<button onclick="ArroData.preset('${k}')"
-                   aria-label="Show ${l === 'All' ? 'the whole record' : 'the last ' + l}"
-                   title="Show the last ${l === 'All' ? 'of everything' : l}">${l}</button>`).join('')}
-        </span>
-        <span class="ad-tool-grp" role="group" aria-label="Export">
-          <button onclick="ArroData.exportCsv('kept')"
-                  aria-label="Export the filtered readings as CSV"
-                  title="The filtered series, as CSV">Export kept</button>
-          <button onclick="ArroData.exportCsv('all')"
-                  aria-label="Export every reading with the filter's verdict, as CSV"
-                  title="Every reading with the filter's verdict against it">Export + verdict</button>
-          <button onclick="ArroData.exportImg('svg')"
-                  aria-label="Download the chart as an SVG image" title="Download the chart as SVG">SVG</button>
-          <button onclick="ArroData.exportImg('png')"
-                  aria-label="Download the chart as a PNG image" title="Download the chart as PNG">PNG</button>
-        </span>
+        <!-- Row one is what the chart is drawing: pick a series, pick what to
+             read off it, pick how to draw it, pick the scale it is drawn
+             against. Four choices, in the order somebody makes them. -->
+        <div class="ad-toolbar-row">
+          ${grp('Series', seg('Which series', ad.mode, [
+            ['raw', 'Raw', 'Everything as exported'],
+            ['filtered', 'Filtered', 'Only what passed the 357 test'],
+            ['both', 'Both', 'Filtered over raw, so removals show'],
+          ], 'setMode'))}
+          ${grp('Reading', seg('Reading', ad.transform, [
+            ['value', 'Value', 'The reading itself'],
+            ['increment', 'Increment', 'Step between consecutive readings'],
+            ['rate', 'Rate/h', 'Step divided by the hours between readings'],
+          ], 'setTransform'))}
+          ${grp('Style', seg('Chart style', ad.chartType, [
+            ['line', 'Line', 'Straight between readings'],
+            ['step', 'Step', 'Hold each reading until the next — how an accumulator behaves'],
+            ['dots', 'Points', 'One mark per reading, nothing joined'],
+          ], 'setChart'))}
+          ${grp('Vertical axis',
+            seg('Vertical axis', ad.yMode, [
+              ['auto', 'Auto', 'Fit everything on screen, spikes included'],
+              ['kept', 'Kept', 'Fit the readings that passed the filter — removals run off the top'],
+              ['zero', 'Zero', 'Always include zero'],
+              ['manual', 'Fixed', 'Type your own range'],
+            ], 'setY') + (ad.yMode === 'manual' ? `
+              <span class="ad-tool-grp ad-yrange">
+                <input type="number" class="ad-num" value="${escAttr(ad.yMin)}" placeholder="min"
+                       aria-label="Vertical axis minimum"
+                       onchange="ArroData.setYRange('min', this.value)">
+                <span class="small" aria-hidden="true">to</span>
+                <input type="number" class="ad-num" value="${escAttr(ad.yMax)}" placeholder="max"
+                       aria-label="Vertical axis maximum"
+                       onchange="ArroData.setYRange('max', this.value)">
+              </span>` : ''))}
+        </div>
+        <!-- Row two is the window on the record and what happens over it:
+             which slice is on screen, what gets marked on it, what dragging on
+             it does. Two kinds of tick, and they used to be one run of five —
+             three that put marks on the chart beside two that change what a
+             drag means, which is not one group however it is laid out. -->
+        <div class="ad-toolbar-row">
+          ${grp('Window', `
+            <span class="ad-tool-grp">
+              ${[['all', 'All'], ['24h', '24h'], ['7d', '7d'], ['30d', '30d'], ['90d', '90d']]
+                .map(([k, l]) => `<button onclick="ArroData.preset('${k}')"
+                       aria-label="Show ${l === 'All' ? 'the whole record' : 'the last ' + l}"
+                       title="Show the last ${l === 'All' ? 'of everything' : l}">${l}</button>`).join('')}
+            </span>`)}
+          ${grp('Mark', `
+            <span class="ad-tool-grp">
+              <label class="ad-chk${anyFilt ? '' : ' ad-chk--off'}" title="Mark every reading the filter rejected${
+                anyFilt ? '' : ' — no filter is running on the Raw series'}">
+                <input type="checkbox" ${ad.showRemoved ? 'checked' : ''} ${anyFilt ? '' : 'disabled'}
+                       onchange="ArroData.setFlag('showRemoved', this.checked)"> removed</label>
+              <label class="ad-chk" title="Mark repeat timestamps dropped before filtering">
+                <input type="checkbox" ${ad.showDupes ? 'checked' : ''}
+                       onchange="ArroData.setFlag('showDupes', this.checked)"> repeats</label>
+              <label class="ad-chk" title="Mark where an accumulator wrap was corrected">
+                <input type="checkbox" ${ad.showRollover ? 'checked' : ''}
+                       onchange="ArroData.setFlag('showRollover', this.checked)"> rollovers</label>
+            </span>`)}
+          ${grp('Drag to zoom', `
+            <span class="ad-tool-grp">
+              <label class="ad-chk" title="Drag a box to zoom to it — time and value together. Or hold Shift while dragging">
+                <input type="checkbox" ${ad.brush ? 'checked' : ''}
+                       onchange="ArroData.setFlag('brush', this.checked)"> box</label>
+              <label class="ad-chk" title="Drag up or down to rescale the vertical axis to that span; time stays put. Or hold Alt while dragging">
+                <input type="checkbox" ${ad.yDrag ? 'checked' : ''}
+                       onchange="ArroData.setFlag('yDrag', this.checked)"> vertical</label>
+            </span>`)}
+        </div>
+        <!-- And row three is the four ways to take the chart away. Its own row
+             rather than the end of row two: nothing on it changes what is on
+             screen, and at every width the chart column actually gets, the four
+             buttons wrapped onto a line of their own anyway — a row that is
+             always the last line is easier to find than one that is sometimes
+             the last line. Left-aligned with everything above it, so the
+             captions read down a single rail. -->
+        <div class="ad-toolbar-row">
+          ${grp('Export', `
+            <span class="ad-tool-grp">
+              <button onclick="ArroData.exportCsv('kept')"
+                      aria-label="Export the filtered readings as CSV"
+                      title="The filtered series, as CSV">Kept CSV</button>
+              <button onclick="ArroData.exportCsv('all')"
+                      aria-label="Export every reading with the filter's verdict, as CSV"
+                      title="Every reading with the filter's verdict against it">All + verdict CSV</button>
+              <button onclick="ArroData.exportImg('svg')"
+                      aria-label="Download the chart as an SVG image" title="Download the chart as SVG">SVG</button>
+              <button onclick="ArroData.exportImg('png')"
+                      aria-label="Download the chart as a PNG image" title="Download the chart as PNG">PNG</button>
+            </span>`)}
+        </div>
       </div>`;
   }
 

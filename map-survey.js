@@ -122,7 +122,13 @@ const MapSurvey = (function () {
   // which is the right cost for something a person just asked for.
   const detail = new Map();     // mark number → attribute object
   const detailPending = new Map();   // mark number → in-flight promise
-  let note = { kind: 'off', drawn: 0, total: 0, capped: false };
+  // Null until the first run(), rather than seeded to 'off'. The panel can be
+  // rendered before attach() has had a chance to run once, and now that the
+  // toggle opens on, a note reading "Survey marks are hidden" under a ticked box
+  // is the panel contradicting itself. What it opens on instead is read in
+  // noteHtml(), at render time rather than here — this file still only
+  // declares, so its position among the modules stays free (test/toplevel.mjs).
+  let note = null;
 
   // Field matching, checked against the live service (the spot-check #119
   // asks for). Every attribute on the SurveyControl sublayers arrives
@@ -690,15 +696,20 @@ const MapSurvey = (function () {
   }
 
   function noteHtml() {
-    switch (note.kind) {
+    // Before the first run() there is no note yet, and the answer is whatever
+    // run() is about to reach: hidden with the layer off, and "zoom in" with it
+    // on, because the Stations map opens at the whole network's extent — far
+    // wider than MIN_ZOOM (see the note on state.mapSurvey in core.js).
+    const n = note || { kind: state.mapSurvey ? 'zoom' : 'off' };
+    switch (n.kind) {
       case 'off':     return 'Survey marks are hidden.';
       case 'zoom':    return 'Zoom in to look up survey marks — this view is too wide to ask for.';
       case 'loading': return 'Looking up survey marks…';
       case 'fail':    return 'Survey marks unavailable — the Queensland spatial data service could not be reached.';
       case 'ok':
-        if (!note.drawn) return 'No survey marks in view.';
-        return `<strong>${note.drawn}</strong> mark${note.drawn === 1 ? '' : 's'} in view` +
-               (note.capped ? ` · more in view not drawn` : '') + '.';
+        if (!n.drawn) return 'No survey marks in view.';
+        return `<strong>${n.drawn}</strong> mark${n.drawn === 1 ? '' : 's'} in view` +
+               (n.capped ? ` · more in view not drawn` : '') + '.';
       default:        return '';
     }
   }
@@ -790,14 +801,20 @@ const MapSurvey = (function () {
 
     noteHtml,
 
-    // Not persisted to localStorage, unlike MapRivers. This is a specialist
-    // layer (a field crew checking a benchmark near a site) rather than
-    // something most sessions want on; off-by-default-every-visit is one
-    // click to undo and keeps "no extra requests fire with the layer off"
-    // true of a fresh page load without having to reason about a remembered
-    // on-state.
+    // Remembered between visits, the way MapRivers is. This layer was
+    // off-by-default-and-forgotten on the reasoning that it is a specialist
+    // one; the request that turned it on by default settles the first half,
+    // and the second half then has to go with it — a default of on that
+    // forgets being switched off is a checkbox an operator has to keep
+    // switching off.
+    //
+    // Nothing fires at page load either way: MIN_ZOOM gates the fetch and the
+    // Stations map opens at the whole network's extent (see the note on
+    // state.mapSurvey), so an on-by-default layer still makes no request until
+    // somebody zooms to a site.
     setEnabled(on) {
       state.mapSurvey = on;
+      try { localStorage.setItem('mn-survey', on ? 'on' : 'off'); } catch (_) {}
       if (!on) { clearTimeout(timer); clearLayer(); setNote('off'); return; }
       setNote(map && map.getZoom() >= MIN_ZOOM ? 'loading' : 'zoom');
       sync();

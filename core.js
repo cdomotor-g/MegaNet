@@ -1518,10 +1518,17 @@ const state = {
   // The one map display switch that is remembered between visits: it is the only
   // one that costs a network request, so an operator who turns it off means it.
   mapRivers:      localStorage.getItem('mn-rivers') !== 'off',
-  // Survey marks & CORS sites (see MapSurvey, #120). Off by default and not
-  // persisted — see the comment on MapSurvey.setEnabled() for why this one
-  // departs from mapRivers' remembered-between-visits pattern.
-  mapSurvey:      false,
+  // Survey marks & CORS sites (see MapSurvey, #120). On by default now, and
+  // remembered like mapRivers: a crew standing at a site wants the benchmarks
+  // beside the station without going looking for a checkbox first, and an
+  // operator who turns them off means it.
+  //
+  // Default-on costs nothing at page load, which is what kept it off before.
+  // MapSurvey has a MIN_ZOOM of 12 and the Stations map opens fitted to every
+  // station in the network — an extent far wider than that — so the layer's
+  // opening state is "zoom in to look them up" and no request is made until
+  // somebody actually zooms to a site.
+  mapSurvey:      localStorage.getItem('mn-survey') !== 'off',
   // LiDAR contour lines (see MapContours, #121). Off by default and not
   // persisted, for MapSurvey's reasons; the interval is the 5 m default
   // SoRT's experience picked as the sane fast one.

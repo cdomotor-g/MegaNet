@@ -4197,6 +4197,15 @@ hr {
   padding-left: 1.1em;
 }
 
+/* The qualifier on a derived line — "indicative" after a wind region. Muted and
+   a step down, because it is a caveat on the value beside it rather than part
+   of the value: the eye should land on B2, then on the word telling it how far
+   to trust B2. */
+.mn-pop-note {
+  color: var(--muted);
+  font-size: .74rem;
+}
+
 .mn-pop-pill {
   background: var(--pill, var(--muted));
   /* White by default — every role hue clears AA with it (5.03:1 at worst).
@@ -6822,12 +6831,50 @@ code {
   .ad-compare-grid { grid-template-columns: 1fr; }
 }
 
+/* The chart toolbar. Three rows, and the split between them is the point: what
+   the chart draws, then the window on the record and what happens over it, then
+   the ways to take it away. A rule between each, a caption over every cluster.
+
+   Rows rather than one wrapping run, because a flat run re-groups itself at
+   every width — at 1440 the checkboxes sat beside the axis buttons and at 1100
+   they did not, so what looked like a group was an accident of the viewport.
+   Rows that each wrap internally keep the grouping the same at every width,
+   which is the property a caption is claiming. */
 .ad-toolbar {
-  display: flex; flex-wrap: wrap; gap: .4rem .5rem;
-  align-items: center; margin-bottom: .5rem;
+  display: flex; flex-direction: column;
+  gap: var(--sp-2); margin-bottom: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--panel-sub);
+}
+/* `stretch`, so every caption in a row starts at the same line however tall the
+   controls under it are — a row of buttons is taller than a row of ticks, and
+   bottom-aligning the groups put their captions at two different heights. The
+   controls take the slack instead, centred inside the group. */
+.ad-toolbar-row {
+  display: flex; flex-wrap: wrap;
+  align-items: stretch; gap: var(--sp-2) var(--sp-4);
+}
+/* The divider between the two rows. On the row rather than between the groups
+   inside it: a vertical rule between wrapping groups leads the next line the
+   moment one wraps, which reads as a broken layout rather than a separator. */
+.ad-toolbar-row + .ad-toolbar-row {
+  border-top: 1px solid var(--border); padding-top: var(--sp-2);
+}
+.ad-grp { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
+.ad-grp-cap {
+  font-size: var(--fs-xs); color: var(--muted);
+  text-transform: uppercase; letter-spacing: .04em; line-height: 1;
+}
+.ad-grp-body {
+  display: flex; flex: 1; flex-wrap: wrap;
+  align-items: center; gap: var(--sp-1) var(--sp-2);
 }
 .ad-tool-grp { display: flex; gap: .25rem; align-items: center; flex-wrap: wrap; }
 .ad-num { width: 76px; }
+/* The two Fixed-range boxes only exist while Fixed is chosen, so they arrive
+   beside the axis buttons rather than under them. */
+.ad-yrange { gap: var(--sp-1); }
 .ad-chk { display: flex; align-items: center; gap: .25rem; font-size: .78rem; color: var(--muted); }
 /* A tick whose filter is not running. The control is `disabled` too, so this is
    the visible half of a state the accessibility tree already has. */
