@@ -293,6 +293,16 @@ jobs:
         working-directory: test
         run: npm run movepin
 
+      # What the Stations filter box *selects*. `npm run smoke` opens the tab
+      # and asserts a clean console; a search box handing back the wrong
+      # stations throws nothing at all, so nothing else here can see it. The
+      # windows (`4021-4025`) are the new rule; the names, bare addresses and
+      # pasted lists asserted beside them are the old ones, so that "additive"
+      # is something the harness holds rather than a word in a commit message.
+      - name: Search — an address window selects the stations inside it
+        working-directory: test
+        run: npm run search
+
       # The database half of the claim is proven against a real Postgres by
       # tools/check_mqtt.sql, which CI cannot run — it needs a connection. What
       # this covers is the half that only exists in a browser: that an

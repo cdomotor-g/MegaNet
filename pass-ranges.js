@@ -7,8 +7,8 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, netName and announce, and
 // across to app.js for the whole of the shared search machinery —
-// prepareSearch, parseSearchTerms, stationMatchesSearch, findStationMatches,
-// markHits, markAlertId, stationAlertIds, passRangeCoversId and
+// prepareSearch, stationMatchesSearch, findStationMatches, markHits,
+// markAlertId, alertIdsInRange, stationAlertIds, passRangeCoversId and
 // repeaterPassingCount. That is the longest reach back into app.js of the
 // fourteen, and it is deliberate: this tab's filter box is meant to behave
 // exactly like the Stations one, so the two share the rules rather than
@@ -54,17 +54,23 @@ function passRangeMatch(s, q) {
 }
 
 // A repeater row survives the filter if the repeater itself matches, if one of
-// the stations it serves matches, or if the query is an ALERT id its pass
-// ranges cover — the last one answers "which repeater carries this address?".
+// the stations it serves matches, or if the query is an ALERT id — or a window
+// of them — its pass ranges cover. That last one answers "which repeater
+// carries this address?", and now "which repeaters carry this block?".
 function passRangeRepeaterMatch(r, matched, q) {
   if (!q) return true;
   if (passRangeMatch(r, q)) return true;
   if (matched.some(s => passRangeMatch(s, q))) return true;
+  const { nums, ranges } = prepareSearch(q);
   // Every address in the box is tried, not just the first — a pasted list is
   // the case where "which repeater carries these?" is actually being asked.
-  return parseSearchTerms(q)
-    .filter(t => /^\d+$/.test(t))
-    .some(t => passRangeCoversId(r.repeater, Number(t)));
+  if (nums.some(t => passRangeCoversId(r.repeater, Number(t)))) return true;
+  // A window asks the same of a block: the repeater answers if it carries any
+  // address on file inside it. Addresses on file rather than every number
+  // between the ends, because an address nobody has issued is carried by
+  // nothing, and a window is allowed to be wide.
+  return ranges.some(([low, high]) =>
+    alertIdsInRange(low, high).some(id => passRangeCoversId(r.repeater, id)));
 }
 
 // Static shell — the filter box lives out here and is never re-rendered on a
@@ -91,9 +97,9 @@ function renderPassRangesHtml() {
           </div>
         </div>
         <label class="pr-filter">
-          Filter by station number, AlertID or station name
+          Filter by station number, AlertID, AlertID range or station name
           <input type="search" id="pr-filter" value="${esc(state.prFilter)}"
-                 placeholder="e.g. 540123, 6128 or Amiens…"
+                 placeholder="e.g. 540123, 6128, 4021-4025 or Amiens…"
                  oninput="onPassRangeFilter(this.value)">
         </label>
         <p class="small">
@@ -148,11 +154,18 @@ function passRangeFoundText() {
 // address inside this range that survives passRangeCoversId cannot have been
 // excluded, and one that was excluded fails it everywhere. Range bounds are
 // numbers, so there is nothing here to escape.
-function passRangesHtml(repeater, searchIds) {
+function passRangesHtml(repeater, searchIds, ranges = []) {
   return (repeater.pass_ranges || []).map(p => {
     const label = `${p.low}–${p.high}`;
-    return searchIds.some(id => id >= p.low && id <= p.high && passRangeCoversId(repeater, id))
-      ? `<mark class="hit">${label}</mark>` : label;
+    const hit = searchIds.some(id => id >= p.low && id <= p.high && passRangeCoversId(repeater, id))
+      // A searched window marks the ranges it overlaps — but on the same terms
+      // as a single address, asked of every address on file inside the overlap.
+      // An overlap holding nothing this repeater carries is not the range that
+      // picked anything up, and marking it would say it was.
+      || ranges.some(([low, high]) =>
+           alertIdsInRange(Math.max(low, p.low), Math.min(high, p.high))
+             .some(id => passRangeCoversId(repeater, id)));
+    return hit ? `<mark class="hit">${label}</mark>` : label;
   }).join(', ');
 }
 
@@ -175,7 +188,7 @@ function passRangeTablesHtml() {
   // where the match was actually made — as on the Stations tab. The numeric
   // terms are the addresses the range column is asked about, so they are
   // converted once here rather than once per range per repeater.
-  const { terms, nums } = prepareSearch(q);
+  const { terms, nums, ranges } = prepareSearch(q);
   const searchIds = nums.map(Number);
 
   const rptData = repeaters
@@ -231,7 +244,7 @@ function passRangeTablesHtml() {
                   <td class="small col-optional">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
                   <td><span class="badge" title="ALERT addresses carried, post-exclusion">${repeaterPassingCount(r) ?? 0}</span></td>
                   <td><span class="badge" title="Field stations matched">${matched.length}</span></td>
-                  <td class="small">${passRangesHtml(r.repeater, searchIds)}</td>
+                  <td class="small">${passRangesHtml(r.repeater, searchIds, ranges)}</td>
                   <td class="small">${firstTen(matched).slice(0, 10).map(s => markHits(s.name, terms)).join(', ')}${matched.length > 10 ? ` +${matched.length - 10} more` : ''}</td>
                 </tr>`).join('')}
             </tbody>
@@ -266,7 +279,7 @@ function passRangeTablesHtml() {
                   <tr class="row-link" onclick="goToStation('${escAttr(s.id)}')">
                     <td>${passRangeRowOpen(s, markHits(s.name, terms))}</td>
                     <td class="small">${markHits(s.station_number || '', terms)}</td>
-                    <td class="small">${stationAlertIds(s).map(id => markAlertId(id, nums)).join(', ')}</td>
+                    <td class="small">${stationAlertIds(s).map(id => markAlertId(id, nums, ranges)).join(', ')}</td>
                     <td class="small col-optional">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
                   </tr>`).join('')}
               </tbody>

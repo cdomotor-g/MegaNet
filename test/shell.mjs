@@ -13,7 +13,7 @@
 // breakpoint, do not remove the focus ring, do not invent a table pattern.
 // Those instructions are worth what they can be checked against.
 //
-// Seven things are checked, and the first three are the ones the U-issues are
+// Eight things are checked, and the first three are the ones the U-issues are
 // held to:
 //
 //   The scale.      Every `@media (max-width: N)` in styles.css has N in
@@ -46,6 +46,11 @@
 //   Overflow.       The document does not scroll sideways at 375, 768 or 1440,
 //                   in either theme. A panel is never allowed to decide the
 //                   page is wider than the screen.
+//
+//   Reach.          Every button in either rail can be brought on screen with
+//                   that rail's own scrollbar, at the top of the page and
+//                   again scrolled to the bottom of it. A rail that ends past
+//                   the fold is not a rail anyone can use.
 //
 // Run:  npm run shell
 //       npm run shell -- -v    also print what passed
@@ -562,6 +567,60 @@ try {
     }
   }
   await page.setViewportSize({ width: 1440, height: 900 });
+
+  // ── 8. Both rails reachable without scrolling the window ──────────────────
+  // Each rail is a sticky box in a document that scrolls, and the banner is
+  // part of that document — it scrolls away with it. So a rail sized to 100dvh
+  // starts at the banner's foot and therefore ends --mn-chrome px past the
+  // fold, and the rail's own scrollbar cannot reach into that overhang: it
+  // moves content inside a box whose last stretch is off screen. Nothing about
+  // that looks broken. The rail scrolls, it just runs out early, and the bottom
+  // two of twenty-two tabs are unreachable until the whole window is scrolled —
+  // which is how it survived every check in this harness until this one.
+  //
+  // The claim is the one an operator would make: at the top of the page, and
+  // again at the bottom of it, every button in either rail can be brought on
+  // screen with that rail's own scrollbar. Four heights, because the failure is
+  // a function of the banner's height against the viewport's, and 1024 px wide
+  // is where the banner wraps to two rows and takes 96 px rather than 75.
+  console.log('\nBoth rails reach every one of their own buttons\n');
+
+  for (const [w, h] of [[1440, 900], [1280, 720], [1024, 640], [1440, 550]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.evaluate(() => { setHelpCollapsed(false); scrollTo(0, 0); });
+    await page.waitForTimeout(250);
+    for (const at of ['at the top', 'scrolled to the foot']) {
+      if (at !== 'at the top') {
+        await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+        await page.waitForTimeout(120);
+      }
+      const reach = await page.evaluate(() => {
+        const out = {};
+        for (const [name, sel] of [['nav', '.nav-inner'], ['help', '.help-inner']]) {
+          const rail  = document.querySelector(sel);
+          const items = [...rail.querySelectorAll('button, a')];
+          // Scrolled to its own end, the last item has to be above the fold;
+          // scrolled back to its start, the first has to be below the top.
+          rail.scrollTop = rail.scrollHeight;
+          const last = items[items.length - 1].getBoundingClientRect().bottom;
+          rail.scrollTop = 0;
+          const first = items[0].getBoundingClientRect().top;
+          out[name] = { n: items.length, below: Math.round(last - innerHeight), above: Math.round(-first) };
+        }
+        return out;
+      });
+      for (const name of ['nav', 'help']) {
+        const r = reach[name];
+        check(`${name} rail: all ${r.n} buttons reachable ${at}, ${w}×${h}`,
+          r.below <= 1 && r.above <= 1,
+          r.below > 1 ? `last item ${r.below}px below the fold`
+                      : `first item ${r.above}px above it`);
+      }
+    }
+  }
+  await page.evaluate(() => { setHelpCollapsed(true); scrollTo(0, 0); });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(250);
 
   // The proving ground itself: #109 is only done if the system it defines is
   // demonstrably in use somewhere. Networks is the smallest tab in the app and

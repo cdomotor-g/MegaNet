@@ -306,52 +306,101 @@ function stationMatchesQuery(s, q) {
   return false;
 }
 
+// ── ALERT address ranges in the search box ───────────────────────────────────
+// A repeater's pass ranges are written `4021-4025`, the Pass Ranges tab prints
+// them that way, and the station editor's pass-range box takes them that way
+// (core.js: parseRangeLines). It is also how the question arrives — "everything
+// in the block we re-addressed", "the window this repeater carries" — and until
+// now the box was the one place in the app that could not hear it: `4021-4025`
+// is no station's name, so it matched nothing at all and the window had to be
+// expanded into five addresses by hand. Three windows meant sixteen.
+//
+// So a term shaped <digits><dash><digits> is a window over ALERT addresses, and
+// every station carrying an address inside it is a match. Windows sit alongside
+// everything the box already takes rather than replacing any of it: names,
+// station numbers, bare addresses and windows can be pasted together in any
+// mixture and any number, separated by anything on the list below, and a station
+// answering any one of them is in.
+//
+// The dash is a hyphen, an en or em dash — a range pasted back out of the Pass
+// Ranges tab carries an en dash, and a document that autocorrected it an em one
+// — or `..`. Everything parseRangeLines accepts, this accepts. No station name
+// and no station number in the file has digits either side of a dash, so nothing
+// that used to be searched as text is read as a window now.
+const ID_RANGE_RE = /^(\d{1,9})\s*(?:-|\u2013|\u2014|\.\.)\s*(\d{1,9})$/;
+
+// One term as [low, high], or null if it is not a window. Written backwards is
+// still a window: "4025-4021" is a typo with one obvious reading, and the
+// alternative is a term that silently matches nothing.
+function parseIdRange(term) {
+  const m = ID_RANGE_RE.exec(String(term ?? '').trim());
+  if (!m) return null;
+  const a = Number(m[1]), b = Number(m[2]);
+  return a <= b ? [a, b] : [b, a];
+}
+
 // The search box takes a list, not just one term: an operator watching a
 // telemetry log copies the addresses coming in, pastes the lot straight into
 // the box and sees where those sites are. Commas, semicolons, pipes, tabs and
 // new lines all separate, so a spreadsheet column, a CSV row and a log excerpt
 // all work as pasted. A run of bare numbers separated by spaces splits too —
 // "6128 6129" is two addresses, while "Mt Stuart" is one name, so spaces only
-// separate when every piece is a number. Terms are matched with OR: a station
-// answering any one of them is in.
+// separate when every piece is a number, or a window (above): "4021-4025
+// 4036-4042" is two windows, and "Mt Stuart" is still one name. Terms are
+// matched with OR: a station answering any one of them is in.
 function parseSearchTerms(text) {
   const terms = [];
   String(text || '').split(/[,;|\t\r\n]+/).forEach(chunk => {
     const term  = chunk.trim();
     if (!term) return;
     const parts = term.split(/\s+/);
-    if (parts.length > 1 && parts.every(p => /^\d+$/.test(p))) terms.push(...parts);
+    if (parts.length > 1 && parts.every(p => /^\d+$/.test(p) || ID_RANGE_RE.test(p))) terms.push(...parts);
     else terms.push(term);
   });
   return [...new Set(terms.map(t => t.toLowerCase()))];
 }
 
-// Prepared form of the box's contents: the terms, plus the numeric ones on
-// their own. Splitting and testing them per station per term is what made a
-// 120-address paste take most of a second; this is done once per pass and
-// memoised on the raw text, since a filter pass asks for the same string
-// several times over (table, map, match note).
+// Prepared form of the box's contents: the terms, the numeric ones on their
+// own, and the windows parsed to bounds. Splitting and testing them per station
+// per term is what made a 120-address paste take most of a second; this is done
+// once per pass and memoised on the raw text, since a filter pass asks for the
+// same string several times over (table, map, match note).
+//
+// A window leaves `terms` rather than sitting in both: "4021-4025" is not a run
+// of characters anybody wants matched against a station name, and leaving it
+// among the terms would have the highlighter looking for it there too.
 let _searchPrep = { text: null, prep: null };
 function prepareSearch(text) {
   const raw = String(text || '');
   if (_searchPrep.text !== raw) {
-    const terms = parseSearchTerms(raw);
-    _searchPrep = { text: raw, prep: { terms, nums: terms.filter(t => /^\d+$/.test(t)) } };
+    const terms = [], ranges = [];
+    for (const t of parseSearchTerms(raw)) {
+      const range = parseIdRange(t);
+      if (range) ranges.push(range);
+      else       terms.push(t);
+    }
+    _searchPrep = { text: raw, prep: { terms, nums: terms.filter(t => /^\d+$/.test(t)), ranges } };
   }
   return _searchPrep.prep;
 }
 
-// Any one term is enough. A station's ALERT addresses are derived once here,
-// not once per numeric term — deriving them is the expensive part.
+// Any one term is enough — and a window is a term like any other. A station's
+// ALERT addresses are derived once here, not once per numeric term or window —
+// deriving them is the expensive part.
 function stationMatchesSearch(s, prep) {
-  const { terms, nums } = prep;
-  if (!terms.length) return true;
+  const { terms, nums, ranges } = prep;
+  if (!terms.length && !ranges.length) return true;
   const name = s.name.toLowerCase();
   const num  = (s.station_number || '').toLowerCase();
   if (terms.some(t => name.includes(t) || num.includes(t))) return true;
+  if (!nums.length && !ranges.length) return false;
+  const ids = stationAlertIds(s);
+  // A window is matched against the address as a number, not as text: it names
+  // every address between its ends, and is a prefix of nothing.
+  if (ranges.some(([low, high]) => ids.some(id => id >= low && id <= high))) return true;
   if (!nums.length) return false;
-  const ids = stationAlertIds(s).map(String);
-  return nums.some(t => ids.some(id => id.startsWith(t)));
+  const strs = ids.map(String);
+  return nums.some(t => strs.some(id => id.startsWith(t)));
 }
 
 // ── Marking where a search term landed ───────────────────────────────────────
@@ -401,8 +450,15 @@ function markHits(text, terms) {
 
 // ALERT addresses are matched from the start (6128 is found by "61", not by
 // "12"), so only that leading run is marked — the longest one that matches.
-function markAlertId(id, nums) {
+// A window matched the address as a whole number rather than as a run of
+// characters, so when one covers it the whole address is what gets marked;
+// there is no leading run to point at, and pointing at part of it would claim
+// a match that was never made.
+function markAlertId(id, nums, ranges) {
   const str = String(id);
+  if (ranges && ranges.some(([low, high]) => Number(id) >= low && Number(id) <= high)) {
+    return `<mark class="hit">${str}</mark>`;
+  }
   let len = 0;
   for (const t of nums) if (t.length > len && str.startsWith(t)) len = t.length;
   return len ? `<mark class="hit">${str.slice(0, len)}</mark>${str.slice(len)}` : str;
@@ -413,34 +469,60 @@ function markAlertId(id, nums) {
 // re-deriving every station's sensor list once per term on every keystroke.
 function searchCorpus() {
   if (state.searchIdx) return state.searchIdx;
-  const names = [], numbers = [], idPrefixes = new Set();
+  const names = [], numbers = [], idPrefixes = new Set(), ids = new Set();
   (state.data?.stations || []).forEach(s => {
     names.push(s.name.toLowerCase());
     if (s.station_number) numbers.push(String(s.station_number).toLowerCase());
     // Every prefix of every address, so "is any address starting with 61 on
     // file?" is one lookup instead of a scan — a pasted log is mostly ids that
-    // are on file, and those then cost nothing to confirm.
+    // are on file, and those then cost nothing to confirm. The addresses
+    // themselves come along sorted, which is what a window is asked against:
+    // no prefix answers "is anything between 4021 and 4025 on file?".
     stationAlertIds(s).forEach(id => {
+      ids.add(id);
       const str = String(id);
       for (let i = 1; i <= str.length; i++) idPrefixes.add(str.slice(0, i));
     });
   });
-  state.searchIdx = { names, numbers, idPrefixes };
+  state.searchIdx = { names, numbers, idPrefixes, ids: [...ids].sort((a, b) => a - b) };
   return state.searchIdx;
+}
+
+// Every ALERT address on file inside a window, in order. Binary search for the
+// low end rather than a scan: this is asked once per window on every keystroke,
+// and again once per pass range per repeater on the Pass Ranges tab.
+function alertIdsInRange(low, high) {
+  const ids = searchCorpus().ids;
+  let lo = 0, hi = ids.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (ids[mid] < low) lo = mid + 1; else hi = mid;
+  }
+  const out = [];
+  for (let i = lo; i < ids.length && ids[i] <= high; i++) out.push(ids[i]);
+  return out;
 }
 
 // Which of the pasted terms are in no station's name, number or addresses?
 // Pasting 40 ids off a log and being told 3 of them aren't in the database is
-// the point of the exercise — a silently shorter list is not an answer. Only
-// asked for an actual list (one term is just a search that found nothing, which
-// the match note already says). Mirrors stationMatchesQuery's rules exactly.
+// the point of the exercise — a silently shorter list is not an answer. The
+// caller decides when it is worth asking (searchTermsNoteHtml). Mirrors the
+// matching rules exactly — substring for a name or a station number, leading
+// digits for an address, bounds for a window.
 function unmatchedSearchTerms(terms) {
-  if (terms.length < 2 || !state.data) return [];
+  if (!state.data) return [];
   const { names, numbers, idPrefixes } = searchCorpus();
-  return terms.filter(t =>
-    !(/^\d+$/.test(t) && idPrefixes.has(t)) &&
-    !names.some(n => n.includes(t)) &&
-    !numbers.some(n => n.includes(t)));
+  return terms.filter(t => {
+    // A window holds no characters to look for — it is on file when some
+    // address falls inside it, and empty when none does. "4021-4025 · not in
+    // this database" is the useful thing to be told about a window that names
+    // a block nobody has addressed yet.
+    const range = parseIdRange(t);
+    if (range) return !alertIdsInRange(range[0], range[1]).length;
+    return !(/^\d+$/.test(t) && idPrefixes.has(t)) &&
+           !names.some(n => n.includes(t)) &&
+           !numbers.some(n => n.includes(t));
+  });
 }
 
 // The values a station offers to a grouped filter. A station with nothing
@@ -2744,7 +2826,7 @@ function stationsTable(allStations) {
   const stations  = capped ? allStations.slice(0, STATIONS_ROW_CAP) : allStations;
   // Same prepared terms the filter itself ran on, so the marks land exactly
   // where the match was made.
-  const { terms, nums } = prepareSearch(state.filters.search);
+  const { terms, nums, ranges } = prepareSearch(state.filters.search);
   // Rows the filter didn't name — they are here because a pass range ties them
   // to one that did, and the badge is what says so.
   const relIds = relatedIdSet();
@@ -2798,7 +2880,7 @@ function stationsTable(allStations) {
                   ? ' <span class="badge badge--rel" title="Not a filter match — a pass range ties it to one">via pass range</span>'
                   : ''}</td>
               <td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
-              <td class="small">${aids.map(id => markAlertId(id, nums)).join(', ')}</td>
+              <td class="small">${aids.map(id => markAlertId(id, nums, ranges)).join(', ')}</td>
               <td class="small">${s.lat != null ? s.lat.toFixed(4) : ''}</td>
               <td class="small">${s.lon != null ? s.lon.toFixed(4) : ''}</td>
               <td class="small">${s.elevation_ahd != null ? s.elevation_ahd : ''}</td>
@@ -3200,9 +3282,11 @@ function stationFiltersHtml() {
                   ${state.filters.search.trim() ? '' : 'hidden'}>clear</button>
         </div>
         <p class="filter-hint">Name, station # or ALERT address — or paste a list of them,
-          separated by commas, spaces or new lines.</p>
+          separated by commas, spaces or new lines. An address range like
+          <code>4021-4025</code> takes every station inside it, and you can paste
+          as many ranges as you like.</p>
         <textarea id="station-search" class="filter-search" rows="1" spellcheck="false"
-                  placeholder="e.g. 6128, 6129 — or paste from a telemetry log"
+                  placeholder="e.g. 6128, 6129, 4021-4025 — or paste from a telemetry log"
                   oninput="mapSearchInput(this.value);autoGrowSearch(this)">${esc(state.filters.search)}</textarea>
         <p class="filter-note" id="search-terms-note">${searchTermsNoteHtml()}</p>
       </div>
@@ -3257,17 +3341,35 @@ function clearSearch() {
   stationsFilterChanged();
 }
 
-// What a pasted list did: how many terms, and which of them are in no station
-// on file. Silent about a single term — the match note below already covers it.
+// What a pasted list did: how many terms, how many addresses the windows among
+// them actually cover, and which terms are in no station on file. Silent about
+// a single plain term — the match note below already covers it — but never
+// about a window, because "how much of that block is on file" is the whole of
+// what a window is asking, and a station count cannot answer it: three stations
+// can hold ten addresses, or one can hold three.
 function searchTermsNoteHtml() {
-  const terms = parseSearchTerms(state.filters.search);
-  if (terms.length < 2) return '';
+  const terms  = parseSearchTerms(state.filters.search);
+  const ranges = prepareSearch(state.filters.search).ranges;
+  if (terms.length < 2 && !ranges.length) return '';
+  // Distinct addresses, so two windows that overlap are not counted twice.
+  const covered = ranges.length
+    ? new Set(ranges.flatMap(([low, high]) => alertIdsInRange(low, high))).size
+    : 0;
+  const bits = [`${terms.length} search term${terms.length === 1 ? '' : 's'}`];
+  if (covered) {
+    bits.push(`${covered} ALERT address${covered === 1 ? '' : 'es'} inside ` +
+              `${ranges.length === 1 ? 'the range' : `the ${ranges.length} ranges`}`);
+  }
   const missing = unmatchedSearchTerms(terms);
-  if (!missing.length) return `${terms.length} search terms · all found.`;
-  const shown = missing.slice(0, 8).map(esc).join(', ');
-  const rest  = missing.length - 8;
-  return `${terms.length} search terms · <strong>${missing.length}</strong> not in this ` +
-         `database: ${shown}${rest > 0 ? ` +${rest} more` : ''}`;
+  if (!missing.length) {
+    bits.push('all found.');
+  } else {
+    const shown = missing.slice(0, 8).map(esc).join(', ');
+    const rest  = missing.length - 8;
+    bits.push(`<strong>${missing.length}</strong> not in this ` +
+              `database: ${shown}${rest > 0 ? ` +${rest} more` : ''}`);
+  }
+  return bits.join(' · ');
 }
 
 // Editing or deleting a station moves the per-option counts (and can retire an

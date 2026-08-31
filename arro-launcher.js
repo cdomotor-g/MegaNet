@@ -80,7 +80,9 @@ function arroSearchResults() {
   const text = state.arro.search.trim();
   if (!text) return [];
   const prep = prepareSearch(text);
-  if (!prep.terms.length) return [];
+  // An address range is a search even though it leaves no term behind it —
+  // `4021-4025` parses to bounds rather than to text (app.js: prepareSearch).
+  if (!prep.terms.length && !prep.ranges.length) return [];
   const out = [];
   for (const s of state.data.stations) {
     if (!stationMatchesSearch(s, prep)) continue;

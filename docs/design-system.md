@@ -741,6 +741,37 @@ Escape listener is transient by the teardown discipline: it dies with the
 tab's teardown and is re-armed on init, so it cannot outlive the surface it
 serves.
 
+### The two rails — a sticky box is sized against the screen it is seen in
+
+The nav and the help panel are the same shape: a full-height column whose
+border runs the length of the page, with a `position: sticky` inner box that
+scrolls on its own. The inner box's height is the one thing about them that is
+easy to get wrong, and was:
+
+> `max-height: calc(100dvh - var(--mn-chrome, 96px))`, with `top: 0`.
+
+Not `100dvh`. The banner is part of the document and scrolls away with it, so a
+rail sized to the whole viewport begins at the banner's foot and therefore ends
+`--mn-chrome` px *past* the fold — and the rail's own scrollbar cannot reach
+into that overhang, because it moves content inside a box whose last stretch is
+off screen. Nothing about that looks broken. The rail scrolls, it just runs out
+early, and the bottom two of twenty-two tabs are unreachable until the whole
+window has been scrolled — which is the complaint that produced this rule.
+
+The measured chrome rather than a guess: `app.js`'s `updateChromeHeight()`
+keeps `--mn-chrome` current on every render, every resize and every appearance
+of the memory strip, and the banner wraps to two rows at 1024 px where it takes
+96 px rather than 75. The cost is that much rail height once the banner has
+scrolled off the top, which is paid in a scrollbar the rail already has.
+
+Below `xs` neither rail is a column at all — both become fixed drawers with
+`inset: 0` and `max-height: none`, so the rule does not apply and does not need
+to.
+
+`npm run shell` holds it, as the claim an operator would make: every button in
+either rail can be brought on screen with that rail's own scrollbar, at the top
+of the page and again scrolled to the foot of it, at four viewport heights.
+
 ---
 
 ## 4. Accessibility primitives

@@ -4318,11 +4318,22 @@ hr {
 }
 
 /* The nav itself stretches so its border runs the full height of the page;
-   only the contents stick, and only as far as one screen. */
+   only the contents stick, and only as far as one screen.
+
+   "One screen" is the screen *below the banner*, not 100dvh. The header is part
+   of the document and scrolls away with it, so at the top of the page a 100dvh
+   rail begins at the banner's foot and therefore ends --mn-chrome px past the
+   fold. The rail's own scrollbar cannot reach into that overhang — it moves the
+   content within the box, and the last of the box is off screen — so the bottom
+   two entries of a twenty-two entry nav were unreachable until the whole window
+   had been scrolled down, at every laptop height measured (and 96 px worth at
+   1024 px wide, where the banner wraps to two rows). Taking the measured chrome
+   off the height is what makes the rail fit the part of the screen it can
+   actually be seen in; `top: 0` then holds it there once the banner has gone. */
 .nav-inner {
   position: sticky;
   top: 0;
-  max-height: 100dvh;
+  max-height: calc(100dvh - var(--mn-chrome, 96px));
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: .5rem .45rem 1rem;
@@ -4605,11 +4616,12 @@ hr {
 }
 
 /* Stretches so the border runs the page's full height; only the contents stick,
-   and only as far as one screen. As .nav-inner. */
+   and only as far as one screen — the screen below the banner, for the reason
+   written out over .nav-inner. As .nav-inner. */
 .help-inner {
   position: sticky;
   top: 0;
-  max-height: 100dvh;
+  max-height: calc(100dvh - var(--mn-chrome, 96px));
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: .5rem .4rem 1rem;

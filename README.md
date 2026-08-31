@@ -1168,7 +1168,7 @@ number of stations behind it and nothing is offered that no station uses:
 
 | Block | Filters on | Control |
 |-------|-----------|---------|
-| Search | name, station number, ALERT address (numeric queries match addresses from the start) — one term or a pasted list | text box that accepts a paste |
+| Search | name, station number, ALERT address (numeric queries match addresses from the start), or an ALERT address range like `4021-4025` — one term or a pasted list of them, mixed freely | text box that accepts a paste |
 | Station type | `roles[]` — field / repeater / base / satcom | tick boxes |
 | Sensor type | every sensor type present in the file — rainfall, water level, battery, water quality, … | tick boxes, plus *must have all ticked types* for "rain **and** level" |
 | Radio network | `radio_network_ids[]` | tick boxes |
@@ -1211,11 +1211,39 @@ Terms combine with OR. The box is a `<textarea>` (a single-line `<input>`
 strips the line breaks out of a pasted column, gluing `6128` and `6129` into
 `61286129`) that opens one line tall and grows with the paste.
 
+**Address ranges.** A term shaped `4021-4025` is a *window* over ALERT
+addresses, and every station holding an address inside it is a match. It is the
+same syntax a repeater's pass ranges are written in — the Pass Ranges tab prints
+them that way and the station editor takes them that way — because it is the
+same question arriving from the other side: *which sites are in that block?*
+Paste as many windows as you like, on their own or mixed in with names and bare
+addresses:
+
+```
+4021-4025
+4036-4042
+4047-4050
+```
+
+The dash may be a hyphen, an en or em dash (a window copied back off the Pass
+Ranges tab carries an en dash) or `..`, the two ends may be either way round,
+and windows separate from each other the same way everything else in the box
+does — commas, semicolons, pipes, tabs, new lines, or plain spaces. A window is
+matched against the address as a *number*, so unlike a bare term it is not a
+prefix match: `4021-4025` is five addresses and nothing else. Nothing that used
+to be searched as text is read as a window — no station name or station number
+in the file has digits either side of a dash.
+
 Under it, the pane reports **which pasted terms are in no station on file** —
 "7 search terms · 2 not in this database: 999991, 999992". A list that quietly
-comes back short is not an answer to "where are these stations?". The Pass
-Ranges filter box takes the same lists, and matches a repeater whose pass
-ranges cover **any** of the pasted addresses.
+comes back short is not an answer to "where are these stations?". Windows are
+reported the same way, plus how much they actually cover: "3 search terms · 16
+ALERT addresses inside the 3 ranges · all found", so a window naming a block
+nobody has addressed yet says so rather than just matching nothing. The Pass
+Ranges filter box takes the same lists and the same windows, and matches a
+repeater whose pass ranges cover **any** of the pasted addresses — which for a
+window is "any address on file inside it", so the answer to *which repeaters
+carry this block?* is one paste.
 
 ### 5. Radio Mobile Export
 Generate the complete set of CSV files required by Radio Mobile software from the JSON data:
