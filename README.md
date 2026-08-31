@@ -1168,7 +1168,7 @@ number of stations behind it and nothing is offered that no station uses:
 
 | Block | Filters on | Control |
 |-------|-----------|---------|
-| Search | name, station number, ALERT address (numeric queries match addresses from the start), or an ALERT address range like `4021-4025` — one term or a pasted list of them, mixed freely | text box that accepts a paste |
+| Search | name, station number, ALERT address (numeric queries match addresses from the start), or an ALERT address range like `4021-4025` — one term or a pasted list of them, mixed freely, in as many separately-scoped entries as you like | text boxes that accept a paste, each with *Look in* tick boxes |
 | Station type | `roles[]` — field / repeater / base / satcom | tick boxes |
 | Sensor type | every sensor type present in the file — rainfall, water level, battery, water quality, … | tick boxes, plus *must have all ticked types* for "rain **and** level" |
 | Radio network | `radio_network_ids[]` | tick boxes |
@@ -1234,9 +1234,41 @@ prefix match: `4021-4025` is five addresses and nothing else. Nothing that used
 to be searched as text is read as a window — no station name or station number
 in the file has digits either side of a dash.
 
+**What an entry is a list *of*.** With all three *Look in* boxes ticked — the
+default, and what the box has always done — a term is tried against the name,
+the station number and the ALERT addresses at once. That is right for one term
+typed by somebody who does not know which of the three it is, and wrong for a
+pasted list: `491` starts ten ALERT addresses **and** sits inside four station
+numbers, and those two sets do not overlap, so a pasted column of addresses came
+back with fourteen stations when ten were asked for. Untick what the entry is
+not, and it only looks where you say.
+
+**A second entry, for a list that is something else.** *+ Add filter entry*
+gives another box with its own tick boxes, so a list of station numbers and a
+list of ALERT addresses can be pasted into one filter without either picking up
+the other's stations. Entries combine as:
+
+| Match | Means | For |
+|---|---|---|
+| **any entry** (default) | a station answering any one entry is in — the union | two lists looked up at once |
+| **all entries** | only stations answering every entry — the intersection | a name *and* an address range as one question |
+
+An entry with no field ticked is **ignored rather than matching nothing** — an
+empty selection is no constraint here, the same rule the tick-box blocks use —
+and it says so under itself, so it is never silently dropped. *clear* takes the
+stack back to one empty entry pointed at everything, which is how a fresh page
+opens.
+
+The amber marks follow the scoping exactly: an entry that says *these are ALERT
+addresses* cannot put a highlight through a station name that happens to hold
+the same digits, because the filter never made that match.
+
 Under it, the pane reports **which pasted terms are in no station on file** —
-"7 search terms · 2 not in this database: 999991, 999992". A list that quietly
-comes back short is not an answer to "where are these stations?". Windows are
+"7 search terms · 2 not in this database: 999991, 999992" — once per entry, and
+only where that entry is pointed, so a term that exists as somebody's station
+number is still *not found* by an entry that said it was a list of addresses. A
+list that quietly comes back short is not an answer to "where are these
+stations?". Windows are
 reported the same way, plus how much they actually cover: "3 search terms · 16
 ALERT addresses inside the 3 ranges · all found", so a window naming a block
 nobody has addressed yet says so rather than just matching nothing. The Pass

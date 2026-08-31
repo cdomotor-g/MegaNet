@@ -69,7 +69,7 @@ try {
   // network) — waited out so the seed's draw is the state under test.
   await page.evaluate(() => {
     state.map.setView([-20.0, 147.0], 8, { animate: false });
-    state.filters.search = 'burdekin';
+    state.filters.searches = [{ text: 'burdekin', name: true, number: true, alert: true }];
     MapRivers.setEnabled(true);
   });
   await page.waitForTimeout(700);

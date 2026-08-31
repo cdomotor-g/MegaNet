@@ -273,6 +273,16 @@ const HELP = {
       + 'behaviour if '
       + 'that is what you want. Names are capped at 60 either way, and the panel says when the cap '
       + 'is in effect.',
+      'The search box is a <strong>stack of entries</strong>, and each says what it is a list '
+      + '<em>of</em>. With all three fields ticked — the default — a term is tried against the '
+      + 'name, the station number and the ALERT addresses at once, which is right for one term '
+      + 'and wrong for a pasted list: <code>491</code> starts ten addresses and sits inside four '
+      + 'station numbers, so a column of addresses comes back with stations that merely share '
+      + 'the digits. Untick what an entry is not, and press <strong>+ Add filter entry</strong> '
+      + 'for a list that is something else. Entries combine as <em>any</em> (the default — two '
+      + 'lists looked up at once) or <em>all</em> (a name and an address range as one question). '
+      + 'An entry with no field ticked is ignored rather than matching nothing, and says so '
+      + 'under itself.',
       'Every tick-box block ends with a <strong>Not recorded yet</strong> bucket, and it is ticked '
       + 'like everything else — which is why the opening view is the whole network. Most stations '
       + 'have no radio network recorded and two thirds have no catchment, so unticking one of '
@@ -1445,7 +1455,16 @@ const state = {
   },
   activeTab:  'stations',
   filters: {
-    search:       '',
+    // The search box is a *stack* of entries, not one box. Each entry carries
+    // its own text and its own set of fields to look in, so "these are station
+    // numbers" and "these are ALERT addresses" can be two entries that cannot
+    // contaminate one another. One entry with every field ticked is the default
+    // and is exactly the single box this used to be. The shape, the field keys
+    // and how two entries combine are documented over SEARCH_FIELDS in app.js;
+    // newSearchRow() there builds this same object, and is what everything
+    // except this initial value uses.
+    searches:     [{ text: '', name: true, number: true, alert: true }],
+    searchMode:   'any',   // 'any' | 'all' — how two or more entries combine
     // Grouped filters. An empty Set is the default and means "no constraint":
     // every station passes, including the ones whose field has never been
     // filled in. See FILTER_NONE / FILTER_EMPTY above.

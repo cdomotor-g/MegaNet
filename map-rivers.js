@@ -5,7 +5,7 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state` and `esc`, and across to app.js for
-// rerenderMapLegend and prepareSearch. Every one of those is called from inside
+// rerenderMapLegend and prepareSearchStack. Every one of those is called from inside
 // a MapRivers function; the IIFE body only sets tunables and an empty cache, so
 // nothing here resolves at load and this file's position among the modules is
 // free.
@@ -86,13 +86,22 @@ const MapRivers = (function () {
   const cache = new Map();    // 'terms|s,w,n,e' → { ways: [{name, coords}], capped, total }
   let note = { kind: 'idle', drawn: 0, total: 0, capped: false, rivers: [], labelCapped: false };
 
-  // What in the box is worth asking Overpass about. `parseSearchTerms` has
+  // What in the box is worth asking Overpass about. `prepareSearchStack` has
   // already split and lower-cased them; a term with no letter in it is an ALERT
   // address or a station number, and the app already treats it that way.
+  //
+  // Only entries pointed at the station *name* are asked for: a river is a
+  // name, and an entry the operator has said is a list of station numbers has
+  // no business naming a creek. Across every such entry rather than the first,
+  // because "any entry" is the default and the map draws the union either way.
   function riverTerms() {
     if (!state.mapRivers) return [];
-    return prepareSearch(state.filters.search).terms
-      .filter(t => t.length >= MIN_TERM && /[a-z]/.test(t));
+    const terms = new Set();
+    for (const e of prepareSearchStack()) {
+      if (!e.active || !e.fields.name) continue;
+      for (const t of e.prep.terms) if (t.length >= MIN_TERM && /[a-z]/.test(t)) terms.add(t);
+    }
+    return [...terms];
   }
 
   // Rounded *outward*, so the box asked for always contains the box on screen.

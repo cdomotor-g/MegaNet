@@ -1284,6 +1284,91 @@ details.filter-block[open] > .filter-head .filter-title::before {
   color: var(--accent);
 }
 
+/* ── The search stack ────────────────────────────────────────────────────────
+   One entry is a box, the fields it is pointed at, and what it found. A stack
+   of one looks like the single box that was here before it — the tick boxes are
+   the only addition, and they read as a caption under the box rather than as a
+   second filter block, because they are not narrowing anything: they say how to
+   read the text above them. */
+
+.search-row + .search-row {
+  margin-top: .55rem;
+  padding-top: .55rem;
+  border-top: 1px dashed var(--border);
+}
+
+/* Dashed rather than solid, and only *between* entries: the filter card is
+   already full of solid rules separating one question from the next, and these
+   are the same question asked twice. */
+
+.search-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .15rem .55rem;
+  margin-top: .3rem;
+}
+
+.search-scope-lead {
+  font-size: .74rem;
+  color: var(--muted);
+}
+
+.search-field {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Pushed to the far end so it is never mistaken for a fourth field, and only
+   drawn once there is more than one entry to remove. */
+.search-remove {
+  margin-left: auto;
+  padding: 0 .45rem;
+  font-size: .9rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.search-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .3rem .7rem;
+  margin-top: .5rem;
+}
+
+.search-add {
+  padding: .15rem .5rem;
+  font-size: .75rem;
+  border-radius: 6px;
+}
+
+.search-mode {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .15rem .5rem;
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+.search-mode-lead {
+  font-size: .74rem;
+}
+
+.search-mode-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .filter-actions {
   display: flex;
   gap: .35rem;

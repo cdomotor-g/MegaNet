@@ -384,15 +384,115 @@ function prepareSearch(text) {
   return _searchPrep.prep;
 }
 
+// ── Which fields an entry is pointed at ──────────────────────────────────────
+// The box matched a term against the name, the station number and the ALERT
+// addresses all at once, and could not be told not to. That is right for
+// "6128" typed by somebody who does not know which of the three it is, and
+// wrong for a pasted list: 491 is a station number, the start of an address and
+// a run inside several names, so a column of addresses pasted in came back with
+// stations that merely share a digit run — the "additional stations" nobody
+// asked for.
+//
+// So an entry says what it is a list *of*. Three tick boxes, all three on by
+// default, which is the behaviour above unchanged; untick two and the entry
+// only looks where you say. Nothing here is a station property — these do not
+// narrow the result the way the tick-box groups below do, they say how to read
+// the text beside them.
+const SEARCH_FIELDS = [
+  { key: 'name',   label: 'Name',    hint: 'the station name' },
+  { key: 'number', label: 'Stn #',   hint: 'the station number' },
+  { key: 'alert',  label: 'AlertID', hint: 'the ALERT addresses' },
+];
+
+// What a two-argument stationMatchesSearch() means, and what the other two
+// filter boxes built on this machinery (Pass Ranges, ARRO Launcher) get: one
+// box, pointed at everything, exactly as before.
+const SEARCH_ALL_FIELDS = { name: true, number: true, alert: true };
+
+// One entry of the stack. The canonical shape — core.js's initial state is the
+// same object written out, and is the only other place it appears.
+function newSearchRow(text = '') {
+  return { text, name: true, number: true, alert: true };
+}
+
+// The stack, never empty: an entry the operator can type into has to exist even
+// when they have removed every other one, and a filter panel with no box at all
+// is not a state anything should have to render.
+function searchRows() {
+  const f = state.filters;
+  if (!Array.isArray(f.searches) || !f.searches.length) f.searches = [newSearchRow()];
+  return f.searches;
+}
+
+function searchRowFields(row) {
+  return { name: !!row.name, number: !!row.number, alert: !!row.alert };
+}
+
+// Is anything in the stack actually filtering? Text alone is not enough — an
+// entry pointed at no field is inert (see prepareSearchStack).
+function anySearchActive() {
+  return activeSearchStack().length > 0;
+}
+
+// Prepared form of the whole stack: one entry per row, in row order, each with
+// its terms, the fields it is pointed at, and whether it filters at all.
+//
+// Memoised on the stack itself rather than on one string, because every one of
+// the callers below asks for the same stack several times per pass — the map
+// layers, the table, the marks, the per-entry notes and the match note — and
+// re-splitting three pasted lists five times over on every keystroke is the
+// cost prepareSearch() was written to avoid in the first place.
+//
+// An entry with no field ticked is `pointed: false` and is skipped rather than
+// matching nothing. That follows the rule the tick-box groups already use — an
+// empty selection is no constraint, and it is `setGroupFilter(…, 'none')` that
+// deliberately matches nothing — and it is the kinder reading of a mis-click:
+// an untickable state that empties the whole table looks like a broken app.
+// The entry says so under itself, so it is never silently ignored.
+let _stackPrep = { sig: null, rows: null, active: null };
+function prepareSearchStack() {
+  const rows = searchRows();
+  const sig  = JSON.stringify(rows);
+  if (_stackPrep.sig !== sig) {
+    const prepped = rows.map((row, i) => {
+      const fields  = searchRowFields(row);
+      const pointed = fields.name || fields.number || fields.alert;
+      const prep    = prepareSearch(row.text);
+      return {
+        i, fields, pointed,
+        // prepareSearch memoises one string at a time, so this is a copy rather
+        // than the live object — the next row's parse would otherwise replace it.
+        prep: { terms: prep.terms, nums: prep.nums, ranges: prep.ranges },
+        active: pointed && !!(prep.terms.length || prep.ranges.length),
+      };
+    });
+    _stackPrep = { sig, rows: prepped, active: prepped.filter(e => e.active) };
+  }
+  return _stackPrep.rows;
+}
+
+// Only the entries that filter, held alongside the full stack rather than
+// derived per station: computeFilteredStations asks this question once per
+// station across 3,000+ of them, and a fresh array per station is a fresh array
+// 3,000 times for an answer that cannot have changed between two of them.
+function activeSearchStack() {
+  prepareSearchStack();
+  return _stackPrep.active;
+}
+
 // Any one term is enough — and a window is a term like any other. A station's
 // ALERT addresses are derived once here, not once per numeric term or window —
-// deriving them is the expensive part.
-function stationMatchesSearch(s, prep) {
+// deriving them is the expensive part. `fields` says where to look; the default
+// is everywhere, which is what a single box has always meant.
+function stationMatchesSearch(s, prep, fields = SEARCH_ALL_FIELDS) {
   const { terms, nums, ranges } = prep;
   if (!terms.length && !ranges.length) return true;
-  const name = s.name.toLowerCase();
-  const num  = (s.station_number || '').toLowerCase();
-  if (terms.some(t => name.includes(t) || num.includes(t))) return true;
+  if (fields.name || fields.number) {
+    const name = fields.name   ? s.name.toLowerCase() : '';
+    const num  = fields.number ? (s.station_number || '').toLowerCase() : '';
+    if (terms.some(t => name.includes(t) || num.includes(t))) return true;
+  }
+  if (!fields.alert) return false;
   if (!nums.length && !ranges.length) return false;
   const ids = stationAlertIds(s);
   // A window is matched against the address as a number, not as text: it names
@@ -403,6 +503,19 @@ function stationMatchesSearch(s, prep) {
   return nums.some(t => strs.some(id => id.startsWith(t)));
 }
 
+// The stack against one station. Entries combine the way the operator asked:
+// `any` is the union — two lists looked up in one pass, which is what a second
+// entry is usually for — and `all` is the intersection, which is how a name and
+// an address window become one question ("the Boyne sites carrying 4021-4025").
+// Inert entries are skipped in both modes, so an empty new entry never empties
+// the table under an operator who is still typing into it.
+function stationMatchesSearchStack(s, active, mode) {
+  if (!active.length) return true;
+  return mode === 'all'
+    ? active.every(e => stationMatchesSearch(s, e.prep, e.fields))
+    : active.some(e  => stationMatchesSearch(s, e.prep, e.fields));
+}
+
 // ── Marking where a search term landed ───────────────────────────────────────
 // Which stations matched is only half the answer: a filter of "491" hits a
 // station number, an ALERT address and a name three different ways, and the
@@ -410,6 +523,26 @@ function stationMatchesSearch(s, prep) {
 // matched, following stationMatchesSearch's rules to the letter — substring
 // for names and station numbers, leading digits for ALERT addresses — so the
 // highlight can never claim a match the filter didn't make.
+
+// What the table is allowed to mark, gathered from the stack in the same shape
+// the filter matched in. A term only marks the field its own entry was pointed
+// at: an entry that says "these are ALERT addresses" must not put an amber run
+// through a station name that happens to contain the same digits, or the
+// highlight would be claiming a match the filter refused to make — which is the
+// one promise this whole section is built on.
+function searchMarks() {
+  const out = { name: [], number: [], nums: [], ranges: [] };
+  for (const { prep, fields, active } of prepareSearchStack()) {
+    if (!active) continue;
+    if (fields.name)   out.name.push(...prep.terms);
+    if (fields.number) out.number.push(...prep.terms);
+    if (fields.alert)  { out.nums.push(...prep.nums); out.ranges.push(...prep.ranges); }
+  }
+  out.name   = [...new Set(out.name)];
+  out.number = [...new Set(out.number)];
+  out.nums   = [...new Set(out.nums)];
+  return out;
+}
 
 // Every place a term occurs in an already-lowercased string, as merged
 // [start, end) pairs. Overlapping terms ("61" and "6128") become one run
@@ -503,26 +636,31 @@ function alertIdsInRange(low, high) {
   return out;
 }
 
-// Which of the pasted terms are in no station's name, number or addresses?
-// Pasting 40 ids off a log and being told 3 of them aren't in the database is
-// the point of the exercise — a silently shorter list is not an answer. The
-// caller decides when it is worth asking (searchTermsNoteHtml). Mirrors the
-// matching rules exactly — substring for a name or a station number, leading
-// digits for an address, bounds for a window.
-function unmatchedSearchTerms(terms) {
+// Which of one entry's terms are in no station on file? Pasting 40 ids off a
+// log and being told 3 of them aren't in the database is the point of the
+// exercise — a silently shorter list is not an answer. Asked per entry, and
+// only where that entry is pointed: a term in a list of ALERT addresses that
+// exists only as somebody's station number is *not* found, because the entry
+// said what it was a list of. Mirrors the matching rules exactly — substring
+// for a name or a station number, leading digits for an address, bounds for a
+// window.
+function unmatchedSearchTerms(prep, fields) {
   if (!state.data) return [];
   const { names, numbers, idPrefixes } = searchCorpus();
-  return terms.filter(t => {
-    // A window holds no characters to look for — it is on file when some
-    // address falls inside it, and empty when none does. "4021-4025 · not in
-    // this database" is the useful thing to be told about a window that names
-    // a block nobody has addressed yet.
-    const range = parseIdRange(t);
-    if (range) return !alertIdsInRange(range[0], range[1]).length;
-    return !(/^\d+$/.test(t) && idPrefixes.has(t)) &&
-           !names.some(n => n.includes(t)) &&
-           !numbers.some(n => n.includes(t));
-  });
+  const missing = prep.terms.filter(t =>
+    !(fields.alert  && /^\d+$/.test(t) && idPrefixes.has(t)) &&
+    !(fields.name   && names.some(n => n.includes(t))) &&
+    !(fields.number && numbers.some(n => n.includes(t))));
+  // A window holds no characters to look for — it is on file when some address
+  // falls inside it, and empty when none does. "4021-4025 · not in this
+  // database" is the useful thing to be told about a window naming a block
+  // nobody has addressed yet, and an entry not pointed at AlertID cannot answer
+  // for one at all. Reported in its normalised form, so a window written
+  // backwards or with `..` is named the way the rest of the app writes it.
+  for (const [low, high] of prep.ranges) {
+    if (!fields.alert || !alertIdsInRange(low, high).length) missing.push(`${low}-${high}`);
+  }
+  return missing;
 }
 
 // The values a station offers to a grouped filter. A station with nothing
@@ -577,7 +715,8 @@ let _filteredCache = null, _filteredCacheSig = null, _filteredCacheData = null;
 
 function filtersSignature(f) {
   return JSON.stringify([
-    f.search, f.enabledOnly, f.sensorsAll, f.basin, f.lga, f.hasCoords, f.hasAlertId,
+    f.searches, f.searchMode,
+    f.enabledOnly, f.sensorsAll, f.basin, f.lga, f.hasCoords, f.hasAlertId,
     [...f.roles].sort(), [...f.networks].sort(), [...f.regions].sort(),
     [...f.catchments].sort(), [...f.sensors].sort(),
   ]);
@@ -597,10 +736,10 @@ function filteredStations() {
 
 function computeFilteredStations() {
   const f = state.filters;
-  const search = prepareSearch(f.search);
+  const stack = activeSearchStack();
   return state.data.stations.filter(s => {
     if (f.enabledOnly && !s.enabled) return false;
-    if (!stationMatchesSearch(s, search)) return false;
+    if (!stationMatchesSearchStack(s, stack, f.searchMode)) return false;
     // Each group is skipped outright when it isn't filtering — deriving a
     // station's regions or sensor types is not free across 3000+ stations on
     // every keystroke.
@@ -2037,10 +2176,19 @@ function stationsFilterChanged() {
 // Typing in the search box rebuilds every marker and every table row, so hold
 // off until the user pauses. The sidebar is never re-rendered from here — the
 // input keeps focus.
-function mapSearchInput(value) {
-  state.filters.search = value;
+function mapSearchInput(i, value) {
+  const row = searchRows()[i];
+  if (!row) return;
+  row.text = value;
   clearTimeout(state.mapSearchTimer);
   state.mapSearchTimer = setTimeout(stationsFilterChanged, 160);
+}
+
+// Is there anything typed at all? Answers the clear button, which is about the
+// text rather than about whether the text is doing anything — an entry pointed
+// at no field still has something in it to clear.
+function anySearchText() {
+  return searchRows().some(r => String(r.text || '').trim());
 }
 
 // ── Base map layers ─────────────────────────────────────────────────────────
@@ -2824,9 +2972,9 @@ function stationsTable(allStations) {
   }
   const capped    = !state.stationsShowAll && allStations.length > STATIONS_ROW_CAP;
   const stations  = capped ? allStations.slice(0, STATIONS_ROW_CAP) : allStations;
-  // Same prepared terms the filter itself ran on, so the marks land exactly
-  // where the match was made.
-  const { terms, nums, ranges } = prepareSearch(state.filters.search);
+  // Same prepared terms the filter itself ran on, gathered per field, so the
+  // marks land exactly where the match was made and nowhere else.
+  const marks = searchMarks();
   // Rows the filter didn't name — they are here because a pass range ties them
   // to one that did, and the badge is what says so.
   const relIds = relatedIdSet();
@@ -2870,8 +3018,8 @@ function stationsTable(allStations) {
               <td title="${esc(s.id)}"><button type="button" class="row-open stn-name role-${primaryRole(s)}"
                     aria-pressed="${state.selectedId === s.id}"
                     onclick="event.stopPropagation();selectStation('${escAttr(s.id)}')"
-                    >${markHits(s.name, terms)}</button></td>
-              <td class="small">${markHits(s.station_number || '', terms)}</td>
+                    >${markHits(s.name, marks.name)}</button></td>
+              <td class="small">${markHits(s.station_number || '', marks.number)}</td>
               <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}${
                 s.roles.includes('repeater') && repeaterPassingCount(s) != null
                   ? ` <span class="badge" title="ALERT addresses carried, in this repeater's open pass ranges">passing ${repeaterPassingCount(s)}</span>`
@@ -2880,7 +3028,7 @@ function stationsTable(allStations) {
                   ? ' <span class="badge badge--rel" title="Not a filter match — a pass range ties it to one">via pass range</span>'
                   : ''}</td>
               <td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
-              <td class="small">${aids.map(id => markAlertId(id, nums, ranges)).join(', ')}</td>
+              <td class="small">${aids.map(id => markAlertId(id, marks.nums, marks.ranges)).join(', ')}</td>
               <td class="small">${s.lat != null ? s.lat.toFixed(4) : ''}</td>
               <td class="small">${s.lon != null ? s.lon.toFixed(4) : ''}</td>
               <td class="small">${s.elevation_ahd != null ? s.elevation_ahd : ''}</td>
@@ -3010,7 +3158,7 @@ function selectStationState(s) {
   const at = filteredStations().findIndex(x => x.id === s.id);
   if (at >= 0 && (state.stationsShowAll || at < STATIONS_ROW_CAP)) return false;
   resetStationFilters();
-  state.filters.search = s.name;
+  state.filters.searches = [newSearchRow(s.name)];
   return true;
 }
 
@@ -3279,16 +3427,14 @@ function stationFiltersHtml() {
         <div class="filter-head">
           <span class="filter-title">Search</span>
           <button class="filter-clear" id="search-clear" onclick="clearSearch()"
-                  ${state.filters.search.trim() ? '' : 'hidden'}>clear</button>
+                  ${anySearchText() ? '' : 'hidden'}>clear</button>
         </div>
         <p class="filter-hint">Name, station # or ALERT address — or paste a list of them,
           separated by commas, spaces or new lines. An address range like
           <code>4021-4025</code> takes every station inside it, and you can paste
-          as many ranges as you like.</p>
-        <textarea id="station-search" class="filter-search" rows="1" spellcheck="false"
-                  placeholder="e.g. 6128, 6129, 4021-4025 — or paste from a telemetry log"
-                  oninput="mapSearchInput(this.value);autoGrowSearch(this)">${esc(state.filters.search)}</textarea>
-        <p class="filter-note" id="search-terms-note">${searchTermsNoteHtml()}</p>
+          as many ranges as you like. Tick what an entry is a list <em>of</em>, and
+          add a second entry for a list that is something else.</p>
+        <div id="search-stack">${searchStackHtml()}</div>
       </div>
       <span class="filter-resets">
         <button class="filter-reset" onclick="clearStationFilters(false)"
@@ -3312,12 +3458,130 @@ function renderStationFilters() {
   initStationFilters();
 }
 
+// ── The search stack, drawn ──────────────────────────────────────────────────
+// One entry is the whole of it until somebody presses +, and one entry is drawn
+// exactly as the single box always was — a textarea, its scope, and its own
+// note. Nothing about a stack of one is different from what was here before,
+// which is the point: the second entry is for the operator who needs it, and
+// costs the operator who does not a row of tick boxes they can leave alone.
+//
+// Rendered as a block rather than per-entry-in-place because the entries are
+// indexed, and removing the second of three renumbers the third. Only + and −
+// redraw it; typing and ticking do not, so the box keeps focus and the caret
+// through a paste (see mapSearchInput / setSearchField).
+function searchStackHtml() {
+  const rows = searchRows();
+  return `
+    ${rows.map((row, i) => searchRowHtml(row, i, rows.length)).join('')}
+    <div class="search-foot">
+      <button type="button" class="search-add" onclick="addSearchRow()"
+              title="A second entry, with its own fields — so a list of station numbers and a list of addresses cannot pick each other up"
+        >+ Add filter entry</button>
+      ${rows.length > 1 ? searchModeHtml() : ''}
+    </div>`;
+}
+
+// How two or more entries combine. Hidden while there is only one, because with
+// one entry there is nothing to combine and a control that cannot change
+// anything is a control that has to be read and dismissed. `any` is the default
+// and is what a second entry is usually for: two lists, one lookup.
+function searchModeHtml() {
+  const opt = (mode, label, title) => `
+    <label class="search-mode-opt" title="${escAttr(title)}">
+      <input type="radio" name="search-mode" value="${mode}"
+             ${state.filters.searchMode === mode ? 'checked' : ''}
+             onchange="setSearchMode('${mode}')"> ${label}
+    </label>`;
+  return `
+    <span class="search-mode" role="group" aria-label="How the entries combine">
+      <span class="search-mode-lead">Match</span>
+      ${opt('any', 'any entry', 'A station answering any one entry is in — two lists looked up at once')}
+      ${opt('all', 'all entries', 'Only stations answering every entry — a name and an address range as one question')}
+    </span>`;
+}
+
+// One entry: the text, what it is a list of, and what it found. The remove
+// button is on the first entry too — removing the only entry leaves a blank
+// one (searchRows), so it can never be pressed into a state with no box.
+function searchRowHtml(row, i, total) {
+  const n = i + 1;
+  const scopeId = `search-scope-${i}`;
+  return `
+    <div class="search-row">
+      <textarea id="station-search-${i}" class="filter-search" rows="1" spellcheck="false"
+                aria-label="${total > 1 ? `Filter entry ${n} of ${total}` : 'Search'}"
+                placeholder="e.g. 6128, 6129, 4021-4025 — or paste from a telemetry log"
+                oninput="mapSearchInput(${i}, this.value);autoGrowSearch(this)">${esc(row.text)}</textarea>
+      <div class="search-scope" role="group" aria-labelledby="${scopeId}">
+        <span class="search-scope-lead" id="${scopeId}">Look in</span>
+        ${SEARCH_FIELDS.map(f => `
+          <label class="search-field" title="Match this entry against ${escAttr(f.hint)}">
+            <input type="checkbox" ${row[f.key] ? 'checked' : ''}
+                   onchange="setSearchField(${i}, '${f.key}', this.checked)"> ${esc(f.label)}
+          </label>`).join('')}
+        <button type="button" class="search-remove" onclick="removeSearchRow(${i})"
+                aria-label="Remove filter entry ${n}" title="Remove this entry"
+                ${total > 1 ? '' : 'hidden'}>−</button>
+      </div>
+      <p class="filter-note" id="search-terms-note-${i}">${searchTermsNoteHtml(i)}</p>
+    </div>`;
+}
+
 // The search box is a <textarea>, not an <input>: a single-line input strips
 // the line breaks out of a pasted column of addresses, gluing 6128 and 6129
 // into 61286129. It opens one line tall and grows to fit what was pasted.
 function initStationFilters() {
-  const el = document.getElementById('station-search');
-  if (el) autoGrowSearch(el);
+  document.querySelectorAll('#station-filters .filter-search').forEach(autoGrowSearch);
+}
+
+// Redraw the stack in place — the block, not the panel around it, so the
+// grouped filters below keep their open/shut state and their scroll position.
+// `focus` is the entry to put the caret in afterwards: the new one on +, and
+// the one that took the removed one's place on −, because a control that
+// vanishes under the pointer should hand focus somewhere deliberate rather than
+// let the document have it.
+function renderSearchStack(focus) {
+  const el = document.getElementById('search-stack');
+  if (!el) return;
+  el.innerHTML = searchStackHtml();
+  el.querySelectorAll('.filter-search').forEach(autoGrowSearch);
+  const box = focus == null ? null : document.getElementById(`station-search-${focus}`);
+  if (box) box.focus();
+}
+
+function addSearchRow() {
+  const rows = searchRows();
+  rows.push(newSearchRow());
+  renderSearchStack(rows.length - 1);
+  // A blank entry filters nothing, so the station list cannot have changed —
+  // but the panel's own chrome (the clear button, the reset buttons) reads the
+  // stack, and the mode selector has just appeared.
+  updateFilterChrome();
+}
+
+function removeSearchRow(i) {
+  const rows = searchRows();
+  if (i < 0 || i >= rows.length) return;
+  rows.splice(i, 1);
+  if (!rows.length) rows.push(newSearchRow());
+  renderSearchStack(Math.min(i, rows.length - 1));
+  stationsFilterChanged();
+}
+
+function setSearchField(i, key, on) {
+  const row = searchRows()[i];
+  if (!row) return;
+  row[key] = !!on;
+  // No redraw: the tick box the operator just clicked is already showing its
+  // own new state, and rebuilding the block under the pointer would take the
+  // focus out of it. Only the entry's note has to catch up, and
+  // updateFilterChrome rewrites every one of them.
+  stationsFilterChanged();
+}
+
+function setSearchMode(mode) {
+  state.filters.searchMode = mode === 'all' ? 'all' : 'any';
+  stationsFilterChanged();
 }
 
 const SEARCH_MAX_PX = 170;   // ~8 lines; past that the box scrolls instead
@@ -3334,33 +3598,45 @@ function autoGrowSearch(el) {
   el.style.setProperty('--grow', Math.min(el.scrollHeight + frame, SEARCH_MAX_PX) + 'px');
 }
 
+// Clear takes the stack back to one empty entry pointed at everything — the
+// state a fresh page opens in. Clearing the text of three entries and leaving
+// three boxes behind would be the literal reading and the less useful one:
+// "clear" is pressed to start again.
 function clearSearch() {
-  state.filters.search = '';
-  const el = document.getElementById('station-search');
-  if (el) { el.value = ''; autoGrowSearch(el); el.focus(); }
+  state.filters.searches = [newSearchRow()];
+  renderSearchStack(0);
   stationsFilterChanged();
 }
 
-// What a pasted list did: how many terms, how many addresses the windows among
-// them actually cover, and which terms are in no station on file. Silent about
-// a single plain term — the match note below already covers it — but never
-// about a window, because "how much of that block is on file" is the whole of
-// what a window is asking, and a station count cannot answer it: three stations
-// can hold ten addresses, or one can hold three.
-function searchTermsNoteHtml() {
-  const terms  = parseSearchTerms(state.filters.search);
-  const ranges = prepareSearch(state.filters.search).ranges;
-  if (terms.length < 2 && !ranges.length) return '';
+// What one entry did: how many terms, how many addresses the windows among them
+// actually cover, and which terms are in no station on file *where this entry
+// is looking*. Silent about a single plain term — the match note below already
+// covers it — but never about a window, because "how much of that block is on
+// file" is the whole of what a window is asking, and a station count cannot
+// answer it: three stations can hold ten addresses, or one can hold three.
+function searchTermsNoteHtml(i) {
+  const entry = prepareSearchStack()[i];
+  if (!entry) return '';
+  const { prep, fields, pointed } = entry;
+  // An entry pointed at nothing is skipped by the filter, and says so here
+  // rather than being quietly dropped. Only worth saying once there is text in
+  // it — an empty entry with no fields ticked is not doing anything wrong.
+  if (!pointed) {
+    return (prep.terms.length || prep.ranges.length)
+      ? 'Not pointed at any field — this entry is being ignored.' : '';
+  }
+  const count = prep.terms.length + prep.ranges.length;
+  if (count < 2 && !prep.ranges.length) return '';
   // Distinct addresses, so two windows that overlap are not counted twice.
-  const covered = ranges.length
-    ? new Set(ranges.flatMap(([low, high]) => alertIdsInRange(low, high))).size
+  const covered = (fields.alert && prep.ranges.length)
+    ? new Set(prep.ranges.flatMap(([low, high]) => alertIdsInRange(low, high))).size
     : 0;
-  const bits = [`${terms.length} search term${terms.length === 1 ? '' : 's'}`];
+  const bits = [`${count} search term${count === 1 ? '' : 's'}`];
   if (covered) {
     bits.push(`${covered} ALERT address${covered === 1 ? '' : 'es'} inside ` +
-              `${ranges.length === 1 ? 'the range' : `the ${ranges.length} ranges`}`);
+              `${prep.ranges.length === 1 ? 'the range' : `the ${prep.ranges.length} ranges`}`);
   }
-  const missing = unmatchedSearchTerms(terms);
+  const missing = unmatchedSearchTerms(prep, fields);
   if (!missing.length) {
     bits.push('all found.');
   } else {
@@ -3516,10 +3792,12 @@ function valueGroupState(keys) {
 // would take the focus out of whatever the operator is clicking).
 function updateFilterChrome() {
   Object.keys(FILTER_GROUPS).forEach(updateFilterGroupState);
-  const terms = document.getElementById('search-terms-note');
-  if (terms) terms.innerHTML = searchTermsNoteHtml();
+  searchRows().forEach((_, i) => {
+    const note = document.getElementById(`search-terms-note-${i}`);
+    if (note) note.innerHTML = searchTermsNoteHtml(i);
+  });
   const clear = document.getElementById('search-clear');
-  if (clear) clear.hidden = !state.filters.search.trim();
+  if (clear) clear.hidden = !anySearchText();
   const area = document.getElementById('filter-state-area');
   if (area) area.textContent = valueGroupState(['basin', 'lga']);
   const data = document.getElementById('filter-state-data');
@@ -3642,7 +3920,7 @@ function rerenderFilterGroup(key) {
 // Set is by definition a real constraint.
 function anyStationFilterActive() {
   const f = state.filters;
-  return !!(f.search.trim() || f.roles.size || f.sensors.size || f.networks.size ||
+  return !!(anySearchActive() || f.roles.size || f.sensors.size || f.networks.size ||
             f.regions.size || f.catchments.size || f.basin || f.lga ||
             f.hasCoords || f.hasAlertId || f.enabledOnly);
 }
@@ -3651,7 +3929,8 @@ function resetStationFilters() {
   // The ACMA block keeps its own state — clearing station filters should not
   // silently drop an RF layer the operator has configured.
   state.filters = {
-    search: '', roles: new Set(), sensors: new Set(), networks: new Set(),
+    searches: [newSearchRow()], searchMode: 'any',
+    roles: new Set(), sensors: new Set(), networks: new Set(),
     regions: new Set(), catchments: new Set(), sensorsAll: false,
     basin: '', lga: '', hasCoords: '', hasAlertId: '', enabledOnly: false,
     acma: state.filters.acma,
