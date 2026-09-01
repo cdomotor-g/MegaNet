@@ -3099,8 +3099,25 @@ hr {
   font-variant-numeric: tabular-nums;
 }
 
-/* The card's own arming button, on its own line under the coordinate boxes. */
+/* The card's own arming button, and Copy lat, lon beside it, on one line under
+   the coordinate boxes. `.pill-row` supplies the layout — this is only the pull
+   up into the grid gap, the same as `.ef-hint` and `.ef-links` take. */
 .ef-movepin { margin-top: -.35rem; }
+
+/* Copy lat, lon flashes "✓ Copied" or "✗ Copy failed" in place of its label for
+   1.6 s. Both are shorter than the label — 79 px and 105 px against 118 px as
+   measured here — and a pill that shrinks and grows again shoves every pill
+   after it sideways, which on the map callout is five links re-wrapping under
+   the pointer. A min-width the longest state fits inside holds the row still.
+
+   `ch` rather than `px` because the label is text and this has to track the
+   font the pill is actually rendered in: 118 px is 16.6ch at the pill's size.
+   18ch is that plus slack, deliberately — the label opens with an emoji, and
+   emoji widths differ between platforms far more than letters do, so a figure
+   that only just fitted here would stop binding on the first machine whose
+   clipboard glyph is wider. The cost of the slack is a few pixels of padding
+   on one pill in a row that wraps anyway. */
+.mn-copy-latlon { min-width: 18ch; justify-content: center; }
 
 /* ── Draw & measure ──────────────────────────────────────────────────────── */
 
@@ -3399,6 +3416,7 @@ hr {
 }
 
 .filter-card > summary,
+.stations-card > summary,
 .path-panel > summary,
 .lb-panel > summary {
   display: flex;
@@ -3410,6 +3428,7 @@ hr {
 }
 
 .filter-card > summary::before,
+.stations-card > summary::before,
 .path-panel > summary::before,
 .lb-panel > summary::before {
   content: '▸';
@@ -3418,10 +3437,12 @@ hr {
 }
 
 .filter-card[open] > summary::before,
+.stations-card[open] > summary::before,
 .path-panel[open] > summary::before,
 .lb-panel[open] > summary::before { content: '▾'; }
 
 .filter-card > summary h3,
+.stations-card > summary h3,
 .path-panel > summary h3,
 .lb-panel > summary h3 {
   margin: 0;
@@ -3432,9 +3453,27 @@ hr {
 .path-panel > summary span,
 .lb-panel > summary span { color: var(--muted); }
 
+/* The stations card is deliberately not in the rule above, and this is the one
+   place the two differ. That selector is `summary span` — every span *inside*
+   the summary, at any depth — and the stations card's heading carries the live
+   row-count badge, which has colours of its own and must keep them. So only the
+   note beside the heading is muted here. */
+.stations-card > summary > .small { color: var(--muted); }
+
 .filter-card > .filter-panel,
+.stations-card > .stations-card-body,
 .path-body,
 .lb-body { padding-top: .5rem; }
+
+/* "+ New" used to sit in a .panel-header beside the heading. The heading is a
+   <summary> now, and a button inside one is a target that toggles the card as
+   often as it is pressed — so the action moved into the body, on its own row,
+   right-aligned where the panel header used to put it. */
+.stations-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--sp-2);
+}
 
 /* verdict strip: the plain-English answer, before any of the numbers */
 .path-verdict {

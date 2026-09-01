@@ -227,7 +227,11 @@ const HELP = {
            + '<strong>Filters</strong> card under the map drives the map and the list at once, and '
            + 'is built from whatever <code>stations.json</code> holds — every option carries the '
            + 'number of stations behind it, and nothing is offered that no station uses. It '
-           + 'collapses, and its summary line says what the filters are doing while it is shut. The map carries its own controls in its top-right corner, as four '
+           + 'collapses, and its summary line says what the filters are doing while it is shut. '
+           + 'The <strong>Stations</strong> list below collapses the same way — it is the tallest '
+           + 'card on the page, and shutting it is how the map, the path tools and the editor get '
+           + 'onto one screen together; its summary keeps the live row count and names the '
+           + 'selected station. The map carries its own controls in its top-right corner, as four '
            + 'icons that open when the pointer is on them and can be pinned open: the base map, '
            + '<strong>Map display</strong>, <strong>Draw &amp; measure</strong> and the legend. '
            + 'The elevation profile and link budget sit under the map. Selecting a '
@@ -243,7 +247,11 @@ const HELP = {
            + 'boxes, and on every station\'s map callout, is a row of pills: Street View, Google '
            + 'Earth and Apple Maps at that position, and searches of the <strong>FWIN</strong> and '
            + '<strong>OOHB</strong> document libraries for that station. Beside them, '
-           + '<strong>Move pin on map</strong>. In the editor\'s <strong>ALERT IDs / Sensors</strong> '
+           + '<strong>Move pin on map</strong> and <strong>Copy lat, lon</strong> — the position as '
+           + 'decimal degrees on the clipboard, ready to paste into a work order, a planning tool '
+           + 'or a message to whoever is standing at the site. In the editor it copies what the two '
+           + 'boxes say rather than what was last saved, so a pin you have just dragged or a figure '
+           + 'you have just typed is what you get. In the editor\'s <strong>ALERT IDs / Sensors</strong> '
            + 'list, each row carries a <strong>Flip</strong> link that opens the Bit Flipper on that '
            + 'row\'s address — what else it could have been, one or more bit-flips away. It reads '
            + 'the address out of the box rather than off the saved record, so a row you have '
@@ -1314,6 +1322,114 @@ function mapLinksHtml(s) {
   return out.join('\n    ');
 }
 
+// ── Copy the coordinate ──────────────────────────────────────────────────────
+// Every one of the five pills above *takes* the coordinate somewhere. This is
+// the sixth thing an operator wants from a position and the one none of them
+// does: hand it over, so it can be pasted into a work order, a radio planning
+// tool, a text message to whoever is standing in the paddock. The alternative
+// is reading twelve digits off the screen and typing them somewhere else, which
+// is the exact operation nobody can check.
+//
+// Not part of mapLinksHtml(): every pill in that row leaves the site, and this
+// one does not go anywhere at all. Same row, same shape, different kind of
+// thing — so it is built here and placed by each caller.
+
+// Six decimal places, the same as MapMovePin writes when it saves a dragged
+// pin — about 0.1 m, past what a handheld GPS claims. Number() strips the
+// trailing zeros toFixed leaves behind, so a coordinate stored as -33.12 is
+// copied as "-33.12" rather than as "-33.120000", and one carrying a double's
+// seventeen digits is copied as the six that mean anything.
+function stationLatLonText(s) {
+  if (s == null || s.lat == null || s.lon == null) return '';
+  return `${Number(Number(s.lat).toFixed(6))}, ${Number(Number(s.lon).toFixed(6))}`;
+}
+
+// Put text on the clipboard, and say whether it landed. Resolves rather than
+// rejects, because every caller wants the same thing from a refusal — to say so
+// on the button — and a rejected promise makes that a second code path.
+//
+// The fallback is not decoration. navigator.clipboard is unavailable over plain
+// `file://` and over http on a non-localhost host, which is how this app is
+// opened often enough to matter, and it is refused outright when the call is
+// not close enough to a user gesture. execCommand('copy') is deprecated and
+// still the only thing that works in those cases.
+function copyToClipboard(text) {
+  const value = String(text ?? '');
+  if (!value) return Promise.resolve(false);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(value).then(() => true, () => _copyFallback(value));
+  }
+  return Promise.resolve(_copyFallback(value));
+}
+
+function _copyFallback(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    // Off-screen rather than hidden: a display:none textarea cannot be selected,
+    // and scrolling the page to a focused element is the visible glitch this
+    // avoids.
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (_) { return false; }
+}
+
+// The pill itself, for the map callout and the station editor card — one place
+// it is written, two places it is drawn, the same argument as mapLinksHtml().
+// Nothing at all when the station has no position: a button that copies an
+// empty string is worse than no button.
+//
+// `live` is the editor card's version. There the two coordinate boxes are the
+// thing being edited — map-move-pin.js writes a dragged position straight into
+// them without re-rendering the card, and a person can type over them — so the
+// pill reads the boxes at the click instead of the record it was drawn from,
+// and its tooltip names where it is reading rather than a figure that may since
+// have changed. Everywhere else the coordinate is fixed and rides on the
+// button, which is what makes the callout's pill work with no lookup at all.
+function copyLatLonPillHtml(s, { live = false } = {}) {
+  const text = stationLatLonText(s);
+  if (!text) return '';
+  return `<button type="button" class="pill mn-copy-latlon"${live ? '' : ` data-mn-latlon="${escAttr(text)}"`}
+       onclick="${live ? 'editorCopyLatLon(this)' : 'copyStationLatLon(this)'}"
+       title="${live
+         ? 'Copy the latitude and longitude in the boxes above to the clipboard, as decimal degrees'
+         : `Copy ${escAttr(text)} to the clipboard — decimal degrees, ready to paste into a map, a work order or a message`}"
+       >📋 Copy lat, lon</button>`;
+}
+
+// The click. The coordinate rides on the button, so the callout's pill needs no
+// lookup at all — but a caller may hand one in instead, which is what the editor
+// card does: the two boxes above its pill are live, and a pin dragged into them
+// or a figure typed over them has to be what gets copied. Reading them at the
+// click is the only version of that which cannot go stale.
+//
+// The label says what happened and puts itself back. Guarded on isConnected
+// because the likeliest place to press this is a Leaflet popup, and a popup
+// closed inside the 1.6 s is a button that no longer exists.
+function copyStationLatLon(btn, text) {
+  if (!btn) return;
+  const value = (text != null ? text : btn.getAttribute('data-mn-latlon')) || '';
+  const prev  = btn.textContent;
+  const flash = (label, said) => {
+    btn.textContent = label;
+    announce(said);
+    setTimeout(() => { if (btn.isConnected) btn.textContent = prev; }, 1600);
+  };
+  // Only reachable from the editor card, whose boxes can be emptied after the
+  // pill was drawn. Saying so beats a button that silently does nothing.
+  if (!value) { flash('✗ No position', 'There is no latitude and longitude to copy'); return; }
+  copyToClipboard(value).then(ok => ok
+    ? flash('✓ Copied', `Copied ${value}`)
+    : flash('✗ Copy failed', 'Could not copy the coordinate to the clipboard'));
+}
+
 // ── Datastore ─────────────────────────────────────────────────────────────────
 // Postgres on Supabase, reached over PostgREST — which is plain HTTP, so this
 // costs no library and index.html gains no <script> tag. One constants block for
@@ -1584,6 +1700,13 @@ const state = {
   // means it. Open on a first visit, because the search box is the most-used
   // control on the page and a tab that opens hiding it reads as broken.
   filtersOpen:    (localStorage.getItem('mn-filters') || 'open') === 'open',
+  // The station list card on the same tab, and remembered for the same reason.
+  // It is the tallest card on the page — a scroller capped at most of the
+  // viewport — so shutting it is how the map, the path tools and the editor
+  // card get onto one screen together. Open on a first visit: the list is half
+  // of what this tab is, and a tab that opens showing an empty box where 3,174
+  // stations should be reads as a file that failed to load.
+  stationsListOpen: (localStorage.getItem('mn-stations-list') || 'open') === 'open',
   // Left nav: an icon rail, or icons plus labels. Kept under 'mn-nav' the same
   // way the theme and the filter card are. With nothing stored the window's
   // width decides, so a first visit on a laptop isn't handed two sidebars.

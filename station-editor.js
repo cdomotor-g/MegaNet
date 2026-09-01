@@ -121,6 +121,12 @@ function editorForm(s) {
   // decides whether the row is drawn is whether it came back with anything.
   const links   = mapLinksHtml(s);
   const movePin = MapMovePin.editorButtonHtml(s);
+  // Same pill the map callout carries, from the same builder — but pointed at
+  // editorCopyLatLon(), which reads the two boxes rather than the record. The
+  // card is where a coordinate is *edited*: a pin dragged in from the map or a
+  // figure typed over one has to be what the clipboard gets, and reading the
+  // boxes at the click is the only version of that which cannot go stale.
+  const copyLL  = copyLatLonPillHtml(s, { live: true });
   // The wind region the station's coordinate falls in — the same answer its map
   // callout gives, so the card and the callout never disagree. Read now, and
   // filled in when the polygons land if this page has not needed them yet.
@@ -151,9 +157,13 @@ function editorForm(s) {
       <label>Latitude<input type="number" step="any" id="ef-lat" value="${s.lat ?? ''}"></label>
       <label>Longitude<input type="number" step="any" id="ef-lon" value="${s.lon ?? ''}"></label>
       <!-- Typing a coordinate is the exact form of this that nobody can check.
-           The button arms map-move-pin.js: the pin comes off the map, goes where
-           the station is, and writes these two boxes on the way back. -->
-      ${movePin ? `<div class="full ef-movepin">${movePin}</div>` : ''}
+           Move pin arms map-move-pin.js: the pin comes off the map, goes where
+           the station is, and writes these two boxes on the way back. Copy is
+           the other direction — the position out of here and into whatever is
+           being written somewhere else. Both belong to the two boxes above, so
+           they sit on one row directly under them rather than in the links row
+           below, which is five things that all leave the site. -->
+      ${movePin || copyLL ? `<div class="full ef-movepin pill-row">${movePin}${copyLL}</div>` : ''}
       ${links ? `<div class="full small ef-links">${links}</div>` : ''}
       <label>Elevation AHD (m)<input type="number" step="any" id="ef-elev" value="${s.elevation_ahd ?? ''}"></label>
       <!-- Read-only because it is not a property of the station: it is where the
@@ -498,6 +508,23 @@ function deriveLegacyAlertIds(sensors) {
   if (wl.length === 1) out.water_level = wl[0];
   else if (wl.length > 1) out.water_level = wl;
   return out;
+}
+
+// The card's Copy lat, lon pill. Reads the two boxes rather than the record the
+// card was drawn from, because those are the two things that move: map-move-pin
+// writes a dragged position straight into them and deliberately does *not*
+// re-render the card (a re-render would put the old coordinates back), and a
+// person can type over them at any time. What is on screen is what gets copied.
+//
+// pFloat() rather than the raw strings, so half-typed input ("-33." or "  ")
+// copies as nothing — and copyStationLatLon() says so on the button — instead
+// of putting a broken coordinate on the clipboard. Formatted by the same
+// stationLatLonText() the callout uses, so the two never disagree about how
+// many digits a position has.
+function editorCopyLatLon(btn) {
+  const lat = pFloat(document.getElementById('ef-lat')?.value);
+  const lon = pFloat(document.getElementById('ef-lon')?.value);
+  copyStationLatLon(btn, stationLatLonText({ lat, lon }));
 }
 
 // Read the form into a station record. Split out of editorSave() because the

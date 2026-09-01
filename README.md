@@ -2526,7 +2526,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Seventeen checks. The ten below are the ones a change to the front end meets
+Twenty-one checks. The ten below are the ones a change to the front end meets
 first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |
@@ -2558,7 +2558,7 @@ then clicks its way through the RF Changes and Interference Workbench controls,
 keyed by the handler each one names rather than by its label. See
 `test/lib/controls.mjs`.
 
-CI runs all seventeen on any push touching a root `*.js`, `index.html`, `styles.css`,
+CI runs all twenty-one on any push touching a root `*.js`, `index.html`, `styles.css`,
 `stations.json`, `db/migrations/`, `test/` or the inspection workbook in
 `archive/`. The filter is a glob rather than a list of filenames
 because the app's script list grew with every milestone of the split — a named

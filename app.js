@@ -1780,18 +1780,34 @@ function renderStationsHtml() {
         </div>
         <div class="panel" id="path-profile-panel" hidden></div>
         <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
-        <div class="panel">
-          <div class="panel-header">
-            <h3 id="stations-table-h">Stations <span class="badge" id="st-count">${stations.length}</span></h3>
-            <button onclick="editorNew()">+ New</button>
-          </div>
-          <!-- Pattern 7a: the wrapper caps its own height, so it is a named
-               scroll region. Named by the heading above it, which carries the
-               row count — so the name says how much is in here, live. -->
-          <div class="table-wrap tall" id="stations-table-wrap"
-               role="region" tabindex="0" aria-labelledby="stations-table-h">
-            ${stationsTable(stations)}
-          </div>
+        <!-- Collapsible, the same <details> the Filters, Path profile and Link
+             budget cards on this tab are. It is the tallest thing on the page —
+             a scroller capped at most of the viewport — and an operator working
+             the map, a path profile or the editor card below it has to scroll
+             past all of it to reach them. The condition #165 set for letting a
+             card on this tab shut is that its summary still says what is inside:
+             the count badge is live, and the note beside it names the selected
+             station, which is the one row a shut list would otherwise hide. -->
+        <div class="panel" id="stations-list-card">
+          <details class="stations-card" ${state.stationsListOpen ? 'open' : ''}
+                   ontoggle="setStationsListOpen(this.open)">
+            <summary>
+              <h3 id="stations-table-h">Stations <span class="badge" id="st-count">${stations.length}</span></h3>
+              <span class="small" id="stations-list-note">${stationsListNoteHtml()}</span>
+            </summary>
+            <div class="stations-card-body">
+              <div class="stations-card-actions">
+                <button onclick="editorNew()">+ New</button>
+              </div>
+              <!-- Pattern 7a: the wrapper caps its own height, so it is a named
+                   scroll region. Named by the heading above it, which carries the
+                   row count — so the name says how much is in here, live. -->
+              <div class="table-wrap tall" id="stations-table-wrap"
+                   role="region" tabindex="0" aria-labelledby="stations-table-h">
+                ${stationsTable(stations)}
+              </div>
+            </div>
+          </details>
         </div>
         <div class="panel" id="stations-carriers-card" ${carriers ? '' : 'hidden'}>
           ${carriers}
@@ -1852,6 +1868,34 @@ function updateChromeHeight() {
 function setStationFiltersOpen(open) {
   state.filtersOpen = !!open;
   localStorage.setItem('mn-filters', state.filtersOpen ? 'open' : 'closed');
+}
+
+// The station list card, open or shut. Remembered for the same reason the
+// filters are: this is not a card you open to answer one question, it is the
+// tab's other half, and an operator who shuts a 1,300-row scroller to get the
+// map and the editor onto one screen means it. Writes state and nothing else —
+// see the note above about #160 and re-rendering a <details> from its own
+// ontoggle.
+function setStationsListOpen(open) {
+  state.stationsListOpen = !!open;
+  localStorage.setItem('mn-stations-list', state.stationsListOpen ? 'open' : 'closed');
+}
+
+// What the summary says beside the count. A shut card must still answer the
+// question the list is open for — the count badge says how many the filters
+// kept, and this says which one is selected, because the selected row is the
+// one thing in a shut list that the editor card below is talking about.
+function stationsListNoteHtml() {
+  const s = state.selectedId && state.data
+    ? state.data.stations.find(x => x.id === state.selectedId) : null;
+  return s ? `Selected: ${esc(s.name)}` : 'No station selected';
+}
+
+// Keep that note honest. Called from every path that changes the selection —
+// which is rerenderStations(), the one thing they all already go through.
+function refreshStationsListNote() {
+  const el = document.getElementById('stations-list-note');
+  if (el) el.innerHTML = stationsListNoteHtml();
 }
 
 // ── Full-screen map ──────────────────────────────────────────────────────────
@@ -2557,7 +2601,7 @@ function refreshMapLayers({ skipFit = false } = {}) {
     // bindPopup takes a function so the HTML is built when the popup opens,
     // not for all ~3,174 markers on every refresh.
     //
-    // The actions below are a row of pills now (#170), and there can be nine of
+    // The actions below are a row of pills now (#170), and there can be ten of
     // them, each one `nowrap` and ~160 px wide. `maxWidth` alone does nothing
     // for that: Leaflet sizes a popup to its *content*, and the flex row is
     // happy to be as narrow as it is given, so at Leaflet's default the pills
@@ -2589,17 +2633,18 @@ function refreshMapLayers({ skipFit = false } = {}) {
         title="${escAttr(wind.title)}">${esc(wind.text)}</span> <span class="mn-pop-note">indicative</span></span>
       ${acmaRepeaterPopupExtra(s)}
       <!-- Every action on this callout is a pill (#170): they are a row of
-           equal things — two that move the map, one that arms the blast
-           styling, and four or five that leave for somewhere else — and a
-           stack of underlined text read as a menu nobody asked for. The two
-           in-page ones are <button>s, which is what #138 says they always
-           should have been: the action happens here, so the element is a
-           button dressed as one, not a link to nowhere. -->
+           equal things — two that move the map, one that copies the position,
+           one that arms the blast styling, and four or five that leave for
+           somewhere else — and a stack of underlined text read as a menu
+           nobody asked for. The in-page ones are <button>s, which is what #138
+           says they always should have been: the action happens here, so the
+           element is a button dressed as one, not a link to nowhere. -->
       <div class="mn-popup-actions pill-row">
         <button type="button" class="pill" onclick="focusStation('${escAttr(s.id)}')"
            title="Select this station in the list under the map">Show in the list below ↓</button>
         <button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
            title="Zoom the map to the ~50 km area around this station">Zoom to station</button>
+        ${copyLatLonPillHtml(s)}
         ${MapBlast.popupLinkHtml(s)}
         ${MapMovePin.popupLinkHtml(s)}
         ${arroUrl ? `<a class="pill" href="${esc(arroUrl)}" target="_blank" rel="noopener"
@@ -3057,6 +3102,10 @@ function rerenderStations() {
   if (wrap) wrap.innerHTML = stationsTable(stations);
   const cnt = document.getElementById('st-count');
   if (cnt) cnt.textContent = stations.length;
+  // Both halves of what the card's summary claims, repainted together: the
+  // badge above and the selected station beside it. Deliberately not a
+  // re-render of the <details> itself — see setStationsListOpen().
+  refreshStationsListNote();
 }
 
 function selectStation(id) {
