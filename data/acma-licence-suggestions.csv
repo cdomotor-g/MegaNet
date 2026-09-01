@@ -1,125 +1,35 @@
 station_id,station_name,current_acma_licence,suggested_licence_no,already_recorded,licensee,freq_mhz,freq_match,distance_m,site_id,site_name,site_precision,device_id
-allambie_lane,Allambie Lane,,12779522/1,,Townsville City Council,152.4000,n/a (no rx_mhz recorded),0,153407,Broadcast Site Allambie Lane KELSO,Within 10 metres,2870485106
-amiens_knob_al,Amiens Knob AL,10182196/1,10182196/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,1,10004034,BOM Site Amiens Knob 71 Minuti Lane Amiens,Within 100 metres,2870244402
-bald_knob_al,Bald Knob AL,433989,10775753/1,,Queensland Bulk Water Supply Authority,151.5000,yes,7,15958,Main Roads/Qld Transport Site WILKES KNOB,Within 10 metres,2870184192
-bald_knob_al,Bald Knob AL,433989,433989/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,16,15959,Energex Site WILKES KNOB,Within 10 metres,2870468000
-ballandean_hill_aler,Ballandean Hill Aler,,10182197/1,,BUREAU OF METEOROLOGY,151.5000,n/a (no rx_mhz recorded),3,10004033,BOM Site Ballandean Hill  via Bents Road Ballandean,Within 100 metres,2870094973
-bilyana_al,Bilyana AL,1448341,1448341/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,292,441162,Bureau Of Meteorology Site BILYANA,Unknown,2870516891
-black_mountain_farl,Black Mountain (Farl,,106735/1,,BJ Tandy and Co Pty Ltd,163.2375,n/a (no rx_mhz recorded),9,18429,Shepherd Site The Black Mountain  13 km NW of MACKAY,Within 10 metres,2870504345
-black_mountain_farl,Black Mountain (Farl,,1144304/1,,Mitchell Flor,165.0500,n/a (no rx_mhz recorded),9,18429,Shepherd Site The Black Mountain  13 km NW of MACKAY,Within 10 metres,2870461145
-black_mountain_farl,Black Mountain (Farl,,1464913/1,,MACKAY SUGAR LIMITED,164.6250,n/a (no rx_mhz recorded),18,440602,RCS Site The Black Mountain  13 km NW of MACKAY,Within 10 metres,2870472156
-black_mountain_farl,Black Mountain (Farl,,1905043/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,150.9000,n/a (no rx_mhz recorded),18,440602,RCS Site The Black Mountain  13 km NW of MACKAY,Within 10 metres,2870405560
-black_mountain_farl,Black Mountain (Farl,,1905044/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,151.1250,n/a (no rx_mhz recorded),18,440602,RCS Site The Black Mountain  13 km NW of MACKAY,Within 10 metres,2870290062
-black_mountain_farl,Black Mountain (Farl,,1905045/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.3625,n/a (no rx_mhz recorded),18,440602,RCS Site The Black Mountain  13 km NW of MACKAY,Within 10 metres,2870128167
-black_mountain_farl,Black Mountain (Farl,,1905046/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.6125,n/a (no rx_mhz recorded),18,440602,RCS Site The Black Mountain  13 km NW of MACKAY,Within 10 metres,2870519906
-black_mountain_farl,Black Mountain (Farl,,1481303/1,,MACKAY SUGAR LIMITED,163.0750,n/a (no rx_mhz recorded),18,440602,RCS Site The Black Mountain  13 km NW of MACKAY,Within 10 metres,2870138497
-black_mountain_farl,Black Mountain (Farl,,1466318/2,,CSE CROSSCOM PTY LTD,163.8875,n/a (no rx_mhz recorded),18,440602,RCS Site The Black Mountain  13 km NW of MACKAY,Within 10 metres,2870366303
-black_mountain_farl,Black Mountain (Farl,,1904310/3,,CSE CROSSCOM PTY LTD,164.0625,n/a (no rx_mhz recorded),18,440602,RCS Site The Black Mountain  13 km NW of MACKAY,Within 10 metres,2870406281
-bones_knob_al,Bones Knob AL,1447474,1441012/1,,BUREAU OF METEOROLOGY,151.5000,yes,37,440307,Comms Mast  Bureau of Meteorology Site Bones Knob  off Griffin Rd TOLGA,Unknown,2870216331
-bones_knob_al,Bones Knob AL,1447474,1447474/1,yes,BUREAU OF METEOROLOGY,151.9500,yes,37,440307,Comms Mast  Bureau of Meteorology Site Bones Knob  off Griffin Rd TOLGA,Unknown,2870221051
-bony_mountain_al,Bony Mountain AL,10182195/1,10182195/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,3,10004035,BOM Site via Yankee Gully Road Bony Mountain,Within 10 metres,2870484070
-brinsmead_al,Brinsmead AL,1441013,1441013/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,457,440326,Met Site Whitfield Range BRINSMEAD,Unknown,2870193659
-budawang,Budawang,,1206178/1,,NSW RURAL FIRE SERVICE,148.5875,n/a (no rx_mhz recorded),15,9728,"NPWS 18m Lattice Tower Fire Lookout Budawang National Park, Mount Budawang Rd BUDAWANG",Within 100 metres,2870446071
-budawang,Budawang,,1917305/1,,OFFICE OF ENVIRONMENT AND HERITAGE,162.1000,n/a (no rx_mhz recorded),15,9728,"NPWS 18m Lattice Tower Fire Lookout Budawang National Park, Mount Budawang Rd BUDAWANG",Within 100 metres,2870215806
-budawang,Budawang,,1917397/1,,OFFICE OF ENVIRONMENT AND HERITAGE,162.8125,n/a (no rx_mhz recorded),15,9728,"NPWS 18m Lattice Tower Fire Lookout Budawang National Park, Mount Budawang Rd BUDAWANG",Within 100 metres,2870396021
-budawang,Budawang,,433708/1,,BUREAU OF METEOROLOGY,151.5000,n/a (no rx_mhz recorded),15,9728,"NPWS 18m Lattice Tower Fire Lookout Budawang National Park, Mount Budawang Rd BUDAWANG",Within 100 metres,2870499494
-cameron_hill_al,Cameron Hill AL,1447480,433844/1,,BUREAU OF METEOROLOGY,151.5000,yes,67,480229,Bureau Met Site PLANT HILL CAMERON HILL,Within 10 metres,2870092839
-cameron_hill_al,Cameron Hill AL,1447480,1447480/1,yes,BUREAU OF METEOROLOGY,151.9500,yes,121,441067,Met Bureau Site Cameron Hill REID RIVER,Unknown,2870469592
-cameron_hill_al,Cameron Hill AL,1447480,433963/1,,BUREAU OF METEOROLOGY,151.5000,yes,403,19674,Telstra Radio Terminal PLANT HILL CAMERON HILL,Within 10 metres,2870403567
-clarke_range_al,Clarke Range AL,1400231,1400231/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,99,400240,Bureau of Meteorology Site CLARKE RG,Unknown,2870337132
-constitution_hill,Constitution Hill,433726,433726/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,16,12766,Energex Site Constitution Hill Sir Samuel Griffith Dr MOUNT COOT-THA,Within 10 metres,2870462676
-coopers_shoot_repeat,Coopers Shoot Repeat,,1983304/1,,Volunteer Marine Rescue NSW,161.5250,n/a (no rx_mhz recorded),9,204828,RVCP Site Coopers Shoot Road BYRON BAY,Within 10 metres,2870226020
-coopers_shoot_repeat,Coopers Shoot Repeat,,13003087/1,,Volunteer Marine Rescue NSW,156.8000,n/a (no rx_mhz recorded),9,204828,RVCP Site Coopers Shoot Road BYRON BAY,Within 10 metres,2870327294
-coopers_shoot_repeat,Coopers Shoot Repeat,,13003088/1,,Volunteer Marine Rescue NSW,156.3750,n/a (no rx_mhz recorded),9,204828,RVCP Site Coopers Shoot Road BYRON BAY,Within 10 metres,2870277696
-coopers_shoot_repeat,Coopers Shoot Repeat,,1205130/1,,NSW RURAL FIRE SERVICE,148.5875,n/a (no rx_mhz recorded),164,34911,NSW Rural Fire Service Site Coopers Shoot BYRON BAY,Within 10 metres,2870235408
-copeland_tops_copel,Copeland Tops (Copel,,1908411/1,,N Abraham & B A Kilby,164.2500,n/a (no rx_mhz recorded),19,7436,"NSWSES 17m Lattice Tower Copeland Tops, off Copeland Trig Trail COPELAND",Within 10 metres,2870071760
-copeland_tops_copel,Copeland Tops (Copel,,10179491/1,,BUREAU OF METEOROLOGY,151.5000,n/a (no rx_mhz recorded),19,7436,"NSWSES 17m Lattice Tower Copeland Tops, off Copeland Trig Trail COPELAND",Within 10 metres,2870451517
-glen_rock_al,Glen Rock Al,1929336,1929336/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,5,139482,Glen Rock 70 metres south of ACMA Site 403861 EMERALD,Within 10 metres,2870513496
-goonellabah_wyreem,Goonellabah(Wyreem,,1204836/1,,NSW RURAL FIRE SERVICE,148.5875,n/a (no rx_mhz recorded),22,8536,"Lismore City Council 22m Water Reservoir A, 16 Wyreema Ave GOONELLABAH",Within 10 metres,2870277943
-goonellabah_wyreem,Goonellabah(Wyreem,,14140/1,,NSW RURAL FIRE SERVICE,160.2250,n/a (no rx_mhz recorded),22,8536,"Lismore City Council 22m Water Reservoir A, 16 Wyreema Ave GOONELLABAH",Within 10 metres,2870069414
-goonellabah_wyreem,Goonellabah(Wyreem,,433772/1,,BUREAU OF METEOROLOGY,151.5000,n/a (no rx_mhz recorded),26,8537,"Lismore City Council 22m Water Reservoir B, 16 Wyreema Ave GOONELLABAH",Within 10 metres,2870523223
-goonellabah_wyreem,Goonellabah(Wyreem,,1975242/1,,ROUS COUNTY COUNCIL,163.0500,n/a (no rx_mhz recorded),38,9003793,"Lismore City Council 35m Lattice Tower, 16 Wyreema Ave GOONELLABAH",Within 10 metres,2870107236
-hillcrest_wine_glass,Hillcrest(Wine Glass,1411025,1411025/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,38,405185,BOM Site Behind buildings near Wineglass Water Tower Wineglass Dr HILLCREST,Within 10 metres,2870095334
-hospital_br_aler,Hospital Br Aler,,480262/1,,Deborah's Flowers,158.0800,n/a (no rx_mhz recorded),188,18569,470 Bridge Road MACKAY,Within 100 metres,2870446527
-kincumber,Kincumber,,1220702/1,,NSW RURAL FIRE SERVICE,148.5875,n/a (no rx_mhz recorded),12,51096,Axicom 50.2m Lattice Tower via 345 Island View Dr Yanina Trail PICKETTS VALLEY,Within 10 metres,2870258562
-kincumber,Kincumber,,11275511/1,,NEW SOUTH WALES GOVERNMENT TELECOMMUNICATIONS AUTHORITY,148.9625,n/a (no rx_mhz recorded),12,51096,Axicom 50.2m Lattice Tower via 345 Island View Dr Yanina Trail PICKETTS VALLEY,Within 10 metres,2870464361
-kincumber,Kincumber,,11275512/1,,NEW SOUTH WALES GOVERNMENT TELECOMMUNICATIONS AUTHORITY,148.5875,n/a (no rx_mhz recorded),12,51096,Axicom 50.2m Lattice Tower via 345 Island View Dr Yanina Trail PICKETTS VALLEY,Within 10 metres,2870413889
-kincumber,Kincumber,,11711167/1,,BUREAU OF METEOROLOGY,151.5000,n/a (no rx_mhz recorded),12,51096,Axicom 50.2m Lattice Tower via 345 Island View Dr Yanina Trail PICKETTS VALLEY,Within 10 metres,2870399574
-koombooloomba_al,Koombooloomba AL,,1190038/2,,CLEANCO QUEENSLAND LIMITED,164.7875,n/a (no rx_mhz recorded),335,9003309,Dam Wall Kareeya Power Station KOOMBOOLOOMBA,Within 10 metres,2870297559
-laheys_lookout_al,Laheys Lookout AL,1421318,1421318/1,yes,BUREAU OF METEOROLOGY,152.4000,yes,80,14008,Council Site Laheys Lookout MOUNT TAMBORINE,Within 10 metres,2870160017
-lookout_rd_reservoir,Lookout Rd Reservoir,,11711162/1,,BUREAU OF METEOROLOGY,151.5000,n/a (no rx_mhz recorded),9,5852,Ausgrid 40m Lattice Tower 4/154 Lookout Rd NEW LAMBTON HEIGHTS,Within 10 metres,2870113535
-lookout_rd_reservoir,Lookout Rd Reservoir,,1251424/1,,DR McPherson,162.7750,n/a (no rx_mhz recorded),120,6709,Newcastle City Council Site Blackbutt Reserve NEW LAMBTON HEIGHTS,Unknown,2870442729
-maalan_rd_al,Maalan Rd AL,,1184704/1,,BUREAU OF METEOROLOGY,151.5000,n/a (no rx_mhz recorded),4,136288,BOM site Maalan Road access from Sutties Road TULLY,Within 10 metres,2870486486
-millaa_millaa_al,Millaa Millaa AL,433870,433870/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,30,22025,Met Bureau Flood Warning Repeater Site MILLAA MILLAA,Unknown,2870218783
-mingela_al,Mingela AL,1448342,1448342/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,11,441157,Bureau of Meteorology Site MINGELA,Within 10 metres,2870472608
-moss_vale_al,Moss Vale AL,1446584,1446584/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,116,440997,Bureau Of Met Repeater Site MOSSVALE,Unknown,2870421484
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,1905755/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,150.9000,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870123199
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,1905756/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,151.1250,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870457256
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,1905757/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.7375,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870255581
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,1905758/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.6125,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870481307
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,1420592/1,,Department of Transport and Main Roads (Queensland Transport),156.6000,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870429124
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,1420593/1,,Department of Transport and Main Roads (Queensland Transport),156.8000,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870524930
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,9993380/1,,Queensland Bulk Water Supply Authority,151.5375,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870176578
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,10160190/1,,Queensland Bulk Water Supply Authority,173.9000,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870523086
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,10160190/1,,Queensland Bulk Water Supply Authority,151.4250,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870524288
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,10160191/1,,Queensland Bulk Water Supply Authority,173.9500,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870408663
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,10160191/1,,Queensland Bulk Water Supply Authority,152.2500,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870412034
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,10774613/1,,Queensland Bulk Water Supply Authority,151.4250,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870431332
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,10774614/1,,Queensland Bulk Water Supply Authority,151.5250,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870441090
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,10774615/1,,Queensland Bulk Water Supply Authority,152.2500,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870241800
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,10774616/1,,Queensland Bulk Water Supply Authority,152.4625,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870066169
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,11815663/1,,Queensland Bulk Water Supply Authority,163.8250,n/a (no rx_mhz recorded),37,15843,Powerlink Tower The Summit MOUNT GLORIOUS,Within 10 metres,2870211000
-mt_glorious_al_rptr,Mt Glorious AL RPTR,,9840712/1,,Philcomm Pty Ltd,162.9375,n/a (no rx_mhz recorded),219,15846,Philcomm Site Attunga Lane MOUNT GLORIOUS,Within 10 metres,2870174550
-mt_gravatt_lookout_a,MT GRAVATT LOOKOUT A,,10062257/1,,CITIZENS RADIO EMERGENCY SERVICE TEAMS QUEENSLAND INC.,163.4250,n/a (no rx_mhz recorded),31,10000390,Mount Gravatt Outlook Mount Gravatt Outlook Drive Mount Gravatt,Within 10 metres,2870451513
-mt_mayde_al,Mt Mayde Al,1929333,1929333/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,2,139479,Mt Mayde 130 meters SE of ACMA Site 17928 EMERALD,Within 10 metres,2870215824
-mt_mowbullan_rptr,Mt MOWBULLAN RPTR,433911,433911/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,29,402542,BOM Site Westside MT MOWBULLAN,Within 10 metres,2870375104
-mt_perry_al,Mt Perry AL,,63155/1,,TELSTRA LIMITED,150.7625,n/a (no rx_mhz recorded),38,16865,Telstra Radio Terminal MOUNT PERRY,Within 10 metres,2870375360
-mt_perry_al,Mt Perry AL,,78947/1,,TELSTRA LIMITED,149.1250,n/a (no rx_mhz recorded),38,16865,Telstra Radio Terminal MOUNT PERRY,Within 10 metres,2870085597
-mt_perry_al,Mt Perry AL,,78957/1,,TELSTRA LIMITED,149.3250,n/a (no rx_mhz recorded),38,16865,Telstra Radio Terminal MOUNT PERRY,Within 10 metres,2870295142
-mt_warrnambool_repea,Mt Warrnambool Repea,,1188835/1,,Country Fire Authority,163.5000,n/a (no rx_mhz recorded),40,48026,CFA Fire Tower off A1 MT WARRNAMBOOL,Within 100 metres,2870383833
-mt_warrnambool_repea,Mt Warrnambool Repea,,1325127/1,,Country Fire Authority,161.0500,n/a (no rx_mhz recorded),40,48026,CFA Fire Tower off A1 MT WARRNAMBOOL,Within 100 metres,2870382562
-mt_warrnambool_repea,Mt Warrnambool Repea,,1325128/1,,Country Fire Authority,161.0125,n/a (no rx_mhz recorded),40,48026,CFA Fire Tower off A1 MT WARRNAMBOOL,Within 100 metres,2870199777
-mt_warrnambool_repea,Mt Warrnambool Repea,,1325129/1,,Country Fire Authority,161.0375,n/a (no rx_mhz recorded),40,48026,CFA Fire Tower off A1 MT WARRNAMBOOL,Within 100 metres,2870292123
-mt_warrnambool_repea,Mt Warrnambool Repea,,1906099/2,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.6125,n/a (no rx_mhz recorded),40,48026,CFA Fire Tower off A1 MT WARRNAMBOOL,Within 100 metres,2870113282
-mt_warrnambool_repea,Mt Warrnambool Repea,,1905813/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.3625,n/a (no rx_mhz recorded),185,42058,Telstra mast MT WARRNAMBOOL,Within 10 metres,2870269203
-mt_warrnambool_repea,Mt Warrnambool Repea,,1905814/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.2125,n/a (no rx_mhz recorded),185,42058,Telstra mast MT WARRNAMBOOL,Within 10 metres,2870266280
-mt_warrnambool_repea,Mt Warrnambool Repea,,1906100/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.7375,n/a (no rx_mhz recorded),185,42058,Telstra mast MT WARRNAMBOOL,Within 10 metres,2870230634
-mt_warrnambool_repea,Mt Warrnambool Repea,,1328829/1,,DEPARTMENT OF JUSTICE AND COMMUNITY SAFETY,148.9125,n/a (no rx_mhz recorded),213,153176,ACE Broadcast Site MT WARRNAMBOOL,Within 10 metres,2870380468
-mt_warrnambool_repea,Mt Warrnambool Repea,,1800313/1,,DEPARTMENT OF JUSTICE AND COMMUNITY SAFETY,148.6875,n/a (no rx_mhz recorded),213,153176,ACE Broadcast Site MT WARRNAMBOOL,Within 10 metres,2870299751
-mt_wolvi_al,Mt Wolvi AL,1418797,1418797/1,yes,BUREAU OF METEOROLOGY,151.9500,yes,207,402600,Met Bureau Site MT WOLVI,Unknown,2870401523
-mt_wolvi_al,Mt Wolvi AL,1418797,10775757/1,,Queensland Bulk Water Supply Authority,151.5000,yes,442,10017993,SEQ Water Site Wolvi Mountain Rd MT WOLVI,Within 10 metres,2870445036
-murray_springs_al,Murray Springs AL,433887,433887/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,82,20624,Met Bureau Flood Warning Station MURRAY SPRINGS,Within 100 metres,2870204577
-o_reillys_al,O'Reillys AL,1421319,1421319/1,yes,BUREAU OF METEOROLOGY,152.4000,yes,346,402950,Met Bureau Site O`Reillys Guesthouse via CANUNGRA,Unknown,2870115974
-obi_lookout_al,Obi Lookout AL,1185817,1185817/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,250,136331,BOM Site Obi Lookout NAMBOUR,Within 10 metres,2870360594
-rocky_ck_dam,Rocky Ck Dam,,1929337/1,,BUREAU OF METEOROLOGY,151.5000,n/a (no rx_mhz recorded),5,139510,Roddas Lookout Adjcent to ACMA Site 18056 EMERALD,Within 10 metres,2870316418
-rocky_ck_dam,Rocky Ck Dam,,10339743/1,,ERGON ENERGY CORPORATION LIMITED,166.9750,n/a (no rx_mhz recorded),15,10007970,Ergon Energy Site Roddas Lookout SPRINGSURE,Within 10 metres,2870286561
-rocky_ck_dam,Rocky Ck Dam,,10339744/1,,ERGON ENERGY CORPORATION LIMITED,167.1250,n/a (no rx_mhz recorded),15,10007970,Ergon Energy Site Roddas Lookout SPRINGSURE,Within 10 metres,2870482667
-rocky_ck_dam,Rocky Ck Dam,,10339745/1,,ERGON ENERGY CORPORATION LIMITED,167.2750,n/a (no rx_mhz recorded),15,10007970,Ergon Energy Site Roddas Lookout SPRINGSURE,Within 10 metres,2870445661
-rocky_ck_dam,Rocky Ck Dam,,10339746/1,,ERGON ENERGY CORPORATION LIMITED,167.4250,n/a (no rx_mhz recorded),15,10007970,Ergon Energy Site Roddas Lookout SPRINGSURE,Within 10 metres,2870498924
-rocky_ck_dam,Rocky Ck Dam,,1905394/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,151.1250,n/a (no rx_mhz recorded),19,18057,Amateur Site RODDAS LOOKOUT,Within 100 metres,2870296634
-rocky_ck_dam,Rocky Ck Dam,,1905395/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.2125,n/a (no rx_mhz recorded),19,18057,Amateur Site RODDAS LOOKOUT,Within 100 metres,2870211663
-rocky_ck_dam,Rocky Ck Dam,,1905396/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.7375,n/a (no rx_mhz recorded),19,18057,Amateur Site RODDAS LOOKOUT,Within 100 metres,2870385029
-rocky_ck_dam,Rocky Ck Dam,,1905397/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.6125,n/a (no rx_mhz recorded),19,18057,Amateur Site RODDAS LOOKOUT,Within 100 metres,2870481521
-rocky_ck_dam,Rocky Ck Dam,,127571/1,,Department of Transport and Main Roads,163.6125,n/a (no rx_mhz recorded),43,18024,TMR RoadTek Site  RODDAS LOOKOUT,Within 100 metres,2870412202
-roddas_lookout_al,Roddas Lookout AL,1929337,1929337/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,5,139510,Roddas Lookout Adjcent to ACMA Site 18056 EMERALD,Within 10 metres,2870316418
-saddle_mountain_aler,Saddle Mountain Aler,1441014,1441014/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,28,21695,Met Bureau Hut Saddle Mountain Road  3 km E of Kuranda SADDLE MOUNTAIN,Within 10 metres,2870337770
-scartwater_al,Scartwater AL,1448343,433844/1,,BUREAU OF METEOROLOGY,151.5000,yes,7,480231,Bureau of Meteorology Site HURRICANE CLIFF,Unknown,2870100609
-scartwater_al,Scartwater AL,1448343,1448343/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,7,480231,Bureau of Meteorology Site HURRICANE CLIFF,Unknown,2870397440
-somersby,Somersby,,1205090/1,,NSW RURAL FIRE SERVICE,148.5875,n/a (no rx_mhz recorded),16,34876,Comms Site Reeves Rd SOMERSBY,Unknown,2870406880
-somersby,Somersby,,1905938/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,150.9000,n/a (no rx_mhz recorded),16,34876,Comms Site Reeves Rd SOMERSBY,Unknown,2870329027
-somersby,Somersby,,1905940/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,151.1250,n/a (no rx_mhz recorded),16,34876,Comms Site Reeves Rd SOMERSBY,Unknown,2870483438
-somersby,Somersby,,1989301/1,,VRA RESCUE NSW LIMITED,164.7500,n/a (no rx_mhz recorded),16,34876,Comms Site Reeves Rd SOMERSBY,Unknown,2870832562
-somersby,Somersby,,1428399/2,,Central Coast Council,163.9375,n/a (no rx_mhz recorded),16,34876,Comms Site Reeves Rd SOMERSBY,Unknown,2870139817
-somersby,Somersby,,11711166/1,,BUREAU OF METEOROLOGY,151.5000,n/a (no rx_mhz recorded),16,34876,Comms Site Reeves Rd SOMERSBY,Unknown,2870183956
-sweeney_ck_u_s_al,Sweeney Ck U/S Al,,1921477/1,,Innisfail Taxis Pty Ltd,162.9125,n/a (no rx_mhz recorded),281,141191,3/50 Grace St INNISFAIL,Within 10 metres,2870332255
-sweeney_ck_u_s_al,Sweeney Ck U/S Al,,1441342/1,,Trans North Pty Ltd,157.5700,n/a (no rx_mhz recorded),432,440361,99 Ernest St INNISFAIL,Unknown,2870491575
-takura_reservoir_ale,Takura Reservoir Ale,1463975,1463975/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,17,16671,Council Site TAKURA HILL,Within 100 metres,2870257083
-the_stonewall_al,The Stonewall AL,1448344,1448344/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,258,441159,Bureau Of Meteorology Site The Stonewall COLLINSVILLE,Unknown,2870072863
-the_summit_alert,The Summit Alert,,1913840/1,,ST. JOHN AMBULANCE AUSTRALIA INCORPORATED,162.7375,n/a (no rx_mhz recorded),48,35087,Community Radio Site The Summit Sir Samuel Griffith Drv MOUNT COOT-THA,Within 10 metres,2870180224
-the_summit_alert,The Summit Alert,,1981414/2,,John Nolan,165.0500,n/a (no rx_mhz recorded),48,35087,Community Radio Site The Summit Sir Samuel Griffith Drv MOUNT COOT-THA,Within 10 metres,2870098477
-the_summit_alert,The Summit Alert,,404437/1,,Australian Broadcasting Corporation,168.9125,n/a (no rx_mhz recorded),78,12747,Telstra Site The Summit MOUNT COOT-THA,Within 10 metres,2870410810
-tweed_heads_duranba,Tweed Heads (Duranba,,1231605/1,,BUREAU OF METEOROLOGY,151.5000,n/a (no rx_mhz recorded),99,205699,Bureau of Meteorology DURANBAH,Unknown,2870260286
-wallaman_al,Wallaman AL,433890,433890/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,33,19722,Bureau of Meteorology Site WALLAMAN,Unknown,2870110425
-warahgai_al,Warahgai AL,10182194/1,10182194/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,26,10004036,"BOM Site Warahgai via Rabbit Fence Road, 8 km West of Karara",Within 100 metres,2870389812
-wilsons_peak,Wilsons Peak,,1410738/1,,BUREAU OF METEOROLOGY,152.4000,n/a (no rx_mhz recorded),74,401378,Met Bureau Site 2 km N of summit of WILSONS PEAK,Unknown,2870185455
-wilsons_peak,Wilsons Peak,,1920244/1,,Queensland Bulk Water Supply Authority,152.2500,n/a (no rx_mhz recorded),170,138858,SE Queensland Water Corporation Site Mt Wilson THE HEAD,Within 100 metres,2870344285
+amiens_knob_al,Amiens Knob AL,10182196/1,10182196/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,1,10004034,BOM Site Amiens Knob 71 Minuti Lane Amiens,Within 100 metres,2889755887
+bald_knob_al,Bald Knob AL,433989,10775753/1,,Queensland Bulk Water Supply Authority,151.5000,yes,7,15958,Main Roads/Qld Transport Site WILKES KNOB,Within 10 metres,2889813571
+bald_knob_al,Bald Knob AL,433989,433989/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,16,15959,Energex Site WILKES KNOB,Within 10 metres,2889619893
+bilyana_al,Bilyana AL,1448341,1448341/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,292,441162,Bureau Of Meteorology Site BILYANA,Unknown,2889669467
+bones_knob_al,Bones Knob AL,1447474,1441012/1,,BUREAU OF METEOROLOGY,151.5000,yes,37,440307,Comms Mast  Bureau of Meteorology Site Bones Knob  off Griffin Rd TOLGA,Unknown,2889668210
+bones_knob_al,Bones Knob AL,1447474,1447474/1,yes,BUREAU OF METEOROLOGY,151.9500,yes,37,440307,Comms Mast  Bureau of Meteorology Site Bones Knob  off Griffin Rd TOLGA,Unknown,2889667698
+bony_mountain_al,Bony Mountain AL,10182195/1,10182195/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,3,10004035,BOM Site via Yankee Gully Road Bony Mountain,Within 10 metres,2889755885
+brinsmead_al,Brinsmead AL,1441013,1441013/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,457,440326,Met Site Whitfield Range BRINSMEAD,Unknown,2889668328
+cameron_hill_al,Cameron Hill AL,1447480,433844/1,,BUREAU OF METEOROLOGY,151.5000,yes,67,480229,Bureau Met Site PLANT HILL CAMERON HILL,Within 10 metres,2889615264
+cameron_hill_al,Cameron Hill AL,1447480,1447480/1,yes,BUREAU OF METEOROLOGY,151.9500,yes,121,441067,Met Bureau Site Cameron Hill REID RIVER,Unknown,2889667709
+cameron_hill_al,Cameron Hill AL,1447480,433963/1,,BUREAU OF METEOROLOGY,151.5000,yes,403,19674,Telstra Radio Terminal PLANT HILL CAMERON HILL,Within 10 metres,2889616101
+clarke_range_al,Clarke Range AL Repeater,1400231,1400231/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,99,400240,Bureau of Meteorology Site CLARKE RG,Unknown,2889656219
+constitution_hill,Constitution Hill,433726,433726/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,16,12766,Energex Site Constitution Hill Sir Samuel Griffith Dr MOUNT COOT-THA,Within 10 metres,2889615275
+glen_rock_al,Glen Rock AL,1929336,1929336/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,5,139482,Glen Rock 70 metres south of ACMA Site 403861 EMERALD,Within 10 metres,2889704669
+hillcrest_wine_glass,Hillcrest AL (Wine Glass),1411025,1411025/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,38,405185,BOM Site Behind buildings near Wineglass Water Tower Wineglass Dr HILLCREST,Within 10 metres,2889656588
+laheys_lookout_al,Laheys Lookout AL,1421318,1421318/1,yes,BUREAU OF METEOROLOGY,152.4000,yes,80,14008,Council Site Laheys Lookout MOUNT TAMBORINE,Within 10 metres,2889660728
+millaa_millaa_al,Millaa Millaa AL,433870,433870/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,30,22025,Met Bureau Flood Warning Repeater Site MILLAA MILLAA,Unknown,2889615159
+mingela_al,Mingela AL,1448342,1448342/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,11,441157,Bureau of Meteorology Site MINGELA,Within 10 metres,2889669173
+moss_vale_al,Moss Vale AL,1446584,1446584/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,116,440997,Bureau Of Met Repeater Site MOSSVALE,Unknown,2889667690
+mt_mayde_al,Mt Mayde AL,1929333,1929333/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,2,139479,Mt Mayde 130 meters SE of ACMA Site 17928 EMERALD,Within 10 metres,2889704264
+mt_mowbullan_rptr,Mt MOWBULLAN RPTR,433911,433911/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,29,402542,BOM Site Westside MT MOWBULLAN,Within 10 metres,2889616668
+mt_wolvi_al,Mt Wolvi AL,1418797,1418797/1,yes,BUREAU OF METEOROLOGY,151.9500,yes,207,402600,Met Bureau Site MT WOLVI,Unknown,2889658342
+mt_wolvi_al,Mt Wolvi AL,1418797,10775757/1,,Queensland Bulk Water Supply Authority,151.5000,yes,442,10017993,SEQ Water Site Wolvi Mountain Rd MT WOLVI,Within 10 metres,2889813618
+murray_springs_al,Murray Springs AL,433887,433887/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,82,20624,Met Bureau Flood Warning Station MURRAY SPRINGS,Within 100 metres,2889615161
+o_reillys_al,OReillys AL,1421319,1421319/1,yes,BUREAU OF METEOROLOGY,152.4000,yes,346,402950,Met Bureau Site O`Reillys Guesthouse via CANUNGRA,Unknown,2889660995
+obi_lookout_al,Obi Lookout AL,1185817,1185817/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,250,136331,BOM Site Obi Lookout NAMBOUR,Within 10 metres,2889625024
+roddas_lookout_al,Roddas Lookout AL,1929337,1929337/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,5,139510,Roddas Lookout Adjcent to ACMA Site 18056 EMERALD,Within 10 metres,2889705230
+saddle_mountain_aler,Saddle Mtn AL,1441014,1441014/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,28,21695,Met Bureau Hut Saddle Mountain Road  3 km E of Kuranda SADDLE MOUNTAIN,Within 10 metres,2889668332
+scartwater_al,Scartwater AL,1448343,433844/1,,BUREAU OF METEOROLOGY,151.5000,yes,7,480231,Bureau of Meteorology Site HURRICANE CLIFF,Unknown,2889615268
+scartwater_al,Scartwater AL,1448343,1448343/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,7,480231,Bureau of Meteorology Site HURRICANE CLIFF,Unknown,2889669660
+takura_reservoir_ale,Takura Resevoir AL,1463975,1463975/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,17,16671,Council Site TAKURA HILL,Within 100 metres,2889674921
+the_stonewall_al,The Stonewall AL,1448344,1448344/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,258,441159,Bureau Of Meteorology Site The Stonewall COLLINSVILLE,Unknown,2889669321
+wallaman_al,Wallaman AL,433890,433890/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,33,19722,Bureau of Meteorology Site WALLAMAN,Unknown,2889615163
+warahgai_al,Warahgai AL,10182194/1,10182194/1,yes,BUREAU OF METEOROLOGY,151.5000,yes,26,10004036,"BOM Site Warahgai via Rabbit Fence Road, 8 km West of Karara",Within 100 metres,2889755867
