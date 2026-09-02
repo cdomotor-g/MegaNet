@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the twenty-three that run in CI
+npm run all                       # the twenty-five that run in CI
 ```
 
 | Command | What it does |
@@ -25,6 +25,8 @@ npm run all                       # the twenty-three that run in CI
 | `npm run check` | `node --check` over every script `index.html` loads |
 | `npm run names` | no duplicate top-level declarations across those scripts |
 | `npm run toplevel` | `init.js` is still the only file that executes at load |
+| `npm run itm` | the Longley–Rice port against 53 reference losses from NTIA's own compiled library (`baseline/itm-vectors.json`), to 10⁻⁶ dB with every intermediate |
+| `npm run pathcover` | the elevation profile with ground cover on it and the Longley–Rice budget over it, on a flat terrain tile the check makes itself and a seeded land cover — the band, the verdict, the rows that add up, the terminal-clutter term, the height table, the switch and the propagation settings |
 | `npm run hfem` | the HFEM codec against the spec's own ten worked examples, its timestamp table and its undefined-scheme list — round trips byte-for-byte, every rejection asserting its reason |
 | `npm run smoke` | loads the page in Chromium, opens all 20 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |

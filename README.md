@@ -1739,7 +1739,7 @@ more than the square roots they save at this size.) Labels are capped by stage
 area rather than by a constant, because they hold a fixed size on screen at any
 zoom, so what they collide with is the room the pane has.
 
-### 17. Terrain Path Tools (Elevation Profile & Indicative Link Budget)
+### 17. Terrain Path Tools (Elevation Profile, Ground Cover & the Longley–Rice Link Budget)
 Two features under the Stations map that both answer *"will this radio path
 work?"*, and one module underneath them that neither could exist without:
 **ground elevation along a line**, which MegaNet previously had no way to get.
@@ -1786,10 +1786,15 @@ Which of the two an end is using is named on the card, and the panel says so
 under every profile it draws.
 
 **The elevation profile** appears under the map once a line exists in *Draw &
-measure*, and plots ground (with a fixed k = 4/3 curvature bulge folded in so the
-line of sight can be drawn straight), the LOS between the two antennas, the **60%
-Fresnel zone**, and the stretches where terrain intrudes into it — plus a
-plain-English verdict, *clear / marginal / obstructed*. Antenna heights default
+measure*, and plots ground (with the earth-curvature bulge folded in so the line
+of sight can be drawn straight — k derived from the surface refractivity at the
+path's own mean height, the way the propagation model derives it, so N₀ = 301 at
+sea level is the textbook 4/3 and a path at 600 m is a little less), **what
+stands on the ground** as a coloured band per land-cover class, the LOS between
+the two antennas, the **60% Fresnel zone**, and the stretches where terrain or
+cover intrudes into it — plus a plain-English verdict, *clear / marginal /
+obstructed*, an *Obstructions* list that says whether each one is ground or
+cover, the elevation angle at each end, and the path loss the model computed. Antenna heights default
 from the station's `rm_systems[].antenna_height_m` and the frequency from the
 repeater's `rx_mhz`; both are editable, and each box says whether it is showing a
 default or an edit. The chart is inline SVG in the manner of `rfStripPlotHtml()`
@@ -1806,31 +1811,100 @@ A **multi-leg line is a distance profile only** — no LOS, no Fresnel, and a no
 saying why. A dog-leg is not a radio path, and drawing a line of sight across a
 corner would describe a path nobody drew.
 
+**Ground cover — Radio Mobile's *Land cover* layer, from a better map.** A 4 m
+field-station antenna in a gum forest is not 4 m above the ground the radio
+sees; it is 11 m *below* the top of it. `LandCover` samples the Esri / Impact
+Observatory / Microsoft **Sentinel-2 10 m Land Cover** (one class per 10 m
+pixel, a map per year) at the profile's own sample points — all 256 in one
+cross-origin `getSamples` request — and stands each class's **representative
+height** (ITU-R P.1812's term) on the terrain: trees 15 m and built area 10 m
+from P.1812-6's defaults, crops 2 m, flooded vegetation 5 m, rangeland 1 m,
+water and bare ground 0. Where the class says *Trees*, the height is taken from
+the **Esri Global Canopy Height 2020** map instead (ETH Zürich's 10 m canopy
+model, ±5 m) — LERC tiles decoded in the browser with Esri's own decoder, loaded
+from a CDN the first time a profile needs it — so a stand of ironbark and a
+strip of regrowth stop being the same 15 m. The band is painted in the class's
+own colour (theme tokens, both themes), the legend names every class on the path
+and the height it stood at, and the table of heights under the chart is
+editable and remembered. The switch is on by default and *off* is said in
+warning colour, because a bare profile reads clear through a forest. The cover
+goes into the profile the way P.1812 §3.2 says and Radio Mobile does: at every
+interior sample, and **not at the two ends** — an antenna's own surroundings
+are the terminal term below, so a canopy is never counted twice.
+
 **The link budget card** takes two points — each independently a station or an
 arbitrary point on the map — and itemises the path:
 
 ```
-EIRP         = tx_power_dbm + tx_gain_dbi − tx_losses_db
-FSPL(dB)     = 32.44 + 20·log10(f_MHz) + 20·log10(d_km)
-RX predicted = EIRP − FSPL − obstruction_db + rx_gain_dbi − rx_losses_db
-Fade margin  = RX predicted − rx_sensitivity_dbm
+EIRP           = tx_power_dbm + tx_gain_dbi − tx_losses_db
+Free space     = 32.45 + 20·log10(f_MHz) + 20·log10(d_km)
+Terrain        = A_ref, the Longley–Rice reference attenuation over the profile
+Statistics     = the climate's median shift + the variability for the reliability asked
+Ground cover   = ITU-R P.2108 §3.1 terminal loss at an end whose antenna is under the cover
+Obstruction floor = knife-edge over the worst obstruction, where the model's regime prices it lower
+= Path loss    = the sum of those
+RX predicted   = EIRP − path loss + rx_gain_dbi − rx_losses_db
+Fade margin    = RX predicted − rx_sensitivity_dbm     (Radio Mobile's "Rx relative")
 ```
 
 Every term is its own row, signed, and visibly adds up to the received level —
-never a single number. Station ends auto-populate from `rm_systems[]` via
+never a single number.
+
+**The propagation model is Radio Mobile's.** `itm.js` is the ITS Irregular
+Terrain Model (Longley–Rice) in point-to-point mode, ported function for
+function from NTIA's reference C++ — v1.3, which NTIA states is functionally
+identical to Hufford's FORTRAN v1.2.2, the code inside Radio Mobile's DLL — and
+held to it by `npm run itm`: 53 reference losses computed by the compiled NTIA
+library (its five published vectors plus 48 synthetic profiles across every
+regime, climate, polarisation and mode of variability), matched to **10⁻⁶ dB**
+with every intermediate (Δh, effective heights, horizons, N_s, warning bits).
+The card's **Propagation settings** are the model's inputs and Radio Mobile's
+network properties one for one — radio climate, surface refractivity, ground
+permittivity and conductivity, polarisation, mode of variability and the three
+percentages — and start from the figures the Radio Mobile export writes
+(`RM_NET_DEFAULTS`: continental subtropical, N 301, ε 15, σ 0.005, vertical,
+Spot, 50 / 50 / 70), so the two tools argue from the same premises. Spot mode
+reads only *% of situations* and greys the other two, as Radio Mobile does.
+Under the table, the readouts of Radio Mobile's Radio Link window: azimuth,
+elevation angles, worst Fresnel, obstructions, k and N_s, propagation regime,
+Δh, effective heights and horizons, the median shift and the variability, the
+received level in µV, E-field and the field the receiver needs, system gain —
+and the model's own warnings in words.
+
+Two things here are deliberately *more* than Radio Mobile does. The terminal
+term: where an antenna stands below the cover around it, ITU-R **P.2108 §3.1**'s
+height-gain loss (a knife edge at the clutter's edge, 27 m away — ~13 dB for a
+4 m antenna under 15 m trees at 150 MHz, ~18 dB at 450) is charged at that end,
+applied only for cover that stands up, since open ground's height gain is
+already inside the model's effective heights. And the **obstruction floor**:
+ITM picks its regime by the smooth-earth horizon, not by what stands in the way,
+so two low masts 10 km apart are "line of sight" to it with a ridge between
+them and the ridge reaches the loss only through the interpolation — the
+"smearing" ITM is criticised for and Radio Mobile inherits. When the geometry
+says the line is cut and the model's excess over free space is below one knife
+edge over the worst obstruction, the loss is held to that, in a row of its own
+that is nought on most obstructed paths.
+
+What it still leaves out is on the card too, in a comparison table against
+Radio Mobile line by line: antenna patterns (one gain figure in every direction,
+where Radio Mobile reads `.ant` files), interference, and whatever the map
+missed. The banner says *a model, not a measurement*, and means it. Station ends auto-populate from `rm_systems[]` via
 `rm_system_id`; **arbitrary ends make relocation studies work**, which is the
 reason both ends are independently either kind: drop an end on a hilltop nobody
 has been to and see what the path would do. Auto-filled values are all editable
 and marked `default` (from the station data), `assumed` (a hypothetical site's
 starting figures, which came from nowhere but this code) or `edited`. The
-obstruction term is a **single knife-edge diffraction proxy** (ITU-R P.526)
-derived from the same profile, shown on its own line and labelled as a proxy; with
-no profile for those two points the card says the result is **free-space only**
-rather than quietly reporting a clear path — and offers *Profile this path*,
-which draws the two ends as a line in *Draw & measure* so the elevation panel
-picks it up and the diffraction term can be filled in. Pressing it again lands
-back on the same line rather than stacking another one at the same coordinates.
-Margin classes are good ≥ 20 dB · marginal 10–20 · poor < 10.
+terrain, statistics and cover terms come from the profile; with no profile for
+those two points the card says the result is **free-space only** rather than
+quietly reporting a clear path — and offers *Profile this path*, which draws
+the two ends as a line in *Draw & measure* so the elevation panel picks it up
+and the model can run. Pressing it again lands back on the same line rather
+than stacking another one at the same coordinates. Where a profile exists but
+the model refuses it (a hop under a kilometre, a mast under half a metre) a
+single knife edge stands in, labelled as a proxy. Margin classes are read
+against a figure that already carries the statistical allowance for the
+reliability asked, so they sit where Radio Mobile's own style does: good ≥ 10 dB
+· marginal 3–10 · poor < 3.
 
 **Either end is found by name, number or ALERT address.** Each end carries a
 search box running the same `prepareSearch` / `stationMatchesSearch` pair as the
@@ -1894,10 +1968,11 @@ catastrophically, so the margin came out at +155 dB and read **Good**. The same
 station is refused at the second end with a reason, and a zero-length path
 reports **No path** rather than a number.
 
-**Where the two features disagree, the terrain wins.** A blocked path can still
-show a fat margin — one knife edge is the most optimistic diffraction model there
-is, and here it is standing in for a ridge *above* the line of sight. So when the
-profile says obstructed, the margin row is forced red and reads **Obstructed**
+**Where the two features disagree, the terrain wins.** A blocked path with no
+model over it can still show a fat margin — one knife edge is the most
+optimistic diffraction model there is, and here it is standing in for a ridge
+*above* the line of sight. So when the profile says obstructed and the model
+did not run, the margin row is forced red and reads **Obstructed**
 however good the number looks, instead of "Good".
 
 **The disclaimer is part of the feature, not decoration.** A red banner sits at
@@ -2597,7 +2672,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Twenty-three checks. The twelve below are the ones a change to the front end
+Twenty-five checks. The fourteen below are the ones a change to the front end
 meets first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |
@@ -2613,6 +2688,8 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run history` | a saved record reading back as the sheet it was written on. The fixture is not a file: the check fills a sheet in, saves it, and serves that document back — so the round trip is what is tested, and the read-only view is compared against the *editable* form's own section list |
 | `npm run movepin` | a station's links and its move-pin mode. The five pills in the callout and in the editor card, the two document searches carrying the *reduced* station name rather than the raw one and asking for both spellings of the words that have two, and the mode armed, dragged **with a real pointer**, read back, cancelled and saved. Smoke sees none of it: a pill row missing two pills and a Save that writes null over a coordinate both open a tab with a clean console |
 | `npm run stncard` | the station card on the map and the callout it turned into a signpost (#175), at a desktop width and at a phone's. A real pin click paints the card without selecting; a filter change destroys the callout and leaves the card; *Edit station ↓* selects and is the one thing that scrolls the editor into view; closing it holds until the next gesture; the three cards that share a rectangle close each other; and at 375 px the callout is two pills that fit inside the map with a finger-sized close button, and *Details* opens the card as a sheet with focus in it. Every one of those failures renders a page that looks right |
+| `npm run itm` | the Longley–Rice port drifting from its reference: 53 losses computed by NTIA's own compiled library — its five published vectors and 48 synthetic profiles across every regime, climate, polarisation and mode of variability — held to 10⁻⁶ dB, intermediates included. Node-only, seconds |
+| `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |
 | `npm run linkbudget` | the link budget card's two ends. Each is found by name, station number, ALERT address or address window — asserted against what the *Stations filter itself* returns for the same term, so the claim is that the card runs the shared matcher rather than a second copy of the rules. Then: the box keeping its caret through a paste, an end armed and filled from a pin click and from a row of the Stations list in its filtered state without selecting it, the three Clear buttons, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute — the same station at both ends, a zero-length path, a term nobody supplied, and a frequency box that cannot say whether it holds an override. Every one of those is a clean console |
 
 The smoke test serves the repo on loopback, blocks every off-origin request

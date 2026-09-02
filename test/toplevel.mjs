@@ -72,6 +72,16 @@ const ACCEPTED = {
          + 'and is generated data behind its own namespace.',
     },
   ],
+  'itm.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = ITM;",
+      why: 'The Longley–Rice port\'s CommonJS registration: test/itm.mjs requires '
+         + 'this same file to hold it against the NTIA reference vectors, so the '
+         + 'model the browser runs is the model the check runs. Guarded so the '
+         + 'browser, where `module` is undefined, never runs it. Constrains '
+         + 'nothing below it.',
+    },
+  ],
   'hfem.js': [
     {
       match: "if (typeof module !== 'undefined' && module.exports) module.exports = HFEM;",

@@ -3422,6 +3422,37 @@ hr {
   --terrain-line: #7d7259;
 }
 
+/* Ground cover on the profile (see LandCover). One token per Sentinel-2
+   land-cover class, in Esri's own legend hues so the band reads the same as
+   the map anyone checks it against — lifted a little in the dark theme so the
+   band stays a band against the darker terrain fill rather than sinking into
+   it. Tokens rather than literals in land-cover.js, for the reason every other
+   palette in the app is: a colour in a JavaScript file cannot follow the
+   theme, and the chart is drawn in both. */
+:root {
+  --cover-water:   #419bdf;
+  --cover-trees:   #397d49;
+  --cover-flooded: #7a87c6;
+  --cover-crops:   #e49635;
+  --cover-built:   #c4281b;
+  --cover-bare:    #a59b8f;
+  --cover-snow:    #a8ebff;
+  --cover-cloud:   #8a8a8a;
+  --cover-range:   #c8c68a;
+}
+
+[data-theme="dark"] {
+  --cover-water:   #5aaef0;
+  --cover-trees:   #4f9e60;
+  --cover-flooded: #8f9bd8;
+  --cover-crops:   #f0a94a;
+  --cover-built:   #e0483a;
+  --cover-bare:    #b3a99c;
+  --cover-snow:    #bdf0ff;
+  --cover-cloud:   #9a9a9a;
+  --cover-range:   #d6d49a;
+}
+
 .filter-card > summary,
 .stations-card > summary,
 .path-panel > summary,
@@ -3563,6 +3594,63 @@ hr {
   background: var(--terrain-fill);
   border: 1px solid var(--terrain-line);
 }
+
+/* The cover band's legend: one chip per class actually on this path, painted
+   with that class's token. `--dot` is the same seam .legend-dot uses. */
+.path-key-cover {
+  height: 8px !important;
+  background: var(--dot, var(--muted));
+  border: 1px solid color-mix(in srgb, var(--dot, var(--muted)) 60%, var(--text));
+}
+.path-key-mast { border-top: 2px solid var(--map-repeater); }
+
+/* Where a cover band is drawn from the terrain up, the chart is asked to say
+   so in words too; this is the line that does. */
+.path-cover-note { margin: .2rem 0 0; }
+
+/* The cover-height table under the profile: nine short rows, two columns of
+   figures, editable in place. Reads like the antenna form above it. */
+.cover-table td, .cover-table th { padding: .15rem .5rem; }
+.cover-table input[type="number"] { width: 5.5em; }
+.cover-table .is-over input { border-color: var(--warn); }
+.cover-table .cover-swatch {
+  display: inline-block;
+  width: 12px; height: 12px;
+  vertical-align: -1px;
+  margin-right: .35rem;
+  border-radius: 2px;
+  background: var(--dot, var(--muted));
+  border: 1px solid color-mix(in srgb, var(--dot, var(--muted)) 60%, var(--text));
+}
+
+/* The propagation settings form on the link budget: the network's premises,
+   nine short fields in the same grid the antenna forms use. */
+.lb-prop {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: .3rem .6rem;
+  margin: .3rem 0 .2rem;
+}
+.lb-prop select, .lb-prop input { width: 100%; box-sizing: border-box; }
+.lb-prop .is-unused { opacity: .55; }
+.lb-propset, .path-cover-table { margin: .4rem 0; }
+.lb-propset > summary, .path-cover-table > summary { cursor: pointer; }
+.lb-prop .lb-flag { display: block; }
+
+/* The model's readouts under the table — Radio Mobile's Radio Link window,
+   as a definition list. */
+.lb-readout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: .2rem .9rem;
+  margin: .5rem 0 .2rem;
+}
+.lb-readout > div { display: flex; justify-content: space-between; gap: .5rem; border-bottom: 1px dotted var(--border); }
+.lb-readout dt { color: var(--muted); }
+.lb-readout dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.lb-warn-list { margin: .3rem 0 0 1.1rem; padding: 0; color: var(--warn); }
+.lb-warn-list li { margin: .1rem 0; }
+
 
 .path-form {
   display: grid;

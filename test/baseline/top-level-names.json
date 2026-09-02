@@ -36,6 +36,8 @@
     "map-locate.js",
     "map-move-pin.js",
     "terrain.js",
+    "itm.js",
+    "land-cover.js",
     "map-los.js",
     "modal.js",
     "packets.js",
@@ -49,6 +51,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 525,
-  "distinct": 525
+  "total": 578,
+  "distinct": 578
 }

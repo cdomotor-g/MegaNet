@@ -162,6 +162,13 @@ jobs:
         working-directory: test
         run: npm run hfem
 
+      # Node-only and fast. The Longley–Rice port has one honest oracle — the
+      # NTIA reference library's own numbers — and 53 of them are recorded in
+      # test/baseline/itm-vectors.json. A port that drifts by 1e-6 dB fails.
+      - name: Longley–Rice port — the NTIA reference vectors
+        working-directory: test
+        run: npm run itm
+
       - name: Smoke — every tab, clean console
         working-directory: test
         run: npm run smoke
@@ -336,6 +343,15 @@ jobs:
       - name: Link budget — either end, found and armed; and what it refuses
         working-directory: test
         run: npm run linkbudget
+
+      # The profile with ground cover on it and the Longley–Rice budget over
+      # it. Every other check sees these panels in their no-terrain state; this
+      # one answers the tile server with flat ground it makes itself and seeds
+      # the land cover, so the band on the chart, the cover terms in the budget
+      # and the settings that drive the model are all exercised on the real page.
+      - name: Path cover — the profile, the band, the model over it
+        working-directory: test
+        run: npm run pathcover
 
       # The database half of the claim is proven against a real Postgres by
       # tools/check_mqtt.sql, which CI cannot run — it needs a connection. What

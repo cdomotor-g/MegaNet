@@ -1782,6 +1782,12 @@ const state = {
     aglA:    null,   // m AGL override; null = the station's rm_systems height
     aglB:    null,
     freqMhz: null,   // null = the repeater on either end, else PATH_DEFAULT_MHZ
+    // Ground cover on the profile (see LandCover): trees, buildings and crops
+    // sampled along the path and stood on the terrain, in the Fresnel check and
+    // in the propagation model both. On by default — it is one request per
+    // profile, and a profile without it is the one that reads clear through a
+    // forest. Remembered, because turning it off is a standing choice.
+    cover:   (localStorage.getItem('mn-path-cover') || 'on') === 'on',
   },
   // Link budget card. The endpoints have to outlive a tab switch — half an hour
   // of what-ifs should not be thrown away by looking at the Pass Ranges tab.
@@ -1791,6 +1797,26 @@ const state = {
     a:       null,   // { kind:'station'|'point', …, def:{}, over:{} } — see LinkBudget
     b:       null,
     freqMhz: null,
+    // The propagation model's own inputs — Radio Mobile's network properties,
+    // one for one, and starting from the same figures the Radio Mobile export
+    // writes (RM_NET_DEFAULTS) so the two tools argue from the same premises.
+    // Session-only, like the antenna overrides: a what-if, not a setting.
+    prop: {
+      climate:    RM_NET_DEFAULTS.Climate,        // 1..7, ITM's radio climates
+      N0:         RM_NET_DEFAULTS.Refractivity,   // surface refractivity, N-units
+      epsilon:    RM_NET_DEFAULTS.Permittivity,   // ground relative permittivity
+      sigma:      RM_NET_DEFAULTS.Conductivity,   // ground conductivity, S/m
+      pol:        RM_NET_DEFAULTS.Polarization,   // 0 horizontal, 1 vertical
+      mdvar:      RM_NET_DEFAULTS['Stat. mode'],  // 0 spot, 1 accidental, 2 mobile, 3 broadcast
+      time:       RM_NET_DEFAULTS['%Time'],
+      location:   RM_NET_DEFAULTS['%Location'],
+      situation:  RM_NET_DEFAULTS['%Situation'],
+    },
+    // Which of the card's disclosures are open: the propagation settings and
+    // the cover-height table. Shut by default — they are the premises, and the
+    // figure is what the card is opened for.
+    propOpen:  false,
+    coverOpen: false,
     // Which end the next station pick fills: a click on the map, or a row in
     // the Stations list under it. null is the original behaviour — A, then B,
     // then A again. Putting the caret in an end's search box arms that end,
