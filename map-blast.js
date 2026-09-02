@@ -258,6 +258,10 @@ const MapBlast = (function () {
       if (state.map) state.map.closePopup();
       applyMapFocusStyles();          // runs the blast restyle from its tail
       applyMapLabels();
+      // The station card draws this pill as well (#175), and is not rebuilt
+      // on its next open the way the callout is — so its label is put right
+      // here, or it would go on saying "Show" over a map already showing.
+      if (typeof repaintStnCard === 'function') repaintStnCard();
     },
 
     disarm() {
@@ -265,6 +269,7 @@ const MapBlast = (function () {
       state.mapBlast = false;
       applyMapFocusStyles();
       applyMapLabels();
+      if (typeof repaintStnCard === 'function') repaintStnCard();   // as in toggle()
     },
 
     exportCsv() {

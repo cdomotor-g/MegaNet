@@ -174,6 +174,12 @@ const MapMovePin = (function () {
     const el = document.getElementById('ef-movepin');
     if (el && s) el.outerHTML = editorButtonHtml(s);
     if (map) map.closePopup();
+    // The station card draws this pill too (#175), and unlike the callout it
+    // is not rebuilt on its next open — so it is repainted here, on every
+    // change of the mode, or its pill would go on offering to start a move
+    // that has already started. Guarded because this module also serves a
+    // page that has no card.
+    if (typeof repaintStnCard === 'function') repaintStnCard();
   }
 
   // ── The mode ───────────────────────────────────────────────────────────────
@@ -223,6 +229,12 @@ const MapMovePin = (function () {
       mapNote('The pin is moved on the Stations map — open that tab first.', 6000);
       return;
     }
+    // Arming the station that is already armed is nothing to do. Without this
+    // a second start() for the same id overwrote the marker, ghost, leader and
+    // panel references, and the first set stayed on the map with nothing left
+    // holding them — a repaint that is late (#175's card was) or a double
+    // press was enough to reach it.
+    if (stationId === id) return;
     if (stationId && stationId !== id) teardown();   // one station at a time
 
     // The Stations map has no exclusive-mode registry — link-budget.js's
@@ -269,6 +281,12 @@ const MapMovePin = (function () {
     addPanel();
     map.panInside(at, { padding: [60, 60] });
 
+    // The mode takes the map, and the station card gives way to it the way
+    // the callout does (#175): on a phone the card is a sheet across the
+    // bottom of the map, over the panel this just added, and on a desktop it
+    // is a rectangle a dragged pin can land under. A pin click brings it back
+    // with the pill reading "cancel", which repaintButtons keeps true.
+    if (typeof closeStnCard === 'function') closeStnCard(false);
     repaintButtons();
     announce(`Moving the pin for ${s.name || id}. Drag it, or click the map. Escape cancels.`);
     mapNote('Drag the pin, or click the map where the station should be. Escape cancels.', 8000);

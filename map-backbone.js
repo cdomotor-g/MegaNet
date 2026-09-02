@@ -406,19 +406,28 @@ const MapBackbone = (function () {
     if (e.key === 'Escape') { e.stopPropagation(); close(); }
   }
 
-  function close() {
+  // `refocus` is false only when another map card is closing this one on its
+  // way open (#175); every zero-argument call — the × button, Escape, a path
+  // that stopped existing — is the real thing and gets the focus restore.
+  function close(refocus = true) {
     cur = null;
     const el = cardEl();
     if (el) { el.hidden = true; el.innerHTML = ''; }
     const back = opener;
     opener = null;
-    if (back && document.contains(back) && typeof back.focus === 'function') back.focus();
+    if (refocus && back && document.contains(back) && typeof back.focus === 'function') back.focus();
   }
 
   function open(kind, aId, bId) {
     const a = stationById(aId), b = stationById(bId);
     if (!a || !b || a.lat == null || a.lon == null || b.lat == null || b.lon == null) return;
     opener = document.activeElement;
+    // One card over the map at a time (#175). The ACMA card and this one have
+    // shared a rectangle since #138 and never closed each other — open both
+    // and this, the later sibling, simply covered that. typeof-guarded because
+    // this module also serves maps app.js has not dressed with either card.
+    if (typeof closeStnCard === 'function') closeStnCard(false);
+    if (typeof closeAcmaCard === 'function' && state.acma && state.acma.cardDeviceId) closeAcmaCard(false);
     cur = { kind, aId, bId };
     // The elevation profile follows the drawn line, so the clicked path becomes
     // one. The panel opens BEFORE the line goes in and an existing line is

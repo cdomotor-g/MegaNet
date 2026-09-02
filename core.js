@@ -339,6 +339,16 @@ const HELP = {
       + 'number</code> is BoM\'s. The boxes sit side by side and are labelled, because handing '
       + 'ARRO the station number fails by opening somebody else\'s station rather than by '
       + 'erroring.',
+      'Clicking a pin paints the <strong>station card</strong> in the map\'s bottom corner — '
+      + 'the full details and every action, without changing the selection — and the callout '
+      + 'on the pin is a signpost: name, roles, and an <em>Actions</em> button that opens the '
+      + 'pills. The card stays put while callouts come and go, and while the filters change; '
+      + '<em>Edit station ↓</em> on it selects the station and jumps to the editor card below '
+      + 'the map. On a phone the callout carries only <em>Details &amp; actions</em> and '
+      + '<em>Copy lat, lon</em>, and the card opens as a sheet across the bottom of the map.',
+      'The 👁️ <strong>Map display</strong> panel holds more than fits its first screenful — '
+      + 'LiDAR contours, wind regions, line-of-sight checks, survey marks, ACMA licensing — '
+      + 'and the legend\'s last line names whichever of them are currently off.',
     ],
     figure: {
       title: 'Draw & measure',
@@ -1301,7 +1311,17 @@ function stationMapLinkUrls(s) {
 // A station with no coordinates still gets the document searches: the two
 // libraries are searched by name, and a site nobody has surveyed yet is exactly
 // the one whose paperwork is worth finding.
+//
+// Split in two since #175: the array, and the row string joined from it. One
+// place the URL shapes are written, three places they are drawn — the editor
+// card's row, the callout's expanded row and the station card — and the
+// callout needs the *count* for its "Actions (N)" label, which is the array's
+// length rather than a regex over the string.
 function mapLinksHtml(s) {
+  return mapLinksPills(s).join('\n    ');
+}
+
+function mapLinksPills(s) {
   const urls = stationMapLinkUrls(s);
   const docs = stationDocSearchUrls(s);
   const out  = [];
@@ -1319,7 +1339,7 @@ function mapLinksHtml(s) {
     out.push(`<a class="pill" href="${esc(docs.oohb)}" target="_blank" rel="noopener"
        title="Searches the OOHB FWN Library for &quot;${escAttr(docs.q)}&quot;">Search OOHB docs ↗</a>`);
   }
-  return out.join('\n    ');
+  return out;
 }
 
 // ── Copy the coordinate ──────────────────────────────────────────────────────
@@ -1707,6 +1727,19 @@ const state = {
   // of what this tab is, and a tab that opens showing an empty box where 3,174
   // stations should be reads as a file that failed to load.
   stationsListOpen: (localStorage.getItem('mn-stations-list') || 'open') === 'open',
+  // The map callout's pill row, shut or open (#175). Session-only and global
+  // rather than per-station: "show me the actions" is a way of reading
+  // callouts, not a fact about one station — and it dies with the page because
+  // a callout that opens pre-expanded on a fresh visit is the "bit much" this
+  // exists to stop.
+  popupPillsOpen: false,
+  // The station the on-map card (bottom-left of the Stations map) is showing
+  // (#175). Session-only, and deliberately NOT selectedId — a fourth thing
+  // alongside the filters, selectedId and the map selection (see the
+  // map-selection note in app.js): a plain pin click paints this without
+  // selecting, so glancing at stations doesn't drag the editor and the table
+  // along. `opener` follows state.acma.cardOpener's pattern (showAcmaCard).
+  stnCard: { id: null, opener: null },
   // Left nav: an icon rail, or icons plus labels. Kept under 'mn-nav' the same
   // way the theme and the filter card are. With nothing stored the window's
   // width decides, so a first visit on a laptop isn't handed two sidebars.

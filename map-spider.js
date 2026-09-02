@@ -174,6 +174,15 @@ const MapSpider = (function () {
   }
 
   return {
+    // Whether a plain click on this pin is about to fan a stack out rather
+    // than open its callout — the same test onPinClick makes, asked ahead of
+    // it by app.js's own click handler on the marker (#175): that handler runs
+    // first and paints the station card, and a stack nobody has picked from
+    // yet has no station to paint.
+    willFan(marker) {
+      return !!map && !isOpen(marker) && stackFor(marker).length >= 2;
+    },
+
     // Wire a freshly built map. Leader lines get their own pane below the
     // overlay pane so they never draw over the pins they point at.
     attach(m) {

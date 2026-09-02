@@ -222,6 +222,11 @@ const MapWind = (function () {
   }
 
   return {
+    // The swatch the map legend draws beside "Wind regions" (#175): region A's
+    // colour, the one that covers most of the country. The key to all five is
+    // in noteHtml(), under the switch that turns the layer on.
+    legendColour() { return REGION_COLOR.A; },
+
     attach(m) {
       map = m;
       if (!m.getPane(PANE)) {

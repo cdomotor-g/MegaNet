@@ -2563,6 +2563,13 @@ hr {
    purpose: the swatch matches the server-rendered image (MapContours draws the
    MapServer's own symbology), which no theme token can restyle. */
 .legend-line-contour { border-top-color: rgb(214, 104, 26); }
+/* The line-of-sight verdict in the legend (#175): the obstructed-link colour,
+   through the same token the drawn links take, so the two agree in both
+   themes. */
+.legend-line-los { border-top-color: var(--map-line-blocked); }
+/* The legend's last line, naming the layers that are off. Text on its own
+   line rather than another swatch row: it is a pointer, not a key. */
+.legend-off { margin-top: var(--sp-1); }
 
 /* River name on hover. Follows the cursor along the line (sticky tooltip), so it
    stays small and out of the way of the pins it sits under. */
@@ -4277,6 +4284,117 @@ hr {
   overflow-wrap: anywhere;
 }
 
+/* The Stations map's own card (#175) — .acma-card's dress, anchored to the
+   BOTTOM-LEFT instead. Everything else the map keeps at its edges is on the
+   right: the icon column, the flyouts that open out of it, the pinned panels
+   that stack under it, and the attribution line — and on a laptop-height
+   map the column reaches far enough down that a card in the bottom-right
+   corner had its close button under the full-screen icon. The left has the
+   zoom control at the top and nothing at the bottom but the move-pin panel,
+   which this card gives way to (map-move-pin.js). It caps its own height and
+   scrolls inside, rather than running the full height of the map the way the
+   ACMA and path cards do: it is a companion to the map, not a replacement
+   for it. */
+.stn-card {
+  top: auto;
+  right: auto;
+  bottom: 1.2rem;
+  left: .9rem;
+  width: 340px;
+  max-height: min(60%, 24rem);
+  /* Under the callouts (Leaflet's popup pane is 700) and under the map's
+     controls (1000) — the opposite of .acma-card's 1100, on purpose. A
+     callout the person just opened on a pin near this corner draws over the
+     card rather than vanishing behind it, and a flyout that reaches this far
+     stays readable. Above the tooltip pane (650), where the station-name
+     labels are. */
+  z-index: 690;
+}
+
+/* The action row is the card's last section — no rule under it. */
+.stn-card-actions {
+  border-bottom: 0;
+}
+
+/* The ALERT id list sits under the label/value rows. */
+.stn-card-ids {
+  margin-top: var(--sp-1);
+}
+
+/* On a phone the card is a bottom sheet: the map's full width, capped so the
+   part of the map the tapped pin is on stays visible above it. 560 is
+   BREAKPOINTS.xs — the same width isPhoneNav() reads. */
+@media (max-width: 560px) {
+  .stn-card {
+    left: .5rem;
+    right: .5rem;
+    bottom: .5rem;
+    width: auto;
+    max-width: none;
+    max-height: 48%;
+    /* A sheet across the whole width has a right edge, and the icon column
+       sits on it: at this height the full-screen icon lands exactly on the
+       sheet's close button. So on a phone the sheet goes over the controls
+       instead, as the ACMA card does at every width — it opens only on a
+       deliberate tap and closes with one, and the icons are back the moment
+       it is gone. */
+    z-index: 1100;
+  }
+  /* Every callout fits a phone (#175), not just the station one: Leaflet
+     writes the content's width inline from each popup's own maxWidth, and
+     the survey-mark and ACMA callouts ask for 300 px, which with Leaflet's
+     margins and the finger-sized close button below is wider than the map.
+     max-width outranks an inline width, and 7rem is the two margins plus
+     the page's own edges. */
+  .leaflet-container .leaflet-popup-content {
+    max-width: calc(100vw - 7rem);
+  }
+}
+
+/* Finger-sized close targets on the callouts and the map cards (#175). Both
+   branches of the query on purpose: pointer:coarse is a tablet or a phone at
+   any width, and the width branch is the phone whether or not the browser
+   admits to a coarse pointer — which is what makes this hold on a 375 px
+   window in a test as it does in a hand. Sizes the controls only, never the
+   layout, the convention every pointer:coarse block in this file keeps.
+   Leaflet's own rule for the close button is `.leaflet-container
+   a.leaflet-popup-close-button` and leaflet.css loads after this file, so the
+   same selector here would lose the cascade on the tie — hence the extra
+   .leaflet-popup class, one step more specific (the dark-theme note below
+   records the same trap). */
+@media (max-width: 560px), (pointer: coarse) {
+  .leaflet-container .leaflet-popup a.leaflet-popup-close-button {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.4rem;
+    line-height: 2.75rem;
+    padding: 0;
+  }
+  .leaflet-container .leaflet-popup-content {
+    margin-right: 2.9rem;
+  }
+  .acma-card-head button {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+}
+
+/* Group headings inside the 👁️ Map display flyout (#175). The flyout scrolls,
+   and a column of checkboxes past the fold gives nobody a reason to scroll
+   it; a heading says what kind of thing is under it. */
+.map-display-h {
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: .6rem 0 .2rem;
+}
+
+.map-display-h:first-child {
+  margin-top: 0;
+}
+
 .leaflet-container {
   background: var(--subtle);
 }
@@ -4361,6 +4479,13 @@ hr {
   margin-top: .45rem;
   padding-top: .4rem;
   border-top: 1px solid var(--border);
+}
+
+/* The "Actions (N) ▾" expander under the callout's detail (#175). Its own row
+   so the pill sits on a line of its own under the identity, with the same
+   gap the actions row keeps — when the row is open it follows directly. */
+.mn-popup-more {
+  margin-top: .45rem;
 }
 
 .leaflet-control-attribution,

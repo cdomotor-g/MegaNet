@@ -870,6 +870,31 @@ itself, and #165 put the filters under it as a collapsible card — so the map i
 about 320 px wider on every screen, and the page scrolls as one piece at every
 width, which is what it already did on a phone.
 
+**The station card, and the callout as a signpost (#175).** Clicking a pin
+paints a card in the map's bottom-left corner — the station's number,
+networks, position, elevation, wind region, every ALERT id with its reading
+kind, a repeater's passing count and delay, the ACMA threat count, and every
+action pill — *without* selecting the station: reading about a site must not
+drag the editor and the table along, and the scroll from the map down to the
+list to *see* a station and back up again was what this replaces. It is the
+map's own memory of what you were last looking at: a filter keystroke rebuilds
+every marker and takes the callout with it, and the card stays; selecting a row
+paints it too, which is also the keyboard's way onto a map whose pins are
+canvas. *Edit station ↓* on it selects the station and is the first thing in
+the app that scrolls the editor into view. The callout on the pin shrank to
+match — name, roles, `Stn #N · elevation`, and one *Actions (N) ▾* button that
+opens the pills, remembered for the session once pressed — because the callout
+carrying all of that *and* ten pills was a lot. On a phone the callout is the
+identity and two fat pills, *Details & actions* and *Copy lat, lon*, sized to
+fit inside the map with a finger-sized close button, and the card opens from
+*Details* as a sheet across the bottom of the map. One card over the map at a
+time: opening this one, the ACMA transmitter card or the radio-path card closes
+the other two — which also ends the case where the last two, drawn in the same
+rectangle, simply covered each other. The legend's last line names whichever
+optional layers are off and that the 👁️ button is where they are turned on, the
+👁️ flyout is grouped under three headings, and a first visit is told about the
+button once.
+
 **What that costs, stated rather than left to be found.** The split existed
 because reaching a filter at the bottom of the rail dragged the map off the top,
 and scrolling to a filter now scrolls the map away above it. Three things make
@@ -1020,14 +1045,16 @@ green temperate through amber and orange to cyclonic red, with the Pilbara's
 D in purple.
 
 "What wind region is that site in?" — the first question of every mast and
-aerial conversation — is answered whether or not that layer is drawn. Every
-station callout carries a **Wind region** line, and the station editor card
-below the table carries it as a read-only field beside the elevation: read-only
-because it is not a property of the station but of where the station's
-coordinate falls, so moving the pin changes it and typing in it could only ever
-be wrong. Asking is what fetches the polygons — the callout opens on *looking
-up…* and fills itself in — and every station after the first is free. Nothing
-is fetched at page load, which was always the half of that rule that mattered.
+aerial conversation — is answered whether or not that layer is drawn. The
+station card on the map carries a **Wind region** line (it was the callout's
+until #175 moved the callout's detail onto the card), and the station editor
+card below the table carries it as a read-only field beside the elevation:
+read-only because it is not a property of the station but of where the
+station's coordinate falls, so moving the pin changes it and typing in it could
+only ever be wrong. Asking is what fetches the polygons — the card opens on
+*looking up…* and fills itself in — and every station after the first is free.
+Nothing is fetched at page load, which was always the half of that rule that
+mattered.
 
 The polygons are Geoscience Australia's machine-readable interpretation of the
 2021 boundaries (eCat 146359, **CC-BY 4.0**), simplified to about 1 km and
@@ -1036,10 +1063,10 @@ to be down — 650 kB of continent, about 135 kB over the wire, once per browser
 GA is blunt that the dataset is **indicative and not for design use**, and the
 note under the switch, the callout line and the field's own tooltip all say so.
 
-**The callout's ALERT ids lead.** `6143 — Battery`, not `Battery — 6143`. The
-list is sorted by id, and an id is what somebody opening a callout came for, so
-the number sits at the left edge where a sorted column belongs and the reading
-kind qualifies it rather than hiding it.
+**The station card's ALERT ids lead.** `6143 — Battery`, not `Battery — 6143`.
+The list is sorted by id, and an id is what somebody opening the card came for,
+so the number sits at the left edge where a sorted column belongs and the
+reading kind qualifies it rather than hiding it.
 
 **Line of sight, for every link at once.** The Path profile tool answers
 "does this hop clear the terrain?" for the one line an operator drew; *Check
@@ -2526,7 +2553,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Twenty-one checks. The ten below are the ones a change to the front end meets
+Twenty-two checks. The eleven below are the ones a change to the front end meets
 first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |
@@ -2541,6 +2568,7 @@ first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run maint` | the Council Maintenance Tasks form drawn against the workbook's own filled sheet, read out of the `.xlsx` in `archive/`. Every cell where that sheet differs from the blank template has to be either on screen or named as having no column |
 | `npm run history` | a saved record reading back as the sheet it was written on. The fixture is not a file: the check fills a sheet in, saves it, and serves that document back — so the round trip is what is tested, and the read-only view is compared against the *editable* form's own section list |
 | `npm run movepin` | a station's links and its move-pin mode. The five pills in the callout and in the editor card, the two document searches carrying the *reduced* station name rather than the raw one and asking for both spellings of the words that have two, and the mode armed, dragged **with a real pointer**, read back, cancelled and saved. Smoke sees none of it: a pill row missing two pills and a Save that writes null over a coordinate both open a tab with a clean console |
+| `npm run stncard` | the station card on the map and the callout it turned into a signpost (#175), at a desktop width and at a phone's. A real pin click paints the card without selecting; a filter change destroys the callout and leaves the card; *Edit station ↓* selects and is the one thing that scrolls the editor into view; closing it holds until the next gesture; the three cards that share a rectangle close each other; and at 375 px the callout is two pills that fit inside the map with a finger-sized close button, and *Details* opens the card as a sheet with focus in it. Every one of those failures renders a page that looks right |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and
@@ -2558,7 +2586,7 @@ then clicks its way through the RF Changes and Interference Workbench controls,
 keyed by the handler each one names rather than by its label. See
 `test/lib/controls.mjs`.
 
-CI runs all twenty-one on any push touching a root `*.js`, `index.html`, `styles.css`,
+CI runs all twenty-two on any push touching a root `*.js`, `index.html`, `styles.css`,
 `stations.json`, `db/migrations/`, `test/` or the inspection workbook in
 `archive/`. The filter is a glob rather than a list of filenames
 because the app's script list grew with every milestone of the split — a named

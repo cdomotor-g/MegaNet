@@ -304,6 +304,18 @@ jobs:
         working-directory: test
         run: npm run stationscard
 
+      # The station card on the map is state, not popup DOM — a filter
+      # keystroke rebuilds every marker and destroys the callout, and the card
+      # has to still be there afterwards. A card that dies with the markers, a
+      # pin click that quietly starts selecting, a close that drops focus on
+      # <body>, two cards drawn on top of each other, a phone callout wider
+      # than the map: every one renders a page that looks entirely correct and
+      # throws nothing. This drives the card from a real pin click at desktop
+      # and phone widths, and holds the one-card-at-a-time rule shut (#175).
+      - name: The station card — state, not popup DOM, at two widths
+        working-directory: test
+        run: npm run stncard
+
       # What the Stations filter box *selects*. `npm run smoke` opens the tab
       # and asserts a clean console; a search box handing back the wrong
       # stations throws nothing at all, so nothing else here can see it. The

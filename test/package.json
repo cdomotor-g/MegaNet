@@ -12,7 +12,7 @@
     "toplevel": "node toplevel.mjs",
     "registry": "node registry.mjs",
     "concat": "node concat-verify.mjs",
-    "all": "npm run check && npm run names && npm run toplevel && npm run hfem && npm run smoke && npm run registry && npm run nav && npm run shell && npm run tabs && npm run rivers && npm run survey && npm run mapctl && npm run help && npm run insp && npm run maint && npm run history && npm run movepin && npm run stationscard && npm run search && npm run claim && npm run gate",
+    "all": "npm run check && npm run names && npm run toplevel && npm run hfem && npm run smoke && npm run registry && npm run nav && npm run shell && npm run tabs && npm run rivers && npm run survey && npm run mapctl && npm run help && npm run insp && npm run maint && npm run history && npm run movepin && npm run stationscard && npm run stncard && npm run search && npm run claim && npm run gate",
     "rivers": "node rivers.mjs",
     "survey": "node survey.mjs",
     "mapctl": "node mapctl.mjs",
@@ -26,6 +26,7 @@
     "history": "node history.mjs",
     "movepin": "node movepin.mjs",
     "stationscard": "node stations-card.mjs",
+    "stncard": "node stn-card.mjs",
     "search": "node search.mjs",
     "claim": "node claim.mjs",
     "gate": "node gate-session.mjs"

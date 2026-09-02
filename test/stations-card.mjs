@@ -107,9 +107,22 @@ async function main() {
     await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0,
       null, { timeout: LOAD_TIMEOUT });
 
-    const pop = await page.evaluate(() => {
+    // The action row is shut by default since #175 — the pill is reached by
+    // pressing "Actions (N) ▾" first, the way a person does.
+    const calloutShut = await page.evaluate(() => {
       const m = state.mapMarkers.find(x => x.mnStation && x.mnStation.lat != null);
       m.openPopup();
+      return {
+        rowAbsent: !document.querySelector('.leaflet-popup .mn-popup-actions'),
+        expander:  !!document.querySelector('.leaflet-popup .mn-popup-expand'),
+      };
+    });
+    check('the callout opens with its actions shut', calloutShut.rowAbsent && calloutShut.expander);
+    await page.click('.leaflet-popup .mn-popup-expand');
+    await page.waitForSelector('.leaflet-popup .mn-copy-latlon', { timeout: 5000 });
+
+    const pop = await page.evaluate(() => {
+      const m = state.mapMarkers.find(x => x.mnStation && x.mnStation.lat != null);
       const row = document.querySelector('.leaflet-popup .mn-popup-actions');
       const btn = row && row.querySelector('.mn-copy-latlon');
       return {
