@@ -1791,6 +1791,14 @@ const state = {
     a:       null,   // { kind:'station'|'point', …, def:{}, over:{} } — see LinkBudget
     b:       null,
     freqMhz: null,
+    // Which end the next station pick fills: a click on the map, or a row in
+    // the Stations list under it. null is the original behaviour — A, then B,
+    // then A again. Putting the caret in an end's search box arms that end,
+    // which is what lets "this end, from over there" be said at all.
+    target:  null,   // null | 'a' | 'b'
+    // What is typed in each end's search box. One string per end, because the
+    // two ends are two questions and answering one must not disturb the other.
+    q:       { a: '', b: '' },
   },
   exportNets:     null,
   // Last datastore round trip, as returned by dbPing(): null before the first

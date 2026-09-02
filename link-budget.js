@@ -1,19 +1,27 @@
 // MegaNet — link-budget.js
 //
 //   LinkBudget     pick two points, get a fade margin. Either end can be a
-//                  station, which fills itself in from rm_systems, or an
-//                  arbitrary point on the ground — which is what makes it
-//                  useful for a relocation nobody has visited yet.
+//                  station — found by name, number or ALERT address, or picked
+//                  off the map or the Stations list — which fills itself in
+//                  from rm_systems, or an arbitrary point on the ground, which
+//                  is what makes it useful for a relocation nobody has visited.
 //   LB_MARGIN      the margin bands, and the class that colours them.
 //   lbMarginClass
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, fmtKm, acmaHaversineKm and
-// RM_NET_DEFAULTS; across to app.js for mapNote; and sideways to
-// path-profile.js for PATH_DEFAULT_MHZ, PATH_DEFAULT_AGL, PATH_VERDICT, fsplDb,
-// wattsToDbm, rmSystemOf and PathProfile, to map-draw.js for MapDraw and to
-// terrain.js for Terrain. See path-profile.js's header for why the mutual
-// reference constrains nothing.
+// Reaches back to core.js for state, esc, escAttr, fmtKm, acmaHaversineKm and
+// RM_NET_DEFAULTS; across to app.js for mapNote and for the search the whole
+// app shares — prepareSearch, stationMatchesSearch, markHits and
+// tableStations; and sideways to path-profile.js for PATH_DEFAULT_MHZ,
+// PATH_DEFAULT_AGL, PATH_VERDICT, fsplDb, wattsToDbm, rmSystemOf and
+// PathProfile, to map-draw.js for MapDraw and to terrain.js for Terrain. See
+// path-profile.js's header for why the mutual reference constrains nothing.
+//
+// app.js calls back in two places, and both are named here because neither is
+// obvious from that end: selectStation() offers a row to an armed end before it
+// selects, and onStationPinClick() offers the pin — which never reaches
+// map.on('click') at all, the markers being built with
+// `bubblingMouseEvents: false`.
 //
 // The number this produces is indicative and optimistic; the banner that cannot
 // be dismissed and the comparison table under it are there so the figure cannot
@@ -82,6 +90,139 @@ const LinkBudget = (function () {
     };
   }
 
+  // ── finding an end without hunting for its pin ───────────────────────────
+  // The card was map-only: an end could be set by clicking the ground, by a
+  // two-point line drawn in Draw & measure, and by nothing else. That is right
+  // for "what would this hilltop do" and useless for the question people
+  // actually arrive with — "what is the margin from 6128 to the repeater it
+  // reports through" — where both ends are known by name, number or ALERT
+  // address long before anybody knows which of ~3,174 pins they are.
+  //
+  // So each end gets a box, and it is the box this app already has: the same
+  // prepareSearch / stationMatchesSearch pair behind the Stations filter, Pass
+  // Ranges and the ARRO Launcher, called with one argument-pair so it is "one
+  // box pointed at everything". A name, a station number, an ALERT address and
+  // an address window (`4021-4025`) therefore mean here exactly what they mean
+  // there, which is the whole reason not to write a second matcher.
+  const LB_FIND_CAP = 25;   // offered before the operator is asked to narrow
+
+  function findQ(which) {
+    const S_ = S();
+    if (!S_.q) S_.q = { a: '', b: '' };
+    return String(S_.q[which] == null ? '' : S_.q[which]);
+  }
+
+  // Always { prep, hits } — a caller destructures it, and an empty array in one
+  // branch is the shape that would come apart in that caller's hands.
+  function findHits(which) {
+    const text = findQ(which).trim();
+    if (!state.data || !text) return { prep: null, hits: [] };
+    // prepareSearch memoises exactly one string (app.js), and both ends ask it
+    // during the same paint — so the answer is copied out of it here, before
+    // the other end's question overwrites the arrays it handed back.
+    const prep = { ...prepareSearch(text) };
+    // A window is a search even though it leaves no term behind it: `4021-4025`
+    // parses to bounds rather than to text.
+    if (!prep.terms.length && !prep.ranges.length) return { prep, hits: [] };
+    const hits = [];
+    for (const s of state.data.stations) {
+      if (!stationMatchesSearch(s, prep)) continue;
+      hits.push(s);
+      if (hits.length > LB_FIND_CAP) break;   // one over, so "more than" is knowable
+    }
+    return { prep, hits };
+  }
+
+  // Whether this end is the one the next station pick fills.
+  function armed(which) { return S().target === which; }
+
+  // Both ends' station ids, so a list can say which of the two it is already on
+  // rather than offering a station that is already at the other end as though
+  // picking it would do something new.
+  function sidOf(which) { const e = S()[which]; return e && e.sid ? e.sid : null; }
+
+  // The list under an end's box, and the two different lists it can be. With
+  // something typed it is the whole file searched. With the box empty and the
+  // end armed it is the set the tab is already showing — tableStations() is the
+  // Stations table's own list, filters, pass-range relatives, map selection and
+  // all — so "pick it out of the list I have already narrowed" costs one click
+  // rather than a second search that repeats the filtering by hand.
+  function findListHtml(which) {
+    if (!state.data) return '';
+    const text = findQ(which).trim();
+    if (!text && !armed(which)) return '';
+    const { prep, hits } = text ? findHits(which) : { prep: null, hits: tableStations() };
+    const more  = hits.length > LB_FIND_CAP;
+    const shown = more ? hits.slice(0, LB_FIND_CAP) : hits;
+    const lead  = text
+      ? `${hits.length === 0 ? 'No station matches' : more ? `More than ${LB_FIND_CAP} match` : `${hits.length} match${hits.length === 1 ? '' : 'es'}`} “${esc(text)}”${more ? ' — keep typing to narrow it' : ''}`
+      : `The <strong>Stations</strong> list holds ${hits.length.toLocaleString()} right now${
+          more ? `; the first ${LB_FIND_CAP} are here. Narrow the filters, or type to search all of them`
+               : ''}`;
+    if (!shown.length) {
+      return `<p class="small lb-find-none">${lead}.</p>`;
+    }
+    const otherSid = sidOf(which === 'a' ? 'b' : 'a');
+    const mine     = sidOf(which);
+    return `
+      <p class="small lb-find-lead" id="lb-find-lead-${which}">${lead}.</p>
+      <div class="lb-hits" role="group" aria-labelledby="lb-find-lead-${which}">
+        ${shown.map(st => {
+          const here  = st.id === mine;
+          const there = st.id === otherSid;
+          return `
+            <button type="button" class="lb-hit${here ? ' is-here' : ''}"
+                    onclick="LinkBudget.pick('${which}','${escAttr(st.id)}')">
+              <span class="lb-hit-name">${prep ? markHits(st.name, prep.terms) : esc(st.name)}</span>
+              <span class="small lb-hit-num">${prep
+                ? markHits(st.station_number || '', prep.terms)
+                : esc(st.station_number || '')}</span>
+              ${here ? '<span class="lb-hit-at">this end</span>'
+                : there ? `<span class="lb-hit-at">end ${which === 'a' ? 'B' : 'A'}</span>` : ''}
+            </button>`;
+        }).join('')}
+      </div>`;
+  }
+
+  // The box itself, plus the sentence that says what arming an end means. The
+  // input is never re-rendered by typing into it — setSearch repaints only the
+  // list below — so the caret survives a paste, exactly as the Stations filter
+  // box and the ARRO Launcher's do.
+  function findHtml(which) {
+    const tag = which === 'a' ? 'A' : 'B';
+    const on  = armed(which);
+    if (!state.data) {
+      return `<p class="small lb-src">No stations loaded, so there is nothing to search —
+        click the map for a hypothetical point instead.</p>`;
+    }
+    return `
+      <div class="lb-find${on ? ' is-armed' : ''}">
+        <label class="sr-only" for="lb-find-${which}">Find the station at end ${tag}</label>
+        <div class="lb-find-row">
+          <input type="search" id="lb-find-${which}" class="lb-find-input"
+                 value="${escAttr(findQ(which))}" autocomplete="off" spellcheck="false"
+                 placeholder="Name, station # or ALERT address — e.g. Loudoun, 541155, 6128"
+                 aria-describedby="lb-find-hint-${which}"
+                 onfocus="LinkBudget.arm('${which}')"
+                 oninput="LinkBudget.setSearch('${which}',this.value)">
+          <button type="button" class="lb-find-x" id="lb-clear-${which}"
+                  onclick="LinkBudget.clearEnd('${which}')"
+                  aria-label="Clear end ${tag}"
+                  title="Clear end ${tag} — the station, anything typed here, and any override on it"
+                  ${S()[which] || findQ(which).trim() ? '' : 'disabled'}>Clear ${tag}</button>
+        </div>
+        <p class="small lb-find-hint" id="lb-find-hint-${which}">${on
+          ? `<strong>End ${tag} is armed.</strong> Click a station pin or any point on the map,
+             or a row in the <strong>Stations</strong> list below — in whatever state the filters
+             have it — and it lands here.
+             <button type="button" class="lb-link" id="lb-arm-${which}"
+                     onclick="LinkBudget.disarm()">Stop picking end ${tag}</button>`
+          : `Type to search, or <button type="button" class="lb-link" id="lb-arm-${which}"
+               onclick="LinkBudget.arm('${which}')">pick end ${tag} off the map or the list</button>.`}</p>
+        <div id="lb-hits-${which}">${findListHtml(which)}</div>
+      </div>`;
+  }
+
   // The value in play, and whether the operator put it there.
   function val(e, k) { return e.over[k] != null ? e.over[k] : e.def[k]; }
   function isOver(e, k) { return e.over[k] != null; }
@@ -102,6 +243,13 @@ const LinkBudget = (function () {
       e._pending = false;
       if (m != null) { e.ground = m; e.groundSrc = 'terrain tile (EGM96 geoid)'; }
       else e.groundSrc = 'unavailable';
+      // A tile can take up to twelve seconds, and the end it was fetched for
+      // may have been cleared or replaced in the meantime. Writing the height
+      // onto the orphan is harmless; repainting the card for it is not — a
+      // repaint is what discards an uncommitted figure (see keepFocus), and one
+      // fired on behalf of an endpoint that is no longer on screen has nothing
+      // to show for the cost.
+      if (S().a !== e && S().b !== e) return;
       rerender();
     });
   }
@@ -121,14 +269,77 @@ const LinkBudget = (function () {
     if (!S().picking || state.draw.tool) return;
     const { ll, sid } = MapDraw.resolveClick(ev.latlng);
     const st = sid && state.data ? state.data.stations.find(s => s.id === sid) : null;
-    const e = st ? stationEndpoint(st) : pointEndpoint(ll[0], ll[1]);
-    // Fill whichever end is empty; once both are set, start again from A.
-    const which = !S().a ? 'a' : !S().b ? 'b' : 'a';
+    takeEndpoint(st ? stationEndpoint(st) : pointEndpoint(ll[0], ll[1]));
+  }
+
+  // Which end a pick is about to land on: the armed one, or — with nothing
+  // armed — whichever is empty, A before B, starting again from A once both
+  // are. Its own function so a station can be checked against the *other* end
+  // before it is taken.
+  function destEnd() {
+    const t = S().target;
+    if (t === 'a' || t === 'b') return t;
+    return !S().a ? 'a' : !S().b ? 'b' : 'a';
+  }
+
+  // Where a picked end goes, however it was picked — a click on the ground, a
+  // pin, or a row in the Stations list.
+  //
+  // An armed end wins when there is one: the operator has said which end they
+  // are filling, and a pick that ignored them would be the card overruling the
+  // person. With nothing armed this is the original cycle — A, then B, then
+  // start again from A with B cleared, so a third click is visibly a new path
+  // rather than a silent edit to the old one.
+  function takeEndpoint(e) {
+    const t = S().target;
+    if (t === 'a' || t === 'b') {
+      const tag = t.toUpperCase();
+      S().target = null;
+      setEnd(t, e);
+      mapNote(S().a && S().b
+        ? `End ${tag} set — both ends are in.`
+        : `End ${tag} set — now the other end.`, 3000);
+      return;
+    }
+    const which = destEnd();
     if (which === 'a' && S().a && S().b) S().b = null;
     setEnd(which, e);
     mapNote(S().a && S().b
       ? 'Both ends set — click again to start a new path.'
       : 'Now click the other end of the path.', 3000);
+  }
+
+  // A station offered to the card from outside the map: a row in the Stations
+  // list, a pin whose own click never reaches the map, or a result in an end's
+  // own search box. Answers whether it was taken, so selectStation() knows
+  // whether it still has a selection to make.
+  //
+  // A station with no recorded position is refused rather than accepted as a
+  // pair of nulls: every figure downstream would come out NaN, and an endpoint
+  // reading "not set" for its own coordinates is not a link end.
+  function takeStationEnd(sid, which) {
+    const st = state.data ? state.data.stations.find(s => s.id === sid) : null;
+    if (!st) return false;
+    if (st.lat == null || st.lon == null) {
+      mapNote(`${st.name} has no position recorded — a link budget needs one at both ends.`, 5000);
+      return false;
+    }
+    // The same station at both ends is a zero-length path, and a zero-length
+    // path loses nothing: the table comes out with an enormous margin marked
+    // "Good". It is always a mis-pick, so it is refused with a reason rather
+    // than computed. The one case with no other end to collide with is the
+    // unaimed cycle landing back on A, which clears B on the way.
+    const dest = which || destEnd();
+    const other = dest === 'a' ? 'b' : 'a';
+    const clearsOther = !S().target && dest === 'a' && S().a && S().b;
+    const at = clearsOther ? null : S()[other];
+    if (at && at.sid === st.id) {
+      mapNote(`${st.name} is already end ${other.toUpperCase()} — a link budget needs two different places.`, 5000);
+      return false;
+    }
+    if (which) { findQ(which); S().target = which; S().q[which] = ''; }
+    takeEndpoint(stationEndpoint(st));
+    return true;
   }
 
   function drawMarkers() {
@@ -178,16 +389,38 @@ const LinkBudget = (function () {
     const txDbm = wattsToDbm(txW);
     const an = analysisFor(a, b);
 
-    const eirp = txDbm == null ? null : txDbm + (val(a, 'gain_dbi') || 0) - (val(a, 'loss_db') || 0);
+    // A term that is not known is not nought. `|| 0` folded an absent antenna
+    // gain into 0 dBi and carried on: the row printed "—" while the = EIRP
+    // subtotal under it was computed as though it were zero, so the column
+    // stopped adding up and the margin quoted a figure nobody supplied. TX
+    // power and the RX threshold already blank the margin when they are
+    // missing; these now do the same. Genuine zeroes are untouched — 0 dBi is a
+    // number, and `n == null` is the only thing that fails here.
+    const txG = val(a, 'gain_dbi'), txL = val(a, 'loss_db');
+    const rxG = val(b, 'gain_dbi'), rxL = val(b, 'loss_db');
+    const eirp = txDbm == null || txG == null || txL == null ? null : txDbm + txG - txL;
     const fspl = fsplDb(dKm, fMhz);
     const diff = an ? an.diffraction_db : null;
-    const rxDbm = eirp == null ? null
-      : eirp - fspl - (diff || 0) + (val(b, 'gain_dbi') || 0) - (val(b, 'loss_db') || 0);
+    const rxDbm = eirp == null || rxG == null || rxL == null ? null
+      : eirp - fspl - (diff || 0) + rxG - rxL;
     const thr = val(b, 'rx_dbm');
-    const margin = rxDbm == null || thr == null ? null : rxDbm - thr;
+    // Which of them is actually missing, so the note can name it rather than
+    // listing both and being half wrong.
+    const missing = [
+      [txDbm, 'TX power'], [txG, 'TX antenna gain'], [txL, 'TX line loss'],
+      [rxG, 'RX antenna gain'], [rxL, 'RX line loss'], [thr, 'RX threshold'],
+    ].filter(([v]) => v == null).map(([, label]) => label);
+    // Both ends in the same place is not a path. fsplDb answers 0 for a
+    // distance of nought — correctly, it has nothing to integrate over — so
+    // every loss vanishes and the margin comes out enormous and "Good". Two
+    // points snapped to the same pin will do it, and so will a station picked
+    // for both ends from somewhere this card cannot vet. A figure that is a
+    // fantasy is worse than no figure, so there is none.
+    const zero = !(dKm > 0.0005);
+    const margin = zero || rxDbm == null || thr == null ? null : rxDbm - thr;
 
     return { dKm, fMhz, txW, txDbm, eirp, fspl, diff, rxDbm, thr, margin, an,
-             fsplOnly: an == null };
+             zero, missing, fsplOnly: an == null };
   }
 
   // ── rendering ──
@@ -196,11 +429,9 @@ const LinkBudget = (function () {
     const tag = which === 'a' ? 'A' : 'B';
     if (!e) {
       return `
-        <div class="lb-end lb-end-empty">
+        <div class="lb-end lb-end-empty${armed(which) ? ' is-armed' : ''}">
           <div class="lb-end-head"><span class="lb-tag">${tag}</span> <em>not set</em></div>
-          <p class="small">${S().picking
-            ? 'Click a station or any point on the map.'
-            : 'Turn on “Pick two points” and click the map.'}</p>
+          ${findHtml(which)}
         </div>`;
     }
     const f = (k, label, step, unit) => {
@@ -209,7 +440,8 @@ const LinkBudget = (function () {
       return `
         <label class="lb-field${over ? ' is-over' : ''}">
           <span>${esc(label)}${unit ? ` <em>${esc(unit)}</em>` : ''}</span>
-          <input type="number" step="${step}" value="${v == null ? '' : v}"
+          <input type="number" step="${step}" id="lb-f-${which}-${k}"
+                 value="${v == null ? '' : v}"
                  placeholder="not set"
                  onchange="LinkBudget.setField('${which}','${k}',this.value)">
           <b class="lb-flag">${over ? 'edited'
@@ -222,13 +454,12 @@ const LinkBudget = (function () {
         </label>`;
     };
     return `
-      <div class="lb-end">
+      <div class="lb-end${armed(which) ? ' is-armed' : ''}">
         <div class="lb-end-head">
           <span class="lb-tag">${tag}</span>
           <strong>${esc(e.name)}</strong>
-          <button class="draw-del" title="Clear this end"
-                  onclick="LinkBudget.clearEnd('${which}')">✕</button>
         </div>
+        ${findHtml(which)}
         <p class="small lb-src">${e.kind === 'station'
           ? `Station${e.sysName ? ` · ${esc(e.sysName)}` : ''}${e.freq ? ` · repeater ${e.freq} MHz` : ''}`
           : 'Hypothetical point — nothing is written back to the station data'}</p>
@@ -270,17 +501,22 @@ const LinkBudget = (function () {
     // is, and it is standing in for a ridge above the line of sight. The number
     // stays as computed — but it does not get to read "Good".
     const blocked = !!(r.an && r.an.verdict === 'obstructed') && r.margin != null;
+    const noPath = !!r.zero;
     return `
       <div class="table-wrap">
       <table class="lb-table">
         <caption class="sr-only">The link budget, term by term — each gain and loss between the transmitter and the receiver, and the margin they add up to</caption>
         <tbody>
           ${budgetRow('TX power', r.txDbm, 'dBm', r.txW != null ? `${r.txW} W at ${esc(a.name)}` : 'no TX power set')}
-          ${budgetRow('TX antenna gain', val(a, 'gain_dbi'), 'dBi', '')}
-          ${budgetRow('TX line loss', val(a, 'loss_db') == null ? null : -val(a, 'loss_db'), 'dB', '')}
+          ${budgetRow('TX antenna gain', val(a, 'gain_dbi'), 'dBi',
+            val(a, 'gain_dbi') == null ? '<span class="txt-bad">not set — no EIRP without it</span>' : '')}
+          ${budgetRow('TX line loss', val(a, 'loss_db') == null ? null : -val(a, 'loss_db'), 'dB',
+            val(a, 'loss_db') == null ? '<span class="txt-bad">not set — no EIRP without it</span>' : '')}
           ${budgetRow('= EIRP', r.eirp, 'dBm', '', 'lb-sub')}
           ${budgetRow('Free-space path loss', -r.fspl, 'dB',
-            `${r.fMhz.toFixed(3)} MHz over ${fmtKm(r.dKm)}`)}
+            r.zero
+              ? '<strong>Both ends are in the same place</strong> — nothing below this line means anything'
+              : `${r.fMhz.toFixed(3)} MHz over ${fmtKm(r.dKm)}`)}
           ${r.diff == null
             ? `<tr class="lb-missing"><th scope="row">Diffraction proxy</th><td class="lb-num">—</td><td class="lb-unit">dB</td>
                  <td class="small lb-note">No terrain profile for these two points —
@@ -290,19 +526,30 @@ const LinkBudget = (function () {
                 `single knife edge${r.an.v != null ? `, v=${r.an.v.toFixed(2)}` : ''} at
                  ${r.fMhz.toFixed(3)} MHz over ${fmtAglPair(val(a, 'agl_m'), val(b, 'agl_m'))}
                  — a proxy, not a propagation model`)}
-          ${budgetRow('RX antenna gain', val(b, 'gain_dbi'), 'dBi', '')}
-          ${budgetRow('RX line loss', val(b, 'loss_db') == null ? null : -val(b, 'loss_db'), 'dB', '')}
+          ${budgetRow('RX antenna gain', val(b, 'gain_dbi'), 'dBi',
+            val(b, 'gain_dbi') == null ? '<span class="txt-bad">not set — no received level without it</span>' : '')}
+          ${budgetRow('RX line loss', val(b, 'loss_db') == null ? null : -val(b, 'loss_db'), 'dB',
+            val(b, 'loss_db') == null ? '<span class="txt-bad">not set — no received level without it</span>' : '')}
           ${budgetRow('= Received signal', r.rxDbm, 'dBm', `at ${esc(b.name)}`, 'lb-sub')}
           ${budgetRow('RX threshold', r.thr, 'dBm', 'receiver sensitivity')}
         </tbody>
         <tfoot>
-          <tr class="lb-margin ${blocked ? 'bad' : (m ? m.cls : '')}">
+          <tr class="lb-margin ${blocked || noPath ? 'bad' : (m ? m.cls : '')}">
             <th>Fade margin</th>
             <td class="lb-num">${r.margin == null ? '—' : (r.margin > 0 ? '+' : '') + r.margin.toFixed(1)}</td>
             <td class="lb-unit">dB</td>
-            <td class="lb-note"><strong>${blocked ? 'Obstructed' : (m ? m.label : '')}</strong>
+            <td class="lb-note"><strong>${noPath ? 'No path'
+              : blocked ? 'Obstructed'
+              : m ? m.label
+              : 'Not computed'}</strong>
               <span class="small">${r.margin == null
-                ? 'Fill in TX power and RX threshold for a margin.'
+                ? (r.zero
+                    ? 'Both ends are in the same place. There is no path here to have a margin — move one of them.'
+                    : r.missing.length
+                      ? `No figure has been given for ${esc(fmtList(r.missing))}, and a margin
+                         computed around a missing term would be an invented one. Fill ${
+                           r.missing.length === 1 ? 'it' : 'them'} in above.`
+                      : 'Fill in the missing figures above for a margin.')
                 : blocked
                   ? `Terrain rises above the line of sight, so this margin is not trustworthy${
                       m ? ` however “${m.label.toLowerCase()}” it looks` : ''}: one knife edge stands in for a
@@ -317,6 +564,11 @@ const LinkBudget = (function () {
           ${esc(PATH_VERDICT[r.an.verdict].note)}
           ${r.an.intrusion_m > 0 ? `Worst intrusion ${Math.round(r.an.intrusion_m)} m into the 60% zone.` : ''}</p>` : ''}
       ${divergenceHtml(r)}`;
+  }
+
+  function fmtList(xs) {
+    if (xs.length <= 1) return xs[0] || '';
+    return `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
   }
 
   // The pair of antenna heights an analysis was run on, as one phrase.
@@ -335,15 +587,46 @@ const LinkBudget = (function () {
     if (!c) return '';
     const a = S().a, b = S().b;
     const same = (x, y) => x != null && y != null && Math.abs(x - y) < 0.05;
-    if (same(c.fMhz, r.fMhz) &&
-        same(c.aglA, val(a, 'agl_m')) && same(c.aglB, val(b, 'agl_m'))) return '';
+    // Heights, in metres off ~30 m tiles: agreeing to within half a metre is
+    // agreeing. The budget's own end height is whatever fillGround put there,
+    // and where there is none it fell back to the profile's sample — the same
+    // number the chart used — so nothing to report.
+    const sameM = (x, y) => x != null && y != null && Math.abs(x - y) < 0.5;
+    const gA = a.ground != null ? a.ground : c.groundA;
+    const gB = b.ground != null ? b.ground : c.groundB;
+    const settings = !(same(c.fMhz, r.fMhz) &&
+                       same(c.aglA, val(a, 'agl_m')) && same(c.aglB, val(b, 'agl_m')));
+    // Only when the chart has a height at both ends to be compared against. A
+    // profile with a missing tile at an end has none, and its own analysis
+    // failed for that reason — quoting a picture that never drew is not a
+    // divergence, it is noise on top of an error the panel already shows.
+    const ground = c.groundA != null && c.groundB != null
+      && !(sameM(c.groundA, gA) && sameM(c.groundB, gB));
+    if (!settings && !ground) return '';
     return `
-      <p class="small lb-diverge">
-        The elevation profile above is drawn at <strong>${c.fMhz.toFixed(3)} MHz</strong> over
-        <strong>${fmtAglPair(c.aglA, c.aglB)}</strong> — not the figures in this table. Same path,
-        same terrain, different assumptions, so the chart and the diffraction line above need not agree.
-        <button class="lb-link" onclick="LinkBudget.matchProfile()">Redraw the chart on these figures</button>
-      </p>`;
+      ${settings ? `
+        <p class="small lb-diverge">
+          The elevation profile above is drawn at <strong>${c.fMhz.toFixed(3)} MHz</strong> over
+          <strong>${fmtAglPair(c.aglA, c.aglB)}</strong> — not the figures in this table. Same path,
+          same terrain, different assumptions, so the chart and the diffraction line above need not agree.
+          <button class="lb-link" onclick="LinkBudget.matchProfile()">Redraw the chart on these figures</button>
+        </p>` : ''}
+      ${ground ? `
+        <p class="small lb-diverge">
+          The chart above stands its ends on <strong>${fmtGroundPair(c.groundA, c.groundB)}</strong>;
+          this table stands them on <strong>${fmtGroundPair(gA, gB)}</strong>. That is a different line
+          of sight over the same ridge, so the verdict here and the picture above can genuinely
+          disagree — the profile reads an end off the terrain it sampled for the chart, and this card
+          off the station's surveyed height or a single-point tile sample of its own. There is no
+          button for this one: neither height is an assumption to be switched, and the honest
+          reading is the surveyed one where a survey exists.
+        </p>` : ''}`;
+  }
+
+  // The pair of ground heights an analysis stood its ends on, as one phrase.
+  function fmtGroundPair(x, y) {
+    const n = v => (v == null ? '?' : String(Math.round(v * 10) / 10));
+    return `${n(x)} / ${n(y)} m of ground`;
   }
 
   function comparisonHtml() {
@@ -397,14 +680,26 @@ const LinkBudget = (function () {
         </label>
         <label class="draw-field">
           <span>Frequency (MHz)</span>
-          <input type="number" step="0.1" min="1" value="${freqOf()}"
+          <input type="number" step="0.1" min="1" id="lb-freq" value="${freqOf()}"
                  onchange="LinkBudget.setFreq(this.value)">
+          <!-- The box is never blank: clearing it falls straight back to the
+               repeater's channel or the network's band, which on screen is
+               indistinguishable from having typed that figure in. The flag is
+               what tells them apart, and it is the one the elevation profile's
+               otherwise-identical box has carried all along. -->
+          <b class="lb-flag">${S_.freqMhz != null ? 'edited'
+            : (S_.a && S_.a.freq > 0) || (S_.b && S_.b.freq > 0)
+              ? 'default · repeater channel' : 'default · network band'}</b>
         </label>
-        <button onclick="LinkBudget.reset()">Clear both ends</button>
+        <button id="lb-clear-both" onclick="LinkBudget.reset()"
+                ${S_.a || S_.b || findQ('a').trim() || findQ('b').trim() ? '' : 'disabled'}
+                >Clear both ends</button>
       </div>
-      <p class="filter-hint">${S_.picking
-        ? 'Click a station to fill it in from its Radio Mobile system, or click empty ground for a hypothetical site. Every value below can be overridden.'
-        : 'Ends can also be set from a line drawn in Draw &amp; measure.'}</p>
+      <p class="filter-hint">${S_.target
+        ? `Every value below can be overridden, whichever way an end was picked.`
+        : S_.picking
+          ? 'Click a station to fill it in from its Radio Mobile system, or click empty ground for a hypothetical site. Every value below can be overridden.'
+          : 'Search for either end below, or set both from a line drawn in Draw &amp; measure.'}</p>
       <div class="lb-ends">
         ${endpointCard('a', S_.a)}
         ${endpointCard('b', S_.b)}
@@ -443,7 +738,60 @@ const LinkBudget = (function () {
       S().picking = d.open;
     }
     const body = d.querySelector(':scope > .lb-body');
-    if (body) body.innerHTML = S().open ? bodyHtml() : '';
+    if (body) keepFocus(() => { body.innerHTML = S().open ? bodyHtml() : ''; });
+  }
+
+  // A repaint must not eat what somebody is in the middle of typing. The body
+  // is replaced wholesale, so every control in it is a different element
+  // afterwards: this notes which one held the caret, where the caret sat and
+  // what was in the box, and puts all three back by id.
+  //
+  // Not a nicety. The number fields commit on `change`, so everything typed
+  // since the last blur is uncommitted — and fillGround() repaints whenever a
+  // terrain tile lands, seconds after the click that asked for it. A figure
+  // half-typed when the tile arrived was thrown away silently, the box
+  // reverting to its default under the cursor. Buttons are restored too, so
+  // pressing one that redraws itself does not drop focus on <body>.
+  function keepFocus(paint) {
+    const el = document.activeElement;
+    const id = el && el.id && el.id.startsWith('lb-') ? el.id : null;
+    const box = id && el.tagName === 'INPUT';
+    const value = box ? el.value : null;
+    let start = null, end = null;
+    // Only some input types expose a selection; a number field throws.
+    if (box) try { start = el.selectionStart; end = el.selectionEnd; } catch { /* no caret */ }
+    paint();
+    if (!id) return;
+    const next = document.getElementById(id);
+    if (!next || next === el) return;
+    if (value != null && next.value !== value) next.value = value;
+    next.focus({ preventScroll: true });
+    if (start != null) try { next.setSelectionRange(start, end); } catch { /* no caret */ }
+  }
+
+  // Somewhere deliberate for the caret to land when the control that had it has
+  // been repainted out of existence, following renderSearchStack's rule in
+  // app.js: a control that vanishes under the pointer hands focus on rather
+  // than letting the document have it. Never moves focus that was somewhere
+  // else — a repaint the operator did not cause must not steal it.
+  function handFocus(id) {
+    const el = document.getElementById(id);
+    if (!el || el.disabled) return;
+    const at = document.activeElement;
+    if (at && at !== document.body && !document.getElementById('link-budget-panel').contains(at)) return;
+    el.focus({ preventScroll: true });
+  }
+
+  // The two clear buttons and the one below them, without a repaint — typing
+  // must never redraw the box being typed into.
+  function refreshClears() {
+    const S_ = S();
+    for (const w of ['a', 'b']) {
+      const b = document.getElementById(`lb-clear-${w}`);
+      if (b) b.disabled = !(S_[w] || findQ(w).trim());
+    }
+    const both = document.getElementById('lb-clear-both');
+    if (both) both.disabled = !(S_.a || S_.b || findQ('a').trim() || findQ('b').trim());
   }
 
   return {
@@ -460,6 +808,11 @@ const LinkBudget = (function () {
     },
     detach() {
       if (map && clickHandler) map.off('click', clickHandler);
+      // The one caller destroys the map on the next line, which would take this
+      // with it — but app.js documents every detach() as self-contained and
+      // re-runnable, and against a map that survives this stranded the A/B
+      // markers and the dashed line with nothing left holding them.
+      if (map && layer) map.removeLayer(layer);
       map = null; layer = null; clickHandler = null;
     },
 
@@ -482,7 +835,88 @@ const LinkBudget = (function () {
       S().picking = !!v;
       rerender();
     },
-    setPicking(v) { S().picking = !!v; rerender(); },
+    setPicking(v) {
+      S().picking = !!v;
+      // Disarming the map disarms the end that was waiting on it: an armed end
+      // that no longer answers clicks is a card claiming a mode it does not
+      // have. MapMovePin calls this on its way in for exactly that reason.
+      if (!S().picking) S().target = null;
+      rerender();
+    },
+
+    // Arm an end: the next station picked anywhere — a pin, the ground, a row
+    // in the Stations list, or a result in this end's own box — fills it.
+    //
+    // Idempotent, and that is load-bearing rather than tidy: the box arms on
+    // focus, arming repaints the card, and the repaint puts focus back (see
+    // keepFocus) — so a version that did work on every call would re-enter
+    // itself for as long as the caret stayed in the box, exactly as setOpen's
+    // guard exists to stop <details> doing.
+    arm(which) {
+      if (which !== 'a' && which !== 'b') return;
+      if (S().target === which && S().picking) return;
+      S().target = which;
+      S().picking = true;
+      rerender();
+    },
+
+    disarm() {
+      if (!S().target) return;
+      S().target = null;
+      rerender();
+    },
+
+    // Typing in an end's box. Only the list under it is repainted — never the
+    // box — so the caret and a part-typed word survive, which is the rule the
+    // Stations filter box and the ARRO Launcher both run on. No debounce: this
+    // is one linear pass over the station list capped at 26 hits, not a rebuild
+    // of ~3,174 markers and a table.
+    setSearch(which, text) {
+      if (which !== 'a' && which !== 'b') return;
+      findQ(which);
+      const S_ = S();
+      if (S_.q[which] === text) return;
+      S_.q[which] = String(text == null ? '' : text);
+      const el = document.getElementById(`lb-hits-${which}`);
+      if (el) el.innerHTML = findListHtml(which);
+      refreshClears();
+    },
+
+    // A result in an end's own list. Picking is deliberately not the same as
+    // selecting: the editor card below stays on whatever it was on, because an
+    // operator building a budget asked for an endpoint, not for the form to be
+    // reloaded and the map flown somewhere.
+    pick(which, sid) {
+      const w = which === 'b' ? 'b' : 'a';
+      if (!takeStationEnd(sid, w)) return;
+      // The button that was pressed has just been replaced by the repaint that
+      // followed it, so a keyboard user would be dropped on <body>. The box
+      // beside it cannot take the focus back — focusing it re-arms the end that
+      // has only this moment been filled — so it goes to the control that
+      // undoes the pick, which is the one thing anybody would want next.
+      handFocus(`lb-clear-${w}`);
+    },
+
+    // Offered by selectStation() — a row in the Stations list, in whatever
+    // state the filters have it — and by a pin click, which never reaches the
+    // map's own click handler (the markers are built with
+    // bubblingMouseEvents:false, so the pin swallows it). Answers whether it
+    // was taken.
+    takeStation(sid) {
+      const t = S().target;
+      if ((t !== 'a' && t !== 'b') || !state.data) return false;
+      return takeStationEnd(sid, null);
+    },
+
+    // A click landing dead on a station pin, offered by app.js's marker
+    // handler. Wider than takeStation: the pick does not have to be aimed at a
+    // named end, because "Pick two points on the map" is itself the operator
+    // saying the map is doing the choosing — with nothing armed this fills A,
+    // then B, exactly as a click on the ground beside the pin always has.
+    mapPickStation(sid) {
+      if (!S().picking || state.draw.tool || !state.data) return false;
+      return takeStationEnd(sid, null);
+    },
     setFreq(v) {
       const n = Number(v);
       S().freqMhz = isFinite(n) && n > 0 ? n : null;
@@ -497,8 +931,30 @@ const LinkBudget = (function () {
       if (e.over[k] == null) delete e.over[k];
       rerender();
     },
-    clearEnd(which) { S()[which] = null; drawMarkers(); rerender(); },
-    reset() { S().a = null; S().b = null; drawMarkers(); rerender(); },
+    // Clear one end: the endpoint, its overrides and whatever is typed in its
+    // box. An armed end stays armed — "clear this and pick another" is what the
+    // button is usually pressed for, and there is a separate control that says
+    // stop.
+    clearEnd(which) {
+      if (which !== 'a' && which !== 'b') return;
+      findQ(which);
+      S()[which] = null;
+      S().q[which] = '';
+      drawMarkers();
+      rerender();
+      // The button that was just pressed is now disabled — there is nothing
+      // left to clear — and a disabled control cannot hold focus. Hand it to
+      // the link beside it, which is how the end gets filled again.
+      handFocus(`lb-arm-${which}`);
+    },
+    reset() {
+      const S_ = S();
+      findQ('a');
+      S_.a = null; S_.b = null;
+      S_.q.a = ''; S_.q.b = '';
+      drawMarkers();
+      rerender();
+    },
 
     // The profile panel finished (or failed) — the diffraction line follows it.
     profileChanged() { if (S().open) rerender(); },
@@ -521,6 +977,12 @@ const LinkBudget = (function () {
       };
       S().open = true;
       S().a = pick(0); S().b = pick(1);
+      // Both ends have just been replaced wholesale, so a half-typed search
+      // against the old ones is a question about something that is no longer
+      // on the card. The arm goes with them for the same reason.
+      findQ('a');
+      S().q.a = ''; S().q.b = '';
+      S().target = null;
       fillGround(S().a); fillGround(S().b);
       drawMarkers();
       // The one programmatic opener, so it writes the element as well as the

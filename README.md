@@ -1832,6 +1832,28 @@ picks it up and the diffraction term can be filled in. Pressing it again lands
 back on the same line rather than stacking another one at the same coordinates.
 Margin classes are good ≥ 20 dB · marginal 10–20 · poor < 10.
 
+**Either end is found by name, number or ALERT address.** Each end carries a
+search box running the same `prepareSearch` / `stationMatchesSearch` pair as the
+Stations filter, Pass Ranges and the ARRO Launcher — so a name, a station
+number, an ALERT address and an address window like `4021-4025` all mean here
+exactly what they mean there. Putting the caret in an end's box **arms** that
+end: the next station picked anywhere — a pin on the map, a point on the ground,
+or a row in the **Stations** list in whatever state the filters have left it —
+lands on *that* end rather than on whichever happened to be empty. An armed pick
+does not also select the station into the editor below, because an operator
+building a budget asked for an endpoint, not for the form to be reloaded and the
+map flown somewhere. **Clear A**, **Clear B** and **Clear both ends** wipe one
+end, the other, or the pair — the station, its overrides and whatever is typed
+in its box.
+
+> Until this existed the card said "click a station on the map" and, on the pin
+> itself, that was not true: markers are built with `bubblingMouseEvents: false`,
+> so a click dead on a pin never reached `map.on('click')` and never reached the
+> budget. What worked was clicking *near* a pin — inside `MapDraw`'s 15 px snap
+> ring and outside the pin's own hit area — which is not an instruction anybody
+> could follow. The marker handler now offers the pin to an armed pick before
+> anything else it does.
+
 **Each end shows the ground it is standing on**, and where that height came
 from: a station's surveyed `elevation_ahd` where there is one, and a terrain-tile
 sample (EGM96, and labelled as such) where there is not — which is most stations,
@@ -1849,6 +1871,28 @@ above is drawn at whenever it differs — with a button that redraws the chart o
 the budget's figures. That is a button rather than something the budget does by
 itself: the profile's overrides apply to *every* line drawn on the map, so
 writing to them would silently re-height the next hand-drawn path too.
+
+The **ground under each end** is the third assumption the two can differ on, and
+the one that bites hardest — a different ground height is a different line of
+sight, so the same hop can come back *clear* in the table and *obstructed* on the
+picture above it. The chart stands an end on the station's surveyed
+`elevation_ahd` and otherwise on the profile's own sample; the card stands it on
+whatever `fillGround` sampled at a single point, at its own zoom. Both heights
+now ride along with the analysis, and the card says so when they disagree by more
+than half a metre. There is no *redraw* button for this one: neither height is an
+assumption to be switched, and the honest reading is the surveyed one where a
+survey exists.
+
+**A figure nobody supplied is not nought, and a path with no length has no
+margin.** An absent antenna gain or feeder loss used to fold into 0 dB and carry
+on, so the row printed `—` while the `= EIRP` subtotal beneath it was computed as
+though a number had been given: the column silently stopped adding up. Those
+terms now blank the margin the way a missing TX power and RX threshold always
+have, and the row names which of them is missing. Both ends in the same place is
+the other one — FSPL over a distance of nought is 0 dB, correctly and
+catastrophically, so the margin came out at +155 dB and read **Good**. The same
+station is refused at the second end with a reason, and a zero-length path
+reports **No path** rather than a number.
 
 **Where the two features disagree, the terrain wins.** A blocked path can still
 show a fat margin — one knife edge is the most optimistic diffraction model there
@@ -2553,8 +2597,8 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Twenty-two checks. The eleven below are the ones a change to the front end meets
-first, in ascending order of cost; `test/README.md` has the full table:
+Twenty-three checks. The twelve below are the ones a change to the front end
+meets first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |
 |---|---|
@@ -2569,6 +2613,7 @@ first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run history` | a saved record reading back as the sheet it was written on. The fixture is not a file: the check fills a sheet in, saves it, and serves that document back — so the round trip is what is tested, and the read-only view is compared against the *editable* form's own section list |
 | `npm run movepin` | a station's links and its move-pin mode. The five pills in the callout and in the editor card, the two document searches carrying the *reduced* station name rather than the raw one and asking for both spellings of the words that have two, and the mode armed, dragged **with a real pointer**, read back, cancelled and saved. Smoke sees none of it: a pill row missing two pills and a Save that writes null over a coordinate both open a tab with a clean console |
 | `npm run stncard` | the station card on the map and the callout it turned into a signpost (#175), at a desktop width and at a phone's. A real pin click paints the card without selecting; a filter change destroys the callout and leaves the card; *Edit station ↓* selects and is the one thing that scrolls the editor into view; closing it holds until the next gesture; the three cards that share a rectangle close each other; and at 375 px the callout is two pills that fit inside the map with a finger-sized close button, and *Details* opens the card as a sheet with focus in it. Every one of those failures renders a page that looks right |
+| `npm run linkbudget` | the link budget card's two ends. Each is found by name, station number, ALERT address or address window — asserted against what the *Stations filter itself* returns for the same term, so the claim is that the card runs the shared matcher rather than a second copy of the rules. Then: the box keeping its caret through a paste, an end armed and filled from a pin click and from a row of the Stations list in its filtered state without selecting it, the three Clear buttons, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute — the same station at both ends, a zero-length path, a term nobody supplied, and a frequency box that cannot say whether it holds an override. Every one of those is a clean console |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and
@@ -2586,7 +2631,7 @@ then clicks its way through the RF Changes and Interference Workbench controls,
 keyed by the handler each one names rather than by its label. See
 `test/lib/controls.mjs`.
 
-CI runs all twenty-two on any push touching a root `*.js`, `index.html`, `styles.css`,
+CI runs all twenty-three on any push touching a root `*.js`, `index.html`, `styles.css`,
 `stations.json`, `db/migrations/`, `test/` or the inspection workbook in
 `archive/`. The filter is a glob rather than a list of filenames
 because the app's script list grew with every milestone of the split — a named

@@ -564,13 +564,30 @@ const PathProfile = (function () {
       // the same hop. So the settings behind the picture ride along, in the
       // caller's A→B order, and a card quoting this can say when they differ
       // rather than printing a verdict the chart above it contradicts.
+      //
+      // The ground at each end rides along for the same reason, and it is the
+      // one that bites hardest: the chart takes a station's surveyed
+      // `elevation_ahd` and otherwise the profile's own sample of the terrain,
+      // while a caller can hand in a height of its own — a single-point tile
+      // sample at a different zoom, say. Two different ground heights are two
+      // different lines of sight, so the same hop can come back clear here and
+      // obstructed on the picture, with nothing above saying why. Resolved
+      // exactly as pathAnalyse resolves it for the chart's own call, so the two
+      // agree whenever they should.
       const ea = endpoint(sh, 0), eb = endpoint(sh, 1);
+      const g = cur.prof.terrain_m;
       const drawn = {
         fMhz: freqFor(ea, eb),
         aglA: P().aglA != null ? P().aglA : ea.agl,
         aglB: P().aglB != null ? P().aglB : eb.agl,
+        groundA: ea.elev != null ? ea.elev : g[0],
+        groundB: eb.elev != null ? eb.elev : g[g.length - 1],
       };
-      an.chart = flipped ? { fMhz: drawn.fMhz, aglA: drawn.aglB, aglB: drawn.aglA } : drawn;
+      an.chart = flipped
+        ? { fMhz: drawn.fMhz,
+            aglA: drawn.aglB, aglB: drawn.aglA,
+            groundA: drawn.groundB, groundB: drawn.groundA }
+        : drawn;
       an.chartFlipped = flipped;
       return an;
     },

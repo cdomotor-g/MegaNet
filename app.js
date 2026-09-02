@@ -2949,15 +2949,26 @@ function onStationPinClick(e) {
     return;
   }
   L.DomEvent.stopPropagation(e);      // as Leaflet's own handler did
+  // A click on a stack of pins fans the stack out instead of opening anything:
+  // MapSpider listens on the same marker, runs after this, and closes the
+  // callout this opens. The card must not paint for whichever pin happened to
+  // be on top of a stack nobody has picked from yet, so it asks first — and
+  // neither must the link budget take an endpoint off it.
+  const fans = MapSpider.willFan(e.target);
+  // A link-budget pick that is armed gets this pin, and gets it before anything
+  // else here runs. The card has always said "click a station on the map" and,
+  // on the pin itself, that was not true: markers are built with
+  // `bubblingMouseEvents: false`, so a click dead on a pin never reaches
+  // `map.on('click')` and never reached the budget. What worked was clicking
+  // *near* a pin — inside MapDraw's 15 px snap ring and outside the pin's own
+  // hit area — which is not an instruction anybody could follow. So the pin
+  // answers it here, where the click actually lands.
+  if (!fans && state.link && state.link.picking
+      && LinkBudget.mapPickStation(e.target.mnStationId)) return;
   const s = e.target.mnStation;
   if (s && s.roles.includes('repeater')) {
     setMapFocusRepeater(state.mapFocusRepeaterId === s.id ? null : s.id);
   }
-  // A click on a stack of pins fans the stack out instead of opening anything:
-  // MapSpider listens on the same marker, runs after this, and closes the
-  // callout this opens. The card must not paint for whichever pin happened to
-  // be on top of a stack nobody has picked from yet, so it asks first.
-  const fans = MapSpider.willFan(e.target);
   if (isPhoneNav()) {
     // A phone map cannot carry a balloon and a sheet at once. With no sheet
     // open the tap opens the callout, and the card comes from its Details
@@ -3311,6 +3322,13 @@ function rerenderStations() {
 }
 
 function selectStation(id) {
+  // An armed link-budget end takes the row instead. The card says out loud that
+  // it is waiting for a station and names the list it is waiting on, so a row
+  // clicked while that is on screen is an answer to it — and answering it must
+  // not also reload the editor form below and fly the map somewhere, which is
+  // what selecting does. Nothing is armed unless somebody armed it, so the
+  // ordinary row click is untouched.
+  if (LinkBudget.takeStation(id)) return;
   if (state.selectedId === id) {
     // Toggle off: clear the highlight and close the editor card below.
     state.selectedId  = null;

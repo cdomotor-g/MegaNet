@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the twenty-two that run in CI
+npm run all                       # the twenty-three that run in CI
 ```
 
 | Command | What it does |
@@ -42,13 +42,14 @@ npm run all                       # the twenty-two that run in CI
 | `npm run stationscard` | the Stations tab's **Copy lat, lon** pill and its collapsible station list: the coordinate on the clipboard read back for real, in the callout (the station's recorded position) and in the editor card (whatever the two boxes currently say, which is what a dragged pin or a typed figure leaves there), the `execCommand` fallback that is the only clipboard path over `file://`, and the list card shutting, keeping its live count and the selected station on the summary, and being remembered across a tab change and a reload |
 | `npm run stncard` | the station card on the Stations map and the callout it turned into a signpost (#175), at 1440 px and at 375 px: a real pin click paints the card without selecting; a filter change destroys the callout and leaves the card; *Edit station ↓* selects and scrolls the editor into view, out of full screen first; × and Escape close it back to the opener and nothing passive reopens it; the station, ACMA and radio-path cards close each other; the phone callout is two pills inside the map's width with a finger-sized close button, and *Details* opens the card as a sheet with focus in it; the legend names the layers that are off and the one-time 👁️ tip shows once |
 | `npm run search` | ALERT address windows in the Stations filter box: `4021-4025` selects the stations inside it, in every form (hyphen, en/em dash, `..`, reversed) and every paste (newlines, commas, spaces, semicolons), mixed with names and bare addresses — and everything the box already took, asserted again beside it |
+| `npm run linkbudget` | the link budget card's two ends: each found by name, station number, ALERT address or address window against the *filter's own* answer, the box keeping its caret through a paste, an armed end filled from a pin click, a point and a row of the Stations list in its filtered state — without selecting it — Clear A / Clear B / Clear both, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute: the same station at both ends, a zero-length path, a term nobody supplied, and a frequency that cannot say whether it is an override |
 | `npm run claim` | claiming an address from the message that arrived on it: an unresolved relayed row offers the claim, the picker sends the *station* address rather than the sensor slot, and the tab stops offering a write that has already landed — with the datastore stubbed at `dbRpc` |
 | `npm run gate` | the Access-to-Supabase verifier refuses what it must — a forged signature, a token minted for another Access application, an expired one, `alg: none` — against keys generated in-process, so it runs offline |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the twenty-two that run in CI |
+| `npm run all` | the twenty-three that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
-`toplevel`, `registry`, `nav`, `shell`, `tabs`, `help`, `search` and `stncard` take `-v` too, to list what
+`toplevel`, `registry`, `nav`, `shell`, `tabs`, `help`, `search`, `linkbudget` and `stncard` take `-v` too, to list what
 passed as well as what did not — `shell -v` prints every contrast ratio it
 measured, in both themes, which is the fastest way to see how much headroom a
 colour has before it stops clearing AA, and `nav -v` prints what each search
@@ -57,7 +58,7 @@ doing its job.
 
 CI runs `check`, `names`, `toplevel`, `hfem`, `smoke`, `registry`, `nav`, `shell`, `tabs`,
 `rivers`, `survey`, `mapctl`, `help`, `insp`, `maint`, `history`, `movepin`, `stationscard`, `stncard`,
-`search`, `claim` and `gate` on every push that touches a root `*.js`,
+`search`, `linkbudget`, `claim` and `gate` on every push that touches a root `*.js`,
 `index.html`, `styles.css`, `stations.json`, `db/migrations/`, `test/` or the
 inspection workbook in `archive/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's

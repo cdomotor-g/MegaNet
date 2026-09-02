@@ -326,6 +326,17 @@ jobs:
         working-directory: test
         run: npm run search
 
+      # What the link budget card does with its two ends, and what it refuses to
+      # do with them. Every failure here is a clean console: a search box that
+      # hands back the wrong stations, a box that loses the caret on the third
+      # keystroke, a repaint that discards a half-typed TX power, a pin click
+      # that never reaches the card at all (it did not — the markers are built
+      # with `bubblingMouseEvents: false`), and a budget over a zero-length path
+      # reporting +155 dB and the word "Good".
+      - name: Link budget — either end, found and armed; and what it refuses
+        working-directory: test
+        run: npm run linkbudget
+
       # The database half of the claim is proven against a real Postgres by
       # tools/check_mqtt.sql, which CI cannot run — it needs a connection. What
       # this covers is the half that only exists in a browser: that an

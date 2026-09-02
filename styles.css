@@ -3640,6 +3640,11 @@ hr {
   margin-bottom: .2rem;
 }
 
+/* The frequency box's source flag reads under the box, the way every other
+   flag on this card does — the row is baseline-aligned, so it has to be a
+   block of its own rather than a run of text beside the input. */
+.lb-controls .draw-field .lb-flag { display: block; }
+
 .lb-ends {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -3676,6 +3681,102 @@ hr {
   color: var(--muted);
   margin: .15rem 0 0;
 }
+
+/* ── finding an end by name, number or ALERT address ── */
+
+.lb-find { margin: .35rem 0 .1rem; }
+
+.lb-find-row {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+}
+
+.lb-find-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  padding: .25rem .35rem;
+  font-size: .82rem;
+}
+
+.lb-find-x {
+  flex: none;
+  font-size: .74rem;
+  padding: .22rem .45rem;
+}
+
+.lb-find-hint {
+  color: var(--muted);
+  margin: .2rem 0 0;
+}
+
+/* An armed end is the one the next pin, point or table row lands on, so it has
+   to be tellable apart from the other one at a glance — the hint alone is a
+   sentence to read, and the whole point of arming is that you are looking at
+   the map rather than at this card. */
+.lb-end.is-armed,
+.lb-end-empty.is-armed {
+  border-color: var(--accent);
+  border-style: solid;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.lb-find.is-armed .lb-find-input { border-color: var(--accent); }
+
+.lb-find-lead,
+.lb-find-none {
+  color: var(--muted);
+  margin: .3rem 0 .1rem;
+}
+
+/* Capped in the markup, so this never has to scroll far — but it scrolls
+   anyway, because two of these side by side inside a card that already carries
+   a table would otherwise push the budget itself off the screen. */
+.lb-hits {
+  display: flex;
+  flex-direction: column;
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.lb-hit {
+  display: flex;
+  align-items: baseline;
+  gap: .4rem;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: .28rem .35rem;
+  font-size: .82rem;
+  color: inherit;
+  cursor: pointer;
+}
+
+.lb-hit:last-child { border-bottom: 0; }
+.lb-hit:hover { background: var(--subtle); }
+.lb-hit-name { flex: 1; min-width: 0; }
+.lb-hit-num { color: var(--muted); }
+
+/* Already at one end or the other. Not disabled — picking end A's own station
+   again is harmless, and a station that is at the *other* end is exactly what
+   somebody swapping the two ends round is reaching for. */
+.lb-hit-at {
+  flex: none;
+  font-size: .6rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--accent);
+}
+
+.lb-hit.is-here { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
 .lb-fields {
   display: grid;
