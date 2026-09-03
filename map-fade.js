@@ -8,11 +8,27 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state`, cssVar and acmaHaversineKm; across to
-// terrain.js for Terrain.profile, to path-profile.js for pathAnalyse,
-// rmSystemOf, fsplDb, wattsToDbm and the PATH_DEFAULT_* constants, to
-// link-budget.js for LB_DEFAULT_LOSS_DB, and to datastore.js for dbSelect,
-// dbRpc and dbCanWrite. All of it from inside MapFade's own functions, so this
-// file's position among the modules is free.
+// terrain.js for Terrain.profile, to land-cover.js for LandCover.sample, to
+// path-profile.js for pathAnalyse, rmSystemOf, wattsToDbm and the
+// PATH_DEFAULT_* constants, and to datastore.js for dbSelect, dbRpc and
+// dbCanWrite. All of it from inside MapFade's own functions, so this file's
+// position among the modules is free.
+//
+// ── One figure, or none ──────────────────────────────────────────────────────
+//
+// This layer answers the question the link budget card answers, so it has to
+// answer it the same way: 256 samples, the same land cover stood on the same
+// terrain, the same Longley–Rice run. It did not, at first — 64 samples and
+// bare ground, MapLos's economics applied to a question they do not suit — and
+// the result was two fade margins for one link, 17.3 dB on the map and 2.2 dB
+// on the card. Under-sampling a 46 km hop over a range accounted for 2.9 dB of
+// that; the missing land cover accounted for the other 12.3, most of it P.2108
+// terminal clutter at two antennas sitting under the canopy at 4 m.
+//
+// So: no cover, no figure. A margin over bare earth is not a cheaper version of
+// this number, it is a different and always kinder one, and a link that reads
+// green because nobody told it about the trees is worse than a link with no
+// colour at all.
 //
 // ── Why this is not just MapLos with more colours ────────────────────────────
 //
@@ -56,11 +72,18 @@
 // are already computed, and a band is a comparison. Only the margins are
 // expensive, and only they are swept.
 const MapFade = (function () {
-  const STORE       = 'mn-fade-v1';
-  const SAMPLES     = 64;   // MapLos's figure, and for its reason: enough to
-                            // find the ridge that matters at a quarter of the
-                            // profile card's tile bill. The signature carries
-                            // it, so raising it re-computes rather than lies.
+  const STORE       = 'mn-fade-v2';
+  const SAMPLES     = 256;  // PathProfile's own figure, and that is the point:
+                            // this layer and the link budget card have to be
+                            // answering the same question with the same
+                            // arithmetic, or the map and the card produce two
+                            // different fade margins for one link and only one
+                            // of them can be right. It was 64 — MapLos's
+                            // figure, which is right for "is the path cut" and
+                            // wrong for "how many decibels" — and on a 46 km
+                            // hop over a range that under-sampling alone was
+                            // worth 2.9 dB of terrain attenuation the map never
+                            // charged for.
   const CONCURRENCY = 4;    // profiles in flight; Terrain dedups tiles beneath
   const CAP         = 5000; // margins kept in localStorage, MapLos's cap
   const CHUNK       = 400;  // rows per save request — a whole network is a
@@ -78,8 +101,10 @@ const MapFade = (function () {
                             // a floor even if the cap moves
   // Bumped when anything about how the margin is derived changes. It is part of
   // the signature, so a bump invalidates every saved row rather than leaving
-  // old figures to be read as new ones.
-  const MODEL       = 'itm-p2p/1';
+  // old figures to be read as new ones. /2 is 256 samples and land cover, which
+  // together moved one real link from 17.3 dB to 2.1 — from the top of green to
+  // the bottom of red, and the card had been saying 2.2 all along.
+  const MODEL       = 'itm-p2p/2';
 
   let mem = null;           // Map sig → { m, ab, ba, v, t }  (this session + localStorage)
   let saved = null;         // Map pairKey → row, as read from the datastore
@@ -140,7 +165,7 @@ const MapFade = (function () {
     // Ends in pair order, so a→b and b→a produce one signature for one line.
     const ends = a.id < b.id ? [end(a, pa), end(b, pb)] : [end(b, pb), end(a, pa)];
     return [
-      MODEL, ends[0], ends[1], freqFor(a, b), SAMPLES,
+      MODEL, ends[0], ends[1], freqFor(a, b), SAMPLES, 'cover',
       p.climate, p.N0, p.epsilon, p.sigma, p.pol, p.mdvar, p.time, p.location, p.situation,
     ].join('|');
   }
@@ -398,28 +423,43 @@ const MapFade = (function () {
       : n ? `Save ${n} to the datastore` : 'Save to the datastore';
   }
 
+  // One link: terrain, then the cover standing on it, then the model over both.
+  // This is PathProfile.sync()'s sequence and PathProfile.coverFor()'s rules,
+  // deliberately — the whole point of the layer is that the colour on the map
+  // and the figure on the card are the same figure.
+  //
+  // Cover is not optional here. It was, and the map was the poorer for it: on a
+  // 46 km hop with both antennas at 4 m under the canopy, P.2108's terminal
+  // clutter alone came to 10.6 dB, and without it the map called a 2 dB link a
+  // 17 dB one and painted it green. A margin computed over bare ground is not a
+  // cheaper version of this figure, it is a different and consistently
+  // optimistic one — so cover that cannot be fetched is a link that cannot be
+  // computed, and says so, rather than one quietly answered from bare earth.
+  async function computeOne(a, b) {
+    const prof = await Terrain.profile([[a.lat, a.lon], [b.lat, b.lon]], SAMPLES);
+    if (!prof || !prof.ok) return null;
+    // A margin over bridged gaps is a guess dressed as a figure, and unlike an
+    // obstruction it is not true in one direction either — so a partial profile
+    // is refused outright (terrain.js's loud-failure rule, at its strictest).
+    if (prof.partial) return null;
+    const res = await LandCover.sample(prof.lat, prof.lon);
+    if (!res || !res.ok) return null;
+    const pa = endSys(a), pb = endSys(b);
+    const an = pathAnalyse(prof, {
+      elevA: pa.elev, elevB: pb.elev, aglA: pa.agl, aglB: pb.agl,
+      freqMhz: freqFor(a, b),
+      cover: res.cls, canopy: res.canopyOk ? res.canopy : null,
+    });
+    if (!an.ok) return null;
+    const m = marginPair(an, a, b);
+    return m ? { m: m.m, ab: m.ab, ba: m.ba, v: an.verdict, t: Date.now() } : null;
+  }
+
   function pump() {
     while (running < CONCURRENCY && queue.length) {
       const job = queue.shift();
       running++;
-      const { a, b } = job;
-      Terrain.profile([[a.lat, a.lon], [b.lat, b.lon]], SAMPLES).then(prof => {
-        let hit = null;
-        if (prof && prof.ok) {
-          const pa = endSys(a), pb = endSys(b);
-          const an = pathAnalyse(prof, {
-            elevA: pa.elev, elevB: pb.elev, aglA: pa.agl, aglB: pb.agl,
-            freqMhz: freqFor(a, b),
-          });
-          // A margin over bridged gaps is a guess dressed as a figure, and
-          // unlike an obstruction it is not true in one direction either — so
-          // a partial profile is refused outright (terrain.js's loud-failure
-          // rule, applied where it is strictest).
-          if (an.ok && !prof.partial) {
-            const m = marginPair(an, a, b);
-            if (m) hit = { m: m.m, ab: m.ab, ba: m.ba, v: an.verdict, t: Date.now() };
-          }
-        }
+      computeOne(job.a, job.b).then(hit => {
         if (hit) { mem.set(job.sig, hit); persistSoon(); pendingRows = null; }
         if (job.gen === gen) {
           if (hit) { paint(job.line, bandOf(hit.m), hit.m); note.done++; }
@@ -438,9 +478,11 @@ const MapFade = (function () {
   }
 
   function noteHtml() {
-    const caveat = 'Longley–Rice over ~30 m terrain at the reliability the link budget card is set to, '
-      + 'both ends&rsquo; filed radios, the worse of the two directions, no trees. '
-      + 'Indicative, like the card &mdash; and every bit as much a model, not a measurement.';
+    const caveat = 'Longley–Rice over ~30 m terrain with the land cover standing on it, at the '
+      + 'reliability the link budget card is set to, both ends&rsquo; filed radios, the worse of the '
+      + 'two directions. The same arithmetic the card runs, over the same 256 samples, so a colour '
+      + 'here and a figure there cannot disagree. Indicative, like the card &mdash; and every bit as '
+      + 'much a model, not a measurement.';
     if (!state.mapFade) {
       return `Colour every link by its fade margin instead of one flat orange: green at
               ${G()} dB or better, yellow at ${O()}, red below. Turning it on computes what the
@@ -453,7 +495,7 @@ const MapFade = (function () {
     if (note.pending) bits.push(`${note.pending} still computing…`);
     if (note.stale)   bits.push(`<span class="txt-warn">${note.stale} saved ${note.stale === 1 ? 'figure has' : 'figures have'} gone stale — the radios or the positions moved since</span>`);
     if (note.noRadio) bits.push(`${note.noRadio} with no radio system on file — no margin to give`);
-    if (note.failed)  bits.push(`<span class="txt-warn">${note.failed} could not be computed — terrain tiles unreachable, or the model refused the path</span>`);
+    if (note.failed)  bits.push(`<span class="txt-warn">${note.failed} could not be computed — terrain or land cover unreachable, or the model refused the path</span>`);
     if (savedState === 'failed') bits.push(`<span class="txt-warn">the datastore did not answer (${esc(savedError)}) — nothing saved is being shown</span>`);
     if (savedState === 'absent') bits.push('nothing saved yet');
     if (!bits.length) bits.push('no links drawn to colour');
@@ -530,6 +572,20 @@ const MapFade = (function () {
     kick() {
       if (!state.mapFade) { setNote(); return; }
       loadSaved();
+      // Sweep the map a neighbourhood at a time, not in the order the links
+      // happened to be drawn. Every profile pulls terrain tiles and land-cover
+      // tiles, both held in small LRUs (128 and 48), and the drawing order is
+      // by repeater across the whole state — so consecutive links shared almost
+      // nothing and the caches evicted everything before it could be used
+      // twice. Sorted into ~25 km cells the same tiles serve dozens of links in
+      // a row: on this network it took the cover service from thirteen requests
+      // a link to about one, and the sweep from an hour to a couple of minutes.
+      // Nothing about the answers changes — only the order they are asked in.
+      const cell = j => {
+        const lat = (j.a.lat + j.b.lat) / 2, lon = (j.a.lon + j.b.lon) / 2;
+        return Math.round(lat * 4) * 100000 + Math.round(lon * 4);
+      };
+      queue.sort((x, y) => cell(x) - cell(y));
       // Nothing is computed until the datastore has been asked. Without this a
       // network whose margins are all saved would still start a terrain sweep
       // for every link in the half-second before its own answers arrive, and

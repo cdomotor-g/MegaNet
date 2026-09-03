@@ -216,10 +216,12 @@
        states the dependency (#154). -->
   <script src="map-los.js?v=20260902a"></script>
   <!-- Same dependencies as map-los.js above — terrain.js for the tiles,
-       path-profile.js for the physics — plus link-budget.js for the default
-       line loss and datastore.js for the round trip that is the point of it:
-       a whole network's fade margins, computed once and kept somewhere other
-       than this browser. Nothing here executes at load either (#154). -->
+       path-profile.js for the physics — plus land-cover.js, whose classes it
+       stands on the profile exactly as the link budget card does (without them
+       the map answers a kinder question than the card and the two disagree),
+       and datastore.js for the round trip that is the point of it: a whole
+       network's fade margins, computed once and kept somewhere other than this
+       browser. Nothing here executes at load either (#154). -->
   <script src="map-fade.js?v=20260902a"></script>
   <script src="modal.js?v=20260902a"></script>
   <script src="packets.js?v=20260902a"></script>

@@ -1115,10 +1115,23 @@ requests, it is off by default and not remembered between visits.
 
 **Fade margin, for every link at once — and kept.** *Check line of sight on
 links* answers one bit per hop. *Colour links by fade margin* answers the
-number: the same Longley–Rice run the link budget card does, over the same 64-sample
-terrain, for both ends' filed radios — and the map paints each link **green at
-15 dB or better, yellow at 6, red below**, with the thresholds editable in the
-same flyout. The margin drawn is the **worse of the two directions**: path loss
+number: the same Longley–Rice run the link budget card does, over the same 256
+samples, with the same land cover stood on the same terrain, for both ends'
+filed radios — and the map paints each link **green at 15 dB or better, yellow
+at 6, red below**, with the thresholds editable in the same flyout.
+
+That "the same" is load-bearing, and it was learned the hard way. The sweep
+first ran at 64 samples over bare ground — MapLos's economics, which are right
+for *is the path cut* and wrong for *how many decibels* — and the map and the
+card then gave two fade margins for one link: 17.3 dB and 2.2 dB. Sampling a
+46 km hop over a range at 717 m intervals accounted for 2.9 dB of that gap; the
+missing land cover accounted for the other 12.3, most of it ITU-R P.2108
+terminal clutter at two antennas standing under the canopy at 4 m. So cover is
+not optional in the sweep: a link whose cover cannot be fetched is a link that
+cannot be computed, and is reported as one — because a margin over bare earth
+is not a cheaper version of this figure, it is a consistently kinder one.
+
+The margin drawn is the **worse of the two directions**: path loss
 is reciprocal and the radios at either end are not, and one line can only
 honestly carry one number. Green is a signal green rather than a natural one,
 and a pixel heavier than the other two, because half the ground these links

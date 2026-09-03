@@ -647,20 +647,87 @@ await page2.waitForFunction(
 await page2.evaluate(() => switchTab('stations'));
 await page2.waitForFunction(() => !!state.map && state.mapLines.length > 0,
   null, { timeout: LOAD_TIMEOUT });
-await page2.waitForTimeout(4000);
+await page2.waitForTimeout(2500);
 
-const cold = await page2.evaluate(() => ({
-  on: state.mapFade,
+ok('the switch comes back on, because it is remembered',
+   await page2.evaluate(() => state.mapFade === true));
+ok('an empty table is read once, not once per redraw for ever',
+   asked > 0 && asked <= 3, `asked ${asked} times`);
+
+// The land-cover service is off-origin and the sweep will not produce a figure
+// without it — deliberately, since a margin over bare earth is a different and
+// kinder number than the card's. So the first pass here finds none, which is
+// itself the right behaviour and is asserted; then the service is answered from
+// LandCover's own test seam and the switch re-armed, which is the only way to
+// seed a module whose sweep starts before any test code can run.
+const bare = await page2.evaluate(() => ({
   painted: state.mapLines.filter(l => l.mnFadeBand).length,
   note: (document.getElementById('map-fade-note') || {}).textContent.replace(/\s+/g, ' '),
 }));
-ok('the switch comes back on, because it is remembered', cold.on === true);
-ok('an empty table is read once, not once per redraw for ever',
-   asked > 0 && asked <= 3, `asked ${asked} times`);
-ok('…and the sweep actually runs against it', cold.painted > 0,
-   `${cold.painted} coloured · ${cold.note.slice(0, 110)}`);
+ok('no land cover, no figure — the sweep does not fall back to bare earth',
+   bare.painted === 0 && /could not be computed/.test(bare.note),
+   `${bare.painted} coloured · ${bare.note.slice(0, 120)}`);
+
+const cold = await page2.evaluate(async () => {
+  // Trees down the middle, grass at the ends: enough that the classes differ
+  // along the path, which is all this needs — the figures themselves are
+  // pathcover.mjs's business.
+  LandCover.seed((lat) => lat.map((_, i) => {
+    const t = i / (lat.length - 1);
+    return t > 0.3 && t < 0.7 ? 2 : 11;
+  }));
+  MapFade.setEnabled(false);
+  MapFade.setEnabled(true);
+  await new Promise(r => setTimeout(r, 5000));
+  return {
+    painted: state.mapLines.filter(l => l.mnFadeBand).length,
+    note: (document.getElementById('map-fade-note') || {}).textContent.replace(/\s+/g, ' '),
+  };
+});
+ok('…and with the cover answered, the sweep runs and paints', cold.painted > 0,
+   `${cold.painted} coloured · ${cold.note.slice(0, 120)}`);
+ok('…still having read the empty table only once', asked <= 3, `asked ${asked} times`);
 ok('…with the note saying there is nothing stored yet',
    /nothing saved yet/.test(cold.note), cold.note.slice(0, 140));
+
+// ── The one that matters: two figures for one link have to be one figure ────
+// This is the whole contract of the layer. A colour on the map and the number
+// on the link budget card are answers to the same question, and an operator who
+// hovers a link and then clicks it must not be told 17.3 dB and then 2.2. They
+// were, because the sweep was quietly running a cheaper model — 64 samples over
+// bare ground against the card's 256 with the cover on it. Nothing about the
+// two figures being close is a coincidence to be relied on; they come out of
+// the same pathAnalyse over the same profile, and if they ever diverge again it
+// is because somebody changed one side of that and not the other.
+
+const agree = await page2.evaluate(async () => {
+  const line = state.mapLines.find(l =>
+    l.mnFadeMargin != null && l.mnLinkStationId && l.mnLinkRepeaterId && !l.mnLinkRepeaterId2);
+  if (!line) return { error: 'no coloured field link to compare' };
+  const aId = line.mnLinkStationId, bId = line.mnLinkRepeaterId;
+  const mapDb = line.mnFadeMargin;
+  LinkBudget.setOpen(true);
+  LinkBudget.arm('a'); LinkBudget.takeStation(aId);
+  LinkBudget.arm('b'); LinkBudget.takeStation(bId);
+  // Setting both ends draws the line and opens the profile; the card's own
+  // figure only exists once that profile and its cover have landed.
+  for (let i = 0; i < 60; i++) {
+    const r = LinkBudget.current();
+    if (r && r.an && r.an.coverUsed && r.margin != null) {
+      return { aId, bId, mapDb, cardDb: r.margin, verdict: r.an.verdict };
+    }
+    await new Promise(r2 => setTimeout(r2, 250));
+  }
+  const r = LinkBudget.current();
+  return { error: 'the card never produced a margin', mapDb,
+           got: r && { margin: r.margin, an: !!r.an, cover: r.an && r.an.coverUsed } };
+});
+ok('the card produced a figure for a link the map has coloured',
+   !agree.error, JSON.stringify(agree));
+ok('…and it is the same figure the map is coloured by',
+   !agree.error && Math.abs(agree.mapDb - agree.cardDb) < 0.05,
+   `map ${agree.mapDb} dB vs card ${agree.cardDb} dB on ${agree.aId} → ${agree.bId}`);
+
 await empty.close();
 
 // ── A table bigger than PostgREST will hand over in one go ──────────────────
@@ -730,5 +797,6 @@ console.log(failures
   : `\nPASS — ${passes} assertions: arming a tool from the flyout does not also draw with it,\n`
     + '       the budget puts the map down once it has both ends, Escape gets out of the pick,\n'
     + '       the margin is in the corner, the chart has a sky and an earth under it, built\n'
-    + '       area is no longer red, and the fade bands are set, banded and remembered.');
+    + '       area is no longer red, the fade bands are set, banded and remembered, and the\n'
+    + '       figure the map colours a link by is the figure the card gives for it.');
 process.exit(failures ? 1 : 0);
