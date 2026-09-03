@@ -511,6 +511,38 @@ const PathProfile = (function () {
     const x = d => L + (D > 0 ? d / D : 0) * iw;
     const y = m => T + (1 - (m - lo) / (hi - lo)) * ih;
 
+    // The plot area, painted. It was transparent, so "above the ground" was the
+    // panel behind it and the chart had no edge of its own — the frame ran into
+    // the page and the picture had no boundary to read the geometry against.
+    // Sky and a border fix both, and the sky is the honest label for it: what is
+    // above the terrain line on a path profile is air.
+    const sky = `<rect x="${L}" y="${T}" width="${iw}" height="${ih}"
+                       fill="var(--profile-sky)" stroke="var(--border)" stroke-width="1"/>`;
+
+    // The earth, as Radio Mobile draws it: an arc along the bottom of the plot
+    // with the ground of the planet filled in underneath.
+    //
+    // This chart adds the curvature to the terrain instead of bending the line
+    // of sight (see earthBulge), which keeps the LOS straight and is why there
+    // was no curve on screen to see — the bulge was in every ground reading and
+    // nowhere in the picture. So here it is, on its own: the same
+    // earthBulge(d1, d2, k) this profile was built with, measured up from the
+    // floor of the plot at the chart's own vertical scale. That scale is the
+    // point — the arc is flat on a 5 km hop because the curvature genuinely
+    // costs a metre and a half there, and bows up hard on a 100 km one because
+    // it costs 150. A curve drawn to look impressive at every length would be
+    // a decoration; this one is a reading.
+    const arc = an.pts.filter(p => p.bulge != null)
+                      .map(p => `${x(p.d1).toFixed(1)},${y(lo + p.bulge).toFixed(1)}`);
+    const earth = arc.length < 2 ? '' : `
+      <path d="M${x(0).toFixed(1)},${(T + ih).toFixed(1)} L${arc.join(' L')} L${x(D).toFixed(1)},${(T + ih).toFixed(1)} Z"
+            fill="var(--profile-earth)" stroke="none"/>
+      <polyline points="${arc.join(' ')}" fill="none"
+                stroke="var(--profile-earth-line)" stroke-width="1.5"/>`;
+    // What the curve is worth at mid-path, for the legend: the figure the arc
+    // is drawn to, so nobody has to measure it off the picture.
+    const sag = an.pts.reduce((mx, p) => p.bulge > mx ? p.bulge : mx, 0);
+
     // Ground, as an area down to the axis. Gaps where a tile was missing are
     // left as gaps — a bridged gap would be invented ground.
     const runs = [];
@@ -644,10 +676,16 @@ const PathProfile = (function () {
                      ? `, worst clearance ${Math.round(w.clearance)} m under the line at ${fmtKm(w.d1 / 1000)}`
                      : `, ${w.cover != null ? 'cover' : 'terrain'} ${Math.round(-w.clearance)} m above the line at ${fmtKm(w.d1 / 1000)}`)
                  : ''}${an.coverUsed ? `, with ${present.length} land-cover class${present.length === 1 ? '' : 'es'} drawn on the ground` : ''}. The same figures are listed under the chart.">
+          ${sky}
           ${grid.join('')}
           ${radio}
           ${ground}
           ${bands.join('')}
+          <!-- Over the ground, not under it: the terrain area fills all the way
+               down to the axis, so an arc drawn first would be buried by it. On
+               top, the band reads as what it is — the planet the terrain is
+               sitting on — which is where Radio Mobile puts it too. -->
+          ${earth}
           ${flat ? '' : obstruction}
           ${marker}
           ${masts}
@@ -659,6 +697,7 @@ const PathProfile = (function () {
             <span><i class="path-key-los"></i> Line of sight</span>
             <span><i class="path-key-fres"></i> 60% Fresnel zone</span>`}
           <span><i class="path-key-gnd"></i> Ground (curvature k=${an.k.toFixed(2)} included)</span>
+          ${earth ? `<span><i class="path-key-earth"></i> Earth curvature${sag > 0.5 ? ` · ${Math.round(sag)} m at mid-path` : ''}</span>` : ''}
           ${flat ? '' : '<span><i class="path-key-obs"></i> Inside the Fresnel zone</span>'}
           ${coverKey}
         </div>
@@ -684,7 +723,15 @@ const PathProfile = (function () {
           <span class="small">${esc(v.note)}</span>
         </div>
         <dl class="path-stats">
-          <div><dt>Path</dt><dd>${esc(a.name)} → ${esc(b.name)}</dd></div>
+          <!-- Two lines, always, whatever the names are. It read
+               "{A} → {B}" on one line and wrapped where the names happened to
+               run out, so the row under it — and everything below that — sat at
+               a different height for every path. One name per line is the same
+               information in a box whose size does not depend on its contents;
+               a name too long for the column is clipped rather than allowed to
+               push the layout about, and the title attribute has it in full. -->
+          <div><dt>Path</dt><dd class="path-ends" title="${escAttr(`${a.name} → ${b.name}`)}"><span>${
+            esc(a.name)}</span><span>${esc(b.name)}</span></dd></div>
           <div><dt>Distance</dt><dd>${fmtKm(an.D / 1000)}</dd></div>
           <div><dt>Frequency</dt><dd>${an.fMhz.toFixed(3)} MHz</dd></div>
           <div><dt>Worst Fresnel</dt><dd>${w.clearance >= 0

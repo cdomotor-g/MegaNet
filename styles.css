@@ -63,6 +63,17 @@
      operator armed and will disarm, an obstruction is a property of the
      ground, and the two can be on screen at once. */
   --map-line-blocked: #d81b60;
+  /* The three fade-margin bands (MapFade). Green is the one that had to be
+     chosen rather than picked: half the ground these links cross is forest,
+     cane or irrigated pasture, and a natural green line over a green base map
+     is a line nobody can find. This is a signal green — the most saturated one
+     that still reads as green rather than as cyan — and it is drawn a pixel
+     heavier than the other two over the same white casing, which is what
+     finally lifts it off a satellite tile. Yellow and red are ordinary: they
+     have no camouflage to escape. */
+  --map-fade-good: #00e676;
+  --map-fade-ok:   #ffab00;
+  --map-fade-bad:  #e53935;
   /* Repeater backbone paths. Black by request — the white casing the map draws
      under it is what carries it on dark imagery, in both themes. */
   --map-backbone: #000000;
@@ -414,6 +425,12 @@
   --tx-bg: #19362a;
   --map-line: #ff9f43;
   --map-line-blocked: #ff6090;
+  /* Lifted for the dark theme like every other map colour here — the base maps
+     do not go dark with the app, so these keep the same job over the same
+     tiles and only need to hold up against a dark panel in the legend. */
+  --map-fade-good: #2bff9e;
+  --map-fade-ok:   #ffc233;
+  --map-fade-bad:  #ff5f52;
   --map-backbone: #000000;
   --map-blast: #ff6659;
   --map-blast-ring: #ff8a80;
@@ -2567,6 +2584,13 @@ hr {
    through the same token the drawn links take, so the two agree in both
    themes. */
 .legend-line-los { border-top-color: var(--map-line-blocked); }
+/* The three fade-margin bands, through the same tokens the drawn links take so
+   the key and the map cannot drift apart. The good band is drawn at the weight
+   the map draws it, because that extra pixel is part of how it is recognised. */
+.legend-line-fade-good { border-top-color: var(--map-fade-good); border-top-width: 3px; }
+.legend-line-fade-ok   { border-top-color: var(--map-fade-ok); }
+.legend-line-fade-bad  { border-top-color: var(--map-fade-bad); }
+
 /* The legend's last line, naming the layers that are off. Text on its own
    line rather than another swatch row: it is a pointer, not a key. */
 .legend-off { margin-top: var(--sp-1); }
@@ -3449,19 +3473,51 @@ hr {
   --terrain-line: #7d7259;
 }
 
+/* The rest of the profile plot: what is above the ground, and what is under it.
+   The chart used to paint neither, so the plot area was the panel behind it —
+   the picture had no edge, and the terrain line ran into the page at the top of
+   the chart. `--profile-sky` is a wash rather than a colour: it has to read as
+   "not the page" without competing with the LOS and Fresnel lines drawn across
+   it, which is why it stays a few percent off the panel rather than a real sky
+   blue. `--profile-earth` is the curvature arc's fill: a shade under the terrain
+   above it in both themes, so it reads as the thing the terrain is standing on
+   rather than as more terrain — it is the one band on the chart that is not a
+   measurement of this path but of the planet it crosses. Its line is the pair's
+   contrast, and carries the whole band on a short hop where the arc is barely a
+   pixel tall. */
+:root {
+  --profile-sky:        #eaf2fa;
+  --profile-earth:      #6f6455;
+  --profile-earth-line: #4a4238;
+}
+
+[data-theme="dark"] {
+  --profile-sky:        #101a26;
+  --profile-earth:      #1c1913;
+  --profile-earth-line: #9a917c;
+}
+
 /* Ground cover on the profile (see LandCover). One token per Sentinel-2
    land-cover class, in Esri's own legend hues so the band reads the same as
    the map anyone checks it against — lifted a little in the dark theme so the
    band stays a band against the darker terrain fill rather than sinking into
    it. Tokens rather than literals in land-cover.js, for the reason every other
    palette in the app is: a colour in a JavaScript file cannot follow the
-   theme, and the chart is drawn in both. */
+   theme, and the chart is drawn in both.
+
+   Built area is the one departure from Esri's legend, and it is a rule rather
+   than a preference: red on this chart means an obstruction — the Fresnel
+   intrusion overlay, the worst-point marker, an obstructed link on the map —
+   and a brick-red built-up band sitting on the terrain read as one of those at
+   a glance. It is black on light and white on dark instead: the highest
+   contrast either theme has, which suits a class that is usually a thin band
+   ten metres tall, and a colour nothing else on the chart is using. */
 :root {
   --cover-water:   #419bdf;
   --cover-trees:   #397d49;
   --cover-flooded: #7a87c6;
   --cover-crops:   #e49635;
-  --cover-built:   #c4281b;
+  --cover-built:   #111111;
   --cover-bare:    #a59b8f;
   --cover-snow:    #a8ebff;
   --cover-cloud:   #8a8a8a;
@@ -3473,7 +3529,7 @@ hr {
   --cover-trees:   #4f9e60;
   --cover-flooded: #8f9bd8;
   --cover-crops:   #f0a94a;
-  --cover-built:   #e0483a;
+  --cover-built:   #f2f5f8;
   --cover-bare:    #b3a99c;
   --cover-snow:    #bdf0ff;
   --cover-cloud:   #9a9a9a;
@@ -3585,6 +3641,29 @@ hr {
   font-size: .85rem;
 }
 
+/* The Path row's two ends, one per line and clipped rather than wrapped. The
+   height of this cell is what sets the height of the first row of the grid, so
+   it has to be the same for "Boonah" and for "Upper Warrell Creek Rd @ Bridge"
+   — otherwise every figure below it moves as the path changes. The full text
+   is on the title attribute, which is where a clipped name goes. */
+.path-ends {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.path-ends > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The far end, marked as the far end without a second line to say so. */
+.path-ends > span + span::before {
+  content: '↳ ';
+  color: var(--muted);
+}
+
 /* the chart scrolls inside itself rather than squashing — a profile narrower
    than about 640 px stops being readable */
 .path-chart-wrap { overflow-x: auto; }
@@ -3630,6 +3709,14 @@ hr {
   border: 1px solid color-mix(in srgb, var(--dot, var(--muted)) 60%, var(--text));
 }
 .path-key-mast { border-top: 2px solid var(--map-repeater); }
+
+/* The curvature arc's chip, built like the ground one so the two read as a
+   pair: the ground of this path, and the ground of the planet under it. */
+.path-key-earth {
+  height: 8px !important;
+  background: var(--profile-earth);
+  border: 1px solid var(--profile-earth-line);
+}
 
 /* Where a cover band is drawn from the terrain up, the chart is asked to say
    so in words too; this is the line that does. */
@@ -3732,6 +3819,29 @@ hr {
   padding: .05rem .3rem;
   vertical-align: middle;
 }
+
+/* The fade margin in the card's top-right corner. `margin-left: auto` is the
+   whole of the positioning: the summary is already a flex row, so the chip
+   takes the space between itself and the strapline and sits hard right of it,
+   at whatever width the card is. It is the same figure the table foot carries,
+   in the same three bands, so the colours have to be those colours — hence the
+   tokens rather than a palette of its own. Hidden until there is a margin to
+   show: an empty pill in the corner is a card claiming to have computed
+   something it has not. */
+.lb-margin-chip {
+  margin-left: auto;
+  font-size: .8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: .05rem .45rem;
+  color: var(--muted);
+}
+
+.lb-margin-chip.ok   { color: var(--ok);   }
+.lb-margin-chip.warn { color: var(--warn); }
+.lb-margin-chip.bad  { color: var(--bad);  }
 
 /* never dismissible, always at the top of the card */
 .lb-disclaimer {
@@ -4609,6 +4719,32 @@ hr {
 
 .map-display-h:first-child {
   margin-top: 0;
+}
+
+/* The fade-margin thresholds and the Save button. Two short number boxes side
+   by side and the button under them at full width: the boxes are a pair and
+   read as one rule, and the button is the consequence of the rule rather than
+   a third field. Inside a flyout that is already narrow, so the boxes are
+   given a floor rather than a share of the row — a threshold that wraps to two
+   digits per line is unreadable. */
+.map-fade-bands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .6rem;
+  margin: .1rem 0 .35rem;
+}
+
+.map-fade-bands .draw-field {
+  flex: 1 1 7.5rem;
+}
+
+.map-fade-bands .draw-field input {
+  width: 100%;
+}
+
+.map-fade-bands button {
+  flex: 1 1 100%;
+  padding: .35rem .6rem;
 }
 
 .leaflet-container {

@@ -400,6 +400,23 @@ const MapChrome = (function () {
         L.DomEvent.disableClickPropagation(wrap);
         L.DomEvent.disableScrollPropagation(wrap);
 
+        // …and without *this*, the one control that repaints its own panel gets
+        // the pin anyway. Leaflet's disableClickPropagation does not stop the
+        // click; it marks the wrapper and, when the map container later sees the
+        // event, walks up from `event.target` looking for that mark. A handler
+        // that replaces the panel's innerHTML — MapDraw.setTool() arming a tool
+        // is exactly that — has by then detached the button that was clicked, so
+        // the walk starts on an orphan, finds no mark, and the map takes the
+        // click as its own: arming the line tool dropped its first point under
+        // the ✏️ flyout, and the tool came up already waiting for point two.
+        //
+        // The event path was fixed when the click was dispatched, so this
+        // listener still runs on a wrapper whose contents have gone. Stopping
+        // here keeps the click off the map without needing the target to still
+        // exist. Nothing in this app listens for clicks on document, so nothing
+        // downstream loses one.
+        L.DomEvent.on(wrap, 'click', L.DomEvent.stopPropagation);
+
         if (typeof opts.onMount === 'function') opts.onMount(content);
         apply(wrap);
         return wrap;

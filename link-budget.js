@@ -60,8 +60,19 @@ const LB_MARGIN = [
 
 function lbMarginClass(db) { return LB_MARGIN.find(m => db >= m.min); }
 
+// Line loss at an end nobody has measured. Half a decibel: a few metres of
+// LMR-400 at these frequencies, which is what these sites are actually built
+// with. It was a decibel, which is a Radio Mobile template figure rather than a
+// measured one, and it was taking a decibel off both ends of every hypothetical
+// path. The two real rm_systems rows moved with it, so a station and a
+// hypothetical site beside it now start from the same premise.
+//
+// The starting figure only: every end's box is editable, and a station whose
+// rm_systems row carries a figure of its own uses that instead of this.
+const LB_DEFAULT_LOSS_DB = 0.5;
+
 const LinkBudget = (function () {
-  let map = null, layer = null, clickHandler = null;
+  let map = null, layer = null, clickHandler = null, keyHandler = null;
 
   const S = () => state.link;
 
@@ -94,8 +105,8 @@ const LinkBudget = (function () {
       name: `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
       lat, lon, ground: null, groundSrc: null, sysName: null, freq: null,
       // A hypothetical site has to start from something; the 1 W field station
-      // is what most of this network actually is.
-      def: { tx_w: 1, loss_db: 1, gain_dbi: 5.15, agl_m: PATH_DEFAULT_AGL, rx_dbm: -117 },
+      // is what most of this network actually is, down to its line loss.
+      def: { tx_w: 1, loss_db: LB_DEFAULT_LOSS_DB, gain_dbi: 5.15, agl_m: PATH_DEFAULT_AGL, rx_dbm: -117 },
       over: {},
     };
   }
@@ -264,6 +275,49 @@ const LinkBudget = (function () {
     });
   }
 
+  // ── the ground profile that goes with the numbers ──
+  // Draw the budget's two ends as a line so the elevation panel picks them up:
+  // the diffraction term in the table comes back from that panel's analysis, so
+  // this is not decoration — it is the rest of the calculation.
+  //
+  // Called two ways. `profileThis()` is the button, and scrolls the panel into
+  // view because the operator pressed something and expects to be taken there.
+  // `bothIn()` is the automatic one, the moment a link is established by any
+  // route, and does not scroll: nobody asked to be moved.
+  function showProfile(scroll) {
+    const { a, b } = S();
+    if (!a || !b) return;
+    // Asked before the line goes in: analysisFor() only answers for a profile
+    // that is already sampled and ready for exactly these two ends, so this is
+    // "will the operator be waiting on terrain".
+    const ready = !!analysisFor(a, b);
+    // Open the panel BEFORE the line goes in, not after. Adding a shape
+    // re-renders the profile panel synchronously and terrain then takes
+    // seconds to arrive, so setting `open` afterwards left the operator
+    // scrolled to a collapsed, empty card for the whole fetch — the button
+    // looking like it had done nothing at all, which is what it was reported
+    // as. The panel now opens on the same tick as the press and shows its own
+    // "sampling terrain…" line while the tiles come in.
+    state.path.open = true;
+    // A second press must land back on the first line rather than stack an
+    // identical one underneath it. Nothing on screen distinguishes two lines
+    // between the same two points, so they only ever turn up as a Draw &
+    // measure list that grows every time this button is pressed.
+    const [pa, pb] = [[a.lat, a.lon], [b.lat, b.lon]];
+    const existing = MapDraw.findLine(pa, pb);
+    if (existing) MapDraw.focus(existing.id);
+    else MapDraw.addLine([pa, pb], [a.sid || null, b.sid || null]);
+    // The panel is open and empty for as long as the terrain tiles take, which
+    // on a long path over ground nobody has looked at yet is several seconds.
+    // It says "sampling terrain…" itself, but that line is below the fold from
+    // where the click happened, so the note strip says it where the eyes are.
+    if (!ready) mapNote('Sampling terrain for the ground profile — a few seconds.', 4000);
+    if (scroll) {
+      const el = document.getElementById('path-profile-panel');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
   // ── map pick ──
 
   function setEnd(which, e) {
@@ -271,6 +325,27 @@ const LinkBudget = (function () {
     fillGround(e);
     drawMarkers();
     rerender();
+  }
+
+  // Escape while the card owns the map: disarm, and say so. Deliberately narrow
+  // — it claims the key only when there is a pick to cancel, so the full-screen
+  // map, the modals and the bug reporter keep it the rest of the time; and it
+  // yields to a draw tool, which owns both the clicks and the key while armed
+  // (MapDraw's own handler runs on the same event and preventDefaults it).
+  //
+  // preventDefault is how this app's Escape consumers claim the key — every
+  // other one checks `e.defaultPrevented` before acting — so a cancelled pick
+  // no longer also throws the operator out of full screen.
+  function onKey(e) {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    if (state.draw.tool) return;
+    const S_ = S();
+    if (!S_.picking && !S_.target) return;
+    e.preventDefault();
+    S_.picking = false;
+    S_.target = null;
+    rerender();
+    mapNote('Stopped picking — the map is yours again.', 3000);
   }
 
   function onMapClick(ev) {
@@ -306,17 +381,39 @@ const LinkBudget = (function () {
       const tag = t.toUpperCase();
       S().target = null;
       setEnd(t, e);
-      mapNote(S().a && S().b
-        ? `End ${tag} set — both ends are in.`
-        : `End ${tag} set — now the other end.`, 3000);
+      if (bothIn()) return;
+      mapNote(`End ${tag} set — now the other end.`, 3000);
       return;
     }
     const which = destEnd();
     if (which === 'a' && S().a && S().b) S().b = null;
     setEnd(which, e);
-    mapNote(S().a && S().b
-      ? 'Both ends set — click again to start a new path.'
-      : 'Now click the other end of the path.', 3000);
+    if (bothIn()) return;
+    mapNote('Now click the other end of the path.', 3000);
+  }
+
+  // Both ends are in: the tool has been asked its question and has it. It used
+  // to stay armed here, so the next click anywhere on the map silently threw
+  // end B away and started a third path — while the operator was clicking to
+  // pan, or to open a station. A tool that has finished disarms itself, the
+  // way the draw tools finish a line.
+  //
+  // Answers whether it fired, because the two callers above have a "now the
+  // other end" note to print only if it did not.
+  function bothIn() {
+    const S_ = S();
+    if (!S_.a || !S_.b) return false;
+    S_.target = null;
+    const wasPicking = S_.picking;
+    S_.picking = false;
+    // The ground profile is the other half of the answer, and the operator who
+    // asked for a margin wants the picture that produced it. Drawn here rather
+    // than left to a button, so both ways in — two clicks on the map, or two
+    // names typed into the boxes — end where a click on an existing link ends.
+    showProfile();
+    rerender();
+    if (wasPicking) mapNote('Both ends set — the map is yours again. Profile below.', 4000);
+    return true;
   }
 
   // A station offered to the card from outside the map: a row in the Stations
@@ -906,13 +1003,50 @@ const LinkBudget = (function () {
       ${comparisonHtml()}`;
   }
 
+  // The margin as it reads in the card's own corner: the figure, and the band's
+  // class so it is coloured the same as the row in the table foot.
+  function marginChip() {
+    const r = S().a && S().b ? compute() : null;
+    if (!r || r.margin == null) return { text: '', cls: '', title: '' };
+    // The table foot's own override, not re-derived: a path the terrain blocks
+    // never reads "good" in the corner while it reads "obstructed" below.
+    const blocked = !!(r.an && r.an.verdict === 'obstructed' && !r.itm);
+    const m = lbMarginClass(r.margin);
+    return {
+      text: `${r.margin > 0 ? '+' : ''}${r.margin.toFixed(1)} dB`,
+      cls: blocked ? 'bad' : m.cls,
+      title: `Fade margin — ${blocked ? 'obstructed' : m.label.toLowerCase()}`,
+    };
+  }
+
+  // Written in place rather than repainted with the body. The <summary> is
+  // first-paint-only (see rerender), because replacing an open <details> eats
+  // the click that opened it — so the chip is a stable element whose text and
+  // class are the only things that move.
+  function syncMarginChip() {
+    const el = document.getElementById('lb-margin-chip');
+    if (!el) return;
+    const c = marginChip();
+    el.textContent = c.text;
+    el.className = `lb-margin-chip ${c.cls}`;
+    el.hidden = !c.text;
+    if (c.title) el.title = c.title; else el.removeAttribute('title');
+  }
+
   function panelHtml() {
+    const c = marginChip();
     return `
       <details class="lb-panel" ${S().open ? 'open' : ''}
                ontoggle="LinkBudget.setOpen(this.open)">
         <summary>
           <h3>Link budget <span class="lb-badge">modelled</span></h3>
           <span class="small">Fade margin between two points — Longley–Rice over terrain and cover</span>
+          <!-- The answer, in the corner the eye lands on first. It is the same
+               figure the table foot carries and is deliberately not a second
+               opinion: both come from one compute(). It stays legible with the
+               card shut, which is the other half of why it is up here. -->
+          <b id="lb-margin-chip" class="lb-margin-chip ${c.cls}"
+             ${c.text ? `title="${escAttr(c.title)}"` : 'hidden'}>${esc(c.text)}</b>
         </summary>
         <div class="lb-body">${S().open ? bodyHtml() : ''}</div>
       </details>`;
@@ -937,6 +1071,7 @@ const LinkBudget = (function () {
     }
     const body = d.querySelector(':scope > .lb-body');
     if (body) keepFocus(() => { body.innerHTML = S().open ? bodyHtml() : ''; });
+    syncMarginChip();
   }
 
   // A repaint must not eat what somebody is in the middle of typing. The body
@@ -998,6 +1133,11 @@ const LinkBudget = (function () {
       layer = L.layerGroup().addTo(m);
       clickHandler = onMapClick;
       m.on('click', clickHandler);
+      // Escape gets out of the pick, the way it gets out of a draw tool. The
+      // card had no way out but the checkbox it was armed from, which is a long
+      // way from the map the operator is looking at.
+      keyHandler = onKey;
+      document.addEventListener('keydown', keyHandler);
       // Endpoints outlive the map they were picked on. A ground sample that was
       // still in flight when the tab changed resolved against a dead panel, so
       // the card came back reading "sampling…" with nothing sampling it.
@@ -1006,6 +1146,7 @@ const LinkBudget = (function () {
     },
     detach() {
       if (map && clickHandler) map.off('click', clickHandler);
+      if (keyHandler) { document.removeEventListener('keydown', keyHandler); keyHandler = null; }
       // The one caller destroys the map on the next line, which would take this
       // with it — but app.js documents every detach() as self-contained and
       // re-runnable, and against a map that survives this stranded the A/B
@@ -1224,28 +1365,7 @@ const LinkBudget = (function () {
 
     // The other direction: draw the budget's two ends as a line so the profile
     // panel picks them up and the diffraction term can be filled in.
-    profileThis() {
-      const { a, b } = S();
-      if (!a || !b) return;
-      // Open the panel BEFORE the line goes in, not after. Adding a shape
-      // re-renders the profile panel synchronously and terrain then takes
-      // seconds to arrive, so setting `open` afterwards left the operator
-      // scrolled to a collapsed, empty card for the whole fetch — the button
-      // looking like it had done nothing at all, which is what it was reported
-      // as. The panel now opens on the same tick as the press and shows its own
-      // "sampling terrain…" line while the tiles come in.
-      state.path.open = true;
-      // A second press must land back on the first line rather than stack an
-      // identical one underneath it. Nothing on screen distinguishes two lines
-      // between the same two points, so they only ever turn up as a Draw &
-      // measure list that grows every time this button is pressed.
-      const [pa, pb] = [[a.lat, a.lon], [b.lat, b.lon]];
-      const existing = MapDraw.findLine(pa, pb);
-      if (existing) MapDraw.focus(existing.id);
-      else MapDraw.addLine([pa, pb], [a.sid || null, b.sid || null]);
-      const el = document.getElementById('path-profile-panel');
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    },
+    profileThis() { showProfile(true); },
 
     // The chart and this table are describing the same hop with different
     // antenna heights or a different frequency. Put the budget's figures into

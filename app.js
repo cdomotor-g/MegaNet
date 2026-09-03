@@ -2118,6 +2118,34 @@ function mapDisplayControlsHtml() {
       Check line of sight on links
     </label>
     <p class="filter-note" id="map-los-note">${MapLos.noteHtml()}</p>
+    <!-- The fade-margin sweep and the two figures it bands against. The
+         thresholds are boxes rather than a menu because they are a judgement an
+         operator makes about their own network, and the Save button is beside
+         them because the pair of them are one gesture: agree the rule, compute
+         the network, put both in the datastore so the next page load — and the
+         next person's — paints from it instead of re-fetching the terrain. -->
+    <label class="filter-check">
+      <input type="checkbox" ${state.mapFade ? 'checked' : ''}
+             onchange="MapFade.setEnabled(this.checked)">
+      Colour links by fade margin
+    </label>
+    ${state.mapFade ? `
+    <div class="map-fade-bands">
+      <label class="draw-field">
+        <span>Green at or above</span>
+        <input type="number" step="0.5" id="map-fade-good" value="${state.mapFadeGoodDb}"
+               onchange="MapFade.setBand('good', this.value)">
+        <b class="lb-flag">dB</b>
+      </label>
+      <label class="draw-field">
+        <span>Yellow at or above</span>
+        <input type="number" step="0.5" id="map-fade-ok" value="${state.mapFadeOkDb}"
+               onchange="MapFade.setBand('ok', this.value)">
+        <b class="lb-flag">dB</b>
+      </label>
+      <button id="map-fade-save" onclick="MapFade.save()" disabled>Save to the datastore</button>
+    </div>` : ''}
+    <p class="filter-note" id="map-fade-note">${MapFade.noteHtml()}</p>
     <div class="map-display-h">Labels &amp; export</div>
     <label class="filter-field filter-field--spaced">
       <span>Station names</span>
@@ -2174,6 +2202,7 @@ function mapLegendOffLayersHtml() {
     !state.mapContours        && 'LiDAR contours',
     !state.mapWind            && 'Wind regions',
     !state.mapLos             && 'Line-of-sight checks',
+    !state.mapFade            && 'Fade-margin link colours',
     !state.filters.acma.show  && 'ACMA licences',
   ].filter(Boolean);
   if (!off.length) return '';
@@ -2231,6 +2260,19 @@ function mapLegendHtml() {
     <span class="legend-item">
       <span class="legend-line legend-line-los"></span>
       <span class="small">Line of sight: an obstructed link draws red</span>
+    </span>` : ''}
+    ${state.mapFade ? `
+    <span class="legend-item">
+      <span class="legend-line legend-line-fade-good"></span>
+      <span class="small">Fade margin ${state.mapFadeGoodDb} dB or better</span>
+    </span>
+    <span class="legend-item">
+      <span class="legend-line legend-line-fade-ok"></span>
+      <span class="small">${state.mapFadeOkDb}–${state.mapFadeGoodDb} dB</span>
+    </span>
+    <span class="legend-item">
+      <span class="legend-line legend-line-fade-bad"></span>
+      <span class="small">Under ${state.mapFadeOkDb} dB. A link with no figure yet keeps the plain link colour.</span>
     </span>` : ''}
     ${state.filters.acma.show ? Object.entries(ACMA_MECH).map(([k, m]) => `
       <span class="legend-item">
@@ -2540,6 +2582,7 @@ function refreshMapLayers({ skipFit = false } = {}) {
   state.mapLines   = [];
   // The lines those in-flight LOS checks were painting are gone with them.
   MapLos.newGeneration();
+  MapFade.newGeneration();
 
   const located  = state.data.stations.filter(s => s.lat != null && s.lon != null);
   const active   = mapFilterActive();
@@ -2614,7 +2657,9 @@ function refreshMapLayers({ skipFit = false } = {}) {
       line.mnBaseColor      = casing ? '#ffffff' : lineColor;
       line.on('click', MapBackbone.onLineClick);
       state.mapLines.push(line);
-      if (!casing) MapLos.classify(line, l.s, l.r);
+      // LOS first, then the margin: both may want this line red, and the one
+      // with a figure behind it is the one that should get the last word.
+      if (!casing) { MapLos.classify(line, l.s, l.r); MapFade.classify(line, l.s, l.r, 'field'); }
     }
   }
 
@@ -2640,12 +2685,13 @@ function refreshMapLayers({ skipFit = false } = {}) {
       line.mnBaseColor       = casing ? '#ffffff' : backboneColor;
       line.on('click', MapBackbone.onLineClick);
       state.mapLines.push(line);
-      if (!casing) MapLos.classify(line, p.a, p.b);
+      if (!casing) { MapLos.classify(line, p.a, p.b); MapFade.classify(line, p.a, p.b, 'backbone'); }
     }
   }
 
   // Every line is queued; now the four profile slots can work the whole list.
   MapLos.kick();
+  MapFade.kick();
 
   for (const s of stations) {
     const role   = primaryRole(s);

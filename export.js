@@ -272,9 +272,13 @@ function runExport() {
   ].join('\n');
 
   // MegaNet_System.csv
+  // The two systems this network is, for a document that arrived without them.
+  // Line loss is the half a decibel the real rm_systems rows now carry — these
+  // stand in for those rows, so a figure they disagreed on would export a
+  // Radio Mobile file that quietly modelled a different network.
   const sysDefs = systems.length ? systems : [
-    { id: 1, name: 'Field Station 1W', tx_power_w: 1, line_loss_db: 1, supp_loss_db_m: 0, antenna_type: 'omni.ant', antenna_gain_dbi: 5.15, antenna_height_m: 4, rx_threshold_dbm: -117.001 },
-    { id: 2, name: 'Field Station 5W', tx_power_w: 5, line_loss_db: 1, supp_loss_db_m: 0, antenna_type: 'omni.ant', antenna_gain_dbi: 5.15, antenna_height_m: 2, rx_threshold_dbm: -117.001 },
+    { id: 1, name: 'Field Station 1W', tx_power_w: 1, line_loss_db: 0.5, supp_loss_db_m: 0, antenna_type: 'omni.ant', antenna_gain_dbi: 5.15, antenna_height_m: 4, rx_threshold_dbm: -117.001 },
+    { id: 2, name: 'Field Station 5W', tx_power_w: 5, line_loss_db: 0.5, supp_loss_db_m: 0, antenna_type: 'omni.ant', antenna_gain_dbi: 5.15, antenna_height_m: 2, rx_threshold_dbm: -117.001 },
   ];
   const systemCsv = [
     'Radio Mobile', '$System',

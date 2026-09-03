@@ -1481,7 +1481,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 24;
+const DB_SCHEMA_VERSION = 25;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 function dbHostLabel() {
@@ -1695,6 +1695,22 @@ const state = {
   // Line-of-sight check on drawn links (see MapLos). Off by default and not
   // persisted, for MapSurvey's reasons — it fetches terrain tiles on enable.
   mapLos:         false,
+  // Fade-margin colouring on drawn links (see MapFade). Off by default like
+  // MapLos, and unlike MapLos it *is* remembered — because once the network's
+  // margins are saved to the datastore this switch costs nothing to have on:
+  // the colours come back with the rows. An operator who turned it on and got
+  // a coloured network should find one again tomorrow.
+  mapFade:        (localStorage.getItem('mn-map-fade') || 'off') === 'on',
+  // Where green stops being green and yellow stops being yellow, in dB of fade
+  // margin. Higher than the link budget card's own bands (10 / 3) on purpose:
+  // the card asks "would this link work", the map asks "which of these would I
+  // rebuild first", and the second question wants more headroom before it says
+  // green. Saved with every row, so a figure read back later carries the rule
+  // it was judged under — and adopted *from* the rows when this browser has no
+  // opinion of its own, which is what mapFadeBandsSet records.
+  mapFadeGoodDb:  Number(localStorage.getItem('mn-map-fade-good') || 15),
+  mapFadeOkDb:    Number(localStorage.getItem('mn-map-fade-ok') || 6),
+  mapFadeBandsSet: localStorage.getItem('mn-map-fade-good') != null,
   // The map fills the viewport (see toggleMapFullscreen, app.js). Session-only
   // for mapSurvey's reasons: full screen is something an operator is doing
   // right now, not a standing preference — and a page that *opens* with a

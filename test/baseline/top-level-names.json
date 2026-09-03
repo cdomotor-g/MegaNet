@@ -39,6 +39,7 @@
     "itm.js",
     "land-cover.js",
     "map-los.js",
+    "map-fade.js",
     "modal.js",
     "packets.js",
     "alert2.js",
@@ -51,6 +52,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 578,
-  "distinct": 578
+  "total": 580,
+  "distinct": 580
 }

@@ -125,6 +125,13 @@ const MapLos = (function () {
   // and obstruction-red coexist on the same line without erasing each other.
   function paint(line, verdict) {
     line.mnLosVerdict = verdict;
+    // A fade margin has already been painted here, so leave it alone. Both
+    // layers may be on at once and both may want this line red; the one with a
+    // figure behind it wins, because the margin is computed over the same
+    // terrain and has already been charged for the obstruction. Without this
+    // the two race — whichever profile landed last picked the colour — and a
+    // link would read green or red depending on the order the tiles arrived in.
+    if (line.mnFadeBand) return;
     if (verdict === 'obstructed') {
       const c = blockedColor();
       line.mnBaseColor = c;

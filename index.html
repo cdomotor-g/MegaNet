@@ -215,6 +215,12 @@
        argue about "obstructed". Neither executes at load, so the order only
        states the dependency (#154). -->
   <script src="map-los.js?v=20260902a"></script>
+  <!-- Same dependencies as map-los.js above — terrain.js for the tiles,
+       path-profile.js for the physics — plus link-budget.js for the default
+       line loss and datastore.js for the round trip that is the point of it:
+       a whole network's fade margins, computed once and kept somewhere other
+       than this browser. Nothing here executes at load either (#154). -->
+  <script src="map-fade.js?v=20260902a"></script>
   <script src="modal.js?v=20260902a"></script>
   <script src="packets.js?v=20260902a"></script>
   <script src="alert2.js?v=20260902a"></script>

@@ -1113,6 +1113,37 @@ carries the verdict counts and the same k=4/3 earth / ~30 m terrain /
 no-trees caveats the profile card owns up to. Like the other layers that cost
 requests, it is off by default and not remembered between visits.
 
+**Fade margin, for every link at once — and kept.** *Check line of sight on
+links* answers one bit per hop. *Colour links by fade margin* answers the
+number: the same Longley–Rice run the link budget card does, over the same 64-sample
+terrain, for both ends' filed radios — and the map paints each link **green at
+15 dB or better, yellow at 6, red below**, with the thresholds editable in the
+same flyout. The margin drawn is the **worse of the two directions**: path loss
+is reciprocal and the radios at either end are not, and one line can only
+honestly carry one number. Green is a signal green rather than a natural one,
+and a pixel heavier than the other two, because half the ground these links
+cross is forest or cane and a green line over a green base map is a line nobody
+can find.
+
+The difference from the line-of-sight sweep is where the answers go. That one
+remembers its verdicts in this browser, so the second person to open the map
+pays the whole terrain bill again. This one has a **Save to the datastore**
+button: press it and the margins land in `meganet.link_fade_margin`, and from
+then on every page load — anyone's — paints the network from the datastore
+without fetching a single tile. Every saved row carries the thresholds it was
+judged against (`meganet.inspection_rain_gauge`'s `adjustment_threshold_pct`
+rule: a threshold that changes must not silently rewrite what was already
+judged) and a **signature** of every input the figure came from — both ends'
+coordinates, elevations, antenna heights, power, gain, line loss and threshold,
+the frequency, the sample count, the propagation settings and a model version.
+A row is painted only while that signature still matches what the station list
+says today, so a moved pin or a retuned repeater retires the colour and has it
+counted as stale rather than letting it quietly age into a lie. Changing a
+threshold re-colours instantly and computes nothing — a band is a comparison,
+and only the margins are expensive. Where both switches are on, the margin wins:
+it is the one with a figure behind it, and it has already been charged for the
+obstruction.
+
 **Draw & measure.** A sketching layer over the network map, opened from the
 pencil icon in the map's top-right corner — and pinnable open, which is what you
 want while you are actually drawing. It is for the picture
@@ -1824,6 +1855,23 @@ from the station's `rm_systems[].antenna_height_m` and the frequency from the
 repeater's `rx_mhz`; both are editable, and each box says whether it is showing a
 default or an edit. The chart is inline SVG in the manner of `rfStripPlotHtml()`
 and `rfcChartHtml()` — no charting library, nothing fetched to draw it.
+
+Three things about how it is drawn are choices rather than defaults. The plot
+area is **painted**: it had been transparent, which meant the picture ran into
+the page and had no edge of its own, so there is a sky wash behind it and a
+border round it now. The curvature that is folded into every ground reading is
+also **drawn**, as an arc along the bottom of the plot with the planet filled in
+underneath it, the way Radio Mobile shows the same thing — measured up from the
+plot floor at the chart's own vertical scale, so it is genuinely flat on a 5 km
+hop (a metre and a half of it) and bows up hard on a 100 km one (a hundred and
+fifty), and the legend prints the figure so nobody has to measure it off the
+picture. And **built area is black on light, white on dark** rather than the
+brick red of Esri's Sentinel-2 legend, because red on this chart means an
+obstruction — the Fresnel intrusion, the worst-point marker, an obstructed link
+on the map — and a red band standing on the terrain read as one of those at a
+glance. Finally the *Path* row under the chart is one end per line rather than
+`A → B` wrapped wherever the names ran out, so every figure below it stays where
+it was for the last path.
 
 > **On the Fresnel coefficient.** The first-zone radius here is
 > `r1 = 17.32·√(d1·d2 / (f·D))` (km, GHz, metres), not the `8.657` the original

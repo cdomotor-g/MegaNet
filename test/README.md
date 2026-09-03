@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the twenty-five that run in CI
+npm run all                       # the twenty-six that run in CI
 ```
 
 | Command | What it does |
@@ -45,13 +45,14 @@ npm run all                       # the twenty-five that run in CI
 | `npm run stncard` | the station card on the Stations map and the callout it turned into a signpost (#175), at 1440 px and at 375 px: a real pin click paints the card without selecting; a filter change destroys the callout and leaves the card; *Edit station ↓* selects and scrolls the editor into view, out of full screen first; × and Escape close it back to the opener and nothing passive reopens it; the station, ACMA and radio-path cards close each other; the phone callout is two pills inside the map's width with a finger-sized close button, and *Details* opens the card as a sheet with focus in it; the legend names the layers that are off and the one-time 👁️ tip shows once |
 | `npm run search` | ALERT address windows in the Stations filter box: `4021-4025` selects the stations inside it, in every form (hyphen, en/em dash, `..`, reversed) and every paste (newlines, commas, spaces, semicolons), mixed with names and bare addresses — and everything the box already took, asserted again beside it |
 | `npm run linkbudget` | the link budget card's two ends: each found by name, station number, ALERT address or address window against the *filter's own* answer, the box keeping its caret through a paste, an armed end filled from a pin click, a point and a row of the Stations list in its filtered state — without selecting it — Clear A / Clear B / Clear both, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute: the same station at both ends, a zero-length path, a term nobody supplied, and a frequency that cannot say whether it is an override |
+| `npm run mapfade` | arming a draw tool from the ✏️ flyout must not also draw with it: a real pointer clicks **Line**, and the line that follows two map clicks has to come out with two points rather than the three the flyout's own leaked click made of it — plus the link budget disarming itself the moment both ends are in and opening the ground profile unasked, Escape getting out of the pick, the margin chip in the card's corner carrying the table's own figure, half a decibel of default line loss at an end nobody has measured, the chart's sky and the earth-curvature arc under it, a Path row whose height does not depend on the two names, built area that is no longer obstruction-red, and MapFade's bands set, banded, remembered and rendered as controls |
 | `npm run claim` | claiming an address from the message that arrived on it: an unresolved relayed row offers the claim, the picker sends the *station* address rather than the sensor slot, and the tab stops offering a write that has already landed — with the datastore stubbed at `dbRpc` |
 | `npm run gate` | the Access-to-Supabase verifier refuses what it must — a forged signature, a token minted for another Access application, an expired one, `alg: none` — against keys generated in-process, so it runs offline |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the twenty-three that run in CI |
+| `npm run all` | the twenty-six that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
-`toplevel`, `registry`, `nav`, `shell`, `tabs`, `help`, `search`, `linkbudget` and `stncard` take `-v` too, to list what
+`toplevel`, `registry`, `nav`, `shell`, `tabs`, `help`, `search`, `linkbudget`, `mapfade` and `stncard` take `-v` too, to list what
 passed as well as what did not — `shell -v` prints every contrast ratio it
 measured, in both themes, which is the fastest way to see how much headroom a
 colour has before it stops clearing AA, and `nav -v` prints what each search
