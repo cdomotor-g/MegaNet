@@ -496,6 +496,16 @@ const MapFade = (function () {
     if (note.stale)   bits.push(`<span class="txt-warn">${note.stale} saved ${note.stale === 1 ? 'figure has' : 'figures have'} gone stale — the radios or the positions moved since</span>`);
     if (note.noRadio) bits.push(`${note.noRadio} with no radio system on file — no margin to give`);
     if (note.failed)  bits.push(`<span class="txt-warn">${note.failed} could not be computed — terrain or land cover unreachable, or the model refused the path</span>`);
+    // The one way left for the map and the card to disagree, said out loud
+    // where it happens. These figures always have the cover in them; the card
+    // follows the operator's switch, so with cover off it is answering about
+    // bare ground and will read higher — by 12 dB on a path with two antennas
+    // under the canopy. The map does not follow the switch on purpose: it
+    // states the network as filed, and cover-off is a what-if (MapLos's rule).
+    if (!state.path.cover) {
+      bits.push('<span class="txt-warn">ground cover is switched off on the profile card, so its figures'
+              + ' are bare-ground ones and will read higher than these</span>');
+    }
     if (savedState === 'failed') bits.push(`<span class="txt-warn">the datastore did not answer (${esc(savedError)}) — nothing saved is being shown</span>`);
     if (savedState === 'absent') bits.push('nothing saved yet');
     if (!bits.length) bits.push('no links drawn to colour');
