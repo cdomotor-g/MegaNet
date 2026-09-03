@@ -1140,7 +1140,9 @@ A row is painted only while that signature still matches what the station list
 says today, so a moved pin or a retuned repeater retires the colour and has it
 counted as stale rather than letting it quietly age into a lie. Changing a
 threshold re-colours instantly and computes nothing — a band is a comparison,
-and only the margins are expensive. Where both switches are on, the margin wins:
+and only the margins are expensive. The read pages: PostgREST hands over a
+thousand rows however many are asked for, silently, so a table this size read in
+one go comes back a third painted and two-thirds looking uncomputed. Where both switches are on, the margin wins:
 it is the one with a figure behind it, and it has already been charged for the
 obstruction.
 

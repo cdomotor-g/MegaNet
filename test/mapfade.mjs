@@ -611,6 +611,114 @@ ok('…and the legend gains a line per band',
 
 await leave();
 
+// ── Nothing saved yet, which is every network the first time ────────────────
+// The switch reads the datastore before it computes anything, so that a
+// network whose margins are already stored does not start a terrain sweep it
+// is about to throw away. The answer then redraws the map, the redraw
+// classifies every line, and classify() asks the datastore — so the read has
+// to be asked once and once only. It guarded 'loading', 'ready' and 'failed'
+// and not 'absent', so an empty table looped: every pass cleared the queue the
+// pass before it had filled, and not one profile was ever fetched. It is the
+// state every network is in until somebody presses Save, and the run above
+// cannot see it, because there the datastore is blocked and the read fails.
+//
+// A page of its own, because the module asks once per page and has already
+// asked on the one above.
+
+const empty = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page2 = await empty.newPage();
+let asked = 0;
+await applyNetworkPolicy(page2, server.origin);
+await page2.route(/elevation-tiles-prod\/terrarium\//, route =>
+  route.fulfill({ status: 200, contentType: 'image/png', body: tile,
+                  headers: { 'Access-Control-Allow-Origin': '*' } }));
+await page2.route(/\/link_fade_margin/, route => {
+  asked++;
+  return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+});
+// Armed before the first paint, which is where the loop started.
+await page2.addInitScript(() => {
+  try { localStorage.setItem('mn-map-fade', 'on'); } catch (_) {}
+});
+page2.on('pageerror', e => errors.push(String(e)));
+await page2.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+await page2.waitForFunction(
+  () => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
+await page2.evaluate(() => switchTab('stations'));
+await page2.waitForFunction(() => !!state.map && state.mapLines.length > 0,
+  null, { timeout: LOAD_TIMEOUT });
+await page2.waitForTimeout(4000);
+
+const cold = await page2.evaluate(() => ({
+  on: state.mapFade,
+  painted: state.mapLines.filter(l => l.mnFadeBand).length,
+  note: (document.getElementById('map-fade-note') || {}).textContent.replace(/\s+/g, ' '),
+}));
+ok('the switch comes back on, because it is remembered', cold.on === true);
+ok('an empty table is read once, not once per redraw for ever',
+   asked > 0 && asked <= 3, `asked ${asked} times`);
+ok('…and the sweep actually runs against it', cold.painted > 0,
+   `${cold.painted} coloured · ${cold.note.slice(0, 110)}`);
+ok('…with the note saying there is nothing stored yet',
+   /nothing saved yet/.test(cold.note), cold.note.slice(0, 140));
+await empty.close();
+
+// ── A table bigger than PostgREST will hand over in one go ──────────────────
+// The read asks for the lot and PostgREST gives it a thousand rows: no error,
+// no short-read header, just a thousand. A network of ~3,200 links therefore
+// came back one-third painted and two-thirds looking as though nobody had ever
+// computed them — and the note said so in as many words, about links whose
+// figures were sitting in the table all along. The read pages now, ordered by
+// the primary key rather than by computed_at, because offset paging over a
+// column whose values are all within a second of each other repeats rows and
+// drops rows, and a dropped row is indistinguishable from an uncomputed one.
+//
+// What is asserted is the paging contract, not the painting: the rows served
+// here are synthetic and their signatures match nothing, which is exactly what
+// the module should do with a row whose inputs have moved.
+
+const paged  = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page3  = await paged.newPage();
+const offsets = [];
+await applyNetworkPolicy(page3, server.origin);
+await page3.route(/elevation-tiles-prod\/terrarium\//, route =>
+  route.fulfill({ status: 200, contentType: 'image/png', body: tile,
+                  headers: { 'Access-Control-Allow-Origin': '*' } }));
+await page3.route(/\/link_fade_margin/, route => {
+  const url = route.request().url();
+  const off = Number((/[?&]offset=(\d+)/.exec(url) || [])[1] ?? -1);
+  const lim = Number((/[?&]limit=(\d+)/.exec(url) || [])[1] ?? -1);
+  offsets.push({ off, lim });
+  // A full page first, then a short one. Nothing beyond that should be asked
+  // for: a short page is the end of the table.
+  const rows = off === 0
+    ? Array.from({ length: lim }, (_, i) => ({
+        station_a_id: `a${i}`, station_b_id: `b${i}`, margin_db: 20,
+        margin_ab_db: 20, margin_ba_db: 20, verdict: 'clear',
+        signature: 'stale/0', good_db: 15, ok_db: 6,
+        computed_at: '2026-01-01T00:00:00Z' }))
+    : [];
+  return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
+});
+await page3.addInitScript(() => { try { localStorage.setItem('mn-map-fade', 'on'); } catch (_) {} });
+page3.on('pageerror', e => errors.push(String(e)));
+await page3.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+await page3.waitForFunction(() => typeof state !== 'undefined' && !!state.data,
+  null, { timeout: LOAD_TIMEOUT });
+await page3.evaluate(() => switchTab('stations'));
+await page3.waitForFunction(() => !!state.map && state.mapLines.length > 0,
+  null, { timeout: LOAD_TIMEOUT });
+await page3.waitForTimeout(3000);
+
+ok('the read asks in pages rather than for the whole table',
+   offsets.length >= 2 && offsets[0].off === 0 && offsets[0].lim === 1000,
+   JSON.stringify(offsets.slice(0, 4)));
+ok('…and goes back for the next one when a page comes back full',
+   offsets.some(o => o.off === 1000), JSON.stringify(offsets.slice(0, 4)));
+ok('…and stops at the first short page', !offsets.some(o => o.off >= 2000),
+   JSON.stringify(offsets.slice(0, 4)));
+await paged.close();
+
 ok('nothing threw for the whole run', errors.length === 0, errors.join('\n         '));
 
 await context.close();

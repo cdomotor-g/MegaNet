@@ -66,6 +66,16 @@ const MapFade = (function () {
   const CHUNK       = 400;  // rows per save request — a whole network is a
                             // ~3,100-row payload, and one of those is a request
                             // some proxy will refuse for its size alone
+  const PAGE        = 1000; // rows per *read*. PostgREST's own ceiling, and it
+                            // is applied silently: `limit=20000` came back with
+                            // exactly a thousand rows and no error and no
+                            // header saying so, which painted the first third
+                            // of the network and left the rest looking as
+                            // though nobody had ever computed it. Paging is
+                            // the only way to read a table bigger than this.
+  const PAGES_MAX   = 40;   // 40,000 rows — an order of magnitude past what
+                            // this network can produce, so the loop always has
+                            // a floor even if the cap moves
   // Bumped when anything about how the margin is derived changes. It is part of
   // the signature, so a bump invalidates every saved row rather than leaving
   // old figures to be read as new ones.
@@ -231,11 +241,18 @@ const MapFade = (function () {
   // free-tier project would otherwise turn one dead read into one per render
   // (station-inspections.js's sticky-failure rule).
   function loadSaved() {
-    if (savedState === 'loading' || savedState === 'ready' || savedState === 'failed') return;
+    // Every state but 'idle' means the question has been asked, and asking it
+    // twice is not merely wasteful — it does not terminate. The answer calls
+    // settled(), settled() redraws the map, the redraw classifies every line,
+    // and classify() asks again. 'absent' was missing from this list, so a
+    // network with nothing saved yet — which is every network the first time
+    // anybody turns the switch on — spun here instead of sweeping: each pass
+    // cleared the queue it had just filled, and not one terrain profile was
+    // ever fetched. Only save() may put it back to 'idle', which is how the
+    // re-read after a save is allowed through.
+    if (savedState !== 'idle') return;
     savedState = 'loading';
-    dbSelect('link_fade_margin?select=station_a_id,station_b_id,margin_db,margin_ab_db,margin_ba_db,'
-           + 'verdict,signature,good_db,ok_db,computed_at'
-           + '&order=computed_at.desc&limit=20000')
+    readAllSaved()
       .then(rows => {
         saved = new Map();
         for (const r of rows) saved.set(pairKey(r.station_a_id, r.station_b_id), r);
@@ -245,9 +262,11 @@ const MapFade = (function () {
         // makes "we agreed on 15 and 6" a property of the network rather than
         // of whoever's browser is open. An operator who has set their own keeps
         // theirs — a stored preference is a decision, and this must not
-        // overrule it.
+        // overrule it. The newest row wins where a network has been saved twice
+        // under two different rules and only half of it re-saved.
         if (rows.length && !state.mapFadeBandsSet) {
-          const g = Number(rows[0].good_db), o = Number(rows[0].ok_db);
+          const newest = rows.reduce((a, b) => (a.computed_at > b.computed_at ? a : b));
+          const g = Number(newest.good_db), o = Number(newest.ok_db);
           if (isFinite(g) && isFinite(o) && g > o) { state.mapFadeGoodDb = g; state.mapFadeOkDb = o; }
         }
         settled();
@@ -257,6 +276,24 @@ const MapFade = (function () {
         savedError = (err && err.message) || String(err);
         settled();
       });
+  }
+
+  // Every saved row, a page at a time. Ordered by the primary key rather than
+  // by computed_at, because offset paging over a column whose values are all
+  // within a second of each other is not paging at all — rows repeat and rows
+  // go missing, and the ones that go missing are indistinguishable from links
+  // nobody has computed.
+  async function readAllSaved() {
+    const cols = 'station_a_id,station_b_id,margin_db,margin_ab_db,margin_ba_db,'
+               + 'verdict,signature,good_db,ok_db,computed_at';
+    const out = [];
+    for (let page = 0; page < PAGES_MAX; page++) {
+      const rows = await dbSelect(`link_fade_margin?select=${cols}`
+        + `&order=station_a_id.asc,station_b_id.asc&limit=${PAGE}&offset=${page * PAGE}`);
+      out.push(...rows);
+      if (rows.length < PAGE) break;
+    }
+    return out;
   }
 
   // The datastore has answered, one way or the other. The map was drawn before
