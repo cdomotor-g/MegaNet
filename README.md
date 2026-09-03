@@ -797,8 +797,8 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
 - Leaflet.js, with the map's own controls stacked in its top-right corner as four icons — base
-  map (OSM-Topo by default, OpenStreetMap or Satellite), **Map display**, **Draw & measure** and
-  the **legend**. Each is an icon and nothing else until you point at it, click it or tab to it,
+  map (OSM-Topo by default, OpenStreetMap, Satellite or Dark), **Map display**, **Draw & measure**
+  and the **legend**. Each is an icon and nothing else until you point at it, click it or tab to it,
   and each can be pinned open — a pin that is remembered between visits
 
 **Reading the map.** Every pin carries a white ring so it separates from the
@@ -955,6 +955,31 @@ World_Reference_Overlay, was evaluated and turned down — it re-draws the same
 names slightly misregistered, its tile cache stops at level 13, and over
 Australia it goes blank from about level 9 anyway. River names over imagery
 stay the rivers layer's job, drawn above these tiles.
+
+**The dark base.** The fourth base map is Esri's Dark Gray Canvas, and the
+genre's whole point is that it is drawn deliberately badly: no terrain, no
+landuse, no colour, roads down to hairlines. It is the base for reading the
+*network* rather than the ground under it. Topo and satellite tiles are dense
+and mid-toned edge to edge, so a white-ringed pin and a white-cased link line
+are competing with the base for attention the whole time; on this one nothing
+else in the frame is bright, and the pins and links are the only thing left to
+look at.
+
+Esri ships it as a mid-grey around `#444`, which is dark for a map but still
+reads as a surface, so the app puts a mild brightness filter over the tiles to
+take it to near-black. The filter is on the base layer alone: the matching
+`Dark_Gray_Reference` service that rides along with it — the same
+ride-along arrangement Satellite uses, for the same reason — sits in the label
+pane above and keeps its full brightness, so the place names stay readable over
+black ground.
+
+It is offered on all seven maps, is never the default, and is independent of the
+app's own light/dark theme — pick it from the **Base map** icon. It is not
+offered as a base for **Map Generator** sheets: the print palette is drawn to
+sit on a light base and would disappear into a black one, and both laser modes
+want no raster at all. *(CARTO's Dark Matter was the first choice and was
+dropped: its keyless tiles now come back stamped "API KEY REQUIRED" across the
+middle. Esri needs no key and was already serving three of this app's layers.)*
 
 **Highlighting rivers.** Half this network is named after the river it sits on,
 so typing `burdekin` into the filter box lights up the Burdekin and its named

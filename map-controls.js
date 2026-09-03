@@ -63,7 +63,14 @@
 // ── The base-map set ─────────────────────────────────────────────────────────
 // Fresh tile-layer instances for the shared base-map set. A Leaflet layer can
 // only live on one map at a time, so every map gets its own instances. The
-// first entry (OSM-Topo) is the default base layer.
+// first entry (OSM-Topo) is the default base layer; everything after it is
+// there to be chosen, and an entry added here is on all seven maps at once.
+//
+// maxZoom is 19 on every layer whose host serves that far — capped there
+// rather than at each host's own ceiling — because a Leaflet map takes its zoom
+// limits from whichever base is on: a layer allowing 20 would let the operator
+// zoom to somewhere the next base they picked could not follow them to, and the
+// view would jump back. OSM-Topo's 17 is the exception, and is the host's.
 function makeBaseLayers() {
   return {
     'OSM-Topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
@@ -79,6 +86,35 @@ function makeBaseLayers() {
     'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community | Labels © Esri, HERE, Garmin, © OpenStreetMap contributors',
       maxZoom: 19,
+    }),
+    // ── Dark ────────────────────────────────────────────────────────────────
+    // Esri's Dark Gray Canvas, which is the genre's whole point: a base drawn
+    // deliberately *badly* — no terrain, no landuse, no colour, roads reduced
+    // to hairlines — so that whatever you put on top of it is the only thing
+    // with any contrast in the frame. Here that is the network. A topo or
+    // satellite base is dense and mid-toned edge to edge, so a white-ringed pin
+    // and a white-cased link line are competing with the tiles the whole time;
+    // on this one nothing else is bright and the pins and links are all there
+    // is left to look at.
+    //
+    // The `mn-base-dark` class carries a CSS filter (styles.css) that takes
+    // Esri's mid-grey the rest of the way to near-black. That is a real
+    // requirement rather than taste — "mostly blackish" was the brief — and a
+    // filter is the cheapest way to it: the alternative was a second tile host,
+    // and the label layer that rides along with this base (see addBaseLayers)
+    // must NOT be darkened with it or the names stop being readable, which a
+    // filter on this layer alone gets for free.
+    //
+    // Why not CARTO's Dark Matter, the obvious first pick: as of 2026 the
+    // keyless basemaps.cartocdn.com tiles come back stamped "API KEY REQUIRED"
+    // across the middle. Verified, not assumed — with a browser Origin and
+    // Referer, which changes nothing. Esri needs no key, already serves the
+    // Satellite base and every label layer in addBaseLayers, and answers with
+    // `access-control-allow-origin: *` the way the Map Generator's canvas
+    // compositing needs — so this adds a base map without adding a host.
+    'Dark': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS User Community',
+      className: 'mn-base-dark', maxZoom: 19,
     }),
   };
 }
@@ -98,45 +134,57 @@ function addBaseLayers(map) {
   const names   = Object.keys(layers);
   const group   = `mn-base-${MapChrome.uid()}`;   // radios only group within one map
 
-  // ── Names over the imagery ─────────────────────────────────────────────────
-  // The Satellite layer is bare imagery — no town names, no roads — which
-  // makes it near-useless for orienting around a station. These two Esri
-  // reference services, from the same host as the imagery itself, paint the
-  // missing names over it: Boundaries_and_Places carries localities and place
-  // names down to street level, Transportation carries roads with their names
-  // and route shields. Both serve native tiles past our maxZoom of 19.
+  // ── Names over the bases that have none ────────────────────────────────────
+  // Two of the four bases arrive without place names on them and are near-
+  // useless for orienting around a station that way: Satellite is bare imagery,
+  // and the Dark canvas is deliberately stripped. Esri publishes a matching
+  // reference service for each, from the same host as the base itself, and
+  // these ride along whenever their base is the chosen one — and only then.
   //
-  // Esri's third reference service, World_Reference_Overlay, was tried and
-  // rejected: it repeats the place names and roads these two already draw
-  // (misregistered doubles read as a bug), its tiles stop at level 13 and go
-  // blank over Australia from about level 9 anyway. River names are already
-  // better served on the Stations map by the Waterways overlay (map-rivers.js),
-  // which labels every named river in view and draws above these tiles.
+  // Satellite takes two: Boundaries_and_Places carries localities and place
+  // names down to street level, Transportation carries roads with their names
+  // and route shields. Both serve native tiles past our maxZoom of 19. Esri's
+  // third reference service, World_Reference_Overlay, was tried and rejected:
+  // it repeats the place names and roads these two already draw (misregistered
+  // doubles read as a bug), its tiles stop at level 13 and go blank over
+  // Australia from about level 9 anyway. River names are already better served
+  // on the Stations map by the Waterways overlay (map-rivers.js), which labels
+  // every named river in view and draws above these tiles.
+  //
+  // Dark takes the one built for it, Dark_Gray_Reference: pale names and
+  // hairline boundaries drawn for exactly this base. It is a separate layer
+  // rather than the labelled variant of the base because the base is passed
+  // through a darkening filter (makeBaseLayers) and the labels must not be —
+  // they are the one thing on that map besides the network meant to be read.
   //
   // They live in their own pane just above Leaflet's tilePane (200) so they
-  // cover the imagery but stay under every overlay — the overlay budget
+  // cover the base but stay under every overlay — the overlay budget
   // (map-survey.js) starts at mnContours' 335. Add/remove tracks the picker
-  // exactly: these are on when — and only when — Satellite is the base.
+  // exactly.
   if (!map.getPane('mnBaseLabels')) {
     map.createPane('mnBaseLabels').style.zIndex = 250;
   }
-  const satLabels = [
-    'Reference/World_Boundaries_and_Places',
-    'Reference/World_Transportation',
-  ].map(svc => L.tileLayer(
+  const refLayer = svc => L.tileLayer(
     `https://server.arcgisonline.com/ArcGIS/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`,
-    { pane: 'mnBaseLabels', maxZoom: 19 }   // attribution rides on the Satellite layer
-  ));
-  function syncSatLabels() {
-    for (const l of satLabels) {
-      if (current === 'Satellite') { if (!map.hasLayer(l)) l.addTo(map); }
-      else if (map.hasLayer(l)) map.removeLayer(l);
+    { pane: 'mnBaseLabels', maxZoom: 19 }   // attribution rides on the base layer
+  );
+  const companions = {
+    'Satellite': ['Reference/World_Boundaries_and_Places',
+                  'Reference/World_Transportation'].map(refLayer),
+    'Dark':      ['Canvas/World_Dark_Gray_Reference'].map(refLayer),
+  };
+  function syncCompanions() {
+    for (const [base, list] of Object.entries(companions)) {
+      for (const l of list) {
+        if (base === current) { if (!map.hasLayer(l)) l.addTo(map); }
+        else if (map.hasLayer(l)) map.removeLayer(l);
+      }
     }
   }
 
   let current   = names[0];
   layers[current].addTo(map);
-  syncSatLabels();   // a no-op while the default is OSM-Topo, correct if it ever isn't
+  syncCompanions();   // a no-op while the default is OSM-Topo, correct if it ever isn't
 
   MapChrome.panel(map, {
     id:    'basemap',
@@ -147,7 +195,9 @@ function addBaseLayers(map) {
         <input type="radio" name="${group}" value="${escAttr(n)}" ${n === current ? 'checked' : ''}>
         ${esc(n)}
       </label>`).join('') +
-      `<p class="filter-note">Satellite includes place &amp; road names.</p>`,
+      `<p class="filter-note">Satellite and Dark both carry place &amp; road names.
+         Dark strips the ground back to near-black so the pins and links are the
+         only thing left with any contrast.</p>`,
     // A real listener rather than an inline handler: `layers` is this map's own
     // set of tile layers and there is no global to reach it through.
     onMount(body) {
@@ -157,7 +207,7 @@ function addBaseLayers(map) {
         map.removeLayer(layers[current]);
         layers[name].addTo(map);
         current = name;
-        syncSatLabels();
+        syncCompanions();
       });
     },
   });

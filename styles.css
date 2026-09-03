@@ -2628,6 +2628,33 @@ hr {
   .mn-river-note-btn { min-height: 2.75rem; }
 }
 
+/* ── The Dark base map ───────────────────────────────────────────────────── */
+
+/* Esri's Dark Gray Canvas arrives as a mid-grey around #444 — dark for a map,
+   but nowhere near the near-black the Dark base is *for*. The brief was a base
+   the operator can ignore entirely so the pins and links are the only thing
+   left to look at, and #444 still reads as a surface. This takes it the rest of
+   the way.
+
+   It is a filter on the tile layer rather than a different tile host because
+   there is no keyless host that ships it this dark (CARTO's Dark Matter, the
+   obvious candidate, now stamps "API KEY REQUIRED" across every keyless tile),
+   and because the filter has to miss the labels: Dark_Gray_Reference rides in
+   the mnBaseLabels pane above this one, is not inside this container, and so
+   keeps its full brightness while the ground under it goes black. Darkening
+   both together is what would make the names unreadable.
+
+   The class is set by makeBaseLayers (map-controls.js) via Leaflet's
+   `className` option, which lands on the layer's own tile container — so this
+   never touches the other three bases, the label pane, or any overlay.
+
+   brightness before contrast, and both mild: harder numbers crush Esri's
+   coastlines and hairline roads out of the tile altogether, which loses the
+   little orientation the base still owes the operator. */
+.leaflet-layer.mn-base-dark {
+  filter: brightness(.55) contrast(1.08);
+}
+
 /* ── Map pins ────────────────────────────────────────────────────────────── */
 
 /* Every station pin is drawn with a white ring (set in app.js) so it separates

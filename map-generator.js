@@ -67,12 +67,23 @@ const MG_PRESETS = {
   custom: { label: 'Custom size…',                w: 200, h: 200, margin: 0  },
 };
 
-// The same base set the Stations map offers (makeBaseLayers,
-// map-controls.js), plus
+// The base set the Stations map offers (makeBaseLayers, map-controls.js), plus
 // "None" — a laser file wants no raster under it, and the option to turn the
 // base off entirely is part of the brief. Raw URL templates rather than
 // Leaflet layers because these tiles are composed onto a canvas and embedded
 // in the SVG as one image, not panned live.
+//
+// The one entry from that set deliberately left out is Dark. It exists on the
+// live maps so the pins and links are the only bright thing in the frame; a
+// *sheet* is the opposite problem. Every colour in MG_PALETTES.print is picked
+// to sit on a light base — the station names are #1a2430, the title block with
+// them — so a near-black raster underneath makes the sheet's own ink vanish,
+// and that is before the ink it would cost to print. The laser palettes are
+// engrave-code colours on bare plate and want no raster at all, which is why
+// both default to 'none'. Offer Dark here and every mode that could take it
+// would produce a worse sheet than the one above it in the list. The Map
+// Generator's own preview map still offers it — that one goes through
+// addBaseLayers like every other map in the app.
 const MG_BASES = {
   'none':          null,
   'OSM-Topo':      { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', sub: 'abc', max: 17,
