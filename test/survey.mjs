@@ -189,7 +189,14 @@ function whereFilter(rows, where) {
 const server = await startServer();
 const browser = await launchBrowser();
 const errors = [];
-const queried = [];   // every /query the app sent: { id, hasRC, outFields, where }
+// The Queensland spatial host serves more than one of this app's layers, so a
+// route has to name the service as well: SurveyControl is what MapSurvey asks,
+// FoundationData is what it falls back to, and nothing else on that host is
+// this file's business.
+const QLD_SURVEY_ROUTE =
+  /spatial-gis\.information\.qld\.gov\.au\/.*(SurveyControl|FoundationData)\//;
+
+const queried = [];   // every /query MapSurvey sent: { id, hasRC, outFields, where }
 const bbox = () => queried.filter((q) => q.where === '1=1');
 const lookups = () => queried.filter((q) => q.where !== '1=1');
 try {
@@ -200,7 +207,14 @@ try {
 
   // Registered after the policy, so it runs first (Playwright: newest route
   // first) and the stub answers before the off-origin abort can.
-  await page.route('**spatial-gis.information.qld.gov.au/**', async (route) => {
+  // MapSurvey's two services by name, not the whole host. The host-wide glob
+  // this used to carry meant "every query the app sent", which was the same
+  // thing only while MapSurvey was the one layer using it — MapRoads reads the
+  // cadastre on the same host now, and is on by default, so a host-wide stub
+  // would answer its queries too and put them in `queried` below. Its requests
+  // fall through to the network policy and are aborted, which is what the rest
+  // of this file already assumes about everything off-origin.
+  await page.route(QLD_SURVEY_ROUTE, async (route) => {
     const url = new URL(route.request().url());
     let body;
     if (url.pathname.endsWith('/layers')) {
@@ -487,7 +501,7 @@ try {
   const fbPage = await context.newPage();
   await applyNetworkPolicy(fbPage, server.origin);
   fbPage.on('pageerror', (e) => errors.push('fallback: ' + e.message));
-  await fbPage.route('**spatial-gis.information.qld.gov.au/**', async (route) => {
+  await fbPage.route(QLD_SURVEY_ROUTE, async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname.endsWith('/layers')) {
       // The sublayer probe is unreachable — this is what sends MapSurvey to

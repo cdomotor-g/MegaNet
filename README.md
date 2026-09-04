@@ -1111,12 +1111,17 @@ glance. Hover one and it names itself — road name, locality, local authority.
 
 The source is the DCDB's own *Cadastral parcels* layer on the Queensland spatial
 platform, filtered to `parcel_typ = 'Road Type Parcel'`, updated nightly — the
-same rows QSpatial's SmartMap draws as road. Off by default and not remembered,
-for the contours' reason: it costs one query per view, and unlike the wind
-regions there is no bundled file that makes every later ask free. It draws from
-about zoom 13 in and says *zoom in to draw road parcels* above that, caches by a
-rounded bounding box so a small pan costs nothing, and caps at 1500 parcels a
-view with the note saying when the cap is in effect. Queensland only — the
+same rows QSpatial's SmartMap draws as road. **On by default**, and remembered
+between visits, on the survey marks' terms rather than the contours' — because
+the minimum zoom does the work the default-off was doing. It draws from about
+zoom 13 in and says *zoom in to draw road parcels* above that; the Stations map
+opens fitted to the whole network, an extent an order of magnitude wider than
+that, so the layer's opening state is *zoom in to draw them* and not one request
+is made until somebody actually goes to a site. Which is the moment the question
+arrives — whose road reserve is this — and having to find a checkbox first is
+what stops it being asked. An operator who switches it off means it. The layer
+caches by a rounded bounding box so a small pan costs nothing, and caps at 1500
+parcels a view with the note saying when the cap is in effect. Queensland only — the
 cadastre it reads stops at the border, and the note says so rather than showing
 an empty layer. That matters more here than it does for the survey marks or the
 contours, because it is measurable: **1,298 of the 3,173 stations with a

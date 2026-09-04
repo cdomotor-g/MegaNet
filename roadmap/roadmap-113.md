@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-04** (revision 77 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-04** (revision 78 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -549,6 +549,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 78 — 2026-09-04: the road parcels come on by default, and a host-wide test stub stops being specific enough
+
+Not issue-driven — one request taken straight to `main`, plus the thing it broke.
+
+- **Road parcels on by default**, and remembered (`mn-roads`), on MapSurvey's terms rather than MapContours'. The rule that had them off — *a layer that costs a request per view stays off until it is asked for* — is about **page load**, and `MIN_ZOOM` already answers that half: the layer draws from about zoom 13, the Stations map opens fitted to every station in the network, and not one request is made until somebody actually zooms to a site. Which is the moment the question arrives — whose road reserve is this — and a checkbox in the way is what stops it being asked. Same argument #120 made for the survey marks, and it transfers exactly because the two layers have the same shape of gate.
+- **`test/survey.mjs` had claimed the whole Queensland host, and that stopped being specific enough.** Its route was `**spatial-gis.information.qld.gov.au/**`, and `queried` — the array two of its load-bearing assertions read ("no query carries `resultRecordCount`", "exactly the feature layers are queried") — therefore meant *every query the app sent to that host*. That was the same thing as *every query MapSurvey sent* only while MapSurvey was the host's one user. `map-roads.js` reads the cadastre on the same host, and turning it on by default made a second layer send queries into that array: one carrying `resultRecordCount`, one to a service id the list does not name. Both assertions would have gone red, and **neither would have been about anything real**. The route names the two services MapSurvey actually asks now (`SurveyControl`, `FoundationData`), and MapRoads' requests fall through to the network policy's abort like everything else off-origin.
+- **The generalisable part, which is the reason this is written down.** A test stub scoped to a *host* is scoped to a shared resource, and it is correct only for as long as one feature owns that host. Three of this app's layers now read `spatial-gis.information.qld.gov.au`; the next one to be added will walk into the same trap in whichever check stubs it broadly. Scope a stub to the service, not the origin.
+- **`npm run all` — twenty-six checks, all green.**
 
 ### Revision 77 — 2026-09-04: the map stops keeping what you asked it to hide, and a station goes to Google Earth with its links attached
 

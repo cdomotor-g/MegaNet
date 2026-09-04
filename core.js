@@ -1700,11 +1700,14 @@ const state = {
   // map stayed silent about which regions the network crosses until somebody
   // went looking for a checkbox. An operator who turns it off means it.
   mapWind:        localStorage.getItem('mn-wind') !== 'off',
-  // Road parcels from the Queensland cadastre (see MapRoads, #176). Off by
-  // default and not persisted, for MapContours' reasons — it costs a query per
-  // view, and unlike the wind regions there is no one bundled file that makes
-  // every later ask free.
-  mapRoads:       false,
+  // Road parcels from the Queensland cadastre (see MapRoads, #176). On by
+  // default and remembered, on MapSurvey's terms — and for MapSurvey's exact
+  // reason, which is that MIN_ZOOM does the work the default-off was doing.
+  // The layer only draws from about zoom 13, the Stations map opens fitted to
+  // the whole network, and no request is made until somebody zooms to a site —
+  // which is the moment "whose road reserve is this?" is worth answering, and
+  // the moment a checkbox stands between the operator and the answer.
+  mapRoads:       localStorage.getItem('mn-roads') !== 'off',
   // Line-of-sight check on drawn links (see MapLos). Off by default and not
   // persisted, for MapSurvey's reasons — it fetches terrain tiles on enable.
   mapLos:         false,

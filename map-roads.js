@@ -429,13 +429,21 @@ const MapRoads = (function () {
 
     noteHtml,
 
-    // Off by default and not persisted, for the reasoning map-survey.js
-    // records and map-contours.js repeats: a context layer that costs a
-    // network request per view stays off until it is asked for, and a fresh
-    // page load fires no extra requests without anyone having to reason about
-    // a remembered on-state.
+    // On by default and remembered, on MapSurvey's terms rather than
+    // MapContours'. The rule that reads "a layer that costs a request per view
+    // stays off until it is asked for" is about page load, and MIN_ZOOM
+    // already answers that half: the Stations map opens fitted to every
+    // station in the network, an extent an order of magnitude wider than zoom
+    // 13, so the layer's opening state is "zoom in to draw them" and not one
+    // request is made until somebody actually goes to a site. Which is the
+    // moment the answer is wanted — whose road reserve is this — and having to
+    // find a checkbox first is the thing that stops it being asked.
+    //
+    // An operator who turns it off means it, so like the rivers, the survey
+    // marks and the wind regions the answer is kept between visits.
     setEnabled(on) {
       state.mapRoads = on;
+      try { localStorage.setItem('mn-roads', on ? 'on' : 'off'); } catch (_) {}
       if (!on) { clearTimeout(timer); clearLayer(); setNote('off'); return; }
       setNote(map && map.getZoom() >= MIN_ZOOM ? 'loading' : 'zoom');
       sync();
