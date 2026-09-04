@@ -1109,6 +1109,18 @@ access track? Can a trailer reach the site without crossing private land? A
 centreline answers none of those; a parcel boundary answers all three at a
 glance. Hover one and it names itself — road name, locality, local authority.
 
+Drawn in yellow, because that is what a road is on every printed map anybody has
+ever navigated from — the layer names itself before the legend does. A deep
+golden yellow rather than a pure one, and that is legibility rather than taste:
+yellow is the highest-luminance hue on the wheel, so a pure one hairlines away
+to nothing over the light topo base while looking fine over satellite imagery.
+It carries a heavier stroke than a mid-toned line would need for the same
+reason. The two things on this map it sits closest to are the amber pass-range
+links and wind region B1's yellow wash over south-east Queensland; a road parcel
+is a closed ring with a fill where a link is a white-cased line, and a 95%
+stroke where the wind region is a 20% fill, so shape and weight carry the
+difference that hue alone would not.
+
 The source is the DCDB's own *Cadastral parcels* layer on the Queensland spatial
 platform, filtered to `parcel_typ = 'Road Type Parcel'`, updated nightly — the
 same rows QSpatial's SmartMap draws as road. **On by default**, and remembered

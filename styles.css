@@ -2650,13 +2650,18 @@ hr {
    label above, and dressed the way the fixed river name is — its own near-white
    ground with fixed dark ink — because unlike the river label this one sits over
    satellite imagery as often as over a street map, and a tooltip that borrows
-   the theme's colours is unreadable over half of them. */
+   the theme's colours is unreadable over half of them.
+
+   The ink is a warm dark brown rather than the layer's own yellow: it ties the
+   label to the line it names while staying a colour that can be read at 11 px,
+   which #f9a825 on near-white (1.9:1) is not. The border carries the tint
+   instead — that is a boundary, not text. */
 .leaflet-tooltip.mn-road-label {
   background: rgba(255, 255, 255, .94);
-  color: #37474f;
+  color: #4e342e;
   font-size: .72rem;
   font-weight: 600;
-  border: 1px solid rgba(55, 71, 79, .35);
+  border: 1px solid rgba(249, 168, 37, .55);
   border-radius: 3px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
   padding: 0 5px;

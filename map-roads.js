@@ -79,10 +79,25 @@ const MapRoads = (function () {
   const OFFSET_DEG   = 0.0001;
 
   // Literal hexes rather than tokens, for the reason map-wind.js records:
-  // Leaflet path options cannot take var(). Blue-grey is the one part of the
-  // wheel this map is not already using — not the rivers' blue, not the
-  // contours' burnt orange, not a link's amber, not a role fill.
-  const LINE_COLOR = '#607d8b';
+  // Leaflet path options cannot take var(). Yellow because that is what a road
+  // is on every printed map anybody has ever navigated from — the layer names
+  // itself before the legend does.
+  //
+  // A deep golden yellow rather than a pure one, and that is a legibility
+  // decision rather than a taste one: yellow is the highest-luminance hue on
+  // the wheel, so a pure #ffd600 hairline over the light topo base is most of
+  // the way to invisible, while the same line over satellite imagery is fine. This sits dark enough to hold on white and bright enough to stay
+  // yellow on imagery.
+  //
+  // Two neighbours it has to be told apart from, and how it is:
+  //   · the pass-range links, amber #ff6f00 — a *line* with a white casing,
+  //     where a road parcel is a closed ring with a fill, so the shape carries
+  //     the difference the ~15° of hue between them would not.
+  //   · wind region B1, #fdd835, which covers south-east Queensland — a 20%
+  //     fill under everything, against a 95% stroke over it. That one is on by
+  //     default, so it tints the ground under this layer for most of the
+  //     network; both were rendered together before this colour was settled.
+  const LINE_COLOR = '#f9a825';
   const UNNAMED    = 'Unnamed road reserve';
 
   let map = null, layer = null, timer = null, seq = 0, failedAt = 0;
@@ -231,11 +246,15 @@ const MapRoads = (function () {
       L.polygon(p.rings, {
         pane: PANE,
         interactive: false,          // see the pointer note in the header
+        // Heavier and more opaque than a mid-toned line would need to be, for
+        // the reason LINE_COLOR records: a light hue on a light base reads
+        // fainter at the same numbers, so the numbers move to keep the
+        // apparent presence the same.
         color: LINE_COLOR,
-        weight: 1,
-        opacity: 0.85,
+        weight: 1.2,
+        opacity: 0.95,
         fillColor: LINE_COLOR,
-        fillOpacity: 0.1,
+        fillOpacity: 0.14,
       }).addTo(layer);
     }
     drawn = parcels;
