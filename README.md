@@ -1118,7 +1118,11 @@ about zoom 13 in and says *zoom in to draw road parcels* above that, caches by a
 rounded bounding box so a small pan costs nothing, and caps at 1500 parcels a
 view with the note saying when the cap is in effect. Queensland only — the
 cadastre it reads stops at the border, and the note says so rather than showing
-an empty layer.
+an empty layer. That matters more here than it does for the survey marks or the
+contours, because it is measurable: **1,298 of the 3,173 stations with a
+position are outside Queensland**, almost all of them in NSW, and NSW publishes
+the same road-parcel polygons with the road name on them. Issue #177 carries
+that.
 
 Vector rather than the server-rendered image the contours settled on, and for
 the opposite reason: road parcels are sparse where contour lines are dense, a
