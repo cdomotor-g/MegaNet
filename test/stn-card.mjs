@@ -580,10 +580,15 @@ async function main() {
     check('and not told again', again === true);
 
     const legend = await fp.evaluate(() => {
+      // Wind regions are ON by default since #176, so the "layers that are off"
+      // line is measured with it explicitly off — that line is about the state,
+      // not about which layer happens to be the default.
+      const wasWind = state.mapWind;
+      state.mapWind = false;
       const before = mapLegendHtml();
       state.mapWind = true; rerenderMapLegend();
       const windOn = document.getElementById('map-legend').innerHTML;
-      state.mapWind = false;
+      state.mapWind = wasWind;
       state.mapLos = true; rerenderMapLegend();
       const losOn = document.getElementById('map-legend').innerHTML;
       state.mapLos = false; rerenderMapLegend();
@@ -591,6 +596,15 @@ async function main() {
       return {
         offLine: /Also available/.test(before) && /Wind regions/.test(before) && /Line-of-sight/.test(before),
         windEntry: /Wind regions A–D/.test(windOn) && !/Also available[^<]*Wind regions/.test(windOn),
+        // Every region is its own row now, with the speed and the pressure
+        // ratio that make the letter mean something (#176) — the whole point of
+        // the change, so it is asserted rather than left to the eye.
+        windRows: ['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'C', 'D']
+                    .every(r => new RegExp(`<strong>${r}</strong>`).test(windOn))
+                  && /45 m\/s \(162 km\/h\)/.test(windOn)
+                  && /80 m\/s \(288 km\/h\)/.test(windOn)
+                  && /3\.2× Region A/.test(windOn)
+                  && (windOn.match(/legend-wind-cyc/g) || []).length === 3,
         losEntry:  /Line of sight/.test(losOn) && /legend-line-los/.test(losOn)
                    && !/Also available[^<]*Line-of-sight/.test(losOn),
         heads,
@@ -598,6 +612,7 @@ async function main() {
     });
     check('the legend names the optional layers that are off, and where to turn them on', legend.offLine);
     check('turning wind on gives it a legend entry and takes it off that line', legend.windEntry);
+    check('the wind key lists all ten regions, with speeds and what they cost', legend.windRows);
     check('the same for line of sight', legend.losEntry);
     check('the 👁️ flyout is grouped under three headings',
       legend.heads.join('|') === 'Stations & links|Overlay layers|Labels & export', legend.heads.join(' | '));

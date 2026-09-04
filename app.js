@@ -2033,7 +2033,8 @@ function mapDisplayControlsHtml() {
   const on = state.mapKillSpaghetti;
   return `
     <div class="map-display-h">Stations &amp; links</div>
-    <label class="filter-check">
+    <label class="filter-check"
+           title="Takes the non-matching pins off the map, and the link lines that run to them with them. Tick &quot;Include related repeaters&quot; to keep the carriers and their lines.">
       <input type="checkbox" ${state.mapHideOthers ? 'checked' : ''}
              onchange="state.mapHideOthers=this.checked;refreshMapLayers()">
       Hide stations that don't match
@@ -2102,6 +2103,13 @@ function mapDisplayControlsHtml() {
       </select>
     </label>
     <p class="filter-note" id="map-contour-note">${MapContours.noteHtml()}</p>
+    <label class="filter-check"
+           title="The surveyed road reserve itself — the parcel the road is dedicated over, with its name, locality and local authority. Queensland cadastre; zoom in past about 1:40,000 to draw it.">
+      <input type="checkbox" ${state.mapRoads ? 'checked' : ''}
+             onchange="MapRoads.setEnabled(this.checked);rerenderMapLegend()">
+      Road parcels (Qld cadastre)
+    </label>
+    <p class="filter-note" id="map-roads-note">${MapRoads.noteHtml()}</p>
     <!-- Wind and LOS repaint the legend from here (#175): rivers, survey
          marks and contours each repaint it from inside their own module, and
          these two never did, so the legend's entry for either — and its line
@@ -2173,20 +2181,27 @@ function rerenderMapDisplayControls() {
 // What the link controls are actually doing. Counted on the last refresh so the
 // note survives a re-render of the pane.
 function mapLinkNoteHtml() {
-  const { drawn, culled, backbone } = state.mapLinkCount;
+  const { drawn, culled, hidden, backbone, backboneHidden } = state.mapLinkCount;
   // Backbone pairs are *matched* by the slider, not culled by it — the note
   // says so in its own clause however the field links are being treated.
   const bb = state.mapShowBackbone
     ? ` · ${backbone || 0} backbone path${backbone === 1 ? '' : 's'} within ${state.mapMaxLinkKm} km`
+      + (backboneHidden ? ` (${backboneHidden} more end on a hidden station)` : '')
+    : '';
+  // What "hide stations that don't match" took with it (#176). Said plainly,
+  // because a link count that drops when a filter is narrowed is otherwise the
+  // kind of change an operator notices without being able to explain.
+  const off = hidden
+    ? ` · <strong>${hidden}</strong> hidden with the stations they run to`
     : '';
   if (!state.mapShowLinks) return `Signal links are hidden${bb}.`;
   const links = n => `${n} link${n === 1 ? '' : 's'}`;
   if (!state.mapKillSpaghetti) {
-    return `${links(drawn)} drawn — every pass-range path, however long${bb}.`;
+    return `${links(drawn)} drawn — every pass-range path, however long${off}${bb}.`;
   }
   return culled
-    ? `${links(drawn)} drawn · <strong>${culled}</strong> over ${state.mapMaxLinkKm} km hidden${bb}.`
-    : `${links(drawn)} drawn · none over ${state.mapMaxLinkKm} km${bb}.`;
+    ? `${links(drawn)} drawn · <strong>${culled}</strong> over ${state.mapMaxLinkKm} km hidden${off}${bb}.`
+    : `${links(drawn)} drawn · none over ${state.mapMaxLinkKm} km${off}${bb}.`;
 }
 
 // The legend has always listed only what is ON — which made the layers most
@@ -2200,6 +2215,7 @@ function mapLegendOffLayersHtml() {
     !state.mapSurvey          && 'Survey marks',
     !state.mapRivers          && 'River highlighting',
     !state.mapContours        && 'LiDAR contours',
+    !state.mapRoads           && 'Road parcels',
     !state.mapWind            && 'Wind regions',
     !state.mapLos             && 'Line-of-sight checks',
     !state.mapFade            && 'Fade-margin link colours',
@@ -2210,6 +2226,42 @@ function mapLegendOffLayersHtml() {
     <span class="legend-item legend-off">
       <span class="small txt-muted">Also available — turn on in 👁️ Map display: ${off.join(' · ')}</span>
     </span>`;
+}
+
+// The wind-region key (#176). It used to be one line — "Wind regions A–D" and
+// a single green swatch — which is a key that names its own colours and then
+// declines to say what any of them mean. Ten regions are drawn on the map, and
+// the reason anybody turns the layer on is to find out what the site under a
+// mast has to be built for, so each one gets its own row: the colour, the
+// region, where it is, the ultimate regional wind speed, and what that costs.
+//
+// The speed is the number people quote; the ×-figure beside it is the one that
+// actually explains the difference, because design pressure goes with V². A
+// Region D site is not "a bit worse" than a Region A one, it is about three
+// times the load on the same mast — which is the sentence the old legend line
+// had no room for.
+//
+// The rows are built from MapWind.regions(), so the colour in the key is the
+// colour on the map by construction and the wording lives beside the data it
+// describes rather than here.
+function mapWindLegendHtml() {
+  const rows = MapWind.regions().map(r => `
+      <span class="legend-item legend-wind-row">
+        <span class="legend-sq" style="--dot:${r.color}"></span>
+        <span class="small">
+          <strong>${esc(r.id)}</strong>${r.cyclonic ? ' <span class="legend-wind-cyc">cyclonic</span>' : ''}
+          — ${esc(r.where)}.
+          <span class="txt-muted">${r.v500} m/s (${r.kmh} km/h) ultimate regional wind speed
+          · ${esc(r.ratioText)}.</span>
+          ${esc(r.note)}
+        </span>
+      </span>`).join('');
+  return `
+    <div class="legend-wind">
+      <span class="small legend-wind-h"><strong>Wind regions A–D (AS/NZS 1170.2:2021)</strong> — indicative</span>
+      ${rows}
+      <span class="small txt-muted legend-wind-foot">${esc(MapWind.provenance())}</span>
+    </div>`;
 }
 
 function mapLegendHtml() {
@@ -2251,11 +2303,12 @@ function mapLegendHtml() {
       <span class="legend-line legend-line-contour"></span>
       <span class="small">LiDAR contours (Qld Dept of Resources)</span>
     </span>` : ''}
-    ${state.mapWind ? `
+    ${MapRoads.active() ? `
     <span class="legend-item">
-      <span class="legend-sq" style="--dot:${MapWind.legendColour()}"></span>
-      <span class="small">Wind regions A–D (AS/NZS 1170.2) — indicative</span>
+      <span class="legend-sq" style="--dot:${MapRoads.legendColour()}"></span>
+      <span class="small">Road parcel — the road reserve, not the road (Qld cadastre). Hover for its name</span>
     </span>` : ''}
+    ${state.mapWind ? mapWindLegendHtml() : ''}
     ${state.mapLos ? `
     <span class="legend-item">
       <span class="legend-line legend-line-los"></span>
@@ -2393,6 +2446,7 @@ function stopStationsMap() {
   MapRivers.detach();
   MapSurvey.detach();
   MapContours.detach();
+  MapRoads.detach();
   MapWind.detach();
   // Not a detach — MapLos holds no layer — but the same duty: the queue is
   // for lines on the map this function is destroying, so clear it and bump
@@ -2462,6 +2516,7 @@ function initMap() {
   MapRivers.attach(state.map);
   MapSurvey.attach(state.map);
   MapContours.attach(state.map);
+  MapRoads.attach(state.map);
   MapWind.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
   // show on the map that has just been rebuilt.
@@ -2593,34 +2648,47 @@ function refreshMapLayers({ skipFit = false } = {}) {
   const relIds   = active ? relatedIdSet() : null;
   const related  = active ? located.filter(s => relIds.has(s.id)) : [];
 
+  // Highlight mode keeps every pin on the map; hide mode shows the matches and
+  // whatever the pass ranges pulled in behind them, and nothing else.
+  //
+  // It used to make one exception — the repeaters at the far end of a drawn
+  // path were kept, so a line never ran off to nowhere. #176 turned that round,
+  // because it was the wrong half of the pair to keep: "hide stations that
+  // don't match" is asked for by somebody who wants the map down to the subset
+  // they are working on, and an exception that quietly re-adds repeaters *and*
+  // their lines gives them back the spaghetti they were hiding. So hide mode is
+  // now literal — the set below is the whole of what is drawn, and the links
+  // are cut to it rather than the other way round. A line with a hidden end is
+  // hidden, and the note under the switch says how many. "Include related
+  // repeaters", one checkbox up, is how the carriers and their lines come back.
+  const hiding   = active && state.mapHideOthers;
+  const stations = hiding ? matched.concat(related) : located;
+  const shownIds = hiding ? new Set(stations.map(s => s.id)) : null;
+  updateMapMatchNote();
+
   // Links follow the highlight: with a filter running, only the matched and
   // related stations draw theirs, so the lines don't bury the pins they're meant
-  // to explain. They are resolved before the pins because in hide mode they
-  // decide which repeaters have to stay on the map.
+  // to explain — and in hide mode a link needs BOTH ends on the map to be drawn
+  // at all.
   const allLinks = state.mapShowLinks
     ? passRangeLinks(active ? matched.concat(related) : located) : [];
   const maxKm = state.mapKillSpaghetti ? state.mapMaxLinkKm : Infinity;
-  const links = allLinks.filter(l => l.km <= maxKm);
+  const inRange = allLinks.filter(l => l.km <= maxKm);
+  const links = shownIds
+    ? inRange.filter(l => shownIds.has(l.s.id) && shownIds.has(l.r.id)) : inRange;
   // Backbone pairs take the slider as a match condition, kill-spaghetti or not
   // — a backbone path either exists at this distance or it doesn't, so there
-  // is no culled remainder to count.
-  const backbone = state.mapShowBackbone ? backboneLinks(state.mapMaxLinkKm) : [];
-  state.mapLinkCount = { drawn: links.length, culled: allLinks.length - links.length,
-                         backbone: backbone.length };
+  // is no culled remainder to count. Hide mode cuts them the same way as the
+  // field links: a repeater-to-repeater path with one repeater hidden is a line
+  // to nowhere, which is the whole complaint.
+  const allBackbone = state.mapShowBackbone ? backboneLinks(state.mapMaxLinkKm) : [];
+  const backbone = shownIds
+    ? allBackbone.filter(p => shownIds.has(p.a.id) && shownIds.has(p.b.id)) : allBackbone;
+  state.mapLinkCount = { drawn: links.length, culled: allLinks.length - inRange.length,
+                         hidden: inRange.length - links.length,
+                         backbone: backbone.length,
+                         backboneHidden: allBackbone.length - backbone.length };
   updateMapLinkNote();
-
-  // Highlight mode keeps every pin on the map; hide mode drops the rest —
-  // except the repeaters at the far end of a drawn path. Hiding those left the
-  // TX path on screen with nothing at the end of it: the one station the
-  // operator most wants to see is the one the signal is going to.
-  let stations = (active && state.mapHideOthers) ? matched.concat(related) : located;
-  if (active && state.mapHideOthers && links.length) {
-    const shown = new Set(stations.map(s => s.id));
-    const kept  = [];
-    for (const l of links) if (!shown.has(l.r.id)) { shown.add(l.r.id); kept.push(l.r); }
-    if (kept.length) stations = stations.concat(kept);
-  }
-  updateMapMatchNote();
   if (!stations.length) { MapSpider.setPins('stations', []); state.mapMatchLabels = new Set(); return; }
 
   // A filter's matches are always named — that is what the filter was for —
@@ -2952,6 +3020,10 @@ function stationActionPills(s) {
            title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
            >Open in ARRO admin ↗</a>` : '',
     ...mapLinksPills(s),
+    // Beside the Google Earth link the row above ends with, and after it on
+    // purpose: that one takes you to the ground, this one takes the network
+    // with you (#176, export.js).
+    stationKmlPillHtml(s),
   ].filter(Boolean);
 }
 

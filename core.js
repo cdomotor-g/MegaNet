@@ -279,8 +279,10 @@ const HELP = {
       + 'so a pin still on screen has not necessarily matched anything. <em>Hide stations that '
       + 'don\'t match</em>, in the map\'s <strong>Map display</strong> panel, is the subtractive '
       + 'behaviour if '
-      + 'that is what you want. Names are capped at 60 either way, and the panel says when the cap '
-      + 'is in effect.',
+      + 'that is what you want: it takes the pins <em>and the link lines that run to them</em>, so '
+      + 'what is left is only the subset you filtered for. Tick <strong>Include related '
+      + 'repeaters</strong> to bring the carriers — and their lines — back with it. Names are '
+      + 'capped at 60 either way, and the panel says when the cap is in effect.',
       'The search box is a <strong>stack of entries</strong>, and each says what it is a list '
       + '<em>of</em>. With all three fields ticked — the default — a term is tried against the '
       + 'name, the station number and the ALERT addresses at once, which is right for one term '
@@ -1689,9 +1691,20 @@ const state = {
   // SoRT's experience picked as the sane fast one.
   mapContours:        false,
   mapContourInterval: '5',
-  // AS/NZS 1170.2 wind loading regions (see MapWind). Off by default and not
-  // persisted, for MapSurvey's reasons — it fetches a 650 KB file on enable.
-  mapWind:        false,
+  // AS/NZS 1170.2 wind loading regions (see MapWind). On by default and
+  // remembered since #176, on MapSurvey's terms rather than MapContours'.
+  // "A layer that costs a request stays off until asked for" was the rule that
+  // kept it off, and it does not hold here: the station card asks the same
+  // file for its Wind region line the moment anybody opens a station, so
+  // having the layer off never avoided the 650 KB fetch — it only meant the
+  // map stayed silent about which regions the network crosses until somebody
+  // went looking for a checkbox. An operator who turns it off means it.
+  mapWind:        localStorage.getItem('mn-wind') !== 'off',
+  // Road parcels from the Queensland cadastre (see MapRoads, #176). Off by
+  // default and not persisted, for MapContours' reasons — it costs a query per
+  // view, and unlike the wind regions there is no one bundled file that makes
+  // every later ask free.
+  mapRoads:       false,
   // Line-of-sight check on drawn links (see MapLos). Off by default and not
   // persisted, for MapSurvey's reasons — it fetches terrain tiles on enable.
   mapLos:         false,
@@ -1724,7 +1737,10 @@ const state = {
   mapPanelsPinned: new Set((localStorage.getItem('mn-map-panels') || '')
                              .split(',').map(s => s.trim()).filter(Boolean)),
   mapMatchLabels: new Set(),  // ids the current filter earned a label (see mapLabelIds)
-  mapLinkCount:   { drawn: 0, culled: 0 },   // last refresh, for the map-display note
+  // Last refresh, for the map-display note: drawn, culled by the distance
+  // slider, hidden with the stations they run to (#176), and the backbone
+  // pair counts beside them.
+  mapLinkCount:   { drawn: 0, culled: 0, hidden: 0, backbone: 0, backboneHidden: 0 },
   mapFitKey:      null,    // extent the map was last auto-fitted to (re-fit only on change)
   mapSearchTimer: null,    // debounce for the search box → marker rebuild
   passRelIdx:     null,    // both directions of the pass-range relation, per loaded file

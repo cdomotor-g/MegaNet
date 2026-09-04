@@ -29,6 +29,7 @@
     "map-rivers.js",
     "map-survey.js",
     "map-contours.js",
+    "map-roads.js",
     "map-wind.js",
     "map-spider.js",
     "map-backbone.js",
@@ -52,6 +53,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 580,
-  "distinct": 580
+  "total": 591,
+  "distinct": 591
 }

@@ -158,6 +158,7 @@ MegaNet/
 │   ├── acma-licence-suggestions.csv  (repeater ↔ ACMA licence review file)
 │   ├── ghosting-links.json           (observed candidate → target ghosting links, Ghosting Graph)
 │   ├── wind-regions-as1170-2021.geojson  (AS/NZS 1170.2 wind regions — GA eCat 146359, CC-BY 4.0, ~1 km simplified)
+│   │                                     (road parcels are NOT bundled — MapRoads queries the live Qld cadastre per view)
 │   └── rf-concepts.json              (RF explainer entries for the Workbench concept drawer)
 │
 ├── radio-mobile/           ← self-contained Radio Mobile desktop project
@@ -944,6 +945,20 @@ on top — so it stays legible over satellite imagery and topo shading, where a
 single thin orange line disappears. **Link opacity** fades the pair together
 when the lines are burying the pins they are meant to explain.
 
+**Hiding a station hides its lines.** *Hide stations that don't match*, in the
+same panel, is the subtractive reading of the filter box — and until #176 it
+made one exception: the repeaters at the far end of a drawn path were kept on
+the map, so a line never ran off to nowhere. That was the wrong half of the pair
+to keep. Somebody ticking that box wants the map down to the subset they are
+working on, and an exception that quietly re-adds repeaters *and* their lines
+hands back the spaghetti they were hiding. So hide mode is literal now: the
+matches and whatever *Include related repeaters* pulled in behind them are the
+whole of what is drawn, and a link — field or backbone — needs both its ends on
+the map to be drawn at all. The note under the switch says how many went with
+them ("412 links drawn · **1129** hidden with the stations they run to"), so a
+count that drops when a filter is narrowed is never a mystery, and *Include
+related repeaters* one row up is how the carriers and their lines come back.
+
 **Names on the satellite view.** The Satellite base is Esri's World_Imagery,
 and bare imagery gives no way to orient around a station without flipping back
 to OSM-Topo — so whenever Satellite is the chosen base, on every map that
@@ -980,6 +995,27 @@ sit on a light base and would disappear into a black one, and both laser modes
 want no raster at all. *(CARTO's Dark Matter was the first choice and was
 dropped: its keyless tiles now come back stamped "API KEY REQUIRED" across the
 middle. Esri needs no key and was already serving three of this app's layers.)*
+
+**Centring a Map Generator sheet on a station.** The **Map Generator** tab —
+the one that turns the network into a printable sheet or a laser plate — frames
+its output from a centre latitude, a centre longitude and a scale. Two numbers
+in a box is the honest way to say *where a sheet is*, and the wrong way to
+choose it: nobody carries their repeater sites' coordinates around, and the way
+the question actually arrives is "print me the country around Loudoun". So above
+those boxes there is a search field that takes a station name, a station number
+or an ALERT address — the same `prepareSearch`/`stationMatchesSearch` pair the
+Stations filter box and the link budget's two end boxes use, so all three agree
+about what a term matches — and picking a hit drops the frame's centre onto that
+station. The picker map follows, and the panel says which station the centre is
+sitting on.
+
+The **scale is deliberately left alone**. "Centre on this station" is a question
+about *where*, and a sheet that silently rescaled itself would take the plate-size
+decision away from the person who made it; the hint says so and the **Scale**
+box is one row down. The "centred on" line is derived rather than remembered —
+it is only shown while the saved centre still rounds to that station's position
+— so *Fit all stations*, a nudge, *Centre output here* or a typed figure all
+retire it without anything having to remember to clear it.
 
 **Highlighting rivers.** Half this network is named after the river it sits on,
 so typing `burdekin` into the filter box lights up the Burdekin and its named
@@ -1063,11 +1099,68 @@ against re-opening. A callout is useful before that lands and stays useful if it
 never does: the heading, the coordinates, the height and the report link are all
 built from what drawing the mark already knew.
 
+**Road parcels.** *Road parcels (Qld cadastre)*, in the same **Map display**
+panel, draws the **road reserve itself** — the surveyed parcel the road is
+dedicated over, with its own boundary, its own local authority and usually its
+own name. Every base map in the picker already draws roads; none of them draws
+the parcel, and the parcel is what the questions actually land on. Is this mast
+standing in the road reserve or on the neighbour's freehold? Whose road is the
+access track? Can a trailer reach the site without crossing private land? A
+centreline answers none of those; a parcel boundary answers all three at a
+glance. Hover one and it names itself — road name, locality, local authority.
+
+The source is the DCDB's own *Cadastral parcels* layer on the Queensland spatial
+platform, filtered to `parcel_typ = 'Road Type Parcel'`, updated nightly — the
+same rows QSpatial's SmartMap draws as road. Off by default and not remembered,
+for the contours' reason: it costs one query per view, and unlike the wind
+regions there is no bundled file that makes every later ask free. It draws from
+about zoom 13 in and says *zoom in to draw road parcels* above that, caches by a
+rounded bounding box so a small pan costs nothing, and caps at 1500 parcels a
+view with the note saying when the cap is in effect. Queensland only — the
+cadastre it reads stops at the border, and the note says so rather than showing
+an empty layer.
+
+Vector rather than the server-rendered image the contours settled on, and for
+the opposite reason: road parcels are sparse where contour lines are dense, a
+viewport's worth is tens of kilobytes, and the whole point is to be able to
+point at one and be told what it is. It takes no clicks, only hovers — a road
+parcel is an enormous target, and a layer that opened a callout every time
+somebody clicked inside one would swallow the *click the empty map to clear the
+focus* gesture the pins, the ACMA card and the repeater focus all depend on.
+
 **Wind loading regions.** *Wind regions (AS/NZS 1170.2)*, another **Map
 display** switch, draws the Standard's wind loading regions — A0–A5, B1, B2,
 C and D — under the pins, on the severity ramp the Standard's own map uses:
 green temperate through amber and orange to cyclonic red, with the Pilbara's
-D in purple.
+D in purple. Each of the six A regions has its own shade of that green, because
+each of them is a separate region on the Standard's map even though they share
+a design speed — one flat green over all six drew a boundary nobody could see.
+
+**On by default and remembered**, on the survey marks' terms rather than the
+contours'. The rule that kept it off was *a layer that costs a request stays off
+until it is asked for*, and it turned out not to apply: the station card asks
+for the same file for its **Wind region** line the moment anybody opens a
+station, so having the layer off never avoided the fetch — it only meant the map
+stayed silent about which regions the network crosses until somebody went
+looking for a checkbox. An operator who unticks it means it, so the answer is
+kept between visits.
+
+**The key says what the letter costs.** The legend used to carry one line —
+*Wind regions A–D* and a single green swatch — which is a key that names its own
+colours and then declines to explain any of them. It is ten rows now, one per
+region, each with where it is, the 500-year ultimate regional wind speed from
+Table 3.1 (45 m/s in A, 57 in B1 and B2, 66 in C, 80 in D), how much design
+pressure that is against a Region A site, and one sentence about what it means
+for a structure. The pressure figure is the one that actually explains the
+difference, and the reason it is there rather than the speed alone: pressure
+goes with *V²*, so a Region D site is not "a bit worse" than a Region A one — it
+is about **3.2×** the load on the same mast. Regions B2, C and D are marked
+**cyclonic**, which is the NCC's own reading and the line that changes what has
+to be built: wind-borne debris, cyclonic connection detailing and low-cycle
+fatigue all start at B2, even though B2's wind speed matches B1's. Region A0
+carries its own note — it is the only region where the Standard refuses a site
+any shelter credit, holding Terrain Category 2 as the floor up to 100 m of
+height whatever the ground looks like.
 
 "What wind region is that site in?" — the first question of every mast and
 aerial conversation — is answered whether or not that layer is drawn. The
@@ -1087,6 +1180,28 @@ bundled at `data/wind-regions-as1170-2021.geojson`, so there is no live service
 to be down — 650 kB of continent, about 135 kB over the wire, once per browser.
 GA is blunt that the dataset is **indicative and not for design use**, and the
 note under the switch, the callout line and the field's own tooltip all say so.
+
+**Google Earth, with the network attached.** The callout, the station card and
+the editor card have all carried a **Google Earth ↗** link for a long time — a
+camera URL that flies to the coordinate and shows you the ground. What it could
+never carry is the thing the map draws *around* that pin: the paths to the
+repeaters that hear the station. Somebody standing in Google Earth looking at a
+hilltop wants to know what the hop crosses, and a coordinate on its own cannot
+tell them.
+
+So the pill beside it, **🌏 Google Earth KML ⬇**, hands over a file instead of a
+URL. It carries the station's own pin, a pin at the far end of every link, and a
+line for each — pass-range links in the map's amber, backbone paths in its
+heavier black, each named with its distance so the file reads as a list as well
+as a picture, and every line `clampToGround` with `tessellate` set so it follows
+the terrain rather than tunnelling through a ridge it is drawn over. (A straight
+3-D chord between two hilltops looks like clearance that is not there, which on
+a radio path is the one misreading that matters.) The links are the map's own:
+the same `passRelationIndex` and backbone index, on the same **Max TX distance**
+rule, so a KML and the map can never disagree about who carries whom. A file
+rather than a URL because there is no URL form of it — Google's Earth URLs carry
+a camera, not geometry — and KML because Google Earth desktop and web, My Maps,
+QGIS, ArcGIS and every handheld that takes a track file all open it.
 
 **The station card's ALERT ids lead.** `6143 — Battery`, not `Battery — 6143`.
 The list is sorted by id, and an id is what somebody opening the card came for,

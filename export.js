@@ -3,14 +3,23 @@
 //   renderExportHtml   the Export tab: pick radio networks, get Radio Mobile
 //   and the export     and CSV output for what is on them.
 //   builders behind it
+//   stationKml         …and one station as a Google Earth KML: its pin, the
+//                      far end of every link, and a line for each (#176). Not
+//                      part of the tab — the pill that calls it lives on the
+//                      station card and the editor card — but it is an export
+//                      builder, and this is where those live.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, announce, netName, csvEscape,
-// dlText and RM_NET_DEFAULTS; across to app.js for findStationMatches, stationAlertIds and
-// repeaterPassingCount; and to datastore.js for renderDbStatusHtml, which
-// renders the datastore panel this tab hosts. The snapshot button written here
-// calls snapshotStationsJson() over in datastore.js for the same reason — see
-// that file's header.
+// dlText, acmaHaversineKm, stationLatLonText and RM_NET_DEFAULTS; across to
+// app.js for findStationMatches, findRepeaterMatches, stationAlertIds and
+// repeaterPassingCount; to map-backbone.js for backboneLinks; to map-wind.js
+// for the region a KML's station sits in; and to datastore.js for
+// renderDbStatusHtml, which renders the datastore panel this tab hosts. The
+// snapshot button written here calls snapshotStationsJson() over in
+// datastore.js for the same reason — see that file's header. Every one of them
+// is called from inside a function here, so this file's position among the
+// modules stays free.
 //
 // Moved out of app.js byte-for-byte by M3 (#134) of #129.
 // Restyled against the design system by U6 (#141) of EPIC #107 — the classes
@@ -338,3 +347,217 @@ function runExport() {
   ), (files.length - 1) * 180 + 60);
 }
 
+
+// ── Google Earth: the station, and the lines out of it (#176) ────────────────
+//
+// The callout, the station card and the editor card have carried a **Google
+// Earth ↗** link since long before this — a camera URL that flies to the
+// coordinate and shows the ground. What it could never carry is the thing the
+// Stations map draws around that pin: the paths to the repeaters that hear it.
+// Somebody standing in Google Earth looking at a hilltop wants to know what
+// the hop actually crosses, and a coordinate on its own cannot tell them.
+//
+// So the pill beside it hands over a KML file instead of a URL: the station's
+// own pin, the far end of every link, and a line for each one — pass-range
+// links in the map's amber and backbone paths in its heavier black, named with
+// the distance so the file reads as a list as well as a picture. Google Earth
+// (desktop and web), Google My Maps, QGIS, ArcGIS and every handheld that
+// takes a track file all open it.
+//
+// A file rather than a URL because there is no URL form of this: Google's
+// Earth URLs carry a camera, not geometry. It is generated in the browser from
+// the same passRelationIndex and backboneIndex the map draws from, so a KML and
+// the map can never disagree about who carries whom.
+
+// Lines produced before the file stops adding them. A repeater carrying a
+// couple of hundred field stations is a legitimate thing to export — that
+// fan-out is exactly the picture somebody wants in Earth — but a file is not
+// the place to discover that a pass range is open far wider than anyone meant.
+const KML_LINK_CAP = 500;
+
+// KML is XML, and a station named "Smith & Sons" is a well-formed way to break
+// a file. Everything written into an element goes through here.
+function kmlEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// KML colours are aabbggrr — alpha first, then the RGB channels backwards.
+// Written out of the same hex the map uses so the two cannot drift.
+function kmlColor(hex, alpha = 'ff') {
+  const h = String(hex).replace('#', '');
+  return `${alpha}${h.slice(4, 6)}${h.slice(2, 4)}${h.slice(0, 2)}`.toLowerCase();
+}
+
+// One station's <Placemark>. `role` decides the pin colour, which is Google's
+// own palette rather than the map's: Earth draws a pushpin from an icon URL,
+// and a station in a colour nobody has ever seen on a pushpin reads as a bug.
+function kmlPlacemark(s, styleId, extra) {
+  const rows = [
+    ['Station #', s.station_number],
+    ['Roles', (s.roles || []).join(', ')],
+    ['Elevation', s.elevation_ahd != null ? `${s.elevation_ahd} m AHD` : ''],
+    ['ALERT ids', stationAlertIds(s).join(', ')],
+    ['Position', stationLatLonText(s)],
+    ...(extra || []),
+  ].filter(([, v]) => v != null && v !== '');
+  return `  <Placemark>
+    <name>${kmlEsc(s.name)}</name>
+    <styleUrl>#${styleId}</styleUrl>
+    <description><![CDATA[${rows.map(([k, v]) =>
+      `<b>${kmlEsc(k)}:</b> ${kmlEsc(v)}`).join('<br>')}]]></description>
+    <Point><coordinates>${s.lon},${s.lat},0</coordinates></Point>
+  </Placemark>`;
+}
+
+// One link. `clampToGround` + `tessellate` so the line follows the terrain in
+// Earth rather than tunnelling through a ridge it is drawn over — a straight
+// 3-D chord between two hilltops looks like clearance that is not there, which
+// on a radio path is the one misreading that matters.
+function kmlLine(a, b, styleId, name, km) {
+  return `  <Placemark>
+    <name>${kmlEsc(name)}</name>
+    <styleUrl>#${styleId}</styleUrl>
+    <description>${kmlEsc(`${km.toFixed(1)} km, ${a.name} → ${b.name}`)}</description>
+    <LineString>
+      <tessellate>1</tessellate>
+      <altitudeMode>clampToGround</altitudeMode>
+      <coordinates>${a.lon},${a.lat},0 ${b.lon},${b.lat},0</coordinates>
+    </LineString>
+  </Placemark>`;
+}
+
+// The links out of one station, as the map resolves them: the pass-range paths
+// (whichever direction the relation runs) and the backbone paths this station
+// is an end of. Both ends of every returned pair have a position — a link to a
+// station nobody has surveyed has nowhere to draw to.
+function stationKmlLinks(s) {
+  const located = x => x && x.lat != null && x.lon != null;
+  const seen = new Set();
+  const links = [];
+  const add = (kind, other) => {
+    if (!located(other) || other.id === s.id || seen.has(kind + '|' + other.id)) return;
+    seen.add(kind + '|' + other.id);
+    links.push({ kind, other, km: acmaHaversineKm(s.lat, s.lon, other.lat, other.lon) });
+  };
+  // A repeater is at both ends of the relation: it carries field stations, and
+  // where it has ALERT ids of its own it is carried in turn. relatedStations()
+  // asks the pair the same way round.
+  for (const r of findRepeaterMatches(s)) add('pass', r);
+  if (s.roles.includes('repeater')) for (const f of findStationMatches(s)) add('pass', f);
+  // Backbone pairs, on the Stations map's own distance rule so the file and
+  // the map agree about which of them exist.
+  for (const p of backboneLinks(state.mapMaxLinkKm)) {
+    if (p.a.id === s.id) add('backbone', p.b);
+    else if (p.b.id === s.id) add('backbone', p.a);
+  }
+  links.sort((x, y) => x.km - y.km);
+  return links;
+}
+
+// The whole file. Written by hand rather than through a library: it is a few
+// hundred lines of one XML shape, and a dependency loaded from a CDN is a
+// thing that can be down when somebody is standing in a paddock.
+function stationKml(s) {
+  const links  = stationKmlLinks(s);
+  const capped = links.length > KML_LINK_CAP;
+  const kept   = capped ? links.slice(0, KML_LINK_CAP) : links;
+  const passes = kept.filter(l => l.kind === 'pass');
+  const backs  = kept.filter(l => l.kind === 'backbone');
+  const wind   = MapWind.regionState(s.lat, s.lon);
+  const nets   = (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean).join(', ');
+
+  // The map's own two link colours, so the file looks like the screen it came
+  // from: amber for a pass-range path, black for a backbone one, and the
+  // backbone heavier — "more prominent" is the rule refreshMapLayers keeps.
+  const styles = `
+  <Style id="mnStation">
+    <IconStyle><scale>1.2</scale>
+      <Icon><href>https://maps.google.com/mapfiles/kml/paddle/grn-stars.png</href></Icon>
+    </IconStyle>
+  </Style>
+  <Style id="mnPeer">
+    <IconStyle><scale>1.0</scale>
+      <Icon><href>https://maps.google.com/mapfiles/kml/paddle/blu-circle.png</href></Icon>
+    </IconStyle>
+  </Style>
+  <Style id="mnPass">
+    <LineStyle><color>${kmlColor('#ff6f00')}</color><width>3</width></LineStyle>
+  </Style>
+  <Style id="mnBackbone">
+    <LineStyle><color>${kmlColor('#101010')}</color><width>4</width></LineStyle>
+  </Style>`;
+
+  const folder = (name, open, body) => body
+    ? `  <Folder><name>${kmlEsc(name)}</name><open>${open ? 1 : 0}</open>\n${body}\n  </Folder>`
+    : '';
+
+  const linkFolder = (name, list, styleId, arrow) => folder(name, false, list.map(l =>
+    kmlLine(s, l.other, styleId, `${s.name} ${arrow} ${l.other.name} — ${l.km.toFixed(1)} km`, l.km)
+  ).join('\n'));
+
+  const peers = folder('Far ends', false, kept.map(l =>
+    kmlPlacemark(l.other, 'mnPeer', [['Link to', `${s.name} — ${l.km.toFixed(1)} km`]])).join('\n'));
+
+  const summary = [
+    `${passes.length} pass-range link${passes.length === 1 ? '' : 's'}`,
+    `${backs.length} backbone path${backs.length === 1 ? '' : 's'} within ${state.mapMaxLinkKm} km`,
+    capped ? `capped at ${KML_LINK_CAP} lines` : '',
+  ].filter(Boolean).join(' · ');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>${kmlEsc(s.name)} — MegaNet</name>
+  <description><![CDATA[${kmlEsc(summary)}.<br>Exported from MegaNet on ${
+    kmlEsc(new Date().toLocaleString())}. Pass-range links are drawn amber, backbone paths black,
+    both clamped to the ground.]]></description>
+${styles}
+${kmlPlacemark(s, 'mnStation', [
+  ['Networks', nets],
+  ['Wind region', wind && wind.text !== 'looking up…' ? wind.text : ''],
+  ['Links', summary],
+])}
+${[linkFolder('Pass-range links', passes, 'mnPass', '→'),
+   linkFolder('Backbone paths', backs, 'mnBackbone', '↔'),
+   peers].filter(Boolean).join('\n')}
+</Document>
+</kml>
+`;
+}
+
+// The pill's click. Named for the station and dated, because a downloads folder
+// is where these go to be found again a fortnight later.
+//
+// A station with no position has no pill at all (stationKmlPillHtml returns
+// nothing), so the only guard needed here is against an id that no longer
+// resolves — a station deleted while its card was open.
+function downloadStationKml(id) {
+  const s = state.data && state.data.stations.find(x => x.id === id);
+  if (!s || s.lat == null || s.lon == null) {
+    announce('That station has no position recorded, so there is nothing to place.');
+    return;
+  }
+  const safe = (s.name || 'station').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'station';
+  const stamp = new Date().toISOString().slice(0, 10);
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([stationKml(s)],
+      { type: 'application/vnd.google-earth.kml+xml' })),
+    download: `meganet-${safe}-${stamp}.kml`,
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+  const n = stationKmlLinks(s).length;
+  announce(`${s.name} downloaded as KML — the pin and ${n} link${n === 1 ? '' : 's'}. Open it in Google Earth.`);
+}
+
+// The pill itself, for the row stationActionPills builds. Next to the Google
+// Earth link rather than anywhere else: they are the same errand, and the one
+// that carries the network is the one worth reaching for.
+function stationKmlPillHtml(s) {
+  if (!s || s.lat == null || s.lon == null) return '';
+  const n = stationKmlLinks(s).length;
+  return `<button type="button" class="pill" onclick="downloadStationKml('${escAttr(s.id)}')"
+       title="Download this station and its ${n} link line${n === 1 ? '' : 's'} as a KML file — open it in Google Earth to see the pin and the paths to its repeaters over the terrain"
+       >🌏 Google Earth KML ⬇</button>`;
+}

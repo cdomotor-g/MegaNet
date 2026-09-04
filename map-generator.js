@@ -464,12 +464,28 @@ const mg = {
   riverCache: new Map(),   // rounded bbox → overpass ways, LRU
   baseCache: new Map(),    // tile compose → data URL, LRU
   layerSvgCache: new Map(),
+  // What is typed in the "centre on a station" box (#176). Not persisted and
+  // not part of mg.s: it is a question being asked right now, not a setting —
+  // the *answer* is the centre, and that is saved. Kept on the module rather
+  // than read out of the input so the list can be repainted without the input
+  // being re-rendered under the caret, LinkBudget's rule for its own find box.
+  stnQuery: '',
 };
+
+// Hits offered under the station box. Eight is what fits without the panel
+// growing a scrollbar of its own; anything wider than that is a search that
+// wants another word typed into it, and the lead line says so.
+const MG_FIND_CAP = 8;
 
 function defaults() {
   return {
     preset: 'a4l', wMm: 297, hMm: 210, marginMm: 10,
     lat: -23.5, lon: 145.5, scale: 7500000, fitDone: false,
+    // The station the centre was taken from, if it was (#176). Only ever read
+    // back through centreStation() below, which checks the coordinate still
+    // agrees — so nudging, fitting or typing a figure retires it without
+    // anything having to remember to clear it.
+    centreSid: null,
     mode: 'print', autoRefresh: true,
     base: { print: 'OSM-Topo', laser: 'none', layers: 'none' },
     colors: {
@@ -1318,7 +1334,18 @@ function afterChange(opts) {
   save();
   syncRect();
   if (o.panel) refreshPanel(o.panel, o.focus);
+  // The "Centred on <station>" line is derived from the centre, so any change
+  // to the centre can retire it — including a figure typed straight into the
+  // latitude box. Rewritten in place rather than by re-rendering the panel it
+  // sits in: that markup holds the search input, and re-rendering an input is
+  // how a caret (and a half-finished paste) gets lost.
+  syncFindHint();
   scheduleGen();
+}
+
+function syncFindHint() {
+  const el = document.getElementById('mg-find-hint');
+  if (el) el.innerHTML = findHintHtml();
 }
 
 function num(v, lo, hi, fallback) {
@@ -1340,6 +1367,113 @@ function colorInput(key) {
          ` onchange="MapGen.setColor('${key}', this.value)">`;
 }
 
+// ── Centre the sheet on a station ────────────────────────────────────────────
+//
+// Two numbers in a box is the honest way to say where a sheet is, and the
+// wrong way to *choose* where it is: nobody carries their repeater sites'
+// coordinates around, and the way this question actually arrives is "print me
+// the country around Loudoun". So the box above the coordinates searches the
+// loaded stations by name, station number or ALERT address — the same
+// prepareSearch/stationMatchesSearch pair the Stations filter and the link
+// budget's two end boxes use, so all three agree about what a term matches —
+// and picking a hit drops the frame's centre onto that station.
+//
+// The scale is deliberately left alone. "Centre on this station" is a question
+// about *where*, and a sheet that silently rescaled itself would take the
+// operator's plate size decision away from them; the hint says so and the
+// Scale box is one row down.
+
+// The station the centre currently sits on, or null. Derived rather than
+// tracked: the remembered id is only honoured while the saved centre still
+// rounds to that station's position, so Fit all stations, a nudge, Centre
+// output here or a typed figure all retire it without anything having to
+// remember to clear it.
+function centreStation() {
+  if (!mg.s.centreSid || !state.data) return null;
+  const s = state.data.stations.find(x => x.id === mg.s.centreSid);
+  if (!s || s.lat == null || s.lon == null) return null;
+  // The centre is stored to four decimals, so a station's own position can sit
+  // up to half a step away from it and still be the station it was taken from.
+  // A shade over half, so a coordinate that lands exactly on the rounding
+  // boundary is not read as a different place.
+  const near = (a, b) => Math.abs(a - b) <= 5.1e-5;
+  return near(s.lat, mg.s.lat) && near(s.lon, mg.s.lon) ? s : null;
+}
+
+function findHintHtml() {
+  const on = centreStation();
+  return on
+    ? `Centred on <strong>${esc(on.name)}</strong>. <em>Scale</em>, below, decides how much
+       country comes with it.`
+    : 'Picking a station moves the centre only — the scale below is left as you set it.';
+}
+
+function stationFindHtml() {
+  if (!state.data) {
+    return `<p class="mg-hint mg-find-none">No stations file is loaded, so there is nothing to
+      search — type a centre below, or load <code>stations.json</code> from the header.</p>`;
+  }
+  return `
+    <div class="mg-find">
+      <label class="sr-only" for="mg-stn-find">Find a station to centre the sheet on</label>
+      <div class="mg-find-row">
+        <input type="search" id="mg-stn-find" class="mg-find-input"
+               value="${escAttr(mg.stnQuery)}" autocomplete="off" spellcheck="false"
+               placeholder="Centre on a station — name, station # or ALERT address"
+               aria-describedby="mg-find-hint"
+               oninput="MapGen.setStationQuery(this.value)">
+        <button type="button" class="mg-find-x" onclick="MapGen.setStationQuery('')"
+                aria-label="Clear the station search" title="Clear the station search"
+                ${mg.stnQuery.trim() ? '' : 'disabled'}>Clear</button>
+      </div>
+      <p class="mg-hint" id="mg-find-hint">${findHintHtml()}</p>
+      <div id="mg-stn-hits">${stationHitsHtml()}</div>
+    </div>`;
+}
+
+// The list under the box. Repainted on its own by setStationQuery, so the
+// input above it is never re-rendered while somebody is typing into it — the
+// caret rule the Stations filter box and LinkBudget's find boxes both keep.
+function stationHitsHtml() {
+  const text = mg.stnQuery.trim();
+  if (!state.data || !text) return '';
+  const prep = { ...prepareSearch(text) };
+  if (!prep.terms.length && !prep.ranges.length) return '';
+  const hits = [];
+  for (const s of state.data.stations) {
+    if (!stationMatchesSearch(s, prep)) continue;
+    hits.push(s);
+    if (hits.length > MG_FIND_CAP) break;      // one over, so "more than" is knowable
+  }
+  const more  = hits.length > MG_FIND_CAP;
+  const shown = more ? hits.slice(0, MG_FIND_CAP) : hits;
+  const lead  = hits.length === 0
+    ? `No station matches “${esc(text)}”`
+    : more ? `More than ${MG_FIND_CAP} match “${esc(text)}” — keep typing to narrow it`
+           : `${hits.length} match${hits.length === 1 ? '' : 'es'} “${esc(text)}”`;
+  if (!shown.length) return `<p class="mg-hint mg-find-none">${lead}.</p>`;
+  const here = centreStation();
+  return `
+    <p class="mg-hint" id="mg-find-lead">${lead}.</p>
+    <div class="mg-hits" role="group" aria-labelledby="mg-find-lead">
+      ${shown.map(st => {
+        const located = st.lat != null && st.lon != null;
+        const mine    = here && here.id === st.id;
+        return `
+          <button type="button" class="mg-hit${mine ? ' is-here' : ''}"
+                  ${located ? '' : 'disabled'}
+                  title="${located ? `Centre the sheet on ${escAttr(st.name)}`
+                                   : 'This station has no position recorded, so there is nowhere to centre on'}"
+                  onclick="MapGen.centreOnStation('${escAttr(st.id)}')">
+            <span class="mg-hit-name">${markHits(st.name, prep.terms)}</span>
+            <span class="mg-hit-num">${markHits(st.station_number || '', prep.terms)}</span>
+            ${mine ? '<span class="mg-hit-at">centre</span>'
+                   : located ? '' : '<span class="mg-hit-at">no position</span>'}
+          </button>`;
+      }).join('')}
+    </div>`;
+}
+
 // The fields half of the Output area panel only — the #mg-minimap div above
 // it is deliberately NOT part of this: the live Leaflet map is mounted in it,
 // and re-rendering the container out from under the map would leave mg.map
@@ -1347,6 +1481,7 @@ function colorInput(key) {
 function viewFieldsHtml() {
   const s = mg.s;
   return `
+    ${stationFindHtml()}
     <div class="button-row mg-row">
       <button onclick="MapGen.centreHere()" title="Move the output frame to this map view's centre">Centre output here</button>
       <button onclick="MapGen.showOutput()" title="Pan the picker to the output frame">Show output area</button>
@@ -1807,6 +1942,44 @@ return {
     mg.s.lat = Math.round(c.lat * 1e4) / 1e4;
     mg.s.lon = Math.round(c.lng * 1e4) / 1e4;
     afterChange({ panel: 'view' });
+  },
+
+  // Typing in the station box (#176). Repaints the hits and nothing else: the
+  // input is in the markup this would otherwise re-render, and a re-rendered
+  // input loses the caret — and, on a paste, the selection. The Clear button's
+  // disabled state lives on that same input, so it is set directly rather than
+  // by repainting the row around it.
+  setStationQuery(v) {
+    mg.stnQuery = String(v == null ? '' : v).slice(0, 200);
+    const box = document.getElementById('mg-stn-find');
+    if (box && box.value !== mg.stnQuery) box.value = mg.stnQuery;
+    const x = document.querySelector('.mg-find-x');
+    if (x) x.disabled = !mg.stnQuery.trim();
+    const hits = document.getElementById('mg-stn-hits');
+    if (hits) hits.innerHTML = stationHitsHtml();
+  },
+
+  // A hit picked: the sheet's centre goes to that station, and the picker map
+  // follows so the frame is visible where it landed rather than somewhere off
+  // screen. Four decimal places, the figure centreHere() and adoptStationsView
+  // both round to — about 11 m, finer than a plate at any scale this tab
+  // prints, and it keeps every centre in the file written the same way.
+  //
+  // The scale is untouched on purpose; see the note above centreStation().
+  centreOnStation(id) {
+    if (!mg.s) mg.s = loadSettings();
+    const s = state.data && state.data.stations.find(x => x.id === id);
+    if (!s || s.lat == null || s.lon == null) {
+      announce('That station has no position recorded.');
+      return;
+    }
+    mg.s.lat = Math.round(s.lat * 1e4) / 1e4;
+    mg.s.lon = Math.round(s.lon * 1e4) / 1e4;
+    mg.s.centreSid = s.id;
+    mg.s.fitDone = true;          // a chosen centre is not a first visit any more
+    afterChange({ panel: 'view' });
+    if (mg.map && mg.rect) mg.map.fitBounds(mg.rect.getBounds().pad(0.15));
+    announce(`Output centred on ${s.name}.`);
   },
 
   showOutput() {

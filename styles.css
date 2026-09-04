@@ -2591,6 +2591,48 @@ hr {
 .legend-line-fade-ok   { border-top-color: var(--map-fade-ok); }
 .legend-line-fade-bad  { border-top-color: var(--map-fade-bad); }
 
+/* The wind-region key (#176). Ten regions, each with a sentence about what it
+   costs, is a nested list rather than ten more chips in the legend's wrapped
+   row — so it claims the legend's full width and stacks, in the panel and in
+   the 👁️ flyout alike. The swatch stays top-aligned because the text beside it
+   is two or three lines, not one. */
+.legend-wind {
+  /* `width` rather than a flex-basis, so it reads the same in both containers
+     this legend has: the panel's wrapping row (where 100% width puts it on a
+     line of its own) and the 👁️ flyout's column (where the basis would be a
+     *height* and 100% of one is not what any of this means). */
+  flex: 0 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+
+.legend-wind-h { margin-bottom: .1rem; }
+
+.legend-wind-row {
+  align-items: flex-start;
+  gap: .45rem;
+  line-height: 1.35;
+}
+
+.legend-wind-row .legend-sq {
+  margin-top: .3em;
+  flex: 0 0 auto;
+}
+
+/* The one word in the key that changes what a structure has to be, so it is
+   the one word that is marked. Colour plus weight, never colour alone. */
+.legend-wind-cyc {
+  color: var(--bad);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: .85em;
+  letter-spacing: .02em;
+}
+
+.legend-wind-foot { margin-top: .15rem; }
+
 /* The legend's last line, naming the layers that are off. Text on its own
    line rather than another swatch row: it is a pointer, not a key. */
 .legend-off { margin-top: var(--sp-1); }
@@ -2603,6 +2645,26 @@ hr {
   padding: 1px 5px;
   color: var(--map-river);
 }
+
+/* The road parcel's name on hover (#176). Sticky to the cursor like the river
+   label above, and dressed the way the fixed river name is — its own near-white
+   ground with fixed dark ink — because unlike the river label this one sits over
+   satellite imagery as often as over a street map, and a tooltip that borrows
+   the theme's colours is unreadable over half of them. */
+.leaflet-tooltip.mn-road-label {
+  background: rgba(255, 255, 255, .94);
+  color: #37474f;
+  font-size: .72rem;
+  font-weight: 600;
+  border: 1px solid rgba(55, 71, 79, .35);
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  padding: 0 5px;
+  line-height: 1.6;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.leaflet-tooltip.mn-road-label::before { display: none; }
 
 /* #150: the permanent name a named river carries on the map. Unlike the sticky
    hover tooltip above, this sits on the line over both basemaps, so it takes
@@ -9098,6 +9160,83 @@ code {
   border-radius: var(--r-md);
   overflow: hidden;
 }
+
+/* ── Centre the sheet on a station (#176) ──
+   The same shape as the link budget's end finder — a search row, a lead line
+   and a capped list of hits — because it is the same gesture and an operator
+   who has used one should recognise the other. Its own classes rather than
+   .lb-*: that card's rules carry an "armed end" state this box has no idea
+   about, and borrowing them would tie two unrelated panels together. */
+
+.mg-find { margin: 0 0 var(--sp-1); }
+
+.mg-find-row {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+}
+
+.mg-find-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  padding: .25rem .35rem;
+  font-size: .82rem;
+}
+
+.mg-find-x {
+  flex: none;
+  font-size: .74rem;
+  padding: .22rem .45rem;
+}
+
+.mg-find-none { margin-top: .3rem; }
+
+/* Capped at MG_FIND_CAP in the markup, so this only scrolls when the panel is
+   already short — a phone, or a pinned flyout. */
+.mg-hits {
+  display: flex;
+  flex-direction: column;
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  margin-top: .2rem;
+}
+
+.mg-hit {
+  display: flex;
+  align-items: baseline;
+  gap: .4rem;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: .28rem .35rem;
+  font-size: .82rem;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mg-hit:last-child { border-bottom: 0; }
+.mg-hit:hover:not(:disabled) { background: var(--subtle); }
+.mg-hit:disabled { cursor: default; opacity: .6; }
+.mg-hit-name { flex: 1; min-width: 0; }
+.mg-hit-num { color: var(--muted); }
+
+.mg-hit-at {
+  flex: none;
+  font-size: .6rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--accent);
+}
+
+.mg-hit.is-here { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
 .mg-row { margin-top: var(--sp-2); align-items: center; }
 

@@ -119,7 +119,11 @@ function editorForm(s) {
   // The row of pills under the coordinate boxes. Read once rather than twice —
   // a station with no position still has the two document searches, so what
   // decides whether the row is drawn is whether it came back with anything.
-  const links   = mapLinksHtml(s);
+  // The KML download joins it here rather than inside mapLinksHtml() because it
+  // is the one pill in the row that does not leave the site for somewhere else:
+  // it builds a file out of this station and the links the map draws around it
+  // (#176, export.js), and it is the same pill the map's own card carries.
+  const links   = [mapLinksHtml(s), stationKmlPillHtml(s)].filter(Boolean).join('\n    ');
   const movePin = MapMovePin.editorButtonHtml(s);
   // Same pill the map callout carries, from the same builder — but pointed at
   // editorCopyLatLon(), which reads the two boxes rather than the record. The
