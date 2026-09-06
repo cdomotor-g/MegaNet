@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "1.2",
-    "description": "MegaNet station database. catchments[] is the Queensland drainage-basin vocabulary used by the Network Maps navigator; per-station catchment_ids are populated for stations whose location is inside a basin polygon (see README).",
+    "description": "MegaNet station database. catchments[] is the Queensland drainage-basin vocabulary used by the Network Maps navigator; per-station catchment_ids are not yet populated (see README).",
     "updated": "2026-07-31",
     "rm_paths": {
       "map": "c:\\program files (x86)\\radio mobile 11.6.6\\networks\\meganet\\net1.map",
@@ -9250,8 +9250,7 @@
       "lon": 147.1372,
       "elevation_ahd": null,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [
         "mt_stuart"
@@ -9260,7 +9259,9 @@
         "burdekin"
       ],
       "alert_ids": {
-        "rainfall": 2913
+        "rainfall": 2910,
+        "battery": 2912,
+        "water_level": 2913
       },
       "satcom": {
         "enabled": false,
@@ -9271,23 +9272,6 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 163,
-      "repeater": {
-        "acma_licence": "433844",
-        "rx_mhz": 151.5,
-        "tx_mhz": 151.5,
-        "pass_ranges": [
-          {
-            "low": 2906,
-            "high": 2915
-          },
-          {
-            "low": 2959,
-            "high": 2970
-          }
-        ],
-        "exclusions": [],
-        "notes": ""
-      },
       "site": {
         "db_id": 2062,
         "number": "34097",
@@ -12844,14 +12828,17 @@
       "lon": 145.9522,
       "elevation_ahd": 7.5,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
         "mulgrave_russell"
       ],
       "alert_ids": {
-        "rainfall": 5114
+        "rainfall": 5113,
+        "battery": 5115,
+        "water_level": 5114
       },
       "satcom": {
         "enabled": false,
@@ -12862,6 +12849,19 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 231,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 5128,
+            "high": 5130
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2247,
         "number": "531074",
@@ -17021,8 +17021,8 @@
       "id": "dittmer_al",
       "name": "Dittmer AL",
       "station_number": "533169",
-      "lat": -20.4267,
-      "lon": 148.4758,
+      "lat": -20.42649,
+      "lon": 148.476303,
       "elevation_ahd": 37.9,
       "roles": [
         "field"
@@ -17032,7 +17032,8 @@
         "proserpine"
       ],
       "alert_ids": {
-        "rainfall": 2653
+        "rainfall": 2653,
+        "battery": 2654
       },
       "satcom": {
         "enabled": false,
@@ -19565,7 +19566,7 @@
     },
     {
       "id": "fanning_river_burde",
-      "name": "Fanning River (Burde",
+      "name": "Fanning River (Burdekin Dam Rd) Tm",
       "station_number": "533219",
       "lat": -19.981,
       "lon": 146.4485,
@@ -37441,7 +37442,8 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 4000
+        "rainfall": 4000,
+        "battery": 4001
       },
       "satcom": {
         "enabled": false,
@@ -37458,6 +37460,10 @@
         "tx_mhz": 151.525,
         "pass_ranges": [
           {
+            "low": 4012,
+            "high": 4014
+          },
+          {
             "low": 4021,
             "high": 4025
           },
@@ -37467,7 +37473,19 @@
           },
           {
             "low": 4047,
-            "high": 4050
+            "high": 4053
+          },
+          {
+            "low": 4062,
+            "high": 4064
+          },
+          {
+            "low": 4077,
+            "high": 4081
+          },
+          {
+            "low": 4030,
+            "high": 4032
           }
         ],
         "exclusions": [],
@@ -42178,7 +42196,10 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 4004,
+        "battery": 4005
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -42192,10 +42213,11 @@
         "acma_licence": "",
         "rx_mhz": 151.525,
         "tx_mhz": 151.525,
+        "delay_ms": 200,
         "pass_ranges": [
           {
             "low": 4006,
-            "high": 4007
+            "high": 4008
           }
         ],
         "exclusions": [],
@@ -46426,8 +46448,7 @@
       "lon": 152.9272,
       "elevation_ahd": 60.6,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [
         "constitution_hill"
@@ -46436,7 +46457,9 @@
         "logan_albert"
       ],
       "alert_ids": {
-        "rainfall": 5339
+        "rainfall": 5338,
+        "battery": 5340,
+        "water_level": 5339
       },
       "satcom": {
         "enabled": false,
@@ -46447,39 +46470,6 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 864,
-      "repeater": {
-        "acma_licence": "",
-        "rx_mhz": 151.5,
-        "tx_mhz": 151.5,
-        "pass_ranges": [
-          {
-            "low": 1979,
-            "high": 1981
-          },
-          {
-            "low": 1993,
-            "high": 1995
-          },
-          {
-            "low": 4112,
-            "high": 4114
-          },
-          {
-            "low": 4121,
-            "high": 4150
-          },
-          {
-            "low": 5500,
-            "high": 5550
-          },
-          {
-            "low": 6275,
-            "high": 6299
-          }
-        ],
-        "exclusions": [],
-        "notes": ""
-      },
       "site": {
         "db_id": 2154,
         "number": "40945",
@@ -46736,7 +46726,7 @@
     },
     {
       "id": "running_ck_bells",
-      "name": "Running Ck (Bells",
+      "name": "RUNNING CREEK (BELLS BRIDGE) ALERT",
       "station_number": "140846",
       "lat": -28.3183,
       "lon": 152.9216,
@@ -53663,10 +53653,7 @@
       "lat": -27.2742,
       "lon": 151.9931,
       "elevation_ahd": 752.1,
-      "roles": [
-        "base",
-        "repeater"
-      ],
+      "roles": [],
       "radio_network_ids": [
         "mt_glorious_seqwater"
       ],
@@ -53679,25 +53666,8 @@
       },
       "rm_system_id": 1,
       "enabled": true,
-      "notes": "",
-      "legacy_unit_id": 996,
-      "repeater": {
-        "acma_licence": "",
-        "rx_mhz": 151.525,
-        "tx_mhz": 151.525,
-        "pass_ranges": [
-          {
-            "low": 6526,
-            "high": 6527
-          },
-          {
-            "low": 4000,
-            "high": 4099
-          }
-        ],
-        "exclusions": [],
-        "notes": ""
-      }
+      "notes": "NOT OPERATIONAL, Proposed base station (ingest location)",
+      "legacy_unit_id": 996
     },
     {
       "id": "topaz_al",
@@ -53824,8 +53794,8 @@
       "id": "townson_al",
       "name": "Townson AL",
       "station_number": "540716",
-      "lat": -27.5658,
-      "lon": 152.0272,
+      "lat": -27.861287,
+      "lon": 152.383737,
       "elevation_ahd": 342.5,
       "roles": [
         "field"
@@ -53835,7 +53805,8 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 4072
+        "rainfall": 4072,
+        "battery": 4073
       },
       "satcom": {
         "enabled": false,
@@ -58437,8 +58408,8 @@
       "id": "warwick_al",
       "name": "Warwick AL",
       "station_number": "41534",
-      "lat": -28.2111,
-      "lon": 152.0275,
+      "lat": -28.209135,
+      "lon": 152.026765,
       "elevation_ahd": 458.4,
       "roles": [
         "field"
@@ -58448,7 +58419,9 @@
         "balonne_condamine"
       ],
       "alert_ids": {
-        "rainfall": 6853
+        "rainfall": 6852,
+        "battery": 6854,
+        "water_level": 6853
       },
       "satcom": {
         "enabled": false,
@@ -63970,7 +63943,8 @@
       "lon": 147.1483,
       "elevation_ahd": null,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -63987,6 +63961,23 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 2906,
+            "high": 2915
+          },
+          {
+            "low": 2959,
+            "high": 2970
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2437,
         "number": "534009",
@@ -139290,7 +139281,8 @@
       "lon": 152.934,
       "elevation_ahd": null,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -139306,6 +139298,39 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 1979,
+            "high": 1981
+          },
+          {
+            "low": 1993,
+            "high": 1995
+          },
+          {
+            "low": 4112,
+            "high": 4114
+          },
+          {
+            "low": 4121,
+            "high": 4150
+          },
+          {
+            "low": 5500,
+            "high": 5550
+          },
+          {
+            "low": 6275,
+            "high": 6299
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2826,
         "number": "540241",
@@ -149938,11 +149963,12 @@
       "id": "toowoomba_al",
       "name": "Toowoomba AL",
       "station_number": "540162",
-      "lat": -27.511389,
-      "lon": 151.953611,
+      "lat": -27.5097,
+      "lon": 151.95479,
       "elevation_ahd": null,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -149957,6 +149983,23 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 6529,
+            "high": 6527
+          },
+          {
+            "low": 4000,
+            "high": 4099
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2776,
         "number": "540162",
@@ -161601,6 +161644,44 @@
           "type": "Battery",
           "sensor_id": "540122.0.B.1703",
           "device_id": 2
+        }
+      ]
+    },
+    {
+      "id": "elpro_test",
+      "name": "ELPRO 115E-2 test unit",
+      "station_number": "999999",
+      "lat": null,
+      "lon": null,
+      "elevation_ahd": null,
+      "roles": [
+        "base"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [],
+      "alert_ids": {},
+      "satcom": {},
+      "rm_system_id": null,
+      "enabled": true,
+      "notes": "Bench/test gateway, not a site. Exists so the 115E-2 MQTT trial has somewhere to land that a person can read: see docs/elpro115e_test_card.md for the technician's half and docs/elpro115e_mqtt.md for the full provisioning guide. Publishes as elpro_test on meganet/v1/elpro_test/logger/reading/elpro. No lat/lon and no rm_system_id on purpose — there is no site and it is not a radio station. Not in stations.json, so document_managed is false and a stations load leaves it alone (0022). Retire with update meganet.station set deleted_at = now() where id = 'elpro_test'.",
+      "sensors": [
+        {
+          "alert_id": 9001,
+          "type": "Water Level",
+          "sensor_id": "elpro_test_level",
+          "device_id": null
+        },
+        {
+          "alert_id": 9002,
+          "type": "Rainfall",
+          "sensor_id": "elpro_test_rain",
+          "device_id": null
+        },
+        {
+          "alert_id": 9003,
+          "type": "Battery",
+          "sensor_id": "elpro_test_battery",
+          "device_id": null
         }
       ]
     }
