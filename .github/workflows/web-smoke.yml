@@ -386,6 +386,15 @@ jobs:
         working-directory: test
         run: npm run claim
 
+      # A level charted as rain, with a 0.2 mm/tip conversion offered against
+      # metres — because the field path could not resolve a `s:<number>/<channel>`
+      # address to its sensor row, and guessKind's fallback is RainAccum. Smoke
+      # cannot see this: the tab renders, the axis is drawn, nothing throws, and
+      # the chart is simply wrong about what it is charting.
+      - name: Field series kind — a level is a level, and is offered no bucket size
+        working-directory: test
+        run: npm run fieldkind
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each

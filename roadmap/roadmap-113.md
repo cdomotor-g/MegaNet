@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-07** (revision 80 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-07** (revision 82 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -556,6 +556,18 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 82 — 2026-09-07: the whole path works, and the app was the last thing left calling a river level rain
+
+The base station is running v3.0 and delivering — and the two SDI-12 levels charted as **RainAccum**, with the inspector offering *"= 0.36 mm (assumed 0.2 mm/tip)"* against a level in metres.
+
+- **Every layer underneath was right, which is what made it worth chasing rather than patching.** The logger sent `s:999998/level_1` with `"unit":"m"`; `meganet.ingest()` stored `addr = s:999998/level_1`, `unit = m`, `conversion = null`; the sensor row is typed `Water Level`. Confirmed by reading the live rows before touching any code — the fault was entirely in the browser, and the fix therefore had nothing to do with the logger, the migration or the contract.
+- **Two defects that only misbehave together.** `fieldAddrs()` built `a:<alert_id>` addresses and nothing else, so a sensor that reports by channel was not in the station's address list — and the series builder looks the address up in that list to find its sensor row, missed, and got `sensor = null`. `guessKind()` then had an empty label, an unresolved sensor, and a fallback of `'RA'`. **A fallback is not a guess**: it was looking at neither the unit the readings carried nor the channel in the address, both of which say *level* in as many words.
+- **The fix reads the evidence in the order of its authority.** The unit first — `m`/`mAHD`/`cm`/`ft` is a level and `mm` is rainfall, and that is the device's own statement about what it measured, so it outranks everything. Then the words, now including the channel out of the address as well as the sensor type and label. Then the `RA` fallback, unchanged and finally only reached when there is genuinely nothing to go on.
+- **And the tip conversion gained a veto, because `kind` is not proof of anything.** The series list has a RainAccum/WaterLevel dropdown, so an operator can put a river level on `RA` with two clicks. `rawBucketNote()` now refuses when the readings carry an engineering unit that is not `mm` or `count` — multiplying metres by 0.2 mm/tip produces a number that looks like rainfall and is nothing at all.
+- **`fieldAddrs()` learned the second address shape**, which is a capability rather than only a repair: the four local channels are now pickable in Field Data directly, instead of reachable only by clicking through from the Message Log. The rule for *which* alert-less sensors report by channel is a shape test — no dot in the `sensor_id`, because every ARRO-sourced id is dotted and a channel is a plain token, which is 927 against 4 in the current data — and it is **written down as a shape test**, with what it would take to do better (ask `meganet.reading` which addresses a station has actually reported on) recorded beside it. Nothing about correctness rests on it: a series resolves to its sensor by matching the channel against `sensor_id`, which is an exact match either way.
+- **`npm run fieldkind` — the twenty-eighth check, and the mutation run is the reason it is worth having.** 30 assertions: the classification rule on its own, the address list against a station carrying both shapes *and* an ARRO id that must not be mistaken for a channel, and the whole operator path with only the network stubbed — the address charted, the series coming out `WL`, resolved to its sensor row, labelled by it, with no mm/tip note anywhere on the page. **Reverting each fix in turn is what made the check honest.** The first two went red immediately. The third did not: with the other two fixed, `kind` is `WL`, so `rawBucketNote()` returned on its first condition and the veto never ran — the check passed a program that still had the bug in it. So the pinned-reading assertion now *forces* the kind to `RA` by hand first, which is exactly the state the dropdown can produce, and the mutation goes red. **A guard that only runs in the state your test never reaches is not tested, and only a mutation run says so.**
+- **Smoke could not have caught any of it**, which is roadmap constraint 1 in its purest form: the tab renders, the axis is drawn, the console is clean, and the chart is confidently wrong about what it is charting.
 
 ### Revision 81 — 2026-09-07: the basins are in real coordinates, and every station knows whose hub it is in
 

@@ -411,8 +411,35 @@ const ArroData = (function () {
   // RainAccum and WaterLevel differ only in how diff() compares two readings, so
   // the guess only has to pick between two rules — and the series list lets it
   // be corrected when the guess is wrong.
+  //
+  // **The fallback is `RA`, and that made this worse than a coin toss for a
+  // whole class of series.** A reading addressed `s:999998/level_1`, carrying
+  // `unit: "m"`, on a sensor row typed `Water Level`, came out as RainAccum —
+  // because the only two things this function looked at were the sensor row
+  // (which the field path failed to resolve, see fieldAddrs) and a label that
+  // was empty, so it fell through to the default. The chart then offered a
+  // 0.2 mm/tip conversion on a water level.
+  //
+  // So it now reads every piece of evidence there is, decisive one first:
+  //
+  //   the unit      A reading that arrived with `m` or `mAHD` is a level and one
+  //                 with `mm` is rainfall. This is the device's own statement
+  //                 about what it measured, and it beats every inference below.
+  //   the words     The sensor's type, its label, and the channel out of the
+  //                 address — `level_1` says as much as `Water Level` does.
+  //   the fallback  RA, unchanged, and now only reached when there is genuinely
+  //                 nothing to go on.
   function guessKind(meta, sensor) {
-    const s = `${sensor?.type || ''} ${meta.sensorLabel || ''}`.toLowerCase();
+    const unit = String(meta.unit || '').trim();
+    if (/^(m|mAHD|cm|ft)$/i.test(unit)) return 'WL';
+    if (/^mm$/i.test(unit)) return 'RA';
+
+    // The channel out of `s:<number>/<channel>`. An ALERT address carries no
+    // channel and contributes nothing here, which is correct.
+    const chan = String(meta.addr || '').startsWith('s:')
+      ? String(meta.addr).slice(2).split('/').slice(1).join('/')
+      : '';
+    const s = `${sensor?.type || ''} ${meta.sensorLabel || ''} ${chan}`.toLowerCase();
     if (/rain|precip|accum/.test(s)) return 'RA';
     if (/level|height|stage|water|depth/.test(s)) return 'WL';
     return 'RA';
@@ -1197,20 +1224,59 @@ const ArroData = (function () {
   // address at all — it reports under its station number with a channel name
   // nobody has told this app, so those are offered as unavailable rather than
   // guessed at, and the box underneath takes one typed in.
+  // The channel a sensor reports under, or null if it does not report by
+  // channel. `meganet.ingest()` builds an address one of two ways — `a:<alert>`
+  // for a radio sensor and `s:<station number>/<channel>` for a station that has
+  // no ALERT address — and this is the second one (docs/ingest-http.md,
+  // *Payload shape*).
+  //
+  // **The test is a shape test, and that is worth being honest about.** A
+  // sensor reports by channel when it has no `alert_id` and its `sensor_id`
+  // carries no dot. Every ARRO-sourced sensor id is dotted — `<site>.<n>.<L>`,
+  // with the ALERT address appended when there is one — and a `channel` is a
+  // plain token the device chooses, so the dot separates them: of the 931
+  // sensors with no alert_id today, 927 are dotted ARRO ids and 4 are the
+  // channels on `bateson_test`. It would misfile a channel somebody named
+  // `air.temp`, and the fix if that ever happens is to ask `meganet.reading`
+  // which addresses a station has actually reported on rather than inferring it
+  // from the registry — a query this tab does not make today.
+  //
+  // Nothing about *correctness* rests on this: it decides what the picker
+  // offers. A series is resolved to its sensor by matching the channel in the
+  // address against `sensor_id`, which is an exact match either way.
+  function fieldChannelId(sen) {
+    if (!sen || sen.alert_id) return null;
+    const id = String(sen.sensor_id || '');
+    return (id && !id.includes('.')) ? id : null;
+  }
+
   function fieldAddrs(st) {
     const out = [], seen = new Set();
+    const num = String(st?.station_number || '');
     for (const sen of (st?.sensors || [])) {
-      if (!sen.alert_id) continue;
-      const addr = `a:${sen.alert_id}`;
-      if (seen.has(addr)) continue;
+      // A radio sensor: the ALERT address is the whole identity.
+      // A channel sensor: the station number names the site and the channel
+      // names which of its sensors spoke, so both halves are needed and a
+      // station with no number cannot be addressed this way at all.
+      const chan = fieldChannelId(sen);
+      const addr = sen.alert_id ? `a:${sen.alert_id}`
+                 : (chan && num) ? `s:${num}/${chan}`
+                 : null;
+      if (!addr || seen.has(addr)) continue;
       seen.add(addr);
       out.push({ addr, sensor: sen, label: sen.type || addr });
     }
     return out;
   }
 
+  // The sensors that still cannot be addressed: no ALERT address, and no
+  // channel to report under either. 927 of them today, all ARRO rows whose
+  // address was never resolved.
   function fieldNoAddr(st) {
-    return (st?.sensors || []).filter(sen => !sen.alert_id).map(sen => sen.type || 'sensor');
+    const num = String(st?.station_number || '');
+    return (st?.sensors || [])
+      .filter(sen => !sen.alert_id && !(fieldChannelId(sen) && num))
+      .map(sen => sen.type || 'sensor');
   }
 
   function fieldWindow(q) {
@@ -1463,7 +1529,7 @@ const ArroData = (function () {
           sensor,
           linkHow:  'address',
           sensorId: sensor?.sensor_id || null,
-          kind:     guessKind({ sensorLabel: hit?.label || '' }, sensor),
+          kind:     guessKind({ sensorLabel: hit?.label || '', unit: built.engUnit, addr }, sensor),
           gapMs:    fieldGapMs(data.t, data.n, res),
           engUnit:  built.engUnit,
           prov: {
@@ -2747,8 +2813,19 @@ const ArroData = (function () {
   // ARRO exported (see the comment on runFilter()). Only offered for a
   // rainfall accumulator with a real "Raw Value" column and a linked
   // station; a water level's raw count isn't a tip count at all.
+  //
+  // **`kind` is not on its own enough to decide that, and this is where the
+  // wrong answer showed up on screen.** `kind` is a guess with a fallback and
+  // the operator can override it, so a series can be sitting on `RA` while its
+  // readings plainly say metres — and multiplying a river level by 0.2 mm/tip
+  // produces a number that looks like rainfall and is nothing at all. The unit
+  // the readings actually carried is the device's own statement about what it
+  // measured, so it gets a veto here: a tip count has no engineering unit, or
+  // has `mm` or `count`. Anything else is not a bucket and is not offered one.
   function rawBucketNote(s, i) {
     if (s.kind !== 'RA' || !s.hasRaw || !s.station) return '';
+    const eng = String(s.engUnit || '').trim();
+    if (eng && !/^(mm|count)$/i.test(eng)) return '';
     const b = bucketSizeMm(s.station);
     const mm = s.raw[i] * b.mm;
     const note = b.recorded ? `recorded, ${b.mm} mm/tip` : `assumed ${b.mm} mm/tip — not recorded for this site`;
@@ -3942,6 +4019,9 @@ const ArroData = (function () {
     fieldShow,
     // exposed for reasoning about the filter outside the UI
     parseCsv, parseName, linkStation, guessKind, runFilter, walk357,
+    // and about which addresses a station is reachable on, which is two shapes
+    // rather than one — see fieldChannelId
+    fieldAddrs, fieldNoAddr, fieldChannelId,
     // the series boundary both sources cross
     seriesData, adoptSeries,
   };
