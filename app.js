@@ -3049,37 +3049,77 @@ function stationPopupHtml(s) {
       </div>` : ''}`;
 }
 
-// The 7–10 actions a station offers, one entry per pill, in the order #170
-// fixed. One builder because three surfaces draw them now — the callout's
-// expanded row and the station card (#175), the editor card its own subset —
-// and test/movepin.mjs pins the shapes once, not per surface. Every one of
-// these is a pill (#170): a row of equal things — two that move the map, one
-// that copies the position, one that arms the blast styling, one that moves
-// the pin, and four or five that leave for somewhere else. The in-page ones
-// are <button>s, which is what #138 says they always should have been: the
-// action happens here, so the element is a button dressed as one, not a link
-// to nowhere. The array's length is the exact count the callout's
-// "Actions (N)" label shows, so an empty entry (a pill a station doesn't get)
-// is dropped rather than counted.
-function stationActionPills(s) {
+// The 7–11 actions a station offers, in four groups. One builder because
+// three surfaces draw them now — the callout's expanded row and the station
+// card (#175), the editor card its own subset — and test/movepin.mjs pins the
+// shapes once, not per surface. Every one of these is a pill (#170), and the
+// in-page ones are <button>s, which is what #138 says they always should have
+// been: the action happens here, so the element is a button dressed as one,
+// not a link to nowhere.
+//
+// The groups are what a row of eleven identical lozenges was missing. Read in
+// order they answer four different questions, and #170's flat row made a
+// person read all eleven labels to find which one they were asking:
+//
+//   In MegaNet          what this app can do with the station — edit it,
+//                       find it in the list, zoom to it, arm the blast styling
+//   Position            the coordinate itself: copy it, or move it
+//   Imagery & terrain   somebody else's picture of the ground, KML included
+//   Records             the paperwork — ARRO's admin page, the two libraries
+//
+// Every pill carries an icon now, for the same reason: at a glance the icon
+// is what separates *Zoom to station* from *Show in the list below* before
+// either label has been read. The trailing marks stay and mean what they
+// always did — ↓ goes down this page, ↗ leaves the site, ⬇ downloads.
+//
+// A group whose pills a station doesn't get (no position, not a repeater, no
+// ARRO id) drops out entirely rather than drawing an empty rule.
+//
+// `edit` adds the station card's own first pill. Only the card has it — the
+// callout is a signpost, and "Edit station ↓" from a balloon over the map is
+// a scroll to somewhere the balloon isn't.
+function stationActionGroups(s, { edit = false } = {}) {
   const arroUrl = arroSiteUrl(arroSiteId(s));
   return [
-    `<button type="button" class="pill" onclick="focusStation('${escAttr(s.id)}')"
-           title="Select this station in the list under the map">Show in the list below ↓</button>`,
-    `<button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
-           title="Zoom the map to the ~50 km area around this station">Zoom to station</button>`,
-    copyLatLonPillHtml(s),
-    MapBlast.popupLinkHtml(s),
-    MapMovePin.popupLinkHtml(s),
-    arroUrl ? `<a class="pill" href="${esc(arroUrl)}" target="_blank" rel="noopener"
+    { label: 'In MegaNet', pills: [
+      edit ? `<button type="button" class="pill mn-edit-station" onclick="editStationFromCard('${escAttr(s.id)}')"
+           title="Select this station and jump to the editor card below the map">✏️ Edit station ↓</button>` : '',
+      `<button type="button" class="pill" onclick="focusStation('${escAttr(s.id)}')"
+           title="Select this station in the list under the map">🗒️ Show in the list below ↓</button>`,
+      `<button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
+           title="Zoom the map to the ~50 km area around this station">🔍 Zoom to station</button>`,
+      MapBlast.popupLinkHtml(s),
+    ] },
+    { label: 'Position', pills: [
+      copyLatLonPillHtml(s),
+      MapMovePin.popupLinkHtml(s),
+    ] },
+    // Beside the Google Earth link, and after it on purpose: that one takes
+    // you to the ground, this one takes the network with you (#176,
+    // export.js). Literally beside it now — the KML pill used to be last in a
+    // flat row of eleven, two document searches away from the link it belongs
+    // next to. No coordinates, no group: neither the views nor the KML exist
+    // for a station with no position.
+    { label: 'Imagery and terrain', pills: (() => {
+      const v = mapViewPillParts(s);
+      return v ? [v.street, v.earth, stationKmlPillHtml(s), v.apple] : [];
+    })() },
+    { label: 'Records', pills: [
+      arroUrl ? `<a class="pill" href="${esc(arroUrl)}" target="_blank" rel="noopener"
            title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
-           >Open in ARRO admin ↗</a>` : '',
-    ...mapLinksPills(s),
-    // Beside the Google Earth link the row above ends with, and after it on
-    // purpose: that one takes you to the ground, this one takes the network
-    // with you (#176, export.js).
-    stationKmlPillHtml(s),
-  ].filter(Boolean);
+           >⚙️ Open in ARRO admin ↗</a>` : '',
+      ...docSearchPills(s),
+    ] },
+  ].map(g => ({ label: g.label, pills: g.pills.filter(Boolean) }))
+   .filter(g => g.pills.length);
+}
+
+// The same pills flattened back into one row, which is what the callout draws
+// and what its "Actions (N)" label counts. The groups set the order; the
+// callout is a ~300 px balloon and rules across it would cost more height than
+// the grouping buys.
+function stationActionPills(s) {
+  return stationActionGroups(s).flatMap(g => g.pills);
 }
 
 // Flip the action row on the open callout (#175). State first, DOM second:
@@ -3897,12 +3937,22 @@ function stnCardHtml(s) {
     <div class="acma-sect" id="${escAttr(slsId)}"
          data-mn-sls="${escAttr(s.station_number || '')}">${sls.html}</div>
     <!-- Edit first, then the same pills the callout offers, from the same
-         builder. MapBlast's and MapMovePin's pills close the callout when
-         pressed; from here there may be none open, which is fine. -->
-    <div class="acma-sect pill-row stn-card-actions">
-      <button type="button" class="pill mn-edit-station" onclick="editStationFromCard('${escAttr(s.id)}')"
-         title="Select this station and jump to the editor card below the map">✏️ Edit station ↓</button>
-      ${stationActionPills(s).join('\n      ')}
+         builder — but in their groups, each its own wrapping row with a rule
+         between (stationActionGroups). The rules are full-bleed, like the
+         section borders above them, so the card reads as one stack of bands
+         rather than a panel with boxes in it. MapBlast's and MapMovePin's
+         pills close the callout when pressed; from here there may be none
+         open, which is fine.
+
+         role=group with a name on each: the rules are the sighted version of
+         a boundary, and a screen reader gets the boundary told to it instead.
+         Nothing is drawn for the names — the card is 340 px and four headings
+         would cost more height than they explain. -->
+    <div class="acma-sect stn-card-actions">
+      ${stationActionGroups(s, { edit: true }).map(g =>
+        `<div class="pill-row stn-card-group" role="group" aria-label="${escAttr(g.label)}">
+        ${g.pills.join('\n        ')}
+      </div>`).join('\n      ')}
     </div>
     <p class="small acma-card-note">
       ${carriers.length ? `Carried by ${carriers.length} repeater${carriers.length === 1 ? '' : 's'}${selected

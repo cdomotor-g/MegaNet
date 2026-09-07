@@ -138,18 +138,25 @@ async function main() {
       };
       const wind = card.querySelector(`#mn-wind-card-${CSS.escape(s.id)}`);
       const acts = card.querySelector('.stn-card-actions');
-      const kids = acts ? [...acts.children] : [];
+      // The actions are groups of pills since the row grew rules between them
+      // — the section's children are the rows, the pills are one level down.
+      const groups = acts ? [...acts.children] : [];
+      const kids = acts ? [...acts.querySelectorAll('.pill')] : [];
       return {
         position:   rowVal('Position'), want: stationLatLonText(s),
         stn:        s.station_number ? rowVal('Stn #') === String(s.station_number) : null,
         elev:       s.elevation_ahd != null ? rowVal('Elevation') === `${s.elevation_ahd} m AHD` : null,
         ids:        /AlertID/.test(text) && stationAlertIds(s).every(id => text.includes(String(id))),
         wind:       !!wind && wind.dataset.mnWind === `${s.lat},${s.lon}`,
-        allPills:   kids.length > 0 && kids.every(e => e.classList.contains('pill')),
+        allPills:   kids.length > 0 && groups.every(g => g.classList.contains('pill-row')
+                    && [...g.children].every(e => e.classList.contains('pill'))),
+        grouped:    groups.length > 1 && groups.every(g =>
+                    g.getAttribute('role') === 'group' && !!g.getAttribute('aria-label')),
+        iconed:     kids.every(e => /^\p{Extended_Pictographic}/u.test(e.textContent.trim())),
         editFirst:  kids[0] && kids[0].classList.contains('mn-edit-station')
                     && kids[0].tagName === 'BUTTON' && kids[0].type === 'button',
         hasCopy:    !!acts.querySelector('.mn-copy-latlon'),
-        hasList:    kids.some(e => /^Show in the list below/.test(e.textContent.trim())),
+        hasList:    kids.some(e => /Show in the list below/.test(e.textContent.trim())),
         count:      kids.length, expect: stationActionPills(s).length + 1,
         footer:     /Pin clicks show this card without changing the selection/.test(text),
         carried:    findRepeaterMatches(s).length,
@@ -164,7 +171,10 @@ async function main() {
     check('every ALERT id, and the wind region under its own element id',
       rows.ids && rows.wind);
     check('every action is a pill, Edit station first', rows.allPills && rows.editFirst);
-    check('and the row is Edit plus exactly what the callout offers',
+    check('in named groups, each its own row — the rules a sighted reader sees',
+      rows.grouped);
+    check('and every one of them opens with an icon', rows.iconed);
+    check('and the rows together are Edit plus exactly what the callout offers',
       rows.hasCopy && rows.hasList && rows.count === rows.expect,
       `${rows.count} vs ${rows.expect}`);
     check('the footer says what a pin click does and does not do', rows.footer);
@@ -429,9 +439,10 @@ async function main() {
       return out;
     });
     check('a blast pill pressed on the card flips its label in place',
-      blast.none || (blast.armed && blast.label === 'Hide blast radius'), blast.label);
+      blast.none || (blast.armed && blast.label === '💥 Hide blast radius'), blast.label);
     check('with the keyboard still on it through the repaint', blast.none || blast.focused);
-    check('and disarming puts the label back', blast.none || blast.backLabel === 'Show blast radius', blast.backLabel);
+    check('and disarming puts the label back',
+      blast.none || blast.backLabel === '💥 Show blast radius', blast.backLabel);
 
     // The ACMA card is three tabs' furniture; opening it on another tab must
     // not forget which station this map was looking at.

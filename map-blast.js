@@ -243,7 +243,7 @@ const MapBlast = (function () {
       return `<button type="button" class="pill" onclick="MapBlast.toggle('${escAttr(s.id)}')"
         title="${on ? 'Take the blast styling off the map'
                     : 'Red links and rings: what stops getting in if this repeater dies'}"
-        >${on ? 'Hide blast radius' : 'Show blast radius'}</button>`;
+        >💥 ${on ? 'Hide blast radius' : 'Show blast radius'}</button>`;
     },
 
     toggle(id) {

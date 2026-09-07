@@ -1323,25 +1323,52 @@ function mapLinksHtml(s) {
   return mapLinksPills(s).join('\n    ');
 }
 
+// Two kinds of leaving, kept apart since the station card grew groups (#175):
+// three pills that put the *site* on somebody else’s imagery, and two that go
+// looking for its *paperwork*. The concatenation is still what the editor card
+// and the callout draw — one flat row, in the order #170 fixed — so nothing
+// that reads mapLinksPills/mapLinksHtml changes shape; the station card asks
+// for the halves instead and draws a rule between them.
 function mapLinksPills(s) {
+  return [...mapViewPills(s), ...docSearchPills(s)];
+}
+
+// Somebody else’s picture of this ground, by name. Null for a station with no
+// coordinates — there is nowhere to point a camera.
+//
+// Named rather than positional because one caller has to reach *into* the
+// order: the station card puts the KML download beside the Google Earth link
+// (#176), and `pills[1]` would be a silent breakage the day a fourth imagery
+// service is added. The flat array below is what everything else draws.
+function mapViewPillParts(s) {
   const urls = stationMapLinkUrls(s);
+  if (!urls) return null;
+  return {
+    street: `<a class="pill" href="${esc(urls.google)}" target="_blank" rel="noopener"
+       title="Opens the nearest Google Street View panorama; sites with no coverage open the map at this location instead">🚶 Google Street View ↗</a>`,
+    earth: `<a class="pill" href="${esc(urls.earth)}" target="_blank" rel="noopener"
+       title="Opens Google Earth looking straight down on this location from about 2 km up">🛰️ Google Earth ↗</a>`,
+    apple: `<a class="pill" href="${esc(urls.apple)}" target="_blank" rel="noopener"
+       title="Opens Apple Maps at this location; Look Around is one tap away where Apple has coverage">🗺️ Apple Maps ↗</a>`,
+  };
+}
+
+function mapViewPills(s) {
+  const p = mapViewPillParts(s);
+  return p ? [p.street, p.earth, p.apple] : [];
+}
+
+// The two document libraries, searched by name — so a station with no position
+// still gets both, which is the whole point of searching by name.
+function docSearchPills(s) {
   const docs = stationDocSearchUrls(s);
-  const out  = [];
-  if (urls) {
-    out.push(`<a class="pill" href="${esc(urls.google)}" target="_blank" rel="noopener"
-       title="Opens the nearest Google Street View panorama; sites with no coverage open the map at this location instead">Google Street View ↗</a>`);
-    out.push(`<a class="pill" href="${esc(urls.earth)}" target="_blank" rel="noopener"
-       title="Opens Google Earth looking straight down on this location from about 2 km up">Google Earth ↗</a>`);
-    out.push(`<a class="pill" href="${esc(urls.apple)}" target="_blank" rel="noopener"
-       title="Opens Apple Maps at this location; Look Around is one tap away where Apple has coverage">Apple Maps ↗</a>`);
-  }
-  if (docs) {
-    out.push(`<a class="pill" href="${esc(docs.fwin)}" target="_blank" rel="noopener"
-       title="Searches the Flood Warning Infrastructure Network Program library for &quot;${escAttr(docs.q)}&quot;">Search FWIN docs ↗</a>`);
-    out.push(`<a class="pill" href="${esc(docs.oohb)}" target="_blank" rel="noopener"
-       title="Searches the OOHB FWN Library for &quot;${escAttr(docs.q)}&quot;">Search OOHB docs ↗</a>`);
-  }
-  return out;
+  if (!docs) return [];
+  return [
+    `<a class="pill" href="${esc(docs.fwin)}" target="_blank" rel="noopener"
+       title="Searches the Flood Warning Infrastructure Network Program library for &quot;${escAttr(docs.q)}&quot;">📚 Search FWIN docs ↗</a>`,
+    `<a class="pill" href="${esc(docs.oohb)}" target="_blank" rel="noopener"
+       title="Searches the OOHB FWN Library for &quot;${escAttr(docs.q)}&quot;">📚 Search OOHB docs ↗</a>`,
+  ];
 }
 
 // ── Copy the coordinate ──────────────────────────────────────────────────────

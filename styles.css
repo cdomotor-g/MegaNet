@@ -4766,7 +4766,15 @@ hr {
   bottom: 1.2rem;
   left: .9rem;
   width: 340px;
-  max-height: min(60%, 24rem);
+  /* It grows until it is just shy of the zoom buttons, which are the only
+     thing above it in this corner. The clearance is measured rather than
+     guessed: .map-panel's own --sp-2 padding (8 px) puts the map's top edge
+     below the card's containing block, Leaflet's control margin adds 10 and
+     its two zoom buttons ~62 with their borders — ~80 px, and 5.75rem (92 px)
+     leaves a hair of map showing under them. The card was capped at
+     min(60%, 24rem) before the actions grew groups, which on a 720 px map
+     was 24rem of a possible ~38 and put half the pills behind a scroll. */
+  max-height: calc(100% - 1.2rem - 5.75rem);
   /* Under the callouts (Leaflet's popup pane is 700) and under the map's
      controls (1000) — the opposite of .acma-card's 1100, on purpose. A
      callout the person just opened on a pin near this corner draws over the
@@ -4776,9 +4784,26 @@ hr {
   z-index: 690;
 }
 
-/* The action row is the card's last section — no rule under it. */
+/* The action row is the card's last section — no rule under it. It carries no
+   padding of its own either: its groups do, so the rule between two groups
+   runs the full width of the card the way the section borders above it do,
+   rather than floating inset with a gap at each end. */
 .stn-card-actions {
   border-bottom: 0;
+  padding: 0;
+}
+
+/* One group of actions — a wrapping pill row (.pill-row supplies the layout),
+   with a hairline over every group but the first. The line is the whole
+   grouping: four named groups, no headings drawn, because at 340 px wide the
+   headings would cost more height than the pills they label. See
+   stationActionGroups() in app.js for what goes in each. */
+.stn-card-group {
+  padding: .45rem .6rem;
+}
+
+.stn-card-group + .stn-card-group {
+  border-top: 1px solid var(--border);
 }
 
 /* The ALERT id list sits under the label/value rows. */
