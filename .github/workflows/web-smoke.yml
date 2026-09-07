@@ -382,6 +382,13 @@ jobs:
       # the database returns is what gets announced, and that the form comes
       # down on the write rather than on the read after it. Two defects were
       # found writing it and neither was visible to any other check here.
+      # Added here rather than with the check itself: `catchments.mjs` landed in
+      # `npm run all` without a CI step, so it ran for whoever typed it and on no
+      # push at all. A check CI does not run is a check that is not there.
+      - name: Catchment boundaries — drawn, out of the way, and answering where a station is
+        working-directory: test
+        run: npm run catchments
+
       - name: Claim an address from the message that arrived on it
         working-directory: test
         run: npm run claim
