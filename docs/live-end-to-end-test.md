@@ -16,7 +16,7 @@ Two things make it possible now, and they are independent. Use either, or both.
 
 | | What it proves | What it needs |
 | --- | --- | --- |
-| **The ALERT2 self-test** | The whole radio path: framing, the ALERT2 decoder, the bit unpacking, the clock gate, the queue, the batch, the POST, the endpoint, the database, the app. | A base station running `base-station-http.CR300` v2.1 and a way to set a `Public` variable. Nothing wired, no radio, no terminal on the RS-232 port. |
+| **The ALERT2 self-test** | The whole radio path: framing, the ALERT2 decoder, the bit unpacking, the clock gate, the queue, the batch, the POST, the endpoint, the database, the app. | A base station running `base-station-http.CR300` v2.1 or later and a way to set a `Public` variable. Nothing wired, no radio, no terminal on the RS-232 port. |
 | **The 18 Bateson workshop rig** | The same path *plus* real sensors on real terminals, continuously, unattended — and the `station_number` + `channel` address shape, which nothing in the live system used before it. | The workshop station. |
 
 ---
@@ -26,6 +26,14 @@ Two things make it possible now, and they are independent. Use either, or both.
 - The base station is running **`logger/base-station-http.CR300` v2.1 or later**
   (`FW_VERSION` in the file, and in the MQTT status message). Earlier versions
   have neither half of this.
+
+  **Run v3.0, not v2.1.** v2.1 compiles and then fails to load on a CR300 — it
+  ran out of memory, because the program was still carrying the bring-up
+  machinery it was built with (a byte census, a raw capture file, four forensics
+  tables). v3.0 removes 22.8 KB of variable memory and about 800 KB of table
+  allocation and changes nothing about what reaches MegaNet. It also makes the
+  self-test frame **binary** rather than ASCII, which is what this receiver
+  actually emits — so the decoder under test is the decoder in use.
 - **`db/migrations/0026_bateson_test_rig.sql` has been applied.** Check it in one
   line — if this returns nothing, stop and apply it:
 
@@ -89,11 +97,13 @@ Read them in this order:
 
 | Watch | Should become |
 | --- | --- |
-| `TestLine` | `ALERT2A,1,9999,MEGANET,N,1,2026,9,7,4,15,07.000,0,0,0,0,0,1,0,0,0,7,7,9999,74,3B,CB,A5,1F,15,00` — the frame it built |
-| `RxLastLine` | **the same string.** Not similar — the same. It went into the byte buffer and came back out of the framer |
-| `RxLastShape` | `ALERT2A` |
-| `RxLastFields` | `31` — 24 fixed fields and 7 payload bytes |
-| `RxLastPayHex` | `74 3B CB A5 1F 15 00 ` — the payload, decoded from hex |
+| `TestHex` | `41 4C 45 52 54 32 0C 00 84 01 07 74 3B CB A5 1F 15 00 ` — the eighteen bytes it built |
+| `RxHex` | **the same bytes.** Not similar — the same. They went into the byte buffer and came back out of the framer |
+| `RxFrameMode` | `binary` |
+| `FrLenByte` / `FrTotal` | `12` / `18` |
+| `FrElemVia` | `1` — found by the `84 01 <len> 74` anchor, not by the loose scan |
+| `FrElemLen` / `FrRecords` | `7` / `1` |
+| `FrGood` / `FrBad` | `1` / `0` |
 | `RxLastRecHex` | `A5 1F 15 00` — the four bytes this reading came out of |
 | `RxLastId` / `RxLastValue` | `8101` / whatever you set. **This is the assertion**: the packing and the unpacking are inverse |
 | `RxFrameSkew` | `0` — the frame carries this logger's own time of day |
@@ -229,8 +239,10 @@ name almost every failure.
 | Readings accepted, but the Message Log is empty | Almost always the clock. See *When readings arrive but the Message Log is empty* in [`logger/README.md`](../logger/README.md) — a logger on local time posts readings ten hours in the future, which are accepted and invisible |
 | `LastStatus` is `401` | The token. Mint and load a new one — [`ingest-http.md`](ingest-http.md) § Getting a token |
 | `LastStatus` is `404` | The `Content-Profile: meganet` header, or the URL. Neither changes per site |
-| `TestFired` climbs but `RxLastLine` never changes | The injected bytes were framed as something else. `RxFrameMode` says which; `RawLog` has the bytes |
-| `RxLastId` is not `TestId` | The packing and the unpacking disagree, which `npm run logger` asserts they do not. Send `TestLine` and `RxLastRecHex` with the report |
+| `TestFired` climbs but `RxHex` never changes | The injected bytes were framed as something else. `RxFrameMode` says which, and `RxStep` says how far it got |
+| `FrElemVia` is `0` | The frame carries no concentration element — the anchor did not match. Send `TestHex` and `RxHex` with the report |
+| `RxLastId` is not `TestId` | The packing and the unpacking disagree, which `npm run logger` asserts they do not. Send `TestHex` and `RxLastRecHex` with the report |
+| `ClockState` says *clock is past 2085* | You are in 2086, and the packed-timestamp encoding this program uses stops there. See *How a timestamp is stored* in [`logger/README.md`](../logger/README.md). Hello from 2026 |
 
 ---
 
@@ -241,9 +253,20 @@ or `db/migrations/`) asserts the parts of this page that are claims about code
 rather than instructions to a person: that the program and `0026` name the same
 station number, protocol key, channel names and self-test address; that the
 self-test frame decodes back to the address it was built for across the whole
-13-bit range; that an address above 8191 would wrap, which is why the guard is
-there; that every unit the program sends is in `meganet.unit`; and that both
-reading shapes render as valid JSON.
+13-bit range, through the same gates `TakeFrames` and `DecodeFrame` apply; that
+an address above 8191 would wrap, which is why the guard is there; that the
+packed timestamp round-trips for every year it claims and that `MAX_YEAR` is the
+last one that wholly fits; that every unit the program sends is in
+`meganet.unit`; that both reading shapes render as valid JSON; and that the
+memory the program declares stays inside the budget v3.0 bought — because a
+declaration added back carelessly is exactly how a program that now fits stops
+fitting, and the logger reports that as *out of memory* with no line number.
+
+71 assertions. Five deliberate breaks have been run against it: a drifted
+station number, the self-test address moved into the 9000 block, a channel
+renamed on the logger only, a fourth column added back to the ring buffer, and a
+`MAX_YEAR` set one year too generous. Each went red on the assertion it should
+have and on no others.
 
 `0026` asserts the rest at apply time — that both addresses resolve to
 `bateson_test` — and CI applies every migration from zero on every push. A rig

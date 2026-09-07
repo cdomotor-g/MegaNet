@@ -66,7 +66,7 @@ connection drops.
 
 | File | What it is |
 | --- | --- |
-| `base-station-http.CR300` | The program — both paths, despite the name, which is kept because it is the name loaded on every logger already running it. Written for a CR300-series; the foot of the file says what to change for a CR1000X or CR6. |
+| `base-station-http.CR300` | The program — both paths, despite the name, which is kept because it is the name loaded on every logger already running it. Written for a CR300-series; the foot of the file says what to change for a CR1000X or CR6. **v3.0 is a third smaller than v2.1, which would not load** — see *What v3.0 took out*, below. |
 | `meganet_token.example.txt` | The shape of the token file. One line, the token, nothing else. |
 
 Two pages sit beside this one and are the ones to read next:
@@ -235,8 +235,16 @@ knows.
 
 What that costs is nothing, because the raw is still sent: `value_raw` is the tip
 count, `value` and `unit` are the millimetres, and `conversion` records the rule
-that got from one to the other. A bucket size corrected at the logger travels with
-the readings after it and does not rewrite the ones already stored.
+that got from one to the other.
+
+**Only the raw goes into the queue.** `MakeRec` multiplies by `Rain_bucket` at
+the moment it renders the reading, because the conversion belongs to the
+*channel* rather than to the reading — which is what let the ring buffer drop
+two of its seven columns at v3.0. The visible consequence is worth knowing: a
+bucket size corrected at the logger applies to everything still in the queue as
+well as to everything after it, and does not rewrite anything already stored.
+Correct it between intervals, not mid-outage, if that distinction matters to
+you.
 
 ### What it refuses to send, and why
 
@@ -408,10 +416,23 @@ over RS-232 — plugging DevConfig into RS-232 means unplugging the receiver.
 ## Proving it works, without waiting for a transmission
 
 **The short answer, since v2.1: set `TestFire` true.** The program builds a
-complete, valid ALERT2A frame for `TestId`/`TestValue` and appends it to the
+complete, valid ALERT2 frame for `TestId`/`TestValue` and appends it to the
 receive byte buffer one instruction before the framer runs, so the decoder, the
 queue, the batch and the POST all run on it exactly as they would on a real
 transmission — because as far as every one of them can tell, it *is* one.
+
+**v3.0 made that frame binary rather than ASCII**, and the reason is the whole
+point of the exercise: this receiver speaks binary, so `DecodeFrame` is the live
+decoder and `ParseAlert2` is not. A self-test that exercised the decoder nobody
+uses would be testing the wrong thing. Eighteen bytes, and every one of them is
+there to satisfy a gate rather than to look plausible:
+
+```
+41 4C 45 52 54 32 0C 00 84 01 07 74 3B CB A5 1F 15 00
+|__ "ALERT2" __| ^  ^  |_ anchor _| |t hi/lo| |b0 b1 b2| status
+                 |  one pad byte, so the anchor search starts on it
+                 the length byte: 6 + 12 = 18 total, and above FRAME_MIN_LEN
+```
 
 Nothing is wired, no radio is involved, and the receiver stays plugged in.
 [`docs/live-end-to-end-test.md`](../docs/live-end-to-end-test.md) is the card for
@@ -516,155 +537,70 @@ Free memory is deliberately absent: `Status.MemoryFree` is a CR1000X/CR6 field
 and is not on the CR300's own Status table, so reading it would not compile.
 Device Configuration Utility's Status tab shows it.
 
-### Is the receiver talking — the serial pipeline, step by step
+### Is the receiver talking — the pipeline, step by step
 
-This is the part to read first when a feed is not doing what you expect. The
-program shows the **same data in every form it passes through**, from bytes in
-the port buffer to the JSON that will be posted. Read down the list: the step
-where the display stops being what you expected is the step that is broken.
-
-| Step | Variable | Means |
-| --- | --- | --- |
-| **1 · the port** | `SecsSinceRx` | Seconds since the last *byte*. **The single most useful number here** — a base station that has gone deaf shows up here and nowhere else, because a deaf base station is not an error, it is a silence. |
-| | `RxAvail` | Bytes sitting in the port buffer, read *before* this scan took them. Should sit near zero. Parked near `RX_BUFFER` means the scan is not keeping up. |
-| | `RxBlockBytes` / `RxBytesTotal` | Bytes taken this scan, and since startup. **`RxBytesTotal` climbing while `RxLines` stays at 0 is the signature of a feed that sends no line terminator** — check `RxAccumLen`. |
-| | `RxNulls` | NUL bytes seen and skipped. Non-zero on an ASCII feed means line noise or a baud mismatch, and is the first thing to suspect when `RxBadFrames` climbs for no obvious reason. |
-| **2 · the block** | `RxBlockHex` | Every byte of this scan's read as padded hex — `41 4C 45 52 54 32 41 2C …`. This is the raw truth and it is the display to trust. |
-| | `RxBlockText` | The same bytes as text, with every control character shown as `-`, so nothing in the data can scramble the display. |
-| **3 · byte buffer** | `RxBufLen` / `RxBufHex` / `RxBufText` | What is waiting to be framed, and how much. Near zero between transmissions, briefly non-zero when a frame straddles two scans. |
-| | `RxLines` / `RxNonText` | Text lines cut out, and runs discarded as not-text. |
-| | `RxBufDrops` | Times the buffer filled with nothing framable in it. |
-| **3b · the frame** | `RxFrameMode` | `binary` or `ascii`, decided per frame. |
-| | `FrLenByte` / `FrTotal` / `FrLeftover` | Byte 7, the frame length it implies, and what was left over afterwards. **`FrLeftover` near zero confirms the `6 + byte 7` rule frame by frame.** |
-| | `FrPre` | Bytes discarded in front of the signature — noise, or the tail of a frame that was missed. |
-| | `FrHex` | The entire frame in hex. |
-| | `FrElemVia` | How the readings element was found: `1` the `84 01 <len> 74` anchor, `2` a loose scan, **`0` not found at all** — the first thing to read when a frame yields nothing. |
-| | `FrElemOff` / `FrElemLen` / `FrElemHex` | Where it starts within the frame, its length, and its bytes. |
-| | `FrTimeSecs` / `FrRecords` / `FrGood` / `FrBad` | The frame's own clock, and how many records it carried, decoded and rejected. |
-| **3c · one reading** | `RdIndex` `RdB0` `RdB1` `RdB2` `RdB3` `RdRecHex` `RdQueued` | The four bytes as numbers, so the unpacking can be recomputed by hand: `id = (B1 MOD 32) * 256 + B0`, `value = INT(B1 / 32) * 256 + B2`. |
-| **4 · the line** | `RxLastLine` / `RxLastLineHex` / `RxLastLineLen` | The last complete line verbatim, the same line in hex, and its length. Worth more than any counter when the format is not what you expected. |
-| | `RxLastSep` | **What separator characters the line actually contained, counted**, ending with `top=<byte> x<count>` — the most common non-alphanumeric byte in the line, whatever it is. The first thing to read when a feed will not parse. |
-| | `RxLastHead` / `RxLastTail` | The first 40 and last 16 characters, printable-safe. The tail is where checksums and record terminators live. |
-| | `RxLastDelim` | Which separator the splitter chose: `comma`, `semicolon`, `tab`, `pipe`, `space` or `none`. |
-| | `RxLastShape` | What it was taken to be: `ALERT2A`, `plain`, or `unrecognised`. |
-| | `RxLastFields` | Fields the splitter found. An `ALERT2A` line with a 7-byte payload has 31. |
-| | `RxLastPrefix` | Bytes discarded from the front of the line to reach `ALERT2A`. Non-zero means the receiver prefixes its output with something. |
-| **5 · the payload** | `RxLastPayLen` / `RxLastPayHex` | The payload length from field 23, and the payload bytes after the hex fields were converted back to numbers. **If `RxLastPayHex` does not match the tail of `RxLastLineHex`, the hex decode is what is wrong** — nothing further along needs looking at. |
-| **6 · the reading** | `RxLastRecHex` | The four payload bytes this reading came out of, so the bit-unpacking can be checked by hand against the table in the program at `ParseAlert2`. |
-| | `RxLastId` / `RxLastValue` / `RxLastSuspect` | The ALERT id and 11-bit value decoded from them, and whether the value was full scale. |
-| | `RxLastStamp` | The timestamp actually attached to it. |
-| **7 · the JSON** | `RxLastJson` | That reading as it will appear in the batch, byte for byte. Built by the same code that builds the POST body, so it cannot drift from what is sent. |
-
-### When every line comes back `unrecognised`
-
-**Read `RxLastSep` first.** `unrecognised line` has exactly one meaning — the
-splitter found fewer than two fields — and that variable says why:
-
-```
-comma=0 space=0 tab=30 semi=0 colon=0 pipe=0 eq=0 hi=0 ctl=0
-```
-
-| What you see | What it means |
-| --- | --- |
-| One count is high (`tab=30`, `semi=30`) | The feed uses a separator the parser can now find on its own — `RxLastDelim` should already say `tab` or `semicolon` and the line should parse. If it still doesn't, the field *layout* differs, not just the separator. |
-| Named counts near zero but **`top=` shows a high count** | The feed is delimited by something the named list does not test for — a slash, a dash, an asterisk. `top=45 x7` is byte 45, `-`, seven times. The named counters test a list guessed in advance; `top=` tests nothing and reports what is there, which is why it is the one to read when the others all say zero. |
-| **Every count zero including `top=`**, `RxLastLineLen` large | The line is one unbroken alphanumeric token. Not a delimiter problem — a different output mode on the receiver. Send the capture. |
-| `hi` non-zero | Bytes above 126. **This is not ASCII**, so no parser setting will help: either the receiver is in a binary output mode, or the baud rate is wrong. Check `RxByteClass()` — a real baud mismatch scatters bytes across every class roughly evenly. |
-| `ctl` non-zero | Control characters inside the line, which usually means the terminator is not what the line assembler thinks it is. |
-| `eq` and `pipe` non-zero | That is HFEM framing (`:HS=1|I1=…|NN:`), not ALERT2 — a different protocol from a different kind of station. This program does not decode it; see *What it deliberately does not do*. |
-
-Then `RxByteClass()` over a few minutes, which is the whole feed rather than one
-line: `printable` + `CR` + `LF` and nothing else is ASCII. Anything landing in
-`high >126` or `ctrl-other` is not, and no amount of parser work will make it so.
-
-`RxWhyCount()` says whether every line fails the same way (one consistent shape
-this program does not know) or fails differently each time (corruption rather
-than misunderstanding). `RxFirstLine` keeps the very first line seen, which is
-often a banner naming the receiver's mode and is gone from the last-line display
-within a second.
-
-### Taking a capture to send
-
-`CPU:rxcapture.txt` is every byte the port delivered, one text line per read,
-before any parsing:
-
-```
-# MegaNet base-station serial capture -- baud 9600 format 3
-# started 2026-08-17T04:15:00Z (logger clock, UTC)
-# one record per read: hh:mm:ss n=<bytes> <hex>
-04:15:07 n=31 41 4C 45 52 54 32 41 2C 31 2C 39 39 39 39 2C ...
-```
-
-It starts itself on every program start, so a logger that was power-cycled comes
-back capturing. To take one:
-
-1. `CaptureReset` → **true** in the Public table. It erases the file, writes a
-   fresh header, and clears itself back to false.
-2. Leave it running. `CaptureState` says `capturing`; `CaptureBytes` climbs.
-   It stops on its own at `CAPTURE_MAX` (200 KB, about nine hours of a busy
-   40-station base) and says `full — retrieve …`. Set `CaptureNow` **false** to
-   stop it earlier; the file is kept either way.
-3. Device Configuration Utility → **File Control** → select `rxcapture.txt` →
-   **Retrieve**. Same route the token file goes out on.
-4. Send that file. It is plain text and carries no credential.
-
-Writes are batched — bytes accumulate in RAM and go to flash when the buffer is
-nearly full or every 60 seconds — because flash on a CR300 is not infinite and a
-capture left running for a week at one write a second is a real cost. A power
-cut loses at most the last minute.
-
-### The capture tables
-
-Four of them, and they are meant to be read together — every row in the later
-ones is derived from bytes recorded in the first.
-
-| Table | One record per | Holds |
-| --- | --- | --- |
-| **`RawLog`** | serial read that returned bytes | `RxBlockSeq`, bytes available, bytes read, buffer occupancy before and after, cumulative NULs, and **the whole block in hex, untruncated**. This is the ground truth; if a decode looks wrong, *what actually arrived* is answered here and nowhere else. |
-| **`FrameLog`** | binary frame found, **including ones that did not decode** | Everything under *3b* above plus `whyCode`. A table holding only successes cannot answer the question these tables exist for. |
-| **`ReadingLog`** | four-byte record, decoded or not | Everything under *3c*, plus the resulting `RxLastId` / `RxLastValue` and whether it was queued. |
-| **`LineLog`** | complete text line | The text path's own forensics, below. |
-
-`RxBlockSeq` and `RxFrameSeq` appear in more than one of them so rows can be
-lined up across tables without relying on timestamps alone.
-
-### The `LineLog` table
-
-The same evidence in a form you can collect with LoggerNet or PC400 instead of
-pulling a file — one record per complete line, 2,000 of them:
-
-| Column | Means |
-| --- | --- |
-| `RxLastLineLen` | Line length after the terminator is stripped |
-| `RxLastFields` | Fields the splitter found |
-| `RxLastDelimCode` | 0 none · 1 comma · 2 semicolon · 3 tab · 4 pipe · 5 space |
-| `RxLastShapeCode` | 1 ALERT2A · 2 plain · 3 unrecognised |
-| `whyCode` | 0 accepted, otherwise the `RxWhyName()` index |
-| `RxLastPrefix` | Bytes skipped to reach `ALERT2A` |
-| `RxSepComma` `RxSepSpace` `RxSepColon` `RxSepEq` `RxSepHi` `RxSepCtl` | The census, per line |
-| `RxTopSepDec` / `RxTopSepN` | The most common non-alphanumeric byte and its count |
-| `RxLastHead` / `RxLastTail` | The first 40 and last 16 characters |
-
-**The first version of this table carried numbers only** — cheap enough to leave
-running for hours, and it established that a feed had a consistent shape without
-ever saying what the shape *was*. The two text samples cost about 56 bytes a
-record and settle it. If memory is tight, lower the 2,000 rather than dropping
-them.
-
-And the counters that say how it went:
+`SecsSinceRx` first, always. It separates *the receiver is silent* from *this
+program cannot parse what it is sending*, and those two have nothing in common.
 
 | Variable | Means |
 | --- | --- |
-| `RxStep` | The last step the pipeline completed, in words — `3 appended to line buffer`, `5 payload decoded`, `7 queued`, `rejected: …`. **Where this stops is where to look.** |
-| `RxFrames` / `RxReadings` | Frames decoded, and readings extracted from them. One ALERT2 frame can carry several readings. |
-| `RxBadFrames` | Lines that would not decode. `RxLastBad`, `RxLastBadHex` and `RxLastWhy` are the last one, the same line in hex, and the reason. The hex copy matters: a line that will not parse is often a line whose text is not readable. |
-| `RxWhyCount()` / `RxWhyName()` | Every rejection since startup, by reason, self-labelled. All on one counter = one consistent shape this program does not know. Spread across several = corruption. |
-| `RxByteClass()` / `RxByteClassName()` | Every byte received, in eight classes — NUL, ctrl-other, CR, LF, TAB, space, printable, high >126. **The fastest read on the table for "is this ASCII at all".** |
-| `RxLenMin` / `RxLenMax` | Shortest and longest complete line seen. Equal means fixed-length records. |
-| `RxTermCR` / `RxTermLF` | Which terminator the feed uses. |
-| `RxFirstLine` / `RxFirstLineHex` | The first line ever seen, kept and never overwritten — startup banners appear once and are gone a second later. |
-| `RxBadRecords` | Records inside otherwise-good frames whose status byte was non-zero. In the reference capture those also carried addresses matching no station, so they are counted and dropped. |
-| `RxFrameSkew` | Seconds between the frame's own ALERT2 time and this logger's clock — see *Which clock stamps the reading*, below. |
+| `SecsSinceRx` | Seconds since the last byte arrived. Climbing past a station's reporting interval means the problem is upstream of this program: cable, receiver, power. |
+| `RxAvail`, `RxBlockBytes`, `RxBytesTotal` | Bytes waiting in the port, bytes taken this scan, bytes since startup. |
+| `RxNulls` | NUL bytes seen. A binary feed carries nine to eleven per frame and that is correct; a non-zero count on a feed you believe is ASCII means the port format is wrong. |
+| `RxBufLen`, `RxBufDrops` | Bytes waiting to be framed, and times the buffer filled with nothing framable in it. |
+| `RxFrameMode` | `binary` or `ascii`, decided per frame. This receiver is `binary`. |
+| `RxStep` | **The one to read.** The last step the pipeline completed — where this stops being what you expect is the step that is broken. |
+| `RxHex` | The first 40 bytes of the last frame, in hex. |
+| `FrLenByte`, `FrTotal` | Byte 7, and `6 + byte 7` — the whole frame length. |
+| `FrElemVia` | How the concentration element was found: `1` the `84 01 <len> 74` anchor, `2` the loose scan, **`0` neither, and the frame carries no element at all**. Read this first when a frame produces no readings. |
+| `FrElemOff`, `FrElemLen`, `FrTimeSecs` | Where the element starts, its length, and the seconds-since-midnight inside it. |
+| `FrRecords`, `FrGood`, `FrBad` | Four-byte records in the frame, how many decoded, and how many had a non-zero status byte or an impossible address. |
+| `RxLastRecHex` | The four bytes the last reading came out of — enough to redo the bit-unpacking by hand against the table in `ParseAlert2`. |
+| `RxLastId`, `RxLastValue` | And what they decoded to. |
+| `RxLastJson` | The reading as it will be posted, byte for byte. |
+| `RxFrames`, `RxReadings`, `RxBadFrames`, `RxBadRecords` | The running totals, all four in `Diag` every five minutes. |
+| `RxLastWhy`, `whyCode`, `RxLastBad` | Why the last frame or line was rejected, as a sentence, as a number, and the first 120 characters of the thing itself. |
+| `RxFrameSkew` | Seconds between the frame's own ALERT2 time and this logger's clock. See *Which clock stamps the reading*. |
+
+`whyCode` is the reason as a number, which is what survives when the sentence is
+truncated: 1 short line, 2 frame flagged invalid, 3 payload length disagrees with
+the hex, 4 payload size, 5 not whole records, 6 payload not hex, 7 not a
+concentration element, 8 clock not set, 9 ALERT id out of range, 10 unrecognised
+line, 12 fields are not numbers, 13 no element in frame, 14 element length is not
+whole records.
+
+### What v3.0 took out of this section, and where it went
+
+**v2.1 would not fit on a CR300.** It compiled and ran out of memory, and the
+cause was not the local sensors or the self-test — those cost about 5 KB between
+them. It was that the program had never stopped being a bring-up tool.
+
+v1 was written not knowing what the receiver would send: whether the feed was
+ASCII or binary, what delimited it, how long a line was. So it was built to find
+out — a byte census over eight classes, a delimiter poll over five candidates, a
+separator tally, a per-rejection counter, hex dumps of the block, the buffer, the
+last line and the last *bad* line, the first line ever seen kept forever, a raw
+capture file on flash, and four tables recording all of it (`RawLog`,
+`FrameLog`, `ReadingLog`, `LineLog` — about 700 KB of table allocation).
+
+**Those questions are answered.** The receiver speaks binary, the frame layout is
+known and is documented below, and the station has posted 7,887 readings from 685
+addresses. So v3.0 deleted the machinery for asking them: 22.8 KB of variable
+memory, 65% of what the program declared, and about 800 KB of tables.
+
+| Gone | What replaced it |
+| --- | --- |
+| `RxBlockHex`, `RxBlockHexFull`, `RxBlockText`, `RxBufHex`, `RxBufText`, `RxLastLineHex`, `RxLastBadHex`, `RxFirstLineHex`, `FrHex`, `FrElemHex` | **`RxHex`** — one dump, over the bytes that actually became a frame. The other nine asked the same question of the block, the buffer, the line and the bad line separately, which mattered only while nobody knew which of those the feed was made of. |
+| `RxByteClass(8)`, `charTally(126)`, the separator tally, `PickDelim` | Nothing. The feed is comma-delimited when it is ASCII at all, and `ParseLine` now says so in two lines instead of polling for it. |
+| `RxWhyCount(14)`, `RxWhyName(14)` | `whyCode`, which still says *which* rejection. *How many times* was a question for a capture, and the capture went too. |
+| `CaptureNow`, `CaptureReset`, `CaptureBytes`, `CaptureState`, `CPU:rxcapture.txt` | Nothing. 3.6 KB of buffers and a 200 KB flash file. |
+| `RawLog`, `FrameLog`, `ReadingLog`, `LineLog` | `Readings` and `Diag`, which were always the two that mattered: the archive that makes an outage recoverable, and the five-minute heartbeat. |
+
+**None of this is lost — it is one command away.** `git show
+ea4116d:logger/base-station-http.CR300` is v2.1 with every one of them, and it is
+the right starting point for a receiver nobody has seen before, on a logger with
+the memory to run it. What would be lost is a base station that will not load.
+
 
 ### Are the local sensors reporting
 
@@ -694,7 +630,7 @@ terminals*, above, for what each channel is and where it is wired.
 | `TestFire` | Set it true to fire one frame. It clears itself. |
 | `TestId` / `TestValue` | The address and value to transmit as. 1–8191 and 0–2047 — the 13 and 11 bits an ALERT2 record actually carries. |
 | `TestState` | `fired …`, `waiting for a gap …`, or the reason it refused. |
-| `TestLine` | The frame it built, verbatim. Compare it against `RxLastLine`: they must be the same string, because they are. |
+| `TestHex` | The frame it built, in hex. Compare it against `RxHex`: they must be the same bytes, because they are. |
 | `TestFired` | Shots fired since startup. |
 | `TestEvery` | Minutes between automatic shots. **0 = off, and off is the shipped default** — an unattended self-test writes synthetic readings into the live database forever. |
 
@@ -968,6 +904,36 @@ new token file recovers everything still in the buffer.
 batch is still stored. `LastReject` says why.
 
 ---
+
+## How a timestamp is stored, and the year it stops working
+
+New at v3.0, and it is the single largest thing the memory diet bought: **a
+queue slot holds the instant as one `Long` rather than as a 24-character ISO
+string.** That is 6.25 KB of the 9.25 KB the ring buffer gave back.
+
+The packing is positional, in the order a date is written — year, then month,
+then day, then hour, minute, second, each multiplied up by the range of the next
+— and unpacking is the same divisions in reverse. **There is no calendar
+arithmetic in either direction**, which is why it was chosen over seconds since
+an epoch: an epoch needs leap-year handling both ways and puts a cliff at 2038
+that nothing in the program would announce.
+
+This encoding has a cliff too, and it is stated rather than left to be found:
+
+- `MIN_YEAR` is **2020**. Below it the clock has plainly reset and nothing is
+  stamped — the endpoint's own floor is 1990, and a logger whose RTC has lost
+  power can land just above that and still be meaningless.
+- `MAX_YEAR` is **2085**, the last year that is *wholly* representable in a
+  32-bit signed `Long`. 2086 starts inside the range and overflows part-way
+  through it, so accepting 2086 would mean taking January and wrapping silently
+  in December.
+- Past `MAX_YEAR`, `StampNow` **refuses** rather than wrapping. A wrapped stamp
+  would put every reading in 2020, and nothing downstream could detect it.
+
+`NowISO` and `NowWhen` sit next to each other in the Public table on purpose:
+the same instant as a string and as the number a slot holds, so the two can be
+checked against each other by eye. `npm run logger` checks the round trip
+exhaustively over every year in the range, and on both sides of the edge.
 
 ## Which clock stamps the reading
 

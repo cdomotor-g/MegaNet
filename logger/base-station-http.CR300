@@ -11,6 +11,52 @@
 ' guide, including the Device Configuration Utility settings that have to be
 ' right before either half of this can deliver anything at all.
 '
+' --- Version 3.0: what came OUT, and why ------------------------------------
+'
+' **v2.1 would not fit on a CR300.** It compiled and ran out of memory, and the
+' reason is worth writing down because it was not the new features -- they cost
+' about 5 KB. It was that the program had never stopped being a bring-up tool.
+'
+' v1 was written not knowing what the receiver would send. Nobody knew whether
+' the feed was ASCII or binary, what delimited it, how long a line was, or which
+' of eight byte classes it used -- so the program was built to answer those
+' questions: a byte census, a delimiter poll, a separator tally, a per-rejection
+' counter, a hex dump of every block, a hex dump of the buffer, a hex dump of
+' the last line, a hex dump of the last BAD line, the first line ever seen kept
+' forever, a raw capture file on flash, and four tables recording all of it --
+' RawLog, FrameLog, ReadingLog and LineLog, about 700 KB of table allocation
+' between them.
+'
+' **Those questions are answered.** The receiver speaks binary; the frame layout
+' is known and is documented below; the station has posted 7,887 readings from
+' 685 addresses. A tool for answering a question that has been answered is not
+' a diagnostic, it is 22 KB of a 30 KB budget. So this version deletes it, and
+' what is deleted is recorded here rather than quietly dropped:
+'
+'   the raw capture file      CapStart/CapFlush/CaptureBlock and 3.6 KB of
+'                             buffers. `git show ea4116d` has it if a future
+'                             receiver ever needs the question asked again.
+'   the byte census           charTally(126), RxByteClass(8), the separator
+'                             tally, PickDelim. The feed is comma-delimited when
+'                             it is ASCII at all; ParseLine now says so.
+'   the why-counters          RxWhyCount(14)/RxWhyName(14). whyCode still
+'                             records WHICH rejection; the tally of how many is
+'                             what a capture was for.
+'   nine hex/text displays    RxBlockHex, RxBlockHexFull, RxBlockText, RxBufHex,
+'                             RxBufText, RxLastLineHex, RxLastBadHex,
+'                             RxFirstLineHex, FrHex, FrElemHex -- 4.4 KB of
+'                             strings, replaced by ONE: RxHex, the first 40
+'                             bytes of the last frame.
+'   four tables               RawLog, FrameLog, ReadingLog, LineLog.
+'
+' What did NOT come out: both receive paths, both transports, the two-tail ring
+' buffer, the clock discipline, the local sensors, the self-test, and every
+' Public that says what the program is doing right now. Nothing that reports on
+' the LIVE system was cut -- only the machinery for working out what the system
+' was.
+'
+' The other 9 KB came out of the ring buffer without losing a slot. See section 3.
+'
 ' --- What this is -----------------------------------------------------------
 '
 ' MegaNet has two inbound paths and they converge on one contract. HTTP needs no
@@ -20,7 +66,7 @@
 ' when this base station stopped talking, which no amount of HTTP tells anybody.
 '
 ' This program does both, for the same readings, from one queue -- and there are
-' now two ways a reading gets into that queue:
+' two ways a reading gets into that queue:
 '
 '   field stations --radio--> ERT-A2 receiver --RS-232--> THIS PROGRAM
 '                                                            ^
@@ -47,11 +93,6 @@
 ' copy lands first sets the row's `source` ("http" or "mqtt"); the other is
 ' counted and discarded. A path being down costs nothing but its own duplicates.
 '
-' One token and one broker credential, one base station, every station it can
-' hear -- docs/ingest-http.md explains why the token belongs to the ingest point
-' rather than to a site, and the same reasoning gives this base station one
-' publisher identity of its own on the topic scheme.
-'
 ' --- The sensors on this logger's own terminals -----------------------------
 '
 ' A base station is normally only a relay. This one also measures: a tipping
@@ -62,8 +103,8 @@
 ' node -- so they use the ingest contract's OTHER address shape, a station
 ' number plus a channel:
 '
-'   radio    {"alert_id":6270, ...}                     -> addr  a:6270
-'   local    {"station_number":"999998","channel":"rain", ...} -> addr  s:999998/rain
+'   radio    {"alert_id":6270, ...}                              ->  a:6270
+'   local    {"station_number":"999998","channel":"rain", ...}   ->  s:999998/rain
 '
 ' Same queue, same batch, same POST, same idempotency. Section 1's local sensors
 ' block is the whole of the configuration, and it is also where the one place
@@ -75,45 +116,27 @@
 '
 ' A base station with no radio traffic cannot be shown to work, and a workshop
 ' rig has none. So this program can transmit to itself: set TestFire true and it
-' builds a complete, valid ALERT2A line and appends it to the receive byte
-' buffer one instruction before the framer runs. Framing, line cutting,
-' ParseAlert2, the bit unpacking, the clock gate, the queue, the batch and the
-' POST all run on it exactly as they would on a real frame, because as far as
-' every one of them can tell it IS one. docs/live-end-to-end-test.md is the card.
+' builds a complete, valid BINARY ALERT2 frame -- the shape this receiver
+' actually emits -- and appends it to the receive byte buffer one instruction
+' before the framer runs. TakeFrames, DecodeFrame, the bit unpacking, the clock
+' gate, the queue, the batch and the POST all run on it exactly as they would on
+' a real frame, because as far as every one of them can tell it IS one.
+' docs/live-end-to-end-test.md is the card.
 '
-' --- How the serial port is read, and why it changed ------------------------
-'
-' The first version of this program called SerialInRecord() once per scan in a
-' drain loop. That was the bug. SerialInRecord's last parameter is
-' RecordsBackFromNewest -- how many records back from the most recent one to
-' hand over -- and it was being passed 1, which asks for the record BEFORE the
-' newest and returns nothing at all when only one has arrived. It is also the
-' wrong shape for draining: one call is meant to yield one record per scan, so
-' looping on it does not empty a buffer that filled between scans.
-'
-' This version reads the port the way the KDO doppler driver on our other
-' loggers reads its sensor, which is the pattern that is known to work on this
-' hardware:
-'
-'   1. SerialInChk()   -- how many bytes are sitting in the port buffer
-'   2. SerialInBlock() -- take all of them, raw, and it returns the byte count
-'   3. walk the block byte by byte with ASCII(), building a padded hex dump and
-'      a printable copy with control characters shown as '-'
-'   4. append the bytes to an assembly buffer and cut complete lines out of it
-'      on CR or LF
-'
-' Nothing about that depends on an option code whose meaning has to be looked
-' up, and every step of it is visible in the Public table -- see section 2. The
-' byte count from SerialInBlock is what bounds the walk, not Len(), because the
-' port is open in transparent mode and a NUL byte would end a CRBasic string
-' early. NULs are skipped and counted rather than silently truncating a line.
+' **It builds the binary form and not the ASCII one deliberately**: the receiver
+' on this base station speaks binary, so DecodeFrame is the live decoder and
+' ParseAlert2 is not. A self-test that exercised the decoder nobody uses would
+' be testing the wrong thing. The ASCII path is still there and still parsed --
+' see the plain-line test in logger/README.md -- for a receiver configured that
+' way.
 '
 ' --- The four things this program is careful about --------------------------
 '
 ' 1. It never blocks the scan on the network. Serial is read in the 1-second
 '    main scan; the POST happens in a SlowSequence, because HTTPPost sits there
 '    until the server answers and a base station that stops reading its serial
-'    port for a minute has lost every transmission in that window.
+'    port for a minute has lost every transmission in that window. The SDI-12
+'    bus is in a sequence of its own for the same reason.
 '
 ' 2. It never throws a reading away because a link was down. Parsed readings go
 '    into a ring buffer and stay there until they have been delivered. A failed
@@ -126,8 +149,8 @@
 '    reused once BOTH have passed it. That is what stops a broker outage from
 '    stalling the POSTs, an HTTP outage from stalling the publishes, and -- the
 '    failure a single shared position would have caused -- a stuck path from
-'    pinning the other one to the same twenty-five readings while newer ones
-'    pile up behind it and fall off the end unsent.
+'    pinning the other one to the same readings while newer ones pile up behind
+'    it and fall off the end unsent.
 '
 ' 3. It does not trust a clock it cannot check. The endpoint rejects anything
 '    stamped before 1990, and the usual cause is an RTC that lost power. This
@@ -191,18 +214,22 @@ Const API_KEY = "sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY"
 ' has no microSD slot, so CRD: does not exist on this hardware.
 Const TOKEN_FILE = "CPU:meganet_token.txt"
 
-' The wire protocol behind the readings, recorded against every one of them.
-' "alert2" for an ERT-A2. Change it to "alert" if your decoder is feeding this
-' program legacy ALERT, or "unknown" if you would rather not claim.
+' The wire protocol behind the RADIO readings, recorded against every one of
+' them. "alert2" for an ERT-A2. Change it to "alert" if your decoder is feeding
+' this program legacy ALERT, or "unknown" if you would rather not claim.
 Const PROTOCOL = "alert2"
+
+' Reported in the MQTT status message, so "which loggers are still on the old
+' program" is answerable from the database rather than from a site visit. Bump
+' it when you change this file in a way a field technician would care about.
+Const FW_VERSION = "3.0"
 
 ' --- the serial port ---------------------------------------------------------
 '
 ' 9600-8-N-1 is the ERT-A2's ALERT2 ASCII default. Format 3 is 8-N-1
 ' transparent, and it is the right one for a third-party feed: format 0 discards
 ' ASCII 0 and every byte above 127, and leaves the PakBus stack scanning the
-' stream for frames it will never find. The KDO driver these constants are
-' modelled on uses the same three values.
+' stream for frames it will never find.
 Const RX_PORT = ComRS232
 Const RX_BAUD = 9600
 Const RX_FORMAT = 3
@@ -214,22 +241,16 @@ Const RX_BUFFER = 2000             'port buffer, bytes. Two seconds of 9600 baud
 Const RX_BLOCK = 250               'most bytes taken from the port in one read
 Const RX_MAX = 250                 'longest text line this program will assemble
 
-' How much of a block or a line to show in the hex and text diagnostics. The
-' dump is 3 characters per byte, so 128 bytes is 384 characters. Longer than
-' this and the diagnostic ends in "..." -- the parsing is not affected, only
-' what you can read on screen.
-Const DUMP_MAX = 128
-
 ' --- posting over HTTP -------------------------------------------------------
-
-' How often to try a POST, and how many readings may go in one. The endpoint's
-' own limit is 1000 per batch, which is not the binding one here: a reading is
-' 69 characters, or 92 when it carries the suspect flag, so 25 of the longest
-' possible readings plus the envelope come to 2366 -- comfortably inside
-' CONTENT_GUARD below. 25 readings every 30 seconds is 50 a minute; a 40-station
-' base reporting every 15 minutes produces about 8.
+'
+' MAX_BATCH came down from 25 at v3.0, with CONTENT_SIZE. A radio reading is 69
+' characters of JSON and a local one about 180, so 12 of the longest possible
+' plus the envelope is inside CONTENT_GUARD with a full record's headroom. What
+' it costs is drain rate after an outage: a full 250-slot queue takes ten and a
+' half minutes to clear rather than five. What it buys is 1.4 KB, and this
+' station produces about thirty readings an hour.
 Const POST_EVERY = 30              'seconds between POST attempts
-Const MAX_BATCH = 25               'readings per POST
+Const MAX_BATCH = 12               'readings per POST
 
 ' Retry backoff after a failed POST: doubles from BACKOFF_MIN up to BACKOFF_MAX.
 Const BACKOFF_MIN = 30             'seconds
@@ -240,102 +261,48 @@ Const BACKOFF_MAX = 900            'seconds -- 15 minutes
 ' The second path. docs/ingest-mqtt.md is the contract; the broker connection
 ' itself is NOT configured here -- it is a block of Device Configuration Utility
 ' settings (broker URL, port, TLS, client id, username, password, clean session,
-' keep alive, and the Last Will) that CRBasic can neither read nor set.
-' logger/README.md lists every one of them and what to put in it. This section
-' is only the part that belongs to the program: which topics, how often, and how
-' hard to retry.
+' and the Last Will), because there is no CRBasic instruction that opens a
+' broker session. logger/README.md lists every one of them.
 '
-' Set MQTT_ENABLE False on a base station that has no broker credential, or on a
-' logger whose operating system predates MQTTPublish() -- on that logger the
-' program will not compile at all and the MQTT subroutines have to be deleted,
-' which is the one change this flag cannot make for you.
+' Set this False on a base station with no broker credential. The HTTP half is
+' unaffected, and since v2.1 it costs nothing else either -- see the note at
+' QueuePush about what QDropped used to do here.
 Const MQTT_ENABLE = True
 
-' WHO THIS BASE STATION IS ON THE WIRE. The <station> topic segment: the BUREAU
-' STATION NUMBER, exactly as meganet.station.station_number holds it -- `541155`,
-' not `0541155`. Sites that have no bureau number publish under their station id
-' instead, which is one rule rather than two identifiers, and a base station
-' never has a bureau number: it is an ingest point, not a gauging station.
-'
-' "18 Bateson" is stations.json id `18_bateson`, station_number "". So the id is
-' what goes here, and it is what the broker ACL for this credential spells --
-' change BOTH together or the broker refuses the publish, which is the loud
-' failure the scheme is built to produce (docs/ingest-mqtt.md, 0020).
-'
-' Letters, digits, dot, dash and underscore only, starting with a letter or a
-' digit, up to 64 characters. bridge/src/topics.js is the same rule in code.
+' The <station> segment of the topic, and it is the BUREAU STATION NUMBER for a
+' site that has one. A base station never does -- it is an ingest point, not a
+' gauging station -- so it is the station id. Change this and the broker's ACL
+' together: the ACL is generated from the same column, so a mistyped segment is
+' refused by the broker rather than filed under an identity nobody claims.
 Const MQTT_STATION = "18_bateson"
-
-' WHICH BOX AT THE SITE IS TALKING. `logger` for the usual case of one. It says
-' who published, not what was measured -- the readings carry their own
-' addresses, which is what MegaNet stores against.
 Const MQTT_DEVICE = "logger"
 
-' QoS 1, not 2. At-least-once means duplicates are guaranteed, and the primary
-' key already eats them; exactly-once costs two extra round trips per message
-' over a marginal link and buys nothing. QoS 2 is not supported by the
-' instruction in any case.
-'
-' MQTTPublish() BLOCKS at QoS 1 -- it waits for the broker's PUBACK or a timeout
-' -- which is why it lives in the same SlowSequence as HTTPPost and not in the
-' scan that reads the serial port.
-Const MQTT_QOS = 1
-
-' Retain flags, written as the numbers the instruction takes rather than as True
-' and False: CRBasic's True is -1, and -1 in a retain parameter is not something
-' to find out about from a broker.
+Const MQTT_QOS = 1                 'at least once. The bridge deduplicates, so
+                                   'the redelivery QoS 1 can cause is free
 Const MQTT_KEEP = 1                'retained -- the status topic
 Const MQTT_DROP = 0                'not retained -- readings
 
-' How often to publish, and the retry backoff, with the same shape and the same
-' defaults as the POST above. They are separate constants rather than shared
-' ones because the two paths fail independently and at different rates: a
-' cellular link that is too poor for a 2 KB POST body will often still carry a
-' publish, and tuning one should not move the other.
 Const MQTT_EVERY = 30              'seconds between publish attempts
 Const MQTT_BACKOFF_MIN = 30        'seconds
 Const MQTT_BACKOFF_MAX = 900       'seconds -- 15 minutes
 
-' How often to re-publish the retained status message.
-'
-' This is the half of MQTT that is arguably worth more than the readings.
-' "Which sites stopped talking overnight" is the morning question, and the
-' broker answers it with the Last Will -- set in Device Configuration Utility,
-' published by the BROKER on this station's behalf when the connection drops
-' without a clean disconnect, which is exactly the case a station cannot report
-' itself. All this program has to do is publish the other half: a retained
-' {"online": true, ...} saying it is here.
-'
-' Re-published on a timer rather than only at startup because a logger that
-' reconnects after an outage has to overwrite the will the broker published for
-' it, and there is no connect event in CRBasic to hang that on. Fifteen minutes
-' is one small retained message an hour and a bit -- cheap on any link that can
-' carry readings at all.
+' How often to re-publish the retained status message. Re-published on a timer
+' rather than only at startup because a logger that reconnects after an outage
+' has to overwrite the will the broker published for it, and there is no connect
+' event in CRBasic to hang that on.
 Const MQTT_STATUS_EVERY = 900      'seconds
-
-' Reported in the status message, so "which loggers are still on the old
-' program" is answerable from the database rather than from a site visit. Bump
-' it when you change this file in a way a field technician would care about.
-Const FW_VERSION = "2.1"
 
 ' --- local sensors, wired to this logger's own terminals ---------------------
 '
-' A base station is normally only a relay: everything it posts arrived over the
-' air with an ALERT address already on it. This one also has sensors bolted to
-' its own terminal strip, and those readings have no ALERT address at all --
-' there is no packet, no transmitting node and no radio, only a cable.
-'
-' docs/ingest-http.md carries the second address shape for exactly this case: a
+' docs/ingest-http.md carries the second address shape for these: a
 ' `station_number` plus a `channel` saying which sensor at that number spoke. So
 ' a local reading posts as
 '
 '   {"station_number":"999998","channel":"rain","reading_ts":"..",
-'    "value_raw":3,"value":0.600,"unit":"mm"}
+'    "value_raw":3,"value":0.600,"unit":"mm","protocol":"wired"}
 '
 ' and lands on meganet.reading as addr `s:999998/rain`, beside `a:6270` off the
-' air -- one queue, one batch, one POST, two address shapes. Nothing else in
-' this program changes: the same ring buffer holds both, and both go out over
-' whichever of the two paths is enabled.
+' air -- one queue, one batch, one POST, two address shapes.
 '
 ' LOCAL_NUMBER is the station number those channels report under. 999998 is
 ' deliberately outside the Bureau's range -- real numbers are five or six digits
@@ -344,49 +311,32 @@ Const FW_VERSION = "2.1"
 ' by db/migrations/0026_bateson_test_rig.sql.** If it does not, the readings are
 ' still stored, but they resolve to nobody: the app shows a bare address where a
 ' station name should be, which is the symptom to recognise.
-'
-' --- these channels DO convert, and the radio path still does not ---
-'
-' Point 4 at the top of this file says a base station hearing forty sites does
-' not know which of them is a rain gauge, and that a wrong bucket size is worse
-' than none. That is true of the radio and it is not true here. This logger is
-' wired to these sensors; the bucket size is written on the gauge two metres
-' away. So it is the one place in the system that knows, and it says so in the
-' reading rather than making MegaNet guess -- `value_raw` is still exactly what
-' the sensor produced (tips, or metres off the SDI-12 bus), and `value`, `unit`
-' and `conversion` travel beside it rather than instead of it.
 Const LOCAL_ENABLE = True
 Const LOCAL_NUMBER = "999998"
 
 ' The wire protocol behind a local reading, recorded against every one of them
 ' the way PROTOCOL is for the radio. There is no wire and no protocol -- the
 ' sensor is on a terminal strip -- and that is a fact worth recording rather than
-' leaving as the envelope's "alert2", which would be untrue of every local
-' reading in the batch. The Message Log shows this column, so it is what stops a
-' rain gauge on a cable being read as a rain gauge on the air.
+' leaving as the batch envelope's "alert2", which would be untrue of every local
+' reading in it.
 '
-' Added as protocol code 6 by db/migrations/0026_bateson_test_rig.sql, and
-' **apply that migration before loading this program**: code_for() RAISES on a
-' protocol key it does not know, and the row loop catches that per reading -- so
-' against a database without 0026 every local reading comes back in `rejected`
-' saying `unknown protocol: wired`, while the radio readings in the same batch
-' are stored. That is a legible failure rather than a silent one, and
-' LastReject in the Public table is where it appears, but it is still a
-' morning wasted if the order is not known in advance.
+' Added as protocol code 6 by db/migrations/0026_bateson_test_rig.sql, which is
+' applied to the live project. Against a database WITHOUT it, code_for() raises
+' on a protocol key it does not know and the row loop catches that per reading,
+' so every local reading comes back in `rejected` saying `unknown protocol:
+' wired` while the radio readings in the same batch are stored. LastReject in
+' the Public table is where that appears.
 Const LOCAL_PROTOCOL = "wired"
 
 ' Minutes between local readings. Every channel reports on this interval, and
 ' the rain gauge's tips are totalised across it -- so this is the rainfall
-' accumulation period as well as the reporting one. Five minutes matches what a
-' flood-warning site transmits and keeps the row count sane: four channels every
-' five minutes is 1,152 readings a day.
+' accumulation period as well as the reporting one.
 Const LOCAL_EVERY = 5              'minutes
 
 ' How many local channels there are, and which is which. The names are the
 ' `channel` values on the wire, so they are also what the Message Log shows and
 ' what a query filters on -- change one and the readings before and after the
-' change are two different addresses. They are lower-case with underscores for
-' the same reason station ids are.
+' change are two different addresses.
 Const LOC_N = 4
 Const LOC_RAIN = 1
 Const LOC_LEVEL1 = 2
@@ -416,52 +366,15 @@ Const LOCAL_MAX = 10000
 
 ' --- the live end-to-end self-test -------------------------------------------
 '
-' The problem this solves: a base station with no radio traffic cannot be proved
-' to work. Everything from the receiver to the app is only exercised by a real
-' transmission, and at a workshop -- or at a live site on a quiet day -- there
-' is not one. The plain "6270,21" line in logger/README.md tests some of it, but
-' it needs a terminal on the RS-232 port, which is where the receiver is plugged
-' in, and it skips the ALERT2 decoder entirely.
-'
-' So this program can transmit to itself. Set TestFire true from LoggerNet, PC400
-' or Device Configuration Utility and it builds a complete, valid ALERT2A ASCII
-' line for TestId/TestValue and appends its bytes to the receive byte buffer --
-' the same buffer SerialInBlock fills, at the same point in the same scan, one
-' instruction before TakeFrames runs. Everything after that is the production
-' path and nothing knows the difference:
-'
-'   framing -> line cut on CRLF -> census -> delimiter -> ParseAlert2 ->
-'   bit unpacking -> clock check -> QueuePush -> BuildBatch -> HTTPPost ->
-'   meganet.ingest_http() -> meganet.reading -> the Message Log tab
-'
-' That is what "end to end" has to mean to be worth anything: not a POST built
-' by hand, but a reading that entered where a real one enters and came out where
-' a real one comes out. docs/live-end-to-end-test.md is the card for running it.
-'
-' The line is injected only when the byte buffer is empty, so it can never be
-' spliced into a half-received real frame. On a station that is hearing traffic
-' it waits for a gap -- TestState says so -- rather than corrupting a reading.
+' See the note in the header. TestInject builds the BINARY frame this receiver
+' actually emits, so the decoder under test is the decoder in use.
 Const TEST_ENABLE = True
 
-' Field 3 and field 24 of the synthetic line: the receiver id and the
-' transmitting node. 9999 is what the reference capture behind alert2.js carries
-' and is not a real node on this network.
-Const TEST_NODE = "9999"
-
-' --- how the queue is sized, and why a local reading is longer ----------------
+' --- clock -------------------------------------------------------------------
 '
-' Kept here rather than beside MAX_BATCH because it is now about both kinds of
-' reading. A radio reading is 69 characters of JSON, or 92 with the suspect flag;
-' a local one is up to about 160, because it carries a station number, a channel
-' name, an engineering value, a unit and sometimes a conversion. CONTENT_GUARD is
-' what actually bounds a batch -- BuildBatch stops adding before the buffer can
-' overrun -- so a batch of local readings is simply a shorter batch, and the next
-' POST takes the rest. Four channels every five minutes is eight readings a
-' batch at the very most, so this never binds in practice.
-
-' Clock discipline. NTPOffset is seconds of offset from UTC, so 0 means the
-' logger's clock runs in UTC -- which is what lets the timestamps below end in
-' Z and mean it. Blank NTP_SERVER to turn this off and set the clock by hand.
+' NTPOffset is seconds of offset from UTC, so 0 means the logger's clock runs in
+' UTC -- which is what lets the timestamps below end in Z and mean it. Blank
+' NTP_SERVER to turn this off and set the clock by hand.
 Const NTP_SERVER = "au.pool.ntp.org"
 Const NTP_EVERY_HR = 6
 
@@ -473,70 +386,51 @@ Const NTP_EVERY_HR = 6
 ' accepted them (its ceiling is a day), and they were invisible in the app
 ' because every time window there ends at now. Nothing downstream can detect
 ' that, and nothing can undo it afterwards.
-'
-' The old code only synced on the NTP_EVERY_HR boundary, so a logger could run
-' for hours before its first sync. It now syncs on the first pass and every
-' NTP_EVERY_HR after that, and REQUIRE_NTP makes an unverified clock refuse to
-' stamp rather than stamp something plausible.
-'
-' Set it False only if this logger genuinely cannot reach an NTP server -- then
-' set the clock to UTC by hand and accept that nothing is checking it. Blanking
-' NTP_SERVER disables the requirement too, for the same reason.
 Const REQUIRE_NTP = True
 
-' How much unsent data to hold. Each slot is one reading; 250 slots is roughly
-' two hours for a busy 40-station base. When it fills, the OLDEST reading is
-' dropped and QDropped counts it -- for flood warning the newest river level
-' matters more than the one before it.
+' The clock sanity window, and it is now a window rather than a floor.
+'
+' MIN_YEAR is the old floor: the endpoint rejects anything before 1990 as a dead
+' clock, and this refuses to stamp one in the first place. Set above 1990 on
+' purpose -- a logger whose clock has reset can land just after 1990 and pass a
+' literal 1990 test while still being meaningless.
+'
+' MAX_YEAR is new at v3.0 and is a consequence of how a timestamp is now stored:
+' one Long holding the calendar fields packed together, which is what took 6.25
+' KB out of the ring buffer (see section 3). MAX_YEAR is the last year that is
+' WHOLLY representable in a 32-bit signed Long, which is the only useful
+' definition of the limit: the last second of 2085 packs to 2,121,292,799
+' against a ceiling of 2,147,483,647, and 2086 STARTS inside the range and
+' overflows part-way through it -- so a MAX_YEAR of 2086 would accept January
+' and wrap silently in December. StampNow refuses past 2085 instead of wrapping
+' and stamping every reading in MIN_YEAR, which nothing downstream could
+' detect. `npm run logger` asserts both sides of that edge.
+Const MIN_YEAR = 2020
+Const MAX_YEAR = 2085
+
+' --- sizes -------------------------------------------------------------------
+
+' How much unsent data to hold. Each slot is one reading. This station hears
+' about thirty readings an hour, so 250 slots is roughly eight hours -- it was
+' described as two when the number was guessed rather than measured.
 Const Q_SIZE = 250
 
 ' The JSON body buffer, and the length at which BuildBatch stops adding. Raise
-' both together if you raise MAX_BATCH, and leave at least 92 characters -- one
-' longest-case reading -- between the guard and the buffer, or the last append
-' can still overrun.
-Const CONTENT_SIZE = 3000
-Const CONTENT_GUARD = 2700
+' both together if you raise MAX_BATCH, and leave at least 180 characters -- one
+' longest-case local reading -- between the guard and the buffer, or the last
+' append can still overrun.
+Const CONTENT_SIZE = 1600
+Const CONTENT_GUARD = 1400
 
 ' A reading whose 11-bit value is all ones. alert2.js calls this out as
 ' over-range or a dead sensor, so it is posted with quality "suspect" rather
 ' than dropped -- a stuck sensor is a fact about the network, not a bad row.
 Const FULL_SCALE = 2047
 
-' The clock sanity floor. The endpoint rejects anything before 1990 as a dead
-' clock rather than a reading; this refuses to stamp one in the first place. Set
-' above 1990 on purpose: a logger whose clock has reset can land just after
-' 1990 and pass a literal 1990 test while still being meaningless.
-Const MIN_YEAR = 2020
-
 ' The ALERT2 ASCII protocol's fixed fields, before the payload hex begins, and
 ' the most fields this program will split a line into.
 Const N_FIELDS = 24
 Const FIELD_MAX = 60
-
-' --- the raw capture ---------------------------------------------------------
-'
-' A plain text file of every byte the port delivers, one text line per read,
-' written so it can be pulled off the logger with Device Configuration Utility
-' (File Control > Retrieve) -- the same route the token file goes on by. This is
-' the thing to send when a feed is not doing what it should: it is lossless, it
-' is before any parsing, and it survives the program being wrong.
-'
-'   # MegaNet base-station serial capture -- ComRS232 9600 format 3
-'   # started 2026-08-17T04:15:00Z (logger clock, UTC)
-'   04:15:07 n=31 41 4C 45 52 54 32 41 2C 31 2C ...
-'
-' Writes are batched: bytes accumulate in a buffer and go to flash when it is
-' nearly full or every CAP_FLUSH_SEC, rather than once a second. Flash on a
-' CR300 is not infinite, and a capture left running for a week at one write a
-' second is a real cost -- so the file also stops itself at CAPTURE_MAX bytes.
-Const CAPTURE_FILE = "CPU:rxcapture.txt"
-Const CAPTURE_MAX = 200000         'bytes, then it stops and says so. Lower this
-                                   'if CPU: is short of room -- 200 KB is about
-                                   'nine hours of a busy 40-station base
-Const CAP_BUF = 2000               'held in RAM between flushes
-Const CAP_FLUSH_SEC = 60           'flush at least this often, so a capture cut
-                                   'short by a power cycle loses a minute, not
-                                   'everything since it started
 
 ' Payload byte 0 of an ALERT2 "ALERT concentration" element. Decimal 116, which
 ' is 0x74 -- written in decimal so there is no doubt what the compiler read.
@@ -544,8 +438,8 @@ Const ELEM_CONCENTRATION = 116
 
 ' --- the ERT-A2's BINARY framing ---------------------------------------------
 '
-' The receiver on this base station does not emit the ALERT2 ASCII lines above.
-' It emits a binary frame, and a terminal capture of three of them settles the
+' The receiver on this base station does not emit the ALERT2 ASCII lines. It
+' emits a binary frame, and a terminal capture of three of them settles the
 ' layout completely:
 '
 '   41 4C 45 52 54 32 | 56 | 9C 2C 02 00 01 75 ... 84 01 0B 74 5C 9E 87 09 8C 00
@@ -555,29 +449,23 @@ Const ELEM_CONCENTRATION = 116
 '   total bytes = 6 + byte 7.  0x56 -> 92 bytes, 0x52 -> 88 bytes, both exact.
 '
 ' Byte 7 read as text is "V" or "R", which is why a terminal shows ALERT2V and
-' ALERT2R and why this program, looking for the literal text ALERT2A, never
-' matched one. The ASCII form is still recognised -- see the mode test in
-' TakeFrames -- because "ALERT2A," is a letter A followed by a comma and a
-' length byte cannot be.
+' ALERT2R and why a program looking for the literal text ALERT2A never matched
+' one. The ASCII form is still recognised -- see the mode test in TakeFrames --
+' because "ALERT2A," is a letter A followed by a comma and a length byte cannot
+' be.
 '
 ' Inside the frame, the ALERT concentration element sits behind a fixed anchor:
 '
 '   84 01 <len> 74 <time hi> <time lo> then <len-3>/4 four-byte records
-'
-' which appeared at the same place in all three reference frames and decoded to
-' sensible readings (alert_id 2438/2439 and 4134). The records are the same
-' four-byte shape the ASCII path already decodes, so ParseAlert2's table applies
-' unchanged.
 Const SIG_LEN = 6                  'the length of "ALERT2"
-Const BUF_MAX = 600                'the byte buffer, in bytes. Two frames and
-                                   'change, which is all a 1-second scan can see
+Const BUF_MAX = 400                'the byte buffer, in bytes. One longest frame
+                                   'and a third, which is what a 1-second scan
+                                   'can see. Was 600
 Const FRAME_MAX = 300              'a length byte claiming more than this is not
                                    'a length byte
 Const FRAME_MIN_LEN = 12           'nor is one claiming less than this
 Const FRAME_LOOPS = 24             'most frames or lines taken from the buffer in
-                                   'one scan. A bound rather than a budget: the
-                                   'buffer holds two frames, so reaching this
-                                   'means something is looping that should not
+                                   'one scan
 
 
 '==============================================================================
@@ -587,25 +475,17 @@ Const FRAME_LOOPS = 24             'most frames or lines taken from the buffer i
 ' Everything below is visible in LoggerNet, PC400 or Device Configuration
 ' Utility without collecting a table.
 '
-' The serial block is the important part of this section and it is laid out as
-' the pipeline it is: seven numbered steps from "bytes in the port buffer" to
-' "the JSON that will be posted", each one showing the same data in the form it
-' has reached. When something is wrong with a feed, the step where the display
-' stops being what you expected is the step that is broken.
+' This section is a third of what it was, and the rule used for cutting it was:
+' **keep everything that says what the program is doing NOW, delete everything
+' that was working out what the feed IS.** The second question is answered --
+' see the version note at the top of the file.
 
 '--- which ingest point this is ----------------------------------------------
 '
 ' Lands in every reading's `path` column and is what the Message Log tab shows
-' as "which base heard it", so name it for the place a person standing there
-' would recognise -- not for a field station it relays, because a base hears
-' forty of those.
-'
-' Public rather than Const, so it can be corrected at the logger without a
-' recompile. Two things follow. The value here is the default at every program
-' start, not a saved setting, so the permanent home for a site's name is still
-' this line. And the batch envelope is rebuilt per POST rather than once in
-' BeginProg, so a name changed on the bench takes effect on the next post
-' instead of at the next restart.
+' as "which base heard it". Public rather than Const, so it can be corrected at
+' the logger without a recompile; the value here is the default at every program
+' start, not a saved setting.
 Public BASE_NAME As String * 20 = "18 Bateson"
 
 '--- is the logger alive ------------------------------------------------------
@@ -614,261 +494,104 @@ Public PTemp                       'degC -- panel temperature
 Public ClockOK As Boolean          'false = clock failed its sanity check, and
                                    'nothing is being stamped or queued
 Public NowISO As String * 24       'the clock, formatted exactly as it is posted
+Public NowWhen As Long             'and the same instant packed into one Long --
+                                   'see PackWhen. This is what a queue slot
+                                   'holds, and the two being different views of
+                                   'one clock is checkable here by eye
 Public NTPErrMs                    'clock error NTP found, in ms, before it
-                                   'corrected it. Growing between syncs is drift
-Public NTPLastOK As Boolean        'the last NTP sync succeeded
-Public ClockVerified As Boolean    'NTP has succeeded at least once since this
-                                   'program started, so the Z on every stamp is
-                                   'the truth rather than a claim
-Public ClockState As String * 60   'plain English: what the clock is doing, or
-                                   'why nothing is being stamped
+                                   'corrected it. NAN = the sync failed
+Public NTPLastOK As Boolean
+Public ClockVerified As Boolean    'NTP has succeeded at least once since start
+Public ClockState As String * 60   'plain English: what the clock is doing
 Public SecsSinceNTP
-
-' Status table fields, read straight out of the Status table with
-' Status.Fieldname. These three are on the CR300's own Status table; several
-' familiar CR1000X fields (MemoryFree, SkippedSlowScan, ProgErrors) are NOT,
-' which is why they are absent here rather than left to fail at compile time.
 Public WatchdogErrs                'non-zero means the logger has been resetting
 Public SkippedScans                'the main scan overrunning its second
 Public VarOutOfBound               'an array index that went past its dimension
 
-'--- SERIAL, STEP 1: the port ------------------------------------------------
+'--- is the receiver talking --------------------------------------------------
 Public SecsSinceRx                 'seconds since the last byte arrived. THE
-                                   'number: a base station that has gone deaf
-                                   'shows up here and nowhere else, because a
-                                   'deaf base station is not an error, it is a
-                                   'silence
-Public RxAvail                     'bytes waiting in the port buffer, read with
-                                   'SerialInChk BEFORE this scan's read. Should
-                                   'sit near zero; parked near RX_BUFFER means
-                                   'the scan is not keeping up
+                                   'first number to read when nothing is coming
+                                   'through: it separates "the receiver is
+                                   'silent" from "this program cannot parse it"
+Public RxAvail                     'bytes waiting in the port buffer
 Public RxBlockBytes                'bytes SerialInBlock returned this scan
 Public RxBytesTotal                'bytes read since startup
-Public RxNulls                     'NUL bytes seen and skipped. Non-zero on an
-                                   'ASCII feed means line noise or a baud
-                                   'mismatch, and is the first thing to suspect
-                                   'when RxBadFrames climbs with no obvious cause
-
-'--- SERIAL, STEP 2: this scan's block, two ways -----------------------------
-Public RxBlockHex As String * 400  'every byte of it as padded hex, exactly as
-                                   'it came off the wire. This is the raw truth
-                                   'and it is the display to trust
-Public RxBlockHexFull As String * 620 'the same, never truncated, for RawLog
-Public RxBufLenBefore              'buffer occupancy before this block went in
-Public RxBlockText As String * 200 'the same bytes as text, with every control
-                                   'character shown as '-' so nothing in the
-                                   'data can scramble the display
-
-'--- SERIAL, STEP 3: the byte buffer -----------------------------------------
-'
-' Bytes go into a numeric array, not a string, and NOTHING is removed from them.
-' The first version of this program stripped NUL bytes before assembling lines,
-' because a CRBasic string ends at the first NUL -- and the reference frames
-' carry nine and eleven NULs each, so that alone destroyed every frame. It then
-' cut lines on CR, and 0x0D occurs inside these frames as ordinary data. A
-' numeric array has neither problem: a byte is a number and 0 is a number.
+Public RxNulls                     'NUL bytes seen. Non-zero on an ASCII feed
+                                   'means the port format is wrong
 Public RxBufLen                    'bytes waiting to be framed
-Public RxBufHex As String * 400    'what is waiting, in hex
-Public RxBufText As String * 200   'and as text, printable-safe
+Public RxBufDrops                  'times the buffer filled with nothing framable
 Public RxLines                     'complete TEXT lines cut out since startup
 Public RxNonText                   'runs discarded as not-text -- binary that
-                                   'happened to contain a CR or LF
-Public RxBufDrops                  'times the buffer filled with nothing framable
-                                   'in it and had to be discarded
-Public RxBlockSeq As Long          'increments on every serial read, so RawLog
-                                   'rows can be lined up against FrameLog rows
-
-'--- SERIAL, STEP 3b: the binary frame ---------------------------------------
+                                   'reached a CR or LF before it was framed
 Public RxFrameMode As String * 8   'ascii or binary, decided per frame
-Public RxFrameSeq As Long          'increments per frame found
-Public RxFrameBadLen               'signatures whose length byte was implausible
-Public FrPre                       'bytes that sat in front of the signature and
-                                   'were discarded -- non-zero means noise or a
-                                   'partial previous frame
+Public RxTermCR                    'text lines ended by a bare CR
+Public RxTermLF                    'and by LF -- CRLF counts here, and the
+                                   'CR before it is stripped as whitespace
+
+'--- what the last frame decoded to -------------------------------------------
+'
+' The pipeline as it now stands: bytes -> frame -> element -> record -> reading.
+' Where this display stops being what you expect is the step that is broken.
+Public RxStep As String * 40       'the last step the pipeline completed
+Public RxHex As String * 124       'the first 40 bytes of the last frame, in hex.
+                                   'The ONE hex display left, and it is the one
+                                   'that answers "what actually arrived" -- the
+                                   'other nine were the same question asked of
+                                   'the block, the buffer, the line, the bad
+                                   'line and the element separately
 Public FrLenByte                   'byte 7, the length
 Public FrTotal                     '6 + FrLenByte, the whole frame
-Public FrLeftover                  'bytes still in the buffer after the frame was
-                                   'taken. Near zero confirms the length rule
-Public FrHex As String * 400       'the entire frame, in hex
 Public FrElemVia                   'how the concentration element was found:
-                                   '1 the 84 01 len 74 anchor, 2 a loose scan,
-                                   '0 not found at all
-Public FrElemOff                   'where it starts, counted from the frame start
+                                   '1 the 84 01 <len> 74 anchor, 2 the loose
+                                   'scan, 0 neither -- read this first when a
+                                   'frame produces no readings
+Public FrElemOff                   'where it starts, from the frame start
 Public FrElemLen                   'its length byte
-Public FrElemHex As String * 120   'the element itself, in hex
 Public FrTimeSecs                  'the two time bytes inside it
 Public FrRecords                   'four-byte records it carries
 Public FrGood                      'of those, how many decoded
-Public FrBad                       'and how many had a non-zero status byte or an
-                                   'out-of-range address
+Public FrBad                       'and how many had a non-zero status byte or
+                                   'an implausible address
 
-'--- SERIAL, STEP 3c: one reading, byte by byte ------------------------------
-Public RdIndex                     'which record within the frame
-Public RdB0 As Long                'the four bytes, as numbers, so the
-Public RdB1 As Long                'bit-unpacking can be checked by hand against
-Public RdB2 As Long                'the table at ParseAlert2. Long, not the
-Public RdB3 As Long                'default float: Sprintf's %02X reads a float
-                                   'as zero, which is why RdRecHex printed
-                                   '"00 00 00 00" beside four correct numbers
-Public RdRecHex As String * 12
-Public RdQueued As Boolean
-
-'--- SERIAL, STEP 4: the last complete line ----------------------------------
-Public RxLastLine As String * 250  'verbatim, terminator stripped. Worth more
-                                   'than any counter when the format is not what
-                                   'you expected
-Public RxLastLineHex As String * 400
-Public RxLastLineLen
-Public RxLastShape As String * 16  'what the line was taken to be: ALERT2A,
-                                   'plain, or unrecognised
+Public RxLastLine As String * 250  'the last complete TEXT line, verbatim
+Public RxLastShape As String * 16  'what it was taken to be: ALERT2A, plain, or
+                                   'unrecognised
 Public RxLastFields                'fields the splitter found in it
-Public RxLastDelim As String * 12  'which separator the splitter used: comma,
-                                   'semicolon, tab, pipe, space, or none. "none"
-                                   'with a long line is the whole diagnosis of
-                                   'an "unrecognised line" -- see RxLastSep
-Public RxSepComma As Long          'the separator census as numbers, so LineLog
-Public RxSepSpace As Long          'can carry it. RxLastSep below is the same
-Public RxSepTab As Long            'thing as one readable string
-Public RxSepSemi As Long
-Public RxSepColon As Long
-Public RxSepPipe As Long
-Public RxSepEq As Long
-Public RxSepHi As Long             'bytes above 126 -- not ASCII
-Public RxSepCtl As Long            'control characters inside the line
-
-' The most common non-alphanumeric character in the line, whatever it is. The
-' counters above test a list this program guessed in advance; this one tests
-' nothing and just reports what is actually there, which is the answer when a
-' feed is delimited by something nobody thought of -- a slash, a dash, an
-' asterisk. RxTopSepDec is its byte value, so it survives being a character no
-' display can render.
-Public RxTopSep As String * 4
-Public RxTopSepDec As Long
-Public RxTopSepN As Long
-
-' The line itself, in two short printable-safe samples. These are what make
-' LineLog answer a question on its own instead of only narrowing one down: a
-' table of lengths and field counts says a feed has a shape, and the first forty
-' characters of it say what the shape IS.
-Public RxLastHead As String * 40   'the first 40 characters
-Public RxLastTail As String * 16   'and the last 16, which is where checksums and
-                                   'record terminators live
-
-Public RxLastSep As String * 90    'the whole census as one readable string:
-                                   '  comma=30 space=0 tab=0 semi=0 colon=0
-                                   '  pipe=0 eq=0 hi=0 ctl=0 top=44 x30
-                                   'This is the one line to read when a feed
-                                   'will not parse. Every count zero means the
-                                   'line is a single unbroken token; hi>0 means
-                                   'bytes above 126, which is not ASCII at all
-Public RxLastPrefix                'bytes discarded from the front of the line
-                                   'to reach "ALERT2A". Non-zero means the
-                                   'receiver prefixes its lines with something
-Public RxLastDelimCode As Long     'the same as RxLastDelim, as a number, so the
-Public RxLastShapeCode As Long     'LineLog table can carry them: delim 0 none,
-                                   '1 comma, 2 semicolon, 3 tab, 4 pipe,
-                                   '5 space; shape 1 ALERT2A, 2 plain,
-                                   '3 unrecognised
-
-'--- SERIAL, STEP 5: the decoded payload -------------------------------------
-Public RxLastPayLen                'payload bytes, from field 23
-Public RxLastPayHex As String * 100 'those bytes after the hex fields were
-                                   'converted back to numbers -- if this does
-                                   'not match the tail of RxLastLineHex, the
-                                   'hex decode is what is wrong
-
-'--- SERIAL, STEP 6: the last reading ----------------------------------------
-Public RxLastRecHex As String * 12 'the four payload bytes this reading came out
-                                   'of, so the bit-unpacking can be checked by
-                                   'hand against the table at ParseAlert2
+Public RxLastRecHex As String * 12 'the four payload bytes the last reading came
+                                   'out of, so the bit-unpacking can be checked
+                                   'by hand against the table at ParseAlert2
 Public RxLastId As Long            'ALERT id decoded from them
 Public RxLastValue As Long         'and the 11-bit value
 Public RxLastSuspect As Boolean    'value was full scale
-Public RxLastStamp As String * 24  'the stamp actually attached to it
-
-'--- SERIAL, STEP 7: what will be posted -------------------------------------
 Public RxLastJson As String * 120  'the JSON object for that reading, byte for
                                    'byte as it will appear in the batch
+Public RxLastWhy As String * 60    'why the last rejected frame or line was
+Public RxLastBad As String * 120   'and the first 120 characters of it
+Public whyCode As Long             'the same reason as a number -- see the list
+                                   'at RejectLine
 
-'--- how far the last line got -----------------------------------------------
-Public RxStep As String * 40       'the last step the pipeline completed. Where
-                                   'this stops is where to look
-Public RxLastWhy As String * 60    'why the last rejected line was rejected
-Public RxLastBad As String * 250   'and the line itself
-Public RxLastBadHex As String * 400 'and that line in hex, which is the copy
-                                   'that still means something when the text is
-                                   'not printable
 Public RxFrames                    'frames that decoded
 Public RxReadings                  'readings extracted from them
-Public RxBadFrames                 'lines rejected
+Public RxBadFrames                 'frames or lines rejected
 Public RxBadRecords                'records inside good frames whose status byte
-                                   'was non-zero
+                                   'was non-zero or whose address was impossible
 Public RxFrameSkew                 'seconds between the frame's own ALERT2 time
-                                   'and this logger's clock -- see ParseAlert2.
-                                   'Logged as IEEE4, not FP2: FP2 cannot hold a
-                                   'number past 7999 and a whole-hour skew is
-                                   'tens of thousands of seconds, so an FP2
-                                   'column reports a clamped -7999 for anything
-                                   'interesting
+                                   'and this logger's clock. Near zero means the
+                                   'two agree and the frame time is UTC; parked
+                                   'at a whole number of hours is a finding
 
-'--- SERIAL FORENSICS: what the whole feed looks like, not just the last line -
-'
-' These are what a capture is for. Left running for a while they answer whether
-' the feed is ASCII at all, which terminator it uses, whether every line is the
-' same length, and whether every rejection is the same rejection -- none of
-' which a single last-line snapshot can tell you.
-
-' Every byte received since startup, sorted into eight classes. This is the
-' fastest read on the whole table: printable plus CR plus LF and nothing else is
-' an ASCII feed; anything in `high` or `ctrl-other` is not, and no amount of
-' parser work will make it one.
-Public RxByteClass(8) As Long
-Public RxByteClassName(8) As String * 12   'labels, filled in BeginProg
-
-' Every line rejected since startup, by reason. All of them landing on one
-' counter says the feed has a single consistent shape this program does not
-' know; a spread says it is being corrupted rather than misunderstood.
-Public RxWhyCount(14) As Long
-Public RxWhyName(14) As String * 30        'labels, filled in BeginProg
-
-' Line shape over the whole capture.
-Public RxLenMin                    'shortest and longest complete line seen. The
-Public RxLenMax                    'two being equal means fixed-length records
-Public RxTermCR                    'lines ended by a bare CR
-Public RxTermLF                    'lines ended by LF -- CRLF counts here, and
-                                   'the CR before it is stripped as whitespace
-Public RxFirstLine As String * 250  'the FIRST line ever seen, kept and never
-Public RxFirstLineHex As String * 400 'overwritten. Startup banners and mode
-                                   'strings appear once and are gone from the
-                                   'last-line display within a second
-
-'--- the raw capture file ----------------------------------------------------
-Public CaptureNow As Boolean       'true = append every read to CAPTURE_FILE.
-                                   'Set false to stop early; the file stays
-Public CaptureReset As Boolean     'set true to erase the file and start again.
-                                   'It clears itself once done
-Public CaptureBytes As Long        'bytes written so far, against CAPTURE_MAX
-Public CaptureState As String * 60 'plain English: capturing, full, stopped, or
-                                   'the reason it cannot write
-
-'--- the local sensors on this logger's terminals ------------------------------
-'
-' Read top to bottom, these are the same seven-step pipeline the serial block
-' above is, for the sensors that arrive by cable instead of by radio: what the
-' terminal measured, what it converts to, whether it was queued, and why not.
+'--- the local sensors on this logger's terminals -----------------------------
 '
 ' The channel table is Public rather than Const so the names, units and decimal
 ' places are readable at the logger beside the values they describe -- checking
 ' MegaNet's station row against what this logger actually sends is then one
-' screen rather than two documents. Filled in BeginProg; changing one here does
-' not survive a restart, which is the same rule BASE_NAME follows.
+' screen rather than two documents. Filled in BeginProg.
 Public LocName(LOC_N) As String * 12   'the `channel` on the wire
 Public LocUnit(LOC_N) As String * 8    'the `unit` beside `value`
-Public LocConv(LOC_N) As String * 32   'the `conversion` note, or empty
 Public LocRawDp(LOC_N) As Long         'decimals for value_raw: 0 for counts
 
 Public Rain_tips                   'tips PulseCount reported this scan. Almost
-                                   'always 0 -- it is the accumulator below that
+                                   'always 0 -- it is the accumulator that
                                    'matters
 Public Rain_bucket = 0.2           'mm per tip. The number written on the gauge.
                                    'Public so it can be corrected at the logger,
@@ -885,31 +608,21 @@ Public Rain_total_mm               'since this program started. Not sent -- it
 
 Public Level1_m                    'SDI-12 address LVL1_SDI_ADDR
 Public Level2_m                    'SDI-12 address LVL2_SDI_ADDR
-                                   'NAN means the sensor did not answer. That is
-                                   'caught before queueing -- see LocalRejected
+                                   'NAN means the sensor did not answer, which
+                                   'is caught before queueing -- see
+                                   'LocalRejected
 
-Public LocalState As String * 60   'plain English: what the local half is doing,
-                                   'or why it queued nothing
+Public LocalState As String * 60   'plain English: what the local half is doing
 Public LocalChan As String * 12    'the channel of the last local reading queued
 Public LocalRaw                    'its value_raw
 Public LocalEng                    'and its value
-Public LocalJson As String * 200   'the JSON object for it, byte for byte as it
-                                   'will appear in the batch. The local half's
-                                   'RxLastJson, kept separate so a battery
-                                   'reading cannot overwrite the radio
-                                   'pipeline's step-7 display
 Public LocalQueued As Long         'local readings queued since startup
 Public LocalRejected As Long       'local reads refused: NAN, or past LOCAL_MAX.
                                    'Non-zero means a sensor is not answering or
                                    'is not scaled the way this program thinks
-Public SecsSinceLocal              'seconds since the last one was queued. Should
-                                   'sit under LOCAL_EVERY * 60
+Public SecsSinceLocal              'seconds since the last one was queued
 
-'--- the live end-to-end self-test ---------------------------------------------
-'
-' Set TestFire true and one synthetic ALERT2A line goes into the receive buffer
-' as though the receiver had just delivered it. See the note in section 1, and
-' docs/live-end-to-end-test.md for the card.
+'--- the live end-to-end self-test --------------------------------------------
 Public TestFire As Boolean         'set true to fire one. Clears itself
 Public TestId As Long = 8101       'the ALERT address to transmit as. Must be
                                    '1-8191, because the wire carries 13 bits of
@@ -919,45 +632,36 @@ Public TestId As Long = 8101       'the ALERT address to transmit as. Must be
                                    'highest real address in the registry is
                                    '7999, so 8100-8109 is free, recognisably
                                    'synthetic AND transmittable. 8101 is the
-                                   'address MegaNet's station row reserves for
-                                   'this test
+                                   'address MegaNet's station row reserves
 Public TestValue As Long = 21      'and the value, 0-2047 -- 11 bits. Change it
                                    'between shots so the second one is a new
                                    'reading rather than a duplicate
 Public TestEvery As Long = 0       'minutes between automatic shots. 0 = off, and
                                    'off is the shipped default: an unattended
                                    'self-test writes synthetic readings into the
-                                   'live database forever. Set it during a
-                                   'commissioning window and set it back
+                                   'live database forever
 Public TestFired As Long           'shots fired since startup
 Public TestState As String * 60    'plain English: fired, waiting, or refused
-Public TestLine As String * 140    'the line it built, verbatim. This is what to
-                                   'compare against RxLastLine -- they must be
-                                   'the same string, because they are
+Public TestHex As String * 60      'the frame it built, in hex. Compare it
+                                   'against RxHex: they must be the same bytes,
+                                   'because they are
 
 '--- is the queue draining ----------------------------------------------------
 '
-' One ring buffer, two readers. QDepthHttp and QDepthMqtt are how far behind
-' each path is; QDepth is the greater of the two, which is what the buffer
-' actually still has to hold and therefore the only one of the three that
-' QDropped can be reasoned about from.
-'
-' The pair being far apart is the diagnostic: it says one path is down and which
-' one, at a glance, before anything else is read.
+' One ring buffer, two readers. The pair being far apart is the diagnostic: it
+' says one path is down and which one, at a glance, before anything else.
 Public QDepth                      'readings the buffer is still holding for at
                                    'least one of the two paths
 Public QDepthHttp                  'readings waiting to be POSTed
 Public QDepthMqtt                  'readings waiting to be published
-Public QPeak                       'the deepest it has ever been, which is what
-                                   'says how much outage Q_SIZE actually buys
+Public QPeak                       'the deepest it has ever been
 Public QDropped                    'readings lost to a full queue. Non-zero means
-                                   'a link has been down longer than the buffer
-                                   'holds -- and, with the two depths above, says
-                                   'which link that was
+                                   'a path that something reads has been down
+                                   'longer than the buffer holds -- see the note
+                                   'at QueuePush about what this used to count
 
 '--- did the last POST work ---------------------------------------------------
-Public PostState As String * 40    'plain English: what the poster is doing, or
-                                   'why it is not
+Public PostState As String * 40    'plain English: what the poster is doing
 Public TokenOK As Boolean          'the token file was found and was not empty
 Public TokenLen As Long            'how many characters it held -- enough to spot
                                    'a truncated paste without printing the secret
@@ -966,76 +670,50 @@ Public PostOK
 Public PostFail
 Public ConsecFail                  'consecutive failures -- resets on success
 Public Backoff                     'seconds until the next attempt, when failing
-Public SecsSincePost               'seconds since the last ACCEPTED post, not
-                                   'since the last attempt
-
+Public SecsSincePost               'seconds since the last ACCEPTED post
 Public Accepted                    'cumulative, from the endpoint's own answer
-Public Duplicates                  'readings it had already stored -- normal after
-                                   'a retry, and proof the retry was safe
+Public Duplicates                  'readings it had already stored -- normal
 Public Rejected                    'readings it refused. Non-zero needs reading:
                                    'LastReject says why
-
-Public LastAccepted                'the last POST's answer, on its own
+Public LastAccepted
 Public LastDuplicates
 Public LastRejected
 Public LastStatus As Long          'the HTTP status code: 200 good, 401 token,
-                                   '400 malformed body
+                                   '400 body
 Public LastSocket                  'HTTPPost's own return: >=100 is the TCP
-                                   'socket it used, 0 the request never got out,
-                                   '-2 the instruction did not execute
-Public LastReject As String * 200  'the first "why" out of the last rejected array
-Public HTTPResponse As String * 500
-Public SentHeader As String * 200  'the request headers as built, TOKEN REDACTED
-Public RespHeader As String * 300  'what came back in their place -- see PostBatch
-Public LastPayload As String * 200 'the first 200 characters of the last body sent
+                                   'socket, 0 is no answer, -2 did not execute
+Public LastReject As String * 150  'the first "why" out of the last rejected
+                                   'array, or the first of an error body
+Public HTTPResponse As String * 300
+Public RespHeader As String * 300  'what came back where the request headers
+                                   'were -- see PostBatch
 
 '--- did the last PUBLISH work ------------------------------------------------
-'
-' The same questions as the POST block above, asked of the other path, and
-' deliberately in the same order and the same words so the two can be read side
-' by side. What is missing is the row of accepted/duplicates/rejected counters,
-' and that absence is the honest one: MQTT gives a publisher no response channel
-' at all. The PUBACK behind MqttResult = 0 is from the BROKER, and means the
-' broker has the message -- not that MegaNet has it. Anything more would be this
-' program inventing a confirmation nobody sent it.
-'
-' Where the readings went is answerable, just not from here: the bridge logs
-' every message it acks, and meganet.station_health carries what the status
-' topic said. docs/ingest-mqtt.md walks through proving it end to end.
-Public MqttState As String * 40    'plain English: what the publisher is doing,
-                                   'or why it is not
-Public MqttTopic As String * 100   'the reading topic this station publishes on,
-                                   'built at startup. Read it once at
-                                   'commissioning and check it against the ACL
+Public MqttState As String * 40    'plain English: what the publisher is doing
+Public MqttTopic As String * 100   'the reading topic this station publishes on
 Public MqttStatusTopic As String * 100 'and the status topic, which is also the
-                                   'one the Last Will has to be set to
+                                   'Last Will topic to set in DevConfig
 Public MqttAttempts
 Public MqttOK
 Public MqttFail
-Public MqttConsecFail              'consecutive failures -- resets on success
-Public MqttBackoff                 'seconds until the next attempt, when failing
-Public SecsSinceMqtt               'seconds since the last SUCCESSFUL publish,
-                                   'not since the last attempt
-Public SecsSinceTry                'and seconds since the last ATTEMPT of any
-                                   'kind, which is the one the backoff is
-                                   'measured against. The pair diverging is a
-                                   'broker being knocked on and not answering
-Public MqttPublished               'readings handed to the broker, cumulative.
-                                   'NOT readings stored -- see the note above
-Public MqttLastBatch               'how many were in the last published message
-Public MqttResult As Long          'MQTTPublish's own return: 0 is success and
-                                   'anything else is the instruction's error
-                                   'code. Non-zero with a plausible topic is
-                                   'almost always the broker connection -- the
-                                   'MQTT settings, not this program
-Public MqttStatusResult As Long    'the same, for the retained status message
-Public SecsSinceStatus             'seconds since the status message was last
-                                   'published. It is retained, so the broker
-                                   'holds it between these
-Public MqttStatusBody As String * 100 'what was last published to the status
-                                   'topic, verbatim
-Public MqttLastPayload As String * 200 'the first 200 characters of the last
-                                   'reading message published
+Public MqttConsecFail
+Public MqttBackoff
+Public MqttPublished               'readings handed to the broker
+Public MqttResult As Long          'MQTTPublish's own return: 0 is success
+Public MqttStatusResult As Long
+Public MqttLastBatch As Long
+Public MqttStatusBody As String * 100
+Public SecsSinceMqtt               'since the last successful publish
+Public SecsSinceTry                'since the last ATTEMPT -- the backoff is
+                                   'measured from this one
+Public SecsSinceStatus
+
+'--- what the last reading archived to Readings was ---------------------------
+Public RdAddr As Long              'positive = ALERT address, negative = the
+                                   'local channel. One column for both, because
+                                   'the two cannot collide: an ALERT address is
+                                   '1-65535 and a channel is 1-LOC_N
+Public RdValue                     'and its raw value
 
 
 '==============================================================================
@@ -1047,43 +725,56 @@ Public MqttLastPayload As String * 200 'the first 200 characters of the last
 ' capacity is Q_SIZE - 1 for whichever path is furthest behind.
 '
 ' ONE buffer and two tails rather than two buffers, because the readings are the
-' same readings: a CR300 has no memory to hold a second copy of them, and two
-' copies would be two things that could disagree about what was heard.
+' same readings. No semaphore guards it, and that is deliberate: the main scan
+' owns QHead; the poster sequence owns both tails, and it is a single sequence
+' rather than one per path precisely so that stays true. The one crossing is on
+' overflow, where QueuePush has to move a tail sitting on the slot it is about
+' to reuse -- a window one instruction wide, costing one reading sent twice
+' (free, by contract) or one dropped a scan early.
 '
-' No semaphore guards it, and that is deliberate rather than an omission. The
-' main scan owns QHead; the poster sequence owns both tails, and it is a single
-' sequence rather than one per path precisely so that stays true -- the two
-' halves of it run one after the other and never interleave, so neither tail nor
-' the scratch they share can be seen half-updated.
+' --- THREE columns, where v2.1 had seven, and no slot was lost --------------
 '
-' The one crossing is on overflow: QueuePush, in the main scan, drops the oldest
-' reading and has to move the tail sitting on it. That was true of the single
-' tail before it was true of two, and the comment here used to claim otherwise.
-' The window is one instruction wide and needs the buffer to fill in the same
-' moment a send completes; what it costs when it is lost is one reading sent
-' twice or one dropped a scan early, and a reading sent twice is free by
-' contract. A semaphore against that would cost every scan.
+' v2.1 held qAddr(Long), qVal(Long), qStamp(String*24), qSus(Boolean),
+' qChan(Long), qRaw(Float) and qEng(Float): 49 bytes a slot, 12,250 bytes for
+' the buffer alone. It is now 12 bytes a slot and 3,000 in total, at the same
+' 250 slots, and every one of the four columns that went was derivable:
 '
-' Three columns were added for the local sensors, and the shape of them is the
-' point: a slot records WHICH channel it is (0 for a radio reading, 1..LOC_N for
-' one of this logger's own), not what that channel is called. The names, units
-' and decimals live once in the LocName/LocUnit/LocConv tables and are looked up
-' when the reading is rendered. A per-slot channel string would have been 250
-' strings on a logger that has 250 of everything already, to hold four distinct
-' values.
-Dim qAddr(Q_SIZE) As Long
-Dim qVal(Q_SIZE) As Long
-Dim qStamp(Q_SIZE) As String * 24
-Dim qSus(Q_SIZE) As Boolean
-Dim qChan(Q_SIZE) As Long          '0 = radio, address in qAddr and value in
-                                   'qVal. 1..LOC_N = that local channel, value
-                                   'in the two below
-Dim qRaw(Q_SIZE) As Float          'local only: value_raw, as the sensor gave it
-Dim qEng(Q_SIZE) As Float          'local only: value, converted
+'   qStamp   the timestamp was a 24-character ISO string, 6,250 bytes of the
+'            12,250. It is now ONE Long holding the calendar fields packed
+'            together -- see PackWhen -- and the ISO string is rebuilt at the
+'            moment the reading is rendered into JSON. Not an epoch: an epoch
+'            needs leap-year arithmetic in both directions and has a cliff in
+'            2038. Packing is exact, reverses by division, and its own cliff is
+'            MAX_YEAR, which is stated in section 1 rather than left to be
+'            discovered.
+'
+'   qChan    a slot is a radio reading or a local channel, never both, so the
+'            two share one column: qAddr is POSITIVE for an ALERT address and
+'            NEGATIVE for a local channel. They cannot collide -- an ALERT
+'            address is 1-65535 and a channel is 1-LOC_N.
+'
+'   qSus     "the value was full scale" is a test on the value, not a fact about
+'            the slot: MakeRec asks qVal(mi) = FULL_SCALE and gets the same
+'            answer the flag held.
+'
+'   qEng     the engineering value is the raw one converted, and the conversion
+'            is a property of the CHANNEL rather than of the reading -- rain is
+'            tips times the bucket, and the other three are already engineering
+'            values. MakeRec applies it.
+'
+' qVal is a Float now rather than a Long, so it carries both an 11-bit radio
+' count and a level in metres. IEEE4 holds every integer to 2^24 exactly, so a
+' radio value and a tip count are exact in it; MakeRec copies to a Long before
+' Sprintf's %d, which reads a Long and would print nonsense from a float.
+Dim qAddr(Q_SIZE) As Long          '>0 ALERT address, <0 local channel
+Dim qVal(Q_SIZE) As Float          'value_raw, whichever kind
+Dim qWhen(Q_SIZE) As Long          'the instant, packed -- see PackWhen
 Dim QHead As Long
 Dim QTailHttp As Long              'the next slot to POST
 Dim QTailMqtt As Long              'the next slot to publish
 Dim qLag As Long                   'scratch, for the depth arithmetic in the scan
+Dim qLost As Boolean               'QueuePush: this overflow actually cost a
+                                   'reading somebody was still waiting for
 
 ' Dim, not Public, on purpose: a Public token is readable by anyone who can
 ' reach the logger, which is the whole thing the token file was for.
@@ -1091,23 +782,18 @@ Dim IngestToken As String * 80
 
 ' One body buffer, shared by both paths. They are built in the same sequence,
 ' one after the other, and each is handed to its instruction before the next is
-' built -- so a second CONTENT_SIZE buffer would be 3 KB of a CR300's memory
-' spent holding a string nothing is reading.
+' built.
 Dim ContentsString As String * CONTENT_SIZE
 Dim HTTPHeader As String * 300
 Dim BatchN As Long                 'readings in the batch currently in flight
 Dim bWrap As Boolean               'BuildBatch's two inputs, set by the caller
-Dim bFrom As Long                  'immediately before the call: which envelope
-                                   'to build, and which tail to build it from
+Dim bFrom As Long                  'immediately before the call
 Dim CRLF As String * 2
 Dim DQ As String * 1               'a double quote. CHR(34) is the portable way
                                    'to get one into a CRBasic string
+Dim MqttLastPayload As String * 200
 
-' Serial working storage. RxBuf is what SerialInBlock writes into; it is Dim
-' rather than Public because the bytes past the count it returned are whatever
-' the previous read left there, and a Public variable showing stale tail bytes
-' would be a diagnostic that lies. RxBlockHex and RxBlockText are built from
-' exactly RxBlockBytes bytes and are the ones to read.
+' Serial working storage.
 Dim RxBuf As String * 256          'what SerialInBlock writes into
 Dim rxByte(BUF_MAX) As Long        'the byte buffer. Numeric, so a NUL is just 0
 Dim nBuf As Long
@@ -1116,10 +802,7 @@ Dim dropN As Long                  'BufDrop
 Dim dk2 As Long
 Dim fk As Long                     'TakeFrames / DecodeFrame
 Dim frSigAt As Long
-Dim frEnd As Long                  'FrLenByte and FrTotal are the Publics above.
-                                   'They were shadowed here by a lower-case pair
-                                   'until CRBasic's case-insensitivity made them
-                                   'the same two names declared twice
+Dim frEnd As Long
 Dim frLoops As Long
 Dim frElemAt As Long
 Dim frRec As Long
@@ -1130,8 +813,12 @@ Dim tOK As Boolean
 Dim tTook As Boolean               'TakeTextLine consumed something
 Dim frDone As Boolean              'TakeFrames: this pass made no progress
 Dim frIsAscii As Boolean
+Dim hx As Long                     'HexDump
+Dim hxFrom As Long
+Dim hxN As Long
+Dim hxNum As String * 4
 
-Dim fld(FIELD_MAX) As String * 16
+Dim fld(FIELD_MAX) As String * 12
 Dim nFld As Long
 Dim pay(32) As Long                'payload bytes, decoded from hex
 Dim nPay As Long
@@ -1145,14 +832,9 @@ Dim rTime(9) As Long               '1 yr, 2 mo, 3 day, 4 hr, 5 min, 6 sec,
                                    '7 usec, 8 day-of-week, 9 day-of-year
 
 ' JSON fragments, built once in BeginProg so the per-reading concatenation in
-' MakeRec stays legible instead of becoming a wall of CHR(34).
-'
-' Three of these comments had no apostrophe at all -- the fragment was sitting
-' in the source as bare code -- and two more carried an odd number of double
-' quotes, which throws CRBasic Editor's syntax colouring off for everything
-' after them. So a tilde stands for a double quote below and the comments carry
-' no quote characters of their own. Every line here begins with an apostrophe,
-' which is the rule for every comment in this file.
+' MakeRec stays legible instead of becoming a wall of CHR(34). A tilde stands
+' for a double quote in the comments below, so the comments carry no quote
+' characters of their own and CRBasic Editor's syntax colouring survives them.
 Dim jEnvelope As String * 200      '~path~:~..~,~protocol~:~..~,~readings~:[
 Dim jTail As String * 8            ']}} -- closes the HTTP payload wrapper too
 Dim jTailBare As String * 8        ']} -- the MQTT one, which has no wrapper
@@ -1171,43 +853,10 @@ Dim fProto As String * 32          ',~protocol~:~wired~ -- fixed, so it is built
 Dim jName As String * 24           'BASE_NAME, safe to put inside a JSON literal
 Dim nk2 As Long
 Dim nc2 As Long
-Dim jRec As String * 120           'one reading, being built
-Dim numStr As String * 16          'one number, formatted
+Dim jRec As String * 200           'one reading, being built
 
 ' Scratch, one set per subroutine, so a call never quietly clobbers its caller's
 ' loop counter. CRBasic has no local scope worth relying on here.
-Dim dk As Long                     'DumpBytes
-Dim dc As Long
-Dim dumpLen As Long
-Dim dumpSrc As String * 256
-Dim dumpHex As String * 400        'truncated at DUMP_MAX, for the display
-Dim dumpHexFull As String * 800    'never truncated, for the capture file
-Dim dumpTxt As String * 200
-Dim dumpCensus As Boolean          'true only for the block read, so the byte
-                                   'census counts each byte once
-Dim ck As Long                     'Census
-Dim cc As Long
-Dim cj As Long
-Dim charTally(126) As Long         'one counter per printable byte value, reset
-                                   'per line. 126 entries so byte 126 has a slot;
-                                   'nothing below 33 is tallied here because the
-                                   'control characters are counted as a class
-Dim best As Long                   'PickDelim
-Dim bestN As Long
-Dim capBuf As String * CAP_BUF     'capture bytes waiting to go to flash
-Dim capLine As String * 820        'one capture record, being built
-Dim capFh As Long
-Dim capWrote As Long
-Dim capSecs As Long
-Dim whyCode As Long                'set before every Call RejectLine()
-Dim hk As Long                     'HexByte
-Dim hn As Long
-Dim hexVal As Long
-Dim hexIn As String * 4
-Dim fi As Long                     'FindStr
-Dim srcStr As String * 500
-Dim needle As String * 32
-Dim foundAt As Long
 Dim si As Long                     'SplitLine
 Dim sStart As Long
 Dim sChar As String * 1
@@ -1218,66 +867,72 @@ Dim jsonKey As String * 16
 Dim jsonVal As Long
 Dim pp As Long                     'ParseStatus
 Dim pd As Long
-Dim pushChan As Long               'QueuePush's inputs for a LOCAL reading, set
-Dim pushRaw As Float               'by the caller immediately before the call --
-Dim pushEng As Float               'the same arrangement bWrap/bFrom use. A
-                                   'radio caller sets pushChan = 0 and the other
-                                   'two are ignored
-Dim locPend(LOC_N) As Boolean      'a staged local reading waiting for the main
-Dim locRawV(LOC_N) As Float        'scan to queue it. Written by whichever task
-Dim locEngV(LOC_N) As Float        'measured the channel, cleared by the scan --
-                                   'see LocalPush for why the handover is a flag
-                                   'and not a queue of its own
-Dim lk As Long                     'LocalPush
-Dim tstK As Long                   'TestInject
-Dim tstNum As String * 40          'and its own number scratch: it runs in the
-                                   'main scan beside DumpBytes, which owns
-                                   'numStr and rewrites it once per byte
-Dim tstSecs As Long                'Long, not the default float: Sprintf's %02X
-Dim tstB0 As Long                  'and %02d read a Long and would print
-Dim tstB1 As Long                  'nonsense from a float
-Dim tstB2 As Long
-Dim tstHi As Long
-Dim tstLo As Long
-Dim qLost As Boolean               'QueuePush: this overflow actually cost a
-                                   'reading somebody was still waiting for
-Dim qn As Long                     'QueuePush
-Dim mi As Long                     'MakeRec -- the queue slot being rendered
-Dim tk As Long                     'ParseLine trimming -- main scan only
-Dim ltk As Long                    'LoadToken trimming. A separate counter from
-                                   'tk on purpose: LoadToken runs in the POSTER
-                                   'sequence and ParseLine in the main scan, and
-                                   'a shared counter between two tasks is a
-                                   'mis-trimmed token that fails to authenticate
-                                   'once in a blue moon and never reproduces
-Dim ak As Long                     'ParseLine's own search for "ALERT2A". Not
-Dim aFound As Long                 'FindStr, for the same reason: FindStr's
-                                   'srcStr/needle/foundAt belong to the poster,
-                                   'which parses the HTTP response with them
-Dim pNum As String * 16            'the poster's number scratch. numStr is the
-                                   'main scan's, and DumpBytes writes it once
-                                   'per byte -- a JSON value built through the
-                                   'same variable would eventually be built out
-                                   'of a hex pair from the serial port
-Dim dNum As String * 16            'QueuePush's own copy of MakeRec's scratch
+Dim hk As Long                     'HexByte
+Dim hn As Long
+Dim hexVal As Long
+Dim hexIn As String * 4
+Dim fi As Long                     'FindStr
+Dim srcStr As String * 300
+Dim needle As String * 32
+Dim foundAt As Long
 Dim numIn As String * 16           'IsNum
 Dim numOK As Boolean
 Dim nk As Long
 Dim nc As Long
 Dim fh As Long                     'LoadToken -- the file handle
+Dim ltk As Long                    'and its trimming counter. Separate from the
+                                   'main scan's on purpose: LoadToken runs in the
+                                   'POSTER sequence, and a shared counter between
+                                   'two tasks is a mis-trimmed token that fails
+                                   'to authenticate once in a blue moon and never
+                                   'reproduces
+Dim tk As Long                     'ParseLine trimming -- main scan only
+Dim ak As Long                     'ParseLine's own search for ALERT2A. Not
+Dim aFound As Long                 'FindStr, because FindStr's scratch belongs
+                                   'to the poster, which parses the HTTP
+                                   'response with it
 Dim i As Long                      'ParseAlert2, and nothing else: the scan that
                                    'calls it must not use i for its own counter
 Dim bi As Long                     'BuildBatch
+Dim mi As Long                     'MakeRec -- the queue slot being rendered
+Dim pNum As String * 16            'the poster's number scratch
+Dim pLong As Long                  'and its Long, for Sprintf's %d
+Dim pStamp As String * 24          'and the ISO string it rebuilds per reading
+Dim mNum As String * 16            'the publisher's number scratch. A second
+                                   'one, because it is written while
+                                   'ContentsString is being handed to an
+                                   'instruction, and sharing it with the poster
+                                   'is a status message eventually built out of
+                                   'half a reading
+Dim dNum As String * 16            'the main scan's number scratch
 Dim postDue As Boolean
 Dim mqttWait As Long               'seconds the broker is to be left alone for
 Dim mqttSent As Boolean            'this tick's publish actually went out
-Dim mNum As String * 16            'the publisher's number scratch. A third one,
-                                   'for the same reason pNum is a second: it is
-                                   'written while ContentsString is being handed
-                                   'to an instruction, and sharing it with the
-                                   'poster is a status message eventually built
-                                   'out of half a reading
 Dim statusDue As Boolean
+
+Dim pushChan As Long               'QueuePush's input: 0 for a radio reading,
+Dim pushRaw As Float               '1..LOC_N for a local channel, with its raw
+                                   'value here. Set by the caller immediately
+                                   'before the call -- the same arrangement
+                                   'bWrap/bFrom use
+Dim locPend(LOC_N) As Boolean      'a staged local reading waiting for the main
+Dim locRawV(LOC_N) As Float        'scan to queue it -- see LocalPush for why
+                                   'the handover is a flag and not a queue
+Dim lk As Long                     'LocalPush
+Dim qn As Long                     'QueuePush
+Dim uv As Long                     'UnWhen -- the packed instant being unpacked
+Dim uY As Long                     'and the six fields it comes back as
+Dim uMo As Long
+Dim uD As Long
+Dim uH As Long
+Dim uMi As Long
+Dim uS As Long
+Dim tstK As Long                   'TestInject
+Dim tstSecs As Long                'Long, not the default float: the packing and
+Dim tstB0 As Long                  'the hex display both read Longs
+Dim tstB1 As Long
+Dim tstB2 As Long
+Dim tstFrame(18) As Long           'the synthetic frame, byte by byte
 
 
 '==============================================================================
@@ -1289,133 +944,24 @@ Dim statusDue As Boolean
 ' so a base station that spent a fortnight offline can still be collected over
 ' a cable and backfilled.
 '
+' Two columns, and they carry both kinds of reading: RdAddr is the ALERT address
+' for a radio reading and the NEGATED channel number for a local one, the same
+' convention the ring buffer uses. RxFrameSkew came out of here at v3.0 -- it is
+' a property of the receiver rather than of a reading, it is in Diag every five
+' minutes, and it was a third of this table's width.
+'
 ' Sized, not auto-allocated. Campbell costs an auto-allocated event-driven table
 ' at one record per second, so a -1 here would claim almost all the memory and
 ' starve the heartbeat below.
 DataTable (Readings,True,20000)
-  Sample (1,RxLastId,Long)
-  Sample (1,RxLastValue,Long)
-  Sample (1,RxFrameSkew,IEEE4)
-EndTable
-
-' The same archive, for the sensors on this logger's own terminals. A table of
-' its own rather than three more columns on Readings, because the two have
-' nothing in common but a timestamp: a radio reading is an address and an 11-bit
-' count, a local one is a channel and two floats, and a single table holding
-' both would be half empty on every row and would need a discriminator column to
-' say which half to read.
-'
-' 5000 records is about four days of four channels every five minutes -- long
-' enough that a fortnight's outage still leaves the overlap needed to see where
-' the gap starts, on a table that costs about 20 bytes a record.
-DataTable (LocalLog,True,5000)
-  Sample (1,LocalChan,String)
-  Sample (1,LocalRaw,IEEE4)
-  Sample (1,LocalEng,IEEE4)
-EndTable
-
-' One record per serial read that returned bytes: the raw block and the buffer
-' state around it. This is the table that makes the rest of them checkable --
-' every other row in every other table is derived from these bytes, so if a
-' decode looks wrong the question "what actually arrived" is answered here and
-' nowhere else. RxBlockHexFull is not truncated.
-DataTable (RawLog,True,400)
-  Sample (1,RxBlockSeq,Long)
-  Sample (1,RxAvail,Long)
-  Sample (1,RxBlockBytes,Long)
-  Sample (1,RxBufLenBefore,Long)
-  Sample (1,RxBufLen,Long)
-  Sample (1,RxNulls,Long)
-  Sample (1,RxBlockHexFull,String)
-EndTable
-
-' One record per binary frame found, INCLUDING the ones that did not decode --
-' a frame that yields nothing is the row that says why, and a table holding only
-' successes cannot answer the question this table exists for.
-'
-' FrElemVia is the one to read first when a frame does not produce readings:
-' 1 means the 84 01 <len> 74 anchor matched, 2 means only the loose scan did,
-' 0 means neither and the frame carries no concentration element at all.
-' FrLeftover near zero confirms the 6 + <length byte> rule frame by frame.
-DataTable (FrameLog,True,400)
-  Sample (1,RxFrameSeq,Long)
-  Sample (1,RxBlockSeq,Long)
-  Sample (1,FrPre,Long)
-  Sample (1,FrLenByte,Long)
-  Sample (1,FrTotal,Long)
-  Sample (1,FrLeftover,Long)
-  Sample (1,FrElemVia,Long)
-  Sample (1,FrElemOff,Long)
-  Sample (1,FrElemLen,Long)
-  Sample (1,FrTimeSecs,Long)
-  Sample (1,FrRecords,Long)
-  Sample (1,FrGood,Long)
-  Sample (1,FrBad,Long)
-  Sample (1,whyCode,Long)
-  Sample (1,RxFrameSkew,IEEE4)
-  Sample (1,FrElemHex,String)
-  Sample (1,FrHex,String)
-EndTable
-
-' One record per four-byte reading record, decoded or not. The four bytes are
-' here as numbers as well as hex so the bit-unpacking can be recomputed from the
-' table by hand: id = (B1 MOD 32) * 256 + B0, value = INT(B1 / 32) * 256 + B2.
-DataTable (ReadingLog,True,1000)
-  Sample (1,RxFrameSeq,Long)
-  Sample (1,RdIndex,Long)
-  Sample (1,RdB0,Long)
-  Sample (1,RdB1,Long)
-  Sample (1,RdB2,Long)
-  Sample (1,RdB3,Long)
-  Sample (1,RxLastId,Long)
-  Sample (1,RxLastValue,Long)
-  Sample (1,RdQueued,Boolean)
-  Sample (1,RdRecHex,String)
-EndTable
-
-' One record per complete line, whether it parsed or not.
-'
-' The first version of this table was numbers only, to keep it cheap enough to
-' leave running for hours. That was the wrong trade and a real capture proved
-' it: a table of lengths and field counts establishes that a feed HAS a
-' consistent shape without ever saying what the shape IS, so the table narrowed
-' the question and could not answer it. Two short text samples cost about 56
-' bytes a record and settle it, so they are here and the record count is lower.
-'
-' The census columns are here for the same reason. RxLastDelimCode only reports
-' the five separators this program tests for; RxTopSepDec reports the most
-' common non-alphanumeric byte in the line whatever it is, which is what
-' identifies a feed delimited by something nobody thought to test.
-'
-' delim  0 none  1 comma  2 semicolon  3 tab  4 pipe  5 space
-' shape  1 ALERT2A  2 plain  3 unrecognised
-' why    0 accepted, otherwise the RxWhyName() index
-DataTable (LineLog,True,2000)
-  Sample (1,RxLastLineLen,Long)
-  Sample (1,RxLastFields,Long)
-  Sample (1,RxLastDelimCode,Long)
-  Sample (1,RxLastShapeCode,Long)
-  Sample (1,whyCode,Long)
-  Sample (1,RxLastPrefix,Long)
-  Sample (1,RxSepComma,Long)
-  Sample (1,RxSepSpace,Long)
-  Sample (1,RxSepColon,Long)
-  Sample (1,RxSepEq,Long)
-  Sample (1,RxSepHi,Long)
-  Sample (1,RxSepCtl,Long)
-  Sample (1,RxTopSepDec,Long)
-  Sample (1,RxTopSepN,Long)
-  Sample (1,RxLastHead,String)
-  Sample (1,RxLastTail,String)
+  Sample (1,RdAddr,Long)
+  Sample (1,RdValue,IEEE4)
 EndTable
 
 ' The heartbeat. Five minutes is frequent enough to see a link flapping and slow
-' enough to keep months on a CR300. It carries BOTH paths' results as well as the
-' counters, which is what answers "when did it stop working, and which half of
-' it" -- there is no separate per-attempt log table and no second table for the
-' publisher, on purpose: one table read in one place beats two that have to be
-' lined up against each other, and lining the two paths up against each other is
-' the entire question this table now exists to answer.
+' enough to keep months on a CR300. It carries BOTH paths' results as well as
+' the counters, which is what answers "when did it stop working, and which half
+' of it".
 '
 ' Counters are Long, not FP2: FP2 carries four significant digits and cannot
 ' hold an integer above 7999 exactly, so a POST counter stored as FP2 starts
@@ -1434,7 +980,9 @@ DataTable (Diag,True,-1)
   Sample (1,RxFrames,Long)
   Sample (1,RxReadings,Long)
   Sample (1,RxBadFrames,Long)
+  Sample (1,RxBadRecords,Long)
   Sample (1,SecsSinceRx,Long)
+  Sample (1,RxFrameSkew,IEEE4)
   Sample (1,QDepth,Long)
   Sample (1,QDepthHttp,Long)
   Sample (1,QDepthMqtt,Long)
@@ -1472,311 +1020,7 @@ EndTable
 ' than a Function would, and it sidesteps every question about how CRBasic
 ' passes strings and arrays into a call.
 
-'------------------------------------------------------------------------------
-' DumpBytes -- dumpLen bytes of dumpSrc, three ways at once:
-'
-'   dumpHex     padded hex, truncated at DUMP_MAX, for the display
-'   dumpHexFull the same and never truncated, for RawLog and the capture file
-'   dumpTxt     printable, with control characters shown as a dash
-'
-' This is the KDO driver's diagnostic loop, and it is the reason this program's
-' serial handling can be checked rather than guessed at. Every byte goes through
-' ASCII(), so what is printed is what arrived -- not what a string function
-' decided the string was.
-'
-' The walk is bounded by dumpLen, the count the caller got back from
-' SerialInBlock, and not by Len(dumpSrc). Len() stops at the first NUL, and the
-' port is open in transparent mode where a NUL is an ordinary byte.
-'------------------------------------------------------------------------------
-Sub DumpBytes()
-  dumpHex = ""
-  dumpHexFull = ""
-  dumpTxt = ""
-  For dk = 1 To dumpLen
-    dc = ASCII(dumpSrc(1,1,dk))
 
-    'Counted, never removed. An earlier version dropped NUL bytes here so that
-    'the result could live in a CRBasic string; the frames this receiver sends
-    'carry nine to eleven of them, so that one line destroyed every frame.
-    If dc = 0 AND dumpCensus Then RxNulls = RxNulls + 1
-
-    Sprintf (numStr,"%02X ",dc)
-    dumpHexFull = dumpHexFull & numStr
-
-    If dk <= DUMP_MAX Then
-      dumpHex = dumpHex & numStr
-      If dc < 32 OR dc > 126 Then
-        dumpTxt = dumpTxt & "-"
-      Else
-        dumpTxt = dumpTxt & CHR(dc)
-      EndIf
-    EndIf
-
-    'The byte census, on the block read only -- this sub is also called for the
-    'assembled line and for the buffer contents, and counting those too would
-    'count most bytes three times.
-    If dumpCensus Then
-      If dc = 0 Then
-        RxByteClass(1) = RxByteClass(1) + 1
-      ElseIf dc = 13 Then
-        RxByteClass(3) = RxByteClass(3) + 1
-      ElseIf dc = 10 Then
-        RxByteClass(4) = RxByteClass(4) + 1
-      ElseIf dc = 9 Then
-        RxByteClass(5) = RxByteClass(5) + 1
-      ElseIf dc = 32 Then
-        RxByteClass(6) = RxByteClass(6) + 1
-      ElseIf dc < 32 Then
-        RxByteClass(2) = RxByteClass(2) + 1
-      ElseIf dc < 127 Then
-        RxByteClass(7) = RxByteClass(7) + 1
-      Else
-        RxByteClass(8) = RxByteClass(8) + 1
-      EndIf
-    EndIf
-  Next dk
-
-  If dumpLen > DUMP_MAX Then
-    dumpHex = dumpHex & "..."
-    dumpTxt = dumpTxt & "..."
-  EndIf
-EndSub
-
-'------------------------------------------------------------------------------
-' Census -- count the separator characters in RxLine, into RxLastSep.
-'
-' The single most useful line on the whole Public table when a feed will not
-' parse, because "unrecognised line" only ever means one thing: the splitter
-' found fewer than two fields, and this says why. Every count zero and a long
-' RxLastLineLen is a line that is one unbroken token. A non-zero `hi` is a feed
-' that is not ASCII, and nothing downstream of here can help with that.
-'------------------------------------------------------------------------------
-Sub Census()
-  RxSepComma = 0
-  RxSepSpace = 0
-  RxSepTab = 0
-  RxSepSemi = 0
-  RxSepColon = 0
-  RxSepPipe = 0
-  RxSepEq = 0
-  RxSepHi = 0
-  RxSepCtl = 0
-  RxLastHead = ""
-  RxLastTail = ""
-  For ck = 33 To 126
-    charTally(ck) = 0
-  Next ck
-
-  For ck = 1 To Len(RxLine)
-    cc = ASCII(Mid(RxLine,ck,1))
-
-    If cc = 44 Then RxSepComma = RxSepComma + 1
-    If cc = 32 Then RxSepSpace = RxSepSpace + 1
-    If cc = 9 Then RxSepTab = RxSepTab + 1
-    If cc = 59 Then RxSepSemi = RxSepSemi + 1
-    If cc = 58 Then RxSepColon = RxSepColon + 1
-    If cc = 124 Then RxSepPipe = RxSepPipe + 1
-    If cc = 61 Then RxSepEq = RxSepEq + 1
-    If cc > 126 Then RxSepHi = RxSepHi + 1
-    If cc < 32 AND cc <> 9 Then RxSepCtl = RxSepCtl + 1
-
-    If cc >= 33 AND cc <= 126 Then charTally(cc) = charTally(cc) + 1
-
-    'The two samples, from the same pass. Anything unprintable becomes a dot so
-    'the sample cannot scramble a table export.
-    If cc < 32 OR cc > 126 Then cc = 46
-    If ck <= 40 Then RxLastHead = RxLastHead & CHR(cc)
-    If ck > Len(RxLine) - 16 Then RxLastTail = RxLastTail & CHR(cc)
-  Next ck
-
-  'The most common character that is neither a letter nor a digit. Whatever a
-  'feed is delimited by, this finds it without having been told to look.
-  RxTopSepDec = 0
-  RxTopSepN = 0
-  RxTopSep = ""
-  For cj = 33 To 126
-    If (cj >= 48 AND cj <= 57) OR (cj >= 65 AND cj <= 90) OR (cj >= 97 AND cj <= 122) Then
-      'a letter or a digit, so not a separator
-    ElseIf charTally(cj) > RxTopSepN Then
-      RxTopSepN = charTally(cj)
-      RxTopSepDec = cj
-    EndIf
-  Next cj
-  If RxTopSepDec > 0 Then RxTopSep = CHR(RxTopSepDec)
-
-  'Built in several calls rather than one wide one. Sprintf's argument limit is
-  'not something this program can check, and a format string that quietly drops
-  'its tail would make the most-read diagnostic on the table the least
-  'trustworthy one.
-  Sprintf (numStr,"comma=%d ",RxSepComma)
-  RxLastSep = numStr
-  Sprintf (numStr,"space=%d ",RxSepSpace)
-  RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"tab=%d ",RxSepTab)
-  RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"semi=%d ",RxSepSemi)
-  RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"colon=%d ",RxSepColon)
-  RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"pipe=%d ",RxSepPipe)
-  RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"eq=%d ",RxSepEq)
-  RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"hi=%d ",RxSepHi)
-  RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"ctl=%d ",RxSepCtl)
-  RxLastSep = RxLastSep & numStr
-  Sprintf (numStr,"top=%d x%d",RxTopSepDec,RxTopSepN)
-  RxLastSep = RxLastSep & numStr
-EndSub
-
-'------------------------------------------------------------------------------
-' PickDelim -- choose the separator to split RxLine on, from what Census counted.
-'
-' Comma first and replaced only on a strictly greater count, so an ALERT2 line
-' still splits on comma even if it happens to contain as many spaces. "none"
-' leaves delim at a character that cannot appear, which yields one field and the
-' honest "unrecognised line" rather than a plausible wrong parse.
-'
-' The first version of this program tried comma, then space, and nothing else --
-' which is why a tab or semicolon separated feed came out as "unrecognised" with
-' no clue as to what it actually was.
-'
-' "none" means the caller does not split at all. An earlier draft set delim to a
-' character assumed not to occur; a binary feed containing that byte then split
-' into two fields and reached ParsePlain, which is the one outcome worse than
-' "unrecognised" -- a plausible reading for a station that never sent one.
-'------------------------------------------------------------------------------
-Sub PickDelim()
-  best = 0
-  bestN = 0
-  If RxSepComma > bestN Then
-    bestN = RxSepComma
-    best = 1
-  EndIf
-  If RxSepSemi > bestN Then
-    bestN = RxSepSemi
-    best = 2
-  EndIf
-  If RxSepTab > bestN Then
-    bestN = RxSepTab
-    best = 3
-  EndIf
-  If RxSepPipe > bestN Then
-    bestN = RxSepPipe
-    best = 4
-  EndIf
-  If RxSepSpace > bestN Then
-    bestN = RxSepSpace
-    best = 5
-  EndIf
-
-  RxLastDelimCode = best
-  If best = 1 Then
-    delim = ","
-    RxLastDelim = "comma"
-  ElseIf best = 2 Then
-    delim = ";"
-    RxLastDelim = "semicolon"
-  ElseIf best = 3 Then
-    delim = CHR(9)
-    RxLastDelim = "tab"
-  ElseIf best = 4 Then
-    delim = "|"
-    RxLastDelim = "pipe"
-  ElseIf best = 5 Then
-    delim = " "
-    RxLastDelim = "space"
-  Else
-    delim = ""
-    RxLastDelim = "none"
-  EndIf
-EndSub
-
-'------------------------------------------------------------------------------
-' CapFlush -- the capture buffer to flash, and nothing if it is empty.
-'
-' Open, append, close. Holding the handle open across scans would lose the whole
-' file to a power cycle, which is the one thing a capture must not do.
-'------------------------------------------------------------------------------
-Sub CapFlush()
-  capSecs = 0
-  If Len(capBuf) = 0 Then ExitSub
-  capFh = FileOpen (CAPTURE_FILE,"a",0)
-  If capFh <> 0 Then
-    capWrote = FileWrite (capFh,capBuf,Len(capBuf))
-    FileClose (capFh)
-    CaptureBytes = CaptureBytes + capWrote
-    capBuf = ""
-  Else
-    CaptureState = "cannot write " & CAPTURE_FILE
-    capBuf = ""                                  'drop it rather than wedge
-  EndIf
-EndSub
-
-'------------------------------------------------------------------------------
-' CapStart -- erase the capture file and write its header.
-'
-' Mode "w" truncates, so there is no delete to get wrong. The header records the
-' port settings the capture was taken at, because a capture of the wrong baud
-' rate looks exactly like a capture of a broken sensor.
-'------------------------------------------------------------------------------
-Sub CapStart()
-  capBuf = ""
-  CaptureBytes = 0
-  capFh = FileOpen (CAPTURE_FILE,"w",0)
-  If capFh <> 0 Then
-    Sprintf (capLine,"# MegaNet base-station serial capture -- baud %d",RX_BAUD)
-    Sprintf (numStr," format %d",RX_FORMAT)
-    capLine = capLine & numStr & CRLF
-    capLine = capLine & "# started " & NowISO & " (logger clock, UTC)" & CRLF
-    capLine = capLine & "# one record per read: hh:mm:ss n=<bytes> <hex>" & CRLF
-    capWrote = FileWrite (capFh,capLine,Len(capLine))
-    FileClose (capFh)
-    CaptureBytes = capWrote
-    CaptureState = "capturing"
-  Else
-    CaptureState = "cannot create " & CAPTURE_FILE
-  EndIf
-EndSub
-
-'------------------------------------------------------------------------------
-' CaptureBlock -- this scan's bytes into the capture buffer, verbatim.
-'
-' dumpHexFull, not dumpHex: the display copy stops at DUMP_MAX and a truncated
-' capture is worse than none, because it looks complete. Nothing here is parsed,
-' filtered or interpreted -- that is the point of it.
-'------------------------------------------------------------------------------
-Sub CaptureBlock()
-  If NOT CaptureNow Then
-    CaptureState = "stopped - set CaptureNow to resume"
-    ExitSub
-  EndIf
-  If CaptureBytes >= CAPTURE_MAX Then
-    CaptureState = "full - retrieve " & CAPTURE_FILE
-    ExitSub
-  EndIf
-
-  If ClockOK Then
-    capLine = Mid(NowISO,12,8)
-  Else
-    capLine = "--:--:--"
-  EndIf
-  Sprintf (numStr," n=%d ",RxBlockBytes)
-  capLine = capLine & numStr & dumpHexFull & CRLF
-
-  If Len(capBuf) + Len(capLine) > CAP_BUF - 4 Then Call CapFlush()
-  capBuf = capBuf & capLine
-  CaptureState = "capturing"
-EndSub
-
-'------------------------------------------------------------------------------
-' HexByte -- hex characters in hexIn, the value out in hexVal, -1 if not hex.
-'
-' Done from ASCII codes rather than with a conversion function so it compiles on
-' every operating system that has HTTPPost at all, and so a stray character in a
-' line a terminal wrapped is a counted rejection rather than a silent zero.
-'------------------------------------------------------------------------------
 Sub HexByte()
   hexVal = 0
   If Len(hexIn) = 0 Then
@@ -1799,13 +1043,6 @@ Sub HexByte()
   Next hk
 EndSub
 
-'------------------------------------------------------------------------------
-' FindStr -- the position of `needle` in `srcStr`, into foundAt. 0 if absent.
-'
-' This is InStr, written out. See the note at the top of the file for why: the
-' option code InStr takes could not be verified, and the failure mode of a wrong
-' one is a silent mis-parse rather than a compile error.
-'------------------------------------------------------------------------------
 Sub FindStr()
   foundAt = 0
   If Len(needle) = 0 Then ExitSub
@@ -1818,14 +1055,6 @@ Sub FindStr()
   Next fi
 EndSub
 
-'------------------------------------------------------------------------------
-' SplitLine -- RxLine split on `delim` into fld(), count into nFld.
-'
-' This is SplitStr, written out, for the same reason. Fields past FIELD_MAX are
-' counted but not stored, so a runaway line cannot write past the array -- and
-' CRBasic does not bounds-check a variable array index, so that guard is the
-' only thing between a malformed line and memory that belongs to something else.
-'------------------------------------------------------------------------------
 Sub SplitLine()
   nFld = 0
   sStart = 1
@@ -1844,15 +1073,6 @@ Sub SplitLine()
   If nFld > FIELD_MAX Then nFld = FIELD_MAX
 EndSub
 
-'------------------------------------------------------------------------------
-' IsNum -- is numIn a plain integer? Answer in numOK.
-'
-' An optional leading minus and then digits, nothing else. ParsePlain needs this
-' because CRBasic converts a string to a number on assignment and gives 0 for
-' anything it cannot read -- so ":HS=1" becomes alert id 0 silently, and a line
-' from an entirely different protocol turns into a reading rather than into a
-' rejection anyone would notice.
-'------------------------------------------------------------------------------
 Sub IsNum()
   numOK = False
   If Len(numIn) = 0 Then ExitSub
@@ -1868,12 +1088,75 @@ Sub IsNum()
 EndSub
 
 '------------------------------------------------------------------------------
-' StampNow -- the clock, as "2026-08-11T04:15:00Z", into NowISO.
+' HexDump -- hxN bytes of the byte buffer from hxFrom, as padded hex, into RxHex.
 '
-' The logger's clock is UTC (NTP offset 0, above), so the Z is the truth and not
-' a claim. ClockOK is set here and nowhere else: a reading is only queued when it
-' is true, because the endpoint's most common rejection is a reading stamped
-' 1970 by an RTC that lost its backup battery, and a base station that posts a
+' What is left of the nine hex displays v2.1 carried. One of them, over the
+' bytes that actually became a frame, is the answer to "what arrived" -- the
+' other eight asked the same question of the block, the buffer, the line and the
+' bad line separately, which mattered only while nobody knew which of those the
+' feed was made of.
+'------------------------------------------------------------------------------
+Sub HexDump()
+  RxHex = ""
+  For hx = hxFrom To hxFrom + hxN - 1
+    If hx > nBuf Then ExitFor
+    If Len(RxHex) > 118 Then
+      RxHex = RxHex & "..."
+      ExitFor
+    EndIf
+    Sprintf (hxNum,"%02X ",rxByte(hx))
+    RxHex = RxHex & hxNum
+  Next hx
+EndSub
+
+'------------------------------------------------------------------------------
+' PackWhen / UnWhen -- one instant as one Long, and back.
+'
+' This is what took 6,250 bytes out of the ring buffer. A slot used to hold the
+' timestamp as a 24-character ISO string; it now holds this number, and MakeRec
+' rebuilds the string at the moment the reading is rendered.
+'
+' The packing is positional, in the order a date is written:
+'
+'   v = year - MIN_YEAR
+'   v = v * 12 + (month - 1)
+'   v = v * 31 + (day - 1)          <- 31, always. February the 31st is simply a
+'   v = v * 24 + hour                  value this encoding can represent and a
+'   v = v * 60 + minute                clock will never produce
+'   v = v * 60 + second
+'
+' and unpacking is the same divisions in reverse. **No calendar arithmetic in
+' either direction** -- that is the whole reason for choosing this over seconds
+' since an epoch, which needs leap-year handling both ways and puts a cliff at
+' 2038 that nothing in the program would announce. The cliff here is MAX_YEAR,
+' and StampNow refuses past it rather than wrapping: the largest value this
+' produces is the last second of 2085 -- 65*12+11 -> 791, *31+30 -> 24,551,
+' *24+23 -> 589,247, *60+59 -> 35,354,879, *60+59 -> 2,121,292,799, against a
+' signed Long's 2,147,483,647. The first second of 2086 does not fit.
+'
+' PackWhen is inline in StampNow rather than a Sub of its own, because it runs
+' once per scan and a Sub call to set one variable is a call for nothing.
+'------------------------------------------------------------------------------
+Sub UnWhen()
+  uS = uv MOD 60
+  uv = INT(uv / 60)
+  uMi = uv MOD 60
+  uv = INT(uv / 60)
+  uH = uv MOD 24
+  uv = INT(uv / 24)
+  uD = (uv MOD 31) + 1
+  uv = INT(uv / 31)
+  uMo = (uv MOD 12) + 1
+  uv = INT(uv / 12)
+  uY = uv + MIN_YEAR
+EndSub
+
+'------------------------------------------------------------------------------
+' StampNow -- the clock, into NowISO and NowWhen.
+'
+' ClockOK is set here and nowhere else: a reading is only queued when it is
+' true, because the endpoint's most common rejection is a reading stamped 1970
+' by an RTC that lost its backup battery, and a base station that posts a
 ' thousand of those has made a battery fault look like a network fault.
 '
 ' Sprintf rather than FormatFloat because the zero-padded widths are the whole
@@ -1886,15 +1169,30 @@ Sub StampNow()
     ClockOK = False
     ClockState = "clock is before " & MIN_YEAR & " - check the RTC battery"
     NowISO = ""
+    NowWhen = 0
+  ElseIf rTime(1) > MAX_YEAR Then
+    'See PackWhen. Refusing is the honest end of a 64-year encoding; wrapping
+    'would stamp every reading in MIN_YEAR and nothing downstream could tell.
+    ClockOK = False
+    ClockState = "clock is past " & MAX_YEAR & " - see PackWhen"
+    NowISO = ""
+    NowWhen = 0
   ElseIf REQUIRE_NTP AND Len(NTP_SERVER) > 0 AND NOT ClockVerified Then
     'The year is plausible, which proves nothing about the zone. See REQUIRE_NTP.
     ClockOK = False
     ClockState = "waiting for the first NTP sync - not stamping yet"
     NowISO = ""
+    NowWhen = 0
   Else
     ClockOK = True
     ClockState = "ok"
     Sprintf (NowISO,"%04d-%02d-%02dT%02d:%02d:%02dZ",rTime(1),rTime(2),rTime(3),rTime(4),rTime(5),rTime(6))
+    NowWhen = rTime(1) - MIN_YEAR
+    NowWhen = NowWhen * 12 + (rTime(2) - 1)
+    NowWhen = NowWhen * 31 + (rTime(3) - 1)
+    NowWhen = NowWhen * 24 + rTime(4)
+    NowWhen = NowWhen * 60 + rTime(5)
+    NowWhen = NowWhen * 60 + rTime(6)
   EndIf
 EndSub
 
@@ -1902,52 +1200,72 @@ EndSub
 ' MakeRec -- queue slot `mi` rendered as one JSON object, into jRec.
 '
 ' Called only from BuildBatch, which is to say only from the poster sequence.
-' QueuePush renders the same object for RxLastJson with its own copy of these
-' six lines rather than calling this, because the two run in different tasks and
-' sharing jRec, mi and a scratch string between them would mean a POST body
+' QueuePush renders the radio object for RxLastJson with its own copy of six of
+' these lines rather than calling this, because the two run in different tasks
+' and sharing jRec, mi and a scratch string between them would mean a POST body
 ' occasionally built out of a reading the main scan was mid-way through
-' displaying. **The two renderings must be kept identical** -- that is a cost of
+' displaying. **Those six lines must be kept identical** -- that is a cost of
 ' the split, and a cheaper one than a wrong value_raw nobody can reproduce.
 '
-' Numbers go through Sprintf rather than being concatenated directly. Implicit
-' numeric-to-string conversion is free to pad, round or reach for scientific
-' notation, and any of the three inside a JSON literal is a rejected batch.
+' Four things are DERIVED here rather than stored per slot, which is where 5 KB
+' of the ring buffer went. See the note at the declaration:
+'
+'   the ISO stamp   rebuilt from the packed Long
+'   radio vs local  the sign of qAddr
+'   suspect         the value being full scale
+'   the engineering value and its conversion, which are properties of the
+'                   channel rather than of the reading
+'
+' Numbers go through Sprintf and FormatFloat rather than being concatenated
+' directly. Implicit numeric-to-string conversion is free to pad, round or reach
+' for scientific notation, and any of the three inside a JSON literal is a
+' rejected batch. Sprintf's %d reads a Long, so a radio value is copied into one
+' first; FormatFloat takes the float.
 '------------------------------------------------------------------------------
 Sub MakeRec()
-  If qChan(mi) = 0 Then
+  uv = qWhen(mi)
+  Call UnWhen()
+  Sprintf (pStamp,"%04d-%02d-%02dT%02d:%02d:%02dZ",uY,uMo,uD,uH,uMi,uS)
+
+  If qAddr(mi) > 0 Then
     'A radio reading: an ALERT address and the count that came off the air.
     Sprintf (pNum,"%d",qAddr(mi))
     jRec = fId & pNum
-    jRec = jRec & fTs & qStamp(mi)
-    Sprintf (pNum,"%d",qVal(mi))
+    jRec = jRec & fTs & pStamp
+    pLong = qVal(mi)
+    Sprintf (pNum,"%d",pLong)
     jRec = jRec & fVal & pNum
-    If qSus(mi) Then jRec = jRec & fSus
+    If pLong = FULL_SCALE Then jRec = jRec & fSus
     jRec = jRec & "}"
   Else
     'A local reading: this station's number, the channel that spoke, and the
     'conversion beside the raw rather than instead of it.
     '
-    'FormatFloat, not Sprintf and not concatenation. Sprintf's %d reads a Long
-    'and these two are Floats; a bare concatenation is free to reach for
-    'scientific notation or to round, and either one inside a JSON literal is a
-    'rejected batch. The decimals are fixed per channel so the text never
-    'carries an exponent -- LocRawDp is 0 for a channel whose raw is a count, so
-    'three tips render as 3 and not as 3.000.
-    '
     'NAN cannot reach here: LocalPush refuses to queue one, because
-    'FormatFloat(NAN) is the word "nan" and a batch carrying it is a 400 for
-    'every reading in it, including the good ones from the radio.
-    jRec = fSn & LOCAL_NUMBER & fCh & LocName(qChan(mi)) & DQ
-    jRec = jRec & fTs & qStamp(mi)
-    If LocRawDp(qChan(mi)) = 0 Then
-      jRec = jRec & fVal & FormatFloat (qRaw(mi),"%.0f")
+    'FormatFloat(NAN) is the word "nan", which is not JSON, and one of those in
+    'a batch is a 400 for every reading in it -- including the radio readings
+    'from the same station that were fine.
+    lk = -qAddr(mi)
+    jRec = fSn & LOCAL_NUMBER & fCh & LocName(lk) & DQ
+    jRec = jRec & fTs & pStamp
+    If LocRawDp(lk) = 0 Then
+      jRec = jRec & fVal & FormatFloat (qVal(mi),"%.0f")
     Else
-      jRec = jRec & fVal & FormatFloat (qRaw(mi),"%.3f")
+      jRec = jRec & fVal & FormatFloat (qVal(mi),"%.3f")
     EndIf
-    jRec = jRec & fEng & FormatFloat (qEng(mi),"%.3f")
-    jRec = jRec & fUnit & LocUnit(qChan(mi)) & DQ
-    If Len(LocConv(qChan(mi))) > 0 Then
-      jRec = jRec & fConv & LocConv(qChan(mi)) & DQ
+
+    'The conversion, applied here because it belongs to the channel. Rain is the
+    'only one that has one: the other three report the number the sensor gave,
+    'which is already the engineering value, and a `conversion` saying "none"
+    'would be a column of noise on every row.
+    If lk = LOC_RAIN Then
+      jRec = jRec & fEng & FormatFloat (qVal(mi) * Rain_bucket,"%.3f")
+    Else
+      jRec = jRec & fEng & FormatFloat (qVal(mi),"%.3f")
+    EndIf
+    jRec = jRec & fUnit & LocUnit(lk) & DQ
+    If lk = LOC_RAIN Then
+      jRec = jRec & fConv & "raw x " & FormatFloat (Rain_bucket,"%.3f") & " mm per tip" & DQ
     EndIf
     jRec = jRec & fProto
     jRec = jRec & "}"
@@ -1957,15 +1275,13 @@ EndSub
 '------------------------------------------------------------------------------
 ' QueuePush -- one reading into the ring buffer.
 '
-' A RADIO reading: pushChan = 0, address in RxLastId, value in RxLastValue,
-' suspect flag in `suspect`.
-' A LOCAL reading: pushChan = the channel, raw in pushRaw, converted in pushEng.
+' A RADIO reading: pushChan = 0, address in RxLastId, value in RxLastValue.
+' A LOCAL reading: pushChan = the channel, raw value in pushRaw.
 '
 ' Called from the main scan, which is the only writer of QHead. **That is why
 ' the local sensors do not queue from the sequence that measures them** -- see
 ' LocalPush. The poster sequence advances both tails as it delivers; this is the
-' one place outside it that touches them, and only when the buffer is full. See
-' the note at the declaration for why that crossing is left unguarded.
+' one place outside it that touches them, and only when the buffer is full.
 '------------------------------------------------------------------------------
 Sub QueuePush()
   qn = QHead + 1
@@ -1978,9 +1294,7 @@ Sub QueuePush()
     '
     'Every tail sitting on the dropped slot moves, and only those: if HTTP has
     'already sent this reading and MQTT has not, HTTP's tail is somewhere ahead
-    'and has no business moving. A tail left pointing at a slot the scan has
-    'just overwritten is the one bug this arrangement can produce, and it is a
-    'silent one -- that path would wake up and send a reading nobody heard.
+    'and has no business moving.
     If qn = QTailHttp Then
       QTailHttp = QTailHttp + 1
       If QTailHttp > Q_SIZE Then QTailHttp = 1
@@ -1993,41 +1307,34 @@ Sub QueuePush()
       'MQTT_ENABLE false nothing advances it, so it sits on slot 1 and every
       'reading past the first Q_SIZE lands on it -- which used to make QDropped
       'climb on a station that had delivered every reading it ever took, and
-      'QDropped is the one counter in this table that is supposed to mean
+      'QDropped is the one counter in the Diag table that is supposed to mean
       'something is wrong. The tail is still moved out of the way either way.
       If MQTT_ENABLE Then qLost = True
     EndIf
     If qLost Then QDropped = QDropped + 1
   EndIf
 
-  qChan(QHead) = pushChan
-  qStamp(QHead) = NowISO
+  qWhen(QHead) = NowWhen
   If pushChan = 0 Then
     qAddr(QHead) = RxLastId
     qVal(QHead) = RxLastValue
-    qSus(QHead) = (suspect = 1)
-    qRaw(QHead) = 0
-    qEng(QHead) = 0
   Else
-    qAddr(QHead) = 0
-    qVal(QHead) = 0
-    qSus(QHead) = False
-    qRaw(QHead) = pushRaw
-    qEng(QHead) = pushEng
+    qAddr(QHead) = -pushChan
+    qVal(QHead) = pushRaw
   EndIf
 
-  'Step 6 and step 7 of the pipeline display, taken from the slot just written.
-  'These lines are MakeRec's, deliberately copied rather than called -- see the
-  'note there. If you change one, change both.
+  RdAddr = qAddr(QHead)
+  RdValue = qVal(QHead)
+
+  'The last step of the pipeline display, taken from the slot just written. The
+  'radio half's six lines are MakeRec's, deliberately copied rather than called
+  '-- see the note there. If you change one, change both.
   '
-  'The two halves write to different Publics and different tables on purpose. A
-  'battery reading arriving between two frames must not overwrite the serial
-  'pipeline's step-7 display, which is the thing a technician is watching when a
-  'feed is not decoding; and the Readings table samples RxLastId, RxLastValue and
-  'RxFrameSkew, none of which a local reading has.
+  'The local half has no JSON display of its own. v2.1 built one and it cost 200
+  'bytes to say what LocalChan, LocalRaw and LocalEng already say between them,
+  'while adding a second rendering that had to be kept identical to MakeRec's.
   If pushChan = 0 Then
     RxLastSuspect = (suspect = 1)
-    RxLastStamp = NowISO
     Sprintf (dNum,"%d",RxLastId)
     RxLastJson = fId & dNum
     RxLastJson = RxLastJson & fTs & NowISO
@@ -2037,30 +1344,19 @@ Sub QueuePush()
     RxLastJson = RxLastJson & "}"
     RxStep = "7 queued"
     RxReadings = RxReadings + 1
-    CallTable Readings
   Else
     LocalChan = LocName(pushChan)
     LocalRaw = pushRaw
-    LocalEng = pushEng
-    LocalJson = fSn & LOCAL_NUMBER & fCh & LocalChan & DQ
-    LocalJson = LocalJson & fTs & NowISO
-    If LocRawDp(pushChan) = 0 Then
-      LocalJson = LocalJson & fVal & FormatFloat (pushRaw,"%.0f")
+    If pushChan = LOC_RAIN Then
+      LocalEng = pushRaw * Rain_bucket
     Else
-      LocalJson = LocalJson & fVal & FormatFloat (pushRaw,"%.3f")
+      LocalEng = pushRaw
     EndIf
-    LocalJson = LocalJson & fEng & FormatFloat (pushEng,"%.3f")
-    LocalJson = LocalJson & fUnit & LocUnit(pushChan) & DQ
-    If Len(LocConv(pushChan)) > 0 Then
-      LocalJson = LocalJson & fConv & LocConv(pushChan) & DQ
-    EndIf
-    LocalJson = LocalJson & fProto
-    LocalJson = LocalJson & "}"
     LocalQueued = LocalQueued + 1
     SecsSinceLocal = 0
-    CallTable LocalLog
   EndIf
 
+  CallTable Readings
   QHead = qn
 EndSub
 
@@ -2072,31 +1368,24 @@ EndSub
 ' themselves. QHead has exactly one writer by design -- the note at the ring
 ' buffer's declaration is built on it -- and a second sequence pushing readings
 ' would make that false in a way nothing would ever reproduce on a bench: two
-' tasks incrementing QHead between each other's read and write, once a fortnight,
-' costing one reading nobody can prove was ever taken.
+' tasks incrementing QHead between each other's read and write, once a
+' fortnight, costing one reading nobody can prove was ever taken.
 '
-' So the sequence that measures a channel only STAGES it: it writes locRawV,
-' locEngV and sets locPend, and the scan picks it up within a second. The
-' handover is a flag rather than a queue of its own because the failure mode of
-' a torn flag is bounded and harmless -- the sequence sets locPend in the same
-' instant the scan clears it, and the reading is either sent twice (free, by
-' contract -- the endpoint stores it once) or sent a second later. A semaphore
-' against that would cost every scan for a race that costs nothing.
+' So the sequence that measures a channel only STAGES it: it writes locRawV and
+' sets locPend, and the scan picks it up within a second. The handover is a flag
+' rather than a queue of its own because the failure mode of a torn flag is
+' bounded and harmless -- the reading is either sent twice (free, by contract)
+' or sent a second later.
 '
 ' Two things are refused rather than queued, and both would otherwise be stored
 ' forever:
 '
 '   NAN            -- an SDI-12 sensor that did not answer. FormatFloat renders
 '                     it as the word "nan", which is not JSON, and one of those
-'                     in a batch is a 400 for every reading in it -- including
-'                     the radio readings that were fine.
+'                     in a batch is a 400 for every reading in it.
 '   past LOCAL_MAX -- a sensor that answered with nonsense. NAN is the honest
 '                     failure; a mis-scaled or shorted sensor returns a NUMBER,
 '                     and a number is what gets stored and later believed.
-'
-' Both are counted at LocalRejected and named in LocalState, because a channel
-' that has quietly stopped reporting is exactly the thing a station is supposed
-' to be able to say about itself.
 '------------------------------------------------------------------------------
 Sub LocalPush()
   For lk = 1 To LOC_N
@@ -2106,19 +1395,18 @@ Sub LocalPush()
       If NOT ClockOK Then
         'Not counted as a rejection: nothing is wrong with the sensor, and the
         'clock state is already reported in one place. The reading is dropped
-        'rather than held, because the next one is LOCAL_EVERY minutes away and
-        'a stamp applied later would be a lie about when it was measured.
+        'rather than held, because a stamp applied later would be a lie about
+        'when it was measured.
         LocalState = "clock not set - nothing stamped"
-      ElseIf locRawV(lk) = NAN OR locEngV(lk) = NAN Then
+      ElseIf locRawV(lk) = NAN Then
         LocalRejected = LocalRejected + 1
         LocalState = LocName(lk) & " read NAN - not queued"
-      ElseIf ABS(locEngV(lk)) > LOCAL_MAX Then
+      ElseIf ABS(locRawV(lk)) > LOCAL_MAX Then
         LocalRejected = LocalRejected + 1
         LocalState = LocName(lk) & " out of range - not queued"
       Else
         pushChan = lk
         pushRaw = locRawV(lk)
-        pushEng = locEngV(lk)
         Call QueuePush()
         LocalState = "queued " & LocName(lk)
       EndIf
@@ -2127,30 +1415,35 @@ Sub LocalPush()
 EndSub
 
 '------------------------------------------------------------------------------
-' TestInject -- one synthetic ALERT2A line into the receive byte buffer.
+' TestInject -- one synthetic BINARY ALERT2 frame into the receive byte buffer.
 '
 ' The live end-to-end test. Called from ReadSerial, one instruction before
 ' TakeFrames, so the bytes this writes are indistinguishable from the bytes
-' SerialInBlock just wrote: the framer, the line cutter, the census, the
-' delimiter pick, ParseAlert2's bit unpacking, the clock check, the queue, the
-' batch builder and the POST all run on it exactly as they would on a real
-' transmission. Nothing downstream is told this is a test, because a path that
-' knows it is being tested is not the path under test.
+' SerialInBlock just wrote: the framer, DecodeFrame, the bit unpacking, the
+' clock check, the queue, the batch builder and the POST all run on it exactly
+' as they would on a real transmission. Nothing downstream is told this is a
+' test, because a path that knows it is being tested is not the path under test.
 '
-' The line is the ALERT2 ASCII protocol's own shape, built to satisfy every gate
-' ParseAlert2 applies rather than to look plausible:
+' **Binary and not ASCII**, because this receiver speaks binary -- so DecodeFrame
+' is the live decoder and ParseAlert2 is not, and a self-test that exercised the
+' one nobody uses would be testing the wrong thing.
 '
-'   field 18 = 1     the receiver's frame-valid flag, or it is rejected
-'   field 23 = 7     the payload length in bytes, which must equal the number of
-'                    trailing hex fields, or it is rejected as wrapped
-'   payload byte 0   0x74, the ALERT concentration element, or it is rejected
-'   bytes 1-2        seconds since midnight, from this logger's clock, so
-'                    RxFrameSkew comes out at 0 and the skew display can be read
-'                    against a known-good frame
-'   bytes 3-6        one four-byte record: the address and value packed the way
-'                    the radio packs them, and a zero status byte
+' Eighteen bytes, which is the shortest frame DecodeFrame will accept, and every
+' one of them is there to satisfy a gate rather than to look plausible:
 '
-' The packing is ParseAlert2's table run backwards, and it is the one part worth
+'   1-6    41 4C 45 52 54 32   "ALERT2", the signature TakeFrames scans for
+'   7      0C                  the length byte: total = 6 + 12 = 18. Below
+'                              FRAME_MIN_LEN it would be refused as not-a-length
+'   8      00                  one pad byte. The anchor search starts at
+'                              frSigAt + SIG_LEN + 1, which is this byte
+'   9-11   84 01 07            the anchor, and the element length
+'   12     74                  ELEM_CONCENTRATION
+'   13-14  <hi> <lo>           seconds since midnight, from this logger's clock,
+'                              so RxFrameSkew comes out at 0
+'   15-17  <b0> <b1> <b2>      the record: address and value, packed
+'   18     00                  the status byte. Non-zero is a corrupt record
+'
+' The packing is DecodeFrame's table run backwards, and it is the one part worth
 ' checking by eye against that table:
 '
 '   b0 = address low 8 bits          address = (b1 MOD 32) * 256 + b0
@@ -2163,11 +1456,10 @@ EndSub
 ' would silently wrap into the other field rather than fail.
 '
 ' Injected only into an EMPTY byte buffer. Appending to a half-received real
-' frame would splice the two together, and the result would decode -- ParseLine
-' finds "ALERT2A" anywhere in a line and steps over the prefix -- as one reading
-' built out of two transmissions. So a busy station makes the shot wait for a
-' gap and says so in TestState, rather than corrupting the thing it exists to
-' prove works.
+' frame would put a second signature inside the first one's length, and the
+' result would decode as one reading built out of two transmissions. So a busy
+' station makes the shot wait for a gap and says so in TestState, rather than
+' corrupting the thing it exists to prove works.
 '------------------------------------------------------------------------------
 Sub TestInject()
   If TestEvery > 0 Then
@@ -2190,88 +1482,80 @@ Sub TestInject()
     TestState = "waiting for a gap - the byte buffer is not empty"
     ExitSub
   EndIf
-
-  RealTime (rTime())
-  If rTime(1) < MIN_YEAR Then
-    'Refused rather than fired: a line stamped from a dead clock would be
-    'rejected at ParseAlert2's own clock gate anyway, and "the self-test did
-    'nothing" is a worse thing to read than the reason.
+  If NOT ClockOK Then
+    'Refused rather than fired: the frame carries a time of day, and the reading
+    'it produces would be refused at the queue's own clock gate anyway. "The
+    'self-test did nothing" is a worse thing to read than the reason.
     TestState = "clock not set - nothing to stamp the frame with"
     TestFire = False
     ExitSub
   EndIf
 
   tstSecs = rTime(4) * 3600 + rTime(5) * 60 + rTime(6)
-  tstHi = INT(tstSecs / 256)
-  tstLo = tstSecs MOD 256
   tstB0 = TestId MOD 256
   tstB1 = INT(TestId / 256) + INT(TestValue / 256) * 32
   tstB2 = TestValue MOD 256
 
-  'Fields 1-6, then the receiver's own clock in 7-12. Built by concatenation
-  'with Sprintf for the numbers, the way every other string in this file is:
-  'one Sprintf with thirty arguments is not checkable by reading it.
-  TestLine = "ALERT2A,1," & TEST_NODE & ",MEGANET,N,1,"
-  Sprintf (tstNum,"%04d,%d,%d,%d,%d,%02d.000",rTime(1),rTime(2),rTime(3),rTime(4),rTime(5),rTime(6))
-  TestLine = TestLine & tstNum
+  tstFrame(1) = 65                               'A
+  tstFrame(2) = 76                               'L
+  tstFrame(3) = 69                               'E
+  tstFrame(4) = 82                               'R
+  tstFrame(5) = 84                               'T
+  tstFrame(6) = 50                               '2
+  tstFrame(7) = 12                               'length: 6 + 12 = 18 total
+  tstFrame(8) = 0                                'pad
+  tstFrame(9) = 132                              '84 -- the anchor
+  tstFrame(10) = 1
+  tstFrame(11) = 7                               'element length
+  tstFrame(12) = ELEM_CONCENTRATION
+  tstFrame(13) = INT(tstSecs / 256)
+  tstFrame(14) = tstSecs MOD 256
+  tstFrame(15) = tstB0
+  tstFrame(16) = tstB1
+  tstFrame(17) = tstB2
+  tstFrame(18) = 0                               'status: a good record
 
-  'Fields 13-24. The 1 is field 18, frame-valid; the second 7 is field 23, the
-  'payload length; TEST_NODE again is field 24, the transmitting node.
-  TestLine = TestLine & ",0,0,0,0,0,1,0,0,0,7,7," & TEST_NODE
-
-  'Fields 25-31: the seven payload bytes as hex.
-  Sprintf (tstNum,",74,%02X,%02X,%02X,%02X,%02X,00",tstHi,tstLo,tstB0,tstB1,tstB2)
-  TestLine = TestLine & tstNum
-
-  For tstK = 1 To Len(TestLine)
+  TestHex = ""
+  For tstK = 1 To 18
     If nBuf < BUF_MAX Then
       nBuf = nBuf + 1
-      rxByte(nBuf) = ASCII(Mid(TestLine,tstK,1))
+      rxByte(nBuf) = tstFrame(tstK)
     EndIf
+    Sprintf (hxNum,"%02X ",tstFrame(tstK))
+    TestHex = TestHex & hxNum
   Next tstK
-  If nBuf < BUF_MAX Then
-    nBuf = nBuf + 1
-    rxByte(nBuf) = 13                            'CR
-  EndIf
-  If nBuf < BUF_MAX Then
-    nBuf = nBuf + 1
-    rxByte(nBuf) = 10                            'LF
-  EndIf
 
   TestFire = False
   TestFired = TestFired + 1
-  TestState = "fired - watch RxLastLine, RxLastId, RxStep, then QDepth"
+  TestState = "fired - watch RxHex, RxLastId, RxStep, then QDepth"
 EndSub
 
 '------------------------------------------------------------------------------
-' RejectLine -- one place to record a line that would not decode, so every
-' rejection leaves the same evidence behind. Reason in RxLastWhy and its number
-' in whyCode before the call.
+' RejectLine -- one place to record a frame or line that would not decode, so
+' every rejection leaves the same evidence behind. Reason in RxLastWhy and its
+' number in whyCode before the call.
 '
-' The hex is kept as well as the text, because a line that will not parse is
-' quite often a line whose text is not readable -- and RxWhyCount() is kept
-' because "which rejection, how many times" is the question a capture is run to
-' answer, and a last-line snapshot cannot answer it.
+'   1 short line              8 clock not set
+'   2 frame flagged invalid   9 alert id out of range
+'   3 payload len vs hex     10 unrecognised line
+'   4 payload size           12 fields are not numbers
+'   5 not whole records      13 no element in frame
+'   6 payload not hex        14 element len not records
+'   7 not concentration elem
+'
+' The per-reason tally v2.1 kept (RxWhyCount(14)) came out at v3.0: "which
+' rejection, how many times" is the question a capture is run to answer, and the
+' capture went with it. whyCode still says WHICH, on the last one, and Diag
+' carries RxBadFrames every five minutes so the rate is still visible.
 '------------------------------------------------------------------------------
 Sub RejectLine()
-  RxLastBad = RxLine
-  RxLastBadHex = RxLastLineHex
+  RxLastBad = Mid(RxLine,1,120)
   RxBadFrames = RxBadFrames + 1
-  If whyCode >= 1 AND whyCode <= 14 Then RxWhyCount(whyCode) = RxWhyCount(whyCode) + 1
   RxStep = "rejected: " & RxLastWhy
 EndSub
 
-'------------------------------------------------------------------------------
-' ParsePlain -- "<alert id>,<value>" or "<alert id> <value>".
-'
-' The fallback for any decoder that is not an ERT-A2, and what you type into a
-' terminal to prove the whole path end to end without waiting for a
-' transmission. logger/README.md walks through that test.
-'------------------------------------------------------------------------------
 Sub ParsePlain()
   RxLastRecHex = ""
-  RxLastPayLen = 0
-  RxLastPayHex = ""
 
   'Both fields must be numbers before either is read as one. See IsNum.
   numIn = fld(1)
@@ -2314,62 +1598,7 @@ Sub ParsePlain()
   Call QueuePush()
 EndSub
 
-'------------------------------------------------------------------------------
-' ParseAlert2 -- the ERT-A2's ALERT2 ASCII protocol.
-'
-'   ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00
-'   |_______________________ 24 fixed fields ________________________|__ payload __|
-'
-' Field 18 is the frame-valid flag, field 23 the payload length in bytes, and
-' field 24 the transmitting node. The full table, and the evidence behind each
-' entry, is in alert2.js -- this program reads the three fields that decide
-' whether a frame is worth anything and leaves the rest to the app.
-'
-' The payload is an ALERT2 "ALERT concentration" element:
-'
-'   byte 0     0x74, the element type
-'   bytes 1-2  seconds since midnight, from the transmitting network
-'   then four bytes per reading:
-'     byte 0   AAAAAAAA   address bits 7-0
-'     byte 1   DDDAAAAA   value bits 10-8, then address bits 12-8
-'     byte 2   DDDDDDDD   value bits 7-0
-'     byte 3   SSSSSSSS   status; 0 on every valid record observed
-'
-' That second byte is the only part of the encoding that is not obvious by eye:
-' a byte that looks like address is carrying the top of the value too. It is
-' split with MOD and INT rather than with shift operators -- CRBasic has none,
-' and the arithmetic is exact on integers this small:
-'
-'   address high bits   pay(i+1) MOD 32       the low five bits
-'   value   high bits   INT(pay(i+1) / 32)    the top three
-'
-' RxLastRecHex shows the four bytes each reading came out of, so this can be
-' checked by hand on the bench against the table above.
-'
-' Nothing is decoded on a best-effort basis. A line that is not understood in
-' full is rejected whole, because half an ALERT frame is a plausible-looking
-' reading for the wrong station, and a wrong station is worse than a gap.
-'
-' --- Which clock stamps the reading -----------------------------------------
-'
-' This one, not either of the two in the frame. The ERT-A2's own RTC is in
-' fields 7-12 and is demonstrably unreliable -- the 444-frame reference capture
-' behind alert2.js has it twelve hours out, an AM/PM error on the unit. The
-' payload's seconds-since-midnight comes from the transmitting network and is
-' the better of the two, but nothing in the frame or in ELPRO's documentation
-' says which zone it counts from, and a base station that guessed wrong would
-' silently shift every reading it ever posted by a whole number of hours.
-'
-' So the reading is stamped with this logger's NTP-disciplined UTC clock at the
-' moment the line arrives -- receive latency at a base station is seconds -- and
-' the disagreement is reported rather than resolved. RxFrameSkew is the frame
-' time minus this logger's time of day: near zero means the two agree and the
-' frame time is UTC; parked at a whole number of hours is the answer to the
-' question above, and worth telling MegaNet about.
-'------------------------------------------------------------------------------
 Sub ParseAlert2()
-  RxLastPayLen = 0
-  RxLastPayHex = ""
   RxLastRecHex = ""
 
   If nFld < N_FIELDS + 4 Then
@@ -2395,7 +1624,6 @@ Sub ParseAlert2()
   'from one a narrow terminal wrapped.
   payLen = fld(23)
   nPay = nFld - N_FIELDS
-  RxLastPayLen = payLen
   If payLen <> nPay Then
     RxLastWhy = "payload length disagrees with the hex"
     whyCode = 3
@@ -2415,9 +1643,7 @@ Sub ParseAlert2()
     ExitSub
   EndIf
 
-  'Hex to bytes. pay(1) is payload byte 0 -- CRBasic arrays start at 1. The
-  'result is echoed into RxLastPayHex so the conversion can be compared against
-  'the tail of RxLastLineHex without any arithmetic.
+  'Hex to bytes. pay(1) is payload byte 0 -- CRBasic arrays start at 1.
   For i = 1 To nPay
     hexIn = fld(N_FIELDS + i)
     Call HexByte()
@@ -2428,8 +1654,6 @@ Sub ParseAlert2()
       ExitSub
     EndIf
     pay(i) = hexVal
-    Sprintf (numStr,"%02X ",hexVal)
-    RxLastPayHex = RxLastPayHex & numStr
   Next i
   RxStep = "5 payload decoded"
 
@@ -2480,108 +1704,6 @@ Sub ParseAlert2()
   Next i
 EndSub
 
-'------------------------------------------------------------------------------
-' ParseLine -- one complete line in RxLine, zero or more readings into the queue.
-'
-' Two shapes, told apart by what the line starts with, the same way alert2.js
-' sniffs a capture. Sniffing on the raw text rather than on a split field means
-' a line whose delimiters are wrong is still identified before it is blamed.
-'------------------------------------------------------------------------------
-Sub ParseLine()
-  RxLastWhy = ""
-  RxLastShape = ""
-  RxLastPrefix = 0
-  whyCode = 0
-
-  'Trim any trailing whitespace the terminator left behind, so the last field is
-  'a clean number whichever of CR, LF or CRLF the receiver ends its lines with.
-  Do While Len(RxLine) > 0
-    tk = ASCII(Mid(RxLine,Len(RxLine),1))
-    If tk = 13 OR tk = 10 OR tk = 32 OR tk = 9 Then
-      RxLine = Mid(RxLine,1,Len(RxLine) - 1)
-    Else
-      ExitDo
-    EndIf
-  Loop
-  If Len(RxLine) = 0 Then ExitSub
-
-  RxLines = RxLines + 1
-  RxLastLine = RxLine
-  RxLastLineLen = Len(RxLine)
-  If RxLenMin = 0 OR RxLastLineLen < RxLenMin Then RxLenMin = RxLastLineLen
-  If RxLastLineLen > RxLenMax Then RxLenMax = RxLastLineLen
-
-  'The line, in hex, beside the line as text. Same loop as the block dump, so
-  'the two displays mean the same thing. The census is off here -- these bytes
-  'were counted when the block they arrived in was read.
-  dumpSrc = RxLine
-  dumpLen = Len(RxLine)
-  dumpCensus = False
-  Call DumpBytes()
-  RxLastLineHex = dumpHex
-
-  'The first line ever seen, kept for good. A receiver's startup banner or mode
-  'string appears once and is gone from the last-line display a second later,
-  'and it is often the line that says what the rest of the feed is.
-  If RxLines = 1 Then
-    RxFirstLine = RxLine
-    RxFirstLineHex = dumpHex
-  EndIf
-
-  'What separators the line actually contains, before anything is assumed about
-  'them, and then the one to split on.
-  Call Census()
-  Call PickDelim()
-  RxStep = "4 line captured, delim " & RxLastDelim
-
-  If RxLastDelimCode = 0 Then
-    nFld = 1                                     'nothing to split on. See the
-  Else                                           'note at PickDelim
-    Call SplitLine()
-  EndIf
-  RxLastFields = nFld
-
-  'ALERT2A found anywhere in the line, not only at the front. A receiver that
-  'prefixes its output -- a prompt, a sequence number, a stray byte from the
-  'previous frame -- would otherwise be unrecognisable, and RxLastPrefix says
-  'how many bytes were stepped over so the prefix itself is not lost.
-  aFound = 0
-  If Len(RxLine) >= 7 Then
-    For ak = 1 To Len(RxLine) - 6
-      If Mid(RxLine,ak,7) = "ALERT2A" Then
-        aFound = ak
-        ExitFor
-      EndIf
-    Next ak
-  EndIf
-  If aFound > 0 Then
-    If aFound > 1 Then
-      RxLastPrefix = aFound - 1
-      RxLine = Mid(RxLine,aFound,Len(RxLine) - aFound + 1)
-      If RxLastDelimCode > 0 Then Call SplitLine()
-      RxLastFields = nFld
-    EndIf
-    RxLastShape = "ALERT2A"
-    RxLastShapeCode = 1
-    Call ParseAlert2()
-  ElseIf nFld >= 2 Then
-    RxLastShape = "plain"
-    RxLastShapeCode = 2
-    Call ParsePlain()
-  Else
-    RxLastShape = "unrecognised"
-    RxLastShapeCode = 3
-    RxLastWhy = "unrecognised line"
-    whyCode = 10
-    Call RejectLine()
-  EndIf
-
-  CallTable LineLog
-EndSub
-
-'------------------------------------------------------------------------------
-' BufDrop -- remove the first dropN bytes from the byte buffer.
-'------------------------------------------------------------------------------
 Sub BufDrop()
   If dropN >= nBuf Then
     nBuf = 0
@@ -2593,17 +1715,6 @@ Sub BufDrop()
   nBuf = nBuf - dropN
 EndSub
 
-'------------------------------------------------------------------------------
-' TakeTextLine -- one printable, CR/LF-terminated run out of the byte buffer.
-'
-' Only runs that are ENTIRELY printable qualify. That guard is the lesson of the
-' first capture: on a binary feed some byte is eventually 0x0D, and treating it
-' as the end of a line turns one good frame into two lines of nonsense and two
-' rejections that describe nothing. A run that reaches a terminator carrying
-' bytes no text line can hold is counted at RxNonText and dropped, so a binary
-' frame this program failed to frame is reported as binary rather than as a
-' malformed line.
-'------------------------------------------------------------------------------
 Sub TakeTextLine()
   tTook = False
   tEnd = 0
@@ -2651,21 +1762,11 @@ Sub TakeTextLine()
   If Len(RxLine) > 0 Then Call ParseLine()
 EndSub
 
-'------------------------------------------------------------------------------
-' DecodeFrame -- one binary frame, from rxByte(frSigAt) to rxByte(frEnd).
-'
-' Every intermediate is written to a Public and then to FrameLog, because the
-' frame layout below is read off three reference frames rather than out of a
-' document, and a decode built on an inference has to be able to say what it
-' inferred. FrElemVia in particular records WHICH rule found the element.
-'------------------------------------------------------------------------------
 Sub DecodeFrame()
   RxFrames = RxFrames + 1
-  RxFrameSeq = RxFrameSeq + 1
   FrElemOff = 0
   FrElemVia = 0
   FrElemLen = 0
-  FrElemHex = ""
   FrTimeSecs = 0
   FrRecords = 0
   FrGood = 0
@@ -2673,11 +1774,9 @@ Sub DecodeFrame()
   whyCode = 0
   RxLastWhy = ""
 
-  FrHex = ""
-  For fk = frSigAt To frEnd
-    Sprintf (numStr,"%02X ",rxByte(fk))
-    If Len(FrHex) <= 380 Then FrHex = FrHex & numStr
-  Next fk
+  hxFrom = frSigAt
+  hxN = 40
+  Call HexDump()
   RxStep = "5 frame captured"
 
   'The anchor: 84 01 <len> 74. Present on every frame in the reference capture,
@@ -2716,10 +1815,8 @@ Sub DecodeFrame()
   If frElemAt = 0 Then
     RxLastWhy = "no concentration element in frame"
     whyCode = 13
-    RxWhyCount(13) = RxWhyCount(13) + 1
     RxBadFrames = RxBadFrames + 1
     RxStep = "rejected: " & RxLastWhy
-    CallTable FrameLog
     ExitSub
   EndIf
 
@@ -2727,17 +1824,11 @@ Sub DecodeFrame()
   If FrElemLen < 7 OR FrElemLen > 32 OR ((FrElemLen - 3) MOD 4) <> 0 Then
     RxLastWhy = "element length is not whole records"
     whyCode = 14
-    RxWhyCount(14) = RxWhyCount(14) + 1
     RxBadFrames = RxBadFrames + 1
     RxStep = "rejected: " & RxLastWhy
-    CallTable FrameLog
     ExitSub
   EndIf
 
-  For fk = frElemAt To frElemAt + FrElemLen - 1
-    Sprintf (numStr,"%02X ",rxByte(fk))
-    If Len(FrElemHex) <= 100 Then FrElemHex = FrElemHex & numStr
-  Next fk
   RxStep = "6 element decoded"
 
   'The frame's own clock, against ours -- the same comparison the ASCII path
@@ -2749,23 +1840,17 @@ Sub DecodeFrame()
   If RxFrameSkew < -43200 Then RxFrameSkew = RxFrameSkew + 86400
 
   FrRecords = (FrElemLen - 3) / 4
-  RdIndex = 0
   For frRec = frElemAt + 3 To frElemAt + FrElemLen - 1 Step 4
-    RdIndex = RdIndex + 1
-    RdB0 = rxByte(frRec)
-    RdB1 = rxByte(frRec + 1)
-    RdB2 = rxByte(frRec + 2)
-    RdB3 = rxByte(frRec + 3)
-    Sprintf (RdRecHex,"%02X %02X %02X %02X",RdB0,RdB1,RdB2,RdB3)
+    Sprintf (RxLastRecHex,"%02X %02X %02X %02X",rxByte(frRec),rxByte(frRec + 1),rxByte(frRec + 2),rxByte(frRec + 3))
 
     'Same unpacking as the ASCII path: the middle byte carries the top three
-    'bits of the value and the top five bits of the address.
-    RxLastId = (RdB1 MOD 32) * 256 + RdB0
-    RxLastValue = INT(RdB1 / 32) * 256 + RdB2
-    RxLastRecHex = RdRecHex
-    RdQueued = False
+    'bits of the value and the top five bits of the address. Read straight out
+    'of the byte buffer -- v2.1 copied the four bytes into four Publics so a
+    'table could sample them, and that table went at v3.0.
+    RxLastId = (rxByte(frRec + 1) MOD 32) * 256 + rxByte(frRec)
+    RxLastValue = INT(rxByte(frRec + 1) / 32) * 256 + rxByte(frRec + 2)
 
-    If RdB3 <> 0 Then
+    If rxByte(frRec + 3) <> 0 Then
       FrBad = FrBad + 1
       RxBadRecords = RxBadRecords + 1
     ElseIf RxLastId < 1 OR RxLastId > 65535 Then
@@ -2775,30 +1860,17 @@ Sub DecodeFrame()
       FrBad = FrBad + 1
       RxLastWhy = "clock not set - not stamping"
       whyCode = 8
-      RxWhyCount(8) = RxWhyCount(8) + 1
     Else
       suspect = 0
       If RxLastValue = FULL_SCALE Then suspect = 1
       pushChan = 0                                 'a radio reading
       Call QueuePush()
-      RdQueued = True
       FrGood = FrGood + 1
     EndIf
-    CallTable ReadingLog
   Next frRec
 
-  CallTable FrameLog
 EndSub
 
-'------------------------------------------------------------------------------
-' TakeFrames -- everything framable in the byte buffer, until nothing is.
-'
-' Binary frames first, text lines only when there is no signature to work with.
-' The order matters: an ASCII feed's line also begins "ALERT2", so the mode test
-' below decides between them on the two bytes after the signature. "ALERT2A,"
-' is a letter A followed by a comma; a length byte of 65 followed by 44 would be
-' a 71-byte frame whose payload began with a comma, which no observed frame does.
-'------------------------------------------------------------------------------
 Sub TakeFrames()
   frLoops = 0
   Do
@@ -2857,17 +1929,14 @@ Sub TakeFrames()
       If FrLenByte < FRAME_MIN_LEN OR FrTotal > FRAME_MAX Then
         'Not a length. Step past this signature byte and keep looking, rather
         'than trusting it and swallowing everything behind it.
-        RxFrameBadLen = RxFrameBadLen + 1
         dropN = frSigAt
         Call BufDrop()
       ElseIf nBuf < frEnd Then
         frDone = True                              'wait for the rest of it
       Else
-        FrPre = frSigAt - 1
         Call DecodeFrame()
         dropN = frEnd
         Call BufDrop()
-        FrLeftover = nBuf
       EndIf
     EndIf
 
@@ -2876,62 +1945,129 @@ Sub TakeFrames()
 EndSub
 
 '------------------------------------------------------------------------------
-' ReadSerial -- steps 1 to 3 of the pipeline, once per scan.
+' ParseLine -- one complete TEXT line in RxLine, zero or more readings queued.
+'
+' Two shapes, told apart by what the line starts with, the same way alert2.js
+' sniffs a capture. Sniffing on the raw text rather than on a split field means
+' a line whose delimiters are wrong is still identified before it is blamed.
+'
+' **The delimiter is a comma**, and v3.0 says so instead of polling for it. v1
+' carried a census of eight separator classes and a PickDelim that chose between
+' five of them, because nobody knew what the feed was delimited by. It is
+' ALERT2 ASCII, it is comma-delimited, and the census cost 1.4 KB to keep
+' answering a question that has one answer. The fallback to a space is kept
+' because it costs two lines and covers the one variant anybody has seen.
+'------------------------------------------------------------------------------
+Sub ParseLine()
+  RxLastWhy = ""
+  RxLastShape = ""
+  whyCode = 0
+
+  'Trim any trailing whitespace the terminator left behind, so the last field is
+  'a clean number whichever of CR, LF or CRLF the receiver ends its lines with.
+  Do While Len(RxLine) > 0
+    tk = ASCII(Mid(RxLine,Len(RxLine),1))
+    If tk = 13 OR tk = 10 OR tk = 32 OR tk = 9 Then
+      RxLine = Mid(RxLine,1,Len(RxLine) - 1)
+    Else
+      ExitDo
+    EndIf
+  Loop
+  If Len(RxLine) = 0 Then ExitSub
+
+  RxLines = RxLines + 1
+  RxLastLine = RxLine
+
+  'Comma unless there is not one, in which case space. Anything else is a feed
+  'this program does not claim to read, and it will fall out as "unrecognised"
+  'below rather than being split on a guess.
+  delim = ","
+  aFound = 0
+  For ak = 1 To Len(RxLine)
+    If Mid(RxLine,ak,1) = "," Then
+      aFound = 1
+      ExitFor
+    EndIf
+  Next ak
+  If aFound = 0 Then delim = " "
+  Call SplitLine()
+  RxLastFields = nFld
+  RxStep = "4 line captured"
+
+  'ALERT2A found anywhere in the line, not only at the front. A receiver that
+  'prefixes its output -- a prompt, a sequence number, a stray byte from the
+  'previous frame -- would otherwise be unrecognisable.
+  aFound = 0
+  If Len(RxLine) >= 7 Then
+    For ak = 1 To Len(RxLine) - 6
+      If Mid(RxLine,ak,7) = "ALERT2A" Then
+        aFound = ak
+        ExitFor
+      EndIf
+    Next ak
+  EndIf
+  If aFound > 0 Then
+    If aFound > 1 Then
+      RxLine = Mid(RxLine,aFound,Len(RxLine) - aFound + 1)
+      Call SplitLine()
+      RxLastFields = nFld
+    EndIf
+    RxLastShape = "ALERT2A"
+    Call ParseAlert2()
+  ElseIf nFld >= 2 Then
+    RxLastShape = "plain"
+    Call ParsePlain()
+  Else
+    RxLastShape = "unrecognised"
+    RxLastWhy = "unrecognised line"
+    whyCode = 10
+    Call RejectLine()
+  EndIf
+EndSub
+
+'------------------------------------------------------------------------------
+' ReadSerial -- the port, once per scan, into the byte buffer.
 '
 ' SerialInBlock takes everything the port has and returns how many bytes that
-' was, which is the count every loop below is bounded by. This is the KDO
-' driver's read, and it replaces the SerialInRecord call that made the first
-' version of this program silently deaf -- see the note at the top of the file.
+' was, which is the count the loop below is bounded by. This is the KDO driver's
+' read, and it replaces the SerialInRecord call that made the first version of
+' this program silently deaf.
 '
 ' SerialFlush is deliberately NOT called here. The KDO driver flushes because it
 ' owns a request/response conversation and anything left over is stale. This
 ' program is a listener on a feed it does not drive, and a flush would throw
 ' away the bytes that arrived while the scan was working.
+'
+' v3.0 removed the block hex dump, the block text dump, the buffer dumps and the
+' capture-file write from this subroutine. What is left is the read and the
+' append, which is all of it that ever touched a reading -- RxHex now dumps the
+' bytes that became a FRAME, which is the copy worth having.
 '------------------------------------------------------------------------------
 Sub ReadSerial()
   RxAvail = SerialInChk (RX_PORT)
   RxBlockBytes = SerialInBlock (RX_PORT,RxBuf,RX_BLOCK)
 
   If RxBlockBytes > 0 Then
-    RxBlockSeq = RxBlockSeq + 1
     RxBytesTotal = RxBytesTotal + RxBlockBytes
     SecsSinceRx = 0
     RxStep = "1 bytes read"
 
-    'MoveBytes, not a plain assignment. Assigning one string to another copies
-    'up to the first NUL, and this feed carries nine to eleven NULs per frame --
-    'so a copy would truncate exactly the data the program exists to read.
-    'MoveBytes copies the count it is given and does not care what is in it.
-    MoveBytes (dumpSrc,0,RxBuf,0,RxBlockBytes)
-    dumpLen = RxBlockBytes
-    dumpCensus = True
-    Call DumpBytes()
-    dumpCensus = False
-    RxBlockHex = dumpHex
-    RxBlockText = dumpTxt
-    RxBlockHexFull = dumpHexFull
-    RxStep = "2 block dumped"
-
-    Call CaptureBlock()
-
-    'Into the byte buffer, raw. Every byte, including NUL, including CR -- this
-    'is the step the first version got wrong, and getting it wrong here cannot
-    'be recovered from anywhere downstream.
-    RxBufLenBefore = nBuf
-    For dk = 1 To RxBlockBytes
+    'Into the byte buffer, raw. Every byte, including NUL, including CR. Read
+    'through Mid() on the string SerialInBlock filled, bounded by the count it
+    'returned rather than by Len() -- a NUL would end a CRBasic string early and
+    'this feed carries nine to eleven of them per frame.
+    For dk2 = 1 To RxBlockBytes
       If nBuf < BUF_MAX Then
         nBuf = nBuf + 1
-        rxByte(nBuf) = ASCII(dumpSrc(1,1,dk))
+        rxByte(nBuf) = ASCII(RxBuf(1,1,dk2))
+        If rxByte(nBuf) = 0 Then RxNulls = RxNulls + 1
       Else
         RxBufDrops = RxBufDrops + 1
       EndIf
-    Next dk
-    RxStep = "3 appended to byte buffer"
-    CallTable RawLog
+    Next dk2
+    RxStep = "2 appended to byte buffer"
   Else
     SecsSinceRx = SecsSinceRx + 1
-    RxBlockHex = ""
-    RxBlockText = ""
   EndIf
 
   'The self-test, if one is armed. Here and not in the scan above, so the bytes
@@ -2941,52 +2077,9 @@ Sub ReadSerial()
   If TEST_ENABLE Then Call TestInject()
 
   Call TakeFrames()
-
-  'What is still waiting, shown both ways.
   RxBufLen = nBuf
-  dumpLen = nBuf
-  If dumpLen > 250 Then dumpLen = 250
-  For dk = 1 To dumpLen
-    MoveBytes (dumpSrc,dk - 1,CHR(rxByte(dk)),0,1)
-  Next dk
-  dumpCensus = False
-  Call DumpBytes()
-  RxBufHex = dumpHex
-  RxBufText = dumpTxt
 EndSub
 
-'------------------------------------------------------------------------------
-' BuildBatch -- up to MAX_BATCH readings out of the ring buffer and into
-' ContentsString, without removing them. BatchN says how many went in.
-'
-' Two callers, one body, one difference between them, and it is the wrapper:
-'
-'   HTTP  {"payload":{"path":..,"protocol":..,"readings":[..]}}
-'   MQTT            {"path":..,"protocol":..,"readings":[..]}
-'
-' PostgREST maps an RPC body's top-level keys to the function's arguments, so
-' ingest_http() -- whose one argument is called `payload` -- has to be handed an
-' object with a `payload` key. The bridge calls that same function itself and
-' builds the wrapper on this station's behalf, so a message that arrived
-' carrying one would be a payload nested inside a payload. Hence bWrap, set by
-' the caller: the same readings, addressed to the two things that receive them.
-'
-' bFrom is the tail to start from, because the two paths are at different points
-' in the buffer whenever one of them is behind.
-'
-' Nothing leaves the queue here. Readings are only released once the path in
-' question has confirmed them -- the endpoint saying it stored them, or the
-' broker returning a PUBACK -- which is what makes a failed attempt cost nothing
-' and a timeout cost one duplicate at worst.
-'
-' The length guard is what actually bounds the body -- MAX_BATCH is the second
-' line of defence. Overflow behaviour on a CRBasic string is not something to
-' rely on either way, and a truncated JSON body is a 400 for the whole batch, so
-' the check happens before the append rather than after it. The guard is the
-' same for both paths: the MQTT message is two characters shorter than the POST
-' body and the broker's own ceiling is 256 KiB, so this buffer is the only bound
-' that ever binds.
-'------------------------------------------------------------------------------
 Sub BuildBatch()
   'The envelope, rebuilt here rather than once in BeginProg, because BASE_NAME
   'is Public and a name changed at the logger has to reach the next POST.
@@ -3038,28 +2131,6 @@ Sub BuildBatch()
   EndIf
 EndSub
 
-'------------------------------------------------------------------------------
-' JsonInt -- the integer after "<jsonKey>": in HTTPResponse, into jsonVal.
-' -1 if the key is not there.
-'
-' A full JSON parser is not what this needs. The response is a flat object
-' written by one function and the numbers this program acts on are never nested.
-'
-' It does have to step over whitespace, and that is not a detail. Postgres
-' renders jsonb with a space after every colon:
-'
-'   {"accepted": 1, "duplicates": 0, "rejected": [], "raw_id": 4821}
-'
-' An earlier version started reading digits at the character straight after the
-' colon, hit that space, stopped, and returned the zero it had already stored --
-' so every POST reported "accepted: 0" and, by subtraction, every reading in it
-' rejected. The data was being stored correctly the whole time; only the
-' counters were wrong, which is the worst way for a diagnostic to fail. The
-' example in docs/ingest-http.md shows the spaces, and had been all along.
-'
-' jsonVal is now only set to 0 once a digit is actually present, so "key exists
-' but its value is not a number" reports -1 rather than reporting zero.
-'------------------------------------------------------------------------------
 Sub JsonInt()
   jsonVal = -1
   srcStr = HTTPResponse
@@ -3087,14 +2158,6 @@ Sub JsonInt()
   EndIf
 EndSub
 
-'------------------------------------------------------------------------------
-' ParseStatus -- the HTTP status code out of RespHeader, into LastStatus.
-'
-' There is no status-code parameter on HTTPPost: it returns a socket. The status
-' arrives in the header variable, because the instruction writes the server's
-' response headers back over whatever request headers it was given -- which is
-' also why PostBatch rebuilds them every single time.
-'------------------------------------------------------------------------------
 Sub ParseStatus()
   LastStatus = 0
   srcStr = RespHeader
@@ -3116,15 +2179,6 @@ Sub ParseStatus()
   EndIf
 EndSub
 
-'------------------------------------------------------------------------------
-' LoadToken -- the secret, out of TOKEN_FILE.
-'
-' Kept out of this program so the file can live in a public repository and be
-' loaded onto a second base station without carrying a live credential -- which
-' is what docs/ingest-http.md asks for in as many words. Kept out of the Public
-' table for the same reason: a Public token is readable by anyone who can reach
-' the logger.
-'------------------------------------------------------------------------------
 Sub LoadToken()
   IngestToken = ""
   TokenOK = False
@@ -3151,31 +2205,6 @@ Sub LoadToken()
   EndIf
 EndSub
 
-'------------------------------------------------------------------------------
-' PostBatch -- one POST, and what came back.
-'
-' Success is "the response says accepted", not "the socket was non-zero". The
-' endpoint never answers 204 for exactly this reason: docs/ingest-http.md's rule
-' is that a logger which cannot tell stored from silently dropped produces gaps
-' nobody notices for a month. So the socket and the status code are recorded as
-' diagnostics, and the response body is what decides whether the queue advances.
-'
-' The header is rebuilt on every call, not once in BeginProg. HTTPPost writes
-' the server's response headers back into the same string it was given, so a
-' header variable built once is correct exactly once -- on the second post the
-' apikey and the token would have been replaced by whatever the server said.
-' SentHeader keeps a redacted copy of what actually went out.
-'
-' HTTPPost is called with its four required parameters and nothing else. The
-' optional TimeOut is the ninth, and reaching it means passing four empty
-' placeholders for the table-streaming parameters in between -- placeholders
-' this program cannot compile to check. The default timeout is 75 seconds, which
-' is generous rather than tight and costs nothing here: a long block delays only
-' this sequence, and the scan reading the serial port is a different one.
-'
-' Nothing here writes a request line or a Content-Length: HTTPPost prepends the
-' one and appends the other, and a program that adds them too sends them twice.
-'------------------------------------------------------------------------------
 Sub PostBatch()
   PostAttempts = PostAttempts + 1
 
@@ -3184,16 +2213,7 @@ Sub PostBatch()
   HTTPHeader = HTTPHeader & "Content-Type: application/json" & CRLF
   HTTPHeader = HTTPHeader & "Content-Profile: meganet" & CRLF
 
-  'What went out, with the credential replaced by its length -- enough to spot a
-  'truncated paste or a missing file, without putting the token on screen.
-  Sprintf (pNum,"%d",TokenLen)
-  SentHeader = "apikey: " & API_KEY
-  SentHeader = SentHeader & " | X-Ingest-Token: " & pNum & " chars"
-  SentHeader = SentHeader & " | Content-Type: application/json"
-  SentHeader = SentHeader & " | Content-Profile: meganet"
-
   HTTPResponse = ""
-  LastPayload = ContentsString
 
   LastSocket = HTTPPost (INGEST_URI,ContentsString,HTTPResponse,HTTPHeader)
 
@@ -3295,13 +2315,6 @@ Sub PostBatch()
   EndIf
 EndSub
 
-'------------------------------------------------------------------------------
-' MqttFailed / MqttWorked -- what a refused or accepted publish costs, in one
-' place, because BOTH messages this program sends are evidence about the same
-' broker connection. A status message that got through says the readings can go
-' too; readings that got through say the station is in a position to say hello.
-' Two separate backoffs would have each path relearning the same fact.
-'------------------------------------------------------------------------------
 Sub MqttFailed()
   MqttFail = MqttFail + 1
   MqttConsecFail = MqttConsecFail + 1
@@ -3325,30 +2338,6 @@ Sub MqttWorked()
   MqttBackoff = 0
 EndSub
 
-'------------------------------------------------------------------------------
-' PublishBatch -- one MQTT message, and what the broker did with it.
-'
-' Called immediately after BuildBatch has built the unwrapped envelope, in the
-' same sequence and with nothing in between: it takes the batch size out of
-' BatchN, which the next BuildBatch of either path will overwrite.
-'
-' MQTTPublish returns 0 for success and its own error code otherwise. At QoS 1
-' that success means the broker sent a PUBACK, so this is a genuine
-' acknowledgement from the far end of the link and not merely "the instruction
-' ran" -- which is exactly the distinction docs/ingest-http.md insists on for the
-' other path, and the reason the tail advances here rather than optimistically.
-'
-' What it does NOT mean is that MegaNet has the reading. MQTT gives a publisher
-' no response channel: the PUBACK is the broker's, and the bridge only acks a
-' storable message to the broker once the database has actually stored it, so a
-' bridge or database outage leaves the message queued at the broker rather than
-' losing it. That is the contract's guarantee and there is nothing this program
-' can or should do to check it -- which is why MqttPublished counts readings
-' handed over, and is named for that rather than for readings stored.
-'
-' Nothing here is retried by hand. A failure leaves the tail where it is, and
-' the next attempt rebuilds the same batch from the same slot.
-'------------------------------------------------------------------------------
 Sub PublishBatch()
   MqttAttempts = MqttAttempts + 1
   MqttLastBatch = BatchN
@@ -3376,29 +2365,6 @@ Sub PublishBatch()
   EndIf
 EndSub
 
-'------------------------------------------------------------------------------
-' PublishStatus -- the retained "I am here" message.
-'
-' Half of the offline detection. The other half is the Last Will, which this
-' program cannot set: it is a Device Configuration Utility setting (Last Will
-' Topic, Message, QoS and Retained), the broker publishes it on this station's
-' behalf when the connection drops without a clean disconnect, and it has to
-' name the SAME topic as MqttStatusTopic below and be marked retained. A will
-' left at the default "Do Not Retain" is a will that vanishes the moment the
-' bridge reconnects, which is the failure this whole mechanism exists to survive.
-' logger/README.md lists the settings; docs/ingest-mqtt.md explains the shape.
-'
-' Retained, so the broker replays it to the bridge on every reconnect and a
-' bridge restart does not lose the picture. Anything beyond `online` is kept
-' verbatim in meganet.station_status.last_status, so a field added here needs no
-' migration and no bridge release -- which is why the firmware version is worth
-' sending: "which loggers are still on the old program" becomes a query.
-'
-' Batt_volt is range-tested rather than trusted. A NAN fails both halves of the
-' test, the same way the NTP result is tested in the clock sequence, and the
-' field is dropped rather than sent -- the word NAN inside a JSON number is a
-' message the bridge can only reject, and it would be rejected retained.
-'------------------------------------------------------------------------------
 Sub PublishStatus()
   MqttStatusBody = "{" & DQ & "online" & DQ & ":true"
   If Batt_volt > 0 AND Batt_volt < 100 Then
@@ -3462,57 +2428,38 @@ BeginProg
   fConv = "," & DQ & "conversion" & DQ & ":" & DQ
   fProto = "," & DQ & "protocol" & DQ & ":" & DQ & LOCAL_PROTOCOL & DQ
 
+  'The topics, built once from the two segments in section 1 rather than typed
+  'out, so the scheme appears in this program exactly once. They are Public: at
+  'commissioning, reading MqttTopic off the logger and checking it against the
+  'line in the broker's ACL is the whole of the topic check.
+  MqttTopic = "meganet/v1/" & MQTT_STATION & "/" & MQTT_DEVICE & "/reading"
+  MqttStatusTopic = "meganet/v1/" & MQTT_STATION & "/status"
+
   'The local channel table. These names are the `channel` values on the wire and
   'therefore half of each reading's address in the database -- change one and the
   'readings before and after the change are two different addresses that no
   'query joins back together. They have to match the sensor rows in
-  'db/migrations/0026_bateson_test_rig.sql.
+  'db/migrations/0026_bateson_test_rig.sql, and `npm run logger` is what holds
+  'the two files to each other.
   '
   'LocRawDp is the decimals value_raw is rendered with. It is 0 for rain because
   'that channel's raw is a tip COUNT, and three tips written as 3.000 is a raw
   'count pretending to have been measured to a thousandth.
-  LocName(LOC_RAIN)   = "rain"
-  LocUnit(LOC_RAIN)   = "mm"
-  LocRawDp(LOC_RAIN)  = 0
-  LocName(LOC_LEVEL1) = "level_1"
-  LocUnit(LOC_LEVEL1) = "m"
+  LocName(LOC_RAIN)    = "rain"
+  LocUnit(LOC_RAIN)    = "mm"
+  LocRawDp(LOC_RAIN)   = 0
+  LocName(LOC_LEVEL1)  = "level_1"
+  LocUnit(LOC_LEVEL1)  = "m"
   LocRawDp(LOC_LEVEL1) = 3
-  LocName(LOC_LEVEL2) = "level_2"
-  LocUnit(LOC_LEVEL2) = "m"
+  LocName(LOC_LEVEL2)  = "level_2"
+  LocUnit(LOC_LEVEL2)  = "m"
   LocRawDp(LOC_LEVEL2) = 3
-  LocName(LOC_BATT)   = "battery"
-  LocUnit(LOC_BATT)   = "V"
-  LocRawDp(LOC_BATT)  = 3
-
-  'Only rain converts, so only rain carries a conversion note. The other three
-  'report the number the sensor gave, which is already the engineering value, and
-  'a `conversion` saying "none" would be a column of noise on every row.
-  LocConv(LOC_RAIN) = "raw x " & FormatFloat (Rain_bucket,"%.3f") & " mm per tip"
-  LocConv(LOC_LEVEL1) = ""
-  LocConv(LOC_LEVEL2) = ""
-  LocConv(LOC_BATT) = ""
+  LocName(LOC_BATT)    = "battery"
+  LocUnit(LOC_BATT)    = "V"
+  LocRawDp(LOC_BATT)   = 3
 
   Level1_m = NAN                     'so a sensor that has never answered reads
   Level2_m = NAN                     'as NAN rather than as a plausible zero
-  If LOCAL_ENABLE Then
-    LocalState = "starting"
-  Else
-    LocalState = "disabled - see LOCAL_ENABLE"
-  EndIf
-  If TEST_ENABLE Then
-    TestState = "idle - set TestFire true to fire one"
-  Else
-    TestState = "disabled - see TEST_ENABLE"
-  EndIf
-
-  'The topics, built once from the two segments in section 1 rather than typed
-  'out, so the scheme appears in this program exactly once. They are Public: at
-  'commissioning, reading MqttTopic off the logger and checking it against the
-  'line in the broker's ACL is the whole of the topic check, and it is the check
-  'worth doing before anyone drives home -- a wrong segment is refused by the
-  'broker rather than filed under an identity nobody claims.
-  MqttTopic = "meganet/v1/" & MQTT_STATION & "/" & MQTT_DEVICE & "/reading"
-  MqttStatusTopic = "meganet/v1/" & MQTT_STATION & "/status"
 
   QHead = 1
   QTailHttp = 1
@@ -3531,6 +2478,17 @@ BeginProg
   RxStep = "waiting for the first byte"
   PostState = "starting"
 
+  If LOCAL_ENABLE Then
+    LocalState = "starting"
+  Else
+    LocalState = "disabled - see LOCAL_ENABLE"
+  EndIf
+  If TEST_ENABLE Then
+    TestState = "idle - set TestFire true to fire one"
+  Else
+    TestState = "disabled - see TEST_ENABLE"
+  EndIf
+
   'Say hello as soon as there is a session to say it on. A restart is exactly
   'when the broker is still holding a will that says this station is down.
   statusDue = True
@@ -3540,47 +2498,15 @@ BeginProg
     MqttState = "disabled - see MQTT_ENABLE"
   EndIf
 
-  'Labels for the two census arrays, so they read as themselves in the Public
-  'table instead of as eight and eleven anonymous numbers.
-  RxByteClassName(1) = "NUL"
-  RxByteClassName(2) = "ctrl-other"
-  RxByteClassName(3) = "CR"
-  RxByteClassName(4) = "LF"
-  RxByteClassName(5) = "TAB"
-  RxByteClassName(6) = "space"
-  RxByteClassName(7) = "printable"
-  RxByteClassName(8) = "high >126"
-
-  RxWhyName(1)  = "1 short line"
-  RxWhyName(2)  = "2 frame flagged invalid"
-  RxWhyName(3)  = "3 payload len vs hex"
-  RxWhyName(4)  = "4 payload size"
-  RxWhyName(5)  = "5 not whole records"
-  RxWhyName(6)  = "6 payload not hex"
-  RxWhyName(7)  = "7 not concentration elem"
-  RxWhyName(8)  = "8 clock not set"
-  RxWhyName(9)  = "9 alert id out of range"
-  RxWhyName(10) = "10 unrecognised line"
-  RxWhyName(11) = "11 no line terminator"
-  RxWhyName(12) = "12 fields are not numbers"
-  RxWhyName(13) = "13 no element in frame"
-  RxWhyName(14) = "14 element len not records"
-
   Call LoadToken()
 
   'Once, here -- not in the scan. Re-opening the port every second re-allocates
   'the ring buffer and resets its pointers, discarding whatever arrived since
-  'the last call, which on a busy base station is most of it. Same five
-  'parameters, in the same order, as the KDO driver uses.
+  'the last call, which on a busy base station is most of it.
   SerialOpen (RX_PORT,RX_BAUD,RX_FORMAT,RX_TXDELAY,RX_BUFFER)
   SerialFlush (RX_PORT)
 
-  'The raw capture starts itself on every program start, so a logger that was
-  'power-cycled at site comes back capturing rather than waiting to be told.
-  'Set CaptureNow false to stop it; the file stays either way.
-  CaptureNow = True
   Call StampNow()
-  Call CapStart()
 
   '--- the fast half: listen --------------------------------------------------
   Scan (1,Sec,3,0)
@@ -3603,8 +2529,7 @@ BeginProg
     ' have arrived since the last time it was called IN THIS SCAN, so a call
     ' every five minutes would count correctly and a call in two places would
     ' not count at all -- and the instruction is a counter read, not a
-    ' measurement, so it costs nothing to do it every second. The tips are
-    ' totalised into Rain_tips_int and the interval's total is what is sent.
+    ' measurement, so it costs nothing to do it every second.
     '
     ' The SDI-12 sensors cannot be read here: SDI12Recorder blocks for about a
     ' second per sensor while the bus answers, and a base station that stops
@@ -3618,15 +2543,13 @@ BeginProg
       Rain_mm = Rain_bucket * Rain_tips_int
 
       If TimeIntoInterval (0,LOCAL_EVERY,Min) Then
-        'The rain gauge: this interval's tips, and the millimetres they are.
-        'Rebuilt each interval rather than once at startup so a bucket size
-        'corrected at the logger travels with the readings that follow it and
-        'not with the ones already stored.
-        LocConv(LOC_RAIN) = "raw x " & FormatFloat (Rain_bucket,"%.3f") & " mm per tip"
+        'The rain gauge: this interval's tips. Only the RAW goes into the queue
+        '-- MakeRec multiplies by the bucket when it renders, because the
+        'conversion belongs to the channel rather than to the reading, and that
+        'is what let the queue lose two of its seven columns.
         Rain_last_mm = Rain_mm
         Rain_total_mm = Rain_total_mm + Rain_mm
         locRawV(LOC_RAIN) = Rain_tips_int
-        locEngV(LOC_RAIN) = Rain_mm
         locPend(LOC_RAIN) = True
         Rain_tips_int = 0
 
@@ -3636,22 +2559,11 @@ BeginProg
         '"is this station reaching MegaNet" is answerable before anybody has
         'been to site.
         locRawV(LOC_BATT) = Batt_volt
-        locEngV(LOC_BATT) = Batt_volt
         locPend(LOC_BATT) = True
       EndIf
 
       Call LocalPush()
     EndIf
-
-    'Capture housekeeping. The flush is time-based as well as size-based so a
-    'quiet feed still commits what it has, and CaptureReset clears itself once
-    'acted on so it behaves like a button rather than a mode.
-    If CaptureReset Then
-      CaptureReset = False
-      Call CapStart()
-    EndIf
-    capSecs = capSecs + 1
-    If capSecs >= CAP_FLUSH_SEC Then Call CapFlush()
 
     'How far behind each path is, and how much the buffer is therefore still
     'holding. QDepth is the greater of the two because a slot is only reusable
@@ -3687,24 +2599,19 @@ BeginProg
   '
   ' A sequence of its own because BOTH of the instructions in it block: HTTPPost
   ' sits there until the server answers or its 75-second timeout expires, and
-  ' MQTTPublish at QoS 1 waits for the broker's PUBACK. A base station that stops
-  ' reading its serial port for that long has lost every transmission in the
-  ' window. Nothing in here touches the receiver, and the only state it shares
-  ' with the scan above is the ring buffer.
+  ' MQTTPublish at QoS 1 waits for the broker's PUBACK.
   '
   ' ONE sequence for both paths rather than one each, and that is the load-
   ' bearing decision in this file. Two sequences would let a slow POST and a slow
   ' publish overlap, and the two halves share BuildBatch, ContentsString, BatchN
   ' and MakeRec's scratch -- so overlapping them means a message occasionally
-  ' built out of half of the other path's batch. That is the failure mode this
-  ' program spends its scratch-variable comments avoiding, and it would be
-  ' invisible: a well-formed batch of the wrong readings.
+  ' built out of half of the other path's batch: a well-formed batch of the
+  ' wrong readings, which is invisible.
   '
   ' What it costs is that a stalled POST delays a publish by up to 75 seconds.
-  ' What it does not cost is progress, which is the thing that matters: the two
-  ' tails are independent, so the delayed path resumes from where it was and
-  ' catches up in batches of MAX_BATCH. An HTTP outage does not stop the
-  ' publishing, and a broker outage does not stop the POSTs.
+  ' What it does not cost is progress: the two tails are independent, so the
+  ' delayed path resumes from where it was and catches up in batches of
+  ' MAX_BATCH.
   SlowSequence
     Scan (10,Sec,3,0)
 
@@ -3744,22 +2651,19 @@ BeginProg
       ' No token test here, and that is not an omission: the bridge holds the
       ' ingest token for this path, and what this station needs instead is a
       ' broker credential, which lives in the MQTT settings where CRBasic cannot
-      ' see it. A publish that fails for want of one fails at MQTTPublish and
-      ' says so in MqttState.
+      ' see it.
       If MQTT_ENABLE Then
         'The status message is due on its own timer, and after any failure --
-        'armed here whether or not the broker is going to be touched this tick,
-        'so that arming it never depends on the thing it is waiting for.
+        'armed here whether or not the broker is going to be touched this tick.
         If SecsSinceStatus >= MQTT_STATUS_EVERY Then statusDue = True
 
         'ONE gate over both messages: how long the broker is left alone. Both
         'are blocking publishes to the same connection, so letting either past
         'the backoff on its own would be a knock every ten seconds at exactly
-        'the moment the link can least carry one.
-        '
-        'Measured from the last attempt rather than the last success, because a
-        'backoff measured from a success that has not happened for an hour has
-        'already expired every time it is read.
+        'the moment the link can least carry one. Measured from the last attempt
+        'rather than the last success, because a backoff measured from a success
+        'that has not happened for an hour has already expired every time it is
+        'read.
         mqttWait = MQTT_EVERY
         If MqttConsecFail > 0 Then mqttWait = MqttBackoff
 
@@ -3783,17 +2687,7 @@ BeginProg
           EndIf
 
           'Readings first, then the status -- but only when the tick has not
-          'already spent a blocking publish on a broker that refused it. The two
-          'ways through are the two things this message is for:
-          '
-          '  nothing was sent    -- it is the probe that finds out the broker is
-          '                         back, on a station with no readings to find
-          '                         that out with
-          '  a batch just landed -- the broker is demonstrably up, so say the
-          '                         station is here NOW rather than after the
-          '                         backlog drains, which is minutes of a
-          '                         station showing offline while it is plainly
-          '                         posting readings
+          'already spent a blocking publish on a broker that refused it.
           If statusDue Then
             If NOT mqttSent OR MqttConsecFail = 0 Then Call PublishStatus()
           EndIf
@@ -3809,13 +2703,11 @@ BeginProg
   ' command on the bus and waits for the sensor to say it is ready and then to
   ' answer, which is about a second per sensor on a standard "M!". Two of them
   ' in the one-second main scan is two seconds of not reading the serial port,
-  ' every interval, and every transmission in that window is gone. The same
-  ' reason the poster is a sequence, for the same instruction shape.
+  ' every interval, and every transmission in that window is gone.
   '
-  ' It does NOT queue anything. It writes the values into the staging pair and
+  ' It does NOT queue anything. It writes the values into the staging array and
   ' sets locPend; the main scan sees the flag within a second and calls
-  ' QueuePush. QHead has one writer, and this is what keeps that true -- see the
-  ' note at LocalPush.
+  ' QueuePush. QHead has one writer, and this is what keeps that true.
   '
   ' A sensor that does not answer leaves NAN in its variable, which is the
   ' honest answer and is what LocalPush refuses to queue. FillNaN is -1 here for
@@ -3827,18 +2719,9 @@ BeginProg
       If LOCAL_ENABLE Then
         SDI12Recorder (Level1_m,LOCAL_SDI_PORT,LVL1_SDI_ADDR,"M!",1.0,0,-1,1)
         SDI12Recorder (Level2_m,LOCAL_SDI_PORT,LVL2_SDI_ADDR,"M!",1.0,0,-1,1)
-
-        'Raw and converted are the same number for these two: an SDI-12 sensor
-        'returns metres, so there is nothing to convert and nothing to record a
-        'conversion for. They are both sent anyway, because `value_raw` is what
-        'the device measured and `value` is the engineering value -- and here
-        'they genuinely are the same measurement, which is a fact worth the
-        'eight characters rather than something to leave the reader to infer.
         locRawV(LOC_LEVEL1) = Level1_m
-        locEngV(LOC_LEVEL1) = Level1_m
         locPend(LOC_LEVEL1) = True
         locRawV(LOC_LEVEL2) = Level2_m
-        locEngV(LOC_LEVEL2) = Level2_m
         locPend(LOC_LEVEL2) = True
       EndIf
     NextScan
@@ -3847,7 +2730,7 @@ BeginProg
   '--- clock discipline -------------------------------------------------------
   '
   ' Its own sequence because NetworkTimeProtocol blocks for up to 70 seconds,
-  ' which would stall either of the two above. Five minutes between scans is
+  ' which would stall any of the three above. Five minutes between scans is
   ' comfortably longer than that, so this never overruns.
   '
   ' The return value is the clock error in milliseconds BEFORE the correction,
@@ -3855,17 +2738,12 @@ BeginProg
   ' below, which is why the test is written as a range rather than as a
   ' comparison against zero -- a good sync legitimately returns near zero, so
   ' testing for zero would conflate success with failure.
-  '
-  ' If your OS does not have NetworkTimeProtocol, delete this whole sequence and
-  ' set the clock by hand or from LoggerNet; nothing else depends on it.
   SlowSequence
     Scan (300,Sec,1,0)
       SecsSinceNTP = SecsSinceNTP + 300
       If Len(NTP_SERVER) > 0 Then
         'NOT ClockVerified is what makes the first pass sync immediately and
-        'keeps retrying every five minutes until it works. Waiting for the
-        'NTP_EVERY_HR boundary is what let a logger run for hours on a clock
-        'nothing had checked.
+        'keeps retrying every five minutes until it works.
         If TimeIntoInterval(0,NTP_EVERY_HR,Hr) OR NOT ClockVerified OR NOT ClockOK Then
           NTPErrMs = NetworkTimeProtocol (NTP_SERVER,0,1000)
           If NTPErrMs > -86400000 AND NTPErrMs < 86400000 Then
@@ -3900,17 +2778,17 @@ EndProg
 '   P_SW, which is the CR300's dedicated switched-pulse terminal and does not
 '   exist on the other two -- there the tipping bucket goes on a C terminal (C1,
 '   C2, ...) configured for pulse input, so the constant becomes that terminal's
-'   name. LOCAL_SDI_PORT is C1 here; on a CR6 an SDI-12 bus can be U1/U2 as well,
-'   and the two sensors' addresses in LVL1_SDI_ADDR/LVL2_SDI_ADDR are wiring
-'   rather than hardware and travel unchanged.
+'   name. LOCAL_SDI_PORT is C1 here; on a CR6 an SDI-12 bus can be U1/U2 as well.
 '
-' Both have more memory than a CR300, so Q_SIZE, RX_BUFFER and CONTENT_SIZE can
-' go up. Raise CONTENT_SIZE, CONTENT_GUARD and MAX_BATCH together -- a reading
-' is up to 92 characters -- and remember the ceiling is 1000 readings per
-' message on BOTH paths: the endpoint's own limit, and the one bridge/ matches
-' it with so that a station gets a clear answer rather than a 400 relayed to
-' nobody. Q_SIZE is now read by two paths, so size it against the longer of the
-' two outages you want to survive, not against either one.
+' **Both have more memory than a CR300, and this file is the shape it is because
+' a CR300 does not.** v2.1 would not fit on one. If you are moving to a CR1000X
+' or a CR6, the things worth spending the extra memory on, in order: Q_SIZE (one
+' slot is 12 bytes now, so 2,000 slots is 24 KB and about three days of outage),
+' then CONTENT_SIZE/CONTENT_GUARD/MAX_BATCH together -- a local reading is up to
+' 180 characters, and the ceiling is 1000 readings per message on BOTH paths.
+' Bringing back the forensics tables and the raw capture (`git show ea4116d`) is
+' the last thing to spend it on, not the first: they answer a question about the
+' feed that this network has already answered.
 '
 ' MQTTPublish() is the one instruction here that is not on every operating
 ' system. It IS on a CR300: the product manual (archive/cr300.pdf, section 13.3,
@@ -3918,13 +2796,7 @@ EndProg
 ' logger too old for it will not compile this file at all, and MQTT_ENABLE
 ' cannot help -- the compiler reads the whole program. On such a logger delete
 ' MqttFailed, MqttWorked, PublishBatch, PublishStatus and the "path 2" block in
-' the slow sequence, and the HTTP half is exactly the program it was before.
-'
-' What that manual does NOT carry is the instruction reference -- section 13.3
-' defers to the CRBasic help -- so the four parameters below are taken from
-' Campbell's published documentation rather than from a page anyone has read.
-' Check them in CRBasic Editor's own help when you compile; it is two call
-' sites and nothing else in this program depends on the answer.
+' the slow sequence, and the HTTP half is exactly the program it was.
 '
 '==============================================================================
 ' What this program deliberately does not do
@@ -3934,31 +2806,32 @@ EndProg
 '   at the top, and the paragraph under it about why the sensors on this
 '   logger's own terminals are the one place that does.
 '
-' It does not make the self-test look like a test. The line TestInject writes is
-'   a valid ALERT2A frame and nothing downstream is told where it came from,
-'   because a path that knows it is being tested is not the path under test.
-'   What separates a self-test reading from a real one is its ADDRESS -- 8101,
-'   in a block no station in the registry uses -- so it is distinguishable in
-'   the database, by a query, after the fact, rather than being handled
-'   differently on the way through.
+' It does not make the self-test look like a test. The frame TestInject writes
+'   is a valid binary ALERT2 frame and nothing downstream is told where it came
+'   from, because a path that knows it is being tested is not the path under
+'   test. What separates a self-test reading from a real one is its ADDRESS --
+'   8101, in a block no station in the registry uses -- so it is
+'   distinguishable in the database, by a query, after the fact, rather than
+'   being handled differently on the way through.
 '
 ' It does not fire the self-test on its own by default. TestEvery ships at 0.
 '   An unattended self-test writes synthetic readings into the live database
 '   forever, and a test rig that quietly becomes a data source is a worse
 '   problem than the one it was solving.
 '
+' It does not keep a raw capture, a byte census or a per-line table any more.
+'   See the version note at the top: those answered what the feed IS, and it is
+'   answered. `git show ea4116d:logger/base-station-http.CR300` is the copy that
+'   still has them, and it is the right starting point for a receiver nobody has
+'   seen before -- on a logger with the memory to run it.
+'
 ' It does not flush the serial port after reading it. A flush belongs to a
-'   driver that owns a request/response conversation, like the KDO one this
-'   program's serial handling is modelled on -- there, anything still in the
-'   buffer after a reply is stale by definition. Here the receiver talks
+'   driver that owns a request/response conversation. Here the receiver talks
 '   whenever it likes and a flush would discard the bytes that arrived while
 '   the scan was working.
 '
 ' It does not decode HFEM. An HFEM line (":HS=1|I1=..|NN:") is a different
-'   format from a different kind of station, and hfem.js is the decoder for it
-'   -- one decoder, so there is never a second opinion about what T3 means. A
-'   base station relaying HFEM publishes the raw line to the bridge's own
-'   .../reading/hfem topic and lets hfem.js decode it there.
+'   format from a different kind of station, and hfem.js is the decoder for it.
 '
 ' It does not stream a DataTable through HTTPPost's optional parameters. Those
 '   produce TOB1, TOA5, CSIXML or CSIJSON, and ingest_http() accepts none of
@@ -3966,30 +2839,18 @@ EndProg
 '
 ' It does not use MQTTPublishTable, or the logger's own automatic publishing.
 '   Those emit CSIJSON or GeoJSON on the MQTTBaseTopic, and the bridge subscribes
-'   to a topic scheme and a payload contract that is neither. Leave the automatic
-'   publishing turned off: everything it would send is a message the bridge acks,
-'   logs as unparseable and counts as rejected. MQTTPublish, which this program
-'   uses, takes a topic of its own and does not inherit MQTTBaseTopic.
+'   to a topic scheme and a payload contract that is neither.
 '
 ' It does not set the Last Will. There is no CRBasic instruction for it -- the
 '   will is sent in the CONNECT packet, which the operating system builds from
 '   the MQTT settings. All this program can do is publish the other half of the
 '   pair, and say loudly here and in logger/README.md that a base station whose
-'   will is unset or left un-retained has no offline detection at all, which is
-'   most of what MQTT was added for.
+'   will is unset or left un-retained has no offline detection at all.
 '
-' It does not subscribe to anything. The bridge's ACL gives a station `write`
-'   and not `readwrite`, so there is nothing to read; commands to stations would
-'   be a second topic branch and an explicit widening of that rule, not a
-'   quiet one.
-'
-' It does not call MQTTConnect. The operating system opens and holds the session
-'   on its own once MQTT is enabled in the settings, and reconnects it; the
-'   instruction exists to FORCE an attempt, which is for programs that power a
-'   modem down between transmissions. This base station is mains-powered and
-'   listening continuously, so there is nothing to force. A logger that switches
-'   its modem on the hour wants MQTTConnect after the link is up, and a PingIP
-'   before it -- that is a different program, not a setting on this one.
+' It does not subscribe to anything, and it does not call MQTTConnect. The
+'   operating system opens and holds the session on its own once MQTT is enabled
+'   in the settings; the instruction exists to FORCE an attempt, which is for
+'   programs that power a modem down between transmissions.
 '
 ' It does not enforce which addresses this base may post for. Neither does the
 '   endpoint: alert_low/alert_high on the token record are a note, not a rule
