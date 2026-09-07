@@ -2646,6 +2646,56 @@ hr {
   color: var(--map-river);
 }
 
+/* Basin and hub names (#178). Both are drawn with L.divIcon in a pane whose
+   pointer-events are off, so these are labels in the plainest sense — no
+   target, no hover, nothing to click. They also sit over satellite imagery as
+   often as over a street map, which is why they carry their own halo rather
+   than a theme colour: a 12 px name in var(--text) is unreadable over half the
+   basemaps this app offers, and a filled tooltip ground the size of "Balonne-
+   Condamine" would hide the basin it is naming. The halo is four offset
+   shadows rather than -webkit-text-stroke, which thins the glyph from the
+   inside and is not in every engine.
+
+   iconSize is null on the marker, so Leaflet leaves the box to the content;
+   these translate themselves back over their own anchor point. */
+.mn-catchment-label,
+.mn-hub-label {
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+}
+.mn-catchment-label > span,
+.mn-hub-label > span {
+  display: inline-block;
+  transform: translate(-50%, -50%);
+  text-shadow:
+     1px  1px 0 rgba(255, 255, 255, .92),
+    -1px  1px 0 rgba(255, 255, 255, .92),
+     1px -1px 0 rgba(255, 255, 255, .92),
+    -1px -1px 0 rgba(255, 255, 255, .92),
+     0    0   4px rgba(255, 255, 255, .75);
+}
+.mn-catchment-label > span {
+  font-size: .72rem;
+  color: #1c3c52;
+}
+/* A hub covers a state, so its name is read at a zoom where a basin's would be
+   off screen — bigger, and spaced, so it reads as the region label it is
+   rather than as another feature name. */
+.mn-hub-label > span {
+  font-size: .8rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #33404d;
+}
+@media (prefers-color-scheme: dark) {
+  .mn-catchment-label > span { color: #123044; }
+  .mn-hub-label > span { color: #2a3742; }
+}
+
 /* The road parcel's name on hover (#176). Sticky to the cursor like the river
    label above, and dressed the way the fixed river name is — its own near-white
    ground with fixed dark ink — because unlike the river label this one sits over

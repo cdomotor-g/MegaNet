@@ -27,6 +27,8 @@
     "maintenance.js",
     "history.js",
     "map-rivers.js",
+    "map-catchments.js",
+    "map-hubs.js",
     "map-survey.js",
     "map-contours.js",
     "map-roads.js",
@@ -53,6 +55,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 591,
-  "distinct": 591
+  "total": 595,
+  "distinct": 595
 }

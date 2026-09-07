@@ -12,7 +12,7 @@
     "toplevel": "node toplevel.mjs",
     "registry": "node registry.mjs",
     "concat": "node concat-verify.mjs",
-    "all": "npm run check && npm run names && npm run toplevel && npm run hfem && npm run itm && npm run logger && npm run smoke && npm run registry && npm run nav && npm run shell && npm run tabs && npm run rivers && npm run survey && npm run mapctl && npm run help && npm run insp && npm run maint && npm run history && npm run movepin && npm run stationscard && npm run stncard && npm run search && npm run linkbudget && npm run pathcover && npm run claim && npm run gate && npm run mapfade",
+    "all": "npm run check && npm run names && npm run toplevel && npm run hfem && npm run itm && npm run logger && npm run smoke && npm run registry && npm run nav && npm run shell && npm run tabs && npm run rivers && npm run survey && npm run mapctl && npm run catchments && npm run help && npm run insp && npm run maint && npm run history && npm run movepin && npm run stationscard && npm run stncard && npm run search && npm run linkbudget && npm run pathcover && npm run claim && npm run gate && npm run mapfade",
     "rivers": "node rivers.mjs",
     "survey": "node survey.mjs",
     "mapctl": "node mapctl.mjs",
@@ -34,7 +34,8 @@
     "pathcover": "node pathcover.mjs",
     "mapfade": "node mapfade.mjs",
     "claim": "node claim.mjs",
-    "gate": "node gate-session.mjs"
+    "gate": "node gate-session.mjs",
+    "catchments": "node catchments.mjs"
   },
   "devDependencies": {
     "acorn": "8.15.0",

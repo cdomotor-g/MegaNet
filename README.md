@@ -1617,19 +1617,29 @@ by region, and — new — suggests the relevant map(s) for any station.
   loaded before `app.js`. The map browser works even before `stations.json` is
   loaded; only the station suggestions require the dataset.
 
-> **Data sufficiency for station→map search.** The station dataset currently has
-> **no catchment or council/LGA fields**, and only ~88 of 1 154 stations carry a
-> `radio_network_id`. Every station does have coordinates, so map suggestions are
-> derived at runtime by projecting each station onto the Queensland basin polygons
-> (`QldBasin_2009Nov_reduced.svg`). The projection is a least-squares affine fit
-> (mean ≈ 34 km) — good enough to *suggest* a catchment/region, but too coarse to
-> store as authoritative data, so per-station `catchment_ids` are **not** written.
-> `stations.json → catchments[]` is now populated with the 76-basin QLD vocabulary
-> (name, basin number, region) so the schema and filters are ready. **Roadmap to
-> make search exact:** (a) add an `lga` field and populate it from an authoritative
-> QLD LGA boundary set; (b) populate `catchment_ids` from official basin boundaries
-> (or from the runtime detection, reviewed near basin edges); (c) backfill
-> `radio_network_ids` for the remaining stations.
+> **Data sufficiency for station→map search.** Map *suggestions* are still derived
+> at runtime by projecting each station onto `QldBasin_2009Nov_reduced.svg` through
+> the least-squares affine fit in `BASIN_GEOREF` (mean ≈ 34 km) — fine for ranking
+> a shortlist of PDFs, and the reason #84 says that same fit cannot draw a boundary
+> over a basemap.
+>
+> **Roadmap item (b) is done (#178).** `catchment_ids` are no longer derived from
+> that fit: they are point-in-polygon against the Bureau's own basin boundaries in
+> WGS84 (`data/qld-basins.geojson`, from `QldBasin_2009Nov.kmz` via
+> `tools/build_geo_layers.py`), and 1,754 of 3,173 stations now carry one — 755
+> more than before, with the rest outside Queensland. Each station also carries
+> `hub_id`, the Bureau maintenance hub responsible for it, from
+> `data/bom-hubs.geojson`. Both draw on the Stations map as optional layers
+> (**River catchments**, **Maintenance hubs** — off by default), and typing a basin
+> name or number into the filter box lights the matching basins up the way it
+> already lights up rivers. `catchments[]` now carries 77 basins with each one's
+> drainage division. See `db/README.md` → **Where a station is** for what changed
+> and how it was checked.
+>
+> Still open: (a) an `lga` field populated from an authoritative QLD LGA boundary
+> set; (c) `radio_network_ids` backfilled for the remaining stations; and #84
+> itself — the Radio Path Maps search could now read the real polygons instead of
+> the affine fit.
 
 ### 9. Serial Monitor (Live Serial Ingestion)
 Connect physical serial devices to the computer's COM ports and stream their

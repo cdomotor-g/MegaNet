@@ -27,6 +27,31 @@ token-checked endpoints the bridge calls, in a transaction that rolls back. The
 half of that acceptance which is about a client and a broker rather than about
 Postgres is `bridge/test/integration.test.js`.
 
+## Map boundaries from a KMZ (#178)
+
+`kml_to_geojson.py` turns a KML or KMZ of polygons into a web-sized GeoJSON, with
+nothing but the standard library — Douglas-Peucker simplification written out,
+because adding shapely to draw a polygon would be the first crack in this repo's
+no-build-step rule. `build_geo_layers.py` is the MegaNet half: the handful of
+facts about *these two files* that a general converter has no business knowing —
+that the basins arrive in pieces ("Border Rivers 1/2/3", "Stradbroke 1–4",
+"Maroochy" twice), that `BASIN_NUMB` reads "416 QLDNSW" and is two fields, and
+that one basin name is shouted in lower case.
+
+```bash
+python3 tools/build_geo_layers.py --kmz-dir ~/Downloads                    # the layers
+python3 tools/build_geo_layers.py --kmz-dir ~/Downloads --write-stations   # and stations.json
+python3 tools/build_geo_layers.py --kmz-dir ~/Downloads --check            # fail on drift
+```
+
+It writes `data/qld-basins.geojson` (77 basins) and `data/bom-hubs.geojson`
+(8 hubs) for the map to draw, and folds each station's basin and hub back into
+`stations.json`. The source KMZs are not in the repo; point `--kmz-dir` at
+wherever they are. What is simplified and what is dropped is printed, never
+silent: the hub file is 5,931 rings for eight hubs and all but ~660 of them are
+islets under a square kilometre, which the drawn copy leaves out and the
+assignment still uses.
+
 ## `ingest/` — the historical inspection workbook (#122)
 
 `ingest/xlsx.py` is a read-only .xlsx reader with nothing but the standard

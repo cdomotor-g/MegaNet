@@ -59,7 +59,7 @@ DB_SCHEMA = 'meganet'
 # order it arrived in, appended after what is — so a key added to the schema
 # tomorrow lands at the end of its object instead of failing here.
 KEY_ORDER = {
-    'root':    ['meta', 'radio_networks', 'catchments', 'rm_systems', 'stations'],
+    'root':    ['meta', 'radio_networks', 'catchments', 'hubs', 'rm_systems', 'stations'],
     'meta':    ['version', 'description', 'updated', 'rm_paths'],
     'rm_paths': ['map', 'jpg', 'land'],
     # The legacy alert_ids object, whose keys the app reads by name. The file is
@@ -67,15 +67,17 @@ KEY_ORDER = {
     # the order it mostly has, applied to all of them.
     'alert_ids': ['rainfall', 'battery', 'water_level'],
     'network': ['id', 'name', 'description'],
-    'catchment': ['id', 'name', 'basin_no', 'area_sqkm', 'region', 'border'],
+    'catchment': ['id', 'name', 'basin_no', 'area_sqkm', 'region', 'division',
+                  'division_no', 'border'],
+    'hub':     ['id', 'name', 'area_sqkm'],
     'rm_system': ['id', 'name', 'tx_power_w', 'line_loss_db', 'supp_loss_db_m',
                   'antenna_type', 'antenna_gain_dbi', 'antenna_height_m',
                   'rx_threshold_dbm'],
     'station': ['id', 'name', 'station_number', 'lat', 'lon', 'elevation_ahd',
                 'roles', 'radio_network_ids', 'catchment_ids', 'alert_ids',
                 'satcom', 'rm_system_id', 'enabled', 'notes', 'legacy_unit_id',
-                'repeater', 'site', 'sensors', 'lga', 'basin', 'location_types',
-                'TBRGbucketSize', 'inspection_config_key'],
+                'repeater', 'site', 'sensors', 'lga', 'basin', 'hub_id',
+                'location_types', 'TBRGbucketSize', 'inspection_config_key'],
     'sensor':  ['alert_id', 'type', 'sensor_id', 'device_id'],
     'site':    ['db_id', 'number', 'name'],
     'satcom':  ['enabled', 'provider', 'terminal_id'],
@@ -98,6 +100,8 @@ def ordered(obj, shape):
             out[k] = [ordered(n, 'network') for n in v]
         elif shape == 'root' and k == 'catchments':
             out[k] = [ordered(c, 'catchment') for c in v]
+        elif shape == 'root' and k == 'hubs':
+            out[k] = [ordered(h, 'hub') for h in v]
         elif shape == 'root' and k == 'rm_systems':
             out[k] = [ordered(y, 'rm_system') for y in v]
         elif shape == 'root' and k == 'meta':

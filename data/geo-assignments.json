@@ -1,0 +1,134 @@
+{
+ "catchment_changes": [],
+ "hub_snapped": [
+  {
+   "hub_id": "brisbane",
+   "id": "air_sea_rescue_al",
+   "km_outside": 0.13
+  },
+  {
+   "hub_id": "brisbane",
+   "id": "brisbane_bar_tide_tm",
+   "km_outside": 0.49
+  },
+  {
+   "hub_id": "perth",
+   "id": "busselton_jetty",
+   "km_outside": 1.34
+  },
+  {
+   "hub_id": "cairns",
+   "id": "cairns_harbour_tide",
+   "km_outside": 0.03
+  },
+  {
+   "hub_id": "brisbane",
+   "id": "couran_point_al",
+   "km_outside": 0.03
+  },
+  {
+   "hub_id": "brisbane",
+   "id": "dry_dock_terranora",
+   "km_outside": 0.0
+  },
+  {
+   "hub_id": "brisbane",
+   "id": "hawthorne_al",
+   "km_outside": 0.0
+  },
+  {
+   "hub_id": "cairns",
+   "id": "innisfail_wharf_aler",
+   "km_outside": 0.0
+  },
+  {
+   "hub_id": "brisbane",
+   "id": "jindalee_centenary",
+   "km_outside": 0.02
+  },
+  {
+   "hub_id": "brisbane",
+   "id": "letitia_2a",
+   "km_outside": 0.2
+  },
+  {
+   "hub_id": "brisbane",
+   "id": "noosa_bar_al",
+   "km_outside": 0.1
+  },
+  {
+   "hub_id": "brisbane",
+   "id": "noosa_heads_al",
+   "km_outside": 0.18
+  },
+  {
+   "hub_id": "adelaide",
+   "id": "osborne",
+   "km_outside": 0.11
+  },
+  {
+   "hub_id": "melbourne",
+   "id": "port_phillip_bay_st_kilda_marina",
+   "km_outside": 0.07
+  },
+  {
+   "hub_id": "brisbane",
+   "id": "tallebudgera_ck_mouth_al",
+   "km_outside": 0.03
+  },
+  {
+   "hub_id": "sydney",
+   "id": "the_entrance_tugger",
+   "km_outside": 0.08
+  },
+  {
+   "hub_id": "brisbane",
+   "id": "whyte_island_alert",
+   "km_outside": 0.1
+  },
+  {
+   "hub_id": "brisbane",
+   "id": "woody_point_al",
+   "km_outside": 0.05
+  }
+ ],
+ "kept_legacy_catchment": [
+  {
+   "catchment_ids": [
+    "ross"
+   ],
+   "id": "apjohn_street_horseshoe_bay_tm"
+  },
+  {
+   "catchment_ids": [
+    "brisbane"
+   ],
+   "id": "brisbane_bar_tide_tm"
+  },
+  {
+   "catchment_ids": [
+    "pioneer"
+   ],
+   "id": "outer_harbour_tide_a"
+  },
+  {
+   "catchment_ids": [
+    "brisbane"
+   ],
+   "id": "whyte_island_alert"
+  }
+ ],
+ "meta": {
+  "basins": "f75f04c0-QldBasin_2009Nov.kmz",
+  "catchment_changes": 0,
+  "generator": "tools/build_geo_layers.py",
+  "hub_snap_km": 25.0,
+  "hub_snapped": 18,
+  "hubs": "314b5661-Hub_Boundaries_May_2018v2_Si2.kmz",
+  "kept_legacy_catchment": 4,
+  "stations": 3173,
+  "with_basin": 1758,
+  "without_basin": 1419,
+  "without_hub": 18
+ }
+}

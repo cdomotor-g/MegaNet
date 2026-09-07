@@ -128,8 +128,9 @@ its cache at all (`PGRST002`).
 | `meganet.sensor` | 8,815 rows. Natural key `(station_id, sensor_id, type)`: one SSR carries several measurements. Indexed on `alert_id`, which is what the search box matches. |
 | `meganet.repeater` | Repeater detail for the 88 stations carrying the role. One-to-one with `station`. |
 | `meganet.pass_range` | The ALERT ranges a repeater passes or excludes, as rows with an `int4range` and a GiST index — so "which repeaters cover address N" is a lookup, not 88 × 10 ranges walked in JavaScript. |
-| `meganet.radio_network`, `meganet.catchment`, `meganet.rm_system` | The reference vocabularies from the top of `stations.json`. |
+| `meganet.radio_network`, `meganet.catchment`, `meganet.hub`, `meganet.rm_system` | The reference vocabularies from the top of `stations.json`. `catchment` carries the 77 Queensland drainage basins and, since `0027`, each one's drainage division. `hub` is the Bureau's eight field maintenance regions — the boundaries themselves are `data/bom-hubs.geojson`, not a column here. |
 | `meganet.doc_meta` | The document's `meta` header. Exactly one row, enforced. |
+| `meganet.station.hub_id`, `meganet.station.catchment_ids` | Which hub maintains a station and which basin it is in — both point-in-polygon against real WGS84 boundaries by `tools/build_geo_layers.py`, not typed and not derived from the affine-fitted basin SVG. See **Where a station is**, below. |
 | `meganet.station_json` | View: one row per *live* station — its id, its `ord`, its `updated_at`, and its `stations.json` fragment. Deleted stations are filtered out here, which is what makes the soft delete work everywhere at once. |
 | `meganet.stations_json` | View: the whole `stations.json` document, rebuilt — the reference lists plus an aggregate of the view above. `security_invoker`, so RLS on the base tables applies. |
 | `meganet.stations_doc()` | The same document as a `stable` function, so `GET /rest/v1/rpc/stations_doc` returns it as the response body rather than wrapped in `{"doc": …}`. This is what the app calls. |
@@ -961,6 +962,65 @@ passing vacuously. The sharpest of them is the round trip — `>30` goes in and
 comes back out as `>30`, not as 30 and not as null — and the one most likely to
 catch a future mistake is the comparison of every projected battery voltage
 against the measurement it was read from.
+
+## Where a station is
+
+`0027`, and the two questions it answers.
+
+**Which basin.** `catchments[]` has held the Queensland basin vocabulary since
+the beginning, but `catchment_ids` on a station was deliberately left empty, and
+the top-level README says why: the only geometry in the repo was
+`assets/geo/QldBasin_2009Nov_reduced.svg`, a *projected* map pinned to the world
+by a least-squares affine fit (`BASIN_GEOREF`, `maps-data.js`) good to a mean of
+about 34 km — "too coarse to store as authoritative data", and 100–150 km out
+when #84 asked it to draw a boundary over tiles. The same README names the fix:
+"populate `catchment_ids` from official basin boundaries."
+
+`data/qld-basins.geojson` is those boundaries, in WGS84, built from the Bureau's
+own `QldBasin_2009Nov.kmz` by `tools/build_geo_layers.py`. 786 stations changed:
+755 that had no basin now have one, 31 move, and 4 that fall in no polygon keep
+the id they had — tide gauges in the water off the mouth of the river they report
+for, where the honest geometric answer is "nowhere".
+
+Two fields that sound like each other are not:
+
+| | |
+| --- | --- |
+| `station.basin` | Free text, from ARRO. BoM's **flood-warning river grouping** — which warning the station is reported under. `"Herbert River"`. |
+| `station.catchment_ids` | The **drainage basin** its coordinates are inside. `["black"]`. |
+
+Black River AL is in the Black basin and reported under the Herbert, and both of
+those are true. 32 of the 786 changed rows disagree with `basin` for exactly this
+reason, so a mismatch between the two is not evidence of a bad assignment. What
+is evidence: the point-in-polygon answers correctly for twelve towns whose basin
+is not in dispute — Brisbane, Rockhampton, Townsville, Cairns, Toowoomba,
+Longreach, Mount Isa, Bundaberg, Mackay, Roma, Charleville and the Gold Coast.
+
+1,419 stations are in no Queensland basin, which is also right: 1,280 of them are
+in other states, and this is a Queensland dataset.
+
+**Which hub.** `meganet.hub` and `station.hub_id`, from
+`Hub_Boundaries_May_2018v2_Si2.kmz`. Every hub boundary is a coastline, so a
+gauge in the water is inside none of them — including the ones at Hawthorne and
+Jindalee, fifteen kilometres up the Brisbane River and unambiguously Brisbane's
+to maintain. 18 stations are in that position, the furthest 1.34 km out, and the
+build tool gives each the nearest hub within 25 km rather than none.
+
+The boundaries are May 2018 and there is no newer set to hand. A boundary that
+has moved since is one this data is quietly wrong about.
+
+Rebuild both, and fold the answers back into `stations.json`:
+
+```sh
+python3 tools/build_geo_layers.py --kmz-dir ~/Downloads --write-stations
+python3 tools/build_geo_layers.py --kmz-dir ~/Downloads --check   # CI
+```
+
+The KMZs are not in the repo — 5 MB and 13 MB of somebody else's export. The
+tool takes `--kmz-dir` and matches the names loosely, so an upload's hash prefix
+does not matter. Everything downstream travels in `stations.json` like every
+other station fact: `select meganet.load_stations_from_github();` and the
+database has it.
 
 ## Checking it from outside
 

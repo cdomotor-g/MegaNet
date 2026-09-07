@@ -1483,7 +1483,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 26;
+const DB_SCHEMA_VERSION = 27;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 function dbHostLabel() {
@@ -1708,6 +1708,16 @@ const state = {
   // which is the moment "whose road reserve is this?" is worth answering, and
   // the moment a checkbox stands between the operator and the answer.
   mapRoads:       localStorage.getItem('mn-roads') !== 'off',
+  // The 77 Queensland drainage basins (see MapCatchments). Off by default and
+  // remembered, on MapContours' terms rather than MapWind's: nothing else in
+  // the app asks data/qld-basins.geojson for anything, so unlike the wind
+  // regions the 760 KB really is avoided by leaving the layer off, and a
+  // basin outline is context somebody goes looking for rather than context
+  // every session wants.
+  mapCatchments:  localStorage.getItem('mn-catchments') === 'on',
+  // The Bureau's eight maintenance hub boundaries (see MapHubs). Off by
+  // default and remembered, for the same reasons.
+  mapHubs:        localStorage.getItem('mn-hubs') === 'on',
   // Line-of-sight check on drawn links (see MapLos). Off by default and not
   // persisted, for MapSurvey's reasons — it fetches terrain tiles on enable.
   mapLos:         false,

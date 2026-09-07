@@ -2120,6 +2120,25 @@ function mapDisplayControlsHtml() {
       Wind regions (AS/NZS 1170.2)
     </label>
     <p class="filter-note" id="map-wind-note">${MapWind.noteHtml()}</p>
+    <!-- The two boundary layers (#178). Both draw under everything else and
+         neither takes a pointer, so they are context in the literal sense: the
+         catchments answer "which basin is this?" and light up from the filter
+         box the way the rivers do, the hubs answer "whose is it to maintain?".
+         Both repaint the legend from here, like wind and LOS. -->
+    <label class="filter-check"
+           title="The 77 Queensland drainage basins. Type a basin name or number in the filter box and the matching ones light up.">
+      <input type="checkbox" ${state.mapCatchments ? 'checked' : ''}
+             onchange="MapCatchments.setEnabled(this.checked);rerenderMapLegend()">
+      River catchments (drainage basins)
+    </label>
+    <p class="filter-note" id="map-catchment-note">${MapCatchments.noteHtml()}</p>
+    <label class="filter-check"
+           title="The Bureau's eight field maintenance hubs, as at May 2018. Which hub a station falls in is on its callout.">
+      <input type="checkbox" ${state.mapHubs ? 'checked' : ''}
+             onchange="MapHubs.setEnabled(this.checked);rerenderMapLegend()">
+      Maintenance hubs (BoM)
+    </label>
+    <p class="filter-note" id="map-hub-note">${MapHubs.noteHtml()}</p>
     <label class="filter-check">
       <input type="checkbox" ${state.mapLos ? 'checked' : ''}
              onchange="MapLos.setEnabled(this.checked);rerenderMapLegend()">
@@ -2217,6 +2236,8 @@ function mapLegendOffLayersHtml() {
     !state.mapContours        && 'LiDAR contours',
     !state.mapRoads           && 'Road parcels',
     !state.mapWind            && 'Wind regions',
+    !state.mapCatchments      && 'River catchments',
+    !state.mapHubs            && 'Maintenance hubs',
     !state.mapLos             && 'Line-of-sight checks',
     !state.mapFade            && 'Fade-margin link colours',
     !state.filters.acma.show  && 'ACMA licences',
@@ -2244,6 +2265,33 @@ function mapLegendOffLayersHtml() {
 // The rows are built from MapWind.regions(), so the colour in the key is the
 // colour on the map by construction and the wording lives beside the data it
 // describes rather than here.
+// The catchment key. One row per drainage division rather than per basin,
+// because 77 rows is not a key and the division is the fact the colours carry:
+// which way the water goes. Built from MapCatchments.divisions(), so the colour
+// in the key is the colour on the map by construction.
+function mapCatchmentLegendHtml() {
+  const rows = MapCatchments.divisions().map(d => `
+      <span class="legend-item">
+        <span class="legend-sq" style="--dot:${d.color}"></span>
+        <span class="small">${esc(d.division)} <span class="txt-muted">${d.basins}</span></span>
+      </span>`).join('');
+  return rows + `
+      <span class="legend-item legend-off">
+        <span class="small txt-muted">Drainage divisions — a basin fills when it matches the filter</span>
+      </span>`;
+}
+
+// The hub key. Eight rows, and unlike the catchments every one of them is drawn
+// on the map at all times the layer is on, so there is nothing to say about
+// matching.
+function mapHubLegendHtml() {
+  return MapHubs.hubs().map(h => `
+      <span class="legend-item">
+        <span class="legend-sq" style="--dot:${h.color}"></span>
+        <span class="small">${esc(h.name)}</span>
+      </span>`).join('');
+}
+
 function mapWindLegendHtml() {
   const rows = MapWind.regions().map(r => `
       <span class="legend-item legend-wind-row">
@@ -2308,6 +2356,8 @@ function mapLegendHtml() {
       <span class="legend-sq" style="--dot:${MapRoads.legendColour()}"></span>
       <span class="small">Road parcel — the road reserve, not the road (Qld cadastre). Hover for its name</span>
     </span>` : ''}
+    ${MapCatchments.active() ? mapCatchmentLegendHtml() : ''}
+    ${MapHubs.active() ? mapHubLegendHtml() : ''}
     ${state.mapWind ? mapWindLegendHtml() : ''}
     ${state.mapLos ? `
     <span class="legend-item">
@@ -2391,6 +2441,7 @@ function stationsFilterChanged() {
   state.stationsShowAll = false;   // a changed filter earns a fresh row cap
   refreshMapLayers();
   MapRivers.sync();                // additive: rivers never touch what matched
+  MapCatchments.sync();            // same contract: basins are context, never a match
   rerenderStations();
   updateFilterChrome();
 }
@@ -2444,6 +2495,8 @@ function stopStationsMap() {
   MapDraw.detach();
   LinkBudget.detach();
   MapRivers.detach();
+  MapCatchments.detach();
+  MapHubs.detach();
   MapSurvey.detach();
   MapContours.detach();
   MapRoads.detach();
@@ -2514,6 +2567,8 @@ function initMap() {
   // Before the first refresh, so the fit that refresh performs is the view the
   // first river lookup is bounded by.
   MapRivers.attach(state.map);
+  MapCatchments.attach(state.map);
+  MapHubs.attach(state.map);
   MapSurvey.attach(state.map);
   MapContours.attach(state.map);
   MapRoads.attach(state.map);
