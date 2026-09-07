@@ -28,6 +28,7 @@ npm run all                       # the twenty-six that run in CI
 | `npm run itm` | the Longley–Rice port against 53 reference losses from NTIA's own compiled library (`baseline/itm-vectors.json`), to 10⁻⁶ dB with every intermediate |
 | `npm run pathcover` | the elevation profile with ground cover on it and the Longley–Rice budget over it, on a flat terrain tile the check makes itself and a seeded land cover — the band, the verdict, the rows that add up, the terminal-clutter term, the height table, the switch and the propagation settings |
 | `npm run hfem` | the HFEM codec against the spec's own ten worked examples, its timestamp table and its undefined-scheme list — round trips byte-for-byte, every rejection asserting its reason |
+| `npm run logger` | the base station program against the migration it posts into — `logger/base-station-http.CR300` is the one file here no CI can compile, so this holds the two things that can be held without a compiler: that it and `db/migrations/0026` name the same rig (a station number, a protocol key, four channel names and an ALERT address, agreed across a CRBasic `Const` and a SQL insert with nothing enforcing it), and that its ALERT2 self-test frame decodes back to the address it was built for across the whole 13-bit range — including the trap that an address above 8191 wraps into the value field rather than failing. Plus the units against `meganet.unit`, both JSON shapes actually parsing, balanced blocks, every `Call` naming a `Sub` that exists, and the plain-ASCII-with-LF rule the file states about itself |
 | `npm run smoke` | loads the page in Chromium, opens all 20 tabs, asserts a clean console, audits every rendered `on*=` handler, and clicks the RF Changes / Workbench controls |
 | `npm run registry` | every Leaflet map and every tab teardown is registered by the file that owns it — and actually fires |
 | `npm run nav` | every tab is in the left nav exactly once, under one heading, and findable by its own label and by what it does |
@@ -49,7 +50,7 @@ npm run all                       # the twenty-six that run in CI
 | `npm run claim` | claiming an address from the message that arrived on it: an unresolved relayed row offers the claim, the picker sends the *station* address rather than the sensor slot, and the tab stops offering a write that has already landed — with the datastore stubbed at `dbRpc` |
 | `npm run gate` | the Access-to-Supabase verifier refuses what it must — a forged signature, a token minted for another Access application, an expired one, `alg: none` — against keys generated in-process, so it runs offline |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the twenty-six that run in CI |
+| `npm run all` | the twenty-seven that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
 `toplevel`, `registry`, `nav`, `shell`, `tabs`, `help`, `search`, `linkbudget`, `mapfade` and `stncard` take `-v` too, to list what

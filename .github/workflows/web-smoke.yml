@@ -51,6 +51,11 @@ on:
       - 'tools/ingest/**'
       - 'data/inspections/**'
       - 'archive/QLD All Site Inspections.xlsx'
+      # The base station program and the migration that gives its readings a
+      # station are one contract across two files, and `npm run logger` is the
+      # only thing holding them together — so a push touching either has to run
+      # it. db/migrations/** is already listed above.
+      - 'logger/**'
       # The bridge's own tests and the database checks run here too (#102) —
       # a push touching either surface has to run them, or the one push that
       # can break the bridge is the one push that does not test it.
@@ -90,6 +95,11 @@ on:
       - 'tools/ingest/**'
       - 'data/inspections/**'
       - 'archive/QLD All Site Inspections.xlsx'
+      # The base station program and the migration that gives its readings a
+      # station are one contract across two files, and `npm run logger` is the
+      # only thing holding them together — so a push touching either has to run
+      # it. db/migrations/** is already listed above.
+      - 'logger/**'
       # The bridge's own tests and the database checks run here too (#102) —
       # a push touching either surface has to run them, or the one push that
       # can break the bridge is the one push that does not test it.
@@ -168,6 +178,17 @@ jobs:
       - name: Longley–Rice port — the NTIA reference vectors
         working-directory: test
         run: npm run itm
+
+      # Node-only and fast. The base station program is the one file here no CI
+      # can compile — CRBasic Editor is a Windows application — so this holds it
+      # to the two things that can be held without one: that it and
+      # db/migrations/0026 name the same rig (a station number, a protocol key,
+      # four channel names and an ALERT address, agreed across a Const and a SQL
+      # insert with nothing enforcing it), and that its ALERT2 self-test frame
+      # decodes back to the address it was built for.
+      - name: Base station program — the rig it and 0026 both name
+        working-directory: test
+        run: npm run logger
 
       - name: Smoke — every tab, clean console
         working-directory: test

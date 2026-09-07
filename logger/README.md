@@ -7,6 +7,8 @@ broker that [`bridge/`](../bridge/README.md) subscribes to.
 
 ```
 field stations ──radio──▶ ERT-A2 receiver ──RS-232──▶ CR300 running this program
+                                                                   ▲
+ rain gauge, 2 × SDI-12 level, supply volts ──cable─────────────────┤
                                                                    │
                                             ┌──────────────────────┴───────────┐
                                           HTTPS                          MQTT QoS 1
@@ -67,11 +69,23 @@ connection drops.
 | `base-station-http.CR300` | The program — both paths, despite the name, which is kept because it is the name loaded on every logger already running it. Written for a CR300-series; the foot of the file says what to change for a CR1000X or CR6. |
 | `meganet_token.example.txt` | The shape of the token file. One line, the token, nothing else. |
 
+Two pages sit beside this one and are the ones to read next:
+
+- [`docs/live-end-to-end-test.md`](../docs/live-end-to-end-test.md) — how to prove
+  the whole path works **on demand**, without waiting for a transmission. The
+  program can now build a valid ALERT2 frame and feed it to its own decoder.
+- [`db/migrations/0026_bateson_test_rig.sql`](../db/migrations/0026_bateson_test_rig.sql)
+  — the station row the local sensors and the self-test resolve to, and the
+  reasoning behind every identifier in it.
+
 ---
 
 ## Four things to change, and only four
 
-Everything else in the program has a working default.
+Everything else in the program has a working default — including both of the
+things added at v2.1, the local sensors and the self-test, which are covered in
+their own sections further down and ship configured for the station this file's
+defaults are named for.
 
 **1 · `BASE_NAME`.** At the top of the diagnostics block:
 
@@ -147,6 +161,104 @@ predates `MQTTPublish()` — see *Compiling it*.
 ```crbasic
 Const PROTOCOL = "alert2"      '"alert" for legacy ALERT, "unknown" to not claim
 ```
+
+This is the **radio's** protocol. Sensors wired to the logger's own terminals
+carry `LOCAL_PROTOCOL` (`wired`) instead, per reading — see *Sensors on the
+logger's own terminals*, below.
+
+---
+
+## Sensors on the logger's own terminals
+
+**Skip this section if the base station is only a relay.** Set
+`LOCAL_ENABLE = False` and nothing below applies; the radio half is exactly the
+program it was.
+
+A base station is normally only a relay: everything it posts arrived over the air
+with an ALERT address already on it. A base station with sensors bolted to its own
+terminal strip is a different thing, and those readings have no ALERT address —
+there is no packet and no transmitting node, only a cable.
+
+So they use the ingest contract's **other** address shape, a station number plus
+a channel ([`ingest-http.md`](../docs/ingest-http.md) § *Payload shape*):
+
+```
+radio    {"alert_id":6270, …}                              →  a:6270
+local    {"station_number":"999998","channel":"rain", …}    →  s:999998/rain
+```
+
+Same ring buffer, same batch, same POST, same idempotency. Two shapes go out in
+one body and the addresses sort themselves out at the far end.
+
+### What is wired, and where
+
+| Channel | Terminal | Constant | `value_raw` | `value`, `unit` |
+| --- | --- | --- | --- | --- |
+| `rain` | `P_SW`, switch closure | `LOCAL_RAIN_CHAN`, `Rain_bucket` | tips this interval | mm, with a `conversion` note |
+| `level_1` | SDI-12 on `C1`, address 1 | `LOCAL_SDI_PORT`, `LVL1_SDI_ADDR` | metres | metres |
+| `level_2` | SDI-12 on `C1`, address 0 | `LOCAL_SDI_PORT`, `LVL2_SDI_ADDR` | metres | metres |
+| `battery` | none — the logger's own supply | — | volts | volts |
+
+`battery` is the one to commission first: it needs nothing wired to it, so a
+logger with every sensor still in its box can already answer *is this station
+reaching MegaNet*.
+
+All four report every `LOCAL_EVERY` minutes (5 by default), which is also the
+rainfall accumulation period — the tips are totalised across it and the interval's
+total is what is sent.
+
+### The three constants that have to match the database
+
+`LOCAL_NUMBER`, `LOCAL_PROTOCOL` and the channel names in `LocName()` are one
+half of a contract whose other half is
+[`db/migrations/0026_bateson_test_rig.sql`](../db/migrations/0026_bateson_test_rig.sql).
+Nothing in either file enforces it, and `npm run logger` is what holds them
+together on every push — because the failure when they drift is silent on both
+sides: the logger posts happily, the endpoint accepts happily, and the readings
+resolve to nobody, which looks exactly like a station that has not been
+commissioned yet.
+
+**Apply `0026` before loading the program.** `code_for()` raises on a protocol
+key the database does not know, so against a database without it every local
+reading comes back in `rejected` saying `unknown protocol: wired` while the radio
+readings in the same batch are stored. `LastReject` says so, which makes it a
+legible failure rather than a silent one, and it is still a morning wasted.
+
+### This is the one place the program converts
+
+Point 4 at the top of the `.CR300` says a base station does not convert: it hears
+forty sites and does not know which is a rain gauge, and a wrong bucket size is
+worse than none. That reasoning is about the radio and **it does not apply to a
+sensor on a cable** — this logger is wired to these, and the bucket size is
+written on the gauge two metres away, so it is the one place in the system that
+knows.
+
+What that costs is nothing, because the raw is still sent: `value_raw` is the tip
+count, `value` and `unit` are the millimetres, and `conversion` records the rule
+that got from one to the other. A bucket size corrected at the logger travels with
+the readings after it and does not rewrite the ones already stored.
+
+### What it refuses to send, and why
+
+`LocalRejected` climbing is the diagnostic. Two things are refused rather than
+queued:
+
+- **NAN** — an SDI-12 sensor that did not answer. `FormatFloat` renders it as the
+  word `nan`, which is not JSON, and one of those in a batch is a `400` for every
+  reading in it *including the radio readings that were fine*.
+- **A value past `LOCAL_MAX`** — a sensor that answered with nonsense. NAN is the
+  honest failure; a mis-scaled or shorted sensor returns a **number**, and a
+  number is what gets stored and later believed.
+
+`SDI12Recorder`'s `FillNaN` is `-1` for the same reason: the alternative is the
+previous reading left in place, and a level sensor unplugged for a week reporting
+last Tuesday's level is the single failure this whole program is written to avoid.
+
+### Where the readings are archived on the logger
+
+`LocalLog`, beside `Readings` — a table of its own rather than three more columns,
+because a radio reading is an address and an 11-bit count and a local one is a
+channel and two floats. About four days at four channels every five minutes.
 
 ---
 
@@ -268,6 +380,11 @@ over RS-232 — plugging DevConfig into RS-232 means unplugging the receiver.
 2. Send the program with Device Configuration Utility (**File Control**), or
    LoggerNet's Connect screen.
 3. Send `meganet_token.txt` the same way.
+3½. **If `LOCAL_ENABLE` is true, apply `db/migrations/0026_bateson_test_rig.sql`
+   to the database this logger posts to — before step 2, ideally.** Without it
+   every local reading comes back rejected (`unknown protocol: wired`) while the
+   radio readings in the same batch are stored. `LastReject` says so; see
+   *Sensors on the logger's own terminals*.
 4. **The clock must be UTC, and the program now insists on it.** It syncs
    against `NTP_SERVER` on its first pass and every six hours after, with an NTP
    offset of 0 — which is what UTC means — and **will not stamp a single reading
@@ -290,8 +407,23 @@ over RS-232 — plugging DevConfig into RS-232 means unplugging the receiver.
 
 ## Proving it works, without waiting for a transmission
 
-The program accepts a second, deliberately trivial line format so that the whole
-path can be tested by hand:
+**The short answer, since v2.1: set `TestFire` true.** The program builds a
+complete, valid ALERT2A frame for `TestId`/`TestValue` and appends it to the
+receive byte buffer one instruction before the framer runs, so the decoder, the
+queue, the batch and the POST all run on it exactly as they would on a real
+transmission — because as far as every one of them can tell, it *is* one.
+
+Nothing is wired, no radio is involved, and the receiver stays plugged in.
+[`docs/live-end-to-end-test.md`](../docs/live-end-to-end-test.md) is the card for
+it: what to set, what each `Public` should become, how to confirm it landed in
+the database and in the app, and what every failure looks like.
+
+The rest of this section is the **older** method, which is still here and still
+works. It tests less — it skips the ALERT2 decoder entirely — and it needs a
+terminal on the RS-232 port, which is where the receiver is plugged in. Prefer
+the self-test unless you are specifically testing the port itself.
+
+The program accepts a second, deliberately trivial line format:
 
 ```
 6270,21
@@ -345,6 +477,17 @@ table for *which half is broken*.
 The two depths are also how you test each path in isolation without touching the
 program: pull the credential for one and watch its depth climb while the other
 keeps sawtoothing.
+
+**One thing changed at v2.1 about `QDropped`, and it was a bug.** The queue has
+two tails and a slot is only reusable once both have passed it — but with
+`MQTT_ENABLE = False` nothing ever advances the publisher's tail, so every
+reading past the first `Q_SIZE` landed on it and was counted as a drop. On a
+station that had delivered every reading it ever took, `QDropped` climbed
+steadily. It now counts a loss only when a path that is actually being read
+loses one, which is what the counter was always supposed to mean; the tail is
+still moved out of the way either way. A base station running HTTP only should
+now show `QDropped = 0` indefinitely, and a non-zero one means what the table
+says it means.
 
 ---
 
@@ -522,6 +665,38 @@ And the counters that say how it went:
 | `RxFirstLine` / `RxFirstLineHex` | The first line ever seen, kept and never overwritten — startup banners appear once and are gone a second later. |
 | `RxBadRecords` | Records inside otherwise-good frames whose status byte was non-zero. In the reference capture those also carried addresses matching no station, so they are counted and dropped. |
 | `RxFrameSkew` | Seconds between the frame's own ALERT2 time and this logger's clock — see *Which clock stamps the reading*, below. |
+
+### Are the local sensors reporting
+
+Only meaningful with `LOCAL_ENABLE = True`. See *Sensors on the logger's own
+terminals*, above, for what each channel is and where it is wired.
+
+| Variable | Means |
+| --- | --- |
+| `LocalState` | Plain English: `queued rain`, `queued battery`, or why nothing was queued. |
+| `SecsSinceLocal` | Seconds since the last local reading went into the queue. Should sit under `LOCAL_EVERY` × 60. |
+| `LocalQueued` | Local readings queued since startup — climbing by four every interval. |
+| `LocalRejected` | **The one to act on.** Non-zero means a channel returned NAN or a value past `LOCAL_MAX`, and `LocalState` names which. |
+| `LocalChan`, `LocalRaw`, `LocalEng` | The last local reading queued: which channel, and its two values. |
+| `LocalJson` | That reading as JSON, byte for byte as it will be posted. The local half's `RxLastJson`, kept separate so a battery reading cannot overwrite the serial pipeline's step-7 display. |
+| `Rain_tips` | Tips `PulseCount` reported *this scan* — almost always 0. |
+| `Rain_tips_int` / `Rain_mm` | This interval's tips so far, and them in millimetres. |
+| `Rain_last_mm` | The last completed interval's total — the number that was actually sent. |
+| `Rain_total_mm` | Since the program started. Not sent; it is here so a bench test can be checked against a measuring cylinder. |
+| `Level1_m`, `Level2_m` | Metres, or `NAN` for a sensor that did not answer. |
+| `Rain_bucket` | Millimetres per tip. `Public`, so it can be corrected at the logger — and it travels with each reading in `conversion`, so correcting it does not rewrite what is already stored. |
+| `LocName()`, `LocUnit()`, `LocConv()` | The channel table, so what this logger sends can be checked against MegaNet's station row on one screen. |
+
+### Is the self-test armed
+
+| Variable | Means |
+| --- | --- |
+| `TestFire` | Set it true to fire one frame. It clears itself. |
+| `TestId` / `TestValue` | The address and value to transmit as. 1–8191 and 0–2047 — the 13 and 11 bits an ALERT2 record actually carries. |
+| `TestState` | `fired …`, `waiting for a gap …`, or the reason it refused. |
+| `TestLine` | The frame it built, verbatim. Compare it against `RxLastLine`: they must be the same string, because they are. |
+| `TestFired` | Shots fired since startup. |
+| `TestEvery` | Minutes between automatic shots. **0 = off, and off is the shipped default** — an unattended self-test writes synthetic readings into the live database forever. |
 
 ### Is the queue draining
 

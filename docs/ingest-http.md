@@ -150,6 +150,14 @@ a station: each reading's `alert_id` or `station_number` is the address, and
 MegaNet resolves it. Send everything your base station heard since the last POST
 and let the addresses sort it out.
 
+The two shapes travel together on purpose, and the base station at 18 Bateson is
+where that is exercised live: it relays ALERT2 addresses off the air *and*
+reports four sensors wired to the logger's own terminals, which have no ALERT
+address because there is no packet — so they report as `station_number` 999998
+with a channel, in the same batches. See
+[`live-end-to-end-test.md`](live-end-to-end-test.md) and
+`db/migrations/0026_bateson_test_rig.sql`.
+
 | Field | Required | Notes |
 | --- | --- | --- |
 | `alert_id` | one of `alert_id` or `station_number` | Your ALERT/ALERT2 address, 1–65535. A radio logger has this and no `channel`. |

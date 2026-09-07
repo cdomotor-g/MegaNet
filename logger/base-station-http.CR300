@@ -1,8 +1,9 @@
 'MegaNet -- base-station-http.CR300
 '
 '   A radio base station's half of MegaNet's ingest: read what the ALERT2
-'   receiver hears off RS-232, and send it to MegaNet over BOTH inbound paths --
-'   POST to meganet.ingest_http(), and publish to the MQTT bridge.
+'   receiver hears off RS-232, read the sensors wired to this logger's own
+'   terminals, and send both to MegaNet over BOTH inbound paths -- POST to
+'   meganet.ingest_http(), and publish to the MQTT bridge.
 '
 ' Target: CR300-series. "Other dataloggers" at the foot says what to change for
 ' a CR1000X or a CR6. docs/ingest-http.md and docs/ingest-mqtt.md are the two
@@ -18,9 +19,12 @@
 ' hold -- and pays for them with what it gives back: the broker's Last Will says
 ' when this base station stopped talking, which no amount of HTTP tells anybody.
 '
-' This program does both, for the same readings, from one queue:
+' This program does both, for the same readings, from one queue -- and there are
+' now two ways a reading gets into that queue:
 '
 '   field stations --radio--> ERT-A2 receiver --RS-232--> THIS PROGRAM
+'                                                            ^
+'    rain gauge, 2 x SDI-12 level, supply volts --cable------+
 '                                                            |
 '                                          +-----------------+-----------------+
 '                                          |                                   |
@@ -47,6 +51,35 @@
 ' hear -- docs/ingest-http.md explains why the token belongs to the ingest point
 ' rather than to a site, and the same reasoning gives this base station one
 ' publisher identity of its own on the topic scheme.
+'
+' --- The sensors on this logger's own terminals -----------------------------
+'
+' A base station is normally only a relay. This one also measures: a tipping
+' bucket on the pulse terminal and two SDI-12 level sensors on C1, plus its own
+' supply voltage, which needs nothing wired to it at all.
+'
+' Those readings have no ALERT address -- there is no packet and no transmitting
+' node -- so they use the ingest contract's OTHER address shape, a station
+' number plus a channel:
+'
+'   radio    {"alert_id":6270, ...}                     -> addr  a:6270
+'   local    {"station_number":"999998","channel":"rain", ...} -> addr  s:999998/rain
+'
+' Same queue, same batch, same POST, same idempotency. Section 1's local sensors
+' block is the whole of the configuration, and it is also where the one place
+' this program DOES convert is argued for: it knows the bucket size because the
+' gauge is two metres away, which is exactly what a base station hearing forty
+' sites does not know about any of them.
+'
+' --- Proving the whole path without waiting for a transmission --------------
+'
+' A base station with no radio traffic cannot be shown to work, and a workshop
+' rig has none. So this program can transmit to itself: set TestFire true and it
+' builds a complete, valid ALERT2A line and appends it to the receive byte
+' buffer one instruction before the framer runs. Framing, line cutting,
+' ParseAlert2, the bit unpacking, the clock gate, the queue, the batch and the
+' POST all run on it exactly as they would on a real frame, because as far as
+' every one of them can tell it IS one. docs/live-end-to-end-test.md is the card.
 '
 ' --- How the serial port is read, and why it changed ------------------------
 '
@@ -101,10 +134,19 @@
 '    program disciplines its clock against NTP, and refuses to stamp a reading
 '    until the clock passes a sanity check, rather than posting rubbish.
 '
-' 4. It does not convert. value_raw is the 11-bit number that came off the air.
-'    A base station hearing forty sites does not know which of them is a rain
-'    gauge and which is a level sensor, and a wrong bucket size is worse than
-'    no bucket size -- MegaNet does the conversion where it knows the sensor.
+' 4. It does not convert what it did not measure. value_raw is the 11-bit number
+'    that came off the air. A base station hearing forty sites does not know
+'    which of them is a rain gauge and which is a level sensor, and a wrong
+'    bucket size is worse than no bucket size -- MegaNet does the conversion
+'    where it knows the sensor.
+'
+'    The sensors on its own terminals are the exception that proves the rule,
+'    and they are the exception because the reasoning does not apply to them:
+'    this logger is wired to them and the bucket size is written on the gauge.
+'    So a local reading carries `value`, `unit` and `conversion` BESIDE its
+'    value_raw and never instead of it -- the raw count is still what was
+'    measured, and the rule that has to hold is that nothing is ever thrown
+'    away, not that nothing is ever computed.
 '
 ' The token is not in this file and never appears in a Public variable. It is
 ' read at startup out of a file on the logger, so this program can live in a
@@ -274,7 +316,148 @@ Const MQTT_STATUS_EVERY = 900      'seconds
 ' Reported in the status message, so "which loggers are still on the old
 ' program" is answerable from the database rather than from a site visit. Bump
 ' it when you change this file in a way a field technician would care about.
-Const FW_VERSION = "2.0"
+Const FW_VERSION = "2.1"
+
+' --- local sensors, wired to this logger's own terminals ---------------------
+'
+' A base station is normally only a relay: everything it posts arrived over the
+' air with an ALERT address already on it. This one also has sensors bolted to
+' its own terminal strip, and those readings have no ALERT address at all --
+' there is no packet, no transmitting node and no radio, only a cable.
+'
+' docs/ingest-http.md carries the second address shape for exactly this case: a
+' `station_number` plus a `channel` saying which sensor at that number spoke. So
+' a local reading posts as
+'
+'   {"station_number":"999998","channel":"rain","reading_ts":"..",
+'    "value_raw":3,"value":0.600,"unit":"mm"}
+'
+' and lands on meganet.reading as addr `s:999998/rain`, beside `a:6270` off the
+' air -- one queue, one batch, one POST, two address shapes. Nothing else in
+' this program changes: the same ring buffer holds both, and both go out over
+' whichever of the two paths is enabled.
+'
+' LOCAL_NUMBER is the station number those channels report under. 999998 is
+' deliberately outside the Bureau's range -- real numbers are five or six digits
+' and none of them is 999998 -- so a workshop rig cannot collide with a gauging
+' station and says as much on sight. **It has to match the station row created
+' by db/migrations/0026_bateson_test_rig.sql.** If it does not, the readings are
+' still stored, but they resolve to nobody: the app shows a bare address where a
+' station name should be, which is the symptom to recognise.
+'
+' --- these channels DO convert, and the radio path still does not ---
+'
+' Point 4 at the top of this file says a base station hearing forty sites does
+' not know which of them is a rain gauge, and that a wrong bucket size is worse
+' than none. That is true of the radio and it is not true here. This logger is
+' wired to these sensors; the bucket size is written on the gauge two metres
+' away. So it is the one place in the system that knows, and it says so in the
+' reading rather than making MegaNet guess -- `value_raw` is still exactly what
+' the sensor produced (tips, or metres off the SDI-12 bus), and `value`, `unit`
+' and `conversion` travel beside it rather than instead of it.
+Const LOCAL_ENABLE = True
+Const LOCAL_NUMBER = "999998"
+
+' The wire protocol behind a local reading, recorded against every one of them
+' the way PROTOCOL is for the radio. There is no wire and no protocol -- the
+' sensor is on a terminal strip -- and that is a fact worth recording rather than
+' leaving as the envelope's "alert2", which would be untrue of every local
+' reading in the batch. The Message Log shows this column, so it is what stops a
+' rain gauge on a cable being read as a rain gauge on the air.
+'
+' Added as protocol code 6 by db/migrations/0026_bateson_test_rig.sql, and
+' **apply that migration before loading this program**: code_for() RAISES on a
+' protocol key it does not know, and the row loop catches that per reading -- so
+' against a database without 0026 every local reading comes back in `rejected`
+' saying `unknown protocol: wired`, while the radio readings in the same batch
+' are stored. That is a legible failure rather than a silent one, and
+' LastReject in the Public table is where it appears, but it is still a
+' morning wasted if the order is not known in advance.
+Const LOCAL_PROTOCOL = "wired"
+
+' Minutes between local readings. Every channel reports on this interval, and
+' the rain gauge's tips are totalised across it -- so this is the rainfall
+' accumulation period as well as the reporting one. Five minutes matches what a
+' flood-warning site transmits and keeps the row count sane: four channels every
+' five minutes is 1,152 readings a day.
+Const LOCAL_EVERY = 5              'minutes
+
+' How many local channels there are, and which is which. The names are the
+' `channel` values on the wire, so they are also what the Message Log shows and
+' what a query filters on -- change one and the readings before and after the
+' change are two different addresses. They are lower-case with underscores for
+' the same reason station ids are.
+Const LOC_N = 4
+Const LOC_RAIN = 1
+Const LOC_LEVEL1 = 2
+Const LOC_LEVEL2 = 3
+Const LOC_BATT = 4
+
+' The tipping bucket. PulseCount's channel on a CR300 is the P_SW terminal;
+' config 2 is switch closure, option 0 is counts. On a CR1000X or CR6 this is a
+' C terminal configured for pulse input -- see "Other dataloggers" at the foot.
+Const LOCAL_RAIN_CHAN = P_SW
+Const RAIN_CONFIG = 2              'switch closure
+Const RAIN_OPTION = 0              'counts, not a rate
+
+' The SDI-12 bus. One port, one address per sensor, "M!" for a standard measure.
+' The two addresses below are the wiring as it stands at 18 Bateson -- level 1
+' answers on address 1 and level 2 on address 0. Check them with a terminal
+' (?! returns every address on the bus) before changing anything here.
+Const LOCAL_SDI_PORT = C1
+Const LVL1_SDI_ADDR = 1
+Const LVL2_SDI_ADDR = 0
+
+' A sanity ceiling on a local engineering value, in whatever unit the channel
+' reports. A disconnected SDI-12 sensor returns NAN, which is caught on its own;
+' a shorted or mis-scaled one returns a number, and a number is what gets stored
+' forever. Anything beyond this is counted at LocalRejected and not queued.
+Const LOCAL_MAX = 10000
+
+' --- the live end-to-end self-test -------------------------------------------
+'
+' The problem this solves: a base station with no radio traffic cannot be proved
+' to work. Everything from the receiver to the app is only exercised by a real
+' transmission, and at a workshop -- or at a live site on a quiet day -- there
+' is not one. The plain "6270,21" line in logger/README.md tests some of it, but
+' it needs a terminal on the RS-232 port, which is where the receiver is plugged
+' in, and it skips the ALERT2 decoder entirely.
+'
+' So this program can transmit to itself. Set TestFire true from LoggerNet, PC400
+' or Device Configuration Utility and it builds a complete, valid ALERT2A ASCII
+' line for TestId/TestValue and appends its bytes to the receive byte buffer --
+' the same buffer SerialInBlock fills, at the same point in the same scan, one
+' instruction before TakeFrames runs. Everything after that is the production
+' path and nothing knows the difference:
+'
+'   framing -> line cut on CRLF -> census -> delimiter -> ParseAlert2 ->
+'   bit unpacking -> clock check -> QueuePush -> BuildBatch -> HTTPPost ->
+'   meganet.ingest_http() -> meganet.reading -> the Message Log tab
+'
+' That is what "end to end" has to mean to be worth anything: not a POST built
+' by hand, but a reading that entered where a real one enters and came out where
+' a real one comes out. docs/live-end-to-end-test.md is the card for running it.
+'
+' The line is injected only when the byte buffer is empty, so it can never be
+' spliced into a half-received real frame. On a station that is hearing traffic
+' it waits for a gap -- TestState says so -- rather than corrupting a reading.
+Const TEST_ENABLE = True
+
+' Field 3 and field 24 of the synthetic line: the receiver id and the
+' transmitting node. 9999 is what the reference capture behind alert2.js carries
+' and is not a real node on this network.
+Const TEST_NODE = "9999"
+
+' --- how the queue is sized, and why a local reading is longer ----------------
+'
+' Kept here rather than beside MAX_BATCH because it is now about both kinds of
+' reading. A radio reading is 69 characters of JSON, or 92 with the suspect flag;
+' a local one is up to about 160, because it carries a station number, a channel
+' name, an engineering value, a unit and sometimes a conversion. CONTENT_GUARD is
+' what actually bounds a batch -- BuildBatch stops adding before the buffer can
+' overrun -- so a batch of local readings is simply a shorter batch, and the next
+' POST takes the rest. Four channels every five minutes is eight readings a
+' batch at the very most, so this never binds in practice.
 
 ' Clock discipline. NTPOffset is seconds of offset from UTC, so 0 means the
 ' logger's clock runs in UTC -- which is what lets the timestamps below end in
@@ -668,6 +851,90 @@ Public CaptureBytes As Long        'bytes written so far, against CAPTURE_MAX
 Public CaptureState As String * 60 'plain English: capturing, full, stopped, or
                                    'the reason it cannot write
 
+'--- the local sensors on this logger's terminals ------------------------------
+'
+' Read top to bottom, these are the same seven-step pipeline the serial block
+' above is, for the sensors that arrive by cable instead of by radio: what the
+' terminal measured, what it converts to, whether it was queued, and why not.
+'
+' The channel table is Public rather than Const so the names, units and decimal
+' places are readable at the logger beside the values they describe -- checking
+' MegaNet's station row against what this logger actually sends is then one
+' screen rather than two documents. Filled in BeginProg; changing one here does
+' not survive a restart, which is the same rule BASE_NAME follows.
+Public LocName(LOC_N) As String * 12   'the `channel` on the wire
+Public LocUnit(LOC_N) As String * 8    'the `unit` beside `value`
+Public LocConv(LOC_N) As String * 32   'the `conversion` note, or empty
+Public LocRawDp(LOC_N) As Long         'decimals for value_raw: 0 for counts
+
+Public Rain_tips                   'tips PulseCount reported this scan. Almost
+                                   'always 0 -- it is the accumulator below that
+                                   'matters
+Public Rain_bucket = 0.2           'mm per tip. The number written on the gauge.
+                                   'Public so it can be corrected at the logger,
+                                   'and it travels with the reading in
+                                   '`conversion` so a change does not rewrite
+                                   'what was already stored
+Public Rain_tips_int As Long       'tips so far this reporting interval
+Public Rain_mm                     'and those tips in mm, so far this interval
+Public Rain_last_mm                'the last completed interval's total, which
+                                   'is the number that was actually sent
+Public Rain_total_mm               'since this program started. Not sent -- it
+                                   'is here so a bench test can be checked
+                                   'against a measuring cylinder
+
+Public Level1_m                    'SDI-12 address LVL1_SDI_ADDR
+Public Level2_m                    'SDI-12 address LVL2_SDI_ADDR
+                                   'NAN means the sensor did not answer. That is
+                                   'caught before queueing -- see LocalRejected
+
+Public LocalState As String * 60   'plain English: what the local half is doing,
+                                   'or why it queued nothing
+Public LocalChan As String * 12    'the channel of the last local reading queued
+Public LocalRaw                    'its value_raw
+Public LocalEng                    'and its value
+Public LocalJson As String * 200   'the JSON object for it, byte for byte as it
+                                   'will appear in the batch. The local half's
+                                   'RxLastJson, kept separate so a battery
+                                   'reading cannot overwrite the radio
+                                   'pipeline's step-7 display
+Public LocalQueued As Long         'local readings queued since startup
+Public LocalRejected As Long       'local reads refused: NAN, or past LOCAL_MAX.
+                                   'Non-zero means a sensor is not answering or
+                                   'is not scaled the way this program thinks
+Public SecsSinceLocal              'seconds since the last one was queued. Should
+                                   'sit under LOCAL_EVERY * 60
+
+'--- the live end-to-end self-test ---------------------------------------------
+'
+' Set TestFire true and one synthetic ALERT2A line goes into the receive buffer
+' as though the receiver had just delivered it. See the note in section 1, and
+' docs/live-end-to-end-test.md for the card.
+Public TestFire As Boolean         'set true to fire one. Clears itself
+Public TestId As Long = 8101       'the ALERT address to transmit as. Must be
+                                   '1-8191, because the wire carries 13 bits of
+                                   'address and nothing wider fits -- which is
+                                   'why this is 8101 and not a 9000-block
+                                   'address like the ELPRO bench unit's. The
+                                   'highest real address in the registry is
+                                   '7999, so 8100-8109 is free, recognisably
+                                   'synthetic AND transmittable. 8101 is the
+                                   'address MegaNet's station row reserves for
+                                   'this test
+Public TestValue As Long = 21      'and the value, 0-2047 -- 11 bits. Change it
+                                   'between shots so the second one is a new
+                                   'reading rather than a duplicate
+Public TestEvery As Long = 0       'minutes between automatic shots. 0 = off, and
+                                   'off is the shipped default: an unattended
+                                   'self-test writes synthetic readings into the
+                                   'live database forever. Set it during a
+                                   'commissioning window and set it back
+Public TestFired As Long           'shots fired since startup
+Public TestState As String * 60    'plain English: fired, waiting, or refused
+Public TestLine As String * 140    'the line it built, verbatim. This is what to
+                                   'compare against RxLastLine -- they must be
+                                   'the same string, because they are
+
 '--- is the queue draining ----------------------------------------------------
 '
 ' One ring buffer, two readers. QDepthHttp and QDepthMqtt are how far behind
@@ -796,10 +1063,23 @@ Public MqttLastPayload As String * 200 'the first 200 characters of the last
 ' moment a send completes; what it costs when it is lost is one reading sent
 ' twice or one dropped a scan early, and a reading sent twice is free by
 ' contract. A semaphore against that would cost every scan.
+'
+' Three columns were added for the local sensors, and the shape of them is the
+' point: a slot records WHICH channel it is (0 for a radio reading, 1..LOC_N for
+' one of this logger's own), not what that channel is called. The names, units
+' and decimals live once in the LocName/LocUnit/LocConv tables and are looked up
+' when the reading is rendered. A per-slot channel string would have been 250
+' strings on a logger that has 250 of everything already, to hold four distinct
+' values.
 Dim qAddr(Q_SIZE) As Long
 Dim qVal(Q_SIZE) As Long
 Dim qStamp(Q_SIZE) As String * 24
 Dim qSus(Q_SIZE) As Boolean
+Dim qChan(Q_SIZE) As Long          '0 = radio, address in qAddr and value in
+                                   'qVal. 1..LOC_N = that local channel, value
+                                   'in the two below
+Dim qRaw(Q_SIZE) As Float          'local only: value_raw, as the sensor gave it
+Dim qEng(Q_SIZE) As Float          'local only: value, converted
 Dim QHead As Long
 Dim QTailHttp As Long              'the next slot to POST
 Dim QTailMqtt As Long              'the next slot to publish
@@ -880,6 +1160,14 @@ Dim fId As String * 16             '{~alert_id~:
 Dim fTs As String * 20             ',~reading_ts~:~
 Dim fVal As String * 20            '~,~value_raw~:
 Dim fSus As String * 24            ',~quality~:~suspect~
+Dim fSn As String * 28             '{~station_number~:~   -- opens the quote
+Dim fCh As String * 24             '~,~channel~:~         -- closes it, opens
+                                   'the channel name, which the caller closes
+Dim fEng As String * 12            ',~value~:
+Dim fUnit As String * 12           ',~unit~:~
+Dim fConv As String * 20           ',~conversion~:~
+Dim fProto As String * 32          ',~protocol~:~wired~ -- fixed, so it is built
+                                   'whole rather than assembled per reading
 Dim jName As String * 24           'BASE_NAME, safe to put inside a JSON literal
 Dim nk2 As Long
 Dim nc2 As Long
@@ -930,6 +1218,29 @@ Dim jsonKey As String * 16
 Dim jsonVal As Long
 Dim pp As Long                     'ParseStatus
 Dim pd As Long
+Dim pushChan As Long               'QueuePush's inputs for a LOCAL reading, set
+Dim pushRaw As Float               'by the caller immediately before the call --
+Dim pushEng As Float               'the same arrangement bWrap/bFrom use. A
+                                   'radio caller sets pushChan = 0 and the other
+                                   'two are ignored
+Dim locPend(LOC_N) As Boolean      'a staged local reading waiting for the main
+Dim locRawV(LOC_N) As Float        'scan to queue it. Written by whichever task
+Dim locEngV(LOC_N) As Float        'measured the channel, cleared by the scan --
+                                   'see LocalPush for why the handover is a flag
+                                   'and not a queue of its own
+Dim lk As Long                     'LocalPush
+Dim tstK As Long                   'TestInject
+Dim tstNum As String * 40          'and its own number scratch: it runs in the
+                                   'main scan beside DumpBytes, which owns
+                                   'numStr and rewrites it once per byte
+Dim tstSecs As Long                'Long, not the default float: Sprintf's %02X
+Dim tstB0 As Long                  'and %02d read a Long and would print
+Dim tstB1 As Long                  'nonsense from a float
+Dim tstB2 As Long
+Dim tstHi As Long
+Dim tstLo As Long
+Dim qLost As Boolean               'QueuePush: this overflow actually cost a
+                                   'reading somebody was still waiting for
 Dim qn As Long                     'QueuePush
 Dim mi As Long                     'MakeRec -- the queue slot being rendered
 Dim tk As Long                     'ParseLine trimming -- main scan only
@@ -985,6 +1296,22 @@ DataTable (Readings,True,20000)
   Sample (1,RxLastId,Long)
   Sample (1,RxLastValue,Long)
   Sample (1,RxFrameSkew,IEEE4)
+EndTable
+
+' The same archive, for the sensors on this logger's own terminals. A table of
+' its own rather than three more columns on Readings, because the two have
+' nothing in common but a timestamp: a radio reading is an address and an 11-bit
+' count, a local one is a channel and two floats, and a single table holding
+' both would be half empty on every row and would need a discriminator column to
+' say which half to read.
+'
+' 5000 records is about four days of four channels every five minutes -- long
+' enough that a fortnight's outage still leaves the overlap needed to see where
+' the gap starts, on a table that costs about 20 bytes a record.
+DataTable (LocalLog,True,5000)
+  Sample (1,LocalChan,String)
+  Sample (1,LocalRaw,IEEE4)
+  Sample (1,LocalEng,IEEE4)
 EndTable
 
 ' One record per serial read that returned bytes: the raw block and the buffer
@@ -1113,6 +1440,12 @@ DataTable (Diag,True,-1)
   Sample (1,QDepthMqtt,Long)
   Sample (1,QPeak,Long)
   Sample (1,QDropped,Long)
+  Sample (1,LocalQueued,Long)
+  Sample (1,LocalRejected,Long)
+  Sample (1,Rain_total_mm,FP2)
+  Sample (1,Level1_m,IEEE4)
+  Sample (1,Level2_m,IEEE4)
+  Sample (1,TestFired,Long)
   Sample (1,Accepted,Long)
   Sample (1,Duplicates,Long)
   Sample (1,Rejected,Long)
@@ -1581,27 +1914,63 @@ EndSub
 ' notation, and any of the three inside a JSON literal is a rejected batch.
 '------------------------------------------------------------------------------
 Sub MakeRec()
-  Sprintf (pNum,"%d",qAddr(mi))
-  jRec = fId & pNum
-  jRec = jRec & fTs & qStamp(mi)
-  Sprintf (pNum,"%d",qVal(mi))
-  jRec = jRec & fVal & pNum
-  If qSus(mi) Then jRec = jRec & fSus
-  jRec = jRec & "}"
+  If qChan(mi) = 0 Then
+    'A radio reading: an ALERT address and the count that came off the air.
+    Sprintf (pNum,"%d",qAddr(mi))
+    jRec = fId & pNum
+    jRec = jRec & fTs & qStamp(mi)
+    Sprintf (pNum,"%d",qVal(mi))
+    jRec = jRec & fVal & pNum
+    If qSus(mi) Then jRec = jRec & fSus
+    jRec = jRec & "}"
+  Else
+    'A local reading: this station's number, the channel that spoke, and the
+    'conversion beside the raw rather than instead of it.
+    '
+    'FormatFloat, not Sprintf and not concatenation. Sprintf's %d reads a Long
+    'and these two are Floats; a bare concatenation is free to reach for
+    'scientific notation or to round, and either one inside a JSON literal is a
+    'rejected batch. The decimals are fixed per channel so the text never
+    'carries an exponent -- LocRawDp is 0 for a channel whose raw is a count, so
+    'three tips render as 3 and not as 3.000.
+    '
+    'NAN cannot reach here: LocalPush refuses to queue one, because
+    'FormatFloat(NAN) is the word "nan" and a batch carrying it is a 400 for
+    'every reading in it, including the good ones from the radio.
+    jRec = fSn & LOCAL_NUMBER & fCh & LocName(qChan(mi)) & DQ
+    jRec = jRec & fTs & qStamp(mi)
+    If LocRawDp(qChan(mi)) = 0 Then
+      jRec = jRec & fVal & FormatFloat (qRaw(mi),"%.0f")
+    Else
+      jRec = jRec & fVal & FormatFloat (qRaw(mi),"%.3f")
+    EndIf
+    jRec = jRec & fEng & FormatFloat (qEng(mi),"%.3f")
+    jRec = jRec & fUnit & LocUnit(qChan(mi)) & DQ
+    If Len(LocConv(qChan(mi))) > 0 Then
+      jRec = jRec & fConv & LocConv(qChan(mi)) & DQ
+    EndIf
+    jRec = jRec & fProto
+    jRec = jRec & "}"
+  EndIf
 EndSub
 
 '------------------------------------------------------------------------------
-' QueuePush -- one reading into the ring buffer. Address in RxLastId, value in
-' RxLastValue, suspect flag in `suspect`.
+' QueuePush -- one reading into the ring buffer.
 '
-' Called from the main scan, which is the only writer of QHead. The poster
-' sequence advances both tails as it delivers; this is the one place outside it
-' that touches them, and only when the buffer is full. See the note at the
-' declaration for why that crossing is left unguarded.
+' A RADIO reading: pushChan = 0, address in RxLastId, value in RxLastValue,
+' suspect flag in `suspect`.
+' A LOCAL reading: pushChan = the channel, raw in pushRaw, converted in pushEng.
+'
+' Called from the main scan, which is the only writer of QHead. **That is why
+' the local sensors do not queue from the sequence that measures them** -- see
+' LocalPush. The poster sequence advances both tails as it delivers; this is the
+' one place outside it that touches them, and only when the buffer is full. See
+' the note at the declaration for why that crossing is left unguarded.
 '------------------------------------------------------------------------------
 Sub QueuePush()
   qn = QHead + 1
   If qn > Q_SIZE Then qn = 1
+  qLost = False
   If qn = QTailHttp OR qn = QTailMqtt Then
     'Full for whichever path is furthest behind. Drop the oldest rather than
     'refuse the newest -- at a flood warning base the current river level is the
@@ -1615,35 +1984,263 @@ Sub QueuePush()
     If qn = QTailHttp Then
       QTailHttp = QTailHttp + 1
       If QTailHttp > Q_SIZE Then QTailHttp = 1
+      qLost = True
     EndIf
     If qn = QTailMqtt Then
       QTailMqtt = QTailMqtt + 1
       If QTailMqtt > Q_SIZE Then QTailMqtt = 1
+      'Only a loss if something was ever going to read that tail. With
+      'MQTT_ENABLE false nothing advances it, so it sits on slot 1 and every
+      'reading past the first Q_SIZE lands on it -- which used to make QDropped
+      'climb on a station that had delivered every reading it ever took, and
+      'QDropped is the one counter in this table that is supposed to mean
+      'something is wrong. The tail is still moved out of the way either way.
+      If MQTT_ENABLE Then qLost = True
     EndIf
-    QDropped = QDropped + 1
+    If qLost Then QDropped = QDropped + 1
   EndIf
-  qAddr(QHead) = RxLastId
-  qVal(QHead) = RxLastValue
+
+  qChan(QHead) = pushChan
   qStamp(QHead) = NowISO
-  qSus(QHead) = (suspect = 1)
+  If pushChan = 0 Then
+    qAddr(QHead) = RxLastId
+    qVal(QHead) = RxLastValue
+    qSus(QHead) = (suspect = 1)
+    qRaw(QHead) = 0
+    qEng(QHead) = 0
+  Else
+    qAddr(QHead) = 0
+    qVal(QHead) = 0
+    qSus(QHead) = False
+    qRaw(QHead) = pushRaw
+    qEng(QHead) = pushEng
+  EndIf
 
   'Step 6 and step 7 of the pipeline display, taken from the slot just written.
-  'These six lines are MakeRec's, deliberately copied rather than called -- see
-  'the note there. If you change one, change both.
-  RxLastSuspect = (suspect = 1)
-  RxLastStamp = NowISO
-  Sprintf (dNum,"%d",RxLastId)
-  RxLastJson = fId & dNum
-  RxLastJson = RxLastJson & fTs & NowISO
-  Sprintf (dNum,"%d",RxLastValue)
-  RxLastJson = RxLastJson & fVal & dNum
-  If RxLastSuspect Then RxLastJson = RxLastJson & fSus
-  RxLastJson = RxLastJson & "}"
-  RxStep = "7 queued"
+  'These lines are MakeRec's, deliberately copied rather than called -- see the
+  'note there. If you change one, change both.
+  '
+  'The two halves write to different Publics and different tables on purpose. A
+  'battery reading arriving between two frames must not overwrite the serial
+  'pipeline's step-7 display, which is the thing a technician is watching when a
+  'feed is not decoding; and the Readings table samples RxLastId, RxLastValue and
+  'RxFrameSkew, none of which a local reading has.
+  If pushChan = 0 Then
+    RxLastSuspect = (suspect = 1)
+    RxLastStamp = NowISO
+    Sprintf (dNum,"%d",RxLastId)
+    RxLastJson = fId & dNum
+    RxLastJson = RxLastJson & fTs & NowISO
+    Sprintf (dNum,"%d",RxLastValue)
+    RxLastJson = RxLastJson & fVal & dNum
+    If RxLastSuspect Then RxLastJson = RxLastJson & fSus
+    RxLastJson = RxLastJson & "}"
+    RxStep = "7 queued"
+    RxReadings = RxReadings + 1
+    CallTable Readings
+  Else
+    LocalChan = LocName(pushChan)
+    LocalRaw = pushRaw
+    LocalEng = pushEng
+    LocalJson = fSn & LOCAL_NUMBER & fCh & LocalChan & DQ
+    LocalJson = LocalJson & fTs & NowISO
+    If LocRawDp(pushChan) = 0 Then
+      LocalJson = LocalJson & fVal & FormatFloat (pushRaw,"%.0f")
+    Else
+      LocalJson = LocalJson & fVal & FormatFloat (pushRaw,"%.3f")
+    EndIf
+    LocalJson = LocalJson & fEng & FormatFloat (pushEng,"%.3f")
+    LocalJson = LocalJson & fUnit & LocUnit(pushChan) & DQ
+    If Len(LocConv(pushChan)) > 0 Then
+      LocalJson = LocalJson & fConv & LocConv(pushChan) & DQ
+    EndIf
+    LocalJson = LocalJson & fProto
+    LocalJson = LocalJson & "}"
+    LocalQueued = LocalQueued + 1
+    SecsSinceLocal = 0
+    CallTable LocalLog
+  EndIf
 
   QHead = qn
-  RxReadings = RxReadings + 1
-  CallTable Readings
+EndSub
+
+'------------------------------------------------------------------------------
+' LocalPush -- every staged local reading into the ring buffer.
+'
+' Called from the MAIN SCAN and from nowhere else, which is the whole reason
+' this subroutine exists rather than the local sequences calling QueuePush
+' themselves. QHead has exactly one writer by design -- the note at the ring
+' buffer's declaration is built on it -- and a second sequence pushing readings
+' would make that false in a way nothing would ever reproduce on a bench: two
+' tasks incrementing QHead between each other's read and write, once a fortnight,
+' costing one reading nobody can prove was ever taken.
+'
+' So the sequence that measures a channel only STAGES it: it writes locRawV,
+' locEngV and sets locPend, and the scan picks it up within a second. The
+' handover is a flag rather than a queue of its own because the failure mode of
+' a torn flag is bounded and harmless -- the sequence sets locPend in the same
+' instant the scan clears it, and the reading is either sent twice (free, by
+' contract -- the endpoint stores it once) or sent a second later. A semaphore
+' against that would cost every scan for a race that costs nothing.
+'
+' Two things are refused rather than queued, and both would otherwise be stored
+' forever:
+'
+'   NAN            -- an SDI-12 sensor that did not answer. FormatFloat renders
+'                     it as the word "nan", which is not JSON, and one of those
+'                     in a batch is a 400 for every reading in it -- including
+'                     the radio readings that were fine.
+'   past LOCAL_MAX -- a sensor that answered with nonsense. NAN is the honest
+'                     failure; a mis-scaled or shorted sensor returns a NUMBER,
+'                     and a number is what gets stored and later believed.
+'
+' Both are counted at LocalRejected and named in LocalState, because a channel
+' that has quietly stopped reporting is exactly the thing a station is supposed
+' to be able to say about itself.
+'------------------------------------------------------------------------------
+Sub LocalPush()
+  For lk = 1 To LOC_N
+    If locPend(lk) Then
+      locPend(lk) = False
+
+      If NOT ClockOK Then
+        'Not counted as a rejection: nothing is wrong with the sensor, and the
+        'clock state is already reported in one place. The reading is dropped
+        'rather than held, because the next one is LOCAL_EVERY minutes away and
+        'a stamp applied later would be a lie about when it was measured.
+        LocalState = "clock not set - nothing stamped"
+      ElseIf locRawV(lk) = NAN OR locEngV(lk) = NAN Then
+        LocalRejected = LocalRejected + 1
+        LocalState = LocName(lk) & " read NAN - not queued"
+      ElseIf ABS(locEngV(lk)) > LOCAL_MAX Then
+        LocalRejected = LocalRejected + 1
+        LocalState = LocName(lk) & " out of range - not queued"
+      Else
+        pushChan = lk
+        pushRaw = locRawV(lk)
+        pushEng = locEngV(lk)
+        Call QueuePush()
+        LocalState = "queued " & LocName(lk)
+      EndIf
+    EndIf
+  Next lk
+EndSub
+
+'------------------------------------------------------------------------------
+' TestInject -- one synthetic ALERT2A line into the receive byte buffer.
+'
+' The live end-to-end test. Called from ReadSerial, one instruction before
+' TakeFrames, so the bytes this writes are indistinguishable from the bytes
+' SerialInBlock just wrote: the framer, the line cutter, the census, the
+' delimiter pick, ParseAlert2's bit unpacking, the clock check, the queue, the
+' batch builder and the POST all run on it exactly as they would on a real
+' transmission. Nothing downstream is told this is a test, because a path that
+' knows it is being tested is not the path under test.
+'
+' The line is the ALERT2 ASCII protocol's own shape, built to satisfy every gate
+' ParseAlert2 applies rather than to look plausible:
+'
+'   field 18 = 1     the receiver's frame-valid flag, or it is rejected
+'   field 23 = 7     the payload length in bytes, which must equal the number of
+'                    trailing hex fields, or it is rejected as wrapped
+'   payload byte 0   0x74, the ALERT concentration element, or it is rejected
+'   bytes 1-2        seconds since midnight, from this logger's clock, so
+'                    RxFrameSkew comes out at 0 and the skew display can be read
+'                    against a known-good frame
+'   bytes 3-6        one four-byte record: the address and value packed the way
+'                    the radio packs them, and a zero status byte
+'
+' The packing is ParseAlert2's table run backwards, and it is the one part worth
+' checking by eye against that table:
+'
+'   b0 = address low 8 bits          address = (b1 MOD 32) * 256 + b0
+'   b1 = address bits 12-8, plus     value   = INT(b1 / 32) * 256 + b2
+'        value bits 10-8 times 32
+'   b2 = value low 8 bits
+'
+' which is why TestId is bounded at 8191 and TestValue at 2047: 13 bits of
+' address and 11 bits of value is all the wire carries, and a bigger number
+' would silently wrap into the other field rather than fail.
+'
+' Injected only into an EMPTY byte buffer. Appending to a half-received real
+' frame would splice the two together, and the result would decode -- ParseLine
+' finds "ALERT2A" anywhere in a line and steps over the prefix -- as one reading
+' built out of two transmissions. So a busy station makes the shot wait for a
+' gap and says so in TestState, rather than corrupting the thing it exists to
+' prove works.
+'------------------------------------------------------------------------------
+Sub TestInject()
+  If TestEvery > 0 Then
+    If TimeIntoInterval (0,TestEvery,Min) Then TestFire = True
+  EndIf
+  If NOT TestFire Then ExitSub
+
+  If TestId < 1 OR TestId > 8191 Then
+    TestState = "TestId must be 1-8191 - 13 bits on the wire"
+    TestFire = False
+    ExitSub
+  EndIf
+  If TestValue < 0 OR TestValue > 2047 Then
+    TestState = "TestValue must be 0-2047 - 11 bits on the wire"
+    TestFire = False
+    ExitSub
+  EndIf
+  If nBuf > 0 Then
+    'Stay armed. The buffer empties within a scan or two of the last frame.
+    TestState = "waiting for a gap - the byte buffer is not empty"
+    ExitSub
+  EndIf
+
+  RealTime (rTime())
+  If rTime(1) < MIN_YEAR Then
+    'Refused rather than fired: a line stamped from a dead clock would be
+    'rejected at ParseAlert2's own clock gate anyway, and "the self-test did
+    'nothing" is a worse thing to read than the reason.
+    TestState = "clock not set - nothing to stamp the frame with"
+    TestFire = False
+    ExitSub
+  EndIf
+
+  tstSecs = rTime(4) * 3600 + rTime(5) * 60 + rTime(6)
+  tstHi = INT(tstSecs / 256)
+  tstLo = tstSecs MOD 256
+  tstB0 = TestId MOD 256
+  tstB1 = INT(TestId / 256) + INT(TestValue / 256) * 32
+  tstB2 = TestValue MOD 256
+
+  'Fields 1-6, then the receiver's own clock in 7-12. Built by concatenation
+  'with Sprintf for the numbers, the way every other string in this file is:
+  'one Sprintf with thirty arguments is not checkable by reading it.
+  TestLine = "ALERT2A,1," & TEST_NODE & ",MEGANET,N,1,"
+  Sprintf (tstNum,"%04d,%d,%d,%d,%d,%02d.000",rTime(1),rTime(2),rTime(3),rTime(4),rTime(5),rTime(6))
+  TestLine = TestLine & tstNum
+
+  'Fields 13-24. The 1 is field 18, frame-valid; the second 7 is field 23, the
+  'payload length; TEST_NODE again is field 24, the transmitting node.
+  TestLine = TestLine & ",0,0,0,0,0,1,0,0,0,7,7," & TEST_NODE
+
+  'Fields 25-31: the seven payload bytes as hex.
+  Sprintf (tstNum,",74,%02X,%02X,%02X,%02X,%02X,00",tstHi,tstLo,tstB0,tstB1,tstB2)
+  TestLine = TestLine & tstNum
+
+  For tstK = 1 To Len(TestLine)
+    If nBuf < BUF_MAX Then
+      nBuf = nBuf + 1
+      rxByte(nBuf) = ASCII(Mid(TestLine,tstK,1))
+    EndIf
+  Next tstK
+  If nBuf < BUF_MAX Then
+    nBuf = nBuf + 1
+    rxByte(nBuf) = 13                            'CR
+  EndIf
+  If nBuf < BUF_MAX Then
+    nBuf = nBuf + 1
+    rxByte(nBuf) = 10                            'LF
+  EndIf
+
+  TestFire = False
+  TestFired = TestFired + 1
+  TestState = "fired - watch RxLastLine, RxLastId, RxStep, then QDepth"
 EndSub
 
 '------------------------------------------------------------------------------
@@ -1713,6 +2310,7 @@ Sub ParsePlain()
   RxStep = "6 reading decoded"
   suspect = 0
   If RxLastValue = FULL_SCALE Then suspect = 1
+  pushChan = 0                                   'a radio reading
   Call QueuePush()
 EndSub
 
@@ -1873,6 +2471,7 @@ Sub ParseAlert2()
       If RxLastId >= 1 AND RxLastId <= 65535 Then
         suspect = 0
         If RxLastValue = FULL_SCALE Then suspect = 1
+        pushChan = 0                               'a radio reading
         Call QueuePush()
       Else
         RxBadRecords = RxBadRecords + 1
@@ -2180,6 +2779,7 @@ Sub DecodeFrame()
     Else
       suspect = 0
       If RxLastValue = FULL_SCALE Then suspect = 1
+      pushChan = 0                                 'a radio reading
       Call QueuePush()
       RdQueued = True
       FrGood = FrGood + 1
@@ -2333,6 +2933,12 @@ Sub ReadSerial()
     RxBlockHex = ""
     RxBlockText = ""
   EndIf
+
+  'The self-test, if one is armed. Here and not in the scan above, so the bytes
+  'it writes are appended by the same code path in the same instruction stream
+  'as the bytes that just came off the port -- and are then framed by the same
+  'call, on the same scan, with nothing able to tell the two apart.
+  If TEST_ENABLE Then Call TestInject()
 
   Call TakeFrames()
 
@@ -2846,6 +3452,59 @@ BeginProg
   fVal  = DQ & "," & DQ & "value_raw" & DQ & ":"
   fSus  = "," & DQ & "quality" & DQ & ":" & DQ & "suspect" & DQ
 
+  'And the local shape's fragments. fSn opens the station number's quote, fCh
+  'closes it and opens the channel's -- MakeRec closes that one, because the
+  'channel name comes out of a table and the fragment cannot hold it.
+  fSn   = "{" & DQ & "station_number" & DQ & ":" & DQ
+  fCh   = DQ & "," & DQ & "channel" & DQ & ":" & DQ
+  fEng  = "," & DQ & "value" & DQ & ":"
+  fUnit = "," & DQ & "unit" & DQ & ":" & DQ
+  fConv = "," & DQ & "conversion" & DQ & ":" & DQ
+  fProto = "," & DQ & "protocol" & DQ & ":" & DQ & LOCAL_PROTOCOL & DQ
+
+  'The local channel table. These names are the `channel` values on the wire and
+  'therefore half of each reading's address in the database -- change one and the
+  'readings before and after the change are two different addresses that no
+  'query joins back together. They have to match the sensor rows in
+  'db/migrations/0026_bateson_test_rig.sql.
+  '
+  'LocRawDp is the decimals value_raw is rendered with. It is 0 for rain because
+  'that channel's raw is a tip COUNT, and three tips written as 3.000 is a raw
+  'count pretending to have been measured to a thousandth.
+  LocName(LOC_RAIN)   = "rain"
+  LocUnit(LOC_RAIN)   = "mm"
+  LocRawDp(LOC_RAIN)  = 0
+  LocName(LOC_LEVEL1) = "level_1"
+  LocUnit(LOC_LEVEL1) = "m"
+  LocRawDp(LOC_LEVEL1) = 3
+  LocName(LOC_LEVEL2) = "level_2"
+  LocUnit(LOC_LEVEL2) = "m"
+  LocRawDp(LOC_LEVEL2) = 3
+  LocName(LOC_BATT)   = "battery"
+  LocUnit(LOC_BATT)   = "V"
+  LocRawDp(LOC_BATT)  = 3
+
+  'Only rain converts, so only rain carries a conversion note. The other three
+  'report the number the sensor gave, which is already the engineering value, and
+  'a `conversion` saying "none" would be a column of noise on every row.
+  LocConv(LOC_RAIN) = "raw x " & FormatFloat (Rain_bucket,"%.3f") & " mm per tip"
+  LocConv(LOC_LEVEL1) = ""
+  LocConv(LOC_LEVEL2) = ""
+  LocConv(LOC_BATT) = ""
+
+  Level1_m = NAN                     'so a sensor that has never answered reads
+  Level2_m = NAN                     'as NAN rather than as a plausible zero
+  If LOCAL_ENABLE Then
+    LocalState = "starting"
+  Else
+    LocalState = "disabled - see LOCAL_ENABLE"
+  EndIf
+  If TEST_ENABLE Then
+    TestState = "idle - set TestFire true to fire one"
+  Else
+    TestState = "disabled - see TEST_ENABLE"
+  EndIf
+
   'The topics, built once from the two segments in section 1 rather than typed
   'out, so the scheme appears in this program exactly once. They are Public: at
   'commissioning, reading MqttTopic off the logger and checking it against the
@@ -2937,6 +3596,53 @@ BeginProg
     Call StampNow()
     Call ReadSerial()
 
+    '--- the local sensors, half of them ------------------------------------
+    '
+    ' The rain gauge is read HERE, in the one-second scan, and not in the
+    ' sequence below with the SDI-12 sensors. PulseCount reports the tips that
+    ' have arrived since the last time it was called IN THIS SCAN, so a call
+    ' every five minutes would count correctly and a call in two places would
+    ' not count at all -- and the instruction is a counter read, not a
+    ' measurement, so it costs nothing to do it every second. The tips are
+    ' totalised into Rain_tips_int and the interval's total is what is sent.
+    '
+    ' The SDI-12 sensors cannot be read here: SDI12Recorder blocks for about a
+    ' second per sensor while the bus answers, and a base station that stops
+    ' reading its serial port for two seconds has lost every transmission in
+    ' that window. They are in a sequence of their own and STAGE their answers;
+    ' LocalPush, below, is what actually queues them, in this scan, because
+    ' QHead has one writer.
+    If LOCAL_ENABLE Then
+      PulseCount (Rain_tips,1,LOCAL_RAIN_CHAN,RAIN_CONFIG,RAIN_OPTION,1,0)
+      Rain_tips_int = Rain_tips_int + Rain_tips
+      Rain_mm = Rain_bucket * Rain_tips_int
+
+      If TimeIntoInterval (0,LOCAL_EVERY,Min) Then
+        'The rain gauge: this interval's tips, and the millimetres they are.
+        'Rebuilt each interval rather than once at startup so a bucket size
+        'corrected at the logger travels with the readings that follow it and
+        'not with the ones already stored.
+        LocConv(LOC_RAIN) = "raw x " & FormatFloat (Rain_bucket,"%.3f") & " mm per tip"
+        Rain_last_mm = Rain_mm
+        Rain_total_mm = Rain_total_mm + Rain_mm
+        locRawV(LOC_RAIN) = Rain_tips_int
+        locEngV(LOC_RAIN) = Rain_mm
+        locPend(LOC_RAIN) = True
+        Rain_tips_int = 0
+
+        'The supply voltage, from the Battery instruction at the top of this
+        'scan. It is here because it is the channel that needs nothing wired to
+        'it: a rig with no sensors attached at all still reports something, so
+        '"is this station reaching MegaNet" is answerable before anybody has
+        'been to site.
+        locRawV(LOC_BATT) = Batt_volt
+        locEngV(LOC_BATT) = Batt_volt
+        locPend(LOC_BATT) = True
+      EndIf
+
+      Call LocalPush()
+    EndIf
+
     'Capture housekeeping. The flush is time-based as well as size-based so a
     'quiet feed still commits what it has, and CaptureReset clears itself once
     'acted on so it behaves like a button rather than a mode.
@@ -2968,6 +3674,7 @@ BeginProg
     If QDepth > QPeak Then QPeak = QDepth
 
     SecsSincePost = SecsSincePost + 1
+    SecsSinceLocal = SecsSinceLocal + 1
     SecsSinceMqtt = SecsSinceMqtt + 1
     SecsSinceTry = SecsSinceTry + 1
     SecsSinceStatus = SecsSinceStatus + 1
@@ -3096,6 +3803,47 @@ BeginProg
     NextScan
   EndSequence
 
+  '--- the local sensors: the SDI-12 bus --------------------------------------
+  '
+  ' Its own sequence because SDI12Recorder blocks: it puts the address and the
+  ' command on the bus and waits for the sensor to say it is ready and then to
+  ' answer, which is about a second per sensor on a standard "M!". Two of them
+  ' in the one-second main scan is two seconds of not reading the serial port,
+  ' every interval, and every transmission in that window is gone. The same
+  ' reason the poster is a sequence, for the same instruction shape.
+  '
+  ' It does NOT queue anything. It writes the values into the staging pair and
+  ' sets locPend; the main scan sees the flag within a second and calls
+  ' QueuePush. QHead has one writer, and this is what keeps that true -- see the
+  ' note at LocalPush.
+  '
+  ' A sensor that does not answer leaves NAN in its variable, which is the
+  ' honest answer and is what LocalPush refuses to queue. FillNaN is -1 here for
+  ' exactly that: the alternative is the previous reading left in place, and a
+  ' level sensor that has been unplugged for a week reporting last Tuesday's
+  ' level is the one failure this whole program is written to avoid.
+  SlowSequence
+    Scan (LOCAL_EVERY,Min,1,0)
+      If LOCAL_ENABLE Then
+        SDI12Recorder (Level1_m,LOCAL_SDI_PORT,LVL1_SDI_ADDR,"M!",1.0,0,-1,1)
+        SDI12Recorder (Level2_m,LOCAL_SDI_PORT,LVL2_SDI_ADDR,"M!",1.0,0,-1,1)
+
+        'Raw and converted are the same number for these two: an SDI-12 sensor
+        'returns metres, so there is nothing to convert and nothing to record a
+        'conversion for. They are both sent anyway, because `value_raw` is what
+        'the device measured and `value` is the engineering value -- and here
+        'they genuinely are the same measurement, which is a fact worth the
+        'eight characters rather than something to leave the reader to infer.
+        locRawV(LOC_LEVEL1) = Level1_m
+        locEngV(LOC_LEVEL1) = Level1_m
+        locPend(LOC_LEVEL1) = True
+        locRawV(LOC_LEVEL2) = Level2_m
+        locEngV(LOC_LEVEL2) = Level2_m
+        locPend(LOC_LEVEL2) = True
+      EndIf
+    NextScan
+  EndSequence
+
   '--- clock discipline -------------------------------------------------------
   '
   ' Its own sequence because NetworkTimeProtocol blocks for up to 70 seconds,
@@ -3148,6 +3896,14 @@ EndProg
 ' CR6 -- save as .CR6. The RS-232 port is ComRS232; a serial daughterboard port
 '   is ComC1 or ComC3 depending on how it is wired.
 '
+' The local sensors need two constants checked on either. LOCAL_RAIN_CHAN is
+'   P_SW, which is the CR300's dedicated switched-pulse terminal and does not
+'   exist on the other two -- there the tipping bucket goes on a C terminal (C1,
+'   C2, ...) configured for pulse input, so the constant becomes that terminal's
+'   name. LOCAL_SDI_PORT is C1 here; on a CR6 an SDI-12 bus can be U1/U2 as well,
+'   and the two sensors' addresses in LVL1_SDI_ADDR/LVL2_SDI_ADDR are wiring
+'   rather than hardware and travel unchanged.
+'
 ' Both have more memory than a CR300, so Q_SIZE, RX_BUFFER and CONTENT_SIZE can
 ' go up. Raise CONTENT_SIZE, CONTENT_GUARD and MAX_BATCH together -- a reading
 ' is up to 92 characters -- and remember the ceiling is 1000 readings per
@@ -3174,7 +3930,22 @@ EndProg
 ' What this program deliberately does not do
 '==============================================================================
 '
-' It does not convert counts to millimetres or metres. See point 4 at the top.
+' It does not convert counts to millimetres or metres FOR THE RADIO. See point 4
+'   at the top, and the paragraph under it about why the sensors on this
+'   logger's own terminals are the one place that does.
+'
+' It does not make the self-test look like a test. The line TestInject writes is
+'   a valid ALERT2A frame and nothing downstream is told where it came from,
+'   because a path that knows it is being tested is not the path under test.
+'   What separates a self-test reading from a real one is its ADDRESS -- 8101,
+'   in a block no station in the registry uses -- so it is distinguishable in
+'   the database, by a query, after the fact, rather than being handled
+'   differently on the way through.
+'
+' It does not fire the self-test on its own by default. TestEvery ships at 0.
+'   An unattended self-test writes synthetic readings into the live database
+'   forever, and a test rig that quietly becomes a data source is a worse
+'   problem than the one it was solving.
 '
 ' It does not flush the serial port after reading it. A flush belongs to a
 '   driver that owns a request/response conversation, like the KDO one this
