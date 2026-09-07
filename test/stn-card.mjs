@@ -153,6 +153,13 @@ async function main() {
         grouped:    groups.length > 1 && groups.every(g =>
                     g.getAttribute('role') === 'group' && !!g.getAttribute('aria-label')),
         iconed:     kids.every(e => /^\p{Extended_Pictographic}/u.test(e.textContent.trim())),
+        // Two pairs, in this order: the two ways to stand on the ground, then
+        // the two Google Earth errands.
+        imagery:    (() => {
+          const g = groups.find(x => x.getAttribute('aria-label') === 'Imagery and terrain');
+          return g ? [...g.children].map(e => e.textContent.trim().replace(/^\S+\s/, '')) : [];
+        })(),
+        field:      !!acts.querySelector('.mn-field-data'),
         editFirst:  kids[0] && kids[0].classList.contains('mn-edit-station')
                     && kids[0].tagName === 'BUTTON' && kids[0].type === 'button',
         hasCopy:    !!acts.querySelector('.mn-copy-latlon'),
@@ -174,6 +181,10 @@ async function main() {
     check('in named groups, each its own row — the rules a sighted reader sees',
       rows.grouped);
     check('and every one of them opens with an icon', rows.iconed);
+    check('the imagery group is the two street views, then the two Google Earths',
+      rows.imagery.join(' | ') === 'Google Street View ↗ | Apple Maps ↗ | Google Earth KML ⬇ | Google Earth ↗',
+      rows.imagery.join(' | '));
+    check('and a station with a position offers Field data', rows.field);
     check('and the rows together are Edit plus exactly what the callout offers',
       rows.hasCopy && rows.hasList && rows.count === rows.expect,
       `${rows.count} vs ${rows.expect}`);
@@ -443,6 +454,42 @@ async function main() {
     check('with the keyboard still on it through the repaint', blast.none || blast.focused);
     check('and disarming puts the label back',
       blast.none || blast.backLabel === '💥 Show blast radius', blast.backLabel);
+
+    // "Field data →" is the third door into the Field Data tab, after the
+    // picker itself and the Message Log's per-address one — and the first that
+    // starts from a station. The datastore is blocked by the network policy, so
+    // what is asserted here is the handoff: the tab changes, the picker lands on
+    // this station, and its addressable sensors are ticked. What happens to the
+    // query after that is `npm run fieldprobe`'s subject.
+    const toField = await page.evaluate(async () => {
+      const s = state.data.stations.find(x =>
+        x.lat != null && ArroData.fieldAddrs(x).length > 0) || state.data.stations[0];
+      showStationCard(s.id);
+      const pill = document.querySelector('#stn-card .mn-field-data');
+      const label = pill && pill.textContent.trim();
+      pill.click();
+      await new Promise(r => setTimeout(r, 120));
+      const q = ArroData.ad.fq;
+      return {
+        label, tab: state.activeTab, source: ArroData.ad.source,
+        id: q && q.stationId, want: s.id,
+        ticked: q ? q.sensors.length : 0, addrs: ArroData.fieldAddrs(s).length,
+        probeBlock: !!document.querySelector('#ad-side .ad-field-probe'),
+      };
+    });
+    check('Field data → is on the card, with its own icon',
+      toField.label === '🌡️ Field data →', toField.label);
+    check('and it opens the Field Data tab, on that station',
+      toField.tab === 'field' && toField.source === 'field' && toField.id === toField.want,
+      `${toField.tab}/${toField.source} ${toField.id} vs ${toField.want}`);
+    check('with every address it can be reached on already ticked',
+      toField.ticked === toField.addrs && toField.ticked > 0,
+      `${toField.ticked} of ${toField.addrs}`);
+    check('and the datastore block drawn under them', toField.probeBlock);
+
+    await page.evaluate(() => { switchTab('stations'); });
+    await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0, null, { timeout: 20_000 });
+    await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: 10_000 });
 
     // The ACMA card is three tabs' furniture; opening it on another tab must
     // not forget which station this map was looking at.

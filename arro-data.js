@@ -1207,8 +1207,63 @@ const ArroData = (function () {
       error:     '',
       empty:     '',
       seq:       0,         // in-flight query id; a late reply for an old one is dropped
+      probe:     newFieldProbe(),   // what the datastore says it holds — see fieldProbe()
     };
   }
+
+  // ── What the datastore actually holds ────────────────────────────────────────
+  // Everything above this line asks stations.json what a station *should* be
+  // reporting. This asks meganet.reading what it *has*, and the two disagree
+  // constantly: 244 of the 706 addresses in the datastore today have no
+  // station_id resolved at all, and the readings that prove the whole ingest
+  // path works arrive under an address no registry entry could have predicted.
+  //
+  // 18 Bateson is the case that made this necessary and is worth stating in
+  // full, because it is not an edge case so much as the shape of the problem.
+  // The surveyed station `18_bateson` is document-managed: no station number,
+  // no ALERT ids, no sensor rows — so fieldAddrs() returns nothing, the picker
+  // says "No ALERT addresses recorded for this station", and an operator is
+  // left with a text box and no idea what to type into it. Meanwhile four
+  // channels report every five minutes into meganet.reading under
+  // `s:999998/rain`, `/level_1`, `/level_2` and `/battery`, filed against a
+  // *second* station row (`bateson_test`) that db/migrations/0026 created
+  // deliberately so that workshop rain could never be read as gauged rainfall.
+  // Both halves of that are right. What was missing was any way to get from
+  // one to the other without reading the migration.
+  //
+  // So: ask. The probe is a search over the four things a reading carries its
+  // identity as — station_id, channel, station_number, alert_id — and it
+  // reports distinct addresses with what it saw on each. Its answers are
+  // tickable exactly like a registry sensor, because to the query that follows
+  // they are the same thing: an address and a window.
+  //
+  // It is a *search*, not a resolution. An address it finds under another
+  // station id is labelled with that station id, here and again on the series
+  // it produces, and the widened search below says out loud that it widened.
+  function newFieldProbe() {
+    return {
+      term:    '',       // what was searched for; '' means "the station picked above"
+      asked:   false,    // has the datastore been asked at all this session
+      loading: false,
+      error:   '',
+      rows:    [],       // [{addr, stationId, unit, n, first, last}], newest first
+      scanned: 0,        // readings read to produce them
+      capped:  false,    // ...and whether that hit the cap
+      widened: '',       // the word a station poll fell back to, when it did
+      seq:     0,
+    };
+  }
+
+  // Readings read per probe. The whole table is 17,783 rows today and this is
+  // deliberately larger than that: the question is "what exists", and an answer
+  // assembled from a recent slice would report a sensor that stopped six weeks
+  // ago as absent — which is the one thing an operator asking this question is
+  // most likely to be chasing. When it does bite, the block says so rather
+  // than quietly showing a prefix, the same rule AD_FIELD_ROW_CAP follows.
+  const AD_PROBE_PAGE     = 10000;
+  const AD_PROBE_ROW_CAP  = 40000;
+  const AD_PROBE_ADDR_CAP = 60;     // addresses listed before it asks for a narrower search
+  const AD_PROBE_SELECT   = 'addr,station_id,unit,reading_ts';
 
   const fq = () => (ad.fq || (ad.fq = newFieldQuery()));
 
@@ -1279,6 +1334,208 @@ const ArroData = (function () {
       .map(sen => sen.type || 'sensor');
   }
 
+  // The filter that finds a term. Four columns, because a reading carries its
+  // identity in four places and an operator typing "bateson", "rain", "999998"
+  // or "8101" means a different one each time.
+  //
+  // Deliberately not a search over `addr` itself. `addr` is generated — it is
+  // `a:<alert_id>` or `s:<number>/<channel>` — so every one of its parts is
+  // already covered by a column here, and searching the composite would drag
+  // PostgREST's filter punctuation (`:` `/` `.` `,`) through a URL for no new
+  // matches. The term is stripped to what those columns can hold instead, which
+  // is why an address typed in whole belongs in the "Or an address" box above
+  // rather than here.
+  function fieldProbeFilter(term) {
+    const safe = String(term).replace(/[^A-Za-z0-9_\- ]+/g, ' ').trim();
+    if (!safe) return '';
+    const like = `*${encodeURIComponent(safe)}*`;
+    const parts = [
+      `station_id.ilike.${like}`,
+      `channel.ilike.${like}`,
+      `station_number.ilike.${like}`,
+    ];
+    // alert_id is an integer column: ilike would be a type error, and an
+    // operator who types 8101 means that address rather than a substring of it.
+    if (/^\d+$/.test(safe)) parts.push(`alert_id.eq.${safe}`);
+    return `or=(${parts.join(',')})`;
+  }
+
+  // The word to search for when a station's own id turns up nothing. The
+  // longest run of four or more letters in its id or its name — "bateson" for
+  // 18 Bateson, which finds bateson_test without this file having to know that
+  // bateson_test exists. Short words are skipped because "the" and "al" match
+  // half the network; nothing at all is returned rather than a guess when a
+  // station's name is all digits.
+  function fieldProbeWiden(st) {
+    const words = `${st?.id || ''} ${st?.name || ''}`.toLowerCase().match(/[a-z]{4,}/g) || [];
+    if (!words.length) return '';
+    return words.sort((a, b) => b.length - a.length)[0];
+  }
+
+  // Something that tells one address from another when the registry has no name
+  // for it. Without this, four probed channels all come out labelled with the
+  // station they belong to and the series list is four identical rows — which
+  // was true of the picked station's name before the probe existed too, and is
+  // only now the common case. The channel is the device's own word for the
+  // sensor (`rain`, `level_1`), which is the best name anybody has.
+  function fieldAddrLabel(addr) {
+    const a = String(addr || '');
+    if (a.startsWith('a:')) return `ALERT ${a.slice(2)}`;
+    const slash = a.indexOf('/');
+    return slash >= 0 ? a.slice(slash + 1) : a;
+  }
+
+  // Paged exactly as fieldQueryRows() is, and for the same reason: the rows-per
+  // -response cap is a server setting we do not control, so this reads until a
+  // page comes back short.
+  async function fieldProbeRows(filter) {
+    const base = `reading?${filter}&select=${AD_PROBE_SELECT}&order=reading_ts.desc`;
+    const rows = [];
+    let capped = false;
+    for (;;) {
+      const page = await dbSelect(`${base}&limit=${AD_PROBE_PAGE}&offset=${rows.length}`);
+      if (!Array.isArray(page) || !page.length) break;
+      rows.push(...page);
+      if (page.length < AD_PROBE_PAGE) break;
+      if (rows.length >= AD_PROBE_ROW_CAP) { capped = true; break; }
+    }
+    return { rows, capped };
+  }
+
+  // Readings → one row per address. Newest-reporting first, because "is it
+  // still speaking" is the question a person asking this is usually really
+  // asking.
+  function fieldProbeReduce(rows) {
+    const by = new Map();
+    for (const r of rows) {
+      const addr = r.addr;
+      if (!addr) continue;
+      let e = by.get(addr);
+      if (!e) {
+        e = { addr, stationId: r.station_id || null, unit: '', n: 0, first: Infinity, last: -Infinity };
+        by.set(addr, e);
+      }
+      e.n++;
+      if (!e.unit && r.unit) e.unit = r.unit;
+      if (!e.stationId && r.station_id) e.stationId = r.station_id;
+      const t = Date.parse(r.reading_ts);
+      if (isFinite(t)) { if (t < e.first) e.first = t; if (t > e.last) e.last = t; }
+    }
+    return [...by.values()].sort((a, b) => b.last - a.last);
+  }
+
+  // Ask. Three questions in order, and it stops at the first that answers:
+  //
+  //   1. the picked station's own id — the indexed one, and the only one whose
+  //      answer needs no caveat
+  //   2. its registry addresses — a reading whose address never resolved to a
+  //      station still belongs to it, and station_id is null on all 244 of them
+  //   3. a widened search on a word out of its name — which is how 18 Bateson
+  //      finds the rig at 18 Bateson, and is flagged as a guess wherever it is
+  //      shown
+  //
+  // A typed term skips all three and searches for exactly that. Captures the
+  // instance up front, like every other query on this tab: a tab switch
+  // mid-flight must not land one picker's answer in the other's.
+  async function fieldProbe(term, { adopt = false } = {}) {
+    const inst = ad;
+    const q = fq();
+    const p = q.probe;
+    const st = fieldStation();
+    const typed = term != null ? String(term).trim() : String(p.term || '').trim();
+
+    if (!typed && !st) {
+      p.error = 'Pick a station above, or type a station id, channel, station number or ALERT address to search for.';
+      p.asked = true;
+      renderSide();
+      return;
+    }
+
+    const seq = ++p.seq;
+    p.term = typed;
+    p.asked = true;
+    p.loading = true;
+    p.error = '';
+    p.widened = '';
+    renderSide();
+
+    const stale = () => inst.fq !== q || p.seq !== seq;
+    let out = { rows: [], capped: false };
+    let widened = '';
+    try {
+      if (typed) {
+        const filter = fieldProbeFilter(typed);
+        out = filter ? await fieldProbeRows(filter) : { rows: [], capped: false };
+      } else {
+        out = await fieldProbeRows(`station_id=eq.${encodeURIComponent(st.id)}`);
+        if (stale()) return;
+        if (!out.rows.length) {
+          const addrs = fieldAddrs(st).map(a => a.addr);
+          if (addrs.length) {
+            // Quoted: an address is `a:6128` or `s:999998/rain`, and both the
+            // colon and the slash are punctuation to PostgREST's list parser.
+            const list = addrs.map(a => `"${String(a).replace(/["\\]/g, '')}"`).join(',');
+            out = await fieldProbeRows(`addr=in.(${encodeURIComponent(list).replace(/%2C/g, ',')})`);
+            if (stale()) return;
+          }
+        }
+        if (!out.rows.length) {
+          widened = fieldProbeWiden(st);
+          const filter = widened ? fieldProbeFilter(widened) : '';
+          if (filter) { out = await fieldProbeRows(filter); if (stale()) return; }
+        }
+      }
+    } catch (err) {
+      if (stale()) return;
+      p.loading = false;
+      p.rows = []; p.scanned = 0; p.capped = false;
+      p.error = `Could not read the datastore — ${err && err.message || err}. `
+              + `${dbHostLabel()} may be unreachable, or asleep.`;
+      renderSide();
+      return;
+    }
+    if (stale()) return;
+
+    p.loading = false;
+    p.rows    = fieldProbeReduce(out.rows);
+    p.scanned = out.rows.length;
+    p.capped  = out.capped;
+    p.widened = p.rows.length ? widened : '';
+
+    // Opened from the station card with nothing in the registry to tick: what
+    // this found *for this station* is what "all its sensors" meant, so it is
+    // ticked and drawn without a second press. A widened match is deliberately
+    // not — those belong to another station row, and putting another site's
+    // readings on screen under the name of the pin somebody clicked is the one
+    // thing this whole path must not do on its own. They are listed, tagged
+    // with the station they are filed under, and left to be chosen.
+    if (adopt && p.rows.length && !p.widened) {
+      q.sensors = p.rows.map(r => r.addr);
+      renderSide();
+      fieldRun();
+      return;
+    }
+
+    renderSide();
+    announce(p.rows.length
+      ? `${p.rows.length} address${p.rows.length === 1 ? '' : 'es'} in the datastore.`
+      : 'Nothing in the datastore matches.');
+  }
+
+  function fieldSetProbeTerm(v) { const p = fq().probe; p.term = String(v || ''); renderSide(); }
+
+  function fieldProbeClear() { fq().probe = newFieldProbe(); renderSide(); }
+
+  // Everything tickable: the registry's addresses, then anything the probe
+  // turned up that they do not already cover. One list, because an "all" that
+  // meant only half of what is on screen would be a lie about the other half.
+  function fieldSelectableAddrs() {
+    const out = fieldAddrs(fieldStation()).map(a => a.addr);
+    const seen = new Set(out);
+    for (const r of fq().probe.rows) if (!seen.has(r.addr)) { seen.add(r.addr); out.push(r.addr); }
+    return out;
+  }
+
   function fieldWindow(q) {
     if (q.win === 'custom') {
       const t0 = Date.parse(`${q.from}T00:00:00`);
@@ -1328,10 +1585,13 @@ const ArroData = (function () {
     return fieldQualityMap;
   }
 
+  // station_id rides along on all three so a series can be labelled with the
+  // station the *readings* name rather than the one the picker happened to be
+  // showing — see the owner lookup in fieldRun(). Both rollups carry it too.
   const AD_FIELD_SELECT = {
-    raw:    'addr,reading_ts,received_at,value_raw,value,unit,quality,path,dup_count,dup_paths',
-    hourly: 'addr,bucket,n,n_dup,unit,raw_min,raw_max,raw_last,val_last,first_ts,last_ts',
-    daily:  'addr,bucket,n,n_dup,unit,raw_min,raw_max,raw_last,val_last,first_ts,last_ts',
+    raw:    'addr,station_id,reading_ts,received_at,value_raw,value,unit,quality,path,dup_count,dup_paths',
+    hourly: 'addr,station_id,bucket,n,n_dup,unit,raw_min,raw_max,raw_last,val_last,first_ts,last_ts',
+    daily:  'addr,station_id,bucket,n,n_dup,unit,raw_min,raw_max,raw_last,val_last,first_ts,last_ts',
   };
 
   // A date for reading_daily's `bucket`, which is a date rather than a
@@ -1513,8 +1773,20 @@ const ArroData = (function () {
         const data  = seriesData(built.cols);
         const hit   = known.get(addr);
         const sensor = hit?.sensor || null;
-        const label = [st?.name || (addr.startsWith('a:') ? `ALERT ${addr.slice(2)}` : addr),
-                       sensor?.type || (hit?.label || '')].filter(Boolean).join(' · ');
+        // Whose readings these are, according to the readings. An address
+        // ticked out of the datastore probe can belong to another station
+        // entirely — 18 Bateson's four channels are stored under
+        // `bateson_test`, deliberately, so that workshop rain can never be
+        // read as gauged rainfall (db/migrations/0026) — and labelling them
+        // with whichever station the picker was showing would undo exactly
+        // that separation. The picked station stands when the readings name
+        // nobody, which is the 244 unresolved addresses' case.
+        const ownerId = rows.find(r => r.station_id)?.station_id || null;
+        const owner = ownerId && ownerId !== st?.id
+          ? ((state.data?.stations || []).find(x => x.id === ownerId) || { id: ownerId, name: ownerId })
+          : st;
+        const label = [owner?.name || fieldAddrLabel(addr),
+                       sensor?.type || hit?.label || fieldAddrLabel(addr)].filter(Boolean).join(' · ');
         const warn = [];
         if (out.capped) warn.push(`The row cap (${AD_FIELD_ROW_CAP.toLocaleString()}) was reached — this is the start of the window, not all of it. Narrow the window or pick a coarser resolution.`);
         if (res !== 'raw') warn.push(`Drawn from ${AD_RES_LABEL[res]}: each point is the counter as it read at the end of its bucket. Within-bucket minimum and maximum are in the inspector and the export.`);
@@ -1525,7 +1797,7 @@ const ArroData = (function () {
           fileName: `${addr} · ${AD_RES_LABEL[res]}`,
           meta:     { sensorId: sensor?.sensor_id || null },
           label,
-          station:  st || null,
+          station:  owner || null,
           sensor,
           linkHow:  'address',
           sensorId: sensor?.sensor_id || null,
@@ -1584,6 +1856,9 @@ const ArroData = (function () {
     const win = fieldWindow(q);
     const res = win ? fieldRes(q, win) : null;
     const hits = st ? [] : fieldMatches(q.find);
+    // "all" means everything on screen, registry and probed alike.
+    const pick = fieldSelectableAddrs();
+    const allOn = pick.length > 0 && pick.every(a => q.sensors.includes(a));
 
     return `
       <div class="panel ad-panel">
@@ -1618,21 +1893,22 @@ const ArroData = (function () {
         ${st ? `
           <div class="ad-field-sensors">
             <div class="panel-header ad-subhead">
-              <h3 class="ad-subhead-h" id="ad-sensors-h">Sensors</h3>
+              <h3 class="ad-subhead-h" id="ad-sensors-h"
+                  title="What stations.json says this station reports. What it actually reports is the block below.">Sensors</h3>
               <button class="btn-link" onclick="ArroData.fieldAllSensors()"
-                      aria-label="${addrs.length && addrs.every(a => q.sensors.includes(a.addr))
-                        ? 'Untick every sensor' : 'Tick every sensor'}">${
-                addrs.length && addrs.every(a => q.sensors.includes(a.addr)) ? 'none' : 'all'}</button>
+                      aria-label="${allOn ? 'Untick every sensor' : 'Tick every sensor'}">${
+                allOn ? 'none' : 'all'}</button>
             </div>
             ${addrs.map(a => `
               <label class="ad-chk ad-sensor-row">
                 <input type="checkbox" ${q.sensors.includes(a.addr) ? 'checked' : ''}
                        onchange="ArroData.fieldToggleSensor('${escAttr(a.addr)}')">
                 <span>${esc(a.label)} <span class="small mono">${esc(a.addr)}</span></span>
-              </label>`).join('') || '<div class="small">No ALERT addresses recorded for this station.</div>'}
+              </label>`).join('') || `<div class="small ad-field-none">No ALERT addresses recorded for this station
+                — ask the datastore below what it has heard from it.</div>`}
             ${noAddr.length ? `
               <div class="small ad-field-noaddr"
-                   title="A satellite or cellular station reports under its station number and a channel name, which stations.json does not record. Type the address in below if you know it.">
+                   title="A satellite or cellular station reports under its station number and a channel name, which stations.json does not record. Ask the datastore below, or type the address in if you know it.">
                 ${noAddr.length} sensor${noAddr.length === 1 ? '' : 's'} here carr${noAddr.length === 1 ? 'ies' : 'y'} no ALERT address
                 (${esc(noAddr.slice(0, 3).join(', '))}${noAddr.length > 3 ? '…' : ''}).</div>` : ''}
             <label class="ad-cfg-row ad-cfg-row--block ad-cfg-row--spaced"
@@ -1643,6 +1919,8 @@ const ArroData = (function () {
                      onchange="ArroData.fieldSetDate('extra', this.value)">
             </label>
           </div>` : ''}
+
+        ${fieldProbeHtml()}
 
         <div class="panel-header ad-subhead">
           <h3 class="ad-subhead-h" id="ad-window-h">Window</h3></div>
@@ -1683,6 +1961,91 @@ const ArroData = (function () {
       </div>`;
   }
 
+  // The datastore block. Always drawn, station picked or not: "what is in the
+  // database" is a question in its own right, and hiding the only control that
+  // answers it behind having already guessed the answer is the trap this whole
+  // addition exists to get out of.
+  //
+  // Its rows are checkboxes for the same reason the registry's are — ticking
+  // one puts its address in q.sensors, and fieldRun() cannot tell where an
+  // address came from, which is exactly right. What it can tell, and does, is
+  // whose reading it is: see the owner lookup in fieldRun().
+  function fieldProbeHtml() {
+    const q  = fq();
+    const p  = q.probe;
+    const st = fieldStation();
+    const registry = new Set(fieldAddrs(st).map(a => a.addr));
+    const shown = p.rows.slice(0, AD_PROBE_ADDR_CAP);
+    const other = p.rows.filter(r => r.stationId && r.stationId !== (st && st.id)).length;
+
+    return `
+      <div class="ad-field-probe">
+        <div class="panel-header ad-subhead">
+          <h3 class="ad-subhead-h" id="ad-probe-h"
+              title="What meganet.reading has actually heard, rather than what stations.json says this station should report. The two disagree often — 244 of the 706 addresses in the datastore resolve to no station at all.">In the datastore</h3>
+          <button class="btn-link" ${p.loading ? 'disabled' : ''}
+                  title="${escAttr(p.term.trim()
+                    ? `Search the datastore for “${p.term.trim()}”`
+                    : st ? `Read the datastore for ${st.name}`
+                         : 'Type something to search for first')}"
+                  onclick="ArroData.fieldProbe()">${p.loading ? 'asking…' : 'ask'}</button>
+        </div>
+
+        <label class="ad-cfg-row ad-cfg-row--block"
+               title="Station id, channel, station number or ALERT address — the four things a reading carries its identity as. Leave it empty to ask about the station picked above.">
+          <span>Search</span>
+          <input type="search" class="ad-field-input" placeholder="${escAttr(st ? st.id : 'bateson, rain, 999998, 8101…')}"
+                 value="${escAttr(p.term)}"
+                 oninput="ArroData.fieldSetProbeTerm(this.value)"
+                 onchange="ArroData.fieldProbe(this.value)">
+        </label>
+
+        ${p.error ? `<div class="small ad-note ad-note--bad ad-field-msg">${esc(p.error)}</div>` : ''}
+        ${p.loading ? '<p class="small ad-cfg-note">Reading ' + esc(dbHostLabel()) + '…</p>' : ''}
+
+        ${!p.asked && !p.loading ? `<p class="small ad-cfg-note">${st
+          ? `Nothing asked yet. <b>ask</b> reads ${esc(dbHostLabel())} for every address ${esc(st.name)} has reported on.`
+          : 'Type a station id, channel, station number or ALERT address and press Enter.'}</p>` : ''}
+
+        ${p.asked && !p.loading && !p.error && !p.rows.length ? `
+          <p class="small ad-field-none">Nothing in the datastore for
+            ${p.term.trim() ? `“${esc(p.term.trim())}”` : esc(st ? st.name : 'that')}.
+            Nothing has ever been ingested under ${p.term.trim() ? 'it' : 'its id, its addresses, or its name'}.</p>` : ''}
+
+        ${shown.length ? `
+          <div class="ad-probe-found" role="group" aria-label="Addresses found in the datastore">
+            ${shown.map(r => {
+              const foreign = r.stationId && r.stationId !== (st && st.id);
+              return `
+              <label class="ad-chk ad-sensor-row ad-probe-row${foreign ? ' ad-probe-row--other' : ''}">
+                <input type="checkbox" ${q.sensors.includes(r.addr) ? 'checked' : ''}
+                       onchange="ArroData.fieldToggleSensor('${escAttr(r.addr)}')">
+                <span>
+                  <span class="mono">${esc(r.addr)}</span>${r.unit ? ` <span class="small">${esc(r.unit)}</span>` : ''}
+                  ${registry.has(r.addr) ? '<span class="small ad-probe-tag" title="This address is in stations.json too — it is ticked in the Sensors list above as well.">registry</span>' : ''}
+                  ${foreign ? `<span class="small ad-probe-tag ad-probe-tag--other"
+                       title="These readings are filed against a different station row. Charting them here labels them with that station, not this one.">${esc(r.stationId)}</span>`
+                    : r.stationId ? '' : '<span class="small ad-probe-tag" title="No station_id resolved on these readings — the address has never been matched to a station.">unresolved</span>'}
+                  <br><span class="small">${r.n.toLocaleString()} reading${r.n === 1 ? '' : 's'} · last ${esc(fmtFull(r.last))}</span>
+                </span>
+              </label>`; }).join('')}
+          </div>
+
+          ${p.widened ? `<div class="small ad-warn ad-field-msg">
+            Nothing is recorded against <b>${esc(st ? st.name : '')}</b> itself. These matched
+            <b>${esc(p.widened)}</b> in the station id, channel or number, so they belong to
+            ${other ? 'another station row' : 'addresses that resolve to no station'} —
+            check it is the site you mean before you chart it.</div>` : ''}
+
+          <p class="small ad-cfg-note">
+            ${p.rows.length.toLocaleString()} address${p.rows.length === 1 ? '' : 'es'}
+            ${p.rows.length > shown.length ? `(${shown.length} shown — narrow the search) ` : ''}from
+            ${p.scanned.toLocaleString()} reading${p.scanned === 1 ? '' : 's'} on ${esc(dbHostLabel())}.
+            ${p.capped ? `The cap (${AD_PROBE_ROW_CAP.toLocaleString()} readings) was reached, so an address that
+              stopped reporting before then may be missing — search for it by name.` : ''}</p>` : ''}
+      </div>`;
+  }
+
   // Setting a station clears the sensor ticks: they are addresses belonging to
   // the station that was showing, and carrying them across would query one
   // station's addresses under another station's name.
@@ -1691,6 +2054,10 @@ const ArroData = (function () {
     q.stationId = id || '';
     q.find = id ? '' : (find || '');
     q.sensors = [];
+    // The probe answered a question about the station that was showing, so it
+    // goes with it. A list of addresses left standing under another station's
+    // name is the same mistake as carrying the sensor ticks across.
+    q.probe = newFieldProbe();
     if (id) {
       // One sensor is the common case and ticking it saves a click; more than
       // one is a choice the operator should make deliberately.
@@ -1709,7 +2076,7 @@ const ArroData = (function () {
 
   function fieldAllSensors() {
     const q = fq();
-    const all = fieldAddrs(fieldStation()).map(a => a.addr);
+    const all = fieldSelectableAddrs();
     q.sensors = all.length && all.every(a => q.sensors.includes(a)) ? [] : all;
     renderSide();
   }
@@ -1718,6 +2085,36 @@ const ArroData = (function () {
   function fieldSetRes(k)    { const q = fq(); q.res = k; renderSide(); }
   function fieldSetDate(which, v) { const q = fq(); q[which] = v; q.error = ''; renderSide(); }
   function fieldClearError() { const q = fq(); q.error = ''; q.empty = ''; renderSide(); }
+
+  // The station card's door in (#175): a station, everything it can be
+  // addressed on ticked, and the readings drawn — the errand somebody standing
+  // on a map pin is actually on. Unlike fieldShow() it starts from a *station*
+  // rather than an address, which means it has to have an answer for a station
+  // that cannot be addressed at all.
+  //
+  // That answer is the probe. With no sensor to tick there is nothing to load,
+  // so it asks the datastore instead and lands the operator on a list of what
+  // that station has actually reported — which for 18 Bateson is four channels
+  // filed under a station row the map has no pin for, and for a genuinely
+  // silent station is the sentence "nothing has ever been ingested under its
+  // id, its addresses, or its name". Both are answers; an empty picker was not.
+  //
+  // The caller switches tabs first, exactly as the Message Log's door does:
+  // switchTab('field') is what makes `ad` the field instance, and writing the
+  // picker before that would set it on the ARRO tab, which has none to show.
+  function fieldOpenStation(id) {
+    const q = fq();
+    const st = (state.data?.stations || []).find(s => s.id === id) || null;
+    q.stationId = st ? st.id : '';
+    q.find   = '';
+    q.extra  = '';
+    q.error  = ''; q.empty = '';
+    q.probe  = newFieldProbe();
+    q.sensors = st ? fieldAddrs(st).map(a => a.addr) : [];
+    if (q.sensors.length) { fieldRun(); return; }
+    renderSide();
+    fieldProbe('', { adopt: true });
+  }
 
   // The Message Log's door in: chart one address' raw readings around a
   // moment, exactly as if the operator had worked the picker by hand — so
@@ -1740,6 +2137,7 @@ const ArroData = (function () {
     const q = fq();
     q.stationId = st ? st.id : '';
     q.find = '';
+    q.probe = newFieldProbe();
     const known = st ? fieldAddrs(st).some(x => x.addr === a) : false;
     q.sensors = known ? [a] : [];
     q.extra   = known ? '' : a;
@@ -4015,8 +4413,12 @@ const ArroData = (function () {
     // the Field Data tab (#114)
     fieldSetStation, fieldToggleSensor, fieldAllSensors, fieldSetWindow,
     fieldSetRes, fieldSetDate, fieldRun, fieldClearError,
+    // what the datastore holds, as opposed to what the registry says it should
+    fieldProbe, fieldSetProbeTerm, fieldProbeClear, fieldSelectableAddrs,
     // the Message Log's door in — one address, one moment, charted
     fieldShow,
+    // and the station card's — one station, everything it reports, drawn
+    fieldOpenStation,
     // exposed for reasoning about the filter outside the UI
     parseCsv, parseName, linkStation, guessKind, runFilter, walk357,
     // and about which addresses a station is reachable on, which is two shapes

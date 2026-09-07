@@ -7790,6 +7790,48 @@ code {
 .ad-field-dates { display: flex; align-items: center; gap: .35rem; margin-top: .3rem; }
 .ad-field-dates input { flex: 1; min-width: 0; }
 
+/* What the datastore holds, under what the registry says it should. Ruled off
+   above rather than boxed: it is a second answer to the same question the
+   Sensors list answers, and a box would read as a different subject. */
+.ad-field-probe {
+  margin-top: .5rem;
+  padding-top: .3rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Capped in the markup at AD_PROBE_ADDR_CAP, so this rarely has to scroll —
+   but a station with thirty addresses would otherwise push the window, the
+   resolution and the Load button off the bottom of the rail. */
+.ad-probe-found {
+  display: flex; flex-direction: column;
+  max-height: 260px; overflow-y: auto;
+  margin: .3rem 0;
+}
+
+.ad-probe-row { align-items: flex-start; }
+.ad-probe-row input { margin-top: .2rem; }
+
+/* The small print on a row: which registry it is in, or which station row it
+   is filed under. A tag rather than a sentence because there is one per line
+   and thirty sentences is a paragraph nobody reads. */
+.ad-probe-tag {
+  display: inline-block;
+  padding: 0 .3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Readings filed under a *different* station than the one picked. Marked in
+   the accent rather than in a warning colour: it is not an error, it is the
+   normal way a workshop rig or an unresolved address looks, and the sentence
+   under the list is what explains it. */
+.ad-probe-tag--other {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .ad-empty { max-width: 620px; margin: 2rem auto; padding: 1.5rem; }
 .ad-empty h2 { margin: 0 0 .6rem; }
 .ad-empty p { color: var(--muted); margin: .5rem 0; }

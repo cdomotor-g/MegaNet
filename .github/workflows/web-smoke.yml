@@ -410,6 +410,27 @@ jobs:
         working-directory: test
         run: npm run fieldkind
 
+      # The picker offered a station's sensors out of stations.json and nothing
+      # else, which for 18 Bateson is an empty list beside four channels
+      # reporting every five minutes under another station row. This check is
+      # the path between them, and the two refusals that keep it honest: a
+      # widened match is never charted on its own, and a series is labelled with
+      # the station its readings are filed under rather than the one the picker
+      # was showing. Invisible to smoke — the picker draws either way.
+      - name: What the datastore holds — the Field Data probe, and whose readings they are
+        working-directory: test
+        run: npm run fieldprobe
+
+      # The same drift the claim step's note describes, found again while
+      # adding the one above: `mapfade` has been in `npm run all` with no step
+      # here, so it has run for whoever typed it and on no push at all. A check
+      # CI does not run is a check that is not there. The two lists still have
+      # to be kept in step by hand and still nothing verifies that they agree —
+      # which is the check worth writing the next time either is touched.
+      - name: Fade margin — the figure the map colours a link by is the card's own
+        working-directory: test
+        run: npm run mapfade
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each

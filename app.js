@@ -3088,21 +3088,24 @@ function stationActionGroups(s, { edit = false } = {}) {
            title="Select this station in the list under the map">🗒️ Show in the list below ↓</button>`,
       `<button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
            title="Zoom the map to the ~50 km area around this station">🔍 Zoom to station</button>`,
+      fieldDataPillHtml(s),
       MapBlast.popupLinkHtml(s),
     ] },
     { label: 'Position', pills: [
       copyLatLonPillHtml(s),
       MapMovePin.popupLinkHtml(s),
     ] },
-    // Beside the Google Earth link, and after it on purpose: that one takes
-    // you to the ground, this one takes the network with you (#176,
-    // export.js). Literally beside it now — the KML pill used to be last in a
-    // flat row of eleven, two document searches away from the link it belongs
-    // next to. No coordinates, no group: neither the views nor the KML exist
-    // for a station with no position.
+    // Two pairs, which is what the row wraps into at the card's width: the two
+    // ways to stand on the ground (Street View, Apple Maps — Look Around is one
+    // tap further), then the two Google Earth errands. Google Earth and Apple
+    // Maps traded places to make that so, at the same time as the KML download
+    // came to sit against the Earth link it belongs with (#176, export.js) —
+    // that one takes you to the ground, this one takes the network with you.
+    // No coordinates, no group: neither the views nor the KML exist for a
+    // station with no position.
     { label: 'Imagery and terrain', pills: (() => {
       const v = mapViewPillParts(s);
-      return v ? [v.street, v.earth, stationKmlPillHtml(s), v.apple] : [];
+      return v ? [v.street, v.apple, stationKmlPillHtml(s), v.earth] : [];
     })() },
     { label: 'Records', pills: [
       arroUrl ? `<a class="pill" href="${esc(arroUrl)}" target="_blank" rel="noopener"
@@ -3112,6 +3115,44 @@ function stationActionGroups(s, { edit = false } = {}) {
     ] },
   ].map(g => ({ label: g.label, pills: g.pills.filter(Boolean) }))
    .filter(g => g.pills.length);
+}
+
+// "Field data →": the station's readings, on the tab that draws them. The
+// third door into Field Data after the picker itself and the Message Log's
+// per-address one (ArroData.fieldShow) — and the first that starts from a
+// station rather than from an address, which is how somebody standing at a
+// map pin thinks about it.
+//
+// It is offered for every station, including the ones with no addressable
+// sensor at all. That looks like a dead end and is the opposite: what the tab
+// answers there is "nothing in stations.json says how to address this site,
+// here is what the datastore has actually heard from it" — see
+// ArroData.fieldOpenStation and the probe it fires. 18 Bateson is the station
+// this was built against: no station number, no ALERT ids, no sensor rows,
+// and four channels reporting into meganet.reading under a station id nobody
+// could have guessed from the map.
+//
+// Nothing is drawn when arro-data.js has not loaded — index.html decides that,
+// not this file, and a pill onto a tab that does not exist is worse than none.
+function fieldDataPillHtml(s) {
+  if (typeof ArroData === 'undefined' || !ArroData.fieldOpenStation) return '';
+  const n = (s.sensors || []).length;
+  return `<button type="button" class="pill mn-field-data" onclick="fieldDataFromCard('${escAttr(s.id)}')"
+           title="Open the Field Data tab on this station${n
+             ? ` with its ${n} sensor${n === 1 ? '' : 's'} ticked, and read the datastore`
+             : ' and ask the datastore what it has heard from it'}"
+           >🌡️ Field data →</button>`;
+}
+
+// Out of full screen first, for the reason editStationFromCard gives: the
+// panel is fixed over the whole viewport, and the tab underneath it would be
+// switched invisibly. The tab change has to land before fieldOpenStation runs
+// — switchTab() is what makes `ad` the field instance, and setting the picker
+// on the ARRO one would put a station in a tab that has no picker to show it.
+function fieldDataFromCard(id) {
+  if (state.mapFullscreen) toggleMapFullscreen(false);
+  switchTab('field');
+  ArroData.fieldOpenStation(id);
 }
 
 // The same pills flattened back into one row, which is what the callout draws
