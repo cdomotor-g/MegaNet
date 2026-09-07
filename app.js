@@ -2120,7 +2120,7 @@ function mapDisplayControlsHtml() {
       Wind regions (AS/NZS 1170.2)
     </label>
     <p class="filter-note" id="map-wind-note">${MapWind.noteHtml()}</p>
-    <!-- The two boundary layers (#178). Both draw under everything else and
+    <!-- The two boundary layers (#179). Both draw under everything else and
          neither takes a pointer, so they are context in the literal sense: the
          catchments answer "which basin is this?" and light up from the filter
          box the way the rivers do, the hubs answer "whose is it to maintain?".

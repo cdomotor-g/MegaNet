@@ -27,7 +27,7 @@ token-checked endpoints the bridge calls, in a transaction that rolls back. The
 half of that acceptance which is about a client and a broker rather than about
 Postgres is `bridge/test/integration.test.js`.
 
-## Map boundaries from a KMZ (#178)
+## Map boundaries from a KMZ (#179)
 
 `kml_to_geojson.py` turns a KML or KMZ of polygons into a web-sized GeoJSON, with
 nothing but the standard library — Douglas-Peucker simplification written out,
