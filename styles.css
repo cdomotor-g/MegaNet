@@ -2658,6 +2658,28 @@ hr {
 
    iconSize is null on the marker, so Leaflet leaves the box to the content;
    these translate themselves back over their own anchor point. */
+/* The SLS section on the station card (#180). Set off from the rows above it
+   with a rule rather than a heading block, because it is the same grammar of
+   label/value rows saying where they came from — a different document, not a
+   different kind of card. */
+.stn-card-sls { border-top: 1px solid var(--border); padding-top: .5rem; }
+.stn-card-sls > .small { display: block; margin-bottom: .25rem; }
+.mn-sls-note { margin: .35rem 0 0; }
+
+/* Manual, as a pill. The one fact in that block that changes what a person
+   does: a gauge read by hand reports nothing over the radio, so silence from it
+   is not a telemetry fault to go chasing. Amber rather than red — it is a
+   property of the site, not a problem with it — and it carries a word as well
+   as a colour, since colour is never the only channel. */
+.mn-sls-manual {
+  display: inline-block;
+  padding: 0 .4em;
+  border: 1px solid rgba(217, 138, 20, .55);
+  border-radius: 3px;
+  background: rgba(217, 138, 20, .12);
+  font-weight: 600;
+}
+
 .mn-catchment-label,
 .mn-hub-label {
   font-weight: 700;

@@ -52,6 +52,28 @@ silent: the hub file is 5,931 rings for eight hubs and all but ~660 of them are
 islets under a square kilometre, which the drawn copy leaves out and the
 assignment still uses.
 
+## The Service Level Specification (#180)
+
+`ingest/sls.py` reads six of the eleven schedules out of
+`archive/QLD_SLS_current.pdf` — the Bureau's Queensland flood-warning SLS,
+version 3.1 — into `data/sls-qld.json` and `data/sls-locations.json`.
+
+```bash
+pip install pdfplumber                     # the only dependency in this directory
+python3 tools/ingest/sls.py                # rewrite both files
+python3 tools/ingest/sls.py --report       # what came out, in prose
+python3 tools/ingest/sls.py --check        # fail on drift (CI does this)
+```
+
+The tables are ruled, so the cell grid recovers exactly — but the header cells
+are merged, which leaves 21 columns of which 12 carry anything. Dropping the
+empty ones and reading what is left is the obvious repair and it is wrong: a
+station with no Moderate level shifts every field after it by one. So the column
+indices are fixed per schedule and the header is checked on every page, which is
+what caught Schedules 4 and 7 changing column count mid-schedule. Those three
+are read by value instead, which is only safe because their fields are closed
+vocabularies.
+
 ## `ingest/` — the historical inspection workbook (#122)
 
 `ingest/xlsx.py` is a read-only .xlsx reader with nothing but the standard

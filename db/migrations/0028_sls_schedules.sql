@@ -267,11 +267,26 @@ select m.*,
   left join meganet.station s
          on meganet.bureau_key(s.station_number) = meganet.bureau_key(m.bureau_number)
         and s.deleted_at is null
-  left join meganet.catchment c
-         on c.basin_no = m.basin_no;
+  -- Lateral, and not a plain join on basin_no, because a basin number is not
+  -- unique in meganet.catchment: 0027 split the bay islands into Moreton Island
+  -- and Stradbroke and both are basin 144. A plain join doubled the eight SLS
+  -- rows in that basin, which is the kind of fan-out that looks like data.
+  -- Where the number is ambiguous the SLS's own subheading settles it — it
+  -- reads "144 Stradbroke Islands", so the row whose catchment name appears in
+  -- that text wins, and `ord` breaks a tie that never happens today.
+  left join lateral (
+    select cc.id
+      from meganet.catchment cc
+     where cc.basin_no = m.basin_no
+     order by (pg_catalog.lower(cc.name) = pg_catalog.lower(coalesce(m.catchment_name, ''))) desc,
+              (pg_catalog.strpos(pg_catalog.lower(coalesce(m.catchment_name, '')),
+                                 pg_catalog.lower(cc.name)) > 0) desc,
+              cc.ord
+     limit 1
+  ) c on true;
 
 comment on view meganet.sls_location is
-  'One row per bureau number: the six SLS station schedules merged, joined to meganet.station where the number matches. Lowest schedule wins each field; priority takes the highest stated anywhere.';
+  'One row per bureau number: the six SLS station schedules merged, joined to meganet.station where the number matches. Lowest schedule wins each field; priority takes the highest stated anywhere. Exactly one row per bureau number — the catchment join is lateral because basin 144 is two catchments (Moreton Island and Stradbroke) and a plain join would double those rows.';
 
 -- ── Loading ──────────────────────────────────────────────────────────────────
 -- Takes the document tools/ingest/sls.py writes and makes the table match it.
@@ -395,20 +410,45 @@ security invoker
 set search_path = ''
 as $$
 declare
-  body text;
+  http_schema text;
+  http_status integer;
+  body        text;
 begin
-  if to_regprocedure('extensions.http_get(text)') is null
-     and to_regprocedure('public.http_get(text)') is null then
-    raise exception 'the http extension is not installed — % cannot be fetched from inside the database', url
-      using hint = 'create extension http with schema extensions; or pass the document to meganet.load_sls_doc() instead';
+  -- Found by name rather than by signature, exactly as 0003 does it. Looking
+  -- for `extensions.http_get(text)` specifically is what the first draft did
+  -- and it reported the extension missing on a database that has it.
+  select n.nspname into http_schema
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+   where p.proname = 'http_get'
+   order by case when n.nspname = 'extensions' then 0 else 1 end
+   limit 1;
+
+  if http_schema is null then
+    raise exception 'the http extension is not enabled on this database'
+      using hint = 'run this once, then try again:  '
+                   'create extension if not exists http with schema extensions;';
   end if;
-  execute 'select content from ' ||
-          case when to_regprocedure('extensions.http_get(text)') is not null
-               then 'extensions.http_get($1)' else 'public.http_get($1)' end
-    into body using url;
+
+  begin
+    execute format('select %I.http_set_curlopt(%L, %L)', http_schema, 'CURLOPT_TIMEOUT', '120');
+  exception when others then
+    null;
+  end;
+
+  execute format('select status, content from %I.http_get(%L)', http_schema, url)
+     into http_status, body;
+
+  if http_status is distinct from 200 then
+    raise exception 'fetching % returned HTTP %', url, http_status;
+  end if;
+
   return meganet.load_sls_doc(body::jsonb);
 end
 $$;
+
+comment on function meganet.load_sls_from_url(text) is
+  'Fetch data/sls-qld.json over HTTP and load it. Defaults to the copy on main in the MegaNet repo.';
 
 revoke all on function meganet.load_sls_from_url(text) from public;
 
@@ -463,6 +503,15 @@ begin
   if not exists (select 1 from pg_catalog.pg_views
                   where schemaname = 'meganet' and viewname = 'sls_location') then
     raise exception '0028 did not take: meganet.sls_location is missing';
+  end if;
+  -- One row per bureau number, and no more. The first draft of this view joined
+  -- meganet.catchment on basin_no, which is not unique, and quietly doubled
+  -- every location in basin 144. Rows loaded or not, this must hold.
+  if (select count(*) from meganet.sls_location)
+     is distinct from (select count(distinct bureau_number) from meganet.sls_row) then
+    raise exception '0028 did not take: sls_location has % rows for % bureau numbers — a join is fanning out',
+      (select count(*) from meganet.sls_location),
+      (select count(distinct bureau_number) from meganet.sls_row);
   end if;
 end
 $$;

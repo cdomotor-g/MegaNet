@@ -130,6 +130,9 @@ its cache at all (`PGRST002`).
 | `meganet.pass_range` | The ALERT ranges a repeater passes or excludes, as rows with an `int4range` and a GiST index — so "which repeaters cover address N" is a lookup, not 88 × 10 ranges walked in JavaScript. |
 | `meganet.radio_network`, `meganet.catchment`, `meganet.hub`, `meganet.rm_system` | The reference vocabularies from the top of `stations.json`. `catchment` carries the 77 Queensland drainage basins and, since `0027`, each one's drainage division. `hub` is the Bureau's eight field maintenance regions — the boundaries themselves are `data/bom-hubs.geojson`, not a column here. |
 | `meganet.doc_meta` | The document's `meta` header. Exactly one row, enforced. |
+| `meganet.sls_row`, `meganet.sls_doc` | The Queensland Service Level Specification's six station schedules, as written, and which edition they came from. |
+| `meganet.sls_location` | View: one row per bureau number, the six schedules merged and joined to the station. See **What the SLS says**, below. |
+| `meganet.bureau_key(text)` | A bureau number with its leading zeros gone. The SLS pads to six digits and `station_number` does not; this is what makes them join. |
 | `meganet.station.hub_id`, `meganet.station.catchment_ids` | Which hub maintains a station and which basin it is in — both point-in-polygon against real WGS84 boundaries by `tools/build_geo_layers.py`, not typed and not derived from the affine-fitted basin SVG. See **Where a station is**, below. |
 | `meganet.station_json` | View: one row per *live* station — its id, its `ord`, its `updated_at`, and its `stations.json` fragment. Deleted stations are filtered out here, which is what makes the soft delete work everywhere at once. |
 | `meganet.stations_json` | View: the whole `stations.json` document, rebuilt — the reference lists plus an aggregate of the view above. `security_invoker`, so RLS on the base tables applies. |
@@ -1021,6 +1024,78 @@ tool takes `--kmz-dir` and matches the names loosely, so an upload's hash prefix
 does not matter. Everything downstream travels in `stations.json` like every
 other station fact: `select meganet.load_stations_from_github();` and the
 database has it.
+
+## What the SLS says
+
+`0028`. `archive/QLD_SLS_current.pdf` is the Bureau's "Service Level
+Specification for Flood Forecasting and Warning Services for Queensland",
+version 3.1, September 2018. Six of its eleven schedules are tables of stations
+keyed on the **bureau number** — the same number `station.station_number`
+carries — which makes it the answer to questions this database could not
+previously ask about a station: its flood class levels, whether anybody
+forecasts for it, who owns it, whether a person reads it, and how much it
+matters when it stops.
+
+`tools/ingest/sls.py` reads schedules 2, 3, 4, 7, 8 and 9 into
+`data/sls-qld.json` (3,588 rows) and the merged half into
+`data/sls-locations.json` (2,783 locations, what the app fetches).
+
+**The document as written, and the reading of it — kept apart**, the same split
+`0014` made for the inspection workbook. 764 bureau numbers appear in more than
+one schedule and they disagree: on priority for 42 of them, the name for 39, the
+owner for 23, the basin for 11, the gauge type for 1. `meganet.sls_row` keeps
+every version; `meganet.sls_location` states its rule.
+
+**The rule.** The lowest-numbered schedule that states a field wins, because the
+schedules run from the most specific statement of service (2: forecast
+locations) to the most general inventory (7: what the Bureau owns), so the
+earlier one is making a claim about the flood-warning service rather than about
+a site register. **Except priority, where the highest stated anywhere wins** —
+priority measures the impact of losing a site, and a site that is High to any
+part of the service is High to lose. Letting a `Low` in a site register overrule
+a `High` in the forecast schedule is the one direction that field must not move.
+
+That rule is implemented twice — in Python for the file the app reads, and in
+SQL for `sls_location` — because the app is a field tool that has to work from
+`file://` with no database behind it. The two are held together by an md5 over
+all 2,783 locations and thirteen fields, not by hope.
+
+**The join needs `bureau_key()`.** The document pads to six digits (`040846`);
+`station_number` does not — 2,167 stations carry six digits, 902 five and 87
+four. Matching the strings as they stand finds 884 stations; matching them with
+the leading zeros stripped finds **1,146**, and nothing collides either way.
+
+| | |
+| --- | --- |
+| SLS locations | 2,783 |
+| …that are MegaNet stations | 1,146 |
+| …automatic | 1,874, of which 1,092 are MegaNet stations |
+| …manual, read by a person | 909, of which **54** are MegaNet stations |
+| …with flood class levels | 1,042 |
+
+**The 1,637 that are not MegaNet stations are kept anyway**, with a null
+`station_id`, and that is a decision rather than an oversight. 855 are manual
+gauges (801 the Bureau's own) that telemeter nothing; 782 are automatic gauges
+belonging to DNRME, Sunwater, Seqwater, QLD Rail and NSW Office of Water. None
+of them go into `stations.json` — they are not MegaNet stations and inventing
+rows for them would corrupt every count in the app.
+
+Two rows record a contradiction rather than repairing one: `031170` KAMERUNGA,
+whose priority column reads `River`, and `035283` YAKCAM, whose data type reads
+`River/River`. Both are in `source_note`, and both are what the page says.
+
+```sh
+pip install pdfplumber
+python3 tools/ingest/sls.py            # rewrite both JSON files
+python3 tools/ingest/sls.py --report   # what came out, in prose
+python3 tools/ingest/sls.py --check    # CI
+```
+
+Then, after pushing:
+
+```sql
+select meganet.load_sls_from_url();
+```
 
 ## Checking it from outside
 

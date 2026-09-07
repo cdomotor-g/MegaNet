@@ -72,6 +72,13 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PDF_DEFAULT = os.path.join(REPO, "archive", "QLD_SLS_current.pdf")
 OUT_DEFAULT = os.path.join(REPO, "data", "sls-qld.json")
+# The browser gets the merged half on its own. The full file is 1.5 MB and half
+# of that is the per-schedule rows, which only the database loader reads —
+# app.js has no use for knowing that CLEARVIEW is in Schedule 2 *and* Schedule
+# 8, only for what the two of them say together. 720 KB is the same order as the
+# wind regions (650 KB) and the basins (744 KB), and like both it is fetched
+# when something asks rather than at page load.
+OUT_LOCATIONS = os.path.join(REPO, "data", "sls-locations.json")
 
 # ── Where each schedule is, and which column holds what ──────────────────────
 # `pages` is the 0-based PDF page range, end-exclusive. `cols` maps a field to
@@ -361,6 +368,63 @@ def read_schedule(pdf, number, spec):
     return unique, dropped
 
 
+# The merge rule, in one place. `meganet.sls_location` is the same rule in SQL,
+# and db/README.md states it once for both:
+#
+#   the lowest-numbered schedule that states a field wins — because the
+#   schedules run from the most specific statement of service (2: forecast
+#   locations) to the most general inventory (7: what the Bureau owns), so the
+#   earlier one is making a claim about the flood-warning service rather than
+#   about a site register;
+#
+#   except priority, where the highest stated anywhere wins — because priority
+#   measures the impact of losing a site, and a site that is High to any part of
+#   the service is High to lose. Letting a "Low" in a site register overrule a
+#   "High" in the forecast schedule is the one direction this field must not
+#   move.
+#
+# Emitted alongside the raw rows rather than left to the reader, because the app
+# reads this file straight off disk — it is a field tool that has to work from
+# file:// with no database behind it — and a second implementation of this rule
+# in JavaScript would be a second thing to keep in step.
+MERGE_FIELDS = ("name", "owner", "gauge_type", "data_type", "basin_no",
+                "catchment_name", "class_minor", "class_moderate", "class_major",
+                "prediction_type", "lead_time", "lead_time_hours",
+                "trigger", "peak_accuracy", "source_note")
+PRIORITY_RANK = {"low": 1, "medium": 2, "high": 3}
+SCHEDULE_FLAG = {2: "forecast_location", 3: "information_location",
+                 4: "river_data_location", 7: "bureau_owned",
+                 8: "bureau_assists", 9: "bureau_colocated"}
+
+
+def merge_locations(schedules):
+    """One entry per bureau number, six schedules folded together."""
+    by_number = {}
+    for key in sorted(schedules, key=int):
+        for r in schedules[key]["rows"]:
+            by_number.setdefault(r["bureau_number"], []).append(r)
+
+    out = []
+    for bureau in sorted(by_number):
+        rows = sorted(by_number[bureau], key=lambda r: r["schedule"])
+        loc = {"bureau_number": bureau,
+               "schedules": sorted({r["schedule"] for r in rows})}
+        for f in MERGE_FIELDS:
+            for r in rows:                      # already in schedule order
+                if r.get(f) is not None:
+                    loc[f] = r[f]
+                    break
+        best = max((PRIORITY_RANK.get(str(r.get("priority", "")).lower(), 0)
+                    for r in rows), default=0)
+        if best:
+            loc["priority"] = {1: "Low", 2: "Medium", 3: "High"}[best]
+        for sched, flag in SCHEDULE_FLAG.items():
+            if sched in loc["schedules"]:
+                loc[flag] = True
+        out.append(loc)
+    return out
+
+
 def build(pdf_path):
     import pdfplumber
     out = {"meta": {}, "schedules": {}}
@@ -381,6 +445,8 @@ def build(pdf_path):
             dupes += dropped
             out["schedules"][str(number)] = {"title": spec["title"], "rows": rows}
         out["meta"]["identical_rows_dropped"] = dupes
+        out["locations"] = merge_locations(out["schedules"])
+        out["meta"]["locations"] = len(out["locations"])
     return out
 
 
@@ -393,8 +459,21 @@ def render(doc):
         parts.append(",\n".join(json.dumps(r, sort_keys=True, separators=(",", ":"))
                                 for r in s["rows"]))
         parts.append("\n]\n}" + ("," if i < len(keys) - 1 else "") + "\n")
-    parts.append("}\n}\n")
+    parts.append("},\n")
+    parts.append('"locations": [\n')
+    parts.append(",\n".join(json.dumps(l, sort_keys=True, separators=(",", ":"))
+                             for l in doc["locations"]))
+    parts.append("\n]\n}\n")
     return "".join(parts)
+
+
+def render_locations(doc):
+    """The merged half on its own, for the app."""
+    return ('{\n"meta": ' + json.dumps(doc["meta"], sort_keys=True) + ',\n'
+            '"locations": [\n'
+            + ",\n".join(json.dumps(l, sort_keys=True, separators=(",", ":"))
+                          for l in doc["locations"])
+            + "\n]\n}\n")
 
 
 def report(doc):
@@ -436,26 +515,35 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     ap.add_argument("--pdf", default=PDF_DEFAULT)
     ap.add_argument("--out", default=OUT_DEFAULT)
+    ap.add_argument("--out-locations", default=OUT_LOCATIONS)
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--report", action="store_true")
     a = ap.parse_args(argv)
 
     doc = build(a.pdf)
     body = render(doc)
+    locs = render_locations(doc)
 
     if a.report:
         report(doc)
         return 0
     if a.check:
-        have = open(a.out, encoding="utf-8").read() if os.path.exists(a.out) else None
-        if have != body:
-            print(f"{a.out}: would change — rerun without --check", file=sys.stderr)
-            return 1
-        print(f"{a.out}: up to date")
-        return 0
+        ok = True
+        for path, want in ((a.out, body), (a.out_locations, locs)):
+            have = open(path, encoding="utf-8").read() if os.path.exists(path) else None
+            if have != want:
+                print(f"{path}: would change — rerun without --check", file=sys.stderr)
+                ok = False
+            else:
+                print(f"{path}: up to date")
+        return 0 if ok else 1
 
     with open(a.out, "w", encoding="utf-8") as fh:
         fh.write(body)
+    with open(a.out_locations, "w", encoding="utf-8") as fh:
+        fh.write(locs)
+    print(f"{a.out_locations}: {len(doc['locations'])} merged locations, "
+          f"{len(locs):,} bytes")
     total = sum(len(s["rows"]) for s in doc["schedules"].values())
     print(f"{a.out}: {total} rows across {len(doc['schedules'])} schedules, "
           f"{len(body):,} bytes")

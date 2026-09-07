@@ -3747,6 +3747,10 @@ function repaintStnCard() {
   // never collide with a callout's; the fill checks data-mn-wind before it
   // writes (map-wind.js), and a repaint reproduces both.
   if (s.lat != null && s.lon != null) MapWind.askRegion(`mn-wind-card-${s.id}`, s.lat, s.lon);
+  // And the SLS section, on the same terms and for the same reason: the first
+  // card that asks pays for the 720 KB, every one after is free, and a station
+  // the document does not carry fills with nothing.
+  SLS.ask(`mn-sls-card-${s.id}`, s);
 }
 
 // Escape closes the card from anywhere inside it. On the card rather than on
@@ -3852,6 +3856,8 @@ function stnCardHtml(s) {
   const located  = s.lat != null && s.lon != null;
   const wind     = located ? MapWind.regionState(s.lat, s.lon) : null;
   const windId   = `mn-wind-card-${s.id}`;
+  const sls      = SLS.state(s);
+  const slsId    = `mn-sls-card-${s.id}`;
   const nets     = (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean).join(', ');
   const isRpt    = s.roles.includes('repeater');
   const passing  = isRpt ? repeaterPassingCount(s) : null;
@@ -3881,6 +3887,15 @@ function stnCardHtml(s) {
         `<span class="mn-pop-line mn-pop-indent">${esc(t.id)}${t.types.length ? ' — ' + esc(t.types.join(' / ')) : ''}</span>`).join('<br>')}</div>` : ''}
       ${acmaRepeaterPopupExtra(s)}
     </div>
+    <!-- What the Bureau's Service Level Specification says about this station
+         (#180). Its own section rather than rows in the one above, because it
+         is a different document talking: those rows are what MegaNet knows,
+         these are what the SLS says, and a flood class level is not the same
+         kind of fact as an antenna height. Empty for a station the SLS does
+         not carry, which is 2,030 of them. Filled after the fetch by SLS.ask,
+         the way the wind region line is. -->
+    <div class="acma-sect" id="${escAttr(slsId)}"
+         data-mn-sls="${escAttr(s.station_number || '')}">${sls.html}</div>
     <!-- Edit first, then the same pills the callout offers, from the same
          builder. MapBlast's and MapMovePin's pills close the callout when
          pressed; from here there may be none open, which is fine. -->

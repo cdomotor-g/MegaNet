@@ -389,6 +389,14 @@ jobs:
         working-directory: test
         run: npm run catchments
 
+      # The Service Level Specification on a station card. The assertion this
+      # exists for is the join: the document pads bureau numbers to six digits
+      # and station_number does not, so 262 of the 1,146 matches depend on the
+      # padding being stripped and nothing else in CI would notice it breaking.
+      - name: Service Level Specification — the flood classes reach the card they belong on
+        working-directory: test
+        run: npm run sls
+
       - name: Claim an address from the message that arrived on it
         working-directory: test
         run: npm run claim
@@ -443,6 +451,17 @@ jobs:
       # here.
       - name: Remarks mining — the derived events still match the rules
         run: python3 tools/ingest/remarks.py --check
+
+      # The SLS extraction, on the same footing as the three above: data/
+      # sls-qld.json and data/sls-locations.json are derived from a PDF in
+      # archive/, and a derived file nobody re-derives quietly stops being true.
+      # Needs pdfplumber, which is the only dependency in tools/ — installed
+      # here rather than pinned into the repo, because it is read once per SLS
+      # revision and never by the app.
+      - name: Install pdfplumber for the SLS check
+        run: pip install --quiet pdfplumber
+      - name: Service Level Specification — the extraction still matches the document
+        run: python3 tools/ingest/sls.py --check
 
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —
