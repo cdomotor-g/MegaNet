@@ -360,6 +360,139 @@ function parseSearchTerms(text) {
   return [...new Set(terms.map(t => t.toLowerCase()))];
 }
 
+// ── The other ways the same site gets written down (#182) ────────────────────
+// "Alligator Ck" and "Alligator Creek" are one place, and which of the two is
+// in stations.json is a fact about whoever typed the row rather than about the
+// site. This file carries 243 names spelt `Ck` and 218 spelt `Creek`, 196 `Rd`
+// against 63 `Road`, 117 `Mt` against 60 `Mount` — so a search that reads them
+// as different strings answers with about half of what was asked for, silently,
+// and the only clue the operator gets is a count that looks plausible.
+//
+// So a term's words are expanded through this table before matching. Each group
+// is one word and every way this file (or an operator) writes it. Grouped
+// rather than keyed, because the relation is symmetric — either spelling has to
+// find both — and because one abbreviation can sit in two groups: `St` is
+// Street 70 times here and Saint eight, and both readings are wanted.
+//
+// The table is short and checked rather than long and plausible. Every group was
+// counted against the 3,174 names in this file: seventeen of the twenty-five
+// have *both* spellings on file and are the ones doing the work, and the other
+// eight have one spelling and an abbreviation an operator may well type for it
+// (nobody has written `Jct` or `Sth` here yet — somebody will). None was put in
+// on the strength of being a plausible abbreviation alone.
+//
+// Two candidates were dropped because the file said they meant something else,
+// and both would have been silent about it:
+//
+//   `HW`   is *headwater*, not highway. All 17 uses sit on a dam or a weir —
+//          "Cania Dam HW", "Teddington Weir HW" — and mapping it to Highway
+//          would have quietly answered a search for one with the other.
+//          `Hwy` is a separate entry and is genuinely highway.
+//   `AL` / `TM` are the ALERT and telemetry suffixes, on 1,362 and 239 names.
+//          They say what kind of station it is, not what the place is called,
+//          and the role and network tick boxes already ask that question
+//          properly. Expanding `al` to `alert` would put 1,362 stations behind
+//          a word somebody typed meaning one of the 17 spelt "Alert".
+//
+// `D/S` and `U/S` are downstream and upstream, and they are *phrases*: this
+// table maps one word onto another and has no way to say "these two tokens mean
+// that one". A search for "downstream" still finds only the two names that
+// spell it out. Worth knowing before assuming the table covers everything.
+const NAME_ABBREV = [
+  ['creek',     'ck', 'crk', 'cr'],
+  ['river',     'riv', 'rvr'],
+  ['mount',     'mt'],
+  ['mountain',  'mtn'],
+  ['road',      'rd'],
+  ['street',    'st'],
+  ['saint',     'st'],
+  ['bridge',    'br', 'bge'],
+  ['crossing',  'xing'],
+  ['station',   'stn', 'sta'],
+  ['reservoir', 'res', 'resr'],
+  ['junction',  'jct', 'jctn'],
+  ['park',      'pk'],
+  ['lane',      'ln'],
+  ['drive',     'dr', 'dv'],
+  ['avenue',    'ave', 'av'],
+  ['parade',    'pde'],
+  ['terrace',   'tce'],
+  ['highway',   'hwy'],
+  ['heights',   'hts'],
+  ['island',    'isl'],
+  ['lagoon',    'lgn'],
+  ['point',     'pt'],
+  ['north',     'nth'],
+  ['south',     'sth'],
+];
+
+// One word to every way of writing it, itself included — null when the word is
+// in no group, which is nearly every word an operator types and is the answer
+// that keeps this cheap. Built on first use rather than at load: this file
+// declares and does not run (test/toplevel.mjs).
+let _abbrevIdx = null;
+function abbrevExpansions(word) {
+  if (!_abbrevIdx) {
+    _abbrevIdx = new Map();
+    for (const group of NAME_ABBREV) {
+      for (const w of group) {
+        const set = _abbrevIdx.get(w) || new Set();
+        group.forEach(x => set.add(x));
+        _abbrevIdx.set(w, set);
+      }
+    }
+  }
+  const set = _abbrevIdx.get(word);
+  return set ? [...set] : null;
+}
+
+const RE_META = /[.*+?^${}()|[\]\\]/g;
+function escapeRe(s) { return String(s).replace(RE_META, '\\$&'); }
+
+// A term as a pattern that also finds the other spellings of its words — or
+// null when the plain substring pass already covers everything this could add,
+// which is the case for every number and every single ordinary word.
+//
+// It does two things beyond the table, and both are the difference between a
+// rule that helps and one that surprises.
+//
+// **An expanded word is matched whole.** `ck` finds "Alligator Ck" and not
+// "Buckley", because `Ck` only means Creek when it *is* the word. The plain
+// substring pass runs first and unchanged, so "Buckley" still answers to `ck`
+// exactly as it did — nothing that matched before stops matching, and this only
+// ever adds rows.
+//
+// **The gaps between words match any run of punctuation.** So "beerburrum
+// woodford rd" finds "Beerburrum-Woodford Rd", and "mt. stuart" — which found
+// nothing at all before — finds "Mt Stuart". That is why a multi-word term gets
+// a pattern even when none of its words is in the table.
+//
+// The last word is left open-ended when it is not an abbreviation, because
+// somebody is typing: "mt stu" has to find Mount Stuart before they have
+// finished the word, the way the substring pass always has.
+let _abbrevRe = new Map();
+function termExpansionRe(term) {
+  if (_abbrevRe.has(term)) return _abbrevRe.get(term);
+  // Bounded. A pasted telemetry log is hundreds of distinct terms and every one
+  // of them would otherwise be remembered for the life of the page.
+  if (_abbrevRe.size > 400) _abbrevRe = new Map();
+  const words = String(term).split(/[^a-z0-9]+/).filter(Boolean);
+  let expanded = false;
+  const parts = words.map(w => {
+    const alts = abbrevExpansions(w);
+    if (!alts) return escapeRe(w);
+    expanded = true;
+    return `\\b(?:${alts.map(escapeRe).join('|')})\\b`;
+  });
+  const src = (expanded || words.length > 1) ? parts.join('[^a-z0-9]+') : null;
+  // Two copies of one pattern, because they are asked different questions:
+  // `test` on a /g/ regex carries lastIndex from the call before it, and this
+  // one is asked about three thousand stations in a row.
+  const out = src ? { one: new RegExp(src), all: new RegExp(src, 'g') } : null;
+  _abbrevRe.set(term, out);
+  return out;
+}
+
 // Prepared form of the box's contents: the terms, the numeric ones on their
 // own, and the windows parsed to bounds. Splitting and testing them per station
 // per term is what made a 120-address paste take most of a second; this is done
@@ -379,7 +512,13 @@ function prepareSearch(text) {
       if (range) ranges.push(range);
       else       terms.push(t);
     }
-    _searchPrep = { text: raw, prep: { terms, nums: terms.filter(t => /^\d+$/.test(t)), ranges } };
+    // `res` is dense and index-aligned with `terms` — a term with nothing to
+    // expand holds a null rather than being dropped, so unmatchedSearchTerms can
+    // still ask "did *this* term find anything, any spelling".
+    _searchPrep = { text: raw, prep: {
+      terms, nums: terms.filter(t => /^\d+$/.test(t)), ranges,
+      res: terms.map(termExpansionRe),
+    } };
   }
   return _searchPrep.prep;
 }
@@ -462,7 +601,7 @@ function prepareSearchStack() {
         i, fields, pointed,
         // prepareSearch memoises one string at a time, so this is a copy rather
         // than the live object — the next row's parse would otherwise replace it.
-        prep: { terms: prep.terms, nums: prep.nums, ranges: prep.ranges },
+        prep: { terms: prep.terms, nums: prep.nums, ranges: prep.ranges, res: prep.res },
         active: pointed && !!(prep.terms.length || prep.ranges.length),
       };
     });
@@ -485,12 +624,16 @@ function activeSearchStack() {
 // deriving them is the expensive part. `fields` says where to look; the default
 // is everywhere, which is what a single box has always meant.
 function stationMatchesSearch(s, prep, fields = SEARCH_ALL_FIELDS) {
-  const { terms, nums, ranges } = prep;
+  const { terms, nums, ranges, res } = prep;
   if (!terms.length && !ranges.length) return true;
   if (fields.name || fields.number) {
     const name = fields.name   ? s.name.toLowerCase() : '';
     const num  = fields.number ? (s.station_number || '').toLowerCase() : '';
     if (terms.some(t => name.includes(t) || num.includes(t))) return true;
+    // Then the other spellings (termExpansionRe), and against the name only: a
+    // station number is digits — all 3,156 of them in this file — so there is
+    // no word in one for the table to have another spelling of.
+    if (fields.name && res && res.some(r => r && r.one.test(name))) return true;
   }
   if (!fields.alert) return false;
   if (!nums.length && !ranges.length) return false;
@@ -531,10 +674,13 @@ function stationMatchesSearchStack(s, active, mode) {
 // highlight would be claiming a match the filter refused to make — which is the
 // one promise this whole section is built on.
 function searchMarks() {
-  const out = { name: [], number: [], nums: [], ranges: [] };
+  const out = { name: [], number: [], nums: [], ranges: [], nameRes: [] };
   for (const { prep, fields, active } of prepareSearchStack()) {
     if (!active) continue;
-    if (fields.name)   out.name.push(...prep.terms);
+    // The patterns ride with the name terms and only with them, for the reason
+    // stationMatchesSearch gives: they are a claim about words, and a station
+    // number has none.
+    if (fields.name)   { out.name.push(...prep.terms); out.nameRes.push(...prep.res.filter(Boolean)); }
     if (fields.number) out.number.push(...prep.terms);
     if (fields.alert)  { out.nums.push(...prep.nums); out.ranges.push(...prep.ranges); }
   }
@@ -547,13 +693,21 @@ function searchMarks() {
 // Every place a term occurs in an already-lowercased string, as merged
 // [start, end) pairs. Overlapping terms ("61" and "6128") become one run
 // rather than nested markup.
-function searchHitRanges(lower, terms) {
+function searchHitRanges(lower, terms, res) {
   const spans = [];
   for (const t of terms) {
     if (!t) continue;
     for (let i = lower.indexOf(t); i !== -1; i = lower.indexOf(t, i + 1)) {
       spans.push([i, i + t.length]);
     }
+  }
+  // …and wherever the term's other spellings landed. `all` carries lastIndex
+  // between calls, so it is rewound rather than trusted. Every alternative in
+  // the pattern is at least one character, so the loop cannot stand still.
+  for (const r of res || []) {
+    if (!r) continue;
+    r.all.lastIndex = 0;
+    for (let m; (m = r.all.exec(lower));) spans.push([m.index, m.index + m[0].length]);
   }
   if (spans.length < 2) return spans;
   spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -568,10 +722,10 @@ function searchHitRanges(lower, terms) {
 
 // HTML for a field with its matched runs wrapped in <mark>. Escaping happens
 // per slice, so the markup can't be spoofed by a station name containing tags.
-function markHits(text, terms) {
+function markHits(text, terms, res) {
   const str = String(text ?? '');
-  if (!str || !terms || !terms.length) return esc(str);
-  const spans = searchHitRanges(str.toLowerCase(), terms);
+  if (!str || !((terms && terms.length) || (res && res.length))) return esc(str);
+  const spans = searchHitRanges(str.toLowerCase(), terms || [], res);
   if (!spans.length) return esc(str);
   let out = '', at = 0;
   for (const [a, b] of spans) {
@@ -647,10 +801,16 @@ function alertIdsInRange(low, high) {
 function unmatchedSearchTerms(prep, fields) {
   if (!state.data) return [];
   const { names, numbers, idPrefixes } = searchCorpus();
-  const missing = prep.terms.filter(t =>
-    !(fields.alert  && /^\d+$/.test(t) && idPrefixes.has(t)) &&
-    !(fields.name   && names.some(n => n.includes(t))) &&
-    !(fields.number && numbers.some(n => n.includes(t))));
+  // A term found only through the abbreviation table is found, and saying it is
+  // "not in this database" would be the note contradicting the row count beside
+  // it. So the same two passes the filter makes, in the same order.
+  const missing = prep.terms.filter((t, i) => {
+    const re = prep.res && prep.res[i];
+    return !(fields.alert  && /^\d+$/.test(t) && idPrefixes.has(t)) &&
+           !(fields.name   && names.some(n => n.includes(t))) &&
+           !(fields.name   && re && names.some(n => re.one.test(n))) &&
+           !(fields.number && numbers.some(n => n.includes(t)));
+  });
   // A window holds no characters to look for — it is on file when some address
   // falls inside it, and empty when none does. "4021-4025 · not in this
   // database" is the useful thing to be told about a window naming a block
@@ -3561,7 +3721,7 @@ function stationsTable(allStations) {
               <td title="${esc(s.id)}"><button type="button" class="row-open stn-name role-${primaryRole(s)}"
                     aria-pressed="${state.selectedId === s.id}"
                     onclick="event.stopPropagation();selectStation('${escAttr(s.id)}')"
-                    >${markHits(s.name, marks.name)}</button></td>
+                    >${markHits(s.name, marks.name, marks.nameRes)}</button></td>
               <td class="small">${markHits(s.station_number || '', marks.number)}</td>
               <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}${
                 s.roles.includes('repeater') && repeaterPassingCount(s) != null
@@ -4296,7 +4456,9 @@ function stationFiltersHtml() {
           separated by commas, spaces or new lines. An address range like
           <code>4021-4025</code> takes every station inside it, and you can paste
           as many ranges as you like. Tick what an entry is a list <em>of</em>, and
-          add a second entry for a list that is something else.</p>
+          add a second entry for a list that is something else. Names are read both
+          ways round: <code>ck</code> finds Creek and <code>creek</code> finds Ck, and
+          the same goes for Mt/Mount, Rd/Road, St/Street and a dozen more.</p>
         <div id="search-stack">${searchStackHtml()}</div>
       </div>
       ${filterResetsHtml()}

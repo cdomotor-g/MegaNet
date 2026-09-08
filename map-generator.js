@@ -1465,7 +1465,7 @@ function stationHitsHtml() {
                   title="${located ? `Centre the sheet on ${escAttr(st.name)}`
                                    : 'This station has no position recorded, so there is nowhere to centre on'}"
                   onclick="MapGen.centreOnStation('${escAttr(st.id)}')">
-            <span class="mg-hit-name">${markHits(st.name, prep.terms)}</span>
+            <span class="mg-hit-name">${markHits(st.name, prep.terms, prep.res)}</span>
             <span class="mg-hit-num">${markHits(st.station_number || '', prep.terms)}</span>
             ${mine ? '<span class="mg-hit-at">centre</span>'
                    : located ? '' : '<span class="mg-hit-at">no position</span>'}

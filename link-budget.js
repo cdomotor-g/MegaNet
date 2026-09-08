@@ -194,7 +194,7 @@ const LinkBudget = (function () {
           return `
             <button type="button" class="lb-hit${here ? ' is-here' : ''}"
                     onclick="LinkBudget.pick('${which}','${escAttr(st.id)}')">
-              <span class="lb-hit-name">${prep ? markHits(st.name, prep.terms) : esc(st.name)}</span>
+              <span class="lb-hit-name">${prep ? markHits(st.name, prep.terms, prep.res) : esc(st.name)}</span>
               <span class="small lb-hit-num">${prep
                 ? markHits(st.station_number || '', prep.terms)
                 : esc(st.station_number || '')}</span>

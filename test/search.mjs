@@ -278,6 +278,92 @@ try {
     r.clearRestoresFields = state.filters.searches[0].name && state.filters.searches[0].number
                             && state.filters.searches[0].alert;
 
+    // ══ Abbreviations — the same site written two ways (#182) ═════════════
+    // Everything here is derived from the loaded file rather than typed out: the
+    // claim is that a search reaches the names that are *in* stations.json, and
+    // a fixture of expected names would only be a second opinion about what is.
+    const all   = state.data.stations;
+    const sel   = t => all.filter(s => stationMatchesSearch(s, prepareSearch(t)));
+    const ids   = t => new Set(sel(t).map(s => s.id));
+    // What the box did before the table existed: the plain substring pass, run
+    // here rather than remembered, so "only ever adds" is checked against the
+    // current code rather than against a number somebody wrote down.
+    const literal = t => {
+      const p = prepareSearch(t);
+      return new Set(all.filter(s => {
+        const n = s.name.toLowerCase(), num = String(s.station_number || '').toLowerCase();
+        return p.terms.some(x => n.includes(x) || num.includes(x));
+      }).map(s => s.id));
+    };
+    const word = re => all.filter(s => re.test(s.name)).map(s => s.id);
+
+    // The pair the whole thing exists for: 243 names say Ck and 218 say Creek.
+    r.ckReachesCreek    = word(/\bcreek\b/i).every(id => ids('ck').has(id));
+    r.creekReachesCk    = word(/\bck\b/i).every(id => ids('creek').has(id));
+    r.mtReachesMount    = word(/\bmount\b/i).every(id => ids('mt').has(id));
+    r.mountReachesMt    = word(/\bmt\b/i).every(id => ids('mt').has(id)) &&
+                          word(/\bmt\b/i).every(id => ids('mount').has(id));
+    r.rdReachesRoad     = word(/\broad\b/i).every(id => ids('rd').has(id));
+    r.roadReachesRd     = word(/\brd\b/i).every(id => ids('road').has(id));
+    r.saintReachesSt    = word(/\bst\b/i).every(id => ids('saint').has(id));
+    r.brReachesBridge   = word(/\bbridge\b/i).every(id => ids('br').has(id));
+
+    // Only ever adds. Nothing that answered the box before stops answering it.
+    r.onlyAdds = ['ck', 'creek', 'mt', 'mount', 'rd', 'road', 'st', 'br', 'res',
+                  'cr', 'mt stuart', 'alligator ck', 'boyne', '6128']
+      .every(t => { const now = ids(t); return [...literal(t)].every(id => now.has(id)); });
+
+    // A whole word, not a run of letters. `ck` reaches Alligator Ck through the
+    // table; the names it reaches that way all carry Creek or Ck as a word.
+    r.wholeWordOnly = sel('ck').filter(s => !literal('ck').has(s.id))
+      .every(s => /\b(creek|ck|crk|cr)\b/i.test(s.name));
+
+    // Punctuation between words, on both sides of the match.
+    r.dotted    = sel('mt. stuart').map(s => s.name);
+    r.plainMt   = sel('mt stuart').map(s => s.name);
+    r.hyphenNew = sel('beerburrum woodford rd').map(s => s.name);
+    r.hyphenWasNothing = literal('beerburrum woodford rd').size;
+
+    // The two the table deliberately leaves out. Asserted in the direction that
+    // can actually go wrong, which is not the one it looks like: "hw" already
+    // finds every Highway name by plain substring — `hw` is inside `highway` —
+    // so an `hw → highway` entry would show no change at all from that side and
+    // an assertion there would be vacuous. What such an entry would really do is
+    // the reverse: put the 17 dam and weir *headwaters* behind the word
+    // "highway", and the 1,362 stations carrying the ALERT suffix behind the
+    // word "alert". So that is what is checked.
+    r.highwayNotHeadwater = sel('highway').every(s => /\b(highway|hwy)\b/i.test(s.name));
+    r.headwaters  = all.filter(s => /\bhw\b/i.test(s.name)).length;
+    r.alertNotSuffix = sel('alert').every(s => /alert/i.test(s.name));
+    r.alSuffixed  = all.filter(s => /\bal\b/i.test(s.name)).length;
+    // …while the abbreviation that really is highway does work.
+    r.hwyReachesHighway = word(/\bhighway\b/i).every(id => ids('hwy').has(id));
+
+    // A station number is digits and is never expanded — the promise the marks
+    // section is built on, made about the filter as well as the highlight.
+    r.numbersUntouched = all.every(s => !s.station_number ||
+      /^\d+$/.test(String(s.station_number)));
+    const numStn = all.find(s => s.station_number);
+    state.filters.searches = [{ ...newSearchRow('creek'), name: true, number: true, alert: true }];
+    r.numberCellUnmarked = !markHits(String(numStn.station_number), searchMarks().number)
+      .includes('mark class="hit"');
+
+    // The highlight follows the filter: a row matched through the table says so.
+    const ckStation = all.find(s => /\bCk\b/.test(s.name));
+    r.markSample = ckStation.name;
+    r.markHtml   = markHits(ckStation.name, searchMarks().name, searchMarks().nameRes);
+
+    // …and the note stops calling a found term missing. "saint" is the term that
+    // can tell the two passes apart: no name in this file contains the letters
+    // s-a-i-n-t, so the substring pass finds nothing and only the table can say
+    // it is on file. ("mount" would prove nothing — it is inside "Mountain".)
+    r.missingSaint = unmatchedSearchTerms(
+      { ...prepareSearch('saint') }, { name: true, number: true, alert: true });
+    r.saintIsLiterallyAbsent = !all.some(s => /saint/i.test(s.name));
+    r.missingNonsense = unmatchedSearchTerms(
+      { ...prepareSearch('zzqqx') }, { name: true, number: true, alert: true });
+    state.filters.searches = [newSearchRow()];
+
     // ══ The Pass Ranges tab, on the same windows ══════════════════════════
     const repeaters = state.data.stations.filter(s => s.roles.includes('repeater') && s.repeater);
     const carrying  = repeaters.filter(rp =>
@@ -374,6 +460,33 @@ try {
   ok('− removes it again', out.removedOne);
   ok('clear takes the stack back to one empty entry', out.clearedToOne);
   ok('pointed at everything, as a fresh page opens', out.clearRestoresFields);
+
+  console.log('\nAbbreviations — the same site written two ways\n');
+  ok('"ck" reaches every name spelt Creek',   out.ckReachesCreek);
+  ok('and "creek" reaches every name spelt Ck', out.creekReachesCk);
+  ok('"mt" reaches Mount, and "mount" reaches Mt', out.mtReachesMount && out.mountReachesMt);
+  ok('"rd" reaches Road, and "road" reaches Rd', out.rdReachesRoad && out.roadReachesRd);
+  ok('"saint" reaches St — a word this file never spells out', out.saintReachesSt);
+  ok('"br" reaches Bridge', out.brReachesBridge);
+  ok('it only ever adds — everything that matched before still matches', out.onlyAdds);
+  ok('an abbreviation counts only as a whole word', out.wholeWordOnly);
+  ok('punctuation between words is ignored: "mt. stuart" is "mt stuart"',
+     out.dotted.length > 0 && out.dotted.join('|') === out.plainMt.join('|'),
+     `${out.dotted.join(', ')} vs ${out.plainMt.join(', ')}`);
+  ok('…which is how a hyphenated name is reachable by typing spaces',
+     out.hyphenNew.length > 0 && out.hyphenWasNothing === 0, out.hyphenNew.join(', '));
+  ok(`"highway" never returns one of the ${out.headwaters} dam and weir HW stations`,
+     out.highwayNotHeadwater);
+  ok(`and "alert" never returns one of the ${out.alSuffixed} carrying the AL suffix`,
+     out.alertNotSuffix);
+  ok('…while HWY, which really is Highway, reaches every one', out.hwyReachesHighway);
+  ok('station numbers are digits, so nothing in one is expanded',
+     out.numbersUntouched && out.numberCellUnmarked);
+  ok('the highlight follows the filter — a row matched through the table says where',
+     /<mark class="hit">Ck<\/mark>/.test(out.markHtml), `${out.markSample} → ${out.markHtml}`);
+  ok('and a term found only through the table is not called missing',
+     out.saintIsLiterallyAbsent && out.missingSaint.length === 0 && out.missingNonsense.length === 1,
+     `saint: ${JSON.stringify(out.missingSaint)}, zzqqx: ${JSON.stringify(out.missingNonsense)}`);
 
   console.log('\nThe Pass Ranges tab, on the same windows\n');
   ok('keeps every repeater carrying an address in the window',

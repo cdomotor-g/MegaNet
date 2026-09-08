@@ -188,7 +188,7 @@ function passRangeTablesHtml() {
   // where the match was actually made — as on the Stations tab. The numeric
   // terms are the addresses the range column is asked about, so they are
   // converted once here rather than once per range per repeater.
-  const { terms, nums, ranges } = prepareSearch(q);
+  const { terms, nums, ranges, res } = prepareSearch(q);
   const searchIds = nums.map(Number);
 
   const rptData = repeaters
@@ -240,12 +240,12 @@ function passRangeTablesHtml() {
             <tbody>
               ${rptData.map(({ r, matched }) => `
                 <tr class="row-link" onclick="goToStation('${escAttr(r.id)}')">
-                  <td>${passRangeRowOpen(r, markHits(r.name, terms))}</td>
+                  <td>${passRangeRowOpen(r, markHits(r.name, terms, res))}</td>
                   <td class="small col-optional">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
                   <td><span class="badge" title="ALERT addresses carried, post-exclusion">${repeaterPassingCount(r) ?? 0}</span></td>
                   <td><span class="badge" title="Field stations matched">${matched.length}</span></td>
                   <td class="small">${passRangesHtml(r.repeater, searchIds, ranges)}</td>
-                  <td class="small">${firstTen(matched).slice(0, 10).map(s => markHits(s.name, terms)).join(', ')}${matched.length > 10 ? ` +${matched.length - 10} more` : ''}</td>
+                  <td class="small">${firstTen(matched).slice(0, 10).map(s => markHits(s.name, terms, res)).join(', ')}${matched.length > 10 ? ` +${matched.length - 10} more` : ''}</td>
                 </tr>`).join('')}
             </tbody>
           </table>`}
@@ -277,7 +277,7 @@ function passRangeTablesHtml() {
               <tbody>
                 ${orphans.map(s => `
                   <tr class="row-link" onclick="goToStation('${escAttr(s.id)}')">
-                    <td>${passRangeRowOpen(s, markHits(s.name, terms))}</td>
+                    <td>${passRangeRowOpen(s, markHits(s.name, terms, res))}</td>
                     <td class="small">${markHits(s.station_number || '', terms)}</td>
                     <td class="small">${stationAlertIds(s).map(id => markAlertId(id, nums, ranges)).join(', ')}</td>
                     <td class="small col-optional">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
