@@ -243,7 +243,10 @@ try {
     // Back to how a fresh page opens — the checks above left the first entry
     // pointed at one field, and "all ticked by default" is about the default.
     state.filters.searches = [newSearchRow()];
-    state.filtersOpen = true;
+    // Through the handler, not the flag: the card is shut on arrival since #181
+    // and its panel carries `hidden`, and a box inside a hidden panel cannot
+    // take focus — which is half of what the block below asserts.
+    setStationFiltersOpen(true);
     renderStationFilters();
     await settle();
     const boxes = () => document.querySelectorAll('#search-stack .filter-search').length;

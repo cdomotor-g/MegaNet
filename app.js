@@ -1768,32 +1768,52 @@ function renderStationsHtml() {
                after every full render rather than dying with the div. -->
           <div id="stn-card" class="acma-card stn-card" hidden></div>
         </div>
-        <!-- Directly under the map, and the same <details> the Path profile and
-             Link budget cards below it are (#165). The summary carries the match
-             note, so a shut card still says what the filters are doing — which
-             is the whole condition for letting it shut at all. -->
+        <!-- Directly under the map (#165), and shut on arrival (#181). It is a
+             disclosure built out of a button and a panel rather than the
+             <details> the three cards below it still are, and that is a
+             consequence of what #181 asked for rather than a preference: the
+             search box and the two clear buttons have to be usable while the
+             card is shut, and a <details> can show nothing but its <summary>
+             when it is closed. Putting them *in* the summary was the other
+             option and is the one this file already rejected once — "a button
+             inside one is a target that toggles the card as often as it is
+             pressed", which is why "+ New" is in the stations card's body and
+             not beside its heading.
+
+             So the head row is: the toggle (a real button, in the h3, which is
+             the accordion pattern), the live match note, and — while the card
+             is shut — the first search entry and the two clear buttons. The
+             match note stays in the row whichever way the card is facing: it
+             is the line that says what the filters are doing, and #165 made a
+             shut card conditional on it. -->
         <div class="panel" id="stations-filter-card">
-          <details class="filter-card" ${state.filtersOpen ? 'open' : ''}
-                   ontoggle="setStationFiltersOpen(this.open)">
-            <summary>
-              <h3>Filters</h3>
+          <div class="filter-card">
+            <div class="filter-card-head">
+              <h3 class="filter-card-title">
+                <button type="button" class="filter-toggle" id="filter-toggle"
+                        aria-expanded="${state.filtersOpen}" aria-controls="station-filters"
+                        onclick="toggleStationFilters()">Filters</button>
+              </h3>
               <span class="small" id="map-match-note">${mapMatchNoteHtml()}</span>
-            </summary>
-            <div class="filter-panel" id="station-filters">
+              <span class="filter-quick" id="filter-quick" ${state.filtersOpen ? 'hidden' : ''}
+                    >${filterQuickHtml()}</span>
+            </div>
+            <div class="filter-panel" id="station-filters" ${state.filtersOpen ? '' : 'hidden'}>
               ${stationFiltersHtml()}
             </div>
-          </details>
+          </div>
         </div>
-        <div class="panel" id="path-profile-panel" hidden></div>
-        <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
-        <!-- Collapsible, the same <details> the Filters, Path profile and Link
-             budget cards on this tab are. It is the tallest thing on the page —
-             a scroller capped at most of the viewport — and an operator working
-             the map, a path profile or the editor card below it has to scroll
-             past all of it to reach them. The condition #165 set for letting a
-             card on this tab shut is that its summary still says what is inside:
-             the count badge is live, and the note beside it names the selected
-             station, which is the one row a shut list would otherwise hide. -->
+        <!-- Collapsible, the same <details> the Path profile and Link budget
+             cards below it are. It is the tallest thing on the page — a scroller
+             capped at most of the viewport — and it sits here, directly under
+             the filters, because those two things are one question asked twice:
+             the filters say which stations, and this is that set as rows. The
+             path tools below are a different job, and #181 moved them below it
+             rather than leaving them between the filter and its own answer.
+             The condition #165 set for letting a card on this tab shut is that
+             its summary still says what is inside: the count badge is live, and
+             the note beside it names the selected station, which is the one row
+             a shut list would otherwise hide. -->
         <div class="panel" id="stations-list-card">
           <details class="stations-card" ${state.stationsListOpen ? 'open' : ''}
                    ontoggle="setStationsListOpen(this.open)">
@@ -1815,6 +1835,8 @@ function renderStationsHtml() {
             </div>
           </details>
         </div>
+        <div class="panel" id="path-profile-panel" hidden></div>
+        <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
         <div class="panel" id="stations-carriers-card" ${carriers ? '' : 'hidden'}>
           ${carriers}
         </div>
@@ -1861,19 +1883,41 @@ function updateChromeHeight() {
   document.documentElement.style.setProperty('--mn-chrome', `${h}px`);
 }
 
+// The filters card's own toggle. A plain button now rather than a <summary>
+// (#181) — see the markup — so the state is not kept for us by the element and
+// this has to move it in both directions.
+function toggleStationFilters() {
+  setStationFiltersOpen(!state.filtersOpen);
+}
+
 // The filters card, open or shut. Remembered between visits, which is the
-// difference between this card and the two below it: Path profile and Link
-// budget are things you open to answer one question and close again, and the
-// filters are how this tab is *operated*. An operator who wants the map to have
-// the whole screen shuts this once and means it.
+// difference between this card and the path tools further down: Path profile
+// and Link budget are things you open to answer one question and close again,
+// and the filters are how this tab is *operated*. An operator who wants the map
+// to have the whole screen shuts this once and means it.
 //
-// It writes state and nothing else — no re-render. #160's lockup was an
-// ontoggle handler that replaced its own <details>, and the element's own
-// `open` is authoritative here for the same reason: the browser sets it on the
-// gesture before this runs.
+// It moves the disclosure and nothing else — the panel's contents and the head
+// row are both already drawn, and a full re-render here would take the caret
+// out of whichever box was just typed in. #160's lockup was a handler that
+// replaced the card it was called from; setting three attributes is the same
+// restraint, expressed against a <div> instead of a <details>.
+//
+// The one thing that does need doing is the handover between the two search
+// boxes. They are one entry — the quick box in the head row and the first box
+// in the panel edit `state.filters.searches[0]` — so whichever is about to
+// become visible catches up with what was typed into the other. Neither is
+// touched while it is the visible one, which is what keeps the caret.
 function setStationFiltersOpen(open) {
   state.filtersOpen = !!open;
   localStorage.setItem('mn-filters', state.filtersOpen ? 'open' : 'closed');
+  const btn   = document.getElementById('filter-toggle');
+  const panel = document.getElementById('station-filters');
+  const quick = document.getElementById('filter-quick');
+  if (btn)   btn.setAttribute('aria-expanded', state.filtersOpen ? 'true' : 'false');
+  if (panel) panel.hidden = !state.filtersOpen;
+  if (quick) quick.hidden = state.filtersOpen;
+  if (state.filtersOpen) renderSearchStack();
+  else                   renderFilterQuick();
 }
 
 // The station list card, open or shut. Remembered for the same reason the
@@ -4255,14 +4299,7 @@ function stationFiltersHtml() {
           add a second entry for a list that is something else.</p>
         <div id="search-stack">${searchStackHtml()}</div>
       </div>
-      <span class="filter-resets">
-        <button class="filter-reset" onclick="clearStationFilters(false)"
-                title="Put every station back at full opacity, without moving the map"
-                ${anyStationFilterActive() ? '' : 'disabled'}>Clear filters</button>
-        <button class="filter-reset" onclick="clearStationFilters(true)"
-                title="Clear the filters and zoom back out to the whole network"
-                ${anyStationFilterActive() ? '' : 'disabled'}>Clear &amp; zoom out</button>
-      </span>
+      ${filterResetsHtml()}
     </div>
     <div class="filter-groups">
       ${Object.keys(FILTER_GROUPS).map(filterGroupHtml).join('')}
@@ -4275,6 +4312,77 @@ function renderStationFilters() {
   const el = document.getElementById('station-filters');
   if (el) el.innerHTML = stationFiltersHtml();
   initStationFilters();
+}
+
+// The two clear buttons. Drawn from one place because they are drawn in two
+// (#181): in the panel beside the search block while the card is open, and in
+// the head row beside the quick box while it is shut. They are the same pair of
+// buttons either way — a second copy that drifted from the first would be two
+// answers to "what does Clear do".
+function filterResetsHtml() {
+  const idle = !anyStationFilterActive();
+  return `
+    <span class="filter-resets">
+      <button class="filter-reset" onclick="clearStationFilters(false)"
+              title="Put every station back at full opacity, without moving the map"
+              ${idle ? 'disabled' : ''}>Clear filters</button>
+      <button class="filter-reset" onclick="clearStationFilters(true)"
+              title="Clear the filters and zoom back out to the whole network"
+              ${idle ? 'disabled' : ''}>Clear &amp; zoom out</button>
+    </span>`;
+}
+
+// ── The head row's own controls, for while the card is shut ─────────────────
+// #165 let this card close on the condition that its head still said what the
+// filters were doing; #181 asks for the head to still *do* it. So a shut card
+// carries the thing the tab is operated with — one search box and the two clear
+// buttons — and opening it hands the job back to the full panel underneath.
+//
+// It is the first entry, not a third search: the box writes
+// `state.filters.searches[0]`, exactly as `station-search-0` in the panel does.
+// A stack of two or more entries cannot fit in a row that also holds a heading
+// and a match note, so it is not attempted — the count beside the box says how
+// many entries are not in view, and opening the card shows them.
+function filterQuickHtml() {
+  const rows = searchRows();
+  const n    = rows.length;
+  return `
+    <textarea id="station-search-quick" class="filter-search filter-search--quick"
+              rows="1" spellcheck="false"
+              aria-label="${n > 1 ? `Filter entry 1 of ${n}` : 'Search stations'}"
+              title="Name, station # or ALERT address. Open the card for the ranges, the fields each entry looks in, and the rest of the filters."
+              placeholder="Name, station # or ALERT address"
+              oninput="mapSearchInput(0, this.value);autoGrowSearch(this)">${esc(rows[0].text)}</textarea>
+    <span class="filter-quick-more" id="filter-quick-more" ${n > 1 ? '' : 'hidden'}
+          title="More search entries than this row can show — open the card to see them"
+      >+${n - 1}</span>
+    ${filterResetsHtml()}`;
+}
+
+// Redraw the head row's controls. Called when the card shuts, which is the one
+// moment the quick box can be behind the panel it is replacing.
+function renderFilterQuick() {
+  const el = document.getElementById('filter-quick');
+  if (!el) return;
+  el.innerHTML = filterQuickHtml();
+  el.querySelectorAll('.filter-search').forEach(autoGrowSearch);
+}
+
+// Keep the quick box honest without redrawing it. updateFilterChrome runs on
+// every settled keystroke, and rebuilding the box being typed into would take
+// the caret with it — so the text is written only when it actually differs,
+// which is the Clear buttons and nothing else.
+function syncQuickSearch() {
+  const box = document.getElementById('station-search-quick');
+  if (!box) return;
+  const rows = searchRows();
+  const text = String((rows[0] && rows[0].text) || '');
+  if (box.value !== text) { box.value = text; autoGrowSearch(box); }
+  const more = document.getElementById('filter-quick-more');
+  if (more) {
+    more.hidden = rows.length < 2;
+    more.textContent = `+${rows.length - 1}`;
+  }
 }
 
 // ── The search stack, drawn ──────────────────────────────────────────────────
@@ -4350,7 +4458,9 @@ function searchRowHtml(row, i, total) {
 // the line breaks out of a pasted column of addresses, gluing 6128 and 6129
 // into 61286129. It opens one line tall and grows to fit what was pasted.
 function initStationFilters() {
-  document.querySelectorAll('#station-filters .filter-search').forEach(autoGrowSearch);
+  // The whole card: the head row's quick box (#181) is the same textarea with
+  // the same paste in it, and it measures itself the same way.
+  document.querySelectorAll('#stations-filter-card .filter-search').forEach(autoGrowSearch);
 }
 
 // Redraw the stack in place — the block, not the panel around it, so the
@@ -4622,7 +4732,11 @@ function updateFilterChrome() {
   const data = document.getElementById('filter-state-data');
   if (data) data.textContent = valueGroupState(['hasCoords', 'hasAlertId', 'enabledOnly']);
   const idle = !anyStationFilterActive();
-  document.querySelectorAll('#station-filters .filter-reset').forEach(b => { b.disabled = idle; });
+  // The whole card, not just the panel: since #181 there is a second copy of
+  // the clear buttons in the head row, and a live pair beside a stale one is
+  // worse than no pair at all.
+  document.querySelectorAll('#stations-filter-card .filter-reset').forEach(b => { b.disabled = idle; });
+  syncQuickSearch();
   updateMapMatchNote();
 }
 

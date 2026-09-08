@@ -357,9 +357,13 @@ const SEED_STATIONS = `async () => {${SEED_ACMA}
   addToMapSelection(state.data.stations.slice(0, 3).map(s => s.id));
   rerenderStations();
   // The filter card itself since #165 — the filters are a collapsible under the
-  // map now, and a shut <details> takes every control in it out of this check.
+  // map now, and a shut card takes every control in it out of this check. It is
+  // shut on arrival since #181, and it is a button-and-panel disclosure rather
+  // than a <details>, so it opens through its own handler rather than by having
+  // an attribute set on it.
+  setStationFiltersOpen(true);
   for (const d of document.querySelectorAll(
-    '#stations-filter-card details, #station-filters details, #acma-filter-block details')) d.open = true;
+    '#station-filters details, #acma-filter-block details')) d.open = true;
   await new Promise(r => setTimeout(r, 350));
 }`;
 

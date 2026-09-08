@@ -168,6 +168,28 @@ const hover = async (panel) => {
   return look(panel);
 };
 
+// Wait for the page to stop moving. The app scrolls a card it has just answered
+// into view *smoothly*, and a glide is still running long after the call that
+// started it returned — so a fixed pause is a bet on how far the card was from
+// the top of the page. #181 moved the link budget below the station list and
+// lengthened that glide by about 1,500 px, at which point the bet stopped
+// paying: an instant scroll issued mid-glide landed, and the glide then carried
+// the page on past it, leaving the map's icon column above the viewport and
+// every assertion below out of the pointer's reach.
+//
+// Two identical readings 50 ms apart is the whole test. It is cheap, and it is
+// the honest form of the thing the fixed timeout was approximating.
+const settleScroll = async () => {
+  let last = null;
+  for (let i = 0; i < 60; i++) {
+    const y = await page.evaluate(() => window.scrollY);
+    if (y === last) return y;
+    last = y;
+    await page.waitForTimeout(50);
+  }
+  return last;
+};
+
 // One control inside an open panel, clicked for real. `text` picks between
 // several matches by their label; `.mn-mapctl-content` scrolls inside itself
 // (styles.css caps it at 42vh), so the control is brought into that box first —
@@ -566,6 +588,7 @@ ok('…lifted for the dark theme rather than repeated from the light one',
 // The map is put back under the pointer first: `LinkBudget.fromProfile()` above
 // scrolled the budget card into view, which is the app behaving correctly and
 // leaves the map's icon column somewhere else on the page.
+await settleScroll();
 await page.evaluate(() => {
   state.mapShowLinks = false;
   state.mapShowBackbone = false;

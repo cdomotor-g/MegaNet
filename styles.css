@@ -3675,7 +3675,6 @@ hr {
   --cover-range:   #d6d49a;
 }
 
-.filter-card > summary,
 .stations-card > summary,
 .path-panel > summary,
 .lb-panel > summary {
@@ -3687,7 +3686,6 @@ hr {
   padding: .1rem 0;
 }
 
-.filter-card > summary::before,
 .stations-card > summary::before,
 .path-panel > summary::before,
 .lb-panel > summary::before {
@@ -3696,12 +3694,10 @@ hr {
   font-size: .85rem;
 }
 
-.filter-card[open] > summary::before,
 .stations-card[open] > summary::before,
 .path-panel[open] > summary::before,
 .lb-panel[open] > summary::before { content: '▾'; }
 
-.filter-card > summary h3,
 .stations-card > summary h3,
 .path-panel > summary h3,
 .lb-panel > summary h3 {
@@ -3709,7 +3705,6 @@ hr {
   font-size: .95rem;
 }
 
-.filter-card > summary span,
 .path-panel > summary span,
 .lb-panel > summary span { color: var(--muted); }
 
@@ -3724,6 +3719,108 @@ hr {
 .stations-card > .stations-card-body,
 .path-body,
 .lb-body { padding-top: .5rem; }
+
+/* ── The filters card's head row (#181) ───────────────────────────────────
+   The three cards below this one on the Stations tab are <details>, and their
+   heads are <summary> — the rules above. This one is a button and a panel
+   instead, because its head has to keep working while the card is shut: a
+   <details> shows nothing but its summary when closed, and the alternative,
+   putting the controls *inside* the summary, is the thing the note under
+   .stations-card-actions already says not to do.
+
+   So the row is styled to read as the same head as the other three — the same
+   caret, the same 0.95 rem heading, the same muted note beside it — and then
+   carries the search box and the two clear buttons on its right while the card
+   is closed. It wraps rather than squeezing: the box asks for 16 rem and drops
+   to its own line under a heading that has run out of room, which is a phone
+   and needs no breakpoint to say so. */
+.filter-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .3rem .6rem;
+  padding: .1rem 0;
+}
+
+.filter-card-title {
+  margin: 0;
+  font-size: .95rem;
+}
+
+/* A real button, so it is one tab stop with one accessible name and one
+   aria-expanded — and stripped back to the text of the heading it is inside,
+   so the row reads as a heading rather than as a control. The caret is the
+   same character the <summary> cards draw, turned by aria-expanded rather than
+   by [open], because that attribute is now where the state lives. */
+.filter-toggle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .5rem;
+  padding: .1rem 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.filter-toggle::before {
+  content: '▸';
+  color: var(--muted);
+  font-size: .85rem;
+}
+
+.filter-toggle[aria-expanded="true"]::before { content: '▾'; }
+
+.filter-card-head > .small { color: var(--muted); }
+
+/* Everything the shut card still has to *do*, pushed to the far end of the row
+   and taking whatever width is left. `min-width: 0` on the flex item is what
+   lets the textarea inside it shrink below its own intrinsic width instead of
+   pushing the row wider than the page. */
+.filter-quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .3rem .45rem;
+  flex: 1 1 16rem;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.filter-quick[hidden] { display: none; }
+
+/* The same textarea as the one in the panel — a paste of ALERT addresses keeps
+   its line breaks here too — sized for a row rather than for a block. It grows
+   with a paste like the panel's does (autoGrowSearch writes --grow for both),
+   but max-height caps it at about three lines and it scrolls after that: this
+   is a head row, and a head row that grows to eight lines is a panel. */
+.filter-search--quick {
+  flex: 1 1 8rem;
+  min-width: 5rem;
+  min-height: 1.9rem;
+  max-height: 4.4rem;
+  padding: .25rem .45rem;
+  font-size: .84rem;
+  resize: none;
+}
+
+/* How many search entries the row is not showing. Only ever drawn with a stack
+   of two or more, and it is the one thing standing between "the box in the head
+   is the search" and a second entry quietly filtering in the background. */
+.filter-quick-more {
+  flex: 0 0 auto;
+  padding: .05rem .35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: .72rem;
+  color: var(--muted);
+  cursor: help;
+}
+
+.filter-quick-more[hidden] { display: none; }
 
 /* "+ New" used to sit in a .panel-header beside the heading. The heading is a
    <summary> now, and a button inside one is a target that toggles the card as

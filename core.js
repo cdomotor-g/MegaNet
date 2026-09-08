@@ -1789,9 +1789,16 @@ const state = {
   // the one collapsible on that tab that is: Path profile and Link budget are
   // opened to answer a question and closed again, while the filters are how the
   // tab is operated — so an operator who shuts them to give the map the screen
-  // means it. Open on a first visit, because the search box is the most-used
-  // control on the page and a tab that opens hiding it reads as broken.
-  filtersOpen:    (localStorage.getItem('mn-filters') || 'open') === 'open',
+  // means it.
+  //
+  // Shut on a first visit since #181. It used to open, and the reason given was
+  // that "the search box is the most-used control on the page and a tab that
+  // opens hiding it reads as broken" — which was true of a card whose head row
+  // held a heading and a note. That head row now carries the search box and
+  // both clear buttons, so the most-used control is on the screen either way,
+  // and what the default decides is only whether the eight blocks of grouped
+  // filters underneath it are, which on arrival they need not be.
+  filtersOpen:    (localStorage.getItem('mn-filters') || 'closed') === 'open',
   // The station list card on the same tab, and remembered for the same reason.
   // It is the tallest card on the page — a scroller capped at most of the
   // viewport — so shutting it is how the map, the path tools and the editor
