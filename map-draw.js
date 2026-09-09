@@ -273,6 +273,64 @@ const MapDraw = (function () {
     if (snapHint) { snapHint.remove(); snapHint = null; }
   }
 
+  // ── the elevation profile's cursor, on the ground ──
+  // path-profile.js owns the reading — which sample, how high the ground is
+  // there — and this owns the map, so the marker that shows it lives here. That
+  // is what makes it go away with the map on a tab switch (see detach) instead
+  // of outliving the div it was drawn on.
+  //
+  // Deliberately not in `group`: render() clears that on every shape change,
+  // and this dot is not a shape. It is not in state either — a cursor is where
+  // the pointer is now, and nothing about it should survive anything.
+  //
+  // Blue with a white casing, which is the one thing here that is a straight
+  // copy: it is what a profile cursor looks like on every mapping tool that has
+  // one, and it is not any of this app's other map colours — not a station
+  // role, not the draw magenta, not the pass-range amber — so it cannot be
+  // mistaken for something that was drawn on purpose.
+  const PROFILE_DOT = '#2196f3';
+  // How near the line the pointer has to be, in pixels. Judged on screen rather
+  // than on the ground because that is how the eye judges "on the line", and a
+  // degree is a different distance at every zoom. A little wider than SNAP_PX,
+  // because missing the line only costs a readout while missing a station pin
+  // costs a misplaced shape.
+  const PROFILE_SNAP_PX = 18;
+  let profileDot = null;
+
+  function clearProfileDot() {
+    if (profileDot) { profileDot.remove(); profileDot = null; }
+  }
+
+  // Where along a line the pointer is, in metres from its first point, or null
+  // when the pointer is not near it.
+  //
+  // Nearest is found in pixels — the projected foot of the perpendicular on
+  // each leg, closest leg wins — and then converted back to metres along the
+  // path with the same haversine legs the profile was sampled on. Which is the
+  // point of doing the last step separately: the chart's x-axis is real ground
+  // distance, so a fraction measured on a Mercator screen would land the dot
+  // slightly off on any line long enough for the projection to matter.
+  function alongLine(pts, latlng) {
+    if (!map || !pts || pts.length < 2) return null;
+    const z = map.getZoom();
+    const px = pts.map(pt => map.project(pt, z));
+    const c  = map.project(latlng, z);
+    let best = null;
+    for (let i = 0; i < px.length - 1; i++) {
+      const a = px[i], b = px[i + 1];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy;
+      const t = len2 > 0 ? Math.max(0, Math.min(1, ((c.x - a.x) * dx + (c.y - a.y) * dy) / len2)) : 0;
+      const d = Math.hypot(a.x + t * dx - c.x, a.y + t * dy - c.y);
+      if (!best || d < best.d) best = { d, i, t };
+    }
+    if (!best || best.d > PROFILE_SNAP_PX) return null;
+    let m = 0;
+    for (let i = 0; i < best.i; i++) m += acmaHaversineKm(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]) * 1000;
+    const j = best.i;
+    return m + best.t * acmaHaversineKm(pts[j][0], pts[j][1], pts[j + 1][0], pts[j + 1][1]) * 1000;
+  }
+
   // Resolve a map click to the point the shape should actually use, and to the
   // station it came from when it snapped.
   function resolve(latlng) {
@@ -490,6 +548,17 @@ const MapDraw = (function () {
     const t = D().tool ? snapTarget(e.latlng) : null;
     showSnapHint(t);
     if (pending) showGhost(t ? [t.mnStation.lat, t.mnStation.lon] : [e.latlng.lat, e.latlng.lng]);
+
+    // The profile cursor, from the map's side: running the pointer along the
+    // profiled line moves the dot on the chart and tags it with the ground
+    // height there. Only while no tool is armed — a pointer that is halfway
+    // through placing a shape has a job already — and only on the line the
+    // profile is actually of, which is PathProfile's answer and not this
+    // module's guess at it.
+    const sh = D().tool ? null : PathProfile.target();
+    const d  = sh && sh.kind === 'line' ? alongLine(sh.pts, e.latlng) : null;
+    if (d != null) PathProfile.hoverAt(d);
+    else if (profileDot) PathProfile.hoverOff();
   }
 
   function onDblClick(e) {
@@ -894,7 +963,7 @@ const MapDraw = (function () {
     attach(m) {
       map   = m;
       group = L.layerGroup().addTo(m);
-      pending = null; ghost = null; snapHint = null; snapCache = null;
+      pending = null; ghost = null; snapHint = null; snapCache = null; profileDot = null;
       m.on('click', onClick);
       m.on('mousemove', onMove);
       m.on('dblclick', onDblClick);
@@ -916,6 +985,7 @@ const MapDraw = (function () {
       if (keyHandler) { document.removeEventListener('keydown', keyHandler); keyHandler = null; }
       clearGhost();
       clearSnapHint();
+      clearProfileDot();
       pending = null; snapCache = null;
       map = null; group = null;
     },
@@ -956,6 +1026,27 @@ const MapDraw = (function () {
     // picks endpoints by the same rule the draw tools do rather than growing a
     // second, subtly different one.
     resolveClick(latlng) { return resolve(latlng); },
+
+    // The elevation profile's cursor on the ground. PathProfile calls both of
+    // these; nothing else has any business with them.
+    showProfilePoint(lat, lon, label) {
+      if (!map || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      if (!profileDot) {
+        profileDot = L.circleMarker([lat, lon], {
+          radius: 5, color: '#ffffff', weight: 2, opacity: 0.95,
+          fillColor: PROFILE_DOT, fillOpacity: 1, interactive: false,
+        }).addTo(map);
+        profileDot.bindTooltip('', {
+          permanent: true, direction: 'top', offset: [0, -8],
+          className: 'mn-profile-label', interactive: false,
+        });
+      } else {
+        profileDot.setLatLng([lat, lon]);
+      }
+      profileDot.setTooltipContent(esc(label || ''));
+    },
+
+    clearProfilePoint() { clearProfileDot(); },
 
     // Drop a two-point line in programmatically (the link budget asking for a
     // profile of its own path). Same shape, same list, same everything.

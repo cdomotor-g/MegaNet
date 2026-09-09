@@ -3684,6 +3684,28 @@ hr {
 
 .leaflet-tooltip.mn-draw-label::before { display: none; }
 
+/* The elevation profile's cursor on the map: the ground height under the dot
+   running along the profiled line (see path-profile.js). Built like the draw
+   label above it — its own near-white ground with fixed dark ink, so it holds
+   its contrast over satellite imagery and over the light topo base alike, which
+   is the deal every permanent label on this map takes. Blue border rather than
+   the draw magenta, because the dot it belongs to is not a drawn shape. */
+.leaflet-tooltip.mn-profile-label {
+  background: rgba(255, 255, 255, .94);
+  color: #0d2b45;
+  border: 1px solid #2196f3;
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: .72rem;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+  pointer-events: none;
+}
+
+.leaflet-tooltip.mn-profile-label::before { display: none; }
+
 /* tool picker */
 /* "Clear all", on its own row. It was the right-hand half of a .panel-header
    until #164 took the heading away — the MapChrome flyout this panel lives in
@@ -4213,6 +4235,11 @@ hr {
   height: auto;
   display: block;
 }
+
+/* The chart's own half of the profile cursor. The crosshair rect over the plot
+   is what catches the pointer, and a crosshair cursor over it says the chart
+   can be read at a point rather than only looked at. */
+.path-chart rect[onmousemove] { cursor: crosshair; }
 
 .path-key {
   display: flex;

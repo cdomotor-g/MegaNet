@@ -20,9 +20,9 @@
 // the trailer get to the site without crossing private land? A centreline
 // answers none of them; a parcel boundary answers all three at a glance.
 //
-// The source is the DCDB's own "Cadastral parcels" layer, filtered to
-// `parcel_typ = 'Road Type Parcel'` — the same rows QSpatial's SmartMap draws
-// as road, updated nightly. Vector rather than a server-rendered image (which
+// The source is the DCDB's own "Cadastral parcels" layer, filtered to the two
+// `parcel_typ` values that make up a road reserve (see below) — the same rows
+// QSpatial's SmartMap draws as road, updated nightly. Vector rather than a server-rendered image (which
 // is what MapContours settled on): road parcels are sparse compared with
 // contour lines, a viewport's worth is tens of kilobytes, and the whole point
 // is to be able to point at one and be told its name.
@@ -40,6 +40,40 @@
 // swallow the "click the empty map to clear the focus" gesture that the pins,
 // the ACMA card and the repeater focus all depend on. The hover label carries
 // what a callout would have said.
+//
+// ── Intersections are road reserve too ──────────────────────────────────────
+// This layer first shipped drawing `parcel_typ = 'Road Type Parcel'` and
+// nothing else, and every junction on it came out as a hole: four road strips
+// closing off short of each other around an unpainted square, which reads as
+// "the road reserve stops here" — the one thing about a road reserve that is
+// never true at an intersection.
+//
+// The DCDB does not put the crossing square in either road. It files it under a
+// third value in the same column, spelled — truncated at 24 characters, in the
+// published field — `'Unlinked parcel or inter'`, for *unlinked parcel or
+// intersection*. Those rows carry no lot, no plan, no tenure and no name; they
+// are the corner of the cadastre where the road network joins itself.
+//
+// So the query asks for both, and the two are told apart on the way in. What
+// stops the second value from over-claiming is that the name covers two things,
+// and only one of them is road: a genuinely unlinked remnant is not a junction
+// and must not be painted as one. The test is the cadastre's own topology — an
+// intersection shares its corners with the roads that meet at it, vertex for
+// vertex, and `geometryPrecision=6` means a shared vertex arrives bit-identical
+// in both features. A parcel of this type that shares no vertex with any road
+// parcel in the same answer is dropped.
+//
+// Measured over eight areas before it was written — suburban Toowoomba, the
+// Toowoomba and Brisbane CBDs, rural Cambooya, Cairns, Mount Isa, Winton and
+// the Gold Coast hinterland, 1,269 of these parcels between them — every single
+// one touched a road parcel. So the test is a floor rather than a filter: it
+// has never yet refused anything, and it is here so that the layer cannot start
+// claiming ground the cadastre does not say is road.
+//
+// The join is worth more than the fill it earns, because the roads sharing an
+// intersection's corners are the roads that meet there. Hovering a junction
+// names them — "Chardonnay Street / Miranda Drive intersection" — which is an
+// answer the road strips on either side could not give.
 const MapRoads = (function () {
   // The Land Parcel Property Framework — the DCDB published as a map service,
   // the same platform the survey marks and contours come from.
@@ -49,10 +83,13 @@ const MapRoads = (function () {
   // cannot reach the service description — never guessed at from nothing.
   const FALLBACK_ID = 4;
   const LAYER_RE    = /cadastral\s+parcels/i;
-  // What makes a parcel a road parcel. The field is `parcel_typ` and the value
-  // is spelled exactly like this in the DCDB; anything else in that column is
-  // a lot, an easement, a watercourse or an unlinked remnant.
-  const WHERE       = "parcel_typ='Road Type Parcel'";
+  // What makes a parcel part of the road reserve. The field is `parcel_typ` and
+  // both values are spelled exactly like this in the DCDB — including the
+  // second one's truncation, which is the published spelling and not a typo
+  // here. Anything else in that column is a lot, an easement or a watercourse.
+  const ROAD_TYPE   = 'Road Type Parcel';
+  const NODE_TYPE   = 'Unlinked parcel or inter';   // see the header
+  const WHERE       = `parcel_typ IN ('${ROAD_TYPE}','${NODE_TYPE}')`;
   const ATTRIBUTION = '© State of Queensland (Department of Natural Resources and Mines, '
                     + 'Manufacturing and Regional and Rural Development)';
 
@@ -70,7 +107,11 @@ const MapRoads = (function () {
   const TIMEOUT_MS   = 20000;
   const BBOX_STEP    = 0.02;   // deg (~2 km) — a small pan re-uses the answer it has
   const BBOX_MAX     = 0.5;    // deg — a backstop behind MIN_ZOOM
-  const MAX_PARCELS  = 1500;   // drawn per view; the service's own ceiling is 4,000
+  // Drawn per view; the service's own ceiling is 4,000. Raised with the
+  // intersections: across the eight sample areas they run at about 55% of the
+  // road-parcel count, so the old 1,500 would have started capping views that
+  // used to draw whole.
+  const MAX_PARCELS  = 2400;
   const CACHE_MAX    = 20;
   const FAIL_TTL     = 60000;
   // Vertex generalisation asked of the service, in degrees (~10 m). A road
@@ -99,6 +140,7 @@ const MapRoads = (function () {
   //     network; both were rendered together before this colour was settled.
   const LINE_COLOR = '#f9a825';
   const UNNAMED    = 'Unnamed road reserve';
+  const UNNAMED_X  = 'Road intersection';
 
   let map = null, layer = null, timer = null, seq = 0, failedAt = 0;
   let layerId = null, resolving = null;   // sublayer resolution — see resolveLayer()
@@ -159,7 +201,7 @@ const MapRoads = (function () {
       geometryType: 'esriGeometryEnvelope',
       inSR: '4326', outSR: '4326',
       spatialRel: 'esriSpatialRelIntersects',
-      outFields: 'feat_name,locality,shire_name,lotplan',
+      outFields: 'feat_name,locality,shire_name,lotplan,parcel_typ',
       returnGeometry: 'true',
       geometryPrecision: '6',
       maxAllowableOffset: String(OFFSET_DEG),
@@ -172,7 +214,15 @@ const MapRoads = (function () {
   // GeoJSON features to the shape draw() and the hit test both want: the rings
   // in [lat, lon] order Leaflet takes, a bounding box so a mousemove can reject
   // most parcels without walking their vertices, and the three strings the
-  // hover label is built from.
+  // hover label is built from. Plus, for joinNodes(), which parcel_typ this row
+  // came back under and the vertices it can be joined on.
+  //
+  // The vertex key is the coordinate pair as the service printed it. Nothing is
+  // re-rounded here: `geometryPrecision=6` already fixed both features' shared
+  // corner at six decimal places, and rounding again on the way in would only
+  // move a matched pair apart.
+  function vertKey(lat, lon) { return lat + ',' + lon; }
+
   function parcelsFrom(json) {
     const out = [];
     for (const f of (json && json.features) || []) {
@@ -180,7 +230,7 @@ const MapRoads = (function () {
       if (!g) continue;
       const polys = g.type === 'Polygon' ? [g.coordinates]
                   : g.type === 'MultiPolygon' ? g.coordinates : [];
-      const rings = [];
+      const rings = [], verts = [];
       let s = 90, n = -90, w = 180, e = -180;
       for (const poly of polys) {
         for (const ring of poly) {
@@ -188,6 +238,7 @@ const MapRoads = (function () {
           for (const [lon, lat] of ring) {
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
             pts.push([lat, lon]);
+            verts.push(vertKey(lat, lon));
             if (lat < s) s = lat; if (lat > n) n = lat;
             if (lon < w) w = lon; if (lon > e) e = lon;
           }
@@ -197,12 +248,55 @@ const MapRoads = (function () {
       if (!rings.length) continue;
       const p = f.properties || {};
       out.push({
-        rings, box: { s, w, n, e },
+        rings, box: { s, w, n, e }, verts,
+        isNode:   String(p.parcel_typ || '').trim() === NODE_TYPE,
+        joins:    [],
         name:    String(p.feat_name || '').trim(),
         locality: String(p.locality || '').trim(),
         shire:    String(p.shire_name || '').trim(),
         lotplan:  String(p.lotplan || '').trim(),
       });
+    }
+    return out;
+  }
+
+  // Attach every intersection to the roads that meet at it, and drop the ones
+  // that meet none — the whole of the guard the header describes.
+  //
+  // One pass over the road parcels' vertices builds the index; one pass over
+  // the intersections reads it. Both are linear in the vertices already in
+  // hand, which for a viewport is a few tens of thousands of string keys and is
+  // gone again by the time this returns: `verts` is dropped from every parcel
+  // on the way out, because the cache holds twenty of these answers and the hit
+  // test never needs them.
+  function joinNodes(parcels) {
+    const meeting = new Map();          // vertex key → Set of road names there
+    for (const p of parcels) {
+      if (p.isNode) continue;
+      for (const k of p.verts) {
+        let names = meeting.get(k);
+        if (!names) meeting.set(k, names = new Set());
+        // An unnamed road is still a road: it joins, it just cannot say what it
+        // is called, so it goes in as the empty string and is filtered out of
+        // the label rather than out of the test.
+        names.add(p.name);
+      }
+    }
+    const out = [];
+    for (const p of parcels) {
+      if (!p.isNode) { delete p.verts; out.push(p); continue; }
+      const names = new Set();
+      let joined = false;
+      for (const k of p.verts) {
+        const at = meeting.get(k);
+        if (!at) continue;
+        joined = true;
+        for (const nm of at) if (nm) names.add(nm);
+      }
+      delete p.verts;
+      if (!joined) continue;            // an unlinked remnant, not a junction
+      p.joins = [...names].sort();
+      out.push(p);
     }
     return out;
   }
@@ -294,9 +388,16 @@ const MapRoads = (function () {
   // question; the locality and the local authority are what turn it into an
   // address, and they are the difference between "Gap Creek Road" and "which
   // Gap Creek Road".
+  //
+  // An intersection carries no name of its own in the cadastre, so it borrows
+  // the names of the roads joined to its corners — which is the name a person
+  // would give it anyway.
   function parcelLabel(p) {
     const where = [p.locality, p.shire].filter(Boolean).join(' · ');
-    return (p.name || UNNAMED) + (where ? ` — ${where}` : '');
+    const what = p.isNode
+      ? (p.joins.length ? `${p.joins.join(' / ')} intersection` : UNNAMED_X)
+      : (p.name || UNNAMED);
+    return what + (where ? ` — ${where}` : '');
   }
 
   function onMapMove(e) {
@@ -326,23 +427,29 @@ const MapRoads = (function () {
   // bbox is rounded outward past the screen edges, and counting everything
   // fetched would let the note claim parcels that are off screen. MapSurvey's
   // inViewCount, on boxes instead of points.
+  // Counted apart rather than added together, because they answer different
+  // questions: the roads are what the layer is for, and the intersections are
+  // the thing that used to be missing from it — a note that folded them into
+  // one figure could not say the junctions were being drawn at all.
   function inViewCount(parcels) {
-    if (!map) return 0;
+    const out = { roads: 0, nodes: 0 };
+    if (!map) return out;
     const b = map.getBounds();
     const s = b.getSouth(), w = b.getWest(), n = b.getNorth(), e = b.getEast();
-    let count = 0;
     for (const p of parcels) {
       const x = p.box;
       if (x.n < s || x.s > n || x.e < w || x.w > e) continue;
-      count++;
+      if (p.isNode) out.nodes++; else out.roads++;
     }
-    return count;
+    return out;
   }
 
   function setNote(kind, entry) {
+    const c = entry ? inViewCount(entry.parcels) : { roads: 0, nodes: 0 };
     note = {
       kind,
-      drawn:  entry ? inViewCount(entry.parcels) : 0,
+      roads:  c.roads,
+      nodes:  c.nodes,
       capped: !!(entry && entry.capped),
     };
     const el = document.getElementById('map-roads-note');
@@ -356,11 +463,15 @@ const MapRoads = (function () {
       case 'zoom':    return 'Zoom in to draw road parcels — this view is too wide to ask the cadastre for.';
       case 'loading': return 'Looking up road parcels…';
       case 'fail':    return 'Road parcels unavailable — the Queensland spatial data service could not be reached.';
-      case 'ok':
-        if (!n.drawn) return 'No road parcels in view. Queensland only — the cadastre this reads stops at the border.';
-        return `<strong>${n.drawn}</strong> road parcel${n.drawn === 1 ? '' : 's'} in view` +
+      case 'ok': {
+        const roads = n.roads || 0, nodes = n.nodes || 0;
+        if (!roads && !nodes) return 'No road parcels in view. Queensland only — the cadastre this reads stops at the border.';
+        return `<strong>${roads}</strong> road parcel${roads === 1 ? '' : 's'}` +
+               (nodes ? ` and <strong>${nodes}</strong> intersection${nodes === 1 ? '' : 's'}` : '') +
+               ' in view' +
                (n.capped ? ' · more in view not drawn' : '') +
                '. Hover one for its name, locality and local authority.';
+      }
       default:        return '';
     }
   }
@@ -390,7 +501,7 @@ const MapRoads = (function () {
       return askJson(queryUrl(id, b));
     }).then(json => {
       if (mine !== seq || !map || !json) return;
-      const all = parcelsFrom(json);
+      const all = joinNodes(parcelsFrom(json));
       const capped = all.length > MAX_PARCELS;
       const entry = { parcels: capped ? all.slice(0, MAX_PARCELS) : all, capped, total: all.length };
       cachePut(key, entry);

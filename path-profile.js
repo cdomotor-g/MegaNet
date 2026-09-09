@@ -376,11 +376,46 @@ const PATH_VERDICT = {
 // The profile is recomputed when the line is finished, selected or typed over,
 // never while it is being dragged out: MapDraw.rerenderPanel is the one hook,
 // and a geometry signature stops a repeat of the same path re-fetching.
+//
+// ── The cursor, on both pictures at once ────────────────────────────────────
+// A profile and a map are two views of one line, and until the pointer is on
+// both of them they stay two pictures. The chart says there is a 640 m ridge
+// nine kilometres along; the map says nothing about where nine kilometres along
+// actually is. Reading one against the other means measuring along the x-axis
+// by eye and then guessing the same fraction on the map — which is the work
+// Google Earth's profile does for you, and the reason its dot is the feature
+// people ask for by name.
+//
+// So: a dot that runs along the ground line with the pointer, tagged with the
+// land height under it, and the same point marked on the map — and it works
+// from either side. Move over the chart and the map dot follows; move along the
+// line on the map and the chart's dot follows. One entry point, hoverAt(), with
+// a distance along the path in metres; both sides call it and neither knows
+// what the other is doing.
+//
+// The two halves live where the thing they touch lives. This file owns the
+// reading — the samples, the scales, the height under the cursor — and the SVG
+// it is drawn on. map-draw.js owns the map, so the marker on the ground is
+// MapDraw's (showProfilePoint), which is what makes it go away with the map on
+// a tab switch rather than outliving it.
+//
+// Pointer only, and that is the honest boundary rather than an oversight: the
+// chart is a `role="img"` with its whole reading in the aria-label — the
+// verdict, the worst clearance and where along the path it falls — so the
+// figure the cursor exists to find is already spoken without it. This is the
+// same line map-roads.js and map-survey.js draw around their hover labels.
 
 const PathProfile = (function () {
   const SAMPLES = 256;
   let cur = { sig: null, status: 'idle', prof: null, error: '',
               cover: null, coverStatus: 'idle', coverError: '' };
+
+  // What the cursor reads: the scales the chart on screen was drawn to, and one
+  // entry per terrain sample carrying where it is on the chart, where it is on
+  // the ground, and how high the ground is there. Rebuilt by every chartSvg(),
+  // null whenever there is no chart — which is also what stops a stale pointer
+  // from painting onto the chart that replaced it.
+  let hoverGeom = null;
 
   const P = () => state.path;
 
@@ -512,6 +547,26 @@ const PathProfile = (function () {
 
     const x = d => L + (D > 0 ? d / D : 0) * iw;
     const y = m => T + (1 - (m - lo) / (hi - lo)) * ih;
+
+    // Everything the cursor needs, frozen against the chart being built here —
+    // the scales it was drawn to and one row per sample. `y` is the ground
+    // line and not the top of the cover: the dot rides the terrain, the way
+    // the dot on Google Earth's profile does, so the number in its tag and the
+    // line it sits on are the same reading. A sample over a tile gap has no
+    // ground and no y, and sampleAt() steps past it rather than inventing one.
+    hoverGeom = {
+      W, L, T, iw, ih, D,
+      pts: an.pts.map((p, i) => ({
+        d1:     p.d1,
+        x:      x(p.d1),
+        y:      p.bulged == null ? null : y(p.bulged),
+        ground: p.ground,
+        cover:  p.cover,
+        cls:    p.cls,
+        lat:    prof.lat ? prof.lat[i] : null,
+        lon:    prof.lon ? prof.lon[i] : null,
+      })),
+    };
 
     // The plot area, painted. It was transparent, so "above the ground" was the
     // panel behind it and the chart had no edge of its own — the frame ran into
@@ -669,6 +724,27 @@ const PathProfile = (function () {
       return `<span><i class="path-key-cover" style="--dot:${LandCover.colourVar(c)}"></i> ${esc(LandCover.CLASSES[c].label)}${hs}</span>`;
     }).join('');
 
+    // Drawn once, hidden, and moved by hand from then on: repainting the panel
+    // on every mousemove would rebuild the whole chart under the pointer and
+    // throw the pointer's own event target away with it.
+    const cursor = `
+      <g id="path-cursor" style="display:none" pointer-events="none">
+        <line id="path-cursor-rule" y1="${T}" y2="${T + ih}"
+              stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3" opacity=".75"/>
+        <circle id="path-cursor-dot" r="4.5"
+                fill="var(--accent)" stroke="var(--panel)" stroke-width="1.5"/>
+        <rect id="path-cursor-box" rx="3" height="17"
+              fill="var(--panel)" stroke="var(--border)" stroke-width="1"/>
+        <text id="path-cursor-text" font-size="11" text-anchor="middle"
+              style="fill:var(--text)"></text>
+      </g>`;
+    // Last in the SVG so it is over everything, and transparent rather than
+    // absent because a fill of `none` takes no pointer events at all.
+    const catcher = `
+      <rect x="${L}" y="${T}" width="${iw}" height="${ih}" fill="transparent"
+            onmousemove="PathProfile.hoverEvent(event)"
+            onmouseleave="PathProfile.hoverOff()"/>`;
+
     return `
       <div class="path-chart-wrap">
         <svg viewBox="0 0 ${W} ${H}" class="path-chart" role="img"
@@ -693,6 +769,8 @@ const PathProfile = (function () {
           ${masts}
           <line x1="${L}" y1="${T + ih}" x2="${W - R}" y2="${T + ih}" stroke="var(--muted)" stroke-width="1"/>
           ${xticks}
+          ${cursor}
+          ${catcher}
         </svg>
         <div class="path-key small">
           ${flat ? '' : `
@@ -709,6 +787,91 @@ const PathProfile = (function () {
           an.coverUsed && cur.cover ? ` ${esc(LandCover.attribution)}${cur.cover.year !== 'seeded' ? ` (${cur.cover.year})` : ''}, on the same sample points.${
           an.canopyUsed ? ` ${esc(LandCover.canopyAttribution)}.` : ''}` : ''}</p>
       </div>`;
+  }
+
+  // ── the cursor ──────────────────────────────────────────────────────────────
+  // Three small jobs: which sample the pointer is over, painting it on the
+  // chart, and mirroring it onto the map. See the header for why it is split
+  // this way.
+
+  // The sample nearest a distance along the path. Terrain.profile samples
+  // evenly end to end, so the index is arithmetic rather than a search; a tile
+  // gap can leave that sample with no ground under it, and then the nearest
+  // usable one on either side is what the cursor honestly has to offer.
+  function sampleAt(d) {
+    const g = hoverGeom;
+    if (!g || !g.pts.length) return null;
+    const last = g.pts.length - 1;
+    let i = g.D > 0 ? Math.round(d / g.D * last) : 0;
+    i = Math.max(0, Math.min(last, i));
+    if (g.pts[i].y != null) return g.pts[i];
+    for (let k = 1; k <= last; k++) {
+      if (i - k >= 0    && g.pts[i - k].y != null) return g.pts[i - k];
+      if (i + k <= last && g.pts[i + k].y != null) return g.pts[i + k];
+    }
+    return null;
+  }
+
+  // What the tag says, and what the map's own marker repeats with room for
+  // more. Whole metres either way: the tiles are sampled every 30–90 m, so a
+  // decimal here would be a precision this profile does not have.
+  function heightLabel(p) {
+    return p.ground == null ? '—' : `${Math.round(p.ground)} m`;
+  }
+
+  function groundLabel(p) {
+    const bits = [`${heightLabel(p)} ground`];
+    if (p.cover > 0) {
+      const cls = p.cls != null && LandCover.CLASSES[p.cls] ? LandCover.CLASSES[p.cls].label : 'cover';
+      bits.push(`${Math.round(p.cover)} m ${cls.toLowerCase()} on it`);
+    }
+    bits.push(`${fmtKm(p.d1 / 1000)} along`);
+    return bits.join(' · ');
+  }
+
+  function hideCursor() {
+    const g = document.getElementById('path-cursor');
+    if (g) g.style.display = 'none';
+    MapDraw.clearProfilePoint();
+  }
+
+  // Move the rule, the dot and the tag onto one sample. Direct DOM writes
+  // rather than a re-render, for the reason chartSvg records where the group is
+  // built. The tag is measured after its text is set — getComputedTextLength is
+  // the only way to size a box round SVG text without guessing at a font — and
+  // then clamped inside the plot so it cannot run off either edge.
+  function paintCursor(p) {
+    const g = hoverGeom;
+    const box = document.getElementById('path-cursor');
+    if (!g || !box || p.y == null) return;
+    const rule = document.getElementById('path-cursor-rule');
+    const dot  = document.getElementById('path-cursor-dot');
+    const bg   = document.getElementById('path-cursor-box');
+    const txt  = document.getElementById('path-cursor-text');
+    if (!rule || !dot || !bg || !txt) return;
+
+    box.style.display = '';
+    rule.setAttribute('x1', p.x.toFixed(1));
+    rule.setAttribute('x2', p.x.toFixed(1));
+    dot.setAttribute('cx', p.x.toFixed(1));
+    dot.setAttribute('cy', p.y.toFixed(1));
+
+    txt.textContent = heightLabel(p);
+    const w = Math.max(28, (txt.getComputedTextLength ? txt.getComputedTextLength() : 30) + 12);
+    // Above the dot, unless that would put it through the top of the plot, in
+    // which case it goes below — a summit is exactly where the tag is most
+    // wanted and exactly where there is no room above it.
+    const above = p.y - 12 - 17 >= g.T;
+    const boxY  = above ? p.y - 12 - 17 : p.y + 12;
+    const cx    = Math.max(g.L + w / 2, Math.min(g.L + g.iw - w / 2, p.x));
+    bg.setAttribute('x', (cx - w / 2).toFixed(1));
+    bg.setAttribute('y', boxY.toFixed(1));
+    bg.setAttribute('width', w.toFixed(1));
+    txt.setAttribute('x', cx.toFixed(1));
+    txt.setAttribute('y', (boxY + 12.5).toFixed(1));
+
+    if (p.lat != null && p.lon != null) MapDraw.showProfilePoint(p.lat, p.lon, groundLabel(p));
+    else MapDraw.clearProfilePoint();
   }
 
   // ── the fade margin ─────────────────────────────────────────────────────────
@@ -1037,12 +1200,44 @@ const PathProfile = (function () {
     const el = document.getElementById('path-profile-panel');
     if (!el) return;
     const sh = target();
+    // The chart about to be thrown away is the one the cursor was reading, and
+    // the marker it put on the map would otherwise outlive it — pointing at a
+    // distance along a path that may not be the current one any more.
+    hoverGeom = null;
+    MapDraw.clearProfilePoint();
     el.hidden = !sh;                       // no line drawn: the panel isn't there at all
     el.innerHTML = sh ? panelHtml() : '';
   }
 
   return {
     sync, rerender,
+
+    // ── the cursor's three doors ──
+    // A pointer over the chart. The SVG is drawn in viewBox units and stretched
+    // to whatever width the panel gives it, so a client x has to come back
+    // through that scale before it can be compared with anything the chart was
+    // built from.
+    hoverEvent(ev) {
+      const g = hoverGeom;
+      if (!g) return;
+      const svg = ev.target && ev.target.ownerSVGElement;
+      if (!svg) return;
+      const r = svg.getBoundingClientRect();
+      if (!r.width) return;
+      const ux = (ev.clientX - r.left) * (g.W / r.width);
+      this.hoverAt((ux - g.L) / (g.iw || 1) * g.D);
+    },
+
+    // A distance along the path, in metres — the one entry point both sides
+    // use. MapDraw calls this when the pointer runs along the line on the map.
+    hoverAt(d) {
+      if (!hoverGeom || !(d >= -1)) { hideCursor(); return; }
+      const p = sampleAt(Math.max(0, Math.min(hoverGeom.D, d)));
+      if (p) paintCursor(p); else hideCursor();
+    },
+
+    hoverOff() { hideCursor(); },
+
     setOpen(v) { P().open = !!v; },
     setAgl(which, v) {
       const n = v.trim() === '' ? null : Number(v);

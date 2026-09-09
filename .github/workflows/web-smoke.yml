@@ -263,6 +263,18 @@ jobs:
         working-directory: test
         run: npm run rivers
 
+      # The road reserve, and the intersections that were missing from it. The
+      # DCDB files the crossing square at a junction under its own parcel_typ
+      # — 'Unlinked parcel or inter' — so a layer drawing only 'Road Type
+      # Parcel' left a hole at every intersection. The check stubs the cadastre
+      # with a crossroads whose roads stop dead at the junction, honours the
+      # where clause so the fixture really has the hole in it, and asserts the
+      # junction is drawn, names the two roads that meet there, and that an
+      # unlinked parcel touching no road is still refused.
+      - name: Road reserve — drawn whole, intersections included
+        working-directory: test
+        run: npm run roads
+
       # The QLD SurveyControl service answers any query carrying
       # resultRecordCount with an empty feature set — HTTP 200, no error field
       # — so a per-layer cap made every mark invisible while the note counted
@@ -388,6 +400,15 @@ jobs:
       - name: Path cover — the profile, the band, the model over it
         working-directory: test
         run: npm run pathcover
+
+      # The profile's cursor, on the chart and on the map at once. The tiles
+      # are a ramp in longitude built here — 0 m at one end of the hop, 1,000 m
+      # at the other, continuous across tile boundaries — so every reading is
+      # arithmetic: a quarter of the way along, the cursor has to say 250 m.
+      # Driven from both sides, because it works from both.
+      - name: Path cursor — the ground under the pointer, on both pictures
+        working-directory: test
+        run: npm run pathcursor
 
       # The database half of the claim is proven against a real Postgres by
       # tools/check_mqtt.sql, which CI cannot run — it needs a connection. What
