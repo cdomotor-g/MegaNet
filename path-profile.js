@@ -815,9 +815,11 @@ const PathProfile = (function () {
   // What the tag says, and what the map's own marker repeats with room for
   // more. Whole metres either way: the tiles are sampled every 30–90 m, so a
   // decimal here would be a precision this profile does not have.
-  function heightLabel(p) {
-    return p.ground == null ? '—' : `${Math.round(p.ground)} m`;
-  }
+  //
+  // No "no height here" case, because there cannot be one: a sample's y is
+  // derived from its ground, so sampleAt() returning a sample at all is already
+  // the guarantee that this has a number to print.
+  function heightLabel(p) { return `${Math.round(p.ground)} m`; }
 
   function groundLabel(p) {
     const bits = [`${heightLabel(p)} ground`];
@@ -827,6 +829,18 @@ const PathProfile = (function () {
     }
     bits.push(`${fmtKm(p.d1 / 1000)} along`);
     return bits.join(' · ');
+  }
+
+  // One entry point: a distance along the path in metres. Both doors below call
+  // it, and it is a local function rather than a member of the returned object
+  // so that neither depends on `this` — an inline `on*=` attribute and a call
+  // from MapDraw both bind it correctly today, but a handler handed straight to
+  // addEventListener would not, and that is a plausible edit rather than a
+  // hypothetical one.
+  function hoverAt(d) {
+    if (!hoverGeom || !(d >= -1)) { hideCursor(); return; }
+    const p = sampleAt(Math.max(0, Math.min(hoverGeom.D, d)));
+    if (p) paintCursor(p); else hideCursor();
   }
 
   function hideCursor() {
@@ -1225,16 +1239,12 @@ const PathProfile = (function () {
       const r = svg.getBoundingClientRect();
       if (!r.width) return;
       const ux = (ev.clientX - r.left) * (g.W / r.width);
-      this.hoverAt((ux - g.L) / (g.iw || 1) * g.D);
+      hoverAt((ux - g.L) / (g.iw || 1) * g.D);
     },
 
-    // A distance along the path, in metres — the one entry point both sides
-    // use. MapDraw calls this when the pointer runs along the line on the map.
-    hoverAt(d) {
-      if (!hoverGeom || !(d >= -1)) { hideCursor(); return; }
-      const p = sampleAt(Math.max(0, Math.min(hoverGeom.D, d)));
-      if (p) paintCursor(p); else hideCursor();
-    },
+    // A distance along the path, in metres. MapDraw calls this when the pointer
+    // runs along the line on the map.
+    hoverAt,
 
     hoverOff() { hideCursor(); },
 
