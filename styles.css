@@ -3144,6 +3144,295 @@ hr {
   }
 }
 
+/* ── Elevation base map (map-elevation.js) ──────────────────────────────── */
+/* The extras that only mean anything while the Elevation base is the chosen
+   one: the relief switch and the colour file's own ramp, shown as a key. Hidden
+   with [hidden] from the picker's change handler rather than removed, so the
+   panel does not change height as a side effect of building it. */
+
+.mn-base-elev-extra {
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line);
+}
+
+/* A vertical strip, highest band at the top, the way a map legend is read.
+   Colour arrives as --dot, the .legend-sq convention (#138). */
+.elev-ramp {
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: .78rem;
+  line-height: 1.35;
+}
+
+.elev-ramp li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.elev-ramp i {
+  flex: none;
+  width: 22px;
+  height: 13px;
+  background: var(--dot, var(--muted));
+  border: 1px solid color-mix(in srgb, var(--dot, var(--muted)) 60%, var(--text));
+}
+
+/* One strip, not twelve chips: the bands butt up against each other so the
+   ramp reads as the continuous scale it is. */
+.elev-ramp li + li i { border-top: 0; }
+
+.elev-ramp span { color: var(--muted); }
+
+/* ── Highest ground in view (map-peaks.js) ──────────────────────────────── */
+/* A divIcon with a zero size and a zero anchor: the marker's origin IS the
+   summit, and everything drawn hangs off that point rather than being centred
+   on it. Leaflet would otherwise size the icon box for us and the triangle's
+   tip — the part that means "here" — would land somewhere near the hill. */
+
+.mn-peak-icon {
+  background: none;
+  border: 0;
+}
+
+.mn-peak {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+/* The triangle sits directly over the point, the height rides above it. */
+.mn-peak-mark {
+  font-size: 15px;
+  font-style: normal;
+  line-height: 1;
+  color: var(--warn);
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px rgba(0, 0, 0, .6);
+}
+
+.mn-peak-h {
+  order: -1;
+  margin-bottom: 1px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--card);
+  color: var(--text);
+  font-size: .7rem;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+}
+
+.mn-peak-pop h4 {
+  margin: 0 0 var(--sp-1);
+  font-size: .95rem;
+}
+
+/* The ranked list under the switch in the Map display panel. A column of
+   buttons rather than a list with buttons in it: each row is one target. */
+.mn-peak-go {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+  text-align: left;
+}
+
+.legend-peak {
+  color: var(--warn);
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* ── Places & coordinates in the filter box (places.js) ─────────────────── */
+/* The strip under a filter entry: what the text means on the ground, as
+   against what it matches in the station list. Empty until Places writes it,
+   and it collapses to nothing when there is nothing to say — :empty rather
+   than [hidden], because the module writes innerHTML and never attributes. */
+
+.search-places:empty { display: none; }
+
+.search-places-in {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  margin-top: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  border-left: 3px solid var(--accent);
+  background: var(--subtle);
+  border-radius: 0 var(--r-sm, 4px) var(--r-sm, 4px) 0;
+}
+
+/* In the head row the strip has to take a line of its own: .filter-quick is a
+   wrapping flex row that otherwise squeezes it in beside the clear buttons. It
+   is a <span> there rather than a <div> — that row's container is a <span> and
+   only phrasing content may go inside one — so it is given the block it would
+   otherwise have had. */
+.search-places--quick {
+  display: block;
+  flex: 1 1 100%;
+  text-align: left;
+}
+
+.search-places--quick:empty { display: none; }
+
+.mn-place-go {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: .8rem;
+}
+
+.mn-place-go .txt-muted { font-weight: 400; }
+
+/* The one pin the module ever drops. A divIcon at a zero anchor, for the
+   reason .mn-peak gives: the marker's origin is the coordinate, and the
+   emoji hangs off it rather than being centred on it. */
+.mn-place-icon {
+  background: none;
+  border: 0;
+}
+
+.mn-place {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  font-size: 22px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5));
+}
+
+.mn-place-pop h4 {
+  margin: 0 0 var(--sp-1);
+  font-size: .95rem;
+}
+
+/* ── Polar radio coverage (map-polar.js) ────────────────────────────────── */
+/* The one on-map panel that is a dialog rather than a switch: nine fields, a
+   station finder and a Draw button, in a flyout that is 300 px wide at most.
+   So everything in it is a full-width row and the fieldsets are the only
+   grouping — Radio Mobile's own three-column layout does not survive a column
+   this narrow, and pretending otherwise is how a panel gets a sideways
+   scrollbar. */
+
+.polar-panel { min-width: 15rem; }
+
+.polar-fs {
+  margin: 0 0 var(--sp-2);
+  padding: var(--sp-1) var(--sp-2) var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 4px);
+}
+
+.polar-fs > legend {
+  padding: 0 .3rem;
+  color: var(--muted);
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.polar-find {
+  width: 100%;
+  margin-top: var(--sp-1);
+}
+
+.polar-picked { margin: var(--sp-1) 0 0; }
+
+/* The hit list is capped at eight and still scrolls: a flyout is at most 42vh
+   tall and this is one fieldset of six. */
+.polar-hits {
+  max-height: 9rem;
+  overflow-y: auto;
+  margin-top: var(--sp-1);
+}
+
+.polar-hit {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 3px var(--sp-1);
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.polar-hit:hover,
+.polar-hit:focus-visible { background: var(--subtle); }
+
+.polar-hit.is-here {
+  background: var(--subtle);
+  font-weight: 600;
+}
+
+.polar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.polar-run { color: var(--accent); }
+
+/* The key, in the panel: the ramp as twelve rows, strongest first, the way the
+   plot reads from the middle outwards. Colour arrives as --dot, the
+   .legend-sq convention (#138). */
+.polar-key {
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: .74rem;
+  line-height: 1.3;
+}
+
+.polar-key li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.polar-key i {
+  flex: none;
+  width: 20px;
+  height: 11px;
+  background: var(--dot, var(--muted));
+}
+
+.polar-key span { color: var(--muted); }
+
+/* …and in the map legend, where there is no room for twelve rows: one strip. */
+.legend-polar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.legend-polar-ramp {
+  display: flex;
+  height: 10px;
+  border: 1px solid var(--line);
+}
+
+.legend-polar-ramp i {
+  flex: 1 1 auto;
+  background: var(--dot, var(--muted));
+}
+
 /* ── My location + heading (mobile only) ─────────────────────────────────── */
 
 .mn-locate a {

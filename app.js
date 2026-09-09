@@ -2307,6 +2307,24 @@ function mapDisplayControlsHtml() {
       </select>
     </label>
     <p class="filter-note" id="map-contour-note">${MapContours.noteHtml()}</p>
+    <!-- The highest ground in view (#184). It sits with the contours because
+         it is the same question asked the other way round — those draw the
+         shape of the ground, this names the top of it — and because both are
+         read off terrain rather than off the station list. -->
+    <label class="filter-check"
+           title="Pin the three to five highest points in the current map view. Hilltops, not stations — whatever ground is highest, whether anything is on it or not.">
+      <input type="checkbox" ${state.mapPeaks ? 'checked' : ''}
+             onchange="MapPeaks.setEnabled(this.checked)">
+      Highest ground in view
+    </label>
+    <label class="filter-field">
+      <span>How many peaks</span>
+      <select onchange="MapPeaks.setCount(this.value)">
+        ${[3, 4, 5].map(n =>
+          `<option value="${n}" ${state.mapPeakCount === n ? 'selected' : ''}>${n}</option>`).join('')}
+      </select>
+    </label>
+    <p class="filter-note" id="map-peaks-note">${MapPeaks.noteHtml()}</p>
     <label class="filter-check"
            title="The surveyed road reserve itself — the parcel the road is dedicated over, with its name, locality and local authority. Queensland cadastre; zoom in past about 1:40,000 to draw it.">
       <input type="checkbox" ${state.mapRoads ? 'checked' : ''}
@@ -2438,6 +2456,7 @@ function mapLegendOffLayersHtml() {
     !state.mapSurvey          && 'Survey marks',
     !state.mapRivers          && 'River highlighting',
     !state.mapContours        && 'LiDAR contours',
+    !state.mapPeaks           && 'Highest ground in view',
     !state.mapRoads           && 'Road parcels',
     !state.mapWind            && 'Wind regions',
     !state.mapCatchments      && 'River catchments',
@@ -2469,6 +2488,27 @@ function mapLegendOffLayersHtml() {
 // The rows are built from MapWind.regions(), so the colour in the key is the
 // colour on the map by construction and the wording lives beside the data it
 // describes rather than here.
+
+// The polar coverage key (#184). The ramp the plot was painted with, the two
+// figures it runs between, and — the part a colour strip cannot carry — which
+// direction of which link between which two radios it is describing. A wash of
+// colour over a map with no sentence naming the radio it belongs to is the one
+// way this feature can mislead somebody, so the sentence is not optional.
+function mapPolarLegendHtml() {
+  const k = MapPolar.legend();
+  if (!k) return '';
+  return `
+    <div class="legend-polar">
+      <span class="small legend-polar-h"><strong>Polar radio coverage</strong> —
+        ${esc(k.centre)} ↔ ${esc(k.mobile)}, ${esc(k.dir)}</span>
+      <span class="legend-polar-ramp" aria-hidden="true">${
+        k.colours.map(c => `<i style="--dot:${c}"></i>`).join('')}</span>
+      <span class="small txt-muted">${k.from} ${esc(k.unit)} at the outside
+        to ${k.to} and better at the middle. Ground under the lower figure is left unpainted.
+        Bare terrain, no antenna patterns — the best case.</span>
+    </div>`;
+}
+
 // The catchment key. One row per drainage division rather than per basin,
 // because 77 rows is not a key and the division is the fact the colours carry:
 // which way the water goes. Built from MapCatchments.divisions(), so the colour
@@ -2554,6 +2594,14 @@ function mapLegendHtml() {
     <span class="legend-item">
       <span class="legend-line legend-line-contour"></span>
       <span class="small">LiDAR contours (Qld Dept of Resources)</span>
+    </span>` : ''}
+    ${MapPolar.active() ? mapPolarLegendHtml() : ''}
+    ${MapPeaks.active() ? `
+    <span class="legend-item">
+      <span class="legend-peak" aria-hidden="true">▲</span>
+      <span class="small">Highest ground in view — ${MapPeaks.peaks().length} summit${
+        MapPeaks.peaks().length === 1 ? '' : 's'}, ranked. Ground height off ~30 m terrain,
+        nothing standing on it</span>
     </span>` : ''}
     ${MapRoads.active() ? `
     <span class="legend-item">
@@ -2657,6 +2705,11 @@ function mapSearchInput(i, value) {
   const row = searchRows()[i];
   if (!row) return;
   row.text = value;
+  // What this text means somewhere other than the station list (#184). Its own
+  // debounce, well past this one: a coordinate is answered from arithmetic on
+  // the spot, and a place name waits for a real pause before anybody's
+  // geocoder is asked about it.
+  Places.forRow(i, value);
   clearTimeout(state.mapSearchTimer);
   state.mapSearchTimer = setTimeout(stationsFilterChanged, 160);
 }
@@ -2703,6 +2756,9 @@ function stopStationsMap() {
   MapHubs.detach();
   MapSurvey.detach();
   MapContours.detach();
+  MapPeaks.detach();
+  MapPolar.detach();
+  Places.detach();
   MapRoads.detach();
   MapWind.detach();
   // Not a detach — MapLos holds no layer — but the same duty: the queue is
@@ -2775,6 +2831,16 @@ function initMap() {
   MapHubs.attach(state.map);
   MapSurvey.attach(state.map);
   MapContours.attach(state.map);
+  MapPeaks.attach(state.map);
+  // Its own on-map panel rather than a switch in the 👁️ flyout: this one is a
+  // dialog, not a layer — nine fields and a Draw button — and it is the same
+  // shape as Radio Mobile's own window, which is what an operator coming from
+  // that tool is looking for.
+  MapPolar.attach(state.map);
+  // No layer of its own until somebody types somewhere into the filter box —
+  // attached for MapSpider's reason: it has to know which map it would be
+  // dropping a pin on before anybody asks it to.
+  Places.attach(state.map);
   MapRoads.attach(state.map);
   MapWind.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
@@ -4518,7 +4584,12 @@ function filterQuickHtml() {
     <span class="filter-quick-more" id="filter-quick-more" ${n > 1 ? '' : 'hidden'}
           title="More search entries than this row can show — open the card to see them"
       >+${n - 1}</span>
-    ${filterResetsHtml()}`;
+    ${filterResetsHtml()}
+    <!-- The same strip the panel's first entry carries, because this box is the
+         one being typed into while the card is shut. Places.js writes both.
+         A <span> rather than the panel's <div>: this row's container is itself
+         a <span>, and only phrasing content may go inside one. -->
+    <span class="search-places search-places--quick" data-mn-places="0"></span>`;
 }
 
 // Redraw the head row's controls. Called when the card shuts, which is the one
@@ -4528,6 +4599,7 @@ function renderFilterQuick() {
   if (!el) return;
   el.innerHTML = filterQuickHtml();
   el.querySelectorAll('.filter-search').forEach(autoGrowSearch);
+  Places.repaint();
 }
 
 // Keep the quick box honest without redrawing it. updateFilterChrome runs on
@@ -4613,6 +4685,11 @@ function searchRowHtml(row, i, total) {
                 ${total > 1 ? '' : 'hidden'}>−</button>
       </div>
       <p class="filter-note" id="search-terms-note-${i}">${searchTermsNoteHtml(i)}</p>
+      <!-- What this entry means on the ground rather than in the station list:
+           a coordinate it parses as, or the towns, localities and airports it
+           names (#184). Places.js fills it in; empty markup here, because the
+           strip is state that outlives a redraw of the stack around it. -->
+      <div class="search-places" data-mn-places="${i}"></div>
     </div>`;
 }
 
@@ -4623,6 +4700,11 @@ function initStationFilters() {
   // The whole card: the head row's quick box (#181) is the same textarea with
   // the same paste in it, and it measures itself the same way.
   document.querySelectorAll('#stations-filter-card .filter-search').forEach(autoGrowSearch);
+  // Whatever the place strips already knew, back onto a card that has just been
+  // re-emitted empty. Deliberately not a fresh lookup: a re-render of the tab
+  // is not somebody asking a question, and re-running one would move the map
+  // out from under an operator who only switched tabs and came back.
+  Places.repaint();
 }
 
 // Redraw the stack in place — the block, not the panel around it, so the
@@ -4636,6 +4718,10 @@ function renderSearchStack(focus) {
   if (!el) return;
   el.innerHTML = searchStackHtml();
   el.querySelectorAll('.filter-search').forEach(autoGrowSearch);
+  // The strips are empty markup until Places writes them back — it holds what
+  // each entry found, so removing the entry above one does not lose it.
+  Places.trim(searchRows().length);
+  Places.repaint();
   const box = focus == null ? null : document.getElementById(`station-search-${focus}`);
   if (box) box.focus();
 }
@@ -4695,6 +4781,8 @@ function autoGrowSearch(el) {
 // "clear" is pressed to start again.
 function clearSearch() {
   state.filters.searches = [newSearchRow()];
+  // The place pin was an answer to a question nobody is asking any more.
+  Places.clear();
   renderSearchStack(0);
   stationsFilterChanged();
 }

@@ -8,7 +8,8 @@
 //                   pinned open, which docks it into the corner for good.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc and escAttr, from inside its own
+// Reaches back to core.js for state, esc and escAttr, and across to
+// map-elevation.js for the Elevation base map — all from inside its own
 // functions; the IIFE body only defines, so this file's position among the
 // modules is free.
 //
@@ -116,6 +117,16 @@ function makeBaseLayers() {
       attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS User Community',
       className: 'mn-base-dark', maxZoom: 19,
     }),
+    // ── Elevation ───────────────────────────────────────────────────────────
+    // The ground itself, banded into colours: terrarium tiles decoded in the
+    // browser and painted through the Radio Mobile colour file's twelve
+    // heights. map-elevation.js holds the ramp, the decode and the reasoning;
+    // this is one more entry in the picker, on all seven maps like the rest.
+    //
+    // It is a base rather than an overlay for the same reason Dark is: the
+    // question it answers — what does this country look like — is the one you
+    // have before you draw anything on it, so nothing should be under it.
+    [MapElevation.NAME]: MapElevation.layer(),
   };
 }
 
@@ -197,17 +208,37 @@ function addBaseLayers(map) {
       </label>`).join('') +
       `<p class="filter-note">Satellite and Dark both carry place &amp; road names.
          Dark strips the ground back to near-black so the pins and links are the
-         only thing left with any contrast.</p>`,
+         only thing left with any contrast.</p>
+       <div class="mn-base-elev-extra" ${current === MapElevation.NAME ? '' : 'hidden'}>
+         <label class="filter-check">
+           <input type="checkbox" class="mn-elev-relief" ${MapElevation.relief() ? 'checked' : ''}>
+           Shade the slopes
+         </label>
+         <p class="filter-note">Hillshade over the band colour — the hue is still
+           the height and nothing else. Off gives the flat banding Radio Mobile
+           draws the same colour file as. Heights are above the EGM96 geoid,
+           ~30&nbsp;m sampling; the bands are the colour file's own.</p>
+         ${MapElevation.rampHtml()}
+       </div>`,
     // A real listener rather than an inline handler: `layers` is this map's own
     // set of tile layers and there is no global to reach it through.
     onMount(body) {
+      const extra = body.querySelector('.mn-base-elev-extra');
       body.addEventListener('change', e => {
+        // The relief switch lives in this panel but is not a base map: it is
+        // MapElevation's own setting, applied to every instance of that layer
+        // on every map at once, so it is answered before the picker is.
+        if (e.target && e.target.classList.contains('mn-elev-relief')) {
+          MapElevation.setRelief(e.target.checked);
+          return;
+        }
         const name = e.target && e.target.value;
         if (!layers[name] || name === current) return;
         map.removeLayer(layers[current]);
         layers[name].addTo(map);
         current = name;
         syncCompanions();
+        if (extra) extra.hidden = name !== MapElevation.NAME;
       });
     },
   });

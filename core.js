@@ -231,9 +231,10 @@ const HELP = {
            + 'The <strong>Stations</strong> list below collapses the same way — it is the tallest '
            + 'card on the page, and shutting it is how the map, the path tools and the editor get '
            + 'onto one screen together; its summary keeps the live row count and names the '
-           + 'selected station. The map carries its own controls in its top-right corner, as four '
+           + 'selected station. The map carries its own controls in its top-right corner, as five '
            + 'icons that open when the pointer is on them and can be pinned open: the base map, '
-           + '<strong>Map display</strong>, <strong>Draw &amp; measure</strong> and the legend. '
+           + '<strong>Map display</strong>, <strong>Draw &amp; measure</strong>, '
+           + '<strong>Polar radio coverage</strong> and the legend. '
            + 'The elevation profile and link budget sit under the map. Selecting a '
            + 'station opens <strong>Repeaters listening</strong> between the list and the editor: '
            + 'every repeater with a pass range open to that station\'s addresses, nearest first. '
@@ -257,6 +258,28 @@ const HELP = {
            + 'the address out of the box rather than off the saved record, so a row you have '
            + 'retyped sends you to the number on screen.',
     watch: [
+      'Three of the map\'s tools read the <strong>ground</strong> rather than the station list, '
+      + 'and all three are indicative in the same way the elevation profile is — ~30 m terrain, '
+      + 'heights above the EGM96 geoid, nothing standing on the ground. <strong>Elevation</strong> '
+      + 'in the base-map picker paints the country by height, in the twelve bands of the Radio '
+      + 'Mobile colour file, with the slopes shaded so a ridge is visible between two contours of '
+      + 'the same colour; the shading can be switched off beside it. <strong>Highest ground in '
+      + 'view</strong>, in <strong>Map display</strong>, pins the three to five highest points in '
+      + 'the window — hilltops, not stations, whether or not anything is on them — and lists them '
+      + 'ranked, each one a button that takes the map there. <strong>Polar radio coverage</strong> '
+      + 'is Radio Mobile\'s own dialog: a centre unit, the radio at the other end, a link '
+      + 'direction, a radial and azimuth range and a threshold, and it colours the ground by what '
+      + 'a mobile would hear standing on it. That plot has <em>no antenna patterns, no trees and '
+      + 'no terminal clutter</em>, every one of which only ever takes coverage away — so it is the '
+      + 'best case, and the elevation profile card is the authority for any path you are about to '
+      + 'build.',
+      'The filter box also answers with <strong>places</strong>. Paste a coordinate into it — '
+      + 'decimal, degrees and minutes, degrees-minutes-seconds, with or without hemisphere '
+      + 'letters, in either order — and the map goes there and drops a pin, with no network at all. '
+      + 'Type a name and, where the place-name service can be reached, the towns, localities and '
+      + 'airports it matches are offered under the box. Neither changes what the station filter '
+      + 'matches: the strip is an extra answer beside the station list, never instead of it, and a '
+      + 'lookup that cannot be made says so and leaves the filtering alone.',
       '<strong>Kill spaghetti</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
       + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 70 km; '
@@ -1735,6 +1758,14 @@ const state = {
   // SoRT's experience picked as the sane fast one.
   mapContours:        false,
   mapContourInterval: '5',
+  // The highest ground in view (see MapPeaks). Off by default and not
+  // persisted, on MapContours' terms rather than MapSurvey's: a pass costs up
+  // to a hundred terrain tiles for a view nobody asked a question about, so
+  // "no extra requests fire with the layer off" has to stay true of a cold
+  // page load. How many peaks is a preference rather than a cost, so that one
+  // is remembered.
+  mapPeaks:       false,
+  mapPeakCount:   Math.max(3, Math.min(5, +localStorage.getItem('mn-peak-count') || 5)),
   // AS/NZS 1170.2 wind loading regions (see MapWind). On by default and
   // remembered since #176, on MapSurvey's terms rather than MapContours'.
   // "A layer that costs a request stays off until asked for" was the rule that

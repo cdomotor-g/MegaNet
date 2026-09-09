@@ -3,6 +3,7 @@
   "scripts": [
     "maps-data.js",
     "core.js",
+    "map-elevation.js",
     "map-controls.js",
     "app.js",
     "rf-changes.js",
@@ -37,13 +38,16 @@
     "map-spider.js",
     "map-backbone.js",
     "map-blast.js",
+    "places.js",
     "map-locate.js",
     "map-move-pin.js",
     "terrain.js",
     "itm.js",
     "land-cover.js",
+    "map-peaks.js",
     "map-los.js",
     "map-fade.js",
+    "map-polar.js",
     "modal.js",
     "packets.js",
     "alert2.js",
@@ -56,6 +60,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 623,
-  "distinct": 623
+  "total": 628,
+  "distinct": 628
 }

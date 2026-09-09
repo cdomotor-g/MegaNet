@@ -12,7 +12,9 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm and RM_NET_DEFAULTS;
 // sideways to terrain.js for Terrain, land-cover.js for LandCover, itm.js for
-// ITM, map-draw.js for MapDraw and link-budget.js for LinkBudget.
+// ITM, map-draw.js for MapDraw and link-budget.js for LinkBudget and
+// lbMarginClass — the fade-margin row in the profile readout bands against
+// the budget card's own bands, so the two cannot disagree about one number.
 //
 // #134 flagged the PathProfile <-> LinkBudget pair as an ordering constraint to
 // settle before either could move. Settled by asking what each IIFE *executes*
@@ -709,6 +711,100 @@ const PathProfile = (function () {
       </div>`;
   }
 
+  // ── the fade margin ─────────────────────────────────────────────────────────
+  // The path loss row answers "what does this ground cost". The question an
+  // operator actually arrives with is the next one — "is there anything left
+  // after paying it" — and until now this card made them open the link budget
+  // to find out. Same figure, same terms, same refusal to invent a missing one
+  // (link-budget.js's rule): TX power, both antenna gains, both line losses and
+  // the RX threshold, all read off the two ends' rm_systems rows.
+  //
+  // Both directions and the worse of the two, which is MapFade's view rather
+  // than the budget card's: the budget is aimed A→B because an operator aimed
+  // it, but this card is describing *a path*, and a hop that gets there and
+  // cannot answer is not a working link. Both one-way figures are quoted
+  // beside it so the asymmetry is visible rather than merely survived.
+  //
+  // Stations only. A line dropped on bare ground has no radio at its end, and
+  // a margin computed around an assumed one would be this card inventing a
+  // network — the link budget is where hypothetical ends live.
+  function endRadio(e) {
+    const sys = e.sys;
+    return {
+      txW:  sys && sys.tx_power_w != null ? sys.tx_power_w : null,
+      gain: sys && sys.antenna_gain_dbi != null ? sys.antenna_gain_dbi : null,
+      loss: sys && sys.line_loss_db != null ? sys.line_loss_db : null,
+      thr:  sys && sys.rx_threshold_dbm != null ? sys.rx_threshold_dbm : null,
+    };
+  }
+
+  // What this end is missing, named so the note can say which figure to go and
+  // fill in rather than shrugging at the whole row. All four at both ends,
+  // because the figure quoted is the worse of the two directions and each end
+  // is therefore both a transmitter and a receiver.
+  function missingTerms(e, r) {
+    const out = [];
+    if (wattsToDbm(r.txW) == null) out.push(`TX power at ${e.name}`);
+    if (r.gain == null) out.push(`antenna gain at ${e.name}`);
+    if (r.loss == null) out.push(`line loss at ${e.name}`);
+    if (r.thr == null)  out.push(`RX threshold at ${e.name}`);
+    return out;
+  }
+
+  function marginOneWay(an, fromR, toR) {
+    const txDbm = wattsToDbm(fromR.txW);
+    if (txDbm == null || fromR.gain == null || fromR.loss == null) return null;
+    if (toR.gain == null || toR.loss == null || toR.thr == null) return null;
+    if (an.pathLoss_db == null) return null;
+    return (txDbm + fromR.gain - fromR.loss) - an.pathLoss_db + toR.gain - toR.loss - toR.thr;
+  }
+
+  // { m, ab, ba } when both directions compute, else why not — one of
+  // 'ends' (a point on the ground rather than a station), 'system' (a station
+  // with no rm_system on file), 'loss' (the model did not run) or a list of
+  // named terms nobody has supplied.
+  function profileMargin(an, a, b) {
+    if (!a.isStation || !b.isStation) return { m: null, why: 'ends' };
+    if (!a.sys || !b.sys) return { m: null, why: 'system' };
+    if (an.pathLoss_db == null) return { m: null, why: 'loss' };
+    const ra = endRadio(a), rb = endRadio(b);
+    const missing = [...missingTerms(a, ra), ...missingTerms(b, rb)];
+    if (missing.length) return { m: null, why: 'missing', missing };
+    const ab = marginOneWay(an, ra, rb), ba = marginOneWay(an, rb, ra);
+    if (ab == null || ba == null) return { m: null, why: 'missing', missing };
+    return { m: Math.min(ab, ba), ab, ba };
+  }
+
+  // The row itself. The band is the link budget's own (lbMarginClass), so the
+  // colour here and the colour there cannot disagree about the same number —
+  // and neither can the map, which bands against the operator's thresholds and
+  // says so in its own legend.
+  function marginCellHtml(an, a, b) {
+    const r = profileMargin(an, a, b);
+    if (r.m == null) {
+      const why = r.why === 'ends'
+        ? 'both ends have to be stations — a point on the ground has no radio on it'
+        : r.why === 'system'
+          ? 'no radio system on file at one end'
+          : r.why === 'loss'
+            ? 'no path loss to take it off'
+            : `no figure on file for ${esc(fmtTermList(r.missing))}`;
+      return `<span class="txt-warn">not computed</span> <span class="small">${why}</span>`;
+    }
+    const cls = lbMarginClass(r.m);
+    const worst = r.ab <= r.ba ? `${esc(a.name)} → ${esc(b.name)}` : `${esc(b.name)} → ${esc(a.name)}`;
+    return `<span class="txt-${cls.cls}">${
+      r.m > 0 ? '+' : ''}${r.m.toFixed(1)} dB</span>
+      <span class="small">${esc(cls.label.toLowerCase())} · worse way round is ${worst} ·
+        ${r.ab > 0 ? '+' : ''}${r.ab.toFixed(1)} / ${r.ba > 0 ? '+' : ''}${r.ba.toFixed(1)} dB A→B / B→A</span>`;
+  }
+
+  // "a, b and c" — the budget card's fmtList, which lives inside its IIFE.
+  function fmtTermList(list) {
+    if (list.length === 1) return list[0];
+    return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+  }
+
   // ── the panel ──
 
   function readoutHtml(an, a, b) {
@@ -745,6 +841,7 @@ const PathProfile = (function () {
           <div><dt>Path loss</dt><dd>${an.pathLoss_db != null
             ? `${an.pathLoss_db.toFixed(1)} dB <span class="small">${esc(itm.modeLabel.toLowerCase())}, ${(an.pathLoss_db - an.fspl_db).toFixed(1)} dB over free space</span>`
             : `<span class="txt-warn">not computed</span> <span class="small">${esc(an.itmError || '')}</span>`}</dd></div>
+          <div><dt>Fade margin</dt><dd>${marginCellHtml(an, a, b)}</dd></div>
           <div><dt>Obstructions</dt><dd>${an.obstructions.length
             ? an.obstructions.slice(0, 3).map(o => `${o.byCover ? 'cover' : 'ground'} +${Math.round(-o.peak.clearance)} m at ${fmtKm(o.peak.d1 / 1000)}`).join(', ')
               + (an.obstructions.length > 3 ? ` and ${an.obstructions.length - 3} more` : '')

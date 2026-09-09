@@ -165,6 +165,12 @@
        app.js because that is where it reads — the first map in the list is the
        Stations map and this is what its corner is made of — not because it has
        to be: like every other module here it only declares. -->
+  <!-- The Elevation base map: terrarium tiles decoded in the browser and
+       banded through the Radio Mobile colour file. Above map-controls.js
+       because makeBaseLayers() names it — a runtime read, like every other
+       cross-module call here, so the order states the dependency rather than
+       being required by it (#154). -->
+  <script src="map-elevation.js?v=20260902a"></script>
   <script src="map-controls.js?v=20260902a"></script>
   <script src="app.js?v=20260902a"></script>
   <script src="rf-changes.js?v=20260902a"></script>
@@ -208,6 +214,12 @@
   <script src="map-spider.js?v=20260902a"></script>
   <script src="map-backbone.js?v=20260902a"></script>
   <script src="map-blast.js?v=20260902a"></script>
+  <!-- What the Stations filter box does with text that is not a station: a
+       coordinate it parses, or the town, locality or airport it names. Beside
+       map-locate.js because it is the same kind of thing — a way of getting the
+       map somewhere that is not a pin — and like every other module here it
+       only declares, so its position states the dependency (#154). -->
+  <script src="places.js?v=20260902a"></script>
   <script src="map-locate.js?v=20260902a"></script>
   <!-- Armed from the station editor card and from the map callout, both of
        which are rendered elsewhere; this only declares the mode. After
@@ -217,6 +229,12 @@
   <script src="terrain.js?v=20260902a"></script>
   <script src="itm.js?v=20260902a"></script>
   <script src="land-cover.js?v=20260902a"></script>
+  <!-- The highest ground in the current view, found in the terrain rather than
+       looked up in a list. After terrain.js because Terrain.grid is what it
+       reads the ground through — a runtime call, like every other cross-module
+       call in this list, so the position states the dependency rather than
+       being required by it (#154). -->
+  <script src="map-peaks.js?v=20260902a"></script>
   <!-- After terrain.js because that is what it asks for tiles through, and
        after path-profile.js (further up) whose pathAnalyse and endpoint rules
        it borrows — the same physics, so the map and the profile card cannot
@@ -231,6 +249,13 @@
        network's fade margins, computed once and kept somewhere other than this
        browser. Nothing here executes at load either (#154). -->
   <script src="map-fade.js?v=20260902a"></script>
+  <!-- Radio Mobile's Single polar radio coverage. Last of the terrain group
+       because it stands on all of it — terrain.js for the elevation grid,
+       itm.js for the model, path-profile.js for the radio-system and
+       propagation rules, map-controls.js for the panel it is drawn in. All
+       runtime calls, so the position states the dependencies rather than being
+       required by them (#154). -->
+  <script src="map-polar.js?v=20260902a"></script>
   <script src="modal.js?v=20260902a"></script>
   <script src="packets.js?v=20260902a"></script>
   <script src="alert2.js?v=20260902a"></script>

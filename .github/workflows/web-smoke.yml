@@ -459,6 +459,17 @@ jobs:
         working-directory: test
         run: npm run drawkml
 
+      # The five terrain-and-place features (#184), against a world this check
+      # makes: terrarium tiles generated per tile coordinate from a closed form,
+      # so the summits the peak finder returns, the colours the elevation base
+      # paints and the coverage the polar plot computes are all checkable
+      # against arithmetic rather than against whatever SRTM says today. Three
+      # of the five are meaningless over `pathcover`'s one flat tile, which is
+      # why this has a fixture of its own.
+      - name: Terrain kit — the ramp, the peaks, the plot, the coordinate, the margin
+        working-directory: test
+        run: npm run terrain
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each
