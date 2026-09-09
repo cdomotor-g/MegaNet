@@ -8,18 +8,23 @@
 //                      part of the tab — the pill that calls it lives on the
 //                      station card and the editor card — but it is an export
 //                      builder, and this is where those live.
+//   drawingKml         …and the Draw & measure drawing as a second KML: every
+//                      circle, box, path, pin and note on the Stations map,
+//                      with the stations they enclose or run between (#183).
+//                      Same reason for living here, same button-somewhere-else.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, announce, netName, csvEscape,
 // dlText, acmaHaversineKm, stationLatLonText and RM_NET_DEFAULTS; across to
 // app.js for findStationMatches, findRepeaterMatches, stationAlertIds and
 // repeaterPassingCount; to map-backbone.js for backboneLinks; to map-wind.js
-// for the region a KML's station sits in; and to datastore.js for
-// renderDbStatusHtml, which renders the datastore panel this tab hosts. The
-// snapshot button written here calls snapshotStationsJson() over in
-// datastore.js for the same reason — see that file's header. Every one of them
-// is called from inside a function here, so this file's position among the
-// modules stays free.
+// for the region a KML's station sits in; to map-draw.js for MapDraw's
+// exportShapes(), which is the whole of what the drawing KML reads; and to
+// datastore.js for renderDbStatusHtml, which renders the datastore panel this
+// tab hosts. The snapshot button written here calls snapshotStationsJson()
+// over in datastore.js for the same reason — see that file's header. Every one
+// of them is called from inside a function here, so this file's position among
+// the modules stays free.
 //
 // Moved out of app.js byte-for-byte by M3 (#134) of #129.
 // Restyled against the design system by U6 (#141) of EPIC #107 — the classes
@@ -560,4 +565,237 @@ function stationKmlPillHtml(s) {
   return `<button type="button" class="pill" onclick="downloadStationKml('${escAttr(s.id)}')"
        title="Download this station and its ${n} link line${n === 1 ? '' : 's'} as a KML file — open it in Google Earth to see the pin and the paths to its repeaters over the terrain"
        >🌏 Google Earth KML ⬇</button>`;
+}
+
+// ── Google Earth: the drawing, and what it holds (#183) ──────────────────────
+//
+// Draw & measure is where a plan gets made: a coverage circle round a proposed
+// repeater, a box round the part of a catchment that went quiet, the path a
+// new hop would take, a note saying what the picture is about. All of it is
+// real geometry — a circle is 25.0 km because somebody typed 25.0 — and none
+// of it survived leaving the page. The panel's own answer was "clip the
+// screen", which keeps a picture of the drawing and throws away the ground.
+//
+// So the panel hands the whole drawing over as a KML instead. Every shape in
+// the colour it was drawn in, each named by what it measures and by the sites
+// it was snapped to, and — the half that makes it worth having — **the
+// stations each shape holds**, so the file answers "which sites are inside
+// this circle" in Google Earth rather than only on the screen it came from.
+//
+// The division of labour with map-draw.js is deliberate and is written on both
+// sides. MapDraw.exportShapes() hands over ground truth: points, closed rings,
+// colours, labels and station ids. Nothing here knows what a Leaflet layer is,
+// and nothing there knows what a Placemark is. The one piece of geometry that
+// could have gone either way — turning a circle into a polygon, which KML has
+// no primitive for — is over there with destPoint and rectBounds, because it
+// is a question about the sphere rather than about the file.
+//
+// Shapes and stations are two folders rather than one folder per shape: a
+// station inside two circles is one pin that says it is in both, where nested
+// folders would draw it twice at the same coordinate and let the two copies
+// disagree the moment either was edited.
+
+// The panel is a sketch pad and a sketch pad can be filled. The cap is on
+// *stations*, not on shapes: a box drawn round a whole region can hold a
+// couple of thousand pins, and a file that takes a minute to open is one
+// nobody opens twice. Shapes are their own limit — they are drawn by hand.
+const DRAW_KML_STATION_CAP = 1000;
+
+// And how many of them one shape's balloon lists before it summarises. The
+// pins are the list; a description is a caption.
+const DRAW_KML_NAMES_SHOWN = 40;
+
+// A hex colour the KML writer can rely on: six digits, no hash. The picker and
+// the six swatches all produce exactly that, but colourOf() can also hand back
+// the theme's --draw straight out of the stylesheet, and a stylesheet is free
+// to say #abc. Anything that is not a hex at all (a named colour, an rgb())
+// falls back to the drawing pink rather than writing a malformed <color>.
+function kmlHex(c) {
+  const h = String(c || '').replace('#', '').trim();
+  if (/^[0-9a-f]{3}$/i.test(h)) return h.split('').map(x => x + x).join('').toLowerCase();
+  if (/^[0-9a-f]{6,8}$/i.test(h)) return h.slice(0, 6).toLowerCase();
+  return 'c2185b';
+}
+
+// One <Style> per colour actually used, carrying all four sub-styles at once:
+// a Placemark takes only the ones its geometry has, so a pin, a line, a filled
+// ring and a note can share a single style id. Two ids per colour rather than
+// one, because a note is a label with no pin under it — Google Earth has no
+// "hide the icon" flag, and scale 0 is the way that is said.
+//
+// The fill is a fifth of opaque. A coverage circle is drawn over terrain that
+// is the reason for drawing it, and an opaque disc hides the hill.
+function drawKmlStyles(hexes) {
+  return hexes.map(h => `
+  <Style id="mnDraw-${h}">
+    <IconStyle>
+      <color>${kmlColor('#' + h)}</color><scale>1.1</scale>
+      <Icon><href>https://maps.google.com/mapfiles/kml/paddle/wht-blank.png</href></Icon>
+      <hotSpot x="0.5" y="0" xunits="fraction" yunits="fraction"/>
+    </IconStyle>
+    <LineStyle><color>${kmlColor('#' + h)}</color><width>3</width></LineStyle>
+    <PolyStyle><color>${kmlColor('#' + h, '33')}</color></PolyStyle>
+  </Style>
+  <Style id="mnNote-${h}">
+    <IconStyle><scale>0</scale></IconStyle>
+    <LabelStyle><color>${kmlColor('#' + h)}</color><scale>1.1</scale></LabelStyle>
+  </Style>`).join('');
+}
+
+// A list of [lat, lon] as KML's own lon,lat,alt — the one axis order in this
+// file that is worth writing down, because getting it backwards puts an
+// Australian drawing in the Indian Ocean and nothing complains.
+function kmlCoords(pts) {
+  return pts.map(([lat, lon]) => `${lon},${lat},0`).join(' ');
+}
+
+// What one shape is called in the file. The sites it joins lead, because
+// "Mt Stuart → Durikai" is the thing the line means and "18.4 km @ 043°" is
+// what it measures; a shape snapped to nothing is named by its measurement
+// alone. A note is its own words and needs nothing added.
+function drawKmlName(sh) {
+  if (sh.kind === 'text') return sh.text || 'Note';
+  // A pin's measurement *is* its name once it has one — the same special case
+  // rowText() makes in the panel's own list, and for the same reason: "Mt
+  // Stuart — Mt Stuart" is what happens without it.
+  if (sh.kind === 'pin') return sh.measure || DRAW_TOOLS.pin.label;
+  const nm = sh.label;
+  return nm ? `${nm} — ${sh.measure}` : (sh.measure || DRAW_TOOLS[sh.kind].label);
+}
+
+// One shape's <Placemark>. Rings are `clampToGround` + `tessellate` for the
+// reason kmlLine() gives about link paths: an area drawn as a flat plate at
+// one altitude floats over the valleys it is supposed to cover, and a circle
+// that hangs above the ground reads as terrain it does not touch.
+function drawKmlPlacemark(sh, stationNames) {
+  const h = kmlHex(sh.colour);
+  // A box drawn round a region can hold a couple of thousand sites, and a
+  // description that long is a wall of text in a balloon nobody can scroll.
+  // The pins in the Stations folder are the list; this is the summary.
+  const shown = stationNames.slice(0, DRAW_KML_NAMES_SHOWN);
+  const more  = stationNames.length - shown.length;
+  const rows = [
+    ['Shape', DRAW_TOOLS[sh.kind] ? DRAW_TOOLS[sh.kind].label : sh.kind],
+    ['Measures', sh.kind === 'text' ? '' : sh.measure],
+    // A line has no position of its own, so what its centre is is worth
+    // saying rather than filing under the same word as a circle's.
+    [sh.path ? 'Midpoint' : 'At',
+      sh.centre ? `${sh.centre[0].toFixed(5)}, ${sh.centre[1].toFixed(5)}` : ''],
+    [sh.ring ? `Stations inside (${stationNames.length})` : 'Stations',
+      shown.join(', ') + (more > 0 ? `, and ${more} more` : '')],
+  ].filter(([, v]) => v);
+  const desc = `    <description><![CDATA[${rows.map(([k, v]) =>
+    `<b>${kmlEsc(k)}:</b> ${kmlEsc(v)}`).join('<br>')}]]></description>`;
+
+  const geom = sh.ring
+    ? `    <Polygon>
+      <tessellate>1</tessellate>
+      <altitudeMode>clampToGround</altitudeMode>
+      <outerBoundaryIs><LinearRing>
+        <coordinates>${kmlCoords(sh.ring)}</coordinates>
+      </LinearRing></outerBoundaryIs>
+    </Polygon>`
+    : sh.path
+      ? `    <LineString>
+      <tessellate>1</tessellate>
+      <altitudeMode>clampToGround</altitudeMode>
+      <coordinates>${kmlCoords(sh.path)}</coordinates>
+    </LineString>`
+      : `    <Point><coordinates>${kmlCoords([sh.point])}</coordinates></Point>`;
+
+  return `  <Placemark>
+    <name>${kmlEsc(drawKmlName(sh))}</name>
+    <styleUrl>#${sh.kind === 'text' ? 'mnNote' : 'mnDraw'}-${h}</styleUrl>
+${desc}
+${geom}
+  </Placemark>`;
+}
+
+// The whole file. Everything on the map, in draw order, plus one pin per
+// station any shape holds — each saying which shapes it is in, because a
+// station inside two circles is a fact about both of them.
+function drawingKml(shapes) {
+  // Resolving a shape's stations walks every marker on the map, so the caller
+  // that already has them says so rather than paying for a second pass to
+  // count what it just wrote.
+  shapes = shapes || MapDraw.exportShapes();
+  const byId = new Map((state.data ? state.data.stations : []).map(s => [s.id, s]));
+
+  // Which shapes each station turned up in, in the order the shapes were
+  // drawn — built once here rather than asked per placemark.
+  const inShapes = new Map();
+  for (const sh of shapes) {
+    for (const id of sh.stationIds) {
+      if (!byId.has(id)) continue;                       // deleted since it was drawn
+      if (!inShapes.has(id)) inShapes.set(id, []);
+      inShapes.get(id).push(drawKmlName(sh));
+    }
+  }
+  const capped   = inShapes.size > DRAW_KML_STATION_CAP;
+  const stations = [...inShapes.keys()].slice(0, DRAW_KML_STATION_CAP).map(id => byId.get(id));
+
+  const names = sh => sh.stationIds.map(id => byId.has(id) ? byId.get(id).name : '').filter(Boolean);
+  const hexes = [...new Set(shapes.map(sh => kmlHex(sh.colour)))];
+
+  const folder = (name, open, body) => body
+    ? `  <Folder><name>${kmlEsc(name)}</name><open>${open ? 1 : 0}</open>\n${body}\n  </Folder>`
+    : '';
+
+  const drawn = folder(`Drawings (${shapes.length})`, true,
+    shapes.map(sh => drawKmlPlacemark(sh, names(sh))).join('\n'));
+
+  const held = folder(`Stations (${stations.length})`, false, stations.map(s =>
+    kmlPlacemark(s, 'mnStation', [['In', (inShapes.get(s.id) || []).join(' · ')]])).join('\n'));
+
+  const summary = [
+    `${shapes.length} shape${shapes.length === 1 ? '' : 's'}`,
+    `${inShapes.size} station${inShapes.size === 1 ? '' : 's'}`,
+    capped ? `capped at ${DRAW_KML_STATION_CAP} pins` : '',
+  ].filter(Boolean).join(' · ');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>MegaNet drawing — ${kmlEsc(summary)}</name>
+  <description><![CDATA[${kmlEsc(summary)}.<br>Exported from MegaNet's Draw &amp;
+    measure panel on ${kmlEsc(new Date().toLocaleString())}. Shapes keep the colour they
+    were drawn in and are clamped to the ground; each names the stations it encloses or
+    runs between, and each of those stations names the shapes it is in.]]></description>
+  <Style id="mnStation">
+    <IconStyle><scale>1.2</scale>
+      <Icon><href>https://maps.google.com/mapfiles/kml/paddle/grn-stars.png</href></Icon>
+    </IconStyle>
+  </Style>${drawKmlStyles(hexes)}
+${[drawn, held].filter(Boolean).join('\n')}
+</Document>
+</kml>
+`;
+}
+
+// The button's click, from the Draw & measure flyout. Dated rather than named,
+// because a drawing has no name — what it is called is what is in it, and the
+// file says that in its own <name> once it is open.
+function downloadDrawingKml() {
+  if (!state.draw.shapes.length) {
+    announce('Nothing is drawn on the map yet, so there is nothing to export.');
+    return;
+  }
+  const shapes = MapDraw.exportShapes();
+  const stamp  = new Date().toISOString().slice(0, 10);
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([drawingKml(shapes)],
+      { type: 'application/vnd.google-earth.kml+xml' })),
+    download: `meganet-drawing-${stamp}.kml`,
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  // Counted the way the file counts: an id that no longer resolves to a
+  // station got no pin, so it is not one of the stations that left.
+  const known = new Set((state.data ? state.data.stations : []).map(s => s.id));
+  const held  = new Set();
+  for (const sh of shapes) for (const id of sh.stationIds) if (known.has(id)) held.add(id);
+  const n = shapes.length;
+  announce(`Drawing downloaded as KML — ${n} shape${n === 1 ? '' : 's'} and `
+    + `${held.size} station${held.size === 1 ? '' : 's'}. Open it in Google Earth.`);
 }

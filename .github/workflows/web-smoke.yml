@@ -164,6 +164,21 @@ jobs:
         working-directory: test
         run: npm run toplevel
 
+      # Parse-only and instant, and up here for the same reason as the three
+      # above: it closes the drift the `catchments` and `mapfade` notes further
+      # down both describe. Each of those checks sat in `npm run all` with no
+      # step in this file — running for whoever typed it and on no push at all
+      # — and both notes end by naming the check that holds the two lists
+      # together as the one worth writing. This is it: the scripts in
+      # test/package.json, the `all` chain, and every `npm run` step in this
+      # file have to name the same set, in both directions. A check CI does not
+      # run is a check that is not there; a step naming a script that no longer
+      # exists is a job that goes red for the wrong reason, which is why it
+      # fails here rather than twenty browser-minutes later (#183).
+      - name: CI runs what `npm run all` runs
+        working-directory: test
+        run: npm run steps
+
       # Node-only and fast, so it runs before a browser is launched. The HFEM
       # codec's tests ARE the specification restated — there is no sample
       # capture, the spec's ten worked examples are the only oracle, and the
@@ -424,12 +439,25 @@ jobs:
       # The same drift the claim step's note describes, found again while
       # adding the one above: `mapfade` has been in `npm run all` with no step
       # here, so it has run for whoever typed it and on no push at all. A check
-      # CI does not run is a check that is not there. The two lists still have
-      # to be kept in step by hand and still nothing verifies that they agree —
-      # which is the check worth writing the next time either is touched.
+      # CI does not run is a check that is not there. The two lists were kept
+      # in step by hand until #183; `npm run steps`, near the top of this job,
+      # holds them together now — the check both these notes said was worth
+      # writing.
       - name: Fade margin — the figure the map colours a link by is the card's own
         working-directory: test
         run: npm run mapfade
+
+      # The drawing leaving for Google Earth (#183). Nothing else here can see
+      # a KML at all: `smoke` presses the button and never opens the file, and
+      # a wrong one opens perfectly — Google Earth ignores a `<styleUrl>`
+      # naming a style that is not there, and draws lat,lon coordinates in the
+      # Indian Ocean without complaint. This parses the document and measures
+      # the ground it describes: the axis order, a circle that is round on the
+      # sphere rather than on the screen, and the station list checked against
+      # a haversine that is not the app's.
+      - name: Drawing KML — the shapes, the stations, and the right planet
+        working-directory: test
+        run: npm run drawkml
 
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier

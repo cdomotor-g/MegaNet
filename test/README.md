@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the thirty-one that run in CI
+npm run all                       # the thirty-three that run in CI
 ```
 
 | Command | What it does |
@@ -51,20 +51,22 @@ npm run all                       # the thirty-one that run in CI
 | `npm run fieldkind` | a field series knows what it is measuring — the two SDI-12 levels at 18 Bateson charted as **RainAccum** with the inspector offering *"= 0.36 mm (assumed 0.2 mm/tip)"* against metres, and every layer underneath was right: the logger sent `s:999998/level_1` with `unit: "m"`, the row is typed `Water Level`. Two defects that only misbehave together — `fieldAddrs()` built `a:<alert_id>` addresses and nothing else, so the series never resolved to its sensor row, and `guessKind()` then read neither the unit nor the channel and fell through to its `RA` default. 30 assertions over the rule, the address list, the whole operator path, and the unit's veto over a kind set by hand — that last one added because a mutation run showed it was otherwise untested |
 | `npm run fieldprobe` | what the *datastore* holds, as against what `stations.json` says it should: the Field Data picker's "In the datastore" block, driven for 18 Bateson — a station with no station number, no ALERT ids and no sensor rows, beside four channels reporting under `bateson_test`. The probe asks the station's own id first, then its registry addresses, then widens to a word out of its name; a widened match is listed, tagged with the station row it is filed under, and **never ticked or charted on its own**; ticked by hand it charts labelled with *that* station, named apart by channel. Plus the search box, the empty answer, and the four columns each query selects |
 | `npm run gate` | the Access-to-Supabase verifier refuses what it must — a forged signature, a token minted for another Access application, an expired one, `alg: none` — against keys generated in-process, so it runs offline |
+| `npm run drawkml` | the Draw & measure drawing as a Google Earth KML: **a wrong KML opens perfectly**, so every assertion is about the parsed file and the ground its numbers describe. The axis order (KML is `lon,lat`, every other API in this app is `lat, lon`, and getting it backwards puts an Australian drawing in the Indian Ocean); a circle that is round *on the sphere* — 72 bearings stepped with `destPoint`, every vertex measured back to the centre, so the tempting version that adds degrees of longitude fails by 2.2 km on a 20 km radius at Brisbane; the stations inside a shape, against a haversine written in the check rather than the app's; every `<styleUrl>` resolving to a `<Style>` that exists; and both halves of the 250 m fallback that finds the station under a pin nobody snapped. 45 assertions, six deliberate breaks — **one of which passed**, see the note below |
+| `npm run steps` | `npm run all` and `.github/workflows/web-smoke.yml` name the same checks, in both directions. Parse-only. It exists because the drift has happened twice — `catchments` and `mapfade` each sat in `all` with no CI step, running for whoever typed them and on no push at all — and **both halves stay green while they disagree**, which is why neither was found on purpose |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the twenty-eight that run in CI |
+| `npm run all` | the thirty-three that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
-`toplevel`, `registry`, `nav`, `shell`, `tabs`, `help`, `search`, `linkbudget`, `mapfade` and `stncard` take `-v` too, to list what
+`toplevel`, `registry`, `nav`, `shell`, `tabs`, `help`, `search`, `linkbudget`, `mapfade`, `drawkml`, `steps` and `stncard` take `-v` too, to list what
 passed as well as what did not — `shell -v` prints every contrast ratio it
 measured, in both themes, which is the fastest way to see how much headroom a
 colour has before it stops clearing AA, and `nav -v` prints what each search
 probe actually found, which is the fastest way to see why a `find` word is not
 doing its job.
 
-CI runs `check`, `names`, `toplevel`, `hfem`, `smoke`, `registry`, `nav`, `shell`, `tabs`,
-`rivers`, `survey`, `mapctl`, `help`, `insp`, `maint`, `history`, `movepin`, `stationscard`, `stncard`,
-`search`, `linkbudget`, `claim` and `gate` on every push that touches a root `*.js`,
+CI runs every check in `npm run all` — the list is no longer worth restating here,
+because since #183 `npm run steps` holds the workflow and that chain to each
+other, so the answer is always "all of them". It runs on every push that touches a root `*.js`,
 `index.html`, `styles.css`, `stations.json`, `db/migrations/`, `test/` or the
 inspection workbook in `archive/` — see
 `.github/workflows/web-smoke.yml`. The `*.js` glob is deliberate: the app's
@@ -661,6 +663,77 @@ assertion they should have. Two of those were the halves of `docUrl()` that
 `/\.md$/`, so the useful link was being served as a download) and the space
 encoding for the PDFs.
 
+### `drawkml.mjs` — a wrong file that opens perfectly
+
+The other checks here can lean on the browser: a page that renders wrongly is a
+page that usually threw on the way, and `pageerror` catches it. A KML has no
+such tell. It is written as a string, downloaded, and opened somewhere else
+entirely — and Google Earth is *forgiving*: a `<styleUrl>` naming a style that
+was never emitted draws in default white, a `<LinearRing>` whose first and last
+points differ is closed silently, and coordinates handed over as `lat,lon`
+instead of `lon,lat` draw an Australian catchment 30° south-west of Sri Lanka
+without a word. `npm run smoke` presses the button and gets a file it never
+opens. Nothing else in this directory looks inside one.
+
+So every assertion is about the parsed document and about the ground its
+numbers describe, and the two worth knowing about are geometric:
+
+- **The axis order**, checked by putting a vertex where it belongs rather than
+  by reading the source. The circle's ring starts at bearing 000°, so vertex 0
+  has to share the centre's longitude and sit *north* of it. Written the wrong
+  way round, both halves fail at once.
+- **A circle is round on the sphere, not on the screen.** KML has no circle, so
+  `MapDraw`'s `ringFor()` steps 72 bearings through `destPoint`. The tempting
+  implementation adds degrees of latitude and longitude around a trig circle,
+  which is exact at the equator, out by 6% at Brisbane and worse further south
+  — an *ellipse* that looks entirely convincing at every zoom. Every vertex is
+  measured back to the centre with a haversine written in this file, so that
+  version fails by 2.2 km on a 20 km radius.
+
+The membership lists are checked the same way — against a haversine written
+here rather than against `acmaHaversineKm`, because a list checked with the
+function that built it is checking nothing.
+
+**Six deliberate breaks, and the one that passed.** Swapping the axes, the
+flat-earth circle, a dropped `<Style>`, and the guard against a station id that
+no longer resolves all went red on the assertion they should have. Turning the
+250 m station-fallback down to **zero** did not — because the fixture had put
+the test pin on the station's *exact* coordinates, where `0 <= 0` is true. The
+fixture now places it 120 m away, on a station with nothing else within 400 m
+(this file has co-located ALERT/telemetry pairs, which would have given the
+assertion two right answers), and asserts the other end of the rule too: a pin
+more than a kilometre from anything enrols nothing. Both mutations are red now.
+
+This is the third entry in this repo's log of *a check whose fixture is uniform
+cannot see a rule about the non-uniform case* — after `history.mjs`'s
+every-box-filled sweep and #148's cell map. It is worth running against any
+check whose fixture is generated rather than typed.
+
+### `ci-steps.mjs` — the two lists that had to agree and nothing made them
+
+`catchments.mjs` landed in `npm run all` with no step in
+`.github/workflows/web-smoke.yml`, so it ran for whoever typed it and on no push
+at all. `mapfade.mjs` did exactly the same, and was found by accident while
+adding the step for something else. Both times the workflow's own comment ended
+by saying the check worth writing is the one that holds the two lists together.
+
+What makes it invisible is that **both halves stay green while they disagree**.
+A check missing from CI passes locally for the person who wrote it — that is
+what "I ran the tests" means. A step naming a script that has since been renamed
+fails with `npm ERR! Missing script`, which reads like a broken workflow rather
+than like a check that quietly stopped existing. Neither is loud and neither is
+anybody's job to notice.
+
+`npm run steps` reads the script names out of `test/package.json`, what
+`npm run all` chains together, and every `npm run <name>` under a
+`working-directory: test` step in the workflow, and requires them to agree in
+both directions. Three exemptions, each named with its reason in the file:
+`all` (the chain itself), `test` (npm's own default) and `concat` (a milestone
+tool the workflow's footer says is deliberately not run). It is in both lists
+like every other check — a rule that exempts its own enforcer has a hole in it.
+
+Parse-only, under a second, and it holds for the check nobody has written yet.
+
 ## Using `concat-verify.mjs` across a split
 
 The only claim that matters when a milestone cuts `app.js` is *the split lost
@@ -741,6 +814,13 @@ without looking, and a verifier nobody looks at verifies nothing.
   than `map.remove()`, and register the teardown *before* the early return that
   skips building a map, so a render that finds no container still leaves one
   behind for the render that does.
+- **A check was added to `test/`.** Three edits, and `npm run steps` fails until
+  all three are made: a `scripts` entry in `test/package.json`, that name in the
+  `all` chain, and a step in `.github/workflows/web-smoke.yml` under
+  `working-directory: test`. That check exists because the first two were made
+  twice without the third, and a check CI does not run is a check that is not
+  there. If a new check genuinely should not run per push, add it to `EXEMPT` in
+  `ci-steps.mjs` **with the reason**, the way `concat` is.
 - **A module needs something to happen at load.** It goes in `init.js`. Anywhere
   else and `npm run toplevel` goes red, which is the point: everything else
   declares, and that is what makes the load order safe to add to.

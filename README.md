@@ -795,6 +795,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
 - Light up the watercourses whose names match the filter box, drawn beneath the pins from OpenStreetMap (*Highlight matching rivers*)
 - Draw and measure over the map: pins, lines, circles, rectangles and text, placed by hand or by coordinates and km, in a colour of your choosing
+- Export the whole drawing to Google Earth as a KML — the shapes in their own colours, and the stations they enclose or run between
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
 - Leaflet.js, with the map's own controls stacked in its top-right corner as four icons — base
@@ -1224,6 +1225,12 @@ rather than a URL because there is no URL form of it — Google's Earth URLs car
 a camera, not geometry — and KML because Google Earth desktop and web, My Maps,
 QGIS, ArcGIS and every handheld that takes a track file all open it.
 
+There is a second KML, from the other direction: **Draw & measure** exports the
+whole drawing — see *🌏 KML ⬇ — the drawing in Google Earth* under that panel
+below. This one answers *"what does this station reach"* from the network the
+app already knows; that one answers *"what did I just draw, and which sites are
+in it"* from a plan somebody made by hand.
+
 **The station card's ALERT ids lead.** `6143 — Battery`, not `Battery — 6143`.
 The list is sorted by id, and an id is what somebody opening the card came for,
 so the number sits at the left edge where a sorted column belongs and the
@@ -1336,8 +1343,30 @@ Changing the colour while a shape is selected recolours that shape. The choice
 is remembered across reloads; the shapes are not.
 
 **Nothing is saved.** The drawings survive switching tabs and filtering, and
-are cleared by reloading the page. There is no export — take a screen clipping
-with the operating system's own tool.
+are cleared by reloading the page — so a drawing worth keeping has to leave the
+page, which is what the KML button is for.
+
+**🌏 KML ⬇ — the drawing in Google Earth.** At the top of the panel, beside
+*Clear all*. It writes the whole drawing out as a KML file: every shape in the
+colour it was drawn in, each named by what it measures and by the sites it was
+snapped to, **and a pin for every station those shapes hold** — the ones inside
+a circle or a rectangle, and the ones a pin sits on or a line runs between. Each
+shape's description lists the stations it holds; each station's lists the shapes
+it is in, so a site inside two circles says so once rather than being drawn
+twice. Circles and rectangles arrive as filled areas, clamped to the ground and
+tessellated so they lie over the terrain instead of floating above it as a flat
+plate. Google Earth (desktop and web), Google My Maps, QGIS, ArcGIS and every
+handheld that takes a track file open it.
+
+A circle becomes a 72-sided polygon on the way out, because KML has no circle:
+the sides are stepped by *bearing* rather than by adding degrees, so a 25 km
+circle is 25 km on every side of it at Cape York and at Hobart alike. A shape
+typed in as numbers still finds the site under it — a station within 250 m of
+a point counts as the one that point is about, which covers the case where
+snapping was off or the coordinates were typed rather than clicked.
+
+Screen clipping is still the right answer for a picture of the map itself: a
+KML carries the geometry and the sites, not the base map under them.
 
 **Selecting stations off the map.** Separate from the filters and from the
 single station the editor is on: a set you pick by hand. A circle or rectangle

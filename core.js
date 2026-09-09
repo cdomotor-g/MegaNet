@@ -404,10 +404,14 @@ const HELP = {
         'Type over its numbers in the list to make it exact — a radius of <code>25</code> km, or a '
         + 'bearing and a distance instead of a second coordinate. Typing releases the shape from '
         + 'whatever it was snapped to.',
+        '<strong>&#127758; KML &#11015;</strong> at the top of the panel hands the whole drawing to '
+        + 'Google Earth — every shape in the colour it was drawn in, and a pin for each station a '
+        + 'circle or a box encloses or a line runs between. Each shape lists the stations it holds, '
+        + 'and each of those stations lists the shapes it is in.',
       ],
       caption: 'A two-point line also feeds the elevation profile and the link budget under the '
              + 'map. Esc cancels the shape in progress; Esc again puts the tool away. Nothing here '
-             + 'is saved — reloading clears it, and there is no export beyond a screen clipping.',
+             + 'is saved — reloading clears it — so a drawing worth keeping goes out as a KML.',
     },
     links: [{ label: 'Who may edit, and what to do when nobody can get in', href: 'docs/access.md' }],
     related: ['passranges', 'maps', 'inspections'],

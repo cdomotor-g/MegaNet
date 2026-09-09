@@ -12,9 +12,10 @@
 // fmtKm, kmPerDegLon, KM_PER_DEG_LAT and acmaHaversineKm — four of which this
 // module hosted for the rest of the app until M1 (#132) moved them, which is
 // why it can now leave without taking them with it. Across to app.js for
-// mapNote and addToMapSelection, and sideways to path-profile.js for
-// PathProfile, which reaches back here for MapDraw. Mutual, and free: the IIFE
-// body only defines.
+// mapNote and addToMapSelection, to export.js for downloadDrawingKml (the
+// panel's Google Earth button, #183), and sideways to path-profile.js for
+// PathProfile, which reaches back here for MapDraw. All mutual, and all free:
+// the IIFE body only defines.
 //
 // Moved out of app.js byte-for-byte by M3 (#134) of #129.
 
@@ -32,8 +33,12 @@
 // how far apart they are and on what bearing.
 //
 // Nothing is saved. The shapes live as long as the page does — a tab switch
-// rebuilds them from state.draw.shapes, a reload clears them — and the export
-// is the operating system's screen-clipping tool.
+// rebuilds them from state.draw.shapes, a reload clears them — so the way to
+// keep a drawing is to take it somewhere else. Since #183 the panel hands the
+// whole of it to Google Earth as a KML: every shape, in the colour it was
+// drawn in, with the stations it encloses or runs between attached. Before
+// that the only answer was the operating system's screen-clipping tool, which
+// keeps a picture of the drawing and nothing about the ground under it.
 //
 // Where the panel is drawn changed at #164 and nothing else did. It was a panel
 // in the Stations sidebar; it is a MapChrome flyout on the map itself now
@@ -152,6 +157,37 @@ const MapDraw = (function () {
       widthKm:  Math.abs(a[1] - b[1]) * kmPerDegLon(lat),
       heightKm: Math.abs(a[0] - b[0]) * KM_PER_DEG_LAT,
     };
+  }
+
+  // A shape with an inside, as a closed ring of points on the ground.
+  //
+  // The map has a circle primitive and a rectangle primitive; a file format
+  // that describes the earth has neither. KML's only area is <LinearRing>, so
+  // a 25 km coverage circle has to be handed over as the polygon it looks
+  // like — and at 5° a segment (72 sides) the error against the true circle is
+  // 0.1% of the radius, which at 25 km is 25 m and well under the width of the
+  // line Google Earth draws it with.
+  //
+  // Sides are stepped by bearing rather than by adding degrees of longitude,
+  // so a circle stays circular at Cape York and at Hobart alike — the same
+  // reason destPoint exists at all. The ring closes on its own first point by
+  // copying it, because "first equals last" in a LinearRing means exactly
+  // equal, and a full turn's worth of trigonometry lands a few nanometres off.
+  const CIRCLE_SIDES = 72;
+
+  function ringFor(sh) {
+    if (sh.kind === 'rect') {
+      const [[latMin, lonMin], [latMax, lonMax]] = rectBounds(sh);
+      return [[latMin, lonMin], [latMin, lonMax], [latMax, lonMax],
+              [latMax, lonMin], [latMin, lonMin]];
+    }
+    if (sh.kind !== 'circle') return null;
+    const ring = [];
+    for (let i = 0; i < CIRCLE_SIDES; i++) {
+      ring.push(destPoint(sh.lat, sh.lon, (i * 360) / CIRCLE_SIDES, sh.radiusKm));
+    }
+    ring.push(ring[0].slice());
+    return ring;
   }
 
   function lineKm(pts) {
@@ -625,6 +661,41 @@ const MapDraw = (function () {
     return out;
   }
 
+  // The stations a shape *touches* rather than encloses: the sites a pin sits
+  // on, a note is about, or a line runs between. A circle and a rectangle have
+  // an inside and use it (above); everything else is defined by its points.
+  //
+  // The recorded snap is the first answer, because a click that landed on a
+  // pin said which station it meant. Where there is none — snapping was off,
+  // or the numbers were typed in, or an edit cleared it — a station within
+  // NEAR_KM of the point is taken as the one it is about. That tolerance is
+  // deliberately tight: this is a drawing sketched over sites a few kilometres
+  // apart at the closest, and a generous radius would quietly enrol the
+  // neighbour rather than the site.
+  const NEAR_KM = 0.25;
+
+  function nearStationId(pt) {
+    let best = null, bestKm = NEAR_KM;
+    for (const m of state.mapMarkers) {
+      const s = m.mnStation;
+      if (!s || s.lat == null || s.lon == null) continue;
+      const km = acmaHaversineKm(pt[0], pt[1], s.lat, s.lon);
+      if (km <= bestKm) { bestKm = km; best = s.id; }
+    }
+    return best;
+  }
+
+  function shapeStationIds(sh) {
+    if (sh.kind === 'circle' || sh.kind === 'rect') return stationsInside(sh);
+    const pts = sh.kind === 'line' ? sh.pts : [[sh.lat, sh.lon]];
+    const out = [], seen = new Set();
+    pts.forEach((pt, i) => {
+      const id = (sh.snappedTo && sh.snappedTo[i]) || nearStationId(pt);
+      if (id && !seen.has(id)) { seen.add(id); out.push(id); }
+    });
+    return out;
+  }
+
   // Additive, so two boxes combine; shift replaces instead, for starting again
   // without going via Clear.
   function selectInside(id, ev) {
@@ -765,6 +836,14 @@ const MapDraw = (function () {
            title. Two would be one too many, and the second would be the one
            a screen reader read out. -->
       <div class="draw-head">
+        <!-- The drawing leaves for Google Earth from the panel that made it
+             (#183) — the shapes are not saved anywhere else, so the flyout is
+             the only place that has them. Disabled with nothing drawn, on the
+             same rule as Clear all beside it. -->
+        <button class="draw-export" onclick="downloadDrawingKml()"
+                ${D_.shapes.length ? '' : 'disabled'}
+                title="Download every shape on the map — and the stations they enclose or run between — as a KML file, to open in Google Earth"
+                >🌏 KML ⬇</button>
         <button class="filter-reset" onclick="MapDraw.clearAll()"
                 ${D_.shapes.length ? '' : 'disabled'}>Clear all</button>
       </div>
@@ -777,7 +856,7 @@ const MapDraw = (function () {
       </div>
       <p class="filter-hint">${D_.tool
         ? esc(DRAW_TOOLS[D_.tool].hint) + ' Esc stops.'
-        : 'Pick a tool, then draw on the map or type the numbers in. Nothing is saved — clip the screen to keep it.'}</p>
+        : 'Pick a tool, then draw on the map or type the numbers in. Nothing is saved — take it to Google Earth with 🌏 KML, or clip the screen.'}</p>
       <button id="draw-finish" hidden onclick="MapDraw.finishLine()">Finish line</button>
       ${colourHtml()}
       ${D_.tool ? `
@@ -844,6 +923,34 @@ const MapDraw = (function () {
     panelHtml, rerenderPanel, render, setTool, select, remove, clearAll,
     finishLine, addFromForm, applyEdit, useMapCentre, toggleLabels, measure,
     setColour, toggleSnap, selectInside, lineKm,
+
+    // Everything drawn, reduced to ground truth: where each shape is, what it
+    // is called, what colour it was drawn in, and which stations it holds.
+    //
+    // This is the whole of what export.js needs to write a KML (#183), and
+    // drawing the boundary here is what keeps the two apart: the file builder
+    // never sees a Leaflet layer, a tooltip or the selection, and this module
+    // never learns any XML. A circle and a rectangle arrive as the closed
+    // rings a file format can describe, because *how a circle becomes a
+    // polygon on a sphere* is geometry, and geometry is this file's half.
+    //
+    // A copy, not the shapes themselves — a caller iterating over the live
+    // array while the operator is still drawing is not a thing worth allowing.
+    exportShapes() {
+      return D().shapes.map(sh => ({
+        id:         sh.id,
+        kind:       sh.kind,
+        colour:     colourOf(sh),
+        label:      snapLabel(sh),
+        measure:    measure(sh),
+        text:       sh.kind === 'text' ? sh.text : '',
+        point:      sh.kind === 'line' ? null : [sh.lat, sh.lon],
+        path:       sh.kind === 'line' ? sh.pts.map(pt => pt.slice()) : null,
+        ring:       ringFor(sh),
+        centre:     centreOf(sh),
+        stationIds: shapeStationIds(sh),
+      }));
+    },
 
     // Where a map click actually lands, snapping included — so the link budget
     // picks endpoints by the same rule the draw tools do rather than growing a

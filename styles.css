@@ -3399,10 +3399,24 @@ hr {
 /* "Clear all", on its own row. It was the right-hand half of a .panel-header
    until #164 took the heading away — the MapChrome flyout this panel lives in
    carries the title now, and a header row with nothing at the left-hand end is
-   not a header. */
+   not a header.
+   It has a left-hand end again since #183: the KML export sits there and Clear
+   all stays where it was, at the far edge, which is where the row's one
+   destructive control belongs. */
 .draw-head {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: .3rem;
+  justify-content: space-between;
+}
+
+/* Same metrics as .filter-reset beside it — a small panel button — under a
+   name of its own because it is not a reset and a class that says so would be
+   the next person's wrong turn. */
+.draw-export {
+  padding: .25rem .6rem;
+  font-size: .78rem;
+  white-space: nowrap;
 }
 
 .draw-tools {
