@@ -21,7 +21,23 @@
 // the email-and-code flow that is still there. Turning the gate off does not
 // quietly turn this into an open door; it turns it off.
 //
-// See docs/access.md ("Between the layers") and issue #173.
+// This Worker answers two routes, and they are independent of each other:
+//
+//   /api/session   the exchange described above — an Access identity in, a
+//                  Supabase session out. Needs three secrets; answers 503
+//                  without them, and 401 on an origin Access does not cover.
+//   /api/db/*      the database and its sign-in, forwarded through this origin
+//                  so the browser never names the Supabase host. Needs no
+//                  secret and no Access identity, and is what keeps the app
+//                  reachable from a network that filters uncategorised
+//                  hostnames. See the section above `export default`.
+//
+// The second exists because of the first's failure mode: the Bureau's web filter
+// denied the Access team domain for having no category, and a Supabase project
+// ref would fail the same test for the same reason.
+//
+// See docs/access.md ("Between the layers"), docs/floodwarning-net.md ("The
+// Access login host is blocked on the Bureau network") and issue #173.
 
 // Already public in core.js — the project ref is in the committed client config,
 // so keeping it here costs nothing and saves a binding the operator would have
@@ -200,9 +216,145 @@ async function mintSession(email, secret) {
   return session.body;
 }
 
+// ── The database, reached through this origin (#the-bureau-block) ────────────
+//
+// The Bureau's web filter denies any hostname its categorisation feed does not
+// know, and a Supabase project ref is exactly that kind of hostname: per-tenant,
+// linked from nowhere, and never going to be categorised by anybody. That is the
+// same property that took floodwarning.net off the Bureau network — there it was
+// the Access team domain rather than the database — so it is worth fixing once,
+// structurally, rather than per hostname at a service desk.
+//
+// The fix is to stop the browser naming it. `/api/db/rest/v1/…` is served from
+// this origin and forwarded from here, which leaves `floodwarning.net` as the
+// only host the app needs for its page, its sign-in and its data.
+//
+// **Nothing about the checking moves.** The publishable key is still public, RLS
+// still decides every read, and `meganet.is_editor()` still decides every write
+// from the caller's own token — which still arrives from the browser and is
+// still the person's. This is a change of route, not of authority, and the
+// difference matters: a proxy that started *adding* authority would be a way
+// around every policy in the database.
+//
+// Two properties keep it from being a proxy somebody else can aim. The upstream
+// is this file's own constant and is never read from the request, and the path
+// has to name one of three known services — so no request to `/api/db/…` can
+// reach a fourth Supabase API, a different host, or a path above a service root.
+
+const DB_PROXY_PREFIX = '/api/db/';
+
+// `db/` at the repo root is a real directory of migrations and is served as
+// static assets, which is why this sits under `/api/` rather than `/db/`.
+const DB_PROXY_SERVICES = ['rest/v1', 'auth/v1', 'storage/v1'];
+
+// An allow-list rather than "forward what the browser sent", because what the
+// browser sent includes the Access cookie and the Cloudflare identity headers,
+// and none of that is Supabase's business. Everything the app actually sends is
+// here; `prefer` and `range` are standard PostgREST controls it does not use
+// today, included because a silently dropped header is a bad afternoon.
+const DB_PROXY_REQUEST_HEADERS = [
+  'accept', 'accept-profile', 'apikey', 'authorization',
+  'content-profile', 'content-type', 'prefer', 'range', 'x-upsert',
+];
+
+const DB_PROXY_RESPONSE_HEADERS = [
+  'content-type', 'content-range', 'content-location', 'range-unit',
+  'preference-applied', 'etag', 'location', 'retry-after', 'www-authenticate',
+];
+
+// Map a request path onto its upstream URL, or null if it is not ours to serve.
+//
+// Exported so test/db-proxy.mjs can assert the refusals. They are worth asserting
+// for the same reason the Access ones are: a forwarding rule that is too generous
+// breaks nothing visible, it just quietly carries a request it should not have.
+export function dbProxyTarget(pathname, search = '') {
+  if (typeof pathname !== 'string' || !pathname.startsWith(DB_PROXY_PREFIX)) return null;
+  const rest = pathname.slice(DB_PROXY_PREFIX.length);
+
+  // Checked before the service match, not after: `/api/db/rest/v1/../../x`
+  // matches `rest/v1` and then leaves it again, and whoever resolves the `..`
+  // later — fetch, or the origin — is resolving it outside this check. Escapes
+  // are decoded first so `%2e%2e` cannot walk past a comparison against '..'.
+  for (const seg of rest.split('/')) {
+    let decoded;
+    try { decoded = decodeURIComponent(seg); } catch (_) { return null; }
+    if (decoded === '..' || decoded === '.') return null;
+  }
+
+  const known = DB_PROXY_SERVICES.some(s => rest === s || rest.startsWith(`${s}/`));
+  if (!known) return null;
+
+  return `${SUPABASE_URL}/${rest}${search || ''}`;
+}
+
+// Exported for the same reason: what is *not* forwarded is the security property,
+// and it is invisible from the outside.
+export function dbProxyRequestHeaders(headers) {
+  const out = new Headers();
+  for (const name of DB_PROXY_REQUEST_HEADERS) {
+    const value = headers.get(name);
+    if (value !== null) out.set(name, value);
+  }
+  // Supabase rate-limits some auth endpoints per caller. Every request now
+  // arrives from this Worker, so without this one person's retries would spend
+  // everybody's allowance — and the address is the one Supabase would have seen
+  // anyway if the browser had dialled it directly.
+  const ip = headers.get('CF-Connecting-IP');
+  if (ip) out.set('X-Forwarded-For', ip);
+  return out;
+}
+
+async function dbProxy(request, target) {
+  const init = {
+    method: request.method,
+    headers: dbProxyRequestHeaders(request.headers),
+    // A 3xx from Supabase is the app's to see and act on, not this Worker's to
+    // chase — following it here would put this file's identity on the next hop.
+    redirect: 'manual',
+  };
+  // Streamed rather than buffered, which is what makes an attachment upload not
+  // land in the Worker's memory on its way past.
+  if (request.method !== 'GET' && request.method !== 'HEAD') init.body = request.body;
+
+  let res;
+  try {
+    res = await fetch(target, init);
+  } catch (err) {
+    // The app already knows how to say the datastore is unreachable. This keeps
+    // that answer true when the hop that failed was this one rather than the
+    // browser's, instead of surfacing as an unexplained 5xx from its own origin.
+    return json({ error: `datastore unreachable: ${err.message}` }, 502);
+  }
+
+  const headers = new Headers();
+  for (const name of DB_PROXY_RESPONSE_HEADERS) {
+    const value = res.headers.get(name);
+    if (value !== null) headers.set(name, value);
+  }
+  // Unconditional, and not a copy of what Supabase said. These responses vary by
+  // Authorization — a session, a one-time code, one person's RLS-filtered rows —
+  // and a cache between here and the browser keyed on the URL alone would hand
+  // one caller's answer to the next.
+  headers.set('Cache-Control', 'no-store');
+
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // The database, routed through this origin so the browser never has to name
+    // a hostname the Bureau's filter has not categorised. Checked before the
+    // gate's own route because it is the one that carries traffic; it needs no
+    // secret and no Access identity, and it must keep working when the gate is
+    // switched off, which is the state that made it necessary.
+    const target = dbProxyTarget(url.pathname, url.search);
+    if (target) return dbProxy(request, target);
 
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.

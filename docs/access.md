@@ -176,6 +176,43 @@ somebody who has bypassed Cloudflare entirely by using the github.io URL.
   at all for an address that is not on that list. An unlisted person does not get
   a session to be refused later; they never become a user.
 
+### Reached through this origin
+
+The browser does not name the Supabase project any more. `worker/index.js`
+forwards `/api/db/rest/v1/*`, `/api/db/auth/v1/*` and `/api/db/storage/v1/*` to
+it, and `core.js` points `DB_URL` at that path on the origins that Worker serves
+— `AUTH_URL` and `STORAGE_URL` derive from `DB_URL`, so the sign-in and the
+attachment bucket came along without being named twice.
+
+The reason is a filter, not a security property: a Supabase project ref is a
+per-tenant hostname nothing will ever categorise, and the Bureau denies what it
+cannot categorise — the same fault that took the Access login host off their
+network. **Nothing about who may do what moves.** The publishable key is still
+public, RLS still decides every read, and `meganet.is_editor()` still decides
+every write from the caller's own token, which still arrives from the browser
+and is still the person's. A proxy that started minting or adding authority
+would be a way around every policy below; this one adds a hop and nothing else.
+
+Two things keep it a route rather than a hole, both asserted in
+`test/db-proxy.mjs` because both fail open and in silence:
+
+- **The upstream is a constant in that file**, never anything read from the
+  request, and the path must name one of three known services — so no request to
+  `/api/db/…` reaches a fourth Supabase API, another host, or a path above a
+  service root (`..` included, percent-encoded or not).
+- **Headers are an allow-list, not a pass-through.** What the browser sends
+  includes the Access cookie and Cloudflare's identity headers, and none of that
+  is Supabase's business. Only the caller's own `Authorization`, the publishable
+  key, the schema profile and the content headers go on — plus the caller's IP as
+  `X-Forwarded-For`, so one person's retries do not spend the project's whole
+  auth rate limit.
+
+Origins without that Worker in front of them — `github.io`, `file://`, a
+checkout on a spare port — are not on the list and keep dialling Supabase
+directly, exactly as every origin did before. The Data source panel says which
+route is in use, because a failed read looks identical whether the project is
+asleep or this origin's Worker is what broke.
+
 ### `editor_allow` is the allowlist
 
 #72 sketched a table called `allowed_domains`. It does not exist, and that is
@@ -336,21 +373,24 @@ single-owner account with one MFA device on one phone is the actual risk here.
 
 ### "The site does not load at all on the Bureau network"
 
-Not a login problem, and nothing on this page will fix it. Confirmed September
-2026: the Bureau's ProxySG denies **`floodwarningnet.cloudflareaccess.com`** —
-Category `none`, Exception `policy_denied` — while `floodwarning.net` itself
-passes. The site is fine; the door it sends you to is the blocked thing.
+Not a login problem. Confirmed September 2026: the Bureau's ProxySG denies
+**`floodwarningnet.cloudflareaccess.com`** — Category `none`, Exception
+`policy_denied` — while `floodwarning.net` itself passes. The site is fine; the
+door it redirects you to is the blocked thing.
 
 That host is this account's Access team domain, and because Cloudflare only lets
-you choose the team-name portion it is a per-tenant name that no categorisation
-feed will ever classify. It needs an allowlist entry from Cyber Security
-Operations, not a recategorisation. The block-page fields, the Cherwell path and
-the four things worth doing are in
-[`floodwarning-net.md` → The Access login host is blocked on the Bureau network](floodwarning-net.md#the-access-login-host-is-blocked-on-the-bureau-network).
+you choose the team-name portion it is a per-tenant name no categorisation feed
+will ever classify. **So the gate has to come off** — there is no configuration
+of Access that avoids the hop. Deleting the Access application makes the site
+load, and `/api/session` then answers 401 everywhere, which is the fallback this
+page already describes.
 
-Deleting the Access application would make the site load immediately, and it is
-worth knowing as the emergency lever, but it removes the perimeter to work around
-a filter entry. Raise the ticket first.
+The database would have failed the same test for the same reason, so it no
+longer gets asked: `/api/db/*` forwards it through this origin (see
+[Layer 2 → reached through this origin](#reached-through-this-origin)). The full
+diagnosis, the Cherwell wording if a second hostname ever needs it, and what is
+still third-party are in
+[`floodwarning-net.md` → The Access login host is blocked on the Bureau network](floodwarning-net.md#the-access-login-host-is-blocked-on-the-bureau-network).
 
 ### "I am signed in but Save is refused"
 

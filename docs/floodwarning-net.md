@@ -259,35 +259,55 @@ applies to the login host rather than to the site.
 
 ### What to do
 
-1. **Raise the Cherwell request.** The block page names the path:
-   **Technology > I want something > Security Services > Cyber Security
-   Operations > Request Website Approval**. Ask for
-   `floodwarningnet.cloudflareaccess.com`, and put in the ticket that it is a
-   per-tenant authentication host which will never carry a category, so the fix
-   is an allowlist entry rather than a recategorisation — and that
-   `floodwarning.net` itself already passes, so this is the only name in the way.
-   IT Service Desk is 03 9669 8188 (x8188) if the form needs chasing.
-2. **Ask about Supabase in the same ticket.** Every station read goes to
-   `jjprlritvhdqpvphfrnu.supabase.co`. If that name is uncategorised too, then
-   fixing the gate produces an app that loads and then silently fetches nothing —
-   a far worse failure to diagnose than a clean block page. Two hostnames, one
-   ticket.
-3. **Submit both to Symantec Site Review** — <https://sitereview.bluecoat.com/> —
-   because the appliance is a ProxySG and WebPulse is what feeds it. This does not
-   replace the ticket, for the reason above, but a reviewer approves a name with a
-   category more readily than one without.
-4. **If the ticket is refused, Access is the thing to drop, not the site.**
-   [`access.md`](access.md#between-the-layers--the-gate-signs-you-in-173) records
-   that the email-and-code sign-in still works wherever Access is not in front,
-   and without the gate the whole flow sits on `floodwarning.net` plus Supabase
-   with no third-party auth host at all. That trades the perimeter for
-   reachability — under option (a), a smaller loss than it sounds, since the data
-   was never the secret and Layer 2 is untouched either way. Do not reach for it
-   before the ticket is answered.
-5. **Longer term, a `bom.gov.au` subdomain** removes the whole class of problem:
-   no external name to categorise, no allowlist entry to survive the next filter
-   change. A conversation with the Bureau rather than a configuration change,
-   which is why it is last.
+The Bureau's own remedy is the Cherwell request the block page names, and it is
+worth knowing even though it is not the route taken:
+**Technology > I want something > Security Services > Cyber Security Operations >
+Request Website Approval**, asking for `floodwarningnet.cloudflareaccess.com`,
+with the ticket saying it is a per-tenant authentication host that will never
+carry a category (IT Service Desk 03 9669 8188, x8188). That is the right
+sentence to write if it is ever needed for a *second* hostname.
+
+It was not taken here, because it stalls on somebody else's queue and because
+the same problem would return with the next uncategorised name. What was done
+instead removes the class of problem:
+
+1. **The database is reached through this origin.** `worker/index.js` forwards
+   `/api/db/*` to the Supabase project, and `core.js` points `DB_URL` at that
+   path on the origins the Worker serves. The rest follows from one constant:
+   `AUTH_URL` and `STORAGE_URL` are derived from `DB_URL`, so the sign-in and
+   the attachment bucket moved with it. The browser now names one host —
+   `floodwarning.net`, which already passes the filter — for the page, the data
+   and the sign-in alike. What it does *not* do is change any authority: the
+   publishable key is still public, RLS still decides every read, and
+   `meganet.is_editor()` still decides every write from the caller's own token.
+   `test/db-proxy.mjs` asserts the two properties that make it a route rather
+   than a hole — the path allow-list and what is stripped from the headers.
+2. **Access comes off.** The proxy solves the data hop, not the gate: while an
+   Access policy is on the hostname, every request still starts with a redirect
+   to the denied login host. Deleting the Access application is what actually
+   makes the site load, and the app is built for it —
+   [`access.md`](access.md#between-the-layers--the-gate-signs-you-in-173):
+   `/api/session` answers 401 wherever there is no Access identity and the
+   email-and-code panel takes over, which now runs through the proxy too.
+   That trades the perimeter for reachability. Under option (a) it is a smaller
+   loss than it sounds — the data was never the secret, and Layer 2 is untouched
+   either way.
+3. **Nothing else changes.** `github.io`, `file://` and a checkout served from a
+   spare port are not on the Worker list, so they keep dialling Supabase
+   directly, exactly as before. That is the safe direction for the default to
+   fail: an origin nobody anticipated behaves as it always has rather than
+   404ing against a route that is not there.
+
+Two things this does not reach, worth knowing before the next report of "it
+does not work from the office":
+
+- **The map's other hosts.** Tiles, Overpass, Nominatim and Google Fonts are
+  still third-party names and any of them may be uncategorised too. The app
+  loads, signs in and reads its data without them; the map degrades. Each is
+  proxyable the same way if it turns out to matter.
+- **A `bom.gov.au` subdomain** would still be the real answer — no external name
+  to categorise at all, and no list to keep current. A conversation with the
+  Bureau rather than a configuration change, which is why it is not this.
 
 Keep the block page screenshot. Its URL and Category fields are the entire
 diagnosis, and a future recurrence is worth comparing against it — a different

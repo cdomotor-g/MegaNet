@@ -516,6 +516,18 @@ jobs:
         working-directory: test
         run: npm run gate
 
+      # The other server-side door, and the one that carries the traffic.
+      # worker/index.js forwards /api/db/* to Supabase so the browser never names
+      # a hostname the Bureau's filter has not categorised — a route with no
+      # Access identity and no secret in front of it. Both of its checks fail
+      # open and in silence: a path rule that is too generous still serves the
+      # app perfectly while also carrying a request that should not have left the
+      # origin, and a header allow-list that leaks the Access cookie breaks
+      # nothing anyone would see. Offline, no network.
+      - name: The database proxy carries only what it should, and strips the rest
+        working-directory: test
+        run: npm run dbproxy
+
       # Python, no browser, no dependencies, and the only check in this file
       # that is about a *data* artefact rather than about the app: #123's sheet
       # manifest, field map and layout table are derived from the historical

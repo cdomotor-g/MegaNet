@@ -1587,8 +1587,41 @@ function copyStationLatLon(btn, text) {
 // in the same migration that creates it (see db/README.md). The rule that keeps
 // that true is worth stating plainly: nothing goes in a table that its policy
 // would not hand to a stranger.
-const DB_URL      = 'https://jjprlritvhdqpvphfrnu.supabase.co/rest/v1';
-const DB_ANON_KEY = 'sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY';
+const DB_ORIGIN    = 'https://jjprlritvhdqpvphfrnu.supabase.co';
+const DB_ANON_KEY  = 'sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY';
+
+// ── Which way round to the database ──────────────────────────────────────────
+//
+// A Supabase project ref is a per-tenant hostname that is linked to from nowhere
+// and serves nothing a crawler would read, so no categorisation feed will ever
+// classify it — and a filter that denies what it cannot classify denies that.
+// The Bureau's does. It is what took floodwarning.net off their network, by way
+// of the Access team domain, which fails the identical test for the identical
+// reason (docs/floodwarning-net.md).
+//
+// So where this origin can carry the traffic itself, it does: worker/index.js
+// forwards `/api/db/*` to the project, and the browser names one host — the one
+// it already loaded the page from — for the app, the sign-in and the data alike.
+//
+// The list is of origins known to have that Worker in front of them, and the
+// default when a host is not on it is the direct URL, which is what every origin
+// used before the proxy existed. That way round on purpose: an origin nobody
+// anticipated — a colleague's static server, a checkout served from a spare
+// port — keeps behaving exactly as it always has instead of 404ing against a
+// route that is not there. `file://` has no origin to speak of and is listed
+// nowhere, so it takes the direct URL too.
+const DB_PROXY_PATH     = '/api/db';
+const DB_PROXY_HOSTS    = ['floodwarning.net', 'www.floodwarning.net'];
+const DB_PROXY_SUFFIXES = ['.workers.dev', '.pages.dev'];
+
+function dbProxyAvailable() {
+  if (typeof location === 'undefined' || location.protocol === 'file:') return false;
+  const host = (location.hostname || '').toLowerCase();
+  return DB_PROXY_HOSTS.includes(host)
+      || DB_PROXY_SUFFIXES.some(suffix => host.endsWith(suffix));
+}
+
+const DB_URL = dbProxyAvailable() ? `${DB_PROXY_PATH}/rest/v1` : `${DB_ORIGIN}/rest/v1`;
 
 // Supabase Auth (GoTrue) lives beside the Data API on the same project host.
 // Derived rather than written out again so the two cannot end up pointed at
@@ -1609,8 +1642,20 @@ const DB_SCHEMA = 'meganet';
 const DB_SCHEMA_VERSION = 28;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
+//
+// The project rather than whatever DB_URL currently holds: behind the proxy that
+// is a path on this origin, and "reading /api/db/rest/v1…" answers a question
+// nobody asked. Every sentence in the app that names this means the database.
 function dbHostLabel() {
-  try { return new URL(DB_URL).host; } catch (_) { return DB_URL; }
+  try { return new URL(DB_ORIGIN).host; } catch (_) { return DB_ORIGIN; }
+}
+
+// …and which way it is being reached, appended to that label where it is not the
+// obvious one. Worth a few words on screen because a failed read looks identical
+// whether the project is asleep or this origin's Worker is the thing that is
+// broken, and those have entirely different fixes.
+function dbRouteLabel() {
+  return dbProxyAvailable() ? ` (via ${location.host})` : '';
 }
 
 // Round-trip timing, for the Data source panel and the load path. Defined up

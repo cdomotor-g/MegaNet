@@ -10,10 +10,17 @@
 name = "meganet"
 compatibility_date = "2026-08-27"
 
-# The one route that is not a static file: /api/session, which exchanges the
-# Cloudflare Access identity for a Supabase session so the app asks for one
-# login rather than two. Assets are still served first, so only paths that are
-# not files in this repo ever reach the Worker. See worker/index.js and #173.
+# The two routes that are not static files. /api/session exchanges a Cloudflare
+# Access identity for a Supabase session, so the app asks for one login rather
+# than two (#173). /api/db/* forwards the database, its sign-in and its storage
+# to the Supabase project, so the browser only ever names this origin — which is
+# what keeps the app reachable from a network that denies hostnames its filter
+# has not categorised (docs/floodwarning-net.md).
+#
+# Assets are still served first, so only paths that are not files in this repo
+# ever reach the Worker. `/api/db/` rather than `/db/` for exactly that reason:
+# `db/` at the repo root is a real directory of migrations and is served.
+# See worker/index.js.
 main = "worker/index.js"
 
 [assets]

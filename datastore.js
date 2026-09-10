@@ -12,7 +12,7 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for DB_URL, DB_ANON_KEY, DB_SCHEMA,
-// DB_SCHEMA_VERSION, _dbClock, dbHostLabel, state, esc and dlText; across to
+// DB_SCHEMA_VERSION, _dbClock, dbHostLabel, dbRouteLabel, state, esc and dlText; across to
 // app.js for SOURCE_LABELS and loadFromApi; and to auth.js for Auth, which
 // reaches back here for dbSetAccessToken.
 //
@@ -156,7 +156,7 @@ function authLineHtml() {
 function renderDbStatusHtml() {
   const s = state.dbStatus;
   const loaded = renderLoadedSourceHtml();
-  const host = `<div class="small db-host">${esc(dbHostLabel())}</div>${authLineHtml()}`;
+  const host = `<div class="small db-host">${esc(dbHostLabel())}${esc(dbRouteLabel())}</div>${authLineHtml()}`;
 
   if (!s || s.checking) {
     return `${loaded}<div class="small">Checking…</div>${host}`;
