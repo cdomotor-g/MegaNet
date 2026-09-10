@@ -108,6 +108,36 @@ and bumps `DB_SCHEMA_VERSION` in `app.js` in the same commit. The app compares t
 two on connect and says "database is v1, this app expects v2" rather than
 half-working against a shape it does not understand.
 
+**That number is not proof the chain ran, and on 2026-09-11 it was not.** The
+production database read `schema_version` 28 against an app expecting 28 — a
+clean match, reported as connected — while `0005_auth.sql` had never been
+applied to it. Nothing caught it: 0005 is the one file nothing later depends on
+(`0007` names `app_user` only in a comment), and `auth.js` swallows a missing
+`whoami()` on purpose. So the app ran for a month with no signup gate, meaning
+any address could have become a user. Writes were never at risk —
+`meganet.is_editor()` is 0004's and was in place — but the layer that stops a
+stranger holding a session at all was simply absent.
+
+Two things follow, and the second is a trap:
+
+- **A version match means the highest migration that *wrote its number* ran.**
+  It says nothing about the ones before it. To actually check, ask for the
+  objects — `\df meganet.*`, or the trigger query above — rather than the number.
+- **A skipped migration cannot be applied late as written**, because that final
+  statement is an unconditional `do update`: running `0005` today would set
+  `schema_version` from 28 back to 5 and make the app report a mismatch against
+  a database that is now *more* correct, not less. Every migration in this
+  directory ends this way, so this applies to all of them. Apply the file minus
+  its last statement, which is what was done for 0005.
+
+  Making late application safe is a one-line change to the pattern, worth doing
+  the next time these are touched:
+
+  ```sql
+  on conflict (key) do update set value = excluded.value
+    where meganet.app_meta.value::int < excluded.value::int;
+  ```
+
 **Exposed schemas live here, not in the dashboard.** `meganet` is not exposed to
 the Data API by default; `0001_init.sql` adds it by setting `pgrst.db_schemas` on
 the `authenticator` role. Doing it that way takes the list out of the dashboard's
@@ -123,7 +153,7 @@ its cache at all (`PGRST002`).
 | --- | --- |
 | `meganet` | The schema. Everything MegaNet owns lives here, not in `public`. |
 | `meganet.touch_updated_at()` | `BEFORE UPDATE` trigger function stamping `updated_at`. Every table with that column hangs it off this one. |
-| `meganet.app_meta` | Key/value facts about the database itself. `schema_version` is the number of the highest migration applied. Readable by anyone, writable by no one holding the anon key. |
+| `meganet.app_meta` | Key/value facts about the database itself. `schema_version` is the number of the highest migration that *wrote it* — which is not the same as the highest applied, and not proof the ones below it ran; see above. Readable by anyone, writable by no one holding the anon key. |
 | `meganet.station` | One row per station, 3,174 of them. `id` is the `stations.json` slug — also the app's `selectedId`, and in URLs. `station_number` is the bureau (BoM/CBM) number, unique among the 3,156 that have one and the identity a station publishes under over MQTT (`0020`). `deleted_at` is the soft delete: null means live. `inspection_config_key` (`0013`, #147) names which of the six inspection sheets the site's telemetry answers to — FK into `meganet.inspection_config`, null until somebody who knows the site says; deliberately not backfilled, because a wrong pre-selected form is worse than being asked. |
 | `meganet.sensor` | 8,815 rows. Natural key `(station_id, sensor_id, type)`: one SSR carries several measurements. Indexed on `alert_id`, which is what the search box matches. |
 | `meganet.repeater` | Repeater detail for the 88 stations carrying the role. One-to-one with `station`. |
