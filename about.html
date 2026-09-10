@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>About MegaNet — radio and satcom telemetry network tooling</title>
   <meta name="description" content="MegaNet is a browser-based planning and maintenance tool for radio and satellite telemetry networks: station records, repeater pass-range analysis, RF interference investigation, ALERT/ALERT2 packet decoding and field inspection forms. An independent open-source project, not an official warning service.">
-  <link rel="canonical" href="https://floodwarning.net/about.html">
+  <!-- /about, not /about.html: Cloudflare's static assets answer the extension
+       with a 307 to the bare path, so that is the URL this page actually has.
+       A canonical naming the redirecting form points a crawler back at the hop
+       it just followed. GitHub Pages serves both, so this is right there too. -->
+  <link rel="canonical" href="https://floodwarning.net/about">
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
   <meta name="theme-color" content="#0b5cab">
 
