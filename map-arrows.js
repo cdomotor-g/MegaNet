@@ -48,18 +48,20 @@
 //
 // An arrowhead takes the colour and opacity of the line it sits on, read off
 // the Leaflet layer when the canvas is drawn rather than recorded when the line
-// was built. A backbone path is the one exception and takes the black its own
-// dashes are drawn in: the backbone's identity on this map *is* the black line,
-// and a chevron in the channel colour over it reads as a field link.
-
-// ── Nothing at the zoom nobody asks the question at ──────────────────────────
-//
-// The marks scale with the zoom and stop being drawn below MIN_ZOOM. See the
-// constants for why. That is what keeps it right through everything else that repaints
+// was built. That is what keeps it right through everything else that repaints
 // a line: the frequency and fade-margin colourings, an obstructed path going
 // crimson, a blast turning a fan red, and the focus dim taking everything not
 // on the focused repeater down to a fifth of its opacity. Each of those calls
 // schedule(); none of them has to know anything about arrows.
+//
+// A backbone path is the one exception and takes the black its own dashes are
+// drawn in: the backbone's identity on this map *is* the black line, and a
+// chevron in the channel colour over it reads as a field link.
+//
+// ── Nothing at the zoom nobody asks the question at ──────────────────────────
+//
+// The marks are a function of the zoom and are not drawn below MIN_ZOOM at all.
+// The constants say why.
 const MapArrows = (function () {
   const PANE   = 'mnArrows';
   // Just above Leaflet's own overlay pane (400), where the shared canvas
