@@ -85,22 +85,33 @@
      152.4) and the rest are headroom, so a file with more channels colours all
      of them rather than wrapping onto a colour already in use.
 
+     **Every one of them is a cool hue, and that is the constraint rather than a
+     preference.** A channel number carries no judgement: 151.525 MHz is not
+     worse than 151.5. Orange, amber and red on this map mean something — a fade
+     margin under the threshold, an obstructed path, a repeater whose loss
+     strands a station — and a ramp that spent them on channel identity would
+     have a third of the network drawn in the colour of a problem. So the range
+     is blue through violet to magenta with a pale pink at the end, and the hot
+     half of the wheel is left to the layers that are actually saying *bad*.
+     (The first version of this ramp used #ff9100 for 151.525 and 65 links
+     around Gatton came out amber, which is how the rule got written down.)
+
      Chosen against everything else that can be on the map at once: none is the
-     crimson of an obstructed path, the red of a blast, the blue of a highlighted
-     river or the teal of a survey mark. Saturated on purpose — these lines are
-     read over satellite imagery and topo shading, under the white casing every
-     link carries — and, like --map-backbone, they are the same in both themes:
-     the base maps do not go dark with the app, so a colour that works over a
-     tile works over it in either theme, and all eight are bright enough to hold
-     up as legend swatches on a dark panel. */
+     crimson of an obstructed path, the red of a blast, the deep blue of a
+     highlighted river or the teal of a survey mark. Saturated on purpose —
+     these lines are read over satellite imagery and topo shading, under the
+     white casing every link carries — and, like --map-backbone, they are the
+     same in both themes: the base maps do not go dark with the app, so a colour
+     that works over a tile works over it in either theme, and all eight are
+     bright enough to hold up as legend swatches on a dark panel. */
   --map-freq-1: #2979ff;
-  --map-freq-2: #ff9100;
-  --map-freq-3: #d500f9;
+  --map-freq-2: #d500f9;
+  --map-freq-3: #7c4dff;
   --map-freq-4: #00e5ff;
-  --map-freq-5: #ffea00;
-  --map-freq-6: #76ff03;
-  --map-freq-7: #b388ff;
-  --map-freq-8: #ff4081;
+  --map-freq-5: #b388ff;
+  --map-freq-6: #00b0ff;
+  --map-freq-7: #64ffda;
+  --map-freq-8: #f48fb1;
   /* Blast radius (#161): the pass-range links that die with a repeater, and
      the ring on a station with no other way in. Red as asked for, and a red
      none of the role fills or ACMA mechanisms use; the ring is the darker of
@@ -2989,6 +3000,16 @@ hr {
   transform: translateY(.5px);
 }
 
+/* A corner button that is a *mode* rather than a disclosure — What is here —
+   says so while it is armed, the way a draw tool does. Colour is not the only
+   channel: the button also carries aria-pressed and its label changes to
+   "Click the map to say where". */
+.mn-mapctl-btn.is-on {
+  border-color: var(--accent);
+  background: var(--subtle);
+  box-shadow: var(--shadow-2), inset 0 0 0 2px var(--accent);
+}
+
 .mn-mapctl-body {
   display: none;
   position: absolute;
@@ -3128,12 +3149,32 @@ hr {
    not. Scroll here rather than on .mn-mapctl-body so the title and the pin stay
    put, and so the hover bridge above is not clipped by an overflow context. */
 .mn-mapctl-content {
-  /* 42vh rather than something rounder: the map itself is 62vh (52dvh on a
-     phone), and a flyout taller than the map it hangs off is a flyout with its
-     last control cut off by the map's own edge. This leaves room for the
-     heading, the padding and Leaflet's 10 px corner margin at both ends. */
-  max-height: min(24rem, 42vh);
+  /* Capped against the map rather than against the viewport: --mn-map-h is the
+     map container's own height, published by trackMapHeight() in
+     map-controls.js. A vh figure was only ever right for one of the shapes this
+     map takes — 62vh in the page, 52dvh on a phone, the whole window in full
+     screen, a column beside the station list in the split — and 42vh of a
+     full-screen map is a flyout with two thirds of the map still under it,
+     while 42vh of a phone map is a flyout hanging past its bottom edge.
+
+     The subtraction is what is above and below a flyout inside the map: the
+     10 px Leaflet corner margin at each end, the panel's own heading, and the
+     icon column the panel opens beside. 24rem is the cap for a *short* panel —
+     a flyout is a glance, and Map display asks for and gets its own taller one
+     below. The vh figure behind it is the fallback for the frame before the
+     first measurement. */
+  max-height: min(24rem, var(--mn-map-h, 62vh) - 7rem);
   overflow-y: auto;
+}
+
+/* …except Map display, which is not a glance. It holds a dozen switches, three
+   sliders, four selects, a radio group and the whole ACMA block behind one
+   icon, and the honest answer to "this menu is getting massive" is a find box
+   *and* the height to show what the find box leaves. So it takes the map, less
+   the same furniture — and it still shrinks to its content, so filtering the
+   panel down to two rows leaves a two-row panel rather than a tall empty box. */
+.mn-mapctl[data-panel="display"] .mn-mapctl-content {
+  max-height: calc(var(--mn-map-h, 62vh) - 7rem);
 }
 
 /* Tighter docked than floating, and deliberately: a flyout has the map to
@@ -3155,11 +3196,11 @@ hr {
 /* Below `md` the map itself shrinks to 52dvh (see the breakpoint block at the
    foot of this file), so the flyout's share of the viewport has to come down
    with it or the panel is taller than the map it hangs off. */
+/* Below `md` the map itself shrinks, and --mn-map-h shrinks with it — so the
+   flyout cap needs no breakpoint of its own any more. What still does is the
+   *docked* cap: two pinned panels divide one column between them, and that is a
+   share of the map rather than a measurement of it. */
 @media (max-width: 900px) {
-  .mn-mapctl-content {
-    max-height: min(24rem, 34vh);
-  }
-
   .mn-mapctl.is-pinned .mn-mapctl-content {
     max-height: min(11rem, 15vh);
   }
@@ -3574,6 +3615,42 @@ hr {
 @keyframes mn-movepin-pulse {
   0%, 100% { transform: scale(1);    opacity: 1; }
   50%      { transform: scale(1.18); opacity: .75; }
+}
+
+/* ── What is here (#186) ───────────────────────────────────────────────────
+   The pin the tool drops, and the crosshair while it is armed. Deliberately
+   not the move-pin marker's amber: that one means "this station is being
+   moved and nothing is saved yet", and a mark that means "you asked about
+   this spot" must not be mistaken for it. Cyan, still, and it takes no
+   pointer — there is nothing to drag. */
+.leaflet-container.mn-here-picking {
+  cursor: crosshair;
+}
+
+.mn-here {
+  position: relative;
+  width: 30px;
+  height: 30px;
+}
+
+.mn-here-ring {
+  position: absolute;
+  inset: 3px;
+  border: 2px solid #00e5ff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(0, 0, 0, .35);
+}
+
+.mn-here-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #00e5ff;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, .5);
 }
 
 /* Bottom left of the map, where nothing else on it lives. */
@@ -6282,11 +6359,18 @@ hr {
   gap: 0;
   /* Both columns scroll inside the viewport rather than the page scrolling
      past them — which is the whole request: the map stays in view while the
-     list beside it is read. --mn-chrome is the measured header + memory-strip
-     height (updateChromeHeight, app.js), so this tracks a banner that has
-     wrapped onto two rows on a narrow window. */
-  height: calc(100dvh - var(--mn-chrome, 0px) - 2rem);
-  min-height: 420px;
+     list beside it is read.
+
+     --mn-split-h is measured from where this element actually starts
+     (syncStationsSplitHeight, app.js) and is the figure that makes that true.
+     The calc() behind it is the fallback for the frame before the first
+     measurement, and it is deliberately the *approximate* one it always was:
+     --mn-chrome covers the banner and the memory strip but not #main-content's
+     own padding or the gap above the panel, so it left the page scrolling
+     behind two columns that were each already scrolling. Three scroll regions
+     where there should be one. */
+  height: var(--mn-split-h, calc(100dvh - var(--mn-chrome, 0px) - 2rem));
+  min-height: 360px;
 }
 
 .stn-split.is-split > .stn-split-map {

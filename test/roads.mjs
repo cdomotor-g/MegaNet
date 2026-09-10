@@ -154,6 +154,14 @@ try {
   await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
   await page.evaluate(() => switchTab('stations'));
   await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
+  // One column, because this check is about the cadastre and not about the
+  // tab's layout. The Stations tab opens side by side, which halves the map's
+  // width — and the fixture's remnant parcel sits 2 km from the centre at
+  // zoom 15, which in half a map is off the screen. A hover that lands outside
+  // the container leaves the *previous* label on screen, so the assertion read
+  // "Miranda Drive" and looked like the layer claiming a paddock as road.
+  await page.evaluate(() => toggleStationsSplit(false));
+  await page.waitForTimeout(400);
 
   // Above MIN_ZOOM, on the fixture. The layer is on by default, so this is all
   // it takes to make it ask.

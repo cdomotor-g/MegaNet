@@ -386,6 +386,11 @@ const MapCatchments = (function () {
 
     provenance() { return PROVENANCE; },
 
+    // The basins, fetched if they are not on hand — for a caller that wants
+    // catchmentAt() to answer without turning the layer on. 760 KB, so it is
+    // still nobody's page load: it is asked for by somebody who clicked.
+    ready() { return ensureData(); },
+
     attach(m) {
       map = m;
       if (!m.getPane(PANE)) {

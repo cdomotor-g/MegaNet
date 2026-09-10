@@ -84,6 +84,14 @@ async function reset() {
     state.selectedId = null;
     state.editorId = null;
     clearSearch();
+    // …and the cards that share the map's bottom-left corner. A row click
+    // earlier in this file paints the station card, and the card is 340 px of
+    // an overlay: on the side-by-side layout the Stations tab now opens in, the
+    // map is about 640 px wide and the card covers its centre — which is where
+    // block 6 puts a pin before clicking it. Nothing about the budget is
+    // involved, so "reset" has to mean the map is clear as well as the card.
+    closeStnCard(false);
+    MapHere.close();
   });
   await page.waitForTimeout(80);
 }

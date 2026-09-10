@@ -14,13 +14,27 @@
 // flat by a base map. Same URL, same datum, same attribution — said in both
 // places rather than reached for.
 //
-// ── Why a tile layer and not an overlay ──────────────────────────────────────
-// Every other terrain feature in this app answers a question about one path or
-// one box: the profile, the LOS sweep, the fade margins, the coverage plot.
-// This answers the question you have before any of those — "what does this
-// country look like" — and that is a *base* map, not something drawn over one.
-// It goes in makeBaseLayers() with OSM-Topo, Satellite and Dark, is one radio
-// in the same picker, and every one of the seven Leaflet maps gets it at once.
+// ── Why an overlay and not a base map (#186) ─────────────────────────────────
+// It shipped as a base map, one radio beside OSM-Topo, Satellite and Dark, on
+// the reasoning that "what does this country look like" is the question you
+// have before you draw anything on it. That reasoning was sound and the answer
+// was still wrong, for a reason a radio button cannot express: **the ground and
+// the place names are not alternatives.** Picked as a base, the ramp took the
+// localities, the roads and the watercourses with it, so the operator who
+// wanted to see which of two hills a site sits on lost the names of both.
+//
+// So it is an overlay now, on the Stations map's Map display panel with an
+// opacity slider — the control that makes the two readings one picture instead
+// of a choice between them. It draws just above the base tiles and *below* the
+// place-name layers that ride along with Satellite and Dark (pane 245, under
+// mnBaseLabels' 250), so on those two bases the names stay crisp over the wash;
+// on OSM-Topo the names are baked into the tiles and the slider is the whole of
+// the answer.
+//
+// The cost, stated rather than discovered: the other six maps had this in their
+// picker and no longer do. Map display is the Stations map's own panel, and a
+// second copy of the switch in the shared base picker would be two controls for
+// one layer.
 //
 // The layer is L.TileLayer with createTile overridden to return a <canvas>
 // rather than an <img>. Everything else about a tile layer — the tile grid,
@@ -232,15 +246,87 @@ const MapElevation = (function () {
     return ElevationLayer;
   }
 
+  // ── The overlay, on one map at a time ──────────────────────────────────────
+  // The Stations map is the one with a Map display panel to switch it from, and
+  // the layer is per-map like every other overlay in this app: attached when
+  // the map is built, taken down with it.
+  const PANE   = 'mnElevation';
+  // Above the base tiles (200) and below the place-name layers that ride with
+  // Satellite and Dark (mnBaseLabels, 250) — see the note at the top. Well
+  // under the 320–350 band the other overlays share (map-survey.js documents
+  // it), because this is ground rather than anything drawn on it.
+  const PANE_Z = 245;
+
+  let map = null, overlay = null;
+
+  function sync() {
+    if (!map) return;
+    if (state.mapElev) {
+      if (!overlay) {
+        if (!map.getPane(PANE)) map.createPane(PANE).style.zIndex = PANE_Z;
+        overlay = new (layerClass())({ pane: PANE, opacity: state.mapElevOpacity });
+      }
+      if (!map.hasLayer(overlay)) overlay.addTo(map);
+      overlay.setOpacity(state.mapElevOpacity);
+    } else if (overlay) {
+      overlay.remove();
+      overlay = null;
+    }
+  }
+
   return {
     RAMP,
     attribution: ATTRIB,
 
-    // The name this base map answers to in the picker. One string, so the
-    // picker's extras block and makeBaseLayers cannot drift apart.
+    // The name it answers to. Kept as an export because the Map Generator reads
+    // it to say which base maps it does *not* offer.
     NAME: 'Elevation',
 
     layer(opts) { return new (layerClass())(opts); },
+
+    attach(m) { map = m; sync(); },
+
+    detach() {
+      if (overlay) overlay.remove();
+      overlay = null;
+      map = null;
+    },
+
+    active() { return !!state.mapElev; },
+
+    // Off by default and remembered, on MapContours' terms rather than
+    // MapSurvey's: it fetches a tile per screenful of terrain the moment it is
+    // on, so a cold page load has to cost nothing.
+    setEnabled(on) {
+      state.mapElev = !!on;
+      try { localStorage.setItem('mn-map-elev', on ? 'on' : 'off'); } catch (_) {}
+      sync();
+      rerenderMapDisplayControls();
+      rerenderMapLegend();
+    },
+
+    // The whole point of it being an overlay: how much of the ground you want
+    // against how much of the map under it. Applied in place — the tiles are
+    // already drawn, and opacity is a style rather than a redraw.
+    setOpacity(v) {
+      const n = Math.max(0.1, Math.min(1, Number(v) || 0));
+      state.mapElevOpacity = n;
+      try { localStorage.setItem('mn-map-elev-opacity', String(n)); } catch (_) {}
+      if (overlay) overlay.setOpacity(n);
+    },
+
+    opacity() { return state.mapElevOpacity; },
+
+    noteHtml() {
+      if (!state.mapElev) {
+        return 'Ground height as colour, over whichever base map is picked — the slider decides '
+             + 'which of the two you are mostly looking at.';
+      }
+      return `Painted at <strong>${Math.round(state.mapElevOpacity * 100)}%</strong> over the base
+              map. Heights are above the EGM96 geoid, ~30 m sampling; the bands are the Radio
+              Mobile colour file's own. On Satellite and Dark the place names draw over the top
+              of it — on OSM-Topo they are in the tiles, so the slider is what brings them back.`;
+    },
 
     // The hex a height is painted, for anything that wants to agree with this
     // ramp without drawing tiles — the peak markers, a legend, a key.

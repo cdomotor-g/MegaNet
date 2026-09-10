@@ -152,8 +152,14 @@ await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0,
   null, { timeout: LOAD_TIMEOUT });
 await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: LOAD_TIMEOUT });
 
-// ── 1. the elevation base map ───────────────────────────────────────────────
-console.log('\nThe elevation base map');
+// ── 1. the elevation overlay ────────────────────────────────────────────────
+// It was a base map until #186 and is an overlay with an opacity slider now:
+// picked as a base it took the localities, the roads and the watercourses with
+// it, and the ground and the place names are not alternatives. What is asserted
+// is unchanged apart from where it lives — the ramp, the painting, the relief
+// switch — plus the two things being an overlay is *for*: it is out of the base
+// picker, and it draws under the place-name layers rather than over them.
+console.log('\nThe elevation overlay');
 
 const ramp = await page.evaluate(() => ({
   stops: MapElevation.RAMP.map(b => [b.m, b.hex.toLowerCase()]),
@@ -177,7 +183,7 @@ ok('every height carries the colour the file gives it',
    JSON.stringify(ramp.stops));
 ok('the sea is blue and the tops are pale — the ramp is not upside down',
    ramp.stops[0][1] === '#0000ff' && ramp.stops[11][1] === '#ffff80');
-ok('Elevation is one of the shared base maps', ramp.names.includes('Elevation'),
+ok('Elevation is no longer one of the base maps', !ramp.names.includes('Elevation'),
    ramp.names.join(', '));
 for (const [m, hex] of ramp.at) {
   const band = WANT.filter(([h]) => m >= h).pop() || WANT[0];
@@ -189,34 +195,55 @@ ok('the key is drawn highest band first', ramp.legendTop === '#FFFF80',
 // Selecting it has to actually paint: a canvas tile on the map is proof that
 // createTile ran, the terrarium PNG decoded and getImageData was allowed.
 const painted = await page.evaluate(async () => {
-  const panel = [...document.querySelectorAll('.mn-mapctl[data-panel="basemap"] input[type="radio"]')]
-    .find(r => r.value === 'Elevation');
-  if (!panel) return { picked: false };
-  panel.checked = true;
-  panel.dispatchEvent(new Event('change', { bubbles: true }));
+  MapElevation.setEnabled(true);
   // Leaflet puts the tile element in the DOM before createTile has finished
   // with it, so "a canvas exists" is not "a canvas has been painted" — the
   // wait is for a pixel with something in it, on any of them.
   const until = Date.now() + 20000;
+  const pane = () => document.querySelector('.leaflet-mnElevation-pane');
+  const key = () => document.querySelector('#map-display-block .elev-ramp');
+  const slider = () => document.querySelector('#map-display-block input[aria-label="Elevation shading opacity"]');
   while (Date.now() < until) {
     const cv = [...document.querySelectorAll('.mn-base-elev canvas.leaflet-tile')];
     for (const c of cv) {
       const d = c.getContext('2d').getImageData(4, 4, 1, 1).data;
       if (d[3] === 255) {
-        return { picked: true, tiles: cv.length, px: [d[0], d[1], d[2], d[3]],
-                 extraShown: !document.querySelector('.mn-base-elev-extra').hidden };
+        return { tiles: cv.length, px: [d[0], d[1], d[2], d[3]],
+                 inPane: !!pane() && pane().contains(c),
+                 paneZ: pane() ? Number(getComputedStyle(pane()).zIndex) : null,
+                 labelZ: (() => { const p = document.querySelector('.leaflet-mnBaseLabels-pane');
+                                  return p ? Number(getComputedStyle(p).zIndex) : null; })(),
+                 key: !!key(), slider: !!slider(),
+                 opacity: MapElevation.opacity() };
       }
     }
     await new Promise(r => setTimeout(r, 200));
   }
   const cv = document.querySelectorAll('.mn-base-elev canvas.leaflet-tile');
-  return { picked: true, tiles: cv.length, px: null,
-           extraShown: !document.querySelector('.mn-base-elev-extra').hidden };
+  return { tiles: cv.length, px: null, inPane: false, paneZ: null, labelZ: null,
+           key: !!key(), slider: !!slider(), opacity: MapElevation.opacity() };
 });
-ok('picking Elevation puts canvas tiles on the map', painted.tiles > 0, `${painted.tiles} tile(s)`);
+ok('switching the overlay on puts canvas tiles on the map', painted.tiles > 0, `${painted.tiles} tile(s)`);
 ok('the tiles are painted, not blank', !!painted.px && painted.px[3] === 255,
    JSON.stringify(painted.px));
-ok('its relief switch and key appear with it', painted.extraShown === true);
+ok('they are in a pane of their own, not the base layer', painted.inPane, JSON.stringify(painted));
+// The whole point of the move: on Satellite and Dark the place names ride in
+// mnBaseLabels, and they have to stay *over* the wash or the ground has taken
+// the names with it again.
+ok('drawn under the place-name layers, which is why it stopped being a base',
+   painted.paneZ != null && painted.labelZ != null && painted.paneZ < painted.labelZ,
+   `${painted.paneZ} < ${painted.labelZ}`);
+ok('its opacity slider and key are in the Map display panel',
+   painted.slider && painted.key, JSON.stringify(painted));
+ok('and it opens at less than full strength, so the base is still readable',
+   painted.opacity > 0 && painted.opacity < 1, String(painted.opacity));
+
+const opacity = await page.evaluate(() => {
+  MapElevation.setOpacity(0.3);
+  return { now: MapElevation.opacity(), stored: localStorage.getItem('mn-map-elev-opacity') };
+});
+ok('the opacity is remembered', opacity.now === 0.3 && Number(opacity.stored) === 0.3,
+   JSON.stringify(opacity));
 
 const relief = await page.evaluate(() => {
   MapElevation.setRelief(false);
@@ -227,11 +254,7 @@ const relief = await page.evaluate(() => {
 ok('the relief switch is remembered', relief.off === 'off' && relief.on === 'on' && relief.now === true,
    JSON.stringify(relief));
 
-await page.evaluate(() => {
-  const r = [...document.querySelectorAll('.mn-mapctl[data-panel="basemap"] input[type="radio"]')]
-    .find(x => x.value === 'OSM-Topo');
-  if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
-});
+await page.evaluate(() => MapElevation.setEnabled(false));
 
 // ── 2. the highest ground in view ───────────────────────────────────────────
 console.log('\nThe highest ground in view');

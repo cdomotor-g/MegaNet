@@ -74,6 +74,11 @@ function check(name, pass, detail = '') {
 // enough patch that both kinds of backbone path and a fan of field links are
 // on screen at one zoom.
 const VIEW = { lat: -26.66, lon: 150.19, zoom: 10 };
+// map-arrows.js's own MIN_ZOOM. Written here rather than read off the module,
+// because "the arrows start somewhere" is not the claim — the claim is that
+// they start at a zoom where direction is a question somebody is asking, and a
+// check that read the constant would agree with any answer.
+const MIN_ARROW_ZOOM = 10;
 
 const server = await startServer();
 const browser = await launchBrowser();
@@ -427,6 +432,23 @@ try {
   await page.evaluate(() => MapChrome.setPinned('display', false));
 
   // ── 9. Side by side ──────────────────────────────────────────────────────
+  // The default since the follow-up to #186 — the single column put the map's
+  // own answer below the fold, so reading it cost the map. The check drives it
+  // the other way round: it opens split, and the assertion about the stacked
+  // shape is made by switching it off.
+  const mapId = await page.evaluate(() => { state.map.__probe = 'same'; return true; });
+  const opened = await page.evaluate(() => ({
+    split: state.mapSplit,
+    onClass: document.getElementById('stations-main').classList.contains('is-split'),
+    // One scroll region, not three: the columns scroll, the page does not.
+    docScrolls: document.documentElement.scrollHeight > window.innerHeight + 1,
+  }));
+  check('the tab opens side by side', opened.split && opened.onClass, JSON.stringify(opened));
+  check('…and the page itself does not scroll behind the two columns that do',
+    !opened.docScrolls, JSON.stringify(opened));
+
+  await page.evaluate(() => toggleStationsSplit(false));
+  await page.waitForTimeout(500);
   const before = await page.evaluate(() => {
     const main = document.getElementById('stations-main');
     return {
@@ -437,10 +459,9 @@ try {
       mapObj: !!state.map,
     };
   });
-  check('the tab opens as one column, with no divider on screen',
+  check('switched off it is one column, with no divider on screen',
     !before.split && !before.bar && before.mapW > before.mainW * 0.9, JSON.stringify(before));
 
-  const mapId = await page.evaluate(() => { state.map.__probe = 'same'; return true; });
   await page.evaluate(() => toggleStationsSplit(true));
   await page.waitForTimeout(600);
   const split = await page.evaluate(() => {
@@ -519,6 +540,151 @@ try {
   }));
   check('and switching back stacks it again, still the same map',
     stacked.mapW >= before.mapW - 2 && !stacked.bar && stacked.sameMap, JSON.stringify(stacked));
+  await page.evaluate(() => toggleStationsSplit(true));
+  await page.waitForTimeout(500);
+
+  // ── 10. The arrows are a function of the zoom ────────────────────────────
+  // Fixed-size marks buried a dense network at a whole-state view and were too
+  // small to read at the zoom the question is actually asked at. Measured as
+  // ink on the arrow canvas — the property this is about is what is on screen,
+  // and "draw() ran" is not that.
+  const ARROW_VIEW = { lat: -26.66, lon: 150.19 };
+  const inkAt = async (z) => {
+    await page.evaluate((v) => state.map.setView([v.lat, v.lon], v.z, { animate: false }),
+      { ...ARROW_VIEW, z });
+    await page.waitForTimeout(700);
+    return page.evaluate(() => {
+      const c = document.querySelector('.mn-arrow-canvas');
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let ink = 0, n = 0;
+      for (let i = 3; i < d.length; i += 4) { n++; if (d[i] > 8) ink++; }
+      return { zoom: state.map.getZoom(), drawing: MapArrows.drawing(), pct: 100 * ink / n };
+    });
+  };
+  const far  = await inkAt(MIN_ARROW_ZOOM - 1);
+  const near = await inkAt(MIN_ARROW_ZOOM);
+  check('below the arrow zoom nothing is drawn at all — not small, none',
+    !far.drawing && far.pct === 0, JSON.stringify(far));
+  check('…and at it they are on the map', near.drawing && near.pct > 0, JSON.stringify(near));
+  // The mark itself grows with the zoom, and closes up. Read off the module's
+  // own ramp rather than off total ink: the number of links in view falls as
+  // you zoom in, so ink would measure both effects at once and could not tell
+  // "bigger marks" from "fewer links".
+  const ramp = await page.evaluate(async () => {
+    const at = async z => {
+      state.map.setView([-26.66, 150.19], z, { animate: false });
+      await new Promise(r => setTimeout(r, 500));
+      return MapArrows.scale();
+    };
+    return { far: await at(10), mid: await at(12), near: await at(15), over: await at(16) };
+  });
+  check('the marks grow with the zoom, and close up as they do',
+    ramp.far.head < ramp.mid.head && ramp.mid.head < ramp.near.head
+      && ramp.far.spacing > ramp.mid.spacing && ramp.mid.spacing > ramp.near.spacing,
+    JSON.stringify(ramp));
+  check('…and stop growing once they are full size',
+    ramp.over.head === ramp.near.head && ramp.over.spacing === ramp.near.spacing,
+    JSON.stringify({ near: ramp.near, over: ramp.over }));
+
+  // ── 11. A backbone path's arrows are black ──────────────────────────────
+  // The backbone's identity on this map *is* the black line, and a chevron in
+  // the channel colour over it reads as a field link.
+  await page.evaluate(() => state.map.setView([-26.66, 150.19], 10, { animate: false }));
+  await page.waitForTimeout(700);
+  // The field links come off the map first, so the only arrowheads on the
+  // canvas are the backbone's. With them on, a fan of field links crosses this
+  // one and their arrows land in the same few pixels — which is a true fact
+  // about the picture and a useless one for this assertion.
+  await page.evaluate(() => { state.mapShowLinks = false; refreshMapLayers({ skipFit: true }); });
+  await page.waitForTimeout(800);
+  const black = await page.evaluate(() => {
+    const hex = c => {
+      const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(c).trim());
+      return m ? [1, 2, 3].map(i => parseInt(m[i], 16)) : null;
+    };
+    const size = state.map.getSize();
+    // A backbone path with both ends on screen, so the mark positions are
+    // known: MapArrows puts a two-way path's heads at 14% and 86% along it.
+    const bb = state.mapLines.find(l => {
+      if (l.mnLinkRole !== 'backbone' || l.mnArrowDir !== 'both') return false;
+      const ll = l.getLatLngs();
+      return ll.every(p => {
+        const q = state.map.latLngToContainerPoint(p);
+        return q.x > 40 && q.y > 40 && q.x < size.x - 40 && q.y < size.y - 40;
+      });
+    });
+    if (!bb) return { found: false };
+    const ll = bb.getLatLngs();
+    const a = state.map.latLngToContainerPoint(ll[0]);
+    const b = state.map.latLngToContainerPoint(ll[1]);
+    const x = a.x + (b.x - a.x) * 0.86, y = a.y + (b.y - a.y) * 0.86;
+    const cv = document.querySelector('.mn-arrow-canvas');
+    const dpr = cv.width / size.x;
+    const r = 9;
+    const d = cv.getContext('2d').getImageData(
+      Math.round(x * dpr) - r, Math.round(y * dpr) - r, r * 2, r * 2).data;
+    const core = hex(bb.options.color);
+    let dark = 0, coloured = 0, any = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 40) continue;
+      any++;
+      if (d[i] < 70 && d[i + 1] < 70 && d[i + 2] < 70) dark++;
+      if (core && Math.abs(d[i] - core[0]) < 40 && Math.abs(d[i + 1] - core[1]) < 40
+               && Math.abs(d[i + 2] - core[2]) < 40) coloured++;
+    }
+    return { found: true, core: bb.options.color, any, dark, coloured };
+  });
+  // Read off the arrow canvas at the mark's own position: the line under it is
+  // the channel colour, so "black there" can only be the arrowhead.
+  check('a backbone path\'s arrowheads are drawn black, not in the channel colour',
+    black.found && black.any > 0 && black.dark > 0 && black.coloured === 0,
+    JSON.stringify(black));
+  await page.evaluate(() => { state.mapShowLinks = true; refreshMapLayers({ skipFit: true }); });
+  await page.waitForTimeout(600);
+
+  // ── 12. What is here ────────────────────────────────────────────────────
+  const here = await page.evaluate(async () => {
+    MapHere.arm(true);
+    const armed = MapHere.armed();
+    state.map.fire('click', { latlng: L.latLng(-26.66, 150.19),
+                              originalEvent: new MouseEvent('click') });
+    await new Promise(r => setTimeout(r, 2500));
+    const el = document.getElementById('here-card');
+    return {
+      armed,
+      disarmed: !MapHere.armed(),
+      shown: !el.hidden,
+      pin: !!document.querySelector('.mn-here'),
+      text: el.textContent.replace(/\s+/g, ' '),
+      stnCardShut: !state.stnCard.id,
+    };
+  });
+  check('the tool arms, and the click that answers it disarms it again',
+    here.armed && here.disarmed, JSON.stringify({ a: here.armed, d: here.disarmed }));
+  check('a pin lands on the point and the card opens', here.shown && here.pin,
+    JSON.stringify({ shown: here.shown, pin: here.pin }));
+  // The rows that need no network, which are the ones this harness can see.
+  for (const row of ['Wind region', 'Drainage basin', 'Maintenance hub',
+                     'Nearest station', 'Nearest repeater', 'Nearest survey mark']) {
+    check(`the card answers "${row}"`, here.text.includes(row), here.text.slice(0, 120));
+  }
+  check('…and it names a real basin and a real hub rather than a placeholder',
+    /Balonne|Condamine|Basin|basin/.test(here.text) && /Hub/.test(here.text),
+    here.text.slice(0, 200));
+  // Every row that cannot be answered says so rather than showing nothing: the
+  // terrain and cover services are off-origin and this harness blocks them.
+  check('an answer it cannot reach is named as unavailable, not left blank',
+    /no terrain tile|unavailable/.test(here.text), here.text.slice(0, 200));
+  check('opening it closes the station card — one card in that rectangle',
+    here.stnCardShut, String(here.stnCardShut));
+
+  const closed = await page.evaluate(() => {
+    MapHere.close();
+    return { shown: !document.getElementById('here-card').hidden,
+             pin: !!document.querySelector('.mn-here') };
+  });
+  check('closing it takes the card and the pin', !closed.shown && !closed.pin,
+    JSON.stringify(closed));
 
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {

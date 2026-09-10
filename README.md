@@ -791,10 +791,12 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Click a station to see its full detail panel
 - Filter map display by role, sensor type, radio network, region, basin/council or data completeness (see *Filtering & Exploration*)
 - Pull the repeaters that carry a matched station onto the map and into the table with it (*Include related repeaters*)
-- Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Limit link length*)
+- Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Limit link/path length*)
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
-- Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop
-- Put the map and the station list side by side, with a divider that drags
+- Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
+- Map and station list side by side by default, with a divider that drags
+- **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub and nearest station, repeater and survey mark
+- Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
 - Light up the watercourses whose names match the filter box, drawn beneath the pins from OpenStreetMap (*Highlight matching rivers*)
 - Draw and measure over the map: pins, lines, circles, rectangles and text, placed by hand or by coordinates and km, in a colour of your choosing
@@ -897,7 +899,7 @@ list to *see* a station and back up again was what this replaces. It is the
 map's own memory of what you were last looking at: a filter keystroke rebuilds
 every marker and takes the callout with it, and the card stays; selecting a row
 paints it too, which is also the keyboard's way onto a map whose pins are
-canvas. *Edit station ↓* on it selects the station and is the first thing in
+canvas. *Station details ↓* on it selects the station and is the first thing in
 the app that scrolls the editor into view. The callout on the pin shrank to
 match — name, roles, `Stn #N · elevation`, and one *Actions (N) ▾* button that
 opens the pills, remembered for the session once pressed — because the callout
@@ -940,7 +942,11 @@ read than none of it.
 It filters what is *drawn* and changes nothing about what is *on* — a hidden
 switch is still doing whatever it was doing, and the "nothing matches" line says
 so — and the term survives the panel redrawing itself, which it does whenever one
-of its own switches moves.
+of its own switches moves. The panel also opens **as tall as the map**, so there
+is something for the find box to filter: every flyout on every map is now capped
+against the map's own height rather than against a share of the viewport, which
+is the only figure that is right in the page, on a phone, in full screen and in
+the side-by-side split at once.
 
 **Full screen.** The ⛶ button in the map's top-right corner, under the four
 panel icons, fixes the map's panel to the viewport — the match note, the ACMA
@@ -954,21 +960,30 @@ panel and removing it later never moves or rebuilds the map at all. Full
 screen is something an operator is doing, not a preference, so it lasts the
 session and is not remembered.
 
-**Side by side.** The ◫ button beside it splits the tab into two columns: the
-map on the left, and everything normally under it — the filters, the station
-list, the path tools, the editor — on the right, each column its own scroller at
-the height of the viewport, with a divider between them that drags. That is the
-whole point of it: the map stays in view while the list under it is read. The
-divider can be dragged with a pointer or moved with the arrow keys (it is a real
-ARIA separator with a value on it, and Home/End take it to either limit), and
-where it was left is remembered.
+**Side by side, and it is how the tab opens.** The map on the left, and
+everything normally under it — the filters, the station list, the path tools,
+the details card — on the right, each column its own scroller at the height of
+the viewport, with a divider between them that drags. That is the whole point of
+it: the map stays in view while the list under it is read. ◫ beside ⛶ switches
+back to the stack. The divider can be dragged with a pointer or moved with the
+arrow keys (it is a real ARIA separator with a value on it, and Home/End take it
+to either limit), and where it was left is remembered.
+
+> The height of those two columns is *measured*, not computed from tokens. The
+> first version guessed `calc(100dvh - var(--mn-chrome) - 2rem)`, which missed
+> `#main-content`'s own padding and the gap above the panel, and left the **page**
+> scrolling behind two columns that were each already scrolling — three scroll
+> regions where there should be one. It is now taken from where the container
+> actually starts, and then corrected once against whatever the document
+> overflows by, because what is *below* the columns cannot be measured from
+> above them.
 
 This is not #165's filter rail coming back. What sat beside the map then was the
 map's *settings*, which had to be scrolled past to reach the map; what sits
 beside it now is the map's *answer* — the list of what matched, the card of what
-is selected, the profile of the path just clicked. It is off on a first visit,
-remembered once set, and folds back to the single column below 1100 px without
-touching the setting: two 400 px columns are two things too narrow to read
+is selected, the profile of the path just clicked. It is on by default,
+remembered once changed, and folds back to the single column below 1100 px
+without touching the setting: two 400 px columns are two things too narrow to read
 rather than two things in view, and a laptop docked to a wide screen finds its
 split again where it left it.
 
@@ -977,24 +992,32 @@ emits — the three children are always there — so switching between the two
 readings moves nothing in the DOM and the Leaflet map keeps its view, its layers
 and its in-flight requests.
 
-**Signal links and *Limit link length*.** Links are drawn from each field station
+**Signal links and *Limit link/path length*.** Links are drawn from each field station
 to every repeater whose pass ranges cover one of its ALERT addresses, which
 across the whole network is 3000-plus lines, many of them running the length of
 the country because two distant sites happen to share an address window.
-*Limit link length* (on by default; it was called *Kill spaghetti* until #186,
+*Limit link/path length* (on by default; it was called *Kill spaghetti* until #186,
 and the new name says what the switch does rather than what the map looks like
-without it) drops any link longer than **Max TX distance** — 70 km by default,
-adjustable from 0 to 600 km, which is the range a VHF hop plausibly covers. The panel says what it is removing ("1537 links drawn · 1604
-over 70 km hidden"), so a link that vanished is never a mystery. Untick it to
-see every path however long, at any distance.
+without it) drops any link longer than **Max TX distance** — 100 km by default,
+adjustable from 0 to 600 km, which is the range a VHF hop plausibly covers. The
+panel says what it is removing ("1809 links drawn · 1332 over 100 km hidden"), so
+a link that vanished is never a mystery. Untick it to see every path however
+long, at any distance.
 
-> The default was 120 km until #164 and is 70 km now, by request. 120 was the
-> *ceiling* — about as far as a VHF hop plausibly reaches — and a map that opens
-> at the ceiling opens as spaghetti: 1938 of 3141 paths drawn. 70 km draws 1537
-> of them and is where the great majority of this network's real hops sit. It
-> also halves the backbone: 183 qualifying pairs at 120 km, 96 at 70. Nothing is
-> lost either way — the slider still runs to 600 km, and *Limit link length* off
-> draws every path however long.
+> The default has moved twice, by request each time, and the figures behind the
+> two moves are the same measurement read from opposite ends. Of 3,141
+> pass-range paths the map draws **1,938 at 120 km, 1,537 at 70 and 1,809 at
+> 100**; the qualifying backbone pairs go **183, 96, 148** with them.
+>
+> 120 was the *ceiling* — about as far as a VHF hop plausibly reaches — and a
+> map that opens at its ceiling opens as spaghetti, which is what took it to 70
+> at #164. 70 then turned out to be the other end of the same argument: it sits
+> inside the real network, and **a hop an operator knows exists and cannot see
+> is a worse failure than a busy map**, because one of them looks like missing
+> data and the other only looks busy. 100 km draws the network that is actually
+> there and still culls 1,332 paths. Nothing is lost at any setting — the slider
+> runs to 600 km, and *Limit link/path length* off draws every path however
+> long.
 
 Each link is drawn twice — a wide white casing underneath and the coloured line
 on top — so it stays legible over satellite imagery and topo shading, where a
@@ -1018,7 +1041,16 @@ terrain and land cover, and until the network has been swept and saved most
 links have no figure and no colour. This network runs on four channels (151.5,
 151.525, 151.95 and 152.4 MHz), and each gets a hue assigned in ascending
 frequency order, so the same channel is the same colour on every load of the
-same file. A field link takes the channel of the repeater at its end, which is
+same file.
+
+**Every hue in that ramp is a cool one, and that is a constraint rather than a
+preference.** A channel number carries no judgement — 151.525 MHz is not worse
+than 151.5 — while orange, amber and red on this map all mean something: a fade
+margin under the threshold, an obstructed path, a repeater whose loss strands a
+station. The first version of the ramp gave 151.525 an amber, and sixty-five
+links around Gatton came out the colour of a problem. So the range is blue
+through violet to magenta, and the hot half of the wheel is left to the layers
+that are actually saying *bad*. A field link takes the channel of the repeater at its end, which is
 not an approximation but the definition — a field station transmits on whatever
 its carrier listens on. A repeater-to-repeater backbone hop takes the first
 end's and names both in the hover text when they differ. The 🔑 legend lists
@@ -1032,6 +1064,18 @@ path points at the base, which is the direction traffic leaves the network. A
 repeater-to-repeater path genuinely runs both ways and is drawn as such — one
 head near each end, pointing outward, and none along the middle — rather than
 being given a direction it hasn't got.
+
+**They are a function of the zoom, and below about zoom 10 they are not drawn at
+all.** Fixed-size marks were wrong at both ends of the range: zoomed out over a
+dense patch the network is a mat of chevrons with the links invisible
+underneath — direction is the one question nobody asks of a whole-state view,
+and the arrows were answering it over the top of the picture somebody wanted —
+while zoomed in, where *which way does this hop run* is exactly the question,
+the same marks are too small to read against a 2.5 px line. So the head, the
+spacing and both stroke widths run on one ramp from zoom 10 to zoom 15 and are
+constant past it, and the legend says so while they are off. A backbone path's
+arrows are black like its dashes: the backbone's identity on this map *is* the
+black line, and a chevron in the channel colour over it reads as a field link.
 
 They are drawn on a canvas of their own rather than as more Leaflet lines, and
 that is not an optimisation but the only shape that works: the marks have to be
@@ -1122,6 +1166,63 @@ sit on a light base and would disappear into a black one, and both laser modes
 want no raster at all. *(CARTO's Dark Matter was the first choice and was
 dropped: its keyless tiles now come back stamped "API KEY REQUIRED" across the
 middle. Esri needs no key and was already serving three of this app's layers.)*
+
+**Elevation shading — an overlay, not a fifth base map.** *Elevation shading*,
+under **Overlay layers** in the 👁️ panel, paints the ground itself in the Radio
+Mobile colour file's twelve height bands: terrarium tiles decoded in the browser,
+the same ones the elevation profile is built on. It shipped as a *base* map, one
+radio beside OSM-Topo, on the reasoning that "what does this country look like"
+is the question you have before you draw anything on it. That reasoning was
+sound and the answer was still wrong, for a reason a radio button cannot
+express: **the ground and the place names are not alternatives.** Picked as a
+base it took the localities, the roads and the watercourses with it, so somebody
+working out which of two hills a site sits on lost the names of both.
+
+So it is an overlay with an **opacity slider** — the control that makes the two
+readings one picture instead of a choice between them — and it draws just above
+the base tiles and *below* the place-name layers that ride along with Satellite
+and Dark, so on those two the names stay crisp over the wash. On OSM-Topo the
+names are baked into the tiles and the slider is the whole of the answer. It
+opens at 65%, off by default and remembered; *Shade the slopes* and the full
+twelve-band key are beside it. Heights are above the EGM96 geoid at ~30 m
+sampling.
+
+> The cost, stated rather than discovered: the other six maps had Elevation in
+> their base picker and no longer do. Map display is the Stations map's own
+> panel, and a second copy of the switch in the shared picker would be two
+> controls for one layer. Say so if you want it back on those maps.
+
+**What is here.** The **ℹ️** button in the map's corner column arms a pick: click
+anywhere and a card in the opposite corner says what the app already knows about
+that point — ground height, land cover, wind region, drainage basin, maintenance
+hub, and the nearest station, repeater and survey mark with the distance and
+bearing to each, every one of them a button that takes you there.
+
+Every fact on that card was already in the app and every one of them was
+reachable only by asking about a *station*. The question that actually arrives on
+a map is the other one: **this hill here, not the site three kilometres away.**
+Siting a new repeater, judging where a road crosses a ridge, working out whose
+hub a complaint belongs to — none of those start from a station, and until this
+tool the only way to ask was to move a pin and read the station card, which
+edits the network to answer a question about the ground.
+
+Three of its rows are deliberately honest about a limit rather than quietly
+weaker than they look:
+
+- **Ground height** is a terrain tile — ~30 m sampling, above the EGM96 geoid.
+  It is *not* AHD and *not* a survey, and a station's own card carries a
+  surveyed figure, so this one names its datum every time. The two must never
+  be read as the same number.
+- **The nearest survey mark** is the nearest mark the survey layer has actually
+  drawn. That layer fetches a viewport at a time past about zoom 12, so with it
+  off or zoomed out there is no answer — and the card says that, and offers to
+  turn the layer on, rather than reporting the nearest of nothing.
+- **Land cover** is a 10 m raster class: a category, not a measurement of the
+  tree in front of you.
+
+The card shares one rectangle with the station card, the ACMA transmitter card
+and the radio-path card, and joins their exclusion — opening any of them closes
+the others.
 
 **Centring a Map Generator sheet on a station.** The **Map Generator** tab —
 the one that turns the network into a printable sheet or a laser plate — frames
@@ -3091,7 +3192,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run maint` | the Council Maintenance Tasks form drawn against the workbook's own filled sheet, read out of the `.xlsx` in `archive/`. Every cell where that sheet differs from the blank template has to be either on screen or named as having no column |
 | `npm run history` | a saved record reading back as the sheet it was written on. The fixture is not a file: the check fills a sheet in, saves it, and serves that document back — so the round trip is what is tested, and the read-only view is compared against the *editable* form's own section list |
 | `npm run movepin` | a station's links and its move-pin mode. The five pills in the callout and in the editor card, the two document searches carrying the *reduced* station name rather than the raw one and asking for both spellings of the words that have two, and the mode armed, dragged **with a real pointer**, read back, cancelled and saved. Smoke sees none of it: a pill row missing two pills and a Save that writes null over a coordinate both open a tab with a clean console |
-| `npm run stncard` | the station card on the map and the callout it turned into a signpost (#175), at a desktop width and at a phone's. A real pin click paints the card without selecting; a filter change destroys the callout and leaves the card; *Edit station ↓* selects and is the one thing that scrolls the editor into view; closing it holds until the next gesture; the three cards that share a rectangle close each other; and at 375 px the callout is two pills that fit inside the map with a finger-sized close button, and *Details* opens the card as a sheet with focus in it. Every one of those failures renders a page that looks right |
+| `npm run stncard` | the station card on the map and the callout it turned into a signpost (#175), at a desktop width and at a phone's. A real pin click paints the card without selecting; a filter change destroys the callout and leaves the card; *Station details ↓* selects and is the one thing that scrolls the details card into view; closing it holds until the next gesture; the three cards that share a rectangle close each other; and at 375 px the callout is two pills that fit inside the map with a finger-sized close button, and *Details* opens the card as a sheet with focus in it. Every one of those failures renders a page that looks right |
 | `npm run itm` | the Longley–Rice port drifting from its reference: 53 losses computed by NTIA's own compiled library — its five published vectors and 48 synthetic profiles across every regime, climate, polarisation and mode of variability — held to 10⁻⁶ dB, intermediates included. Node-only, seconds |
 | `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |
 | `npm run linkbudget` | the link budget card's two ends. Each is found by name, station number, ALERT address or address window — asserted against what the *Stations filter itself* returns for the same term, so the claim is that the card runs the shared matcher rather than a second copy of the rules. Then: the box keeping its caret through a paste, an end armed and filled from a pin click and from a row of the Stations list in its filtered state without selecting it, the three Clear buttons, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute — the same station at both ends, a zero-length path, a term nobody supplied, and a frequency box that cannot say whether it holds an override. Every one of those is a clean console |

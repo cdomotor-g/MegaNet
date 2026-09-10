@@ -5,7 +5,7 @@
 //      *without* selecting the station, by every row selection, and never by
 //      anything passive once it has been closed. It is state, not popup DOM:
 //      a filter keystroke rebuilds every marker and destroys the callout, and
-//      the card has to still be there afterwards. Edit station ↓ on it is the
+//      the card has to still be there afterwards. Station details ↓ on it is the
 //      first thing in the app that scrolls the editor into view.
 //   2. **One card at a time** — this card, the ACMA transmitter card and the
 //      radio-path card share one rectangle. The two older ones never closed
@@ -177,7 +177,7 @@ async function main() {
       rows.stn !== false && rows.elev !== false);
     check('every ALERT id, and the wind region under its own element id',
       rows.ids && rows.wind);
-    check('every action is a pill, Edit station first', rows.allPills && rows.editFirst);
+    check('every action is a pill, Station details first', rows.allPills && rows.editFirst);
     check('in named groups, each its own row — the rules a sighted reader sees',
       rows.grouped);
     check('and every one of them opens with an icon', rows.iconed);
@@ -215,7 +215,7 @@ async function main() {
     await page.evaluate(() => { resetStationFilters(); stationsFilterChanged(); });
     await page.waitForTimeout(450);
 
-    log('\nEdit station ↓ selects, and is the first thing that scrolls to the editor\n');
+    log('\nStation details ↓ selects, and is the first thing that scrolls to the editor\n');
 
     await page.click('#stn-card .mn-edit-station');
     // Smooth scroll — give it a moment to arrive.

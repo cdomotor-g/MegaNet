@@ -263,6 +263,12 @@ const MapHubs = (function () {
     noteHtml,
     hubAt,
 
+    // The boundaries, fetched if they are not on hand — for a caller that wants
+    // hubAt() to be able to answer without turning the layer on. MapWind's
+    // askRegion() is the same arrangement said the other way round: this one
+    // hands back the promise and lets the caller decide what to draw with it.
+    ready() { return ensureData(); },
+
     // Off by default and remembered, on MapCatchments' terms.
     setEnabled(on) {
       state.mapHubs = on;

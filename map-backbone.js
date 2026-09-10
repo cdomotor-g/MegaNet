@@ -428,6 +428,7 @@ const MapBackbone = (function () {
     // this module also serves maps app.js has not dressed with either card.
     if (typeof closeStnCard === 'function') closeStnCard(false);
     if (typeof closeAcmaCard === 'function' && state.acma && state.acma.cardDeviceId) closeAcmaCard(false);
+    if (typeof MapHere !== 'undefined') MapHere.close();
     cur = { kind, aId, bId };
     // The elevation profile follows the drawn line, so the clicked path becomes
     // one. The panel opens BEFORE the line goes in and an existing line is

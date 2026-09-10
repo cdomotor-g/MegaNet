@@ -282,7 +282,7 @@ const HELP = {
       + 'lookup that cannot be made says so and leaves the filtering alone.',
       '<strong>Limit link length</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
-      + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 70 km; '
+      + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 100 km; '
       + 'the <strong>Map display</strong> panel on the map says how many links were drawn and how '
       + 'many were culled, so check that before concluding the path isn\'t there.',
       'The strip belongs to the box the caret is in and goes when focus leaves it — the results '
@@ -300,7 +300,25 @@ const HELP = {
       '<strong>Arrows along the links</strong> show which way the traffic runs — into the repeater '
       + 'that carries a field station, on to the base station from a repeater. A '
       + 'repeater-to-repeater backbone hop runs both ways and is drawn with a head at each end '
-      + 'instead of a row of one-way arrows.',
+      + 'instead of a row of one-way arrows, and a backbone path\'s arrows are black like its '
+      + 'dashes. They are a function of the zoom: nothing at all until about zoom 10, then '
+      + 'growing and closing up as you go in. Out at a whole-state view direction is not the '
+      + 'question anybody is asking, and a mat of chevrons over a dense network is the picture '
+      + 'nobody wanted.',
+      '<strong>Elevation shading</strong>, under <em>Overlay layers</em>, paints the ground itself '
+      + 'in the Radio Mobile colour file\'s twelve height bands — over whichever base map is '
+      + 'picked, with an opacity slider. It was a fifth base map until #186 and that was the '
+      + 'wrong shape: picked as a base it took the localities, the roads and the watercourses '
+      + 'with it, and the ground and the place names are not alternatives. The slider is what '
+      + 'makes them one picture. Heights are above the EGM96 geoid at ~30 m sampling.',
+      'The <strong>ℹ️ What is here</strong> button arms a pick: click anywhere on the map and a '
+      + 'card in the opposite corner says what the app knows about that point — ground height, '
+      + 'land cover, wind region, drainage basin, maintenance hub, and the nearest station, '
+      + 'repeater and survey mark with the distance and bearing to each. Every one of those was '
+      + 'already in the app and every one of them could only be asked about a <em>station</em>; '
+      + 'this asks about the ground, which is the question siting actually starts from. Ground '
+      + 'height there is a terrain tile above the EGM96 geoid, not a surveyed AHD figure like '
+      + 'the one on a station\'s own card, and the card says so every time.',
       '<strong>Backbone paths</strong> are black dashes over the link colour, and they are of two '
       + 'kinds: two '
       + 'repeaters within the <em>Max TX distance</em> whose pass-range windows are open to at '
@@ -314,12 +332,15 @@ const HELP = {
       'The 👁️ <strong>Map display</strong> panel has a <strong>Find a control</strong> box at the '
       + 'top of it. Type into it and the panel filters down to the rows that match — against the '
       + 'label, its note and its tooltip, so "wind", "dB", "contour" and "licence" all land '
-      + 'somewhere. It filters what is drawn and switches nothing off.',
+      + 'somewhere. It filters what is drawn and switches nothing off, and the panel opens as '
+      + 'tall as the map so there is something for it to filter.',
       'The ◫ button beside ⛶ puts the map and everything normally under it '
       + '<strong>side by side</strong>, each its own scroller at the height of the window, with a '
-      + 'divider between them that drags (or moves with the arrow keys). Where you leave the '
-      + 'divider is remembered, and the split folds back to one column on a narrow screen without '
-      + 'forgetting it.',
+      + 'divider between them that drags (or moves with the arrow keys). This is how the tab '
+      + 'opens — the single column put the map\'s own answer below the fold, so reading it cost '
+      + 'you the map — and ◫ switches back to the stack. Where you leave the divider is '
+      + 'remembered, and the split folds back to one column on a narrow screen without forgetting '
+      + 'it.',
       '<strong>Clear filters</strong> also clears the repeater focus — the dim that a click on a '
       + 'repeater pin puts over everything not on its own paths. Both are ways of saying "back to '
       + 'the whole network", so both buttons do both, and both are enabled by a focus even with no '
@@ -412,7 +433,7 @@ const HELP = {
       + 'the full details and every action, without changing the selection — and the callout '
       + 'on the pin is a signpost: name, roles, and an <em>Actions</em> button that opens the '
       + 'pills. The card stays put while callouts come and go, and while the filters change; '
-      + '<em>Edit station ↓</em> on it selects the station and jumps to the editor card below '
+      + '<em>Station details ↓</em> on it selects the station and jumps to its details card below '
       + 'the map. On a phone the callout carries only <em>Details &amp; actions</em> and '
       + '<em>Copy lat, lon</em>, and the card opens as a sheet across the bottom of the map.',
       'The 👁️ <strong>Map display</strong> panel holds more than fits its first screenful — '
@@ -1760,12 +1781,22 @@ const state = {
   mapShowBackbone: true,
   mapHideOthers:  false,   // filter box: highlight matches (default) vs hide the rest
   mapKillSpaghetti: true,  // drop pass-range links longer than mapMaxLinkKm
-  // km. Lowered from 120 at #164, by request: 120 was "about as far as a VHF
-  // hop plausibly reaches", which is the ceiling rather than the working
-  // figure, and a map that opens at the ceiling opens as spaghetti. 70 km is
-  // where the great majority of this network's real hops sit; the slider still
-  // runs to MAX_LINK_KM_CAP for the ones that do not.
-  mapMaxLinkKm:   70,
+  // km. 120 until #164, then 70, and 100 since — by request each time, and the
+  // figures behind the two moves are worth keeping together because they are
+  // the same measurement read twice.
+  //
+  // At 120 km the map draws 1,938 of 3,141 pass-range paths and matches 183
+  // backbone pairs; at 70 km, 1,537 and 96; at 100 km, 1,809 and 148. 120 was
+  // the *ceiling* — about as far as a VHF hop plausibly reaches — and a map
+  // that opens at its ceiling opens as spaghetti, which is what took it to 70.
+  // 70 turned out to be the other end of that argument: it is inside the real
+  // network, and a hop an operator knows exists and cannot see is a worse
+  // failure than a busy map, because one of them looks like missing data.
+  // 100 km draws the network that is actually there and still leaves 1,332
+  // paths culled. Nothing is lost either way — the slider runs to
+  // MAX_LINK_KM_CAP, and Limit link/path length off draws every path however
+  // long.
+  mapMaxLinkKm:   100,
   mapLinkOpacity: 0.8,     // pass-range lines: 0.1–1.0, applied over their casing
   mapLabelMode:   'auto',  // station name labels: 'auto' (fit the viewport) | 'on' | 'off'
   mapRelated:     true,    // pull pass-range-related repeaters in with the matches
@@ -1784,6 +1815,19 @@ const state = {
   // opening state is "zoom in to look them up" and no request is made until
   // somebody actually zooms to a site.
   mapSurvey:      localStorage.getItem('mn-survey') !== 'off',
+  // Ground height as colour, over whichever base map is picked (see
+  // MapElevation, #186). It was a base map until then and is an overlay now,
+  // because the ground and the place names are not alternatives — the opacity
+  // below is what makes them one picture. Off by default and remembered, on
+  // MapContours' terms: it fetches a terrain tile per screenful the moment it
+  // is on, so a cold page load has to cost nothing.
+  mapElev:            localStorage.getItem('mn-map-elev') === 'on',
+  // How much of the ground against how much of the map under it. 0.65 rather
+  // than 1: the reason it stopped being a base map is that a full-strength
+  // ramp takes the localities and the roads with it, so the figure it opens at
+  // has to be one you can still read a name through.
+  mapElevOpacity:     Math.max(0.1, Math.min(1,
+                        Number(localStorage.getItem('mn-map-elev-opacity')) || 0.65)),
   // LiDAR contour lines (see MapContours, #121). Off by default and not
   // persisted, for MapSurvey's reasons; the interval is the 5 m default
   // SoRT's experience picked as the sane fast one.
@@ -1868,10 +1912,15 @@ const state = {
   // toggleStationsSplit, app.js). Remembered, unlike full screen, and for the
   // opposite reason: this is not something an operator is doing right now, it
   // is which of two readings of the tab they prefer, and a preference that has
-  // to be re-made on every visit is not one. Off on a first visit — the single
-  // column is the shape the tab was designed in, and it is the only one that
-  // fits a laptop screen without either half being cramped.
-  mapSplit:       localStorage.getItem('mn-map-split') === 'on',
+  // to be re-made on every visit is not one.
+  //
+  // **On by default**, by request. The single column was the shape the tab was
+  // designed in and it is the shape that puts the map's own answer — what
+  // matched, what is selected, the path just clicked — below the fold, so
+  // reading it costs the map. Below `lg` the layout folds back to one column
+  // whatever this says, so the default is only ever the default on a screen
+  // wide enough to hold both halves.
+  mapSplit:       localStorage.getItem('mn-map-split') !== 'off',
   // Where the divider sits, as a percentage of the row given to the map. 58 by
   // default: the map is the half being *looked* at and the list beside it is
   // being read a row at a time, so an even split gives the map less than it

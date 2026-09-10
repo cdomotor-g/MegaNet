@@ -1950,6 +1950,11 @@ function renderStationsHtml() {
                is one map's. State-driven, so it is repainted from initMap()
                after every full render rather than dying with the div. -->
           <div id="stn-card" class="acma-card stn-card" hidden></div>
+          <!-- What is here (#186): the fourth card in this one rectangle, and
+               the only one that is about the ground rather than about something
+               on it. Same dress and same exclusion — opening any of the four
+               closes the others. -->
+          <div id="here-card" class="acma-card stn-card" hidden></div>
          </div>
         </div>
        </div>
@@ -2082,7 +2087,57 @@ function updateChromeHeight() {
   const bar = document.getElementById('mem-bar');
   const h = (hdr ? hdr.offsetHeight : 0) + (bar && !bar.hidden ? bar.offsetHeight : 0);
   document.documentElement.style.setProperty('--mn-chrome', `${h}px`);
+  // The side-by-side split is the other thing whose height is "the viewport,
+  // less whatever is above it", and it is measured here for the same reason:
+  // this function already runs on every resize and every time the memory strip
+  // enters or leaves the layout, which is the whole list of things that move it.
+  syncStationsSplitHeight();
 }
+
+// How tall the side-by-side split may be: from where it starts to the bottom of
+// the window. Measured rather than computed from tokens, and that is the point
+// — the first version guessed `calc(100dvh - var(--mn-chrome) - 2rem)`, which
+// missed #main-content's own padding and the layout gap above the panel, and
+// left the *page* scrolling behind two columns that were each already scrolling.
+// Three scroll regions where there should be one is what "the scroll is a bit
+// funny" describes.
+//
+// The element's own top is the honest figure, whatever the padding above it
+// turns out to be, so nothing here has to be kept in step with the stylesheet.
+function syncStationsSplitHeight() {
+  const main = document.getElementById('stations-main');
+  if (!main) return;
+  if (!state.mapSplit) { main.style.removeProperty('--mn-split-h'); return; }
+  // Document-relative, so a page that happens to be scrolled measures the same.
+  const top = main.getBoundingClientRect().top + window.scrollY;
+  let h = Math.round(window.innerHeight - top - STATIONS_SPLIT_FOOT);
+  main.style.setProperty('--mn-split-h', `${Math.max(360, h)}px`);
+  // …and then check the answer, because what is *below* the columns cannot be
+  // measured from above them: #main-content's own bottom padding, a margin on
+  // the layout, whatever a future breakpoint adds. Whatever the document
+  // overflows by, this element is that much too tall — so take it off and stop.
+  // One correction, not a loop: the second measurement is exact, and a loop
+  // that kept going would be a loop that could not stop on a rounding error.
+  const over = document.documentElement.scrollHeight - window.innerHeight;
+  if (over > 0) {
+    h = Math.max(360, h - over);
+    main.style.setProperty('--mn-split-h', `${h}px`);
+  }
+  // Changing this changes the map's height, and Leaflet caches the container's
+  // size — so a height set without a re-measure leaves the map projecting
+  // against a box it no longer has. Nothing looks wrong: the tiles draw, the
+  // pins draw, and every screen point Leaflet hands back is out by half the
+  // difference, so a click lands somewhere other than what is under the cursor.
+  // The memory strip entering the layout is the case that found it: it is what
+  // calls this a second time, sixteen pixels after the map was built, and
+  // `npm run linkbudget` caught the result as "a click dead on a pin sets an
+  // end" failing on a pin the pointer was dead on.
+  if (h !== lastSplitHeight) {
+    lastSplitHeight = h;
+    invalidateMapSizes(0);
+  }
+}
+let lastSplitHeight = null;
 
 // The filters card's own toggle. A plain button now rather than a <summary>
 // (#181) — see the markup — so the state is not kept for us by the element and
@@ -2197,6 +2252,11 @@ function toggleMapFullscreen(on) {
 // two things in view — and styles.css folds it back to one column there without
 // touching the setting, so a laptop that is docked to a wide screen finds its
 // split again.
+// What is left under the split: the page's own bottom padding. Small, and a
+// figure rather than a measurement because there is nothing below the columns
+// to measure — it is the gap that stops the divider ending flush with the
+// window edge.
+const STATIONS_SPLIT_FOOT = 12;
 const STATIONS_SPLIT_MIN = 25;   // per cent of the width the map may shrink to
 const STATIONS_SPLIT_MAX = 75;   // …and grow to. Both leave the other side usable.
 const STATIONS_SPLIT_STEP = 2;   // one arrow-key press
@@ -2211,6 +2271,9 @@ function toggleStationsSplit(on) {
   if (main) main.classList.toggle('is-split', state.mapSplit);
   const b = document.querySelector('.mn-map-split');
   if (b) syncMapSplitBtn(b);
+  // The height is measured off where the container starts, so it has to be
+  // taken after the class is on — and taken away again when it comes off.
+  syncStationsSplitHeight();
   // No transition on the class, so the container is already its new size.
   invalidateMapSizes(0);
   announce(state.mapSplit
@@ -2409,6 +2472,25 @@ function stationsMapPanels(map) {
     return b;
   };
   split.addTo(map);
+
+  // What is here (#186) — arm it, click the map, and the card in the opposite
+  // corner says what the app knows about that point. A plain corner button for
+  // full screen's reasons; it toggles a *mode* rather than disclosing a panel,
+  // which is what a MapChrome panel is for.
+  const here = L.control({ position: 'topright' });
+  here.onAdd = () => {
+    const b = L.DomUtil.create('button', 'mn-mapctl-btn mn-map-here');
+    b.type = 'button';
+    b.textContent = 'ℹ️';
+    b.setAttribute('aria-pressed', 'false');
+    b.title = 'What is here?';
+    b.setAttribute('aria-label', 'What is here?');
+    L.DomEvent.disableClickPropagation(b);
+    L.DomEvent.on(b, 'click', L.DomEvent.stop);
+    L.DomEvent.on(b, 'click', () => MapHere.arm());
+    return b;
+  };
+  here.addTo(map);
 }
 
 // ── Map display block ────────────────────────────────────────────────────────
@@ -2464,7 +2546,7 @@ function mapDisplayControlsHtml() {
     <label class="filter-check">
       <input type="checkbox" ${state.mapShowLinks ? 'checked' : ''}
              onchange="state.mapShowLinks=this.checked;rerenderMapDisplayControls();refreshMapLayers()">
-      Show signal links
+      Show radio paths / signal links
     </label>
     <label class="filter-range${state.mapShowLinks ? '' : ' is-off'}">
       <span>Link opacity <strong id="link-opacity-val" aria-hidden="true">${Math.round(state.mapLinkOpacity * 100)}%</strong></span>
@@ -2477,7 +2559,7 @@ function mapDisplayControlsHtml() {
     <label class="filter-check">
       <input type="checkbox" ${on ? 'checked' : ''}
              onchange="state.mapKillSpaghetti=this.checked;rerenderMapDisplayControls();refreshMapLayers()">
-      Limit link length
+      Limit link/path length
     </label>
     <label class="filter-range${on ? '' : ' is-off'}">
       <span>Max TX distance <strong id="max-tx-val" aria-hidden="true">${state.mapMaxLinkKm} km</strong></span>
@@ -2490,7 +2572,7 @@ function mapDisplayControlsHtml() {
     <label class="filter-check">
       <input type="checkbox" ${state.mapShowBackbone ? 'checked' : ''}
              onchange="state.mapShowBackbone=this.checked;rerenderMapLegend();refreshMapLayers()">
-      Backbone paths (repeater &amp; base)
+      Backbone links/paths (repeater &amp; base)
     </label>
     <label class="filter-check"
            title="Arrowheads along every drawn link, showing which way the traffic runs — a field station reports in to its repeater, a repeater hands off to a base. A repeater-to-repeater path runs both ways and is drawn with a head at each end.">
@@ -2542,6 +2624,33 @@ function mapDisplayControlsHtml() {
     </div>
     <p class="filter-note" id="map-fade-note">${MapFade.noteHtml()}</p>` : ''}
     <div class="map-display-h">Overlay layers</div>
+    <!-- Ground height as colour (#186). It was a base map until then, one radio
+         beside OSM-Topo — and picked as a base it took the localities, the
+         roads and the watercourses with it. It is over the base now, with the
+         slider that decides which of the two you are mostly looking at. -->
+    <label class="filter-check"
+           title="The ground itself, banded into colours from the Radio Mobile colour file, drawn over whichever base map is picked. Heights are above the EGM96 geoid at ~30 m sampling.">
+      <input type="checkbox" ${state.mapElev ? 'checked' : ''}
+             onchange="MapElevation.setEnabled(this.checked)">
+      Elevation shading (ground height as colour)
+    </label>
+    ${state.mapElev ? `
+    <label class="filter-range">
+      <span>Elevation opacity <strong id="elev-opacity-val" aria-hidden="true">${
+        Math.round(state.mapElevOpacity * 100)}%</strong></span>
+      <input type="range" min="0.1" max="1" step="0.05" value="${state.mapElevOpacity}"
+             aria-label="Elevation shading opacity"
+             aria-valuetext="${Math.round(state.mapElevOpacity * 100)} per cent"
+             oninput="document.getElementById('elev-opacity-val').textContent=Math.round(this.value*100)+'%';this.setAttribute('aria-valuetext',Math.round(this.value*100)+' per cent');MapElevation.setOpacity(+this.value)">
+    </label>
+    <label class="filter-check"
+           title="Hillshade over the band colour — the hue is still the height and nothing else. Off gives the flat banding Radio Mobile draws the same colour file as.">
+      <input type="checkbox" ${MapElevation.relief() ? 'checked' : ''}
+             onchange="MapElevation.setRelief(this.checked)">
+      Shade the slopes
+    </label>
+    ${MapElevation.rampHtml()}` : ''}
+    <p class="filter-note" id="map-elev-note">${MapElevation.noteHtml()}</p>
     <label class="filter-check">
       <input type="checkbox" ${state.mapRivers ? 'checked' : ''}
              onchange="MapRivers.setEnabled(this.checked)">
@@ -2682,6 +2791,9 @@ function mapDisplayRowText(els) {
     out += ' ' + (el.textContent || '');
     if (el.title) out += ' ' + el.title;
     for (const n of el.querySelectorAll('[title]')) out += ' ' + n.title;
+    // A slider's own name is on its aria-label rather than in any text node —
+    // "Elevation shading opacity" is the whole of what that row says out loud.
+    for (const n of el.querySelectorAll('[aria-label]')) out += ' ' + n.getAttribute('aria-label');
   }
   return out.toLowerCase();
 }
@@ -2703,8 +2815,11 @@ function mapDisplayRows(root) {
       groups.push(cur);
       continue;
     }
+    // What belongs to the control above it rather than being a control of its
+    // own: a note, the fade thresholds, the elevation key.
     const trailing = el.classList.contains('filter-note')
-                  || el.classList.contains('map-fade-bands');
+                  || el.classList.contains('map-fade-bands')
+                  || el.classList.contains('elev-ramp');
     if (trailing && cur.rows.length) cur.rows[cur.rows.length - 1].push(el);
     else cur.rows.push([el]);
   }
@@ -2787,6 +2902,7 @@ function mapLinkNoteHtml() {
 // layer is switched.
 function mapLegendOffLayersHtml() {
   const off = [
+    !state.mapElev            && 'Elevation shading',
     !state.mapSurvey          && 'Survey marks',
     !state.mapRivers          && 'River highlighting',
     !state.mapContours        && 'LiDAR contours',
@@ -2930,8 +3046,12 @@ function mapLegendHtml() {
     ${MapArrows.active() ? `
     <span class="legend-item">
       <span class="legend-arrow" aria-hidden="true">➤</span>
-      <span class="small">Arrows run the way the traffic does — into the repeater, and on to the
-        base. A repeater-to-repeater path runs both ways and carries a head at each end</span>
+      <span class="small">${MapArrows.drawing()
+        ? `Arrows run the way the traffic does — into the repeater, and on to the base. A
+           repeater-to-repeater path runs both ways and carries a head at each end; a backbone
+           path's arrows are black, like its dashes`
+        : `Arrows along the links are on, and draw from zoom ${MapArrows.minZoom} in — they grow
+           as you zoom, and are off out here where direction is not the question being asked`}</span>
     </span>` : ''}
     ${MapRivers.active() ? `
     <span class="legend-item">
@@ -2942,6 +3062,12 @@ function mapLegendHtml() {
     <span class="legend-item">
       <span class="legend-dot legend-dot-survey"></span>
       <span class="small">Survey mark / CORS site (Qld Dept of Resources)</span>
+    </span>` : ''}
+    ${MapElevation.active() ? `
+    <span class="legend-item">
+      <span class="legend-sq" style="--dot:${MapElevation.colourAt(600)}"></span>
+      <span class="small">Elevation shading — ground height in the Radio Mobile colour file's
+        twelve bands, keyed in full in 👁️ Map display</span>
     </span>` : ''}
     ${MapContours.active() ? `
     <span class="legend-item">
@@ -3103,6 +3229,8 @@ function stopStationsMap() {
   MapLocate.detach();
   MapMovePin.detach();
   MapArrows.detach();
+  MapElevation.detach();
+  MapHere.detach();
   MapDraw.detach();
   LinkBudget.detach();
   MapRivers.detach();
@@ -3144,6 +3272,10 @@ function initMap() {
   // switchTab(), so it never sees the teardown, and this map is rebuilt on
   // every one of them.
   stopStationsMap();
+  // The remembered figure is about the container that has just been thrown
+  // away, so the next measurement must not be able to match it and skip the
+  // re-measure the new map needs.
+  lastSplitHeight = null;
   const el = document.getElementById('leaflet-map');
   if (!el) return;
   // preferCanvas: with ~3,174 station pins and ~3,141 pass-range link lines,
@@ -3180,6 +3312,18 @@ function initMap() {
   // the arrow canvas, and a schedule with no canvas to draw on is a no-op that
   // never comes back.
   MapArrows.attach(state.map);
+  MapElevation.attach(state.map);
+  // Before MapDraw, for MapMovePin's reason: the tools that take a map click
+  // have to know which map before anybody arms one.
+  MapHere.attach(state.map);
+  // The split is remembered and on by default, so the tab can render straight
+  // into it — and the height it needs cannot be known until the markup is in
+  // the document.
+  //
+  // It re-measures the map when it changes that height, which matters here more
+  // than anywhere: Leaflet caches the container's size at L.map() time, which
+  // is before this line has given the container one.
+  syncStationsSplitHeight();
   MapDraw.attach(state.map);
   LinkBudget.attach(state.map);
   // Before the first refresh, so the fit that refresh performs is the view the
@@ -3749,14 +3893,14 @@ function stationPopupHtml(s) {
 // ARRO id) drops out entirely rather than drawing an empty rule.
 //
 // `edit` adds the station card's own first pill. Only the card has it — the
-// callout is a signpost, and "Edit station ↓" from a balloon over the map is
+// callout is a signpost, and "Station details ↓" from a balloon over the map is
 // a scroll to somewhere the balloon isn't.
 function stationActionGroups(s, { edit = false } = {}) {
   const arroUrl = arroSiteUrl(arroSiteId(s));
   return [
     { label: 'In MegaNet', pills: [
       edit ? `<button type="button" class="pill mn-edit-station" onclick="editStationFromCard('${escAttr(s.id)}')"
-           title="Select this station and jump to the editor card below the map">✏️ Edit station ↓</button>` : '',
+           title="Select this station and jump to its details card below the map">✏️ Station details ↓</button>` : '',
       `<button type="button" class="pill" onclick="focusStation('${escAttr(s.id)}')"
            title="Select this station in the list under the map">🗒️ Show in the list below ↓</button>`,
       `<button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
@@ -4487,6 +4631,7 @@ function showStationCard(id, { takeFocus = false, opener = document.activeElemen
   if (!(card && opener && card.contains(opener))) state.stnCard.opener = opener;
   if (state.acma.cardDeviceId) closeAcmaCard(false);
   MapBackbone.closeCard(false);
+  MapHere.close();
   state.stnCard.id = id;
   repaintStnCard();
   if (takeFocus) {
@@ -4604,7 +4749,7 @@ function stnCardFromPopup(id, e) {
   showStationCard(id, { takeFocus: true });
 }
 
-// "Edit station ↓": the first thing in the app that scrolls the *editor* into
+// "Station details ↓": the first thing in the app that scrolls the *editor* into
 // view. "Show in the list below" lands on the table row, which is right for a
 // list; someone who pressed Edit wants the form, two cards further down, and
 // was scrolling past the list to find it. Out of full screen first — there is
@@ -4702,7 +4847,7 @@ function stnCardHtml(s) {
       ${carriers.length ? `Carried by ${carriers.length} repeater${carriers.length === 1 ? '' : 's'}${selected
         ? ` — <button type="button" class="link-btn" onclick="stnCardScrollToCarriers()">shown under the map ↓</button>` : ''}. ` : ''}
       ${isPhoneNav() ? 'This card does not change the selection' : 'Pin clicks show this card without changing the selection'};
-      <em>Edit station ↓</em> selects it.
+      <em>Station details ↓</em> selects it.
     </p>`;
 }
 
@@ -4715,7 +4860,7 @@ function editorActive() {
 function renderStationEditorCard() {
   if (!editorActive()) {
     return `
-      <div class="panel-header"><h3>Station Editor</h3></div>
+      <div class="panel-header"><h3>Station details</h3></div>
       <p class="small st-note-pad">
         Select a station in the list above to view and edit it, or click
         <em>+ New</em> to add one.
@@ -6138,6 +6283,7 @@ function showAcmaCard(deviceId, anchorId) {
   // without a station card, closeStnCard finds no element and does nothing.
   closeStnCard(false);
   MapBackbone.closeCard(false);
+  MapHere.close();
   const el = document.getElementById('acma-card');
   if (el) {
     el.hidden = false;

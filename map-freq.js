@@ -61,15 +61,24 @@ const MapFreq = (function () {
   // file with more channels colours all of them rather than wrapping onto a
   // colour already in use before it has to.
   //
+  // Every one of them is a cool hue, and that is a constraint rather than a
+  // preference. A channel number carries no judgement — 151.525 MHz is not
+  // worse than 151.5 — while orange, amber and red on this map all mean
+  // something: a fade margin under the threshold, an obstructed path, a
+  // repeater whose loss strands a station. A ramp that spent those on channel
+  // identity would draw a third of the network in the colour of a problem, so
+  // the range is blue through violet to magenta and the hot half of the wheel
+  // is left to the layers that are actually saying *bad*.
+  //
   // Chosen against what else can be on the map at the same time: none of them
   // is the crimson MapLos paints an obstructed path, the red MapBlast paints a
-  // dying one, the blue of a highlighted river or the teal of a survey mark.
-  // They are deliberately saturated — these lines are read over satellite
+  // dying one, the deep blue of a highlighted river or the teal of a survey
+  // mark. They are deliberately saturated — these lines are read over satellite
   // imagery and topo shading, under the same white casing every link carries.
   const TOKENS = ['--map-freq-1', '--map-freq-2', '--map-freq-3', '--map-freq-4',
                   '--map-freq-5', '--map-freq-6', '--map-freq-7', '--map-freq-8'];
-  const FALLBACK = ['#2979ff', '#ff9100', '#d500f9', '#00e5ff',
-                    '#ffea00', '#76ff03', '#b388ff', '#ff4081'];
+  const FALLBACK = ['#2979ff', '#d500f9', '#7c4dff', '#00e5ff',
+                    '#b388ff', '#00b0ff', '#64ffda', '#f48fb1'];
 
   // frequency → resolved colour, plus the repeater count behind each, for the
   // legend. Rebuilt on demand and dropped by reset(); resolved rather than

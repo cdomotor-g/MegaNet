@@ -799,6 +799,29 @@ const MapSurvey = (function () {
     // uses for its own legend entry.
     active() { return !!layer; },
 
+    // The drawn mark nearest a point, with how far away it is — for the
+    // what-is-here card (#186). Deliberately only what is *drawn*: this layer
+    // fetches a viewport at a time past MIN_ZOOM, so "the nearest mark" is
+    // honestly "the nearest one we have", and a caller that says otherwise is
+    // making a claim about ground nobody has asked the service about. Null when
+    // the layer is off, zoomed out, or between fetches, and the card says which.
+    nearest(lat, lon) {
+      let best = null, bestKm = Infinity;
+      for (const p of drawnPoints) {
+        const km = acmaHaversineKm(lat, lon, p.lat, p.lon);
+        if (km < bestKm) { bestKm = km; best = p; }
+      }
+      return best ? { mark: best, km: bestKm } : null;
+    },
+
+    // Open one of those marks' callouts, so the card can hand the reader over
+    // to the layer's own answer rather than restating half of it.
+    show(mark) {
+      if (!map || !mark) return;
+      map.setView([mark.lat, mark.lon], Math.max(map.getZoom(), MIN_ZOOM), { animate: true });
+      openCallout(mark);
+    },
+
     noteHtml,
 
     // Remembered between visits, the way MapRivers is. This layer was

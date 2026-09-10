@@ -117,16 +117,10 @@ function makeBaseLayers() {
       attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS User Community',
       className: 'mn-base-dark', maxZoom: 19,
     }),
-    // ── Elevation ───────────────────────────────────────────────────────────
-    // The ground itself, banded into colours: terrarium tiles decoded in the
-    // browser and painted through the Radio Mobile colour file's twelve
-    // heights. map-elevation.js holds the ramp, the decode and the reasoning;
-    // this is one more entry in the picker, on all seven maps like the rest.
-    //
-    // It is a base rather than an overlay for the same reason Dark is: the
-    // question it answers — what does this country look like — is the one you
-    // have before you draw anything on it, so nothing should be under it.
-    [MapElevation.NAME]: MapElevation.layer(),
+    // Elevation was a fifth entry here until #186 and is an overlay now, on the
+    // Stations map's Map display panel with an opacity slider — see the note at
+    // the top of map-elevation.js. The ground and the place names are not
+    // alternatives, which is the one thing a radio button cannot say.
   };
 }
 
@@ -209,43 +203,49 @@ function addBaseLayers(map) {
       `<p class="filter-note">Satellite and Dark both carry place &amp; road names.
          Dark strips the ground back to near-black so the pins and links are the
          only thing left with any contrast.</p>
-       <div class="mn-base-elev-extra" ${current === MapElevation.NAME ? '' : 'hidden'}>
-         <label class="filter-check">
-           <input type="checkbox" class="mn-elev-relief" ${MapElevation.relief() ? 'checked' : ''}>
-           Shade the slopes
-         </label>
-         <p class="filter-note">Hillshade over the band colour — the hue is still
-           the height and nothing else. Off gives the flat banding Radio Mobile
-           draws the same colour file as. Heights are above the EGM96 geoid,
-           ~30&nbsp;m sampling; the bands are the colour file's own.</p>
-         ${MapElevation.rampHtml()}
-       </div>`,
+       <p class="filter-note">Elevation moved out of this picker at #186: it is an
+         overlay on the 👁️ <strong>Map display</strong> panel now, with an opacity
+         slider, so the ground and the place names can both be on screen.</p>`,
     // A real listener rather than an inline handler: `layers` is this map's own
     // set of tile layers and there is no global to reach it through.
     onMount(body) {
-      const extra = body.querySelector('.mn-base-elev-extra');
       body.addEventListener('change', e => {
-        // The relief switch lives in this panel but is not a base map: it is
-        // MapElevation's own setting, applied to every instance of that layer
-        // on every map at once, so it is answered before the picker is.
-        if (e.target && e.target.classList.contains('mn-elev-relief')) {
-          MapElevation.setRelief(e.target.checked);
-          return;
-        }
         const name = e.target && e.target.value;
         if (!layers[name] || name === current) return;
         map.removeLayer(layers[current]);
         layers[name].addTo(map);
         current = name;
         syncCompanions();
-        if (extra) extra.hidden = name !== MapElevation.NAME;
       });
     },
   });
   // The credit line, off the map and under it. Every map calls addBaseLayers,
   // so every map gets it — which is the point (see mapAttributionBelow).
   mapAttributionBelow(map);
+  // …and how tall a flyout in its corner may be, for the same reason.
+  trackMapHeight(map);
   return layers;
+}
+
+// Publish the map's own height to its container as --mn-map-h, so a control
+// drawn *inside* the map can be capped against the map rather than against the
+// viewport (styles.css, .mn-mapctl-content).
+//
+// The caps were vh figures — 42vh for a flyout — and a vh figure is only ever
+// right for one of the shapes this map takes. The Stations map is min(62vh,
+// 720px) in the page, 52dvh on a phone, the full window in full screen and a
+// column's worth beside the station list in the side-by-side split, and a panel
+// capped at 42vh is a panel with room to spare in two of those and its last
+// control cut off by the map's edge in the others. The map knows its own
+// height; this is how the stylesheet gets to read it.
+function trackMapHeight(map) {
+  const el = map.getContainer();
+  const sync = () => {
+    const h = el.clientHeight;
+    if (h > 0) el.style.setProperty('--mn-map-h', `${h}px`);
+  };
+  map.on('resize', sync);
+  sync();
 }
 
 // ── The credit line, under the map instead of on it ──────────────────────────
