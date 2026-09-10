@@ -334,6 +334,25 @@ emergency state for an app whose data is public anyway.
 Keep a second account owner or a hardware key on the Cloudflare account. A
 single-owner account with one MFA device on one phone is the actual risk here.
 
+### "The site does not load at all on the Bureau network"
+
+Not a login problem, and nothing in this page will fix it: a corporate web filter
+is refusing the name before Access ever sees the request. The signature is that
+it fails the same way for everyone on the Bureau network and works from a phone
+on mobile data.
+
+The cause is mostly the gate itself. Because Access answers *every* path with a
+redirect to `floodwarningnet.cloudflareaccess.com`, a filter's crawler can never
+read a single byte of the site, so the name cannot be categorised — and a login
+form on an unfamiliar domain asking for a `@bom.gov.au` address looks, to a
+scanner, exactly like credential phishing. The evidence, the diagnostics and the
+four things worth doing are in
+[`floodwarning-net.md` → The name is blocked on the Bureau network](floodwarning-net.md#the-name-is-blocked-on-the-bureau-network).
+
+Deleting the Access application would make the site load, and that is worth
+knowing as an emergency lever, but it is treating a categorisation problem by
+removing the perimeter. Try the recategorisation requests first.
+
 ### "I am signed in but Save is refused"
 
 The address is not on `meganet.editor_allow`. The Data source panel says so in

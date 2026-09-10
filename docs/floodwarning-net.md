@@ -3,34 +3,42 @@
 `floodwarning.net` used to point at the FloodLab / ALERT1v3 project. It is being
 recycled: MegaNet takes the name, and FloodLab is retired from it.
 
-This is a runbook, not a description of something already done. **Every step
-below is a dashboard action that needs a human with the Cloudflare account.**
-Nothing in this repository performs it, and nothing in this repository has to
-change for it to work — see "Why no code changes", at the foot.
+This was written as a runbook. **Every step below is a dashboard action that
+needs a human with the Cloudflare account.** Nothing in this repository performs
+it, and nothing in this repository has to change for it to work — see "Why no
+code changes", at the foot.
+
+**Status, 2026-09-10: steps 1 to 4 have been done.** The apex resolves to
+Cloudflare and every request to it is challenged by Access, so what follows is
+now the record of what was done and the thing to read when undoing it, rather
+than a plan. One thing the plan did not anticipate has since turned up: the name
+is blocked on the Bureau network. That has its own section —
+[The name is blocked on the Bureau network](#the-name-is-blocked-on-the-bureau-network).
 
 ---
 
 ## Where the domain actually stands
 
-Measured 2026-08-12, from a resolver with no special access:
+Measured 2026-09-10, from a resolver with no special access:
+
+| Name | Result | What it means |
+|---|---|---|
+| `floodwarning.net` | `104.21.59.35`, `172.67.211.242` | Cloudflare anycast, proxied. Serving. |
+| `www.floodwarning.net` | the same pair | Attached as a second custom domain. |
+| `GET /` on either | **302 → `floodwarningnet.cloudflareaccess.com`** | Access is in front and is challenging. |
+
+Measured 2026-08-12, before the cutover, and kept because it is the state a
+rollback returns to:
 
 | Name | Result | What it means |
 |---|---|---|
 | `floodwarning.net` | resolves NOERROR, **no A/AAAA record** | The zone exists and its nameservers answer. The apex has no address record. |
 | `www.floodwarning.net` | **NXDOMAIN** | No such name at all. |
 
-So **nothing is being served at floodwarning.net today.** Whatever record used to
-send it to FloodLab is already gone.
-
-That is worth knowing before starting, because it changes the risk: this is not a
-cutover of live traffic from one app to another, with a window where users hit
-the wrong thing. It is bringing a dormant name back up, pointed somewhere new.
-There is no traffic to break.
-
-It also means step 1 is not "remove the old record" — it is "find out what state
-the zone is really in", because a zone with no apex record is equally consistent
-with a deleted Pages project, a lapsed integration, or somebody having already
-half-done this.
+Nothing was being served at that point. That is why the cutover below carried no
+risk of interrupting live traffic — there was none to interrupt — and it is why
+the first step was not "remove the old record" but "find out what state the zone
+is really in".
 
 ---
 
@@ -177,6 +185,119 @@ it only if the github.io URL has actually been shared around.
 claiming a custom domain, and with Cloudflare Pages serving the same name it
 produces two services both asserting they own `floodwarning.net`. There is no
 `CNAME` file here today; that is deliberate, and this paragraph is why.
+
+---
+
+## The name is blocked on the Bureau network
+
+Reported September 2026: `floodwarning.net` does not load from a Bureau machine.
+`floodwarning.tech` — an unrelated third party in the same field, Adam Murphy's
+ALERT2 / TDMA tooling — loads fine from the same machine.
+
+That comparison is the useful part, because it rules out the three intuitive
+explanations on its own. Both sites are about flood warning. Both have a login on
+them. Both are hosted offshore on a commodity provider. Whatever the filter is
+reacting to, it is none of those.
+
+Measured 2026-09-10, from outside both networks:
+
+| | `floodwarning.net` | `floodwarning.tech` |
+|---|---|---|
+| `GET /`, signed out | **302 → `floodwarningnet.cloudflareaccess.com`** | **200, 5,912 bytes of real content** |
+| `GET /robots.txt` | 302, to the same login | 200 — `Allow: /`, plus a sitemap |
+| Readable without signing in | **nothing, at any path** | everything but `/dashboard`, `/login`, `/api/`, … |
+| Registered | 2026-02-26 | 2024-08-11 |
+| Before that | **expired, then auctioned on DropCatch.com** (listing seen 2025-10-16) | never dropped |
+| Serving what it serves now since | ~2026-08-28 | 2024 |
+| Hosting | Cloudflare, proxied | Hetzner behind Caddy; Cloudflare for DNS only |
+
+### Why
+
+Ranked by how much of the difference each one explains.
+
+**1. Nothing here is readable, so nothing can classify it.** A web filter
+categorises a name by fetching it. Every path on this domain — `/`,
+`/robots.txt`, even `/favicon.ico` — answers 302 to a login on a *different*
+hostname. A crawler never receives one byte of MegaNet, so the name cannot leave
+**Uncategorised**, and a government SOE commonly default-denies that category.
+Handed the same crawler, `floodwarning.tech` returns a page reading "Open Source
+Flood Warning & Hydrography Projects" and a `robots.txt` pointing at a sitemap,
+and lands somewhere harmless like Technology or Business. It is not that the
+other site argued its way past the filter. It answered the question and this one
+does not.
+
+**2. From the outside, the gate has the exact shape of a phishing kit.** Line the
+facts up as a scanner sees them: a six-month-old domain, bought at expiry
+auction, named after a Bureau statutory function, which redirects instantly to a
+hostname the visitor never asked for, where a form asks for a `@bom.gov.au`
+address and mails back a six-digit code. Every one of those is a
+credential-harvesting indicator and together they are the textbook description of
+one. A brand-impersonation rule would fire on the *name* alone and never so much
+as look at `.tech`, which claims nothing.
+
+**If Bureau security blocked this without knowing what it was, they were right
+to.** That is worth leading with when raising it, rather than treating the block
+as a fault.
+
+**3. `*.cloudflareaccess.com` may be blocked in its own right.** It is
+Cloudflare's Zero Trust product, and several enterprise filters file it under
+Proxy Avoidance / Anonymisers / VPN — it tunnels into private resources, and it
+competes with whatever the agency already runs. If that category is denied, the
+redirect target is refused whether or not `floodwarning.net` itself is.
+
+**4. The domain dropped and was re-caught.** Expiry, auction, re-registration is
+the most common pattern in malicious domain re-use, so filters treat it harshly:
+the registration date resets, which restarts any newly-registered-domain penalty,
+and a previous owner's categorisation can survive the change of hands. What the
+previous owner served is worth finding out and has not been established here —
+archive.org was rate-limiting the lookup when this was written.
+
+**Not the TLD, and not the host.** Both are the obvious guess and both run
+backwards. `.tech` is a new gTLD with a *worse* average reputation than `.net`,
+and some filters deny new gTLDs wholesale; Hetzner has a considerably worse abuse
+reputation than Cloudflare. If either were the mechanism, the other site would be
+the blocked one.
+
+### Telling which, from a Bureau machine
+
+- **Read the block page.** It names the product and almost always the category.
+  One screenshot settles the whole question and makes everything below
+  unnecessary.
+- **Try the three names separately** — `floodwarning.net`,
+  `floodwarningnet.cloudflareaccess.com`, and the `workers.dev` preview from
+  step 2 if it has not been retired yet. The preview serves the same app with no
+  gate in front of it: if it loads and the real name does not, the gate is the
+  cause and the content is not.
+- **`nslookup floodwarning.net`.** An internal address or an NXDOMAIN means DNS
+  filtering — a category feed or a newly-registered-domain list. Getting
+  `104.21.59.35` / `172.67.211.242` back and *then* failing to load means the
+  HTTP proxy.
+
+### What to do about it
+
+1. **Submit recategorisation requests.** Free, and the actual fix. Every vendor
+   takes them — Zscaler Sitereview, FortiGuard, Symantec/Broadcom Sitereview,
+   Palo Alto Test A Site, Netskope, Cisco Talos, Microsoft SmartScreen. Submit
+   `floodwarning.net` **and** `floodwarningnet.cloudflareaccess.com`; the second
+   is the one people forget, and on cause 3 it is the one that matters.
+2. **Give the crawler something to read.** Exempt one page from the Access policy
+   — a public `/about` saying in plain HTML what MegaNet is, who runs it, and
+   that access is restricted to Bureau staff — and leave `/robots.txt` outside
+   the policy too. This is most of why `.tech` is categorised and this domain is
+   not, and it defuses cause 2 as well, because a login stops being the first
+   thing any visitor sees. It costs nothing under option (a): the page says only
+   what this public repository already says.
+3. **Ask Bureau IT to allowlist it**, with the case stated plainly: a
+   Bureau-staff tool, gated to `@bom.gov.au`, whose data is public by decision
+   ([`access.md`](access.md#the-decision-the-data-stays-public-option-a)).
+4. **Longer term, a `bom.gov.au` subdomain** deletes this entire class of
+   problem — no external name to categorise, no impersonation question to answer,
+   no allowlist entry to maintain across filter changes. That is a conversation
+   with the Bureau rather than a configuration change, which is why it is last
+   and not first.
+
+Only (2) is a change anyone can make from here, and even that one is a dashboard
+action against the Access policy rather than a commit.
 
 ---
 
