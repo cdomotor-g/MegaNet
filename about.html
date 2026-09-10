@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>About MegaNet — radio and satcom telemetry network tooling</title>
+  <meta name="description" content="MegaNet is a browser-based planning and maintenance tool for radio and satellite telemetry networks: station records, repeater pass-range analysis, RF interference investigation, ALERT/ALERT2 packet decoding and field inspection forms. An independent open-source project, not an official warning service.">
+  <link rel="canonical" href="https://floodwarning.net/about.html">
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+  <meta name="theme-color" content="#0b5cab">
+
+  <!-- Deliberately self-contained: no stylesheet, no font, no script, no image
+       beyond the icon. This page exists to be read by things that are not a
+       browser on a fast connection — a categorisation crawler, a proxy that
+       fetches a page to decide what it is, somebody on a filtered network where
+       every CDN in styles.css is refused. Anything it had to fetch first is a
+       way for it to arrive blank, and a page that arrives blank is the problem
+       it was written to fix. See docs/floodwarning-net.md. -->
+  <style>
+    :root {
+      --ink: #16202a; --dim: #5a6772; --bg: #ffffff; --panel: #f4f7fa;
+      --line: #d6dee6; --brand: #0b5cab; --link: #0b5cab;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ink: #e6edf3; --dim: #9bacba; --bg: #0d1319; --panel: #151d25;
+        --line: #27333d; --brand: #4a9eff; --link: #6fb4ff;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 2rem 1rem 4rem;
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink); background: var(--bg);
+    }
+    main { max-width: 46rem; margin: 0 auto; }
+    h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .3rem; }
+    h2 { font-size: 1.15rem; margin: 2.4rem 0 .6rem; color: var(--brand); }
+    .lede { font-size: 1.08rem; color: var(--dim); margin: 0 0 2rem; }
+    a { color: var(--link); }
+    ul { padding-left: 1.2rem; }
+    li { margin: .35rem 0; }
+    dt { font-weight: 600; margin-top: .9rem; }
+    dd { margin: .15rem 0 0; color: var(--dim); }
+    .note {
+      background: var(--panel); border: 1px solid var(--line);
+      border-left: 3px solid var(--brand);
+      padding: 1rem 1.15rem; margin: 1.5rem 0; border-radius: 4px;
+    }
+    .note p:first-child { margin-top: 0; }
+    .note p:last-child { margin-bottom: 0; }
+    footer {
+      margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+      color: var(--dim); font-size: .92rem;
+    }
+  </style>
+</head>
+<body>
+<main>
+
+  <h1>MegaNet</h1>
+  <p class="lede">
+    A browser-based tool for planning and maintaining radio and satellite
+    telemetry networks — the field stations that measure rainfall and river
+    levels, the repeaters that relay them, and the radio paths between.
+  </p>
+
+  <p>
+    Environmental telemetry stations sit in catchments and report by radio.
+    A reading leaves a station, is relayed by one or more repeaters, and arrives
+    at a base station. Keeping a network of them working means knowing which
+    repeater serves which station, what path a signal actually takes over the
+    terrain, what else is transmitting nearby, and what was found the last time
+    somebody drove out to the site. MegaNet is where those questions are
+    answered in one place instead of five spreadsheets.
+  </p>
+
+  <p>
+    It runs entirely in the browser. There is no installer and no build step:
+    the application is static files, and the station records live in a Postgres
+    database it reads over HTTP.
+  </p>
+
+  <h2>What it does</h2>
+  <dl>
+    <dt>Stations &amp; networks</dt>
+    <dd>
+      Station records and site photographs, an interactive map with terrain and
+      elevation profiles, repeater pass-range analysis and hop chains, network
+      clustering, printable radio path map sheets, and CSV and Radio Mobile
+      export.
+    </dd>
+
+    <dt>Interference</dt>
+    <dd>
+      Licensed transmitters near a site from the ACMA register, what changed in
+      that register and when, and a workbench for building and scoring an
+      interference case.
+    </dd>
+
+    <dt>Addresses &amp; packets</dt>
+    <dd>
+      ALERT address arithmetic and bit-flip ghosting analysis, a graph of
+      address collisions across a network, and decoders for ALERT, ALERT2 and
+      HFEM telemetry formats.
+    </dd>
+
+    <dt>Telemetry</dt>
+    <dd>
+      Incoming message logs, raw field data, rainfall and level charting, and a
+      serial monitor for talking to a logger on a bench.
+    </dd>
+
+    <dt>Site visits</dt>
+    <dd>
+      Structured inspection forms, site maintenance tasks, and the history of
+      what was recorded at each station over time.
+    </dd>
+  </dl>
+
+  <h2>What it is not</h2>
+  <div class="note">
+    <p>
+      <strong>MegaNet is not a flood warning service, and it does not issue
+      warnings, forecasts or public alerts.</strong> It is engineering tooling
+      for the radio networks that telemetry travels over — an asset register, a
+      path planner and a fault-finding aid. Nothing here should be read as an
+      official statement about flooding, river conditions or public safety.
+    </p>
+    <p>
+      It is also not an official product of, and is not endorsed by, the
+      Australian Bureau of Meteorology or any other agency. It is an
+      independent open-source project that happens to be useful to people who
+      look after these networks. For official Australian flood warnings and
+      river height data, go to
+      <a href="http://www.bom.gov.au/australia/flood/">the Bureau of
+      Meteorology</a>.
+    </p>
+  </div>
+
+  <h2>Reading and editing</h2>
+  <p>
+    Station data is public and can be read with nobody signed in — that is a
+    deliberate decision rather than an oversight, and the reasoning is written
+    down in the repository. Editing is different: saving a change requires a
+    session, and the database itself checks the signed-in address against an
+    editors list on every write. The rules are enforced inside Postgres, not by
+    the page being polite about it.
+  </p>
+
+  <h2>Open source</h2>
+  <p>
+    MegaNet is MIT licensed and developed in the open. The source, the issue
+    tracker and the documentation — including how access and data protection
+    actually work — are on GitHub at
+    <a href="https://github.com/cdomotor-g/MegaNet">cdomotor-g/MegaNet</a>.
+    Questions, bug reports and corrections are welcome there.
+  </p>
+
+  <footer>
+    <p>
+      <a href="/">Open the application</a> &middot;
+      <a href="https://github.com/cdomotor-g/MegaNet">Source on GitHub</a> &middot;
+      <a href="https://github.com/cdomotor-g/MegaNet/issues">Report a problem</a>
+    </p>
+    <p>An independent open-source project. Not an official warning service.</p>
+  </footer>
+
+</main>
+</body>
+</html>

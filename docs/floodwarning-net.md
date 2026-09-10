@@ -298,6 +298,23 @@ instead removes the class of problem:
    fail: an origin nobody anticipated behaves as it always has rather than
    404ing against a route that is not there.
 
+4. **There is something to read at the door.** The block page's stated reason
+   was that the site "has not been categorised", and the app could not have been
+   categorised: it draws itself from JavaScript, so anything that does not run
+   scripts — a categorisation crawler, a proxy deciding what a name is — saw an
+   empty document. Now `index.html` carries a `<meta name="description">`,
+   `about.html` is a self-contained page in plain HTML saying what MegaNet is
+   and what it is not, and `robots.txt` invites the crawl and names a
+   `sitemap.xml`. Deliberately no stylesheet, font, script or CDN on that page:
+   a page that has to fetch something first is a page that can arrive blank, and
+   arriving blank is the fault it exists to fix.
+
+   The "what it is not" half is not boilerplate. This domain is named after a
+   Bureau statutory function, and a reader — or a brand-protection rule — is
+   entitled to wonder. The page says plainly that MegaNet issues no warnings,
+   is not an official Bureau product, and points at the Bureau for the real
+   thing. That is both true and the single most useful sentence on it.
+
 Two things this does not reach, worth knowing before the next report of "it
 does not work from the office":
 

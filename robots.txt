@@ -1,0 +1,28 @@
+# MegaNet — https://floodwarning.net
+#
+# Everything a visitor can see, a crawler may read. That is not indifference:
+# a categorisation feed decides what this site is by fetching it, and a name it
+# cannot classify is a name a filtering proxy denies. This file and /about.html
+# exist so there is an answer to find. See docs/floodwarning-net.md.
+
+User-agent: *
+Allow: /
+
+# Source and working files. Served, because the whole repository is the site and
+# always has been, but they are checked-in SQL, test harnesses and archived HTML
+# rather than pages — noise in an index, and nothing a crawler needs to decide
+# what this is.
+Disallow: /db/
+Disallow: /test/
+Disallow: /tools/
+Disallow: /archive/
+Disallow: /radio-mobile/
+Disallow: /bridge/
+Disallow: /logger/
+Disallow: /worker/
+
+# The one route that is not a file. It answers 401 or 502 to anything without a
+# session and forwards the rest to the database; there is nothing here to index.
+Disallow: /api/
+
+Sitemap: https://floodwarning.net/sitemap.xml
