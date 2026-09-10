@@ -249,6 +249,19 @@
        network's fade margins, computed once and kept somewhere other than this
        browser. Nothing here executes at load either (#154). -->
   <script src="map-fade.js?v=20260902a"></script>
+  <!-- The other link colouring, and the one the map opens with: the channel
+       each hop runs on, read straight off the repeater at its end. It asks for
+       nothing but core.js — no terrain, no datastore, no network — which is why
+       it can be the default where the fade margin cannot. Nothing executes at
+       load, so this position states nothing but that it belongs with the other
+       link colouring (#154). -->
+  <script src="map-freq.js?v=20260902a"></script>
+  <!-- Direction arrowheads along the drawn links, on a canvas of their own.
+       Reads the lines the Stations map has already drawn — their geometry,
+       their colour and their opacity — so it depends on nothing but core.js and
+       Leaflet, and is scheduled from app.js, map-los.js and map-fade.js as each
+       of them repaints a line. Inert at load like the rest (#154). -->
+  <script src="map-arrows.js?v=20260902a"></script>
   <!-- Radio Mobile's Single polar radio coverage. Last of the terrain group
        because it stands on all of it — terrain.js for the elevation grid,
        itm.js for the model, path-profile.js for the radio-system and

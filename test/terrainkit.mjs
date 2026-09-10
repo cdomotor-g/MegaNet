@@ -345,9 +345,15 @@ NOT_COORDS.forEach((t, i) => {
 
 // Typed into the box, a coordinate has to move the map and drop a pin — with
 // no network at all, which is the case a person standing beside a site is in.
+//
+// The box is focused first, and that is not stage-dressing: since #186 the
+// strip belongs to the entry the caret is in and is not drawn for any other, so
+// a value assigned to a box nobody is typing in correctly produces no strip.
+// Focusing is what "typed into the box" means.
 const typed = await page.evaluate(async () => {
   setStationFiltersOpen(true);
   const box = document.getElementById('station-search-0');
+  box.focus();
   box.value = '-26.1234, 152.5678';
   box.dispatchEvent(new Event('input', { bubbles: true }));
   await new Promise(r => setTimeout(r, 400));
@@ -368,6 +374,7 @@ ok('…naming the coordinate it read', typed.strip.includes('-26.1234, 152.5678'
 // policy makes of it — must leave the station filter alone and say so.
 const blocked = await page.evaluate(async () => {
   const box = document.getElementById('station-search-0');
+  box.focus();
   box.value = 'Gympie';
   box.dispatchEvent(new Event('input', { bubbles: true }));
   await new Promise(r => setTimeout(r, 2600));

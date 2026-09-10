@@ -1899,8 +1899,31 @@ function renderStationsHtml() {
            filters — and puts it under the map as a collapsible card, which
            leaves nothing on the left to keep a column for. The map is ~320 px
            wider on every screen as a result, which is the point. -->
-      <div class="stack" id="stations-main">
+      <!-- Three children, always, and a class that decides whether they are a
+           stack or two columns (#186). The map, a divider, and everything that
+           is normally under the map. Emitted this way even when the split is
+           off — with is-split absent the wrappers are transparent, the
+           divider is display:none, and the page is the single column it has
+           been since #165 — because the alternative is two markup shapes for
+           one tab, and switching between them would mean rebuilding the DOM
+           the Leaflet map is standing in. As one shape, the toggle is a class
+           on this div and the map never moves. -->
+      <div class="stack stn-split${state.mapSplit ? ' is-split' : ''}" id="stations-main"
+           style="--mn-split:${state.mapSplitPct}%">
+       <div class="stn-split-map">
         <div class="panel map-panel${state.mapFullscreen ? ' is-full' : ''}">
+         <!-- The map, and everything drawn *over* the map: the note strip, the
+              three cards, and the accessible description that stands in for
+              markup this canvas does not have. This box is the positioning
+              anchor for all of them — it used to be .map-panel itself, and
+              stopped being able to be when the credit line moved off the map
+              and into the panel under it (#186, mapAttributionBelow). A card
+              anchored "bottom: .5rem" against a panel that is map *plus*
+              credits is a card anchored below the map, which on a phone put
+              the station sheet over the credits and past half the map's
+              height. So the stage is the map's own rectangle, and the credit
+              line is the panel's second child, outside it. -->
+         <div class="mn-map-stage">
           <!-- The map is a canvas: ~3,174 pins and ~3,141 link lines drawn as
                pixels, with no DOM per station to annotate. So it answers the
                chart pattern (design-system §3) rather than pretending to be
@@ -1927,7 +1950,24 @@ function renderStationsHtml() {
                is one map's. State-driven, so it is repainted from initMap()
                after every full render rather than dying with the div. -->
           <div id="stn-card" class="acma-card stn-card" hidden></div>
+         </div>
         </div>
+       </div>
+       <!-- The divider. A real separator with a value on it, so it can be
+            dragged with a pointer *and* moved with the arrow keys — this sets
+            how much of the screen the map gets, which is not a decision to
+            hand only to people who can hold a mouse steady. Hidden by CSS
+            while the split is off; it divides nothing then. -->
+       <div class="stn-split-bar" role="separator" tabindex="0"
+            aria-orientation="vertical"
+            aria-label="How much width the map takes beside the list"
+            aria-valuemin="${STATIONS_SPLIT_MIN}" aria-valuemax="${STATIONS_SPLIT_MAX}"
+            aria-valuenow="${state.mapSplitPct}"
+            aria-valuetext="Map takes ${state.mapSplitPct} per cent of the width"
+            title="Drag to re-split, or use the arrow keys"
+            onpointerdown="stationsSplitDragStart(event)"
+            onkeydown="stationsSplitKey(event)"></div>
+       <div class="stn-split-rest">
         <!-- Directly under the map (#165), and shut on arrival (#181). It is a
              disclosure built out of a button and a panel rather than the
              <details> the three cards below it still are, and that is a
@@ -2004,6 +2044,7 @@ function renderStationsHtml() {
         <div class="panel" id="stations-editor-card">
           ${renderStationEditorCard()}
         </div>
+       </div>
       </div>
     </div>`;
 }
@@ -2135,6 +2176,135 @@ function toggleMapFullscreen(on) {
     : 'Map back in the page.');
 }
 
+// ── Side by side ─────────────────────────────────────────────────────────────
+// The map on the left, and everything that is normally under it — the filters,
+// the station list, the path tools, the editor — on the right, with a divider
+// that drags (#186).
+//
+// This tab was two columns once and stopped being them at #165, and this is not
+// that split coming back: what went away was a *filter rail* beside the map,
+// which had nothing to do with the map and had to be scrolled past to reach it.
+// What this puts beside the map is the map's own answer — the list of what
+// matched, the card of what is selected, the profile of the path just clicked —
+// so the two halves are one question and its answer rather than a tool and its
+// settings. It is off by default and remembered, because which of those two
+// readings a person wants is a preference and not a mode.
+//
+// Both columns are their own scroller at the height of the viewport, which is
+// the whole point of asking for it: the map stays in view while the list under
+// it is read. That is also why the split is *not* offered below the `lg`
+// breakpoint — two 400 px columns are two things too narrow to read rather than
+// two things in view — and styles.css folds it back to one column there without
+// touching the setting, so a laptop that is docked to a wide screen finds its
+// split again.
+const STATIONS_SPLIT_MIN = 25;   // per cent of the width the map may shrink to
+const STATIONS_SPLIT_MAX = 75;   // …and grow to. Both leave the other side usable.
+const STATIONS_SPLIT_STEP = 2;   // one arrow-key press
+
+function toggleStationsSplit(on) {
+  state.mapSplit = on == null ? !state.mapSplit : !!on;
+  try { localStorage.setItem('mn-map-split', state.mapSplit ? 'on' : 'off'); } catch (_) {}
+  // A class, not a re-render: the wrappers are in the markup either way, so
+  // nothing moves in the DOM and the Leaflet map keeps its view, its layers and
+  // its in-flight requests. Same reasoning as toggleMapFullscreen above.
+  const main = document.getElementById('stations-main');
+  if (main) main.classList.toggle('is-split', state.mapSplit);
+  const b = document.querySelector('.mn-map-split');
+  if (b) syncMapSplitBtn(b);
+  // No transition on the class, so the container is already its new size.
+  invalidateMapSizes(0);
+  announce(state.mapSplit
+    ? 'Map and station list side by side. The divider between them can be dragged, or moved with the arrow keys.'
+    : 'Map back above the station list.');
+}
+
+function syncMapSplitBtn(b) {
+  const on = state.mapSplit;
+  b.textContent = '◫';
+  b.setAttribute('aria-pressed', String(on));
+  const label = on ? 'Stack the map above the list' : 'Map and list side by side';
+  b.title = label;
+  b.setAttribute('aria-label', label);
+}
+
+// Where the divider sits, as a percentage of the row. Written to a custom
+// property rather than to the grid template, so the drag touches one declaration
+// on one element and the layout rules stay in the stylesheet.
+function setStationsSplitPct(pct, persist) {
+  const v = Math.max(STATIONS_SPLIT_MIN, Math.min(STATIONS_SPLIT_MAX, Math.round(pct)));
+  state.mapSplitPct = v;
+  const main = document.getElementById('stations-main');
+  if (main) main.style.setProperty('--mn-split', `${v}%`);
+  const bar = main && main.querySelector('.stn-split-bar');
+  if (bar) {
+    bar.setAttribute('aria-valuenow', String(v));
+    bar.setAttribute('aria-valuetext', `Map takes ${v} per cent of the width`);
+  }
+  if (persist) { try { localStorage.setItem('mn-map-split-pct', String(v)); } catch (_) {} }
+}
+
+// The map is re-measured while the divider is moving, not only when it is let
+// go — a map that redraws on mouse-up is a map you are sizing blind. Throttled
+// to one measure a frame: invalidateSize() re-reads the container, re-lays the
+// tiles and fires `resize`, which the arrow canvas redraws off, and doing that
+// per pointermove event rather than per frame is several times the work for the
+// same picture.
+let stationsSplitRaf = null;
+function stationsSplitResized() {
+  if (stationsSplitRaf) return;
+  stationsSplitRaf = requestAnimationFrame(() => {
+    stationsSplitRaf = null;
+    try { if (state.map) state.map.invalidateSize({ pan: false }); } catch (_) {}
+  });
+}
+
+function stationsSplitDragStart(e) {
+  const main = document.getElementById('stations-main');
+  if (!main || !state.mapSplit) return;
+  const bar = e.currentTarget;
+  e.preventDefault();                       // no text selection while dragging
+  // Pointer capture, so the drag survives the pointer leaving the 8 px bar —
+  // which it does immediately, since the bar is what is being moved out from
+  // under it. Without this the drag ends on the first fast flick.
+  try { bar.setPointerCapture(e.pointerId); } catch (_) {}
+  document.body.classList.add('mn-split-dragging');
+  const move = ev => {
+    const r = main.getBoundingClientRect();
+    if (!r.width) return;
+    setStationsSplitPct(((ev.clientX - r.left) / r.width) * 100, false);
+    stationsSplitResized();
+  };
+  const end = () => {
+    bar.removeEventListener('pointermove', move);
+    bar.removeEventListener('pointerup', end);
+    bar.removeEventListener('pointercancel', end);
+    document.body.classList.remove('mn-split-dragging');
+    // Remembered on release rather than on every frame of the drag: one write
+    // per gesture, and the figure stored is the one the operator settled on.
+    setStationsSplitPct(state.mapSplitPct, true);
+    invalidateMapSizes(0);
+  };
+  bar.addEventListener('pointermove', move);
+  bar.addEventListener('pointerup', end);
+  bar.addEventListener('pointercancel', end);
+}
+
+// The same divider from the keyboard. Left/Right move it a step, Home/End take
+// it to either limit — the ARIA separator pattern, and the reason the bar is a
+// focusable element with a value on it rather than a styled border.
+function stationsSplitKey(e) {
+  const step = { ArrowLeft: -STATIONS_SPLIT_STEP, ArrowRight: STATIONS_SPLIT_STEP,
+                 ArrowDown: -STATIONS_SPLIT_STEP, ArrowUp: STATIONS_SPLIT_STEP };
+  let next = null;
+  if (e.key in step)        next = state.mapSplitPct + step[e.key];
+  else if (e.key === 'Home') next = STATIONS_SPLIT_MIN;
+  else if (e.key === 'End')  next = STATIONS_SPLIT_MAX;
+  if (next == null) return;
+  e.preventDefault();
+  setStationsSplitPct(next, true);
+  invalidateMapSizes(0);
+}
+
 function syncMapFullBtn(b) {
   const full = state.mapFullscreen;
   b.textContent = '⛶';
@@ -2193,6 +2363,10 @@ function stationsMapPanels(map) {
     html: () => `
       <div id="map-display-block">${mapDisplayControlsHtml()}</div>
       <div class="filter-block">${acmaFilterBlockHtml()}</div>`,
+    // The panel is rebuilt with the map on every render of the tab; the find
+    // term is not, so a term that was in the box comes back filtering the rows
+    // that were just built.
+    onMount: () => applyMapDisplayFind(),
   });
   MapChrome.panel(map, {
     id: 'draw', icon: '✏️', title: 'Draw & measure',
@@ -2219,13 +2393,31 @@ function stationsMapPanels(map) {
     return b;
   };
   full.addTo(map);
+
+  // Side by side (#186) — the same kind of button as full screen, next to it,
+  // because they are the same kind of decision: how much of the screen this map
+  // is being given. Built the same way and for the same reasons, down to not
+  // being a MapChrome panel.
+  const split = L.control({ position: 'topright' });
+  split.onAdd = () => {
+    const b = L.DomUtil.create('button', 'mn-mapctl-btn mn-map-split');
+    b.type = 'button';
+    syncMapSplitBtn(b);
+    L.DomEvent.disableClickPropagation(b);
+    L.DomEvent.on(b, 'click', L.DomEvent.stop);
+    L.DomEvent.on(b, 'click', () => toggleStationsSplit());
+    return b;
+  };
+  split.addTo(map);
 }
 
 // ── Map display block ────────────────────────────────────────────────────────
 
 // Past this the slider is measuring nothing real — no pass-range hop on this
-// network reaches it. "Kill spaghetti" off is the escape hatch for the operator
-// who wants every path drawn however absurd, so the cap can stay this tight.
+// network reaches it. "Limit link length" off is the escape hatch for the
+// operator who wants every path drawn however absurd, so the cap can stay this
+// tight. (The switch was called "Kill spaghetti" until #186; the state key it
+// writes, state.mapKillSpaghetti, still carries that name.)
 const MAX_LINK_KM_CAP = 600;
 
 // Three group headings since #175. This flyout holds a dozen controls and the
@@ -2236,6 +2428,27 @@ const MAX_LINK_KM_CAP = 600;
 function mapDisplayControlsHtml() {
   const on = state.mapKillSpaghetti;
   return `
+    <!-- Find a control (#186). This panel is a dozen switches, three sliders,
+         four selects, a radio group and the whole ACMA block, under four
+         headings and behind one eye icon, and it scrolls — so the honest
+         description of it is that a person who knows exactly which switch they
+         want still has to go looking for it. The box filters the panel to the
+         rows that match, headings and all, and matches against what each row
+         *says* — its label, its note and its tooltip — so "wind", "dB",
+         "contour" and "licence" all land somewhere. It filters what is drawn
+         and changes nothing about what is on: a hidden switch is still doing
+         whatever it was doing, and the "nothing matches" line says so. A
+         type="search" field, so the browsers that draw a ✕ in one give the
+         whole panel back in a click. -->
+    <div class="mapd-find" id="map-display-find-row">
+      <input type="search" id="map-display-find" class="mapd-find-box"
+             placeholder="Find a control…" spellcheck="false"
+             aria-label="Find a control in this panel"
+             aria-controls="map-display-block"
+             value="${escAttr(mapDisplayFind)}"
+             oninput="setMapDisplayFind(this.value)">
+    </div>
+    <p class="filter-note" id="map-display-find-none" hidden></p>
     <div class="map-display-h">Stations &amp; links</div>
     <label class="filter-check"
            title="Takes the non-matching pins off the map, and the link lines that run to them with them. Tick &quot;Include related repeaters&quot; to keep the carriers and their lines.">
@@ -2264,7 +2477,7 @@ function mapDisplayControlsHtml() {
     <label class="filter-check">
       <input type="checkbox" ${on ? 'checked' : ''}
              onchange="state.mapKillSpaghetti=this.checked;rerenderMapDisplayControls();refreshMapLayers()">
-      Kill spaghetti
+      Limit link length
     </label>
     <label class="filter-range${on ? '' : ' is-off'}">
       <span>Max TX distance <strong id="max-tx-val" aria-hidden="true">${state.mapMaxLinkKm} km</strong></span>
@@ -2279,6 +2492,55 @@ function mapDisplayControlsHtml() {
              onchange="state.mapShowBackbone=this.checked;rerenderMapLegend();refreshMapLayers()">
       Backbone paths (repeater &amp; base)
     </label>
+    <label class="filter-check"
+           title="Arrowheads along every drawn link, showing which way the traffic runs — a field station reports in to its repeater, a repeater hands off to a base. A repeater-to-repeater path runs both ways and is drawn with a head at each end.">
+      <input type="checkbox" ${state.mapArrows ? 'checked' : ''}
+             onchange="MapArrows.setEnabled(this.checked)">
+      Arrows along the links
+    </label>
+    <!-- What the link colours mean (#186). A radio group, not two switches:
+         the frequency colouring and the fade-margin colouring both want the
+         colour of the core line, and a green line that might be 15 dB of
+         headroom or might be 151.95 MHz is worse than either on its own.
+         Line of sight is not in the group and does not need to be — it paints
+         crimson over whichever colouring is running, and says one thing. -->
+    <div class="map-display-h">Link colour</div>
+    <div role="radiogroup" aria-label="What the link colours mean">
+      ${[['freq',  'By frequency',   'The channel the hop runs on, off the repeater at its end — recorded, so every link has one the moment the file loads'],
+         ['fade',  'By fade margin', 'Green, yellow or red by how many decibels of headroom the path has. Computed per link over terrain and land cover, and saved to the datastore'],
+         ['plain', 'Plain',          'One colour for every link, as the map drew them before either colouring existed']].map(([v, label, hint]) => `
+        <label class="filter-check" title="${escAttr(hint)}">
+          <input type="radio" name="map-link-colour" value="${v}"
+                 ${state.mapLinkColour === v ? 'checked' : ''}
+                 onchange="setMapLinkColour('${v}')">
+          ${label}
+        </label>`).join('')}
+    </div>
+    ${state.mapLinkColour === 'freq' ? `
+    <p class="filter-note" id="map-freq-note">${MapFreq.noteHtml()}</p>` : ''}
+    ${state.mapFade ? `
+    <!-- The two figures the sweep bands against. The thresholds are boxes
+         rather than a menu because they are a judgement an operator makes about
+         their own network, and the Save button is beside them because the pair
+         of them are one gesture: agree the rule, compute the network, put both
+         in the datastore so the next page load — and the next person's — paints
+         from it instead of re-fetching the terrain. -->
+    <div class="map-fade-bands">
+      <label class="draw-field">
+        <span>Green at or above</span>
+        <input type="number" step="0.5" id="map-fade-good" value="${state.mapFadeGoodDb}"
+               onchange="MapFade.setBand('good', this.value)">
+        <b class="lb-flag">dB</b>
+      </label>
+      <label class="draw-field">
+        <span>Yellow at or above</span>
+        <input type="number" step="0.5" id="map-fade-ok" value="${state.mapFadeOkDb}"
+               onchange="MapFade.setBand('ok', this.value)">
+        <b class="lb-flag">dB</b>
+      </label>
+      <button id="map-fade-save" onclick="MapFade.save()" disabled>Save to the datastore</button>
+    </div>
+    <p class="filter-note" id="map-fade-note">${MapFade.noteHtml()}</p>` : ''}
     <div class="map-display-h">Overlay layers</div>
     <label class="filter-check">
       <input type="checkbox" ${state.mapRivers ? 'checked' : ''}
@@ -2367,34 +2629,6 @@ function mapDisplayControlsHtml() {
       Check line of sight on links
     </label>
     <p class="filter-note" id="map-los-note">${MapLos.noteHtml()}</p>
-    <!-- The fade-margin sweep and the two figures it bands against. The
-         thresholds are boxes rather than a menu because they are a judgement an
-         operator makes about their own network, and the Save button is beside
-         them because the pair of them are one gesture: agree the rule, compute
-         the network, put both in the datastore so the next page load — and the
-         next person's — paints from it instead of re-fetching the terrain. -->
-    <label class="filter-check">
-      <input type="checkbox" ${state.mapFade ? 'checked' : ''}
-             onchange="MapFade.setEnabled(this.checked)">
-      Colour links by fade margin
-    </label>
-    ${state.mapFade ? `
-    <div class="map-fade-bands">
-      <label class="draw-field">
-        <span>Green at or above</span>
-        <input type="number" step="0.5" id="map-fade-good" value="${state.mapFadeGoodDb}"
-               onchange="MapFade.setBand('good', this.value)">
-        <b class="lb-flag">dB</b>
-      </label>
-      <label class="draw-field">
-        <span>Yellow at or above</span>
-        <input type="number" step="0.5" id="map-fade-ok" value="${state.mapFadeOkDb}"
-               onchange="MapFade.setBand('ok', this.value)">
-        <b class="lb-flag">dB</b>
-      </label>
-      <button id="map-fade-save" onclick="MapFade.save()" disabled>Save to the datastore</button>
-    </div>` : ''}
-    <p class="filter-note" id="map-fade-note">${MapFade.noteHtml()}</p>
     <div class="map-display-h">Labels &amp; export</div>
     <label class="filter-field filter-field--spaced">
       <span>Station names</span>
@@ -2416,7 +2650,107 @@ function mapDisplayControlsHtml() {
 
 function rerenderMapDisplayControls() {
   const el = document.getElementById('map-display-block');
-  if (el) el.innerHTML = mapDisplayControlsHtml();
+  if (!el) return;
+  el.innerHTML = mapDisplayControlsHtml();
+  // The find box is re-emitted with its term in it, so the filtering has to be
+  // re-applied to the rows that were just rebuilt — a panel that came back
+  // showing everything while its box still read "wind" would be lying about
+  // what it is showing.
+  applyMapDisplayFind();
+}
+
+// ── Find a control in the Map display panel (#186) ───────────────────────────
+// Session-only and deliberately not in `state`: a search term is something
+// somebody is doing right now, like the full-screen flag and unlike every switch
+// this panel holds. It survives rerenderMapDisplayControls (the panel redraws
+// itself whenever one of its own switches moves) and nothing else.
+let mapDisplayFind = '';
+
+function setMapDisplayFind(v) {
+  mapDisplayFind = String(v || '');
+  applyMapDisplayFind();
+}
+
+// What one row is matched against: everything it says out loud. The visible
+// text, plus every tooltip inside it — the tooltips are where several of these
+// controls explain what they actually do ("Takes the non-matching pins off the
+// map…"), and a panel search that could not find a control by its own
+// explanation would send people back to reading the whole list.
+function mapDisplayRowText(els) {
+  let out = '';
+  for (const el of els) {
+    out += ' ' + (el.textContent || '');
+    if (el.title) out += ' ' + el.title;
+    for (const n of el.querySelectorAll('[title]')) out += ' ' + n.title;
+  }
+  return out.toLowerCase();
+}
+
+// The panel's rows, grouped under their headings. The markup is a flat list on
+// purpose — the ids, the checkboxes and the pointer contract test/mapctl.mjs
+// reads are all on the controls themselves — so the grouping is worked out here
+// rather than wrapped in the HTML: a heading starts a group, and a note or a
+// threshold box attaches to the control above it, because that is what it is
+// about.
+function mapDisplayRows(root) {
+  const groups = [];
+  let cur = { head: null, rows: [] };
+  groups.push(cur);
+  for (const el of root.children) {
+    if (el.id === 'map-display-find-row' || el.id === 'map-display-find-none') continue;
+    if (el.classList.contains('map-display-h')) {
+      cur = { head: el, rows: [] };
+      groups.push(cur);
+      continue;
+    }
+    const trailing = el.classList.contains('filter-note')
+                  || el.classList.contains('map-fade-bands');
+    if (trailing && cur.rows.length) cur.rows[cur.rows.length - 1].push(el);
+    else cur.rows.push([el]);
+  }
+  return groups;
+}
+
+function applyMapDisplayFind() {
+  const root = document.getElementById('map-display-block');
+  if (!root) return;
+  // Every word has to appear somewhere in the row, in any order: "link colour"
+  // finds the radio group whether the row reads "Link colour" or "colour the
+  // links", and "wind region" finds the switch and its note between them.
+  const terms = mapDisplayFind.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  let shown = 0;
+  for (const g of mapDisplayRows(root)) {
+    let any = false;
+    for (const row of g.rows) {
+      const hit = !terms.length || (() => {
+        const text = mapDisplayRowText(row);
+        return terms.every(t => text.includes(t));
+      })();
+      for (const el of row) el.hidden = !hit;
+      if (hit) { any = true; shown++; }
+    }
+    // A heading with nothing under it is a heading about nothing.
+    if (g.head) g.head.hidden = !any;
+  }
+  // The ACMA block is the panel's other half and lives outside #map-display-block
+  // (it is rendered by acmaFilterBlockHtml and re-rendered by its own code), so
+  // it is filtered whole rather than row by row — it is one subject, and a
+  // half-filtered licence panel would be harder to read than none of it.
+  const acma = root.parentNode && root.parentNode.querySelector('.filter-block');
+  if (acma) {
+    const hit = !terms.length
+      || terms.every(t => (acma.textContent || '').toLowerCase().includes(t));
+    acma.hidden = !hit;
+    if (hit) shown++;
+  }
+  const none = document.getElementById('map-display-find-none');
+  if (none) {
+    none.hidden = !terms.length || shown > 0;
+    if (!none.hidden) {
+      none.textContent = `Nothing in this panel matches “${mapDisplayFind.trim()}”. `
+        + 'Clear the box to see all of it — nothing has been switched off.';
+    }
+  }
 }
 
 // What the link controls are actually doing. Counted on the last refresh so the
@@ -2462,7 +2796,6 @@ function mapLegendOffLayersHtml() {
     !state.mapCatchments      && 'River catchments',
     !state.mapHubs            && 'Maintenance hubs',
     !state.mapLos             && 'Line-of-sight checks',
-    !state.mapFade            && 'Fade-margin link colours',
     !state.filters.acma.show  && 'ACMA licences',
   ].filter(Boolean);
   if (!off.length) return '';
@@ -2571,14 +2904,34 @@ function mapLegendHtml() {
       <span class="legend-dot legend-dot-rel" style="--dot:${roleVar('repeater')}"></span>
       <span class="small">Related by pass range</span>
     </span>
+    <!-- The plain link colour. With a colouring running it is not what a link
+         normally looks like any more — it is what is left for the ones the
+         colouring has no answer for — so the entry says which of the two it is
+         describing rather than letting an orange swatch imply the first. -->
     <span class="legend-item">
       <span class="legend-line"></span>
-      <span class="small">Pass-range link</span>
+      <span class="small">Pass-range link${state.mapLinkColour === 'plain' ? ''
+        : ' — the plain colour, kept by a link the colouring has no figure for'}</span>
     </span>
     ${state.mapShowBackbone ? `
     <span class="legend-item">
       <span class="legend-line legend-line-backbone"></span>
-      <span class="small">Backbone path</span>
+      <span class="small">Backbone path — black dashes over whatever the link colour is saying</span>
+    </span>` : ''}
+    ${MapFreq.active() ? MapFreq.rows().map(r => `
+    <span class="legend-item">
+      <span class="legend-line" style="border-top-color:${r.colour}"></span>
+      <span class="small">${esc(r.label)} — ${r.count} repeater${r.count === 1 ? '' : 's'}</span>
+    </span>`).join('') + (MapFreq.rows().length ? `
+    <span class="legend-item">
+      <span class="small txt-muted">A link takes the channel of the repeater on its end. One with
+        no recorded frequency keeps the plain link colour.</span>
+    </span>` : '') : ''}
+    ${MapArrows.active() ? `
+    <span class="legend-item">
+      <span class="legend-arrow" aria-hidden="true">➤</span>
+      <span class="small">Arrows run the way the traffic does — into the repeater, and on to the
+        base. A repeater-to-repeater path runs both ways and carries a head at each end</span>
     </span>` : ''}
     ${MapRivers.active() ? `
     <span class="legend-item">
@@ -2749,6 +3102,7 @@ function stopStationsMap() {
   MapSpider.detach();
   MapLocate.detach();
   MapMovePin.detach();
+  MapArrows.detach();
   MapDraw.detach();
   LinkBudget.detach();
   MapRivers.detach();
@@ -2822,6 +3176,10 @@ function initMap() {
   // it is attached for the same reason MapSpider is: it needs to know which map
   // it would be moving a pin on before anybody asks it to.
   MapMovePin.attach(state.map);
+  // Before the first refresh: refreshMapLayers ends by scheduling a redraw of
+  // the arrow canvas, and a schedule with no canvas to draw on is a no-op that
+  // never comes back.
+  MapArrows.attach(state.map);
   MapDraw.attach(state.map);
   LinkBudget.attach(state.map);
   // Before the first refresh, so the fit that refresh performs is the view the
@@ -2948,6 +3306,11 @@ const MAP_LINK_CASING_MIX = 0.75;   // casing opacity, as a fraction of the core
 // the requirement — and the wide casing doubles as the click target.
 const MAP_BACKBONE_CASING_W = 5;
 const MAP_BACKBONE_CORE_W   = 2.5;
+// The black dashes laid over a backbone path's coloured core (#186). Even on
+// and off, so the pattern reads as black-colour-black-colour rather than as a
+// coloured line with specks on it, and long enough at 2.5 px of weight to be
+// two distinguishable things at the zoom a backbone hop is looked at.
+const MAP_BACKBONE_DASH = '9,9';
 
 // `skipFit` clears the fit for this refresh while still recording the extent it
 // would have fitted, so the map holds the operator's pan and zoom and the next
@@ -2963,6 +3326,10 @@ function refreshMapLayers({ skipFit = false } = {}) {
   // The lines those in-flight LOS checks were painting are gone with them.
   MapLos.newGeneration();
   MapFade.newGeneration();
+  // Not a generation — nothing is in flight — but the same duty: the resolved
+  // frequency palette is dropped so a theme switch, which refreshes the map,
+  // re-reads the tokens once instead of once per drawn link.
+  MapFreq.reset();
 
   const located  = state.data.stations.filter(s => s.lat != null && s.lon != null);
   const active   = mapFilterActive();
@@ -3048,37 +3415,70 @@ function refreshMapLayers({ skipFit = false } = {}) {
       // What a restyle should put back when it lets go — MapLos may repaint
       // this to the obstructed colour, and MapBlast restores to it.
       line.mnBaseColor      = casing ? '#ffffff' : lineColor;
+      // Which way the traffic runs, for MapArrows: a pass-range path is a field
+      // station reporting in to its repeater, and the polyline is drawn station
+      // end first, so "forward" is the arrow's own direction. Only the core
+      // carries it — the casing under it would draw a second set on top.
+      if (!casing) line.mnArrowDir = 'fwd';
       line.on('click', MapBackbone.onLineClick);
       state.mapLines.push(line);
-      // LOS first, then the margin: both may want this line red, and the one
-      // with a figure behind it is the one that should get the last word.
-      if (!casing) { MapLos.classify(line, l.s, l.r); MapFade.classify(line, l.s, l.r, 'field'); }
+      // The frequency first — it is the base colouring, recorded rather than
+      // computed, and it paints synchronously — then LOS, then the margin: all
+      // three may want this line a colour, and the one with a figure behind it
+      // is the one that should get the last word.
+      if (!casing) {
+        MapFreq.classify(line, l.s, l.r);
+        MapLos.classify(line, l.s, l.r);
+        MapFade.classify(line, l.s, l.r, 'field');
+      }
     }
   }
 
   // Backbone paths — repeater to repeater and repeater to base — on top of the
-  // field links and under the pins: heavier, black, and carrying BOTH station
-  // ids so the focus dim can ask "is the focused repeater on either end".
-  // Clicks open the radio-path card.
+  // field links and under the pins: heavier, carrying BOTH station ids so the
+  // focus dim can ask "is the focused repeater on either end". Clicks open the
+  // radio-path card.
+  //
+  // Three passes, not two, since #186. A backbone path used to be a black line
+  // and nothing else, which was legible but said only "backbone" — and once the
+  // links are coloured by frequency or by fade margin, a backbone path being
+  // the one line on the map with no colour is the one place the colouring
+  // stops answering. So the core takes the colouring like every other line and
+  // a black dashed line is laid over it, which gives the black-colour-black
+  // pattern this asks for: the dashes say "backbone", the colour between them
+  // says whatever the colouring says. With the plain colouring on, the core is
+  // black already and the dashes vanish into it, which is the line as it always
+  // was.
   const backboneColor = getComputedStyle(document.documentElement)
     .getPropertyValue('--map-backbone').trim() || '#000000';
-  for (const pass of ['casing', 'core']) {
+  for (const pass of ['casing', 'core', 'dash']) {
     const casing = pass === 'casing';
+    const dash   = pass === 'dash';
     for (const p of backbone) {
       const lineOp = casing ? casingOp : coreOp;
       const line = L.polyline([[p.a.lat, p.a.lon], [p.b.lat, p.b.lon]], {
         color:   casing ? '#ffffff' : backboneColor,
         weight:  casing ? MAP_BACKBONE_CASING_W : MAP_BACKBONE_CORE_W,
         opacity: lineOp,
+        dashArray: dash ? MAP_BACKBONE_DASH : null,
       }).addTo(map);
-      line.mnLinkRole        = casing ? 'backbone-casing' : 'backbone';
+      line.mnLinkRole        = casing ? 'backbone-casing' : dash ? 'backbone-dash' : 'backbone';
       line.mnLinkRepeaterId  = p.a.id;
       line.mnLinkRepeaterId2 = p.b.id;
       line.mnBaseOpacity     = lineOp;
       line.mnBaseColor       = casing ? '#ffffff' : backboneColor;
+      // Repeater to base runs one way — that is the direction traffic leaves
+      // the network. Repeater to repeater genuinely runs both, and is drawn as
+      // a two-way link rather than given a direction it hasn't got. The dash
+      // overlay and the casing carry no arrows: one set per path.
+      if (pass === 'core') line.mnArrowDir = p.kind === 'base' ? 'fwd' : 'both';
       line.on('click', MapBackbone.onLineClick);
       state.mapLines.push(line);
-      if (!casing) { MapLos.classify(line, p.a, p.b); MapFade.classify(line, p.a, p.b, 'backbone'); }
+      if (pass === 'core') {
+        MapFreq.classify(line, p.a, p.b);
+        MapLos.classify(line, p.a, p.b);
+        MapFade.classify(line, p.a, p.b, 'backbone');
+      }
     }
   }
 
@@ -3184,6 +3584,9 @@ function refreshMapLayers({ skipFit = false } = {}) {
     if (!skipFit) map.fitBounds(fitTo, { padding: [24, 24], maxZoom: fitTo.length === 1 ? 14 : 12 });
   }
   applyMapLabels();
+  // The lines are all on the map and styled; the arrowheads are painted off
+  // them on the next frame (map-arrows.js).
+  MapArrows.schedule();
 }
 
 // Parts 1 and 2 of the graphic pattern: the picture's name says what it is
@@ -3543,6 +3946,10 @@ function setMapFocusRepeater(id) {
   // repeater, so it follows the focus however it was set — a pin click, the
   // empty map, or one of its own rows.
   rerenderStationCarriersCard();
+  // And the Clear buttons, which are enabled by a focus as well as by a filter
+  // (#186) — they are the control that undoes this, so they have to notice it
+  // arriving and leaving.
+  updateFilterChrome();
 }
 
 function clearMapFocusRepeater() {
@@ -3580,6 +3987,10 @@ function applyMapFocusStyles() {
   // focus change, and only ever touching ring colour/weight/dash and line
   // colour — the opacities above are the filter's and the focus's to decide.
   MapBlast.applyStyles();
+  // And the arrowheads follow the opacities this pass just set: they are drawn
+  // in the colour and at the opacity of the line they sit on, so a dim that did
+  // not repaint them would leave a fan of full-strength arrows over faded lines.
+  MapArrows.schedule();
 }
 
 // The selection as a file — the same columns the table shows, plus the station
@@ -3683,16 +4094,38 @@ function setMapLabelMode(mode) {
 
 // Restyling the polylines already on the map beats rebuilding every layer to
 // change one number.
+// The link-colour radio group (#186). One entry point for all three choices,
+// because the three are one setting: the colour of a link's core line.
+//
+// MapFade.setEnabled does the work either way — it moves state.mapFade, refreshes
+// the map, and repaints the display block and the legend, which is exactly the
+// list this needs done whichever option was picked. So this sets the mode,
+// remembers it, and hands over; there is no second path for the two options
+// MapFade is not involved in.
+function setMapLinkColour(mode) {
+  if (mode !== 'freq' && mode !== 'fade' && mode !== 'plain') return;
+  state.mapLinkColour = mode;
+  try { localStorage.setItem('mn-map-link-colour', mode); } catch (_) {}
+  MapFade.setEnabled(mode === 'fade');
+}
+
 function setMapLinkOpacity(v) {
   state.mapLinkOpacity = v;
   const label = document.getElementById('link-opacity-val');
   if (label) label.textContent = `${Math.round(v * 100)}%`;
   for (const l of state.mapLines) {
-    if (l.mnLinkRole === 'casing' ||
-        l.mnLinkRole === 'backbone-casing') l.setStyle({ opacity: v * MAP_LINK_CASING_MIX });
-    else if (l.mnLinkRole === 'core' ||
-             l.mnLinkRole === 'backbone')   l.setStyle({ opacity: v });
+    const op = l.mnLinkRole === 'casing' || l.mnLinkRole === 'backbone-casing'
+      ? v * MAP_LINK_CASING_MIX
+      : l.mnLinkRole === 'core' || l.mnLinkRole === 'backbone' ||
+        l.mnLinkRole === 'backbone-dash' ? v : null;
+    if (op == null) continue;
+    // mnBaseOpacity as well as the style, or the next focus dim — which restores
+    // to mnBaseOpacity when it lets a line go — would put back the opacity this
+    // slider was moved off.
+    l.mnBaseOpacity = op;
+    l.setStyle({ opacity: op });
   }
+  MapArrows.schedule();
 }
 
 // The `n` stations closest to the centre of their own bounding box — used to
@@ -4547,15 +4980,25 @@ function renderStationFilters() {
 // the head row beside the quick box while it is shut. They are the same pair of
 // buttons either way — a second copy that drifted from the first would be two
 // answers to "what does Clear do".
+// Is there anything for the Clear buttons to put back? A filter, or — since
+// #186 — a repeater focus with no filter behind it. That second case is exactly
+// the state they were reported as failing to fix: the map three-quarters dimmed,
+// the filters empty, and both buttons greyed out, because "active" had only ever
+// meant the filters. Written once and read from both the markup and the enable
+// pass, so the two can't drift.
+function stationsResetIdle() {
+  return !anyStationFilterActive() && !state.mapFocusRepeaterId;
+}
+
 function filterResetsHtml() {
-  const idle = !anyStationFilterActive();
+  const idle = stationsResetIdle();
   return `
     <span class="filter-resets">
       <button class="filter-reset" onclick="clearStationFilters(false)"
-              title="Put every station back at full opacity, without moving the map"
+              title="Put every station and link back at full opacity — filters and repeater focus both — without moving the map"
               ${idle ? 'disabled' : ''}>Clear filters</button>
       <button class="filter-reset" onclick="clearStationFilters(true)"
-              title="Clear the filters and zoom back out to the whole network"
+              title="The same, and zoom back out to the whole network"
               ${idle ? 'disabled' : ''}>Clear &amp; zoom out</button>
     </span>`;
 }
@@ -4580,6 +5023,7 @@ function filterQuickHtml() {
               aria-label="${n > 1 ? `Filter entry 1 of ${n}` : 'Search stations'}"
               title="Name, station # or ALERT address. Open the card for the ranges, the fields each entry looks in, and the rest of the filters."
               placeholder="Name, station # or ALERT address"
+              onfocus="Places.focusIn(0)" onblur="Places.focusOut(0)"
               oninput="mapSearchInput(0, this.value);autoGrowSearch(this)">${esc(rows[0].text)}</textarea>
     <span class="filter-quick-more" id="filter-quick-more" ${n > 1 ? '' : 'hidden'}
           title="More search entries than this row can show — open the card to see them"
@@ -4672,6 +5116,7 @@ function searchRowHtml(row, i, total) {
       <textarea id="station-search-${i}" class="filter-search" rows="1" spellcheck="false"
                 aria-label="${total > 1 ? `Filter entry ${n} of ${total}` : 'Search'}"
                 placeholder="e.g. 6128, 6129, 4021-4025 — or paste from a telemetry log"
+                onfocus="Places.focusIn(${i})" onblur="Places.focusOut(${i})"
                 oninput="mapSearchInput(${i}, this.value);autoGrowSearch(this)">${esc(row.text)}</textarea>
       <div class="search-scope" role="group" aria-labelledby="${scopeId}">
         <span class="search-scope-lead" id="${scopeId}">Look in</span>
@@ -4981,7 +5426,7 @@ function updateFilterChrome() {
   if (area) area.textContent = valueGroupState(['basin', 'lga']);
   const data = document.getElementById('filter-state-data');
   if (data) data.textContent = valueGroupState(['hasCoords', 'hasAlertId', 'enabledOnly']);
-  const idle = !anyStationFilterActive();
+  const idle = stationsResetIdle();
   // The whole card, not just the panel: since #181 there is a second copy of
   // the clear buttons in the head row, and a live pair beside a stale one is
   // worse than no pair at all.
@@ -5128,8 +5573,22 @@ function resetStationFilters() {
 // zoomed into — springing the map back to the national view throws away the
 // thing they were doing. So the default holds the view, and the second button
 // is there for when they do want to zoom back out.
+//
+// The repeater focus goes with the filters (#186), and until it did, "put the
+// rest of the network back at full opacity" was only half true. Clicking a
+// repeater pin dims every station and link that is not on one of its paths, and
+// that dim is not a filter — clearing the filters left it exactly where it was,
+// so a map that had been both filtered and focused came back from Clear still
+// three-quarters faded, with nothing on screen saying why or which control
+// would undo it. (It could be undone: click the empty map. Nobody should have
+// to know that.) Both buttons take it, and the blast styling that rides on it,
+// because both are the operator saying "back to the whole network".
 function clearStationFilters(zoomOut) {
   resetStationFilters();
+  // Before the refresh, not after: setMapFocusRepeater restyles the markers and
+  // links that are on the map now, and the refresh below is about to replace
+  // them. Clearing first means the rebuild draws them undimmed to begin with.
+  clearMapFocusRepeater();
   renderStationFilters();
   state.stationsShowAll = false;
   refreshMapLayers({ skipFit: !zoomOut });

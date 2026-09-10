@@ -791,7 +791,10 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Click a station to see its full detail panel
 - Filter map display by role, sensor type, radio network, region, basin/council or data completeness (see *Filtering & Exploration*)
 - Pull the repeaters that carry a matched station onto the map and into the table with it (*Include related repeaters*)
-- Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Kill spaghetti*)
+- Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Limit link length*)
+- Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
+- Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop
+- Put the map and the station list side by side, with a divider that drags
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
 - Light up the watercourses whose names match the filter box, drawn beneath the pins from OpenStreetMap (*Highlight matching rivers*)
 - Draw and measure over the map: pins, lines, circles, rectangles and text, placed by hand or by coordinates and km, in a colour of your choosing
@@ -830,6 +833,18 @@ Untick the box for literal matches only.
 **Clearing a filter, twice over.** *Clear filters* puts every station back at
 full opacity **without moving the map** — you were looking at a region and you
 still are. *Clear & zoom out* does the same and re-fits to the whole network.
+
+Both take the **repeater focus** with them, and until #186 neither did. Clicking
+a repeater pin dims every station and link that is not on one of its own paths,
+which is a display overlay rather than a filter — so clearing the filters left it
+exactly where it was, and a map that had been both filtered and focused came back
+from *Clear* still three-quarters faded, with nothing on screen saying why or
+which control would undo it. Worse, with no filter running the two buttons were
+disabled, so the one control that reads as "put it back" could not even be
+pressed. Both are now enabled by a focus as well as by a filter, and both clear
+it (and the blast styling that rides on it), because both are the operator saying
+*back to the whole network*. Clicking the empty map still clears the focus on its
+own; nobody should have had to know that was the way out.
 
 **Station names.** Names are capped at 60 on screen, because past that they
 overlap into noise. The **Station names** control decides when they appear:
@@ -911,6 +926,22 @@ into as many columns as the window allows — four on a wide screen, two at 768 
 one on a phone. A 320 px rail had one sensible arrangement; a card the width of
 the page has a better one.
 
+**Finding a control in the Map display panel.** That one flyout holds a dozen
+switches, three sliders, four selects, a radio group and the whole ACMA licence
+block, under four headings, and it scrolls — so somebody who knows exactly which
+switch they want still has to go looking for it. A **Find a control** box at the
+top filters the panel to the rows that match, headings and all. It matches
+against what each row *says* — its label, its note and its tooltip — so "wind",
+"dB", "contour" and "licence" all land somewhere, and every word typed has to
+appear somewhere in the row, in any order. The ACMA block is filtered whole
+rather than row by row: it is one subject, and half a licence panel is harder to
+read than none of it.
+
+It filters what is *drawn* and changes nothing about what is *on* — a hidden
+switch is still doing whatever it was doing, and the "nothing matches" line says
+so — and the term survives the panel redrawing itself, which it does whenever one
+of its own switches moves.
+
 **Full screen.** The ⛶ button in the map's top-right corner, under the four
 panel icons, fixes the map's panel to the viewport — the match note, the ACMA
 and path cards and the corner controls all ride along, because they are all
@@ -923,13 +954,37 @@ panel and removing it later never moves or rebuilds the map at all. Full
 screen is something an operator is doing, not a preference, so it lasts the
 session and is not remembered.
 
-**Signal links and *Kill spaghetti*.** Links are drawn from each field station
+**Side by side.** The ◫ button beside it splits the tab into two columns: the
+map on the left, and everything normally under it — the filters, the station
+list, the path tools, the editor — on the right, each column its own scroller at
+the height of the viewport, with a divider between them that drags. That is the
+whole point of it: the map stays in view while the list under it is read. The
+divider can be dragged with a pointer or moved with the arrow keys (it is a real
+ARIA separator with a value on it, and Home/End take it to either limit), and
+where it was left is remembered.
+
+This is not #165's filter rail coming back. What sat beside the map then was the
+map's *settings*, which had to be scrolled past to reach the map; what sits
+beside it now is the map's *answer* — the list of what matched, the card of what
+is selected, the profile of the path just clicked. It is off on a first visit,
+remembered once set, and folds back to the single column below 1100 px without
+touching the setting: two 400 px columns are two things too narrow to read
+rather than two things in view, and a laptop docked to a wide screen finds its
+split again where it left it.
+
+Like full screen, it is a class toggled on the container the markup already
+emits — the three children are always there — so switching between the two
+readings moves nothing in the DOM and the Leaflet map keeps its view, its layers
+and its in-flight requests.
+
+**Signal links and *Limit link length*.** Links are drawn from each field station
 to every repeater whose pass ranges cover one of its ALERT addresses, which
 across the whole network is 3000-plus lines, many of them running the length of
 the country because two distant sites happen to share an address window.
-*Kill spaghetti* (on by default) drops any link longer than **Max TX distance**
-— 70 km by default, adjustable from 0 to 600 km, which is the range a VHF hop
-plausibly covers. The panel says what it is removing ("1537 links drawn · 1604
+*Limit link length* (on by default; it was called *Kill spaghetti* until #186,
+and the new name says what the switch does rather than what the map looks like
+without it) drops any link longer than **Max TX distance** — 70 km by default,
+adjustable from 0 to 600 km, which is the range a VHF hop plausibly covers. The panel says what it is removing ("1537 links drawn · 1604
 over 70 km hidden"), so a link that vanished is never a mystery. Untick it to
 see every path however long, at any distance.
 
@@ -938,13 +993,84 @@ see every path however long, at any distance.
 > at the ceiling opens as spaghetti: 1938 of 3141 paths drawn. 70 km draws 1537
 > of them and is where the great majority of this network's real hops sit. It
 > also halves the backbone: 183 qualifying pairs at 120 km, 96 at 70. Nothing is
-> lost either way — the slider still runs to 600 km, and *Kill spaghetti* off
+> lost either way — the slider still runs to 600 km, and *Limit link length* off
 > draws every path however long.
 
 Each link is drawn twice — a wide white casing underneath and the coloured line
 on top — so it stays legible over satellite imagery and topo shading, where a
 single thin orange line disappears. **Link opacity** fades the pair together
 when the lines are burying the pins they are meant to explain.
+
+**What the link colours mean — one radio group, not three switches.** *Link
+colour* in the same panel offers **By frequency** (the default), **By fade
+margin** and **Plain**. They are radio buttons because all three want the same
+channel — the colour of a link's core line — and a green line that might be
+15 dB of headroom or might be 151.95 MHz is worse than either reading on its
+own. Line of sight is deliberately *not* in the group: it paints crimson over
+whichever colouring is running and says one thing, "the ground cuts this path",
+which outranks "on this channel".
+
+*By frequency* is the default because, of the two colourings, it is the one that
+is complete and free the moment the file loads. A frequency is **recorded** — it is
+`repeater.rx_mhz`, right there in `stations.json` — so every drawn link either
+has one or provably has not; a fade margin is **computed**, per hop, over
+terrain and land cover, and until the network has been swept and saved most
+links have no figure and no colour. This network runs on four channels (151.5,
+151.525, 151.95 and 152.4 MHz), and each gets a hue assigned in ascending
+frequency order, so the same channel is the same colour on every load of the
+same file. A field link takes the channel of the repeater at its end, which is
+not an approximation but the definition — a field station transmits on whatever
+its carrier listens on. A repeater-to-repeater backbone hop takes the first
+end's and names both in the hover text when they differ. The 🔑 legend lists
+every channel in the file with how many repeaters are on it.
+
+**Arrows along the links.** Every drawn link carries arrowheads showing which
+way the traffic runs: a pass-range link is a field station reporting *in* to
+the repeater whose window covers its address, so a fan of arrows converging on a
+hilltop is a picture of what that repeater carries; a repeater-to-base backbone
+path points at the base, which is the direction traffic leaves the network. A
+repeater-to-repeater path genuinely runs both ways and is drawn as such — one
+head near each end, pointing outward, and none along the middle — rather than
+being given a direction it hasn't got.
+
+They are drawn on a canvas of their own rather than as more Leaflet lines, and
+that is not an optimisation but the only shape that works: the marks have to be
+evenly spaced *on screen*, so as Leaflet layers the count would be a function of
+the zoom (a few thousand at one zoom, tens of thousands at the next, rebuilt on
+every wheel click), and a chevron in geographic coordinates grows with the zoom
+until each one is a kilometre across. In screen pixels they are the same size at
+every zoom, cost no layer objects, and take the colour and opacity of the line
+they sit on at the moment they are painted — so they follow the frequency and
+fade-margin colourings, an obstructed path going crimson, a blast turning a fan
+red, and the focus dim, without knowing anything about any of them. On by
+default and remembered; the switch is *Arrows along the links*.
+
+**Backbone paths are black dashes over the colour.** A backbone path used to be
+a solid black line, which was legible and said only "backbone" — and once the
+links are coloured by frequency or by margin, the backbone being the one line on
+the map with no colour is the one place the colouring stops answering. So since
+#186 its core takes the colouring like every other link and a black dashed line
+is laid over it: the dashes say *backbone*, the colour between them says
+whatever the colouring says. With *Plain* selected the core is black already and
+the dashes vanish into it, which is the line exactly as it always was.
+
+**The credit line is under the map, not on it.** Leaflet puts the attribution
+control in the map's bottom-right corner, floating over the map, and on these
+maps it is not a short one — the Stations map credits four base services, the
+drainage basins, the maintenance hubs, the wind regions and OpenStreetMap, which
+wraps to two full-width lines across the foot of the map. Anything else that
+wants the bottom of the map is then underneath it: that is how it was found, with
+the move-pin panel's **Save position** and **Cancel** buttons sitting behind the
+credits. The move-pin panel is not the problem, it is the first thing to want
+that corner — a control in a map corner is a control somebody is meant to be able
+to press, and a credit line that must always be on screen will always be in the
+way of one.
+
+So the control stays exactly as Leaflet built it, collecting credits from layers
+as they come and go, and only its container is re-parented into a strip
+immediately below the map. The credits stay live, complete and attached to the
+map they describe, and stop covering it. It is done in `addBaseLayers`, so all
+seven maps get it — and so does whatever map is written next.
 
 **Hiding a station hides its lines.** *Hide stations that don't match*, in the
 same panel, is the subtractive reading of the filter box — and until #176 it
@@ -1473,6 +1599,21 @@ splits too, since `6128 6129` is two addresses while `Mt Stuart` is one name.
 Terms combine with OR. The box is a `<textarea>` (a single-line `<input>`
 strips the line breaks out of a pasted column, gluing `6128` and `6129` into
 `61286129`) that opens one line tall and grows with the paste.
+
+**The filter box also answers with places.** Paste a coordinate into it —
+decimal, degrees and minutes, or degrees-minutes-seconds, with or without
+hemisphere letters, in either order — and the map goes there and drops a pin,
+with no network at all. Type a name and, where the place-name service can be
+reached, the towns, localities and airports it matches are offered under the box.
+Neither changes what the station filter matches: the strip is an extra answer
+beside the station list, never instead of it.
+
+That strip belongs to the box the caret is in, and to no other. It appears when
+the box takes focus and goes when focus leaves — six place names left under a box
+nobody is typing in are six rows of map the operator asked to see and cannot. The
+results themselves are kept, so clicking back into the box brings the same strip
+straight back with no second lookup, and clicking a result does not dismiss the
+strip out from under the click.
 
 **Address ranges.** A term shaped `4021-4025` is a *window* over ALERT
 addresses, and every station holding an address inside it is a match. It is the

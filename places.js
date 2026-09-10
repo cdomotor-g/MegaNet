@@ -99,6 +99,15 @@ const Places = (function () {
   // out. Keyed by the entry's index, which is what the panel renders by.
   const rows = new Map();
   const timers = new Map();
+  // Which entry's box the caret is in, or null. The strip is drawn for that
+  // entry and no other (#186): it is an answer to what is being typed *now*,
+  // and a stack of six place names left under a box nobody is in is six rows
+  // of map the operator asked to see and cannot. The results themselves are
+  // kept — clicking back into the box brings the same strip straight back with
+  // no second lookup, which is the whole reason this is a paint rule and not a
+  // clear().
+  let focusRow = null;
+  let blurTimer = null;
   let flownTo = null;           // the coordinate the map was last moved to, so a
                                 // re-render does not move it again
 
@@ -353,10 +362,12 @@ const Places = (function () {
   function stripHtml(i) {
     const r = rows.get(i);
     if (!r) return '';
+    if (focusRow !== i) return '';      // the box this belongs to is not in use
     const bits = [];
     if (r.coord) {
       bits.push(`
         <button type="button" class="btn-link mn-place-go" onclick="Places.goToRow(${i}, -1)"
+                onmousedown="event.preventDefault()"
                 title="Centre the map on this coordinate">
           📍 <strong>${esc(r.coord.text)}</strong>
           <span class="txt-muted">${r.flown ? 'the map is here' : 'go here'}</span>
@@ -367,6 +378,7 @@ const Places = (function () {
     else if (r.list && r.list.length) {
       bits.push(r.list.map((h, n) => `
         <button type="button" class="btn-link mn-place-go" onclick="Places.goToRow(${i}, ${n})"
+                onmousedown="event.preventDefault()"
                 title="Centre the map on ${escAttr(h.name)}">
           📍 <strong>${esc(h.name)}</strong>
           <span class="txt-muted">${esc(h.kind)}${h.where ? ` · ${esc(h.where)}` : ''}</span>
@@ -422,12 +434,50 @@ const Places = (function () {
       marker = null;
       map = null;
       flownTo = null;
+      // The box the caret was in is going away with the tab, and the results
+      // are not: without this, leaving the Stations tab and coming back would
+      // repaint a strip under a box nobody is typing in — the state this
+      // feature exists to avoid.
+      clearTimeout(blurTimer);
+      blurTimer = null;
+      focusRow = null;
     },
 
     // Every entry's strip, rebuilt after the stack is re-rendered. The state
     // lives here rather than in the DOM, so removing an entry above this one
     // does not lose what the one below it found.
     repaint() { for (const i of rows.keys()) paint(i); },
+
+    // ── Which box is in use ───────────────────────────────────────────────
+    // The strip belongs to the entry being typed in, and to no other (#186).
+    // Called from the search boxes' own focus and blur — including the head
+    // row's quick box, which writes entry 0 exactly as the panel's first box
+    // does, so both hand in the same index and the strip follows the caret
+    // between them.
+    //
+    // The blur is deferred by a beat and the buttons in the strip cancel the
+    // focus move with preventDefault on mousedown, which is belt and braces
+    // over the same hazard: a result clicked with the mouse must not be
+    // unmounted by the blur that click causes before the click itself lands.
+    focusIn(i) {
+      clearTimeout(blurTimer);
+      blurTimer = null;
+      if (focusRow === i) return;
+      const prev = focusRow;
+      focusRow = i;
+      if (prev != null) paint(prev);
+      paint(i);
+    },
+
+    focusOut(i) {
+      clearTimeout(blurTimer);
+      blurTimer = setTimeout(() => {
+        blurTimer = null;
+        if (focusRow !== i) return;
+        focusRow = null;
+        paint(i);
+      }, 160);
+    },
 
     // The stack was rebuilt with a different number of entries: anything past
     // the end no longer exists.
@@ -491,6 +541,9 @@ const Places = (function () {
       for (const t of timers.values()) clearTimeout(t);
       timers.clear();
       rows.clear();
+      clearTimeout(blurTimer);
+      blurTimer = null;
+      focusRow = null;
       flownTo = null;
       if (marker) { marker.remove(); marker = null; }
     },

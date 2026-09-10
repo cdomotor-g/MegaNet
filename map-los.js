@@ -136,6 +136,10 @@ const MapLos = (function () {
       const c = blockedColor();
       line.mnBaseColor = c;
       if (!line.mnBlastRed) line.setStyle({ color: c });
+      // The arrowheads on this line take its colour, so they have to be
+      // repainted with it. Coalesced to one redraw a frame, so a whole sweep
+      // landing at once costs one (map-arrows.js).
+      MapArrows.schedule();
     }
   }
 

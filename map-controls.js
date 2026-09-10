@@ -242,7 +242,62 @@ function addBaseLayers(map) {
       });
     },
   });
+  // The credit line, off the map and under it. Every map calls addBaseLayers,
+  // so every map gets it — which is the point (see mapAttributionBelow).
+  mapAttributionBelow(map);
   return layers;
+}
+
+// ── The credit line, under the map instead of on it ──────────────────────────
+//
+// Leaflet puts the attribution control in the map's bottom-right corner, where
+// it is a floating box *over* the map — and on this app's maps it is not a
+// short one: the Stations map credits four base services, the drainage basins,
+// the maintenance hubs, the wind regions and OpenStreetMap, which wraps to two
+// full-width lines across the foot of the map.
+//
+// Anything else that wants the bottom of a map is then underneath it. That is
+// how it was found — the move-pin panel's Save and Cancel buttons sit bottom
+// left and the credit line was covering them — but the move-pin panel is not
+// the problem, it is the first thing to want that corner. A control in a map
+// corner is a control an operator is meant to be able to press, and a credit
+// line that must always be on screen will always be in the way of one.
+//
+// So the credit line leaves the map. The control itself stays exactly as it
+// is — Leaflet collects attributions from layers as they are added and removed
+// and writes them into `_container`, and none of that cares where in the
+// document that container sits — and only the container is re-parented, into a
+// strip immediately below the map. The credits stay live, stay complete, stay
+// attached to the map they describe, and stop covering it.
+//
+// Called from addBaseLayers, so it applies to all seven maps without any of
+// them asking, and to whatever map is written next.
+function mapAttributionBelow(map) {
+  const ctrl  = map && map.attributionControl;
+  const mapEl = map && map.getContainer && map.getContainer();
+  const box   = ctrl && ctrl.getContainer && ctrl.getContainer();
+  if (!ctrl || !mapEl || !box || !mapEl.parentNode) return null;
+  // One strip per map, reused across rebuilds: initMap() tears the Stations
+  // map down and builds another on every render of the tab, and a strip per
+  // build would stack empty boxes under the map for the life of the page.
+  //
+  // "Below the map" means below everything drawn over the map, not just below
+  // the map element: the Stations map wraps its container and its on-map cards
+  // in a stage (.mn-map-stage) precisely so that the cards can be positioned
+  // against the map's own rectangle, and a credit line inside that stage would
+  // put it back inside the box the cards measure themselves against. Every
+  // other map in the app has no stage and no cards, and the strip goes directly
+  // under the container.
+  const after = (mapEl.closest && mapEl.closest('.mn-map-stage')) || mapEl;
+  let strip = after.nextElementSibling;
+  if (!strip || !strip.classList.contains('mn-map-attrib')) {
+    strip = document.createElement('div');
+    strip.className = 'mn-map-attrib';
+    after.parentNode.insertBefore(strip, after.nextSibling);
+  }
+  strip.textContent = '';
+  strip.appendChild(box);
+  return strip;
 }
 
 // ── The on-map panel ─────────────────────────────────────────────────────────

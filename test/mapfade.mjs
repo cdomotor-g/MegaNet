@@ -598,21 +598,28 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(300);
 
+// The switch was a checkbox of its own until #186 and is one of three radio
+// buttons now — the fade margin and the frequency colouring both want the colour
+// of a link's core line, so they cannot both be on. What this block asks about is
+// unchanged: the control is in the Map display panel, it is not the one selected
+// when the layer is off, clicking it turns the layer on, and the thresholds, the
+// Save button and the legend lines come with it.
 ok('the Map display flyout opens on hover', (await hover('display')).shown);
 const before = await page.evaluate(() => {
   const l = [...document.querySelectorAll('.mn-mapctl[data-panel="display"] label')]
-    .find(x => /Colour links by fade margin/.test(x.textContent));
+    .find(x => /By fade margin/.test(x.textContent));
   return l ? { checked: l.querySelector('input').checked } : null;
 });
-ok('the Map display panel offers “Colour links by fade margin”', !!before);
-ok('…unticked, because the layer is off', before && before.checked === false);
+ok('the Map display panel offers “By fade margin”', !!before);
+ok('…unpicked, because the layer is off', before && before.checked === false);
 
-const hitFade = await clickInside('display', 'input[type="checkbox"]', 'Colour links by fade margin');
-ok('the checkbox was there to click', !!hitFade);
+const hitFade = await clickInside('display', 'input[type="radio"]', 'By fade margin');
+ok('the radio was there to click', !!hitFade);
 await page.waitForTimeout(300);
-ok('ticking it turns the layer on', await page.evaluate(() => MapFade.active() === true));
+ok('picking it turns the layer on', await page.evaluate(() => MapFade.active() === true));
 ok('…and remembers it, unlike the line-of-sight switch beside it',
-   await page.evaluate(() => localStorage.getItem('mn-map-fade') === 'on'));
+   await page.evaluate(() => localStorage.getItem('mn-map-link-colour') === 'fade'
+                         && localStorage.getItem('mn-map-fade') === 'on'));
 
 const controls = await page.evaluate(() => ({
   save: !!document.getElementById('map-fade-save'),

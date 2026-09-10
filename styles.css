@@ -75,8 +75,32 @@
   --map-fade-ok:   #ffab00;
   --map-fade-bad:  #e53935;
   /* Repeater backbone paths. Black by request — the white casing the map draws
-     under it is what carries it on dark imagery, in both themes. */
+     under it is what carries it on dark imagery, in both themes. Since #186 the
+     black is a dashed line laid *over* the coloured core rather than the core
+     itself, so a backbone path still reads as a backbone path while its colour
+     goes on saying whatever the link colouring says. */
   --map-backbone: #000000;
+  /* The link-by-frequency ramp (MapFreq, #186). Eight hues assigned in
+     ascending frequency order — this network uses four (151.5, 151.525, 151.95,
+     152.4) and the rest are headroom, so a file with more channels colours all
+     of them rather than wrapping onto a colour already in use.
+
+     Chosen against everything else that can be on the map at once: none is the
+     crimson of an obstructed path, the red of a blast, the blue of a highlighted
+     river or the teal of a survey mark. Saturated on purpose — these lines are
+     read over satellite imagery and topo shading, under the white casing every
+     link carries — and, like --map-backbone, they are the same in both themes:
+     the base maps do not go dark with the app, so a colour that works over a
+     tile works over it in either theme, and all eight are bright enough to hold
+     up as legend swatches on a dark panel. */
+  --map-freq-1: #2979ff;
+  --map-freq-2: #ff9100;
+  --map-freq-3: #d500f9;
+  --map-freq-4: #00e5ff;
+  --map-freq-5: #ffea00;
+  --map-freq-6: #76ff03;
+  --map-freq-7: #b388ff;
+  --map-freq-8: #ff4081;
   /* Blast radius (#161): the pass-range links that die with a repeater, and
      the ring on a station with no other way in. Red as asked for, and a red
      none of the role fills or ACMA mechanisms use; the ring is the darker of
@@ -2548,6 +2572,17 @@ hr {
 }
 
 .legend-line-river { border-top-color: var(--map-river); }
+
+/* The direction arrows (MapArrows, #186). A glyph rather than a drawn chevron:
+   the marks on the map are canvas strokes with no CSS to borrow, and one
+   character at the legend's size is a closer likeness than a box with two
+   borders on it. */
+.legend-arrow {
+  display: inline-block;
+  color: var(--map-line);
+  font-size: .8rem;
+  line-height: 1;
+}
 /* Heavier than the pass-range swatch, as the path itself is; the outline is
    the legend's stand-in for the white casing that separates black from a dark
    basemap. */
@@ -5296,6 +5331,44 @@ hr {
   }
 }
 
+/* Find a control, at the top of the 👁️ Map display flyout (#186). The panel is
+   a dozen switches, three sliders, four selects, a radio group and the ACMA
+   block under four headings, and it scrolls — so it is sticky rather than
+   scrolling away with the rows it is filtering, which is the one thing a search
+   box in a scroller must not do. */
+.mapd-find {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-bottom: .35rem;
+  background: var(--panel);
+}
+
+.mapd-find-box {
+  width: 100%;
+  box-sizing: border-box;
+  padding: .3rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--panel-sub);
+  color: var(--text);
+  font: inherit;
+  font-size: .82rem;
+}
+
+.mapd-find-box::placeholder { color: var(--muted); }
+
+/* The find filter hides a row by setting the `hidden` attribute on it, which is
+   the right signal for a screen reader and — on its own — not enough to hide
+   anything here. Half these rows are labels this stylesheet gives
+   `display: flex`, and an author rule beats the browser's own
+   `[hidden] { display: none }` at the same specificity: the headings vanished
+   and every checkbox stayed exactly where it was. Scoped to the on-map panels
+   rather than declared globally, because that is the whole of where it is
+   needed and a global !important on `[hidden]` is a rule nobody can get out
+   from under later. */
+.mn-mapctl-content [hidden] { display: none !important; }
+
 /* Group headings inside the 👁️ Map display flyout (#175). The flyout scrolls,
    and a column of checkboxes past the fold gives nobody a reason to scroll
    it; a heading says what kind of thing is under it. */
@@ -5308,7 +5381,10 @@ hr {
   margin: .6rem 0 .2rem;
 }
 
-.map-display-h:first-child {
+/* The first heading is no longer the block's first child — the find row is —
+   so this reaches whichever heading is drawn first, hidden rows and all. */
+.map-display-h:first-child,
+.mapd-find + .filter-note + .map-display-h {
   margin-top: 0;
 }
 
@@ -5434,6 +5510,52 @@ hr {
 .leaflet-control-attribution,
 .leaflet-control-scale-line {
   font-size: .72rem;
+}
+
+/* The direction-arrow canvas (map-arrows.js) — one canvas over the whole view,
+   in a pane of its own just above the one the links are drawn on. Positioned
+   rather than laid out: MapArrows moves it with L.DomUtil.setPosition every
+   time the view settles, exactly as Leaflet moves its own renderer canvas, and
+   it never takes a pointer — an arrow is not a click target, the line under it
+   is. */
+.mn-arrow-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+/* ── The credit line, under the map instead of on it ────────────────────────
+   mapAttributionBelow() (map-controls.js) lifts Leaflet's attribution control
+   out of the map's bottom-right corner and drops its container into this strip,
+   immediately below the map. The reasoning is there; what is here is the
+   undoing of Leaflet's own styling for it, because everything that made it a
+   floating box over the map is wrong for a line of credits under one: it is not
+   positioned, it does not float, it carries no white plate of its own, and it
+   takes the page's muted text colour so it reads the same in both themes.
+
+   Every map in the app gets this — the strip is created by addBaseLayers, which
+   all seven call — so nothing else that wants the foot of a map has to fight it
+   for the space. */
+.mn-map-attrib {
+  padding: .25rem .15rem 0;
+  line-height: 1.35;
+}
+
+.mn-map-attrib .leaflet-control-attribution {
+  position: static;
+  float: none;
+  clear: none;
+  margin: 0;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--muted);
+}
+
+.mn-map-attrib .leaflet-control-attribution a {
+  color: var(--muted);
+  text-decoration: underline;
 }
 
 /* Folded 1200 → 1400 by #109's breakpoint pass, and *up* rather than down,
@@ -6083,6 +6205,17 @@ hr {
   border-radius: 6px;
 }
 
+/* The map's own rectangle, and the positioning anchor for everything drawn over
+   it — the note strip, the ACMA, path and station cards. It exists because the
+   credit line moved off the map and into the panel under it (#186): a card
+   anchored to the bottom of .map-panel would be anchored to the bottom of the
+   credits, which on a phone put the station sheet across them and past half the
+   map's height. The stage is the map; the credit line is the panel's next
+   child, outside it. */
+.mn-map-stage {
+  position: relative;
+}
+
 /* Full screen: the whole working surface — map, match note, ACMA and path
    cards, the corner controls — is positioned inside .map-panel, so fixing the
    panel to the viewport takes everything along and the Leaflet map is never
@@ -6097,12 +6230,190 @@ hr {
   z-index: 1900;
   margin: 0;
   border-radius: 0;
+  /* A column, since the credit line moved off the map and under it: the map
+     takes whatever is left after the strip has had the one or two lines it
+     needs, instead of being 100% of a panel that now holds two things. Every
+     other child of this panel is absolutely positioned, so the column has
+     exactly the two items in it. */
+  display: flex;
+  flex-direction: column;
+}
+
+.map-panel.is-full > .mn-map-stage {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .map-panel.is-full #leaflet-map {
   height: 100%;
   min-height: 0;
   border-radius: 0;
+}
+
+/* ── Stations tab: side by side (#186) ─────────────────────────────────────
+   The map in one column, everything normally under it in the other, and a
+   divider that drags. Off by default; app.js toggles `is-split` on the same
+   #stations-main the single column uses, so nothing in the DOM moves and the
+   Leaflet map is never rebuilt — the reasoning is at toggleStationsSplit().
+
+   With the split off, the three wrappers have to be invisible: the two panels
+   are the grid items the stack has always laid out, so .stn-split-map has to
+   disappear into it (`display: contents`) and the divider has to not exist. The
+   right-hand wrapper is a grid of its own either way — same 1rem gap as the
+   stack it sits in, so the cards below the map are spaced identically whichever
+   way the tab is facing.
+
+   This is not #165's filter rail coming back. What sat beside the map then was
+   the map's *settings*; what sits beside it now is the map's *answer*. */
+.stn-split-map { display: contents; }
+
+.stn-split-rest {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  min-width: 0;
+}
+
+.stn-split-bar { display: none; }
+
+.stn-split.is-split {
+  grid-template-columns: minmax(0, var(--mn-split, 58%)) 10px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0;
+  /* Both columns scroll inside the viewport rather than the page scrolling
+     past them — which is the whole request: the map stays in view while the
+     list beside it is read. --mn-chrome is the measured header + memory-strip
+     height (updateChromeHeight, app.js), so this tracks a banner that has
+     wrapped onto two rows on a narrow window. */
+  height: calc(100dvh - var(--mn-chrome, 0px) - 2rem);
+  min-height: 420px;
+}
+
+.stn-split.is-split > .stn-split-map {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;      /* the map fills this column; it never scrolls */
+}
+
+/* The map panel becomes the column, and the map inside it takes whatever is
+   left after the credit line under it. Same shape as .map-panel.is-full, for
+   the same reason — a panel holding two things in a column instead of one
+   thing with a fixed height. */
+.stn-split.is-split > .stn-split-map > .map-panel {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+}
+
+.stn-split.is-split > .stn-split-map > .map-panel > .mn-map-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.stn-split.is-split > .stn-split-map > .map-panel #leaflet-map {
+  height: 100%;
+  min-height: 240px;
+}
+
+.stn-split.is-split > .stn-split-rest {
+  overflow-y: auto;
+  padding: 0 var(--sp-1) var(--sp-2);
+}
+
+/* The divider itself: a full-height hit target with a hairline down the middle,
+   which is what makes an 10 px grab area look like a 1 px rule. */
+.stn-split.is-split > .stn-split-bar {
+  display: block;
+  position: relative;
+  cursor: col-resize;
+  border: 0;
+  background: transparent;
+  touch-action: none;    /* the pointer drag is ours, not the page's scroll */
+}
+
+.stn-split.is-split > .stn-split-bar::before {
+  content: "";
+  position: absolute;
+  inset: var(--sp-2) 4px;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.stn-split.is-split > .stn-split-bar:hover::before,
+.stn-split.is-split > .stn-split-bar:focus-visible::before {
+  background: var(--accent);
+}
+
+/* While the divider is being dragged the pointer is over the map, the table or
+   anything else the bar has been pulled across, and none of them should be
+   selecting text or fighting for the cursor. */
+body.mn-split-dragging {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* The split folds back to one column at `lg` (#186). Two columns of about
+   400 px are two things too narrow to read rather than two things in view,
+   which is the only thing the split is for. The *setting* is untouched — this
+   is a fold, not a switch-off, so a laptop docked to a wide screen finds its
+   split again where it left it.
+
+   These two blocks are here, immediately under the rules they undo, rather than
+   with the other `lg` and `sm` rules eight hundred lines up: every selector is
+   the same one at the same specificity, so **source order is the whole of what
+   decides**, and up there the base rules came later and won. The first version
+   of this was written up there and folded nothing — 381 px of map in a 688 px
+   column at 1000 px wide, which is exactly the state the fold exists to
+   prevent.
+
+   Every declaration the split makes is undone rather than left to interact with
+   the single column, the map's own height included: with the wrappers back to
+   `display: contents` the panel is a plain block again, and a map left on
+   `flex: 1 1 auto` inside one collapses to its min-height. */
+@media (max-width: 1100px) {
+  .stn-split.is-split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    height: auto;
+    min-height: 0;
+  }
+
+  .stn-split.is-split > .stn-split-map {
+    display: contents;
+    overflow: visible;
+  }
+
+  .stn-split.is-split > .stn-split-bar { display: none; }
+
+  .stn-split.is-split > .stn-split-rest {
+    overflow-y: visible;
+    padding: 0;
+  }
+
+  .stn-split.is-split > .stn-split-map > .map-panel {
+    display: block;
+  }
+
+  .stn-split.is-split > .stn-split-map > .map-panel > .mn-map-stage {
+    flex: 0 1 auto;
+  }
+
+  .stn-split.is-split > .stn-split-map > .map-panel #leaflet-map {
+    height: min(62vh, 720px);
+    min-height: 360px;
+  }
+}
+
+/* And the phone's own map height, restated at the specificity the rule above
+   uses — `#leaflet-map` alone is outranked by it, so without this a 390 px
+   screen with the split remembered as on would take the laptop figure. */
+@media (max-width: 700px) {
+  .stn-split.is-split > .stn-split-map > .map-panel #leaflet-map {
+    height: 52dvh;
+    min-height: 260px;
+  }
 }
 
 /* Code elements */

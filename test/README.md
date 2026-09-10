@@ -17,7 +17,7 @@ risks, and the two live TDZ crashes in
 cd test
 npm install                       # once
 npx playwright-core install chromium   # once, if no browser is present
-npm run all                       # the thirty-six that run in CI
+npm run all                       # the thirty-seven that run in CI
 ```
 
 | Command | What it does |
@@ -49,6 +49,7 @@ npm run all                       # the thirty-six that run in CI
 | `npm run linkbudget` | the link budget card's two ends: each found by name, station number, ALERT address or address window against the *filter's own* answer, the box keeping its caret through a paste, an armed end filled from a pin click, a point and a row of the Stations list in its filtered state — without selecting it — Clear A / Clear B / Clear both, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute: the same station at both ends, a zero-length path, a term nobody supplied, and a frequency that cannot say whether it is an override |
 | `npm run pathcursor` | the elevation profile's cursor, on the chart and on the map at once: a dot running along the ground line with the pointer, tagged with the land height under it, and the same point marked on the map — from either side. The tiles are a **ramp in longitude** built in the check, 0 m at one end of the hop and 1,000 m at the other, continuous across tile boundaries and independent of the zoom Terrain picks, because flat ground would let a cursor that ignored the pointer entirely pass every assertion. So every reading is arithmetic: a quarter of the way along the plot the tag has to say 250 m, the dot has to be a quarter of the way across *and lower down it than the halfway one*, and the marker has to be a quarter of the way along the line. Driven from both directions, and asserted to leave nothing behind — off the chart, off the line, and when the line itself is deleted |
 | `npm run mapfade` | arming a draw tool from the ✏️ flyout must not also draw with it: a real pointer clicks **Line**, and the line that follows two map clicks has to come out with two points rather than the three the flyout's own leaked click made of it — plus the link budget disarming itself the moment both ends are in and opening the ground profile unasked, Escape getting out of the pick, the margin chip in the card's corner carrying the table's own figure, half a decibel of default line loss at an end nobody has measured, the chart's sky and the earth-curvature arc under it, a Path row whose height does not depend on the two names, built area that is no longer obstruction-red, MapFade's bands set, banded, remembered and rendered as controls, an empty datastore read once rather than once per redraw for ever, a table bigger than PostgREST's 1,000-row ceiling read in pages, no land cover meaning no figure rather than a kinder one off bare earth — and, the assertion the rest of it exists for, the margin the map colours a link by being the same number to the decimal that the link budget card gives for that link |
+| `npm run maplinks` | what the Stations map's links say and where its furniture sits (#186): the credit line out of the map *and* out of the box the on-map cards are positioned against, with the move-pin panel's Save button geometrically clear of it; the link colour a link is painted checked against `MapFreq.rows()` rather than a literal, so a re-ordered palette still passes and a wrong pairing does not; a backbone path as three lines with the black dash over the coloured core; the arrows' direction as *data* — a field link's polyline ending on the repeater it points at, a repeater-to-repeater path two-way — on a pointer-less canvas in a pane above the links; a repeater focus with no filter behind it dimming the map, enabling both Clear buttons and being cleared by them; the place strip appearing on focus, going on blur and coming back with the same answer; and the split as two columns whose widths add up, with the same Leaflet map on both sides of the toggle. **The panel search is measured with `getClientRects()`, never `el.hidden`** — the first implementation set the attribute and left every row on screen, because an author `display: flex` beats the browser's own `[hidden] { display: none }` at the same specificity, and a check reading the property would have agreed with the bug. Confirmed red on three deliberate breaks |
 | `npm run claim` | claiming an address from the message that arrived on it: an unresolved relayed row offers the claim, the picker sends the *station* address rather than the sensor slot, and the tab stops offering a write that has already landed — with the datastore stubbed at `dbRpc` |
 | `npm run fieldkind` | a field series knows what it is measuring — the two SDI-12 levels at 18 Bateson charted as **RainAccum** with the inspector offering *"= 0.36 mm (assumed 0.2 mm/tip)"* against metres, and every layer underneath was right: the logger sent `s:999998/level_1` with `unit: "m"`, the row is typed `Water Level`. Two defects that only misbehave together — `fieldAddrs()` built `a:<alert_id>` addresses and nothing else, so the series never resolved to its sensor row, and `guessKind()` then read neither the unit nor the channel and fell through to its `RA` default. 30 assertions over the rule, the address list, the whole operator path, and the unit's veto over a kind set by hand — that last one added because a mutation run showed it was otherwise untested |
 | `npm run fieldprobe` | what the *datastore* holds, as against what `stations.json` says it should: the Field Data picker's "In the datastore" block, driven for 18 Bateson — a station with no station number, no ALERT ids and no sensor rows, beside four channels reporting under `bateson_test`. The probe asks the station's own id first, then its registry addresses, then widens to a word out of its name; a widened match is listed, tagged with the station row it is filed under, and **never ticked or charted on its own**; ticked by hand it charts labelled with *that* station, named apart by channel. Plus the search box, the empty answer, and the four columns each query selects |
@@ -57,7 +58,7 @@ npm run all                       # the thirty-six that run in CI
 | `npm run terrain` | the five terrain-and-place features, against a world the check *makes*: terrarium tiles generated per tile coordinate from a closed-form surface — hills every eight kilometres, so the summits are real summits and the coverage is over real relief — which makes every answer checkable against arithmetic rather than against whatever SRTM says about Queensland today. Three of the five are meaningless over `pathcover`'s one flat tile, which is why this has a fixture of its own. The Radio Mobile colour file's twelve heights paired with its twelve colours *end to end* (head to head puts pure blue on the mountains, which is a plot that looks deliberate and is upside down); peaks rather than maxima (sort the grid and take the top five and you get five pixels of one hilltop, every time — the check measures the closest pair against the view); the coordinate parser over eleven shapes and seven near-misses, including `26 07 24 S`, where reading the S as a seconds marker rather than as South is a silent 52-degree error, and `6128 6129`, which is two station numbers and must not be a coordinate; the profile card's fade-margin row, banded and quoting both directions, and its stated reason when an end is a point on the ground; and the polar plot drawing, keying itself with both radios named, refusing a range that is not one, and **re-banding a new threshold without fetching a single extra tile** — the separation between a level and the colour it lands in, asserted against the tile counter — plus the saved CSV, every row of which has to land inside the plot it claims to describe and measure back to its own range from the centre |
 | `npm run steps` | `npm run all` and `.github/workflows/web-smoke.yml` name the same checks, in both directions. Parse-only. It exists because the drift has happened twice — `catchments` and `mapfade` each sat in `all` with no CI step, running for whoever typed them and on no push at all — and **both halves stay green while they disagree**, which is why neither was found on purpose |
 | `npm run concat` | byte-exact concat-and-diff against a recorded snapshot (milestone tool) |
-| `npm run all` | the thirty-six that run in CI |
+| `npm run all` | the thirty-seven that run in CI |
 
 `npm run smoke -- -v` also prints which off-origin hosts were blocked;
 `toplevel`, `registry`, `nav`, `shell`, `tabs`, `help`, `search`, `linkbudget`, `mapfade`, `drawkml`, `steps` and `stncard` take `-v` too, to list what
@@ -420,6 +421,43 @@ the top of their *own* icon, and the icons are ~46 px apart while the panels are
 150–450 px tall — so a second stuck panel lies **across** the first, the later
 control paints on top, and a click aimed at a checkbox in the panel underneath
 lands on the panel above it instead.
+
+### `maplinks.mjs` — ask the geometry, not the attribute
+
+The subject is the Stations map's links and the furniture around them (#186),
+and every claim in it is invisible to `smoke`: a map whose links are all one
+colour, whose arrows never draw, whose credit line covers the move-pin panel's
+Save button, whose Clear buttons leave the map three-quarters faded and whose
+Map display search hides nothing at all opens with a clean console.
+
+The part worth carrying to the next check is not the subject but the
+**measurement**. The panel search filters rows by setting the `hidden`
+attribute on them, which is the right signal for a screen reader and, on its
+own, hid nothing: half these rows are labels `styles.css` gives
+`display: flex`, and an author rule beats the browser's own
+`[hidden] { display: none }` at the same specificity. In a property dump the
+implementation was perfect — every non-matching row had `hidden === true` — and
+on screen the headings vanished and every checkbox stayed exactly where it was.
+**A check reading `el.hidden` would have agreed with the bug.** So this file
+asks `getClientRects()` everywhere it asks whether something is on screen, and
+the same rule found a second defect of the same family in the same change: the
+side-by-side split's `lg` fold-back, written where the other `lg` rules live,
+lost on source order to the rules it was meant to undo and folded nothing. It
+is measured here as a column width at a set viewport, not as a media query
+somebody read.
+
+Two other habits from elsewhere in this directory are worth naming because they
+are what make the colour assertions mean anything. The link colours are checked
+against `MapFreq.rows()` rather than against literals — a re-ordered palette
+still passes, a *wrong* pairing does not — which is `terrainkit.mjs`'s rule
+about the elevation ramp seen from the other side. And the arrows' direction is
+checked as data: the polyline's far end has to be the repeater the arrow points
+at, which is the one assertion that can tell "arrows drawn" from "arrows drawn
+the right way round".
+
+Confirmed red on three deliberate breaks: the `[hidden]` rule removed, the
+credit strip put back inside `.mn-map-stage`, and the backbone's dash pass
+dropped with a repeater-to-repeater path given a direction it hasn't got.
 
 ### `inspections.mjs` — the half the network policy hides
 

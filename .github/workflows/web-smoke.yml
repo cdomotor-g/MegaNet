@@ -468,6 +468,20 @@ jobs:
         working-directory: test
         run: npm run mapfade
 
+      # What the links say and where the map's furniture sits (#186). Nine
+      # changes landed together and `smoke` is blind to every one of them: a map
+      # whose links are all one colour, whose arrows never draw, whose credit
+      # line covers the move-pin panel's Save button, whose Clear buttons leave
+      # the map three-quarters faded and whose Map display search hides nothing
+      # all open with a clean console. The panel filtering is measured with
+      # getClientRects() rather than off `el.hidden`, because the first
+      # implementation set the attribute and left every row on screen — an
+      # author `display: flex` beats the browser's own `[hidden]` rule, and a
+      # check reading the property would have agreed with the bug.
+      - name: Map links — the colour, the arrows, the credit line and the split
+        working-directory: test
+        run: npm run maplinks
+
       # The drawing leaving for Google Earth (#183). Nothing else here can see
       # a KML at all: `smoke` presses the button and never opens the file, and
       # a wrong one opens perfectly — Google Earth ignores a `<styleUrl>`

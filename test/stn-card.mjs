@@ -672,8 +672,11 @@ async function main() {
     check('turning wind on gives it a legend entry and takes it off that line', legend.windEntry);
     check('the wind key lists all ten regions, with speeds and what they cost', legend.windRows);
     check('the same for line of sight', legend.losEntry);
-    check('the 👁️ flyout is grouped under three headings',
-      legend.heads.join('|') === 'Stations & links|Overlay layers|Labels & export', legend.heads.join(' | '));
+    // Four since #186 — "Link colour" joined them when the fade-margin switch
+    // became one of three radio buttons and the frequency colouring the default.
+    check('the 👁️ flyout is grouped under four headings',
+      legend.heads.join('|') === 'Stations & links|Link colour|Overlay layers|Labels & export',
+      legend.heads.join(' | '));
     await fresh.context.close();
 
     check('nothing threw for the whole run', errors.length === 0, errors.slice(0, 3).join(' | '));

@@ -224,6 +224,10 @@ const MapFade = (function () {
       style.weight = line.mnLinkRole === 'backbone' ? MAP_BACKBONE_CORE_W + 1 : MAP_LINK_CORE_W + 1;
     }
     if (!line.mnBlastRed) line.setStyle(style);
+    // The arrowheads on this line take its colour, so they follow the band.
+    // Coalesced to one redraw a frame, so a sweep of three thousand margins
+    // landing over a minute costs one redraw per frame, not per margin.
+    MapArrows.schedule();
     // The figure itself, on hover. A colour says which of three buckets; the
     // number is what anybody who cares about the colour asks next.
     if (typeof line.bindTooltip === 'function' && margin != null) {
@@ -622,7 +626,7 @@ const MapFade = (function () {
       refreshMapLayers({ skipFit: true });
       // The thresholds and the Save button only exist while the switch is on,
       // so the panel that holds the switch has to be redrawn by the switch —
-      // "Show signal links" and "Kill spaghetti" in the same flyout do exactly
+      // "Show signal links" and "Limit link length" in the same flyout do exactly
       // this, and for exactly this reason. Done here rather than in the
       // onchange attribute so a programmatic caller gets the controls too.
       rerenderMapDisplayControls();

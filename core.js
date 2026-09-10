@@ -280,19 +280,50 @@ const HELP = {
       + 'airports it matches are offered under the box. Neither changes what the station filter '
       + 'matches: the strip is an extra answer beside the station list, never instead of it, and a '
       + 'lookup that cannot be made says so and leaves the filtering alone.',
-      '<strong>Kill spaghetti</strong> caps how long a signal link may be before it stops being '
+      '<strong>Limit link length</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
       + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 70 km; '
       + 'the <strong>Map display</strong> panel on the map says how many links were drawn and how '
       + 'many were culled, so check that before concluding the path isn\'t there.',
-      '<strong>Backbone paths</strong> are the heavy black lines, and they are of two kinds: two '
+      'The strip belongs to the box the caret is in and goes when focus leaves it — the results '
+      + 'are kept, so clicking back into the box brings the same strip back without a second '
+      + 'lookup.',
+      '<strong>Link colour</strong> is one radio group in <strong>Map display</strong>, not two '
+      + 'switches: <em>By frequency</em> (the default), <em>By fade margin</em> or <em>Plain</em>. '
+      + 'They cannot both be on because both want the same thing — the colour of a link\'s core '
+      + 'line. Frequency is the default because it is <em>recorded</em> rather than computed: it '
+      + 'is the rx frequency of the repeater on the link\'s end, so every link either has one or '
+      + 'provably has not, the moment the file loads. A fade margin has to be swept over terrain '
+      + 'first, and until it is, most links have no figure and no colour. The 🔑 legend lists '
+      + 'every channel in the file with how many repeaters are on it. Line of sight is not in the '
+      + 'group and does not need to be: it paints crimson over whichever colouring is running.',
+      '<strong>Arrows along the links</strong> show which way the traffic runs — into the repeater '
+      + 'that carries a field station, on to the base station from a repeater. A '
+      + 'repeater-to-repeater backbone hop runs both ways and is drawn with a head at each end '
+      + 'instead of a row of one-way arrows.',
+      '<strong>Backbone paths</strong> are black dashes over the link colour, and they are of two '
+      + 'kinds: two '
       + 'repeaters within the <em>Max TX distance</em> whose pass-range windows are open to at '
       + 'least one common ALERT address, and every repeater within that same distance of a base '
       + 'station — a base opens no window of its own to share, so on those the distance is the '
       + 'whole test. For backbone the slider is the <em>match</em> — moving it changes which '
       + 'pairs qualify, not just which are drawn. Clicking any radio path — field link or '
       + 'backbone — opens a card about that hop and points the elevation profile and link budget '
-      + 'panels at it.',
+      + 'panels at it. The dashes are what says <em>backbone</em>; the colour between them says '
+      + 'whatever the link colouring says.',
+      'The 👁️ <strong>Map display</strong> panel has a <strong>Find a control</strong> box at the '
+      + 'top of it. Type into it and the panel filters down to the rows that match — against the '
+      + 'label, its note and its tooltip, so "wind", "dB", "contour" and "licence" all land '
+      + 'somewhere. It filters what is drawn and switches nothing off.',
+      'The ◫ button beside ⛶ puts the map and everything normally under it '
+      + '<strong>side by side</strong>, each its own scroller at the height of the window, with a '
+      + 'divider between them that drags (or moves with the arrow keys). Where you leave the '
+      + 'divider is remembered, and the split folds back to one column on a narrow screen without '
+      + 'forgetting it.',
+      '<strong>Clear filters</strong> also clears the repeater focus — the dim that a click on a '
+      + 'repeater pin puts over everything not on its own paths. Both are ways of saying "back to '
+      + 'the whole network", so both buttons do both, and both are enabled by a focus even with no '
+      + 'filter running.',
       '<strong>Include related repeaters</strong> widens the match itself rather than the drawing: '
       + 'repeaters whose pass ranges cover a matched station are pulled in even though they don\'t '
       + 'match the filter text. That is why the station count can exceed the number of rows your '
@@ -1796,12 +1827,27 @@ const state = {
   // Line-of-sight check on drawn links (see MapLos). Off by default and not
   // persisted, for MapSurvey's reasons — it fetches terrain tiles on enable.
   mapLos:         false,
-  // Fade-margin colouring on drawn links (see MapFade). Off by default like
-  // MapLos, and unlike MapLos it *is* remembered — because once the network's
-  // margins are saved to the datastore this switch costs nothing to have on:
-  // the colours come back with the rows. An operator who turned it on and got
-  // a coloured network should find one again tomorrow.
-  mapFade:        (localStorage.getItem('mn-map-fade') || 'off') === 'on',
+  // What the link colours mean (#186): 'freq' — the channel the hop runs on
+  // (MapFreq, and the default); 'fade' — the fade margin in three bands
+  // (MapFade); 'plain' — the one link colour the map drew for its whole life
+  // before either existed. One radio group rather than two checkboxes, because
+  // both want the same channel: the colour of the core line.
+  //
+  // Remembered, and the default is the frequency for the reason map-freq.js
+  // gives at length — it is recorded rather than computed, so it is complete
+  // and free the moment the file loads, which is what a default has to be.
+  mapLinkColour:  mapLinkColourFromStorage(),
+  // Fade-margin colouring on drawn links (see MapFade). Derived from the radio
+  // group above so the two can never disagree, and kept as its own flag because
+  // MapFade, MapLos, the legend and the map-display block have all asked
+  // `state.mapFade` since long before there was a third option.
+  mapFade:        mapLinkColourFromStorage() === 'fade',
+  // Direction arrowheads along every drawn link (see MapArrows). On by default
+  // and remembered: it costs nothing — no request, no computation, one canvas
+  // painted off lines that are on the map already — so the rule that keeps
+  // MapContours and MapPeaks off until asked for does not apply. An operator
+  // who turns them off means it.
+  mapArrows:      (localStorage.getItem('mn-map-arrows') || 'on') === 'on',
   // Where green stops being green and yellow stops being yellow, in dB of fade
   // margin. Higher than the link budget card's own bands (10 / 3) on purpose:
   // the card asks "would this link work", the map asks "which of these would I
@@ -1817,6 +1863,21 @@ const state = {
   // right now, not a standing preference — and a page that *opens* with a
   // full-screen map has hidden its own navigation.
   mapFullscreen:  false,
+  // The Stations tab side by side: the map in one column, everything normally
+  // under it in the other, with a draggable divider (#186 — see
+  // toggleStationsSplit, app.js). Remembered, unlike full screen, and for the
+  // opposite reason: this is not something an operator is doing right now, it
+  // is which of two readings of the tab they prefer, and a preference that has
+  // to be re-made on every visit is not one. Off on a first visit — the single
+  // column is the shape the tab was designed in, and it is the only one that
+  // fits a laptop screen without either half being cramped.
+  mapSplit:       localStorage.getItem('mn-map-split') === 'on',
+  // Where the divider sits, as a percentage of the row given to the map. 58 by
+  // default: the map is the half being *looked* at and the list beside it is
+  // being read a row at a time, so an even split gives the map less than it
+  // wants and the list more than it needs.
+  mapSplitPct:    Math.max(25, Math.min(75,
+                    Number(localStorage.getItem('mn-map-split-pct')) || 58)),
   // Which on-map control panels (see MapChrome, map-controls.js) the operator
   // has pinned open. Persisted, and the one thing about those panels that is:
   // a pin is a standing preference about how this operator reads a map, not
@@ -2515,6 +2576,25 @@ function roleColor(role) {
 // forget the `.trim()` — getPropertyValue returns the declaration's whitespace
 // and ` #0b5cab` is not a colour any of those three contexts accepts.
 //
+// Which link colouring the map opens with (#186). A function rather than a
+// literal because `state` needs the same answer twice — once for
+// mapLinkColour and once for the derived mapFade — and hoisting makes it
+// readable from the object literal above.
+//
+// The second clause is the migration: this setting replaced a plain on/off
+// switch for the fade-margin colouring, and an operator who had that switch on
+// finds their map coloured the same way it was rather than silently swapped to
+// the new default.
+function mapLinkColourFromStorage() {
+  let saved = null, fade = null;
+  try {
+    saved = localStorage.getItem('mn-map-link-colour');
+    fade  = localStorage.getItem('mn-map-fade');
+  } catch (_) { /* private mode, or storage disabled — take the default */ }
+  if (saved === 'freq' || saved === 'fade' || saved === 'plain') return saved;
+  return fade === 'on' ? 'fade' : 'freq';
+}
+
 // The fallback is not decoration. A token misspelt here resolves to the empty
 // string and the attribute silently draws in black, which on a dark panel is a
 // line nobody can see and nothing throws.

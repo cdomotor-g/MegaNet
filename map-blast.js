@@ -33,7 +33,7 @@
 // rather than fighting over it.
 
 // ── The analysis ─────────────────────────────────────────────────────────────
-// The distance rule is the map's own: with "Kill spaghetti" on, a fallback
+// The distance rule is the map's own: with "Limit link length" on, a fallback
 // repeater only counts if it is within the Max TX distance slider — because a
 // red line has to be a line that was drawn, and the drawn links live under
 // that cull. With it off, any pass-range carrier counts however far away. A
@@ -152,7 +152,7 @@ const MapBlast = (function () {
     return isFinite(maxKm)
       ? `counting fallback repeaters within <strong>${maxKm} km</strong> (the Max TX distance
          slider — move it and this answer follows)`
-      : `counting a fallback repeater at <strong>any distance</strong> — “Kill spaghetti” is off,
+      : `counting a fallback repeater at <strong>any distance</strong> — “Limit link length” is off,
          so no distance rule is applied`;
   }
 
