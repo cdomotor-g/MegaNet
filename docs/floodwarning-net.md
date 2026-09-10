@@ -11,9 +11,10 @@ code changes", at the foot.
 **Status, 2026-09-10: steps 1 to 4 have been done.** The apex resolves to
 Cloudflare and every request to it is challenged by Access, so what follows is
 now the record of what was done and the thing to read when undoing it, rather
-than a plan. One thing the plan did not anticipate has since turned up: the name
-is blocked on the Bureau network. That has its own section —
-[The name is blocked on the Bureau network](#the-name-is-blocked-on-the-bureau-network).
+than a plan. One thing the plan did not anticipate has since turned up: Access
+puts the login on a hostname the Bureau's web filter denies, so the site does not
+load from a Bureau machine. That has its own section —
+[The Access login host is blocked on the Bureau network](#the-access-login-host-is-blocked-on-the-bureau-network).
 
 ---
 
@@ -188,116 +189,109 @@ produces two services both asserting they own `floodwarning.net`. There is no
 
 ---
 
-## The name is blocked on the Bureau network
+## The Access login host is blocked on the Bureau network
 
-Reported September 2026: `floodwarning.net` does not load from a Bureau machine.
-`floodwarning.tech` — an unrelated third party in the same field, Adam Murphy's
-ALERT2 / TDMA tooling — loads fine from the same machine.
+`floodwarning.net` does not load from a Bureau machine. The block page, captured
+11 September 2026, says exactly why, and it is worth reading field by field
+because it contradicts most of what is easy to assume:
 
-That comparison is the useful part, because it rules out the three intuitive
-explanations on its own. Both sites are about flood warning. Both have a login on
-them. Both are hosted offshore on a commodity provider. Whatever the filter is
-reacting to, it is none of those.
+| Field | Value |
+|---|---|
+| URL | **`floodwarningnet.cloudflareaccess.com`** |
+| Category | **`none`** |
+| Exception | `policy_denied` |
+| ProxySG Appliance | `S2-BOM-SWG-fsg12` — a Symantec/Broadcom ProxySG secure web gateway |
+| Stated reason | "the website has not been categorised by the department security filter" |
 
-Measured 2026-09-10, from outside both networks:
+**Read the URL field twice: `floodwarning.net` is not what was blocked.** The
+browser reached the apex, was served the 302, followed it, and was stopped at the
+next hop. The site passes the filter. The Access login host does not.
 
-| | `floodwarning.net` | `floodwarning.tech` |
-|---|---|---|
-| `GET /`, signed out | **302 → `floodwarningnet.cloudflareaccess.com`** | **200, 5,912 bytes of real content** |
-| `GET /robots.txt` | 302, to the same login | 200 — `Allow: /`, plus a sitemap |
-| Readable without signing in | **nothing, at any path** | everything but `/dashboard`, `/login`, `/api/`, … |
-| Registered | 2026-02-26 | 2024-08-11 |
-| Before that | **expired, then auctioned on DropCatch.com** (listing seen 2025-10-16) | never dropped |
-| Serving what it serves now since | ~2026-08-28 | 2024 |
-| Hosting | Cloudflare, proxied | Hetzner behind Caddy; Cloudflare for DNS only |
+And `none` is not a bad category, it is the absence of one. WebPulse — the
+categorisation feed a ProxySG consults — has never classified that name, and the
+Bureau default-denies whatever it cannot classify. There is no threat verdict
+here: `policy_denied` on an empty category is a default-deny, not a detection.
 
-### Why
+### Why that host will never be categorised
 
-Ranked by how much of the difference each one explains.
+`floodwarningnet.cloudflareaccess.com` is this Zero Trust account's **team
+domain**. Cloudflare lets you choose the team-name portion and nothing else — its
+own setup documentation gives the value as `<your-team-name>.cloudflareaccess.com`.
+So the name is unique to one tenant, is linked to from nowhere, and serves nothing
+but a login form.
 
-**1. Nothing here is readable, so nothing can classify it.** A web filter
-categorises a name by fetching it. Every path on this domain — `/`,
-`/robots.txt`, even `/favicon.ico` — answers 302 to a login on a *different*
-hostname. A crawler never receives one byte of MegaNet, so the name cannot leave
-**Uncategorised**, and a government SOE commonly default-denies that category.
-Handed the same crawler, `floodwarning.tech` returns a page reading "Open Source
-Flood Warning & Hydrography Projects" and a `robots.txt` pointing at a sitemap,
-and lands somewhere harmless like Technology or Business. It is not that the
-other site argued its way past the filter. It answered the question and this one
-does not.
+Nothing is ever going to categorise that. It is not a backlog that will clear;
+there is no content to classify and no reason for a crawler to call. It will read
+`none` indefinitely, which means **it needs an allowlist entry, not a
+recategorisation** — the distinction to make explicitly when raising the ticket,
+because it is not the usual "your filter has us in the wrong bucket" complaint.
 
-**2. From the outside, the gate has the exact shape of a phishing kit.** Line the
-facts up as a scanner sees them: a six-month-old domain, bought at expiry
-auction, named after a Bureau statutory function, which redirects instantly to a
-hostname the visitor never asked for, where a form asks for a `@bom.gov.au`
-address and mails back a six-digit code. Every one of those is a
-credential-harvesting indicator and together they are the textbook description of
-one. A brand-impersonation rule would fire on the *name* alone and never so much
-as look at `.tech`, which claims nothing.
+The same fact kills the tempting engineering answer. The hop onto Cloudflare's
+domain is not a redirect that can be moved onto `floodwarning.net`; while Access
+is the gate, the login genuinely happens somewhere else, and that somewhere else
+is a name the Bureau has never heard of.
 
-**If Bureau security blocked this without knowing what it was, they were right
-to.** That is worth leading with when raising it, rather than treating the block
-as a fault.
+### And why `floodwarning.tech` loads
 
-**3. `*.cloudflareaccess.com` may be blocked in its own right.** It is
-Cloudflare's Zero Trust product, and several enterprise filters file it under
-Proxy Avoidance / Anonymisers / VPN — it tunnels into private resources, and it
-competes with whatever the agency already runs. If that category is denied, the
-redirect target is refused whether or not `floodwarning.net` itself is.
+The comparison that prompted this — Adam Murphy's ALERT2 / TDMA tooling at
+`floodwarning.tech`, which loads on the same machine — turns out to have a very
+short explanation, and it is not about reputation, age, TLD or hosting. **It has
+no Access gate.** `GET /` returns 200 with the page, its own login lives on its
+own domain, and no request ever leaves for a third-party authentication host. One
+hop, one name, and that name is categorised.
 
-**4. The domain dropped and was re-caught.** Expiry, auction, re-registration is
-the most common pattern in malicious domain re-use, so filters treat it harshly:
-the registration date resets, which restarts any newly-registered-domain penalty,
-and a previous owner's categorisation can survive the change of hands. What the
-previous owner served is worth finding out and has not been established here —
-archive.org was rate-limiting the lookup when this was written.
+Three hypotheses worth recording as dead, since each looked plausible before the
+block page turned up:
 
-**Not the TLD, and not the host.** Both are the obvious guess and both run
-backwards. `.tech` is a new gTLD with a *worse* average reputation than `.net`,
-and some filters deny new gTLDs wholesale; Hetzner has a considerably worse abuse
-reputation than Cloudflare. If either were the mechanism, the other site would be
-the blocked one.
+- **Not the domain's history.** `floodwarning.net` was registered 2026-02-26,
+  after expiring and being auctioned on DropCatch (listing seen 2025-10-16),
+  against `floodwarning.tech`'s 2024-08-11 and never dropped. Irrelevant — the
+  apex passes.
+- **Not the phishing shape.** A gate on an unfamiliar domain asking for a
+  `@bom.gov.au` address and mailing back a six-digit code genuinely does resemble
+  credential harvesting, but the appliance returned no such finding.
+- **Not the TLD, and not the host.** Both run backwards anyway: `.tech` is a new
+  gTLD with a worse average reputation than `.net`, and Hetzner's is worse than
+  Cloudflare's.
 
-### Telling which, from a Bureau machine
+The one idea that survived is the mechanism — uncategorised means denied. It just
+applies to the login host rather than to the site.
 
-- **Read the block page.** It names the product and almost always the category.
-  One screenshot settles the whole question and makes everything below
-  unnecessary.
-- **Try the three names separately** — `floodwarning.net`,
-  `floodwarningnet.cloudflareaccess.com`, and the `workers.dev` preview from
-  step 2 if it has not been retired yet. The preview serves the same app with no
-  gate in front of it: if it loads and the real name does not, the gate is the
-  cause and the content is not.
-- **`nslookup floodwarning.net`.** An internal address or an NXDOMAIN means DNS
-  filtering — a category feed or a newly-registered-domain list. Getting
-  `104.21.59.35` / `172.67.211.242` back and *then* failing to load means the
-  HTTP proxy.
+### What to do
 
-### What to do about it
+1. **Raise the Cherwell request.** The block page names the path:
+   **Technology > I want something > Security Services > Cyber Security
+   Operations > Request Website Approval**. Ask for
+   `floodwarningnet.cloudflareaccess.com`, and put in the ticket that it is a
+   per-tenant authentication host which will never carry a category, so the fix
+   is an allowlist entry rather than a recategorisation — and that
+   `floodwarning.net` itself already passes, so this is the only name in the way.
+   IT Service Desk is 03 9669 8188 (x8188) if the form needs chasing.
+2. **Ask about Supabase in the same ticket.** Every station read goes to
+   `jjprlritvhdqpvphfrnu.supabase.co`. If that name is uncategorised too, then
+   fixing the gate produces an app that loads and then silently fetches nothing —
+   a far worse failure to diagnose than a clean block page. Two hostnames, one
+   ticket.
+3. **Submit both to Symantec Site Review** — <https://sitereview.bluecoat.com/> —
+   because the appliance is a ProxySG and WebPulse is what feeds it. This does not
+   replace the ticket, for the reason above, but a reviewer approves a name with a
+   category more readily than one without.
+4. **If the ticket is refused, Access is the thing to drop, not the site.**
+   [`access.md`](access.md#between-the-layers--the-gate-signs-you-in-173) records
+   that the email-and-code sign-in still works wherever Access is not in front,
+   and without the gate the whole flow sits on `floodwarning.net` plus Supabase
+   with no third-party auth host at all. That trades the perimeter for
+   reachability — under option (a), a smaller loss than it sounds, since the data
+   was never the secret and Layer 2 is untouched either way. Do not reach for it
+   before the ticket is answered.
+5. **Longer term, a `bom.gov.au` subdomain** removes the whole class of problem:
+   no external name to categorise, no allowlist entry to survive the next filter
+   change. A conversation with the Bureau rather than a configuration change,
+   which is why it is last.
 
-1. **Submit recategorisation requests.** Free, and the actual fix. Every vendor
-   takes them — Zscaler Sitereview, FortiGuard, Symantec/Broadcom Sitereview,
-   Palo Alto Test A Site, Netskope, Cisco Talos, Microsoft SmartScreen. Submit
-   `floodwarning.net` **and** `floodwarningnet.cloudflareaccess.com`; the second
-   is the one people forget, and on cause 3 it is the one that matters.
-2. **Give the crawler something to read.** Exempt one page from the Access policy
-   — a public `/about` saying in plain HTML what MegaNet is, who runs it, and
-   that access is restricted to Bureau staff — and leave `/robots.txt` outside
-   the policy too. This is most of why `.tech` is categorised and this domain is
-   not, and it defuses cause 2 as well, because a login stops being the first
-   thing any visitor sees. It costs nothing under option (a): the page says only
-   what this public repository already says.
-3. **Ask Bureau IT to allowlist it**, with the case stated plainly: a
-   Bureau-staff tool, gated to `@bom.gov.au`, whose data is public by decision
-   ([`access.md`](access.md#the-decision-the-data-stays-public-option-a)).
-4. **Longer term, a `bom.gov.au` subdomain** deletes this entire class of
-   problem — no external name to categorise, no impersonation question to answer,
-   no allowlist entry to maintain across filter changes. That is a conversation
-   with the Bureau rather than a configuration change, which is why it is last
-   and not first.
-
-Only (2) is a change anyone can make from here, and even that one is a dashboard
-action against the Access policy rather than a commit.
+Keep the block page screenshot. Its URL and Category fields are the entire
+diagnosis, and a future recurrence is worth comparing against it — a different
+URL in that field is a different problem.
 
 ---
 

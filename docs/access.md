@@ -336,22 +336,21 @@ single-owner account with one MFA device on one phone is the actual risk here.
 
 ### "The site does not load at all on the Bureau network"
 
-Not a login problem, and nothing in this page will fix it: a corporate web filter
-is refusing the name before Access ever sees the request. The signature is that
-it fails the same way for everyone on the Bureau network and works from a phone
-on mobile data.
+Not a login problem, and nothing on this page will fix it. Confirmed September
+2026: the Bureau's ProxySG denies **`floodwarningnet.cloudflareaccess.com`** —
+Category `none`, Exception `policy_denied` — while `floodwarning.net` itself
+passes. The site is fine; the door it sends you to is the blocked thing.
 
-The cause is mostly the gate itself. Because Access answers *every* path with a
-redirect to `floodwarningnet.cloudflareaccess.com`, a filter's crawler can never
-read a single byte of the site, so the name cannot be categorised — and a login
-form on an unfamiliar domain asking for a `@bom.gov.au` address looks, to a
-scanner, exactly like credential phishing. The evidence, the diagnostics and the
-four things worth doing are in
-[`floodwarning-net.md` → The name is blocked on the Bureau network](floodwarning-net.md#the-name-is-blocked-on-the-bureau-network).
+That host is this account's Access team domain, and because Cloudflare only lets
+you choose the team-name portion it is a per-tenant name that no categorisation
+feed will ever classify. It needs an allowlist entry from Cyber Security
+Operations, not a recategorisation. The block-page fields, the Cherwell path and
+the four things worth doing are in
+[`floodwarning-net.md` → The Access login host is blocked on the Bureau network](floodwarning-net.md#the-access-login-host-is-blocked-on-the-bureau-network).
 
-Deleting the Access application would make the site load, and that is worth
-knowing as an emergency lever, but it is treating a categorisation problem by
-removing the perimeter. Try the recategorisation requests first.
+Deleting the Access application would make the site load immediately, and it is
+worth knowing as the emergency lever, but it removes the perimeter to work around
+a filter entry. Raise the ticket first.
 
 ### "I am signed in but Save is refused"
 
