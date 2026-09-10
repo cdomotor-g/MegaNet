@@ -2153,6 +2153,24 @@ h2.h-bad {
    label (it is what says the link leaves the app), not punctuation after it. */
 .stn-arro { white-space: nowrap; }
 
+/* The station table when it is the column beside the map rather than the page
+   (#186 — the column set itself is decided in stationsTable, app.js).
+
+   Five columns in about 420 px, and the 8.8 px of side padding every cell
+   carries is 88 px of that — a fifth of the table spent on gutters, at the
+   width where a name has the least room to spare. Tightened rather than
+   removed: the columns still have to read as columns, and .4rem still separates
+   them by more than the space between two words. It buys back roughly 30 px,
+   which is a quarter of the name column.
+
+   The station number is the one cell held to one line. It is an identifier: six
+   digits broken over two lines read as two numbers, and it is the field a
+   person copies out of this table into a work order. */
+.stn-table--narrow th,
+.stn-table--narrow td { padding: .4rem .35rem; }
+
+.stn-table--narrow .stn-num { white-space: nowrap; }
+
 .rx-cell {
   background: var(--rx-bg);
 }

@@ -1132,8 +1132,10 @@ leaves behind:
   pointing at the text.** The Stations map has ~3,174 pins and no DOM to
   annotate, so its accessible name carries the counts, rebuilt on every layer
   refresh, and an `aria-describedby` note says in as many words that the
-  station table below is the same filtered set, row by row, with a button on
-  each row that selects it on the map.
+  station table beside it — under it when the two are stacked — is the same
+  filtered set, row by row, with a button on each row that selects it on the
+  map, and that its own caption names the columns it is carrying, which is not
+  the same list in both shapes.
 - **Name a slider once, not on every step.** Rolling a live readout into a
   control's label renames the control as it is dragged, where the value is
   already announced as the value. The readout is `aria-hidden`, the control

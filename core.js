@@ -340,7 +340,11 @@ const HELP = {
       + 'opens — the single column put the map\'s own answer below the fold, so reading it cost '
       + 'you the map — and ◫ switches back to the stack. Where you leave the divider is '
       + 'remembered, and the split folds back to one column on a narrow screen without forgetting '
-      + 'it.',
+      + 'it. The station list beside the map carries five columns rather than ten — name, station '
+      + 'number, roles, AlertID and <strong>SLS catchment</strong> — because ten of them in a '
+      + '420 px column is ten columns nothing fits in. The network, position, elevation, the '
+      + 'enabled tick and the ARRO link are all on the station\'s card, which a click on any row '
+      + 'opens; stack the tab again and the table has them back.',
       '<strong>Clear filters</strong> also clears the repeater focus — the dim that a click on a '
       + 'repeater pin puts over everything not on its own paths. Both are ways of saying "back to '
       + 'the whole network", so both buttons do both, and both are enabled by a focus even with no '

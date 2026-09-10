@@ -220,8 +220,16 @@ try {
     // ══ The table ═════════════════════════════════════════════════════════
     switchTab('stations');
     await settle();
-    const marksIn = col => [...document.querySelectorAll(
-      `#main-content table tbody tr td:nth-child(${col}) mark.hit`)].map(m => m.textContent.trim());
+    // By header rather than by position: the station table carries two column
+    // sets now — five of them beside the map, ten across the page (#186) — so
+    // "the AlertID column" is the fourth cell in one shape and the fifth in the
+    // other, and a hard-coded index silently tests the wrong cell in whichever
+    // shape it was not written for.
+    const colOf = head => 1 + [...document.querySelectorAll('#main-content table thead th')]
+      .findIndex(th => th.textContent.trim() === head);
+    const marksIn = head => [...document.querySelectorAll(
+      `#main-content table tbody tr td:nth-child(${colOf(head)}) mark.hit`)]
+        .map(m => m.textContent.trim());
     const draw = async rows => {
       state.filters.searches = rows;
       stationsFilterChanged();
@@ -230,14 +238,14 @@ try {
 
     await draw([row('4021-4025')]);
     r.rowsDrawn   = document.querySelectorAll('#main-content table tbody tr').length;
-    r.markedWhole = marksIn(5).some(t => /^40(2[1-5])$/.test(t));
-    r.markedWindowText = marksIn(5).concat(marksIn(2)).some(t => t.includes('-'));
+    r.markedWhole = marksIn('AlertID').some(t => /^40(2[1-5])$/.test(t));
+    r.markedWindowText = marksIn('AlertID').concat(marksIn('Stn #')).some(t => t.includes('-'));
 
     // Scoped marks: the amber can only ever be where the match was made.
     await draw([row(crossover, { name: false, number: false })]);
-    r.idOnlyMarks = { alert: marksIn(5).length, number: marksIn(2).length };
+    r.idOnlyMarks = { alert: marksIn('AlertID').length, number: marksIn('Stn #').length };
     await draw([row(crossover, { name: false, alert: false })]);
-    r.numOnlyMarks = { alert: marksIn(5).length, number: marksIn(2).length };
+    r.numOnlyMarks = { alert: marksIn('AlertID').length, number: marksIn('Stn #').length };
 
     // ══ The controls ══════════════════════════════════════════════════════
     // Back to how a fresh page opens — the checks above left the first entry

@@ -43,6 +43,13 @@
     renderTabs();
     renderHelp();
   });
+  // Crossing `lg` folds the Stations split back to one column and unfolds it
+  // again (styles.css), without the setting moving either way — and the station
+  // table's columns follow the *layout*, not the setting: five of them beside
+  // the map, ten of them across the page. Same reasoning as the rail above, and
+  // the same shape: the crossing repaints the table, the 300 resize events
+  // between two crossings do not.
+  window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).addEventListener('change', syncStationsTableCols);
   // On a phone both rails are drawers laid over the page, and a drawer that
   // only closes by picking a tab is a trap — Escape backs out of either.
   document.addEventListener('keydown', e => {

@@ -794,7 +794,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Limit link/path length*)
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
-- Map and station list side by side by default, with a divider that drags
+- Map and station list side by side by default, with a divider that drags — and a five-column list beside it (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape has room for
 - **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub and nearest station, repeater and survey mark
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
@@ -863,7 +863,8 @@ match*, drops) the same set. Picking a row pans the map to that station and
 opens its pin, so the list and the map never disagree about which site is being
 looked at.
 
-**The ARRO column.** The last column on every row is a link straight out to that
+**The ARRO column.** The last column of the stacked table — the split drops it,
+along with the network and the position — is a link straight out to that
 station's ARRO (Contrail) site admin page — the place its telemetry actually
 lives. It exists because the key ARRO takes is `site.db_id`, an arbitrary
 database index, and it is *not* the BoM station number over on the left, so
@@ -991,6 +992,27 @@ Like full screen, it is a class toggled on the container the markup already
 emits — the three children are always there — so switching between the two
 readings moves nothing in the DOM and the Leaflet map keeps its view, its layers
 and its in-flight requests.
+
+**The station list carries fewer columns beside the map.** Ten columns in a
+420 px column is ten columns nothing fits in — measured at 1440 px, every
+latitude and longitude in the table was clipped, 496 of the 500 station numbers
+with them, and a third of the ALERT address lists. So the side-by-side shape
+lists five: **Name**, **Stn #**, **Roles**, **AlertID** and **SLS catchment**.
+Nothing is lost that is not already on the same screen — the position is what
+the map beside it is drawing, and the network, the elevation, the enabled tick
+and the ARRO link are all on the station's own card, one row click away in that
+same column. Stacked, the table has the width of the page and keeps all ten.
+Crossing 1100 px swaps the sets on its own, in either direction, because the
+columns follow the *layout* and not the setting.
+
+The SLS catchment is the one column that is not in the stacked table at all: the
+drainage basin the Bureau's Service Level Specification files the station under,
+which is the fact the map beside it cannot draw. It is the same answer the
+station card's **SLS catchment** row gives, read from the same
+`data/sls-locations.json`, and the 720 KB of schedule behind it is fetched once,
+after the first paint, the first time the narrow table asks for it. The 2,028
+stations the document does not carry show an em dash, as the ARRO column already
+does for a station with no site id.
 
 **Signal links and *Limit link/path length*.** Links are drawn from each field station
 to every repeater whose pass ranges cover one of its ALERT addresses, which

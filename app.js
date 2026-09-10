@@ -1935,11 +1935,13 @@ function renderStationsHtml() {
                aria-describedby="map-alt"></div>
           <p id="map-alt" class="sr-only">
             This map is drawn as a picture and has no per-station markup. The same set it is
-            showing is listed as text below it: the match note directly under the map says how
+            showing is listed as text beside it: the match note directly under the map says how
             many stations matched and how many were pulled in by a pass range, and the
-            <strong>Stations</strong> table lower down the page is the same filtered set, one row
-            per station, with the name, number, roles, network, ALERT addresses and position of
-            each — and a button on every row that selects it here.
+            <strong>Stations</strong> table — in the column beside this map, or under it when the
+            two are stacked — is the same filtered set, one row per station, with the name,
+            number, roles and ALERT addresses of each, and a button on every row that selects it
+            here. Its own caption names the columns it is carrying, which is not the same
+            list in both shapes.
           </p>
           <div id="map-note" class="map-note" hidden></div>
           <div id="acma-card" class="acma-card" hidden></div>
@@ -2261,6 +2263,29 @@ const STATIONS_SPLIT_MIN = 25;   // per cent of the width the map may shrink to
 const STATIONS_SPLIT_MAX = 75;   // …and grow to. Both leave the other side usable.
 const STATIONS_SPLIT_STEP = 2;   // one arrow-key press
 
+// Whether the split is actually in effect, which is not the same question as
+// whether it is switched on: below `lg` styles.css folds the two columns back
+// into one and deliberately leaves the *setting* alone, so a laptop docked to a
+// wide screen finds its split again. Anything that changes with the layout —
+// the station table's columns — has to ask this rather than state.mapSplit.
+// Named off BREAKPOINTS for the same reason isPhoneNav() is: the media query
+// here and the one in the stylesheet are the same fold, and `npm run shell`
+// holds the stylesheet to that list.
+function stationsSplitActive() {
+  return state.mapSplit && !window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).matches;
+}
+
+// Repaint the station table if — and only if — the column set it is holding is
+// no longer the one stationsSplitActive() asks for. Called from both things
+// that can change that answer: the toggle, and the fold at `lg` (init.js). The
+// check is what stops a toggle below the fold, where the table is already the
+// wide one, from throwing away 500 rows and the keyboard's place in them.
+function syncStationsTableCols() {
+  if (!document.getElementById('stations-table-wrap')) return;
+  if (stationsColsNarrow === stationsSplitActive()) return;
+  rerenderStations();
+}
+
 function toggleStationsSplit(on) {
   state.mapSplit = on == null ? !state.mapSplit : !!on;
   try { localStorage.setItem('mn-map-split', state.mapSplit ? 'on' : 'off'); } catch (_) {}
@@ -2274,6 +2299,11 @@ function toggleStationsSplit(on) {
   // The height is measured off where the container starts, so it has to be
   // taken after the class is on — and taken away again when it comes off.
   syncStationsSplitHeight();
+  // The list beside the map is a narrower list, and carries a narrower set of
+  // columns for it (see stationsTable). Unlike the height this is a re-render,
+  // because the columns are markup — but only of the table, and only when the
+  // set it is holding is the wrong one.
+  syncStationsTableCols();
   // No transition on the class, so the container is already its new size.
   invalidateMapSizes(0);
   announce(state.mapSplit
@@ -4137,8 +4167,10 @@ function applyMapFocusStyles() {
   MapArrows.schedule();
 }
 
-// The selection as a file — the same columns the table shows, plus the station
-// id, so the picked set can leave the page for a spreadsheet.
+// The selection as a file — the same columns the table shows when it has the
+// width for all of them, plus the station id, so the picked set can leave the
+// page for a spreadsheet. Deliberately not narrowed with the table: what the
+// split drops it drops for room on a screen, and a file has no such problem.
 function exportMapSelection() {
   const rows = selectedStations();
   if (!rows.length) return;
@@ -4292,6 +4324,12 @@ function mapNearestToCentre(stations, n) {
 // lets the operator pull the rest in when they actually want it.
 const STATIONS_ROW_CAP = 500;
 
+// Which of the two column sets the table on screen is holding — see
+// stationsTable(), and syncStationsTableCols() for what reads it. Null until
+// the table has been painted once, which is what keeps a resize before the tab
+// has ever rendered from calling for a repaint of nothing.
+let stationsColsNarrow = null;
+
 // What the table says when it is listing a map selection rather than a filter
 // result — including the way back to the filter, which is the only way back.
 function selectionBarHtml() {
@@ -4324,6 +4362,22 @@ function stationsTable(allStations) {
   // Rows the filter didn't name — they are here because a pass range ties them
   // to one that did, and the badge is what says so.
   const relIds = relatedIdSet();
+  // Which of the two column sets this paint gets. Side by side the table is a
+  // ~420 px column rather than the width of the page, and ten columns in that is
+  // ten columns nothing fits in: measured at 1440 px, every latitude and every
+  // longitude in the table was clipped, 496 of the 500 station numbers with
+  // them, and a third of the ALERT address lists. The five columns below clip
+  // nothing at all in the same 420 px.
+  //
+  // So the split drops six — network, lat, lon, elevation, enabled, ARRO — and
+  // adds the one thing the map beside it cannot say: which SLS catchment the
+  // station is in. Nothing goes that is not already on the same screen: the
+  // position is what the map is drawing, and the other five are on the
+  // station's card, one row click away in this same column. Stacked, the table
+  // has the width of the page and keeps all ten.
+  const narrow = stationsSplitActive();
+  stationsColsNarrow = narrow;
+  if (narrow) askStationsSls();
   return `
     ${selBar}
     ${capped ? `
@@ -4331,33 +4385,33 @@ function stationsTable(allStations) {
         narrow the filter or <button type="button" class="link-btn"
           onclick="state.stationsShowAll=true;rerenderStations()">show all</button>.</p>
     ` : ''}
-    <table>
-      <colgroup>
+    <table${narrow ? ' class="stn-table--narrow"' : ''}>
+      <colgroup>${narrow ? `
+        <col style="width:28%"><col style="width:17%"><col style="width:19%">
+        <col style="width:16%"><col style="width:20%">` : `
         <col style="width:20%"><col style="width:8%"><col style="width:12%"><col style="width:12%">
         <col style="width:11%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:6%">
-        <col style="width:7%">
+        <col style="width:7%">`}
       </colgroup>
-      <caption class="sr-only">Every station the filter matched — name, number, roles, radio network, ALERT addresses, position, whether it is enabled, and a link to its ARRO admin page</caption>
+      <caption class="sr-only">${narrow
+        ? 'Every station the filter matched — name, number, roles, ALERT addresses and SLS catchment. '
+          + 'The map beside this table carries the position of each, and selecting a row opens a card '
+          + 'with its radio network, elevation and ARRO link.'
+        : 'Every station the filter matched — name, number, roles, radio network, ALERT addresses, '
+          + 'position, whether it is enabled, and a link to its ARRO admin page'}</caption>
       <thead>
         <tr>
-          <th scope="col">Name</th><th scope="col">Stn #</th><th scope="col">Roles</th><th scope="col">Network</th>
-          <th scope="col">AlertID</th><th scope="col">Lat</th><th scope="col">Lon</th>
-          <th scope="col">Elev (AHD)</th><th scope="col">On</th><th scope="col">ARRO</th>
+          <th scope="col">Name</th><th scope="col">Stn #</th><th scope="col">Roles</th>
+          ${narrow ? '' : '<th scope="col">Network</th>'}
+          <th scope="col">AlertID</th>${narrow ? `
+          <th scope="col">SLS catchment</th>` : `
+          <th scope="col">Lat</th><th scope="col">Lon</th>
+          <th scope="col">Elev (AHD)</th><th scope="col">On</th><th scope="col">ARRO</th>`}
         </tr>
       </thead>
       <tbody>
         ${stations.map(s => {
           const aids = stationAlertIds(s);
-          // The ARRO column: telemetry lives in ARRO and the only key it takes
-          // is site.db_id, which is *not* the station number two cells to the
-          // left — so the link is built here from the id the file already
-          // carries, rather than sending the operator to the ARRO Launcher tab
-          // to look one station up by hand. 390 of 3,174
-          // stations carry no site id and get an em dash: saying "this one has
-          // no ARRO record" beats a dead link, and beats an empty cell that
-          // reads as a rendering fault.
-          const arroId  = arroSiteId(s);
-          const arroUrl = arroSiteUrl(arroId);
           return `
             <tr class="row-link ${state.selectedId === s.id ? 'selected' : ''}" data-sid="${escAttr(s.id)}"
                 onclick="selectStation('${escAttr(s.id)}')">
@@ -4365,7 +4419,7 @@ function stationsTable(allStations) {
                     aria-pressed="${state.selectedId === s.id}"
                     onclick="event.stopPropagation();selectStation('${escAttr(s.id)}')"
                     >${markHits(s.name, marks.name, marks.nameRes)}</button></td>
-              <td class="small">${markHits(s.station_number || '', marks.number)}</td>
+              <td class="small stn-num">${markHits(s.station_number || '', marks.number)}</td>
               <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}${
                 s.roles.includes('repeater') && repeaterPassingCount(s) != null
                   ? ` <span class="badge" title="ALERT addresses carried, in this repeater's open pass ranges">passing ${repeaterPassingCount(s)}</span>`
@@ -4373,8 +4427,29 @@ function stationsTable(allStations) {
                 relIds.has(s.id)
                   ? ' <span class="badge badge--rel" title="Not a filter match — a pass range ties it to one">via pass range</span>'
                   : ''}</td>
-              <td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
+              ${narrow ? '' : `<td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>`}
               <td class="small">${aids.map(id => markAlertId(id, marks.nums, marks.ranges)).join(', ')}</td>
+              ${narrow ? `<td class="small">${slsCatchmentCell(s)}</td>` : stationWideCellsHtml(s)}
+            </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+// The five cells the split drops, kept in one place so the row above reads as a
+// row rather than as five conditionals. Only ever called for the wide table, so
+// nothing here is computed for a column that is not being drawn.
+function stationWideCellsHtml(s) {
+  // The ARRO column: telemetry lives in ARRO and the only key it takes is
+  // site.db_id, which is *not* the station number this table also carries — so
+  // the link is built here from the id the file already carries, rather than
+  // sending the operator to the ARRO Launcher tab to look one station up by
+  // hand. 390 of 3,174 stations carry no site id and get an em dash: saying
+  // "this one has no ARRO record" beats a dead link, and beats an empty cell
+  // that reads as a rendering fault.
+  const arroId  = arroSiteId(s);
+  const arroUrl = arroSiteUrl(arroId);
+  return `
               <td class="small">${s.lat != null ? s.lat.toFixed(4) : ''}</td>
               <td class="small">${s.lon != null ? s.lon.toFixed(4) : ''}</td>
               <td class="small">${s.elevation_ahd != null ? s.elevation_ahd : ''}</td>
@@ -4390,11 +4465,64 @@ function stationsTable(allStations) {
                      aria-label="Open the ARRO admin page for ${escAttr(s.name)} in a new tab"
                      onclick="event.stopPropagation();arroRememberStation('${escAttr(s.id)}')"
                      >ARRO ↗</a>`
-                : `<span class="txt-muted" title="No ARRO site id recorded for this station">—</span>`}</td>
-            </tr>`;
-        }).join('')}
-      </tbody>
-    </table>`;
+                : `<span class="txt-muted" title="No ARRO site id recorded for this station">—</span>`}</td>`;
+}
+
+// The SLS catchment cell — the drainage basin the Service Level Specification
+// files the station under, which is the one fact in the narrow table that is
+// not already on the map beside it.
+//
+// `SLS.forStation` answers null for two different things and they must not read
+// the same. The document carries 1,146 of the 3,174 stations; the other 2,028
+// are genuinely not in it and get the em dash the ARRO column already uses for
+// "no record". A table painted before the 720 KB schedule has landed knows
+// nothing about any of them yet, and leaves the cell empty rather than claiming
+// the em dash's answer — askStationsSls() has the repaint on order.
+function slsCatchmentCell(s) {
+  if (typeof SLS === 'undefined') return '';
+  if (!SLS.loaded()) {
+    return stationsSlsFailed
+      ? '<span class="txt-muted" title="The Service Level Specification file could not be loaded, '
+        + 'so this column has nothing to say — the station card says the same about its SLS block">?</span>'
+      : '';
+  }
+  const loc = SLS.forStation(s);
+  if (!loc || !loc.catchment_name) {
+    return '<span class="txt-muted" title="Not one of the 1,146 stations the Service Level '
+         + 'Specification carries">—</span>';
+  }
+  // The gloss in brackets comes off the cell and stays in the tooltip. Three of
+  // the 43 catchment names the stations use carry one, and one of them —
+  // "Border Rivers (Weir, Macintyre, Dumaresq & Macintyre Brook)", 42 stations —
+  // is 59 characters, six wrapped lines in this column and a row six times the
+  // height of its neighbours. What the brackets hold is the list of rivers in
+  // the catchment, not its name: "Border Rivers" and "South Coast" are what the
+  // document calls them and what a person reads the column for. The whole
+  // string is on the row's tooltip, and on the station's SLS card in full.
+  const name = loc.catchment_name.split('(')[0].trim() || loc.catchment_name;
+  return `<span title="${escAttr(`SLS catchment ${loc.basin_no || ''} ${loc.catchment_name}`.trim())}"
+    >${esc(name)}</span>`;
+}
+
+// Whether the SLS file has been sent for on account of the column, so a table
+// that repaints on every keystroke asks once — and whether that ask came back
+// empty-handed, which is the one state the cell above cannot read off SLS.
+let stationsSlsAsked  = false;
+let stationsSlsFailed = false;
+
+// The column's half of sls.js's lazy fetch. The station card does this one card
+// at a time with SLS.ask(); a whole column of it is the same bargain made once
+// — ask on the first narrow paint, repaint when the answer arrives. It does put
+// the 720 KB behind opening the Stations tab, which sls.js deliberately kept
+// out of opening the app: it is after the first paint, off the critical path,
+// and once per session, which is the price of the column being useful at all.
+function askStationsSls() {
+  if (typeof SLS === 'undefined' || stationsSlsAsked || SLS.loaded()) return;
+  stationsSlsAsked = true;
+  // Both arms repaint: the failure is the case that has to replace a column of
+  // empty cells with something that says why it is empty.
+  SLS.ensureData().then(() => rerenderStations(),
+                        () => { stationsSlsFailed = true; rerenderStations(); });
 }
 
 function rerenderStations() {
