@@ -8784,7 +8784,10 @@ code {
    pressed: pointer on the open strip (press brings the window there), grab on
    the window itself (drag moves it), ew-resize on the invisible zones drawn
    over its edges (drag widens or narrows it). The zone rects come from
-   drawOv() carrying only a class — hit shapes, painted at fill-opacity 0. */
+   drawOv() carrying only a class — hit shapes, painted at fill-opacity 0 —
+   and everything visible over them, the handles included, is drawn with
+   pointer-events="none" so a painted shape can never answer the pointer in
+   place of the zone that knows what a press there means. */
 .ad-ov {
   display: block; width: 100%; height: 56px;
   grid-column: 1; grid-row: 2;
@@ -8809,6 +8812,18 @@ code {
 .ad-vov-edge { cursor: ns-resize; }
 .ad-ov-mid:active,
 .ad-vov-mid:active { cursor: grabbing; }
+
+/* While a drag is running, the gesture states the cursor for the whole element
+   instead of leaving it to whichever zone the pointer happens to be over. A
+   resize routinely takes the pointer off the end of the track or up onto the
+   chart with the gesture still live — the element holds the pointer capture —
+   and without this the double arrow flicks back to a plain pointer halfway
+   through, which reads as the cursor being unreliable. `!important` because it
+   has to beat the zone rules above on the SVG's own children. */
+.ad-ov.is-resizing,  .ad-ov.is-resizing  * { cursor: ew-resize !important; }
+.ad-vov.is-resizing, .ad-vov.is-resizing * { cursor: ns-resize !important; }
+.ad-ov.is-moving,  .ad-ov.is-moving  *,
+.ad-vov.is-moving, .ad-vov.is-moving * { cursor: grabbing !important; }
 
 /* Full screen (#191). The same shape as the map's own: fixed over everything,
    below #app-modal so the bug reporter still opens on top, and a column so the
@@ -8863,6 +8878,14 @@ code {
 }
 .ad-pin-grid div { display: flex; gap: .35rem; font-size: .8rem; }
 .ad-pin-grid span { color: var(--muted); min-width: 66px; }
+/* The two Δ cells carry a second line — the gap either side and the rate
+   across it — which will not fit beside the figure in a 150 px column. They
+   wrap it under the figure rather than squeezing the column for everyone, and
+   the indent keeps it hanging off its own label. */
+.ad-pin-grid .ad-delta { flex-wrap: wrap; }
+.ad-pin-grid .ad-delta .ad-delta-note {
+  flex: 1 0 100%; min-width: 0; margin-left: calc(66px + .35rem);
+}
 .ad-pin-why { color: var(--muted); }
 .ad-badge { font-size: .7rem; padding: .05rem .4rem; border-radius: 20px; border: 1px solid var(--border); }
 .ad-badge--ok   { color: var(--ok);   border-color: var(--ok); }

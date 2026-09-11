@@ -2513,6 +2513,11 @@ const ArroData = (function () {
   // "45 min", "1.5 h", "1.5 d" — only ever used for the gap threshold, which is
   // a rough number that wants a rough rendering.
   function fmtDur(ms) {
+    // Seconds under the minute. Without this a 40-second gap reads "0 min",
+    // which is not a rounding — it is the wrong answer, and on the Δ cells of
+    // the pinned callout it would be the answer most often given, since that is
+    // the scale most of these records log at.
+    if (ms < 60000)   return `${Math.round(ms / 1000)} s`;
     if (ms < 3600000) return `${Math.round(ms / 60000)} min`;
     if (ms < AD_DAY)  return `${(ms / 3600000).toFixed(ms % 3600000 ? 1 : 0)} h`;
     return `${(ms / AD_DAY).toFixed(ms % AD_DAY ? 1 : 0)} d`;
@@ -3170,7 +3175,8 @@ const ArroData = (function () {
   // name rather than a caption.
   function chartName() {
     const f = chartFacts();
-    const how = 'Drag to pan, scroll or + and − to zoom, Shift+drag a box to zoom to it, '
+    const how = 'Drag to pan, scroll or + and − to zoom, Shift+scroll or a sideways wheel to pan, '
+              + 'Shift+drag a box to zoom to it, '
               + 'Alt+drag up or down to rescale the vertical axis, arrow keys to step, '
               + '0 to reset both axes. '
               + 'Every value is in the readings table below the chart.';
@@ -3247,7 +3253,7 @@ const ArroData = (function () {
                   aria-label="${ad.full ? 'Exit full screen' : 'Chart full screen'}">⛶</button>
         </div>
         <div class="ad-stage" id="ad-stage" tabindex="0"
-             aria-label="Chart window — arrow keys to step, + and − to zoom, 0 to reset both axes, Escape to unpin">
+             aria-label="Chart window — arrow keys to step, + and − to zoom, Shift+scroll to pan sideways, 0 to reset both axes, Escape to unpin">
           <svg id="ad-svg" role="img" aria-label="${escAttr(chartName())}"></svg>
           <div class="ad-tip" id="ad-tip" hidden></div>
         </div>
@@ -4112,6 +4118,52 @@ const ArroData = (function () {
     return ` <span class="small">= ${esc(fmtVal(mm))} mm (${esc(note)})</span>`;
   }
 
+  // The reading either side of a pinned one, as the difference the eye was
+  // about to work out for itself. A callout that gives a level to three decimal
+  // places and says nothing about the one before it makes the operator hold two
+  // numbers in their head and subtract — on the tab whose whole job is finding
+  // the reading that moved when it should not have.
+  //
+  // **Record order, not drawn order.** The neighbour is i±1 in the series, even
+  // when the filters removed it. Every verdict in the panel around this is
+  // stated against "the reading before it" — the rate-of-rise and rate-of-fall
+  // limits by name, the 357 test against the three that follow — so quoting the
+  // nearest *surviving* neighbour instead would answer a different question
+  // from the one the badge above it just answered, and the pair would disagree
+  // on a chart where they are inches apart. When the neighbour is one the
+  // filters took out, the cell says which filter, rather than quietly offering
+  // a difference against a reading that is not in the filtered series.
+  //
+  // The difference always runs in time order: `Δ previous` is what the value
+  // did coming *into* this reading, `Δ next` what it does leaving it. So two
+  // adjacent readings quote the same figure once each, and the pair reads as a
+  // slope through the point rather than as two unrelated subtractions.
+  function deltaCell(s, i, step, f) {
+    const j = i + step;
+    if (j < 0)           return '<b class="txt-muted">— first reading</b>';
+    // s.n, not s.t.length: seriesData() guarantees the arrays are *at least*
+    // n long and says the tail is ignored, so a series sitting in an
+    // over-allocated buffer would otherwise be given a neighbour made of
+    // whatever was left in it.
+    if (j >= s.n) return '<b class="txt-muted">— last reading</b>';
+    const [from, to] = step < 0 ? [j, i] : [i, j];
+    const dv = s.v[to] - s.v[from];
+    const dt = s.t[to] - s.t[from];
+    const sign = dv > 0 ? '+' : '';
+    const unit = s.unit ? ' ' + esc(s.unit) : '';
+    // A zero gap is a repeat timestamp — the thing AD_OOS exists to name — and
+    // a rate across it would be a division by zero dressed up as a measurement.
+    const rate = dt > 0
+      ? ` · ${sign}${esc(fmtVal(dv / (dt / 3600000)))}${s.unit ? ' ' + esc(s.unit) : ''}/h`
+      : '';
+    const gap = dt > 0 ? `over ${esc(fmtDur(dt))}` : 'same timestamp';
+    const cut = adCut(f.status[j])
+      ? ` · <span class="txt-warn">that reading was removed — ${esc(AD_STATUS_LABEL[f.status[j]])}</span>`
+      : '';
+    return `<b>${sign}${esc(fmtVal(dv))}${unit}</b>`
+         + `<span class="small ad-delta-note">${gap}${rate}${cut}</span>`;
+  }
+
   function pinHtml(s, i) {
     const f = runFilter(s, ad.cfg);
     const st = f.status[i];
@@ -4148,6 +4200,8 @@ const ArroData = (function () {
           <div><span>Value</span><b>${esc(fmtVal(s.v[i]))} ${esc(s.unit)}</b></div>
           <div><span>Raw</span><b>${esc(fmtVal(s.raw[i]))}</b>${rawBucketNote(s, i)}</div>
           <div><span>Adjusted</span><b>${esc(fmtVal(f.adj[i]))}${rolled ? ' <span class="small">(wrap here)</span>' : ''}</b></div>
+          <div class="ad-delta"><span>&Delta; previous</span>${deltaCell(s, i, -1, f)}</div>
+          <div class="ad-delta"><span>&Delta; next</span>${deltaCell(s, i, 1, f)}</div>
           <div><span>Quality</span><b>${esc(s.qcodes[s.q[i]] || '—')}</b></div>
           ${s.prov ? fieldPinRows(s, i) : ''}
         </div>
@@ -4275,6 +4329,22 @@ const ArroData = (function () {
   const padRNow = () => (axisSides().right.length ? PADR2 : PADR);
   const ovClampX  = px => Math.max(PADL, Math.min(ad.w - padRNow(), px));
   const vovClampY = py => Math.max(PADT, Math.min(ad.h - PADB, py));
+  // How near an edge of either navigator's window a press has to land to mean
+  // "resize that edge", in viewBox px either side of it. It lives up here
+  // beside the other one-figure-each constants because three places quote it
+  // and they must not disagree: the hit-test that reads a press, and the two
+  // drawers that paint the cursor zone promising what that press will do.
+  //
+  // It was 7 while the zone drawn over it was 6, and both were too small to
+  // aim at — the complaint that prompted this was simply that the edges could
+  // not be grabbed. 11 is a target a hand finds without looking.
+  const AD_OV_GRIP = 11;
+  // …but never so much of a narrow window that its middle disappears. At a
+  // flat 11 either side, a window under 22 px across would be edge all the way
+  // through and could never be *moved* from the navigator again — which a deep
+  // zoom reaches easily. Taking at most a third from either side always leaves
+  // a third in the middle to grab.
+  const navGrip = (lo, hi) => Math.max(3, Math.min(AD_OV_GRIP, (hi - lo) / 3));
   const MARK_CAP = 2500;      // removed-point markers drawn before we stop
   // Vertical throw, in viewBox px, below which a zoom box means "time only".
   // Years of x-only brushing taught a flat sweep across the chart; a hand that
@@ -4335,6 +4405,13 @@ const ArroData = (function () {
     if (!g) { svg.innerHTML = ''; return; }
     const c = theme();
     svg.setAttribute('viewBox', `0 0 ${g.w} ${g.h}`);
+    // Fill the box rather than fit inside it. The default, `xMidYMid meet`,
+    // scales the viewBox uniformly and centres the leftovers — so a viewBox
+    // measured off the stage's *border* box, drawn into the content box inside
+    // it, came out fractionally small and offset, and every px→time conversion
+    // in here was reading from a ruler the browser had quietly moved. See
+    // svgPt(); on the two navigators the same mismatch was 12–17 px.
+    svg.setAttribute('preserveAspectRatio', 'none');
     svg.setAttribute('width', g.w);
     svg.setAttribute('height', g.h);
 
@@ -4572,6 +4649,11 @@ const ArroData = (function () {
     const c = theme();
     const w = ad.w, h = AD_OV_H;
     svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    // See draw(). Here the shapes are wildly different — a viewBox as wide as
+    // the chart and 56 px tall, drawn into a box as wide as the chart and 54 px
+    // tall — so `meet` shrank the whole strip by ~3.5% and centred it, putting
+    // the edge handles up to 17 px from where every press was being measured.
+    svg.setAttribute('preserveAspectRatio', 'none');
     svg.setAttribute('width', w);
     svg.setAttribute('height', h);
     const pw = w - PADL - padRNow();
@@ -4616,18 +4698,36 @@ const ArroData = (function () {
     // Cursor affordances for the three overview gestures. The rects paint
     // nothing (fill-opacity 0 keeps them hit-testable, which fill="none" would
     // not be) — they exist so the pointer says what a press here will do: grab
-    // over the window's middle, ew-resize over its edges. The small accent
-    // pills are the visible half of the same promise. The edge zones come
+    // over the window's middle, ew-resize over its edges. The edge zones come
     // last so they win where they overlap the middle, matching the JS
-    // hit-test's own edge-first order.
-    out += `<rect class="ad-ov-mid" x="${a.toFixed(1)}" y="4"
-                  width="${Math.max(1, b - a).toFixed(1)}" height="${h - 16}"
+    // hit-test's own edge-first order, and both run the full height of the
+    // strip down to the date labels: the JS only ever looks at x, so a zone
+    // shorter than the band gave the strip a stripe along the top where the
+    // cursor said one thing and the press did another.
+    out += `<rect class="ad-ov-mid" x="${a.toFixed(1)}" y="0"
+                  width="${Math.max(1, b - a).toFixed(1)}" height="${h - 12}"
                   fill="${c.accent}" fill-opacity="0"/>`;
+    // The two edge handles, drawn as something a hand can land on rather than
+    // as a hairline. A 2.5 px pill inside a 12 px zone was the visible half of
+    // a promise the pointer could barely keep: it read as a tick mark, not as
+    // a grip, so nobody aimed at it, and what they were aiming at was six
+    // pixels wide. It is now a proper handle — panel-filled, accent-outlined
+    // and ridged down the middle, the way every resize grip is — over a zone
+    // navGrip() wide. The handle and the ridges take no pointer events at all,
+    // so the classed zone behind them is always what the cursor reads: painted
+    // shapes on top of a hit rect are exactly how a cursor stops being
+    // reliable.
     const hy = 4 + (h - 16) / 2;
+    const grip = navGrip(a, b);
     for (const e of [a, b]) {
-      out += `<rect x="${(e - 1.25).toFixed(1)}" y="${(hy - 7).toFixed(1)}" width="2.5" height="14"
-                    rx="1.2" fill="${c.accent}"/>
-              <rect class="ad-ov-edge" x="${(e - 6).toFixed(1)}" y="4" width="12" height="${h - 16}"
+      out += `<rect x="${(e - 3.5).toFixed(1)}" y="${(hy - 12).toFixed(1)}" width="7" height="24"
+                    rx="3.5" fill="${c.panel}" stroke="${c.accent}" stroke-width="1.3"
+                    pointer-events="none"/>
+              <path d="M${(e - 1.5).toFixed(1)} ${(hy - 5).toFixed(1)}v10
+                       M${(e + 1.5).toFixed(1)} ${(hy - 5).toFixed(1)}v10"
+                    stroke="${c.accent}" stroke-width="1" opacity=".7" pointer-events="none"/>
+              <rect class="ad-ov-edge" x="${(e - grip).toFixed(1)}" y="0"
+                    width="${(grip * 2).toFixed(1)}" height="${h - 12}"
                     fill="${c.accent}" fill-opacity="0"/>`;
     }
     out += `<text x="${PADL - 6}" y="${h - 5}" font-size="9" text-anchor="end" fill="${c.muted}">whole record</text>
@@ -4677,6 +4777,10 @@ const ArroData = (function () {
     const c = theme();
     const w = AD_VOV_W, h = ad.h;
     svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    // See draw(). 46 viewBox px of width drawn into 44 of content box is a 4.3%
+    // uniform squeeze under `meet`, which on a 600 px column put the two
+    // handles a round dozen pixels below the presses aimed at them.
+    svg.setAttribute('preserveAspectRatio', 'none');
     svg.setAttribute('width', w);
     svg.setAttribute('height', h);
 
@@ -4730,18 +4834,30 @@ const ArroData = (function () {
 
     // The same cursor contract as the horizontal strip, turned ninety degrees:
     // an invisible but hit-testable middle that says "grab", invisible edge
-    // zones that say "resize", and a visible pill at each edge so the promise
+    // zones that say "resize", and a visible handle at each edge so the promise
     // is not made by the cursor alone. Edges last, so they win where a narrow
     // window makes them overlap the middle — which is the order the hit-test
     // uses too.
-    out += `<rect class="ad-vov-mid" x="${(trackX - 4).toFixed(1)}" y="${top.toFixed(1)}"
-                  width="${trackW + 8}" height="${Math.max(1, bot - top).toFixed(1)}"
+    //
+    // Both zones take the full width of the column rather than the 24 px around
+    // the track. The hit-test only ever looks at y, the column holds nothing
+    // else a press could mean, and half the width there was to aim at was
+    // being thrown away for no gain.
+    const vgrip = navGrip(top, bot);
+    const hx = trackX + trackW / 2;
+    out += `<rect class="ad-vov-mid" x="0" y="${top.toFixed(1)}"
+                  width="${w}" height="${Math.max(1, bot - top).toFixed(1)}"
                   fill="${c.accent}" fill-opacity="0"/>`;
     for (const e of [top, bot]) {
-      out += `<rect x="${(trackX + trackW / 2 - 7).toFixed(1)}" y="${(e - 1.25).toFixed(1)}"
-                    width="14" height="2.5" rx="1.2" fill="${c.accent}"/>
-              <rect class="ad-vov-edge" x="${(trackX - 4).toFixed(1)}" y="${(e - 6).toFixed(1)}"
-                    width="${trackW + 8}" height="12" fill="${c.accent}" fill-opacity="0"/>`;
+      out += `<rect x="${(hx - 12).toFixed(1)}" y="${(e - 3.5).toFixed(1)}" width="24" height="7"
+                    rx="3.5" fill="${c.panel}" stroke="${c.accent}" stroke-width="1.3"
+                    pointer-events="none"/>
+              <path d="M${(hx - 5).toFixed(1)} ${(e - 1.5).toFixed(1)}h10
+                       M${(hx - 5).toFixed(1)} ${(e + 1.5).toFixed(1)}h10"
+                    stroke="${c.accent}" stroke-width="1" opacity=".7" pointer-events="none"/>
+              <rect class="ad-vov-edge" x="0" y="${(e - vgrip).toFixed(1)}"
+                    width="${w}" height="${(vgrip * 2).toFixed(1)}"
+                    fill="${c.accent}" fill-opacity="0"/>`;
     }
 
     // The two ends of the track, named. Rotated rather than wrapped: the column
@@ -4749,7 +4865,7 @@ const ArroData = (function () {
     const endLabel = (val, py, anchor) => `
       <text x="${trackX + trackW + 9}" y="${py}" font-size="9" fill="${c.muted}"
             text-anchor="${anchor}" transform="rotate(90 ${trackX + trackW + 9} ${py})"
-            >${esc(fmtVal(val))}</text>`;
+            pointer-events="none">${esc(fmtVal(val))}</text>`;
     out += endLabel(ex.hi, PADT + 2, 'start') + endLabel(ex.lo, ad.h - PADB - 2, 'end');
 
     svg.innerHTML = out;
@@ -4924,10 +5040,45 @@ const ArroData = (function () {
 
   // ── interaction ────────────────────────────────────────────────────────────
 
-  function localX(ev, el) {
+  // Where a pointer event is, in an SVG's own coordinates — asked of the SVG
+  // rather than worked out from its box.
+  //
+  // The arithmetic this replaces, `(clientX - rect.left) * (ad.w / rect.width)`,
+  // looks equivalent and is not, for two reasons that compound. The rect is the
+  // *border* box, while the viewBox is fitted into the content box inside it,
+  // so each 1 px of border shifted the answer; and preserveAspectRatio, left at
+  // its `meet` default, fitted it uniformly and centred what was left over, so
+  // a viewBox whose shape did not match its box was drawn scaled down and
+  // offset while this went on mapping as though it filled the box corner to
+  // corner. On the chart that was a pixel or two. On the two navigators — a
+  // viewBox as tall as the stage squeezed into a 56 px strip, and one as wide
+  // as the stage squeezed into a 46 px column — it was 12 to 17 px, and that
+  // is the whole of why their edge handles could not be grabbed: the handle
+  // was painted here and every press was measured over there. The drawers now
+  // ask for `none` so the fit is exact, and this asks the browser for the
+  // matrix it actually drew with, which cannot disagree with what is on screen.
+  function svgPt(ev, el) {
+    const m = el.getScreenCTM && el.getScreenCTM();
+    if (m) {
+      const pt = typeof DOMPoint === 'function'
+        ? new DOMPoint(ev.clientX, ev.clientY)
+        : Object.assign(el.createSVGPoint(), { x: ev.clientX, y: ev.clientY });
+      const q = pt.matrixTransform(m.inverse());
+      return { x: q.x, y: q.y };
+    }
+    // No CTM means the element is not being rendered. Fall back to the box,
+    // reading the viewBox off the element rather than assuming the stage's, so
+    // this stays right for all three SVGs.
     const r = el.getBoundingClientRect();
-    return (ev.clientX - r.left) * (ad.w / r.width);
+    const vb = el.viewBox && el.viewBox.baseVal;
+    const vw = vb && vb.width  ? vb.width  : r.width;
+    const vh = vb && vb.height ? vb.height : r.height;
+    return {
+      x: r.width  ? (ev.clientX - r.left) * (vw / r.width)  : 0,
+      y: r.height ? (ev.clientY - r.top)  * (vh / r.height) : 0,
+    };
   }
+  const localX = (ev, el) => svgPt(ev, el).x;
 
   // Which curves a pointer may land on. Not the same list as layers(): a
   // reading the filter rejected is *drawn* whenever the removal marks are on —
@@ -5026,15 +5177,46 @@ const ArroData = (function () {
     return true;
   }
 
+  // The biggest step one wheel event may take, in pixel-mode delta. Browsers
+  // disagree wildly about how big a number one notch of a mouse wheel is —
+  // 100 here, 120 there, 53 on a third — while a trackpad sends a stream of 2s
+  // and 3s for the same physical gesture. Feeding any of them straight into the
+  // exponent meant a mouse zoomed in visible lurches where a trackpad glided,
+  // which is the "too jumpy" this exists to answer. Capping the step is what
+  // makes the two one gesture: a trackpad's small deltas pass through
+  // untouched, a mouse's single big one is held to the same ceiling, and every
+  // notch is the same modest move whatever sent it.
+  const AD_WHEEL_STEP = 48;
+
+  // Drawing, coalesced onto a frame.
+  //
+  // A view change costs a chart redraw, both navigators, the readings table and
+  // the two comparison panes — and renderTable() is up to 3,000 rows of HTML,
+  // guarded against being rebuilt mid-*drag* but not against a wheel, which is
+  // neither. A wheel delivers events faster than that work can run, so a flick
+  // of it queued a dozen full rebuilds and the chart arrived in lurches a
+  // quarter-second behind the hand. The view itself is still updated
+  // synchronously — it is two numbers, and the next event has to read them —
+  // but the painting happens once per frame however many events landed in it.
+  let adFrame = 0;
+  function drawSoon() {
+    if (adFrame) return;
+    adFrame = requestAnimationFrame(() => {
+      adFrame = 0;
+      draw(); drawOv(); renderReadout();
+    });
+  }
+  function cancelDrawSoon() {
+    if (adFrame) { cancelAnimationFrame(adFrame); adFrame = 0; }
+  }
+
   function bind() {
     const stage = document.getElementById('ad-stage');
     const svg = document.getElementById('ad-svg');
     if (!stage || !svg) return;
 
     svg.onpointermove = ev => {
-      const px = localX(ev, svg);
-      const r = svg.getBoundingClientRect();
-      const py = (ev.clientY - r.top) * (ad.h / r.height);
+      const { x: px, y: py } = svgPt(ev, svg);
       if (ad.drag) {
         if (ad.drag.mode === 'movept') {
           // Written straight into the series so the curve, the marks and the
@@ -5075,9 +5257,7 @@ const ArroData = (function () {
       const g = geom();
       if (!g) return;
       svg.setPointerCapture?.(ev.pointerId);
-      const px = localX(ev, svg);
-      const r = svg.getBoundingClientRect();
-      const py = (ev.clientY - r.top) * (ad.h / r.height);
+      const { x: px, y: py } = svgPt(ev, svg);
       // Which gesture this press begins. The modifiers outrank the checkboxes
       // so a keyboard hand can always reach either zoom without touching the
       // toolbar: Alt means the vertical axis, Shift means a box, and only
@@ -5115,9 +5295,7 @@ const ArroData = (function () {
       if (!d) return;
       const g = geom();
       if (!g) return;
-      const px = localX(ev, svg);
-      const r = svg.getBoundingClientRect();
-      const py = (ev.clientY - r.top) * (ad.h / r.height);
+      const { x: px, y: py } = svgPt(ev, svg);
       // Movement on either axis makes a drag. Judging by x alone — as this
       // once did — reads a purely vertical zoom stroke as a click and pins a
       // reading nobody pointed at.
@@ -5191,10 +5369,41 @@ const ArroData = (function () {
       ev.preventDefault();
       const g = geom();
       if (!g) return;
+      // deltaY and deltaX arrive in whatever unit the browser felt like:
+      // pixels on most, lines on Firefox, pages on a rare few. Left unscaled a
+      // line-mode notch is a delta of about 3 where a pixel-mode one is about
+      // 50, which is why a Firefox wheel used to barely move the chart. One
+      // factor, applied to both axes, so the two gestures feel the same
+      // everywhere.
+      const unit = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? 100 : 1;
+      // A wheel that says "sideways" pans time rather than zooming it. That is
+      // a tilt wheel or a trackpad's horizontal gesture, which arrive as
+      // deltaX, and Shift+wheel, which is the one-wheel mouse's way of saying
+      // the same thing — some platforms already turn Shift+wheel into deltaX
+      // themselves, so both have to be read, and the || is what stops a
+      // platform that does both from panning twice as far.
+      //
+      // Requiring x to actually dominate is what keeps a trackpad usable: a
+      // two-finger scroll meant as a zoom drifts a pixel or two sideways nearly
+      // every time, and "any deltaX at all pans" would turn most zooms into
+      // pans. Shift overrides the test outright, because a hand holding Shift
+      // has said what it wants.
+      const sideways = ev.shiftKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY);
+      const raw = sideways ? (ev.deltaX || (ev.shiftKey ? ev.deltaY : 0)) : 0;
+      // Both gestures are capped by the same figure, so a notch pans about as
+      // far as a notch zooms and neither one lurches. See AD_WHEEL_STEP.
+      const cap = d => Math.max(-AD_WHEEL_STEP, Math.min(AD_WHEEL_STEP, d * unit));
+      if (raw) {
+        const dt = cap(raw) / g.pw * (g.v.t1 - g.v.t0);
+        ad.view = { t0: g.v.t0 + dt, t1: g.v.t1 + dt };
+        drawSoon();
+        return;
+      }
+      if (!ev.deltaY) return;
       const t = g.tOf(localX(ev, svg));
-      const z = Math.exp(ev.deltaY * 0.0014);
+      const z = Math.exp(cap(ev.deltaY) * 0.0014);
       ad.view = { t0: t - (t - g.v.t0) * z, t1: t + (g.v.t1 - t) * z };
-      draw(); drawOv(); renderReadout();
+      drawSoon();
     }, { passive: false });
     // Reset means both axes: the window goes, and the vertical mode goes back
     // to whatever the operator had before a zoom gesture commandeered it.
@@ -5283,7 +5492,9 @@ const ArroData = (function () {
   // A jump still exists and is still worth having, but it is now only what it
   // says: press somewhere the window is not, and the window comes to you. It
   // then becomes a move, so one gesture is press-to-there-and-drag.
-  const AD_OV_GRIP = 7;     // viewBox px either side of an edge that means "resize"
+  // The grip itself is AD_OV_GRIP / navGrip(), up with the other constants
+  // both drawers quote, so the zone a press is measured against and the zone
+  // the cursor is promised over are one figure and not two.
   const AD_OV_MIN  = 1000;  // the narrowest window a drag may leave, in ms
 
   // Which of the four a press at `p` is, given the window's two edges. Edges
@@ -5291,10 +5502,24 @@ const ArroData = (function () {
   // target, so it has to win wherever a narrow window makes them overlap — the
   // same order the two SVGs stack their cursor zones in.
   function navHit(p, lo, hi) {
+    const g = navGrip(lo, hi);
     const dlo = Math.abs(p - lo), dhi = Math.abs(p - hi);
-    if (dlo <= AD_OV_GRIP && dlo <= dhi) return 'lo';
-    if (dhi <= AD_OV_GRIP) return 'hi';
+    if (dlo <= g && dlo <= dhi) return 'lo';
+    if (dhi <= g) return 'hi';
     return (p > lo && p < hi) ? 'move' : 'jump';
+  }
+
+  // A cursor zone only speaks while the pointer is inside it, and a drag is
+  // the one time the pointer routinely leaves — past the end of the track, up
+  // onto the chart, off the window entirely — with the gesture still running
+  // because the element holds the pointer capture. The cursor would flick back
+  // to the strip's own `pointer` halfway through a resize, which is the second
+  // half of "the double arrow does not reliably appear". So the gesture itself
+  // states the cursor, on the whole element, until it ends.
+  function navCursor(el, kind) {
+    if (!el) return;
+    el.classList.toggle('is-resizing', kind === 'lo' || kind === 'hi');
+    el.classList.toggle('is-moving',   kind === 'move');
   }
 
   function bindNavigators() {
@@ -5303,10 +5528,11 @@ const ArroData = (function () {
     // ── The whole record, along the bottom ──────────────────────────────────
     const ov = document.getElementById('ad-ov');
     if (ov) {
-      const pxOf = ev => {
-        const r = ov.getBoundingClientRect();
-        return r.width ? (ev.clientX - r.left) * (ad.w / r.width) : 0;
-      };
+      // svgPt(), not the same sum by hand: the strip's own handles are what a
+      // press here is measured against, and a mapping that disagrees with the
+      // one that drew them by even a border's width is the bug this navigator
+      // spent its life with. One mapping, asked of the element.
+      const pxOf = ev => svgPt(ev, ov).x;
       const tAt = (px, ex) => ex.t0 + (px - PADL) / (ad.w - PADL - padRNow()) * (ex.t1 - ex.t0);
 
       const move = ev => {
@@ -5349,14 +5575,15 @@ const ArroData = (function () {
           kind = 'move';
         }
         ad.ovDrag = { kind, t0, t1, grab: tAt(px, ex) };
+        navCursor(ov, kind);
         after();
       };
       ov.onpointermove = ev => { if (ad.ovDrag) move(ev); };
-      ov.onpointerup = () => { ad.ovDrag = null; };
-      ov.onpointercancel = () => { ad.ovDrag = null; };
+      ov.onpointerup = () => { ad.ovDrag = null; navCursor(ov, null); };
+      ov.onpointercancel = () => { ad.ovDrag = null; navCursor(ov, null); };
       // Double-click anywhere on the strip is the whole record back, matching
       // the same gesture on the chart above it.
-      ov.ondblclick = () => { ad.ovDrag = null; ad.view = null; after(); };
+      ov.ondblclick = () => { ad.ovDrag = null; navCursor(ov, null); ad.view = null; after(); };
     }
 
     // ── The whole vertical range, down the right ────────────────────────────
@@ -5366,10 +5593,7 @@ const ArroData = (function () {
     // the same function for both axes.
     const vov = document.getElementById('ad-vov');
     if (vov) {
-      const pyOf = ev => {
-        const r = vov.getBoundingClientRect();
-        return r.height ? (ev.clientY - r.top) * (ad.h / r.height) : 0;
-      };
+      const pyOf = ev => svgPt(ev, vov).y;   // see pxOf on the strip above
       const valAt = (py, ex) => ex.hi - (py - PADT) / (ad.h - PADT - PADB) * (ex.hi - ex.lo);
       // The narrowest vertical window a drag may leave. Proportional rather
       // than absolute: 1000 ms means something on every record, one millimetre
@@ -5408,6 +5632,7 @@ const ArroData = (function () {
           kind = 'move';
         }
         ad.vovDrag = { kind, lo, hi, grab: valAt(py, ex) };
+        navCursor(vov, kind);
         // The first commit is what moves the toolbar to Fixed and fills its two
         // inputs, so the pane is re-rendered once, here, rather than on every
         // frame of the drag — and only when the press actually changed the
@@ -5421,15 +5646,19 @@ const ArroData = (function () {
             // so the gesture would end here. Re-take it on the new one.
             const again = document.getElementById('ad-vov');
             if (again) { try { again.setPointerCapture?.(ev.pointerId); } catch (_) {} }
+            navCursor(again, kind);
           }
         }
       };
       vov.onpointermove = ev => { if (ad.vovDrag) move(ev); };
-      vov.onpointerup = () => { ad.vovDrag = null; };
-      vov.onpointercancel = () => { ad.vovDrag = null; };
+      // The element may have been replaced mid-gesture (see above), so the end
+      // of the drag clears the class off whichever one is on the page now.
+      const vovDone = () => { ad.vovDrag = null; navCursor(document.getElementById('ad-vov'), null); };
+      vov.onpointerup = vovDone;
+      vov.onpointercancel = vovDone;
       // …and double-click gives the axis back to whatever mode it was in.
       vov.ondblclick = () => {
-        ad.vovDrag = null;
+        vovDone();
         if (restoreY()) renderMainOnly(); else { draw(); drawVov(); }
       };
     }
@@ -5463,6 +5692,7 @@ const ArroData = (function () {
   // on the page would be the leak #142 exists to stop.
   function stop() {
     if (ad.ro) { ad.ro.disconnect(); ad.ro = null; }
+    cancelDrawSoon();
     ad.full = false;
     syncFullEsc();
   }

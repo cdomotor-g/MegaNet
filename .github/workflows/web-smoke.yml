@@ -505,6 +505,18 @@ jobs:
         working-directory: test
         run: npm run terrain
 
+      # The two navigators under and beside the Arrow chart. Their edge handles
+      # were ungrabbable for a reason no check here could see: the drawing and
+      # the hit-test each converted client coordinates to viewBox coordinates
+      # their own way, and disagreed by 12–17 px, so the handle was painted in
+      # one place and every press was measured in another. `smoke` sees a chart
+      # that renders; only a real press at the handle's drawn position tells the
+      # two apart. Also the wheel, which shares that mapping, and the deltas the
+      # pinned callout quotes either side of a reading.
+      - name: Arrow navigators — the handles, the wheel and the callout's deltas
+        working-directory: test
+        run: npm run adnav
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each
