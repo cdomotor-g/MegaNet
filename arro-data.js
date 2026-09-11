@@ -3179,6 +3179,7 @@ const ArroData = (function () {
               + 'Shift+drag a box to zoom to it, '
               + 'Alt+drag up or down to rescale the vertical axis, arrow keys to step, '
               + '0 to reset both axes. '
+              + 'Hovering a reading names the difference either side of it. '
               + 'Every value is in the readings table below the chart.';
     if (!f) return `Chart, empty — no series is shown. ${how}`;
     const shape = ad.chartType === 'dots' ? 'Point chart' : ad.chartType === 'step' ? 'Step chart' : 'Line chart';
@@ -4118,50 +4119,95 @@ const ArroData = (function () {
     return ` <span class="small">= ${esc(fmtVal(mm))} mm (${esc(note)})</span>`;
   }
 
-  // The reading either side of a pinned one, as the difference the eye was
-  // about to work out for itself. A callout that gives a level to three decimal
-  // places and says nothing about the one before it makes the operator hold two
-  // numbers in their head and subtract — on the tab whose whole job is finding
-  // the reading that moved when it should not have.
+  // The reading either side of a given one, as the difference the eye was about
+  // to work out for itself. Two places quote it — the balloon that follows the
+  // pointer and the pinned callout under the chart — and they quote the same
+  // arithmetic from here, because two definitions of "the previous reading" on
+  // one chart is a way to be wrong in two places at once.
   //
   // **Record order, not drawn order.** The neighbour is i±1 in the series, even
-  // when the filters removed it. Every verdict in the panel around this is
-  // stated against "the reading before it" — the rate-of-rise and rate-of-fall
-  // limits by name, the 357 test against the three that follow — so quoting the
-  // nearest *surviving* neighbour instead would answer a different question
-  // from the one the badge above it just answered, and the pair would disagree
-  // on a chart where they are inches apart. When the neighbour is one the
-  // filters took out, the cell says which filter, rather than quietly offering
-  // a difference against a reading that is not in the filtered series.
+  // when the filters removed it. Every verdict this tab states is stated against
+  // "the reading before it" — the rate-of-rise and rate-of-fall limits by name,
+  // the 357 test against the three that follow — so quoting the nearest
+  // *surviving* neighbour instead would answer a different question from the one
+  // the badge in the callout just answered, on a chart where the two readings
+  // are inches apart. Both callers say when a neighbour was removed rather than
+  // quietly offering a difference against a reading that is not on the curve.
   //
-  // The difference always runs in time order: `Δ previous` is what the value
-  // did coming *into* this reading, `Δ next` what it does leaving it. So two
-  // adjacent readings quote the same figure once each, and the pair reads as a
-  // slope through the point rather than as two unrelated subtractions.
-  function deltaCell(s, i, step, f) {
+  // **The values are the ones being drawn**, which on a rainfall accumulator are
+  // not `s.v`: `adj` is the count with the 2,048 rollover unwrapped, and at a
+  // wrap `s.v` falls by 2,047.8 where the curve — and the rain — goes up by 0.2.
+  // Raw mode draws `s.v` itself, and then so does this. A difference printed
+  // beside a point has to be the difference between the two points on screen.
+  //
+  // The difference always runs in time order: what the value did coming *into*
+  // this reading, and what it does leaving it. So two adjacent readings quote
+  // the same figure once each, and the pair reads as a slope through the point
+  // rather than as two unrelated subtractions. Null at the ends of the record.
+  function neighbourDelta(s, i, step, raw) {
     const j = i + step;
-    if (j < 0)           return '<b class="txt-muted">— first reading</b>';
     // s.n, not s.t.length: seriesData() guarantees the arrays are *at least*
     // n long and says the tail is ignored, so a series sitting in an
     // over-allocated buffer would otherwise be given a neighbour made of
     // whatever was left in it.
-    if (j >= s.n) return '<b class="txt-muted">— last reading</b>';
+    if (j < 0 || j >= s.n) return null;
+    const f = runFilter(s, ad.cfg);          // cached on the series by cfg key
+    // `raw` overrides the mode for a point that came off the *raw* layer while
+    // the filtered one is also on screen — a removal drawn as a ✕, which the
+    // chart plots from s.v. Without it a ✕ hovered either side of a rainfall
+    // rollover would be handed a difference off a curve it is not on.
+    const vals = (raw === undefined ? ad.mode === 'raw' : raw) ? s.v : f.adj;
     const [from, to] = step < 0 ? [j, i] : [i, j];
-    const dv = s.v[to] - s.v[from];
-    const dt = s.t[to] - s.t[from];
-    const sign = dv > 0 ? '+' : '';
+    return { j, dv: vals[to] - vals[from], dt: s.t[to] - s.t[from], cut: adCut(f.status[j]) };
+  }
+
+  const deltaSign = dv => (dv > 0 ? '+' : '');
+
+  // The long form, for the pinned callout: the difference, the gap it happened
+  // over, the rate across that gap, and the filter that took the neighbour out
+  // if one did.
+  function deltaCell(s, i, step) {
+    const d = neighbourDelta(s, i, step);
+    if (!d) return `<b class="txt-muted">— ${step < 0 ? 'first' : 'last'} reading</b>`;
+    const sign = deltaSign(d.dv);
     const unit = s.unit ? ' ' + esc(s.unit) : '';
     // A zero gap is a repeat timestamp — the thing AD_OOS exists to name — and
     // a rate across it would be a division by zero dressed up as a measurement.
-    const rate = dt > 0
-      ? ` · ${sign}${esc(fmtVal(dv / (dt / 3600000)))}${s.unit ? ' ' + esc(s.unit) : ''}/h`
+    const rate = d.dt > 0
+      ? ` · ${deltaSign(d.dv)}${esc(fmtVal(d.dv / (d.dt / 3600000)))}${unit}/h`
       : '';
-    const gap = dt > 0 ? `over ${esc(fmtDur(dt))}` : 'same timestamp';
-    const cut = adCut(f.status[j])
-      ? ` · <span class="txt-warn">that reading was removed — ${esc(AD_STATUS_LABEL[f.status[j]])}</span>`
+    const gap = d.dt > 0 ? `over ${esc(fmtDur(d.dt))}` : 'same timestamp';
+    const cut = d.cut
+      ? ` · <span class="txt-warn">that reading was removed — ${
+            esc(AD_STATUS_LABEL[statusOf(s, d.j)])}</span>`
       : '';
-    return `<b>${sign}${esc(fmtVal(dv))}${unit}</b>`
+    return `<b>${sign}${esc(fmtVal(d.dv))}${unit}</b>`
          + `<span class="small ad-delta-note">${gap}${rate}${cut}</span>`;
+  }
+
+  // …and the short form, for the balloon. Figures only — no gap, no rate, no
+  // named filter — because a thing read at a glance while the hand is still
+  // moving is not where the story goes. The callout under the chart is, and a
+  // click is all it takes to get there. A neighbour the filters removed is
+  // still flagged, in the one way that costs no width: the figure goes amber,
+  // because a difference against a reading that is not drawn on this curve
+  // should not look like a difference between two points that are.
+  //
+  // Nothing at all unless the chart is drawing values. In Increment the plotted
+  // number *is* the difference from the reading before, and in Rate it is that
+  // per hour — so a second one beside it would be the same fact twice, and
+  // printed against the untransformed value it would be a different number.
+  function tipDeltas(r) {
+    if (ad.transform !== 'value') return '';
+    const s = ad.series.find(x => x.key === r.key);
+    if (!s) return '';
+    const one = step => {
+      const d = neighbourDelta(s, r.i, step, r.raw);
+      if (!d) return '—';
+      return `<b${d.cut ? ' class="txt-warn"' : ''}>${
+        deltaSign(d.dv)}${esc(fmtVal(d.dv))}</b>`;
+    };
+    return `<div class="ad-tip-d">&Delta; prev ${one(-1)} · &Delta; next ${one(1)}</div>`;
   }
 
   function pinHtml(s, i) {
@@ -4200,8 +4246,8 @@ const ArroData = (function () {
           <div><span>Value</span><b>${esc(fmtVal(s.v[i]))} ${esc(s.unit)}</b></div>
           <div><span>Raw</span><b>${esc(fmtVal(s.raw[i]))}</b>${rawBucketNote(s, i)}</div>
           <div><span>Adjusted</span><b>${esc(fmtVal(f.adj[i]))}${rolled ? ' <span class="small">(wrap here)</span>' : ''}</b></div>
-          <div class="ad-delta"><span>&Delta; previous</span>${deltaCell(s, i, -1, f)}</div>
-          <div class="ad-delta"><span>&Delta; next</span>${deltaCell(s, i, 1, f)}</div>
+          <div class="ad-delta"><span>&Delta; previous</span>${deltaCell(s, i, -1)}</div>
+          <div class="ad-delta"><span>&Delta; next</span>${deltaCell(s, i, 1)}</div>
           <div><span>Quality</span><b>${esc(s.qcodes[s.q[i]] || '—')}</b></div>
           ${s.prov ? fieldPinRows(s, i) : ''}
         </div>
@@ -5122,6 +5168,9 @@ const ArroData = (function () {
           // rather than implying every reading survived.
           kindLabel: ad.mode === 'raw' ? 'raw'
                    : (kind === 'raw' && adCut(statusOf(s, i))) ? 'removed' : 'kept',
+          // Which layer the point was plotted from, so anything quoting a
+          // difference beside it can use the same values the chart drew.
+          raw: kind === 'raw',
           dist,
         };
       }
@@ -5138,7 +5187,8 @@ const ArroData = (function () {
     tip.innerHTML = `<div class="ad-tip-t">${esc(fmtFull(ad.hover.t))}</div>`
       + ad.hover.rows.slice(0, 6).map(r => `
         <div class="ad-tip-r"><span class="ad-dot" style="--dot:${escAttr(r.color)}"></span>
-          ${esc(r.label)} <b>${esc(fmtVal(r.y))}</b> ${esc(r.unit)}</div>`).join('');
+          ${esc(r.label)} <b>${esc(fmtVal(r.y))}</b> ${esc(r.unit)}</div>
+        ${tipDeltas(r)}`).join('');
     const r = stage.getBoundingClientRect();
     const lx = ev.clientX - r.left, ly = ev.clientY - r.top;
     tip.hidden = false;

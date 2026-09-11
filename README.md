@@ -2686,10 +2686,10 @@ library. It carries wheel zoom, Shift+wheel or a tilt wheel to pan sideways,
 drag to pan, drag-to-select zoom on either or both axes, an overview strip of
 the whole record with the visible window on it — movable, and resizable by its
 edges — plus a second navigator down the right for the vertical axis, a
-crosshair with a hover readout, a pinned callout that says what the reading did
-either side of itself, keyboard pan/zoom, per-series colour, line type, axis
-side and visibility, solo and fit, light/dark repaint, and SVG/PNG download.
-Three readings of the data
+crosshair whose balloon says what the reading did either side of itself and a
+pinned callout that says it at length, keyboard pan/zoom, per-series colour,
+line type, axis side and visibility, solo and fit, light/dark repaint, and
+SVG/PNG download. Three readings of the data
 (value, increment, rate per hour), three chart styles (line, step, points) and
 four vertical scales — including **Kept**, which scales to the surviving
 readings so a single 2014 mm spike stops flattening a 300 mm trace, and draws

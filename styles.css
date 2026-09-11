@@ -8848,6 +8848,16 @@ code {
 }
 .ad-tip-t { color: var(--muted); margin-bottom: .15rem; }
 .ad-tip-r { display: flex; align-items: center; gap: .3rem; white-space: nowrap; }
+/* What the reading did either side of itself, under the row it belongs to.
+   Indented past the legend dot so it reads as part of that row rather than as
+   a row of its own, and muted so the value above stays what the eye lands on —
+   the differences are the second question, asked while already looking. */
+.ad-tip-d {
+  color: var(--muted); white-space: nowrap; font-size: .93em;
+  margin: 0 0 .15rem calc(9px + .3rem);
+}
+.ad-tip-d b { color: var(--text); font-weight: 600; }
+.ad-tip-d b.txt-warn { color: var(--warn); }
 
 /* The legend key beside a series name, in the readout, the tooltip and the
    pinned reading. Its colour is the series' own, so it arrives as a token on

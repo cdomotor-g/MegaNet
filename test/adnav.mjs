@@ -26,6 +26,11 @@
 // thickness and the cursor that made it findable in the first place, and the
 // wheel gestures that share the same coordinate mapping.
 //
+// It also covers the two differences the hover balloon and the pinned callout
+// quote either side of a reading: both go through one neighbourDelta(), against
+// the values the chart is actually drawing, so a rainfall rollover or a removed
+// neighbour cannot make the figure beside a point disagree with the points.
+//
 //   node --run adnav      (or: npm run adnav)
 
 import { startServer } from './lib/server.mjs';
@@ -306,7 +311,107 @@ try {
      Math.max(...ratios) - Math.min(...ratios) < 0.001,
      Object.entries(perMode).map(([k, m]) => `${k}=${m.ratio.toFixed(4)}`).join(' '));
 
-  // ── 5. The callout says what the reading did, either side ─────────────────
+  // ── 5. The balloon says it too, at a glance ───────────────────────────────
+  // The hover balloon is where the question is actually asked — the pointer is
+  // already on the point. It quotes the same two differences as the callout,
+  // from the same neighbourDelta(), but as figures alone.
+  const balloon = await page.evaluate(async () => {
+    const A = window.ArroData, s = A.ad.series[0];
+    const f = A.runFilter(s, A.ad.cfg);
+    // A reading whose neighbours both differ from it, so the figures are not
+    // all zeros, and one whose previous neighbour the filters removed.
+    const CUT = new Set([3, 4, 5, 6, 7]);
+    let step = -1, cut = -1;
+    for (let i = 1; i < s.n - 1; i++) {
+      if (step < 0 && Math.abs(f.adj[i] - f.adj[i - 1]) > 0.1
+                   && Math.abs(f.adj[i + 1] - f.adj[i]) > 0.1) step = i;
+      if (cut < 0 && CUT.has(f.status[i - 1])
+                  && Math.abs(f.adj[i] - f.adj[i - 1]) > 0.1) cut = i;
+      if (step >= 0 && cut >= 0) break;
+    }
+    const hover = (i) => {
+      // Straight through hoverAt()'s own path: set the window around the
+      // reading, then ask the module where the pointer would land on it.
+      const t = s.t[i];
+      A.ad.view = { t0: t - 900000, t1: t + 900000 };
+      A.repaint();
+      const px = 64 + (t - A.ad.view.t0) / (A.ad.view.t1 - A.ad.view.t0) * (A.ad.w - 64 - 18);
+      const r = document.getElementById('ad-svg').getBoundingClientRect();
+      return { x: r.left + (px / A.ad.w) * r.width, y: r.top + r.height / 2 };
+    };
+    return { step, cut, at: { step: hover(step), cut: hover(cut) },
+             want: { prev: f.adj[step] - f.adj[step - 1], next: f.adj[step + 1] - f.adj[step] } };
+  });
+
+  const tipAt = async (pt) => {
+    await page.mouse.move(pt.x, pt.y);
+    await page.waitForTimeout(200);
+    return page.evaluate(() => {
+      const el = document.getElementById('ad-tip');
+      if (!el || el.hidden) return null;
+      const d = el.querySelector('.ad-tip-d');
+      return { text: el.innerText.replace(/\s+/g, ' ').trim(),
+               delta: d ? d.textContent.replace(/\s+/g, ' ').trim() : null,
+               warned: !!(d && d.querySelector('b.txt-warn')) };
+    });
+  };
+
+  // Re-measure: repaint() above moved the window, and the coordinates were
+  // computed against the window each hover() call had just set.
+  await page.evaluate((i) => {
+    const A = window.ArroData, s = A.ad.series[0], t = s.t[i];
+    A.ad.view = { t0: t - 900000, t1: t + 900000 };
+    A.repaint();
+  }, balloon.step);
+  await page.waitForTimeout(200);
+  const tipStep = await tipAt(balloon.at.step);
+  ok('the hover balloon appears', !!tipStep, 'no balloon');
+  ok('it carries a Δ prev and a Δ next', !!(tipStep && /Δ prev/.test(tipStep.delta || '')
+                                            && /Δ next/.test(tipStep.delta || '')),
+     tipStep && tipStep.text);
+  // Against the arithmetic, not just against a number being present: which
+  // reading the pointer actually landed on is hoverAt()'s call, so the expected
+  // figures are read back from the reading it chose.
+  const want = await page.evaluate(() => {
+    const A = window.ArroData, s = A.ad.series[0];
+    const h = A.ad.hover && A.ad.hover.rows[0];
+    if (!h) return null;
+    const f = A.runFilter(s, A.ad.cfg);
+    const fmt = dv => `${dv > 0 ? '+' : ''}${
+      Math.abs(dv) >= 1000 ? dv.toFixed(0) : Math.abs(dv) >= 10 ? dv.toFixed(1)
+      : Math.abs(dv) >= 1 ? dv.toFixed(2)
+      : dv.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}`;
+    return { prev: fmt(f.adj[h.i] - f.adj[h.i - 1]), next: fmt(f.adj[h.i + 1] - f.adj[h.i]) };
+  });
+  ok('the figures are the differences either side of the reading it landed on',
+     !!(want && tipStep.delta === `Δ prev ${want.prev} · Δ next ${want.next}`),
+     `${tipStep && tipStep.delta}  ≠  Δ prev ${want && want.prev} · Δ next ${want && want.next}`);
+  ok('…and they are not all zeros, so the check means something',
+     !!(want && (want.prev !== '0' || want.next !== '0')),
+     JSON.stringify(want));
+
+  await page.evaluate((i) => {
+    const A = window.ArroData, s = A.ad.series[0], t = s.t[i];
+    A.ad.view = { t0: t - 900000, t1: t + 900000 };
+    A.repaint();
+  }, balloon.cut);
+  await page.waitForTimeout(200);
+  const tipCut = await tipAt(balloon.at.cut);
+  ok('a difference against a reading the filters removed is flagged',
+     !!(tipCut && tipCut.warned), tipCut && tipCut.delta);
+
+  // Increment already plots the difference from the reading before, so a second
+  // one beside it would be the same fact twice — and against the untransformed
+  // value, a different number.
+  await page.evaluate(() => window.ArroData.setTransform('increment'));
+  await page.waitForTimeout(250);
+  const tipInc = await tipAt(balloon.at.cut);
+  ok('the balloon drops the deltas when the chart is already drawing them',
+     !!tipInc && tipInc.delta === null, tipInc && tipInc.text);
+  await page.evaluate(() => window.ArroData.setTransform('value'));
+  await page.waitForTimeout(250);
+
+  // ── 6. The callout says what the reading did, either side ─────────────────
   const pin = await page.evaluate(async () => {
     const A = window.ArroData;
     const s = A.ad.series[0];
@@ -369,6 +474,6 @@ try {
 console.log(failures
   ? `\nFAIL — ${failures} check(s) failed.`
   : '\nPASS — the navigator handles answer the pointer where they are drawn, the\n'
-    + '       wheel pans sideways and steps evenly, and a callout says what the\n'
-    + '       reading did either side of itself.');
+    + '       wheel pans sideways and steps evenly, and both the balloon and the\n'
+    + '       callout say what the reading did either side of itself.');
 process.exit(failures ? 1 : 0);
