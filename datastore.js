@@ -13,8 +13,10 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for DB_URL, DB_ANON_KEY, DB_SCHEMA,
 // DB_SCHEMA_VERSION, _dbClock, dbHostLabel, dbRouteLabel, state, esc and dlText; across to
-// app.js for SOURCE_LABELS and loadFromApi; and to auth.js for Auth, which
-// reaches back here for dbSetAccessToken.
+// app.js for SOURCE_LABELS and loadFromApi; to export.js for exportMayDownload
+// and rerenderExport, which are the Export tab's sign-in gate and the repaint
+// that follows one (#191); and to auth.js for Auth, which reaches back here for
+// dbSetAccessToken.
 //
 // This was three banner sections of app.js with the Export tab sitting in the
 // middle of them; they are joined here because they are one concern. The seam
@@ -218,6 +220,19 @@ async function snapshotStationsJson() {
     const el = document.getElementById('snapshot-note');
     if (el) el.innerHTML = `<span class="${tone || 'txt-muted'}">${esc(text)}</span>`;
   };
+
+  // The runtime half of the Export tab's gate (#191) — see exportMayDownload()
+  // in export.js for why this is checked here as well as in the markup. The
+  // tab is re-rendered rather than only told, so the button it is offering
+  // matches the session it actually has.
+  if (typeof exportMayDownload === 'function' && !exportMayDownload()) {
+    // Repaint first: rerenderExport() rebuilds the note element say() writes
+    // into, so saying it first would put the sentence on a node that is about
+    // to be thrown away.
+    if (state.activeTab === 'export') rerenderExport(() => document.getElementById('btn-snapshot'));
+    say('Not downloaded — the station document needs a signed-in session.', 'txt-bad');
+    return;
+  }
 
   if (btn) btn.disabled = true;
   say('Fetching the current document…');

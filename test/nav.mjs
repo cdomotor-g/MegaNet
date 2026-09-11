@@ -184,12 +184,17 @@ try {
   const narrow = await find('alert packets');
   check('a second term narrows rather than widens', narrow.shown.length < broad.shown.length,
     `"alert" → ${broad.shown.length}, "alert packets" → ${narrow.shown.length}`);
-  // The tie the group heading creates, and the reason the ↵ mark exists: three
-  // tabs share the heading "Addresses & packets", so all three score on
-  // "packets", and the topmost of the three is not the one that was asked for.
-  check('and the label breaks the tie the shared group heading creates',
-    narrow.best !== null && idOf(narrow.best) === 'packets',
-    `showed ${narrow.shown.join(', ')}; marked ${narrow.best}`);
+  // The tie, and the reason the ↵ mark exists. Every tab under the ALERT
+  // heading scores on "alert", and three of them carry "decode" as well —
+  // ALERT Packets in its find words, ALERT2 in its, HFEM Messages in its — so
+  // all three tie at 2 and the topmost of the three is not the one asked for.
+  // (Until the heading was shortened to "ALERT" the same tie came from the
+  // word "packets" sitting in the old heading "Addresses & packets"; the tie
+  // moved, the rule that resolves it did not.)
+  const tied = await find('alert decode');
+  check('the label breaks a tie three tabs score equally on',
+    tied.shown.length > 1 && tied.best !== null && idOf(tied.best) === 'packets',
+    `showed ${tied.shown.join(', ')}; marked ${tied.best}`);
 
   // Word starts, not bare substrings. Both of these matched under the first
   // version — "the" inside *hypotheses*, "rf" inside *interference* — and both

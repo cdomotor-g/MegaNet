@@ -483,7 +483,7 @@ try {
     setNavCollapsed(false);
     document.getElementById('app-status').textContent = '';
     const btn = [...document.querySelectorAll('#tab-nav .tab-btn')]
-      .find(b => b.querySelector('.nav-label')?.textContent === 'Networks');
+      .find(b => b.querySelector('.nav-label')?.textContent === 'Radio Path Maps');
     btn.focus();
     btn.click();
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -491,20 +491,20 @@ try {
     return {
       tab: state.activeTab,
       onNavButton: !!now?.classList?.contains('tab-btn'),
-      onTheNewOne: now?.querySelector?.('.nav-label')?.textContent === 'Networks',
+      onTheNewOne: now?.querySelector?.('.nav-label')?.textContent === 'Radio Path Maps',
       current: now?.getAttribute('aria-current'),
       said: document.getElementById('app-status')?.textContent || '',
     };
   });
-  check('clicking a nav tab opens it', fromNav.tab === 'networks', fromNav.tab);
+  check('clicking a nav tab opens it', fromNav.tab === 'maps', fromNav.tab);
   check('and focus lands on the new tab\'s own button, not on <body>',
     fromNav.onNavButton && fromNav.onTheNewOne);
   check('and that button is the one marked aria-current, so arriving on it says so',
     fromNav.current === 'page', String(fromNav.current));
   // The other half of the rule, and the easier one to get wrong: the region
   // stays quiet when focus has already said it. A screen reader reads
-  // "Networks, button, current page" on arrival; a live region saying
-  // "Networks — Stations & networks" a moment later is the same fact twice.
+  // "Radio Path Maps, button, current page" on arrival; a live region saying
+  // "Radio Path Maps — Stations & networks" a moment later is the same fact twice.
   check('and the live region stays quiet, because focus already said it',
     fromNav.said === '', JSON.stringify(fromNav.said));
 
@@ -557,7 +557,7 @@ try {
     for (const theme of ['light', 'dark']) {
       const over = await page.evaluate(async t => {
         document.documentElement.setAttribute('data-theme', t);
-        switchTab('networks');
+        switchTab('passranges');
         await new Promise(r => requestAnimationFrame(r));
         const d = document.documentElement;
         return { scroll: d.scrollWidth, client: d.clientWidth };
@@ -623,11 +623,14 @@ try {
   await page.waitForTimeout(250);
 
   // The proving ground itself: #109 is only done if the system it defines is
-  // demonstrably in use somewhere. Networks is the smallest tab in the app and
-  // #137 owns it afterwards.
+  // demonstrably in use somewhere. Networks was that tab — the smallest in the
+  // app — until #191 removed it for repeating what the station card and the
+  // Export rail already say. Pass Ranges inherits the job: it is the next
+  // smallest thing here built entirely out of the system's parts, .page and two
+  // wrapped tables and nothing else.
   const proof = await page.evaluate(async () => {
     document.documentElement.setAttribute('data-theme', 'light');
-    switchTab('networks');
+    switchTab('passranges');
     await new Promise(r => requestAnimationFrame(r));
     const main = document.getElementById('main-content');
     const tables = [...main.querySelectorAll('table')];

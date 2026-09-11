@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-10** (revision 90 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-11** (revision 91 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -587,6 +587,137 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 91 — 2026-09-11: the Networks tab goes, and the data tab learns to change a reading
+
+Twenty-three session requests across two areas — the shell and the map, then the
+ARRO Data chart — asked in one message. No issue opened or closed. `networks.js`
+is **deleted**; `data/demo/` is new; everything else is `arro-data.js`,
+`app.js`, `core.js`, `export.js`, `datastore.js`, `index.html`, `styles.css`,
+the README and the three checks that had claims about what moved.
+
+**One tab removed, and the argument for removing it rather than keeping it for
+symmetry.** *Networks* was a read-only listing of the named radio-network
+clusters and the 76-basin catchment vocabulary, and every number on it is
+already on a tab somebody is on anyway: the network a station belongs to is on
+its card and in the Stations filter pane, and the ticks that scope an export
+live on the Export tab's own rail. A tab that repeats what is elsewhere still
+costs a row in the nav and a stop for every keyboard user walking it. The word
+did not go with the tab — `networks` is a find term on Stations and Export now,
+which is where the answer is. Twenty-two tabs to twenty-one; `smoke`'s
+`EXPECTED_TABS` moved with it, and `shell` lost three references to the tab it
+had been using as #109's proving ground (Pass Ranges inherits the job: the next
+smallest thing built entirely out of the system's parts).
+
+**Two group headings shortened, and the words they carried moved into `find`.**
+*Addresses & packets* → **ALERT**, *Telemetry* → **Data**. The find box matches
+against the group heading as well as the label, so shortening a heading
+*removes* routes — "telemetry" reached four tabs through the old one and now
+reaches them through their own find words instead. The nav check's tie-break
+probe moved with it: the tie it was written about came from the word "packets"
+sitting in the old heading, and the same tie now comes from "decode" in three
+tabs' find words. The tie moved; the rule that resolves it did not.
+
+**The Export tab is behind the sign-in that station edits are behind.** What
+leaves that tab is the whole network, not a view of it — one press writes
+coordinates, heights, frequencies and pass windows for every repeater on the
+ticked networks and every station their pass ranges reach, and *Snapshot* writes
+the station document itself. What is **not** gated is deliberate: the ticks, the
+counts, the repeater table and the Data source panel all stay live, because they
+are what somebody needs to see before deciding whether signing in is worth it.
+The gate is checked twice, in the markup and again inside each action, because a
+render can outlive the session it was drawn for.
+
+**A reset button on the map, and the line it will not cross.** Eleven modules
+can put something on the Stations map and every one has its own way of taking it
+off again — right for each of them in isolation, and adding up to a map nobody
+can get back to a clean state without remembering all eleven. **↺** clears the
+filters, the selection, the box-select, the focused repeater and its blast ring,
+every drawing, both link-budget ends, the polar plot, the spiderfied cluster,
+whatever mode was armed, and all four corner cards. It leaves the 👁️ flyout
+entirely alone: the base map, the overlay layers, the link colouring and the
+label mode are *settings* rather than clicks, and a reset that silently
+re-argued them would be the last time anyone pressed it. Only the drawings are
+unrecoverable, so they are the only thing worth a confirm.
+
+**The whole-record navigator's middle gesture was wrong in a way that read as
+randomness, and this is the generalisable half of the revision.** Its press
+handler recognised the two edges and called everything else "pan" — and "pan"
+re-centred the window on the press point. So a press two pixels outside the
+grip, which the cursor had just promised was a resize, threw the window sideways
+by however far off centre it landed; a press dead in the middle did nothing; and
+the two were the same gesture. On a zoomed-out chart it was worse: `view()` lets
+the window run a whole span past either end of the record, so **both edge
+handles were drawn off the ends of the track**, no press could reach one, and
+every press jumped. Three things fix it — clamping the drawn handles to the
+track, a real "move" that tracks the pointer by its grab offset instead of
+teleporting to it, and a grip wide enough to hit — and **only the middle one is
+new behaviour; the other two are the promised behaviour becoming reachable.**
+The rule: *a cursor is a promise, and a hit-test that can be out of reach is a
+promise the code cannot keep.*
+
+**A second navigator, on the axis that never had one.** The vertical axis had
+four modes and a pair of number boxes and no way to *point* at a range — "show
+me the bottom metre of this hydrograph" was a mode change, two typed figures and
+a guess at what the figures should be, for a question the eye had already
+answered by looking at the chart. The new column down the right takes the same
+three gestures as the strip below, and commits through `commitY()` — the same
+manual takeover the box zoom and the Alt-drag already used — so there is no
+fifth axis mode and no second override for `yRange()` to consult.
+
+**Readings can be edited, and the honesty is the feature.** Lasso a stretch
+(removed readings included — the spike somebody wants to delete is *by
+definition* one the filter already rejected), or tick rows in the table, then
+set a value, move the selection by an amount, scale it, re-code its quality,
+drag it up or down on the chart, or delete it. Every edit re-runs the 357 walk,
+so a spike deleted here stops dragging its neighbours down immediately, and both
+Export buttons write what is on screen. **Nothing is written back to ARRO or to
+the datastore**, closing the tab loses the lot, an edited series says so in the
+rail and carries a *revert* to the values as loaded, deleted rows do not come
+back and the confirm says so, and closing an edited series asks first.
+
+**Two defects turned up that nobody asked about.** `hoverAt()` searched the
+filtered track alone in every mode but Raw, so the one reading anybody actually
+wants to inspect — the one with a cross drawn on it — was the one reading on the
+chart that did not answer a click; it is reachable whenever it is drawn now, one
+row per series still. And *Drag to zoom* was two independent tick boxes, so both
+could be on at once, which a drag cannot honour: a press has exactly one meaning
+and `onpointerdown` had to pick between them silently. It is one segmented
+control with **Pan** in it, which says the truth — this is a choice whose
+commonest state was never on the toolbar at all.
+
+**The rest, briefly.** *Rate of fall* is a filter of its own rather than a sign
+on rate of rise, because the fastest credible fall at a site is rarely the
+fastest credible rise — and until now a water level's falls were judged against
+the *rise* threshold with no way to say otherwise, while an accumulator's were
+never judged at all. Each mark the chart draws is written down once
+(`AD_MARKS`) and drawn from there by the chart, the tick boxes, the filter
+panel and the table's verdict column, so a legend can never teach a shape the
+chart does not draw. A series can go on either vertical axis, pick its line
+type, and take its colour from a grid of named swatches rather than only from
+the browser's gradient surface. The chart and the readings table each get a full
+screen. The Stations filter card lands shut in the split view whatever was
+remembered, read-only and for one page load, so nobody's preference is destroyed
+by having opened the tab in the wrong layout once. The 👁️ flyout's four headings
+draw rules. The banner says **Flood-Net**, and only the banner — renaming the
+files, the module prefixes and the Radio Mobile `MegaNet*.csv` set would be a
+migration with a thousand edges and nothing gained on screen.
+
+**Demo data.** The tab was useless without a file, and the file it was useless
+without was one somebody had to go and fetch out of ARRO first. `data/demo/` now
+holds the *same* export every comment in `arro-data.js` argues from — Durikai's
+rain accumulator, 14,942 rows over seven months, 6,111 distinct timestamps, 395
+values ARRO wrote with a thousands separator in an unquoted field, 82
+single-reading spikes to 1234. Nothing about it was cleaned: it is there because
+it is messy, and because every claim `runFilter()` makes about what it is
+defending against can now be checked against the file that taught it. It arrives
+through `addSeries()` under its real filename, so the sensor-id parse and the
+station link run exactly as for a dropped file — **there is no demo code path in
+the chart.**
+
+**`npm run all` — thirty-seven checks, all green.** Three carried claims about
+what moved and were updated rather than worked around: `smoke`'s tab count,
+`shell`'s three uses of the removed tab, and `nav`'s tie-break probe.
 
 ### Revision 90 — 2026-09-10: the map answers about the ground, and the arrows stop shouting
 

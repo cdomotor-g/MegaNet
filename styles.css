@@ -3028,6 +3028,17 @@ hr {
   box-shadow: var(--shadow-2), inset 0 0 0 2px var(--accent);
 }
 
+/* Reset (#191) is the one corner button that takes something away, so it says
+   so on hover rather than only in its tooltip — the same warning colour the
+   rest of the app uses for a destructive control. Resting state is the same as
+   its neighbours: it is a recovery button, not a hazard sitting in the corner
+   colouring the map red. */
+.mn-map-reset:hover,
+.mn-map-reset:focus-visible {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
 .mn-mapctl-body {
   display: none;
   position: absolute;
@@ -5467,20 +5478,44 @@ hr {
 /* Group headings inside the 👁️ Map display flyout (#175). The flyout scrolls,
    and a column of checkboxes past the fold gives nobody a reason to scroll
    it; a heading says what kind of thing is under it. */
+/* …and since #191 it draws a rule as well as saying it. Uppercase small caps in
+   --muted was the whole of the separation, and it is not enough: an eye going
+   down a single column of checkboxes reads a heading as one more row unless
+   something physically stops it. The rule is the section break; the space on
+   both sides of it is what stops the rule reading as an underline for whatever
+   sits above. Above rather than below, because a heading belongs to the block
+   that follows it — a line under the words would fence the heading in with its
+   own section instead of fencing off the previous one. */
 .map-display-h {
   font-size: .72rem;
   font-weight: 600;
   letter-spacing: .04em;
   text-transform: uppercase;
   color: var(--muted);
-  margin: .6rem 0 .2rem;
+  margin: var(--sp-4) 0 var(--sp-2);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
 }
 
 /* The first heading is no longer the block's first child — the find row is —
-   so this reaches whichever heading is drawn first, hidden rows and all. */
+   so this reaches whichever heading is drawn first, hidden rows and all. There
+   is nothing above it to divide from, so it takes neither rule nor space. */
 .map-display-h:first-child,
-.mapd-find + .filter-note + .map-display-h {
+.mapd-find + .filter-note + .map-display-h,
+.map-display-h.mapd-h--first {
   margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* The ACMA block is the panel's fifth section and arrives as a sibling
+   .filter-block rather than as one of these headings, so the seam above it has
+   to be drawn on its own top edge — otherwise the one break the panel most
+   needs is the only one it does not have. */
+#map-display-block + .filter-block {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
 }
 
 /* The fade-margin thresholds and the Save button. Two short number boxes side
@@ -7151,6 +7186,18 @@ code {
 .exp-head-acts { display: flex; gap: var(--sp-1); align-items: center; }
 .exp-note      { margin-top: var(--sp-1); }
 
+/* The sign-in gate's one line (#191). It stands where a download button was, so
+   it is marked as an aside rather than as an error: nothing has gone wrong, and
+   everything else on the tab is still readable. */
+.exp-gate-note {
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--muted);
+}
+
 /* The generate panel packs tighter than the app-wide stack: its three children
    are a header, the file list and one note about a path, which read as one
    thing rather than three. */
@@ -7465,6 +7512,12 @@ code {
 /* Wide enough for a 720-wide figure and its padding, and no wider — prose in a
    card broader than that is a paragraph with a margin of empty card beside it. */
 .modal-card--wide { max-width: 762px; }
+/* …except when it is holding the readings table (#191), which is seven columns
+   and the reason somebody opened it full screen. :has() rather than a second
+   modifier class because Modal.open() takes one boolean and this is the
+   table's own business, not the dialog shell's. Browsers without :has() get the
+   762 px above, which is narrow but not broken. */
+.modal-card--wide:has(#ad-table-modal) { max-width: min(1200px, 94vw); }
 .modal-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .modal-body {
   margin-top: .7rem;
@@ -8320,6 +8373,94 @@ code {
 .ad-drop-sub     { margin: var(--sp-1) 0 var(--sp-2); }
 .ad-drop-busy    { margin-top: var(--sp-1); }
 
+/* "Choose files…" and "Demo data" (#191). Centred with everything else in the
+   drop zone, and wrapping rather than shrinking — the rail is 320 px and the
+   second of the two is a link-weight button, so a row that squeezed them would
+   squeeze the wrong one. */
+.ad-drop-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  align-items: center;
+  justify-content: center;
+}
+
+/* The mark legend (#191): the shape a switch puts on the chart, drawn beside
+   the switch. Inline with the text baseline rather than floated beside it, so a
+   label that wraps takes its mark with it. currentColor is the whole point of
+   the three tone classes — the SVG is written once and coloured by where it is
+   standing. */
+.ad-mark {
+  display: inline-block;
+  vertical-align: -.15em;
+  flex: none;
+}
+.ad-mark--bad   { color: var(--bad); }
+.ad-mark--warn  { color: var(--warn); }
+.ad-mark--muted { color: var(--muted); }
+
+/* ── Editing readings (#191) ─────────────────────────────────────────────────
+   The editor stands in the readout strip under the chart, where the crosshair
+   line normally is, because a selection is the same kind of thing: what the
+   chart is currently about. Bordered rather than free-floating, so it reads as
+   a thing that is holding something rather than as text that has appeared. */
+.ad-edit {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  background: var(--subtle);
+}
+.ad-edit-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3);
+}
+.ad-edit-head .ad-x { margin-left: auto; }
+.ad-edit-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2);
+}
+.ad-edit-row label { display: flex; align-items: center; gap: .3rem; color: var(--muted); }
+.ad-qbox { width: 6rem; }
+/* Delete is the one control here that cannot be undone, so it is the one
+   control here that is coloured. */
+.ad-edit-del { color: var(--bad); border-color: var(--bad); }
+.ad-edit-note { margin: 0; color: var(--muted); }
+.ad-picked-n { color: var(--accent); }
+
+/* A picked row, and an edited one. Two channels because they stack: a row can
+   be both, and a background that means two things at once means neither. */
+.ad-row--picked  > td { background: var(--subtle); }
+.ad-row--edited  > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+.ad-row-pick     { width: 1.6rem; }
+.ad-row-verdict  { white-space: nowrap; }
+.ad-edited-dot   { color: var(--warn); font-weight: 700; }
+
+/* A cell that can be typed into. Borderless until it is hovered or focused, so
+   three hundred rows do not read as three hundred boxes — the affordance
+   arrives under the pointer, and the keyboard gets it from the focus ring. */
+.ad-cell {
+  width: 100%; min-width: 4rem; max-width: 8rem;
+  padding: .1rem .25rem;
+  font: inherit; color: inherit;
+  background: none; border: 1px solid transparent; border-radius: 4px;
+}
+.ad-cell:hover { border-color: var(--border); }
+/* The border and the ground change on focus; the focus *ring* stays, because a
+   text box in a table is exactly the shape a keyboard user needs one on, and
+   the two allowlisted `outline: none` rules in this file are both elements with
+   no box worth ringing (see test/shell.mjs). A border colour is not a ring. */
+.ad-cell:focus { border-color: var(--accent); background: var(--panel); }
+.ad-cell--q { max-width: 5rem; }
+
+.ad-table-acts {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2);
+  justify-content: space-between;
+}
+.ad-table-acts .ad-table-note { flex: 1 1 16rem; }
+/* Full screen the table is the only thing on the screen, so it takes the height
+   the modal card gives it rather than the .tall cap the in-page one uses. */
+.ad-table-full { max-height: min(70dvh, 46rem); overflow: auto; }
+
 .ad-note { min-height: 1.1rem; margin: .35rem 0 .1rem; color: var(--muted); }
 .ad-note--bad { color: var(--bad); }
 
@@ -8364,6 +8505,70 @@ code {
   border: 1px solid var(--border); border-radius: 4px;
   background: none; cursor: pointer; flex: none;
 }
+
+/* ── The colour control (#191) ───────────────────────────────────────────────
+   A dot that is the series' colour, and a disclosure holding twelve named
+   swatches plus the native picker for anything not among them. A <details>
+   rather than a popover: no positioning, no outside-click handler, no
+   z-index — it pushes the card down while it is open, which on a 320 px rail
+   is the honest way to show a grid. */
+.ad-colour { flex: none; position: relative; }
+.ad-colour > summary {
+  display: block;
+  width: 20px; height: 20px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--sw, var(--accent));
+  cursor: pointer;
+  list-style: none;
+}
+.ad-colour > summary::-webkit-details-marker { display: none; }
+.ad-colour > summary::marker { content: ''; }
+.ad-colour > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ad-colour[open] > summary { box-shadow: 0 0 0 2px var(--accent); }
+
+/* Out of the flow, so opening the grid does not re-lay the card's head row and
+   push the name and the ✕ around. Anchored to the card rather than to the
+   20 px summary, hence `left: 0` on a container that is only as wide as the
+   dot — `position: relative` on .ad-colour makes that the dot's own corner,
+   which is where the grid should hang from. */
+.ad-colour-pop {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + .25rem);
+  left: 0;
+  width: max-content;
+  max-width: 15rem;
+  padding: var(--sp-2);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 14px rgba(0,0,0,.16);
+}
+.ad-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1.35rem);
+  gap: .25rem;
+}
+/* The border is --text at a low alpha rather than --border, so the white swatch
+   has an edge on a white panel and the black one has an edge on a dark one —
+   the two that are deliberately invisible on one ground each (see AD_SWATCHES)
+   would otherwise be an invisible square in the grid as well as on the chart. */
+.ad-sw {
+  width: 1.35rem; height: 1.35rem; padding: 0;
+  border: 1px solid color-mix(in srgb, var(--text) 45%, transparent);
+  border-radius: 4px;
+  background: var(--sw);
+  cursor: pointer;
+}
+/* The one that is currently set. A ring rather than a tick, because a tick over
+   a dark swatch and a tick over a light one cannot both be legible. */
+.ad-sw.is-on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+.ad-sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ad-colour-any {
+  display: flex; align-items: center; gap: .35rem;
+  margin-top: var(--sp-2); color: var(--muted);
+}
+.ad-colour-any input { width: 2rem; height: 1.35rem; padding: 0; border: 1px solid var(--border); }
 .ad-x {
   border: 0; background: none; color: var(--muted);
   cursor: pointer; padding: 0 .25rem; font-size: .9rem; line-height: 1;
@@ -8402,6 +8607,9 @@ code {
 }
 .ad-filt-body { padding-left: 1.35rem; }
 .ad-filt--off .ad-filt-head { color: var(--muted); font-weight: 500; }
+/* A switched-off filter's mark dims with its heading rather than staying the
+   one bright thing in a greyed row (#191). */
+.ad-filt--off .ad-mark { color: inherit; }
 .ad-filt--off .ad-filt-body { opacity: .5; }
 
 /* A link that has to read as part of a sentence. .btn-link is a bordered
@@ -8519,8 +8727,25 @@ code {
 .ad-seg button:first-child { border-left: 0; }
 .ad-seg button.on { background: var(--accent); color: #fff; }
 
+/* ── The plot and its two navigators (#191) ──────────────────────────────────
+   A 2×2 grid: the chart, the vertical navigator beside it, the whole-record
+   strip under it, and the corner between the two navigators left empty. The
+   grid is what makes each navigator exactly as long as the axis it steers —
+   which is not a nicety: a track that is a different length from its axis puts
+   the window box somewhere other than where the window is, and the whole
+   gesture is "drag the box to where you want the window", so the two have to
+   line up to the pixel. */
+.ad-plot {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 46px;
+  grid-template-rows: auto auto;
+  gap: .4rem;
+}
+
 .ad-stage {
   position: relative;
+  grid-column: 1; grid-row: 1;
   height: clamp(280px, 52dvh, 620px);
   border: 1px solid var(--border);
   border-radius: 9px;
@@ -8531,19 +8756,74 @@ code {
 .ad-stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ad-stage svg { display: block; width: 100%; height: 100%; cursor: crosshair; }
 
+/* Reset and full screen, over the chart's top-right corner. Absolute rather
+   than a grid cell of their own: they sit *on* the picture, which is what says
+   they are about the picture. Right of the vertical navigator's left edge would
+   overlap it, so they are inset from the stage's own right edge instead. */
+.ad-stage-acts {
+  position: absolute;
+  z-index: 4;
+  top: .45rem;
+  right: calc(46px + .4rem + .45rem);
+  display: flex;
+  gap: .25rem;
+}
+.ad-stage-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 1.9rem; height: 1.9rem; padding: 0;
+  font-size: .95rem; line-height: 1;
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 7px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.1);
+  cursor: pointer;
+}
+.ad-stage-btn:hover,
+.ad-stage-btn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+
 /* The overview reads as three grips and the cursor names each before it is
-   pressed: pointer on the open strip (press jumps the window there), grab on
+   pressed: pointer on the open strip (press brings the window there), grab on
    the window itself (drag moves it), ew-resize on the invisible zones drawn
    over its edges (drag widens or narrows it). The zone rects come from
    drawOv() carrying only a class — hit shapes, painted at fill-opacity 0. */
 .ad-ov {
   display: block; width: 100%; height: 56px;
-  margin-top: .4rem;
+  grid-column: 1; grid-row: 2;
   border: 1px solid var(--border); border-radius: 7px;
   background: var(--panel); cursor: pointer;
+  touch-action: none;
 }
 .ad-ov-mid  { cursor: grab; }
 .ad-ov-edge { cursor: ew-resize; }
+
+/* …and the same three grips down the right, turned ninety degrees. Same
+   height as the stage beside it, and ns-resize rather than ew- because the
+   edges it offers are horizontal ones. */
+.ad-vov {
+  display: block; width: 46px; height: 100%;
+  grid-column: 2; grid-row: 1;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--panel); cursor: pointer;
+  touch-action: none;
+}
+.ad-vov-mid  { cursor: grab; }
+.ad-vov-edge { cursor: ns-resize; }
+.ad-ov-mid:active,
+.ad-vov-mid:active { cursor: grabbing; }
+
+/* Full screen (#191). The same shape as the map's own: fixed over everything,
+   below #app-modal so the bug reporter still opens on top, and a column so the
+   chart takes whatever the strip under it does not need. The grid inside is
+   untouched — it is still a stage, a column beside it and a strip below — only
+   the height it is laid out in has changed. */
+.ad-plot.is-full {
+  position: fixed;
+  inset: 0;
+  z-index: 1900;
+  padding: .5rem;
+  background: var(--bg);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.ad-plot.is-full .ad-stage { height: 100%; min-height: 0; }
 
 .ad-tip {
   position: absolute; z-index: 5; pointer-events: none;
@@ -8680,6 +8960,13 @@ code {
   .ad-layout { grid-template-columns: 1fr; }
   .ad-side   { height: auto; overflow: visible; }
   .ad-stage  { height: 54dvh; }
+  /* The vertical navigator is a pointer gesture in a 46 px column, which on a
+     phone is a target nobody can hit and a column the chart cannot spare. The
+     axis is still fully steerable from the toolbar's four modes and its two
+     number boxes, which is what it was before this existed. */
+  .ad-plot   { grid-template-columns: minmax(0, 1fr); }
+  .ad-vov    { display: none; }
+  .ad-stage-acts { right: .45rem; }
 
   /* Stacked, the rail comes first in the DOM and put about a thousand pixels of
      imports and filter settings above the chart — on the tab whose entire point
@@ -9632,6 +9919,9 @@ code {
   /* …and the one that cannot grow into a box, because a colour input *is* its
      swatch: it gets the height instead, and the row around it the room. */
   .ad-swatch { width: 2.4rem; height: 2.4rem; }
+  .ad-colour > summary { width: 2.4rem; height: 2.4rem; }
+  .ad-swatches { grid-template-columns: repeat(4, 2.2rem); gap: .35rem; }
+  .ad-sw { width: 2.2rem; height: 2.2rem; }
 
   /* A link that has to read as part of a sentence cannot become a 44 px block
      without breaking the sentence — it takes the hit area as padding, the same

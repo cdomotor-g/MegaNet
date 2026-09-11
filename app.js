@@ -1829,7 +1829,6 @@ function renderMain() {
   switch (state.activeTab) {
     case 'stations':   el.innerHTML = renderStationsHtml();  initStationFilters(); initMap(); break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
-    case 'networks':   el.innerHTML = renderNetworksHtml();               break;
     case 'passranges': el.innerHTML = renderPassRangesHtml();             break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;
     case 'rfchanges':  el.innerHTML = RfChanges.render();    RfChanges.init();    break;
@@ -2503,6 +2502,25 @@ function stationsMapPanels(map) {
   };
   split.addTo(map);
 
+  // Reset (#191) — the one button that puts the map back the way it was found.
+  // A plain corner button for the same reasons as the three above it, and last
+  // in the corner for one of its own: it is the destructive one, and a button
+  // that throws work away should not sit where a hand reaching for full screen
+  // can find it first.
+  const reset = L.control({ position: 'topright' });
+  reset.onAdd = () => {
+    const b = L.DomUtil.create('button', 'mn-mapctl-btn mn-map-reset');
+    b.type = 'button';
+    b.textContent = '↺';
+    b.title = 'Reset the map — clears the filters, the selection, every drawing and every card';
+    b.setAttribute('aria-label', 'Reset the map');
+    L.DomEvent.disableClickPropagation(b);
+    L.DomEvent.on(b, 'click', L.DomEvent.stop);
+    L.DomEvent.on(b, 'click', () => resetStationsMap());
+    return b;
+  };
+  reset.addTo(map);
+
   // What is here (#186) — arm it, click the map, and the card in the opposite
   // corner says what the app knows about that point. A plain corner button for
   // full screen's reasons; it toggles a *mode* rather than disclosing a panel,
@@ -2521,6 +2539,90 @@ function stationsMapPanels(map) {
     return b;
   };
   here.addTo(map);
+}
+
+// ── Reset the map (#191) ─────────────────────────────────────────────────────
+// Eleven modules can put something on this map, and every one of them has its
+// own way of taking it off again — a Clear button in a flyout, a ✕ on a card,
+// a second press of the pill that armed it. That is right for each of them in
+// isolation and it adds up to a map nobody can get back to a clean state
+// without remembering all eleven. This is the one gesture that does.
+//
+// What it clears is everything the *operator* put there: the filters and the
+// search behind them, the selection and the box-select, the focused repeater
+// and its blast ring, every drawing, both link-budget ends, the polar plot,
+// the spiderfied cluster, whatever mode was armed, and all four of the cards
+// in the map's corners.
+//
+// What it deliberately leaves alone is everything in the Map display flyout —
+// the base map, the overlay layers, the link colouring, the label mode, the
+// opacity sliders. Those are settings rather than clicks: somebody who has
+// turned the contours on and the links off has said how they want to read a
+// map, not made a selection, and a reset that silently re-argued that would be
+// the last time anyone pressed it. The button's own tooltip says which of the
+// two it is.
+//
+// Every call is guarded. This runs on the Stations tab, where all of these
+// modules are loaded — but it is one function naming eleven of them, and a
+// reset that throws because one module was not on the page would be the worst
+// possible failure for a button whose whole job is recovery.
+function resetStationsMap() {
+  const drawn = (state.draw && state.draw.shapes.length) || 0;
+  // Only the drawings are unrecoverable — a filter takes a moment to retype, a
+  // sketch does not — so they are the only thing worth a confirm, and it is
+  // skipped entirely when there is nothing to lose.
+  if (drawn && !confirm(
+      `Reset the map? This removes ${drawn} drawing${drawn === 1 ? '' : 's'}, `
+      + 'the filters and the selection. Layers and the base map are left as they are.')) return;
+
+  const try_ = fn => { try { fn(); } catch (_) { /* a module that is not here has nothing to clear */ } };
+
+  // 1. The modes, first: an armed tool that answers clicks has to stop doing so
+  //    before anything below re-renders under it.
+  try_(() => { if (state.draw.tool) MapDraw.setTool(''); });
+  try_(() => { if (MapMovePin.armed()) MapMovePin.cancel(); });
+  try_(() => LinkBudget.setPicking(false));
+
+  // 2. The cards in the four corners. `false` on the two that take it: nothing
+  //    is being closed on purpose by a keyboard here, so focus stays where the
+  //    reset button put it rather than being thrown at a row underneath.
+  try_(() => closeStnCard(false));
+  try_(() => { if (state.acma.cardDeviceId) closeAcmaCard(false); });
+  try_(() => MapHere.close());
+  try_(() => MapBackbone.closeCard());
+
+  // 3. What is drawn on top of the stations.
+  try_(() => {
+    if (!state.draw.shapes.length && !state.draw.selectedId) return;
+    state.draw.shapes = [];
+    state.draw.selectedId = null;
+    MapDraw.render();
+    MapDraw.rerenderPanel();
+  });
+  try_(() => LinkBudget.reset());
+  try_(() => { if (MapPolar.active()) MapPolar.clear(); });
+  try_(() => MapSpider.reset());
+
+  // 4. The selection, the focus and the blast ring that rides on it. The blast
+  //    flag goes before the focus it reads, so applyMapFocusStyles' tail has
+  //    nothing left to paint.
+  state.mapBlast = false;
+  try_(() => clearMapFocusRepeater());
+  try_(() => clearMapSelection());
+  state.selectedId = null;
+  state.stationsShowAll = false;
+
+  // 5. And the filters, which is also the refresh: clearStationFilters ends in
+  //    refreshMapLayers and rerenderStations, so everything above is repainted
+  //    by it rather than by five separate redraws. `true` re-fits the map to
+  //    the whole file — a reset that left the view zoomed into a paddock the
+  //    selection used to be in would not be one.
+  try_(() => clearStationFilters(true));
+  try_(() => rerenderMapLegend());
+  try_(() => rerenderStationEditorCard());
+
+  announce('Map reset — filters, selection, drawings and cards cleared. '
+         + 'The base map and the overlay layers are unchanged.');
 }
 
 // ── Map display block ────────────────────────────────────────────────────────
@@ -2876,6 +2978,16 @@ function applyMapDisplayFind() {
     }
     // A heading with nothing under it is a heading about nothing.
     if (g.head) g.head.hidden = !any;
+  }
+  // Each heading draws the rule that separates it from the section above
+  // (#191), and the topmost one has nothing above it to separate from. Which
+  // heading that is depends on what has been typed — filtering can hide the
+  // first two — so it is marked here rather than guessed at by :first-child in
+  // the stylesheet, which only ever sees the unfiltered panel.
+  let first = true;
+  for (const h of root.querySelectorAll('.map-display-h')) {
+    h.classList.toggle('mapd-h--first', first && !h.hidden);
+    if (!h.hidden) first = false;
   }
   // The ACMA block is the panel's other half and lives outside #map-display-block
   // (it is rendered by acmaFilterBlockHtml and re-rendered by its own code), so

@@ -32,9 +32,42 @@
 
 // ── EXPORT tab ─────────────────────────────────────────────────────────────────
 
+// Signing in is what this tab's two buttons now cost (#191), and the reason is
+// the same one the station editor gives: what leaves here is the whole network,
+// not a view of it. "Generate & Download All" writes the Radio Mobile
+// configuration for every repeater on the ticked networks and every station
+// their pass ranges reach — coordinates, heights, frequencies and pass windows
+// for a few hundred sites in one press — and Snapshot writes the station
+// document itself. Reading a station on the map is a page view; taking the
+// list away as a file is not, and the editors list is already the app's answer
+// to "who is this".
+//
+// What is *not* gated is deliberate. The network ticks, the counts, the
+// repeater table, the Data source panel and its Re-test button all stay live
+// for anyone: they say what this tab would produce and whether the database is
+// reachable, which is exactly what somebody needs to see before deciding
+// whether signing in is worth it — and none of them is a copy of anything.
+//
+// The gate is checked twice on purpose. Once in the markup, so a signed-out
+// visitor is offered a sign-in button rather than a button that will refuse
+// them; and once at the top of each action, because the markup is a render
+// that can be older than the session — a token can expire, or be signed out in
+// another tab, while this one is still on screen showing yesterday's buttons.
+function exportMayDownload() {
+  return typeof Auth !== 'undefined' && Auth.isSignedIn && Auth.isSignedIn();
+}
+
+// The one line every gated control says when it is standing in for itself.
+function exportGateNoteHtml(what) {
+  return `<p class="small exp-gate-note">
+    <a href="#" onclick="Auth.open();return false">Sign in</a> to ${esc(what)} —
+    everything else on this tab reads without one, and your ticks are kept while you do.</p>`;
+}
+
 function renderExportHtml() {
   const nets = state.data.radio_networks || [];
   if (!state.exportNets) state.exportNets = new Set(nets.map(n => n.id));
+  const mayDl = exportMayDownload();
 
   const selRpts = state.data.stations.filter(s =>
     s.roles.includes('repeater') && s.repeater &&
@@ -97,14 +130,18 @@ function renderExportHtml() {
         <div class="panel">
           <div class="panel-header">
             <h2>stations.json</h2>
-            <button id="btn-snapshot" class="exp-btn-sm" onclick="snapshotStationsJson()"
-                    title="Download the database's current station list as stations.json">Snapshot</button>
+            ${mayDl
+              ? `<button id="btn-snapshot" class="exp-btn-sm" onclick="snapshotStationsJson()"
+                    title="Download the database's current station list as stations.json">Snapshot</button>`
+              : `<button class="exp-btn-sm" onclick="Auth.open()"
+                    title="Downloading the station document needs a signed-in session">Sign in to snapshot</button>`}
           </div>
           <div class="small">
             The whole station list as a file — the offline copy, and what this app
             falls back to when the datastore cannot be reached. Taken from the
             database as it is right now, not from what this tab has loaded.
           </div>
+          ${mayDl ? '' : exportGateNoteHtml('download the station document')}
           <div id="snapshot-note" class="small exp-note" role="status"></div>
         </div>
       </aside>
@@ -113,8 +150,12 @@ function renderExportHtml() {
         <div class="panel stack exp-main-panel">
           <div class="panel-header">
             <h2 id="exp-files-h">Radio Mobile Export</h2>
-            <button class="primary" onclick="runExport()">Generate &amp; Download All</button>
+            ${mayDl
+              ? `<button class="primary" onclick="runExport()">Generate &amp; Download All</button>`
+              : `<button class="primary" onclick="Auth.open()"
+                    title="Generating the Radio Mobile set needs a signed-in session">Sign in to generate</button>`}
           </div>
+          ${mayDl ? '' : exportGateNoteHtml('generate the five Radio Mobile files')}
           <div class="table-wrap">
             <table>
               <caption class="sr-only">The five files "Generate &amp; Download All" produces, and what each holds</caption>
@@ -227,6 +268,16 @@ function countExportUnits(selectedNets) {
 }
 
 function runExport() {
+  // The second check. See exportMayDownload(): the button above may have been
+  // drawn before the session went away. The repaint goes first and the refusal
+  // second, because rerenderExport() ends by announcing the selection summary —
+  // announcing before it would put the refusal in the live region and then
+  // immediately overwrite it with a sentence about network ticks.
+  if (!exportMayDownload()) {
+    rerenderExport(() => document.querySelector('.exp-main-panel .primary'));
+    announce('Not exported — the Radio Mobile files need a signed-in session. Sign in and press it again.');
+    return;
+  }
   const { data, exportNets } = state;
   const paths   = data.meta?.rm_paths || {};
   const systems = data.rm_systems || [];

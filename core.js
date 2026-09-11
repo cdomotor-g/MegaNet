@@ -63,13 +63,13 @@
 //     field, and inspections ↔ maintenance ↔ history — with *no* edge of any
 //     kind between them. Reading a sensor trace and filling in a paper form had
 //     been filed together on the strength of the word "data".
-//   * Export is the one tab that moved further than its neighbours. All three
-//     of its own `related` entries are Network-group tabs, two of them mutual
-//     (networks ↔ export, passranges ↔ export), and what it builds is scoped by
-//     the ticks on the Networks tab. It was under "Data & admin" and it belongs
-//     with the network it exports.
+//   * Export is the one tab that moved further than its neighbours. Its
+//     `related` entries are Network-group tabs, passranges ↔ export mutual
+//     among them, and what it builds is scoped by the radio networks ticked on
+//     its own left rail. It was under "Data & admin" and it belongs with the
+//     network it exports.
 //
-// So: five groups, largest of them five tabs, each one a cluster the help text
+// So: five groups, largest of them six tabs, each one a cluster the help text
 // had already drawn. Group order runs outward from the file you loaded — what
 // is out there, what is interfering with it, what it actually transmitted, what
 // the sensors said, and what we did about it on site.
@@ -80,13 +80,22 @@
 // map sheets, so it is **Radio Path Maps**. "Network View" is not about networks
 // either: it draws ALERT addresses as nodes and bit-flip ghosting between them
 // as edges — README §16 already calls it the ghosting knowledge graph — so it is
-// the **Ghosting Graph**. "Networks" keeps the word, because it is the only one
-// of the three that means the named radio-network clusters in the file. Both old
-// labels survive as `find` words — spelled as the two words they were, because
-// the find box matches from the start of a word and `networkview` would only
-// ever be reached by typing it as one — so the rename does not strand anyone who
-// learnt the tab under its old name. Tab *ids* are untouched: they key HELP,
-// renderMain(), the teardown registry and everything in localStorage.
+// the **Ghosting Graph**. Both old labels survive as `find` words — spelled as
+// the two words they were, because the find box matches from the start of a
+// word and `networkview` would only ever be reached by typing it as one — so
+// the rename does not strand anyone who learnt the tab under its old name. Tab
+// *ids* are untouched: they key HELP, renderMain(), the teardown registry and
+// everything in localStorage.
+//
+// The third of the three, "Networks", is gone entirely. It was a read-only
+// listing of the named radio-network clusters and the catchment vocabulary, and
+// every number on it is already on a tab somebody is on anyway: the network
+// each station belongs to is on its card and in the Stations filter pane, and
+// the ticks that scope an export now live on the Export tab's own rail. A tab
+// that repeats what is elsewhere still costs a row in the nav and a stop for
+// every keyboard user walking it, so it was removed rather than kept for
+// symmetry. `networks` as a *word* is not gone — it is a find term on the
+// Stations and Export tabs, which is where the answer now is.
 //
 // ── `find`: the words nobody would think to look under the label ─────────────
 //
@@ -98,15 +107,13 @@
 const TABS = [
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📡',
-      find: 'sites list map filters repeaters draw measure terrain elevation profile photos editor' },
+      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor' },
     { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
       find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
-    { id: 'networks',   label: 'Networks',               icon: '🕸️',
-      find: 'clusters primary repeater ingest counts scope ticks' },
     { id: 'passranges', label: 'Pass Ranges',            icon: '🔗',
       find: 'hop chain orphans gaps alertid address window coverage base' },
     { id: 'export',     label: 'Export',                 icon: '📤',
-      find: 'csv radio mobile download stations.json backup escape hatch data source' },
+      find: 'csv radio mobile networks clusters download stations.json backup escape hatch data source' },
     { id: 'mapgen',     label: 'Map Generator',          icon: '🖨️',
       find: 'print paper a4 svg laser cut engrave k40 whisperer contour elevation layers billet plate title block scale bar graticule sheet' },
   ] },
@@ -118,9 +125,9 @@ const TABS = [
     { id: 'workbench',  label: 'Interference Workbench', icon: '🔬',
       find: 'case hypotheses scoring evidence checklist acma complaint site visit share' },
   ] },
-  { group: 'Addresses & packets', tabs: [
+  { group: 'ALERT', tabs: [
     { id: 'bitflipper', label: 'Bit Flipper',            icon: '🔀',
-      find: 'flip alert address ghosting variants corruption decimal cross-reference' },
+      find: 'flip alert address addresses ghosting variants corruption decimal cross-reference' },
     { id: 'network',    label: 'Ghosting Graph',         icon: '🧬',
       find: 'network view knowledge graph force layout nodes edges addresses collisions' },
     { id: 'packets',    label: 'ALERT Packets',          icon: '📦',
@@ -132,15 +139,15 @@ const TABS = [
     { id: 'serial',     label: 'Serial Monitor',         icon: '🔌',
       find: 'com port web serial live stream terminal baud log' },
   ] },
-  { group: 'Telemetry', tabs: [
+  { group: 'Data', tabs: [
     { id: 'arro',       label: 'ARRO Launcher',          icon: '🚀',
-      find: 'contrail open station site raw id jump launch' },
+      find: 'contrail telemetry open station site raw id jump launch' },
     { id: 'arrodata',   label: 'ARRO Data',              icon: '📊',
-      find: 'csv file chart plot sensor continuity 3-5-7 filter noise drop' },
+      find: 'csv telemetry file chart plot sensor continuity 3-5-7 filter noise drop demo' },
     { id: 'field',      label: 'Field Data',             icon: '🌡️',
-      find: 'readings datastore sensors chart plot window rainfall level quality' },
+      find: 'readings telemetry datastore sensors chart plot window rainfall level quality' },
     { id: 'msglog',     label: 'Message Log',            icon: '📨',
-      find: 'messages arrivals incoming ingest raw log fade margin ingress base pathway follow live decode calibration' },
+      find: 'messages telemetry arrivals incoming ingest raw log fade margin ingress base pathway follow live decode calibration' },
   ] },
   { group: 'Site visits', tabs: [
     { id: 'inspections', label: 'Inspections',           icon: '🩺',
@@ -513,24 +520,7 @@ const HELP = {
       + 'current as the day they were drawn, and nothing on the Stations map feeds them. This tab '
       + 'works with no station file loaded at all; only the search half needs one.',
     ],
-    related: ['stations', 'networks'],
-  },
-
-  networks: {
-    summary: 'The named radio-network clusters in the loaded file — usually named after their '
-           + 'primary repeater or ingest point — with the repeater and field-station counts behind '
-           + 'each one. Ticking networks here is what scopes the Export tab.',
-    watch: [
-      'Network membership is <strong>recorded, not derived</strong>, and most of the file has none: '
-      + 'a station is on a network because somebody put it there. So these counts describe what '
-      + 'has been mapped so far rather than the whole network, and a station missing from every '
-      + 'row is unrecorded rather than unconnected.',
-      'The catchment list below is the 76-basin Queensland vocabulary, and it is <strong>not '
-      + 'yet assigned per station</strong> — the Stations tab derives a station\'s region from its '
-      + 'coordinates at runtime instead. It is here because the filters and the schema are ready '
-      + 'for it, not because the data is.',
-    ],
-    related: ['export', 'stations'],
+    related: ['stations'],
   },
 
   passranges: {
@@ -849,10 +839,14 @@ const HELP = {
       + 'transmits tips; what a tip is worth is the gauge\'s bucket size, which is a separate fact '
       + 'the filter never sees. Setting a threshold as though it were millimetres is the quiet way '
       + 'to throw away a real record.',
-      '<strong>Only two of the five filters are the specification\'s.</strong> The 3-5-7 test and '
-      + 'rollover correction come from it; rate-of-rise, minimum/maximum and the repeat-collapsing '
-      + 'minimum gap are this app\'s, run before the continuity walk, and each has its own switch '
-      + 'so you can read the difference straight off the counts.',
+      '<strong>Only two of the six filters are the specification\'s.</strong> The 3-5-7 test and '
+      + 'rollover correction come from it; rate of rise, rate of fall, minimum/maximum and the '
+      + 'repeat-collapsing minimum gap are this app\'s, run before the continuity walk, and each '
+      + 'has its own switch so you can read the difference straight off the counts. '
+      + '<strong>Rise and fall are two filters with two figures</strong>, because the fastest '
+      + 'credible fall at a site is rarely the fastest credible rise — and an accumulator does not '
+      + 'normally want the fall one at all, since it cannot fall except by wrapping or by '
+      + 'corruption, which the rollover and 357 tests already own.',
       'Raw is <strong>never overwritten</strong> — filtering only produces a parallel verdict '
       + 'against each reading, every rejection can be clicked for the row and the reason, and the '
       + '<em>verdict</em> export is the artifact to keep when the question is what was thrown away.',
@@ -861,8 +855,24 @@ const HELP = {
       + 'and then to saying plainly that it is not linked.',
       '<strong>Readings as a table</strong>, under the chart, is the same numbers without a mouse: '
       + 'one row per series for the window on screen, then the individual readings with the '
-      + 'filter\'s verdict against each. It is capped at 300 rows and says when it has capped — '
-      + 'the two export buttons are the uncapped answer.',
+      + 'filter\'s verdict against each, marked with the same symbol the chart draws for it. It is '
+      + 'capped at 300 rows and says when it has capped; <strong>⛶ Full screen</strong> raises the '
+      + 'cap to 3,000 and gives the table the window, and the two export buttons are the uncapped '
+      + 'answer.',
+      '<strong>Readings can be edited, and the edits live only in this browser tab.</strong> Set '
+      + '<em>Drag does</em> to <b>Select</b> and lasso a stretch (or tick rows in the table, or '
+      + 'press <b>all in view</b>), then set a value, move the selection by an amount, scale it, '
+      + 're-code its quality, drag it up or down on the chart, or delete it. The 357 walk re-runs '
+      + 'on every change, so a spike deleted here stops dragging its neighbours down immediately, '
+      + 'and both <b>Export</b> buttons write what is on screen. <strong>Nothing is written back '
+      + 'to ARRO</strong> and closing the tab loses the lot — an edited series says so in the rail '
+      + 'and carries a <em>revert</em> that puts its values back as loaded. Deleted rows do not '
+      + 'come back.',
+      '<strong>Demo data</strong> in the drop zone loads a real ARRO export shipped with the app — '
+      + 'Durikai\'s rain accumulator, seven months, 14,942 readings, uncleaned. It is the file the '
+      + 'filters were written against: 8,831 repeat timestamps, 395 values ARRO wrote with a '
+      + 'thousands separator in an unquoted field, and the single-reading spikes to 1234 that read '
+      + 'as rollovers unless the 357 walk removes them first.',
     ],
     links: [
       { label: 'How the 357 filter works — the test, drawn', call: 'ArroData.explain()' },
@@ -1103,6 +1113,10 @@ const HELP = {
       'That also means a station on <strong>no recorded network</strong> cannot be exported by '
       + 'ticking every box, because nothing pulls it in. Ticking all of them is a little under '
       + 'half the file, not the file.',
+      '<strong>Both downloads need a signed-in session.</strong> Everything that says what this '
+      + 'tab would produce — the ticks, the counts, the repeater table and the Data source panel '
+      + '— reads without one; what is behind the sign-in is taking the network away as a file, '
+      + 'which is the whole list rather than a view of it. Your ticks survive signing in.',
       'The <strong>Data source</strong> panel is the first place a schema mismatch shows up: if it '
       + 'says the list came from <code>stations.json</code> rather than the datastore, the app '
       + 'fell back, edits elsewhere are refused, and the retry button is there rather than a '
@@ -1113,7 +1127,7 @@ const HELP = {
     ],
     links: [{ label: 'Why the station list lives in Postgres, and what that bought',
               href: 'docs/datastore-decision.md' }],
-    related: ['networks', 'stations', 'passranges'],
+    related: ['stations', 'passranges'],
   },
 };
 
@@ -2005,7 +2019,21 @@ const state = {
   // both clear buttons, so the most-used control is on the screen either way,
   // and what the default decides is only whether the eight blocks of grouped
   // filters underneath it are, which on arrival they need not be.
-  filtersOpen:    (localStorage.getItem('mn-filters') || 'closed') === 'open',
+  //
+  // **Side by side ignores what was stored, on arrival only (#191.)** The split
+  // gives the whole right-hand column to the map, and the filter card is the
+  // first thing under the divider on the left — so a stored "open" lands on a
+  // page whose visible half is eight blocks of tick boxes and whose map is a
+  // strip. That is not what the split is for. So the landing state there is
+  // shut, whatever was remembered; pressing Filters still opens it, and still
+  // writes the preference, which is then honoured the moment the split is off.
+  // Deliberately not a write: this reads the stored value and overrides it for
+  // one page load, so nobody's setting is destroyed by having opened the tab in
+  // the wrong layout once.
+  filtersOpen:    (localStorage.getItem('mn-filters') || 'closed') === 'open'
+                  && !(localStorage.getItem('mn-map-split') !== 'off'
+                       && typeof window !== 'undefined' && window.matchMedia
+                       && !window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).matches),
   // The station list card on the same tab, and remembered for the same reason.
   // It is the tallest card on the page — a scroller capped at most of the
   // viewport — so shutting it is how the map, the path tools and the editor

@@ -65,6 +65,48 @@ const AD_COLORS = ['#0b5cab', '#c7401a', '#107c10', '#7c35a3',
 // single dashed line says "provisional" and means nothing of the kind.
 const AD_DASH = ['', '7 3', '2 3', '10 3 2 3', '5 2 1 2', '1 3'];
 
+// …and the same six, named, for the operator who wants to say which (#191).
+// The chart picked one per slot and there was no way to ask for another — which
+// is fine until two series land on slots whose dashes read alike in print, or
+// until somebody wants the one line that matters solid and the rest dashed.
+// `auto` is the slot rule, unchanged and still the default, so a chart nobody
+// has touched draws exactly what it drew before.
+const AD_DASH_CHOICES = [
+  ['auto',   'Auto',        null],
+  ['solid',  'Solid',       ''],
+  ['dash',   'Dashed',      '7 3'],
+  ['dot',    'Dotted',      '2 3'],
+  ['dashdot','Dash-dot',    '10 3 2 3'],
+  ['long',   'Long dash',   '12 4'],
+];
+
+// The swatch grid the colour control offers beside the browser's own picker
+// (#191). A native <input type="color"> is a gradient surface and an eyedropper
+// — excellent for matching a colour, useless for "make this one red", which is
+// what somebody comparing four traces actually wants. So: the colours a person
+// asks for by name, one square each.
+//
+// Ten of the twelve are mid-lightness on purpose, because a chart line is drawn
+// on --panel and --panel is white in one theme and near-navy in the other, so a
+// colour that only works on one of them is a colour that disappears when
+// somebody toggles the theme. **Black and white are the deliberate exceptions**
+// and each is invisible on one of the two grounds. They are here because they
+// were asked for and because they are the right answer to a real question —
+// "make this one black, it is going in a printed report" — and picking one is
+// an operator saying which ground they are aiming at. Nothing else in the app
+// is coloured from this list; these are line colours and nothing more.
+//
+// Hex rather than tokens, because this is the literal the SVG carries into a
+// PNG export where no stylesheet resolves anything — see slotColor(), which is
+// the *other* half of that argument and is why an untouched series is still
+// token-coloured and still re-resolves when the theme moves.
+const AD_SWATCHES = [
+  ['#c7401a', 'Red'],     ['#e06c00', 'Orange'],  ['#b8860b', 'Amber'],
+  ['#107c10', 'Green'],   ['#00838f', 'Teal'],    ['#0b5cab', 'Blue'],
+  ['#3949ab', 'Indigo'],  ['#7c35a3', 'Purple'],  ['#ad1457', 'Magenta'],
+  ['#5d4037', 'Brown'],   ['#16202a', 'Black'],   ['#ffffff', 'White'],
+];
+
 // …and the same argument for the modes that draw marks rather than lines. Four
 // shapes, cycled with the colour.
 const AD_SHAPES = ['circle', 'square', 'triangle', 'diamond'];
@@ -75,7 +117,7 @@ const AD_SHAPES = ['circle', 'square', 'triangle', 'diamond'];
 // are kept distinct from BAD so a rejected reading can always say which filter
 // rejected it.
 const AD_UNKNOWN = 0, AD_GOOD = 1, AD_SUSPECT = 2, AD_BAD = 3, AD_OOS = 4,
-      AD_RANGE = 5, AD_RATE = 6;
+      AD_RANGE = 5, AD_RATE = 6, AD_FALL = 7;
 
 const AD_STATUS_LABEL = {
   [AD_UNKNOWN]: 'untested',
@@ -85,10 +127,12 @@ const AD_STATUS_LABEL = {
   [AD_OOS]:     'out of sequence',
   [AD_RANGE]:   'out of range',
   [AD_RATE]:    'rose too fast',
+  [AD_FALL]:    'fell too fast',
 };
 
 // Every status that means "this reading is not in the filtered series".
-const adCut = st => st === AD_BAD || st === AD_OOS || st === AD_RANGE || st === AD_RATE;
+const adCut = st => st === AD_BAD || st === AD_OOS || st === AD_RANGE
+                 || st === AD_RATE || st === AD_FALL;
 
 // Spec defaults, all overridable from the panel — the ticket asks for the steps,
 // the rollover ceiling and the continuity break to be configurable.
@@ -111,12 +155,71 @@ const AD_CFG_DEFAULT = {
   minGapSec:  0,      // collapse readings closer together than this (0 = off)
   rateOn:     false,  // rate-of-rise limit
   rateMax:    50,     // fastest believable rise, in Value units per hour
+  // The other direction, and a filter of its own rather than a sign on the one
+  // above (#191). A gauge's two directions are not one number: a water level
+  // rises with the catchment and falls with the channel draining, and the
+  // fastest *credible* fall at a site is routinely a different figure from the
+  // fastest credible rise. Before this the rise limit tested a level's falls
+  // too, against the rise threshold, which is the wrong figure applied with no
+  // way to say so — and tested an accumulator's falls not at all.
+  fallOn:     false,  // rate-of-fall limit
+  fallMax:    50,     // fastest believable fall, in Value units per hour
   rangeOn:    false,  // minimum / maximum limits
   rangeMin:   '',     // blank = no floor
   rangeMax:   '',     // blank = no ceiling
 };
 
 const AD_DAY = 86400000;
+
+// What each vertical-axis mode is called, for the places that have to name the
+// one currently set rather than offer all four — the reset button's tooltip,
+// and the sentence the vertical navigator uses to say what it is steering.
+const AD_Y_LABEL = { auto: 'Auto', kept: 'Kept', zero: 'Zero', manual: 'Fixed' };
+
+// ── The marks, as one drawing each (#191) ────────────────────────────────────
+// Six things get a mark on this chart — five removals and a rollover seam — and
+// until now the only place the shape of any of them was written down was inside
+// draw(), 400 lines away from the tick boxes that switch them on. "removed",
+// "repeats" and "rollovers" beside three identical checkboxes told nobody what
+// to go and look for, and a filter panel saying "Rate of rise" never said that
+// the thing it puts on the chart is a small up-pointing triangle.
+//
+// So the shapes live here, once, and both the chart and the controls draw from
+// them. The geometry is deliberately the same as draw()'s — an ✕ for the 357
+// test, a hollow square for the range limits, a filled triangle for each rate
+// limit pointing the way it is about, a faint dot for a repeat, a dashed
+// vertical for a rollover seam — because a legend that is merely *similar* to
+// what is on the chart is worse than none: it teaches a shape that is not
+// there.
+//
+// currentColor rather than a theme lookup: these are inline in a label, and a
+// label already knows what colour it is. The chart resolves the same shapes
+// against theme() for the same reason it always has — it has to survive being
+// serialised into a PNG with no stylesheet.
+const AD_MARKS = {
+  removed:  { label: 'failed the 357 test',            tone: 'bad',
+              d: '<path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" fill="none"/>' },
+  range:    { label: 'outside the range limits',        tone: 'warn',
+              d: '<rect x="4.2" y="4.2" width="7.6" height="7.6" fill="none" stroke="currentColor" stroke-width="1.8"/>' },
+  rate:     { label: 'rose faster than the rate limit', tone: 'warn',
+              d: '<path d="M8 3.6l4.4 7.6H3.6Z" fill="currentColor"/>' },
+  fall:     { label: 'fell faster than the rate limit', tone: 'warn',
+              d: '<path d="M8 12.4L3.6 4.8h8.8Z" fill="currentColor"/>' },
+  repeat:   { label: 'a repeat timestamp',              tone: 'muted',
+              d: '<circle cx="8" cy="8" r="2.2" fill="currentColor" opacity=".55"/>' },
+  rollover: { label: 'an accumulator wrap corrected',   tone: 'warn',
+              d: '<path d="M8 2v12" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 2.5" fill="none"/>' },
+};
+
+// One mark, at label size. aria-hidden because every caller sits next to the
+// words it illustrates — a screen reader being told "triangle" after "Rate of
+// fall" learns nothing it did not have.
+function adMarkSvg(kind) {
+  const m = AD_MARKS[kind];
+  if (!m) return '';
+  return `<svg class="ad-mark ad-mark--${m.tone}" viewBox="0 0 16 16" width="13" height="13"
+               aria-hidden="true" focusable="false">${m.d}</svg>`;
+}
 
 // ── module ──
 
@@ -146,7 +249,16 @@ const ArroData = (function () {
       seq:       0,
       cfg:       { ...AD_CFG_DEFAULT },
       view:      null,           // {t0,t1} visible window, ms; null = full extent
-      mode:      'both',         // raw | filtered | both
+      // Filtered, not both (#191). "Both" draws every series twice — the filtered
+      // line solid over a ghost of the raw — which is the right picture for the
+      // question "what did the filter take out?" and the wrong one for the
+      // question somebody actually arrives with, which is "what does this gauge
+      // say?". Two overlaid traces per series is also where a four-series chart
+      // stops being readable. The removals are still one click away on the
+      // Series control, still marked on the chart by Mark ▸ removed, and still
+      // counted in the rail; what changed is which of the three the tab opens
+      // holding.
+      mode:      'filtered',     // raw | filtered | both
       transform: 'value',        // value | increment | rate
       chartType: 'line',
       yMode:     'auto',         // auto | zero | manual
@@ -157,14 +269,38 @@ const ArroData = (function () {
       tableOpen:    false,       // the readings table under the chart (#141), folded away
       tableSig:     '',          // what it was last built from — see renderTable()
       showPoints:   'auto',      // auto | on | off
+      colourOpen:   null,        // which series' colour grid is open (#191)
       normalise:    false,
       hover:     null,           // {x,y,t,rows:[]}
       pin:       null,           // clicked point: {key,i}
+      // The picked readings, as "seriesKey\u0000rowIndex" — see the editing
+      // section. A Set rather than an array because the chart asks "is this one
+      // picked?" once per drawn mark.
+      picked:    new Set(),
+      // The last thing the value box was set to, kept across the re-renders an
+      // edit causes so a second press of the same button does the same thing.
+      editVal:   '',
+      editQ:     '',
       drag:      null,
-      brush:     false,          // brush-to-zoom armed (else drag pans)
-      yDrag:     false,          // drag rescales the vertical axis (else drag pans)
+      // What a plain drag on the chart does, as one choice rather than two
+      // switches (#191). It was `brush` and `yDrag`, two independent tick
+      // boxes — so both could be on at once, which the gesture cannot honour:
+      // a press has exactly one meaning and onpointerdown had to pick, silently
+      // preferring the vertical. Three states, one control, and "none" is one
+      // of them because panning is the state people spend most of their time
+      // in. The Shift and Alt modifiers still outrank whatever is set here, so
+      // either zoom is always reachable without touching the toolbar.
+      dragMode:  'pan',          // pan | box | y
+      // The chart taking the whole viewport (#191). Session-only and per
+      // instance, like the map's own: it is something somebody is doing right
+      // now, not a preference.
+      full:      false,
       yStash:    null,           // {yMode,yMin,yMax} from before a zoom gesture forced 'manual'
-      ovDrag:    null,           // 'pan' | 'left' | 'right' while the overview is held
+      // Which navigator gesture is in flight, and what it started from:
+      // { kind:'lo'|'hi'|'move', t0, t1, grab } on the horizontal strip and
+      // { kind, lo, hi, grab } on the vertical one. Null when neither is held.
+      ovDrag:    null,
+      vovDrag:   null,
       w: 900, h: 380,
       ro:        null,
       sensorIdx: null,
@@ -455,6 +591,7 @@ const ArroData = (function () {
     return [kind, cfg.use357 ? 1 : 0, cfg.small, cfg.medium, cfg.large, cfg.cycle, cfg.breakCount,
             cfg.startTests, cfg.rolloverOn ? 1 : 0, cfg.oosOn ? 1 : 0, cfg.dedupeOn ? 1 : 0,
             cfg.minGapSec, cfg.rateOn ? 1 : 0, cfg.rateMax,
+            cfg.fallOn ? 1 : 0, cfg.fallMax,
             cfg.rangeOn ? 1 : 0, cfg.rangeMin, cfg.rangeMax].join('|');
   }
 
@@ -666,12 +803,28 @@ const ArroData = (function () {
     //     the right division of labour, because breaking and re-establishing
     //     continuity is exactly what that walk is for.
     //
-    //     A rain accumulator is only tested upwards. It cannot fall except by
-    //     wrapping or by corruption, and both of those already have an owner. A
-    //     water level is tested in both directions, so a single dropout costs
-    //     two readings: the fall into it and the climb back out.
-    if (cfg.rateOn && +cfg.rateMax > 0) {
-      const max = +cfg.rateMax;
+    //     **The two directions are two filters (#191), not one with a sign.**
+    //     Up and down are different questions with different answers at the
+    //     same site: a water level rises with the catchment and falls with the
+    //     channel draining, and the fastest credible figure for one is
+    //     routinely not the figure for the other. Until this they were one
+    //     control — `Math.abs` on a water level, so a fall was judged against
+    //     the *rise* threshold with no way to say otherwise, and `d` on an
+    //     accumulator, so a fall was never judged at all. So: Rate of rise
+    //     tests moves upward against rateMax, Rate of fall tests moves downward
+    //     against fallMax, each with its own switch, and a reading rejected by
+    //     either says which. A level with a single dropout still costs two
+    //     readings with both on — the fall into it and the climb back out — but
+    //     it is now two named verdicts rather than one.
+    //
+    //     An accumulator's falls are left alone by default and should usually
+    //     stay that way: it cannot fall except by wrapping or by corruption,
+    //     and both of those already have an owner further down. The switch is
+    //     offered anyway, because "usually" is not "never" and the operator can
+    //     see what it removes.
+    if ((cfg.rateOn && +cfg.rateMax > 0) || (cfg.fallOn && +cfg.fallMax > 0)) {
+      const up   = cfg.rateOn && +cfg.rateMax > 0 ? +cfg.rateMax : null;
+      const down = cfg.fallOn && +cfg.fallMax > 0 ? +cfg.fallMax : null;
       const kept = [];
       for (let k = 0; k < live.length; k++) {
         const i = live[k];
@@ -679,8 +832,10 @@ const ArroData = (function () {
           const p = live[k - 1];
           const hrs = (t[i] - t[p]) / 3600000;
           const d = v[i] - v[p];
-          const move = isRA ? d : Math.abs(d);
-          if (hrs > 0 && move / hrs > max) { cutFlag[i] = AD_RATE; continue; }
+          if (hrs > 0) {
+            if (d > 0 && up   !== null && d / hrs > up)    { cutFlag[i] = AD_RATE; continue; }
+            if (d < 0 && down !== null && -d / hrs > down) { cutFlag[i] = AD_FALL; continue; }
+          }
         }
         kept.push(i);
       }
@@ -755,18 +910,19 @@ const ArroData = (function () {
       else if (cutFlag[i]) status[i] = cutFlag[i];
     }
 
-    let good = 0, bad = 0, oos = 0, range = 0, rate = 0;
+    let good = 0, bad = 0, oos = 0, range = 0, rate = 0, fall = 0;
     for (let i = 0; i < n; i++) {
       const st = status[i];
       if (st === AD_GOOD)       good++;
       else if (st === AD_OOS)   oos++;
       else if (st === AD_RANGE) range++;
       else if (st === AD_RATE)  rate++;
+      else if (st === AD_FALL)  fall++;
       else bad++;
     }
 
     s.filt = { key, status, adj, rolls,
-               stats: { good, bad, oos, range, rate, rollovers: rolls.length, total: n } };
+               stats: { good, bad, oos, range, rate, fall, rollovers: rolls.length, total: n } };
     return s.filt;
   }
 
@@ -827,6 +983,31 @@ const ArroData = (function () {
     return { t0, t1 };
   }
 
+  // extent()'s other axis (#191): the whole value range in the record, which is
+  // what the vertical navigator draws its track against. Deliberately the whole
+  // record rather than the visible window — the navigator's job is to say where
+  // the window sits inside everything there is, and a track that rescaled every
+  // time the window moved could not say that. Same layer choice as drawOv, so
+  // the two navigators are describing the same curve.
+  function vExtent() {
+    let lo = Infinity, hi = -Infinity;
+    for (const s of shown()) {
+      const track = tracks(s)[ad.mode === 'raw' ? 'raw' : 'filt'];
+      for (let k = 0; k < track.n; k++) {
+        const y = track.y[k];
+        if (y < lo) lo = y;
+        if (y > hi) hi = y;
+      }
+    }
+    if (!isFinite(lo)) return null;
+    if (hi <= lo) hi = lo + 1;
+    // A hair of headroom, so a record whose maximum is also the window's
+    // maximum still draws an edge handle inside the track rather than on its
+    // rim where nothing can grab it.
+    const pad = (hi - lo) * 0.02;
+    return { lo: lo - pad, hi: hi + pad };
+  }
+
   function view() {
     const ex = extent();
     if (!ex) return null;
@@ -851,9 +1032,36 @@ const ArroData = (function () {
     return [{ track: tr.raw, kind: 'raw' }, { track: tr.filt, kind: 'filt' }];
   }
 
-  function yRange(v) {
+  // ── Two vertical axes (#191) ────────────────────────────────────────────────
+  // A series is drawn against the left axis unless it has been put on the
+  // right, and `axisOf` is the only place that question is asked. The right
+  // axis exists for the case this tab hits constantly and had no answer for:
+  // a rain accumulator in millimetres and a water level in metres, over the
+  // same storm, on the same chart. Sharing one scale, either the rainfall is a
+  // flat line at the bottom or the level is — and the operator's actual
+  // question is about their *shapes* against each other.
+  //
+  // A right-hand series with nothing on it is not a right axis: `sideOf`
+  // reports what is actually drawn, so a chart where every visible series has
+  // been sent right simply draws them on the left and keeps its one axis,
+  // rather than leaving an empty scale in the left margin.
+  const axisOf = s => (s.axis === 'right' ? 'right' : 'left');
+  function axisSides() {
+    const vis = shown();
+    const right = vis.filter(s => axisOf(s) === 'right');
+    // Everything on the right and nothing on the left: draw it on the left.
+    if (right.length && right.length === vis.length) return { left: vis, right: [] };
+    return { left: vis.filter(s => axisOf(s) === 'left'), right };
+  }
+
+  // `side` is 'left', 'right', or omitted for every visible series at once —
+  // which is what everything reading a single range still wants: the overview
+  // strip, the vertical navigator, the comparison panes and the stats line are
+  // all describing the record rather than one of its axes.
+  function yRange(v, side) {
+    const list = side ? axisSides()[side] : shown();
     let lo = Infinity, hi = -Infinity;
-    for (const s of shown()) {
+    for (const s of list) {
       // "Kept" scales to the surviving readings alone. A single corrupt packet
       // reading 2014 mm against a gauge sitting at 300 flattens the real trace
       // into the bottom eighth of the chart, and the removals are still drawn —
@@ -870,7 +1078,13 @@ const ArroData = (function () {
       }
     }
     if (!isFinite(lo)) return { lo: 0, hi: 1 };
-    if (ad.yMode === 'manual') {
+    // Fixed, and the vertical navigator that speaks through it, govern the
+    // **left** axis only. Two typed ranges and two navigators would be a second
+    // set of controls for a second axis that exists to be glanced at beside the
+    // first; the right axis auto-fits its own series, and the toolbar says so
+    // when there is one. Everything else — Auto, Kept, Zero — applies to both,
+    // because those are rules rather than figures and both axes can obey them.
+    if (ad.yMode === 'manual' && side !== 'right') {
       const a = parseFloat(ad.yMin), b = parseFloat(ad.yMax);
       if (!isNaN(a) && !isNaN(b) && b > a) return { lo: a, hi: b };
     }
@@ -878,6 +1092,14 @@ const ArroData = (function () {
     if (hi === lo) { hi = lo + 1; lo -= 1; }
     const pad = (hi - lo) * 0.06;
     return { lo: lo - pad, hi: hi + pad };
+  }
+
+  // The unit printed against one axis: the shared one if every series on that
+  // side agrees, and nothing if they do not — an axis labelled "mm" with a
+  // series in metres drawn against it is worse than an unlabelled one.
+  function axisUnit(list) {
+    const units = [...new Set(list.map(s => s.unit || '').filter(Boolean))];
+    return units.length === 1 ? units[0] : '';
   }
 
   // ── axes ──
@@ -1067,6 +1289,62 @@ const ArroData = (function () {
     }
   }
 
+  // ── Demo data (#191) ───────────────────────────────────────────────────────
+  // One real ARRO export, committed to the repo, one click from the drop zone.
+  //
+  // It is the *same* export every comment in this file argues from — 14,942
+  // rows of Durikai's rain accumulator over seven months, the one with 6,111
+  // distinct timestamps behind those rows, the 395 values ARRO wrote with a
+  // thousands separator in an unquoted CSV field, and the 82 single-reading
+  // spikes to 1234 that read as rollovers unless the 357 walk removes them
+  // first. Nothing about it was cleaned: it is here because it is messy, and
+  // because every claim runFilter() makes about what it is defending against
+  // can be checked against the file that taught it.
+  //
+  // It arrives through addSeries() under its real filename, so parseName picks
+  // 541134.0.R.5758 out of it and linkStation finds Durikai in the station file
+  // exactly as it would for a file dropped from a desktop. There is no demo
+  // code path in the chart — the demo is a file, and everything downstream of
+  // it is the ordinary one.
+  const AD_DEMO_FILE = 'aem_Durikai_AL_541134_Rainfall_541134_0_R_5758.csv';
+  const AD_DEMO_URL  = `data/demo/${AD_DEMO_FILE}`;
+
+  async function loadDemo() {
+    if (ad.busy) return;
+    // Already loaded is a no-op with an explanation rather than a second copy:
+    // two identical series on one chart is a puzzle, not a demonstration.
+    if (ad.series.some(x => x.fileName === AD_DEMO_FILE)) {
+      note('The demo series is already loaded — it is in the list below.');
+      return;
+    }
+    const inst = ad;
+    inst.busy++;
+    renderSide();
+    const problems = [];
+    try {
+      const res = await fetch(AD_DEMO_URL, { cache: 'force-cache' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      // The tab may have been switched while the file was in flight, and a
+      // series belongs to the instance that asked for it — see the note on
+      // `ad` above.
+      const was = ad;
+      ad = inst;
+      try { addSeries(AD_DEMO_FILE, text, problems); } finally { ad = was; }
+    } catch (err) {
+      problems.push(`Demo data: ${err && err.message || err}.`);
+    } finally {
+      inst.busy = Math.max(0, inst.busy - 1);
+    }
+    if (ad !== inst) return;            // it landed in a tab nobody is looking at
+    ad.view = null;
+    renderAll();
+    note(problems.length ? problems.join(' ')
+         : 'Demo data loaded — Durikai rainfall, 14,942 readings over seven months, '
+         + 'exactly as ARRO exported them. Nothing was uploaded.',
+         !!problems.length);
+  }
+
   // The other half of the boundary. Series data plus who it is, into the active
   // instance's list — every default the chart, the filter and the export happen
   // to read lives here, so adding a source is a query and a label rather than a
@@ -1093,6 +1371,11 @@ const ArroData = (function () {
       slot:     ad.series.length % AD_SERIES_TOKENS.length,
       colorSet: false,
       color:    slotColor(ad.series.length % AD_SERIES_TOKENS.length),
+      // How this trace is drawn, and which scale against (#191). All three are
+      // the operator's to set and all three default to the rule that was here
+      // before: the dash from the slot, the axis on the left.
+      dash:     'auto',        // auto | solid | dash | dot | dashdot | long
+      axis:     'left',        // left | right
       visible:  true,
       // The longest silence the chart will draw a line across. Zero is off,
       // which is what every ARRO import gets: a CSV arrives whole, so a hole in
@@ -2290,8 +2573,17 @@ const ArroData = (function () {
         <div><strong>Drop ARRO sensor CSVs here</strong></div>
         <div class="small ad-drop-sub">
           Read in your browser — nothing is uploaded.</div>
-        <button onclick="document.getElementById('ad-file').click()"
-                aria-label="Choose ARRO sensor CSV files to import">Choose files…</button>
+        <div class="ad-drop-acts">
+          <button onclick="document.getElementById('ad-file').click()"
+                  aria-label="Choose ARRO sensor CSV files to import">Choose files…</button>
+          <!-- Nothing to find, nothing to export, nothing to have to hand: the
+               tab is useless without a file, and the file it is useless without
+               is one somebody has to go and fetch out of ARRO first. This is
+               the real one (#191). -->
+          <button class="btn-link" onclick="ArroData.loadDemo()" ${ad.busy ? 'disabled' : ''}
+                  title="One real ARRO export shipped with the app — Durikai's rain accumulator, seven months, 14,942 readings, uncleaned"
+                  aria-label="Load the bundled demo export">Demo data</button>
+        </div>
         ${ad.busy ? `<div class="small ad-drop-busy">Reading ${ad.busy} file${ad.busy === 1 ? '' : 's'}…</div>` : ''}
       </div>`;
   }
@@ -2314,9 +2606,34 @@ const ArroData = (function () {
             <input type="checkbox" ${s.visible ? 'checked' : ''} title="Show on the chart"
                    aria-label="Show ${escAttr(s.label)} on the chart"
                    onchange="ArroData.toggle('${s.key}')">
-            <input type="color" class="ad-swatch" value="${escAttr(s.color)}" title="Series colour"
-                   aria-label="Colour for ${escAttr(s.label)}${s.colorSet ? '' : ' — currently the theme’s'}"
-                   onchange="ArroData.setColor('${s.key}', this.value)">
+            <!-- Two ways to the same value (#191): the grid for "make it red",
+                 the native picker for "match this exact colour". The grid is a
+                 <details> rather than a popover so it needs no positioning, no
+                 outside-click handler and no z-index — it pushes the rest of
+                 the card down for as long as it is open, which on a 320 px rail
+                 is the honest way to show twelve swatches. -->
+            <details class="ad-colour" ${ad.colourOpen === s.key ? 'open' : ''}
+                     ontoggle="ArroData.colourToggle('${s.key}', this.open)">
+              <summary class="ad-colour-cur" style="--sw:${escAttr(s.color)}"
+                       title="Series colour — ${escAttr(s.colorSet ? 'chosen' : 'the theme’s')}"
+                       aria-label="Colour for ${escAttr(s.label)}${s.colorSet ? '' : ' — currently the theme’s'}"></summary>
+              <div class="ad-colour-pop">
+                <div class="ad-swatches" role="group" aria-label="Pick a colour for ${escAttr(s.label)}">
+                  ${AD_SWATCHES.map(([hex, name]) => `
+                    <button type="button" class="ad-sw${
+                        s.color.toLowerCase() === hex.toLowerCase() ? ' is-on' : ''}"
+                            style="--sw:${hex}" title="${escAttr(name)}" aria-label="${escAttr(name)}"
+                            aria-pressed="${s.color.toLowerCase() === hex.toLowerCase()}"
+                            onclick="ArroData.setColor('${s.key}', '${hex}')"></button>`).join('')}
+                </div>
+                <label class="small ad-colour-any">Any colour
+                  <input type="color" value="${escAttr(s.color)}"
+                         aria-label="Any colour for ${escAttr(s.label)}"
+                         onchange="ArroData.setColor('${s.key}', this.value)"></label>
+                ${s.colorSet ? `<button class="btn-link" onclick="ArroData.setColor('${s.key}', '')"
+                        title="Back to the colour this slot gets from the theme">theme colour</button>` : ''}
+              </div>
+            </details>
             <b class="ad-series-name" title="${escAttr(s.fileName)}">${esc(s.label)}</b>
             <button class="ad-x" title="Remove this ${ad.source === 'field' ? 'series' : 'import'}"
                     aria-label="Remove ${escAttr(s.label)}"
@@ -2341,9 +2658,29 @@ const ArroData = (function () {
                     title="Readings the 357 test rejected — click for what the test does">${st.bad.toLocaleString()} removed</button> ·
             <span title="Repeat or out-of-sequence timestamps, excluded before filtering">${st.oos.toLocaleString()} repeats</span>
             ${st.range ? ` · <span class="txt-warn" title="Readings outside the minimum / maximum you set">${st.range.toLocaleString()} out of range</span>` : ''}
-            ${st.rate ? ` · <span class="txt-warn" title="Readings that climbed faster than the rate limit">${st.rate.toLocaleString()} too fast</span>` : ''}
+            ${st.rate ? ` · <span class="txt-warn" title="Readings that climbed faster than the rate-of-rise limit">${st.rate.toLocaleString()} rose too fast</span>` : ''}
+            ${st.fall ? ` · <span class="txt-warn" title="Readings that dropped faster than the rate-of-fall limit">${st.fall.toLocaleString()} fell too fast</span>` : ''}
             ${st.rollovers ? ` · <span title="Accumulator wraps corrected">${st.rollovers} rollover${st.rollovers === 1 ? '' : 's'}</span>` : ''}
           </div>
+          ${(() => {
+            // What has been changed since this series was loaded (#191). Shown
+            // only when there is something to say, and paired with the way back
+            // — an edited series that could not say so, or could not be put
+            // back, would be a quiet corruption of somebody's record.
+            const ed = editedCount(s), del = s.deleted || 0;
+            if (!ed && !del) return '';
+            return `<div class="small ad-series-meta ad-series-edited">
+              <span class="ad-badge ad-badge--warn" title="Changed in this browser tab. Nothing is written back to ${
+                escAttr(ad.source === 'field' ? 'the datastore' : 'ARRO')}; the Export buttons write what you see.">edited</span>
+              ${ed ? `<span>${ed.toLocaleString()} changed</span>` : ''}
+              ${ed && del ? ' · ' : ''}
+              ${del ? `<span>${del.toLocaleString()} deleted</span>` : ''}
+              ${s.orig ? `<button class="btn-link" onclick="ArroData.revertSeries('${s.key}')"
+                       aria-label="Put ${escAttr(s.label)} back to the values it was loaded with"
+                       title="Back to the values and quality codes this series was loaded with${
+                         del ? ' — deleted readings do not come back' : ''}">revert</button>` : ''}
+            </div>`;
+          })()}
           <div class="small ad-series-meta">
             <label title="How diff() compares two readings. A rain accumulator only climbs; a water level may move either way.">reads as
               <select aria-label="How ${escAttr(s.label)} reads — accumulator or level"
@@ -2355,6 +2692,24 @@ const ArroData = (function () {
                     aria-label="Show only ${escAttr(s.label)}" title="Show only this series">solo</button>
             <button class="btn-link" onclick="ArroData.zoomTo('${s.key}')"
                     aria-label="Zoom the chart to ${escAttr(s.label)}" title="Zoom the chart to this series">fit</button>
+          </div>
+          <!-- How this trace is drawn, and which scale against (#191). Beside
+               the colour rather than in the toolbar because all three are
+               facts about *this* series: the toolbar decides what the chart
+               draws, the card decides what each line in it looks like. -->
+          <div class="small ad-series-meta">
+            <label title="The dash pattern. Auto is the one this series' slot gets — which is solid when it is the only series shown, so two lines can always be told apart without colour.">line
+              <select aria-label="Line type for ${escAttr(s.label)}"
+                      onchange="ArroData.setDash('${s.key}', this.value)">
+                ${AD_DASH_CHOICES.map(([v, label]) =>
+                  `<option value="${v}" ${(s.dash || 'auto') === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}
+              </select></label>
+            <label title="Which vertical scale this series is drawn against. Put a series in different units — rainfall in mm beside a level in metres — on the right and both keep their own shape instead of one flattening the other.">axis
+              <select aria-label="Vertical axis for ${escAttr(s.label)}"
+                      onchange="ArroData.setAxis('${s.key}', this.value)">
+                <option value="left"  ${axisOf(s) === 'left'  ? 'selected' : ''}>Left</option>
+                <option value="right" ${axisOf(s) === 'right' ? 'selected' : ''}>Right</option>
+              </select></label>
           </div>
           ${(s.warn || []).map(w => `<div class="small ad-warn">${esc(w)}</div>`).join('')}
         </div>`;
@@ -2391,13 +2746,17 @@ const ArroData = (function () {
         <input type="number" value="${escAttr(c[k])}" placeholder="none" ${on ? '' : 'disabled'}
                onchange="ArroData.setCfg('${k}', this.value)">
       </label>`;
-    // A filter's own switch, and the body it governs.
-    const block = (k, label, tip, body, note) => `
+    // A filter's own switch, and the body it governs. `mark` is the shape this
+    // filter puts on the chart when it rejects something (#191) — passed as a
+    // key rather than as markup, because `label` is escaped and must stay that
+    // way: it is the only field here a caller could be tempted to smuggle HTML
+    // through.
+    const block = (k, label, tip, body, note, mark) => `
       <div class="ad-filt${c[k] ? '' : ' ad-filt--off'}">
         <label class="ad-filt-head" title="${escAttr(tip)}">
           <input type="checkbox" ${c[k] ? 'checked' : ''}
                  onchange="ArroData.setCfg('${k}', this.checked)">
-          <span>${esc(label)}</span></label>
+          <span>${esc(label)}</span>${mark ? adMarkSvg(mark) : ''}</label>
         <div class="ad-filt-body">${body}${note ? `<p class="small ad-cfg-note">${note}</p>` : ''}</div>
       </div>`;
 
@@ -2422,37 +2781,55 @@ const ArroData = (function () {
            ${num('medium', 'Medium step', 'Difference allowed against the next-next reading (spec: 5)', 0, 10000, c.use357)}
            ${num('large', 'Large step', 'Difference allowed against the next-next-next reading (spec: 7)', 0, 10000, c.use357)}
            ${num('breakCount', 'Break after', 'Consecutive failures that break continuity and start a new series (spec: 4)', 1, 100, c.use357)}
-           ${num('startTests', 'Start window', 'Tests allowed to establish the start of a series (spec flowchart: 4)', 1, 100, c.use357)}`)}
+           ${num('startTests', 'Start window', 'Tests allowed to establish the start of a series (spec flowchart: 4)', 1, 100, c.use357)}`,
+          '', 'removed')}
 
         ${block('rolloverOn', 'Correct rollovers',
           'Detect accumulator wraps and carry the count across them',
           num('cycle', 'Rollover at', 'Accumulator cycle size — the device counts 0 to cycle−1 (spec: 2048)', 2, 1e9, c.rolloverOn),
           c.use357 ? '' : 'With the 357 test off, nothing has removed the corrupt packets a wrap is '
-                        + 'easily confused with — expect spikes to be read as rollovers.')}
+                        + 'easily confused with — expect spikes to be read as rollovers.',
+          'rollover')}
 
         ${block('oosOn', 'Drop repeat timestamps',
           'Remove readings that do not advance the clock, before filtering',
           num('minGapSec', 'Min gap (s)', 'Collapse readings closer together than this. 0 keeps the spec behaviour.', 0, 86400, c.oosOn),
           'Repeats are ARRO re-sending one observation. Four re-sends of a corrupt '
           + 'packet satisfy the spec\'s "four consecutive readings make a series" and '
-          + 'survive as one — set a minimum gap to collapse them.')}
+          + 'survive as one — set a minimum gap to collapse them.',
+          'repeat')}
 
         ${block('rateOn', 'Rate of rise',
           'Remove readings that climb faster than a gauge plausibly can',
           num('rateMax', `Max rise (${esc(unit)}/h)`,
-              'Fastest believable change per hour between one reading and the next', 0, 1e9, c.rateOn),
+              'Fastest believable upward change per hour between one reading and the next', 0, 1e9, c.rateOn),
           `Each reading against the one before it, so this filter only ever claims the
            step — a corrupt plateau costs its first reading here and the rest is the 357
-           test's business.
+           test's business. <b>Upward moves only</b>; falls are the filter below.`,
+          'rate')}
+
+        ${block('fallOn', 'Rate of fall',
+          'Remove readings that drop faster than a gauge plausibly can',
+          num('fallMax', `Max fall (${esc(unit)}/h)`,
+              'Fastest believable downward change per hour between one reading and the next', 0, 1e9, c.fallOn),
+          `The mirror of the one above, and a separate figure on purpose: the fastest
+           credible <em>fall</em> at a site is rarely the fastest credible rise — a level
+           climbs with the catchment and falls with the channel draining.
            ${ad.series.some(s => s.kind === 'RA')
-              ? 'An accumulator is only tested upwards; falls belong to the rollover and 357 tests.' : ''}`)}
+              ? '<b>An accumulator does not normally need this.</b> It cannot fall except '
+                + 'by wrapping or by corruption, and the rollover and 357 tests already own '
+                + 'both — turn it on only to see what it would take.'
+              : 'With both directions on, a single dropout costs two readings: the fall '
+                + 'into it and the climb back out.'}`,
+          'fall')}
 
         ${block('rangeOn', 'Minimum / maximum',
           'Remove readings outside what this sensor can physically report',
           `${lim('rangeMin', 'Minimum', 'Readings below this are removed. Blank for no floor.', c.rangeOn)}
            ${lim('rangeMax', 'Maximum', 'Readings above this are removed. Blank for no ceiling.', c.rangeOn)}`,
           `Compared against <b>Value</b> as exported, in ${esc(unit)}, before any rollover
-           correction. Leave an end blank to bound only the other one.`)}
+           correction. Leave an end blank to bound only the other one.`,
+          'range')}
       </div>`;
   }
 
@@ -2815,7 +3192,23 @@ const ArroData = (function () {
     return `Overview of the whole record, ${fmtFull(ex.t0)} to ${fmtFull(ex.t1)}. `
          + `The box marks the window drawn on the chart above, `
          + `${fmtFull(v.t0)} to ${fmtFull(v.t1)}. `
-         + `Drag the box to move the window, or drag either edge to resize it.`;
+         + `Drag inside the box to move the window, or drag either edge to resize it; `
+         + `press outside it to bring the window there.`;
+  }
+
+  // The same sentence for the other axis (#191).
+  function vOverviewName() {
+    const ex = vExtent();
+    if (!ex) return 'Vertical range of the whole record — nothing loaded';
+    const v = view();
+    const yr = v ? yRange(v) : null;
+    const unit = shown()[0]?.unit || '';
+    return `Vertical range of the whole record, ${fmtVal(ex.lo)} to ${fmtVal(ex.hi)} ${unit}`.trimEnd()
+         + `. The box marks the range drawn on the chart, ${
+             yr ? `${fmtVal(yr.lo)} to ${fmtVal(yr.hi)}` : 'not set'}. `
+         + `Drag inside the box to move the range, or drag the top or bottom edge to resize it; `
+         + `press outside it to bring the range there. Dragging sets the vertical axis to Fixed; `
+         + `Reset puts it back to ${AD_Y_LABEL[ad.yStash ? ad.yStash.yMode : ad.yMode] || 'its setting'}.`;
   }
 
   function mainHtml() {
@@ -2832,13 +3225,37 @@ const ArroData = (function () {
            graphic that is a shortcut for controls beside it may be named as a
            picture while being clicked (pattern 8), and this is not that shape —
            arbitrary pan and zoom exist nowhere else on the tab. -->
-      <div class="ad-stage" id="ad-stage" tabindex="0"
-           aria-label="Chart window — arrow keys to step, + and − to zoom, 0 to reset both axes, Escape to unpin">
-        <svg id="ad-svg" role="img" aria-label="${escAttr(chartName())}"></svg>
-        <div class="ad-tip" id="ad-tip" hidden></div>
+      <!-- The stage and the two navigators that frame it (#191): the whole
+           record along the bottom, the whole vertical range down the right.
+           They are one grid rather than three stacked elements because both
+           navigators have to be exactly as long as the axis they steer, and
+           the only thing that knows how long that is is the stage itself. -->
+      <div class="ad-plot${ad.full ? ' is-full' : ''}" id="ad-plot">
+        <!-- Reset and full screen. Over the chart's top-right corner rather
+             than in the toolbar for the same reason the map puts its own two
+             there: they are about the picture in front of you, not about what
+             is being drawn, and a hand that has just finished dragging the
+             chart is already here. -->
+        <div class="ad-stage-acts">
+          <button type="button" class="ad-stage-btn" onclick="ArroData.resetView()"
+                  title="Reset the view — the whole record, and the vertical axis back to ${
+                    escAttr(AD_Y_LABEL[ad.yStash ? ad.yStash.yMode : ad.yMode] || 'its setting')}"
+                  aria-label="Reset the chart view">↺</button>
+          <button type="button" class="ad-stage-btn" onclick="ArroData.toggleFull()"
+                  aria-pressed="${ad.full}"
+                  title="${ad.full ? 'Exit full screen (Escape)' : 'Full screen'}"
+                  aria-label="${ad.full ? 'Exit full screen' : 'Chart full screen'}">⛶</button>
+        </div>
+        <div class="ad-stage" id="ad-stage" tabindex="0"
+             aria-label="Chart window — arrow keys to step, + and − to zoom, 0 to reset both axes, Escape to unpin">
+          <svg id="ad-svg" role="img" aria-label="${escAttr(chartName())}"></svg>
+          <div class="ad-tip" id="ad-tip" hidden></div>
+        </div>
+        <svg id="ad-vov" class="ad-vov" role="img"
+             aria-label="${escAttr(vOverviewName())}"></svg>
+        <svg id="ad-ov" class="ad-ov" role="img"
+             aria-label="${escAttr(overviewName())}"></svg>
       </div>
-      <svg id="ad-ov" class="ad-ov" role="img"
-           aria-label="${escAttr(overviewName())}"></svg>
       <div id="ad-readout" class="ad-readout">${readoutHtml()}</div>
       ${tableDetailsHtml()}
       ${compareHtml()}`;
@@ -2849,6 +3266,16 @@ const ArroData = (function () {
   // second thing to read — and built only while it is open, because the readings
   // table is up to AD_TABLE_MAX rows and a pan should not pay for it.
   const AD_TABLE_MAX = 300;
+  // …and full screen, where there is a screen to put them on (#191).
+  const AD_TABLE_MAX_FULL = 3000;
+
+  // The mark that goes with each verdict, so a row in the table and a cross on
+  // the chart are visibly the same fact. AD_GOOD and AD_UNKNOWN have no mark
+  // because nothing is drawn for them — the reading is simply on the line.
+  const AD_MARK_FOR = {
+    [AD_BAD]: 'removed', [AD_RANGE]: 'range', [AD_RATE]: 'rate',
+    [AD_FALL]: 'fall',   [AD_OOS]:   'repeat',
+  };
 
   function tableDetailsHtml() {
     return `
@@ -2860,7 +3287,43 @@ const ArroData = (function () {
       </details>`;
   }
 
-  function tableHtml() {
+  // ── The readings table, full screen (#191) ─────────────────────────────────
+  // The table under the chart is a disclosure in a column that is already
+  // holding a chart, two navigators and a toolbar — which leaves it about eight
+  // rows of a three-hundred-row list. That is fine as "the numbers behind the
+  // picture" and useless as a place to work, and working in it is exactly what
+  // editing readings turned it into.
+  //
+  // A modal rather than a second full-screen mode: the chart's full screen is a
+  // *view* of something that stays interactive underneath, and this is not —
+  // while the table is up it is the only thing on screen, which is the whole
+  // reason to put it up. Modal already owns the Escape key, the Tab walls and
+  // handing focus back, so none of that is re-implemented here.
+  let adTableModalOpen = false;
+
+  function openTableModal() {
+    adTableModalOpen = true;
+    Modal.open({
+      title: `Readings — ${ad.source === 'field' ? 'field data' : 'imported'}`,
+      wide: true,
+      html: `<div id="ad-table-modal">${tableHtml(true)}</div>`,
+    });
+    // Modal.close() can also be reached by Escape, the ✕ and the backdrop, and
+    // none of them know about this flag — so the element's absence is what the
+    // rest of the module tests, and this is only the fast path.
+    const el = document.getElementById('app-modal');
+    if (el) el.addEventListener('click', () => { if (!document.getElementById('ad-table-modal')) adTableModalOpen = false; });
+  }
+
+  function closeTableModal() { adTableModalOpen = false; Modal.close(); }
+
+  function renderTableModal() {
+    const el = document.getElementById('ad-table-modal');
+    if (!el) { adTableModalOpen = false; return; }
+    el.innerHTML = tableHtml(true);
+  }
+
+  function tableHtml(big) {
     const f = chartFacts();
     if (!f) return '<p class="small ad-flush">No series is shown — tick one on the left.</p>';
 
@@ -2893,47 +3356,113 @@ const ArroData = (function () {
     // Every reading in the window would be a hundred thousand rows on a wide
     // one. Capped, and the cap is *said* rather than silently applied — the two
     // Export buttons in the toolbar are the uncapped answer and this points at
-    // them.
+    // them. The cap is raised full screen, where there is a screen to put the
+    // rows on and the reason for being there is to work through them.
+    const cap = big ? AD_TABLE_MAX_FULL : AD_TABLE_MAX;
     const rows = [];
     let total = 0;
     for (const p of f.per) {
       for (let i = p.j0; i < p.j1; i++) {
         total++;
-        if (rows.length >= AD_TABLE_MAX) continue;
+        if (rows.length >= cap) continue;
         const st = p.f.status[i];
+        const picked = isPicked(p.s.key, i);
+        const edited = p.s.edited && p.s.edited[i];
         rows.push(`
-          <tr>
+          <tr class="${picked ? 'ad-row--picked' : ''}${edited ? ' ad-row--edited' : ''}">
+            <td class="ad-row-pick">
+              <input type="checkbox" ${picked ? 'checked' : ''}
+                     aria-label="Pick the ${escAttr(p.s.label)} reading at ${escAttr(fmtFull(p.s.t[i]))}"
+                     onchange="ArroData.pickToggle('${p.s.key}', ${i})"></td>
             <td>${esc(p.s.label)}</td>
             <td class="small mono">${esc(fmtFull(p.s.t[i]))}</td>
-            <td class="small">${esc(fmtVal(p.s.v[i]))}</td>
+            <!-- Editable in place (#191). A number input rather than a
+                 contenteditable cell: it gets the right keyboard on a phone,
+                 it refuses non-numbers without a validator, and its value
+                 round-trips without any parsing of the DOM. It fires on
+                 change, not on input — an edit re-runs the 357 walk over the whole series
+                 and rebuilds this table, which is not something to do per
+                 keystroke. -->
+            <td class="small ad-row-val">
+              <input type="number" step="any" class="ad-cell" value="${escAttr(p.s.v[i])}"
+                     aria-label="Value of the ${escAttr(p.s.label)} reading at ${escAttr(fmtFull(p.s.t[i]))}"
+                     onchange="ArroData.editCell('${p.s.key}', ${i}, 'v', this.value)">
+              ${edited ? '<span class="ad-edited-dot" title="Changed since it was loaded">•</span>' : ''}
+            </td>
             <td class="small col-optional">${esc(p.s.unit || '')}</td>
-            <td class="small">${esc(AD_STATUS_LABEL[st])}</td>
+            <td class="small ad-row-q">
+              <input type="text" class="ad-cell ad-cell--q" list="ad-qcodes-tbl"
+                     value="${escAttr(p.s.qcodes[p.s.q[i]] || '')}"
+                     aria-label="Quality code of the ${escAttr(p.s.label)} reading at ${escAttr(fmtFull(p.s.t[i]))}"
+                     onchange="ArroData.editCell('${p.s.key}', ${i}, 'q', this.value)"></td>
+            <!-- The verdict says the word and shows the mark the chart draws
+                 for it, so a row here and a cross out there are visibly the
+                 same fact rather than two things to correlate by timestamp. -->
+            <td class="small ad-row-verdict">${adMarkSvg(AD_MARK_FOR[st] || '')}${esc(AD_STATUS_LABEL[st])}</td>
           </tr>`);
       }
     }
     const capped = total > rows.length;
+    const codes = [...new Set(f.per.flatMap(p => p.s.qcodes).filter(Boolean))].sort();
 
     return `${summary}
-      <p class="small ad-table-note" id="ad-table-note">
-        ${capped
-          ? `The first ${rows.length.toLocaleString()} of ${total.toLocaleString()} readings in this
-             window. Zoom in for fewer, or use <b>Kept CSV</b> / <b>All + verdict CSV</b> under
-             <b>Export</b> in the toolbar for all of them.`
-          : `All ${total.toLocaleString()} reading${total === 1 ? '' : 's'} in this window.`}
-      </p>
-      <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="ad-table-note">
+      <div class="ad-table-acts">
+        <p class="small ad-table-note" id="ad-table-note">
+          ${capped
+            ? `The first ${rows.length.toLocaleString()} of ${total.toLocaleString()} readings in this
+               window. ${big ? 'Zoom the chart in for fewer' : 'Open it full screen for more, zoom in for fewer'},
+               or use <b>Kept CSV</b> / <b>All + verdict CSV</b> under <b>Export</b> for all of them.`
+            : `All ${total.toLocaleString()} reading${total === 1 ? '' : 's'} in this window.`}
+          ${ad.picked.size ? ` <b>${ad.picked.size.toLocaleString()} picked</b> — the editor is under the chart.` : ''}
+        </p>
+        ${big
+          ? `<button onclick="ArroData.closeTableModal()" title="Back to the chart">Close</button>`
+          : `<button onclick="ArroData.openTableModal()"
+                     title="Open the readings on the whole screen, with more rows">⛶ Full screen</button>`}
+      </div>
+      <datalist id="ad-qcodes-tbl">${codes.map(c => `<option value="${escAttr(c)}">`).join('')}</datalist>
+      <div class="table-wrap ${big ? 'ad-table-full' : 'tall'}" role="region" tabindex="0" aria-labelledby="ad-table-note">
         <table>
-          <caption class="sr-only">Every reading the chart draws in this window, with the filter's verdict against it</caption>
+          <caption class="sr-only">Every reading the chart draws in this window, with the filter's verdict against it. The value and quality cells can be typed into, and the first column picks a reading for the editor under the chart.</caption>
           <thead><tr>
+            <th scope="col"><span class="sr-only">Picked</span></th>
             <th scope="col">Series</th>
             <th scope="col">Reading</th>
             <th scope="col">Value</th>
             <th scope="col" class="col-optional">Unit</th>
+            <th scope="col">Quality</th>
             <th scope="col">Verdict</th>
           </tr></thead>
           <tbody>${rows.join('')}</tbody>
         </table>
       </div>`;
+  }
+
+  // One cell, typed into. Goes through the same three steps every other edit
+  // does — keep the original, mark the row, drop the caches — so a value typed
+  // here and a value dragged on the chart are the same kind of change and the
+  // rail counts them together.
+  function editCell(key, i, which, raw) {
+    const s = find(key);
+    if (!s || !(i >= 0 && i < s.n)) return;
+    if (which === 'v') {
+      const num = parseFloat(raw);
+      if (!isFinite(num)) { note('That is not a number — the reading is unchanged.', true); renderTable(true); return; }
+      if (num === s.v[i]) return;
+      keepOriginal(s);
+      s.v[i] = num;
+    } else {
+      const at = qualityIndex(s, raw);
+      if (at === s.q[i]) return;
+      keepOriginal(s);
+      s.q[i] = at;
+    }
+    s.edited[i] = 1;
+    invalidate(s);
+    // No esc(): note() writes through textContent, so escaping here would put
+    // a literal &amp; on screen for a station whose name has an ampersand.
+    afterEdit(`${s.label} at ${fmtFull(s.t[i])} ${
+      which === 'v' ? `set to ${fmtVal(s.v[i])}` : `coded ${s.qcodes[s.q[i]] || '(no code)'}`}.`);
   }
 
   // Same shape as the comparison panes: remembered across re-renders, and drawn
@@ -2951,7 +3480,7 @@ const ArroData = (function () {
     const box  = document.getElementById('ad-table');
     const body = document.getElementById('ad-table-body');
     if (!box || !box.open || !body) return;
-    if (!force && (ad.drag || ad.ovDrag)) return;
+    if (!force && (ad.drag || ad.ovDrag || ad.vovDrag)) return;
     const v = view();
     const sig = [ad.mode, ad.transform, cfgKey(ad.cfg, 'tbl'),
                  v ? `${Math.round(v.t0)}-${Math.round(v.t1)}` : '',
@@ -3080,7 +3609,7 @@ const ArroData = (function () {
   function toolbarHtml() {
     const anyFilt = ad.mode !== 'raw';
     return `
-      <div class="ad-toolbar">
+      <div class="ad-toolbar" id="ad-toolbar">
         <!-- Row one is what the chart is drawing: pick a series, pick what to
              read off it, pick how to draw it, pick the scale it is drawn
              against. Four choices, in the order somebody makes them. -->
@@ -3130,28 +3659,59 @@ const ArroData = (function () {
                        aria-label="Show ${l === 'All' ? 'the whole record' : 'the last ' + l}"
                        title="Show the last ${l === 'All' ? 'of everything' : l}">${l}</button>`).join('')}
             </span>`)}
+          <!-- Each tick carries the mark it switches on (#191). "removed" was
+               three words beside three identical boxes and the shapes they put
+               on the chart were only written down inside draw(); a person who
+               ticked one still had to work out which of five marks had just
+               appeared. "removed" is the one that draws more than one shape —
+               the 357 test's ✕ and whichever limit filters are running — so it
+               shows them all, and the set it shows follows the switches in the
+               filter panel rather than being a fixed three. -->
           ${grp('Mark', `
             <span class="ad-tool-grp">
               <label class="ad-chk${anyFilt ? '' : ' ad-chk--off'}" title="Mark every reading the filter rejected${
                 anyFilt ? '' : ' — no filter is running on the Raw series'}">
                 <input type="checkbox" ${ad.showRemoved ? 'checked' : ''} ${anyFilt ? '' : 'disabled'}
-                       onchange="ArroData.setFlag('showRemoved', this.checked)"> removed</label>
+                       onchange="ArroData.setFlag('showRemoved', this.checked)">
+                ${['removed', ad.cfg.rangeOn ? 'range' : '', ad.cfg.rateOn ? 'rate' : '',
+                   ad.cfg.fallOn ? 'fall' : ''].filter(Boolean).map(adMarkSvg).join('')}
+                removed</label>
               <label class="ad-chk" title="Mark repeat timestamps dropped before filtering">
                 <input type="checkbox" ${ad.showDupes ? 'checked' : ''}
-                       onchange="ArroData.setFlag('showDupes', this.checked)"> repeats</label>
+                       onchange="ArroData.setFlag('showDupes', this.checked)">
+                ${adMarkSvg('repeat')} repeats</label>
               <label class="ad-chk" title="Mark where an accumulator wrap was corrected">
                 <input type="checkbox" ${ad.showRollover ? 'checked' : ''}
-                       onchange="ArroData.setFlag('showRollover', this.checked)"> rollovers</label>
+                       onchange="ArroData.setFlag('showRollover', this.checked)">
+                ${adMarkSvg('rollover')} rollovers</label>
             </span>`)}
-          ${grp('Drag to zoom', `
+          <!-- One choice, not two switches (#191). These were two independent
+               tick boxes and both could be on at once — which a drag cannot
+               honour: a press has one meaning, and onpointerdown had to pick
+               between them silently. A segmented control with Pan in it says
+               the truth, which is that this is a three-way choice whose third
+               state is the one the chart spends most of its life in. Same
+               shape as the four controls on the row above, so it reads as a
+               choice rather than as a pair of settings. -->
+          ${grp('Drag does', seg('What dragging the chart does', ad.dragMode, [
+            ['pan',    'Pan',      'Drag moves the window along the record. Shift or Alt still reach either zoom.'],
+            ['box',    'Box zoom', 'Drag a box to zoom to it — time and value together. Or hold Shift while dragging.'],
+            ['y',      'Vertical', 'Drag up or down to rescale the vertical axis to that span; time stays put. Or hold Alt while dragging.'],
+            ['select', 'Select',   'Drag a box to pick every reading in it, removed ones included, then edit or delete them. Click a picked reading and drag it up or down to move it.'],
+          ], 'setDrag'))}
+          ${ad.picked.size ? `
+          ${grp('Picked', `
             <span class="ad-tool-grp">
-              <label class="ad-chk" title="Drag a box to zoom to it — time and value together. Or hold Shift while dragging">
-                <input type="checkbox" ${ad.brush ? 'checked' : ''}
-                       onchange="ArroData.setFlag('brush', this.checked)"> box</label>
-              <label class="ad-chk" title="Drag up or down to rescale the vertical axis to that span; time stays put. Or hold Alt while dragging">
-                <input type="checkbox" ${ad.yDrag ? 'checked' : ''}
-                       onchange="ArroData.setFlag('yDrag', this.checked)"> vertical</label>
-            </span>`)}
+              <b class="ad-picked-n">${ad.picked.size.toLocaleString()}</b>
+              <button onclick="ArroData.pickAllInView()"
+                      title="Pick every reading in the window on screen, removed ones included">all in view</button>
+              <button onclick="ArroData.pickClear()" title="Clear the selection">clear</button>
+            </span>`)}` : `
+          ${grp('Picked', `
+            <span class="ad-tool-grp">
+              <button onclick="ArroData.pickAllInView()"
+                      title="Pick every reading in the window on screen, removed ones included">all in view</button>
+            </span>`)}`}
         </div>
         <!-- And row three is the four ways to take the chart away. Its own row
              rather than the end of row two: nothing on it changes what is on
@@ -3178,6 +3738,264 @@ const ArroData = (function () {
       </div>`;
   }
 
+  // ── Editing readings (#191) ────────────────────────────────────────────────
+  // Until now this tab could only ever describe a record. You could see that a
+  // gauge had sent 1,613 mm for one reading at 22:09, see the 357 test throw it
+  // out, see exactly why — and then had to open the file in something else to
+  // do anything about it. That is the whole gap: the tab that knows most about
+  // which readings are wrong was the one tab that could not fix one.
+  //
+  // **What an edit is, and what it is not.** These edits live in this browser
+  // tab and nowhere else. Nothing is written back to ARRO, nothing is written to
+  // the datastore, and closing the tab loses them. What they are *for* is the
+  // two things people were doing by hand: producing a corrected CSV (the export
+  // buttons read the edited values, because they read s.v and s.q), and seeing
+  // what the filters make of a record once an obvious fault is corrected — the
+  // 357 walk re-runs on every edit, so a spike deleted here immediately stops
+  // dragging its neighbours down with it.
+  //
+  // Every edited series says so in the rail, and one press puts it back: `orig`
+  // is a copy of the values and quality codes as they were read, taken at the
+  // first edit and never after it, so revert means "as loaded" rather than
+  // "one step ago". A deletion rebuilds the parallel arrays, and `orig` is cut
+  // with the same mask so the two stay aligned — it is the rows that were
+  // deleted, not the edits, that a revert cannot bring back, and the UI says so
+  // before it does one.
+
+  // The picked readings, as a set of "seriesKey\u0000rowIndex". A flat set
+  // rather than a map of sets because every operation over it — count it, group
+  // it, iterate it in series order — is a one-liner either way, and a flat set
+  // is the one a `has` is O(1) on, which is what the chart asks on every mark
+  // it draws.
+  const pickKey = (key, i) => `${key}\u0000${i}`;
+  const isPicked = (key, i) => ad.picked.size > 0 && ad.picked.has(pickKey(key, i));
+
+  // The picked set, grouped by series and sorted, which is what every edit
+  // wants. Rows whose series has since been removed are dropped rather than
+  // throwing — `remove()` does not walk the selection.
+  function pickedBySeries() {
+    const by = new Map();
+    for (const k of ad.picked) {
+      const cut = k.indexOf('\u0000');
+      const key = k.slice(0, cut), i = +k.slice(cut + 1);
+      const s = find(key);
+      if (!s || !(i >= 0 && i < s.n)) continue;
+      let list = by.get(s);
+      if (!list) by.set(s, list = []);
+      list.push(i);
+    }
+    for (const list of by.values()) list.sort((a, b) => a - b);
+    return by;
+  }
+
+  // Taken once, at the first edit, and never again — see the note above.
+  function keepOriginal(s) {
+    if (!s.orig) s.orig = { v: Float64Array.from(s.v), q: Uint8Array.from(s.q) };
+    if (!s.edited) s.edited = new Uint8Array(s.n);
+  }
+
+  // Everything downstream of a reading's value is derived and cached, so an
+  // edit has to drop both caches or the chart redraws the numbers it had
+  // before. This is the only place that pairing is written down.
+  function invalidate(s) { s.filt = null; s.tracks = null; }
+
+  // A quality code, by label, added to the series' vocabulary if it is new.
+  // qcodes is "the codes seen in this file, in first-seen order" and q[] indexes
+  // it, so a code nobody has used yet has to be appended before it can be
+  // referenced — and an empty label means "no code", which is index 0 in every
+  // file that has one and a new entry in every file that does not.
+  function qualityIndex(s, label) {
+    const want = String(label == null ? '' : label);
+    let at = s.qcodes.indexOf(want);
+    if (at < 0) { s.qcodes.push(want); at = s.qcodes.length - 1; }
+    return at;
+  }
+
+  // ── The four edits ─────────────────────────────────────────────────────────
+
+  // `how` is 'set' (this value), 'by' (this much added) or 'scale'. Three rather
+  // than one because the three are genuinely different jobs: correcting a
+  // misread digit, undoing a datum shift across a stretch, and fixing a unit.
+  function editValue(how, raw) {
+    const num = parseFloat(raw);
+    if (!isFinite(num)) { note('Type a number first.', true); return; }
+    const by = pickedBySeries();
+    if (!by.size) return;
+    let n = 0;
+    for (const [s, rows] of by) {
+      keepOriginal(s);
+      for (const i of rows) {
+        const next = how === 'set' ? num : how === 'by' ? s.v[i] + num : s.v[i] * num;
+        if (next === s.v[i]) continue;
+        s.v[i] = next;
+        s.edited[i] = 1;
+        n++;
+      }
+      invalidate(s);
+    }
+    afterEdit(`${n.toLocaleString()} reading${n === 1 ? '' : 's'} ${
+      how === 'set' ? `set to ${fmtVal(num)}` : how === 'by' ? `moved by ${fmtVal(num)}` : `scaled by ${fmtVal(num)}`}.`);
+  }
+
+  function editQuality(label) {
+    const by = pickedBySeries();
+    if (!by.size) return;
+    let n = 0;
+    for (const [s, rows] of by) {
+      keepOriginal(s);
+      const at = qualityIndex(s, label);
+      for (const i of rows) {
+        if (s.q[i] === at) continue;
+        s.q[i] = at;
+        s.edited[i] = 1;
+        n++;
+      }
+      // The quality code is carried through the export and shown in the
+      // inspector; it is not an input to the 357 walk, which reads values only.
+      // Dropping the caches anyway keeps one rule rather than two.
+      invalidate(s);
+    }
+    afterEdit(`${n.toLocaleString()} reading${n === 1 ? '' : 's'} coded ${label || '(no code)'}.`);
+  }
+
+  // Rebuilds every parallel array without the picked rows. The only edit that
+  // changes `n`, and therefore the only one that has to touch `extra`, `orig`
+  // and `edited` as well — everything the series carries per reading is cut
+  // with one mask, here, so there is exactly one list to keep up to date.
+  function editDelete() {
+    const by = pickedBySeries();
+    if (!by.size) return;
+    const total = [...by.values()].reduce((a, r) => a + r.length, 0);
+    if (!confirm(`Delete ${total.toLocaleString()} reading${total === 1 ? '' : 's'}? `
+               + 'They go out of the chart, the table and the exports. '
+               + 'Revert puts back edited values but not deleted rows.')) return;
+    for (const [s, rows] of by) {
+      keepOriginal(s);
+      const drop = new Set(rows);
+      const keep = [];
+      for (let i = 0; i < s.n; i++) if (!drop.has(i)) keep.push(i);
+      const cut = (src) => {
+        const out = Array.isArray(src) ? new Array(keep.length) : new src.constructor(keep.length);
+        for (let k = 0; k < keep.length; k++) out[k] = src[keep[k]];
+        return out;
+      };
+      s.t = cut(s.t); s.tr = cut(s.tr); s.v = cut(s.v); s.raw = cut(s.raw); s.q = cut(s.q);
+      s.edited = cut(s.edited);
+      if (s.orig) s.orig = { v: cut(s.orig.v), q: cut(s.orig.q) };
+      if (s.eng) s.eng = cut(s.eng);
+      for (const [name, col] of Object.entries(s.extra || {})) s.extra[name] = cut(col);
+      s.n = keep.length;
+      s.deleted = (s.deleted || 0) + rows.length;
+      invalidate(s);
+    }
+    ad.picked.clear();
+    ad.pin = null;
+    afterEdit(`${total.toLocaleString()} reading${total === 1 ? '' : 's'} deleted.`);
+  }
+
+  // As loaded, for one series. Deleted rows are gone for good and the button
+  // says so — putting them back would mean keeping the whole original series
+  // beside the edited one for the life of the tab, which is a lot of memory for
+  // an undo nobody asked for.
+  function revertSeries(key) {
+    const s = find(key);
+    if (!s || !s.orig) return;
+    if (!confirm(`Put ${s.label} back to the values and quality codes it was loaded with?`
+               + (s.deleted ? ` The ${s.deleted.toLocaleString()} deleted reading${
+                   s.deleted === 1 ? '' : 's'} cannot come back.` : ''))) return;
+    s.v = Float64Array.from(s.orig.v);
+    s.q = Uint8Array.from(s.orig.q);
+    s.edited = new Uint8Array(s.n);
+    s.orig = null;
+    invalidate(s);
+    afterEdit(`${s.label} put back to the values it was loaded with.`);
+  }
+
+  const editedCount = s => {
+    if (!s.edited) return 0;
+    let n = 0;
+    for (let i = 0; i < s.n; i++) if (s.edited[i]) n++;
+    return n;
+  };
+
+  // One tail for all four: the filters re-run on the next draw because the
+  // caches are gone, and the rail has to repaint because the counts in it have
+  // just moved.
+  function afterEdit(said) {
+    ad.tableSig = '';
+    renderSide();
+    draw(); drawOv(); drawCompare(true); renderReadout();
+    if (adTableModalOpen) renderTableModal();
+    note(`${said} In this browser only — nothing is written back to ${
+      ad.source === 'field' ? 'the datastore' : 'ARRO'}.`);
+    announce(said);
+  }
+
+  // ── The selection ──────────────────────────────────────────────────────────
+
+  function pickToggle(key, i) {
+    const k = pickKey(key, i);
+    if (ad.picked.has(k)) ad.picked.delete(k); else ad.picked.add(k);
+    renderReadout(); draw();
+    if (adTableModalOpen) renderTableModal(); else renderTable(true);
+  }
+
+  // Every reading in the window on screen, across every visible series —
+  // removed ones included, for pickInBox()'s reason. The one gesture for "this
+  // whole stretch is rubbish", which is the commonest thing anyone wants to do
+  // to a record: zoom to the stretch, press this, delete.
+  function pickAllInView() {
+    const v = view();
+    if (!v) return;
+    let added = 0;
+    for (const s of shown()) {
+      const i0 = lower(s.t, s.n, v.t0), i1 = lower(s.t, s.n, v.t1);
+      for (let i = i0; i < i1; i++) {
+        const k = pickKey(s.key, i);
+        if (!ad.picked.has(k)) { ad.picked.add(k); added++; }
+      }
+    }
+    if (!added) { note('Every reading in this window is already picked.'); return; }
+    announce(`${added.toLocaleString()} reading${added === 1 ? '' : 's'} picked, ${
+      ad.picked.size.toLocaleString()} in all.`);
+    renderMainOnly();
+  }
+
+  function pickClear() {
+    if (!ad.picked.size) return;
+    ad.picked.clear();
+    renderReadout(); draw();
+    if (adTableModalOpen) renderTableModal(); else renderTable(true);
+  }
+
+  // Everything inside a dragged box, across every visible series. Values are
+  // compared against the series' own vertical scale, so a box drawn over a
+  // right-axis trace picks the readings it looks like it is over rather than
+  // the ones a left-axis reading of the same pixels would give.
+  //
+  // Removed readings are picked too, whenever they are drawn — which is the
+  // point: the spike somebody wants to delete is by definition one the filter
+  // has already rejected, so a lasso that could only reach survivors would miss
+  // every reading anyone wants to edit.
+  function pickInBox(x0, y0, x1, y1) {
+    const g = geom();
+    if (!g) return 0;
+    const lo = Math.min(x0, x1), hi = Math.max(x0, x1);
+    const top = Math.min(y0, y1), bot = Math.max(y0, y1);
+    let added = 0;
+    for (const s of shown()) {
+      const sy = g.yOf(s);
+      const i0 = lower(s.t, s.n, g.tOf(lo)), i1 = lower(s.t, s.n, g.tOf(hi));
+      for (let i = i0; i < i1; i++) {
+        const py = sy(s.v[i]);
+        if (py < top || py > bot) continue;
+        const k = pickKey(s.key, i);
+        if (!ad.picked.has(k)) { ad.picked.add(k); added++; }
+      }
+    }
+    return added;
+  }
+
   // ── readout / inspector ────────────────────────────────────────────────────
 
   function statusOf(s, i) {
@@ -3185,7 +4003,71 @@ const ArroData = (function () {
     return f.status[i];
   }
 
+  // The editor, shown in the readout strip whenever anything is picked. It goes
+  // there rather than in a panel of its own because that strip is already the
+  // "what is under the pointer" line, and a selection is the same kind of thing
+  // — the chart's current subject — only sticky.
+  function editorHtml() {
+    const by = pickedBySeries();
+    const total = [...by.values()].reduce((a, r) => a + r.length, 0);
+    if (!total) return '';
+    const one = total === 1;
+    // The codes already in the file, plus whatever has been typed. Offered as a
+    // datalist rather than a <select> because a code the file has never used is
+    // a perfectly ordinary thing to want, and a closed list would forbid it.
+    const codes = [...new Set([...by.keys()].flatMap(s => s.qcodes).filter(Boolean))].sort();
+    const [s0, rows0] = [...by][0];
+    return `
+      <div class="ad-edit" role="group" aria-label="Edit the picked readings">
+        <div class="ad-edit-head">
+          <b>${total.toLocaleString()} reading${one ? '' : 's'} picked</b>
+          <span class="small">${[...by].map(([s, r]) =>
+            `${esc(s.label)} ×${r.length.toLocaleString()}`).join(' · ')}</span>
+          ${one ? `<span class="small mono">${esc(fmtFull(s0.t[rows0[0]]))} · ${
+            esc(fmtVal(s0.v[rows0[0]]))} ${esc(s0.unit)}</span>` : ''}
+          <button class="ad-x" onclick="ArroData.pickClear()"
+                  aria-label="Clear the selection" title="Clear the selection">✕</button>
+        </div>
+        <div class="ad-edit-row">
+          <label class="small">Value
+            <input type="number" step="any" class="ad-num" id="ad-edit-val"
+                   value="${escAttr(ad.editVal)}" placeholder="${one ? escAttr(fmtVal(s0.v[rows0[0]])) : 'number'}"
+                   aria-label="Value to apply to the picked readings"
+                   oninput="ArroData.setEditVal(this.value)"></label>
+          <button onclick="ArroData.editValue('set', document.getElementById('ad-edit-val').value)"
+                  title="Give every picked reading this value">set to</button>
+          <button onclick="ArroData.editValue('by', document.getElementById('ad-edit-val').value)"
+                  title="Add this to every picked reading — negative subtracts. The way to undo a datum shift across a stretch.">move by</button>
+          <button onclick="ArroData.editValue('scale', document.getElementById('ad-edit-val').value)"
+                  title="Multiply every picked reading by this — the way to fix a unit, 0.001 for mm read as µm">×</button>
+        </div>
+        <div class="ad-edit-row">
+          <label class="small">Quality
+            <input type="text" class="ad-num ad-qbox" id="ad-edit-q" list="ad-qcodes"
+                   value="${escAttr(ad.editQ)}" placeholder="code"
+                   aria-label="Quality code to apply to the picked readings"
+                   oninput="ArroData.setEditQ(this.value)">
+            <datalist id="ad-qcodes">${codes.map(c => `<option value="${escAttr(c)}">`).join('')}</datalist>
+          </label>
+          <button onclick="ArroData.editQuality(document.getElementById('ad-edit-q').value)"
+                  title="Code every picked reading with this. Blank clears the code.">code as</button>
+          <button class="ad-edit-del" onclick="ArroData.editDelete()"
+                  title="Take these readings out of the chart, the table and the exports">delete</button>
+        </div>
+        <p class="small ad-edit-note">
+          Drag a picked reading up or down on the chart to move it.
+          Edits live in this browser tab only — nothing is written back to ${
+            ad.source === 'field' ? 'the datastore' : 'ARRO'}; the two
+          <b>Export</b> buttons write what you see here.
+        </p>
+      </div>`;
+  }
+
   function readoutHtml() {
+    // A selection outranks a hover and a pin: it is the thing being worked on,
+    // and it does not go away when the pointer does.
+    const edit = editorHtml();
+    if (edit) return edit;
     if (ad.pin) {
       const s = ad.series.find(x => x.key === ad.pin.key);
       if (s) return pinHtml(s, ad.pin.i);
@@ -3240,10 +4122,11 @@ const ArroData = (function () {
                          : 'Kept — the 357 test is switched off, so nothing here was tested for continuity.')
       : st === AD_OOS ? 'Dropped before filtering — this timestamp does not advance the clock, so it is a repeat of an earlier reading rather than a new observation.'
       : st === AD_RANGE ? `Outside the limits you set — anything ${lim || 'outside the range'} is removed before the 357 test runs.`
-      : st === AD_RATE ? `Moved faster than ${ad.cfg.rateMax} ${s.unit}/h from the reading before it, so it was removed before the 357 test ran.`
+      : st === AD_RATE ? `Climbed faster than ${ad.cfg.rateMax} ${s.unit}/h from the reading before it, so it was removed before the 357 test ran.`
+      : st === AD_FALL ? `Dropped faster than ${ad.cfg.fallMax} ${s.unit}/h from the reading before it, so it was removed before the 357 test ran.`
       : `Failed the 357 test against the readings that follow it — not within ${ad.cfg.small} of the next, ${ad.cfg.medium} of the next-next, or ${ad.cfg.large} of the one after that.`;
     const badge = st === AD_GOOD ? 'ok' : st === AD_OOS ? 'dup'
-                : (st === AD_RANGE || st === AD_RATE) ? 'warn' : 'bad';
+                : (st === AD_RANGE || st === AD_RATE || st === AD_FALL) ? 'warn' : 'bad';
     const rolled = f.rolls.includes(i);
     return `
       <div class="ad-pin">
@@ -3328,8 +4211,13 @@ const ArroData = (function () {
     return moved;
   }
 
-  // The dash pattern that goes with a slot. Empty for a lone series: see AD_DASH.
+  // The dash pattern this series is drawn with. A chosen one wins; otherwise the
+  // slot rule, which is empty for a lone series — see AD_DASH.
   function seriesDash(s) {
+    if (s.dash && s.dash !== 'auto') {
+      const hit = AD_DASH_CHOICES.find(d => d[0] === s.dash);
+      if (hit) return hit[2];
+    }
     if (shown().length < 2) return '';
     return AD_DASH[(s.slot || 0) % AD_DASH.length];
   }
@@ -3374,12 +4262,32 @@ const ArroData = (function () {
   }
 
   const PADL = 64, PADR = 18, PADT = 14, PADB = 30;
+  // The right margin when a second axis is drawn in it — wide enough for a
+  // column of tick labels, which PADR at 18 px is not (#191).
+  const PADR2 = 58;
+  // The overview strip's own height and the vertical navigator's own width, so
+  // the two drawing functions and the two hit-tests quote one figure each.
+  const AD_OV_H = 56, AD_VOV_W = 46;
+  // The plot's right margin as it is right now — PADR2 while a second vertical
+  // axis is drawn in it, PADR otherwise. The overview strip under the chart has
+  // to quote the same figure or its window box stops lining up with the window
+  // it is describing, which is the one thing that navigator must never do.
+  const padRNow = () => (axisSides().right.length ? PADR2 : PADR);
+  const ovClampX  = px => Math.max(PADL, Math.min(ad.w - padRNow(), px));
+  const vovClampY = py => Math.max(PADT, Math.min(ad.h - PADB, py));
   const MARK_CAP = 2500;      // removed-point markers drawn before we stop
   // Vertical throw, in viewBox px, below which a zoom box means "time only".
   // Years of x-only brushing taught a flat sweep across the chart; a hand that
   // wobbles a few pixels while making one must not be answered with a squashed
   // vertical axis it never asked for.
   const AD_BOX_EPS = 8;
+  // How near a click has to land, in the same blended distance hoverAt() ranks
+  // by, to count as being *on* a reading rather than near one. Pinning is happy
+  // to take the nearest reading anywhere on the chart — that is what a
+  // crosshair does — but picking one for editing, and grabbing one to move, are
+  // not, and a delete that took a reading eighty pixels from the pointer would
+  // be the worst bug on this tab.
+  const AD_GRAB_PX = 14;
 
   function measure() {
     const stage = document.getElementById('ad-stage');
@@ -3396,13 +4304,28 @@ const ArroData = (function () {
     const v = view();
     if (!v) return null;
     const w = ad.w, h = ad.h;
-    const pw = w - PADL - PADR, ph = h - PADT - PADB;
-    const yr = yRange(v);
+    const sides = axisSides();
+    // The right margin grows to hold a second column of tick labels, and only
+    // then: a chart with one axis is drawn exactly as it always was.
+    const padR = sides.right.length ? PADR2 : PADR;
+    const pw = w - PADL - padR, ph = h - PADT - PADB;
+    const yr  = yRange(v, 'left');
+    const yrR = sides.right.length ? yRange(v, 'right') : null;
     const x = t => PADL + (t - v.t0) / (v.t1 - v.t0) * pw;
-    const y = val => PADT + (1 - (val - yr.lo) / (yr.hi - yr.lo)) * ph;
+    const scale = r => val => PADT + (1 - (val - r.lo) / (r.hi - r.lo)) * ph;
+    const y  = scale(yr);
+    const yR = yrR ? scale(yrR) : y;
+    // Which scale a given series is drawn against. Everything that plots a
+    // point goes through this rather than through `y` directly, so a series
+    // sent to the right axis cannot be drawn against the left one by a caller
+    // that forgot to ask.
+    const yOf = s => (yrR && axisOf(s) === 'right' ? yR : y);
     const tOf = px => v.t0 + (px - PADL) / pw * (v.t1 - v.t0);
+    // The vertical gestures — the Alt drag, the box zoom's vertical half, and
+    // the navigator down the right — all commit through the *left* axis, for
+    // the reason given on yRange().
     const valOf = py => yr.hi - (py - PADT) / ph * (yr.hi - yr.lo);
-    return { v, w, h, pw, ph, yr, x, y, tOf, valOf };
+    return { v, w, h, pw, ph, padR, yr, yrR, sides, x, y, yR, yOf, tOf, valOf };
   }
 
   function draw() {
@@ -3424,11 +4347,21 @@ const ArroData = (function () {
                  width="${g.pw}" height="${g.ph}"/></clipPath></defs>
                <rect x="0" y="0" width="${g.w}" height="${g.h}" fill="${c.panel}"/>`;
 
+    // The gridlines belong to the left axis; the right axis gets tick labels
+    // and no lines of its own. Two sets of gridlines at two spacings over one
+    // rectangle is a moiré, not a scale — and the reason for a second axis is
+    // to compare two *shapes*, which needs one grid to read them against.
     out += yt.map(val => `
-      <line x1="${PADL}" y1="${g.y(val).toFixed(1)}" x2="${g.w - PADR}" y2="${g.y(val).toFixed(1)}"
+      <line x1="${PADL}" y1="${g.y(val).toFixed(1)}" x2="${g.w - g.padR}" y2="${g.y(val).toFixed(1)}"
             stroke="${c.border}" stroke-width="1"/>
       <text x="${PADL - 6}" y="${(g.y(val) + 3.5).toFixed(1)}" font-size="10" text-anchor="end"
             fill="${c.muted}">${esc(fmtVal(val))}</text>`).join('');
+
+    if (g.yrR) {
+      out += niceTicks(g.yrR.lo, g.yrR.hi, Math.max(2, Math.round(g.ph / 46))).map(val => `
+        <text x="${g.w - g.padR + 6}" y="${(g.yR(val) + 3.5).toFixed(1)}" font-size="10"
+              fill="${c.muted}">${esc(fmtVal(val))}</text>`).join('');
+    }
 
     out += ticks.map(t => `
       <line x1="${g.x(t).toFixed(1)}" y1="${PADT}" x2="${g.x(t).toFixed(1)}" y2="${g.h - PADB}"
@@ -3456,6 +4389,8 @@ const ArroData = (function () {
     let series = '';
 
     for (const s of shown()) {
+      // Which of the two vertical scales this series is drawn against (#191).
+      const sy = g.yOf(s);
       for (const { track, kind } of layers(s)) {
         const i0 = Math.max(0, lower(track.t, track.n, g.v.t0) - 1);
         const i1 = Math.min(track.n, lower(track.t, track.n, g.v.t1) + 1);
@@ -3467,13 +4402,13 @@ const ArroData = (function () {
         const shape = seriesShape(s);
         if (dots) {
           markers += pts.slice(0, 4000).map(p =>
-            shapeMark(shape, p[0], g.y(p[1]), ghost ? 1.3 : 2, escAttr(s.color), ghost ? .3 : .9)).join('');
+            shapeMark(shape, p[0], sy(p[1]), ghost ? 1.3 : 2, escAttr(s.color), ghost ? .3 : .9)).join('');
         } else {
           // The dash is the series' identity without its colour — see AD_DASH.
           // It rides on the ghost too: raw and filtered are one series drawn
           // twice, and giving them different dashes would say otherwise.
           const dash = seriesDash(s);
-          series += `<path d="${pathFrom(pts, g.y, stepped, track, s)}" fill="none" stroke="${escAttr(s.color)}"
+          series += `<path d="${pathFrom(pts, sy, stepped, track, s)}" fill="none" stroke="${escAttr(s.color)}"
                         stroke-width="${ghost ? 1 : 1.7}" opacity="${ghost ? .34 : 1}"
                         ${dash ? `stroke-dasharray="${dash}"` : ''}
                         stroke-linejoin="round" stroke-linecap="round"/>`;
@@ -3481,7 +4416,7 @@ const ArroData = (function () {
         // Few enough points on screen that each one is a real reading: show them.
         if (!dots && ad.showPoints !== 'off' && (i1 - i0) <= Math.max(40, g.pw / 12) && !ghost) {
           for (let k = i0; k < i1; k++) {
-            markers += shapeMark(shape, g.x(track.t[k]), g.y(track.y[k]), 2.2, escAttr(s.color));
+            markers += shapeMark(shape, g.x(track.t[k]), sy(track.y[k]), 2.2, escAttr(s.color));
           }
         }
       }
@@ -3494,13 +4429,13 @@ const ArroData = (function () {
         for (let i = i0; i < i1 && nMark < MARK_CAP; i++) {
           const st = f.status[i];
           const isDup = st === AD_OOS;
-          const isCut = st === AD_BAD || st === AD_RANGE || st === AD_RATE;
+          const isCut = st === AD_BAD || st === AD_RANGE || st === AD_RATE || st === AD_FALL;
           if (!(isCut && wantBad) && !(isDup && ad.showDupes)) continue;
           if (ad.transform !== 'value') continue;   // a removed step has no meaningful height
-          const px = g.x(s.t[i]), py = g.y(s.v[i]);
+          const px = g.x(s.t[i]), py = sy(s.v[i]);
           // Which filter took it out, told apart by shape as well as colour —
           // at four pixels a colour alone is a guess.
-          const col = st === AD_BAD ? c.bad : isDup ? c.muted : c.warn;
+          const col = st === AD_BAD ? c.bad : isDup ? c.muted : c.warn;    // AD_RANGE/RATE/FALL are all warn
           nMark++;
           // A removal above the top of the scale still has to be visible, or
           // "Kept" would quietly hide the very readings it is scaled to exclude.
@@ -3519,6 +4454,11 @@ const ArroData = (function () {
             : st === AD_RATE
             ? `<path d="M${px.toFixed(1)} ${(py - 3.6).toFixed(1)}l3.4 5.8h-6.8Z" fill="${c.warn}"
                      opacity=".92"><title>rose faster than the rate limit</title></path>`
+            // The mirror of it, pointing the way the reading went — the same
+            // pair of shapes the two filter blocks put beside their own names.
+            : st === AD_FALL
+            ? `<path d="M${px.toFixed(1)} ${(py + 3.6).toFixed(1)}l3.4 -5.8h-6.8Z" fill="${c.warn}"
+                     opacity=".92"><title>fell faster than the rate limit</title></path>`
             : `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="1.6" fill="${c.muted}" opacity=".5"/>`;
         }
       }
@@ -3531,14 +4471,35 @@ const ArroData = (function () {
       out += `<line x1="${hx.toFixed(1)}" y1="${PADT}" x2="${hx.toFixed(1)}" y2="${g.h - PADB}"
                     stroke="${c.accent}" stroke-width="1" opacity=".55"/>`;
       for (const r of ad.hover.rows) {
-        out += `<circle cx="${g.x(r.t).toFixed(1)}" cy="${g.y(r.y).toFixed(1)}" r="3.6"
+        const hs = g.yOf(ad.series.find(x => x.key === r.key) || {});
+        out += `<circle cx="${g.x(r.t).toFixed(1)}" cy="${hs(r.y).toFixed(1)}" r="3.6"
                         fill="none" stroke="${escAttr(r.color)}" stroke-width="2"/>`;
       }
+    }
+    // Everything picked, ringed (#191). Over the curves and under the pin, so a
+    // pinned reading inside a selection still reads as the pinned one. Capped
+    // the way the removal marks are: "all in view" can pick ten thousand
+    // readings and ten thousand rings is a solid bar, not a selection.
+    if (ad.picked.size && ad.transform === 'value') {
+      let rings = '', n = 0;
+      for (const s of shown()) {
+        const sy = g.yOf(s);
+        const i0 = lower(s.t, s.n, g.v.t0), i1 = lower(s.t, s.n, g.v.t1);
+        for (let i = i0; i < i1 && n < MARK_CAP; i++) {
+          if (!isPicked(s.key, i)) continue;
+          const py = sy(s.v[i]);
+          if (py < PADT || py > g.h - PADB) continue;
+          n++;
+          rings += `<circle cx="${g.x(s.t[i]).toFixed(1)}" cy="${py.toFixed(1)}" r="4.5"
+                            fill="none" stroke="${c.accent}" stroke-width="1.8" opacity=".95"/>`;
+        }
+      }
+      out += `<g clip-path="url(#ad-clip)">${rings}</g>`;
     }
     if (ad.pin) {
       const s = ad.series.find(x => x.key === ad.pin.key);
       if (s && ad.transform === 'value') {
-        const px = g.x(s.t[ad.pin.i]), py = g.y(s.v[ad.pin.i]);
+        const px = g.x(s.t[ad.pin.i]), py = g.yOf(s)(s.v[ad.pin.i]);
         out += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="6" fill="none"
                         stroke="${c.accent}" stroke-width="2"/>`;
       }
@@ -3548,7 +4509,16 @@ const ArroData = (function () {
     // it will zoom to — unless its vertical throw is under AD_BOX_EPS, in
     // which case the feedback goes full-height, honestly promising the x-only
     // zoom the commit will deliver.
-    if (ad.drag && ad.drag.mode !== 'pan') {
+    if (ad.drag && ad.drag.mode === 'select') {
+      // The lasso, drawn as a dashed box rather than the zoom's filled one:
+      // the two gestures look identical under the hand and do entirely
+      // different things, so they must not look identical on the chart.
+      const a = Math.min(ad.drag.x0, ad.drag.x1), b = Math.max(ad.drag.x0, ad.drag.x1);
+      const ya = Math.min(ad.drag.y0, ad.drag.y1), yb = Math.max(ad.drag.y0, ad.drag.y1);
+      out += `<rect x="${a.toFixed(1)}" y="${ya.toFixed(1)}" width="${(b - a).toFixed(1)}"
+                    height="${(yb - ya).toFixed(1)}" fill="${c.accent}" fill-opacity=".07"
+                    stroke="${c.accent}" stroke-width="1.2" stroke-dasharray="5 3"/>`;
+    } else if (ad.drag && ad.drag.mode !== 'pan' && ad.drag.mode !== 'movept') {
       const cl = p => Math.max(PADT, Math.min(g.h - PADB, p));
       const a = Math.min(ad.drag.x0, ad.drag.x1), b = Math.max(ad.drag.x0, ad.drag.x1);
       const ya = cl(Math.min(ad.drag.y0, ad.drag.y1)), yb = cl(Math.max(ad.drag.y0, ad.drag.y1));
@@ -3565,19 +4535,28 @@ const ArroData = (function () {
       }
     }
 
-    out += `<line x1="${PADL}" y1="${g.h - PADB}" x2="${g.w - PADR}" y2="${g.h - PADB}"
+    out += `<line x1="${PADL}" y1="${g.h - PADB}" x2="${g.w - g.padR}" y2="${g.h - PADB}"
                   stroke="${c.muted}" stroke-width="1"/>
             <line x1="${PADL}" y1="${PADT}" x2="${PADL}" y2="${g.h - PADB}"
-                  stroke="${c.muted}" stroke-width="1"/>`;
+                  stroke="${c.muted}" stroke-width="1"/>
+            ${g.yrR ? `<line x1="${g.w - g.padR}" y1="${PADT}" x2="${g.w - g.padR}" y2="${g.h - PADB}"
+                  stroke="${c.muted}" stroke-width="1"/>` : ''}`;
 
-    const unit = shown()[0]?.unit || '';
-    const yLabel = ad.transform === 'value' ? unit
-                 : ad.transform === 'increment' ? `${unit}/reading` : `${unit}/h`;
-    if (yLabel) {
-      out += `<text x="6" y="${PADT + 8}" font-size="10" fill="${c.muted}">${esc(yLabel)}</text>`;
+    const suffix = u => (ad.transform === 'value' ? u
+                       : ad.transform === 'increment' ? `${u}/reading` : `${u}/h`);
+    const leftLabel = suffix(axisUnit(g.sides.left) || shown()[0]?.unit || '');
+    if (leftLabel) {
+      out += `<text x="6" y="${PADT + 8}" font-size="10" fill="${c.muted}">${esc(leftLabel)}</text>`;
+    }
+    if (g.yrR) {
+      const rightLabel = suffix(axisUnit(g.sides.right));
+      if (rightLabel) {
+        out += `<text x="${g.w - 4}" y="${PADT + 8}" font-size="10" text-anchor="end"
+                      fill="${c.muted}">${esc(rightLabel)}</text>`;
+      }
     }
     if (nMark >= MARK_CAP) {
-      out += `<text x="${g.w - PADR}" y="${PADT + 10}" font-size="10" text-anchor="end" fill="${c.muted}">
+      out += `<text x="${g.w - g.padR}" y="${PADT + 10}" font-size="10" text-anchor="end" fill="${c.muted}">
                 marks capped at ${MARK_CAP} — zoom in for the rest</text>`;
     }
     svg.innerHTML = out;
@@ -3591,11 +4570,11 @@ const ArroData = (function () {
     const ex = extent();
     if (!ex) { svg.innerHTML = ''; return; }
     const c = theme();
-    const w = ad.w, h = 56;
+    const w = ad.w, h = AD_OV_H;
     svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
     svg.setAttribute('width', w);
     svg.setAttribute('height', h);
-    const pw = w - PADL - PADR;
+    const pw = w - PADL - padRNow();
     const x = t => PADL + (t - ex.t0) / (ex.t1 - ex.t0) * pw;
 
     let lo = Infinity, hi = -Infinity;
@@ -3620,10 +4599,17 @@ const ArroData = (function () {
       }
     }
     const v = view();
-    const a = x(v.t0), b = x(v.t1);
+    // Clamped to the track (#191). view() deliberately lets the window run up
+    // to a whole span past either end of the record, and an edge handle drawn
+    // out there is drawn outside the SVG: the pointer can never reach it, every
+    // press lands on "outside the window", and the window jumps instead of
+    // resizing — which is exactly what a zoomed-out chart used to do. Clamping
+    // the *drawing* is the whole fix; the window itself is untouched, and the
+    // hit-test below clamps identically so the two cannot disagree.
+    const a = ovClampX(x(v.t0)), b = ovClampX(x(v.t1));
     out += `<rect x="${PADL}" y="4" width="${Math.max(0, a - PADL).toFixed(1)}" height="${h - 16}"
                   fill="${c.muted}" opacity=".22"/>
-            <rect x="${b.toFixed(1)}" y="4" width="${Math.max(0, w - PADR - b).toFixed(1)}" height="${h - 16}"
+            <rect x="${b.toFixed(1)}" y="4" width="${Math.max(0, w - padRNow() - b).toFixed(1)}" height="${h - 16}"
                   fill="${c.muted}" opacity=".22"/>
             <rect x="${a.toFixed(1)}" y="4" width="${Math.max(1, b - a).toFixed(1)}" height="${h - 16}"
                   fill="none" stroke="${c.accent}" stroke-width="1.4"/>`;
@@ -3646,7 +4632,7 @@ const ArroData = (function () {
     }
     out += `<text x="${PADL - 6}" y="${h - 5}" font-size="9" text-anchor="end" fill="${c.muted}">whole record</text>
             <text x="${PADL}" y="${h - 5}" font-size="9" fill="${c.muted}">${esc(fmtFull(ex.t0).slice(0, 10))}</text>
-            <text x="${w - PADR}" y="${h - 5}" font-size="9" text-anchor="end" fill="${c.muted}">${esc(fmtFull(ex.t1).slice(0, 10))}</text>`;
+            <text x="${w - padRNow()}" y="${h - 5}" font-size="9" text-anchor="end" fill="${c.muted}">${esc(fmtFull(ex.t1).slice(0, 10))}</text>`;
     svg.innerHTML = out;
 
     svg.setAttribute('aria-label', overviewName());
@@ -3660,13 +4646,121 @@ const ArroData = (function () {
     // nothing reads between one pixel and the next.
     const stage = document.getElementById('ad-svg');
     if (stage) stage.setAttribute('aria-label', chartName());
+    drawVov();
     renderTable();
     drawCompare();
+  }
+
+  // ── The vertical navigator (#191) ──────────────────────────────────────────
+  // The overview strip, stood on its end and pointed at the other axis: the
+  // whole value range in the record as a track, the range the chart is drawing
+  // as a box on it, and the same three gestures — drag the box to move the
+  // range, drag an edge to resize it, press outside it to bring it there.
+  //
+  // Why it exists at all: the vertical axis had four modes and a pair of number
+  // boxes, and no way to *point* at a range. "Show me the bottom metre of this
+  // hydrograph" was a mode change, two typed figures and a guess at what the
+  // figures should be — for a question the eye had already answered by looking
+  // at the chart. The horizontal axis has had the gesture for that all along.
+  //
+  // It speaks through commitY(), which is the same manual takeover the box
+  // zoom and the Alt-drag use, so all three land in one place: yMode goes to
+  // 'manual', the two inputs echo the dragged figures, and the stash the reset
+  // reads is taken once. There is no fifth axis mode and no second override for
+  // yRange() to consult.
+  function drawVov() {
+    const svg = document.getElementById('ad-vov');
+    if (!svg) return;
+    const ex = vExtent();
+    const v = view();
+    if (!ex || !v) { svg.innerHTML = ''; return; }
+    const c = theme();
+    const w = AD_VOV_W, h = ad.h;
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+
+    // The track runs exactly as far as the plot rectangle does, so a value at
+    // the same height on both is at the same height on the screen.
+    const ph = h - PADT - PADB;
+    const y  = val => PADT + (1 - (val - ex.lo) / (ex.hi - ex.lo)) * ph;
+    const trackX = 13, trackW = 16;
+
+    const yr = yRange(v);
+    const top = vovClampY(y(yr.hi)), bot = vovClampY(y(yr.lo));
+
+    let out = `<rect x="0" y="0" width="${w}" height="${h}" fill="${c.panel}"/>
+               <rect x="${trackX}" y="${PADT}" width="${trackW}" height="${ph}"
+                     fill="${c.border}" opacity=".45" rx="3"/>`;
+
+    // Where the readings actually are, down the track — the vertical answer to
+    // the sparkline the horizontal strip draws. One band per tenth of the
+    // range, opacity by how many readings fall in it, so a hydrograph that
+    // spends its life in the bottom metre says so and the operator can see
+    // where it is worth dragging the window to.
+    const BINS = 24;
+    const hist = new Float64Array(BINS);
+    let most = 0;
+    for (const s of shown()) {
+      const track = tracks(s)[ad.mode === 'raw' ? 'raw' : 'filt'];
+      for (let k = 0; k < track.n; k++) {
+        const f = (track.y[k] - ex.lo) / (ex.hi - ex.lo);
+        const b = Math.max(0, Math.min(BINS - 1, Math.floor(f * BINS)));
+        if (++hist[b] > most) most = hist[b];
+      }
+    }
+    if (most) {
+      const bh = ph / BINS;
+      for (let b = 0; b < BINS; b++) {
+        if (!hist[b]) continue;
+        out += `<rect x="${trackX}" y="${(PADT + ph - (b + 1) * bh).toFixed(1)}"
+                      width="${trackW}" height="${(bh + 0.5).toFixed(1)}" fill="${c.accent}"
+                      opacity="${(0.12 + 0.6 * (hist[b] / most)).toFixed(3)}"/>`;
+      }
+    }
+
+    // Everything outside the window, dimmed; the window itself, outlined.
+    out += `<rect x="${trackX}" y="${PADT}" width="${trackW}" height="${Math.max(0, top - PADT).toFixed(1)}"
+                  fill="${c.muted}" opacity=".3"/>
+            <rect x="${trackX}" y="${bot.toFixed(1)}" width="${trackW}"
+                  height="${Math.max(0, ad.h - PADB - bot).toFixed(1)}" fill="${c.muted}" opacity=".3"/>
+            <rect x="${(trackX - 2).toFixed(1)}" y="${top.toFixed(1)}" width="${trackW + 4}"
+                  height="${Math.max(1, bot - top).toFixed(1)}" fill="none"
+                  stroke="${c.accent}" stroke-width="1.4" rx="2"/>`;
+
+    // The same cursor contract as the horizontal strip, turned ninety degrees:
+    // an invisible but hit-testable middle that says "grab", invisible edge
+    // zones that say "resize", and a visible pill at each edge so the promise
+    // is not made by the cursor alone. Edges last, so they win where a narrow
+    // window makes them overlap the middle — which is the order the hit-test
+    // uses too.
+    out += `<rect class="ad-vov-mid" x="${(trackX - 4).toFixed(1)}" y="${top.toFixed(1)}"
+                  width="${trackW + 8}" height="${Math.max(1, bot - top).toFixed(1)}"
+                  fill="${c.accent}" fill-opacity="0"/>`;
+    for (const e of [top, bot]) {
+      out += `<rect x="${(trackX + trackW / 2 - 7).toFixed(1)}" y="${(e - 1.25).toFixed(1)}"
+                    width="14" height="2.5" rx="1.2" fill="${c.accent}"/>
+              <rect class="ad-vov-edge" x="${(trackX - 4).toFixed(1)}" y="${(e - 6).toFixed(1)}"
+                    width="${trackW + 8}" height="12" fill="${c.accent}" fill-opacity="0"/>`;
+    }
+
+    // The two ends of the track, named. Rotated rather than wrapped: the column
+    // is 46 px and a figure like 1,613.0 does not fit across it.
+    const endLabel = (val, py, anchor) => `
+      <text x="${trackX + trackW + 9}" y="${py}" font-size="9" fill="${c.muted}"
+            text-anchor="${anchor}" transform="rotate(90 ${trackX + trackW + 9} ${py})"
+            >${esc(fmtVal(val))}</text>`;
+    out += endLabel(ex.hi, PADT + 2, 'start') + endLabel(ex.lo, ad.h - PADB - 2, 'end');
+
+    svg.innerHTML = out;
+    svg.setAttribute('aria-label', vOverviewName());
   }
 
   // ── side-by-side comparison ────────────────────────────────────────────────
 
   const CMP_PADL = 46, CMP_PADR = 10, CMP_PADT = 10, CMP_PADB = 20;
+  // …and the right margin when a second axis puts two figures in it (#191).
+  const CMP_PADR2 = 40;
 
   // Redrawing both panes on every mouse move would be work for nothing — the
   // crosshair does not reach them. This is what they actually depend on.
@@ -3684,7 +4778,8 @@ const ArroData = (function () {
     const h = Math.round(Math.max(160, Math.min(300, w * 0.62)));
     const sig = [v.t0, v.t1, w, h, ad.transform, ad.chartType, ad.showRemoved, ad.showDupes,
                  ad.yMode, ad.yMin, ad.yMax,
-                 cfgKey(ad.cfg, 'cmp'), vis.map(s => `${s.key}${s.color}${s.kind}`).join(',')].join('|');
+                 cfgKey(ad.cfg, 'cmp'),
+                 vis.map(s => `${s.key}${s.color}${s.kind}${s.axis}${s.dash}`).join(',')].join('|');
     // The childNodes test matters: re-rendering the main column hands back a
     // pair of empty <svg>s whose inputs have not changed, and a signature check
     // on its own would leave them empty.
@@ -3700,38 +4795,60 @@ const ArroData = (function () {
     // line, and "Kept" is already how you ask to see its shape instead — the
     // spikes then run off the top of the left-hand pane, which is a fair
     // description of them.
-    let lo = Infinity, hi = -Infinity;
-    for (const s of vis) {
-      const tr = tracks(s);
-      for (const track of ad.yMode === 'kept' ? [tr.filt] : [tr.raw, tr.filt]) {
-        const i0 = Math.max(0, lower(track.t, track.n, v.t0) - 1);
-        const i1 = Math.min(track.n, lower(track.t, track.n, v.t1) + 1);
-        for (let k = i0; k < i1; k++) { const y = track.y[k]; if (y < lo) lo = y; if (y > hi) hi = y; }
+    //
+    // Since #191 that is one scale *per axis*: a series sent to the right axis
+    // is drawn against the right axis here too, and both panes share both
+    // scales. The claim these panes make — same window, same scale, so the only
+    // difference between them is the filters — is unchanged; what would have
+    // broken it is a rainfall trace in millimetres pulling a level in metres
+    // flat in *both* panes, which is the very thing the right axis exists to
+    // stop and would have come straight back here.
+    const paneRange = list => {
+      let lo = Infinity, hi = -Infinity;
+      for (const s of list) {
+        const tr = tracks(s);
+        for (const track of ad.yMode === 'kept' ? [tr.filt] : [tr.raw, tr.filt]) {
+          const i0 = Math.max(0, lower(track.t, track.n, v.t0) - 1);
+          const i1 = Math.min(track.n, lower(track.t, track.n, v.t1) + 1);
+          for (let k = i0; k < i1; k++) { const y = track.y[k]; if (y < lo) lo = y; if (y > hi) hi = y; }
+        }
       }
-    }
-    if (!isFinite(lo)) { lo = 0; hi = 1; }
-    if (ad.yMode === 'zero' && lo > 0) lo = 0;
-    if (hi === lo) { hi = lo + 1; lo -= 1; }
-    const pad = (hi - lo) * 0.06;
-    let yr = { lo: lo - pad, hi: hi + pad };
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      if (ad.yMode === 'zero' && lo > 0) lo = 0;
+      if (hi === lo) { hi = lo + 1; lo -= 1; }
+      const pad = (hi - lo) * 0.06;
+      return { lo: lo - pad, hi: hi + pad };
+    };
+
+    const sides = axisSides();
+    let yr = paneRange(sides.left.length ? sides.left : vis);
+    // Fixed governs the left axis here for the reason it does on the main chart
+    // — see yRange().
     if (ad.yMode === 'manual') {
       const a = parseFloat(ad.yMin), b = parseFloat(ad.yMax);
       if (!isNaN(a) && !isNaN(b) && b > a) yr = { lo: a, hi: b };
     }
+    const yrR = sides.right.length ? paneRange(sides.right) : null;
 
     const c = theme();
     for (const [svg, kind] of [[a, 'raw'], [b, 'filt']]) {
       svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
       svg.setAttribute('width', w);
       svg.setAttribute('height', h);
-      svg.innerHTML = cmpPane(kind, w, h, v, yr, c);
+      svg.innerHTML = cmpPane(kind, w, h, v, yr, c, yrR);
     }
   }
 
-  function cmpPane(kind, w, h, v, yr, c) {
-    const pw = w - CMP_PADL - CMP_PADR, ph = h - CMP_PADT - CMP_PADB;
+  function cmpPane(kind, w, h, v, yr, c, yrR) {
+    const padR = yrR ? CMP_PADR2 : CMP_PADR;
+    const pw = w - CMP_PADL - padR, ph = h - CMP_PADT - CMP_PADB;
     const x = t => CMP_PADL + (t - v.t0) / (v.t1 - v.t0) * pw;
-    const y = val => CMP_PADT + (1 - (val - yr.lo) / (yr.hi - yr.lo)) * ph;
+    const scale = r => val => CMP_PADT + (1 - (val - r.lo) / (r.hi - r.lo)) * ph;
+    const y  = scale(yr);
+    const yR = yrR ? scale(yrR) : y;
+    // Same rule as the main chart: the left axis keeps the gridlines and a
+    // series is drawn against whichever scale it belongs to.
+    const yOf = s => (yrR && axisOf(s) === 'right' ? yR : y);
     const { ticks, step } = timeTicks(v.t0, v.t1, Math.max(2, Math.round(pw / 120)));
     const yt = niceTicks(yr.lo, yr.hi, Math.max(2, Math.round(ph / 44)));
     const clip = `ad-cmp-clip-${kind}`;
@@ -3741,7 +4858,7 @@ const ArroData = (function () {
                <rect x="0" y="0" width="${w}" height="${h}" fill="${c.panel}"/>`;
 
     out += yt.map(val => `
-      <line x1="${CMP_PADL}" y1="${y(val).toFixed(1)}" x2="${w - CMP_PADR}" y2="${y(val).toFixed(1)}"
+      <line x1="${CMP_PADL}" y1="${y(val).toFixed(1)}" x2="${w - padR}" y2="${y(val).toFixed(1)}"
             stroke="${c.border}" stroke-width="1"/>
       <text x="${CMP_PADL - 5}" y="${(y(val) + 3.2).toFixed(1)}" font-size="9" text-anchor="end"
             fill="${c.muted}">${esc(fmtVal(val))}</text>`).join('');
@@ -3754,13 +4871,14 @@ const ArroData = (function () {
 
     let body = '';
     for (const s of shown()) {
+      const sy = yOf(s);
       const track = kind === 'raw' ? tracks(s).raw : tracks(s).filt;
       const i0 = Math.max(0, lower(track.t, track.n, v.t0) - 1);
       const i1 = Math.min(track.n, lower(track.t, track.n, v.t1) + 1);
       const pts = densify(track, i0, i1, x, pw);
       if (pts.length) {
         const dash = seriesDash(s);
-        body += `<path d="${pathFrom(pts, y, ad.chartType === 'step', track, s)}" fill="none"
+        body += `<path d="${pathFrom(pts, sy, ad.chartType === 'step', track, s)}" fill="none"
                        stroke="${escAttr(s.color)}" stroke-width="1.4"
                        ${dash ? `stroke-dasharray="${dash}"` : ''}
                        stroke-linejoin="round" stroke-linecap="round"/>`;
@@ -3774,10 +4892,10 @@ const ArroData = (function () {
         for (let i = j0; i < j1 && n < 900; i++) {
           const st = f.status[i];
           if (st === AD_GOOD || (st === AD_OOS && !ad.showDupes)) continue;
-          const px = x(s.t[i]), py = y(s.v[i]);
+          const px = x(s.t[i]), py = sy(s.v[i]);
           if (py < CMP_PADT - 4 || py > h - CMP_PADB + 4) continue;
           n++;
-          const col = st === AD_BAD ? c.bad : st === AD_OOS ? c.muted : c.warn;
+          const col = st === AD_BAD ? c.bad : st === AD_OOS ? c.muted : c.warn;   // range/rate/fall all warn
           body += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2.4" fill="none"
                            stroke="${col}" stroke-width="1.3" opacity=".9"><title>${esc(AD_STATUS_LABEL[st])}
                            · ${esc(fmtVal(s.v[i]))} ${esc(s.unit)}</title></circle>`;
@@ -3785,10 +4903,22 @@ const ArroData = (function () {
       }
     }
     out += `<g clip-path="url(#${clip})">${body}</g>`;
-    out += `<line x1="${CMP_PADL}" y1="${h - CMP_PADB}" x2="${w - CMP_PADR}" y2="${h - CMP_PADB}"
+    out += `<line x1="${CMP_PADL}" y1="${h - CMP_PADB}" x2="${w - padR}" y2="${h - CMP_PADB}"
                   stroke="${c.muted}" stroke-width="1"/>
             <line x1="${CMP_PADL}" y1="${CMP_PADT}" x2="${CMP_PADL}" y2="${h - CMP_PADB}"
                   stroke="${c.muted}" stroke-width="1"/>`;
+    // The right axis, when there is one. Two values at each end rather than a
+    // full column: these panes are 240–420 px wide and a second set of tick
+    // labels down them would cost more room than the shape they are there to
+    // show. The main chart above carries the whole scale.
+    if (yrR) {
+      out += `<line x1="${w - padR}" y1="${CMP_PADT}" x2="${w - padR}" y2="${h - CMP_PADB}"
+                    stroke="${c.muted}" stroke-width="1"/>
+              <text x="${w - padR + 3}" y="${CMP_PADT + 8}" font-size="9"
+                    fill="${c.muted}">${esc(fmtVal(yrR.hi))}</text>
+              <text x="${w - padR + 3}" y="${h - CMP_PADB - 2}" font-size="9"
+                    fill="${c.muted}">${esc(fmtVal(yrR.lo))}</text>`;
+    }
     return out;
   }
 
@@ -3799,27 +4929,52 @@ const ArroData = (function () {
     return (ev.clientX - r.left) * (ad.w / r.width);
   }
 
+  // Which curves a pointer may land on. Not the same list as layers(): a
+  // reading the filter rejected is *drawn* whenever the removal marks are on —
+  // as an ✕, a □ or a triangle — and before #191 none of them could be clicked,
+  // because this searched the filtered track alone in every mode but Raw. So
+  // the one reading somebody actually wants to inspect, or pick and delete, was
+  // the one reading on the chart that did not answer a click. The marks are
+  // there; they are now reachable.
+  //
+  // One row per series still: the raw layer is searched, but a hit on it only
+  // survives if it is nearer than the filtered layer's, so a kept reading is
+  // never shadowed by the removed one beside it.
+  function hoverLayers(s) {
+    const out = layers(s);
+    if (ad.mode === 'raw' || out.some(l => l.kind === 'raw')) return out;
+    if (!ad.showRemoved) return out;
+    return [...out, { track: tracks(s).raw, kind: 'raw' }];
+  }
+
   function hoverAt(px, py) {
     const g = geom();
     if (!g) return null;
     const t = g.tOf(px);
     const rows = [];
     for (const s of shown()) {
-      for (const { track, kind } of layers(s)) {
-        if (ad.mode === 'both' && kind === 'raw') continue;   // one row per series
+      const sy = g.yOf(s);
+      let best = null;
+      for (const { track, kind } of hoverLayers(s)) {
         if (!track.n) continue;
         let k = lower(track.t, track.n, t);
         if (k >= track.n) k = track.n - 1;
         if (k > 0 && Math.abs(track.t[k - 1] - t) < Math.abs(track.t[k] - t)) k--;
         const i = track.ref[k];
-        rows.push({
+        const dist = Math.abs(g.x(track.t[k]) - px) + Math.abs(sy(track.y[k]) - py) * 0.35;
+        if (best && best.dist <= dist) continue;
+        best = {
           key: s.key, label: s.label, color: s.color, unit: s.unit,
           t: track.t[k], y: track.y[k], i, k,
           q: s.qcodes[s.q[i]] || '',
-          kindLabel: ad.mode === 'raw' ? 'raw' : 'kept',
-          dist: Math.abs(g.x(track.t[k]) - px) + Math.abs(g.y(track.y[k]) - py) * 0.35,
-        });
+          // Which curve it came off, so the readout can say "kept" or "removed"
+          // rather than implying every reading survived.
+          kindLabel: ad.mode === 'raw' ? 'raw'
+                   : (kind === 'raw' && adCut(statusOf(s, i))) ? 'removed' : 'kept',
+          dist,
+        };
       }
+      if (best) rows.push(best);
     }
     rows.sort((a, b) => a.dist - b.dist);
     return { t, x: px, y: py, rows };
@@ -3881,6 +5036,21 @@ const ArroData = (function () {
       const r = svg.getBoundingClientRect();
       const py = (ev.clientY - r.top) * (ad.h / r.height);
       if (ad.drag) {
+        if (ad.drag.mode === 'movept') {
+          // Written straight into the series so the curve, the marks and the
+          // readout all follow the hand. The 357 walk is *not* re-run per
+          // frame — the caches are dropped at pointerup — so what moves during
+          // the drag is the line, and the verdicts catch up when it is let go.
+          const g2 = geom();
+          if (g2) {
+            const dv = g2.valOf(py) - ad.drag.hold.from;
+            for (const r of ad.drag.hold.rows) r.s.v[r.i] = r.v0 + dv;
+            for (const r of ad.drag.hold.rows) r.s.tracks = null;
+          }
+          ad.drag.x1 = px; ad.drag.y1 = py;
+          draw();
+          return;
+        }
         if (ad.drag.mode !== 'pan') { ad.drag.x1 = px; ad.drag.y1 = py; draw(); return; }
         const g = geom();
         if (!g) return;
@@ -3912,9 +5082,32 @@ const ArroData = (function () {
       // so a keyboard hand can always reach either zoom without touching the
       // toolbar: Alt means the vertical axis, Shift means a box, and only
       // then do the armed toggles speak — else the drag pans, as ever.
-      const mode = ev.altKey ? 'y' : ev.shiftKey ? 'box'
-                 : ad.yDrag ? 'y' : ad.brush ? 'box' : 'pan';
-      ad.drag = { px, py, x0: px, y0: py, x1: px, y1: py, t0: g.v.t0, t1: g.v.t1, mode };
+      let mode = ev.altKey ? 'y' : ev.shiftKey ? 'box' : (ad.dragMode || 'pan');
+      // In Select, a press that lands on a reading that is already picked is a
+      // grab on *that reading* rather than the start of a new box — which is
+      // what "physically move the point" has to mean: you pick it, then you
+      // take hold of it. Pressing anywhere else in Select starts a lasso, so
+      // the two never compete for the same press.
+      let hold = null;
+      if (mode === 'select') {
+        const h = hoverAt(px, py);
+        const near = h && h.rows[0] && h.rows[0].dist <= AD_GRAB_PX && isPicked(h.rows[0].key, h.rows[0].i);
+        if (near) {
+          const s = find(h.rows[0].key);
+          if (s) {
+            mode = 'movept';
+            // Every picked reading moves together, by the same amount, from the
+            // values they had at the press — so a stretch dragged down keeps
+            // its shape instead of collapsing onto one value.
+            const rows = [];
+            for (const [ser, idx] of pickedBySeries()) {
+              for (const i of idx) rows.push({ s: ser, i, v0: ser.v[i] });
+            }
+            hold = { rows, from: g.valOf(py) };
+          }
+        }
+      }
+      ad.drag = { px, py, x0: px, y0: py, x1: px, y1: py, t0: g.v.t0, t1: g.v.t1, mode, hold };
     };
     svg.onpointerup = ev => {
       const d = ad.drag;
@@ -3932,6 +5125,34 @@ const ArroData = (function () {
       const moved = dx > 3 || dy > 3;
       const cl = p => Math.max(PADT, Math.min(g.h - PADB, p));
       let yDone = false;
+      if (d.mode === 'movept') {
+        // Pressed a picked reading and let go without moving it: that is the
+        // gesture for putting one back, and it has to be, because press-on-a-
+        // picked-reading is claimed by the grab and would otherwise be the one
+        // reading in the selection a click could not remove.
+        if (!moved) {
+          const h = hoverAt(px, py);
+          if (h && h.rows[0]) pickToggle(h.rows[0].key, h.rows[0].i);
+          return;
+        }
+        // The values were written live during the drag; this is the tail that
+        // makes it an edit — mark the rows, drop the caches, repaint the rail.
+        if (moved) {
+          for (const r of d.hold.rows) { keepOriginal(r.s); r.s.edited[r.i] = 1; invalidate(r.s); }
+          afterEdit(`${d.hold.rows.length.toLocaleString()} reading${
+            d.hold.rows.length === 1 ? '' : 's'} moved on the chart.`);
+        }
+        return;
+      }
+      if (moved && d.mode === 'select') {
+        const n = pickInBox(d.x0, d.y0, px, py);
+        renderReadout();
+        if (adTableModalOpen) renderTableModal(); else renderTable(true);
+        announce(n ? `${n.toLocaleString()} reading${n === 1 ? '' : 's'} picked, ${
+          ad.picked.size.toLocaleString()} in all.` : 'Nothing in that box.');
+        draw();
+        return;
+      }
       if (moved && d.mode === 'box') {
         const a = g.v.t0 + (Math.min(d.x0, px) - PADL) / g.pw * (g.v.t1 - g.v.t0);
         const b = g.v.t0 + (Math.max(d.x0, px) - PADL) / g.pw * (g.v.t1 - g.v.t0);
@@ -3946,9 +5167,16 @@ const ArroData = (function () {
           yDone = commitY(g.valOf(cl(Math.max(d.y0, py))), g.valOf(cl(Math.min(d.y0, py))));
         }
       } else if (!moved) {
-        // A click pins the nearest reading, so it can be read in full and
-        // its verdict explained.
         const h = hoverAt(px, py);
+        const hit = h && h.rows[0] && h.rows[0].dist <= AD_GRAB_PX ? h.rows[0] : null;
+        // In Select, and with Ctrl or ⌘ held in any mode, a click adds or
+        // removes one reading. Everywhere else it pins one, which is what it
+        // has always done — so the reading-in-full inspector is never behind a
+        // mode change.
+        if ((d.mode === 'select' || ev.ctrlKey || ev.metaKey) && hit) {
+          pickToggle(hit.key, hit.i);
+          return;
+        }
         if (h && h.rows.length) ad.pin = { key: h.rows[0].key, i: h.rows[0].i };
         else ad.pin = null;
       }
@@ -4004,70 +5232,19 @@ const ArroData = (function () {
             return;
           }
           break;
-        case 'Escape': ad.pin = null; break;
+        // Escape gives back the most recent thing claimed: the selection first,
+        // then the pin. One key, unwound in the order they were made.
+        case 'Escape':
+          if (ad.picked.size) { ev.preventDefault(); pickClear(); return; }
+          ad.pin = null;
+          break;
         default: return;
       }
       ev.preventDefault();
       draw(); drawOv(); renderReadout();
     };
 
-    // Overview: press inside the window (or anywhere off it) to centre the
-    // window there and drag it along — or take the window by an edge, within
-    // AD_OV_GRIP viewBox px of it, and drag that edge alone: the other end
-    // holds still and the window's *width* changes. The same 1000ms floor
-    // view() enforces applies here, so an edge can never be dragged through
-    // its partner into a zero-width window.
-    const ov = document.getElementById('ad-ov');
-    if (ov) {
-      const AD_OV_GRIP = 6;
-      const ovPx = ev => {
-        const r = ov.getBoundingClientRect();
-        return (ev.clientX - r.left) * (ad.w / r.width);
-      };
-      const tAt = (px, ex) => ex.t0 + (px - PADL) / (ad.w - PADL - PADR) * (ex.t1 - ex.t0);
-      const jump = ev => {
-        const ex = extent();
-        if (!ex) return;
-        const t = tAt(ovPx(ev), ex);
-        const v = view();
-        const half = (v.t1 - v.t0) / 2;
-        ad.view = { t0: t - half, t1: t + half };
-        draw(); drawOv(); renderReadout();
-      };
-      const resize = ev => {
-        const ex = extent();
-        if (!ex) return;
-        const v = view();
-        const t = tAt(ovPx(ev), ex);
-        if (ad.ovDrag === 'left') {
-          ad.view = { t0: Math.max(ex.t0, Math.min(t, v.t1 - 1000)), t1: v.t1 };
-        } else {
-          ad.view = { t0: v.t0, t1: Math.min(ex.t1, Math.max(t, v.t0 + 1000)) };
-        }
-        draw(); drawOv(); renderReadout();
-      };
-      ov.onpointerdown = ev => {
-        if (ev.button) return;   // as on the stage: only the primary button drags
-        const ex = extent();
-        if (!ex) return;
-        ov.setPointerCapture?.(ev.pointerId);
-        const v = view();
-        const pw = ad.w - PADL - PADR;
-        const px = ovPx(ev);
-        const da = Math.abs(px - (PADL + (v.t0 - ex.t0) / (ex.t1 - ex.t0) * pw));
-        const db = Math.abs(px - (PADL + (v.t1 - ex.t0) / (ex.t1 - ex.t0) * pw));
-        // Nearer edge wins when the window is so narrow both are in reach.
-        ad.ovDrag = da <= AD_OV_GRIP && da <= db ? 'left'
-                  : db <= AD_OV_GRIP ? 'right' : 'pan';
-        if (ad.ovDrag === 'pan') jump(ev); else resize(ev);
-      };
-      ov.onpointermove = ev => {
-        if (ad.ovDrag === 'pan') jump(ev);
-        else if (ad.ovDrag) resize(ev);
-      };
-      ov.onpointerup = () => { ad.ovDrag = null; };
-      ov.onpointerleave = () => { ad.ovDrag = null; };
-    }
+    bindNavigators();
 
     const drop = document.getElementById('ad-drop');
     if (drop) {
@@ -4081,6 +5258,183 @@ const ArroData = (function () {
     }
   }
 
+  // ── The two navigators ─────────────────────────────────────────────────────
+  // One binding for both, because they are one interaction on two axes: a track
+  // showing everything there is, a box showing what the chart is drawing, and
+  // three gestures over it.
+  //
+  // **What a press means, and the bug this rewrote (#191).** The rule is the
+  // one anybody would guess from the cursor: within the box, the box *moves*;
+  // at an edge, that edge *resizes*; outside the box, the box comes to where
+  // you pressed. The horizontal strip used to get the middle case wrong in a
+  // way that read as randomness. Its press handler recognised the two edges and
+  // called *everything else* "pan" — and "pan" re-centred the window on the
+  // press point. So a press two pixels outside the grip, which the cursor had
+  // just promised was a resize, threw the window sideways by however far off
+  // centre it landed; a press dead in the middle did nothing at all; and the
+  // two were the same gesture. On a zoomed-out chart it was worse: view() lets
+  // the window run a whole span past either end of the record, so both edge
+  // handles were drawn off the ends of the track, no press could ever reach
+  // one, and *every* press jumped. Three things fix it — the clamp in drawOv,
+  // a real "move" that tracks the pointer by its grab offset instead of
+  // teleporting to it, and a grip wide enough to hit — and only "move" is new
+  // behaviour; the other two are the promised behaviour becoming reachable.
+  //
+  // A jump still exists and is still worth having, but it is now only what it
+  // says: press somewhere the window is not, and the window comes to you. It
+  // then becomes a move, so one gesture is press-to-there-and-drag.
+  const AD_OV_GRIP = 7;     // viewBox px either side of an edge that means "resize"
+  const AD_OV_MIN  = 1000;  // the narrowest window a drag may leave, in ms
+
+  // Which of the four a press at `p` is, given the window's two edges. Edges
+  // first and the nearer one when both are in reach: an edge is the smaller
+  // target, so it has to win wherever a narrow window makes them overlap — the
+  // same order the two SVGs stack their cursor zones in.
+  function navHit(p, lo, hi) {
+    const dlo = Math.abs(p - lo), dhi = Math.abs(p - hi);
+    if (dlo <= AD_OV_GRIP && dlo <= dhi) return 'lo';
+    if (dhi <= AD_OV_GRIP) return 'hi';
+    return (p > lo && p < hi) ? 'move' : 'jump';
+  }
+
+  function bindNavigators() {
+    const after = () => { draw(); drawOv(); renderReadout(); };
+
+    // ── The whole record, along the bottom ──────────────────────────────────
+    const ov = document.getElementById('ad-ov');
+    if (ov) {
+      const pxOf = ev => {
+        const r = ov.getBoundingClientRect();
+        return r.width ? (ev.clientX - r.left) * (ad.w / r.width) : 0;
+      };
+      const tAt = (px, ex) => ex.t0 + (px - PADL) / (ad.w - PADL - padRNow()) * (ex.t1 - ex.t0);
+
+      const move = ev => {
+        const d = ad.ovDrag;
+        const ex = extent();
+        if (!d || !ex) return;
+        const t = tAt(pxOf(ev), ex);
+        if (d.kind === 'lo') {
+          ad.view = { t0: Math.min(t, d.t1 - AD_OV_MIN), t1: d.t1 };
+        } else if (d.kind === 'hi') {
+          ad.view = { t0: d.t0, t1: Math.max(t, d.t0 + AD_OV_MIN) };
+        } else {
+          // The grab offset is the whole of why this does not teleport: the
+          // window keeps whatever part of it was under the pointer at the
+          // press, so it follows the hand rather than snapping its centre to it.
+          const dt = t - d.grab;
+          ad.view = { t0: d.t0 + dt, t1: d.t1 + dt };
+        }
+        after();
+      };
+
+      ov.onpointerdown = ev => {
+        if (ev.button) return;   // as on the stage: only the primary button drags
+        const ex = extent();
+        const v = view();
+        if (!ex || !v) return;
+        ov.setPointerCapture?.(ev.pointerId);
+        const pw = ad.w - PADL - padRNow();
+        const at = t => ovClampX(PADL + (t - ex.t0) / (ex.t1 - ex.t0) * pw);
+        const px = pxOf(ev);
+        let kind = navHit(px, at(v.t0), at(v.t1));
+        let { t0, t1 } = v;
+        if (kind === 'jump') {
+          // Bring the window here, keeping its width, and carry on as a move
+          // with the pointer in the middle of it — which is where it now is.
+          const half = (t1 - t0) / 2;
+          const t = tAt(px, ex);
+          t0 = t - half; t1 = t + half;
+          ad.view = { t0, t1 };
+          kind = 'move';
+        }
+        ad.ovDrag = { kind, t0, t1, grab: tAt(px, ex) };
+        after();
+      };
+      ov.onpointermove = ev => { if (ad.ovDrag) move(ev); };
+      ov.onpointerup = () => { ad.ovDrag = null; };
+      ov.onpointercancel = () => { ad.ovDrag = null; };
+      // Double-click anywhere on the strip is the whole record back, matching
+      // the same gesture on the chart above it.
+      ov.ondblclick = () => { ad.ovDrag = null; ad.view = null; after(); };
+    }
+
+    // ── The whole vertical range, down the right ────────────────────────────
+    // Screen y runs downwards and values run upwards, so 'lo' here is the *top*
+    // edge and holds the window's maximum. Naming them by which edge of the box
+    // they are rather than by which value they carry is what lets navHit() be
+    // the same function for both axes.
+    const vov = document.getElementById('ad-vov');
+    if (vov) {
+      const pyOf = ev => {
+        const r = vov.getBoundingClientRect();
+        return r.height ? (ev.clientY - r.top) * (ad.h / r.height) : 0;
+      };
+      const valAt = (py, ex) => ex.hi - (py - PADT) / (ad.h - PADT - PADB) * (ex.hi - ex.lo);
+      // The narrowest vertical window a drag may leave. Proportional rather
+      // than absolute: 1000 ms means something on every record, one millimetre
+      // does not.
+      const minSpan = ex => (ex.hi - ex.lo) / 400;
+
+      const move = ev => {
+        const d = ad.vovDrag;
+        const ex = vExtent();
+        if (!d || !ex) return;
+        const val = valAt(pyOf(ev), ex);
+        const m = minSpan(ex);
+        let lo = d.lo, hi = d.hi;
+        if (d.kind === 'lo')      hi = Math.max(val, d.lo + m);      // top edge → the maximum
+        else if (d.kind === 'hi') lo = Math.min(val, d.hi - m);      // bottom edge → the minimum
+        else { const dv = val - d.grab; lo = d.lo + dv; hi = d.hi + dv; }
+        if (commitY(lo, hi)) { draw(); drawVov(); renderReadout(); }
+      };
+
+      vov.onpointerdown = ev => {
+        if (ev.button) return;
+        const ex = vExtent();
+        const v = view();
+        if (!ex || !v) return;
+        vov.setPointerCapture?.(ev.pointerId);
+        const ph = ad.h - PADT - PADB;
+        const at = val => vovClampY(PADT + (1 - (val - ex.lo) / (ex.hi - ex.lo)) * ph);
+        const py = pyOf(ev);
+        const yr = yRange(v);
+        let kind = navHit(py, at(yr.hi), at(yr.lo));   // top edge first: see above
+        let { lo, hi } = yr;
+        if (kind === 'jump') {
+          const half = (hi - lo) / 2;
+          const val = valAt(py, ex);
+          lo = val - half; hi = val + half;
+          kind = 'move';
+        }
+        ad.vovDrag = { kind, lo, hi, grab: valAt(py, ex) };
+        // The first commit is what moves the toolbar to Fixed and fills its two
+        // inputs, so the pane is re-rendered once, here, rather than on every
+        // frame of the drag — and only when the press actually changed the
+        // range, which a press on the middle of the box does not.
+        const wasManual = ad.yMode === 'manual';
+        if (commitY(lo, hi)) {
+          if (wasManual) { draw(); drawVov(); renderReadout(); }
+          else {
+            renderMainOnly();
+            // renderMainOnly() rebuilds the element the capture was taken on,
+            // so the gesture would end here. Re-take it on the new one.
+            const again = document.getElementById('ad-vov');
+            if (again) { try { again.setPointerCapture?.(ev.pointerId); } catch (_) {} }
+          }
+        }
+      };
+      vov.onpointermove = ev => { if (ad.vovDrag) move(ev); };
+      vov.onpointerup = () => { ad.vovDrag = null; };
+      vov.onpointercancel = () => { ad.vovDrag = null; };
+      // …and double-click gives the axis back to whatever mode it was in.
+      vov.ondblclick = () => {
+        ad.vovDrag = null;
+        if (restoreY()) renderMainOnly(); else { draw(); drawVov(); }
+      };
+    }
+  }
+
   function init() {
     // The observer below outlives the element it watches unless something drops
     // it on the way out of the tab. Saying so here, rather than being named in
@@ -4090,8 +5444,11 @@ const ArroData = (function () {
     if (ad.ro) { ad.ro.disconnect(); ad.ro = null; }
     measure();
     bind();
+    // The class is state-driven and render() emits it, so this only has to put
+    // the Escape listener back after a re-render that dropped it.
+    syncFullEsc();
     draw();
-    drawOv();
+    drawOv();          // …which draws the vertical navigator from its tail
     const stage = document.getElementById('ad-stage');
     if (stage && typeof ResizeObserver !== 'undefined') {
       // The comparison panes size themselves off their own column, which the
@@ -4101,7 +5458,14 @@ const ArroData = (function () {
     }
   }
 
-  function stop() { if (ad.ro) { ad.ro.disconnect(); ad.ro = null; } }
+  // Leaving the tab takes the full screen with it: the class dies with the
+  // markup, and a document-level Escape handler for a chart that is no longer
+  // on the page would be the leak #142 exists to stop.
+  function stop() {
+    if (ad.ro) { ad.ro.disconnect(); ad.ro = null; }
+    ad.full = false;
+    syncFullEsc();
+  }
 
   function renderAll() {
     const side = document.getElementById('ad-side');
@@ -4121,9 +5485,19 @@ const ArroData = (function () {
     if (el) el.innerHTML = readoutHtml();
   }
   // Config and visibility changes invalidate the drawn curves but not the page.
+  // The toolbar alone. Since #191 the Mark group shows the shapes each switched-on
+  // filter draws, which is a fact about ad.cfg — so a filter turned on in the
+  // rail has to repaint the toolbar as well, and repainting the whole main pane
+  // for it would re-bind the chart and drop the pointer mid-gesture.
+  function rerenderToolbar() {
+    const el = document.getElementById('ad-toolbar');
+    if (el) el.outerHTML = toolbarHtml();
+  }
+
   function redraw(sideToo) {
     for (const s of ad.series) s.tracks = null;
     if (sideToo) renderSide();
+    rerenderToolbar();
     draw(); drawOv(); renderReadout();
   }
 
@@ -4138,12 +5512,41 @@ const ArroData = (function () {
   // in both themes. Overruling it on the next theme toggle would be the app
   // undoing a decision the operator made, which is worse than a colour that is
   // a little dark on one of the two.
+  // An empty value means "give it back to the theme" (#191): clearing colorSet
+  // is what lets reslotColors() re-resolve it on the next theme change, which
+  // is the whole reason that flag exists.
   function setColor(key, v) {
     const s = find(key);
     if (!s) return;
-    s.color = v;
-    s.colorSet = true;
-    draw(); drawOv(); drawCompare(true);
+    if (v) { s.color = v; s.colorSet = true; }
+    else   { s.colorSet = false; s.color = slotColor(s.slot || 0); }
+    // The swatch grid repaints too — the "currently this one" ring moved, and
+    // the card's own dot with it.
+    renderSide();
+    draw(); drawOv(); drawVov(); drawCompare(true);
+  }
+
+  // Which series' colour grid is open. On the instance rather than in the DOM
+  // because renderSide() rebuilds the whole rail on every change inside it, and
+  // a <details> that shuts itself the moment you pick a colour is a grid you
+  // can only use once per open.
+  function colourToggle(key, open) {
+    const next = open ? key : (ad.colourOpen === key ? null : ad.colourOpen);
+    if (next === ad.colourOpen) return;
+    ad.colourOpen = next;
+  }
+
+  function setDash(key, v) { const s = find(key); if (s) { s.dash = v; draw(); drawOv(); drawCompare(true); } }
+
+  // Moving a series between the axes changes the plot's right margin, which
+  // every scale on the chart is measured off — so this is a redraw of the whole
+  // trio rather than of the curve that moved.
+  function setAxis(key, v) {
+    const s = find(key);
+    if (!s) return;
+    s.axis = v === 'right' ? 'right' : 'left';
+    renderSide();
+    draw(); drawOv(); drawVov(); drawCompare(true);
   }
   function setKind(key, v) { const s = find(key); if (s) { s.kind = v; s.filt = null; s.tracks = null; redraw(true); } }
   function solo(key) { ad.series.forEach(s => { s.visible = s.key === key; }); redraw(true); }
@@ -4153,15 +5556,43 @@ const ArroData = (function () {
     ad.view = { t0: s.t[0], t1: s.t[s.n - 1] };
     draw(); drawOv(); renderReadout();
   }
+  // A series that has been edited says so before it goes, because closing it is
+  // the one way to lose those edits without being asked (#191).
+  function removeWarning(s) {
+    const ed = editedCount(s), del = s.deleted || 0;
+    if (!ed && !del) return '';
+    return `${s.label} has ${[ed ? `${ed.toLocaleString()} edited reading${ed === 1 ? '' : 's'}` : '',
+                              del ? `${del.toLocaleString()} deleted` : ''].filter(Boolean).join(' and ')}. `
+         + 'Removing it loses them — the exports are the only copy. Remove it anyway?';
+  }
+
+  // Picks belonging to series that are going away go with them: pickedBySeries()
+  // already skips them, but ad.picked.size is what the toolbar counts and a
+  // count of readings nobody can reach is a lie.
+  function forgetPicks(keys) {
+    if (!ad.picked.size) return;
+    const gone = new Set(keys);
+    for (const k of [...ad.picked]) if (gone.has(k.slice(0, k.indexOf('\u0000')))) ad.picked.delete(k);
+  }
+
   function remove(key) {
-    ad.series = ad.series.filter(s => s.key !== key);
+    const s = find(key);
+    const warn = s ? removeWarning(s) : '';
+    if (warn && !confirm(warn)) return;
+    ad.series = ad.series.filter(x => x.key !== key);
     if (ad.pin && ad.pin.key === key) ad.pin = null;
+    forgetPicks([key]);
     ad.view = null;
     renderAll();
   }
   function clearAll() {
     const what = ad.source === 'field' ? 'loaded series' : 'imports';
-    if (ad.series.length > 1 && !confirm(`Remove all ${ad.series.length} ${what}?`)) return;
+    const edited = ad.series.filter(s => editedCount(s) || s.deleted).length;
+    const extra = edited
+      ? ` ${edited} of them ${edited === 1 ? 'has' : 'have'} unsaved edits, which go with them.` : '';
+    if ((ad.series.length > 1 || edited)
+        && !confirm(`Remove all ${ad.series.length} ${what}?${extra}`)) return;
+    forgetPicks(ad.series.map(s => s.key));
     ad.series = []; ad.pin = null; ad.hover = null; ad.view = null;
     renderAll();
   }
@@ -4173,7 +5604,7 @@ const ArroData = (function () {
     if (!total) return;
     if (total > 1 && !confirm(`Remove all ${total} loaded series, on both data tabs?`)) return;
     for (const i of Object.values(instances)) {
-      i.series = []; i.pin = null; i.hover = null; i.view = null;
+      i.series = []; i.pin = null; i.hover = null; i.view = null; i.picked.clear();
     }
     renderAll();
   }
@@ -4208,8 +5639,104 @@ const ArroData = (function () {
   // any stash a zoom gesture left behind: the operator has spoken since, and
   // reset must not overrule them with older state.
   function setY(v)         { ad.yMode = v; ad.yStash = null; renderMainOnly(); }
-  function setYRange(which, v) { if (which === 'min') ad.yMin = v; else ad.yMax = v; ad.yStash = null; draw(); }
+  // drawVov as well as draw: the navigator's box *is* the range these two boxes
+  // hold, and one of the three saying something different from the other two is
+  // the failure that navigator exists to prevent.
+  function setYRange(which, v) {
+    if (which === 'min') ad.yMin = v; else ad.yMax = v;
+    ad.yStash = null;
+    draw(); drawVov();
+  }
   function setFlag(k, v)   { ad[k] = v; renderMainOnly(); }
+  // Select works against where a reading is *drawn*, which only means the
+  // reading itself while the chart is showing values — on Increment or Rate the
+  // height of a point is a difference between two readings, and a box drawn
+  // over it would pick whichever readings happened to produce it. So arming
+  // Select puts the chart back on Value and says so, rather than quietly
+  // picking the wrong rows.
+  function setDrag(v) {
+    ad.dragMode = v;
+    if (v === 'select' && ad.transform !== 'value') {
+      ad.transform = 'value';
+      for (const s of ad.series) s.tracks = null;
+      note('Showing Value — a reading can only be picked where it is drawn, and on '
+         + 'Increment or Rate a point is the difference between two of them.');
+    }
+    renderMainOnly();
+  }
+  // The two edit fields keep what is typed without re-rendering under the
+  // caret — which is what happens if the input's own value is state a render
+  // reads back.
+  function setEditVal(v)   { ad.editVal = String(v == null ? '' : v); }
+  function setEditQ(v)     { ad.editQ = String(v == null ? '' : v); }
+
+  // ── Reset the view, and full screen (#191) ─────────────────────────────────
+
+  // Both axes back to where the tab opened them: the whole record across, and
+  // whatever vertical mode was set before a gesture took it to Fixed. Exactly
+  // what double-click and the 0 key already did — this is the same thing with a
+  // button on it, because the two that existed were a gesture nobody is told
+  // about and a keystroke that needs the chart focused first. The pin goes too:
+  // it is a reading picked out of a view that is being thrown away.
+  function resetView() {
+    ad.view = null;
+    ad.pin = null;
+    const moved = restoreY();
+    if (moved) renderMainOnly();
+    else { draw(); drawOv(); renderReadout(); }
+    announce('Chart view reset — the whole record, and the vertical axis back to '
+           + `${AD_Y_LABEL[ad.yMode] || ad.yMode}.`);
+  }
+
+  // The chart over the whole viewport. A class on the plot wrapper rather than
+  // a re-render, for the map's reason (toggleMapFullscreen): nothing moves in
+  // the DOM, so the pointer capture, the pin and the in-flight gesture all
+  // survive it — and the two navigators are inside the same wrapper, so they
+  // grow with it without knowing they have.
+  //
+  // measure() reads the stage after the class lands and the draw follows, which
+  // is why this cannot simply toggle and return: the SVG is sized in viewBox
+  // units off ad.w / ad.h, and both have just changed.
+  function toggleFull(on) {
+    ad.full = on == null ? !ad.full : !!on;
+    const plot = document.getElementById('ad-plot');
+    if (plot) plot.classList.toggle('is-full', ad.full);
+    syncFullEsc();
+    measure();
+    draw(); drawOv();
+    // The two buttons live in the markup, so their pressed state and titles are
+    // re-emitted rather than poked — there are two of them and one is a label
+    // that changes.
+    const acts = plot && plot.querySelector('.ad-stage-acts');
+    if (acts) {
+      const b = acts.lastElementChild;
+      if (b) {
+        b.setAttribute('aria-pressed', String(ad.full));
+        b.title = ad.full ? 'Exit full screen (Escape)' : 'Full screen';
+        b.setAttribute('aria-label', ad.full ? 'Exit full screen' : 'Chart full screen');
+      }
+    }
+    announce(ad.full ? 'Chart is full screen. Press Escape to exit.' : 'Chart back in the page.');
+    if (ad.full) document.getElementById('ad-stage')?.focus();
+  }
+
+  // Escape leaves full screen — the same contract the full-screen map keeps,
+  // including yielding to anything that has already claimed the key (a modal
+  // opened over the chart takes it first, and the chart stays full).
+  let fullEsc = null;
+  function syncFullEsc() {
+    if (ad.full && !fullEsc) {
+      fullEsc = e => {
+        if (e.defaultPrevented || e.key !== 'Escape') return;
+        e.preventDefault();
+        toggleFull(false);
+      };
+      document.addEventListener('keydown', fullEsc);
+    } else if (!ad.full && fullEsc) {
+      document.removeEventListener('keydown', fullEsc);
+      fullEsc = null;
+    }
+  }
   function unpin()         { ad.pin = null; draw(); renderReadout(); }
 
   // <details> reports its own state, so this only has to remember it across
@@ -4406,9 +5933,13 @@ const ArroData = (function () {
     // Both instances' series at once, for the memory meter — which is asking
     // about the page's footprint, not about either tab.
     allSeries: () => Object.values(instances).flatMap(i => i.series),
-    render, init, stop, repaint, importFiles, pick,
-    toggle, setColor, setKind, solo, zoomTo, remove, clearAll, showStation,
-    setCfg, resetCfg, setMode, setTransform, setChart, setY, setYRange, setFlag,
+    render, init, stop, repaint, importFiles, pick, loadDemo,
+    toggle, setColor, colourToggle, setDash, setAxis, setKind, solo, zoomTo, remove, clearAll, showStation,
+    setCfg, resetCfg, setMode, setTransform, setChart, setY, setYRange, setFlag, setDrag,
+    resetView, toggleFull,
+    // Editing readings (#191), and the selection it works over
+    pickToggle, pickClear, pickAllInView, editValue, editQuality, editDelete,
+    revertSeries, setEditVal, setEditQ, editCell, openTableModal, closeTableModal,
     preset, unpin, exportCsv, exportImg, explain, compareToggle, tableToggle, dropAll,
     // the Field Data tab (#114)
     fieldSetStation, fieldToggleSensor, fieldAllSensors, fieldSetWindow,

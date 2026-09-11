@@ -68,7 +68,6 @@ MegaNet/
 ├── map-draw.js             ← MapDraw   — draw & measure over the Stations map
 ├── path-profile.js         ← PathProfile — elevation profile, and the path physics
 ├── link-budget.js          ← LinkBudget — fade margin between two points
-├── networks.js             ← Networks tab
 ├── pass-ranges.js          ← Pass Ranges tab
 ├── bit-flipper.js          ← Bit Flipper tab
 ├── network-view.js         ← NetworkView — Ghosting Graph tab (the knowledge graph)
@@ -316,7 +315,8 @@ The file is a copy now, so it is refreshed on a schedule rather than left to
 drift: `.github/workflows/stations-snapshot.yml` runs
 `tools/snapshot_stations_json.py` weekly and opens a pull request when the
 document has moved. The Export tab has the same snapshot as a button, for a copy
-to take somewhere without a network.
+to take somewhere without a network — behind a sign-in since #191, like the
+Radio Mobile set beside it.
 
 ### Cost of the full document
 
@@ -912,8 +912,30 @@ time: opening this one, the ACMA transmitter card or the radio-path card closes
 the other two — which also ends the case where the last two, drawn in the same
 rectangle, simply covered each other. The legend's last line names whichever
 optional layers are off and that the 👁️ button is where they are turned on, the
-👁️ flyout is grouped under three headings, and a first visit is told about the
-button once.
+👁️ flyout is grouped under four headings — each drawing a rule above itself
+since #191, because uppercase small caps in `--muted` was the whole of the
+separation and an eye going down a single column of tick boxes reads a heading
+as one more row unless something physically stops it — and a first visit is told
+about the button once.
+
+**Reset (#191).** A fifth corner button, **↺**, and the one gesture that puts the
+map back the way it was found: the filters and the search behind them, the
+selection and the box-select, the focused repeater and its blast ring, every
+drawing, both link-budget ends, the polar plot, the spiderfied cluster, whatever
+mode was armed, and all four of the corner cards. Eleven modules can put
+something on this map and every one of them has its own way of taking it off
+again — right for each of them in isolation, and adding up to a map nobody can
+get back to a clean state without remembering all eleven.
+
+What it deliberately leaves alone is everything in the 👁️ flyout: the base map,
+the overlay layers, the link colouring, the label mode, the opacity sliders.
+Those are settings rather than clicks — somebody who has turned the contours on
+and the links off has said how they want to *read* a map, not made a selection —
+and a reset that silently re-argued that would be the last time anyone pressed
+it. The button's own tooltip says which of the two it is, and the announcement
+after it says what was cleared and what was not. Only the drawings are
+unrecoverable, so they are the only thing worth a confirm, and it is skipped
+entirely when there are none.
 
 **What that costs, stated rather than left to be found.** The split existed
 because reaching a filter at the bottom of the rail dragged the map off the top,
@@ -923,6 +945,15 @@ single card immediately under the map rather than a rail longer than the
 viewport, the card collapses, and its summary line carries the live match count
 — so what the filters are doing is readable without opening them, and reading it
 costs you nothing of the map.
+
+**Side by side lands with the card shut (#191)**, whatever was remembered. The
+split gives the whole right-hand column to the map, and the filter card is the
+first thing under the divider on the left — so a stored "open" lands on a page
+whose visible half is eight blocks of tick boxes and whose map is a strip, which
+is not what the split is for. Pressing **Filters** still opens it and still
+writes the preference, which is honoured the moment the split is off; the
+override is read-only and lasts one page load, so nobody's setting is destroyed
+by having opened the tab in the wrong layout once.
 
 Inside the card the search box leads and spans, and the six filter groups flow
 into as many columns as the window allows — four on a wide screen, two at 768 px,
@@ -1817,6 +1848,17 @@ Generate the complete set of CSV files required by Radio Mobile software from th
 
 Export is scoped to the current filter selection so users can generate per-catchment or per-network RM projects.
 
+**Both downloads need a signed-in session (#191)** — *Generate & Download All*
+and the `stations.json` *Snapshot* beside it. What is behind the sign-in is
+taking the network away as a file rather than looking at it: one press writes
+coordinates, heights, frequencies and pass windows for every repeater on the
+ticked networks and every station their pass ranges reach. Everything that says
+what the tab *would* produce — the network ticks, the unit counts, the selected
+repeater table and the **Data source** panel with its Re-test button — reads
+without one, so the decision to sign in can be made with the numbers on screen.
+Ticks survive signing in. The gate is checked twice, in the markup and again
+inside each action, because a render can outlive the session it was drawn for.
+
 ### 6. ALERT Address / BitFlipper Tool (Integrated)
 - Input an ALERT decimal address and see its bit-flip variants; the results,
   table and map update live in the background as you type (the address field
@@ -2030,10 +2072,10 @@ on a narrow window.
 
 | Group | Tabs |
 | --- | --- |
-| **Stations & networks** | Stations · Radio Path Maps · Networks · Pass Ranges · Export |
+| **Stations & networks** | Stations · Radio Path Maps · Pass Ranges · Export · Map Generator |
 | **Interference** | RF Environment · RF Changes · Interference Workbench |
-| **Addresses & packets** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · Serial Monitor |
-| **Telemetry** | ARRO Launcher · ARRO Data · Field Data |
+| **ALERT** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · HFEM Messages · Serial Monitor |
+| **Data** | ARRO Launcher · ARRO Data · Field Data · Message Log |
 | **Site visits** | Inspections · Site Maintenance · Inspection History |
 
 #### Where the grouping comes from
@@ -2055,20 +2097,27 @@ beside which; read as a graph it does not describe three groups.
   and `inspections ↔ maintenance ↔ history`, with **no edge of any kind** between
   them. Reading a sensor trace and filling in a paper form had been filed
   together on the strength of the word "data".
-- **Export moved.** All three of its own `related` entries are Stations &
-  networks tabs, two of them mutual, and what it builds is scoped by the ticks on
-  the Networks tab. It sat under "Data & admin" and belongs with the network it
-  exports.
+- **Export moved.** Its own `related` entries are Stations & networks tabs,
+  `passranges ↔ export` mutual among them, and what it builds is scoped by the
+  radio networks ticked on its own left rail. It sat under "Data & admin" and
+  belongs with the network it exports.
 
 #### Three tabs said "network" and meant three things
 `Network Maps` is not about networks — it browses the bundled Radio-path PDF map
 sheets — so it is **Radio Path Maps**. `Network View` is not about networks
 either: it draws ALERT addresses as nodes and bit-flip ghosting between them as
 edges (§16 already called it the ghosting knowledge graph), so it is the
-**Ghosting Graph**. `Networks` keeps the word, being the only one of the three
-that means the named radio-network clusters in the file. Both old labels survive
-as find words, so the rename strands nobody; **tab ids are unchanged**, because
-they key `HELP`, `renderMain()`, the teardown registry and `localStorage`.
+**Ghosting Graph**. Both old labels survive as find words, so the rename strands
+nobody; **tab ids are unchanged**, because they key `HELP`, `renderMain()`, the
+teardown registry and `localStorage`.
+
+The third of the three, `Networks`, has since been removed outright. It was a
+read-only listing of the named radio-network clusters and the catchment
+vocabulary, and every number on it is already on a tab somebody is on anyway —
+the network a station belongs to is on its card and in the Stations filter pane,
+and the ticks that scope an export live on the Export tab's own rail. `networks`
+as a *word* survives as a find term on Stations and Export, which is where the
+answer now is.
 
 #### Find a tab
 Nineteen tabs is past the size where a column of labels is something you scan, so
@@ -2145,7 +2194,7 @@ a sensor page also needs.
   id, station number and ARRO site name as read-only fields, a site admin link,
   and a *Graph last 7 days* link. Per-sensor admin links hang off the existing
   sensor rows rather than forming a second list beside them.
-- **The ARRO Launcher tab** — a jump box, grouped under **Telemetry**.
+- **The ARRO Launcher tab** — a jump box, grouped under **Data**.
 
 **The launcher's one addition over a standalone bookmarklet is the station
 search.** Type a name, a station number or an ALERT address and it resolves to
@@ -2180,7 +2229,7 @@ near-black on a dark panel. Links are now `var(--accent)`, visited included.
 The Bit Flipper answers "what else could this address be?" one address at a
 time. The Ghosting Graph asks it of the whole file at once and draws the answer:
 **ALERT addresses are nodes, and a relationship between two of them is an edge.**
-Grouped under **Addresses & packets**, next to the Bit Flipper it generalises.
+Grouped under **ALERT**, next to the Bit Flipper it generalises.
 
 Ported from a standalone `BitFlipper_Network_View` page — a hand-rolled SVG force
 layout with no dependencies, its own palette, a full-viewport grid and its
@@ -2558,12 +2607,12 @@ what `walk357()` returns when handed exactly those numbers, so the diagram
 cannot drift away from the code that made it.
 
 **Every filter has a switch, and not every filter is the spec's.** The 3-5-7
-test, rollover correction, repeat timestamps, a **rate-of-rise** limit and
-**minimum / maximum** limits each have their own on/off, so any of them can be
-taken out of the pipeline and the difference read straight off the counts. Only
-the first two come from the specification; the other three are gates this app
-adds, and they run *before* the continuity walk so a reading nothing could have
-produced never gets a vote on its neighbours:
+test, rollover correction, repeat timestamps, a **rate-of-rise** limit, a
+**rate-of-fall** limit and **minimum / maximum** limits each have their own
+on/off, so any of them can be taken out of the pipeline and the difference read
+straight off the counts. Only the first two come from the specification; the
+rest are gates this app adds, and they run *before* the continuity walk so a
+reading nothing could have produced never gets a vote on its neighbours:
 
 - **Rate of rise** compares each reading with the one before it, and claims the
   step and nothing more. Anchoring to the last *surviving* reading is the
@@ -2571,14 +2620,27 @@ produced never gets a vote on its neighbours:
   and stays there is then measured against a value it will never return to, and
   the whole record after the step is lost. A corrupt plateau costs its first
   reading here and the rest is the 357 walk's business, which is what breaking
-  and re-establishing continuity is for. An accumulator is only tested upwards;
-  a water level is tested both ways, so a single dropout costs two readings.
+  and re-establishing continuity is for.
+- **Rate of fall** is the mirror of it, and a filter of its own rather than a
+  sign on the one above (#191). Up and down are different questions with
+  different answers at the same site: a level rises with the catchment and falls
+  with the channel draining, and the fastest credible figure for one is
+  routinely not the figure for the other. Until they were split, a water level's
+  falls were judged against the *rise* threshold with no way to say otherwise
+  (`Math.abs`), and an accumulator's falls were never judged at all. Now each
+  direction has its own figure and its own verdict. An accumulator does not
+  normally want the fall filter — it cannot fall except by wrapping or by
+  corruption, both of which the rollover and 357 tests already own — but the
+  switch is there, because the operator can see what it removes.
 - **Minimum / maximum** bound the exported `Value`, either end blank for
   unbounded.
 
 Each removal keeps the name of the filter that made it: a cross for the 357
-test, a square for out of range, a triangle for too fast, on the chart and in
-the CSV verdict export alike.
+test, a square for out of range, an up triangle for too fast a rise, a down
+triangle for too fast a fall — on the chart, beside the tick box that switches
+it on, in the readings table's verdict column, and in the CSV verdict export
+alike. The shapes are written down once (`AD_MARKS`) and drawn from there by all
+four, so a legend can never teach a shape the chart does not draw.
 
 **Order matters more than the spec lets on.** A rain accumulator that wraps and
 one hit by a corrupt packet both look like a long fall, and the sample is full
@@ -2622,8 +2684,9 @@ the record, **Kept** is what stops it flattening the filtered pane.
 **The chart is hand-rolled SVG**, like the rest of the app's charts — no
 library. It carries wheel zoom, drag to pan, drag-to-select zoom on either or
 both axes, an overview strip of the whole record with the visible window on it
-— movable, and resizable by its edges — a crosshair with a hover readout,
-keyboard pan/zoom, per-series colour and visibility, solo and fit, light/dark
+— movable, and resizable by its edges — plus a second navigator down the right
+for the vertical axis, a crosshair with a hover readout, keyboard pan/zoom,
+per-series colour, line type, axis side and visibility, solo and fit, light/dark
 repaint, and SVG/PNG download. Three readings of the data
 (value, increment, rate per hour), three chart styles (line, step, points) and
 four vertical scales — including **Kept**, which scales to the surviving
@@ -2633,7 +2696,8 @@ them.
 
 **The toolbar over it is three captioned rows**, and the split is the whole of
 it: *what the chart draws* (Series · Reading · Style · Vertical axis), then *the
-window and what happens over it* (Window · Mark · Drag to zoom), then *Export*.
+window and what happens over it* (Window · Mark · Drag does · Picked), then
+*Export*.
 Before that it was fourteen controls in one wrapping run — four identically
 styled segmented controls with nothing but a tooltip to say which governed
 what, five bare checkboxes of two different kinds mixed together (three that put
@@ -2646,21 +2710,85 @@ is the group's accessible name as well as its visible one — `role="group"` wit
 `aria-labelledby` — so the eye and a screen reader are told the same thing.
 Nothing about what any control *does* changed.
 
-**Three ways into a closer look.** *Drag to zoom → box* (or Shift held) draws a
+**Three ways into a closer look.** *Drag does → Box zoom* (or Shift held) draws a
 box, and the window becomes the box — both axes now, not just time. A flat sweep
 stays the time-only zoom years of use have taught, and the rubber band says
 which it will be before the button comes up: full height for a flat sweep, the
-box itself otherwise. *Drag to zoom → vertical* (or Alt held, so neither zoom
+box itself otherwise. *Drag does → Vertical* (or Alt held, so neither zoom
 ever needs the toolbar) is the other direction: time stays put and the vertical
-axis becomes the dragged span. And the overview's window is no longer
-drag-to-recentre only — each edge carries a grip that drags that edge alone,
-so the window resizes as well as moves. What the drag zooms do to the vertical
+axis becomes the dragged span. What the drag zooms do to the vertical
 axis is not private state: they commit through the toolbar's own axis mode —
 *Fixed*, with the min/max boxes holding the dragged numbers — so the committed
-range is visible, editable, and honest about what happened. Double-click, or
-the 0 key, resets both axes and restores whatever vertical mode was chosen
-before the first zoom; choosing a mode by hand drops that memory, because the
-operator has spoken since and reset must not overrule them.
+range is visible, editable, and honest about what happened. Double-click, the
+**↺** button over the chart's corner, or the 0 key, resets both axes and
+restores whatever vertical mode was chosen before the first zoom; choosing a
+mode by hand drops that memory, because the operator has spoken since and reset
+must not overrule them. **⛶** beside it gives the chart the whole viewport,
+Escape included.
+
+*Drag does* is **one choice, not two switches** (#191). It was a pair of
+independent tick boxes, so both could be on at once — which a drag cannot
+honour: a press has exactly one meaning and `onpointerdown` had to pick between
+them silently, always preferring the vertical. A segmented control with **Pan**
+in it says the truth, which is that this is a choice whose commonest state is
+the one that was never on the toolbar at all.
+
+**Two navigators, one on each axis** (#191). The whole-record strip under the
+chart has been joined by a vertical one down the right: the full value range in
+the record as a track, a density band saying where the readings actually sit in
+it, and a box marking the range the chart is drawing. Both take the same three
+gestures — drag inside the box to move the window, drag an edge to resize it,
+press outside it to bring the window there. The vertical one commits through
+`commitY()`, the same manual takeover the box zoom and the Alt drag use, so all
+three land in one place and there is no fifth axis mode for `yRange()` to
+consult.
+
+The horizontal strip's middle gesture used to be **wrong in a way that read as
+randomness**. Its press handler recognised the two edges and called everything
+else "pan" — and "pan" re-centred the window on the press point. So a press two
+pixels outside the grip, which the cursor had just promised was a resize, threw
+the window sideways by however far off centre it landed; a press dead in the
+middle did nothing at all; and the two were the same gesture. On a zoomed-out
+chart it was worse: `view()` lets the window run a whole span past either end of
+the record, so both edge handles were drawn *off the ends of the track*, no
+press could reach one, and every press jumped. Three things fix it — clamping
+the drawn handles to the track, a real "move" that tracks the pointer by its
+grab offset instead of teleporting to it, and a grip wide enough to hit — and
+only the middle one is new behaviour; the other two are the promised behaviour
+becoming reachable.
+
+**A series can be drawn against either vertical axis** (#191), with its own line
+type and its own colour picked from a grid of named swatches rather than only
+from the browser's gradient surface. The right axis exists for the case this tab
+hits constantly and had no answer for: rainfall in millimetres and a level in
+metres over the same storm, where one scale means one of the two is a flat line
+at the bottom and the operator's actual question is about their shapes against
+each other. The left axis keeps the gridlines — two grids at two spacings over
+one rectangle is a moiré, not a scale — and each axis labels its own unit, or
+nothing when the series on that side disagree. *Fixed* and the vertical
+navigator govern the left axis; the right one auto-fits its own series.
+
+**Readings can be edited, in the chart or in the table** (#191), and the edits
+live in the browser tab and nowhere else. Set *Drag does* to **Select** and
+lasso a stretch — removed readings included, which is the point, since the
+spike somebody wants to delete is by definition one the filter has already
+rejected — or tick rows in the table, or press **all in view**. Then: set a
+value, move the selection by an amount, scale it (`0.001` for millimetres read
+as micrometres), re-code its quality, drag it up or down on the chart, or delete
+it. Every edit re-runs the 357 walk, so a spike deleted here stops dragging its
+neighbours down immediately, and both **Export** buttons write what is on
+screen. Nothing is written back to ARRO; an edited series says so in the rail
+and carries a **revert** that puts its values and quality codes back as loaded.
+Deleted rows do not come back, and both the delete and the revert say so before
+they run. Closing a series that has been edited asks first.
+
+**The removed readings are clickable now.** `hoverAt()` searched the filtered
+track alone in every mode but Raw, so the one reading anybody actually wants to
+inspect — the one with a cross drawn on it — was the one reading on the chart
+that did not answer a click. The removal marks are drawn whenever *Mark →
+removed* is on; they are reachable whenever they are drawn, with one row per
+series still, because a hit on the raw layer only survives if it is nearer than
+the filtered layer's.
 
 **Scale is handled by drawing pixels, not points.** Each pixel column keeps its
 first, minimum, maximum and last value, so a spike survives at any zoom while
@@ -2670,6 +2798,17 @@ is kept for filtering and export. Filtering the 14,942-row sample takes ~6 ms.
 Exports reuse `csvEscape()` / `dlText()`: **kept** writes the filtered series,
 **verdict** writes every row with the filter's decision against it — which is
 the artifact to keep when the question is what was thrown away and why.
+
+**Demo data** in the drop zone loads a real ARRO export committed to the repo at
+`data/demo/aem_Durikai_AL_541134_Rainfall_541134_0_R_5758.csv` (#191). It is the
+*same* export every argument above is made from — Durikai's rain accumulator,
+seven months, 14,942 rows, 6,111 distinct timestamps, the 395 unquoted thousands
+separators, the 82 single-reading spikes to 1234. Nothing about it was cleaned:
+it is there because it is messy, and because every claim `runFilter()` makes
+about what it is defending against can be checked against the file that taught
+it. It arrives through `addSeries()` under its real filename, so the sensor-id
+parse and the station link run exactly as they would for a file dropped from a
+desktop — there is no demo code path in the chart.
 
 > The specification is in `docs/` (v2.1, May 2009, and the 1998 first edition),
 > along with the sample export used to develop this.

@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
   <meta name="theme-color" content="#0b5cab">
-  <link rel="stylesheet" href="styles.css?v=20260902a">
+  <link rel="stylesheet" href="styles.css?v=20260911a">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -49,7 +49,13 @@
             aria-controls="tab-nav" aria-expanded="false" aria-label="Sections"
             title="Sections">☰</button>
     <div class="header-id">
-      <h1>MegaNet</h1>
+      <!-- The name in the banner, and only there (#191). Everything the repo
+           calls itself — the file names, the module prefixes, the Radio Mobile
+           export's MegaNet*.csv set, the bug reporter's user agent — is
+           untouched: renaming a product in the one place people read it is a
+           label change, and renaming it everywhere would be a migration with a
+           thousand edges and nothing gained on screen. -->
+      <h1>Flood-Net</h1>
       <p class="header-sub">
         <span class="header-tag">Network Tool</span>
         <span id="hdr-stats" class="header-stats"></span>
@@ -167,8 +173,8 @@
        APP_VERSION reads it back off this very tag, and an unstamped core.js
        makes every bug report say 'dev'. -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="maps-data.js?v=20260902a"></script>
-  <script src="core.js?v=20260902a"></script>
+  <script src="maps-data.js?v=20260911a"></script>
+  <script src="core.js?v=20260911a"></script>
   <!-- The furniture the seven Leaflet maps share: the base-map picker, and the
        on-map panel every other control on a map is built out of (#164). Above
        app.js because that is where it reads — the first map in the list is the
@@ -179,77 +185,76 @@
        because makeBaseLayers() names it — a runtime read, like every other
        cross-module call here, so the order states the dependency rather than
        being required by it (#154). -->
-  <script src="map-elevation.js?v=20260902a"></script>
-  <script src="map-controls.js?v=20260902a"></script>
-  <script src="app.js?v=20260902a"></script>
-  <script src="rf-changes.js?v=20260902a"></script>
-  <script src="workbench.js?v=20260902a"></script>
-  <script src="mem-meter.js?v=20260902a"></script>
-  <script src="auth.js?v=20260902a"></script>
-  <script src="map-draw.js?v=20260902a"></script>
-  <script src="path-profile.js?v=20260902a"></script>
-  <script src="link-budget.js?v=20260902a"></script>
-  <script src="networks.js?v=20260902a"></script>
-  <script src="pass-ranges.js?v=20260902a"></script>
-  <script src="bit-flipper.js?v=20260902a"></script>
-  <script src="network-view.js?v=20260902a"></script>
-  <script src="arro-launcher.js?v=20260902a"></script>
-  <script src="arro-data.js?v=20260902a"></script>
-  <script src="datastore.js?v=20260902a"></script>
-  <script src="export.js?v=20260902a"></script>
-  <script src="station-editor.js?v=20260902a"></script>
+  <script src="map-elevation.js?v=20260911a"></script>
+  <script src="map-controls.js?v=20260911a"></script>
+  <script src="app.js?v=20260911a"></script>
+  <script src="rf-changes.js?v=20260911a"></script>
+  <script src="workbench.js?v=20260911a"></script>
+  <script src="mem-meter.js?v=20260911a"></script>
+  <script src="auth.js?v=20260911a"></script>
+  <script src="map-draw.js?v=20260911a"></script>
+  <script src="path-profile.js?v=20260911a"></script>
+  <script src="link-budget.js?v=20260911a"></script>
+  <script src="pass-ranges.js?v=20260911a"></script>
+  <script src="bit-flipper.js?v=20260911a"></script>
+  <script src="network-view.js?v=20260911a"></script>
+  <script src="arro-launcher.js?v=20260911a"></script>
+  <script src="arro-data.js?v=20260911a"></script>
+  <script src="datastore.js?v=20260911a"></script>
+  <script src="export.js?v=20260911a"></script>
+  <script src="station-editor.js?v=20260911a"></script>
   <!-- The Inspections section at the foot of the card station-editor.js
        renders: the door into Inspection History for one station, and the chart
        of what its past visits measured. After station-editor.js because that is
        where it is called from, not because it has to be — like every other
        module here it only declares. -->
-  <script src="station-inspections.js?v=20260902a"></script>
-  <script src="attachments.js?v=20260902a"></script>
-  <script src="inspections.js?v=20260902a"></script>
-  <script src="maintenance.js?v=20260902a"></script>
-  <script src="history.js?v=20260902a"></script>
-  <script src="map-rivers.js?v=20260902a"></script>
-  <script src="map-catchments.js?v=20260902a"></script>
-  <script src="map-hubs.js?v=20260902a"></script>
-  <script src="sls.js?v=20260902a"></script>
-  <script src="map-survey.js?v=20260902a"></script>
-  <script src="map-contours.js?v=20260902a"></script>
+  <script src="station-inspections.js?v=20260911a"></script>
+  <script src="attachments.js?v=20260911a"></script>
+  <script src="inspections.js?v=20260911a"></script>
+  <script src="maintenance.js?v=20260911a"></script>
+  <script src="history.js?v=20260911a"></script>
+  <script src="map-rivers.js?v=20260911a"></script>
+  <script src="map-catchments.js?v=20260911a"></script>
+  <script src="map-hubs.js?v=20260911a"></script>
+  <script src="sls.js?v=20260911a"></script>
+  <script src="map-survey.js?v=20260911a"></script>
+  <script src="map-contours.js?v=20260911a"></script>
   <!-- Road parcels from the Queensland cadastre. Beside the survey marks and
        the contours because it is the same kind of thing — a Qld spatial
        service drawn under the pins — not because it has to be: like every
        other module here it only declares. -->
-  <script src="map-roads.js?v=20260902a"></script>
-  <script src="map-wind.js?v=20260902a"></script>
-  <script src="map-spider.js?v=20260902a"></script>
-  <script src="map-backbone.js?v=20260902a"></script>
-  <script src="map-blast.js?v=20260902a"></script>
+  <script src="map-roads.js?v=20260911a"></script>
+  <script src="map-wind.js?v=20260911a"></script>
+  <script src="map-spider.js?v=20260911a"></script>
+  <script src="map-backbone.js?v=20260911a"></script>
+  <script src="map-blast.js?v=20260911a"></script>
   <!-- What the Stations filter box does with text that is not a station: a
        coordinate it parses, or the town, locality or airport it names. Beside
        map-locate.js because it is the same kind of thing — a way of getting the
        map somewhere that is not a pin — and like every other module here it
        only declares, so its position states the dependency (#154). -->
-  <script src="places.js?v=20260902a"></script>
-  <script src="map-locate.js?v=20260902a"></script>
+  <script src="places.js?v=20260911a"></script>
+  <script src="map-locate.js?v=20260911a"></script>
   <!-- Armed from the station editor card and from the map callout, both of
        which are rendered elsewhere; this only declares the mode. After
        map-blast.js because it is the same kind of thing — a mode on the
        Stations map that one station at a time is in. -->
-  <script src="map-move-pin.js?v=20260902a"></script>
-  <script src="terrain.js?v=20260902a"></script>
-  <script src="itm.js?v=20260902a"></script>
-  <script src="land-cover.js?v=20260902a"></script>
+  <script src="map-move-pin.js?v=20260911a"></script>
+  <script src="terrain.js?v=20260911a"></script>
+  <script src="itm.js?v=20260911a"></script>
+  <script src="land-cover.js?v=20260911a"></script>
   <!-- The highest ground in the current view, found in the terrain rather than
        looked up in a list. After terrain.js because Terrain.grid is what it
        reads the ground through — a runtime call, like every other cross-module
        call in this list, so the position states the dependency rather than
        being required by it (#154). -->
-  <script src="map-peaks.js?v=20260902a"></script>
+  <script src="map-peaks.js?v=20260911a"></script>
   <!-- After terrain.js because that is what it asks for tiles through, and
        after path-profile.js (further up) whose pathAnalyse and endpoint rules
        it borrows — the same physics, so the map and the profile card cannot
        argue about "obstructed". Neither executes at load, so the order only
        states the dependency (#154). -->
-  <script src="map-los.js?v=20260902a"></script>
+  <script src="map-los.js?v=20260911a"></script>
   <!-- Same dependencies as map-los.js above — terrain.js for the tiles,
        path-profile.js for the physics — plus land-cover.js, whose classes it
        stands on the profile exactly as the link budget card does (without them
@@ -257,46 +262,46 @@
        and datastore.js for the round trip that is the point of it: a whole
        network's fade margins, computed once and kept somewhere other than this
        browser. Nothing here executes at load either (#154). -->
-  <script src="map-fade.js?v=20260902a"></script>
+  <script src="map-fade.js?v=20260911a"></script>
   <!-- The other link colouring, and the one the map opens with: the channel
        each hop runs on, read straight off the repeater at its end. It asks for
        nothing but core.js — no terrain, no datastore, no network — which is why
        it can be the default where the fade margin cannot. Nothing executes at
        load, so this position states nothing but that it belongs with the other
        link colouring (#154). -->
-  <script src="map-freq.js?v=20260902a"></script>
+  <script src="map-freq.js?v=20260911a"></script>
   <!-- Direction arrowheads along the drawn links, on a canvas of their own.
        Reads the lines the Stations map has already drawn — their geometry,
        their colour and their opacity — so it depends on nothing but core.js and
        Leaflet, and is scheduled from app.js, map-los.js and map-fade.js as each
        of them repaints a line. Inert at load like the rest (#154). -->
-  <script src="map-arrows.js?v=20260902a"></script>
+  <script src="map-arrows.js?v=20260911a"></script>
   <!-- What is here: one point on the map, and everything the app already knows
        about the ground under it. It asks terrain.js, land-cover.js, map-wind.js,
        map-catchments.js, map-hubs.js and map-survey.js — every one of them at
        runtime, from a click — so this position states the dependency rather
        than being required by it (#154). -->
-  <script src="map-here.js?v=20260902a"></script>
+  <script src="map-here.js?v=20260911a"></script>
   <!-- Radio Mobile's Single polar radio coverage. Last of the terrain group
        because it stands on all of it — terrain.js for the elevation grid,
        itm.js for the model, path-profile.js for the radio-system and
        propagation rules, map-controls.js for the panel it is drawn in. All
        runtime calls, so the position states the dependencies rather than being
        required by them (#154). -->
-  <script src="map-polar.js?v=20260902a"></script>
-  <script src="modal.js?v=20260902a"></script>
-  <script src="packets.js?v=20260902a"></script>
-  <script src="alert2.js?v=20260902a"></script>
-  <script src="hfem.js?v=20260902a"></script>
+  <script src="map-polar.js?v=20260911a"></script>
+  <script src="modal.js?v=20260911a"></script>
+  <script src="packets.js?v=20260911a"></script>
+  <script src="alert2.js?v=20260911a"></script>
+  <script src="hfem.js?v=20260911a"></script>
   <!-- After hfem.js, which it renders the output of. Neither executes at load,
        so nothing would actually break the other way round — the order is here
        because it states the dependency, which is what this list is for (#154). -->
-  <script src="hfem-tab.js?v=20260902a"></script>
-  <script src="network-maps.js?v=20260902a"></script>
-  <script src="serial.js?v=20260902a"></script>
-  <script src="message-log.js?v=20260902a"></script>
-  <script src="bug-report.js?v=20260902a"></script>
-  <script src="map-generator.js?v=20260902a"></script>
-  <script src="init.js?v=20260902a"></script>
+  <script src="hfem-tab.js?v=20260911a"></script>
+  <script src="network-maps.js?v=20260911a"></script>
+  <script src="serial.js?v=20260911a"></script>
+  <script src="message-log.js?v=20260911a"></script>
+  <script src="bug-report.js?v=20260911a"></script>
+  <script src="map-generator.js?v=20260911a"></script>
+  <script src="init.js?v=20260911a"></script>
 </body>
 </html>
