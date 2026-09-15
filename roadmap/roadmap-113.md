@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-15** (revision 92 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-15** (revision 93 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -228,6 +228,17 @@ Six per-tab issues are about to restyle nineteen tabs in parallel. The decisions
 
 ## Epics & their sub-issues
 
+### ⛰️ EPIC #186 — the 3-D view: the layers it does not draw yet (P3) — **OPEN, opened revision 93**
+`[Epic]` `[Opus5/High]` — the rating is for the children; each is a new renderer path with no 2-D equivalent to copy.
+The 3-D view shipped at `d7509fc` mirrors exactly two things off the Stations map — `state.mapLines` and `state.mapMarkers` — which is precisely what was asked for and deliberately the whole of what it does. Everything else the map can draw is **absent when it is tilted**, and a layer that is on in 2-D and silently gone in 3-D is what this epic closes.
+- **#187** `[Sub-issue of #186]` `[Sonnet5/Med]` — **OPEN** — ACMA transmitters (drawn into `state.acma.*`, which the mirror does not see) and the Draw & measure shapes. The trap is the circle, and #183 already paid for it once: **a circle is round on the sphere, not on the screen**, so a MapLibre `circle` layer draws a 25 km ring of the wrong ground radius almost everywhere. Emit the KML exporter's own 72-vertex `destPoint` walk.
+- **#188** `[Sub-issue of #186]` `[Opus5/High]` — **OPEN** — polar radio coverage draped on the relief, which is the payoff layer of the epic: coverage running up a valley and stopping at a ridge, with the ridge visible. Must keep `npm run terrain`'s re-banding property — a new threshold re-colours the computed plot **without fetching a single extra terrain tile**.
+
+> **The rule every child inherits, and the reason the parent is worth having at all.** The 3-D view is correct because it does not re-derive: it reads the lines and pins the 2-D map has already drawn, so the filters, the hidden and culled sets, the colouring and the focus dim are whatever `refreshMapLayers()` just decided. **The first child that computes its own answer is the first place the two modes can disagree with nothing to say which is right.** Where a 2-D module holds its geometry privately, have that module expose it rather than writing a second copy here — the same move #118 made when a reader tab asked another tab for a model instead of reaching into its renderers.
+
+> **Sequencing.** All three are independent of each other and depend on nothing but the shipped view. They do collide in one file (`map-3d.js`), so they are constraint 2 work: **one at a time**, not in parallel.
+
+
 ### 🧱 ~~EPIC #129~~ — `app.js` decomposition (P2) — **CLOSED. All five milestones shipped.**
 Split the 22,458-line monolith into **ordered classic `<script>` tags** — not ES modules (four independent blockers, chiefly 347 inline `on*=` handlers that resolve against the global scope and would fail *silently at click time*), not a bundler (contradicts `docs/floodwarning-net.md:90`'s "static files with no build step"). **528** top-level declarations with **zero duplicate names** make the namespace clean enough to split. (#129 and #130 both say 516; the AST count at the same commit `70d8202` is 528 — the figure was corrected when `test/dup-names.mjs` was built to measure it. The claim that matters, zero duplicates, holds either way, and is now enforced in CI.) Stations map core (now `app.js` **1145–2391**) is **explicitly frozen and out of scope**. The honest payoff assessment is in #129's body; every line number in it and in #135 is out of date by ~11,800 lines, and the **refreshed section map is in the M3 comment** on #129. Read that, not the line numbers in the issue bodies.
 - ~~#130~~ `[Sub-issue of #129]` **CLOSED at `680d950`** — M0, the headless smoke test. Shipped as `test/` + `.github/workflows/web-smoke.yml`. It also found and fixed a real crash on `main` (see the note under the epic).
@@ -379,6 +390,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
+- **#190** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 93** — MapLibre 5.24.0 is the last UMD build, and the 3-D view pins it. **6.x ships ESM only**, so a plain `<script src>` cannot load it and the app is on a branch that stops getting fixes at a moment nobody picks. High not for the diff but for the decision: this is the first real pressure on the classic-script contract #129 argued for at length. Four options are on the issue; `await import(url)` inside a classic script looks right — it needs no bundler and `map-3d.js` already loads the library lazily from its own function, which is exactly where it would go — and it wants checking rather than assuming, in particular what `file://` does with a module script. **Gates nothing; gated by nothing.**
+- **#189** `[Standalone]` `[Haiku4.5/Low]` — **OPEN, opened revision 93** — the 2-D OpenStreetMap base asks for `{s}.tile.openstreetmap.org`, and the OSMF tile policy asks for exactly `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, adding that other hostnames "may be slower or withdrawn without notice". Works today; documented as something that may stop working, which on a base map means tiles that quietly stop arriving. The 3-D view already uses the bare host and says in a comment that the 2-D layer was left alone rather than changed in passing — this is that change. `OSM-Topo` is **not** in scope: OpenTopoMap publishes the `{a,b,c}` form itself.
 - **#185** `[Standalone]` `[Human]` — **OPEN** — spot-check the three things #184 could not check from an agent session. Not a credentials problem; **toolchain**, the second of the four categories below: the environment cannot reach `nominatim.openstreetmap.org`, cannot run Radio Mobile, and cannot form an opinion about whether a colour ramp looks right. Three parts, ~15 minutes, each with click-by-click steps on the issue:
   - **Is the elevation ramp the right way up?** The colour file is two lists and does not say which way the colours run; the two readings give opposite maps, and the wrong one is silently confident. Paired end to end (as shipped) the water is blue and the tops are grey then pale; head to head it puts pure blue on the mountains. **No test can settle this** — `npm run terrain` asserts the twelve pairs are what the code says they are, which is the most a check of a ramp can do. One line to reverse if it reads inverted.
   - **Does the place lookup work from the live origin?** Nominatim is keyless but refuses traffic it does not like, and every off-origin host is blocked here and in the harness — so the check only proves the app *fails politely*, not that it succeeds. If it is refused, the Queensland place-names service is the fallback, and it is the same kind of ArcGIS endpoint the survey marks and contours already use.
@@ -475,7 +488,9 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## Resource allocation summary
 
-> ## ⬛ One AI row, and six `[Human]` issues.
+> ## ⬛ Five AI rows, and six `[Human]` issues.
+>
+> **Revision 93 opened #186 (epic) with #187 and #188 under it, plus #189 and #190** — four pickable agent issues where there had been one, all out of the 3-D view shipping. The board has agent work at three effort levels for the first time in many revisions. Everything below about the six `[Human]` issues still stands.
 >
 > **Revision 77 opened #177** — `[Sonnet5/Med]`, road parcels for NSW — so the board is no longer empty of agent work for the first time in several revisions. Everything below about the six `[Human]` issues still stands.
 >
@@ -490,8 +505,18 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Opus5
 | Effort | Issues |
 |---|---|
-| High | *(empty)* |
+| High | **#188** (polar coverage on the 3-D terrain) · **#190** (MapLibre's UMD end of life) · **#186** (epic — rating is for its children) |
 | Med | *(empty)* |
+
+### AI agent — Sonnet5
+| Effort | Issues |
+|---|---|
+| Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters and drawings in 3-D) |
+
+### AI agent — Haiku4.5
+| Effort | Issues |
+|---|---|
+| Low | **#189** (the OSM tile URL the policy asks for) |
 
 *(The Med row held **#174** for the length of revision 74 — a survey mark's report link and the details beside it, filed and closed in one session. **Med was right, and not for the diff size**: the code is one module and the link itself is one pill. What earned the rating is the question of *where the data comes from* — the obvious implementation adds the callout's fields to the bbox query, which works perfectly in every test and costs a real user 180 kB per sublayer per view to show one mark's row. Nothing fails; it just gets slow in exactly the dense urban views where the layer is most useful. Splitting viewport from callout, and teaching the stub to answer with the fields it was asked for so the split is actually checked, is the whole issue.)*
 
@@ -552,6 +577,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 9b. ~~#144 (`MemMeter` vs Leaflet maps)~~ — **done at `437f58c`.** It gated nothing and still gates nothing; what it leaves behind is that a tab added later has its map counted off `liveMaps()` without `mem-meter.js` being told the tab exists, which is the third thing #142's registry work has made free rather than possible. Sequenced *after* #143 rather than blocked by it: the question "how much is this page holding" only has a clean answer now that a map exists solely while its tab is open. Like #142 and #143, cheaper before #107's U-issues than after, but far less so — a new tab's map is counted automatically off `liveMaps()` once this lands, whereas the other two had per-tab omissions to fix.
 10. ~~#99 (doc bug fix) has no blockers — ready to pick up now.~~ — **done at `30cf03b`.** It gated nothing on the board, so nothing else moved.
 10. #66 (CORS check) has no blockers — ready now; gates only future/unfiled ARRO API work.
+10d. **#186's children (#187, #188), #189 and #190 have no blockers and gate nothing** — all four fell out of the 3-D view shipping at `d7509fc` and none of them is in front of anything. The one real sequencing note is negative and is constraint 2's: **#187 and #188 both edit `map-3d.js`, so they run one at a time.** #189 is a one-line change in `map-controls.js` and collides with neither. #190 is a decision rather than a change and should be made *before* either child grows the file further, because the answer could move which build the module loads.
 10c. #145 (apply `0009`, create the bucket) has no blockers — ready now. **It gates nothing on this board**, which is worth stating plainly so it is not mistaken for a blocker on #116/#117/#123/#126: those four were unblocked by the *migration being written*, not by it being applied, and all four are code and schema-design work that can proceed against the file. What is actually waiting on it is the Export tab reading green, `tools/check_inspections.sql` being runnable against the real database, and — for Part B only — #116 being able to upload a photo at the end of a form.
 10. ~~**#115 (inspection schema) is the widest gate in the repo**~~ — **done at `68baffc`.** It was the widest gate and it is discharged: #116, #117, #123 and #126 are unblocked in one go, which makes four of the board's five next-pickable items come out of one epic. What it leaves behind is a constraint rather than a dependency — the record tables are editors-only, so #118 and #128 render behind sign-in.
 11. ~~#116 and #117 can run in parallel now~~ — **both are closed, and the parallelism claim was never tested.** It would have held: different form families, different tables, different save functions, shared lookup tables neither writes. What actually happened was better for #117 than the parallel would have been — the tab, the CSS section, the three-state pick-list, the draft path, the 409 contract and the section-pruning rule all existed to copy, and the fixture reader in `test/` did too. **Two tabs, two issues, four shared edits each** (`TABS`, `HELP`, a `state` block, one `renderMain()` line) — see constraint 3, which now states that as a shape rather than a single data point.
@@ -587,6 +613,108 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 93 — 2026-09-15: the map tilts, and one epic plus four issues come out of it
+
+One session request — *"it would be really awesome to have a 3-D mode for the
+stations map"*, with OpenStreetMap over the terrain, the stations pinned and the
+links marked as they already are, and links optionally drawn as a vertical sheet
+rising to the line of sight. Shipped at `d7509fc`: `map-3d.js` (new),
+`test/map3d.mjs` (new, 64 assertions), `app.js`, `core.js`, `map-controls.js`,
+`index.html`, `styles.css`, the README, `test/lib/network.mjs`,
+`test/package.json`, `test/README.md` and the workflow. **EPIC #186 opened with
+#187 and #188 under it; #189 and #190 opened standalone.**
+
+**The question asked was "do we need the Blender MCP or is there something
+else", and the answer is neither exotic nor a compromise.** Blender is an
+offline modeller: it would produce a picture of the terrain, not a map an
+operator can pan, filter and click, and there is no path from it to a static
+GitHub Pages page. MapLibre GL is a browser renderer with a camera, native
+`raster-dem` terrain, and — the part that made the decision easy — support for
+the **terrarium** encoding, which is the exact tile format `terrain.js` has been
+decoding by hand for every elevation profile in this app since #133. One source,
+two consumers: the relief on screen and the clearance in the profile card are
+the same ground, at the same z12 resolution, from the same keyless open data.
+
+**The seam is the whole design, and it is worth stating as a general rule.** The
+3-D view does not work out which stations to draw or what colour a link should
+be. `refreshMapLayers()` has already decided all of it — the filters, the hidden
+and culled sets, the frequency or fade-margin colouring, the obstruction red,
+the focus dim — and it lands on Leaflet layers in `state.mapLines` and
+`state.mapMarkers` carrying their resolved styles. So the 3-D view **mirrors
+those two arrays** and nothing else. The alternative is a second implementation
+of eleven modules' decisions, and the first time the two disagreed the map would
+be lying in one of its two modes with nothing to say which. It is the same move
+#118 made one level up, when a reader tab asked another tab for a model rather
+than reaching into its renderers.
+
+**The load-bearing defect this could have shipped with, and why a test could
+catch it.** A profile chart keeps the line of sight straight and bends the earth
+up underneath it — `clearance = los − (ground + bulge)`, which is how
+`path-profile.js` and Radio Mobile both read. A 3-D view cannot do that: the
+ground is drawn where the DEM says it is, because that is what the base map is
+draped over. So the bulge moves to the other side of the subtraction and the
+sheet's top edge is `los − bulge`, a ray that sags towards the horizon exactly
+as far as the earth curves away under it. **Write `ray = los` and the picture is
+still a picture** — a plausible one, over real terrain, reporting clearance that
+is not there by the whole bulge, which is ~50 m on a 60 km hop. Nothing throws,
+nothing looks wrong, and the tilted map disagrees with the profile card about
+whether a path is blocked. Every sheet assertion in `npm run map3d` is therefore
+arithmetic against `pathAnalyse`'s own numbers computed in the same page, over a
+hop **the check picks for being 40–90 km long** so that the bulge is larger than
+the tolerance — a short hop would have put the whole trap inside it.
+
+**Four deliberate breaks, all red on the right assertions**, before any of it was
+trusted: the bulge dropped (4 red), the white casings mirrored (4), the canvas
+raised above the control corners (5, four of them the geometry probes), the
+renderer loaded eagerly (1).
+
+Five things worth carrying forward:
+
+- **A `z-index` window read out of the library rather than out of its
+  stylesheet.** The 3-D canvas has to cover every Leaflet pane and cover
+  nothing an operator can press — that is what lets *one* set of controls drive
+  both modes, so a filter changed while tilted is the same filter. The obvious
+  reading of Leaflet's CSS is wrong: `.leaflet-control` is 800 and looks like
+  the ceiling, but a control is never stacked at 800 because it sits inside
+  `.leaflet-top` / `.leaflet-bottom`, which are positioned at **1000** and open
+  a stacking context of their own. The first version of the comment said 800
+  and the check asserted `700 < z < 800`; a deliberate break at 850 passed every
+  geometry probe and failed only the numeric assertion, which is how the wrong
+  rule was found. Both bounds are now read off the live elements, so a Leaflet
+  upgrade that moves either fails this instead of silently widening it.
+  **A check that restates a constant is weaker than one that measures it** —
+  `maplinks`' lesson, one layer down.
+- **An assertion that two counters agree is no assertion at all when they count
+  the same thing.** The check drained the sheet queue by waiting for
+  `rows === done`, which is true on every tick because both are the number of
+  completed sheets. It waited for nothing, compared a half-built list against a
+  full one, and reported a defect that was not there. `pending` (queued plus in
+  flight) is the only honest "is it finished", and it is exposed for that.
+- **…but the thing it was falsely accusing turned out to be real anyway.**
+  Chasing it showed `map.setTerrain()` fires `moveend`, so an exaggeration
+  change arrived at the queue looking exactly like a pan and re-measured every
+  hop — throwing away profiles whose ground heights and Fresnel ratios cannot
+  depend on how tall the picture is drawn. Sheets are keyed by station pair now,
+  so panning back costs nothing and the slider costs nothing at all.
+- **One deliberate exception to "index.html names everything the page loads".**
+  MapLibre is ~1 MB of WebGL and this is one optional mode on one tab, so it is
+  injected on the first ⛰️ press and never for a session that does not press
+  one. That is a claim that decays the first time somebody adds a convenience
+  call at the top of a file, so `npm run map3d` asserts `window.maplibregl` is
+  `undefined` after the page has loaded and the map has opened. It also means
+  `npm run smoke` — which opens all twenty tabs and presses nothing — neither
+  pays for the renderer nor is exposed to it.
+- **Two facts measured rather than assumed, both of which changed the code.**
+  MapLibre *does* depth-test `circle` layers against terrain — the same two pins
+  either side of a ridge both render with terrain off and only the near one with
+  it on — so a pin behind a hill is hidden, which on this map is information
+  (a station you can see over the ground is a station you have line of sight to)
+  and is also a pin that is *missing*, so the panel says it both ways round.
+  And `circle-pitch-alignment: 'map'`, which the first draft set with a comment
+  crediting it for that occlusion, does nothing of the kind — it lays the circle
+  flat on the ground, which at 70° of pitch turns every station into a thin
+  ellipse. It is gone and the comment says what the setting actually does.
 
 ### Revision 92 — 2026-09-15: the exporting system's verdict finally decides something
 
