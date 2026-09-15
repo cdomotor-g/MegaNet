@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-11** (revision 91 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-15** (revision 92 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -12,7 +12,7 @@ These condition **every** agent-assigned issue on the board. They were absent fr
 
 ### 1. ~~There is no test net on the front end~~ — **resolved by #130 at `680d950`**
 
-This was the board's largest cross-cutting risk and it is now closed. `test/` holds **thirty-seven** checks that CI runs on every push touching a root `*.js`, `index.html`, `styles.css`, `stations.json`, `db/migrations/`, `docs/`, `db/README.md`, `test/` or the inspection workbook in `archive/` (`.github/workflows/web-smoke.yml`), plus one run by hand at split time. The count in this paragraph had drifted from sixteen to thirty-one before anyone noticed, and the table below has never held all of them — **`test/README.md` is the list, and since #183 `npm run steps` is what keeps `npm run all` and the workflow naming the same set.** The table here records the checks whose *reason for existing* is worth carrying on this board; it is not an inventory.
+This was the board's largest cross-cutting risk and it is now closed. `test/` holds **forty** checks that CI runs on every push touching a root `*.js`, `index.html`, `styles.css`, `stations.json`, `db/migrations/`, `docs/`, `db/README.md`, `test/` or the inspection workbook in `archive/` (`.github/workflows/web-smoke.yml`), plus one run by hand at split time. The count in this paragraph had drifted from sixteen to thirty-one before anyone noticed, and the table below has never held all of them — **`test/README.md` is the list, and since #183 `npm run steps` is what keeps `npm run all` and the workflow naming the same set.** The table here records the checks whose *reason for existing* is worth carrying on this board; it is not an inventory.
 
 Of the sixteen this paragraph was written about, **twelve were added by the change they were needed for** — two at #142, one at #116, one at #117, one at #105, one at #108, one at #109, one at #137, one at #153, one at #150, one at revision 60 and one at revision 68 — and each exists because that change was invisible to the checks already there:
 
@@ -587,6 +587,76 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 92 — 2026-09-15: the exporting system's verdict finally decides something
+
+One session request, from an operator looking at a Warrego Highway water-level
+export and asking why the later part of the chart was full of points the filters
+should plainly have taken out — and whether the quality codes were what stood in
+the way. No issue opened or closed. `arro-data.js`, `styles.css`, the README,
+`test/adqual.mjs` (new), `test/package.json`, `test/README.md` and the workflow.
+
+**The answer to the question asked was no, and the answer to the question behind
+it was two other things.** Worth recording both, because the diagnosis is more
+reusable than the fix:
+
+- **The repeat-timestamp rule is only as good as the exporter's clock.** It tests
+  `t[i] <= lastT`, so it catches a re-send stamped with the *same second* and
+  nothing else. In the sample's January and February, ARRO stamped each
+  observation's re-sends identically and the rule set aside about half of every
+  month; from 1 March the same re-sends arrive one to three seconds apart,
+  nothing matches, and **99% of the record is kept where 50% was before.**
+  Nothing about the data changed — the clock changed, and half the filtering
+  quietly stopped. The existing **minimum gap** setting is the fix and was
+  already there, at its spec-faithful default of 0.
+- **3/5/7 are counts, and this series is in metres.** A 3 m step on a water level
+  is enormous, so a spike a metre off the record is "continuous" by the first
+  test. Worse, four re-sends of *one* flagged packet are identical, so every
+  difference between them is zero and they satisfy continuity at **any**
+  threshold: tightening the steps from 3/5/7 to 0.1/0.2/0.3 left all 60 of the
+  sample's kept out-of-range readings exactly where they were. That artefact is
+  documented in the source as the reason `minGapSec` exists; this is the first
+  time it has been measured on a real export.
+
+**And the gap the question found on the way past.** `parseCsv()` has read the
+`Data Quality` column since the first import — it is in the readings table, in
+the callout, in both export CSVs, and editable by hand — and `runFilter()` read
+`s.t` and `s.v` and nothing else. **A reading the telemetry itself had flagged
+was filtered exactly as though it had not been.** Six letters of the exporting
+system's own verdict, carried the whole way through the app, deciding nothing.
+There is now a **Quality codes** filter block: every code in the loaded imports
+listed with how many readings carry it and the values they span, a tick per code,
+and the exclusion applied *before* the continuity walk so a flagged reading gets
+no vote on whether its neighbours are continuous.
+
+**Two things about it are deliberate and both are refusals to guess.** The list
+starts empty and the switch starts off, so an import that charted one way before
+this charts identically after it — the codes are a vendor vocabulary that differs
+by system and by site, nothing in the file says which of them are bad, and a
+default that guessed would silently delete somebody's flood peak. This is
+`guessKind()`'s "a fallback is not a guess" applied to a second vocabulary. And
+**the counts stay legible with the switch off**, at the .5 opacity every other
+filter body dims to, because working out *which* code to exclude is what somebody
+does before flicking the switch; a control that only showed its numbers once it
+was armed would have the order backwards. On the sample, that reading is what
+tells you `MM` is 98.7% of the March–April record and excluding it would delete
+the later part of the chart rather than clean it.
+
+**`npm run all` — forty checks, all green.** One new check
+(`test/adqual.mjs`, 30 assertions, one CI step, one `test/README.md` row). Its
+fixture is the part worth carrying: the flagged readings are deliberately
+*plausible* — 40.9 m among levels of 0.6–0.8 m, re-sent four times — because a
+fixture whose bad readings are bad enough to fail 357 on their own passes against
+an app that ignores the codes entirely. Same shape as #118's finding that a
+uniform fixture cannot see a rule about the non-uniform case. The two
+load-bearing assertions are the ones that can only move if the gate runs *before*
+the rest of the pipeline, and both are about readings that are **not** flagged: a
+gate that merely painted statuses on at the end would remove the same readings
+and be indistinguishable on them. Confirmed red on three deliberate breaks — the
+gate moved after the walk, the ticks dropped from the cache key, the codes matched
+by index instead of by label. The constraint-1 count in this file also said
+thirty-seven and the chain held thirty-nine before this change; it is forty now
+and stated as such.
 
 ### Revision 91 — 2026-09-11: the Networks tab goes, and the data tab learns to change a reading
 

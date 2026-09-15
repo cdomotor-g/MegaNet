@@ -8612,6 +8612,28 @@ code {
 .ad-filt--off .ad-mark { color: inherit; }
 .ad-filt--off .ad-filt-body { opacity: .5; }
 
+/* One quality code per row: a tick and the letters on the left, how many
+   readings carry it and what they span on the right (revision 92).
+
+   `.ad-cfg-row input { width: 84px }` above is (0,1,1) and would stretch each
+   checkbox into an 84 px bar, so the box is pulled back to its intrinsic size
+   here — the same override `.ad-field-input` needed, for the same reason.
+
+   The rows stay legible with the filter switched off, at the .5 opacity every
+   other filter body dims to, because the counts are half the point of the
+   control: somebody works out *which* code to exclude by reading them, and that
+   reading happens before the switch is flicked, not after. */
+.ad-qual-row { gap: .75rem; align-items: baseline; }
+.ad-qual-row input[type="checkbox"] { width: auto; flex: none; }
+.ad-qual-code { display: inline-flex; align-items: baseline; gap: .35rem; min-width: 0; }
+.ad-qual-code b { overflow-wrap: anywhere; }
+/* Right-aligned and tabular so the counts form a column that can be scanned
+   down rather than a ragged edge that has to be read word by word. */
+.ad-qual-n {
+  color: var(--muted); text-align: right; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 /* A link that has to read as part of a sentence. .btn-link is a bordered
    button, which inside a run of stats or a paragraph shoulders the words apart
    and announces itself as a control it is not. */

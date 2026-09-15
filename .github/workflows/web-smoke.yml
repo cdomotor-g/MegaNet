@@ -517,6 +517,16 @@ jobs:
         working-directory: test
         run: npm run adnav
 
+      # The Data Quality codes an export arrives with. The tab read them from the
+      # first import — table, callout, both export CSVs, editable by hand — and
+      # `runFilter()` looked at the timestamps and the values and nothing else,
+      # so a reading the telemetry itself had flagged was filtered exactly as
+      # though it had not been. Nothing throws and every other check here is
+      # green while it is true; the chart is simply wrong about what survived.
+      - name: Arrow quality codes — the exporting system's verdict decides something
+        working-directory: test
+        run: npm run adqual
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each

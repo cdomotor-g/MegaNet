@@ -112,12 +112,12 @@ const AD_SWATCHES = [
 const AD_SHAPES = ['circle', 'square', 'triangle', 'diamond'];
 
 // Point status. Ordered so that "kept" is < BAD and the drawing code can test
-// with a single comparison. RANGE and RATE are removals by the two limit
-// filters, which run before the 357 walk and are not part of the spec — they
-// are kept distinct from BAD so a rejected reading can always say which filter
+// with a single comparison. RANGE, RATE and QUAL are removals by gates this app
+// adds, which run before the 357 walk and are not part of the spec — they are
+// kept distinct from BAD so a rejected reading can always say which filter
 // rejected it.
 const AD_UNKNOWN = 0, AD_GOOD = 1, AD_SUSPECT = 2, AD_BAD = 3, AD_OOS = 4,
-      AD_RANGE = 5, AD_RATE = 6, AD_FALL = 7;
+      AD_RANGE = 5, AD_RATE = 6, AD_FALL = 7, AD_QUAL = 8;
 
 const AD_STATUS_LABEL = {
   [AD_UNKNOWN]: 'untested',
@@ -128,11 +128,12 @@ const AD_STATUS_LABEL = {
   [AD_RANGE]:   'out of range',
   [AD_RATE]:    'rose too fast',
   [AD_FALL]:    'fell too fast',
+  [AD_QUAL]:    'excluded by quality code',
 };
 
 // Every status that means "this reading is not in the filtered series".
 const adCut = st => st === AD_BAD || st === AD_OOS || st === AD_RANGE
-                 || st === AD_RATE || st === AD_FALL;
+                 || st === AD_RATE || st === AD_FALL || st === AD_QUAL;
 
 // Spec defaults, all overridable from the panel — the ticket asks for the steps,
 // the rollover ceiling and the continuity break to be configurable.
@@ -167,6 +168,24 @@ const AD_CFG_DEFAULT = {
   rangeOn:    false,  // minimum / maximum limits
   rangeMin:   '',     // blank = no floor
   rangeMax:   '',     // blank = no ceiling
+  // The exporting system's own verdict on each reading, which this tab has read
+  // since the first import and never let decide anything (revision 92). ARRO
+  // grades every row in the Data Quality column; the tab showed the letters in
+  // the table, in the callout and in the export, and ran the filters as though
+  // they said nothing. A reading the telemetry itself has flagged could still
+  // vote on its neighbours' continuity and still be drawn as kept.
+  //
+  // `qualCut` is a list of code *labels* rather than indices, because the index
+  // is per-series — q[i] points into that series' own qcodes — and one panel
+  // governs every series loaded. Empty by default and the switch off by default,
+  // because **what a code means is the operator's call, not this app's.** The
+  // codes are a vendor vocabulary that differs by system and by site, nothing in
+  // the file says which of them are bad, and a default that guessed would
+  // silently delete somebody's flood peak. The panel's job is to show what is in
+  // the file and how much of it; deciding is the job of the person who knows the
+  // site.
+  qualOn:     false,  // exclude readings by their Data Quality code
+  qualCut:    [],     // the codes to exclude, by label
 };
 
 const AD_DAY = 86400000;
@@ -205,6 +224,8 @@ const AD_MARKS = {
               d: '<path d="M8 3.6l4.4 7.6H3.6Z" fill="currentColor"/>' },
   fall:     { label: 'fell faster than the rate limit', tone: 'warn',
               d: '<path d="M8 12.4L3.6 4.8h8.8Z" fill="currentColor"/>' },
+  qual:     { label: 'excluded by its quality code',    tone: 'warn',
+              d: '<path d="M8 3.3l4.7 4.7L8 12.7 3.3 8Z" fill="none" stroke="currentColor" stroke-width="1.7"/>' },
   repeat:   { label: 'a repeat timestamp',              tone: 'muted',
               d: '<circle cx="8" cy="8" r="2.2" fill="currentColor" opacity=".55"/>' },
   rollover: { label: 'an accumulator wrap corrected',   tone: 'warn',
@@ -247,7 +268,9 @@ const ArroData = (function () {
       source,                  // 'arro' | 'field' — provenance, and never inferred
       series:    [],
       seq:       0,
-      cfg:       { ...AD_CFG_DEFAULT },
+      // A fresh qualCut per instance: spreading the defaults copies the array
+      // *reference*, and the two tabs would then share one list of ticked codes.
+      cfg:       { ...AD_CFG_DEFAULT, qualCut: [] },
       view:      null,           // {t0,t1} visible window, ms; null = full extent
       // Filtered, not both (#191). "Both" draws every series twice — the filtered
       // line solid over a ghost of the raw — which is the right picture for the
@@ -592,7 +615,29 @@ const ArroData = (function () {
             cfg.startTests, cfg.rolloverOn ? 1 : 0, cfg.oosOn ? 1 : 0, cfg.dedupeOn ? 1 : 0,
             cfg.minGapSec, cfg.rateOn ? 1 : 0, cfg.rateMax,
             cfg.fallOn ? 1 : 0, cfg.fallMax,
-            cfg.rangeOn ? 1 : 0, cfg.rangeMin, cfg.rangeMax].join('|');
+            cfg.rangeOn ? 1 : 0, cfg.rangeMin, cfg.rangeMax,
+            // Sorted, so ticking two codes in either order is one cache key
+            // rather than two, and joined on a character a CSV field cannot
+            // carry. Last in the key on purpose: a code containing the '|' the
+            // outer join uses can then only lengthen the string, never shift
+            // another setting into a neighbouring slot.
+            cfg.qualOn ? 1 : 0, qualKey(cfg)].join('|');
+  }
+
+  // The ticked codes as one comparable string.
+  const qualKey = cfg => [...(cfg.qualCut || [])].map(String).sort().join('\u0001');
+
+  // Which of *this* series' quality indices the panel has ticked. qcodes is
+  // per-series and q[i] indexes it, so the shared list of labels has to be
+  // resolved against each series in turn — two imports that saw their codes in
+  // a different order have different indices for the same letters.
+  function qualCutSet(s, cfg) {
+    const out = new Set();
+    if (!cfg.qualOn || !s.q || !s.qcodes) return out;
+    const want = new Set((cfg.qualCut || []).map(String));
+    if (!want.size) return out;
+    for (let k = 0; k < s.qcodes.length; k++) if (want.has(String(s.qcodes[k]))) out.add(k);
+    return out;
   }
 
   // A blank limit means "no limit". Parsed here rather than at the input, so a
@@ -764,7 +809,7 @@ const ArroData = (function () {
     //    from the spec rather than part of it.
     const gapMs = Math.max(0, +cfg.minGapSec || 0) * 1000;
     const oosFlag = new Uint8Array(n);
-    const cutFlag = new Uint8Array(n);      // AD_RANGE / AD_RATE, or 0
+    const cutFlag = new Uint8Array(n);      // AD_QUAL / AD_RANGE / AD_RATE, or 0
     let live = [];
     let lastT = -Infinity;
     for (let i = 0; i < n; i++) {
@@ -774,7 +819,32 @@ const ArroData = (function () {
       live.push(i);
     }
 
-    // 1a. Limits. Neither of these is in the Bureau's spec: they are gates on
+    // 1a. Quality codes (revision 92). First of the value gates, because it is
+    //     the only one that is not this app's opinion: ARRO has already graded it
+    //     and this is that grade being honoured rather than a threshold somebody
+    //     picked. It runs before the 357 walk for the reason the limits below do —
+    //     a reading the telemetry itself has flagged must not get a vote on its
+    //     neighbours' continuity — and it matters more here than it looks, because
+    //     3/5/7 are *counts-domain* steps. On a level in metres a 3 m step is
+    //     enormous, so a flagged reading a metre off the record clears the first
+    //     test outright; and four re-sends of one flagged packet are *identical*,
+    //     so every difference between them is zero and they satisfy continuity at
+    //     any threshold at all. Tightening the steps cannot reach either case.
+    //     Measured on a 5,716-reading Warrego Highway export: dropping 3/5/7 to
+    //     0.1/0.2/0.3 left all 60 of the kept readings outside -1..10 m exactly
+    //     where they were.
+    //
+    //     Off unless the operator has both turned it on and named codes. Nothing
+    //     in the file says which letters are bad, so nothing here assumes.
+    const qCut = qualCutSet(s, cfg);
+    if (qCut.size) {
+      live = live.filter(i => {
+        if (qCut.has(s.q[i])) { cutFlag[i] = AD_QUAL; return false; }
+        return true;
+      });
+    }
+
+    // 1b. Limits. Neither of these is in the Bureau's spec: they are gates on
     //     what a sensor can physically report, and they run *before* the 357
     //     walk so that a reading nothing could have produced never gets a vote
     //     on continuity. A single 2014 mm packet is enough to be tested against
@@ -790,7 +860,7 @@ const ArroData = (function () {
       }
     }
 
-    // 1b. Rate of rise: is the *step* between two readings one this sensor could
+    // 1c. Rate of rise: is the *step* between two readings one this sensor could
     //     have made? Each reading is compared with the one before it in the
     //     list, and the comparison holds whether or not that neighbour was
     //     itself rejected. Anchoring to the last *surviving* reading instead is
@@ -910,7 +980,7 @@ const ArroData = (function () {
       else if (cutFlag[i]) status[i] = cutFlag[i];
     }
 
-    let good = 0, bad = 0, oos = 0, range = 0, rate = 0, fall = 0;
+    let good = 0, bad = 0, oos = 0, range = 0, rate = 0, fall = 0, qual = 0;
     for (let i = 0; i < n; i++) {
       const st = status[i];
       if (st === AD_GOOD)       good++;
@@ -918,11 +988,12 @@ const ArroData = (function () {
       else if (st === AD_RANGE) range++;
       else if (st === AD_RATE)  rate++;
       else if (st === AD_FALL)  fall++;
+      else if (st === AD_QUAL)  qual++;
       else bad++;
     }
 
     s.filt = { key, status, adj, rolls,
-               stats: { good, bad, oos, range, rate, fall, rollovers: rolls.length, total: n } };
+               stats: { good, bad, oos, range, rate, fall, qual, rollovers: rolls.length, total: n } };
     return s.filt;
   }
 
@@ -2665,6 +2736,7 @@ const ArroData = (function () {
             ${st.range ? ` · <span class="txt-warn" title="Readings outside the minimum / maximum you set">${st.range.toLocaleString()} out of range</span>` : ''}
             ${st.rate ? ` · <span class="txt-warn" title="Readings that climbed faster than the rate-of-rise limit">${st.rate.toLocaleString()} rose too fast</span>` : ''}
             ${st.fall ? ` · <span class="txt-warn" title="Readings that dropped faster than the rate-of-fall limit">${st.fall.toLocaleString()} fell too fast</span>` : ''}
+            ${st.qual ? ` · <span class="txt-warn" title="Readings carrying one of the quality codes you are excluding">${st.qual.toLocaleString()} by quality code</span>` : ''}
             ${st.rollovers ? ` · <span title="Accumulator wraps corrected">${st.rollovers} rollover${st.rollovers === 1 ? '' : 's'}</span>` : ''}
           </div>
           ${(() => {
@@ -2766,6 +2838,30 @@ const ArroData = (function () {
       </div>`;
 
     const unit = ad.series[0]?.unit || 'units';
+    const tally = qualityTally();
+
+    // One row per code in the file: how many readings carry it, what values they
+    // span, and a tick. The counts are the point of the control as much as the
+    // ticks are — "MM, 1,922 readings, −50.45 to 51.85 m" is the sentence that
+    // tells somebody staring at a spray of points which letter to look at, and
+    // there was nowhere in the app that said it. The range is deliberately over
+    // the whole import rather than the drawn window: a code is a property of the
+    // record, and a count that moved when the chart was panned would be read as
+    // "how many are on screen", which is the readings table's job.
+    const qualRows = tally.map(r => `
+      <label class="ad-cfg-row ad-qual-row" title="${escAttr(
+        `${r.n.toLocaleString()} reading${r.n === 1 ? '' : 's'} coded ${r.code || '(no code)'}`
+        + (r.lo === null ? '' : `, ${fmtVal(r.lo)} to ${fmtVal(r.hi)} ${unit}`)
+        + `. Tick to remove them before the 357 test runs.`)}">
+        <span class="ad-qual-code">
+          <input type="checkbox" value="${escAttr(r.code)}" ${r.cut ? 'checked' : ''}
+                 ${c.qualOn ? '' : 'disabled'}
+                 aria-label="Exclude readings coded ${escAttr(r.code || 'with no quality code')}"
+                 onchange="ArroData.setQual(this.value, this.checked)">
+          <b class="mono">${esc(r.code || '(none)')}</b></span>
+        <span class="ad-qual-n small">${r.n.toLocaleString()}${
+          r.lo === null ? '' : ` · ${esc(fmtVal(r.lo))} to ${esc(fmtVal(r.hi))}`}</span>
+      </label>`).join('');
 
     return `
       <div class="panel ad-panel">
@@ -2828,6 +2924,25 @@ const ArroData = (function () {
                 + 'into it and the climb back out.'}`,
           'fall')}
 
+        ${block('qualOn', 'Quality codes',
+          'Remove readings by the Data Quality code the exporting system gave them',
+          tally.length
+            ? `<p class="small ad-filt-lede">
+                 Every code in ${ad.series.length === 1 ? 'this import' : 'these imports'}, with how many
+                 readings carry it and the values they span. Tick the ones to leave out.</p>
+               ${qualRows}`
+            : `<p class="small ad-filt-lede">No <b>Data Quality</b> column in ${
+                 ad.series.length === 1 ? 'this import' : 'these imports'} — nothing to exclude by.</p>`,
+          tally.length
+            ? `The exporting system's own verdict, which every other filter here ignores: these
+               letters are ARRO's, not this app's, and <b>nothing is removed until you tick one</b>.
+               What a code means differs by system and by site and the file does not say, so the
+               choice is yours — the counts and ranges above are there to make it.
+               Ticked codes go before the 357 test, so a flagged reading gets no vote on whether
+               its neighbours are continuous.`
+            : '',
+          'qual')}
+
         ${block('rangeOn', 'Minimum / maximum',
           'Remove readings outside what this sensor can physically report',
           `${lim('rangeMin', 'Minimum', 'Readings below this are removed. Blank for no floor.', c.rangeOn)}
@@ -2836,6 +2951,39 @@ const ArroData = (function () {
            correction. Leave an end blank to bound only the other one.`,
           'range')}
       </div>`;
+  }
+
+  // Every quality code across every loaded series, with its count and the values
+  // it covers. Over `ad.series` rather than `shown()` because one filter panel
+  // governs every import in the tab, and a code that vanished from the list when
+  // a series was unticked would take its exclusion with it invisibly.
+  //
+  // Sorted by count, commonest first: the code somebody is looking for is nearly
+  // always either the bulk of the file or the handful of spikes in it, and
+  // alphabetical order buries both in the middle.
+  function qualityTally() {
+    const cut = new Set((ad.cfg.qualCut || []).map(String));
+    const by = new Map();
+    for (const s of ad.series) {
+      if (!s.q || !s.qcodes) continue;
+      for (let i = 0; i < s.n; i++) {
+        const code = String(s.qcodes[s.q[i]] ?? '');
+        let r = by.get(code);
+        if (!r) { r = { code, n: 0, lo: null, hi: null, cut: cut.has(code) }; by.set(code, r); }
+        r.n++;
+        const v = s.v[i];
+        if (!isFinite(v)) continue;
+        if (r.lo === null || v < r.lo) r.lo = v;
+        if (r.hi === null || v > r.hi) r.hi = v;
+      }
+    }
+    // A code the operator ticked and then removed the last series carrying it
+    // still has to be listed, or the only way back to an exclusion that is still
+    // in force would be the defaults button.
+    for (const code of cut) {
+      if (!by.has(code)) by.set(code, { code, n: 0, lo: null, hi: null, cut: true });
+    }
+    return [...by.values()].sort((a, b) => b.n - a.n || a.code.localeCompare(b.code));
   }
 
   // ── the filter, explained (issue #80) ──────────────────────────────────────
@@ -3114,10 +3262,17 @@ const ArroData = (function () {
           <li><b>Minimum / maximum</b> — removes readings outside what the sensor can physically
               report, before the continuity test runs, so a value nothing could have produced never
               gets a vote on its neighbours.</li>
+          <li><b>Quality codes</b> — removes readings by the <b>Data Quality</b> letters the
+              exporting system put on them. It is the only gate here that is not this app's
+              opinion: the grade was already in the file, and until now nothing read it. It
+              matters most where the 357 test is weakest — the 3/5/7 steps are counts, so on a
+              level in metres a flagged reading a metre off the record clears every one of them
+              comfortably. Nothing is excluded until you tick a code, because what the letters
+              mean differs by system and by site and the file does not say.</li>
         </ul>
-        <p>Both run before the 357 walk and are marked separately on the chart — a square for out of
-           range, a triangle for too fast, a cross for the 357 test itself — so a removal always says
-           which filter made the call.</p>
+        <p>All three run before the 357 walk and are marked separately on the chart — a square for
+           out of range, a triangle for too fast, a diamond for a quality code, a cross for the 357
+           test itself — so a removal always says which filter made the call.</p>
 
         <p class="f357-src">Hydrology Raw Data Filtering Program Specification v2.1, Commonwealth
            Bureau of Meteorology, May 2009, with the 1998 first edition. Both are in
@@ -3281,7 +3436,7 @@ const ArroData = (function () {
   // because nothing is drawn for them — the reading is simply on the line.
   const AD_MARK_FOR = {
     [AD_BAD]: 'removed', [AD_RANGE]: 'range', [AD_RATE]: 'rate',
-    [AD_FALL]: 'fall',   [AD_OOS]:   'repeat',
+    [AD_FALL]: 'fall',   [AD_OOS]:   'repeat', [AD_QUAL]: 'qual',
   };
 
   function tableDetailsHtml() {
@@ -3681,7 +3836,9 @@ const ArroData = (function () {
                 <input type="checkbox" ${ad.showRemoved ? 'checked' : ''} ${anyFilt ? '' : 'disabled'}
                        onchange="ArroData.setFlag('showRemoved', this.checked)">
                 ${['removed', ad.cfg.rangeOn ? 'range' : '', ad.cfg.rateOn ? 'rate' : '',
-                   ad.cfg.fallOn ? 'fall' : ''].filter(Boolean).map(adMarkSvg).join('')}
+                   ad.cfg.fallOn ? 'fall' : '',
+                   ad.cfg.qualOn && (ad.cfg.qualCut || []).length ? 'qual' : ''
+                  ].filter(Boolean).map(adMarkSvg).join('')}
                 removed</label>
               <label class="ad-chk" title="Mark repeat timestamps dropped before filtering">
                 <input type="checkbox" ${ad.showDupes ? 'checked' : ''}
@@ -4222,9 +4379,11 @@ const ArroData = (function () {
       : st === AD_RANGE ? `Outside the limits you set — anything ${lim || 'outside the range'} is removed before the 357 test runs.`
       : st === AD_RATE ? `Climbed faster than ${ad.cfg.rateMax} ${s.unit}/h from the reading before it, so it was removed before the 357 test ran.`
       : st === AD_FALL ? `Dropped faster than ${ad.cfg.fallMax} ${s.unit}/h from the reading before it, so it was removed before the 357 test ran.`
+      : st === AD_QUAL ? `Coded ${s.qcodes[s.q[i]] || '(no code)'} by ${
+          ad.source === 'field' ? 'the datastore' : 'ARRO'}, which is one of the codes you are excluding — so it was removed before the 357 test ran and got no vote on its neighbours.`
       : `Failed the 357 test against the readings that follow it — not within ${ad.cfg.small} of the next, ${ad.cfg.medium} of the next-next, or ${ad.cfg.large} of the one after that.`;
     const badge = st === AD_GOOD ? 'ok' : st === AD_OOS ? 'dup'
-                : (st === AD_RANGE || st === AD_RATE || st === AD_FALL) ? 'warn' : 'bad';
+                : (st === AD_RANGE || st === AD_RATE || st === AD_FALL || st === AD_QUAL) ? 'warn' : 'bad';
     const rolled = f.rolls.includes(i);
     return `
       <div class="ad-pin">
@@ -4552,13 +4711,14 @@ const ArroData = (function () {
         for (let i = i0; i < i1 && nMark < MARK_CAP; i++) {
           const st = f.status[i];
           const isDup = st === AD_OOS;
-          const isCut = st === AD_BAD || st === AD_RANGE || st === AD_RATE || st === AD_FALL;
+          const isCut = st === AD_BAD || st === AD_RANGE || st === AD_RATE
+                     || st === AD_FALL || st === AD_QUAL;
           if (!(isCut && wantBad) && !(isDup && ad.showDupes)) continue;
           if (ad.transform !== 'value') continue;   // a removed step has no meaningful height
           const px = g.x(s.t[i]), py = sy(s.v[i]);
           // Which filter took it out, told apart by shape as well as colour —
           // at four pixels a colour alone is a guess.
-          const col = st === AD_BAD ? c.bad : isDup ? c.muted : c.warn;    // AD_RANGE/RATE/FALL are all warn
+          const col = st === AD_BAD ? c.bad : isDup ? c.muted : c.warn;    // AD_RANGE/RATE/FALL/QUAL are all warn
           nMark++;
           // A removal above the top of the scale still has to be visible, or
           // "Kept" would quietly hide the very readings it is scaled to exclude.
@@ -4582,6 +4742,15 @@ const ArroData = (function () {
             : st === AD_FALL
             ? `<path d="M${px.toFixed(1)} ${(py + 3.6).toFixed(1)}l3.4 -5.8h-6.8Z" fill="${c.warn}"
                      opacity=".92"><title>fell faster than the rate limit</title></path>`
+            // A hollow diamond, and hollow on purpose: the two range/quality
+            // marks are the ones that say "something outside this reading
+            // rejected it", and the filled triangles the ones that say "the step
+            // to it was impossible". Diamond against the range filter's square
+            // because at four pixels a rotated square and a square are the only
+            // two outlines that stay apart.
+            : st === AD_QUAL
+            ? `<path d="M${px.toFixed(1)} ${(py - 3.4).toFixed(1)}l3.4 3.4l-3.4 3.4l-3.4 -3.4Z"
+                     fill="none" stroke="${c.warn}" stroke-width="1.4"><title>excluded by its quality code</title></path>`
             : `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="1.6" fill="${c.muted}" opacity=".5"/>`;
         }
       }
@@ -5057,7 +5226,7 @@ const ArroData = (function () {
           const px = x(s.t[i]), py = sy(s.v[i]);
           if (py < CMP_PADT - 4 || py > h - CMP_PADB + 4) continue;
           n++;
-          const col = st === AD_BAD ? c.bad : st === AD_OOS ? c.muted : c.warn;   // range/rate/fall all warn
+          const col = st === AD_BAD ? c.bad : st === AD_OOS ? c.muted : c.warn;   // range/rate/fall/qual all warn
           body += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2.4" fill="none"
                            stroke="${col}" stroke-width="1.3" opacity=".9"><title>${esc(AD_STATUS_LABEL[st])}
                            · ${esc(fmtVal(s.v[i]))} ${esc(s.unit)}</title></circle>`;
@@ -5906,8 +6075,21 @@ const ArroData = (function () {
     for (const s of ad.series) { s.filt = null; s.tracks = null; }
     redraw(true);
   }
+
+  // One code ticked or unticked. The list is replaced rather than mutated so
+  // that a cfg captured anywhere else cannot change under it, and because
+  // AD_CFG_DEFAULT.qualCut would otherwise be the array every instance shares.
+  function setQual(code, on) {
+    const want = String(code);
+    const cut = new Set((ad.cfg.qualCut || []).map(String));
+    if (on) cut.add(want); else cut.delete(want);
+    ad.cfg.qualCut = [...cut];
+    for (const s of ad.series) { s.filt = null; s.tracks = null; }
+    redraw(true);
+  }
+
   function resetCfg() {
-    ad.cfg = { ...AD_CFG_DEFAULT };
+    ad.cfg = { ...AD_CFG_DEFAULT, qualCut: [] };
     for (const s of ad.series) { s.filt = null; s.tracks = null; }
     redraw(true);
   }
@@ -6215,7 +6397,7 @@ const ArroData = (function () {
     allSeries: () => Object.values(instances).flatMap(i => i.series),
     render, init, stop, repaint, importFiles, pick, loadDemo,
     toggle, setColor, colourToggle, setDash, setAxis, setKind, solo, zoomTo, remove, clearAll, showStation,
-    setCfg, resetCfg, setMode, setTransform, setChart, setY, setYRange, setFlag, setDrag,
+    setCfg, resetCfg, setQual, setMode, setTransform, setChart, setY, setYRange, setFlag, setDrag,
     resetView, toggleFull,
     // Editing readings (#191), and the selection it works over
     pickToggle, pickClear, pickAllInView, editValue, editQuality, editDelete,

@@ -2608,11 +2608,12 @@ cannot drift away from the code that made it.
 
 **Every filter has a switch, and not every filter is the spec's.** The 3-5-7
 test, rollover correction, repeat timestamps, a **rate-of-rise** limit, a
-**rate-of-fall** limit and **minimum / maximum** limits each have their own
-on/off, so any of them can be taken out of the pipeline and the difference read
-straight off the counts. Only the first two come from the specification; the
-rest are gates this app adds, and they run *before* the continuity walk so a
-reading nothing could have produced never gets a vote on its neighbours:
+**rate-of-fall** limit, **minimum / maximum** limits and the export's own
+**quality codes** each have their own on/off, so any of them can be taken out of
+the pipeline and the difference read straight off the counts. Only the first two
+come from the specification; the rest are gates this app adds, and they run
+*before* the continuity walk so a reading nothing could have produced never gets
+a vote on its neighbours:
 
 - **Rate of rise** compares each reading with the one before it, and claims the
   step and nothing more. Anchoring to the last *surviving* reading is the
@@ -2634,13 +2635,39 @@ reading nothing could have produced never gets a vote on its neighbours:
   switch is there, because the operator can see what it removes.
 - **Minimum / maximum** bound the exported `Value`, either end blank for
   unbounded.
+- **Quality codes** act on the `Data Quality` letters the export already
+  carries, and are the only gate here that is not this app's opinion — the grade
+  was in the file all along. The tab has read that column since the first import
+  and showed it in the readings table, in the callout, in both export CSVs and
+  as an editable cell; `runFilter()` read the timestamps and the values and
+  nothing else, so **a reading the telemetry itself had flagged was filtered
+  exactly as though it had not been.** The panel now lists every code in the
+  loaded imports with how many readings carry it and the values they span, and a
+  tick per code excludes it before the continuity walk runs.
+
+  Two things about it are deliberate. **Nothing is excluded until a code is
+  ticked, and the list starts empty**: the codes are a vendor vocabulary that
+  differs by system and by site, nothing in the file says which of them are bad,
+  and a default that guessed would silently delete somebody's flood peak. And
+  **the counts stay legible with the switch off**, because working out *which*
+  code to exclude is what somebody does before flicking it — a control that only
+  showed its numbers once it was armed would have the order backwards.
+
+  It matters most where the 357 test is weakest. The 3/5/7 steps are
+  counts-domain constants, so on a water level in metres a 3 m step is enormous:
+  a flagged reading a metre off the record clears every one of them comfortably,
+  and four re-sends of one flagged packet are continuous with *each other* by any
+  threshold at all — tightening the steps cannot touch them. On a sample export
+  of 5,716 readings at Warrego Highway, the 60 kept readings outside −1…10 m were
+  all coded, and none of the codes was doing anything.
 
 Each removal keeps the name of the filter that made it: a cross for the 357
 test, a square for out of range, an up triangle for too fast a rise, a down
-triangle for too fast a fall — on the chart, beside the tick box that switches
-it on, in the readings table's verdict column, and in the CSV verdict export
-alike. The shapes are written down once (`AD_MARKS`) and drawn from there by all
-four, so a legend can never teach a shape the chart does not draw.
+triangle for too fast a fall, a hollow diamond for an excluded quality code — on
+the chart, beside the tick box that switches it on, in the readings table's
+verdict column, and in the CSV verdict export alike. The shapes are written down
+once (`AD_MARKS`) and drawn from there by all four, so a legend can never teach a
+shape the chart does not draw.
 
 **Order matters more than the spec lets on.** A rain accumulator that wraps and
 one hit by a corrupt packet both look like a long fall, and the sample is full
@@ -2664,6 +2691,17 @@ series of their own — twelve readings above 1000 mm do exactly this. A
 configurable **minimum gap** collapses them, off by default because it is a
 departure from the spec rather than part of it. At 60 s the sample's kept series
 becomes a strictly monotone accumulation, with the same 248 mm net.
+
+**And the repeat rule is only as good as the exporter's clock.** It tests
+`t[i] <= lastT`, so it catches a re-send stamped with the *same second* and
+nothing else. A Warrego Highway export shows both halves of that: through
+January and February ARRO stamped each observation's re-sends identically and
+about half of every month was set aside as repeats; from March the same re-sends
+arrive one to three seconds apart, nothing matches, and **99% of the record is
+kept where 50% was before**. Nothing changed about the data — the clock changed.
+This is the one setting worth reaching for when a later stretch of a chart looks
+denser than an earlier one, and it is why the minimum gap is a duration rather
+than a switch.
 
 **Raw is never overwritten.** The parsed arrays are written once at import and
 never again; filtering only ever produces a parallel status array. Raw and
