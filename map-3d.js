@@ -380,7 +380,12 @@ const Map3D = (function () {
   function queueSheets() {
     sheets.gen++;
     sheets.queue = [];
-    sheets.running = 0;
+    // `running` is deliberately NOT reset here. It counts promises that are in
+    // flight, which is a fact about the world rather than about a generation:
+    // the profiles the last round started are still running whatever this round
+    // thinks, and they will each decrement it when they land. Zeroing it made
+    // them decrement past zero, and `pending` — queued plus running — went
+    // negative, which the panel renders as "-3 still measuring…".
     buf = null;
     if (!state.map3dSheets || !map || !ready) {
       sheets.pick = [];
@@ -422,7 +427,6 @@ const Map3D = (function () {
   }
 
   function pumpSheets() {
-    const gen = sheets.gen;
     while (sheets.running < SHEET_CONC && sheets.queue.length) {
       const job = sheets.queue.shift();
       sheets.running++;
@@ -435,8 +439,13 @@ const Map3D = (function () {
         if (job.gen !== sheets.gen) return;
         collect();
       }).finally(() => {
-        if (job.gen !== gen) return;
-        sheets.running--;
+        // Always, and before the generation guard: this promise has landed, so
+        // the in-flight count owes it a decrement whichever round queued it.
+        // Clamped because close() swaps the whole ledger out from under any
+        // profile still running, and a counter that can go negative is a
+        // counter the panel can quote.
+        sheets.running = Math.max(0, sheets.running - 1);
+        if (job.gen !== sheets.gen) { pumpSheets(); return; }
         if (!sheets.queue.length && !sheets.running) rebuildSheets();
         else if (sheets.done % 8 === 0) rebuildSheets();   // show progress, not a wait
         setNote();

@@ -527,6 +527,29 @@ const built = await page.evaluate(() => {
 });
 ok('switching the sheets on builds geometry',
    built.verts > 0 && built.rows > 0, `${built.rows} hops, ${built.verts} vertices`);
+// A pan while profiles are in flight starts a new generation over the top of
+// them, and the in-flight count has to survive that: the old profiles are still
+// running whatever the new round thinks. Zeroing it on re-queue made each of
+// them decrement past zero, and the panel quoted "-3 still measuring…".
+const churn = await page.evaluate(async () => {
+  const m = Map3D._map();
+  const seen = [];
+  const views = [[152.4, -26.0], [152.9, -25.6], [152.1, -26.4], [152.6, -25.9], [152.3, -26.1]];
+  for (const [lng, lat] of views) {
+    m.jumpTo({ center: [lng, lat], zoom: 8.5, pitch: 60 });
+    await new Promise(r => setTimeout(r, 220));
+    seen.push(Map3D._sheets().pending);
+  }
+  for (let i = 0; i < 200 && Map3D._sheets().pending > 0; i++) {
+    await new Promise(r => setTimeout(r, 100));
+    seen.push(Map3D._sheets().pending);
+  }
+  return { min: Math.min(...seen), last: Map3D._sheets().pending, n: seen.length };
+});
+ok('panning while profiles are in flight never makes the count go negative',
+   churn.min >= 0, `lowest pending seen was ${churn.min} over ${churn.n} readings`);
+ok('…and it settles back to nothing in flight',
+   churn.last === 0, `${churn.last} still pending`);
 ok('and the note says how many hops were sheeted',
    /\d+\s+hops?\s+sheeted/.test(built.note), built.note.slice(0, 120));
 
