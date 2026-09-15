@@ -189,6 +189,11 @@ function addBaseLayers(map) {
 
   let current   = names[0];
   layers[current].addTo(map);
+  // Which base this map is showing, published on the map itself. `current` is a
+  // closure variable and there is no other way to ask; Map3D needs the answer
+  // because the 3-D view drapes the *same* base map over the terrain, and a
+  // base that changed when you tilted would be a different map (map-3d.js).
+  map.mnBaseName = current;
   syncCompanions();   // a no-op while the default is OSM-Topo, correct if it ever isn't
 
   MapChrome.panel(map, {
@@ -215,7 +220,11 @@ function addBaseLayers(map) {
         map.removeLayer(layers[current]);
         layers[name].addTo(map);
         current = name;
+        map.mnBaseName = current;
         syncCompanions();
+        // The 3-D view is draped in whatever this picker is on, so a change
+        // here has to reach it. A no-op unless 3-D is actually open.
+        if (typeof Map3D !== 'undefined') Map3D.baseChanged();
       });
     },
   });

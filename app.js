@@ -2468,6 +2468,15 @@ function stationsMapPanels(map) {
     id: 'legend', icon: '🔑', title: 'Legend',
     html: () => `<div class="map-legend" id="map-legend">${mapLegendHtml()}</div>`,
   });
+  // 3-D — a MapChrome panel rather than a plain corner button, unlike ℹ️ and
+  // ⛶, because it is not only a mode: it carries the exaggeration slider, the
+  // line-of-sight sheet switch and the note that says what the relief is made
+  // of and what it cannot be trusted to say. The ⛰️ button in the corner is the
+  // mode; this is everything about it (map-3d.js).
+  MapChrome.panel(map, {
+    id: '3d', icon: '⛰️', title: '3-D view',
+    html: () => Map3D.panelHtml(),
+  });
 
   // Full screen — a plain corner button, not a MapChrome panel: it discloses
   // nothing, it does one thing, and test/mapctl.mjs iterates .mn-mapctl
@@ -2539,6 +2548,31 @@ function stationsMapPanels(map) {
     return b;
   };
   here.addTo(map);
+
+  // 3-D — the mode itself, as a plain corner button for ℹ️'s reason: it toggles
+  // a mode rather than disclosing a panel. It is a *second* way into the ⛰️
+  // panel's own switch and deliberately so — tilting the map is the thing an
+  // operator does most often here, and making them open a flyout for it every
+  // time is the same mistake the sidebar panels were before #164.
+  //
+  // The 3-D canvas covers every Leaflet pane and stops below Leaflet's control
+  // container (styles.css, #map3d), so this button — and every panel beside it —
+  // is still on screen and still working while 3-D is on. That is what lets one
+  // set of controls drive both modes.
+  const three = L.control({ position: 'topright' });
+  three.onAdd = () => {
+    const b = L.DomUtil.create('button', 'mn-mapctl-btn mn-map-3d');
+    b.type = 'button';
+    b.textContent = '⛰️';
+    b.setAttribute('aria-pressed', state.map3d ? 'true' : 'false');
+    b.title = '3-D view — tilt the map and see the ground it is drawn on';
+    b.setAttribute('aria-label', '3-D view');
+    L.DomEvent.disableClickPropagation(b);
+    L.DomEvent.on(b, 'click', L.DomEvent.stop);
+    L.DomEvent.on(b, 'click', () => Map3D.toggle());
+    return b;
+  };
+  three.addTo(map);
 }
 
 // ── Reset the map (#191) ─────────────────────────────────────────────────────
@@ -3455,6 +3489,16 @@ function initMap() {
   // never comes back.
   MapArrows.attach(state.map);
   MapElevation.attach(state.map);
+  // 3-D does not survive a rebuild of the map — the container it drew into went
+  // with the old one — so attach() closes whatever was open and takes the new
+  // map. Its own teardown key beside the tab's: registerTabTeardown is a Map
+  // keyed by name, so 'Stations' is already taken by stopStationsMap and a
+  // second registration under that name would replace it (#142). Leaving the
+  // tab has to take the WebGL context down with it; a GL context and its worker
+  // pool outliving the div they were built on is exactly the leak that registry
+  // check exists to catch.
+  Map3D.attach(state.map);
+  registerTabTeardown('Stations 3-D', () => Map3D.stop());
   // Before MapDraw, for MapMovePin's reason: the tools that take a map click
   // have to know which map before anybody arms one.
   MapHere.attach(state.map);
@@ -3772,6 +3816,7 @@ function refreshMapLayers({ skipFit = false } = {}) {
   MapLos.kick();
   MapFade.kick();
 
+
   for (const s of stations) {
     const role   = primaryRole(s);
     const color  = ROLE_COLOR[role] || ROLE_COLOR.field;
@@ -3854,6 +3899,12 @@ function refreshMapLayers({ skipFit = false } = {}) {
   applyMapSelectionStyles();
   applyMapFocusStyles();
   MapSpider.setPins('stations', state.mapMarkers);
+  // The 3-D view mirrors the lines and pins this function has just drawn rather
+  // than deriving its own, so a rebuild of them is a rebuild of it — and it goes
+  // *here*, after the selection and focus styles, because those change the
+  // colours and opacities the mirror reads. A no-op unless 3-D is open, which is
+  // almost never: two early returns (map-3d.js).
+  Map3D.sync();
 
   // Zoom to the matches (all of them, not just the first) and to the repeaters
   // pulled in behind them — a path with its far end off-screen explains

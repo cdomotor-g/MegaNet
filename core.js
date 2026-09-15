@@ -238,10 +238,10 @@ const HELP = {
            + 'The <strong>Stations</strong> list below collapses the same way — it is the tallest '
            + 'card on the page, and shutting it is how the map, the path tools and the editor get '
            + 'onto one screen together; its summary keeps the live row count and names the '
-           + 'selected station. The map carries its own controls in its top-right corner, as five '
+           + 'selected station. The map carries its own controls in its top-right corner, as six '
            + 'icons that open when the pointer is on them and can be pinned open: the base map, '
            + '<strong>Map display</strong>, <strong>Draw &amp; measure</strong>, '
-           + '<strong>Polar radio coverage</strong> and the legend. '
+           + '<strong>Polar radio coverage</strong>, <strong>3-D view</strong> and the legend. '
            + 'The elevation profile and link budget sit under the map. Selecting a '
            + 'station opens <strong>Repeaters listening</strong> between the list and the editor: '
            + 'every repeater with a pass range open to that station\'s addresses, nearest first. '
@@ -265,6 +265,20 @@ const HELP = {
            + 'the address out of the box rather than off the saved record, so a row you have '
            + 'retyped sends you to the number on screen.',
     watch: [
+      '<strong>3-D view</strong> — ⛰️ in the map\'s corner, or the panel of the same name — '
+      + 'tilts the map onto the ground it is drawn on: the base map you are already on, draped over '
+      + '~30 m terrain, with the pins and links you are already looking at on it. Drag to pan, '
+      + 'right-drag (or Ctrl-drag, or two fingers) to tilt and rotate. It is the same map and the '
+      + 'same controls, so a filter changed while it is tilted is the same filter. Tick '
+      + '<strong>Line-of-sight sheets</strong> and each hop also grows a vertical surface between '
+      + 'its line of sight and the ground under it, green where the path clears the 60% Fresnel '
+      + 'zone and red where the ground is above the line — the profile card\'s own geometry, so the '
+      + 'two cannot disagree. Terrain is fetched for the view you are looking at and no further, '
+      + 'and the sheets are capped at 80 hops at a time with the panel saying how many it left '
+      + 'out: <em>an unsheeted hop is not a clear one</em>. Vertical exaggeration opens at 1×, '
+      + 'which is the truthful setting; anything above it is a taller picture of the same ground, '
+      + 'not more of it. And a terrain tile that will not load is said out loud rather than drawn '
+      + 'flat, because flat ground between two stations reads as a clear path. One thing to know about the picture: <em>a pin behind a hill is hidden by it</em>. That is useful both ways round — a station you cannot see from a given point has no line of sight from it, and a station you are hunting for may be over the next ridge rather than missing.',
       'Three of the map\'s tools read the <strong>ground</strong> rather than the station list, '
       + 'and all three are indicative in the same way the elevation profile is — ~30 m terrain, '
       + 'heights above the EGM96 geoid, nothing standing on the ground. <strong>Elevation</strong> '
@@ -1934,6 +1948,23 @@ const state = {
   // Line-of-sight check on drawn links (see MapLos). Off by default and not
   // persisted, for MapSurvey's reasons — it fetches terrain tiles on enable.
   mapLos:         false,
+  // The Stations map in three dimensions (see Map3D, map-3d.js). Session-only
+  // for mapFullscreen's reason: it is a mode an operator is in right now, not a
+  // standing preference — and a tab that *opens* by fetching a megabyte of
+  // WebGL renderer and a screenful of terrain has decided something on their
+  // behalf that costs real bandwidth.
+  map3d:          false,
+  // The line-of-sight sheets in that view: a surface between each hop's ray and
+  // the ground under it. Off by default and not persisted, for MapLos' reason
+  // and the same cost — one terrain profile per hop on enable.
+  map3dSheets:    false,
+  // Vertical exaggeration of the relief, 1–3×. Remembered, unlike the two
+  // above, and for mapSplit's reason: it is not something an operator is doing
+  // right now, it is how they read a landscape. 1× is the default because it is
+  // the truthful one — the slider says what it is doing, and anything above 1
+  // is a taller picture of the same ground, not more of it.
+  map3dExag:      Math.max(1, Math.min(3,
+                    Number(localStorage.getItem('mn-3d-exag')) || 1)),
   // What the link colours mean (#186): 'freq' — the channel the hop runs on
   // (MapFreq, and the default); 'fade' — the fade margin in three bands
   // (MapFade); 'plain' — the one link colour the map drew for its whole life

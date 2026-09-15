@@ -58,6 +58,13 @@
   --rx-bg: #eef4fb;
   --tx-bg: #eef8f1;
   --map-line: #ff6f00;
+  /* The sky behind the terrain in the 3-D view (Map3D). Tokens rather than
+     literals in map-3d.js for the reason every other map colour here is one:
+     the theme owns colour. They are NOT flipped for the dark theme — see the
+     note beside the dark block. */
+  --map3d-sky: #7fb3e8;
+  --map3d-horizon: #dfeaf5;
+  --map3d-fog: #e8eef5;
   /* A link whose terrain profile says the path is obstructed (MapLos).
      Crimson rather than the blast red above it: a blast is something an
      operator armed and will disarm, an obstruction is a property of the
@@ -460,6 +467,14 @@
   --tx-bg: #19362a;
   --map-line: #ff9f43;
   --map-line-blocked: #ff6090;
+  /* The 3-D sky, darkened — but only a little, and not to night. The ground in
+     that view is lit by real base-map tiles which do not go dark with the app,
+     so a black sky over a daylit landscape reads as a rendering fault rather
+     than as a theme. This is dusk over the same ground: enough to stop a bright
+     band glaring out of a dark page, not enough to claim the sun has set. */
+  --map3d-sky: #2c4a6b;
+  --map3d-horizon: #5d7793;
+  --map3d-fog: #44586e;
   /* Lifted for the dark theme like every other map colour here — the base maps
      do not go dark with the app, so these keep the same job over the same
      tiles and only need to hold up against a dark panel in the legend. */
@@ -3247,6 +3262,85 @@ hr {
     min-width: 2.75rem;
     min-height: 2.75rem;
   }
+}
+
+/* ── The 3-D view (map-3d.js) ─────────────────────────────────────────────
+   The MapLibre canvas, inside the Leaflet container and covering it.
+
+   The z-index is the whole design and is worth stating plainly, because the
+   obvious reading of Leaflet's stylesheet is the wrong one. Its panes run 200
+   (tiles) → 400 (overlays) → 500 (shadows) → 600 (markers) → 650 (tooltips) →
+   700 (popups). `.leaflet-control` is 800 — but a control is never stacked at
+   800, because it sits inside `.leaflet-top` / `.leaflet-bottom`, which are
+   positioned at **1000** and so open a stacking context of their own. The
+   corners are the ceiling, not the controls.
+
+   So the window is 700 < z < 1000, and 750 sits in it: this covers
+   *everything the 2-D map draws* and covers *nothing an operator can press*.
+   The base-map picker, the four panels, the corner buttons and the ⛰️ toggle
+   itself all stay on screen and keep working while 3-D is on.
+
+   That is what makes this a mode rather than a second map. There is one set of
+   controls, and it drives both — so a filter changed in 3-D is the same filter,
+   and leaving 3-D leaves the map exactly as the controls say it should be.
+
+   The cards drawn over the map (#stn-card and the other three) are children of
+   .mn-map-stage, outside the Leaflet container entirely, so they are above this
+   already and a pin clicked in 3-D still paints one. */
+#map3d {
+  position: absolute;
+  inset: 0;
+  z-index: 750;
+  border-radius: inherit;
+  /* Nothing to see until the renderer has been fetched and the map built; the
+     class is added by Map3D.open() and removed by close(). A div with no
+     dimensions still covers the controls it is behind, which is why this is
+     display rather than opacity. */
+  display: none;
+}
+
+#map3d.is-on { display: block; }
+
+/* The megabyte of renderer is being fetched. A spinner rather than nothing,
+   because on a slow connection this is a second or two of a button that looks
+   like it did not work. */
+#map3d.is-loading {
+  display: block;
+  background: var(--bg, #f4f7fb);
+  opacity: 0.6;
+}
+
+#map3d.is-loading::after {
+  content: "Loading the 3-D renderer…";
+  position: absolute;
+  inset-inline: 0;
+  top: 45%;
+  text-align: center;
+  font: inherit;
+  color: var(--muted, #4f6478);
+}
+
+/* MapLibre's own furniture, brought into this app's type. Its stylesheet is
+   fetched with the library and sets its own sizes; these are the two places
+   that would otherwise read as somebody else's map inside ours. */
+#map3d .maplibregl-ctrl-attrib-inner { font-size: 0.72rem; }
+#map3d .maplibregl-ctrl-group { border-radius: 6px; }
+
+/* The ⛰️ corner button while the mode is on — the same "this is armed" dress
+   the ℹ️ what-is-here button uses, so the two modes read the same way. */
+.mn-mapctl-btn.mn-map-3d.is-on {
+  background: var(--accent, #0b5cab);
+  color: #fff;
+}
+
+/* The 3-D panel: the two buttons on one row, everything else stacked the way
+   every other on-map panel stacks. */
+.map3d-panel { display: grid; gap: var(--sp-1, 0.5rem); }
+
+.map3d-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1, 0.5rem);
 }
 
 /* ── Elevation base map (map-elevation.js) ──────────────────────────────── */

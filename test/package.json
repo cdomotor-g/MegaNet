@@ -12,7 +12,7 @@
     "toplevel": "node toplevel.mjs",
     "registry": "node registry.mjs",
     "concat": "node concat-verify.mjs",
-    "all": "npm run check && npm run names && npm run toplevel && npm run steps && npm run hfem && npm run itm && npm run logger && npm run smoke && npm run registry && npm run nav && npm run shell && npm run tabs && npm run rivers && npm run roads && npm run survey && npm run mapctl && npm run catchments && npm run sls && npm run help && npm run insp && npm run maint && npm run history && npm run movepin && npm run stationscard && npm run stncard && npm run search && npm run linkbudget && npm run pathcover && npm run pathcursor && npm run claim && npm run fieldkind && npm run fieldprobe && npm run gate && npm run dbproxy && npm run mapfade && npm run maplinks && npm run drawkml && npm run terrain && npm run adnav && npm run adqual",
+    "all": "npm run check && npm run names && npm run toplevel && npm run steps && npm run hfem && npm run itm && npm run logger && npm run smoke && npm run registry && npm run nav && npm run shell && npm run tabs && npm run rivers && npm run roads && npm run survey && npm run mapctl && npm run catchments && npm run sls && npm run help && npm run insp && npm run maint && npm run history && npm run movepin && npm run stationscard && npm run stncard && npm run search && npm run linkbudget && npm run pathcover && npm run pathcursor && npm run claim && npm run fieldkind && npm run fieldprobe && npm run gate && npm run dbproxy && npm run mapfade && npm run maplinks && npm run drawkml && npm run terrain && npm run map3d && npm run adnav && npm run adqual",
     "rivers": "node rivers.mjs",
     "roads": "node roads.mjs",
     "survey": "node survey.mjs",
@@ -40,6 +40,7 @@
     "maplinks": "node maplinks.mjs",
     "drawkml": "node drawkml.mjs",
     "terrain": "node terrainkit.mjs",
+    "map3d": "node map3d.mjs",
     "adnav": "node adnav.mjs",
     "adqual": "node adqual.mjs",
     "steps": "node ci-steps.mjs",
@@ -52,6 +53,7 @@
   "devDependencies": {
     "acorn": "8.15.0",
     "leaflet": "1.9.4",
+    "maplibre-gl": "5.24.0",
     "playwright-core": "1.56.1"
   }
 }

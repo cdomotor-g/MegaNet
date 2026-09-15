@@ -505,6 +505,17 @@ jobs:
         working-directory: test
         run: npm run terrain
 
+      # The 3-D view (map-3d.js). Invisible to every check above it: `smoke`
+      # opens the Stations tab and a ⛰️ button that does nothing at all passes,
+      # `registry` looks for Leaflet maps and a WebGL context outliving its div
+      # is not one, and `maplinks` measures the 2-D links while a 3-D view
+      # drawing a different set in different colours leaves it green. Needs
+      # WebGL2, which Playwright's Chromium has through SwiftShader; the check
+      # skips rather than fails if it is ever absent.
+      - name: The 3-D view — the mirror, the sheet geometry, the teardown
+        working-directory: test
+        run: npm run map3d
+
       # The two navigators under and beside the Arrow chart. Their edge handles
       # were ungrabbable for a reason no check here could see: the drawing and
       # the hit-test each converted client coordinates to viewBox coordinates

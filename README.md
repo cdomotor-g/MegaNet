@@ -796,6 +796,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
 - Map and station list side by side by default, with a divider that drags — and a five-column list beside it (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape has room for
 - **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub and nearest station, repeater and survey mark
+- **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
 - Light up the watercourses whose names match the filter box, drawn beneath the pins from OpenStreetMap (*Highlight matching rivers*)
@@ -819,6 +820,48 @@ stations that don't match*, in that same panel, for the old subtractive behaviou
 which still keeps the repeater at the far end of any drawn signal link, since a
 TX path with its destination receiver hidden is the one station you most wanted
 to see.
+
+**The map in three dimensions.** Press ⛰️ in the map's corner and the same map
+tilts: the ground gets its real relief, the base map you were already on is
+draped over it, and the pins and links you were already looking at come with
+them. Drag to pan, right-drag (or Ctrl-drag, or two fingers) to tilt and rotate,
+scroll to zoom — up to 85° of pitch, which is nearly along the ground.
+
+It is the *same* map, not a second one. The 3-D view does not work out for
+itself which stations to draw or what colour a link should be: it mirrors the
+lines and pins the 2-D map has already drawn, so the filters, the hidden and
+culled sets, the frequency or fade-margin colouring and the focus dim are all
+exactly what they were a moment ago. The 2-D controls stay on screen and keep
+working while it is tilted, which is what makes it a mode rather than a
+separate tool — change a filter in 3-D and it is the same filter.
+
+Two ways to read a radio path, and you can have both at once. The link line
+itself tracks across the ground, following every rise it crosses. Tick
+**Line-of-sight sheets** and each hop also grows a vertical surface between the
+ray and the ground under it — green where the path clears the 60% Fresnel zone,
+amber where the ground is inside it, red where the ground is above the line —
+so an obstruction is a curtain disappearing into a hill rather than a number in
+a table. The geometry is the Path profile tool's own, with one transform: a
+profile chart keeps the line of sight straight and bends the earth up
+underneath it, and a 3-D view cannot, because the ground is drawn where the
+terrain says it is. So the earth bulge comes off the ray instead. The clearance
+is the same figure either way, which is the point — the tilted map and the
+profile card cannot disagree about whether a path is blocked.
+
+One thing to know about the picture: a pin behind a hill is hidden by it. That
+cuts both ways — a station you cannot see from a given vantage has no line of
+sight from it, which is exactly the question this view is for, but a station you
+are hunting for may be over the next ridge rather than missing.
+
+Terrain is fetched for the view you are looking at and no further, which is what
+makes a whole-of-state network affordable to fly over; the sheets are capped at
+80 hops at a time and the panel says how many it left out, because an unsheeted
+hop is not a clear one. The renderer itself (MapLibre GL, ~1 MB of WebGL) is
+fetched the first time you press ⛰️ and never for a session that does not. A
+terrain tile that will not load is said out loud rather than drawn as flat
+ground, for the reason the elevation profile gives at length: flat ground
+between two stations reads as a clear path, and that is the one wrong answer
+that costs somebody a site visit.
 
 **Who carries this station?** Finding a station on the map is half the
 question; the other half is which repeaters carry it. *Include related

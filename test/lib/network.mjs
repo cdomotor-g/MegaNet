@@ -1,13 +1,25 @@
 // The test's answer to "what happens to the network?", which #130 asks to be
 // picked and documented. It is picked here, once, so every test agrees.
 //
-// **The page is fully offline except for Leaflet, which is served from disk.**
+// **The page is fully offline except for Leaflet and MapLibre, both served from
+// disk.**
 //
 // Why: Leaflet comes from unpkg (index.html:12 and :97) and the app is
 // unusable without it — half the tabs build an L.map() and every one of those
 // would throw a ReferenceError that has nothing to do with the change under
 // test. So `unpkg.com/leaflet@…` is fulfilled from the `leaflet` devDependency,
 // which is pinned to the same 1.9.4 the page asks for. Real Leaflet, no network.
+//
+// MapLibre is here for the same reason and on different terms. It is the 3-D
+// view's renderer (map-3d.js) and it is **not** in index.html: it is fetched on
+// the first press of ⛰️ and never for a session that does not press one. So
+// unlike Leaflet it is absent from every check that does not open 3-D, which is
+// all of them but one — and that is itself a property worth having, because it
+// is the whole justification for loading it that way. `npm run map3d` asserts
+// that `window.maplibregl` is undefined until the button is pressed.
+//
+// Served from the `maplibre-gl` devDependency, pinned to the same 5.24.0
+// map-3d.js asks for. Real MapLibre, real WebGL, no network.
 //
 // Everything else off-origin is aborted: the Supabase datastore, GitHub raw,
 // Overpass, the basemap tile servers. Three consequences worth stating, because
@@ -33,6 +45,13 @@ function leafletDist() {
   // Resolved through node, so it works from any cwd and fails loudly if the
   // devDependency is missing rather than silently going to the network.
   return path.dirname(require.resolve('leaflet/dist/leaflet.js'));
+}
+
+// The same, for the 3-D renderer. Resolved lazily rather than at module load:
+// every check imports this file and only one of them opens 3-D, so a harness
+// without the package installed must still run the other forty.
+function maplibreDist() {
+  return path.dirname(require.resolve('maplibre-gl/dist/maplibre-gl.js'));
 }
 
 const CONTENT_TYPE = {
@@ -65,6 +84,23 @@ export async function applyNetworkPolicy(page, origin) {
     if (leaflet) {
       const file = path.join(dist, path.normalize(leaflet[1]));
       if (file.startsWith(dist + path.sep) && fs.existsSync(file)) {
+        return route.fulfill({
+          status: 200,
+          contentType: CONTENT_TYPE[path.extname(file)] || 'application/octet-stream',
+          body: fs.readFileSync(file),
+        });
+      }
+    }
+
+    // `dist/` and everything under it — maplibre-gl.js and maplibre-gl.css. The
+    // UMD build carries its own worker as an inline blob, so nothing else off
+    // this host is asked for (blob: is allowed above).
+    const maplibre = url.match(/unpkg\.com\/maplibre-gl@[\d.]+\/dist\/([^?#]+)/);
+    if (maplibre) {
+      let dist3d = null;
+      try { dist3d = maplibreDist(); } catch (_) { dist3d = null; }
+      const file = dist3d && path.join(dist3d, path.normalize(maplibre[1]));
+      if (file && file.startsWith(dist3d + path.sep) && fs.existsSync(file)) {
         return route.fulfill({
           status: 200,
           contentType: CONTENT_TYPE[path.extname(file)] || 'application/octet-stream',
