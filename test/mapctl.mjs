@@ -28,6 +28,22 @@
 // primitive is shared, so what passes here is what the other six Leaflet maps
 // get.
 //
+// ── And since #192, the corner they stand in ────────────────────────────────
+// The eleven icons were regrouped into one control holding five labelled
+// groups, and §9 below is about that arrangement rather than about any one
+// panel. Everything it asserts is measured off the geometry the browser gave
+// the elements, for the reason `maplinks` states at more length: an
+// implementation that sets the right attribute and draws the wrong thing
+// passes every check that reads the attribute. So "the groups are separated"
+// is asked as *is the smallest gap between two groups bigger than the biggest
+// gap inside one*, and "the camera buttons are not on the flat map" is asked
+// as `getClientRects()`, never as `el.hidden`.
+//
+// The one thing here that is not geometry is the order, which is read from
+// `MapChrome.groups()` rather than from a list copied into this file — a sixth
+// group added there is then in this check the day it lands, and a group that
+// exists on screen and not in that table fails.
+//
 // Run:  npm run mapctl
 //       npm run mapctl -- -v    also print what passed
 
@@ -279,6 +295,97 @@ try {
   await leave();
   s = await look('legend');
   check('unpinning puts it away again', !s.shown && !s.pinned, JSON.stringify(s));
+
+  // ── 9. The corner is grouped, and the grouping is on screen (#192) ────────
+  // Eleven equal icons in one column, four apart from the panel they belong
+  // to, is what this section exists to stop coming back.
+  const corner = await page.evaluate(() => {
+    const box = el => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, w: r.width }; };
+    const shown = el => !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+    const bar = document.querySelector('.leaflet-top.leaflet-right .mn-mapbar');
+    return {
+      controls: document.querySelectorAll('.leaflet-top.leaflet-right > .leaflet-control').length,
+      known: Object.keys(MapChrome.groups()),
+      loose: bar ? [...bar.children].filter(c => !c.classList.contains('mn-mapbar-group')).length : -1,
+      groups: bar ? [...bar.querySelectorAll('.mn-mapbar-group')].map(g => ({
+        name:  g.dataset.group,
+        label: g.getAttribute('aria-label'),
+        role:  g.getAttribute('role'),
+        items: [...g.children].map(c => ({
+          panel: c.dataset.panel || '',
+          cls:   c.className,
+          pair:  c.dataset.pair || '',
+          order: Number(c.dataset.order),
+          shown: shown(c),
+          ...box(c),
+        })),
+      })) : [],
+    };
+  });
+
+  check('the corner is one control, not one per icon', corner.controls === 1,
+    `${corner.controls} controls in the top-right corner`);
+  check('and nothing is loose in it — every icon is in a group', corner.loose === 0,
+    `${corner.loose} children of the bar are not groups`);
+
+  const names = corner.groups.map(g => g.name);
+  check('every group on screen is one MapChrome names',
+    names.every(n => corner.known.includes(n)), JSON.stringify({ names, known: corner.known }));
+  check('and they are in the order it declares them in',
+    JSON.stringify(names) === JSON.stringify(corner.known.filter(n => names.includes(n))),
+    JSON.stringify(names));
+  check('each one is a labelled group, so the hairline means something without eyes',
+    corner.groups.every(g => g.role === 'group' && !!g.label),
+    JSON.stringify(corner.groups.map(g => [g.name, g.role, g.label])));
+  check('the destructive one is still last in the column', names[names.length - 1] === 'reset',
+    JSON.stringify(names));
+
+  // The separators, measured rather than read off the stylesheet: what a
+  // reader has to be able to see is that the gap between two groups is bigger
+  // than the gaps inside them. A hairline that renders as nothing still fails
+  // here, because the spacing it sits in is part of the same rule.
+  const visible = corner.groups.map(g => g.items.filter(i => i.shown)).filter(g => g.length);
+  const inside = [];
+  for (const g of visible) for (let i = 1; i < g.length; i++) inside.push(g[i].top - g[i - 1].bottom);
+  const between = [];
+  for (let i = 1; i < visible.length; i++) {
+    const prev = visible[i - 1], next = visible[i];
+    between.push(next[0].top - prev[prev.length - 1].bottom);
+  }
+  check('every gap between two groups is wider than every gap inside one',
+    between.length > 1 && inside.length > 1 && Math.min(...between) > Math.max(...inside),
+    JSON.stringify({ inside, between }));
+
+  // The split button: the ⛰️ that turns 3-D on and the caret that opens
+  // everything about it, as one control. "Adjacent" is the claim, and touching
+  // is how it is made — so both halves are measured, not just found.
+  const three = corner.groups.find(g => g.name === '3d') || { items: [] };
+  const mode  = three.items.find(i => /mn-map-3d/.test(i.cls));
+  const caret = three.items.find(i => i.panel === '3d');
+  check('the ⛰️ mode and the 3-D panel are in the same group', !!mode && !!caret);
+  if (mode && caret) {
+    check('…next to each other, in that order', caret.order > mode.order
+      && !three.items.some(i => i.order > mode.order && i.order < caret.order),
+      JSON.stringify(three.items.map(i => [i.order, i.cls])));
+    check('…joined into one control rather than two buttons a gap apart',
+      Math.abs(caret.top - mode.bottom) <= 1 && Math.abs(caret.w - mode.w) < 1,
+      JSON.stringify({ modeBottom: mode.bottom, caretTop: caret.top, w: [mode.w, caret.w] }));
+    check('…and the small half is the smaller one',
+      (caret.bottom - caret.top) < (mode.bottom - mode.top) * 0.75,
+      JSON.stringify({ mode: mode.bottom - mode.top, caret: caret.bottom - caret.top }));
+  }
+
+  // The camera pair. There is no camera in 2-D — Leaflet has no pitch and no
+  // bearing — so these two are built, placed in the 3-D group, and not on the
+  // map. Asked of the geometry: `[hidden]` loses to `.mn-mapctl-btn`'s own
+  // `display: flex` at the same specificity, which is a set attribute and a
+  // button still on screen.
+  for (const [cls, what] of [['mn-map-north', 'the compass'], ['mn-map-tilt', 'the tilt']]) {
+    const b = three.items.find(i => i.cls.includes(cls));
+    check(`${what} button is in the 3-D group`, !!b, JSON.stringify(three.items.map(i => i.cls)));
+    if (b) check(`…and is not on the map while the map is flat`, !b.shown,
+      JSON.stringify(b));
+  }
 
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {

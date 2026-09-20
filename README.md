@@ -804,9 +804,12 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Export the whole drawing to Google Earth as a KML — the shapes in their own colours, and the stations they enclose or run between
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
-- Leaflet.js, with the map's own controls stacked in its top-right corner as four icons — base
-  map (OSM-Topo by default, OpenStreetMap, Satellite or Dark), **Map display**, **Draw & measure**
-  and the **legend**. Each is an icon and nothing else until you point at it, click it or tab to it,
+- Leaflet.js, with the map's own controls in its top-right corner, grouped by what they are for
+  and separated by a hairline: what the map **shows** (base map — OSM-Topo by default,
+  OpenStreetMap, Satellite or Dark — **Map display**, the **legend**), the tools you point at it
+  (**Draw & measure**, **Polar radio coverage**, **What is here**), the **3-D view** and its
+  camera, how much screen the map gets (⛶ full screen, ◫ side by side), and ↺ reset on its own at
+  the bottom. Each panel is an icon and nothing else until you point at it, click it or tab to it,
   and each can be pinned open — a pin that is remembered between visits
 
 **Reading the map.** Every pin carries a white ring so it separates from the
@@ -933,6 +936,45 @@ itself, and #165 put the filters under it as a collapsible card — so the map i
 about 320 px wider on every screen, and the page scrolls as one piece at every
 width, which is what it already did on a phone.
 
+**The corner, grouped (#192).** Eleven icons had accumulated in that corner over
+seven issues, each its own Leaflet control with Leaflet's own 10 px margin: half
+a metre of identical buttons down the side of the map, in the order the modules
+happened to attach rather than in any order a reader could use. Nothing in the
+column said which of them were about what the map *shows*, which were tools you
+arm and then point at it, which were about how much screen it gets, and which
+single one throws your work away — and the two that are the same feature, the
+⛰️ that tilts the map and the ⛰️ that carries the tilt's own settings, were four
+buttons apart and identical.
+
+It is one control holding five labelled groups now, with 3 px inside a group and
+a gap and a hairline between them, so the column reads as five short clusters
+and is ~35 px shorter than the stack it replaced even before the two hidden
+camera buttons. Each icon states its group and its place in it, so
+`addBaseLayers` (first), `stationsMapPanels` (next) and `MapPolar.attach` (well
+after) produce the same column whatever order they run in — 📡 lands among the
+other tools instead of at the bottom where attaching last used to put it. The
+groups are real ARIA groups with names, so a screen reader is told *3-D view*
+where a sighted operator is shown a hairline; a separator that existed only in
+the stylesheet would have made the corner prettier and no more navigable. And
+when the corner is taller than the map — a phone at 52 dvh with 44 px touch
+targets — the groups that do not fit wrap, whole, into a second column over the
+map rather than hanging off the bottom edge.
+
+**The 3-D pair is one split button, and it has a camera (#192).** The mountain
+and its panel share an edge now, the panel drawn as a thin caret under the
+button it belongs to: press the big half to tilt the map, the small half for
+what it tilts it with. Two buttons appear beside them while the mode is on — a
+**compass** whose needle turns with the map, and a **tilt** control that draws
+the ground as the camera sees it, square from overhead and foreshortened as it
+drops. Pressing the compass faces north again; pressing the tilt flattens the
+camera to straight down, and pressing it again returns it to 62°, because a
+reset that only ever flattens leaves whoever pressed it by accident with no way
+back that does not involve discovering the right-drag. Both are drawn from the
+camera rather than labelled once, which is half of what they are for: a needle
+at 37° is how you *find out* the map is not facing north. Neither is offered on
+the flat map — Leaflet has no pitch and no bearing, so there is no camera to
+reset, and a button that can do nothing is not shown.
+
 **The station card, and the callout as a signpost (#175).** Clicking a pin
 paints a card in the map's bottom-left corner — the station's number,
 networks, position, elevation, wind region, every ALERT id with its reading
@@ -1023,8 +1065,8 @@ against the map's own height rather than against a share of the viewport, which
 is the only figure that is right in the page, on a phone, in full screen and in
 the side-by-side split at once.
 
-**Full screen.** The ⛶ button in the map's top-right corner, under the four
-panel icons, fixes the map's panel to the viewport — the match note, the ACMA
+**Full screen.** The ⛶ button in the map's top-right corner, in the group about
+how much screen the map gets, fixes the map's panel to the viewport — the match note, the ACMA
 and path cards and the corner controls all ride along, because they are all
 positioned inside that panel. Press it again, or Escape, to put the page back;
 Escape defers to any dialog open over the map, and the bug reporter still

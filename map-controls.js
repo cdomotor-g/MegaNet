@@ -2,10 +2,12 @@
 //
 //   makeBaseLayers  the shared base-map tile set, as fresh Leaflet layers.
 //   addBaseLayers   put that set on a map and give it the base-map picker.
-//   MapChrome       the on-map panel: an icon in a map corner that opens a
-//                   flyout when the pointer is over it, and when it is
-//                   clicked, tapped or opened with Enter — and that can be
-//                   pinned open, which docks it into the corner for good.
+//   MapChrome       the map's corner: one column of icons, grouped and
+//                   separated by what they are for. An icon is either a panel
+//                   — a flyout that opens when the pointer is over it, and
+//                   when it is clicked, tapped or opened with Enter, and that
+//                   can be pinned open, which docks it into the corner for
+//                   good — or a plain button that does one thing.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc and escAttr, and across to
@@ -196,10 +198,14 @@ function addBaseLayers(map) {
   map.mnBaseName = current;
   syncCompanions();   // a no-op while the default is OSM-Topo, correct if it ever isn't
 
+  // First in the corner, and first in the group about what the map shows:
+  // every other icon in that group is a way of drawing something *over* this
+  // choice, so this is the one they are all qualifying.
   MapChrome.panel(map, {
     id:    'basemap',
     icon:  '🗺️',
     title: 'Base map',
+    group: 'show', order: 10,
     html: () => names.map(n => `
       <label class="filter-check">
         <input type="radio" name="${group}" value="${escAttr(n)}" ${n === current ? 'checked' : ''}>
@@ -316,10 +322,115 @@ const MapChrome = (function () {
   const STORE = 'mn-map-panels';
   let seq = 0;
 
+  // ── The corner, and why it is one control now (#192) ─────────────────────
+  // Eleven icons had accumulated in the Stations map's top-right corner, each
+  // one its own Leaflet control carrying Leaflet's own 10 px margin: a 500-pixel
+  // column of identical buttons down the side of a map that is 720 px tall at
+  // its tallest. Nothing in it said which of them were about what the map
+  // *shows*, which were tools you point *at* it, which were about how much
+  // screen it gets, and which single one throws your work away — and the two
+  // that are the same feature, the ⛰️ that tilts the map and the ⛰️ that
+  // carries the tilt's own settings, were four buttons apart with nothing to
+  // say they were related at all.
+  //
+  // So the corner is **one control holding ordered groups** rather than N
+  // controls in whatever order the modules happened to attach. Three things
+  // follow, and all three are the point:
+  //
+  //   **The order is declared.** An icon states which group it is in and where
+  //   in it, so addBaseLayers (before), stationsMapPanels (next) and
+  //   MapPolar.attach (well after) produce the same column whatever order they
+  //   run in — and whoever adds the twelfth icon picks a meaning rather than a
+  //   position in a list they cannot see.
+  //
+  //   **The spacing can say something.** Icons inside a group sit 3 px apart;
+  //   the groups are separated by a gap and a hairline (styles.css). The column
+  //   reads as five short clusters instead of eleven equal buttons, and it is
+  //   ~35 px shorter than the stack it replaced with everything shut — and a
+  //   great deal shorter than it on a phone, where the icons are 44 px and the
+  //   old column was 200 px taller than the map it was drawn on.
+  //
+  //   **The grouping is not only pixels.** Each group is a labelled ARIA group,
+  //   so a screen reader is told "3-D view" where a sighted operator is shown a
+  //   hairline. A separator that existed only in the stylesheet would have made
+  //   the corner prettier and no more navigable.
+  //
+  // The group names are the five questions the corner answers. `show` is what
+  // is drawn and how to read it; `tools` is what you arm and point at the map;
+  // `3d` is the mode and its camera; `screen` is how much of the page this map
+  // is being given; `reset` is the one that takes something away, last, for the
+  // reason it has always been last (app.js).
+  const GROUPS = {
+    show:   'What the map shows',
+    tools:  'Tools',
+    '3d':   '3-D view',
+    screen: 'Screen',
+    reset:  'Reset',
+  };
+  const ORDER = Object.keys(GROUPS);
+
   // Write the pinned set back, as a comma list.
   function persist() {
     try { localStorage.setItem(STORE, [...state.mapPanelsPinned].join(',')); }
     catch (e) { /* private browsing, a full quota — the pin still works this session */ }
+  }
+
+  // The one Leaflet control per map corner that every icon is put inside.
+  // Made on first use, so a map that only ever calls addBaseLayers gets a bar
+  // with one group in it and nothing else changes for the other six maps.
+  function bar(map, position) {
+    const bars = map._mnBars || (map._mnBars = {});
+    if (bars[position]) return bars[position];
+    const ctl = L.control({ position });
+    ctl.onAdd = () => {
+      const el = L.DomUtil.create('div', 'mn-mapbar');
+      el.setAttribute('role', 'group');
+      el.setAttribute('aria-label', 'Map controls');
+      // Once, for the whole column, rather than once per icon: a click
+      // anywhere in here is a click on a control and the map underneath must
+      // not also take it, and a scroll over a long flyout must not zoom.
+      L.DomEvent.disableClickPropagation(el);
+      L.DomEvent.disableScrollPropagation(el);
+      return el;
+    };
+    ctl.addTo(map);
+    bars[position] = ctl.getContainer();
+    return bars[position];
+  }
+
+  // The group inside that bar, made on first use and inserted in ORDER's order
+  // however late the module asking for it attaches.
+  function slot(map, opts) {
+    const el   = bar(map, opts.position || 'topright');
+    const name = GROUPS[opts.group] ? opts.group : 'tools';
+    const rank = ORDER.indexOf(name);
+    let g = el.querySelector(`.mn-mapbar-group[data-group="${name}"]`);
+    if (!g) {
+      g = L.DomUtil.create('div', 'mn-mapbar-group');
+      g.dataset.group = name;
+      g.dataset.rank  = String(rank);
+      g.setAttribute('role', 'group');
+      g.setAttribute('aria-label', GROUPS[name]);
+      el.insertBefore(g, [...el.children].find(c => Number(c.dataset.rank) > rank) || null);
+    }
+    return g;
+  }
+
+  // …and the icon's place within it. The same rule one level down and for the
+  // same reason: `order` is a number the caller states rather than the moment
+  // it happened to call. Gaps of ten, so an icon can be put between two others
+  // without renumbering them.
+  function place(map, el, opts) {
+    const g = slot(map, opts);
+    const n = Number(opts.order) || 0;
+    el.dataset.order = String(n);
+    // Two icons that are one control — the ⛰️ mode and the caret that opens
+    // its settings. The stylesheet joins anything carrying the same pair name
+    // into a single button with a split bottom; nothing here needs to know
+    // which two they are.
+    if (opts.pair) el.dataset.pair = opts.pair;
+    g.insertBefore(el, [...g.children].find(c => Number(c.dataset.order) > n) || null);
+    return el;
   }
 
   // Push the open/pinned state onto one control's DOM. Called on build and
@@ -353,6 +464,11 @@ const MapChrome = (function () {
     // Radio groups and body ids have to be unique across every map on the page.
     uid() { return ++seq; },
 
+    // The corner's groups, for anything that needs to reason about them —
+    // `test/mapctl.mjs` asserts the column is in this order and that every
+    // group on screen is one of these.
+    groups() { return { ...GROUPS }; },
+
     // Pin or unpin by id, from anywhere. Every control carrying that id is
     // updated, because the same panel can exist on more than one map.
     setPinned(id, on) {
@@ -362,13 +478,71 @@ const MapChrome = (function () {
       for (const el of document.querySelectorAll(`.mn-mapctl[data-panel="${id}"]`)) apply(el);
     },
 
+    // ── A plain corner button ────────────────────────────────────────────────
+    // One press, one thing, nothing disclosed: full screen, side by side,
+    // reset, What is here, the ⛰️ mode and the two camera buttons are all this
+    // shape. They were five hand-rolled `L.control` blocks in app.js until the
+    // corner became a bar — the same six lines of Leaflet plumbing five times,
+    // none of which could say which group it belonged to, and each of which
+    // built its icon slightly differently from the panels beside it.
+    //
+    //   icon      the markup inside the button: an emoji, or an SVG for the two
+    //             that have to *show* something that changes (Map3D's compass
+    //             needle and its tilt)
+    //   title     tooltip and accessible name, one string, as for a panel
+    //   ariaLabel optional, and the one place the two come apart: ↺'s tooltip
+    //             is a sentence about what it clears, which is the right thing
+    //             to read on hover and far too much to hear read out as the
+    //             name of a button
+    //   onClick   what it does, called with the button
+    //   className extra classes — which is how the module that owns a button
+    //             finds it again to keep it in step (`.mn-map-3d`, …)
+    //   pressed   this button is a *mode* rather than an action, and starts
+    //             in that state. A mode has to say so from the moment it is
+    //             built, not from the first time it changes: ℹ️ and ⛰️ are
+    //             both toggles, and a toggle with no aria-pressed is a button
+    //             that never tells anyone it is on
+    //   hidden    built, placed, and not shown: a control that cannot do
+    //             anything yet. Its group keeps the space in the order rather
+    //             than the column, so showing it later moves nothing above it
+    //   group / order / pair   where it goes — see place() above
+    //
+    // Returns the button, for a caller that wants to go on syncing it.
+    button(map, opts) {
+      const b = L.DomUtil.create('button',
+        `mn-mapctl-btn${opts.className ? ` ${opts.className}` : ''}`);
+      b.type = 'button';
+      b.innerHTML = `<span class="mn-mapctl-ico" aria-hidden="true">${opts.icon || ''}</span>`;
+      if (opts.title) b.title = opts.title;
+      if (opts.title || opts.ariaLabel) {
+        b.setAttribute('aria-label', opts.ariaLabel || opts.title);
+      }
+      if (opts.pressed !== undefined) b.setAttribute('aria-pressed', String(!!opts.pressed));
+      if (opts.hidden) b.hidden = true;
+      // A corner button is not a disclosure and has no body to leave behind,
+      // so it needs only what every control in here needs: the click must not
+      // reach the map. The bar stops it as well; this stops it at the source,
+      // which is what survives a handler that repaints its own button.
+      L.DomEvent.disableClickPropagation(b);
+      L.DomEvent.on(b, 'click', L.DomEvent.stop);
+      if (typeof opts.onClick === 'function') L.DomEvent.on(b, 'click', () => opts.onClick(b));
+      return place(map, b, opts);
+    },
+
     // Build one panel and add it to `map`.
     //
     //   id        stable, and the key the pin is remembered under
     //   icon      the one thing on screen while the panel is shut
     //   title     the button's accessible name, its tooltip and the panel's own
     //             heading — one string, so they cannot disagree
+    //   btnLabel  optional, and the one exception to that: an icon that is not
+    //             a picture of its panel needs to say what pressing it does.
+    //             The 3-D caret is ▾ — "3-D view" is the right heading for the
+    //             panel and the wrong tooltip for a chevron
+    //   caret     draw the icon as the thin lower half of the control above it
+    //             rather than as a button of its own (see `pair`)
     //   position  a Leaflet corner; 'topright' unless a caller says otherwise
+    //   group / order / pair   where it goes in that corner — see place()
     //   html      () => string, the panel's contents. Called once, here: what
     //             is inside keeps its own ids and is re-rendered by whatever
     //             owned it before it moved onto the map.
@@ -376,149 +550,148 @@ const MapChrome = (function () {
     //             listeners rather than inline handlers
     //   pinnable  false drops the pin — a panel nobody would want kept open
     //
-    // Returns the Leaflet control, which dies with the map like any other.
+    // Returns the wrapper element. It was the Leaflet control until the corner
+    // became a bar; no caller ever used it, and there is no control of its own
+    // to return any more — the panel dies with the bar, which dies with the map
+    // like any other control.
     panel(map, opts) {
-      const id  = opts.id;
-      const ctl = L.control({ position: opts.position || 'topright' });
+      const id   = opts.id;
+      const wrap = L.DomUtil.create('div', 'mn-mapctl');
+      wrap.dataset.panel = id;
 
-      ctl.onAdd = () => {
-        const wrap = L.DomUtil.create('div', 'mn-mapctl');
-        wrap.dataset.panel = id;
+      const bodyId = `mn-mapctl-body-${id}-${MapChrome.uid()}`;
 
-        const bodyId = `mn-mapctl-body-${id}-${MapChrome.uid()}`;
+      const btn = L.DomUtil.create('button',
+        `mn-mapctl-btn${opts.caret ? ' is-caret' : ''}`, wrap);
+      btn.type = 'button';
+      btn.title = opts.btnLabel || opts.title;
+      btn.setAttribute('aria-label', opts.btnLabel || opts.title);
+      btn.setAttribute('aria-expanded', 'false');
+      btn.setAttribute('aria-controls', bodyId);
+      btn.innerHTML = `<span class="mn-mapctl-ico" aria-hidden="true">${opts.icon}</span>`;
 
-        const btn = L.DomUtil.create('button', 'mn-mapctl-btn', wrap);
-        btn.type = 'button';
-        btn.title = opts.title;
-        btn.setAttribute('aria-label', opts.title);
-        btn.setAttribute('aria-expanded', 'false');
-        btn.setAttribute('aria-controls', bodyId);
-        btn.innerHTML = `<span class="mn-mapctl-ico" aria-hidden="true">${opts.icon}</span>`;
+      const body = L.DomUtil.create('div', 'mn-mapctl-body', wrap);
+      body.id = bodyId;
 
-        const body = L.DomUtil.create('div', 'mn-mapctl-body', wrap);
-        body.id = bodyId;
+      const head = L.DomUtil.create('div', 'mn-mapctl-head', body);
+      const h3   = L.DomUtil.create('h3', 'mn-mapctl-title', head);
+      h3.textContent = opts.title;
 
-        const head = L.DomUtil.create('div', 'mn-mapctl-head', body);
-        const h3   = L.DomUtil.create('h3', 'mn-mapctl-title', head);
-        h3.textContent = opts.title;
+      if (opts.pinnable !== false) {
+        const pin = L.DomUtil.create('button', 'mn-mapctl-pin', head);
+        pin.type = 'button';
+        pin.innerHTML = '<span aria-hidden="true">📌</span>';
+        L.DomEvent.on(pin, 'click', L.DomEvent.stop)
+                  .on(pin, 'click', () => MapChrome.setPinned(id, !state.mapPanelsPinned.has(id)));
+      }
 
-        if (opts.pinnable !== false) {
-          const pin = L.DomUtil.create('button', 'mn-mapctl-pin', head);
-          pin.type = 'button';
-          pin.innerHTML = '<span aria-hidden="true">📌</span>';
-          L.DomEvent.on(pin, 'click', L.DomEvent.stop)
-                    .on(pin, 'click', () => MapChrome.setPinned(id, !state.mapPanelsPinned.has(id)));
-        }
+      const content = L.DomUtil.create('div', 'mn-mapctl-content', body);
+      content.innerHTML = typeof opts.html === 'function' ? opts.html() : (opts.html || '');
 
-        const content = L.DomUtil.create('div', 'mn-mapctl-content', body);
-        content.innerHTML = typeof opts.html === 'function' ? opts.html() : (opts.html || '');
-
-        // Click to open, click again to shut. This is the whole of the control
-        // on a touch screen, where there is no pointer to hover with, and it is
-        // also how a keyboard opens it — the button is a button, so Enter and
-        // Space already arrive here. It is a plain disclosure, in other words,
-        // and `is-open` is the state aria-expanded reports.
-        //
-        // What it toggles against is what is **on screen**, not the class on its
-        // own. On a mouse the icon cannot be clicked without being hovered
-        // first, so the panel is already open by the time the click lands: a
-        // bare `toggle('is-open')` there looked like it did nothing, and left
-        // the panel open for good — the class it had just set outlived the hover
-        // that was doing the showing, and only a second click on the icon could
-        // undo it. Clicking a panel you can see shuts it, and `is-shut` is what
-        // holds it shut under a pointer that has not moved away yet; the
-        // pointerleave below drops that class so the next hover opens it again.
-        L.DomEvent.on(btn, 'click', L.DomEvent.stop).on(btn, 'click', () => {
-          const hovered = hoverShows(wrap);
-          const showing = !wrap.classList.contains('is-shut')
-                       && (wrap.classList.contains('is-open') || hovered);
-          wrap.classList.toggle('is-open', !showing);
-          wrap.classList.toggle('is-shut', showing && hovered);
-          apply(wrap);
-        });
-
-        // Focus arriving inside a panel that is open on *hover* alone promotes
-        // it to open-for-real. Two things go wrong without this, and the second
-        // is the one that matters: aria-expanded would read "false" about a
-        // panel the operator is typing in, and the panel would shut the moment
-        // the mouse moved — with focus inside it, which drops focus to the top
-        // of the document. The CSS holds it open while that is settled
-        // (.mn-mapctl-body:has(:focus-visible)) and this is what makes the state
-        // agree with the pixels.
-        //
-        // **Keyboard focus only**, and that qualifier is the bug this gate
-        // fixes rather than a refinement of it. A *click* on a checkbox, a
-        // colour swatch or a draw tool inside the panel focuses that control
-        // too, so an ungated promotion fired on every ordinary use of the panel
-        // and made it permanent: one tick of "Snap to stations" in Draw &
-        // measure, one radio in Base map, one checkbox in Map display, and the
-        // flyout stayed on the map until its icon was found and clicked again.
-        // That is not a disclosure, it is a panel that will not go away, and
-        // with three of them on one corner they stack up over the map.
-        //
-        // `:focus-visible` is the browser's own answer to "did the keyboard put
-        // focus here", so the safety net keeps every case it was built for —
-        // including the one that is not a keypress: a text or number field
-        // matches it whatever focused it, so the "Place by numbers" inputs still
-        // hold their panel open while they are being typed into.
-        //
-        // The button is excluded on purpose: clicking it focuses it *and* fires
-        // the toggle above, and a focusin that opened first would have that
-        // toggle close what the click was opening.
-        L.DomEvent.on(wrap, 'focusin', e => {
-          if (e.target === btn) return;
-          if (wrap.classList.contains('is-open') || state.mapPanelsPinned.has(id)) return;
-          if (!(e.target.matches && e.target.matches(':focus-visible'))) return;
-          wrap.classList.add('is-open');
-          apply(wrap);
-        });
-
-        // The pointer leaving does two things, both about the frame after it.
-        // It clears the shut-by-click suppression above, so the icon opens on
-        // hover again. And it takes focus off whatever inside the panel a
-        // *click* left it on, because the hover rule is about to hide that
-        // element with focus still in it — which drops focus to <body> and
-        // starts the next Tab at the top of the document. That is the same
-        // defect the promotion above exists to prevent, arriving by the door the
-        // :focus-visible gate deliberately leaves open. The icon is where the
-        // focus came from and where Tab should carry on from, and moving it
-        // there after a pointer gesture draws no focus ring.
-        L.DomEvent.on(wrap, 'pointerleave', () => {
-          wrap.classList.remove('is-shut');
-          if (wrap.classList.contains('is-open') || state.mapPanelsPinned.has(id)) return;
-          const active = document.activeElement;
-          if (active && active !== btn && wrap.contains(active)) btn.focus({ preventScroll: true });
-        });
-
-        // Without these, ticking a checkbox in the panel also drops a draw pin
-        // on the map underneath it, and scrolling a long panel zooms the map.
-        L.DomEvent.disableClickPropagation(wrap);
-        L.DomEvent.disableScrollPropagation(wrap);
-
-        // …and without *this*, the one control that repaints its own panel gets
-        // the pin anyway. Leaflet's disableClickPropagation does not stop the
-        // click; it marks the wrapper and, when the map container later sees the
-        // event, walks up from `event.target` looking for that mark. A handler
-        // that replaces the panel's innerHTML — MapDraw.setTool() arming a tool
-        // is exactly that — has by then detached the button that was clicked, so
-        // the walk starts on an orphan, finds no mark, and the map takes the
-        // click as its own: arming the line tool dropped its first point under
-        // the ✏️ flyout, and the tool came up already waiting for point two.
-        //
-        // The event path was fixed when the click was dispatched, so this
-        // listener still runs on a wrapper whose contents have gone. Stopping
-        // here keeps the click off the map without needing the target to still
-        // exist. Nothing in this app listens for clicks on document, so nothing
-        // downstream loses one.
-        L.DomEvent.on(wrap, 'click', L.DomEvent.stopPropagation);
-
-        if (typeof opts.onMount === 'function') opts.onMount(content);
+      // Click to open, click again to shut. This is the whole of the control
+      // on a touch screen, where there is no pointer to hover with, and it is
+      // also how a keyboard opens it — the button is a button, so Enter and
+      // Space already arrive here. It is a plain disclosure, in other words,
+      // and `is-open` is the state aria-expanded reports.
+      //
+      // What it toggles against is what is **on screen**, not the class on its
+      // own. On a mouse the icon cannot be clicked without being hovered
+      // first, so the panel is already open by the time the click lands: a
+      // bare `toggle('is-open')` there looked like it did nothing, and left
+      // the panel open for good — the class it had just set outlived the hover
+      // that was doing the showing, and only a second click on the icon could
+      // undo it. Clicking a panel you can see shuts it, and `is-shut` is what
+      // holds it shut under a pointer that has not moved away yet; the
+      // pointerleave below drops that class so the next hover opens it again.
+      L.DomEvent.on(btn, 'click', L.DomEvent.stop).on(btn, 'click', () => {
+        const hovered = hoverShows(wrap);
+        const showing = !wrap.classList.contains('is-shut')
+                     && (wrap.classList.contains('is-open') || hovered);
+        wrap.classList.toggle('is-open', !showing);
+        wrap.classList.toggle('is-shut', showing && hovered);
         apply(wrap);
-        return wrap;
-      };
+      });
 
-      ctl.addTo(map);
-      return ctl;
+      // Focus arriving inside a panel that is open on *hover* alone promotes
+      // it to open-for-real. Two things go wrong without this, and the second
+      // is the one that matters: aria-expanded would read "false" about a
+      // panel the operator is typing in, and the panel would shut the moment
+      // the mouse moved — with focus inside it, which drops focus to the top
+      // of the document. The CSS holds it open while that is settled
+      // (.mn-mapctl-body:has(:focus-visible)) and this is what makes the state
+      // agree with the pixels.
+      //
+      // **Keyboard focus only**, and that qualifier is the bug this gate
+      // fixes rather than a refinement of it. A *click* on a checkbox, a
+      // colour swatch or a draw tool inside the panel focuses that control
+      // too, so an ungated promotion fired on every ordinary use of the panel
+      // and made it permanent: one tick of "Snap to stations" in Draw &
+      // measure, one radio in Base map, one checkbox in Map display, and the
+      // flyout stayed on the map until its icon was found and clicked again.
+      // That is not a disclosure, it is a panel that will not go away, and
+      // with three of them on one corner they stack up over the map.
+      //
+      // `:focus-visible` is the browser's own answer to "did the keyboard put
+      // focus here", so the safety net keeps every case it was built for —
+      // including the one that is not a keypress: a text or number field
+      // matches it whatever focused it, so the "Place by numbers" inputs still
+      // hold their panel open while they are being typed into.
+      //
+      // The button is excluded on purpose: clicking it focuses it *and* fires
+      // the toggle above, and a focusin that opened first would have that
+      // toggle close what the click was opening.
+      L.DomEvent.on(wrap, 'focusin', e => {
+        if (e.target === btn) return;
+        if (wrap.classList.contains('is-open') || state.mapPanelsPinned.has(id)) return;
+        if (!(e.target.matches && e.target.matches(':focus-visible'))) return;
+        wrap.classList.add('is-open');
+        apply(wrap);
+      });
+
+      // The pointer leaving does two things, both about the frame after it.
+      // It clears the shut-by-click suppression above, so the icon opens on
+      // hover again. And it takes focus off whatever inside the panel a
+      // *click* left it on, because the hover rule is about to hide that
+      // element with focus still in it — which drops focus to <body> and
+      // starts the next Tab at the top of the document. That is the same
+      // defect the promotion above exists to prevent, arriving by the door the
+      // :focus-visible gate deliberately leaves open. The icon is where the
+      // focus came from and where Tab should carry on from, and moving it
+      // there after a pointer gesture draws no focus ring.
+      L.DomEvent.on(wrap, 'pointerleave', () => {
+        wrap.classList.remove('is-shut');
+        if (wrap.classList.contains('is-open') || state.mapPanelsPinned.has(id)) return;
+        const active = document.activeElement;
+        if (active && active !== btn && wrap.contains(active)) btn.focus({ preventScroll: true });
+      });
+
+      // Without these, ticking a checkbox in the panel also drops a draw pin
+      // on the map underneath it, and scrolling a long panel zooms the map.
+      // The bar carries them too, and both are worth having: this is the pair
+      // that goes on working if a panel is ever built somewhere else.
+      L.DomEvent.disableClickPropagation(wrap);
+      L.DomEvent.disableScrollPropagation(wrap);
+
+      // …and without *this*, the one control that repaints its own panel gets
+      // the pin anyway. Leaflet's disableClickPropagation does not stop the
+      // click; it marks the wrapper and, when the map container later sees the
+      // event, walks up from `event.target` looking for that mark. A handler
+      // that replaces the panel's innerHTML — MapDraw.setTool() arming a tool
+      // is exactly that — has by then detached the button that was clicked, so
+      // the walk starts on an orphan, finds no mark, and the map takes the
+      // click as its own: arming the line tool dropped its first point under
+      // the ✏️ flyout, and the tool came up already waiting for point two.
+      //
+      // The event path was fixed when the click was dispatched, so this
+      // listener still runs on a wrapper whose contents have gone. Stopping
+      // here keeps the click off the map without needing the target to still
+      // exist. Nothing in this app listens for clicks on document, so nothing
+      // downstream loses one.
+      L.DomEvent.on(wrap, 'click', L.DomEvent.stopPropagation);
+
+      if (typeof opts.onMount === 'function') opts.onMount(content);
+      apply(wrap);
+      return place(map, wrap, opts);
     },
   };
 })();

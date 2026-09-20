@@ -91,6 +91,12 @@ const Map3D = (function () {
   // it covers: the relief still renders, and every hill is in the wrong place.
   const DEM_TILE_PX = 256;
 
+  // The pitch the camera opens at, and the pitch the tilt button puts it back
+  // to. Named because two things now depend on it being the same number: the
+  // camera build below and ⛰️'s tilt control, which flattens to nil on the
+  // first press and returns *here* on the second (see resetTilt).
+  const PITCH_HOME = 62;
+
   const SHEET_SAMPLES = 48;   // per hop. MapLos uses 64 for a yes/no verdict;
                               // a sheet is a picture and reads the same at 48,
                               // at three quarters of the tiles
@@ -670,7 +676,7 @@ const Map3D = (function () {
       // 256 px tiles and MapLibre's reading of the same number differ by one
       // step — the same ground at Leaflet z12 is MapLibre z11.
       zoom: Math.max(0, z - 1),
-      pitch: 62,
+      pitch: PITCH_HOME,
       bearing: 0,
       maxPitch: 85,
       // Pan, tilt, rotate and zoom are the whole point of this mode, so every
@@ -688,12 +694,23 @@ const Map3D = (function () {
     map.addControl(new ml.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new ml.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
+    // The two camera buttons in the ⛰️ cluster are a readout as well as a
+    // control — the needle points where north has gone and the quad shows how
+    // far the camera has dropped — so they follow the drag rather than waiting
+    // for it to end. Both events fire per frame while a right-drag is running
+    // and each costs two `innerHTML` writes on a 15 px SVG; `moveend` was the
+    // alternative and it is the wrong one, because the whole value of a needle
+    // is that it moves *with* the map you are turning.
+    map.on('rotate', syncCamera);
+    map.on('pitch', syncCamera);
+
     map.on('style.load', () => {
       ready = true;
       map.setTerrain({ source: 'mn-dem', exaggeration: state.map3dExag || 1 });
       map.addLayer(sheetLayer);
       queueSheets();
       setNote();
+      syncCamera();
     });
 
     // A DEM tile that will not come is flat ground on screen, and flat ground
@@ -753,6 +770,84 @@ const Map3D = (function () {
       btn.setAttribute('aria-pressed', state.map3d ? 'true' : 'false');
       btn.classList.toggle('is-on', !!state.map3d);
     }
+    syncCamera();
+  }
+
+  // ── The camera buttons (#192) ──────────────────────────────────────────────
+  // 🧭 and the tilt quad, in the ⛰️ cluster in the map's corner. They exist
+  // because the two things a right-drag does are the two things it is hardest
+  // to undo: a map turned 37° is a map you have to turn 37° back by hand, and
+  // a camera dropped to the horizon cannot be raised by any gesture a mouse
+  // wheel offers. `levelCamera()` has always done both at once from inside the
+  // panel; these are its halves, one press each, without opening anything.
+  //
+  // They are drawn from the camera rather than labelled once, and that is half
+  // of what they are for. A needle at 0° tells you the map is north-up; a
+  // needle at 37° is how you *find out* it is not — which is a question
+  // somebody four drags into a hillside does not know to ask.
+  //
+  // Hidden while the map is flat: Leaflet has no camera at all, so in 2-D
+  // north is always up and the tilt is always nil, and a control that cannot do
+  // anything should not be occupying a corner of the map (map-controls.js says
+  // the same thing at more length about flyouts).
+
+  // The needle, pointing at where north has gone. Bearing is the map's
+  // rotation, so the needle turns the other way.
+  function northIcon(deg) {
+    const r = -(((Number(deg) || 0) % 360 + 360) % 360);
+    return `<svg class="mn-compass" viewBox="0 0 16 16" width="15" height="15"`
+         + ` aria-hidden="true" style="transform: rotate(${r.toFixed(1)}deg)">`
+         + `<polygon class="mn-compass-n" points="8,1.5 10.8,8.4 5.2,8.4"/>`
+         + `<polygon class="mn-compass-s" points="8,14.5 10.8,7.6 5.2,7.6"/></svg>`;
+  }
+
+  // A patch of ground, seen from wherever the camera is. Square when it is
+  // straight overhead, foreshortened into a trapezoid as it drops — the same
+  // picture the view itself is showing, which is what makes it readable without
+  // a legend. Clamped against MapLibre's own maxPitch so the far edge cannot
+  // cross the near one.
+  function tiltIcon(deg) {
+    const k  = Math.max(0, Math.min(1, (Number(deg) || 0) / 85));
+    const tw = 6 - 3.6 * k;                    // the far edge, foreshortened
+    const y  = (4 + 1.6 * k).toFixed(1);       // …and dropping towards the horizon
+    return `<svg class="mn-tilt" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">`
+         + `<polygon points="${(8 - tw).toFixed(1)},${y} ${(8 + tw).toFixed(1)},${y}`
+         + ` 14,12.6 2,12.6"/></svg>`;
+  }
+
+  // Both buttons, redrawn and relabelled from the camera. Called on every
+  // rotate and every pitch while 3-D is open, and by repaintPanel() when the
+  // mode itself changes — which is what shows them and what puts them away.
+  function syncCamera() {
+    const on = !!state.map3d && !!map;
+    const b  = on ? Math.round(((map.getBearing() % 360) + 360) % 360) % 360 : 0;
+    const p  = on ? Math.round(map.getPitch()) : 0;
+    for (const el of document.querySelectorAll('.mn-map-north')) {
+      el.hidden = !on;
+      const ico = el.querySelector('.mn-mapctl-ico');
+      if (ico) ico.innerHTML = northIcon(b);
+      // The label carries the reading, because the needle does not: an operator
+      // who cannot see it has no other way to be told the map is turned.
+      label(el, b ? `Face north again — the map is turned ${b}°` : 'Facing north already');
+    }
+    for (const el of document.querySelectorAll('.mn-map-tilt')) {
+      el.hidden = !on;
+      const ico = el.querySelector('.mn-mapctl-ico');
+      if (ico) ico.innerHTML = tiltIcon(p);
+      // Two presses rather than one, and the label always says which one this
+      // is. A reset that only ever flattens leaves the operator who pressed it
+      // by accident with no way back that does not involve discovering the
+      // right-drag; the second press is that way back.
+      label(el, p > 1 ? `Look straight down — the camera is tilted ${p}°`
+                      : `Tilt back to ${PITCH_HOME}°`);
+    }
+  }
+
+  // The tooltip and the accessible name are the same sentence, as they are on
+  // every other button in that corner (MapChrome).
+  function label(el, text) {
+    el.title = text;
+    el.setAttribute('aria-label', text);
   }
 
   function noteHtml() {
@@ -863,10 +958,35 @@ const Map3D = (function () {
 
     // Put the camera back overhead without leaving 3-D — the gesture that gets
     // somebody un-lost after a rotate, and the one thing a tilted map makes
-    // genuinely hard to do by hand.
+    // genuinely hard to do by hand. Both halves at once; the two corner buttons
+    // below are each of them on its own.
     levelCamera() {
       if (map) map.easeTo({ pitch: 0, bearing: 0, duration: 400 });
     },
+
+    // North, keeping whatever tilt the operator has chosen. The 🧭 button.
+    resetNorth() {
+      if (!map) return;
+      map.easeTo({ bearing: 0, duration: 400 });
+      announce('Facing north');
+    },
+
+    // Tilt, keeping whatever bearing they are on — and a press at a time.
+    // Flat is the reset, PITCH_HOME is the way back, and the button's own label
+    // says which press this is (syncCamera). A control that only flattens is a
+    // control somebody presses once and then has to find the right-drag to
+    // undo, which is the gesture they were avoiding by reaching for a button.
+    resetTilt() {
+      if (!map) return;
+      const flat = map.getPitch() <= 1;
+      map.easeTo({ pitch: flat ? PITCH_HOME : 0, duration: 400 });
+      announce(flat ? `Tilted back to ${PITCH_HOME} degrees` : 'Looking straight down');
+    },
+
+    // What app.js builds those two buttons' icons out of, so the markup for a
+    // needle and a foreshortened quad lives with the camera it describes rather
+    // than in the file that decides where in the corner they go.
+    northIcon, tiltIcon,
 
     // The 3-D panel, in the idiom every other on-map panel is written in:
     // `.filter-check` switches, a `.filter-range` slider, bare buttons and a
@@ -884,7 +1004,8 @@ const Map3D = (function () {
               ${on ? 'Leave 3-D' : 'Enter 3-D'}
             </button>
             <button type="button" onclick="Map3D.levelCamera()" ${on ? '' : 'disabled'}
-                    title="Point the camera straight down and north-up again">Level the camera</button>
+                    title="Point the camera straight down and north-up again — the 🧭 and tilt
+                           buttons in the corner do one each">Level the camera</button>
           </div>
           <label class="filter-check"
                  title="A surface between each hop's line of sight and the ground under it, shaded green where it clears the 60% Fresnel zone and red where the ground is above the line. Costs terrain tiles, so it is off until asked for.">

@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-15** (revision 93 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-20** (revision 94 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -33,7 +33,7 @@ Of the sixteen this paragraph was written about, **twelve were added by the chan
 | `npm run shell` | *(new — #109)* the app that renders perfectly and cannot be operated. A page opens all twenty tabs with a clean console just as happily with no skip link, no landmark structure, a focus ring that vanishes on half its backgrounds, a nav that drops focus on `<body>` at every tab change, and a dark palette that fails contrast — none of it throws. **47 assertions**: the six-step breakpoint scale (read out of `BREAKPOINTS` in `core.js`, so the CSS and the two JavaScript uses cannot drift), 25 text pairs and 4 control-boundary pairs against WCAG AA in **both themes** computed off the values the browser resolves, a two-entry `outline: none` allowlist, landmarks, the skip link, `aria-expanded` on all four shell disclosures, focus on a tab switch, and no sideways document scroll at 375/768/1440. It is also what makes #109's instructions to #136–#141 enforceable rather than advisory |
 | `npm run tabs` | *(new — #137)* the other eighteen tabs. `shell` holds #109's system against the shell and **one** tab, deliberately and by its own comment, so every clause of EPIC #107's per-tab Definition of Done was worth exactly what the reviewer's attention was worth. This is that Definition, checked, per tab named in `CONVERTED` — **a U-issue's landing commit adds its ids to that list**: no inline styles (a `--token: value` block and a `<col>` width exempt), tables wrapped/captioned/scoped, capped `.table-wrap`s named as regions, `<tr onclick>` holding a focusable control, `<aside>`s and controls named, headings stepping by one, and no sideways document scroll at 375/768/1440 in **both themes** — plus pattern 8's condition, that every region the basin drawing draws has a chip. **154 assertions over nine of the nineteen tabs** (44 over three at #137; #141 added four tabs, a `seed` hook, a corrected heading assertion and a second pattern-level claim — the ARRO chart's palette round trip; #138 added the two RF tabs and changed three things about seeds — see constraint 6). Confirmed to have teeth three times: four failures when pointed at two unconverted tabs, two more when #141's palette resolution was deliberately broken, and eleven when #138 first pointed it at RF Environment and RF Changes |
 | `npm run rivers` | *(new — #150)* a river layer that draws and cannot be used. Overpass is off-origin and the harness blocks it, so the geometry is seeded through `MapRivers.seed()` and everything downstream of the fetch is exercised on the real page — grouping by name, the three passes, the permanent labels, the map-delegated callout, and the assertion the issue asked for: one real control in the DOM per named river, so the layer is reachable without a mouse |
-| `npm run mapctl` | *(new — revision 60)* an on-map panel that will not go away. The one class of defect every other check here is **structurally** blind to: nothing else in `test/` moves a pointer, so a flyout that stays on the map after the mouse leaves it is invisible to all of them — nothing throws, every handler resolves, contrast is unchanged, and the keyboard path goes on working. Real `page.mouse` moves, real clicks inside Base map / Map display / Draw & measure, and the question asked afterwards is always "is it still on the map?" |
+| `npm run mapctl` | *(new — revision 60; extended at #192)* an on-map panel that will not go away, and — since #192 — a corner that has stopped saying anything. The first half is the class of defect every other check here is **structurally** blind to: nothing else in `test/` moves a pointer, so a flyout that stays on the map after the mouse leaves it is invisible to all of them — nothing throws, every handler resolves, contrast is unchanged, and the keyboard path goes on working. Real `page.mouse` moves, real clicks inside Base map / Map display / Draw & measure, and the question asked afterwards is always "is it still on the map?" The second half is the **arrangement**, and every assertion in it is geometry for `maplinks`' reason: "the groups are separated" is asked as *is the smallest gap between two groups bigger than the biggest gap inside one*, and "the camera buttons are not on the flat map" as `getClientRects()`, never as `el.hidden` — which is the attribute an author `display: flex` outranks. The group order is read out of `MapChrome.groups()` rather than copied here, so a sixth group is in this check the day it lands. 45 assertions, confirmed red on three deliberate breaks |
 | `npm run drawkml` | *(new — #183)* a Google Earth KML that is **wrong and opens perfectly**. Earth ignores a `<styleUrl>` naming a style that was never emitted, closes a `<LinearRing>` whose ends differ, and draws `lat,lon` coordinates 30° south-west of Sri Lanka without a word — so `smoke` presses the button, gets a file it never opens, and passes. Every assertion is about the parsed document and the ground its numbers describe: the axis order (checked by putting the ring's bearing-000° vertex where due north actually is), a circle round *on the sphere* (72 bearings through `destPoint`; the degrees version fails by 2.2 km on a 20 km radius at Brisbane), and the stations inside a shape against a haversine written in the check rather than the app's |
 | `npm run maplinks` | *(new — revision 89)* a map whose links are all one colour, whose arrows never draw, whose credit line covers a button, whose Clear buttons leave the map faded and whose panel search hides nothing — all of which open with a clean console, which is `smoke`'s whole test. The part that generalises is not the subject but the *measurement*: the panel search is asserted with `getClientRects()` rather than `el.hidden`, because the implementation that shipped first set the attribute and hid nothing (an author `display: flex` outranks the browser's `[hidden]` rule at the same specificity) and a check reading the property would have passed it. **Any check about whether something is on screen has to ask the geometry.** Confirmed red on three deliberate breaks |
 | `npm run steps` | *(new — #183)* `npm run all` and `.github/workflows/web-smoke.yml` naming the same checks, in both directions. The drift it closes has happened twice — `catchments` and `mapfade` each sat in `all` with no CI step — and **both halves stay green while they disagree**, which is why neither was found on purpose. Parse-only, under a second, and it holds for the check nobody has written yet |
@@ -490,6 +490,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Five AI rows, and six `[Human]` issues.
 >
+> **Revision 94 opened and closed #192 in the same push, and opened nothing that stays open** — the Stations map's corner was regrouped from a session request, so the allocation below is exactly revision 93's. #191 is a closed non-issue: it was filed into a number the codebase had already spent, and the replacement is #192 (see the revision entry at the bottom of the file).
+
 > **Revision 93 opened #186 (epic) with #187 and #188 under it, plus #189 and #190** — four pickable agent issues where there had been one, all out of the 3-D view shipping. The board has agent work at three effort levels for the first time in many revisions. Everything below about the six `[Human]` issues still stands.
 >
 > **Revision 77 opened #177** — `[Sonnet5/Med]`, road parcels for NSW — so the board is no longer empty of agent work for the first time in several revisions. Everything below about the six `[Human]` issues still stands.
@@ -613,6 +615,101 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 94 — 2026-09-20: the map's corner says what its eleven buttons are for, and the 3-D view grows a camera
+
+One session request — *"can you please tidy up these tools on the stations map,
+and also add in new useful tools that we don't have, such as reset north, and
+reset tilt buttons … there are currently two 3d mode buttons that do different
+things, that may be warranted but it is not immediately obvious to the user that
+they are related"* — filed as **#192 and closed in the same push**. Touched
+`map-controls.js`, `app.js`, `map-3d.js`, `map-polar.js`, `styles.css`,
+`core.js`, `test/mapctl.mjs` and the README. **#191 is a closed non-issue** —
+filed first, into a number `app.js`, `core.js`, `styles.css`, `datastore.js` and
+the README have been citing since the reset button and the Export gate shipped.
+
+**What the corner had become, and why it is the shape of problem worth a board
+entry.** Eleven icons had accumulated there over seven issues, and not one of
+them was wrong: #164 moved three panels onto the map, #186 added What is here
+and side by side, the 3-D view added two, the polar plot one, and each arrived
+as its own `L.control` carrying Leaflet's own 10 px margin. The result is a
+failure nobody introduced — ~500 px of identical buttons down the side of a
+589 px map, **in the order the modules happened to attach**. 📡 Polar coverage
+sat at the bottom of the column for no reason but that `MapPolar.attach()` runs
+last in `initMap()`, and the two halves of the 3-D view — the ⛰️ that tilts the
+map and the ⛰️ that carries the tilt's own settings — were four buttons apart
+and identical. *That is the general shape: a corner with no owner accumulates in
+call order, and call order is not an order anybody can read.*
+
+**So the corner has an owner.** `MapChrome` holds one Leaflet control per map
+corner and every icon states its group and its place in it; the column is drawn
+from those two numbers. Five groups — what the map shows · the tools you point
+at it · the 3-D view · how much screen it gets · reset — with 3 px inside a
+group and a gap and a hairline between them. Three things follow and all three
+are the point: the order is **declared** rather than accidental, so whoever adds
+the twelfth icon picks a meaning instead of a position in a list they cannot
+see; the spacing **says something**, so the column reads as five short clusters;
+and the grouping is not only pixels — each group is a labelled ARIA group, so a
+screen reader is told *3-D view* where a sighted operator is shown a hairline. A
+separator that existed only in the stylesheet would have made the corner
+prettier and no more navigable.
+
+**The two mountains are one split button.** The mode is the full-height half and
+its panel is a thin caret sharing its edge: press the big half to tilt the map,
+the small half for what it tilts it with. The panel keeps the id, the title and
+the pin it has always had — it is the same panel, drawn as the lower half of the
+button it belongs to.
+
+**And the 3-D view has a camera, which is the part that was asked for by name.**
+A compass whose needle turns with the map, and a tilt control that draws the
+ground as the camera sees it — square from overhead, foreshortened as it drops.
+Both are **drawn from the camera rather than labelled once**, and that is half
+of what they are for: a needle at 37° is how you find out the map is not facing
+north, which is a question somebody four drags into a hillside does not know to
+ask. Two decisions inside them are worth carrying:
+
+- **The tilt is two presses, not one.** Flat on the first, back to the opening
+  62° on the second, with the button's own label saying which press this is. A
+  reset that only ever flattens leaves whoever pressed it by accident with no
+  way back that does not involve discovering the right-drag — which is the
+  gesture they were avoiding by reaching for a button.
+- **Neither is offered on the flat map.** Leaflet has no pitch and no bearing,
+  so in 2-D north is always up and the tilt is always nil. A control that can do
+  nothing is not shown, which is the same rule `map-controls.js` states at more
+  length about flyouts.
+
+MapLibre's own `NavigationControl` still sits in the 3-D canvas's bottom-right
+corner and still resets both. It was left alone on purpose: that one is the
+renderer's furniture in the renderer's corner, in with its zoom, and an operator
+looking for a *map tool* on this page looks top-right where the other eleven
+are.
+
+**One finding worth generalising, caught by a deliberate break rather than by
+review.** The two camera buttons are hidden with `[hidden]`, and the attribute
+does nothing on them: `.mn-mapctl-btn` sets `display: flex`, which outranks the
+browser's own `[hidden] { display: none }` at the same specificity. So the
+attribute is set, the button is on the map, and every check that reads
+`el.hidden` agrees with the bug. This is the **third** time this repo has met
+that exact trap — revision 89's panel search, #186's find box, and now this —
+and the rule it wrote then held now: *any check about whether something is on
+screen has to ask the geometry.* `npm run mapctl` asks `getClientRects()`, and
+deleting the `!important` that beats the cascade turns it red.
+
+**The corner is also shorter and no longer runs off a phone.** 463 px against
+the old ~496 with everything shut, and where it is taller than the map — a phone
+at 52 dvh with 44 px touch targets — the groups that do not fit now wrap, whole,
+into a second column *over* the map rather than hanging off the bottom edge.
+That last part was not in the request; it was already true before the change and
+is the kind of thing a corner with an owner can finally fix in one rule.
+
+`npm run mapctl` went from 30 assertions to 45 and was confirmed red on three
+deliberate breaks (the pair unjoined, the separators collapsed, the `[hidden]`
+rule removed). `map3d`, `smoke`, `shell`, `tabs`, `registry`, `maplinks`,
+`movepin` and `help` are unchanged and green — `map3d` found the one real
+regression on the way through: `MapChrome.button()` did not carry
+`aria-pressed`, so the ⛰️ and ℹ️ toggles were built saying nothing about being
+toggles. It is an option on the primitive now, which is where it should have
+been when it was five copies.
 
 ### Revision 93 — 2026-09-15: the map tilts, and one epic plus four issues come out of it
 

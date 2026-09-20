@@ -778,8 +778,13 @@ const MapPolar = (function () {
         pane.style.zIndex = PANE_Z;
         pane.style.pointerEvents = 'none';
       }
+      // In among the other tools you arm and then point at the map, rather
+      // than at the bottom of the column where attaching last used to put it
+      // (#192): this one wants a station to sweep from, the way Draw wants a
+      // click to start a line.
       MapChrome.panel(m, {
         id: 'polar', icon: '📡', title: 'Polar radio coverage',
+        group: 'tools', order: 20,
         html: () => panelHtml(),
         onMount(el) { body = el; },
       });

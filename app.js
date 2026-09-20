@@ -2310,9 +2310,10 @@ function toggleStationsSplit(on) {
     : 'Map back above the station list.');
 }
 
+// The same, for side by side, and the same note about the icon.
 function syncMapSplitBtn(b) {
+  if (!b) return;
   const on = state.mapSplit;
-  b.textContent = '◫';
   b.setAttribute('aria-pressed', String(on));
   const label = on ? 'Stack the map above the list' : 'Map and list side by side';
   b.title = label;
@@ -2397,9 +2398,16 @@ function stationsSplitKey(e) {
   invalidateMapSizes(0);
 }
 
+// The corner button, told what it is currently doing. Called on build and
+// again on every change of the flag, from here and from toggleMapFullscreen().
+//
+// It writes the label and leaves the icon alone, which it did not before #192:
+// it set `textContent`, which replaced the `.mn-mapctl-ico` span MapChrome
+// draws every icon in and left this one button's glyph sitting a half-pixel off
+// its neighbours'. The icon is the button's; the state is this function's.
 function syncMapFullBtn(b) {
+  if (!b) return;
   const full = state.mapFullscreen;
-  b.textContent = '⛶';
   b.setAttribute('aria-pressed', String(full));
   const label = full ? 'Exit full screen (Escape)' : 'Full screen';
   b.title = label;
@@ -2439,19 +2447,38 @@ function syncMapFullEsc() {
   }
 }
 
-// ── The Stations map's own controls (#164) ───────────────────────────────────
-// Map display, Draw & measure and the legend, as three icons in the map's
-// top-right corner under the base-map picker. They were three panels in the
-// sidebar until #164; what moved is where they are drawn, not what they are —
-// every one of them keeps the id it had, so mapDisplayControlsHtml(),
-// MapDraw.rerenderPanel() and rerenderMapLegend() go on finding their own
-// markup and re-rendering it in place without knowing it has moved.
+// ── The Stations map's own controls (#164, regrouped at #192) ────────────────
+// Map display, Draw & measure and the legend, as icons in the map's top-right
+// corner under the base-map picker. They were three panels in the sidebar until
+// #164; what moved is where they are drawn, not what they are — every one of
+// them keeps the id it had, so mapDisplayControlsHtml(), MapDraw.rerenderPanel()
+// and rerenderMapLegend() go on finding their own markup and re-rendering it in
+// place without knowing it has moved.
+//
+// **What #192 changed is the corner rather than the controls.** Every icon now
+// states the group it belongs to and where in that group it sits, and
+// MapChrome draws the column out of those two numbers (map-controls.js holds
+// the reasoning). Nothing here is built out of `L.control` any more: five
+// corner buttons were five copies of the same Leaflet plumbing, and the copies
+// had drifted — three set `textContent` where the panels beside them set an
+// icon span, one carried `aria-pressed` and two that are also modes did not.
+//
+// The order the icons are *declared* in below is the order they appear in the
+// corner, which is not the order they are added in: MapPolar.attach() runs long
+// after this function and drops 📡 into the middle of the tools group, where it
+// belongs, rather than at the bottom of the column where it landed before.
 //
 // Rebuilt with the map, on every render of the tab: initMap() calls this after
 // addBaseLayers() and before the modules attach.
 function stationsMapPanels(map) {
+  // ── What the map shows ─────────────────────────────────────────────────────
+  // The base-map picker is the first of these and is added by addBaseLayers()
+  // (show/10), because every map in the app has one and only this map has the
+  // rest. These two are the other half of the same question: what is drawn over
+  // that base, and what do the colours on it mean.
   MapChrome.panel(map, {
     id: 'display', icon: '👁️', title: 'Map display',
+    group: 'show', order: 20,
     html: () => `
       <div id="map-display-block">${mapDisplayControlsHtml()}</div>
       <div class="filter-block">${acmaFilterBlockHtml()}</div>`,
@@ -2461,118 +2488,127 @@ function stationsMapPanels(map) {
     onMount: () => applyMapDisplayFind(),
   });
   MapChrome.panel(map, {
-    id: 'draw', icon: '✏️', title: 'Draw & measure',
-    html: () => `<div id="map-draw-panel">${MapDraw.panelHtml()}</div>`,
-  });
-  MapChrome.panel(map, {
     id: 'legend', icon: '🔑', title: 'Legend',
+    group: 'show', order: 30,
     html: () => `<div class="map-legend" id="map-legend">${mapLegendHtml()}</div>`,
   });
-  // 3-D — a MapChrome panel rather than a plain corner button, unlike ℹ️ and
-  // ⛶, because it is not only a mode: it carries the exaggeration slider, the
-  // line-of-sight sheet switch and the note that says what the relief is made
-  // of and what it cannot be trusted to say. The ⛰️ button in the corner is the
-  // mode; this is everything about it (map-3d.js).
+
+  // ── The tools you point at the map ─────────────────────────────────────────
+  // What these three have in common, and what separates them from the group
+  // above: each of them is armed here and then used *over there*, on the map
+  // itself. Draw wants a click to start a line, What is here wants a click to
+  // ask about a point, and the polar plot wants a station to sweep from.
   MapChrome.panel(map, {
-    id: '3d', icon: '⛰️', title: '3-D view',
-    html: () => Map3D.panelHtml(),
+    id: 'draw', icon: '✏️', title: 'Draw & measure',
+    group: 'tools', order: 10,
+    html: () => `<div id="map-draw-panel">${MapDraw.panelHtml()}</div>`,
+  });
+  // 📡 Polar radio coverage is tools/20 — MapPolar.attach(), which runs later.
+  //
+  // What is here (#186) — arm it, click the map, and the card in the opposite
+  // corner says what the app knows about that point. A plain corner button
+  // rather than a panel: it toggles a *mode*, and a mode has nothing to
+  // disclose. MapHere.syncBtn() finds it again by its class and is what puts
+  // the armed dress and the "Click the map to say where" label on it.
+  MapChrome.button(map, {
+    className: 'mn-map-here', icon: 'ℹ️', title: 'What is here?',
+    group: 'tools', order: 30, pressed: MapHere.armed(),
+    onClick: () => MapHere.arm(),
   });
 
-  // Full screen — a plain corner button, not a MapChrome panel: it discloses
-  // nothing, it does one thing, and test/mapctl.mjs iterates .mn-mapctl
-  // wrappers, which this deliberately is not. Rebuilt with the map on every
-  // render; renderStationsHtml() emits the is-full class from state, so the
-  // button always sits inside a panel that already tells the truth.
-  const full = L.control({ position: 'topright' });
-  full.onAdd = () => {
-    const b = L.DomUtil.create('button', 'mn-mapctl-btn mn-map-full');
-    b.type = 'button';
-    syncMapFullBtn(b);
-    L.DomEvent.disableClickPropagation(b);
-    L.DomEvent.on(b, 'click', L.DomEvent.stop);
-    L.DomEvent.on(b, 'click', () => toggleMapFullscreen());
-    return b;
-  };
-  full.addTo(map);
-
-  // Side by side (#186) — the same kind of button as full screen, next to it,
-  // because they are the same kind of decision: how much of the screen this map
-  // is being given. Built the same way and for the same reasons, down to not
-  // being a MapChrome panel.
-  const split = L.control({ position: 'topright' });
-  split.onAdd = () => {
-    const b = L.DomUtil.create('button', 'mn-mapctl-btn mn-map-split');
-    b.type = 'button';
-    syncMapSplitBtn(b);
-    L.DomEvent.disableClickPropagation(b);
-    L.DomEvent.on(b, 'click', L.DomEvent.stop);
-    L.DomEvent.on(b, 'click', () => toggleStationsSplit());
-    return b;
-  };
-  split.addTo(map);
-
-  // Reset (#191) — the one button that puts the map back the way it was found.
-  // A plain corner button for the same reasons as the three above it, and last
-  // in the corner for one of its own: it is the destructive one, and a button
-  // that throws work away should not sit where a hand reaching for full screen
-  // can find it first.
-  const reset = L.control({ position: 'topright' });
-  reset.onAdd = () => {
-    const b = L.DomUtil.create('button', 'mn-mapctl-btn mn-map-reset');
-    b.type = 'button';
-    b.textContent = '↺';
-    b.title = 'Reset the map — clears the filters, the selection, every drawing and every card';
-    b.setAttribute('aria-label', 'Reset the map');
-    L.DomEvent.disableClickPropagation(b);
-    L.DomEvent.on(b, 'click', L.DomEvent.stop);
-    L.DomEvent.on(b, 'click', () => resetStationsMap());
-    return b;
-  };
-  reset.addTo(map);
-
-  // What is here (#186) — arm it, click the map, and the card in the opposite
-  // corner says what the app knows about that point. A plain corner button for
-  // full screen's reasons; it toggles a *mode* rather than disclosing a panel,
-  // which is what a MapChrome panel is for.
-  const here = L.control({ position: 'topright' });
-  here.onAdd = () => {
-    const b = L.DomUtil.create('button', 'mn-mapctl-btn mn-map-here');
-    b.type = 'button';
-    b.textContent = 'ℹ️';
-    b.setAttribute('aria-pressed', 'false');
-    b.title = 'What is here?';
-    b.setAttribute('aria-label', 'What is here?');
-    L.DomEvent.disableClickPropagation(b);
-    L.DomEvent.on(b, 'click', L.DomEvent.stop);
-    L.DomEvent.on(b, 'click', () => MapHere.arm());
-    return b;
-  };
-  here.addTo(map);
-
-  // 3-D — the mode itself, as a plain corner button for ℹ️'s reason: it toggles
-  // a mode rather than disclosing a panel. It is a *second* way into the ⛰️
-  // panel's own switch and deliberately so — tilting the map is the thing an
-  // operator does most often here, and making them open a flyout for it every
-  // time is the same mistake the sidebar panels were before #164.
+  // ── The 3-D view, as one cluster ───────────────────────────────────────────
+  // Two of these four were four buttons apart before #192 and read as two
+  // unrelated ⛰️s — which was the whole of the complaint that opened the issue,
+  // and a fair one: there was nothing on screen to say that the second mountain
+  // was the first mountain's settings.
+  //
+  // They are one control now. The mode is a full-height button and the panel is
+  // the thin caret under it, sharing its edge, in the idiom every split button
+  // in every toolbar uses: **press the big half to do the thing, press the
+  // small half for what it does it with.** The caret keeps the id, the title
+  // and the pin it has always had — it is the same panel, drawn as the lower
+  // half of the button it belongs to.
   //
   // The 3-D canvas covers every Leaflet pane and stops below Leaflet's control
-  // container (styles.css, #map3d), so this button — and every panel beside it —
-  // is still on screen and still working while 3-D is on. That is what lets one
-  // set of controls drive both modes.
-  const three = L.control({ position: 'topright' });
-  three.onAdd = () => {
-    const b = L.DomUtil.create('button', 'mn-mapctl-btn mn-map-3d');
-    b.type = 'button';
-    b.textContent = '⛰️';
-    b.setAttribute('aria-pressed', state.map3d ? 'true' : 'false');
-    b.title = '3-D view — tilt the map and see the ground it is drawn on';
-    b.setAttribute('aria-label', '3-D view');
-    L.DomEvent.disableClickPropagation(b);
-    L.DomEvent.on(b, 'click', L.DomEvent.stop);
-    L.DomEvent.on(b, 'click', () => Map3D.toggle());
-    return b;
-  };
-  three.addTo(map);
+  // container (styles.css, #map3d), so this cluster — and every panel beside
+  // it — is still on screen and still working while 3-D is on. That is what
+  // lets one set of controls drive both modes.
+  MapChrome.button(map, {
+    className: 'mn-map-3d', icon: '⛰️',
+    title: '3-D view — tilt the map and see the ground it is drawn on',
+    group: '3d', order: 10, pair: '3d', pressed: Map3D.active(),
+    onClick: () => Map3D.toggle(),
+  });
+  // The panel behind the caret is not only the mode: it carries the
+  // exaggeration slider, the line-of-sight sheet switch and the note that says
+  // what the relief is made of and what it cannot be trusted to say. The button
+  // above is the mode; this is everything about it (map-3d.js).
+  MapChrome.panel(map, {
+    id: '3d', icon: '▾', title: '3-D view',
+    btnLabel: '3-D view settings — exaggeration, line-of-sight sheets, what the relief is',
+    caret: true, pair: '3d',
+    group: '3d', order: 20,
+    html: () => Map3D.panelHtml(),
+  });
+  // ── …and the camera (#192) ─────────────────────────────────────────────────
+  // The two gestures a tilted map makes genuinely hard to undo by hand, asked
+  // for by name. They are hidden while the map is flat, and that is the honest
+  // state rather than a tidier one: in 2-D there is no camera — Leaflet has no
+  // pitch and no bearing — so north is always up, the tilt is always nil, and a
+  // button that would do nothing is a button that should not be there. Map3D
+  // shows them when it opens and hides them when it closes, and keeps the
+  // needle and the tilt drawn at whatever the camera is actually doing, so the
+  // pair is a readout as well as a control: a rotated needle is how you find
+  // out you are not facing north in the first place.
+  //
+  // MapLibre's own NavigationControl in the bottom-right corner does reset
+  // both, and it stays. It is a different claim: that one is the renderer's
+  // furniture, in the renderer's corner, in with the zoom — and an operator
+  // looking for a map tool on this page looks here, where the other eleven are.
+  MapChrome.button(map, {
+    className: 'mn-map-north', icon: Map3D.northIcon(0),
+    title: 'Face north again', hidden: true,
+    group: '3d', order: 30,
+    onClick: () => Map3D.resetNorth(),
+  });
+  MapChrome.button(map, {
+    className: 'mn-map-tilt', icon: Map3D.tiltIcon(0),
+    title: 'Look straight down', hidden: true,
+    group: '3d', order: 40,
+    onClick: () => Map3D.resetTilt(),
+  });
+
+  // ── How much screen the map gets ───────────────────────────────────────────
+  // Full screen and side by side are the same decision at two sizes, so they
+  // are one group. Rebuilt with the map on every render; renderStationsHtml()
+  // emits the is-full class from state, so the buttons always sit inside a
+  // panel that already tells the truth.
+  //
+  // Both carry a pressed state and a label that changes with it, so both are
+  // built bare and then handed to the same function that keeps them in step
+  // from everywhere else — the label on the button and the state it reports
+  // are written in one place or they drift.
+  syncMapFullBtn(MapChrome.button(map, {
+    className: 'mn-map-full', icon: '⛶', group: 'screen', order: 10,
+    onClick: () => toggleMapFullscreen(),
+  }));
+  syncMapSplitBtn(MapChrome.button(map, {
+    className: 'mn-map-split', icon: '◫', group: 'screen', order: 20,
+    onClick: () => toggleStationsSplit(),
+  }));
+
+  // ── And the one that takes something away ──────────────────────────────────
+  // Reset (#191) — the one button that puts the map back the way it was found.
+  // A group of its own, at the bottom, for the reason it was last in the column
+  // before there were any groups: it is the destructive one, and a button that
+  // throws work away should not sit where a hand reaching for full screen can
+  // find it first. The hairline above it is that sentence, drawn.
+  MapChrome.button(map, {
+    className: 'mn-map-reset', icon: '↺', group: 'reset', order: 10,
+    title: 'Reset the map — clears the filters, the selection, every drawing and every card',
+    ariaLabel: 'Reset the map',
+    onClick: () => resetStationsMap(),
+  });
 }
 
 // ── Reset the map (#191) ─────────────────────────────────────────────────────
