@@ -238,6 +238,8 @@ The 3-D view shipped at `d7509fc` mirrors exactly two things off the Stations ma
 
 > **Sequencing.** All three are independent of each other and depend on nothing but the shipped view. They do collide in one file (`map-3d.js`), so they are constraint 2 work: **one at a time**, not in parallel.
 
+> **`map-3d.js` moved under both children at revision 98.** #196 made the radio paths clickable there — `linkFeatures()` now carries the pair each line joins, and the click handler hit-tests `mn-links` with a 5 px box between the pins and the What-is-here pick. Two things in it are worth reading before either child is picked up rather than rediscovering. **A point query does not hit a line:** measured at the middle of a field link at 60° of pitch, `queryRenderedFeatures([x, y])` returns 0 features and the same call with a 5 px box returns 1, so any new clickable *line* layer needs `LINK_HIT_PX`, and #187's Draw & measure shapes are exactly that. And **the handler's order is now load-bearing** — pins, then links, then the pick — so a child adding a third clickable layer is choosing where it sits in that chain, not just adding a listener.
+
 
 ### 🧱 ~~EPIC #129~~ — `app.js` decomposition (P2) — **CLOSED. All five milestones shipped.**
 Split the 22,458-line monolith into **ordered classic `<script>` tags** — not ES modules (four independent blockers, chiefly 347 inline `on*=` handlers that resolve against the global scope and would fail *silently at click time*), not a bundler (contradicts `docs/floodwarning-net.md:90`'s "static files with no build step"). **528** top-level declarations with **zero duplicate names** make the namespace clean enough to split. (#129 and #130 both say 516; the AST count at the same commit `70d8202` is 528 — the figure was corrected when `test/dup-names.mjs` was built to measure it. The claim that matters, zero duplicates, holds either way, and is now enforced in CI.) Stations map core (now `app.js` **1145–2391**) is **explicitly frozen and out of scope**. The honest payoff assessment is in #129's body; every line number in it and in #135 is out of date by ~11,800 lines, and the **refreshed section map is in the M3 comment** on #129. Read that, not the line numbers in the issue bodies.
@@ -490,6 +492,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Five AI rows, and six `[Human]` issues.
 >
+> **Revision 98 opened and closed #196, #197, #198 and #199 in the same push, and opened nothing that stays open** — paths made clickable in the 3-D view, and three pieces of Elvis (Geoscience Australia / ICSM) elevation work out of a session asking what that platform could give this app. The allocation below is unchanged. One human step falls out of it and is **not** filed: a check that `api-elevation.fsdf.org.au` and `s3-ap-southeast-2.amazonaws.com` load from a Bureau machine, since `docs/floodwarning-net.md` records that the filter default-denies hostnames it has never categorised. Nothing shipped depends on it — every Elvis feature is off by default or asked for — so it is a "confirm before relying on it", not a blocker.
+
 > **Revision 97 opened and closed #195 in the same push, and opened nothing that stays open** — the side-by-side columns collapsing to their floor when something else on the page overflowed. The allocation below is unchanged.
 
 > **Revision 96 opened and closed #194 in the same push, and opened nothing that stays open** — the two Map display layers that stopped applying when the map was tilted. The allocation below is unchanged.
@@ -621,6 +625,114 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 98 — 2026-09-21: the paths in 3-D start answering, and the nation's own elevation data arrives
+
+Out of a session asking what ELVIS (elevation.fsdf.org.au — Geoscience Australia
+/ ICSM) could give this app. **Four issues opened and closed in the same push**:
+**#196** paths clickable in the 3-D view, then **#197**, **#198** and **#199**,
+the three pieces of Elvis work. Touched `map-3d.js`, `map-backbone.js` (read
+only — `open` was already public), `app.js`, `core.js`, `index.html`,
+`map-here.js`, `path-profile.js`, two new front-end modules, one new tool, four
+new checks and `test/lib/terrarium.mjs`.
+
+**The platform has no MCP.** Not on the site, not in any registry, not on GitHub
+or npm. Geoscience Australia announced an AI assistant *inside* the Digital
+Atlas in October 2025, which is not an MCP server. It also has no published API:
+the endpoints below were read out of the Elvis front end's own bundle and
+confirmed against the live service. `elevation-at-point` is keyless and
+`Access-Control-Allow-Origin: *`, which is the only reason any of this can ride
+in a static page.
+
+**#196 — the paths were drawn all along, they were just never asked.** `mn-links`
+has been drawn and draped since the 3-D view shipped; the click handler was
+scoped to `['mn-stations']` and nothing else. Two things blocked it rather than
+one. `linkFeatures()` copied presentation and stopped, so a hit could not be
+traced back to a link — it now carries the same three ids `app.js` hangs on every
+polyline. And **a point query does not hit a line**: at the middle of a field
+link at 60° of pitch the bare point returns 0 features and a 5 px box returns 1.
+Leaflet gives its polylines that tolerance for free; MapLibre has no equivalent,
+so `LINK_HIT_PX` writes it out. See the note on EPIC #186 — both facts are
+inherited by anything else that makes a line clickable there.
+
+**#197 — the map could not say which ground it knew well.** Every terrain answer
+in this app is ~30 m terrarium, everywhere, and there was no way to see it. The
+coverage overlay draws the *metadata*: which DEM the nation holds where. It
+feeds nothing; the note and the legend both keep saying profiles still read
+~30 m ground, and the check holds them to it. Two limits are measured rather
+than assumed — the cache stops at z11, and tiles outside it 403 rather than 404,
+because an S3 bucket that denies listing says "forbidden" for an object never
+written.
+
+**#198 — the card could not say AHD about the ground.** `map-here.js` has always
+been honest that its height is "above the EGM96 geoid — not AHD, and not a
+survey"; every other height in the app *is* AHD. Elvis answers in AHD. Over a
+seeded 220-station random sample of `stations.json`: **1 m under 54.5%, 50 cm
+under 10.0%, 2 m 5.5%, 5 m 4.5% — 74.5% finer than 30 m**, the rest the same
+national SRTM, and nothing unreachable.
+
+> **The finding that was not a finding, and nearly shipped as one.** An earlier
+> pass reported "10% no data". It was an artefact. Above about eight requests in
+> flight the service sheds load by answering `"No Data"` — HTTP 200, all five
+> fields, indistinguishable from a point it genuinely holds nothing for:
+>
+> | in flight | answered | `"No Data"` |
+> |---|---|---|
+> | 4 | 40/40 | 0 |
+> | 8 | 40/40 | 0 |
+> | 16 | 31/40 | 9 |
+> | 20 | 21/40 | 19 — **all 19 had data when asked alone** |
+>
+> A soft failure wearing a valid answer's clothes, and silent. Taken at face
+> value it writes "this place has no elevation data" about places holding 1 m
+> LiDAR. The tool now re-asks every `"No Data"` serially before believing it;
+> `elvis.js` treats one as a failure to retry rather than an answer to cache.
+> **The generalisable part: a 200 is not an answer.** This service reports
+> overload in the response body, in the same shape as its real data, and no
+> status code or error path ever fires. Anything new that reads an undocumented
+> service should ask what its *degraded* answer looks like before trusting its
+> successful one.
+
+**Why the tool proposes and never writes.** 2,334 stations have no
+`elevation_ahd` and the tool offers one for each. For the 840 that have one it
+offers nothing — it audits. Against those, the disagreement is one-directional:
+the mark is almost always higher. Ring-sampling settles why. Every one of the
+worst sits in incised ground with **+10 to +49 m of relief within 120 m** — the
+coordinate is the gauge down in the channel, the surveyed mark is the hut on the
+bank. A 1 m model finds the real channel floor; a 30 m one smooths it away and
+lands partway up the bank.
+
+> **So the naive metric is backwards, and it is worth stating plainly.** Against
+> the surveyed heights the 30 m tiles score *better* (median 3.0 m vs 5.9 m).
+> That is not the coarser source being more correct about the ground — it is
+> smoothing landing nearer a mark that was never at the coordinate. A large
+> difference here flags the **coordinate**, not the height, which is why
+> `--relief` exists and why nothing is written automatically.
+
+**#199 — a second opinion on one path.** 64 points against Elvis, about twenty
+seconds, one path at a time, never from the sweeps. The thing that would have
+made it worthless: comparing the card's 256-sample run against a 64-sample Elvis
+one folds the sample count into the difference and then blames the DEM. **Both
+sides are analysed on the same 64 points** — the tile side re-analysed rather
+than reused — and the check asserts the grids match rather than trusting them.
+`mainOpts()` came out of `bodyHtml` for the same reason: a second copy of the
+card's settings would eventually drift, at which point the card would be
+measuring its own form and calling it the terrain.
+
+**What Elvis is not, decided rather than assumed.** It cannot replace
+`terrain.js`. There is no batch call, one request measures 1.4–5.0 s, a
+256-sample profile would be ~40 s of them against one tile fetch for a whole
+hop — and Elvis's own profile tool falls back to the same 30 m SRTM anyway. The
+GA WCS *is* CORS-open and returns real 16-bit elevation grids, but it is the
+same 30 m and decoding GeoTIFF in-browser means a dependency. `terrain.js`'s
+header reasoned this out before any of it was measured, and it holds.
+
+**Two checks caught their own implementation, which is the point of writing them
+first.** The `"No Data"` assertion failed on the seeded path because the test
+seam called `remember()` directly and bypassed the rule the fetch path applied —
+extracting a single `keep()` is what made the seam exercise the real rule
+instead of its own copy. And the tool's `--check` rejected `reading_for`'s
+threshold as too strict to recognise its own worked example.
 
 ### Revision 97 — 2026-09-21: the correction that charged the columns for somebody else's overflow
 
