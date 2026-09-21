@@ -1000,6 +1000,127 @@ if (onPin) {
 await page.evaluate(() => { MapHere.close(); closeStnCard(false); });
 
 // ── 9. leaving the tab takes the GL context with it ─────────────────────────
+// ── a path clicked in 3-D opens the card its 2-D line opens (#195) ────────
+console.log('\nA radio path clicked in 3-D opens the path card');
+
+// The styling alone was never enough: a hit has to reach a *link*, so the
+// mirror has to carry the pair each line joins.
+const linkIds = await page.evaluate(() => {
+  const f = Map3D._mirror().links.features;
+  const paired = f.filter(x => x.properties.rid != null
+    && (x.properties.sid != null || x.properties.rid2 != null));
+  return { n: f.length, paired: paired.length,
+           backbones: f.filter(x => x.properties.rid2 != null).length };
+});
+ok('the mirror draws some paths', linkIds.n > 0, `${linkIds.n} features`);
+ok('every drawn path carries the pair it joins',
+   linkIds.n > 0 && linkIds.paired === linkIds.n, `${linkIds.paired}/${linkIds.n}`);
+
+// Where the renderer says the line is, not where the arithmetic says it should
+// be — the rule the pin check follows, and it counts for more here because
+// these lines are draped over terrain rather than billboarded above it.
+const line = await page.evaluate(() => {
+  const f = Map3D._mirror().links.features.find(x => x.properties.rid != null);
+  if (!f) return null;
+  const c = f.geometry.coordinates, a = c[0], b = c[c.length - 1];
+  const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  Map3D._map().jumpTo({ center: mid, zoom: 11, pitch: 60, bearing: 0 });
+  return { mid, props: f.properties };
+});
+ok('the file has a path to click', !!line);
+
+if (line) {
+  await page.waitForTimeout(1200);
+  const where = await page.evaluate((t) => {
+    const m = Map3D._map();
+    const p = m.project(t.mid);
+    const r = m.getCanvas().getBoundingClientRect();
+    const box = [[p.x - 5, p.y - 5], [p.x + 5, p.y + 5]];
+    const f = m.queryRenderedFeatures(box, { layers: ['mn-links'] });
+    // The bare point, for the comparison that justifies LINK_HIT_PX.
+    const pt = m.queryRenderedFeatures([p.x, p.y], { layers: ['mn-links'] });
+    return { x: Math.round(r.left + p.x), y: Math.round(r.top + p.y),
+             box: f.length, point: pt.length,
+             hit: f.length ? f[0].properties : null };
+  }, line);
+  ok('the tolerance box finds the path under the pointer', !!where.hit,
+     JSON.stringify(where));
+  ok('…and it is at least as forgiving as the bare point',
+     where.box >= where.point, `box ${where.box}, point ${where.point}`);
+
+  if (where.hit) {
+    // While a draw tool is armed the click belongs to the drawing, exactly as
+    // in 2-D. Checked first, because it must not leave a card open behind it.
+    await page.evaluate(() => {
+      state.path.open = false;
+      if (typeof MapBackbone !== 'undefined') MapBackbone.closeCard(false);
+      state.draw.tool = 'line';
+    });
+    await page.mouse.click(where.x, where.y);
+    await page.waitForTimeout(400);
+    const armed = await page.evaluate(() => state.path.open);
+    ok('a path click is ignored while a draw tool is armed', armed !== true,
+       `state.path.open = ${armed}`);
+
+    await page.evaluate(() => {
+      state.draw.tool = null;
+      state.path.open = false;
+      if (typeof MapBackbone !== 'undefined') MapBackbone.closeCard(false);
+    });
+    await page.mouse.click(where.x, where.y);
+    await page.waitForTimeout(700);
+    const card = await page.evaluate(() => {
+      const el = document.getElementById('path-card');
+      const r  = el ? el.getBoundingClientRect() : null;
+      return { open: state.path.open, box: !!(r && r.width > 0 && r.height > 0) };
+    });
+    ok('clicking a path in 3-D opens the path card',
+       card.open === true && card.box, JSON.stringify(card));
+  }
+}
+
+// A pin sits on the end of every line it belongs to, so the handler asks the
+// pins first. If that order ever flips, the station at a link's end becomes
+// the one station on the map nobody can open.
+const endpoint = await page.evaluate(() => {
+  const f = Map3D._mirror().links.features.find(x => x.properties.rid != null);
+  if (!f) return null;
+  const id = f.properties.rid;
+  const mk = (state.mapMarkers || []).find(m => m.mnStationId === id);
+  if (!mk) return null;
+  const ll = mk.getLatLng();
+  Map3D._map().jumpTo({ center: [ll.lng, ll.lat], zoom: 12, pitch: 60, bearing: 0 });
+  return { id, lat: ll.lat, lng: ll.lng };
+});
+if (endpoint) {
+  await page.waitForTimeout(1200);
+  const both = await page.evaluate((t) => {
+    const m = Map3D._map();
+    const p = m.project([t.lng, t.lat]);
+    const r = m.getCanvas().getBoundingClientRect();
+    const box = [[p.x - 5, p.y - 5], [p.x + 5, p.y + 5]];
+    return { x: Math.round(r.left + p.x), y: Math.round(r.top + p.y),
+             pin:  m.queryRenderedFeatures([p.x, p.y], { layers: ['mn-stations'] }).length,
+             line: m.queryRenderedFeatures(box, { layers: ['mn-links'] }).length };
+  }, endpoint);
+  if (both.pin > 0 && both.line > 0) {
+    await page.evaluate(() => {
+      state.path.open = false; state.draw.tool = null;
+      if (typeof MapBackbone !== 'undefined') MapBackbone.closeCard(false);
+      closeStnCard(false);
+    });
+    await page.mouse.click(both.x, both.y);
+    await page.waitForTimeout(600);
+    const who = await page.evaluate(() => ({
+      station: state.stnCard.id, path: state.path.open }));
+    ok('where a pin and a path overlap, the pin takes the click',
+       who.station != null && who.path !== true, JSON.stringify(who));
+  } else {
+    ok('where a pin and a path overlap, the pin takes the click', true,
+       `no overlap in frame (pin ${both.pin}, line ${both.line}) — not exercised`);
+  }
+}
+
 console.log('\nLeaving the tab takes the WebGL context with it');
 
 await page.evaluate(() => switchTab('export'));

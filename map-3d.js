@@ -91,6 +91,14 @@ const Map3D = (function () {
   // it covers: the relief still renders, and every hill is in the wrong place.
   const DEM_TILE_PX = 256;
 
+  // How far from the pointer a radio path still counts as clicked, in screen
+  // pixels. A line layer draws at two or three of them, and MapLibre hit-tests
+  // exactly what it drew: at 70° of pitch a bare point query asks the user to
+  // land on a two-pixel target that is also foreshortened. Leaflet gives its
+  // polylines this tolerance for free; MapLibre has no equivalent, so the box
+  // is written out here. Pins keep the point query — see the click handler.
+  const LINK_HIT_PX = 5;
+
   // The pitch the camera opens at, and the pitch the tilt button puts it back
   // to. Named because two things now depend on it being the same number: the
   // camera build below and ⛰️'s tilt control, which flattens to nil on the
@@ -311,18 +319,35 @@ const Map3D = (function () {
       if (role === 'casing' || role === 'backbone-casing') continue;
       const pts = typeof l.getLatLngs === 'function' ? l.getLatLngs() : null;
       if (!pts || pts.length < 2) continue;
+      const props = {
+        colour: l.options.color || '#ff6f00',
+        width:  (l.options.weight || 2) + (role === 'backbone' ? 1 : 0),
+        op:     l.options.opacity == null ? 1 : l.options.opacity,
+        // A backbone path is three stacked Leaflet lines: a casing, a
+        // coloured core and a black dashed overlay. The casing is dropped
+        // above; the dash is kept and drawn as a real dash, which is what
+        // says "backbone" once the core has taken the colouring's colour.
+        dash:   role === 'backbone-dash' ? 1 : 0,
+      };
+      // And who the path joins, which is what makes it clickable here (#195).
+      // Styling alone was enough while these lines were only drawn; a click
+      // has to get back to a *link*, and the mirror is built from Leaflet
+      // lines that already know — app.js hangs the same three ids on every
+      // polyline it draws so the 2-D handler can read them off `e.target`.
+      // Copying them across is the whole of the identity: MapLibre feature
+      // properties have to be primitives, and these are ids.
+      //
+      // Set only when present. `rid2` is what tells a backbone path from a
+      // field link at click time, exactly as it does in 2-D, so it has to be
+      // absent rather than undefined — a property explicitly set to
+      // undefined survives into the feature and would read as a backbone with
+      // nothing at the far end.
+      if (l.mnLinkStationId   != null) props.sid  = l.mnLinkStationId;
+      if (l.mnLinkRepeaterId  != null) props.rid  = l.mnLinkRepeaterId;
+      if (l.mnLinkRepeaterId2 != null) props.rid2 = l.mnLinkRepeaterId2;
       out.push({
         type: 'Feature',
-        properties: {
-          colour: l.options.color || '#ff6f00',
-          width:  (l.options.weight || 2) + (role === 'backbone' ? 1 : 0),
-          op:     l.options.opacity == null ? 1 : l.options.opacity,
-          // A backbone path is three stacked Leaflet lines: a casing, a
-          // coloured core and a black dashed overlay. The casing is dropped
-          // above; the dash is kept and drawn as a real dash, which is what
-          // says "backbone" once the core has taken the colouring's colour.
-          dash:   role === 'backbone-dash' ? 1 : 0,
-        },
+        properties: props,
         geometry: { type: 'LineString', coordinates: pts.map(p => [p.lng, p.lat]) },
       });
     }
@@ -909,6 +934,20 @@ const Map3D = (function () {
       const hit = map.queryRenderedFeatures(e.point, { layers: ['mn-stations'] })[0];
       const id  = hit && hit.properties ? hit.properties.id : null;
       if (id != null) { clickedStation(id, e); return; }
+      // Then a path (#195). Pins are asked first and the order is not
+      // arbitrary: a pin sits on the end of every line it belongs to, so
+      // asking the lines first would make the station at a link's end the one
+      // station on the map nobody could open.
+      //
+      // The box rather than the point is LINK_HIT_PX's reason for existing.
+      // queryRenderedFeatures takes either, and a two-pixel line tilted away
+      // from the camera is not a target — this is the tolerance Leaflet
+      // gives the same polylines in 2-D, restated because MapLibre has none.
+      const pad  = LINK_HIT_PX;
+      const near = [[e.point.x - pad, e.point.y - pad],
+                    [e.point.x + pad, e.point.y + pad]];
+      const line = map.queryRenderedFeatures(near, { layers: ['mn-links'] })[0];
+      if (line && line.properties) { clickedLink(line.properties, e); return; }
       // Empty ground, with the pick armed: this is the bridge (#194). The 2-D
       // map's own click carries `latlng` for that pixel on the *Leaflet* map,
       // and in this mode that is a different camera — its own centre, zoom,
@@ -957,8 +996,34 @@ const Map3D = (function () {
       }
       if (typeof showStationCard === 'function') showStationCard(id);
     }
+    // A path. The same two branches MapBackbone.onLineClick takes in 2-D, but
+    // read off the properties linkFeatures() copied across rather than off
+    // `e.target`: there is no Leaflet layer here to be the target, and that
+    // handler's `L.DomEvent.stopPropagation` would have no Leaflet event to
+    // stop. The branch itself is the 2-D one unchanged — a path with a
+    // repeater at both ends is a backbone path, anything else is a field link
+    // — because it is the same `open()` on the other side and it has to
+    // be told the same thing.
+    //
+    // The draw-tool guard comes across with it, for the reason it exists in
+    // 2-D: while a tool is armed a click on a line belongs to the drawing, and
+    // opening a card here would answer a question nobody asked while the map
+    // was still waiting for a vertex.
+    function clickedLink(p, e) {
+      if (state.draw && state.draw.tool) return;
+      stopBubbling(e);
+      if (typeof MapBackbone === 'undefined') return;
+      if (p.rid2 != null) MapBackbone.open('backbone', p.rid, p.rid2);
+      else if (p.sid != null && p.rid != null) MapBackbone.open('field', p.sid, p.rid);
+    }
     map.on('mouseenter', 'mn-stations', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'mn-stations', () => { map.getCanvas().style.cursor = ''; });
+    // The lines say they are clickable too. MapLibre scopes these to the
+    // layer's own rendered geometry, with no tolerance to give them, so the
+    // pointer appears a pixel or two later than the click box would take it —
+    // the cursor is the hint, LINK_HIT_PX is the affordance.
+    map.on('mouseenter', 'mn-links', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'mn-links', () => { map.getCanvas().style.cursor = ''; });
   }
 
   function makeHost() {
