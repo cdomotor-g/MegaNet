@@ -1,0 +1,841 @@
+id,name,lat,lon,surveyed_ahd_m,elvis_ahd_m,difference_m,abs_difference_m,dem_resolution,relief_within_ring_m,reading,source,dataset
+palmers_rd,Palmers Road,-28.434,153.295,151.0,44.35,106.65,106.65,1m,61.9,"coordinate: ground rises 62 m within the ring, 58% of the difference — the mark is likely uphill of the point, so check the position before the height",CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5286854_56_0001_0001.tif
+corsis_al,Corsis AL,-17.5967,145.9014,140.8,45.37,95.43,95.43,1m,14.5,mark is 95 m above the modelled ground and the ring explains only 15% of it,QLD Government,CassowaryCoast_2009_Prj_SW_382000_8054000_2K_DEM_1m.tif
+tarana_fish_river,Tarana (Fish River),-33.5728,149.9128,953.8,866.26,87.54,87.54,5m,49.2,"coordinate: ground rises 49 m within the ring, 56% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Oberon201311-PHO3-AHD_7706280_55_0002_0002_5m.tif
+jeogla_at_east_kund,Jeogla (at East Kunderang Rd),-30.8108,152.071,730.2,817.69,-87.49,87.49,2m,-0.8,modelled ground is above the mark — unusual; check both,NSW Government,Carrai201805-LID2-AHD_4106590_56_0002_0002_2m.tif
+budds_mare_at_the_c,Budds Mare (at the campground),-30.9847,151.9721,870.3,947.45,-77.15,77.15,2m,17.5,modelled ground is above the mark — unusual; check both,NSW Government,Armidale201505-LID2-AHD_4006570_56_0002_0002_2m.tif
+main_camp_rd_al,Main Camp Ck AL,-27.8336,152.3144,596.3,521.56,74.74,74.74,1m,53.2,"coordinate: ground rises 53 m within the ring, 71% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Lockyer_Valley_2022_LGA_SW_432000_6921000_1k_DEM_1m.tif
+couchy_ck,Couchy Creek,-28.2662,153.279,151.6,83.22,68.38,68.38,1m,49.1,"coordinate: ground rises 49 m within the ring, 72% of the difference — the mark is likely uphill of the point, so check the position before the height",CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5276873_56_0001_0001.tif
+meunga_ck_al,Meunga Creek AL,-18.2817,145.8786,175.0,108.28,66.72,66.72,1m,49.5,"coordinate: ground rises 50 m within the ring, 74% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,CassowaryCoast_2009_Prj_SW_380000_7978000_2K_DEM_1m.tif
+spring_bluff_al,Spring Bluff AL,-27.4692,151.9836,467.9,404.76,63.14,63.14,1m,45.3,"coordinate: ground rises 45 m within the ring, 72% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Toowoomba_2015_Prj_SW_399000_6961000_1K_DEM_1m.tif
+bald_knob_al,Bald Knob AL,-26.7789,152.9153,423.5,476.43,-52.93,52.93,1m,0.5,modelled ground is above the mark — unusual; check both,QLD Government,SunshineCoast_2014_LGA_SW_491000_7038000_1K_DEM_1m.tif
+upper_spence_ck_t,Upper Spence Ck T,-16.3165,145.0995,727.1,778.26,-51.16,51.16,1 Second,1.2,modelled ground is above the mark — unusual; check both,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+bellbird_ck_al,Bellbird Ck AL,-26.6274,152.7046,151.0,105.32,45.68,45.68,1m,0.5,mark is 46 m above the modelled ground and the ring explains only 1% of it,QLD Government,SunshineCoast_2008_LGA_SW_470000_7054000_1K_DEM_1m.tif
+nundle_pearly_gates,Nundle (Pearly Gates),-31.5,151.093,666.7,621.2,45.5,45.5,5m,36.0,"coordinate: ground rises 36 m within the ring, 79% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Ellerston201304-PHO3-AHD_3186512_56_0002_0002_5m.tif
+mt_gayndah_al,Mt Gayndah AL,-25.605,151.5403,319.1,363.85,-44.75,44.75,1m,0.0,modelled ground is above the mark — unusual; check both,QLD Government,BurnettRivPhilpott_2014_Prj_SW_353000_7167000_1K_DEM_1m.tif
+wattamolla_griffith,Wattamolla (Griffiths),-34.7208,150.6491,192.5,148.48,44.02,44.02,1m,19.8,"coordinate: ground rises 20 m within the ring, 45% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Kiama201610-LID1-AHD_2846154_56_0002_0002_1m.tif
+clarrie_hall_dam_d_s,Clarie Hall Dam D/S,-28.43,153.315,73.5,29.84,43.66,43.66,1m,39.3,"coordinate: ground rises 39 m within the ring, 90% of the difference — the mark is likely uphill of the point, so check the position before the height",CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5306855_56_0001_0001.tif
+forbesdale_gloucest,Forbesdale (Gloucester River),-32.059,151.897,182.2,138.7,43.5,43.5,2m,12.8,mark is 44 m above the modelled ground and the ring explains only 29% of it,NSW Government,Dungog201803-LID2-AHD_3946452_56_0002_0002_2m.tif
+koree_island_hastin,Koree Island (Hastin,-31.4628,152.6789,48.7,10.81,37.89,37.89,1m,26.3,"coordinate: ground rises 26 m within the ring, 70% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Kempsey201205-LID1-AHD_4686518_56_0002_0002_1m.tif
+ban_ban_al,Ban Ban AL,-25.7108,151.8083,178.0,140.22,37.78,37.78,1 Second,34.4,"coordinate: ground rises 34 m within the ring, 91% of the difference — the mark is likely uphill of the point, so check the position before the height",Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mullumbimby_ck_m,Mullumbimby Creek (Mullumbimby Ck),-28.5542,153.4367,87.0,51.92,35.08,35.08,1m,39.8,"coordinate: ground rises 40 m within the ring, 114% of the difference — the mark is likely uphill of the point, so check the position before the height",CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5426841_56_0001_0001.tif
+upper_rous_river_ho,Hopkins Creek,-28.2722,153.2134,218.2,183.74,34.46,34.46,2m,40.4,"coordinate: ground rises 40 m within the ring, 117% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Murwillumbah201709-LID2-AHD_5206872_56_0002_0002_2m.tif
+fossickers_flat_sho,Fossickers Flat (Shoalhaven River),-34.8217,150.1817,272.4,238.88,33.52,33.52,2m,91.3,"coordinate: ground rises 91 m within the ring, 272% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,MossVale201805-LID2-AHD_2426142_56_0002_0002_2m.tif
+chaffey_dam_w_l_pee,Chaffey Dam W/L (Peel River),-31.35,151.1375,552.3,518.98,33.32,33.32,5m,28.9,"coordinate: ground rises 29 m within the ring, 87% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Nundle201305-PHO3-AHD_3226530_56_0002_0002_5m.tif
+tully_gorge_al,Tully Gorge AL,-17.7725,145.6503,114.7,81.63,33.07,33.07,1m,10.2,mark is 33 m above the modelled ground and the ring explains only 31% of it,QLD Government,CassowaryCoast_2016_Prj_SW_356000_8034000_1K_DEM_1m.tif
+upper_tenthill_al,Upper Tenthill AL,-27.8094,152.2867,359.3,326.48,32.82,32.82,1m,25.0,"coordinate: ground rises 25 m within the ring, 76% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Lockyer_Valley_2022_LGA_SW_429000_6923000_1k_DEM_1m.tif
+logans_crossing_cam,Logans Crossing (Cam,-31.6161,152.6925,42.5,10.39,32.11,32.11,1m,9.1,mark is 32 m above the modelled ground and the ring explains only 28% of it,NSW Natural Resorces Commision,Wauchope2022-DEM-AHD-1m_470500-6502000_56_500m_500m.tif
+moparrabah_parrabel,Moparrabah,-30.9783,152.5106,114.9,84.03,30.87,30.87,2m,0.5,mark is 31 m above the modelled ground and the ring explains only 2% of it,NSW Government,Macksville201707-LID2-AHD_4526572_56_0002_0002_2m.tif
+wattamolla_new,Wattamolla (NEW),-34.7283,150.6585,398.5,368.07,30.43,30.43,1m,15.1,"coordinate: ground rises 15 m within the ring, 50% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Kiama201610-LID1-AHD_2846154_56_0002_0002_1m.tif
+tyalgum_br_tya,Tyalgum Bridge,-28.359,153.21,82.5,52.4,30.1,30.1,2m,4.5,mark is 30 m above the modelled ground and the ring explains only 15% of it,NSW Government,Murwillumbah201709-LID2-AHD_5206862_56_0002_0002_2m.tif
+upper_dalrymple_ck_a,Upper Dalrymple Ck AL,-27.9839,152.2909,685.1,655.35,29.75,29.75,1m,15.4,"coordinate: ground rises 15 m within the ring, 52% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,LockyerValleySouth_2011_Rgn_SW_430000_6904000_1K_DEM_1m.tif
+spring_ck_rd_al,Spring Ck Rd AL,-28.2519,152.4717,775.8,746.26,29.54,29.54,1m,15.0,"coordinate: ground rises 15 m within the ring, 51% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,ScenicRim_2011_LGA_SW_448000_6874000_1K_DEM_1m.tif
+wittitrin_dungay_cr,Wittitrin (Dungay Creek),-31.0897,152.6217,101.5,72.08,29.42,29.42,2m,35.8,"coordinate: ground rises 36 m within the ring, 122% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Kempsey201707-LID2-AHD_4626560_56_0002_0002_2m.tif
+paluma_al,Paluma AL,-19.01,146.2156,864.1,834.75,29.35,29.35,1m,27.7,"coordinate: ground rises 28 m within the ring, 94% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Townsville_2018_Prj_SW_417000_7897000_1.0K_DEM_1m.tif
+burringbar_north_arm,Burringbar North Arm (Harwood Rd),-28.405,153.46,153.0,125.24,27.76,27.76,1m,38.4,"coordinate: ground rises 38 m within the ring, 138% of the difference — the mark is likely uphill of the point, so check the position before the height",CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5456857_56_0001_0001.tif
+mosely_s_al,Mosely's AL,-28.1639,152.2986,610.1,582.69,27.41,27.41,1 Second,18.3,"coordinate: ground rises 18 m within the ring, 67% of the difference — the mark is likely uphill of the point, so check the position before the height",Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+dingo_beach_al,Dingo Beach AL,-20.0997,148.4919,101.1,128.21,-27.11,27.11,50cm,-0.4,modelled ground is above the mark — unusual; check both,Griffith Uni,Proserpine201311-DEM-GRID-50cm_6557776_55_0001_0001.tif
+cudgera_ck_potts,Pottsville West Reservoir,-28.402,153.533,71.6,44.8,26.8,26.8,1m,28.5,"coordinate: ground rises 28 m within the ring, 106% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,TweedHeads201309-LID1-AHD_5526858_56_0002_0002_1m.tif
+chillingham,Chillingham,-28.3132,153.2759,57.5,30.82,26.68,26.68,1m,36.9,"coordinate: ground rises 37 m within the ring, 138% of the difference — the mark is likely uphill of the point, so check the position before the height",CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5276868_56_0001_0001.tif
+brisbane_rd_al,Brisbane Rd AL,-27.6078,152.9083,25.8,0.24,25.56,25.56,1m,15.9,"coordinate: ground rises 16 m within the ring, 62% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Brisbane_2019_Prj_SW_490000_6946000_1k_DEM_1m.tif
+queen_mary_falls_ale,Queen Mary Falls AL,-28.3342,152.3933,957.9,932.76,25.14,25.14,2m,15.1,"coordinate: ground rises 15 m within the ring, 60% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Warwick201709-LID2-AHD_4406864_56_0002_0002_2m.tif
+o_reillys_al,OReillys AL,-28.2314,153.1356,936.4,911.82,24.58,24.58,1m,14.4,"coordinate: ground rises 14 m within the ring, 59% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,ScenicRim_2011_LGA_SW_513000_6877000_1K_DEM_1m.tif
+copeland_tops_copel,Copeland Tops (Copeland),-31.9723,151.8092,771.6,796.16,-24.56,24.56,2m,-0.7,modelled ground is above the mark — unusual; check both,NSW Government,UpperManning201803-LID2-AHD_3866462_56_0002_0002_2m.tif
+gungas_rd_mulgum,Gungas Rd (Mulgum,-28.5732,153.247,103.4,79.09,24.31,24.31,1m,10.0,mark is 24 m above the modelled ground and the ring explains only 41% of it,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5246839_56_0001_0001.tif
+mt_pinnacle_al,Mt Pinnacle AL,-21.1586,148.655,662.0,638.28,23.72,23.72,1m,36.0,"coordinate: ground rises 36 m within the ring, 152% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Mackay_2009_Rgn_SW_670000_7658000_2K_DEM_1m.tif
+chaffey_dam_d_s_pee,Chaffey Dam D/S (Peel River),-31.3431,151.1422,515.2,491.89,23.31,23.31,5m,3.1,mark is 23 m above the modelled ground and the ring explains only 13% of it,NSW Government,Nundle201305-PHO3-AHD_3226530_56_0002_0002_5m.tif
+double_crossing_rd_a,Double Crossing Rd AL,-28.0369,153.1417,131.9,108.6,23.3,23.3,1m,13.4,"coordinate: ground rises 13 m within the ring, 57% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,ScenicRim_2011_LGA_SW_513000_6898000_1K_DEM_1m.tif
+stewart_ck_valley,Stewart Ck Valley,-16.3166,145.3202,22.8,46.09,-23.29,23.29,1m,38.4,modelled ground is above the mark — unusual; check both,QLD Government,Cairns_2010_Prj_SW_320000_8195000_1K_DEM_1m.tif
+st_agnes_ck_al,St Agnes Ck AL,-25.1347,151.9742,49.2,26.32,22.88,22.88,1m,22.1,"coordinate: ground rises 22 m within the ring, 97% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,BundabergCentral_2009_Rgn_SW_396000_7218000_2K_DEM_1m.tif
+wilsons_peak,Wilsons Peak,-28.2379,152.4872,883.3,860.45,22.85,22.85,1m,55.0,"coordinate: ground rises 55 m within the ring, 241% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,ScenicRim_2011_LGA_SW_449000_6876000_1K_DEM_1m.tif
+baroonbah_crossing,Baroonbah Crossing,-25.6928,149.2131,272.5,249.95,22.55,22.55,50cm,4.0,mark is 23 m above the modelled ground and the ring explains only 18% of it,Griffith Uni,Taroom201810-DEM-GRID-50cm_7227156_55_0001_0001.tif
+killarney_spring_ck_2,Killarney (Spring Ck) AL,-28.3525,152.3373,592.0,569.58,22.42,22.42,2m,8.4,mark is 22 m above the modelled ground and the ring explains only 38% of it,NSW Government,Warwick201709-LID2-AHD_4346862_56_0002_0002_2m.tif
+lake_placid_al,Lake Placid AL,-16.8683,145.6731,33.2,10.85,22.35,22.35,1m,46.6,"coordinate: ground rises 47 m within the ring, 209% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Cairns_2010_Prj_SW_358000_8134000_1K_DEM_1m.tif
+nash_s_crossing_aler,Nashs Crossing AL,-18.4125,145.7722,82.1,59.98,22.12,22.12,50cm,16.7,"coordinate: ground rises 17 m within the ring, 76% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Herbert_River_2024_Prj_SW_370000_7963000_1k_DEM_50cm.tif
+daintree_village_tm,Daintree Village TM,-16.2497,145.3172,27.4,5.39,22.01,22.01,1m,12.7,"coordinate: ground rises 13 m within the ring, 58% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Cairns_2010_Prj_SW_320000_8202000_1K_DEM_1m.tif
+mt_perry_al,Mt Perry AL,-25.1892,151.6267,378.8,400.56,-21.76,21.76,1m,0.7,modelled ground is above the mark — unusual; check both,QLD Government,MtPerry_2014_Twn_SW_361000_7213000_1K_DEM_1m.tif
+darlington_al,Darlington AL,-28.2608,153.0917,314.7,293.08,21.62,21.62,1m,19.3,"coordinate: ground rises 19 m within the ring, 89% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,ScenicRim_2011_LGA_SW_508000_6873000_1K_DEM_1m.tif
+repentance_coopers,Repentance (Coopers Creek),-28.6408,153.4131,76.4,54.79,21.61,21.61,1m,16.9,"coordinate: ground rises 17 m within the ring, 78% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Lismore201008-LID1-AHD_5406830_56_0002_0002_1m.tif
+brisbane_city_al,Brisbane City AL,-27.4707,153.0341,20.9,-0.65,21.55,21.55,1m,21.2,"coordinate: ground rises 21 m within the ring, 98% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Brisbane_2014_LGA_SW_503000_6961000_1K_DEM_1m.tif
+finch_hatton_dam_go,Finch Hatton Dam (Gorge Rd) AL,-21.1119,148.6353,121.1,99.55,21.55,21.55,1m,25.8,"coordinate: ground rises 26 m within the ring, 120% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Mackay_2009_Rgn_SW_668000_7664000_2K_DEM_1m.tif
+killarney_spring_ck,Killarney (Spring Ck) AL,-28.3544,152.3319,576.8,555.26,21.54,21.54,2m,26.5,"coordinate: ground rises 27 m within the ring, 123% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Warwick201709-LID2-AHD_4346862_56_0002_0002_2m.tif
+uki_tweed_river,Uki (Tweed River),-28.4147,153.3339,37.0,15.47,21.53,21.53,1m,23.0,"coordinate: ground rises 23 m within the ring, 107% of the difference — the mark is likely uphill of the point, so check the position before the height",CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5326856_56_0001_0001.tif
+moy_pocket_al,Moy Pocket AL,-26.5261,152.7439,95.3,73.83,21.47,21.47,1m,40.9,"coordinate: ground rises 41 m within the ring, 191% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Gympie_2009_Rgn_SW_474000_7066000_1K_DEM_1m.tif
+upper_freestone,Upper Freestone AL,-28.1341,152.2217,645.3,623.98,21.32,21.32,1 Second,11.9,"coordinate: ground rises 12 m within the ring, 56% of the difference — the mark is likely uphill of the point, so check the position before the height",Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+upper_sandy_ck_al,Upper Sandy Creek AL,-27.4558,152.1983,526.3,505.13,21.17,21.17,1m,8.3,mark is 21 m above the modelled ground and the ring explains only 39% of it,QLD Government,Lockyer_Valley_2022_LGA_SW_420000_6962000_1k_DEM_1m.tif
+mandagery_ck_at_e,Mandagery Ck at E,-33.4016,148.4086,291.8,270.74,21.06,21.06,5m,22.1,"coordinate: ground rises 22 m within the ring, 105% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Parkes201509-PHO3-AHD_6306302_55_0002_0002_5m.tif
+redoak_stewarts_riv,Redoak (Stewarts Riv,-31.7275,152.6389,38.0,17.01,20.99,20.99,1m,6.4,mark is 21 m above the modelled ground and the ring explains only 31% of it,NSW Natural Resorces Commision,Wauchope2022-DEM-AHD-1m_465500-6489500_56_500m_500m.tif
+coolabine_ck_aler,Coolabine Ck AL,-26.5967,152.7672,150.9,171.72,-20.82,20.82,1m,3.1,modelled ground is above the mark — unusual; check both,QLD Government,SunshineCoast_2008_LGA_SW_476000_7058000_1K_DEM_1m.tif
+mulla_crossing_cock,Mulla Crossing (Cockburn River),-31.0625,151.125,460.6,440.17,20.43,20.43,5m,18.0,"coordinate: ground rises 18 m within the ring, 88% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Nundle201305-PHO3-AHD_3206560_56_0002_0002_5m.tif
+redlynch_al,Redlynch AL,-16.9422,145.6953,46.6,26.19,20.41,20.41,1m,0.1,mark is 20 m above the modelled ground and the ring explains only 0% of it,QLD Government,Cairns_2010_Prj_SW_361000_8126000_1K_DEM_1m.tif
+hollywell_al,Hollywell AL,-25.3319,151.2328,375.8,395.94,-20.14,20.14,1 Second,9.9,modelled ground is above the mark — unusual; check both,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+gowan_green_bell_ri,Gowan Green (Bell Ri,-32.8006,148.9803,389.2,369.07,20.13,20.13,5m,54.3,"coordinate: ground rises 54 m within the ring, 270% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Wellington201409-PHO3-AHD_6846368_55_0002_0002_5m.tif
+the_head_al,The Head AL,-28.2833,152.4175,687.0,666.96,20.04,20.04,1 Second,8.0,mark is 20 m above the modelled ground and the ring explains only 40% of it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+cedar_ck_plunket,Cedar Creek (Plunkett Rd) AL,-27.8324,153.1738,40.5,20.57,19.93,19.93,1m,5.3,mark is 20 m above the modelled ground and the ring explains only 27% of it,QLD Government,Logan_2017_LGA_SW_517000_6921000_0.5K_DEM_1m.tif
+beaudesert_al,Beaudesert AL,-27.9681,152.9861,49.1,29.31,19.79,19.79,1m,13.8,"coordinate: ground rises 14 m within the ring, 70% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,ScenicRim_2011_LGA_SW_498000_6906000_1K_DEM_1m.tif
+upper_murray_al,Upper Murray AL,-18.1069,145.8053,55.6,35.91,19.69,19.69,50cm,23.8,"coordinate: ground rises 24 m within the ring, 121% of the difference — the mark is likely uphill of the point, so check the position before the height",Griffith Uni,Innisfail201308-DEM-GRID-50cm_3737997_55_0001_0001.tif
+cooroy_al,Cooroy AL,-26.4064,152.9211,139.7,120.24,19.46,19.46,1m,26.4,"coordinate: ground rises 26 m within the ring, 136% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Noosa_2022_LGA_SW_492000_7079000_1k_DEM_1m.tif
+upper_stockyard_cree,Upper Stockyard Creek AL,-26.2514,150.7272,396.7,377.39,19.31,19.31,1 Second,12.3,"coordinate: ground rises 12 m within the ring, 64% of the difference — the mark is likely uphill of the point, so check the position before the height",Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+harper_ck_al,Harper Ck AL,-26.7642,152.7722,507.4,526.11,-18.71,18.71,1m,6.3,modelled ground is above the mark — unusual; check both,QLD Government,SunshineCoast_2008_LGA_SW_477000_7039000_1K_DEM_1m.tif
+darlington_school_al,Darlington School AL,-28.2059,153.0408,195.6,176.95,18.65,18.65,1m,12.5,"coordinate: ground rises 13 m within the ring, 67% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,ScenicRim_2011_LGA_SW_504000_6879000_1K_DEM_1m.tif
+jindalee_centenary,Jindalee (Centenary),-27.5283,152.9467,17.4,-1.1,18.5,18.5,1m,13.8,"coordinate: ground rises 14 m within the ring, 75% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Brisbane_2019_Prj_SW_494000_6955000_1k_DEM_1m.tif
+west_haldon_al,West Haldon AL,-27.7781,152.0803,520.4,502.47,17.93,17.93,1m,24.5,"coordinate: ground rises 25 m within the ring, 137% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Toowoomba_2011_Prj_SW_409000_6927000_1K_DEM_1m.tif
+slacks_ck_loganlea_r,Slacks Ck (Loganlea Rd) AL,-27.6475,153.1475,18.8,0.95,17.85,17.85,1m,12.9,"coordinate: ground rises 13 m within the ring, 72% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Logan_2017_LGA_SW_514500_6941500_0.5K_DEM_1m.tif
+clothiers_ck,Clothiers Ck Rd,-28.336,153.476,50.8,32.98,17.82,17.82,1m,11.5,"coordinate: ground rises 11 m within the ring, 64% of the difference — the mark is likely uphill of the point, so check the position before the height",CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5466865_56_0001_0001.tif
+point_rd_at_the_wa,Point Rd at the Wa,-16.9045,145.8628,19.6,1.78,17.82,17.82,50cm,35.9,"coordinate: ground rises 36 m within the ring, 201% of the difference — the mark is likely uphill of the point, so check the position before the height",Griffith Uni,Cairns201308-DEM-GRID-50cm_3788130_55_0001_0001.tif
+running_ck_bells,Running Ck (Bells,-28.3183,152.9216,176.8,159.05,17.75,17.75,2m,16.8,"coordinate: ground rises 17 m within the ring, 95% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,MountLindesay201709-LID2-AHD_4926866_56_0002_0002_2m.tif
+casino_rd_br,Casino Rd Br (,-28.8694,153.0458,40.2,22.48,17.72,17.72,1m,17.2,"coordinate: ground rises 17 m within the ring, 97% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Casino_202307_LID1_AHD_1m_1km_56_5046806.tif
+taroona_peel_river,Taroona (Peel River),-31.4333,151.1333,609.9,592.19,17.71,17.71,5m,14.4,"coordinate: ground rises 14 m within the ring, 82% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Nundle201305-PHO3-AHD_3226520_56_0002_0002_5m.tif
+grigor_rd_al,Grigor Rd AL,-26.7181,152.6692,163.4,181.02,-17.62,17.62,1m,-0.5,modelled ground is above the mark — unusual; check both,QLD Government,Sunshine_Coast_2022_LGA_SW_467000_7044000_1k_DEM_1m.tif
+aldavilla_d_s_macle,Aldavilla D/S (Macleay River),-31.0825,152.7831,17.8,0.19,17.61,17.61,1m,12.5,"coordinate: ground rises 12 m within the ring, 71% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Kempsey200910-LID1-AHD_4786560_56_0002_0002_1m.tif
+mt_rawdon_al,Mt Rawdon AL,-25.2356,151.7964,126.3,108.85,17.45,17.45,1m,37.6,"coordinate: ground rises 38 m within the ring, 215% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,GoodNight_2014_Prj_SW_378000_7208000_1K_DEM_1m.tif
+upper_alligator_cree,Upper Alligator Cree,-19.4356,146.9539,215.5,232.94,-17.44,17.44,50cm,-5.0,modelled ground is above the mark — unusual; check both,Griffith Uni,Townsville201305-DEM-GRID-50cm_4957850_55_0001_0001.tif
+eungella_oxley_rive,Eungella (Oxley River),-28.3538,153.293,36.8,19.38,17.42,17.42,1m,28.5,"coordinate: ground rises 29 m within the ring, 164% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Murwillumbah201309-LID1-AHD_5286862_56_0002_0002_1m.tif
+teemburra_dam_al,Teemburra Dam AL,-21.2175,148.665,311.2,293.91,17.29,17.29,50cm,31.6,"coordinate: ground rises 32 m within the ring, 183% of the difference — the mark is likely uphill of the point, so check the position before the height",Griffith Uni,Mackay201805-DEM-GRID-50cm_6727652_55_0001_0001.tif
+pikes_ck_al,Pikes Creek AL,-28.6905,151.5389,665.5,648.24,17.26,17.26,50cm,12.9,"coordinate: ground rises 13 m within the ring, 75% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Dumaresq_River_Catchment_2023_Prj_SW_357000_6825000_1k_DEM_50cm.tif
+coulson,Coulson,-27.9543,152.7398,93.5,76.29,17.21,17.21,1m,12.1,"coordinate: ground rises 12 m within the ring, 70% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,ScenicRim_2011_LGA_SW_474000_6907000_1K_DEM_1m.tif
+doongul_ck_wongi,Doongul Ck (Wongi,-25.4694,152.4643,59.0,41.79,17.21,17.21,1m,4.5,mark is 17 m above the modelled ground and the ring explains only 26% of it,QLD Government,Fraser_coast_2022_LGA_SW_446000_7182000_1k_DEM_1m.tif
+kerewong_broken_bag,Kerewong (Broken Bag,-31.5372,152.6931,45.2,28.05,17.15,17.15,1m,14.9,"coordinate: ground rises 15 m within the ring, 87% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Natural Resorces Commision,Wauchope2022-DEM-AHD-1m_470500-6510500_56_500m_500m.tif
+junction_view_al,Junction View AL,-27.8011,152.1875,253.9,236.97,16.93,16.93,1m,2.1,mark is 17 m above the modelled ground and the ring explains only 13% of it,QLD Government,LockyerValleySouth_2011_Rgn_SW_419000_6924000_1K_DEM_1m.tif
+tomerong_ck,Tomerong Creek,-35.0598,150.5815,36.8,19.9,16.9,16.9,1m,7.1,mark is 17 m above the modelled ground and the ring explains only 42% of it,NSW Government,JervisBay201012-LID1-AHD_2786116_56_0002_0002_1m.tif
+calcium_al,Calcium AL,-19.655,146.7994,175.5,192.36,-16.86,16.86,50cm,46.1,modelled ground is above the mark — unusual; check both,Griffith Uni,Townsville201305-DEM-GRID-50cm_4787826_55_0001_0001.tif
+kookaburra_at_the_s,Kookaburra (at the School Hut),-31.0238,152.3388,966.6,949.77,16.83,16.83,2m,16.1,"coordinate: ground rises 16 m within the ring, 96% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Cowarral201804-LID2-AHD_4366566_56_0002_0002_2m.tif
+alstonville_stp,Alstonville STP,-28.8306,153.4444,124.5,107.69,16.81,16.81,1m,5.7,mark is 17 m above the modelled ground and the ring explains only 34% of it,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5436810_56_0001_0001.tif
+mt_berryman_rd_ale,Mt Berryman Rd AL,-27.7542,152.3367,424.2,407.39,16.81,16.81,1m,41.6,"coordinate: ground rises 42 m within the ring, 248% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,LockyerValleySouth_2011_Rgn_SW_434000_6929000_1K_DEM_1m.tif
+ma_ma_ck_al,Ma Ma Ck AL,-27.6539,152.1653,165.6,148.94,16.66,16.66,1m,15.6,"coordinate: ground rises 16 m within the ring, 93% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,LockyerValley_2015_Prj_SW_417000_6940000_1K_DEM_1m.tif
+goonoo_goonoo_goono,Goonoo Goonoo (Goonoo Goonoo Ck),-31.2717,150.9167,445.9,429.4,16.5,16.5,5m,9.5,"coordinate: ground rises 9 m within the ring, 57% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Tamworth201602-PHO3-AHD_3006538_56_0002_0002_5m.tif
+bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,-26.8325,152.7431,578.8,595.13,-16.33,16.33,1m,3.3,modelled ground is above the mark — unusual; check both,QLD Government,Moreton_Bay_2018_LGA_SW_474000_7032000_1k_DEM_1m.tif
+goldsborough_valley,Goldsborough Valley AL,-17.2464,145.7744,83.6,67.3,16.3,16.3,1 Second,9.4,"coordinate: ground rises 9 m within the ring, 58% of the difference — the mark is likely uphill of the point, so check the position before the height",Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+dalveen_al,Dalveen AL,-28.5,151.9706,928.7,912.51,16.19,16.19,1m,9.1,"coordinate: ground rises 9 m within the ring, 56% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,TheSummittoDalveen_2013_Prj_SW_399000_6846000_1K_DEM_1m.tif
+mt_kelly_al,Mt Kelly AL,-19.6619,147.3128,168.1,184.11,-16.01,16.01,1m,1.4,modelled ground is above the mark — unusual; check both,QLD Government,Burdekin_2009_Rgn_SW_532000_7824000_2K_DEM_1m.tif
+castle_hill_al,Castle Hill AL,-19.2586,146.8031,250.0,265.94,-15.94,15.94,1m,17.9,modelled ground is above the mark — unusual; check both,QLD Government,Townsville_2018_Prj_SW_479000_7870000_1.0K_DEM_1m.tif
+south_lismore_rober,Leycester Creek (Robert White Bridge),-28.8042,153.2625,11.5,-4.43,15.93,15.93,1m,16.5,"coordinate: ground rises 17 m within the ring, 104% of the difference — the mark is likely uphill of the point, so check the position before the height",CSIRO and NEMA,NorthernRiversNSW2022Bathymetry-LeycesterCreek-DEM-AHD-1m_5256813_56_0001_0001.tif
+brdwater_ck_ale,Broadwater Creek AL,-28.5986,151.8883,822.8,806.89,15.91,15.91,50cm,8.0,"coordinate: ground rises 8 m within the ring, 50% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Dumaresq_River_Catchment_2023_Prj_SW_391000_6835000_1k_DEM_50cm.tif
+piallamore_peel_riv,Piallamore (Peel River),-31.1833,151.065,439.1,423.24,15.86,15.86,5m,29.5,"coordinate: ground rises 29 m within the ring, 186% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Nundle201305-PHO3-AHD_3146548_56_0002_0002_5m.tif
+murwillumbah_sewera,Murwillumbah WWTP,-28.323,153.348,19.9,4.41,15.49,15.49,1m,10.8,"coordinate: ground rises 11 m within the ring, 70% of the difference — the mark is likely uphill of the point, so check the position before the height",CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5346866_56_0001_0001.tif
+mt_stanley_tm,Mt Stanley TM,-26.6821,152.2052,181.8,166.32,15.48,15.48,1 Second,18.8,"coordinate: ground rises 19 m within the ring, 121% of the difference — the mark is likely uphill of the point, so check the position before the height",Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+munna_ck_glenbar_ti,Munna Ck (Glenbar Tiaro Rd) Alert,-25.7474,152.2966,93.0,77.59,15.41,15.41,1m,11.7,"coordinate: ground rises 12 m within the ring, 76% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,Fraser_coast_2022_LGA_SW_429000_7152000_1k_DEM_1m.tif
+upper_goomburra,Upper Goomburra AL,-28.0288,152.1891,586.2,570.9,15.3,15.3,1m,11.2,"coordinate: ground rises 11 m within the ring, 73% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,MaryvaletoGoomburra_2012_Rgn_SW_420000_6899000_1K_DEM_1m.tif
+tatham_ellangowan_ro,Tatham Ellangowan Ro,-28.9798,153.1213,21.9,6.69,15.21,15.21,1m,2.0,mark is 15 m above the modelled ground and the ring explains only 13% of it,NSW Government,Lismore201006-LID1-AHD_5106794_56_0002_0002_1m.tif
+connolly_dam_al,Connolly Dam AL,-28.3558,151.9967,574.4,559.29,15.11,15.11,1m,28.8,"coordinate: ground rises 29 m within the ring, 191% of the difference — the mark is likely uphill of the point, so check the position before the height",QLD Government,SouthernDowns_2010_Rgn_SW_401000_6862000_1K_DEM_1m.tif
+ellerston_poitrel,Ellerston (Poitrel),-31.7069,151.2131,697.2,712.31,-15.11,15.11,5m,8.6,modelled ground is above the mark — unusual; check both,NSW Government,Ellerston201304-PHO3-AHD_3306490_56_0002_0002_5m.tif
+south_kariboe_ck_ale,South Kariboe Ck AL,-24.561,150.747,267.4,252.29,15.11,15.11,50cm,20.5,"coordinate: ground rises 21 m within the ring, 136% of the difference — the mark is likely uphill of the point, so check the position before the height",Griffith Uni,Moura201802-DEM-GRID-50cm_2717281_56_0001_0001.tif
+the_fisheries_al,The Fisheries AL,-17.1853,145.7239,104.6,89.51,15.09,15.09,50cm,21.5,"coordinate: ground rises 21 m within the ring, 142% of the difference — the mark is likely uphill of the point, so check the position before the height",Griffith Uni,Cairns201308-DEM-GRID-50cm_3648099_55_0001_0001.tif
+white_rock_macquari,White Rock (Macquarie River),-33.4931,149.6205,676.9,661.86,15.04,15.04,1m,20.3,"coordinate: ground rises 20 m within the ring, 135% of the difference — the mark is likely uphill of the point, so check the position before the height",NSW Government,Bathurst201907-LID1-AHD_7426290_55_0002_0002_1m.tif
+upper_quart_pot_ck_a,Upper Quart Pot Ck AL,-28.7768,152.0161,934.8,919.86,14.94,14.94,50cm,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Dumaresq_River_Catchment_2023_Prj_SW_403000_6816000_1k_DEM_50cm.tif
+lake_macdonald_drive,Lake MacDonald Drive AL,-26.3719,152.9242,98.0,83.09,14.91,14.91,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Noosa_2015_LGA_SW_492000_7083000_1K_DEM_1m.tif
+brunswick_hwyoldbr,Brunswick HwyOldBr,-28.5313,153.539,15.8,0.94,14.86,14.86,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Ballina201008-LID1-AHD_5526842_56_0002_0002_1m.tif
+teddington_weir_hw_t,Teddington Weir HW TM,-25.6517,152.6633,30.5,15.71,14.79,14.79,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,FraserCoast_2009_Ctl_SW_466000_7162000_1K_DEM_1m.tif
+budawang,Budawang (ERTS),-35.4801,149.9957,1122.5,1137.27,-14.77,14.77,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Ulladulla201501-LID1-AHD_2266068_56_0002_0002_1m.tif
+whiporie_myall_cree,Whiporie (Myall Cree,-29.2797,152.9906,56.1,41.37,14.73,14.73,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Coaldale201707-LID1-AHD_4986760_56_0002_0002_1m.tif
+kettle_swamp_ck_a,Kettle Swamp Creek AL,-28.6608,151.9494,824.5,809.82,14.68,14.68,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Stanthorpe_2011_Twn_SW_397000_6829000_1K_DEM_1m.tif
+marsden_weir_wollon,Marsden Weir (Wollondily River),-34.7365,149.7061,646.9,632.24,14.66,14.66,5m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Goulburn201312-PHO3-AHD_7466152_55_0002_0002_5m.tif
+bukki_rd_br,Bukki Rd Br,-16.9248,145.903,26.0,11.41,14.59,14.59,50cm,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Yarrabah_2024_Prj_SW_383000_8128000_1k_DEM_50cm.tif
+gargett_al,Gargett AL,-21.1781,148.7442,68.0,53.41,14.59,14.59,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Mackay_2009_Rgn_SW_680000_7656000_2K_DEM_1m.tif
+chinchilla_weir_tw,Chinchilla Weir Tw,-26.8,150.5753,301.6,287.02,14.58,14.58,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Surat_CMA_2014_OGIA_SW_258000_7033000_1k_DEM_1m.tif
+glennely_ck,Glennely Creek,-35.0872,150.4563,41.2,26.66,14.54,14.54,2m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Ulladulla201804-LID2-AHD_2686114_56_0002_0002_2m.tif
+kullogum_al,Kullogum AL,-25.3308,152.2519,94.2,79.77,14.43,14.43,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mckell_rd_al,McKell Rd AL,-17.4442,145.5094,1015.7,1030.02,-14.32,14.32,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Atherton201808-DEM-GRID-50cm_3418070_55_0001_0001.tif
+mt_petersen_al,Mt Petersen AL,-27.6517,152.1986,484.9,499.2,-14.3,14.3,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,LockyerValley_2015_Prj_SW_420000_6941000_1K_DEM_1m.tif
+davidson_ck_al,Davidson Creek AL,-17.9608,145.7539,36.3,50.46,-14.16,14.16,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Innisfail201807-DEM-GRID-50cm_3688013_55_0001_0001.tif
+sutties_ck_al,Sutties Creek AL,-17.6803,145.6603,690.7,676.61,14.09,14.09,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+bellbird_park_purse,Bellbird Park (Purser Rd) AL,-27.6692,152.8731,63.9,49.83,14.07,14.07,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Ipswich_2014_LGA_SW_487000_6939000_1K_DEM_1m.tif
+logan_village_al,Logan Village AL,-27.7711,153.1019,32.2,18.24,13.96,13.96,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Logan_2021_GDA2020_LGA_SW_510000_6928000_500m_DEM_1m.tif
+cockatoo_rd_al,Cockatoo Rd AL,-25.6811,150.1336,218.8,204.88,13.92,13.92,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Surat_CMA_2012_OGIA_SW_212000_7156000_1k_DEM_1m.tif
+fig_tree_al,Fig Tree AL,-25.2839,151.9892,55.2,69.04,-13.84,13.84,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Bundaberg_2016_Rgn_SW_398000_7203000_1K_DEM_1m.tif
+inveralochy_br,Inveralachy Bridge,-34.9584,149.6625,667.6,653.82,13.78,13.78,5m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Goulburn201312-PHO3-AHD_7426128_55_0002_0002_5m.tif
+rathdowney_al,Rathdowney AL,-28.2153,152.8681,100.3,86.52,13.78,13.78,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,ScenicRim_2011_LGA_SW_487000_6878000_1K_DEM_1m.tif
+gloucester_gloucest,Gloucester (Gloucester River),-32.005,151.958,104.6,90.96,13.64,13.64,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Dungog201801-LID1-AHD_4006458_56_0002_0002_1m.tif
+boat_harbour_rous_r,Boat Harbour (Rous River),-28.3217,153.3467,17.7,4.07,13.63,13.63,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Murwillumbah201309-LID1-AHD_5326866_56_0002_0002_1m.tif
+amiens_knob_al,Amiens Knob AL,-28.6061,151.8175,958.4,972.02,-13.62,13.62,50cm,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Dumaresq_River_Catchment_2023_Prj_SW_384000_6835000_1k_DEM_50cm.tif
+mummulgum_bingeebee,Mummulgum (Bingeebee,-28.7883,152.7728,190.2,176.6,13.6,13.6,1m,,differs — ring-sample it (--relief) before reading anything into it,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_4776815_56_0001_0001.tif
+comboyne_thone_rive,Comboyne (Thone Rive,-31.6097,152.4625,595.7,582.19,13.51,13.51,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Wingham201707-LID1-AHD_4486502_56_0002_0002_1m.tif
+flaggy_ck_al,Flaggy Ck AL,-16.7803,145.5303,398.8,385.32,13.48,13.48,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+cardwell_gap_al,Cardwell Gap AL,-18.5422,146.1844,31.4,17.95,13.45,13.45,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Ingham201806-DEM-GRID-50cm_4137949_55_0001_0001.tif
+mooga_ck_tm,Mooga Ck Tm,-26.4132,148.8009,333.9,320.46,13.44,13.44,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+russell_river,Russell River,-17.4608,145.8822,45.0,31.74,13.26,13.26,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Cairns_2010_Prj_SW_381000_8069000_1K_DEM_1m.tif
+peachester,Peachester,-26.8425,152.8819,166.7,153.6,13.1,13.1,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Sunshine_Coast_2022_LGA_SW_488000_7031000_1k_DEM_1m.tif
+upper_finch_hatton_a,Upper Finch Hatton AL,-21.09,148.6353,126.4,113.54,12.86,12.86,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Mackay201805-DEM-GRID-50cm_6697667_55_0001_0001.tif
+orange_north_orange,Orange (North Orange WTP),-33.2551,149.0775,830.1,817.36,12.74,12.74,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Orange201907-LID1-AHD_6926318_55_0002_0002_1m.tif
+brinsmead_al,Brinsmead AL,-16.8886,145.7108,100.3,87.57,12.73,12.73,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Cairns201308-DEM-GRID-50cm_3628132_55_0001_0001.tif
+pomona_al,Pomona AL,-26.3672,152.8431,157.1,144.53,12.57,12.57,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Noosa_2015_LGA_SW_484000_7083000_1K_DEM_1m.tif
+kendall_delward,Kendall (Delward),-31.6539,152.5561,122.1,109.56,12.54,12.54,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Natural Resorces Commision,Wauchope2022-DEM-AHD-1m_457500-6497500_56_500m_500m.tif
+millaa_millaa_al,Millaa Millaa AL,-17.5175,145.6089,843.0,855.52,-12.52,12.52,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,MillaaMillaa_2011_Twn_SW_352000_8062000_1K_DEM_1m.tif
+cameron_hill_al,Cameron Hill AL,-19.7437,146.8586,310.4,322.87,-12.47,12.47,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Townsville201305-DEM-GRID-50cm_4857816_55_0001_0001.tif
+bowen_wtp_al,Bowen WTP AL,-20.3539,148.4492,53.3,40.85,12.45,12.45,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Proserpine201806-DEM-GRID-50cm_6517748_55_0001_0001.tif
+yangan_al,Yangan AL,-28.2006,152.2156,514.4,502.08,12.32,12.32,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,SouthernDowns_2010_Rgn_SW_423000_6880000_1K_DEM_1m.tif
+davies_ck_tm,Davies Ck Tm,-16.9416,145.5416,407.9,395.65,12.25,12.25,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Cairns201308-DEM-GRID-50cm_3448126_55_0001_0001.tif
+highfields_tm,Highfields TM,-27.4428,151.964,645.8,633.57,12.23,12.23,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Toowoomba_Cooby_2020_Prj_SW_397000_6964000_1k_DEM_1m.tif
+bengalla_tm,Bengalla TM,-28.6561,150.6653,240.2,228.11,12.09,12.09,5m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Yetman201108-PHO3-AHD_2706826_56_0002_0002_5m.tif
+lower_quinzeh_al,Lower Quinzeh AL,-27.7681,153.1211,24.6,12.62,11.98,11.98,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Logan_2021_GDA2020_LGA_SW_511500_6928000_500m_DEM_1m.tif
+peets_br_al,Peets Bridge AL,-17.1336,145.7644,34.4,22.55,11.85,11.85,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Cairns201308-DEM-GRID-50cm_3688105_55_0001_0001.tif
+perthville_queen_ch,Perthville (Queen Charlottes Creek),-33.4917,149.5467,689.8,677.98,11.82,11.82,2m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Bathurst201510-LID2-AHD_7366290_55_0002_0002_2m.tif
+goolmangar_goolmang,Goolmangar (Goolmangar Ck),-28.4788,153.218,180.6,168.85,11.75,11.75,2m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Murwillumbah201709-LID2-AHD_5206848_56_0002_0002_2m.tif
+kirrama_range_al,Kirrama Range AL,-18.2086,145.7953,778.7,766.96,11.74,11.74,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+island_point_rd_st,Island Point Road,-35.0989,150.5935,12.1,0.5,11.6,11.6,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,JervisBay201012-LID1-AHD_2806112_56_0002_0002_1m.tif
+oxley_ck_al,Oxley Ck AL,-27.705,152.9714,54.1,42.55,11.55,11.55,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Logan_2013_LGA_SW_497000_6935000_1K_DEM_1m.tif
+bumana,Bumana,-34.677,149.725,683.1,671.58,11.52,11.52,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Goulburn201107-LID1-AHD_7486158_55_0002_0002_1m.tif
+folding_hills_al,Folding Hills AL,-24.575,150.624,235.0,223.48,11.52,11.52,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Moura201306-DEM-GRID-50cm_2597280_56_0001_0001.tif
+durah_homestead_al,Durah Homestead AL,-26.2839,150.9664,373.9,362.39,11.51,11.51,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+lansdowne_br_mu,Landsdowne Bridge (Mulwaree River),-34.7691,149.7234,638.6,627.1,11.5,11.5,5m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Goulburn201312-PHO3-AHD_7486148_55_0002_0002_5m.tif
+brassall_hancocks_b,Brassall AL (Hancocks Br),-27.6036,152.7439,32.2,20.72,11.48,11.48,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Ipswich_2023_LGA_SW_474000_6946000_1k_DEM_1m.tif
+carroll_village_nam,Carroll Village (Nam,-30.9833,150.4417,284.4,272.99,11.41,11.41,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,UpperNamoiNorth_202304_LID1_AHD_1m_1km_56_2556569.tif
+tomerong_eucalypt_l,Tomerong (Eucalypt Lane),-35.0478,150.5378,130.5,119.13,11.37,11.37,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,JervisBay201012-LID1-AHD_2746118_56_0002_0002_1m.tif
+schmidts_rd_al,Schmidts Rd AL,-27.7,153.1203,17.5,6.17,11.33,11.33,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Logan_2017_LGA_SW_511500_6936000_0.5K_DEM_1m.tif
+upper_blackfellow_al,Upper Blackfellow AL,-27.915,152.2736,578.7,590.01,-11.31,11.31,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Lockyer_Valley_2022_LGA_SW_428000_6912000_1k_DEM_1m.tif
+schultz_lookout_aler,Schultz Lookout AL,-27.6653,152.3458,222.0,233.25,-11.25,11.25,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,LockyerValleyNorth_2010_Rgn_SW_435000_6939000_1K_DEM_1m.tif
+davies_ck_rd_tm,Davies Ck Rd Tm,-17.0232,145.5858,651.4,640.23,11.17,11.17,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+kogan_condamine_rd_a,Kogan Condamine Rd A,-26.8926,150.38,298.3,287.19,11.11,11.11,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+black_mt_al,Black Mt AL,-26.4075,152.8625,215.7,226.77,-11.07,11.07,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Noosa_2015_LGA_SW_486000_7079000_1K_DEM_1m.tif
+wallaman_escarpment,Wallaman Escarpment,-18.648,145.8745,633.8,622.75,11.05,11.05,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+orange_stp_enviromon,Orange (STP),-33.2646,149.1287,853.7,842.69,11.01,11.01,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Orange201907-LID1-AHD_6986316_55_0002_0002_1m.tif
+upper_durah_ck_al,Upper Durah Creek AL,-26.1708,150.9122,406.3,395.36,10.94,10.94,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+nerada_al,Nerada AL,-17.5308,145.8464,52.1,41.22,10.88,10.88,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,CassowaryCoast_2016_Prj_SW_377000_8061000_1K_DEM_1m.tif
+burringbar_reservo,Burringbar Reservoir,-28.4372,153.4729,45.0,55.82,-10.82,10.82,1m,,differs — ring-sample it (--relief) before reading anything into it,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5466854_56_0001_0001.tif
+cairns_harbour_tide,Cairns Harbour Tide AL,-16.9267,145.7808,10.1,-0.72,10.82,10.82,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Cairns201308-DEM-GRID-50cm_3708128_55_0001_0001.tif
+houghlahan_s_ck,Houghlahans Creek,-28.7845,153.4772,118.8,129.54,-10.74,10.74,1m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Lismore201006-LID1-AHD_5466814_56_0002_0002_1m.tif
+sassafras,Sassafras,-35.1056,150.2583,744.0,733.26,10.74,10.74,2m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Ulladulla201804-LID2-AHD_2506110_56_0002_0002_2m.tif
+boyne_river_chahpin,Boyne River (Chahpin,-26.4514,151.3874,359.5,348.8,10.7,10.7,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+emu_ck_at_pierces,Emu Ck at Pierces,-27.0644,152.0046,367.7,357.0,10.7,10.7,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,EmuCkToowoomba_2014_Prj_SW_401000_7006000_1K_DEM_1m.tif
+tinaroo_dam_al,Tinaroo Dam AL,-17.1642,145.5464,677.0,666.34,10.66,10.66,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,KairitoTinarooFalls_2011_Twn_SW_345000_8101000_1K_DEM_1m.tif
+coonambula_al,Coonambula AL,-25.5884,151.1489,137.7,127.07,10.63,10.63,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+upper_amby_ck_tm,Upper Amby Ck Tm,-26.4074,148.2638,388.0,377.46,10.54,10.54,1 Second,,differs — ring-sample it (--relief) before reading anything into it,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+myall_park_rd_aler,Myall Park Rd AL,-26.5667,150.2353,312.8,302.39,10.41,10.41,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Surat_CMA_2022_OGIA_SW_224000_7058000_1k_DEM_1m.tif
+bloomfield_river_bri,Bloomfield River Bri,-24.532,150.92,523.8,534.1,-10.3,10.3,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Moura201802-DEM-GRID-50cm_2897285_56_0001_0001.tif
+blue_hills_al,Blue Hills AL,-24.532,150.92,523.8,534.1,-10.3,10.3,50cm,,differs — ring-sample it (--relief) before reading anything into it,Griffith Uni,Moura201802-DEM-GRID-50cm_2897285_56_0001_0001.tif
+lacks_ck_middle,Lacks Creek (Middle Pocket),-28.4944,153.4847,40.5,30.25,10.25,10.25,1m,,differs — ring-sample it (--relief) before reading anything into it,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5476847_56_0001_0001.tif
+hospital_br_aler,Hospital Bridge AL,-21.1444,149.1544,11.9,1.75,10.15,10.15,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Mackay_2015_Rgn_SW_723000_7660000_1K_DEM_1m.tif
+long_flat_hastings,Long Flat (Hastings,-31.4369,152.4886,64.1,53.97,10.13,10.13,2m,,differs — ring-sample it (--relief) before reading anything into it,NSW Government,Cowarral201804-LID2-AHD_4506520_56_0002_0002_2m.tif
+bolton_rd_al,Bolton Rd AL,-16.8911,145.5458,386.6,376.48,10.12,10.12,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Speewah_2011_Loc_SW_345000_8131000_1K_DEM_1m.tif
+granite_street_al,Granite Street AL,-28.6633,151.9367,796.0,785.88,10.12,10.12,1m,,differs — ring-sample it (--relief) before reading anything into it,QLD Government,Stanthorpe_2011_Twn_SW_396000_6828000_1K_DEM_1m.tif
+lismore_wilsons_riv,Lismore (Wilsons River AT Browns Ck),-28.81,153.2733,14.0,3.9,10.1,10.1,1m,,differs — ring-sample it (--relief) before reading anything into it,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5266813_56_0001_0001.tif
+ned_churchward_weir,Ned Churchward Weir HW AL,-25.0514,152.0997,48.0,38.03,9.97,9.97,1m,,close,QLD Government,Bundaberg_2016_Rgn_SW_409000_7229000_1K_DEM_1m.tif
+upper_quinzeh_al,Upper Quinzeh AL,-27.8013,153.126,31.8,21.86,9.94,9.94,1m,,close,QLD Government,Logan_2017_LGA_SW_512000_6924500_0.5K_DEM_1m.tif
+conondale_al,Conondale AL,-26.7294,152.7133,139.0,129.07,9.93,9.93,1m,,close,QLD Government,SunshineCoast_2008_LGA_SW_471000_7043000_1K_DEM_1m.tif
+saddle_mountain_aler,Saddle Mtn AL,-16.8183,145.6628,631.6,641.52,-9.92,9.92,50cm,,close,Griffith Uni,Cairns201308-DEM-GRID-50cm_3578140_55_0001_0001.tif
+lismore_browns_ck_p,Lismore (Browns Ck P,-28.8058,153.2775,15.2,5.34,9.86,9.86,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5276813_56_0001_0001.tif
+upsalls_ck_br,Upsalls Ck Br,-31.6247,152.6575,27.7,17.89,9.81,9.81,1m,,close,NSW Government,CamdenHaven201205-LID1-AHD_4666500_56_0002_0002_1m.tif
+carbrook_al,Carbrook AL,-27.6547,153.2317,24.8,15.01,9.79,9.79,1m,,close,QLD Government,Logan_2021_GDA2020_LGA_SW_522500_6941000_500m_DEM_1m.tif
+lismore_ballina_st,Lismore (Ballina St,-28.8128,153.2694,9.8,0.02,9.78,9.78,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5266812_56_0001_0001.tif
+upper_major_ck_al,Upper Major Creek AL,-19.5817,146.9381,66.8,57.05,9.75,9.75,50cm,,close,Griffith Uni,Ayr201804-DEM-GRID-50cm_4937834_55_0001_0001.tif
+nashua_wilsons_rive,Nashua (Wilsons River),-28.7278,153.4622,25.9,16.18,9.72,9.72,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5456822_56_0001_0001.tif
+plevna_al,Plevna AL,-21.2997,148.5444,838.6,828.9,9.7,9.7,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mt_hallen_sandy,Mt Hallen (Sandy,-27.317,152.3763,191.5,181.83,9.67,9.67,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mt_mowbullan_rptr,Mt MOWBULLAN RPTR,-26.8883,151.6006,1086.8,1096.44,-9.64,9.64,50cm,,close,Griffith Uni,Dalby201312-DEM-GRID-50cm_3617025_56_0001_0001.tif
+mt_fort_william_aler,Mt Fort William AL,-24.6475,151.3389,696.8,687.17,9.63,9.63,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+barongarook_al,Barongarook AL,-28.4314,151.4622,393.6,383.98,9.62,9.62,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+woolners_arm_doubtf,Woolners Arm (Doubtf,-28.705,152.8502,73.4,63.79,9.61,9.61,2m,,close,NSW Government,Bonalbo201709-LID2-AHD_4846824_56_0002_0002_2m.tif
+henderson_ck_al,Henderson Ck AL,-27.8296,153.0155,28.5,18.95,9.55,9.55,1m,,close,QLD Government,Logan_2017_LGA_SW_501500_6921500_0.5K_DEM_1m.tif
+canaan_ck_al,Canaan Creek AL,-26.3956,150.6767,395.9,386.36,9.54,9.54,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+carrs_lookout_al,Carrs Lkt AL,-28.2944,152.4156,1093.7,1084.17,9.53,9.53,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+findon_ck,Findon Ck,-28.3885,152.8803,149.9,140.45,9.45,9.45,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_4886859_56_0001_0001.tif
+cooran_al,Cooran AL,-26.3297,152.8136,82.3,72.93,9.37,9.37,1m,,close,QLD Government,Noosa_2022_LGA_SW_481000_7087000_1k_DEM_1m.tif
+powerline_al,Powerline AL,-19.6331,147.1103,25.7,16.37,9.33,9.33,50cm,,close,Griffith Uni,Ayr201804-DEM-GRID-50cm_5117829_55_0001_0001.tif
+cooranga_al,Cooranga AL,-26.77,151.4064,552.3,543.0,9.3,9.3,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+rock_valley_leycest,Rock Valley (Leycester Creek),-28.7364,153.1634,35.3,26.02,9.28,9.28,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5156821_56_0001_0001.tif
+deickmans_br_ale,Dieckmans Bridge AL,-28.2453,152.8908,112.6,103.45,9.15,9.15,1m,,close,QLD Government,ScenicRim_2011_LGA_SW_489000_6875000_1K_DEM_1m.tif
+constitution_hill,Constitution Hill,-27.4797,152.9542,247.1,256.22,-9.12,9.12,1m,,close,QLD Government,Brisbane_2014_LGA_SW_495000_6960000_1K_DEM_1m.tif
+flagstone_ck_jimboo,Flagstone Ck (Jimboomba) AL,-27.8042,152.9828,33.4,24.29,9.11,9.11,1m,,close,QLD Government,Logan_2021_GDA2020_LGA_SW_498000_6924000_500m_DEM_1m.tif
+nimbin_goolmangar_c,Nimbin (Goolmanger Creek),-28.6069,153.2083,46.6,37.54,9.06,9.06,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5206835_56_0001_0001.tif
+spicers_peak_al,Spicers Peak AL,-28.1133,152.3722,1146.3,1137.25,9.05,9.05,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+fords_rd_al,Fords Rd AL,-27.529,152.1928,163.6,154.56,9.04,9.04,1m,,close,QLD Government,LockyerValley_2015_Prj_SW_420000_6954000_1K_DEM_1m.tif
+mt_driven_tm,Mt Driven Tm,-27.9811,149.0973,207.8,198.86,8.94,8.94,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+dumbleton_rocks_aler,Dumbleton Rocks AL,-21.1439,149.0753,26.7,17.77,8.93,8.93,1m,,close,QLD Government,Mackay_2009_Rgn_SW_714000_7660000_2K_DEM_1m.tif
+maleny_al,Maleny AL,-26.7631,152.8475,421.3,412.38,8.92,8.92,1m,,close,QLD Government,Sunshine_Coast_2022_LGA_SW_484000_7039000_1k_DEM_1m.tif
+murray_springs_al,Murray Springs AL,-18.1494,145.4803,839.0,847.9,-8.9,8.9,50cm,,close,Griffith Uni,Atherton201808-DEM-GRID-50cm_3397992_55_0001_0001.tif
+tung_oil_al,Tung Oil AL,-17.5456,145.9325,29.4,20.53,8.87,8.87,1m,,close,QLD Government,CassowaryCoast_2009_Prj_SW_386000_8058000_2K_DEM_1m.tif
+hawkwood_range_al,Hawkwood Range AL,-25.7158,150.9753,392.0,400.85,-8.85,8.85,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+paradise_lagoon_aler,Paradise Lagoon AL,-18.9794,146.2711,35.5,26.65,8.85,8.85,1m,,close,QLD Government,Townsville_2018_Prj_SW_423000_7901000_1.0K_DEM_1m.tif
+obi_lookout_al,Obi Lookout AL,-26.6883,152.8064,474.6,465.8,8.8,8.8,1m,,close,QLD Government,SunshineCoast_2008_LGA_SW_480000_7048000_1K_DEM_1m.tif
+townson_al,Townson AL,-27.5658,152.0272,342.5,333.7,8.8,8.8,1m,,close,QLD Government,Toowoomba_2010_Rgn_SW_403000_6950000_1K_DEM_1m.tif
+withcott_al,Withcott AL,-27.5658,152.0272,342.5,333.7,8.8,8.8,1m,,close,QLD Government,Toowoomba_2010_Rgn_SW_403000_6950000_1K_DEM_1m.tif
+athol_westbrook_crk,Athol (Newton Rd East) TM,-27.613,151.793,487.1,478.32,8.78,8.78,1m,,close,QLD Government,SpringCkSthWestbrook_2014_Prj_SW_380000_6945000_1K_DEM_1m.tif
+grey_s_plains_rd_a,Greys Plains Rd AL,-27.8025,152.4361,136.9,128.2,8.7,8.7,1m,,close,QLD Government,Ipswich_2019_LGA_SW_444000_6924000_1k_DEM_1m.tif
+delaneys_ck_al,Delaneys Ck AL,-27.0019,152.7872,142.5,133.81,8.69,8.69,1m,,close,QLD Government,MoretonBay_2009_LGA_SW_478000_7013000_1K_DEM_1m.tif
+running_river_hidde,Running River (Hidde,-18.9803,146.0248,639.9,631.22,8.68,8.68,1m,,close,QLD Government,HiddenValley_2013_Loc_SW_397000_7901000_1K_DEM_1m.tif
+retreat_br_tm,Retreat Bridge TM,-27.9006,150.3486,257.0,248.41,8.59,8.59,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+hastings_sewerage_t,Hastings WWTP,-28.353,153.56,12.9,4.32,8.58,8.58,1m,,close,NSW Government,TweedHeads201309-LID1-AHD_5546862_56_0002_0002_1m.tif
+upper_bracker_ck_ale,Upper Bracker Ck AL,-28.7847,151.4122,695.8,704.38,-8.58,8.58,5m,,close,NSW Government,Texas201109-PHO3-AHD_3446814_56_0002_0002_5m.tif
+bellbrook_macleay_r,Bellbrook (Macleay River),-30.8217,152.5067,82.7,74.13,8.57,8.57,2m,,close,NSW Government,Macksville201707-LID2-AHD_4526590_56_0002_0002_2m.tif
+narda_lagoon_al,Narda Lagoon AL,-27.6489,152.3908,113.6,105.04,8.56,8.56,1m,,close,QLD Government,LockyerValleyNorth_2010_Rgn_SW_439000_6941000_1K_DEM_1m.tif
+gayndah_flume_al,Gayndah Flume AL,-25.6217,151.6031,113.7,105.15,8.55,8.55,1m,,close,QLD Government,Gayndah_2011_Twn_SW_359000_7165000_1K_DEM_1m.tif
+warahgai_al,Warahgai AL,-28.2269,151.4892,650.5,659.0,-8.5,8.5,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+paradise_ck_rd,Paradise Ck Rd AL,-27.4542,152.0789,278.2,269.71,8.49,8.49,1m,,close,QLD Government,LockyerValleyNorth_2010_Rgn_SW_408000_6962000_1K_DEM_1m.tif
+dry_dock_terranora,Dry Dock,-28.193,153.524,5.2,-3.21,8.41,8.41,1m,,close,CSIRO and NEMA,NorthernRiversNSW2022Bathymetry-TerranoraCreek-DEM-AHD-1m_5516881_56_0001_0001.tif
+yammanie_minnamoolka,Yammanie Minnamoolka,-18.298,145.2726,675.5,667.12,8.38,8.38,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+murwillumbah_br,Murwillumbah Bridge,-28.3283,153.4,8.1,-0.27,8.37,8.37,1m,,close,NSW Government,Murwillumbah201309-LID1-AHD_5386866_56_0002_0002_1m.tif
+sengs_rd_al,Sengs Rd AL,-26.7186,151.2056,399.7,391.41,8.29,8.29,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mt_dangar_al,Mt Dangar AL,-20.2197,148.1217,56.2,64.45,-8.25,8.25,1m,,close,QLD Government,Whitsunday_2009_Prj_SW_616000_7762000_2K_DEM_1m.tif
+moss_vale_al,Moss Vale AL,-20.2381,148.0311,128.8,137.01,-8.21,8.21,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+wairuna_rd_tm,Wairuna Rd Tm,-18.4785,145.2966,526.2,518.0,8.2,8.2,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+waterlilyprk_ocean,WaterlilyPrk(Ocean,-28.5201,153.5341,10.9,2.72,8.18,8.18,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5526845_56_0001_0001.tif
+mourilyan_harbour_al,Mourilyan Harbour Tide AL,-17.5994,146.125,8.5,0.35,8.15,8.15,50cm,,close,Griffith Uni,Innisfail201308-DEM-GRID-50cm_4078053_55_0001_0001.tif
+moon_rd_al,Moon Road AL,-27.6619,152.32,147.4,139.26,8.14,8.14,1m,,close,QLD Government,LockyerValley_2015_Prj_SW_432000_6940000_1K_DEM_1m.tif
+mt_glorious_al_rptr,Mt Glorious AL RPTR,-27.3151,152.7477,764.0,755.9,8.1,8.1,1m,,close,QLD Government,MoretonBay_2009_LGA_SW_475000_6978000_1K_DEM_1m.tif
+warra_al,Warra AL,-26.9283,150.9181,320.9,312.83,8.07,8.07,1m,,close,QLD Government,Surat_CMA_2014_OGIA_SW_293000_7019000_1k_DEM_1m.tif
+cordalba_al,Cordalba AL,-25.1569,152.2119,100.1,92.14,7.96,7.96,1m,,close,QLD Government,Bundaberg_2016_Rgn_SW_420000_7217000_1K_DEM_1m.tif
+upper_burringbar_rd,Upper Burringbar Rd,-28.4531,153.406,197.2,189.24,7.96,7.96,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5396852_56_0001_0001.tif
+yarrol_al,Yarrol AL,-24.9925,151.3475,254.9,246.98,7.92,7.92,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+yarrahappini_al,Yarrahappini AL,-27.8336,152.9878,39.4,31.5,7.9,7.9,1m,,close,QLD Government,Logan_2017_LGA_SW_498500_6921000_0.5K_DEM_1m.tif
+kempsey_rd_br_m,Kempsey Rd Bridge (Macleay River),-31.0833,152.8467,17.5,25.34,-7.84,7.84,1m,,close,NSW Government,Kempsey201607-LID1-AHD_4846560_56_0002_0002_1m.tif
+stanthorpe_al,Stanthorpe AL,-28.6544,151.9189,794.3,786.47,7.83,7.83,1m,,close,QLD Government,Stanthorpe_2011_Twn_SW_394000_6829000_1K_DEM_1m.tif
+lundavra_tm,Lundavra TM,-28.0697,149.9794,234.9,227.09,7.81,7.81,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+seymour_gap_tm,Seymour Gap TM,-21.6187,141.3328,275.8,268.0,7.8,7.8,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+roma_condamine_rd,Roma Condamine Rd AL,-26.8993,149.8279,277.9,270.14,7.76,7.76,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+tuckombil,Tuckombil,-28.8178,153.4842,136.4,128.64,7.76,7.76,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5476812_56_0001_0001.tif
+bundamba_hanlon_st,Bundamba (Hanlon St) AL,-27.5914,152.7964,18.3,10.61,7.69,7.69,1m,,close,QLD Government,Ipswich_2023_LGA_SW_479000_6948000_1k_DEM_1m.tif
+toorooka_macleay_ri,Toorooka (Macleay River),-30.91,152.59,67.5,59.82,7.68,7.68,2m,,close,NSW Government,Macksville201707-LID2-AHD_4606580_56_0002_0002_2m.tif
+extended_range_al,Extended Range AL,-17.5512,145.2111,952.0,959.65,-7.65,7.65,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+cons_plains_al,Cons Plains AL,-28.2297,152.4164,1194.8,1187.2,7.6,7.6,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+ipswich_al,Ipswich AL,-27.6117,152.7611,22.8,15.21,7.59,7.59,1m,,close,QLD Government,Ipswich_2009_LGA_SW_476000_6945000_1K_DEM_1m.tif
+harding_street_al,Harding St AL,-27.6375,152.7903,31.6,24.03,7.57,7.57,1m,,close,QLD Government,Ipswich_2023_LGA_SW_479000_6942000_1k_DEM_1m.tif
+bathurst_stanley_str,Bathurst Stanley Street (Macquarie River),-33.4107,149.5843,656.9,649.37,7.53,7.53,1m,,close,NSW Government,Bathurst201907-LID1-AHD_7406300_55_0002_0002_1m.tif
+braziers_hill_al,Braziers Hill AL,-26.7261,151.1328,442.0,434.47,7.53,7.53,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+killarney_al,Killarney AL,-28.3394,152.2944,519.6,512.14,7.46,7.46,1m,,close,QLD Government,SouthernDowns_2010_Rgn_SW_430000_6864000_1K_DEM_1m.tif
+ballymena_tm,Ballymena TM,-28.0522,150.1475,240.4,232.96,7.44,7.44,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+bony_mountain_al,Bony Mountain AL,-28.1014,151.8767,569.0,561.56,7.44,7.44,1m,,close,QLD Government,SouthernDowns_2010_Rgn_SW_389000_6891000_1K_DEM_1m.tif
+mullumbimby_ck_azal,Mullumbimby Ck (Azalea St Bridge),-28.5598,153.4933,9.1,1.67,7.43,7.43,1m,,close,NSW Government,Ballina201008-LID1-AHD_5486840_56_0002_0002_1m.tif
+belgrae_park_al,Belgrae Park AL,-26.9669,151.4847,481.2,473.79,7.41,7.41,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+clyde_rd_al,Clyde Rd AL,-17.3247,145.9522,7.5,0.15,7.35,7.35,1m,,close,QLD Government,Cairns_2010_Prj_SW_388000_8084000_1K_DEM_1m.tif
+mt_piccaninny_al,Mt Piccaninny AL,-19.7733,146.9597,65.5,58.16,7.34,7.34,1m,,close,QLD Government,Burdekin_2011_Prj_SW_495000_7813000_1K_DEM_1m.tif
+bulgun_ck_al,Bulgun Creek AL,-17.8678,145.9247,128.5,121.18,7.32,7.32,1m,,close,QLD Government,CassowaryCoast_2016_Prj_SW_386000_8024000_1K_DEM_1m.tif
+waterhole_ck_at_m,Waterhole Ck at M,-33.3551,148.3855,307.2,299.99,7.21,7.21,1m,,close,NSW Government,Eugowra_202308_LID1_AHD_1m_1km_55_6286308.tif
+lismore_dawson_stre,Lismore (Dawson Street),-28.8081,153.2818,8.8,1.64,7.16,7.16,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5276813_56_0001_0001.tif
+u_s_pejar_dam,U/S Pejar Dam,-34.556,149.583,795.6,802.7,-7.1,7.1,5m,,close,NSW Government,Goulburn201312-PHO3-AHD_7366172_55_0002_0002_5m.tif
+sussex_inlet,Sussex Inlet,-35.1711,150.5933,7.5,0.41,7.09,7.09,1m,,close,NSW Government,JervisBay201012-LID1-AHD_2806104_56_0002_0002_1m.tif
+warwick_al,Warwick AL,-28.2111,152.0275,458.4,451.33,7.07,7.07,1m,,close,QLD Government,SouthernDowns_2010_Rgn_SW_404000_6879000_1K_DEM_1m.tif
+wingen,Wingen,-31.8906,150.8745,305.7,298.72,6.98,6.98,5m,,close,NSW Government,Murrurundi201111-PHO3-AHD_2986468_56_0002_0002_5m.tif
+eltham_wilsons_cree,Eltham (Wilsons Creek),-28.7569,153.3944,24.6,17.66,6.94,6.94,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5386818_56_0001_0001.tif
+japoonvale_al,Japoonvale AL,-17.7147,145.9056,46.3,39.4,6.9,6.9,1m,,close,QLD Government,CassowaryCoast_2016_Prj_SW_383000_8041000_1K_DEM_1m.tif
+east_barrattas_al,East Barrattas AL,-19.5728,147.2233,12.1,5.21,6.89,6.89,50cm,,close,Griffith Uni,Ayr201804-DEM-GRID-50cm_5237835_55_0001_0001.tif
+ravensbourne_al,Ravensbourne AL,-27.3627,152.1589,624.1,617.21,6.89,6.89,1m,,close,QLD Government,Toowoomba_2010_Rgn_SW_416000_6973000_1K_DEM_1m.tif
+bellevue_gloucester,Gloucester River at Bellevue,-32.0564,151.7131,308.8,301.93,6.87,6.87,2m,,close,NSW Government,Dungog201803-LID2-AHD_3786452_56_0002_0002_2m.tif
+ballandean_al,Ballandean AL,-28.7847,151.82,698.2,691.41,6.79,6.79,50cm,,close,QLD Government,Dumaresq_River_Catchment_2023_Prj_SW_384000_6815000_1k_DEM_50cm.tif
+back_beach_rd_at_d,Back Beach Rd at D,-16.9422,145.8858,20.5,13.8,6.7,6.7,50cm,,close,Griffith Uni,Cairns201807-DEM-GRID-50cm_3818126_55_0001_0001.tif
+wooroora_al,Wooroora AL,-17.9331,145.5249,789.9,796.58,-6.68,6.68,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+back_beach_rd_at_r,Back Beach Rd at R,-16.9236,145.8736,18.0,11.35,6.65,6.65,50cm,,close,Griffith Uni,Cairns201308-DEM-GRID-50cm_3808128_55_0001_0001.tif
+ridgelands_al,Ridgelands AL,-21.2361,148.5503,839.6,846.22,-6.62,6.62,50cm,,close,Griffith Uni,Mackay201805-DEM-GRID-50cm_6607650_55_0001_0001.tif
+rollingstone_al,Rollingstone AL,-19.0514,146.3944,23.4,16.78,6.62,6.62,50cm,,close,Griffith Uni,Ingham201806-DEM-GRID-50cm_4367893_55_0001_0001.tif
+roma_tm,Roma Tm,-26.5711,148.795,304.3,297.68,6.62,6.62,1m,,close,QLD Government,Roma_2011_Twn_SW_678000_7059000_1K_DEM_1m.tif
+bedarra_al,Bedarra AL,-26.8417,150.3442,294.9,288.29,6.61,6.61,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+gairloch_al,Gairloch AL,-18.6178,146.1836,18.9,12.32,6.58,6.58,50cm,,close,Griffith Uni,Ingham201806-DEM-GRID-50cm_4137941_55_0001_0001.tif
+koombooloomba_al,Koombooloomba AL,-17.8328,145.6011,752.5,759.07,-6.57,6.57,50cm,,close,Griffith Uni,Atherton201808-DEM-GRID-50cm_3518027_55_0001_0001.tif
+upper_crabbes_ck,Upper Crabbes Creek (Crabbes Creek Rd),-28.4635,153.4526,88.3,94.87,-6.57,6.57,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5446851_56_0001_0001.tif
+bilwon_al,Bilwon AL,-16.8419,145.4433,374.0,367.44,6.56,6.56,1m,,close,QLD Government,Biboohra_2011_Twn_SW_334000_8137000_1K_DEM_1m.tif
+east_booyal_al,East Booyal AL,-25.252,152.084,133.5,126.98,6.52,6.52,50cm,,close,Griffith Uni,Bundaberg201801-DEM-GRID-50cm_4077206_56_0001_0001.tif
+mountain_station_cre,Mountain Station Creek AL,-28.7178,151.9847,888.5,881.99,6.51,6.51,50cm,,close,QLD Government,Dumaresq_River_Catchment_2023_Prj_SW_400000_6822000_1k_DEM_50cm.tif
+dalgangal_rd_al,Dalgangal Rd AL,-25.4194,151.5225,146.5,140.0,6.5,6.5,1m,,close,QLD Government,ReidCkNorthBurnett_2014_Prj_SW_351000_7187000_1K_DEM_1m.tif
+ghost_hill_al,Ghost Hill AL,-25.3108,152.8319,68.4,74.9,-6.5,6.5,1m,,close,QLD Government,FraserCoast_2009_Ctl_SW_483000_7200000_1K_DEM_1m.tif
+mulgowie_rd_al,Mulgowie Rd AL,-27.7142,152.3675,138.0,131.5,6.5,6.5,1m,,close,QLD Government,Ipswich_2019_LGA_SW_437000_6934000_1k_DEM_1m.tif
+emerald_crest_al,Emerald Crest AL,-17.0233,145.5183,504.6,511.03,-6.43,6.43,50cm,,close,Griffith Uni,Mareeba201807-DEM-GRID-50cm_3428117_55_0001_0001.tif
+stony_ck_al,Stony Ck AL,-19.2486,146.6658,16.7,10.27,6.43,6.43,1m,,close,QLD Government,Townsville_2018_Prj_SW_464000_7871000_1.0K_DEM_1m.tif
+kamerunga_br_ale,Kamerunga Bridge AL,-16.8747,145.6856,15.7,9.28,6.42,6.42,1m,,close,QLD Government,Cairns_2010_Prj_SW_359000_8133000_1K_DEM_1m.tif
+boundary_ck_al,Boundary Ck AL,-20.4186,148.1108,184.5,190.89,-6.39,6.39,50cm,,close,Griffith Uni,Proserpine201806-DEM-GRID-50cm_6157741_55_0001_0001.tif
+tamworth_rd_br,Tamworth Road Bridge (Peel River),-31.0928,150.9267,381.6,375.22,6.38,6.38,5m,,close,NSW Government,Tamworth201602-PHO3-AHD_3026558_56_0002_0002_5m.tif
+thornton_school_roa,Thornton (School Rd) AL,-27.7983,152.3728,176.3,169.92,6.38,6.38,1m,,close,QLD Government,LockyerValleySouth_2011_Rgn_SW_438000_6924000_1K_DEM_1m.tif
+woodgate_al,Woodgate AL,-25.0992,152.5489,10.6,4.24,6.36,6.36,1m,,close,QLD Government,Bundaberg_2009_Prj_SW_454000_7222000_2K_DEM_1m.tif
+coral_ave_at_mullu,Coral Ave at Mullu,-28.5485,153.4854,13.9,7.57,6.33,6.33,1m,,close,NSW Government,Lismore201008-LID1-AHD_5466840_56_0002_0002_1m.tif
+surrey_tm,Surrey TM,-28.3839,149.6747,193.9,187.57,6.33,6.33,1m,,close,QLD Government,Border_Rivers_2023_Prj_SW_762000_6857000_1k_DEM_1m.tif
+topaz_al,Topaz AL,-17.4694,145.7311,676.7,682.99,-6.29,6.29,50cm,,close,Griffith Uni,Innisfail201308-DEM-GRID-50cm_3658068_55_0001_0001.tif
+eildon_hill_al,Eildon Hill AL,-27.4328,153.0242,40.3,34.02,6.28,6.28,1m,,close,QLD Government,Brisbane_2019_Prj_SW_502000_6965000_1k_DEM_1m.tif
+langley_tm,Langley TM,-27.9753,150.9225,370.8,364.52,6.28,6.28,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+branyan_woongarra_p,Branyan (Woongarra PS) AL,-24.93,152.2553,38.2,31.93,6.27,6.27,1m,,close,QLD Government,Bundaberg_2011_Rgn_SW_424000_7242000_1K_DEM_1m.tif
+mullumbimby_brunswi,Mullumbimby -Federation Bridge(Brunswick River),-28.5528,153.4944,10.7,4.44,6.26,6.26,1m,,close,NSW Government,Ballina201008-LID1-AHD_5486840_56_0002_0002_1m.tif
+railway_br_al,Railway Br AL,-25.2756,152.5089,15.4,9.14,6.26,6.26,1m,,close,QLD Government,FraserCoast_2009_Ctl_SW_450000_7204000_1K_DEM_1m.tif
+sherwood_br_mac,Sherwood Road Br (Macleay River),-31.0583,152.7314,10.1,3.86,6.24,6.24,1m,,close,NSW Government,Kempsey200910-LID1-AHD_4746562_56_0002_0002_1m.tif
+cungulla_al,Cungulla AL,-19.3967,147.1072,9.4,3.18,6.22,6.22,50cm,,close,Griffith Uni,Townsville201804-DEM-GRID-50cm_5117855_55_0001_0001.tif
+stretton_gowan_rd_a,Stretton (Gowan Rd) AL,-27.6417,153.0667,36.3,30.09,6.21,6.21,1m,,close,QLD Government,Logan_2023_LGA_SW_506000_6942000_1k_DEM_1m.tif
+forbes_iron_br,Forbes Iron Br (,-33.4,148.0167,242.0,235.86,6.14,6.14,5m,,close,NSW Government,Parkes201509-PHO3-AHD_5946302_55_0002_0002_5m.tif
+sexton_al,Sexton AL,-25.9725,152.5069,35.8,41.94,-6.14,6.14,50cm,,close,DCCEEW,Mary2018-DEM-GRID-0_5_4507127_56_0001_0001.tif
+vincentia,Vincentia,-35.08,150.68,86.4,80.29,6.11,6.11,1m,,close,NSW Government,JervisBay201012-LID1-AHD_2886114_56_0002_0002_1m.tif
+gatton,Gatton,-27.555,152.275,107.6,101.53,6.07,6.07,1m,,close,QLD Government,LockyerValley_2015_Prj_SW_428000_6951000_1K_DEM_1m.tif
+widgee_ck_wide_bay,Widgee Ck (Wide Bay,-26.0913,152.5103,54.5,48.47,6.03,6.03,1m,,close,QLD Government,Gympie_2009_Rgn_SW_451000_7114000_1K_DEM_1m.tif
+tuckurimba_baxter_l,Tuckurimba (Baxters Lane),-28.9619,153.3066,6.6,0.58,6.02,6.02,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5296796_56_0001_0001.tif
+yarrandi_br_dar,Yarrandi Bridge (Dart Brook),-32.0122,150.7828,227.2,221.19,6.01,6.01,2m,,close,NSW Government,Muswellbrook201711-LID2-AHD_2906456_56_0002_0002_2m.tif
+emu_vale_al,Emu Vale AL,-28.2292,152.2269,507.4,501.4,6.0,6.0,1m,,close,QLD Government,SouthernDowns_2010_Rgn_SW_424000_6877000_1K_DEM_1m.tif
+back_beach_rd_at_o,Back Beach Rd at O,-16.9673,145.8877,16.8,10.81,5.99,5.99,50cm,,close,Griffith Uni,Cairns201308-DEM-GRID-50cm_3818123_55_0001_0001.tif
+mattie_o_neill_br_al,Mattie ONeill Br AL,-21.1569,148.7322,68.2,62.25,5.95,5.95,1m,,close,QLD Government,Mackay_2009_Rgn_SW_678000_7658000_2K_DEM_1m.tif
+boar_pocket_al,Boar Pocket AL,-17.1967,145.6694,736.5,730.59,5.91,5.91,50cm,,close,Griffith Uni,Innisfail201308-DEM-GRID-50cm_3588098_55_0001_0001.tif
+suffolkprk_servord,SuffolkPrk(ServoRd,-28.6883,153.608,10.8,4.89,5.91,5.91,1m,,close,NSW Government,Ballina201008-LID1-AHD_5586826_56_0002_0002_1m.tif
+upper_reid_al,Upper Reid AL,-19.7303,146.6689,134.1,140.0,-5.9,5.9,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mt_burrabaranga_aler,Mt Burrabaranga AL,-28.3614,151.6717,717.5,723.39,-5.89,5.89,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+innisfail_wharf_aler,Innisfail Wharf AL,-17.5236,146.0325,9.2,3.32,5.88,5.88,1m,,close,QLD Government,CassowaryCoast_2016_Prj_SW_397000_8062000_1K_DEM_1m.tif
+saunders_ck_al,Saunders Ck AL,-19.2517,146.6836,15.2,9.32,5.88,5.88,1m,,close,QLD Government,Townsville_2018_Prj_SW_466000_7871000_1.0K_DEM_1m.tif
+slacks_ck_reserve_pk,Slacks Ck (Reserve Park) AL,-27.6342,153.1253,19.4,13.52,5.88,5.88,1m,,close,QLD Government,Logan_2017_LGA_SW_512000_6943000_0.5K_DEM_1m.tif
+wauchope_bain_st,Wauchope (Bain St),-31.4522,152.7228,16.4,10.57,5.83,5.83,1m,,close,NSW Government,Kempsey201205-LID1-AHD_4726520_56_0002_0002_1m.tif
+expedition_pass_aler,Expedition Pass AL,-20.1833,147.165,99.2,93.39,5.81,5.81,50cm,,close,QLD Government,Burdekin_River_North_2024_2025_Prj_SW_517000_7768000_500m_DEM_50cm.tif
+bohle_river_kelso_tm,Bohle River Kelso Tm,-19.3976,146.7008,32.0,26.2,5.8,5.8,1m,,close,QLD Government,Townsville_2009_Ctl_SW_468000_7855000_1K_DEM_1m.tif
+port_macquarie_golf,Port Macquarie (Golf,-31.4844,152.9161,13.9,8.12,5.78,5.78,1m,,close,NSW Government,Kempsey201205-LID1-AHD_4926516_56_0002_0002_1m.tif
+dakiel_al,Dakiel AL,-24.7456,151.2603,304.9,299.14,5.76,5.76,1m,,close,QLD Government,KalpowartoBancroft_2014_Prj_SW_324000_7262000_1K_DEM_1m.tif
+bray_park_weir,Bray Park Weir,-28.3511,153.3681,11.8,6.07,5.73,5.73,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5366863_56_0001_0001.tif
+burraburri_ck_al,Burraburri Creek AL,-26.4092,151.1222,357.7,351.97,5.73,5.73,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+pacific_haven_al,Pacific Haven AL,-25.2386,152.5319,9.6,3.87,5.73,5.73,1m,,close,QLD Government,Fraser_coast_2022_LGA_SW_452000_7208000_1k_DEM_1m.tif
+willowbank,Willowbank,-27.6952,152.6865,36.1,30.37,5.73,5.73,1m,,close,QLD Government,Ipswich_2009_LGA_SW_469000_6936000_1K_DEM_1m.tif
+foxley_al,Foxley AL,-28.27,153.0264,184.6,178.88,5.72,5.72,1m,,close,QLD Government,ScenicRim_2011_LGA_SW_502000_6872000_1K_DEM_1m.tif
+spressers_br_ale,Spressers Bridge AL,-27.6631,152.5906,40.9,35.18,5.72,5.72,1m,,close,QLD Government,Ipswich_2019_LGA_SW_459000_6940000_1k_DEM_1m.tif
+wondecla_tm,Wondecla Tm,-17.4364,145.4217,946.3,940.65,5.65,5.65,50cm,,close,Griffith Uni,Innisfail201308-DEM-GRID-50cm_3328071_55_0001_0001.tif
+pikedale_tm,Pikedale TM,-28.6514,151.6336,574.3,568.66,5.64,5.64,50cm,,close,QLD Government,Dumaresq_River_Catchment_2023_Prj_SW_366000_6829000_1k_DEM_50cm.tif
+preston_al,Preston AL,-20.4042,148.6681,13.3,7.66,5.64,5.64,50cm,,close,Griffith Uni,Proserpine201311-DEM-GRID-50cm_6747742_55_0001_0001.tif
+musket_flat_mt_al,Musket Flat AL,-25.4969,152.3836,104.2,109.82,-5.62,5.62,1m,,close,QLD Government,Fraser_coast_2022_LGA_SW_438000_7179000_1k_DEM_1m.tif
+mossman_treatment_pl,Mossman Treatment Pl,-16.4509,145.3776,11.3,5.69,5.61,5.61,50cm,,close,Griffith Uni,Cairns201308-DEM-GRID-50cm_3268180_55_0001_0001.tif
+clarke_range2_al,Clarke Range 2 AL,-21.0794,148.5442,975.3,980.9,-5.6,5.6,50cm,,close,Griffith Uni,Mackay201308-DEM-GRID-50cm_6607668_55_0001_0001.tif
+clarke_range_al,Clarke Range AL Repeater,-21.0794,148.5442,975.3,980.9,-5.6,5.6,50cm,,close,Griffith Uni,Mackay201308-DEM-GRID-50cm_6607668_55_0001_0001.tif
+bushland_beach_al,Bushland Beach AL,-19.1936,146.6808,8.6,3.01,5.59,5.59,1m,,close,QLD Government,Townsville_2009_Ctl_SW_466000_7877000_1K_DEM_1m.tif
+marsden_first_ave,Marsden (First Ave) AL,-27.6686,153.1031,18.2,12.62,5.58,5.58,1m,,close,QLD Government,Logan_2023_LGA_SW_510000_6939000_1k_DEM_1m.tif
+proserpine_al,Proserpine AL,-20.4017,148.5847,18.0,12.45,5.55,5.55,1m,,close,QLD Government,Whitsunday_2009_Rgn_SW_665000_7743000_1K_DEM_1m.tif
+finch_hatton_showgro,Finch Hatton Showgrounds AL,-21.1379,148.6344,95.2,89.66,5.54,5.54,1m,,close,QLD Government,Mackay_2009_Rgn_SW_668000_7660000_2K_DEM_1m.tif
+sennini_s_rd_al,Finch Hatton (Senninis Rd) AL,-21.14,148.5903,116.0,110.48,5.52,5.52,1m,,close,QLD Government,Mackay_2009_Rgn_SW_664000_7660000_2K_DEM_1m.tif
+stuart_al,Stuart AL,-19.3469,146.8511,18.9,13.39,5.51,5.51,50cm,,close,Griffith Uni,Townsville201305-DEM-GRID-50cm_4847860_55_0001_0001.tif
+o_connor_tm,OConnor TM,-27.7267,150.6453,298.0,292.51,5.49,5.49,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+dalrymple_rd_al,Dalrymple Road AL,-19.2919,146.7108,13.4,7.95,5.45,5.45,1m,,close,QLD Government,Townsville_2009_Ctl_SW_469000_7866000_1K_DEM_1m.tif
+hartmann_br_tm,Hartmann Br Tm,-28.3706,149.8811,200.0,194.57,5.43,5.43,1m,,close,QLD Government,BungunyatoToobeah_2012_Rgn_SW_782000_6858000_1K_DEM_1m.tif
+beerburrum_woodford,Beerburrum-Woodford Rd AL,-26.9379,152.8509,160.3,165.72,-5.42,5.42,1m,,close,QLD Government,MoretonBay_2014_LGA_SW_485000_7020000_1K_DEM_1m.tif
+boompa_rd_al,Boompa Road AL,-25.6358,152.1811,121.0,126.38,-5.38,5.38,1m,,close,QLD Government,Fraser_coast_2022_LGA_SW_417000_7164000_1k_DEM_1m.tif
+greenswamp_rd_charle,Greenswamp Rd AL,-26.7731,150.5442,301.0,295.62,5.38,5.38,1m,,close,QLD Government,Chinchilla_2010_Twn_SW_254000_7036000_2K_DEM_1m.tif
+ravenshoe_al,Ravenshoe AL,-17.591,145.5296,1103.4,1108.72,-5.32,5.32,50cm,,close,Griffith Uni,Innisfail201308-DEM-GRID-50cm_3438054_55_0001_0001.tif
+camboon_al,Camboon AL,-25.0106,150.3889,362.5,367.8,-5.3,5.3,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+bundamba_school_aler,Bundamba School AL,-27.6117,152.8064,19.6,14.31,5.29,5.29,1m,,close,QLD Government,Ipswich_2019_LGA_SW_480000_6945000_1k_DEM_1m.tif
+picton_lakesland_roa,Picton Lakesland Roa,-34.1833,150.55,307.1,301.83,5.27,5.27,1m,,close,NSW Government,Wollongong201906-LID1-AHD_2746214_56_0002_0002_1m.tif
+loamside_al,Loamside AL,-27.6831,152.7297,29.3,24.04,5.26,5.26,1m,,close,QLD Government,Ipswich_2009_LGA_SW_473000_6937000_1K_DEM_1m.tif
+suhrs_ck_sandy_cree,Suhrs Ck (Sandy Cree,-20.0931,146.9003,262.3,257.04,5.26,5.26,1m,,close,QLD Government,Ravenswood_2012_Twn_SW_489000_7778000_1K_DEM_1m.tif
+landers_ck_al,Landers Ck AL,-19.9972,147.1056,75.8,70.57,5.23,5.23,50cm,,close,QLD Government,Burdekin_River_North_2024_2025_Prj_SW_511000_7788500_500m_DEM_50cm.tif
+coringa_al,Coringa AL,-25.3803,151.9869,61.8,67.0,-5.2,5.2,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+lenthalls_dam_al,Lenthalls Dam AL,-25.4019,152.5317,31.2,26.0,5.2,5.2,1m,,close,QLD Government,FraserCoast_2009_Ctl_SW_452000_7190000_1K_DEM_1m.tif
+stuart_ck_al,Stuart Creek AL,-19.3219,146.8375,9.5,4.33,5.17,5.17,1m,,close,QLD Government,Townsville_2018_Prj_SW_482000_7863000_1.0K_DEM_1m.tif
+pallarenda_al,Pallarenda AL,-19.2042,146.7708,7.9,2.77,5.13,5.13,50cm,,close,Griffith Uni,Townsville201305-DEM-GRID-50cm_4757876_55_0001_0001.tif
+wellington_bell_riv,Wellington (Bell Riv,-32.5554,148.9409,294.5,289.37,5.13,5.13,5m,,close,NSW Government,Wellington201409-PHO3-AHD_6826396_55_0002_0002_5m.tif
+howard_al,Howard PS AL,-25.3289,152.5619,13.4,18.48,-5.08,5.08,1m,,close,QLD Government,Fraser_coast_2022_LGA_SW_455000_7198000_1k_DEM_1m.tif
+weringa_ck_al,Weringa Ck AL,-26.1189,150.1108,330.4,335.46,-5.06,5.06,50cm,,close,Griffith Uni,Taroom201810-DEM-GRID-50cm_2117107_56_0001_0001.tif
+beruna_al,Beruna AL,-26.6433,150.8542,323.3,318.26,5.04,5.04,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+duncans_ck_dunca,Duncans Creek (Duncans Creek),-31.3453,151.1752,529.3,524.28,5.02,5.02,5m,,close,NSW Government,Nundle201305-PHO3-AHD_3266530_56_0002_0002_5m.tif
+campbells_gully_aler,Campbells Gully AL,-28.1781,152.0594,476.9,471.89,5.01,5.01,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+south_mission_beach,South Mission Beach AL,-17.9506,146.0861,67.4,62.43,4.97,4.97,50cm,,close,Griffith Uni,Innisfail201308-DEM-GRID-50cm_4038015_55_0001_0001.tif
+cooringa_al,Cooringa AL,-27.0908,151.5961,521.0,516.06,4.94,4.94,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+monto_al,Monto AL,-24.8658,151.1086,237.4,232.49,4.91,4.91,1m,,close,QLD Government,Monto_2011_Twn_SW_308000_7248000_1K_DEM_1m.tif
+foxground,Foxground,-34.7203,150.7692,70.4,65.54,4.86,4.86,1m,,close,NSW Government,Kiama201103-LID1-AHD_2946154_56_0002_0002_1m.tif
+benobble_al,Benobble AL,-27.9978,153.1575,85.2,80.35,4.85,4.85,1m,,close,QLD Government,ScenicRim_2011_LGA_SW_515000_6903000_1K_DEM_1m.tif
+port_douglas_tm,Port Douglas Tm,-16.4938,145.4609,8.4,3.55,4.85,4.85,50cm,,close,Griffith Uni,Cairns201807-DEM-GRID-50cm_3358175_55_0001_0001.tif
+boonah_al,Boonah AL,-28.0033,152.6875,97.3,92.47,4.83,4.83,1m,,close,QLD Government,ScenicRim_2011_LGA_SW_469000_6902000_1K_DEM_1m.tif
+jinghi_jinghi_al,Jinghi Jinghi AL,-26.6941,151.077,363.9,359.08,4.82,4.82,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+kirrama_al,Kirrama AL,-18.1409,145.6101,591.2,596.0,-4.8,4.8,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+lower_gregory_al,Lower Gregory AL,-20.3006,148.5483,33.3,28.5,4.8,4.8,50cm,,close,Griffith Uni,Proserpine201311-DEM-GRID-50cm_6617754_55_0001_0001.tif
+summerholm_al,Summerholm AL,-27.6116,152.464,242.9,247.7,-4.8,4.8,1m,,close,QLD Government,Ipswich_2019_LGA_SW_447000_6945000_1k_DEM_1m.tif
+moggill_aitchenson,Moggill (Aitchenson St East) AL-B,-27.5871,152.8641,15.2,19.98,-4.78,4.78,1m,,close,QLD Government,Brisbane_2009_LGA_SW_486000_6948000_1K_DEM_1m.tif
+mt_margaret_al,Mt Margaret AL,-19.35,146.6042,86.2,90.97,-4.77,4.77,1m,,close,QLD Government,Townsville_2009_Ctl_SW_458000_7860000_1K_DEM_1m.tif
+bolinda_estate_al,Bolinda Estate AL,-17.8311,145.7053,39.0,34.24,4.76,4.76,1m,,close,QLD Government,CassowaryCoast_2009_Prj_SW_362000_8028000_2K_DEM_1m.tif
+marburg_radar,Marburg Radar,-27.6061,152.5402,348.5,353.26,-4.76,4.76,1m,,close,QLD Government,Ipswich_2009_LGA_SW_454000_6946000_1K_DEM_1m.tif
+toolakea_al,Toolakea AL,-19.1464,146.5803,8.1,3.34,4.76,4.76,50cm,,close,Griffith Uni,Townsville201305-DEM-GRID-50cm_4557882_55_0001_0001.tif
+begonia_tm,Begonia Tm,-27.4937,148.3356,246.3,241.55,4.75,4.75,1m,,close,QLD Government,Begonia_2013_Loc_SW_631000_6958000_1K_DEM_1m.tif
+niagara_rd_jandowae,Niagara Rd AL,-26.7139,151.2752,425.7,420.96,4.74,4.74,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+the_cascades_al,The Cascades AL,-16.9546,145.6879,53.1,48.36,4.74,4.74,50cm,,close,Griffith Uni,Cairns201807-DEM-GRID-50cm_3608125_55_0001_0001.tif
+corndale_coopers_cr,Ewing Bridge Corndale (Coopers Ck),-28.7231,153.3614,25.5,20.77,4.73,4.73,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5356822_56_0001_0001.tif
+banora_sewerage_tre,Banora WWTP,-28.204,153.531,7.0,2.3,4.7,4.7,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5526880_56_0001_0001.tif
+orange_kite_st,Orange (Kite St),-33.2857,149.0997,865.4,860.76,4.64,4.64,5m,,close,NSW Government,Orange201308-PHO3-AHD_6946314_55_0002_0002_5m.tif
+strathyre_rd_al,Strathyre Rd AL,-28.1239,151.4742,465.6,460.96,4.64,4.64,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mingela_al,Mingela AL,-19.8789,146.6322,294.3,289.67,4.63,4.63,50cm,,close,Griffith Uni,ChartersTowers201310-DEM-GRID-50cm_4617801_55_0001_0001.tif
+blenheim_al,Blenheim AL,-21.1006,148.2169,273.7,269.08,4.62,4.62,50cm,,close,DCCEEW,LittleBowen2021-DEM-GRID-0_5_6267666_55_0001_0001.tif
+bray_park_water_tre,Bray Park WTP,-28.341,153.378,22.0,17.38,4.62,4.62,1m,,close,NSW Government,Murwillumbah201309-LID1-AHD_5366864_56_0002_0002_1m.tif
+reid_ck_al,Reid Ck AL,-25.2761,151.5169,180.0,175.38,4.62,4.62,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+bybera_tm,Bybera TM,-28.2694,150.8106,294.8,290.2,4.6,4.6,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mourilyan_mill_al,Mourilyan Mill AL,-17.5806,146.0297,14.7,10.13,4.57,4.57,50cm,,close,QLD Government,South_Johnstone_River_2024_Prj_SW_397000_8055000_1k_DEM_50cm.tif
+allora_dalrymple_cr,Allora (Dalrymple Cr,-28.0347,151.987,471.8,467.24,4.56,4.56,1m,,close,QLD Government,SouthernDowns_2010_Rgn_SW_400000_6898000_1K_DEM_1m.tif
+ingham_pump_station,Ingham PS AL,-18.6347,146.1444,16.4,11.84,4.56,4.56,1m,,close,QLD Government,Hinchinbrook_2009_Ctl_SW_409000_7939000_1K_DEM_1m.tif
+upper_lockyer_al,Upper Lockyer AL,-27.4922,152.0819,189.3,184.75,4.55,4.55,1m,,close,QLD Government,LockyerValley_2015_Prj_SW_409000_6958000_1K_DEM_1m.tif
+third_lane_macleay,Third Lane (Macleay,-31.0465,152.8624,0.7,5.22,-4.52,4.52,1m,,close,NSW Government,Kempsey201607-LID1-AHD_4866564_56_0002_0002_1m.tif
+avon_river_downstrea,Avon River (D/S Waukivory Creek),-32.0439,151.9625,97.5,92.99,4.51,4.51,1m,,close,NSW Government,Dungog201801-LID1-AHD_4026454_56_0002_0002_1m.tif
+morganville_al,Morganville AL,-25.1719,151.9725,47.9,43.39,4.51,4.51,1m,,close,QLD Government,BundabergCentral_2009_Rgn_SW_396000_7214000_2K_DEM_1m.tif
+durikai_al,Durikai AL,-28.2767,151.6022,644.7,640.21,4.49,4.49,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+upper_rosenthal_aler,Upper Rosenthal AL,-28.4025,152.0386,855.0,859.49,-4.49,4.49,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+georges_plains_quee,Georges Plains (Queen Charlotte Creek),-33.5273,149.5206,690.0,685.52,4.48,4.48,5m,,close,NSW Government,Oberon201311-PHO3-AHD_7346286_55_0002_0002_5m.tif
+sweeney_ck_d_s_al,Sweeney Ck D/S AL,-17.5261,146.0242,8.9,4.42,4.48,4.48,50cm,,close,Griffith Uni,Innisfail201807-DEM-GRID-50cm_3968061_55_0001_0001.tif
+sweeney_ck_u_s_al,Sweeney Ck U/S AL,-17.5261,146.0242,8.9,4.42,4.48,4.48,50cm,,close,Griffith Uni,Innisfail201807-DEM-GRID-50cm_3968061_55_0001_0001.tif
+blackstone_br_al,Blackstone Br AL,-27.6219,152.7978,23.3,18.83,4.47,4.47,1m,,close,QLD Government,Ipswich_2019_LGA_SW_480000_6944000_1k_DEM_1m.tif
+euramo_al,Euramo AL,-17.9922,145.9425,11.9,7.43,4.47,4.47,1m,,close,QLD Government,CassowaryCoast_2009_Prj_SW_388000_8010000_2K_DEM_1m.tif
+port_macquarie_koal,Port Macquarie (Koal,-31.4525,152.9017,12.5,8.05,4.45,4.45,1m,,close,NSW Government,Kempsey201205-LID1-AHD_4906520_56_0002_0002_1m.tif
+kilbronae_tm,Kilbronae TM,-28.2817,150.3747,229.5,225.06,4.44,4.44,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+wyaga_tm,Wyaga TM,-28.1667,150.6444,261.1,256.66,4.44,4.44,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+murray_flats_al,Murray Flats AL,-18.0297,145.9242,11.7,7.27,4.43,4.43,1m,,close,QLD Government,CassowaryCoast_2009_Prj_SW_386000_8006000_2K_DEM_1m.tif
+michael_ck_al,Michael Ck AL,-18.8478,145.9067,728.5,732.9,-4.4,4.4,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+turners_flat_maclea,Turners Flat (Macleay River),-31.01,152.7119,21.5,17.1,4.4,4.4,1m,,close,NSW Government,Kempsey200910-LID1-AHD_4726568_56_0002_0002_1m.tif
+rosewood_wwtp_al,Rosewood WWTP AL,-27.6475,152.5883,46.9,42.53,4.37,4.37,1m,,close,QLD Government,Ipswich_2019_LGA_SW_459000_6941000_1k_DEM_1m.tif
+south_townsville_ale,South Townsville AL,-19.2633,146.825,7.2,2.84,4.36,4.36,1m,,close,QLD Government,Townsville_2018_Prj_SW_481000_7870000_1.0K_DEM_1m.tif
+whites_ck_al,Whites Ck AL,-19.3778,146.9242,20.8,16.44,4.36,4.36,50cm,,close,Griffith Uni,Townsville201804-DEM-GRID-50cm_4927857_55_0001_0001.tif
+auburn_river_andrew,Auburn River (Andrew,-25.7453,150.5891,300.5,296.15,4.35,4.35,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+outer_harbour_tide_a,Outer Harbour Tide AL,-21.1083,149.2239,4.1,-0.25,4.35,4.35,50cm,,close,Griffith Uni,Mackay201805-DEM-GRID-50cm_7317664_55_0001_0001.tif
+derra_al,Derra AL,-25.6733,151.2436,134.7,130.36,4.34,4.34,1m,,close,QLD Government,Mundubbera_2011_Twn_SW_323000_7159000_1K_DEM_1m.tif
+winton,Winton,-22.4,143.0403,183.3,178.98,4.32,4.32,1m,,close,QLD Government,Winton_2010_Twn_SW_710000_7521000_1K_DEM_1m.tif
+myuna_al,Myuna AL,-20.5819,147.5981,99.2,103.51,-4.31,4.31,50cm,,close,DCCEEW,Burdekin2018-DEM-GRID-0_5_5627724_55_0001_0001.tif
+garradunga_al,Garradunga AL,-17.4606,145.9922,12.5,8.21,4.29,4.29,1m,,close,QLD Government,CassowaryCoast_2009_Ctl_SW_392000_8069000_1K_DEM_1m.tif
+mt_mulligan_tm,Mt Mulligan TM,-16.8737,144.893,341.2,336.99,4.21,4.21,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+tarana_crossing_aler,Tarana Crossing AL,-25.7961,149.5583,210.6,206.39,4.21,4.21,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+malanda_tm,Malanda Tm,-17.3305,145.6064,738.9,743.1,-4.2,4.2,50cm,,close,Griffith Uni,Atherton201808-DEM-GRID-50cm_3518083_55_0001_0001.tif
+ainsworth_rd_middle,Ainsworth Rd (Middle,-28.9162,152.8841,84.3,80.14,4.16,4.16,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_4886801_56_0001_0001.tif
+upper_cherwell_al,Upper Cherwell AL,-25.2928,152.4097,25.8,29.96,-4.16,4.16,1m,,close,QLD Government,Fraser_coast_2022_LGA_SW_440000_7202000_1k_DEM_1m.tif
+woodspring_al,Woodspring AL,-28.3614,151.1381,302.3,298.14,4.16,4.16,1m,,close,QLD Government,Inglewood_2011_Twn_SW_317000_6861000_1K_DEM_1m.tif
+chinchilla_al,Chinchilla AL,-26.7369,150.6228,306.3,302.15,4.15,4.15,1m,,close,QLD Government,Chinchilla_2010_Twn_SW_262000_7040000_2K_DEM_1m.tif
+fraser_coast_regiona,Fraser Coast Regiona,-25.3149,152.8885,11.6,7.49,4.11,4.11,1m,,close,QLD Government,HerveyBay_2015_Rgn_SW_488000_7200000_1K_DEM_1m.tif
+jubilee_pocket_al,Jubilee Pocket AL,-20.2803,148.7456,116.6,120.71,-4.11,4.11,50cm,,close,Griffith Uni,Proserpine201806-DEM-GRID-50cm_6827756_55_0001_0001.tif
+didcott_al,Didcott AL,-25.4775,151.865,150.9,146.81,4.09,4.09,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+bromfield_swamp_tm,Bromfield Swamp Tm,-17.3725,145.5398,803.2,807.28,-4.08,4.08,50cm,,close,Griffith Uni,Innisfail201308-DEM-GRID-50cm_3448078_55_0001_0001.tif
+upper_castle_al,Upper Castle AL,-24.8309,150.5779,400.0,395.92,4.08,4.08,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+brigalow_br_aler,Brigalow Br AL,-26.9044,150.7831,311.9,307.84,4.06,4.06,1m,,close,QLD Government,Surat_CMA_2014_OGIA_SW_279000_7022000_1k_DEM_1m.tif
+mckinlay_river_lh_tm,McKinlay River Lh TM,-21.2668,141.2827,169.2,165.16,4.04,4.04,1m,,close,QLD Government,McKinlay_2012_Twn_SW_529000_7648000_1K_DEM_1m.tif
+glenwood_mary_river,Glenwood AL,-25.9358,152.6161,67.8,63.77,4.03,4.03,1m,,close,QLD Government,FraserCoast_2009_Ctl_SW_461000_7131000_1K_DEM_1m.tif
+finch_hatton_al,Finch Hatton AL,-21.1328,148.6492,92.4,88.38,4.02,4.02,1m,,close,QLD Government,Mackay_2009_Rgn_SW_670000_7662000_2K_DEM_1m.tif
+native_wells_al,Native Wells AL,-18.1469,145.0934,762.9,766.91,-4.01,4.01,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+beenleigh_al,Beenleigh AL,-27.7258,153.2192,9.8,5.8,4.0,4.0,1m,,close,QLD Government,Logan_2017_LGA_SW_521500_6933000_0.5K_DEM_1m.tif
+louisa_ck_al,Louisa Ck AL,-19.2722,146.7544,8.5,4.51,3.99,3.99,50cm,,close,Griffith Uni,Townsville201804-DEM-GRID-50cm_4747869_55_0001_0001.tif
+tweed_heads_duranba,Tweed Heads (Duranbah),-28.274,153.5267,85.6,89.59,-3.99,3.99,1m,,close,NSW Government,TweedHeads201309-LID1-AHD_5506872_56_0002_0002_1m.tif
+dalcouth_al,Dalcouth AL,-28.6794,151.9831,860.6,856.62,3.98,3.98,1m,,close,QLD Government,Stanthorpe_2011_Twn_SW_400000_6827000_1K_DEM_1m.tif
+kynnumboon,Kynnumboon,-28.3167,153.3833,5.0,1.02,3.98,3.98,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5376867_56_0001_0001.tif
+knapps_peak_al,Knapps Peak AL,-28.1461,152.7358,283.3,287.26,-3.96,3.96,1m,,close,QLD Government,ScenicRim_2011_LGA_SW_474000_6886000_1K_DEM_1m.tif
+yourka_al,Yourka AL,-18.0081,145.4706,778.5,774.54,3.96,3.96,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+purga_ck_washpoo,Purga Ck (Washpoo,-27.8182,152.7549,65.7,61.76,3.94,3.94,1m,,close,QLD Government,Ipswich_2019_LGA_SW_475000_6922000_1k_DEM_1m.tif
+accommodation_ck_al,Accommodation Creek AL,-28.8081,151.8364,693.5,689.58,3.92,3.92,5m,,close,NSW Government,Stanthorpe201108-PHO3-AHD_3866812_56_0002_0002_5m.tif
+ceratodus_al,Ceratodus AL,-25.2831,151.145,186.8,182.9,3.9,3.9,1m,,close,QLD Government,Ceratodus_2012_Twn_SW_313000_7202000_1K_DEM_1m.tif
+donnington_airpark_a,Donnington Airpark AL,-19.6017,146.8403,68.0,64.1,3.9,3.9,50cm,,close,Griffith Uni,Ayr201804-DEM-GRID-50cm_4837832_55_0001_0001.tif
+upper_barrattas_aler,Upper Barrattas AL,-19.885,147.0333,61.6,57.7,3.9,3.9,1m,,close,QLD Government,Burdekin_2011_Prj_SW_503000_7801000_1K_DEM_1m.tif
+miles_al,Miles AL,-26.6581,150.1808,303.0,299.13,3.87,3.87,1m,,close,QLD Government,Miles_2010_Twn_SW_218000_7048000_2K_DEM_1m.tif
+gleneagle_al,Gleneagle AL,-18.1919,145.3325,574.3,570.45,3.85,3.85,50cm,,close,DCCEEW,Herbert1Lidar2020-DEM-0_5_3237987_55_0001_0001.tif
+portside_al,Portside AL,-25.5392,152.7068,5.8,1.95,3.85,3.85,1m,,close,QLD Government,Maryborough_2015_Twn_SW_470000_7175000_1K_DEM_1m.tif
+clump_point_tide_ale,Clump Point Tide AL,-17.8503,146.1061,3.2,-0.64,3.84,3.84,50cm,,close,Griffith Uni,Innisfail201807-DEM-GRID-50cm_4058026_55_0001_0001.tif
+mackay_al,Mackay AL,-21.1397,149.1883,9.9,6.07,3.83,3.83,1m,,close,QLD Government,Mackay_2021_Prj_SW_727000_7660000_1k_DEM_1m.tif
+netherdale_al,Netherdale AL,-21.1383,148.5286,175.8,171.97,3.83,3.83,1m,,close,QLD Government,Mackay_2009_Rgn_SW_658000_7660000_2K_DEM_1m.tif
+weetalaba_al,Weetalaba AL,-21.0428,147.9417,204.5,200.7,3.8,3.8,50cm,,close,Griffith Uni,Proserpine201806-DEM-GRID-50cm_5977672_55_0001_0001.tif
+seven_oaks_al,Seven Oaks AL,-26.7042,150.7631,317.0,313.21,3.79,3.79,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+peacock_siding_al,Peacock Siding AL,-18.6797,145.9961,35.6,31.83,3.77,3.77,50cm,,close,Griffith Uni,Ingham201806-DEM-GRID-50cm_3947934_55_0001_0001.tif
+port_macquarie_wate,Port Macquarie (Wate,-31.4631,152.8989,32.2,28.44,3.76,3.76,1m,,close,NSW Government,Kempsey201205-LID1-AHD_4906518_56_0002_0002_1m.tif
+west_plane_ck_rd,West Plane (Creek Rd) AL,-21.4697,149.1433,61.8,58.04,3.76,3.76,1m,,close,QLD Government,Mackay_2009_Rgn_SW_722000_7624000_2K_DEM_1m.tif
+owanyilla_al,Owanyilla AL,-25.6447,152.6242,26.9,23.15,3.75,3.75,1m,,close,QLD Government,Fraser_coast_2022_LGA_SW_462000_7163000_1k_DEM_1m.tif
+texas_tm,Texas TM,-28.8675,151.1611,283.3,279.55,3.75,3.75,50cm,,close,QLD Government,Dumaresq_River_Catchment_2023_Prj_SW_320000_6805000_1k_DEM_50cm.tif
+takura_reservoir_ale,Takura Resevoir AL,-25.3275,152.7061,84.6,88.32,-3.72,3.72,1m,,close,QLD Government,Fraser_coast_2022_LGA_SW_470000_7198000_1k_DEM_1m.tif
+gillies_lookout_aler,Gillies Lookout AL,-17.1706,145.6886,738.1,741.8,-3.7,3.7,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+inkerman_br_aler,Inkerman Br AL,-19.6433,147.3972,18.0,14.3,3.7,3.7,1m,,close,QLD Government,Burdekin_2009_Prj_SW_541000_7827000_1K_DEM_1m.tif
+croftby_al,Croftby AL,-28.1481,152.57,173.0,169.31,3.69,3.69,1m,,close,QLD Government,ScenicRim_2011_LGA_SW_457000_6886000_1K_DEM_1m.tif
+sunday_ck_rd_al,Sunday Ck Rd AL,-25.3947,151.6678,93.2,96.85,-3.65,3.65,1m,,close,QLD Government,BurnettRivYendaMingo_2014_Loc_SW_365000_7190000_1K_DEM_1m.tif
+carbrook_riedel_rd,Carbrook (Riedel Rd) AL,-27.7,153.2833,8.9,5.27,3.63,3.63,1m,,close,QLD Government,Logan_2009_LGA_SW_527000_6935000_1K_DEM_1m.tif
+forbesdale_barringt,Forbesdale (Barrington River),-32.038,151.8667,141.0,137.37,3.63,3.63,2m,,close,NSW Government,Dungog201803-LID2-AHD_3926454_56_0002_0002_2m.tif
+alligator_ck_aler,Alligator Creek AL,-19.3869,146.9578,10.7,7.11,3.59,3.59,1m,,close,QLD Government,Townsville_2018_Prj_SW_495000_7856000_1.0K_DEM_1m.tif
+coopers_shoot_repeat,Coopers Shoot Repeater,-28.6777,153.596,123.0,126.59,-3.59,3.59,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5586827_56_0001_0001.tif
+toowoomba_radar,Toowoomba Radar,-27.2742,151.9931,752.1,755.68,-3.58,3.58,1m,,close,QLD Government,Toowoomba_2010_Rgn_SW_400000_6982000_1K_DEM_1m.tif
+bowen_pump_station_a,Bowen PS AL,-20.0089,148.2044,9.6,6.03,3.57,3.57,1m,,close,QLD Government,Whitsunday_2009_Ctl_SW_625000_7787000_1K_DEM_1m.tif
+deeragun_al,Deeragun AL,-19.2797,146.6486,26.0,22.43,3.57,3.57,50cm,,close,Griffith Uni,Townsville201804-DEM-GRID-50cm_4637868_55_0001_0001.tif
+ravenswood_al,Ravenswood AL,-20.1011,146.9069,288.8,285.24,3.56,3.56,1m,,close,QLD Government,Ravenswood_2012_Twn_SW_490000_7777000_1K_DEM_1m.tif
+mulgowie_al,Mulgowie AL,-27.7297,152.3644,145.0,141.46,3.54,3.54,1m,,close,QLD Government,LockyerValleySouth_2011_Rgn_SW_437000_6932000_1K_DEM_1m.tif
+hodgsonvale_rd_tm,Hodgson Vale (Carroll Rd) TM,-27.6664,151.9491,514.0,510.51,3.49,3.49,1m,,close,QLD Government,Toowoomba_2010_Rgn_SW_396000_6939000_1K_DEM_1m.tif
+upper_black_river_al,Upper Black River AL,-19.3422,146.5017,82.4,78.91,3.49,3.49,50cm,,close,Griffith Uni,Townsville201305-DEM-GRID-50cm_4477861_55_0001_0001.tif
+corfield_tm,Corfield Tm,-21.7161,143.3742,255.0,251.52,3.48,3.48,1m,,close,QLD Government,Corfield_2013_Twn_SW_745000_7596000_1K_DEM_1m.tif
+bones_knob_al,Bones Knob AL,-17.2206,145.4469,935.4,938.86,-3.46,3.46,50cm,,close,Griffith Uni,Atherton201808-DEM-GRID-50cm_3348095_55_0001_0001.tif
+albert_river_tm,Albert River Tm,-17.8615,139.4081,10.2,6.76,3.44,3.44,50cm,,close,QLD Government,Burketown_2024_Prj_SW_331000_8024000_1k_DEM_50cm.tif
+strathbogie_al,Strathbogie AL,-20.1425,147.5631,90.5,87.06,3.44,3.44,50cm,,close,DCCEEW,Burdekin2018-DEM-GRID-0_5_5587772_55_0001_0001.tif
+abergowrie_al,Abergowrie AL,-18.4889,145.9364,40.8,44.22,-3.42,3.42,50cm,,close,Griffith Uni,Ingham201310-DEM-GRID-50cm_3877955_55_0001_0001.tif
+greenhaven_al,Greenhaven AL,-17.5875,145.5997,847.3,850.72,-3.42,3.42,50cm,,close,Griffith Uni,Atherton201808-DEM-GRID-50cm_3518054_55_0001_0001.tif
+ayr_al,Ayr AL,-19.5864,147.3975,8.0,4.6,3.4,3.4,50cm,,close,Griffith Uni,Ayr201804-DEM-GRID-50cm_5417834_55_0001_0001.tif
+jandowae_al,Jandowae AL,-26.7794,151.1086,360.7,357.32,3.38,3.38,1m,,close,QLD Government,Jandowae_2010_Twn_SW_310000_7036000_2K_DEM_1m.tif
+diamondy_al,Diamondy AL,-26.6333,151.2703,433.6,430.24,3.36,3.36,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+billinudgel_marshal,Billinudgel,-28.5016,153.5268,5.7,2.4,3.3,3.3,1m,,close,NSW Government,Ballina201008-LID1-AHD_5506846_56_0002_0002_1m.tif
+goonellabah_wyreem,Goonellabah (Wyreema Rd),-28.8222,153.3175,194.0,190.71,3.29,3.29,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5306811_56_0001_0001.tif
+thomatis_ck_al,Thomatis Ck AL,-16.8514,145.7171,7.0,3.73,3.27,3.27,1m,,close,QLD Government,Cairns_2010_Prj_SW_363000_8136000_1K_DEM_1m.tif
+herberton_al,Herberton AL,-17.3769,145.3803,946.8,950.04,-3.24,3.24,50cm,,close,Griffith Uni,Innisfail201308-DEM-GRID-50cm_3278078_55_0001_0001.tif
+lorne_br_camden,Lorne Br (Camden,-31.6629,152.6108,31.6,28.36,3.24,3.24,1m,,close,NSW Government,CamdenHaven201208-LID1-AHD_4626496_56_0002_0002_1m.tif
+ingham_depot_al,Ingham Depot AL,-18.67,146.1539,16.2,12.97,3.23,3.23,1m,,close,QLD Government,Hinchinbrook_2009_Ctl_SW_410000_7935000_1K_DEM_1m.tif
+kerimbilla_tm,Kerimbilla TM,-28.3911,150.4825,226.4,223.17,3.23,3.23,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+menavale_al,Menavale AL,-17.6808,145.8878,128.3,131.53,-3.23,3.23,50cm,,close,Griffith Uni,Innisfail201807-DEM-GRID-50cm_3828044_55_0001_0001.tif
+paradise_weir_peel,Paradise Weir (Peel River),-31.1022,150.9375,382.3,379.1,3.2,3.2,5m,,close,NSW Government,Tamworth201602-PHO3-AHD_3026556_56_0002_0002_5m.tif
+karara_al,Karara AL,-28.1342,151.5697,444.9,441.71,3.19,3.19,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+wallangarra_tm,Wallangarra TM,-28.9236,151.9289,881.1,877.91,3.19,3.19,1m,,close,QLD Government,Wallangarra_2013_Twn_SW_395000_6800000_1K_DEM_1m.tif
+the_pocket_marshall,The Pocket (Marshalls Creek),-28.5047,153.4772,23.1,19.92,3.18,3.18,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5466846_56_0001_0001.tif
+loudoun_br_al,Loudoun Br AL,-27.3278,150.9218,354.5,351.33,3.17,3.17,1m,,close,QLD Government,Surat_CMA_2012_OGIA_SW_294000_6975000_1k_DEM_1m.tif
+myola_al,Myola AL,-16.8,145.6119,342.5,339.33,3.17,3.17,50cm,,close,Griffith Uni,Cairns201807-DEM-GRID-50cm_3528142_55_0001_0001.tif
+jubilee_pocket_new_t,Jubilee Pocket NEW T,-20.2698,148.7511,7.5,4.34,3.16,3.16,50cm,,close,Griffith Uni,Proserpine201806-DEM-GRID-50cm_6827757_55_0001_0001.tif
+rooney_s_br_aler,Rooneys Bridge AL,-19.285,146.8153,4.5,1.34,3.16,3.16,50cm,,close,Griffith Uni,Townsville201804-DEM-GRID-50cm_4807867_55_0001_0001.tif
+ballandean_hill_aler,Ballandean Hill AL,-28.7978,151.8303,778.6,781.71,-3.11,3.11,50cm,,close,QLD Government,Dumaresq_River_Catchment_2023_Prj_SW_385000_6813000_1k_DEM_50cm.tif
+tara_lagoon_al,Tara Lagoon AL,-27.2742,150.4639,313.0,309.9,3.1,3.1,1m,,close,QLD Government,Tara_2010_Twn_SW_248000_6980000_2K_DEM_1m.tif
+chisholm_trail_oak_v,Chisholm Trail Oak V,-19.388,146.8094,83.2,80.12,3.08,3.08,50cm,,close,Griffith Uni,Townsville201305-DEM-GRID-50cm_4797856_55_0001_0001.tif
+upper_poison_ck_a,Upper Poison Ck AL,-17.806,144.9594,700.8,697.73,3.07,3.07,50cm,,close,Griffith Uni,Innisfail201308-DEM-GRID-50cm_2838030_55_0001_0001.tif
+wongabel_tm,Wongabel Tm,-17.3379,145.4802,767.0,763.93,3.07,3.07,1m,,close,QLD Government,Atherton_2011_Twn_SW_338000_8082000_1K_DEM_1m.tif
+bohle_river_al,Bohle River AL,-19.3181,146.7028,17.3,14.24,3.06,3.06,1m,,close,QLD Government,Townsville_2009_Ctl_SW_468000_7863000_1K_DEM_1m.tif
+clydesdale_al,Clydesdale AL,-27.1939,151.4864,378.6,375.54,3.06,3.06,1m,,close,QLD Government,MyallCkToowoomba_2014_Prj_SW_350000_6991000_1K_DEM_1m.tif
+sarich_s_al,Sarichs AL,-21.2725,148.8203,70.4,73.43,-3.03,3.03,50cm,,close,Griffith Uni,Mackay201308-DEM-GRID-50cm_6887646_55_0001_0001.tif
+barrackdale_choke_s,Barrackdale Choke (S,-27.5323,148.7355,226.6,223.58,3.02,3.02,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+kulpi_al,Kulpi AL,-27.1897,151.6994,464.0,461.0,3.0,3.0,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+babinda_post_office,Babinda Post Office,-17.3436,145.9217,17.8,14.81,2.99,2.99,50cm,,close,Griffith Uni,Innisfail201807-DEM-GRID-50cm_3858082_55_0001_0001.tif
+turkey_mountain_al,Turkey Mountain AL,-26.3456,150.87,494.2,497.19,-2.99,2.99,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+lower_mt_walker_aler,Lower Mt Walker AL,-27.704,152.551,48.8,45.83,2.97,2.97,1m,,close,QLD Government,Ipswich_2019_LGA_SW_455000_6935000_1k_DEM_1m.tif
+cherwell_river_rail,Cherwell River (Rail,-25.2905,152.416,29.5,26.54,2.96,2.96,50cm,,close,Griffith Uni,Bundaberg201801-DEM-GRID-50cm_4417202_56_0001_0001.tif
+barakula_forest_stat,Barakula Forest Station AL,-26.4272,150.5044,332.8,329.87,2.93,2.93,1m,,close,QLD Government,Surat_CMA_2012_OGIA_SW_251000_7074000_1k_DEM_1m.tif
+caniaview_al,Caniaview AL,-24.785,150.9728,583.8,586.71,-2.91,2.91,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+coulson_crossing_ale,Coulson Crossing AL,-27.9521,152.7271,74.2,71.31,2.89,2.89,1m,,close,QLD Government,ScenicRim_2011_LGA_SW_473000_6908000_1K_DEM_1m.tif
+peak_crossing_al,Peak Crossing AL,-27.7806,152.7311,53.1,50.21,2.89,2.89,1m,,close,QLD Government,ScenicRim_2011_LGA_SW_473000_6927000_1K_DEM_1m.tif
+sarina_maguire_rd,Sarina (Maguire Rd) AL,-21.4938,149.1249,99.5,96.61,2.89,2.89,1m,,close,QLD Government,Mackay_2009_Rgn_SW_720000_7620000_2K_DEM_1m.tif
+cormacks_al,Cormacks AL,-19.4392,146.8464,56.7,59.57,-2.87,2.87,1m,,close,QLD Government,Townsville_2009_Ctl_SW_483000_7850000_1K_DEM_1m.tif
+kings_ck_brg_rada,Kings Ck Brg Rada,-28.5621,153.52,6.1,3.24,2.86,2.86,1m,,close,NSW Government,Ballina201008-LID1-AHD_5506840_56_0002_0002_1m.tif
+mahrigong_tm,Mahrigong Tm,-22.2322,143.7837,294.0,296.86,-2.86,2.86,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+quay_street_east_ale,Quay St (East) AL,-24.8625,152.3575,10.0,7.14,2.86,2.86,1m,,close,QLD Government,Bundaberg_2011_Rgn_SW_435000_7250000_1K_DEM_1m.tif
+back_beach_rd_at_m,Back Beach Rd at M,-16.9314,145.8768,20.2,17.39,2.81,2.81,1m,,close,QLD Government,Yarrabah_2009_LGA_SW_380000_8126000_2K_DEM_1m.tif
+rudds_lane_al,Rudds Lane AL,-28.1692,152.9833,97.2,94.4,2.8,2.8,1m,,close,QLD Government,ScenicRim_2011_LGA_SW_498000_6884000_1K_DEM_1m.tif
+upper_lonesome_al,Upper Lonesome AL,-24.7369,150.4054,446.2,449.0,-2.8,2.8,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+clovelly_al,Clovelly AL,-26.4764,150.0764,406.3,403.52,2.78,2.78,1m,,close,QLD Government,Surat_CMA_2014_OGIA_SW_208000_7068000_1k_DEM_1m.tif
+kenilworth_h_s_al,Kenilworth H/S AL,-26.5803,152.7322,105.0,102.23,2.77,2.77,1m,,close,QLD Government,SunshineCoast_2014_LGA_SW_473000_7060000_1K_DEM_1m.tif
+craiglie_tm,Craiglie Tm,-16.5395,145.474,6.0,3.25,2.75,2.75,1m,,close,QLD Government,Cairns_2010_Prj_SW_337000_8170000_1K_DEM_1m.tif
+giru_al,Giru AL,-19.5126,147.1115,8.3,5.56,2.74,2.74,50cm,,close,Griffith Uni,Townsville201305-DEM-GRID-50cm_5117842_55_0001_0001.tif
+rita_island_al,Rita Island AL,-19.6294,147.4817,11.2,8.46,2.74,2.74,50cm,,close,Griffith Uni,Townsville201305-DEM-GRID-50cm_5507829_55_0001_0001.tif
+doongal_ck_old_g,Doongal Ck (Old G,-25.501,152.3893,68.9,66.17,2.73,2.73,1m,,close,QLD Government,Fraser_coast_2022_LGA_SW_438000_7179000_1k_DEM_1m.tif
+mona_mona_al,Mona Mona AL,-16.7319,145.5111,420.0,422.72,-2.72,2.72,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+round_mountain_al,Round Mountain AL,-28.0708,152.9272,60.6,57.96,2.64,2.64,1m,,close,QLD Government,ScenicRim_2011_LGA_SW_492000_6894000_1K_DEM_1m.tif
+strathdickie_al,Strathdickie AL,-20.3264,148.5861,268.8,271.44,-2.64,2.64,50cm,,close,Griffith Uni,Proserpine201806-DEM-GRID-50cm_6657751_55_0001_0001.tif
+boortkoi_al,Boortkoi AL,-26.5264,150.3953,333.6,330.97,2.63,2.63,1m,,close,QLD Government,Surat_CMA_2022_OGIA_SW_240000_7063000_1k_DEM_1m.tif
+jandowae_macalister,Jandowae-MacAlister Rd AL,-26.8919,151.0853,337.2,334.59,2.61,2.61,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+niagara_al,Niagara AL,-26.6967,151.3933,556.5,553.89,2.61,2.61,50cm,,close,Griffith Uni,Dalby201811-DEM-GRID-50cm_3407046_56_0001_0001.tif
+upper_don_al,Upper Don AL,-20.2943,148.1142,89.8,87.19,2.61,2.61,50cm,,close,Griffith Uni,Proserpine201311-DEM-GRID-50cm_6167755_55_0001_0001.tif
+alligator_ck_rd,Alligator Ck Rd,-19.4035,146.946,18.7,16.11,2.59,2.59,50cm,,close,Griffith Uni,Townsville201804-DEM-GRID-50cm_4947854_55_0001_0001.tif
+the_pinnacles_al,The Pinnacles AL,-19.385,146.6831,44.3,41.71,2.59,2.59,50cm,,close,Griffith Uni,Townsville201804-DEM-GRID-50cm_4667856_55_0001_0001.tif
+horse_ck,Horse Ck,-25.8902,149.7581,210.5,207.93,2.57,2.57,50cm,,close,Griffith Uni,Taroom201810-DEM-GRID-50cm_7767133_55_0001_0001.tif
+lumeah_al,Lumeah AL,-28.0614,153.0408,93.9,91.33,2.57,2.57,1m,,close,QLD Government,ScenicRim_2011_LGA_SW_504000_6895000_1K_DEM_1m.tif
+quinalow_peranga_rd,Peranga (Haden-Maclagan Rd) TM,-27.106,151.624,439.8,437.23,2.57,2.57,1m,,close,QLD Government,Quinlow_2010_Twn_SW_363000_7001000_1K_DEM_1m.tif
+upper_dogwood_ck,Upper Dogwood Ck AL,-26.2033,150.2567,374.6,372.04,2.56,2.56,1m,,close,QLD Government,Surat_CMA_2012_OGIA_SW_225000_7098000_1k_DEM_1m.tif
+tumbulgum_tweed_riv,Tumbulgum,-28.2769,153.4608,5.3,2.75,2.55,2.55,50cm,,close,NSW Gov,TweedRiver2022-DEM-AHD-50cm_535500m6863000m_56_0020km_0016km.tif
+jarra_ck_al,Jarra Creek AL,-17.8831,145.8428,26.9,24.36,2.54,2.54,50cm,,close,Griffith Uni,Innisfail201807-DEM-GRID-50cm_3778022_55_0001_0001.tif
+giddi_giddi_south_tm,Giddi Giddi South TM,-28.4033,150.0517,202.8,200.27,2.53,2.53,1m,,close,QLD Government,Border_Rivers_2023_Prj_SW_799000_6854000_1k_DEM_1m.tif
+medows_lane_goonoo,Medows Lane (Goonoo Goonoo Ck),-31.167,150.917,406.5,403.97,2.53,2.53,5m,,close,NSW Government,Tamworth201602-PHO3-AHD_3006550_56_0002_0002_5m.tif
+black_mountain_farl,Black Mountain (Farleigh) AL,-21.0642,149.0955,296.0,298.52,-2.52,2.52,1m,,close,QLD Government,Mackay_2015_Rgn_SW_717000_7669000_1K_DEM_1m.tif
+inglewood_br_ale,Inglewood Bridge AL,-28.4133,151.0825,286.0,283.49,2.51,2.51,1m,,close,QLD Government,Inglewood_2011_Twn_SW_312000_6855000_1K_DEM_1m.tif
+copperlode_dam_al,Copperlode AL,-16.9794,145.6747,424.4,426.9,-2.5,2.5,50cm,,close,Griffith Uni,Cairns201807-DEM-GRID-50cm_3588122_55_0001_0001.tif
+avoca_tm,Avoca TM,-27.9803,150.515,296.9,294.41,2.49,2.49,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+elbow_valley_al,Elbow Valley AL,-28.3731,152.14,491.8,494.28,-2.48,2.48,1m,,close,QLD Government,SouthernDowns_2010_Rgn_SW_415000_6861000_1K_DEM_1m.tif
+whiteford_s_al,Whitefords AL,-21.3228,148.835,85.1,82.62,2.48,2.48,50cm,,close,Griffith Uni,Mackay201805-DEM-GRID-50cm_6907641_55_0001_0001.tif
+bartle_view_al,Bartle View AL,-17.545,145.7156,572.6,575.05,-2.45,2.45,50cm,,close,Griffith Uni,Atherton201808-DEM-GRID-50cm_3638059_55_0001_0001.tif
+lanifer_tm,Lanifer Tm,-21.9942,143.2537,214.5,216.95,-2.45,2.45,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+widgee_ck_pahlow_rd,Widgee Ck (pahlow Rd,-26.1956,152.4568,94.1,91.65,2.45,2.45,1m,,close,QLD Government,Gympie_2009_Rgn_SW_445000_7102000_1K_DEM_1m.tif
+new_kildonan_tm,New Kildonan TM,-28.6656,150.445,226.0,223.56,2.44,2.44,1m,,close,NSW Spatial Services,Boggabilla_202310_LID1_AHD_1m_1km_56_2506826.tif
+warrego_highway_aler,Warrego Highway AL,-27.5533,152.3889,83.0,80.57,2.43,2.43,1m,,close,QLD Government,Lockyer_Valley_2022_LGA_SW_439000_6952000_1k_DEM_1m.tif
+hillcrest_wine_glass,Hillcrest AL (Wine Glass),-27.6763,153.03,77.0,74.58,2.42,2.42,1m,,close,QLD Government,Logan_2013_LGA_SW_502000_6938000_1K_DEM_1m.tif
+bilyana_al,Bilyana AL,-18.1181,145.8772,61.3,63.71,-2.41,2.41,1m,,close,QLD Government,CassowaryCoast_2016_Prj_SW_381000_7996000_1K_DEM_1m.tif
+canning_ck_al,Canning Creek AL,-28.1711,151.1361,351.4,349.0,2.4,2.4,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+gunnawarra_al_rudd,Gunnawarra (Rudd Ck) AL,-17.9164,145.1503,603.8,601.4,2.4,2.4,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mcdonalds_al,McDonalds AL,-19.5472,146.8489,49.0,46.6,2.4,2.4,1m,,close,QLD Government,Woodstock_2011_Twn_SW_484000_7838000_1K_DEM_1m.tif
+marian_weir_al,Marian Weir AL,-21.1392,148.9358,35.9,38.29,-2.39,2.39,1m,,close,QLD Government,Mackay_2009_Rgn_SW_700000_7660000_2K_DEM_1m.tif
+walls_camp_pacific,Walls Camp AL (Pacific Haven),-25.24,152.5613,6.9,4.51,2.39,2.39,1m,,close,QLD Government,Fraser_coast_2022_LGA_SW_455000_7208000_1k_DEM_1m.tif
+dalby_al,Dalby AL,-27.1833,151.2661,344.4,342.02,2.38,2.38,1m,,close,QLD Government,Dalby_2010_Twn_SW_328000_6992000_2K_DEM_1m.tif
+cairns_airport_al,Cairns Airport AL,-16.8622,145.7419,2.5,0.14,2.36,2.36,50cm,,close,Griffith Uni,Cairns201807-DEM-GRID-50cm_3658135_55_0001_0001.tif
+condamine_al,Condamine AL,-26.9267,150.1314,284.0,281.64,2.36,2.36,1m,,close,QLD Government,Condamine_2011_Twn_SW_215000_7018000_1K_DEM_1m.tif
+brandon_al,Brandon AL,-19.5558,147.3681,8.8,6.45,2.35,2.35,50cm,,close,Griffith Uni,Ayr201804-DEM-GRID-50cm_5387837_55_0001_0001.tif
+dunmore_exchange_tm,Dunmore Exchange TM,-27.6539,150.9136,339.8,337.45,2.35,2.35,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+seven_mile_br_al,Seven Mile Bridge AL,-27.6483,152.6347,35.8,33.45,2.35,2.35,1m,,close,QLD Government,Ipswich_2019_LGA_SW_463000_6941000_1k_DEM_1m.tif
+yandill_tm,Yandill Tm,-16.0555,145.3073,227.3,229.65,-2.35,2.35,50cm,,close,Griffith Uni,Cooktown201308-DEM-GRID-50cm_3188224_55_0001_0001.tif
+belmont_tm,Belmont Tm,-22.1644,143.4504,223.2,220.88,2.32,2.32,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+artunga_al,Artunga AL,-28.4014,151.2925,324.9,322.59,2.31,2.31,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+wolffdene_al,Wolffdene AL,-27.7828,153.1889,17.6,15.29,2.31,2.31,1m,,close,QLD Government,Logan_2021_GDA2020_LGA_SW_518500_6926500_500m_DEM_1m.tif
+goomburra_al,Goomburra AL,-28.0389,152.1081,509.4,507.1,2.3,2.3,1m,,close,QLD Government,MaryvaletoGoomburra_2012_Rgn_SW_412000_6898000_1K_DEM_1m.tif
+midgen_flat_at_newry,Midgen Flat at Newry,-28.7115,153.5618,67.8,70.1,-2.3,2.3,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5546823_56_0001_0001.tif
+mountain_view_mt_la,Mountain View (Mt La,-22.7175,143.2982,273.9,271.6,2.3,2.3,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+gleesons_mill_al,Gleesons Mill AL,-19.4347,146.7039,35.0,32.71,2.29,2.29,50cm,,close,Griffith Uni,Townsville201305-DEM-GRID-50cm_4687851_55_0001_0001.tif
+the_channon,The Channon,-28.6792,153.2775,30.0,27.71,2.29,2.29,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5276827_56_0001_0001.tif
+three_mile_br_al,Three Mile Br AL,-27.6322,152.7269,20.7,22.99,-2.29,2.29,1m,,close,QLD Government,Ipswich_2014_LGA_SW_473000_6943000_1K_DEM_1m.tif
+toogong_glenayr,Toogong (Glenayr),-33.3711,148.5917,325.1,322.81,2.29,2.29,1m,,close,NSW Government,Eugowra_202308_LID1_AHD_1m_1km_55_6486306.tif
+dagworth_tm,Dagworth Tm,-21.6635,142.199,196.9,199.18,-2.28,2.28,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+sandy_waterhole_tm,Sandy Waterhole Tm,-18.0418,139.1922,24.2,21.93,2.27,2.27,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+seven_oaks_macleay,Seven Oaks (Macleay River),-31,152.932,0.3,2.57,-2.27,2.27,1m,,close,NSW Government,Macksville201607-LID1-AHD_4926570_56_0002_0002_1m.tif
+maalan_rd_al,Maalan Road AL,-17.6247,145.5969,971.0,973.26,-2.26,2.26,50cm,,close,Griffith Uni,Innisfail201308-DEM-GRID-50cm_3518050_55_0001_0001.tif
+cliffdale_al,Cliffdale (Repeater) AL,-27.2265,145.4986,290.5,288.26,2.24,2.24,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+creb_track_tm,Creb Track Tm,-16.1958,145.2922,13.6,11.39,2.21,2.21,1m,,close,QLD Government,Cairns_2010_Prj_SW_317000_8208000_1K_DEM_1m.tif
+mill_rd_black_river,Mill Rd Black River,-19.2474,146.5738,29.0,26.8,2.2,2.2,1m,,close,QLD Government,Townsville_2009_Prj_SW_454000_7870000_2K_DEM_1m.tif
+groper_ck_al,Groper Ck AL,-19.6917,147.5317,4.6,2.41,2.19,2.19,50cm,,close,Griffith Uni,Ayr201804-DEM-GRID-50cm_5557822_55_0001_0001.tif
+18_bateson,18 Bateson,-27.39,152.7791,524.4,522.22,2.18,2.18,1m,,close,QLD Government,Brisbane_2009_LGA_SW_478000_6970000_1K_DEM_1m.tif
+bentley_back_ck,Bentley (Back Creek),-28.7406,153.075,47.8,45.62,2.18,2.18,1m,,close,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5076820_56_0001_0001.tif
+mundays_lane_maria,Mundays Lane (Maria,-31.3253,152.8415,2.4,0.25,2.15,2.15,1m,,close,NSW Government,Kempsey201205-LID1-AHD_4846534_56_0002_0002_1m.tif
+orange_dalton_st_br,Orange (Dalton St Bridge),-33.2771,149.1063,859.3,857.15,2.15,2.15,1m,,close,NSW Government,Orange201305-LID1-AHD_6966316_55_0002_0002_1m.tif
+cardwell_tide_al,Cardwell Tide AL,-18.2633,146.0258,6.5,4.36,2.14,2.14,1m,,close,QLD Government,CassowaryCoast_2009_Ctl_SW_397000_7980000_1K_DEM_1m.tif
+upper_emu_ck_al,Upper Emu Ck AL,-28.1608,152.3839,1066.0,1068.14,-2.14,2.14,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+belmore_river_u_s_fl,Belmore River U/S Floodgates,-31.07,152.97,-0.8,1.33,-2.13,2.13,1m,,close,NSW Government,Kempsey201607-LID1-AHD_4966562_56_0002_0002_1m.tif
+allambie_al,Allambie (Repeater) AL,-26.9033,145.3525,288.0,290.12,-2.12,2.12,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+diwan_tm,Diwan Tm,-16.2031,145.404,32.0,34.12,-2.12,2.12,1m,,close,QLD Government,Cairns_2010_Prj_SW_329000_8207000_1K_DEM_1m.tif
+reeves_al,Reeves AL,-20.1494,148.1556,41.0,38.88,2.12,2.12,1m,,close,QLD Government,Whitsunday_2009_Prj_SW_620000_7770000_2K_DEM_1m.tif
+mcavoy_br_al,McAvoy Bridge AL,-17.5047,145.9928,9.4,7.3,2.1,2.1,50cm,,close,Griffith Uni,Innisfail201308-DEM-GRID-50cm_3938064_55_0001_0001.tif
+pilton_kings_crk_gat,Pilton (Gatton-Clifton Rd) TM,-27.859,152.056,491.1,489.0,2.1,2.1,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+waikola_al,Waikola AL,-26.0003,149.1953,306.9,309.0,-2.1,2.1,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+wyoming_ssdr_tm,Wyoming Ssdr TM,-21.2566,143.5555,293.0,295.07,-2.07,2.07,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+upper_bluewater_aler,Upper Bluewater AL,-19.2386,146.4531,89.5,91.56,-2.06,2.06,1 Second,,close,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+marriages_al,Marriages AL,-25.56,151.1839,137.1,135.05,2.05,2.05,1m,,close,QLD Government,BurnettRivRiverleigh_2014_Prj_SW_317000_7171000_1K_DEM_1m.tif
+mt_sylvia_al,Mt Sylvia AL,-27.7209,152.2194,179.5,181.55,-2.05,2.05,1m,,close,QLD Government,Lockyer_Valley_2022_LGA_SW_423000_6933000_1k_DEM_1m.tif
+escott_station,Escott Station,-17.7999,139.3605,14.0,11.99,2.01,2.01,50cm,,close,QLD Government,Burketown_2024_Prj_SW_326000_8031000_1k_DEM_50cm.tif
+macalister_bell_rd_j,Jimbour Ck AL,-26.9594,151.2174,358.7,360.71,-2.01,2.01,1m,,close,QLD Government,Jimbour_2012_Twn_SW_323000_7016000_1K_DEM_1m.tif
+macalister_bell_rd_j_2,Macalister Bell Rd J,-26.9594,151.2174,358.7,360.71,-2.01,2.01,1m,,close,QLD Government,Jimbour_2012_Twn_SW_323000_7016000_1K_DEM_1m.tif
+malanda_al,Malanda AL,-17.3594,145.5922,764.7,766.71,-2.01,2.01,1m,,close,QLD Government,Malanda_2011_Twn_SW_350000_8080000_1K_DEM_1m.tif
+black_river_al,Black River AL,-19.2375,146.6328,15.5,13.5,2.0,2.0,50cm,,close,Griffith Uni,Townsville201804-DEM-GRID-50cm_4617872_55_0001_0001.tif
+durrumbul_brunswick,Durrumbul (Brunswick River),-28.5328,153.4567,20.6,18.63,1.97,1.97,1m,,agrees,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5446843_56_0001_0001.tif
+chinderah_tweed_riv,Chinderah (Tweed River),-28.231,153.555,4.1,2.16,1.94,1.94,50cm,,agrees,NSW Gov,TweedRiver2022-DEM-AHD-50cm_535500m6863000m_56_0020km_0016km.tif
+dow_s_ck_al,Dows Ck AL,-21.1092,148.7839,70.1,68.16,1.94,1.94,1m,,agrees,QLD Government,Mackay_2009_Rgn_SW_684000_7664000_2K_DEM_1m.tif
+crystal_brook,Cressfield,-31.945,150.8119,307.2,305.27,1.93,1.93,5m,,agrees,NSW Government,Murrurundi201111-PHO3-AHD_2926462_56_0002_0002_5m.tif
+eungella_dam_al,Eungella Dam AL,-21.1403,148.3653,685.7,683.78,1.92,1.92,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+nyora_al,Nyora AL,-28.1694,151.3928,468.9,466.99,1.91,1.91,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+churchill_street_ale,Churchill St AL,-25.5344,152.7067,9.4,11.3,-1.9,1.9,1m,,agrees,QLD Government,Maryborough_2015_Twn_SW_470000_7175000_1K_DEM_1m.tif
+townsville_airport_a,Townsville Airport AL,-19.2483,146.7661,5.7,3.8,1.9,1.9,50cm,,agrees,Griffith Uni,Townsville201305-DEM-GRID-50cm_4757871_55_0001_0001.tif
+moffatt_al,Moffatt AL,-27.0969,151.3978,373.3,375.19,-1.89,1.89,1m,,agrees,QLD Government,Kaimkillenbun_2012_Twn_SW_341000_7001000_1K_DEM_1m.tif
+innisplain_al,Innisplain AL,-28.1704,152.9029,77.7,75.83,1.87,1.87,1m,,agrees,QLD Government,ScenicRim_2011_LGA_SW_490000_6883000_1K_DEM_1m.tif
+little_bohle_river_a,Little Bohle River AL,-19.3258,146.6767,24.1,22.23,1.87,1.87,1m,,agrees,QLD Government,Townsville_2018_Prj_SW_466000_7863000_1.0K_DEM_1m.tif
+eungella_al,Eungella AL,-21.1317,148.4931,680.6,678.74,1.86,1.86,1m,,agrees,QLD Government,Mackay_2009_Rgn_SW_654000_7662000_2K_DEM_1m.tif
+woodlawn_wilsons_ri,Woodlawn,-28.785,153.3036,10.7,8.85,1.85,1.85,1m,,agrees,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5296815_56_0001_0001.tif
+mingo_crossing_al,Mingo Crossing AL,-25.395,151.7775,65.1,66.94,-1.84,1.84,1m,,agrees,QLD Government,BurnettRivYendaMingo_2014_Loc_SW_377000_7190000_1K_DEM_1m.tif
+north_tamborine_aler,North Tamborine AL,-27.94,153.1917,541.6,539.76,1.84,1.84,1m,,agrees,QLD Government,ScenicRim_2011_LGA_SW_518000_6909000_1K_DEM_1m.tif
+tiaro_al,Tiaro AL,-25.7244,152.5775,30.7,28.87,1.83,1.83,1m,,agrees,QLD Government,FraserCoast_2009_Ctl_SW_457000_7154000_1K_DEM_1m.tif
+kooralbyn_al,Kooralbyn AL,-28.0661,152.8532,335.2,337.02,-1.82,1.82,1m,,agrees,QLD Government,ScenicRim_2011_LGA_SW_485000_6895000_1K_DEM_1m.tif
+tully_weir_al,Tully Weir AL,-17.7772,145.565,690.4,688.59,1.81,1.81,50cm,,agrees,Griffith Uni,Innisfail201308-DEM-GRID-50cm_3478033_55_0001_0001.tif
+waterford_al,Waterford AL,-27.6947,153.1364,16.5,14.7,1.8,1.8,1m,,agrees,QLD Government,Logan_2017_LGA_SW_513000_6936500_0.5K_DEM_1m.tif
+dittmer_al,Dittmer AL,-20.4267,148.4758,37.9,36.11,1.79,1.79,50cm,,agrees,Griffith Uni,Proserpine201311-DEM-GRID-50cm_6537740_55_0001_0001.tif
+hurricane_cliff_al,Hurricane Cliff AL,-20.0944,147.7097,568.0,566.23,1.77,1.77,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+toolebuc_tm,Toolebuc Tm,-22.1642,140.8431,223.2,224.97,-1.77,1.77,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+bluewater_al,Bluewater AL,-19.1833,146.5469,20.4,18.65,1.75,1.75,50cm,,agrees,Griffith Uni,Townsville201804-DEM-GRID-50cm_4527878_55_0001_0001.tif
+ida_ck_al,Ida Ck AL,-20.2886,148.1175,84.8,83.06,1.74,1.74,50cm,,agrees,Griffith Uni,Proserpine201806-DEM-GRID-50cm_6167756_55_0001_0001.tif
+central_mill_al,Central Mill AL,-17.6089,145.9792,18.1,16.37,1.73,1.73,50cm,,agrees,QLD Government,South_Johnstone_River_2024_Prj_SW_391000_8052000_1k_DEM_50cm.tif
+scrubby_ck_tm,Scrubby Ck Tm,-17.3033,145.4617,769.9,768.17,1.73,1.73,1m,,agrees,QLD Government,Atherton_2011_Twn_SW_336000_8086000_1K_DEM_1m.tif
+medpark_br_tm,Medpark Bridge TM,-28.3011,150.2936,216.1,214.38,1.72,1.72,1m,,agrees,QLD Government,Border_Rivers_2023_Prj_SW_823000_6865000_1k_DEM_1m.tif
+roma_peak_al,Roma Peak AL,-20.3078,148.2181,145.3,147.0,-1.7,1.7,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+tindarra_tm,Tindarra TM,-26.4689,148.8047,311.3,313.0,-1.7,1.7,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+biboohra_tm,Biboohra Tm,-16.9159,145.4228,384.8,383.14,1.66,1.66,1m,,agrees,QLD Government,Biboohra_2011_Twn_SW_332000_8129000_1K_DEM_1m.tif
+main_arm_rain_gaug,Main Arm Rain Gaug,-28.5011,153.4305,60.3,61.95,-1.65,1.65,1m,,agrees,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5426847_56_0001_0001.tif
+pinelands_al,Pinelands AL,-26.4342,150.0756,368.1,366.46,1.64,1.64,1m,,agrees,QLD Government,Surat_CMA_2012_OGIA_SW_208000_7072000_1k_DEM_1m.tif
+terraine_al,Terraine AL,-28.4833,151.2761,327.6,325.96,1.64,1.64,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+kars_springs_welldu,Kars Springs (Welldun),-31.8988,150.658,342.3,343.93,-1.63,1.63,5m,,agrees,NSW Government,Murrurundi201111-PHO3-AHD_2786468_56_0002_0002_5m.tif
+mt_wolvi_al,Mt Wolvi AL,-26.1767,152.8675,373.3,371.67,1.63,1.63,1m,,agrees,QLD Government,Gympie_2009_Rgn_SW_486000_7104000_1K_DEM_1m.tif
+jiggi_gwynne_rd,Jiggi (Gwynne Street),-28.676,153.1538,258.1,259.7,-1.6,1.6,1m,,agrees,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5156827_56_0001_0001.tif
+laidley,Laidley,-27.6514,152.3808,111.3,109.72,1.58,1.58,1m,,agrees,QLD Government,LockyerValley_2015_Prj_SW_438000_6941000_1K_DEM_1m.tif
+mt_brigalow_al,Mt Brigalow AL,-27.2022,151.7861,570.4,568.83,1.57,1.57,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+trebonne_al,Trebonne AL,-18.6181,146.0842,21.1,19.54,1.56,1.56,50cm,,agrees,Griffith Uni,Ingham201806-DEM-GRID-50cm_4037941_55_0001_0001.tif
+mirani_township_aler,Mirani Township AL,-21.1606,148.8597,54.6,53.05,1.55,1.55,50cm,,agrees,Griffith Uni,Mackay201805-DEM-GRID-50cm_6937658_55_0001_0001.tif
+emu_ck_al,Emu Ck AL,-20.4103,148.2306,218.7,217.16,1.54,1.54,50cm,,agrees,Griffith Uni,Proserpine201806-DEM-GRID-50cm_6287742_55_0001_0001.tif
+millmerran_commens_s,Millmerran (Town Pool Commens St) TM,-27.8785,151.264,418.7,417.19,1.51,1.51,1m,,agrees,QLD Government,Millmerran_2010_Twn_SW_329000_6915000_1K_DEM_1m.tif
+scottsdale_al,Scottsdale AL,-28.432,151.8756,759.5,757.99,1.51,1.51,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+zattas_al,Zattas AL,-18.4506,145.8294,50.7,49.19,1.51,1.51,50cm,,agrees,QLD Government,Herbert_River_2024_Prj_SW_376000_7959000_1k_DEM_50cm.tif
+keerong_br_rd,"Terania Creek (Green Bridge, Keerrong)",-28.7138,153.2584,18.2,19.7,-1.5,1.5,1m,,agrees,NSW Government,Lismore201707-LID1-AHD_5246822_56_0002_0002_1m.tif
+ross_river_dam_al,Ross River Dam AL,-19.41,146.7372,42.3,43.8,-1.5,1.5,1m,,agrees,QLD Government,Townsville_2009_Ctl_SW_472000_7853000_1K_DEM_1m.tif
+walla_al_b,Walla AL-B,-25.1358,151.9844,43.6,42.13,1.47,1.47,1m,,agrees,QLD Government,BundabergCentral_2009_Rgn_SW_396000_7218000_2K_DEM_1m.tif
+crawfords_lookout_al,Crawford Lkt AL,-17.615,145.8011,332.4,333.84,-1.44,1.44,50cm,,agrees,Griffith Uni,Innisfail201807-DEM-GRID-50cm_3728052_55_0001_0001.tif
+mirani_weir_tw_al,Mirani Weir TW AL,-21.1772,148.8311,60.4,58.96,1.44,1.44,50cm,,agrees,Griffith Uni,Mackay201308-DEM-GRID-50cm_6907657_55_0001_0001.tif
+ranges_br_al,Ranges Bridge AL,-27.1215,151.0919,328.4,326.96,1.44,1.44,1m,,agrees,QLD Government,Surat_CMA_202310_OGIA_SW_310000_6998000_1k_DEM_1m.tif
+loudoun_br_al_2,Loudoun Br AL,-27.2136,151.1858,332.7,334.13,-1.43,1.43,1m,,agrees,QLD Government,Surat_CMA_2012_OGIA_SW_320000_6988000_1k_DEM_1m.tif
+halifax_al,Halifax AL,-18.5789,146.2803,5.6,4.19,1.41,1.41,50cm,,agrees,Griffith Uni,Ingham201806-DEM-GRID-50cm_4247945_55_0001_0001.tif
+upper_bogie_al,Upper Bogie AL,-20.4411,147.9953,283.6,285.0,-1.4,1.4,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+one_mile_br_aler,One Mile Br AL,-27.6272,152.7461,20.0,21.36,-1.36,1.36,1m,,agrees,QLD Government,Ipswich_2023_LGA_SW_474000_6944000_1k_DEM_1m.tif
+bargara_al,Bargara AL,-24.8333,152.4603,6.2,7.55,-1.35,1.35,1m,,agrees,QLD Government,Bundaberg_2016_Rgn_SW_445000_7253000_1K_DEM_1m.tif
+burketown_airstrip,Burketown Airstrip,-17.7561,139.5283,4.2,2.85,1.35,1.35,1m,,agrees,QLD Government,Burketown_2010_Twn_SW_343000_8036000_1K_DEM_1m.tif
+the_stonewall_al,The Stonewall AL,-20.8247,148.0408,269.6,270.95,-1.35,1.35,50cm,,agrees,QLD Government,Burdekin_River_South_2024_Prj_SW_608000_7696500_500m_DEM_50cm.tif
+campbells_river_ups,Campbells River (Upstream Chifley),-33.6134,149.6987,736.3,737.64,-1.34,1.34,5m,,agrees,NSW Government,Oberon201311-PHO3-AHD_7506276_55_0002_0002_5m.tif
+gordon_ck_al,Gordon Ck AL,-19.3139,146.8094,4.9,3.56,1.34,1.34,1m,,agrees,QLD Government,Townsville_2018_Prj_SW_479000_7864000_1.0K_DEM_1m.tif
+torridon_al,Torridon AL,-28.0522,151.59,421.0,419.69,1.31,1.31,1m,,agrees,QLD Government,Leyburn_2011_Twn_SW_361000_6896000_1K_DEM_1m.tif
+raelee_downs_tm,Raelee Downs Tm,-21.593,143.0356,214.8,216.1,-1.3,1.3,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+dalbeg_al,Dalbeg AL,-20.3089,147.2961,61.6,62.89,-1.29,1.29,1m,,agrees,QLD Government,Burdekin_2009_Rgn_SW_530000_7754000_2K_DEM_1m.tif
+munna_ck_al,Munna Creek AL,-25.6188,152.2336,101.4,100.11,1.29,1.29,1m,,agrees,QLD Government,Fraser_coast_2022_LGA_SW_423000_7166000_1k_DEM_1m.tif
+jondaryan_lagoon_crk,Jondaryan Park TM,-27.3688,151.5912,385.0,383.73,1.27,1.27,1m,,agrees,QLD Government,Toowoomba_2010_Rgn_SW_360000_6971000_1K_DEM_1m.tif
+leeson_tm,Leeson Tm,-22.1782,142.758,168.4,167.14,1.26,1.26,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mt_garnet_al,Mt Garnet AL,-17.7047,145.1461,659.2,657.94,1.26,1.26,50cm,,agrees,DCCEEW,Herbert2018-DEM-GRID-0_5_3038041_55_0001_0001.tif
+carpentaria_br_t,Carpentaria Br T,-18.7272,144.3125,484.6,485.84,-1.24,1.24,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+gordonvale_al,Gordonvale AL,-17.1011,145.7894,16.7,15.47,1.23,1.23,1m,,agrees,QLD Government,Cairns_2010_Prj_SW_371000_8108000_1K_DEM_1m.tif
+glenaubyn_al,Glenaubyn AL,-26.5083,149.9483,384.7,385.91,-1.21,1.21,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+brabons_al,Brabons AL,-19.4772,146.6314,81.9,80.72,1.18,1.18,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+glen_allyn_al,Glen Allyn AL,-17.3808,145.6508,707.8,706.62,1.18,1.18,50cm,,agrees,Griffith Uni,Innisfail201308-DEM-GRID-50cm_3568077_55_0001_0001.tif
+orange_spring_ck_wt,Orange (Spring Ck WTP),-33.3172,149.1073,898.6,897.42,1.18,1.18,5m,,agrees,NSW Government,Orange201308-PHO3-AHD_6966310_55_0002_0002_5m.tif
+tuncester_leycester,Tuncester (Leycester Creek),-28.7967,153.2386,11.8,12.98,-1.18,1.18,1m,,agrees,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5236814_56_0001_0001.tif
+mt_bohle_al,Mt Bohle AL,-19.2669,146.7044,8.1,6.94,1.16,1.16,50cm,,agrees,Griffith Uni,Townsville201804-DEM-GRID-50cm_4687869_55_0001_0001.tif
+humeburn_al,Humeburn AL,-27.3984,145.2076,197.1,195.97,1.13,1.13,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+malboona_tm,Malboona Tm,-21.9332,143.56,251.8,252.9,-1.1,1.1,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+terania_ck,Terania Creek,-28.588,153.2989,212.1,213.18,-1.08,1.08,1m,,agrees,NSW Government,Lismore201707-LID1-AHD_5286836_56_0002_0002_1m.tif
+upper_rudd_ck_ale,Upper Rudd Ck AL,-18.0394,144.8856,759.5,758.42,1.08,1.08,50cm,,agrees,Griffith Uni,Ingham201806-DEM-GRID-50cm_2768004_55_0001_0001.tif
+glengallan_ck_ale,Glengallan Ck AL,-28.1167,152.0642,466.3,465.24,1.06,1.06,1m,,agrees,QLD Government,MaryvaletoGoomburra_2012_Rgn_SW_408000_6889000_1K_DEM_1m.tif
+clearfield_old_tent,Clearfield (Old Tent,-29.1745,152.8775,74.0,72.97,1.03,1.03,2m,,agrees,NSW Government,Coaldale201707-LID2-AHD_4886772_56_0002_0002_2m.tif
+kataughal_rd_black,Kataughal Rd (Black,-19.2817,146.5922,35.5,36.53,-1.03,1.03,1m,,agrees,QLD Government,Townsville_2009_Prj_SW_456000_7866000_2K_DEM_1m.tif
+eidsvold_al,Eidsvold AL,-25.4022,151.1033,152.8,153.81,-1.01,1.01,1m,,agrees,QLD Government,Eidsvold_2011_Twn_SW_309000_7189000_1K_DEM_1m.tif
+st_kilda_al,St Kilda AL,-25.0492,151.9217,103.5,104.51,-1.01,1.01,1m,,agrees,QLD Government,BundabergCentral_2009_Rgn_SW_390000_7228000_2K_DEM_1m.tif
+mapleton_al,Mapleton AL,-26.6247,152.8664,392.7,393.7,-1.0,1.0,1m,,agrees,QLD Government,SunshineCoast_2014_LGA_SW_486000_7055000_1K_DEM_1m.tif
+goulburn_pomeroy,Goulburn (Pomeroy),-34.6514,149.5024,688.5,689.49,-0.99,0.99,5m,,agrees,NSW Government,Gunning201503-PHO3-AHD_7286162_55_0002_0002_5m.tif
+eugowra_town_mandag,Eugowra Town (Mandag,-33.4333,148.3833,275.8,274.82,0.98,0.98,1m,,agrees,NSW Government,Eugowra_202308_LID1_AHD_1m_1km_55_6286299.tif
+cherrabah_al,Cherrabah AL,-28.4389,152.0947,709.3,710.25,-0.95,0.95,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+boondooma_rptr_al,Boondooma Repeater AL,-26.0942,151.4417,324.1,325.04,-0.94,0.94,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+wallaman_al,Wallaman AL,-18.4606,145.7383,709.2,710.14,-0.94,0.94,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mt_goonaneman_al,Mt Goonaneman AL,-25.4275,152.1172,651.6,652.53,-0.93,0.93,50cm,,agrees,Griffith Uni,Bundaberg201801-DEM-GRID-50cm_4117187_56_0001_0001.tif
+mt_lawless_al,Mt Lawless AL,-25.545,151.655,93.0,92.07,0.93,0.93,1m,,agrees,QLD Government,BurnettRivWetheron_2014_Loc_SW_364000_7174000_1K_DEM_1m.tif
+bromfleet_al,Bromfleet AL,-27.9108,153.1047,44.7,43.79,0.91,0.91,1m,,agrees,QLD Government,Logan_2021_GDA2020_LGA_SW_510000_6912500_500m_DEM_1m.tif
+eton_vale_al,Eton Vale AL,-20.2933,147.6647,190.1,191.0,-0.9,0.9,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+millaroo_al,Millaroo AL,-19.9717,147.2508,40.4,41.29,-0.89,0.89,50cm,,agrees,QLD Government,Burdekin_River_North_2024_2025_Prj_SW_526000_7791500_500m_DEM_50cm.tif
+bundi_rd_al,Bundi Rd AL,-26.0947,149.6225,293.1,293.96,-0.86,0.86,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+centenary_br_tm,Centenary Bridge TM,-27.8086,151.3632,378.8,377.94,0.86,0.86,1m,,agrees,QLD Government,Brookstead_2012_Twn_SW_338000_6922000_1K_DEM_1m.tif
+mundubbera,Mundubbera,-25.5908,151.2986,133.9,134.76,-0.86,0.86,1m,,agrees,QLD Government,Mundubbera_2011_Twn_SW_329000_7168000_1K_DEM_1m.tif
+gormans_gap_al,Gormans Gap AL,-27.6417,151.9844,660.7,661.55,-0.85,0.85,1m,,agrees,QLD Government,LockyerValleyNorth_2010_Rgn_SW_399000_6942000_1K_DEM_1m.tif
+marco_street_al,Marco St AL,-17.5556,145.9556,132.8,133.64,-0.84,0.84,1m,,agrees,QLD Government,CassowaryCoast_2016_Prj_SW_389000_8058000_1K_DEM_1m.tif
+harpers_crossing_ale,Harpers Crossing AL,-28.0278,152.6578,95.4,94.57,0.83,0.83,1m,,agrees,QLD Government,ScenicRim_2011_LGA_SW_466000_6899000_1K_DEM_1m.tif
+murrays_br_al,Murrays Br AL,-28.2883,152.1053,460.3,459.48,0.82,0.82,1m,,agrees,QLD Government,SouthernDowns_2010_Rgn_SW_412000_6870000_1K_DEM_1m.tif
+sandy_ck_rd_ale,Sandy Creek Road AL,-27.5711,152.1781,123.2,122.38,0.82,0.82,1m,,agrees,QLD Government,LockyerValleyNorth_2010_Rgn_SW_418000_6950000_1K_DEM_1m.tif
+redbank_ck_tm,Redbank Ck Tm,-18.769,145.4051,467.2,468.0,-0.8,0.8,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+stillers_rd_al,Stillers Rd AL,-26.3642,150.2161,352.1,352.88,-0.78,0.78,1m,,agrees,QLD Government,Surat_CMA_2012_OGIA_SW_222000_7080000_1k_DEM_1m.tif
+tamborine_al,Tamborine AL,-27.8647,153.1211,34.6,33.82,0.78,0.78,1m,,agrees,QLD Government,Logan_2023_LGA_SW_511000_6917000_1k_DEM_1m.tif
+walker_ck_winton,Walker Ck (Winton,-21.0647,144.0169,274.0,273.22,0.78,0.78,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+belmore_river_entran,Belmore River Entrance,-31.0333,152.9417,2.9,3.64,-0.74,0.74,1m,,agrees,NSW Government,Kempsey201607-LID1-AHD_4946566_56_0002_0002_1m.tif
+cambooya_hodgson_crk,Cambooya (Rolleston Park) TM,-27.706,151.862,465.9,465.18,0.72,0.72,1m,,agrees,QLD Government,Toowoomba_2015_Prj_SW_387000_6934000_1K_DEM_1m.tif
+kinchela_ck_macl,Kinchela Creek (Macleay River),-30.9933,152.9883,1.8,2.52,-0.72,0.72,1m,,agrees,NSW Government,Macksville201607-LID1-AHD_4986570_56_0002_0002_1m.tif
+parklands_al,Parklands AL,-27.6989,153.1925,7.3,6.58,0.72,0.72,1m,,agrees,QLD Government,Logan_2023_LGA_SW_518000_6936000_1k_DEM_1m.tif
+kootingal_cockburn,Kootingal (Cockburn River),-31.083,151.033,410.1,409.39,0.71,0.71,5m,,agrees,NSW Government,Nundle201305-PHO3-AHD_3126558_56_0002_0002_5m.tif
+mundubbera_al,Mundubbera AL,-25.5936,151.3,124.8,125.49,-0.69,0.69,1m,,agrees,QLD Government,Mundubbera_2011_Twn_SW_329000_7168000_1K_DEM_1m.tif
+major_ck_al,Major Creek AL,-19.6689,147.025,33.6,34.26,-0.66,0.66,1m,,agrees,QLD Government,Burdekin_2011_Prj_SW_502000_7825000_1K_DEM_1m.tif
+woodlands_rd_al,Woodlands Rd AL,-27.6281,152.3299,114.7,115.36,-0.66,0.66,1m,,agrees,QLD Government,LockyerValleyNorth_2010_Rgn_SW_433000_6943000_1K_DEM_1m.tif
+mt_pleasant_al,Mt Pleasant AL,-20.2897,147.9019,189.8,189.15,0.65,0.65,50cm,,agrees,Griffith Uni,Proserpine201311-DEM-GRID-50cm_5947756_55_0001_0001.tif
+gleneagle,Gleneagle,-18.1608,145.3422,573.7,573.07,0.63,0.63,50cm,,agrees,DCCEEW,Herbert1Lidar2020-DEM-0_5_3247991_55_0001_0001.tif
+t_bar_test,T-Bar Test,-27.6553,151.6174,663.5,662.87,0.63,0.63,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+gambubal_rd_al,Gambubal Rd AL,-28.2758,152.3447,1042.4,1041.78,0.62,0.62,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mt_gravatt_lookout_a,Mt Gravatt Lookout AL,-27.5423,153.0732,188.4,189.02,-0.62,0.62,1m,,agrees,QLD Government,Brisbane_2014_LGA_SW_507000_6953000_1K_DEM_1m.tif
+four_mile_al,Four Mile AL,-19.8647,146.7831,126.6,126.0,0.6,0.6,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+bundamba_barclay_st,Bundamba (Barclay St) AL,-27.6203,152.8261,97.4,97.98,-0.58,0.58,1m,,agrees,QLD Government,Ipswich_2019_LGA_SW_482000_6944000_1k_DEM_1m.tif
+terara_shoalhaven_r,Terara,-34.8708,150.6333,4.2,3.65,0.55,0.55,1m,,agrees,NSW Government,Kiama201104-LID1-AHD_2826138_56_0002_0002_1m.tif
+aplin_weir_al,Aplin Weir AL,-19.3039,146.7803,7.0,6.46,0.54,0.54,1m,,agrees,QLD Government,Townsville_2018_Prj_SW_476000_7865000_1.0K_DEM_1m.tif
+d_s_borenore_ck_mol,D/S Borenore Creek (Molong Ck),-33.1636,148.9597,619.7,619.17,0.53,0.53,5m,,agrees,NSW Government,Molong201403-PHO3-AHD_6826328_55_0002_0002_5m.tif
+flagstone_ck_aler,Flagstone Ck AL,-27.6047,152.1325,152.9,153.43,-0.53,0.53,1m,,agrees,QLD Government,Lockyer_Valley_2022_LGA_SW_414000_6946000_1k_DEM_1m.tif
+ben_avon_al,Ben Avon AL,-17.8072,145.325,661.5,662.0,-0.5,0.5,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+numinbah,Numinbah,-28.2703,153.2483,134.1,134.6,-0.5,0.5,2m,,agrees,NSW Government,Murwillumbah201709-LID2-AHD_5246872_56_0002_0002_2m.tif
+mullumbimby_chincoga,Mullumbimby (Chincogan),-28.5212,153.4723,235.5,235.01,0.49,0.49,1m,,agrees,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5466844_56_0001_0001.tif
+goltz_rd_al,Goltz Rd AL,-27.8658,152.1814,457.8,457.33,0.47,0.47,1m,,agrees,QLD Government,Lockyer_Valley_2022_LGA_SW_419000_6917000_1k_DEM_1m.tif
+abergowrie_br_al,Abergowrie Bridge AL,-18.5144,146.0006,34.5,34.04,0.46,0.46,1m,,agrees,QLD Government,Hinchinbrook_2009_Prj_SW_394000_7952000_2K_DEM_1m.tif
+fanning_river_dotsw,Fanning River (Dotsw,-19.7336,146.4278,271.2,270.76,0.44,0.44,50cm,,agrees,Griffith Uni,ChartersTowers201310-DEM-GRID-50cm_4407817_55_0001_0001.tif
+kilmoylar_rd_al,Kilmoylar Rd AL,-27.84,152.9347,31.5,31.06,0.44,0.44,1m,,agrees,QLD Government,Logan_2017_LGA_SW_493500_6920500_0.5K_DEM_1m.tif
+haughton_river_flin,Haughton River (Flin,-19.8354,146.6893,153.5,153.07,0.43,0.43,50cm,,agrees,Griffith Uni,ChartersTowers201310-DEM-GRID-50cm_4677806_55_0001_0001.tif
+mareeba_al,Mareeba AL,-17.0022,145.4292,398.0,397.57,0.43,0.43,1m,,agrees,QLD Government,Mareeba_2011_Twn_SW_332000_8119000_1K_DEM_1m.tif
+whiteway_rd_al,Whiteway Rd AL,-27.5972,152.3456,97.0,96.57,0.43,0.43,1m,,agrees,QLD Government,LockyerValleyNorth_2010_Rgn_SW_435000_6947000_1K_DEM_1m.tif
+whiteway_rd_overflow,Whiteway Rd Overflow AL,-27.5972,152.3456,97.0,96.57,0.43,0.43,1m,,agrees,QLD Government,LockyerValleyNorth_2010_Rgn_SW_435000_6947000_1K_DEM_1m.tif
+fifteen_mile_al,Fifteen Mile AL,-27.3986,152.0731,482.6,482.18,0.42,0.42,1m,,agrees,QLD Government,Lockyer_Valley_2022_LGA_SW_408000_6969000_1k_DEM_1m.tif
+parkville_kingdon_p,Parkville,-31.9583,150.8567,248.0,247.58,0.42,0.42,5m,,agrees,NSW Government,Murrurundi201111-PHO3-AHD_2966462_56_0002_0002_5m.tif
+nettlefield_al,Nettlefield AL,-19.5822,146.6953,133.6,134.0,-0.4,0.4,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+sutherland_al,Sutherland AL,-20.7149,148.1503,251.6,252.0,-0.4,0.4,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+bottle_tree_al,Bottle Tree AL,-26.8,150.4322,384.4,384.01,0.39,0.39,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+hinterland_way_at_ne,Hinterland Way at Ne,-28.7602,153.5339,112.7,112.34,0.36,0.36,1m,,agrees,NSW Government,Ballina201006-LID1-AHD_5526818_56_0002_0002_1m.tif
+kingscliff_sewerage,Kingscliff WWTP,-28.256,153.548,2.8,3.13,-0.33,0.33,1m,,agrees,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5536874_56_0001_0001.tif
+kirby_tm,Kirby Tm,-21.9589,141.4817,244.7,245.0,-0.3,0.3,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+abercorn_al,Abercorn AL,-25.1292,151.1306,199.3,199.59,-0.29,0.29,1m,,agrees,QLD Government,Abercorn_2011_Twn_SW_311000_7219000_1K_DEM_1m.tif
+blaxland_al,Blaxland AL,-27.1892,151.3378,350.1,350.37,-0.27,0.27,1m,,agrees,QLD Government,Kaimkillenbun_2012_Twn_SW_335000_6991000_1K_DEM_1m.tif
+limevale_tm,Limevale TM,-28.725,151.1843,319.6,319.87,-0.27,0.27,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+black_weir_al,Black Weir AL,-19.3164,146.735,18.5,18.24,0.26,0.26,1m,,agrees,QLD Government,Townsville_2009_Ctl_SW_472000_7864000_1K_DEM_1m.tif
+kooralbyn_br_ale,Kooralbyn Bridge AL,-28.0925,152.8514,91.0,91.25,-0.25,0.25,1m,,agrees,QLD Government,ScenicRim_2011_LGA_SW_485000_6892000_1K_DEM_1m.tif
+alick_ck_rwr_tm,Alick Ck Rwr TM,-21.1832,142.921,205.2,204.96,0.24,0.24,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+clare_al,Clare AL,-19.7586,147.2436,28.5,28.27,0.23,0.23,1m,,agrees,QLD Government,Burdekin_2009_Rgn_SW_524000_7814000_2K_DEM_1m.tif
+laheys_lookout_al,Laheys Lookout AL,-27.9972,153.1825,550.2,549.97,0.23,0.23,1m,,agrees,QLD Government,ScenicRim_2011_LGA_SW_517000_6903000_1K_DEM_1m.tif
+tully_al,Tully AL,-17.9353,145.9231,22.8,23.03,-0.23,0.23,1m,,agrees,QLD Government,CassowaryCoast_2009_Ctl_SW_385000_8016000_1K_DEM_1m.tif
+lorraine_tm,Lorraine Tm,-22.5203,143.5011,251.7,251.92,-0.22,0.22,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+mt_walsh_al,Mt Walsh AL,-25.5972,152.0936,168.6,168.39,0.21,0.21,50cm,,agrees,Griffith Uni,Bundaberg201801-DEM-GRID-50cm_4087168_56_0001_0001.tif
+mcgarrigal_rd_al,McGarrigal Rd AL,-27.6969,152.3703,124.6,124.4,0.2,0.2,1m,,agrees,QLD Government,Ipswich_2019_LGA_SW_437000_6936000_1k_DEM_1m.tif
+bilambil_heights_ma,Marana St Reservoir,-28.216,153.478,156.4,156.57,-0.17,0.17,1m,,agrees,CSIRO and NEMA,RichmondRiver2023-DEM-AHD-1m_5466878_56_0001_0001.tif
+harrisons_rd_al,Harrisons Rd AL,-28.2583,152.0925,456.7,456.87,-0.17,0.17,1m,,agrees,QLD Government,SouthernDowns_2010_Rgn_SW_410000_6873000_1K_DEM_1m.tif
+grandchester_al,Grandchester AL,-27.6631,152.4611,86.8,86.96,-0.16,0.16,1m,,agrees,QLD Government,Ipswich_2023_LGA_SW_446000_6940000_1k_DEM_1m.tif
+lava_plains_rd_tm,Lava Plains Rd Tm,-18.49,144.7976,696.9,696.74,0.16,0.16,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+rockside_mt_al,Rockside Mt AL,-27.7167,152.3106,419.1,419.24,-0.14,0.14,1m,,agrees,QLD Government,Lockyer_Valley_2022_LGA_SW_432000_6933000_1k_DEM_1m.tif
+canobolas_hillview,Canobolas (Hillview),-33.303,149.0474,980.6,980.47,0.13,0.13,5m,,agrees,NSW Government,Orange201308-PHO3-AHD_6906312_55_0002_0002_5m.tif
+toorak_research_stat,Toorak Research Stat,-21.0314,141.8003,149.2,149.07,0.13,0.13,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+scone_kingdon_ponds,Scone (Kingdon Ponds),-32.05,150.8528,203.2,203.08,0.12,0.12,2m,,agrees,NSW Government,Muswellbrook201711-LID2-AHD_2966452_56_0002_0002_2m.tif
+mt_nebo_al,Mt Nebo AL,-27.3955,152.7822,454.5,454.61,-0.11,0.11,1m,,agrees,QLD Government,MoretonBay_2014_LGA_SW_478000_6969000_1K_DEM_1m.tif
+bendemeer_tm,Bendemeer TM,-21.9143,142.3804,171.5,171.6,-0.1,0.1,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+bullamalita,Bullamalita,-34.897,149.774,693.8,693.7,0.1,0.1,5m,,agrees,NSW Government,Goulburn201312-PHO3-AHD_7526134_55_0002_0002_5m.tif
+cannonvale_al,Cannonvale AL,-20.2814,148.685,39.0,39.1,-0.1,0.1,50cm,,agrees,Griffith Uni,Proserpine201311-DEM-GRID-50cm_6757756_55_0001_0001.tif
+woodlands_al,Woodlands AL,-19.4844,146.7694,48.1,48.0,0.1,0.1,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+tinaroo_ck_tm,Tinaroo Ck Tm,-17.0956,145.5217,647.9,647.99,-0.09,0.09,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+brdwater_br_r,BRdwater Br (R,-29.0134,153.4311,4.6,4.67,-0.07,0.07,1m,,agrees,NSW Government,Woodburn201006-LID1-AHD_5406790_56_0002_0002_1m.tif
+lake_cathie_sewerag,Lake Cathie (Sewerag,-31.5797,152.8381,8.5,8.44,0.06,0.06,1m,,agrees,NSW Government,CamdenHaven201205-LID1-AHD_4846506_56_0002_0002_1m.tif
+churchill_al,Churchill AL,-27.6335,152.754,23.3,23.25,0.05,0.05,1m,,agrees,QLD Government,Ipswich_2014_LGA_SW_475000_6943000_1K_DEM_1m.tif
+hamilton_river_stati,Hamilton River Stati,-22.7727,140.6373,164.1,164.13,-0.03,0.03,1 Second,,agrees,Geoscience Australia SRTM,srtm-1sec-dem-v1-COG.tif
+maclean_br_al,Maclean Bridge AL,-27.7864,153.0161,22.5,22.53,-0.03,0.03,1m,,agrees,QLD Government,Logan_2013_LGA_SW_501000_6926000_1K_DEM_1m.tif
+burncluith_br_al,Burncluith Bridge AL,-26.6717,150.7206,314.5,314.48,0.02,0.02,1m,,agrees,QLD Government,Surat_CMA_2012_OGIA_SW_273000_7047000_1k_DEM_1m.tif

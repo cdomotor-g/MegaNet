@@ -1,0 +1,39 @@
+{
+  "asked": 3173,
+  "answered": 3173,
+  "no_data": 0,
+  "unreachable": 0,
+  "proposed_fills": 2333,
+  "audited": 840,
+  "dem_resolution": {
+    "1m": 1608,
+    "1 Second": 926,
+    "50cm": 337,
+    "2m": 170,
+    "5m": 132
+  },
+  "source": {
+    "QLD Government": 1027,
+    "Geoscience Australia SRTM": 926,
+    "NSW Government": 694,
+    "Griffith Uni": 245,
+    "SA Government": 91,
+    "CSIRO and NEMA": 80,
+    "TAS Government": 65,
+    "ACT Government": 19,
+    "DCCEEW": 13,
+    "NSW Gov": 5,
+    "NSW Natural Resorces Commision": 5,
+    "NSW Spatial Services": 3
+  },
+  "difference_m": {
+    "median": 4.8,
+    "mean": 8.23,
+    "p90": 17.75,
+    "max": 106.65,
+    "within_2m": 177,
+    "within_5m": 430,
+    "within_10m": 630
+  },
+  "note": "A large difference flags the coordinate, not the height: these are creek and gorge gauges where the point is the gauge in the channel and the surveyed mark is the hut on the bank. Use --relief to tell that apart from a genuinely wrong figure. Nothing here edits stations.json."
+}

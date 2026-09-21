@@ -11,21 +11,21 @@ WHY THIS EXISTS
     height in this file is in.
 
     Elvis (elevation.fsdf.org.au, Geoscience Australia / ICSM) answers in AHD
-    off the best model the nation holds at a point. Measured over a seeded
-    220-station random sample of this file, answered cleanly at 8 in flight:
+    off the best model the nation holds at a point. Run over the whole file —
+    3,173 stations asked, 3,173 answered, 0 "No Data", 0 unreachable:
 
-        1 m          120   54.5%
-        50 cm         22   10.0%
-        2 m           12    5.5%
-        5 m           10    4.5%
-        ─────────────────────────
-        finer than 30 m    74.5%
-        1 second (~30 m)   25.5%
-        no data             0.0%
+        1 m              1,608   50.7%
+        50 cm              337   10.6%
+        2 m                170    5.4%
+        5 m                132    4.2%
+        ───────────────────────────────
+        finer than 30 m  2,247   70.8%
+        1 second (~30 m)   926   29.2%
 
-    Nothing was unreachable and nothing was genuinely missing. An earlier pass
-    put "no data" at 10%; every one of those was the concurrency artefact
-    described under THE SERVICE, which is why that pass is not the figure here.
+    An earlier pass put "no data" at 10%; every one of those was the concurrency
+    artefact described under THE SERVICE, which is why it is not the figure
+    here. The output of that full run is committed under data/elvis/, with a
+    README that reads the audit before acting on it.
 
     Nothing but the standard library — same rule as the rest of tools/, and the
     same reason: this repo has no build step, and the service is plain JSON over
