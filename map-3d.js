@@ -329,7 +329,7 @@ const Map3D = (function () {
         // says "backbone" once the core has taken the colouring's colour.
         dash:   role === 'backbone-dash' ? 1 : 0,
       };
-      // And who the path joins, which is what makes it clickable here (#195).
+      // And who the path joins, which is what makes it clickable here (#196).
       // Styling alone was enough while these lines were only drawn; a click
       // has to get back to a *link*, and the mirror is built from Leaflet
       // lines that already know — app.js hangs the same three ids on every
@@ -934,7 +934,7 @@ const Map3D = (function () {
       const hit = map.queryRenderedFeatures(e.point, { layers: ['mn-stations'] })[0];
       const id  = hit && hit.properties ? hit.properties.id : null;
       if (id != null) { clickedStation(id, e); return; }
-      // Then a path (#195). Pins are asked first and the order is not
+      // Then a path (#196). Pins are asked first and the order is not
       // arbitrary: a pin sits on the end of every line it belongs to, so
       // asking the lines first would make the station at a link's end the one
       // station on the map nobody could open.

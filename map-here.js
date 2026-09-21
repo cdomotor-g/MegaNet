@@ -36,7 +36,7 @@
 //     is a *surveyed* figure and these two must never be read as the same
 //     number, so this one names its datum every time.
 //   * **Ground height (Elvis)** is the second answer to the same question, off
-//     the best model Geoscience Australia holds at that point (#197) — which
+//     the best model Geoscience Australia holds at that point (#198) — which
 //     is 1 m LiDAR over most of settled Queensland and the same ~30 m SRTM
 //     elsewhere. It is in **AHD**, so unlike the row above it is comparable
 //     with a station's surveyed elevation, and it names the resolution because
@@ -106,7 +106,7 @@ const MapHere = (function () {
       .then(keep(m => { facts.elev = m == null ? null : m; render(); }),
             keep(() => { facts.elev = null; render(); }));
 
-    // The same ground, asked of the nation's own model (#197). This is the row
+    // The same ground, asked of the nation's own model (#198). This is the row
     // that can say AHD — the datum every other height in this app is in, and
     // the one the terrain tile above is not — and can say whether the answer
     // came off 1 m LiDAR or the same ~30 m SRTM the tile did.

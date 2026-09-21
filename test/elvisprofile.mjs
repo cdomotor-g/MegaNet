@@ -1,4 +1,4 @@
-// The second opinion: re-sampling one path against Elvis's 1 m data (#198).
+// The second opinion: re-sampling one path against Elvis's 1 m data (#199).
 //
 // Why this check is worth its runtime. The verdict on the profile card is the
 // one number somebody drives out to a site on, and it is computed on ~30 m

@@ -407,7 +407,7 @@ const PATH_VERDICT = {
 
 const PathProfile = (function () {
   const SAMPLES = 256;
-  // The second opinion (#198): how many of those 256 points get asked of Elvis.
+  // The second opinion (#199): how many of those 256 points get asked of Elvis.
   // One request per point, ~2.5 s each, so 64 at six in flight is about twenty
   // seconds — the most that can be asked of somebody waiting for an answer
   // about one path. Six, not eight: eight is where the service starts shedding
@@ -538,7 +538,7 @@ const PathProfile = (function () {
     };
   }
 
-  // ── the second opinion (#198) ─────────────────────────────────────────────
+  // ── the second opinion (#199) ─────────────────────────────────────────────
   //
   // The whole profile is ~30 m terrarium ground. Over most of settled
   // Queensland the nation holds 1 m LiDAR of the same hills, and 30 m sampling

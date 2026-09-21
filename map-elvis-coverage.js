@@ -2,7 +2,7 @@
 //
 //   ElvisCoverage   Which digital elevation model Australia actually has under
 //                   a place, drawn over the Stations map as the coverage
-//                   footprints ELVIS publishes (#196).
+//                   footprints ELVIS publishes (#197).
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state`; across to app.js for rerenderMapLegend.

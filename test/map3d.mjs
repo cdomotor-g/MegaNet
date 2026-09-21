@@ -1000,7 +1000,7 @@ if (onPin) {
 await page.evaluate(() => { MapHere.close(); closeStnCard(false); });
 
 // ── 9. leaving the tab takes the GL context with it ─────────────────────────
-// ── a path clicked in 3-D opens the card its 2-D line opens (#195) ────────
+// ── a path clicked in 3-D opens the card its 2-D line opens (#196) ────────
 console.log('\nA radio path clicked in 3-D opens the path card');
 
 // The styling alone was never enough: a hit has to reach a *link*, so the

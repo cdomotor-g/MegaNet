@@ -1,4 +1,4 @@
-// The Elvis elevation-data coverage overlay (#196).
+// The Elvis elevation-data coverage overlay (#197).
 //
 // What this layer is for is the thing worth protecting: every terrain answer in
 // the app — the profile card's clearance, ITM's loss, the fade margin on a

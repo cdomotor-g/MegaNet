@@ -2924,7 +2924,7 @@ function mapDisplayControlsHtml() {
       </select>
     </label>
     <p class="filter-note" id="map-contour-note">${MapContours.noteHtml()}</p>
-    <!-- Which DEM the nation holds here (#196). It sits under the contours
+    <!-- Which DEM the nation holds here (#197). It sits under the contours
          because it answers the question they raise: those are surveyed LiDAR
          lines, and this says where LiDAR exists at all. -->
     <label class="filter-check">
@@ -5019,7 +5019,7 @@ function goToStation(id) {
 // is focused now, and is passed in by the one caller for which "now" is too
 // late — selectStation, which has re-rendered the table (and so destroyed the
 // row that was pressed) before it gets here.
-// The ground height under a station that has no surveyed one (#197), off the
+// The ground height under a station that has no surveyed one (#198), off the
 // best model Geoscience Australia holds there. Kept out of elvis.js, which
 // reaches no DOM, and written here on SLS.ask's terms: `data-mn-elvis` carries
 // the point the placeholder was rendered for and is checked before writing, so
@@ -5240,7 +5240,7 @@ function stnCardHtml(s) {
       ${acmaCardRow('Position', located ? esc(stationLatLonText(s)) : null)}
       ${acmaCardRow('Elevation', s.elevation_ahd != null ? `${esc(s.elevation_ahd)} m AHD` : null)}
       <!-- Only where there is no surveyed figure, which is 2,334 of the 3,174
-           (#197). Where there *is* one it stands: a surveyed mark and a model
+           (#198). Where there *is* one it stands: a surveyed mark and a model
            of the ground are answers to different questions, and the places
            they disagree most are the incised creek sites where the coordinate
            is the gauge in the channel and the mark is the hut on the bank.
