@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-21** (revision 96 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-21** (revision 97 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -35,7 +35,7 @@ Of the sixteen this paragraph was written about, **twelve were added by the chan
 | `npm run rivers` | *(new — #150)* a river layer that draws and cannot be used. Overpass is off-origin and the harness blocks it, so the geometry is seeded through `MapRivers.seed()` and everything downstream of the fetch is exercised on the real page — grouping by name, the three passes, the permanent labels, the map-delegated callout, and the assertion the issue asked for: one real control in the DOM per named river, so the layer is reachable without a mouse |
 | `npm run mapctl` | *(new — revision 60; extended at #192)* an on-map panel that will not go away, and — since #192 — a corner that has stopped saying anything. The first half is the class of defect every other check here is **structurally** blind to: nothing else in `test/` moves a pointer, so a flyout that stays on the map after the mouse leaves it is invisible to all of them — nothing throws, every handler resolves, contrast is unchanged, and the keyboard path goes on working. Real `page.mouse` moves, real clicks inside Base map / Map display / Draw & measure, and the question asked afterwards is always "is it still on the map?" The second half is the **arrangement**, and every assertion in it is geometry for `maplinks`' reason: "the groups are separated" is asked as *is the smallest gap between two groups bigger than the biggest gap inside one*, and "the camera buttons are not on the flat map" as `getClientRects()`, never as `el.hidden` — which is the attribute an author `display: flex` outranks. The group order is read out of `MapChrome.groups()` rather than copied here, so a sixth group is in this check the day it lands. 45 assertions, confirmed red on three deliberate breaks |
 | `npm run drawkml` | *(new — #183)* a Google Earth KML that is **wrong and opens perfectly**. Earth ignores a `<styleUrl>` naming a style that was never emitted, closes a `<LinearRing>` whose ends differ, and draws `lat,lon` coordinates 30° south-west of Sri Lanka without a word — so `smoke` presses the button, gets a file it never opens, and passes. Every assertion is about the parsed document and the ground its numbers describe: the axis order (checked by putting the ring's bearing-000° vertex where due north actually is), a circle round *on the sphere* (72 bearings through `destPoint`; the degrees version fails by 2.2 km on a 20 km radius at Brisbane), and the stations inside a shape against a haversine written in the check rather than the app's |
-| `npm run maplinks` | *(new — revision 89)* a map whose links are all one colour, whose arrows never draw, whose credit line covers a button, whose Clear buttons leave the map faded and whose panel search hides nothing — all of which open with a clean console, which is `smoke`'s whole test. The part that generalises is not the subject but the *measurement*: the panel search is asserted with `getClientRects()` rather than `el.hidden`, because the implementation that shipped first set the attribute and hid nothing (an author `display: flex` outranks the browser's `[hidden]` rule at the same specificity) and a check reading the property would have passed it. **Any check about whether something is on screen has to ask the geometry.** Confirmed red on three deliberate breaks |
+| `npm run maplinks` | *(new — revision 89)* a map whose links are all one colour, whose arrows never draw, whose credit line covers a button, whose Clear buttons leave the map faded and whose panel search hides nothing — all of which open with a clean console, which is `smoke`'s whole test. The part that generalises is not the subject but the *measurement*: the panel search is asserted with `getClientRects()` rather than `el.hidden`, because the implementation that shipped first set the attribute and hid nothing (an author `display: flex` outranks the browser's `[hidden]` rule at the same specificity) and a check reading the property would have passed it. **Any check about whether something is on screen has to ask the geometry.** Confirmed red on three deliberate breaks. *Extended at #195*: it also holds the **height** of the two columns against a page made to overflow for a reason they have no part in — the state the report arrived as, where every other signal reads true |
 | `npm run steps` | *(new — #183)* `npm run all` and `.github/workflows/web-smoke.yml` naming the same checks, in both directions. The drift it closes has happened twice — `catchments` and `mapfade` each sat in `all` with no CI step — and **both halves stay green while they disagree**, which is why neither was found on purpose. Parse-only, under a second, and it holds for the check nobody has written yet |
 | `npm run concat` | *(not in CI — milestone tool)* byte-exact concat-and-diff, the proof a split moved code and changed none of it, and the only check that catches the NUL-byte hazard in constraint 4 |
 
@@ -490,6 +490,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Five AI rows, and six `[Human]` issues.
 >
+> **Revision 97 opened and closed #195 in the same push, and opened nothing that stays open** — the side-by-side columns collapsing to their floor when something else on the page overflowed. The allocation below is unchanged.
+
 > **Revision 96 opened and closed #194 in the same push, and opened nothing that stays open** — the two Map display layers that stopped applying when the map was tilted. The allocation below is unchanged.
 
 > **Revision 95 opened and closed #193 in the same push, and opened nothing that stays open** — a station card that was being painted under the 3-D canvas. The allocation below is unchanged.
@@ -619,6 +621,89 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 97 — 2026-09-21: the correction that charged the columns for somebody else's overflow
+
+Reported in session from the in-app bug reporter — *"something is up with the
+scroll or page sizing sometimes. i clicked a station (Marburg) from 3d mode and
+suddenly the page shortened and map and right pane shrunk"* — filed as **#195
+and closed in the same push**. Touched `app.js`, `test/maplinks.mjs`,
+`test/baseline/top-level-names.json` and the README.
+
+**The screenshot is the whole diagnosis, once you know what to measure.** Both
+columns at 360 px — `.stn-split.is-split`'s own `min-height`, hit *from above* —
+with about 300 px of map in a window with room for 929. That is not a layout
+that failed to grow; it is a layout that was actively shrunk to its floor, and
+the floor is only reachable by subtraction.
+
+**What was subtracting.** `syncStationsSplitHeight()` measures the split from
+where its container starts, applies the figure, and then corrects itself against
+whatever the document turns out to overflow by — *"whatever the document
+overflows by, this element is that much too tall"*. That sentence is true only
+while this element is what makes the page overflow. Let anything else stick out
+below the fold and the columns are charged for all of it. Reproduced exactly:
+an unrelated absolutely positioned strip in the document, in neither column and
+in no scroller, takes the map from 929 px to **306 px** and both panes to 360 on
+the next `updateChromeHeight()` — the report's own figures, from a cause that
+has nothing to do with either column.
+
+**Why nothing caught it.** Every signal reads true in the broken state. Both
+columns are still columns, `state.mapSplit` is still on, the class is still
+there, the map still draws, and *every number in the calculation is a real
+measurement of something*. This is the sixth entry in the family that runs
+through revision 89's panel search, #186's find box, #192's `[hidden]` buttons,
+#193's buried card and #194's drape — and it is the first one where the wrong
+answer is arrived at by arithmetic over honest measurements rather than by
+asking the wrong object. **The generalisable part: a measurement of the whole
+page is not a measurement of the part of it you are about to change.**
+
+**The fix, and why it is a second measurement rather than a smarter sum.** The
+foot below the columns cannot be computed from the shell without assuming the
+shell's shape — `#main-content`'s padding, `#app-shell`'s, a margin a future
+breakpoint adds — and that is exactly what the original comment refused to do,
+rightly. So the question is not *how far does the document overflow* but *how
+much of that is this element*, and the only honest way to ask it is to shrink
+the element and see whether the page got shorter. Whatever the shrink buys is
+what it was too tall by; whatever it does not buy was never its to pay. Two
+measurements instead of one, and still **one correction rather than a loop** —
+a loop that kept going would be a loop that could not stop on a rounding error.
+
+**The other half, found by fixing the first.** The measurement also ran *below
+the fold*. Under 1100 px the stack is `height: auto` and the page is one long
+scroller on purpose, so `--mn-split-h` is not read at that width at all — and a
+figure taken against that page is a measurement of a layout that is not on
+screen. It was stored anyway, as the floor, because the correction read that
+scroller as the columns being too tall, and it survived the fold because the
+variable does; what clears it is the next measurement, which is a window resize
+that may never come. The sync now asks `stationsSplitActive()` — the same pair
+of conditions the table's own column set follows — and writes nothing while the
+answer is no.
+
+**What is *not* fixed here, said out loud.** The trigger on the reporter's
+machine is still unidentified. Everything driven in a headless run at their
+window size — 3-D on, a pin click, a path profile, the filters, both rails, full
+screen, the memory panel, the bug reporter, a scrolled page — leaves the
+document at exactly `innerHeight`, so the overflow they hit comes from something
+this session could not reproduce. That matters less than it sounds: after this
+change the columns are immune to *any* overflow they did not cause, so whatever
+it was can no longer shrink them. If the page is still seen to scroll oddly
+without the columns moving, that is the remaining half and it is worth a new
+report rather than a guess. One near-miss worth recording for whoever picks that
+up: `Auth.syncHeader()` can change the banner's height without anything calling
+`updateChromeHeight()`, which leaves `--mn-chrome` stale and both rails' own
+`max-height` with it.
+
+`npm run maplinks` 70 → 73 assertions, all three confirmed red against the
+shipped code, and red again on two deliberate breaks taken separately (the
+wholesale subtraction restored, 2 red; the fold guard removed, 1 red). The
+load-bearing one does not ask whether the columns have a height or whether the
+class survived — it makes the page overflow by 2,400 px for a reason the split
+has no part in and cannot shrink away, and then asks for the map's height in
+pixels. A fourth assertion was written and **removed before the push**: it
+checked that unfolding gives the columns the window back, and it is green
+against the bug, because crossing `lg` is a viewport change and the resize
+listener re-measures on the same gesture. An assertion that cannot fail is
+not one.
 
 ### Revision 96 — 2026-09-21: two layers that stopped applying when the map was tilted, and the one that was quietly wrong about where
 

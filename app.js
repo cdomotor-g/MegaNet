@@ -2108,21 +2108,60 @@ function updateChromeHeight() {
 function syncStationsSplitHeight() {
   const main = document.getElementById('stations-main');
   if (!main) return;
-  if (!state.mapSplit) { main.style.removeProperty('--mn-split-h'); return; }
+  // Not while the split is off, and — the part that was missing — not while it
+  // is *folded*. Below `lg` the stylesheet puts the two columns back into one
+  // stack at `height: auto`, so this variable is not read there at all, and the
+  // page is deliberately one long scroller. Measuring against that page and
+  // writing the answer down anyway is how the floor below used to get stored:
+  // the figure meant nothing at the width it was taken, and it was still there
+  // at the width that reads it. stationsSplitActive() is the same pair of
+  // conditions the table's own column set follows, which is the point of it
+  // being a function rather than two tests written out twice.
+  if (!stationsSplitActive()) {
+    main.style.removeProperty('--mn-split-h');
+    // …and forget what was last applied, so the next measurement counts as a
+    // change and re-measures the map. Leaving the old figure here would let a
+    // fold-and-unfold end with Leaflet still projecting against the folded box.
+    lastSplitHeight = null;
+    return;
+  }
   // Document-relative, so a page that happens to be scrolled measures the same.
   const top = main.getBoundingClientRect().top + window.scrollY;
-  let h = Math.round(window.innerHeight - top - STATIONS_SPLIT_FOOT);
-  main.style.setProperty('--mn-split-h', `${Math.max(360, h)}px`);
+  const overflow = () => document.documentElement.scrollHeight - window.innerHeight;
+  const put = (v) => main.style.setProperty('--mn-split-h', `${v}px`);
+  let h = Math.max(STATIONS_SPLIT_FLOOR,
+                   Math.round(window.innerHeight - top - STATIONS_SPLIT_FOOT));
+  put(h);
   // …and then check the answer, because what is *below* the columns cannot be
   // measured from above them: #main-content's own bottom padding, a margin on
-  // the layout, whatever a future breakpoint adds. Whatever the document
-  // overflows by, this element is that much too tall — so take it off and stop.
-  // One correction, not a loop: the second measurement is exact, and a loop
-  // that kept going would be a loop that could not stop on a rounding error.
-  const over = document.documentElement.scrollHeight - window.innerHeight;
+  // the layout, whatever a future breakpoint adds.
+  //
+  // **The check used to be wrong, and it is worth saying how, because the
+  // reasoning reads as sound.** It took the document's overflow and subtracted
+  // the whole of it: "whatever the page overflows by, this element is that much
+  // too tall". That sentence is only true while this element is the thing
+  // making the page overflow. Let anything else on the page stick out below the
+  // fold — a rail that has stopped fitting, a card that escaped its scroller,
+  // one frame of a layout that has not settled — and the columns were charged
+  // for all of it and collapsed to the floor: a 929 px map became 306 px, the
+  // right-hand pane went with it, and the page shortened in the same gesture.
+  // Nothing threw, the two columns stayed columns, and every figure involved
+  // was a real measurement of something.
+  //
+  // So the question is not "how far does the document overflow" but "how much
+  // of that is *this element*", and the only honest way to ask it is to shrink
+  // the element and see whether the page got shorter. Whatever the shrink
+  // bought is what it was too tall by; whatever it did not buy was never its to
+  // pay. Two measurements rather than one, and still one correction rather than
+  // a loop — a loop that kept going would be a loop that could not stop on a
+  // rounding error.
+  const over = overflow();
   if (over > 0) {
-    h = Math.max(360, h - over);
-    main.style.setProperty('--mn-split-h', `${h}px`);
+    const probe = Math.max(STATIONS_SPLIT_FLOOR, h - over);
+    put(probe);
+    const bought = Math.min(h - probe, Math.max(0, over - overflow()));
+    h -= bought;
+    if (h !== probe) put(h);
   }
   // Changing this changes the map's height, and Leaflet caches the container's
   // size — so a height set without a re-measure leaves the map projecting
@@ -2258,6 +2297,11 @@ function toggleMapFullscreen(on) {
 // to measure — it is the gap that stops the divider ending flush with the
 // window edge.
 const STATIONS_SPLIT_FOOT = 12;
+// The shortest the columns may be made, whatever the measurement says. The same
+// figure as `.stn-split.is-split`'s own min-height — the stylesheet holds the
+// floor for the frame before the first measurement, this holds it for every
+// measurement after — and below it two columns stop being two columns.
+const STATIONS_SPLIT_FLOOR = 360;
 const STATIONS_SPLIT_MIN = 25;   // per cent of the width the map may shrink to
 const STATIONS_SPLIT_MAX = 75;   // …and grow to. Both leave the other side usable.
 const STATIONS_SPLIT_STEP = 2;   // one arrow-key press

@@ -489,6 +489,60 @@ try {
   check('…and a right column that scrolls on its own',
     /auto|scroll/.test(split.restScrolls), split.restScrolls);
 
+  // **The columns are only charged for the overflow they caused.**
+  //
+  // syncStationsSplitHeight measures the split's height, applies it, and then
+  // corrects itself against whatever the document turns out to overflow by. The
+  // first version subtracted the *whole* of that overflow, on the reasoning
+  // that the only thing below the fold could be the columns it had just sized.
+  // Let anything else stick out down there and the columns paid for it: the
+  // reported case came back with a 306 px map and a 360 px right-hand pane —
+  // `.stn-split.is-split`'s own min-height, hit from above — on a window with
+  // room for 929, and the page shortened in the same gesture.
+  //
+  // Nothing about that state looks broken from inside the app. The two columns
+  // are still two columns, `state.mapSplit` is still on, the class is still
+  // there, and every number in the calculation is a real measurement of
+  // something. So the assertion cannot be "the split has a height" or "the
+  // class survived" — it has to be the height itself, against a page that is
+  // deliberately made to overflow by something the split has no part in and
+  // cannot shrink away. An absolutely positioned strip in the document does
+  // that honestly: it is not in either column, it is not in a scroller, and
+  // shrinking the map by a pixel does nothing for it.
+  const beforeSpacer = await page.evaluate(() => ({
+    splitH: document.getElementById('stations-main').style.getPropertyValue('--mn-split-h'),
+    mapH: Math.round(document.getElementById('leaflet-map').getBoundingClientRect().height),
+  }));
+  const spaced = await page.evaluate(() => {
+    const d = document.createElement('div');
+    d.id = 'mn-overflow-probe';
+    d.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:2400px;pointer-events:none';
+    document.body.appendChild(d);
+    updateChromeHeight();                      // what a resize or the memory strip does
+    return {
+      over: document.documentElement.scrollHeight - window.innerHeight,
+      splitH: document.getElementById('stations-main').style.getPropertyValue('--mn-split-h'),
+      mapH: Math.round(document.getElementById('leaflet-map').getBoundingClientRect().height),
+      restH: Math.round(document.querySelector('.stn-split-rest').getBoundingClientRect().height),
+    };
+  });
+  check('a page that overflows for somebody else does not shrink the columns',
+    spaced.over > 1000 && spaced.mapH >= beforeSpacer.mapH - 8,
+    `${beforeSpacer.mapH} → ${spaced.mapH} with ${spaced.over} px of overflow elsewhere`);
+  check('…and the right-hand pane keeps its height with it',
+    spaced.restH > 600, `${spaced.restH} px`);
+  const unspaced = await page.evaluate(() => {
+    document.getElementById('mn-overflow-probe').remove();
+    updateChromeHeight();
+    return {
+      over: document.documentElement.scrollHeight - window.innerHeight,
+      mapH: Math.round(document.getElementById('leaflet-map').getBoundingClientRect().height),
+    };
+  });
+  check('…and taking it away leaves the height where it was',
+    unspaced.over <= 1 && Math.abs(unspaced.mapH - beforeSpacer.mapH) <= 2,
+    `${beforeSpacer.mapH} → ${unspaced.mapH}, over ${unspaced.over}`);
+
   // The divider, from the keyboard — the reason it is a focusable separator.
   await page.focus('.stn-split-bar');
   for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowLeft');
@@ -520,6 +574,7 @@ try {
       mainW: Math.round(main.getBoundingClientRect().width),
       bar: document.querySelector('.stn-split-bar').getClientRects().length > 0,
       stillSet: state.mapSplit,
+      splitH: main.style.getPropertyValue('--mn-split-h'),
       sideways: document.documentElement.scrollWidth > window.innerWidth,
     };
   });
@@ -528,8 +583,20 @@ try {
     JSON.stringify(folded));
   check('…without forgetting that the split is on', folded.stillSet === true,
     JSON.stringify(folded));
+  // And nothing is written down while it is folded. Below `lg` the stack is
+  // `height: auto` and the page is one long scroller on purpose, so a height
+  // measured against it is a measurement of a layout that is not on screen —
+  // and it used to be stored anyway, as the floor, because the correction above
+  // read that scroller as the columns being too tall. It survived the fold
+  // because the variable does: what clears it is the next measurement, which
+  // is a window resize that may never come.
+  check('…and nothing is measured against the folded page',
+    folded.splitH === '', `--mn-split-h: ${JSON.stringify(folded.splitH)}`);
   await page.setViewportSize({ width: 1500, height: 950 });
   await page.waitForTimeout(700);
+  // Nothing is asserted about the way back up: crossing `lg` is a viewport
+  // change, so the resize listener re-measures on the same gesture whatever was
+  // or was not stored. An assertion there would be green against the bug too.
 
   await page.evaluate(() => toggleStationsSplit(false));
   await page.waitForTimeout(500);

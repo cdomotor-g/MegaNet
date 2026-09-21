@@ -1140,6 +1140,31 @@ to either limit), and where it was left is remembered.
 > overflows by, because what is *below* the columns cannot be measured from
 > above them.
 
+**The correction had to learn whose overflow it was reading (#195).** It took
+the document's overflow and subtracted the whole of it, on the reasoning that
+the only thing below the fold could be the columns it had just sized. That
+sentence is only true while the columns *are* what makes the page overflow. Let
+anything else stick out down there — a rail that has stopped fitting, a card
+that escaped its scroller, one frame of a layout that has not settled — and the
+columns were charged for all of it and collapsed to `min-height`: a 929 px map
+became 306 px, the pane beside it went with it, and the page shortened in the
+same gesture. Nothing threw, both columns stayed columns, and every figure in
+the calculation was a real measurement of something.
+
+So the question is not *how far does the document overflow* but *how much of
+that is this element*, and the only honest way to ask it is to shrink the
+element and see whether the page got shorter. Whatever the shrink buys is what
+it was too tall by; whatever it does not buy was never its to pay. Two
+measurements instead of one, still one correction rather than a loop.
+
+The other half of the same bug: the measurement used to run **below the fold**
+too. Under 1100 px the stack is `height: auto` and the page is one long scroller
+on purpose, so `--mn-split-h` is not read there at all — and a figure taken
+against that page is a measurement of a layout that is not on screen. It was
+stored anyway, as the floor, and it survived the fold because the variable does.
+The sync now asks `stationsSplitActive()` — the same pair of conditions the
+table's own column set follows — and writes nothing while the answer is no.
+
 This is not #165's filter rail coming back. What sat beside the map then was the
 map's *settings*, which had to be scrolled past to reach the map; what sits
 beside it now is the map's *answer* — the list of what matched, the card of what
