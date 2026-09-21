@@ -106,6 +106,29 @@ try {
     calls.n === 1, `${calls.n} call(s)`);
   check('…and the answer is kept', calls.cached === 1, String(calls.cached));
 
+  // The soft failure that wears a valid answer's clothes. Above ~8 requests in
+  // flight the service returns "No Data" for points it holds 1 m LiDAR for:
+  // measured 0 of 40 at eight in flight, 9 of 40 at sixteen, every one of which
+  // answered properly when asked again alone. A card never goes near that
+  // ceiling, but a cached false negative would outlive the load that made it —
+  // so "No Data" has to be retried, not kept.
+  const nodata = await page.evaluate(async () => {
+    Elvis.clear();
+    let n = 0;
+    const NONE = { 'SOURCE': 'No Data', 'DATASET': 'No Data', 'DEM RESOLUTION': 'No Data',
+                   'HEIGHT AT LOCATION': 'No Data', 'METADATA URL': 'No Data' };
+    const REAL = { 'SOURCE': 'QLD Government - x', 'DATASET': 'd_1m.tif',
+                   'DEM RESOLUTION': '1m', 'HEIGHT AT LOCATION': '7.5m', 'METADATA URL': '' };
+    Elvis.seed(() => { n++; return NONE; });
+    const first = await Elvis.at(-27.9, 153.9);
+    const kept = Elvis.cached();
+    Elvis.seed(null); Elvis.clear();
+    return { first, kept, n, REAL_unused: !!REAL };
+  });
+  check('a "No Data" answer is not kept as an answer',
+    nodata.first.ok === false && nodata.kept === 0,
+    `ok=${nodata.first.ok} cached=${nodata.kept}`);
+
   // ── nothing is asked of the real service unprompted ──────────────────────
   check('no request reaches the service without a question',
     asked.length === 0, `${asked.length}: ${asked.slice(0, 2).join(' ')}`);

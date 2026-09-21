@@ -55,6 +55,14 @@
 //   …the same with "1 Second" and the national SRTM file, outside LiDAR cover;
 //   …and every field the literal string "No Data" where it holds nothing.
 //
+// That third shape is not always true. Above about 8 requests in flight the
+// service sheds load by returning it for points it does hold data for — a soft
+// failure wearing a valid answer's clothes, measured at 0 of 40 at eight in
+// flight and 9 of 40 at sixteen, every one of which answered properly when
+// asked again alone. One card asking about one click never approaches that,
+// but a "No Data" is treated as a failure to be retried rather than an answer
+// to keep, because a cached false negative would outlive the load that made it.
+//
 // Heights arrive as strings with the unit stuck on ("11.94m"), so they are
 // parsed rather than trusted, and a parse that fails is a failure rather than
 // a NaN travelling on.
@@ -129,6 +137,23 @@ const Elvis = (function () {
     return t && t.toLowerCase() !== 'no data' ? t : null;
   }
 
+  // What is worth keeping, decided in one place so the seeded path and the
+  // fetched path cannot drift — the test seam has to exercise the real rule,
+  // or it is testing itself.
+  //
+  // A "No Data" is NOT kept. Measured: above ~8 requests in flight the service
+  // sheds load by answering "No Data" — HTTP 200, all five fields,
+  // indistinguishable from a point it genuinely holds nothing for. Serially
+  // those same points return 1 m LiDAR. One card asking about one click will
+  // not go near that ceiling, but a false negative cached for the session would
+  // outlive the load that caused it, so it goes in the failure bucket and gets
+  // another chance after FAIL_TTL.
+  function keep(k, r) {
+    if (!r.ok && r.noData) { failedAt.set(k, Date.now()); return r; }
+    if (r.ok) failedAt.delete(k);
+    return remember(k, r);
+  }
+
   function shape(j) {
     const res    = j ? j['DEM RESOLUTION'] : null;
     const height = heightMetres(j ? j['HEIGHT AT LOCATION'] : null);
@@ -182,7 +207,7 @@ const Elvis = (function () {
       }
 
       if (seeded) {
-        return Promise.resolve(remember(k, shape(seeded(lat, lon))));
+        return Promise.resolve(keep(k, shape(seeded(lat, lon))));
       }
       if (typeof fetch !== 'function') {
         return Promise.resolve({ ok: false, error: 'No network in this environment.' });
@@ -194,10 +219,7 @@ const Elvis = (function () {
           failedAt.set(k, Date.now());
           return { ok: false, error: 'Elvis could not be reached just now.' };
         }
-        failedAt.delete(k);
-        // A "No Data" answer is cached: it is the service's real answer about
-        // that place, not a failure to reach it, and it will not change.
-        return remember(k, shape(j));
+        return keep(k, shape(j));
       });
       inflight.set(k, p);
       return p;

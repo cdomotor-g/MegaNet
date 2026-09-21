@@ -608,6 +608,14 @@ jobs:
       - name: Remarks mining — the derived events still match the rules
         run: python3 tools/ingest/remarks.py --check
 
+      # The Elvis parser, offline. The service returns everything as prose with
+      # the unit stuck on, and answers "No Data" — HTTP 200, all five fields —
+      # both for places it holds nothing and, under load, for places it does.
+      # Parsed loosely either becomes a float in a dataset, so the parsing has
+      # its own check rather than riding on a run that needs the network.
+      - name: Elvis station elevations — the parsing, including "No Data" and 0 m
+        run: python3 tools/elvis_station_elevations.py --check
+
       # The SLS extraction, on the same footing as the three above: data/
       # sls-qld.json and data/sls-locations.json are derived from a PDF in
       # archive/, and a derived file nobody re-derives quietly stops being true.
