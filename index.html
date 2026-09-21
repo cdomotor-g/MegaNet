@@ -219,6 +219,11 @@
   <script src="sls.js?v=20260921a"></script>
   <script src="map-survey.js?v=20260921a"></script>
   <script src="map-contours.js?v=20260921a"></script>
+  <!-- Beside the contours because it is the same kind of thing: a context
+       layer over the base map with no bearing on the physics. It draws which
+       DEM resolution exists where, which is the question the contours' own
+       source raises and this app could not previously answer. -->
+  <script src="map-elvis-coverage.js?v=20260921a"></script>
   <!-- Road parcels from the Queensland cadastre. Beside the survey marks and
        the contours because it is the same kind of thing — a Qld spatial
        service drawn under the pins — not because it has to be: like every

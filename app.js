@@ -2924,6 +2924,25 @@ function mapDisplayControlsHtml() {
       </select>
     </label>
     <p class="filter-note" id="map-contour-note">${MapContours.noteHtml()}</p>
+    <!-- Which DEM the nation holds here (#196). It sits under the contours
+         because it answers the question they raise: those are surveyed LiDAR
+         lines, and this says where LiDAR exists at all. -->
+    <label class="filter-check">
+      <input type="checkbox" ${state.mapElvisCov ? 'checked' : ''}
+             onchange="ElvisCoverage.setEnabled(this.checked)">
+      Elevation data coverage (Elvis)
+    </label>
+    ${state.mapElvisCov ? `
+    <label class="filter-range">
+      <span>Coverage opacity <strong id="elvis-cov-opacity-val" aria-hidden="true">${
+        Math.round(ElvisCoverage.opacity() * 100)}%</strong></span>
+      <input type="range" min="0.1" max="1" step="0.05" value="${ElvisCoverage.opacity()}"
+             aria-label="Elevation data coverage opacity"
+             aria-valuetext="${Math.round(ElvisCoverage.opacity() * 100)} per cent"
+             oninput="document.getElementById('elvis-cov-opacity-val').textContent=Math.round(this.value*100)+'%';this.setAttribute('aria-valuetext',Math.round(this.value*100)+' per cent');ElvisCoverage.setOpacity(+this.value)">
+    </label>
+    ${ElvisCoverage.rampHtml()}` : ''}
+    <p class="filter-note" id="map-elvis-cov-note">${ElvisCoverage.noteHtml()}</p>
     <!-- The highest ground in view (#184). It sits with the contours because
          it is the same question asked the other way round — those draw the
          shape of the ground, this names the top of it — and because both are
@@ -3330,6 +3349,13 @@ function mapLegendHtml() {
       <span class="legend-line legend-line-contour"></span>
       <span class="small">LiDAR contours (Qld Dept of Resources)</span>
     </span>` : ''}
+    ${ElvisCoverage.active() ? `
+    <span class="legend-item">
+      <span class="legend-sq" style="--dot:#004385"></span>
+      <span class="small">Elevation data coverage — the best DEM resolution Australia holds
+        under each place, keyed in full in 👁️ Map display. Profiles still read ~30 m terrain
+        everywhere (Elvis — Geoscience Australia / ICSM)</span>
+    </span>` : ''}
     ${MapPolar.active() ? mapPolarLegendHtml() : ''}
     ${MapPeaks.active() ? `
     <span class="legend-item">
@@ -3494,6 +3520,7 @@ function stopStationsMap() {
   MapHubs.detach();
   MapSurvey.detach();
   MapContours.detach();
+  ElvisCoverage.detach();
   MapPeaks.detach();
   MapPolar.detach();
   Places.detach();
@@ -3599,6 +3626,7 @@ function initMap() {
   MapHubs.attach(state.map);
   MapSurvey.attach(state.map);
   MapContours.attach(state.map);
+  ElvisCoverage.attach(state.map);
   MapPeaks.attach(state.map);
   // Its own on-map panel rather than a switch in the 👁️ flyout: this one is a
   // dialog, not a layer — nine fields and a Draw button — and it is the same

@@ -1926,6 +1926,14 @@ const state = {
   // SoRT's experience picked as the sane fast one.
   mapContours:        false,
   mapContourInterval: '5',
+  // Which DEM the nation holds under a place (see ElvisCoverage). Off by
+  // default and not persisted, on MapContours' own terms: it costs tile
+  // requests for a view nobody asked a question about, so "no extra requests
+  // fire with the layer off" has to stay true of a cold page load. The
+  // opacity is a preference rather than a cost, so that one is remembered.
+  mapElvisCov:        false,
+  mapElvisCovOpacity: Math.max(0.1, Math.min(1,
+                        Number(localStorage.getItem('mn-elvis-cov-op')) || 0.6)),
   // The highest ground in view (see MapPeaks). Off by default and not
   // persisted, on MapContours' terms rather than MapSurvey's: a pass costs up
   // to a hundred terrain tiles for a view nobody asked a question about, so

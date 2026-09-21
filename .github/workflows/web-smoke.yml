@@ -300,6 +300,14 @@ jobs:
         working-directory: test
         run: npm run mapctl
 
+      # The coverage overlay is metadata about the terrain, not terrain, and the
+      # one way it could mislead is by being taken for a height source. The
+      # check holds it to that: silent while off, and a note that keeps saying
+      # profiles still read ~30 m ground everywhere.
+      - name: Elvis coverage — where the good elevation data is, and no claim beyond it
+        working-directory: test
+        run: npm run elviscov
+
       # Not a check about code at all: the help panel's *content*. Smoke asserts
       # every tab has a HELP entry, which stops the rail rendering blank and
       # says nothing about what is behind the key. A doc link pointing at a file
