@@ -407,6 +407,14 @@ const PATH_VERDICT = {
 
 const PathProfile = (function () {
   const SAMPLES = 256;
+  // The second opinion (#198): how many of those 256 points get asked of Elvis.
+  // One request per point, ~2.5 s each, so 64 at six in flight is about twenty
+  // seconds — the most that can be asked of somebody waiting for an answer
+  // about one path. Six, not eight: eight is where the service starts shedding
+  // load by answering "No Data" (elvis.js's header has the measurements), and
+  // the card is not the place to find the edge of that.
+  const ELVIS_SAMPLES = 64;
+  const ELVIS_CONC    = 6;
   let cur = { sig: null, status: 'idle', prof: null, error: '',
               cover: null, coverStatus: 'idle', coverError: '' };
 
@@ -497,7 +505,11 @@ const PathProfile = (function () {
     const sig = sigOf(sh);
     if (sig === cur.sig) { rerender(); return; }
     cur = { sig, status: sh ? 'loading' : 'idle', prof: null, error: '',
-            cover: null, coverStatus: 'idle', coverError: '' };
+            cover: null, coverStatus: 'idle', coverError: '',
+            // The second opinion is never fetched with the profile — it is
+            // twenty seconds of somebody else's service for a question most
+            // paths do not raise. It is asked for, and it resets with the line.
+            elvis: null, elvisStatus: 'idle', elvisError: '' };
     rerender();
     if (!sh) return;
     const mine = sig;
@@ -510,6 +522,178 @@ const PathProfile = (function () {
       announce();
       if (res.ok) fetchCover(mine);
     });
+  }
+
+  // What the card analyses this path with. Lifted out of bodyHtml so the second
+  // opinion below analyses with exactly the same settings rather than a second
+  // copy of them: if these two ever disagreed, the comparison would be
+  // measuring the form and calling it the terrain.
+  function mainOpts(a, b) {
+    return {
+      elevA: a.elev, elevB: b.elev,
+      aglA: P().aglA != null ? P().aglA : a.agl,
+      aglB: P().aglB != null ? P().aglB : b.agl,
+      freqMhz: freqFor(a, b),
+      ...coverFor(),
+    };
+  }
+
+  // ── the second opinion (#198) ─────────────────────────────────────────────
+  //
+  // The whole profile is ~30 m terrarium ground. Over most of settled
+  // Queensland the nation holds 1 m LiDAR of the same hills, and 30 m sampling
+  // does not merely blur a ridge — it can miss one. A knife edge smoothed by
+  // ten metres moves the diffraction term and can move the verdict, which is
+  // the one number on this card somebody drives out to a site on.
+  //
+  // So: ask Elvis about 64 points along this path and analyse them the same
+  // way. Explicit, one path at a time, and never from map-los.js or
+  // map-fade.js — those sweep thousands of links, and elvis.js's header sets
+  // out why that would be both slow and rude.
+  //
+  // **Both models are analysed on the same 64 points.** Comparing a 256-sample
+  // terrarium run against a 64-sample Elvis one would fold the sampling into
+  // the answer and then blame the DEM for it. The terrarium verdict quoted
+  // here is therefore its own re-analysis at 64, which is also why it can
+  // differ from the verdict above: that is the sampling talking, and the note
+  // says so rather than leaving it as a puzzle.
+  function subProfile(prof, idx, heights) {
+    return {
+      ok: true,
+      distance_m: idx.map(i => prof.distance_m[i]),
+      terrain_m:  heights || idx.map(i => prof.terrain_m[i]),
+      lat: idx.map(i => prof.lat[i]),
+      lon: idx.map(i => prof.lon[i]),
+      totalKm: prof.totalKm,
+      resolution_m: prof.resolution_m,
+      partial: prof.partial,
+    };
+  }
+
+  // n evenly spaced indices across the profile, both ends always included.
+  function pickIdx(len, n) {
+    if (len <= n) return Array.from({ length: len }, (_, i) => i);
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(Math.round(i * (len - 1) / (n - 1)));
+    return [...new Set(out)];
+  }
+
+  // A small pool rather than Promise.all over 64: see ELVIS_CONC.
+  function askAll(pts, limit) {
+    const out = new Array(pts.length);
+    let next = 0;
+    const worker = () => {
+      const i = next++;
+      if (i >= pts.length) return Promise.resolve();
+      return Elvis.at(pts[i][0], pts[i][1])
+        .then(r => { out[i] = r && r.ok ? r : null; })
+        .then(worker);
+    };
+    return Promise.all(Array.from({ length: Math.min(limit, pts.length) }, worker))
+      .then(() => out);
+  }
+
+  function askElvis() {
+    const sh = target();
+    if (!sh || sh.pts.length !== 2 || cur.status !== 'ready' || !cur.prof) return;
+    if (cur.elvisStatus === 'loading') return;
+    if (typeof Elvis === 'undefined') {
+      cur.elvisStatus = 'failed'; cur.elvisError = 'Elvis is not loaded.'; rerender(); return;
+    }
+    const prof = cur.prof;
+    const mine = cur.sig;
+    const idx  = pickIdx(prof.distance_m.length, ELVIS_SAMPLES);
+    cur.elvisStatus = 'loading'; cur.elvisError = ''; cur.elvis = null;
+    rerender();
+
+    askAll(idx.map(i => [prof.lat[i], prof.lon[i]]), ELVIS_CONC).then(res => {
+      if (cur.sig !== mine) return;                 // the line moved on while we asked
+      const got = res.filter(Boolean).length;
+      if (got < Math.ceil(idx.length * 0.6)) {
+        cur.elvisStatus = 'failed';
+        cur.elvisError = `Only ${got} of ${idx.length} points came back — too few to compare.`;
+        rerender();
+        return;
+      }
+      // A point Elvis could not answer keeps the terrarium height rather than
+      // becoming a hole: a null in terrain_m reads downstream as missing
+      // ground, and a gap in the middle of a path reads as a clear one.
+      const heights = idx.map((i, j) => (res[j] ? res[j].height_m : prof.terrain_m[i]));
+      const a = endpoint(sh, 0), b = endpoint(sh, 1);
+      const opt = mainOpts(a, b);
+      // The cover array is per-sample of the 256 grid, so it is subsampled with
+      // everything else or it would be applied to the wrong points.
+      const cov = Array.isArray(opt.cover) ? idx.map(i => opt.cover[i]) : opt.cover;
+      const can = Array.isArray(opt.canopy) ? idx.map(i => opt.canopy[i]) : opt.canopy;
+      const o   = { ...opt, cover: cov, canopy: can };
+
+      const base = pathAnalyse(subProfile(prof, idx), o);
+      const alt  = pathAnalyse(subProfile(prof, idx, heights), o);
+      if (!base.ok || !alt.ok) {
+        cur.elvisStatus = 'failed';
+        cur.elvisError = (base.ok ? alt.error : base.error) || 'The comparison did not run.';
+        rerender();
+        return;
+      }
+      let worstD = 0, worstAt = null;
+      const finest = [];
+      idx.forEach((i, j) => {
+        if (!res[j] || prof.terrain_m[i] == null) return;
+        const d = res[j].height_m - prof.terrain_m[i];
+        if (Math.abs(d) > Math.abs(worstD)) { worstD = d; worstAt = prof.distance_m[i]; }
+        if (res[j].resolution_m != null) finest.push(res[j].resolution_m);
+      });
+      cur.elvis = {
+        idx, heights, got, asked: idx.length,
+        base, alt,
+        changed: base.verdict !== alt.verdict,
+        worstD, worstAt,
+        finest: finest.length ? Math.min(...finest) : null,
+        coarsest: finest.length ? Math.max(...finest) : null,
+      };
+      cur.elvisStatus = 'ready';
+      rerender();
+    });
+  }
+
+  function elvisHtml(an) {
+    if (cur.elvisStatus === 'idle') return '';
+    if (cur.elvisStatus === 'loading') {
+      return `<p class="filter-note">Asking Geoscience Australia about ${ELVIS_SAMPLES}
+        points along this path — about twenty seconds.</p>`;
+    }
+    if (cur.elvisStatus === 'failed') {
+      return `<p class="filter-note">${esc(cur.elvisError || 'The second opinion did not run.')}</p>`;
+    }
+    const e = cur.elvis;
+    if (!e) return '';
+    const V = k => (PATH_VERDICT[k] ? PATH_VERDICT[k].label : k);
+    const res = e.finest == null ? ''
+      : e.finest === e.coarsest
+        ? `${e.finest < 1 ? `${Math.round(e.finest * 100)} cm` : `${e.finest} m`} data`
+        : `${e.finest < 1 ? `${Math.round(e.finest * 100)} cm` : `${e.finest} m`}–${e.coarsest} m data`;
+    const headline = e.changed
+      ? `<strong>The verdict changes.</strong> On the same ${e.asked} points the ~${
+          cur.prof.resolution_m} m ground says <strong>${esc(V(e.base.verdict))}</strong> and
+         Elvis says <strong>${esc(V(e.alt.verdict))}</strong>.`
+      : `<strong>The verdict holds.</strong> Both models call this path
+         <strong>${esc(V(e.alt.verdict))}</strong> on the same ${e.asked} points.`;
+    return `
+      <div class="filter-note">
+        <p>${headline}${res ? ` Elvis answered off ${esc(res)}.` : ''}</p>
+        <p>Worst ground disagreement <strong>${e.worstD >= 0 ? '+' : ''}${e.worstD.toFixed(1)} m</strong>${
+          e.worstAt != null ? ` at ${(e.worstAt / 1000).toFixed(1)} km` : ''} — Elvis reads
+          ${e.worstD >= 0 ? 'higher' : 'lower'} there. Clearance at the worst point:
+          ${e.base.worst && e.base.worst.ratio != null ? (e.base.worst.ratio * 100).toFixed(0) : '—'}%
+          of the first Fresnel zone on tiles, ${
+          e.alt.worst && e.alt.worst.ratio != null ? (e.alt.worst.ratio * 100).toFixed(0) : '—'}% on Elvis.</p>
+        ${e.got < e.asked ? `<p>${e.asked - e.got} point${e.asked - e.got === 1 ? '' : 's'}
+          went unanswered and kept the tile height.</p>` : ''}
+        <p>Both figures above are re-analysed on those ${e.asked} points, so the difference
+          between them is the elevation model and not the sampling. The verdict at the top of
+          this card is the full ${SAMPLES}-point run and may differ from either.
+          ${esc(Elvis.attribution)}.</p>
+      </div>`;
   }
 
   // The cover classes to analyse with, or null; and whether that is because
@@ -1168,13 +1352,7 @@ const PathProfile = (function () {
         ${an.ok ? chartSvg(an, prof, true) : `<p class="filter-note">${esc(an.error)}</p>`}`;
     }
 
-    const an = pathAnalyse(prof, {
-      elevA: a.elev, elevB: b.elev,
-      aglA: P().aglA != null ? P().aglA : a.agl,
-      aglB: P().aglB != null ? P().aglB : b.agl,
-      freqMhz: freqFor(a, b),
-      ...coverFor(),
-    });
+    const an = pathAnalyse(prof, mainOpts(a, b));
     if (!an.ok) return `<p class="filter-note">${esc(an.error)}</p>`;
 
     const datum = (a.elev != null || b.elev != null) ? `
@@ -1191,8 +1369,15 @@ const PathProfile = (function () {
       ${chartSvg(an, prof)}
       ${endsFormHtml(a, b, an)}
       ${datum}
+      ${elvisHtml(an)}
       <div class="path-actions">
         <button onclick="LinkBudget.fromProfile()">Link budget for this path →</button>
+        <button onclick="PathProfile.askElvis()"
+                ${cur.elvisStatus === 'loading' ? 'disabled' : ''}
+                title="Re-sample this path against the best elevation model Geoscience Australia holds — 1 m LiDAR over most of settled Queensland. One path at a time; about twenty seconds.">${
+          cur.elvisStatus === 'loading' ? 'Asking Elvis…'
+          : cur.elvisStatus === 'ready' ? 'Check again with Elvis'
+          : 'Check this path against 1 m data'}</button>
       </div>`;
   }
 
@@ -1282,6 +1467,10 @@ const PathProfile = (function () {
       announce();
     },
     refresh() { cur.sig = null; sync(); },
+
+    // The second opinion, asked for rather than fetched with the profile.
+    askElvis,
+    elvisState() { return { status: cur.elvisStatus, error: cur.elvisError, res: cur.elvis }; },
     // The cover layer's state, for anything that wants to say what it saw.
     coverState() { return { status: cur.coverStatus, error: cur.coverError, res: cur.cover }; },
     // What the link budget quotes for its terrain and cover lines: the analysis
