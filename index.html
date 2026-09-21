@@ -246,6 +246,11 @@
        Stations map that one station at a time is in. -->
   <script src="map-move-pin.js?v=20260921a"></script>
   <script src="terrain.js?v=20260921a"></script>
+  <!-- Beside terrain.js and emphatically not a replacement for it: one point
+       per request, no batch, ~2.5 s a call. It answers about a place a person
+       clicked, in AHD and naming the dataset — which is the one thing the
+       tiles cannot do. The sweeps never reach it; its own header says why. -->
+  <script src="elvis.js?v=20260921a"></script>
   <script src="itm.js?v=20260921a"></script>
   <script src="land-cover.js?v=20260921a"></script>
   <!-- The highest ground in the current view, found in the terrain rather than

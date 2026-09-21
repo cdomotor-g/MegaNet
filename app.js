@@ -5019,6 +5019,38 @@ function goToStation(id) {
 // is focused now, and is passed in by the one caller for which "now" is too
 // late — selectStation, which has re-rendered the table (and so destroyed the
 // row that was pressed) before it gets here.
+// The ground height under a station that has no surveyed one (#197), off the
+// best model Geoscience Australia holds there. Kept out of elvis.js, which
+// reaches no DOM, and written here on SLS.ask's terms: `data-mn-elvis` carries
+// the point the placeholder was rendered for and is checked before writing, so
+// an answer to the old question cannot land in a card that re-rendered for a
+// different station while the request was in flight.
+//
+// It says "modelled", never plain metres. A surveyed mark and a model of the
+// ground are different claims and the card must not let them read alike.
+function elvisCardAsk(elId, s) {
+  if (!s || s.elevation_ahd != null || s.lat == null || s.lon == null) return;
+  if (typeof Elvis === 'undefined') return;
+  const want = `${s.lat},${s.lon}`;
+  const put = (html, title) => {
+    const el = document.getElementById(elId);
+    if (!el || el.dataset.mnElvis !== want) return;
+    el.innerHTML = html;
+    if (title) el.setAttribute('title', title);
+  };
+  put('<span class="txt-muted small">asking Elvis…</span>', '');
+  Elvis.at(s.lat, s.lon).then(r => {
+    if (!r || !r.ok) { put('<span class="txt-muted small">not surveyed</span>', ''); return; }
+    const res = r.resolution ? ` <span class="mn-pop-note">${esc(r.resolution)}</span>` : '';
+    const title = ['Not surveyed — modelled from the best elevation data Geoscience Australia '
+      + 'holds at this point, in AHD.',
+      r.source ? `Source: ${r.source}.` : '',
+      r.dataset ? `Dataset: ${r.dataset}.` : '',
+      'A model of the ground, not a mark on it.'].filter(Boolean).join(' ');
+    put(`${esc(r.height_m.toFixed(1))} m AHD <span class="mn-pop-note">modelled</span>${res}`, title);
+  }, () => put('<span class="txt-muted small">not surveyed</span>', ''));
+}
+
 function showStationCard(id, { takeFocus = false, opener = document.activeElement } = {}) {
   const s = state.data && state.data.stations.find(x => x.id === id);
   if (!s) return;
@@ -5079,6 +5111,7 @@ function repaintStnCard() {
   // card that asks pays for the 720 KB, every one after is free, and a station
   // the document does not carry fills with nothing.
   SLS.ask(`mn-sls-card-${s.id}`, s);
+  elvisCardAsk(`mn-elvis-card-${s.id}`, s);
 }
 
 // Escape closes the card from anywhere inside it. On the card rather than on
@@ -5184,6 +5217,7 @@ function stnCardHtml(s) {
   const located  = s.lat != null && s.lon != null;
   const wind     = located ? MapWind.regionState(s.lat, s.lon) : null;
   const windId   = `mn-wind-card-${s.id}`;
+  const elvisId  = `mn-elvis-card-${s.id}`;
   const sls      = SLS.state(s);
   const slsId    = `mn-sls-card-${s.id}`;
   const nets     = (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean).join(', ');
@@ -5205,6 +5239,19 @@ function stnCardHtml(s) {
       ${acmaCardRow('Networks', nets ? esc(nets) : null)}
       ${acmaCardRow('Position', located ? esc(stationLatLonText(s)) : null)}
       ${acmaCardRow('Elevation', s.elevation_ahd != null ? `${esc(s.elevation_ahd)} m AHD` : null)}
+      <!-- Only where there is no surveyed figure, which is 2,334 of the 3,174
+           (#197). Where there *is* one it stands: a surveyed mark and a model
+           of the ground are answers to different questions, and the places
+           they disagree most are the incised creek sites where the coordinate
+           is the gauge in the channel and the mark is the hut on the bank.
+           Sorting that out is an audit over the whole file, not a second
+           number on a card — and it keeps this to one request for the
+           stations that have nothing, rather than one per card opened.
+           Filled after the fetch by elvisCardAsk, the way SLS.ask fills its
+           section and the wind line fills its span. -->
+      ${s.elevation_ahd == null && located ? `<div class="acma-row"><span>Elevation</span><span
+          id="${escAttr(elvisId)}" data-mn-elvis="${escAttr(`${s.lat},${s.lon}`)}"
+          >&nbsp;</span></div>` : ''}
       ${passing != null ? acmaCardRow('Passing', String(passing)) : ''}
       ${isRpt && s.repeater && s.repeater.delay_ms != null
         ? acmaCardRow('Repeater delay', `${esc(s.repeater.delay_ms)} ms`) : ''}

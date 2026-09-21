@@ -42,6 +42,7 @@
     "map-locate.js",
     "map-move-pin.js",
     "terrain.js",
+    "elvis.js",
     "itm.js",
     "land-cover.js",
     "map-peaks.js",
@@ -64,6 +65,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 681,
-  "distinct": 681
+  "total": 683,
+  "distinct": 683
 }

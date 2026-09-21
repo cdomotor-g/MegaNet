@@ -35,6 +35,19 @@
 //     geoid — not AHD, and not a survey. The station card's own elevation row
 //     is a *surveyed* figure and these two must never be read as the same
 //     number, so this one names its datum every time.
+//   * **Ground height (Elvis)** is the second answer to the same question, off
+//     the best model Geoscience Australia holds at that point (#197) — which
+//     is 1 m LiDAR over most of settled Queensland and the same ~30 m SRTM
+//     elsewhere. It is in **AHD**, so unlike the row above it is comparable
+//     with a station's surveyed elevation, and it names the resolution because
+//     the two are not interchangeable.
+//
+//     The two rows are kept apart on purpose. Where they disagree that is
+//     information rather than noise: over an incised creek a 1 m surface finds
+//     the channel floor that a 30 m one smooths away, and a single averaged
+//     number would throw exactly that away. It is also one request per pick
+//     against an undocumented service, so it fails on its own without taking
+//     the card with it.
 //   * **The nearest survey mark** is the nearest mark the survey layer has
 //     actually drawn. That layer fetches a viewport at a time past its own
 //     minimum zoom, so with it off, or zoomed out, there is no answer — and the
@@ -86,12 +99,24 @@ const MapHere = (function () {
 
   function ask(lat, lon) {
     const mine = ++gen;
-    facts = { elev: 'loading', cover: 'loading', basin: 'loading', hub: 'loading' };
+    facts = { elev: 'loading', elvis: 'loading', cover: 'loading', basin: 'loading', hub: 'loading' };
     const keep = fn => (...a) => { if (mine === gen) fn(...a); };
 
     Terrain.sample(lat, lon)
       .then(keep(m => { facts.elev = m == null ? null : m; render(); }),
             keep(() => { facts.elev = null; render(); }));
+
+    // The same ground, asked of the nation's own model (#197). This is the row
+    // that can say AHD — the datum every other height in this app is in, and
+    // the one the terrain tile above is not — and can say whether the answer
+    // came off 1 m LiDAR or the same ~30 m SRTM the tile did.
+    //
+    // One request, for one point, because a person clicked it. It resolves
+    // either way and its own module holds a negative cache, so a network that
+    // denies the host costs one slow call a minute rather than one per pick.
+    Elvis.at(lat, lon)
+      .then(keep(r => { facts.elvis = r && r.ok ? r : (r || null); render(); }),
+            keep(() => { facts.elvis = null; render(); }));
 
     // Two samples twenty metres apart, because the cover service answers about
     // a path. The first is the point; the second is only there to make it one.
@@ -170,6 +195,35 @@ const MapHere = (function () {
       >${esc(Math.round(facts.elev))} m <span class="mn-pop-note">EGM96</span></span></div>`;
   }
 
+  // The same question asked of Elvis, kept as its own row rather than folded
+  // into the one above. Two models disagreeing about the ground is information
+  // — over an incised creek a 1 m surface finds the channel floor a 30 m one
+  // smooths away — and collapsing them to a single number would throw exactly
+  // that away. The datum is on both rows for the same reason the row above
+  // carries EGM96: these are not the same figure and must not read as one.
+  function elvisRow() {
+    if (facts.elvis === 'loading') {
+      return acmaCardRow('Ground height (Elvis)', 'asking Geoscience Australia…');
+    }
+    if (!facts.elvis) {
+      return acmaCardRow('Ground height (Elvis)', 'unavailable — offline, or the service refused');
+    }
+    if (!facts.elvis.ok) {
+      return acmaCardRow('Ground height (Elvis)', esc(facts.elvis.error || 'no answer'));
+    }
+    const e = facts.elvis;
+    const res = e.resolution ? ` <span class="mn-pop-note">${esc(e.resolution)}</span>` : '';
+    const title = [
+      'Elvis — Geoscience Australia / ICSM. Australian Height Datum.',
+      e.source  ? `Source: ${e.source}.` : '',
+      e.dataset ? `Dataset: ${e.dataset}.` : '',
+      'The best model the nation holds here, which is not the ~30 m tile the row above reads.',
+    ].filter(Boolean).join(' ');
+    return `<div class="acma-row"><span>Ground height (Elvis)</span><span
+      title="${esc(title)}"
+      >${esc(e.height_m.toFixed(1))} m <span class="mn-pop-note">AHD</span>${res}</span></div>`;
+  }
+
   function coverRow() {
     if (facts.cover === 'loading') return acmaCardRow('Land cover', 'looking it up…');
     if (!facts.cover) return acmaCardRow('Land cover', 'unavailable — offline, or the service refused');
@@ -238,6 +292,7 @@ const MapHere = (function () {
       </div>
       <div class="acma-sect">
         ${elevRow()}
+        ${elvisRow()}
         ${coverRow()}
         <div class="acma-row"><span>Wind region</span><span><span id="${windId}"
             data-mn-wind="${escAttr(`${lat},${lon}`)}"
