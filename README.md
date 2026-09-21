@@ -856,6 +856,30 @@ cuts both ways — a station you cannot see from a given vantage has no line of
 sight from it, which is exactly the question this view is for, but a station you
 are hunting for may be over the next ridge rather than missing.
 
+**Two Map display layers used to stop applying when the map was tilted, and
+both work now (#194).** The **elevation ramp** is draped on the terrain as a
+raster layer, served by a custom MapLibre protocol that fetches the same
+terrarium tile from the same URL and hands it to `MapElevation`'s *own* painter
+— so the bands, the hillshade and the relief switch are that file's, and there
+is no second copy of them here. It sits between the base map and the links,
+which is where its pane sits in 2-D, and the opacity slider and the relief
+toggle both reach it. Before this it simply vanished when you tilted, which is
+the hardest kind of absence to notice on this view: the 3-D map already shows
+relief through shading, so the hills were still there and only the meaning of
+the colour had gone.
+
+**What is here** was the other failure and the worse one. The pick ran off the
+2-D map's click, whose `latlng` is where that pixel sits on the *Leaflet* map,
+while the camera looking at the terrain has its own centre, zoom, pitch and
+bearing. On a 62°-pitched view, a third of the way down the frame, the two
+answers were **12.6 km apart** — and the card reported a ground height, a land
+cover class, a drainage basin and a nearest station for ground nobody had
+clicked on. Near the middle of the frame the gap is ~150 m, which is how it went
+unnoticed. The pick now takes the coordinate the renderer computed, the Leaflet
+click is stopped so it cannot arrive with the other number, and the point is
+marked on the terrain in the same cyan ring the 2-D marker uses — a card that
+answers about a point you cannot see on the map is half an answer.
+
 **Pins are clickable here too (#193).** A pin in 3-D does what a pin in 2-D
 does, less the callout this mode has no way to draw: an armed link-budget
 picker takes the click, a repeater takes the focus dim, and the station card

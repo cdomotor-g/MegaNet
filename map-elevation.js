@@ -259,7 +259,15 @@ const MapElevation = (function () {
 
   let map = null, overlay = null;
 
+  // The 3-D view drapes the same tiles over its terrain, so every switch that
+  // changes what this layer draws has to reach it too. A no-op unless 3-D is
+  // actually open — the same shape as addBaseLayers' call to Map3D.baseChanged.
+  function syncThreeD() {
+    if (typeof Map3D !== 'undefined' && Map3D.elevationChanged) Map3D.elevationChanged();
+  }
+
   function sync() {
+    syncThreeD();
     if (!map) return;
     if (state.mapElev) {
       if (!overlay) {
@@ -274,9 +282,37 @@ const MapElevation = (function () {
     }
   }
 
+  // ── The same pixels, somewhere Leaflet is not (#194) ───────────────────────
+  // The 3-D view drapes this colouring over its terrain, and it must be *this*
+  // colouring rather than a second one that agrees today. The ramp, the band
+  // edges, the hillshade and its re-centring are the argument this file makes
+  // about what the ground looks like; a copy of them in map-3d.js is a second
+  // argument, and the first time the two differ the map is wrong in one of its
+  // two modes with nothing on screen to say which.
+  //
+  // So what is exported is the painter itself. map-3d.js fetches the same tile
+  // from the same URL, hands the decoded image here, and gets back the canvas
+  // `createTile` would have put on the 2-D map — including whatever the relief
+  // switch currently says, because `paint` reads it.
+  function paintedTile(img, z, ty) {
+    const c = document.createElement('canvas');
+    c.width = c.height = TILE_PX;
+    paint(c, img, z, ty);
+    return c;
+  }
+
   return {
     RAMP,
     attribution: ATTRIB,
+
+    // What a consumer outside Leaflet needs to fetch and paint a tile itself:
+    // the source, its native ceiling, and the painter. See paintedTile above.
+    TILE_PX,
+    MAX_NATIVE,
+    tileUrl(z, x, y) {
+      return TILE_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+    },
+    paintedTile,
 
     // The name it answers to. Kept as an export because the Map Generator reads
     // it to say which base maps it does *not* offer.
@@ -313,6 +349,7 @@ const MapElevation = (function () {
       state.mapElevOpacity = n;
       try { localStorage.setItem('mn-map-elev-opacity', String(n)); } catch (_) {}
       if (overlay) overlay.setOpacity(n);
+      syncThreeD();
     },
 
     opacity() { return state.mapElevOpacity; },
@@ -325,7 +362,9 @@ const MapElevation = (function () {
       return `Painted at <strong>${Math.round(state.mapElevOpacity * 100)}%</strong> over the base
               map. Heights are above the EGM96 geoid, ~30 m sampling; the bands are the Radio
               Mobile colour file's own. On Satellite and Dark the place names draw over the top
-              of it — on OSM-Topo they are in the tiles, so the slider is what brings them back.`;
+              of it — on OSM-Topo they are in the tiles, so the slider is what brings them back.
+              In the ⛰️ 3-D view the same ramp is draped on the terrain, slider and relief switch
+              and all.`;
     },
 
     // The hex a height is painted, for anything that wants to agree with this
@@ -341,6 +380,10 @@ const MapElevation = (function () {
       try { localStorage.setItem('mn-elev-relief', relief ? 'on' : 'off'); }
       catch (_) { /* private browsing — the setting still holds this session */ }
       for (const l of live) l.redraw();
+      // The 3-D drape is painted through the same function, so its tiles are
+      // stale in exactly the same way — and MapLibre will not refetch a URL it
+      // already holds, so that side reloads the source rather than redrawing.
+      syncThreeD();
     },
 
     // The ramp as a legend strip, drawn highest band first the way a legend is

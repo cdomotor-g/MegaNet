@@ -772,7 +772,234 @@ if (pin) {
   await page.evaluate(() => { state.mapFocusRepeaterId = null; closeStnCard(false); });
 }
 
-// ── 8. leaving the tab takes the GL context with it ─────────────────────────
+// ── 8. the elevation drape, and the What is here bridge (#194) ──────────────
+// Two layers of the 2-D map that were simply absent when it was tilted, and
+// they failed in opposite ways. The elevation ramp went *quiet*: the switch
+// stayed on, the slider stayed where it was, and the colours were gone — which
+// is the hardest kind to notice here, because the 3-D view shows relief through
+// shading anyway, so the hills are still there and only their meaning has
+// left. **What is here** did the other thing and answered confidently about the
+// wrong ground: the pick ran off the 2-D map's click, whose `latlng` is that
+// pixel's place on the *Leaflet* map, while the camera looking at it has its
+// own centre, zoom, pitch and bearing.
+console.log('\nThe elevation ramp is draped on the terrain, and What is here picks the right ground');
+
+const elevLook = () => page.evaluate(() => {
+  const m = Map3D._map();
+  const st = m.getStyle();
+  return {
+    order:   st.layers.map(l => l.id),
+    layer:   !!m.getLayer('mn-elev'),
+    tiles:   st.sources['mn-elev'] ? st.sources['mn-elev'].tiles : null,
+    attrib:  st.sources['mn-elev'] ? st.sources['mn-elev'].attribution : null,
+    opacity: m.getLayer('mn-elev') ? m.getPaintProperty('mn-elev', 'raster-opacity') : null,
+    on: MapElevation.active(), slider: state.mapElevOpacity, relief: MapElevation.relief(),
+  };
+});
+
+// The camera is parked for the rest of this section, so nothing but the drape
+// can change what the renderer is asked to draw.
+await page.evaluate(() => {
+  const m = state.mapMarkers[0].getLatLng();
+  Map3D._map().jumpTo({ center: [m.lng, m.lat], zoom: 11, pitch: 60, bearing: 0 });
+});
+await page.waitForTimeout(1500);
+
+// **How this asks whether the drape actually draws, and why not by looking.**
+// The first version of this section screenshotted the canvas with the overlay
+// off and again with it on and required the two to differ. It passed with the
+// drape pinned to zero opacity — a deliberate break it should have caught —
+// because a terrain tile arriving between the two shots changes the pixels
+// whatever the drape did. Waiting for two identical frames first narrowed it
+// and did not close it.
+//
+// So it counts instead. `MapElevation.paintedTile` is the one function that
+// turns a terrarium tile into ramp colours, and map-3d.js's protocol is the
+// only thing in this mode that calls it. Wrapping it and requiring the count to
+// rise is a fact about what ran rather than a guess about what appeared — and
+// it asserts the property that matters, which is that the drape's pixels come
+// out of MapElevation rather than out of a second implementation here.
+await page.evaluate(() => {
+  const real = MapElevation.paintedTile;
+  window.__paints = 0;
+  MapElevation.paintedTile = function (...a) { window.__paints++; return real.apply(this, a); };
+});
+
+const flat = await elevLook();
+ok('with the overlay off there is no drape on the terrain',
+   flat.layer === false && flat.tiles === null, JSON.stringify(flat));
+ok('nothing has painted a ramp tile while the overlay is off',
+   await page.evaluate(() => window.__paints) === 0);
+
+await page.evaluate(() => { MapElevation.setRelief(true); MapElevation.setOpacity(1); MapElevation.setEnabled(true); });
+await page.waitForFunction(() => {
+  const m = Map3D._map();
+  return !!m.getLayer('mn-elev') && m.isSourceLoaded('mn-elev');
+}, null, { timeout: GL_TIMEOUT }).catch(() => {});
+await page.waitForTimeout(1200);
+const on = await elevLook();
+
+ok('turning it on adds a raster layer served by the elevation protocol',
+   on.layer === true && Array.isArray(on.tiles) && /^mn-elev:\/\//.test(on.tiles[0]),
+   JSON.stringify(on));
+// The order is the assertion, not the presence: the ramp is painted *over* the
+// base map it qualifies and *under* everything the network draws on it, which
+// is the same place its pane occupies in 2-D (245, between the base tiles and
+// the overlays).
+ok('…between the base map and the links, as it is in 2-D',
+   on.order.indexOf('mn-elev') > on.order.indexOf('mn-base')
+   && on.order.indexOf('mn-elev') < on.order.indexOf('mn-links'),
+   JSON.stringify(on.order));
+ok('…carrying the source’s own credit', typeof on.attrib === 'string' && /Terrain/i.test(on.attrib),
+   String(on.attrib));
+// And that it actually draws: the camera has not moved, nothing else changed,
+// so a canvas identical to the one before it would mean a layer that exists and
+// paints nothing — which every assertion above would happily pass.
+const paints = await page.evaluate(() => window.__paints);
+ok('…and it really fetched and painted tiles, through MapElevation’s own painter',
+   paints > 0, `${paints} tiles painted`);
+
+// The painter is MapElevation's, which is the property that stops the two modes
+// disagreeing about what a height looks like. With relief off a pixel is the
+// band colour and nothing else, so it can be held against the ramp directly.
+const paint = await page.evaluate(async () => {
+  MapElevation.setRelief(false);
+  const z = 10, x = 920, y = 590;
+  const img = await new Promise((res, rej) => {
+    const i = new Image(); i.crossOrigin = 'anonymous';
+    i.onload = () => res(i); i.onerror = () => rej(new Error('tile unavailable'));
+    i.src = MapElevation.tileUrl(z, x, y);
+  });
+  const canvas = MapElevation.paintedTile(img, z, y);
+  const cx = canvas.getContext('2d', { willReadFrequently: true });
+  const raw = document.createElement('canvas');
+  raw.width = raw.height = MapElevation.TILE_PX;
+  raw.getContext('2d').drawImage(img, 0, 0);
+  const out = [];
+  for (const [px, py] of [[40, 40], [128, 128], [200, 90]]) {
+    const t = raw.getContext('2d').getImageData(px, py, 1, 1).data;
+    const height = t[0] * 256 + t[1] + t[2] / 256 - 32768;
+    const p = cx.getImageData(px, py, 1, 1).data;
+    const hex = '#' + [p[0], p[1], p[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+    out.push({ height: Math.round(height), painted: hex.toUpperCase(),
+               ramp: MapElevation.colourAt(height).toUpperCase() });
+  }
+  return out;
+});
+ok('the drape is painted by MapElevation’s own ramp, not a copy of it',
+   paint.length === 3 && paint.every(p => p.painted === p.ramp), JSON.stringify(paint));
+
+await page.evaluate(() => MapElevation.setOpacity(0.35));
+await page.waitForTimeout(250);
+ok('the opacity slider reaches the drape',
+   (await elevLook()).opacity === 0.35, JSON.stringify(await elevLook()));
+
+// The relief switch changes the pixels behind the same z/x/y, and MapLibre will
+// not refetch a URL it already holds — so the template has to move with it or
+// the toggle shows yesterday's tiles.
+const r1 = (await elevLook()).tiles[0];
+await page.evaluate(() => MapElevation.setRelief(true));
+await page.waitForTimeout(400);
+const r2 = (await elevLook()).tiles[0];
+ok('toggling relief changes the tile template, so the drape repaints',
+   r1 !== r2, JSON.stringify([r1, r2]));
+
+await page.evaluate(() => MapElevation.setEnabled(false));
+await page.waitForTimeout(400);
+const off = await elevLook();
+ok('turning it off takes the layer and its source away',
+   off.layer === false && off.tiles === null, JSON.stringify(off));
+
+// ── What is here, picking off the camera that is actually looking ───────────
+await page.evaluate(() => { MapHere.close(); MapHere.arm(true); });
+const bridge = await page.evaluate(() => {
+  const m = Map3D._map();
+  const r = m.getCanvas().getBoundingClientRect();
+  // Well off centre and high in a pitched view, where the two projections have
+  // no reason to agree — near the middle of a tilted map they nearly do, which
+  // is how this went unnoticed.
+  const p = { x: Math.round(r.width * 0.32), y: Math.round(r.height * 0.34) };
+  const gl = m.unproject([p.x, p.y]);
+  const c  = document.getElementById('leaflet-map').getBoundingClientRect();
+  const lf = state.map.containerPointToLatLng([r.left + p.x - c.left, r.top + p.y - c.top]);
+  return { cx: Math.round(r.left + p.x), cy: Math.round(r.top + p.y),
+           gl: [gl.lat, gl.lng], lf: [lf.lat, lf.lng] };
+});
+// Degrees are enough: the two answers are kilometres apart here, and the check
+// is which one the card got rather than how far apart they are.
+const apart = Math.abs(bridge.gl[0] - bridge.lf[0]) + Math.abs(bridge.gl[1] - bridge.lf[1]);
+ok('the two projections of that pixel really do disagree', apart > 0.01,
+   JSON.stringify(bridge));
+
+await page.mouse.click(bridge.cx, bridge.cy);
+await page.waitForTimeout(700);
+const picked = await page.evaluate(() => {
+  const m = Map3D._map();
+  const src = m.getStyle().sources['mn-here'];
+  const f = src && src.data && src.data.features[0];
+  return { at: MapHere.point(), armed: MapHere.armed(),
+           mark: f ? [f.geometry.coordinates[1], f.geometry.coordinates[0]] : null,
+           card: (() => { const el = document.getElementById('here-card');
+             if (!el || !el.getClientRects().length) return null;
+             const r = el.getBoundingClientRect();
+             const t = document.elementFromPoint(r.left + 14, r.top + 14);
+             return { shown: true, mine: !!(t && (t === el || el.contains(t))) }; })() };
+});
+// `near` above compares two scalars; this one compares two [lat, lon] pairs.
+const samePoint = (a, b) => !!a && !!b && near(a[0], b[0], 1e-4) && near(a[1], b[1], 1e-4);
+ok('the pick takes the renderer’s coordinate, not the 2-D map’s',
+   samePoint(picked.at, bridge.gl) && !samePoint(picked.at, bridge.lf), JSON.stringify(picked.at));
+ok('…and the point is marked on the terrain it was picked on',
+   samePoint(picked.mark, bridge.gl), JSON.stringify(picked.mark));
+ok('…and the card that answers is on screen and readable',
+   picked.card && picked.card.mine === true, JSON.stringify(picked.card));
+ok('…and the pick disarms itself, as it does in 2-D', picked.armed === false);
+
+// 2-D's precedence, which Leaflet enforces with fakeStop and this file has to
+// write out: a click that lands on a pin is a pin click, and an armed pick does
+// not also take it.
+await page.evaluate(() => { MapHere.close(); MapHere.arm(true); closeStnCard(false); });
+//
+// The pin is found by *asking where the hit test answers*, not by projecting a
+// coordinate and trusting it. `project()` is the flat position of a point, and
+// these pins stand on terrain: near the middle of the view the two agree
+// closely, and high in a pitched frame they do not. A check that clicks at
+// `project()` and happens to miss reports a precedence failure that is really
+// a mis-aimed click.
+const onPin = await page.evaluate(() => {
+  const m = Map3D._map();
+  const r = m.getCanvas().getBoundingClientRect();
+  const mid = { x: r.width / 2, y: r.height / 2 };
+  const seen = m.queryRenderedFeatures({ layers: ['mn-stations'] });
+  const byDistance = seen
+    .map(f => ({ f, p: m.project(f.geometry.coordinates) }))
+    .sort((a, b) => Math.hypot(a.p.x - mid.x, a.p.y - mid.y)
+                  - Math.hypot(b.p.x - mid.x, b.p.y - mid.y));
+  for (const { p } of byDistance.slice(0, 40)) {
+    const hit = m.queryRenderedFeatures([p.x, p.y], { layers: ['mn-stations'] })[0];
+    if (hit) {
+      return { x: Math.round(r.left + p.x), y: Math.round(r.top + p.y),
+               id: hit.properties.id };
+    }
+  }
+  return null;
+});
+ok('there is a pin on screen the hit test agrees about', !!onPin);
+if (onPin) {
+  await page.mouse.click(onPin.x, onPin.y);
+  await page.waitForTimeout(500);
+  const after2 = await page.evaluate(() => ({ card: state.stnCard.id, here: MapHere.point(),
+                                              armed: MapHere.armed() }));
+  // The card is the station's and no point was picked. The pick also *disarms*,
+  // which is not this file's doing and is the same in 2-D: showStationCard()
+  // calls MapHere.close() because the four cards share one rectangle, so the
+  // tool that was armed for a point is put away by the card that replaced it.
+  ok('a pin clicked while the pick is armed is a pin click, not a pick',
+     after2.card === onPin.id && after2.here === null, JSON.stringify(after2));
+}
+await page.evaluate(() => { MapHere.close(); closeStnCard(false); });
+
+// ── 9. leaving the tab takes the GL context with it ─────────────────────────
 console.log('\nLeaving the tab takes the WebGL context with it');
 
 await page.evaluate(() => switchTab('export'));

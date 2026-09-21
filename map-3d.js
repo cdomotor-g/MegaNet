@@ -97,6 +97,27 @@ const Map3D = (function () {
   // first press and returns *here* on the second (see resetTilt).
   const PITCH_HOME = 62;
 
+  // ── The elevation drape (#194) ──────────────────────────────────────────
+  // `MapElevation` paints ground height into a colour ramp on the 2-D map, and
+  // until this it simply vanished when the map was tilted: it is a Leaflet tile
+  // layer, and every Leaflet pane is under the canvas in this mode. Which is
+  // the one layer whose absence is *least* obvious here, because the 3-D view
+  // already shows relief through shading — the hills are still there, just no
+  // longer coloured by height, and nothing says the switch stopped applying.
+  //
+  // It is drawn here as a raster source served by a custom MapLibre protocol.
+  // The protocol fetches the same terrarium tile from the same URL and hands it
+  // to **MapElevation's own painter**, so the bands, the hillshade and the
+  // relief switch are that file's and there is no second copy of them here.
+  // That is this module's standing rule (see the header) applied to a raster
+  // instead of to a line: the first thing that computes its own answer is the
+  // first place the two modes can disagree.
+  //
+  // `?r=` is in the tile template rather than being ignored: MapLibre caches by
+  // URL and the relief switch changes the pixels behind the same z/x/y, so the
+  // token is what makes a toggle repaint instead of showing yesterday's tiles.
+  const ELEV_PROTO = 'mn-elev';
+
   const SHEET_SAMPLES = 48;   // per hop. MapLos uses 64 for a yes/no verdict;
                               // a sheet is a picture and reads the same at 48,
                               // at three quarters of the tiles
@@ -111,6 +132,8 @@ const Map3D = (function () {
   let host     = null;   // the div it draws into
   let ready    = false;  // style loaded — nothing may be added before this
   let demFails = 0;      // DEM tiles the renderer could not fetch
+  let elevReg  = false;  // the elevation protocol, registered once per page
+  let elevKey  = null;   // the tile template the drape is currently built on
   let sheets   = { rows: [], pick: [], queue: [], running: 0, gen: 0,
                    done: 0, failed: 0, dropped: 0, inView: 0 };
   let buf      = null;   // { pos, clr, count } — the sheet geometry, in mercator
@@ -164,6 +187,59 @@ const Map3D = (function () {
   }
 
   // ── loading the library ──────────────────────────────────────────────────
+  // The tile template the drape is built from, carrying whatever the relief
+  // switch currently says. Null when the overlay is off.
+  function elevTiles() {
+    if (typeof MapElevation === 'undefined' || !MapElevation.active()) return null;
+    return `${ELEV_PROTO}://{z}/{x}/{y}?r=${MapElevation.relief() ? 1 : 0}`;
+  }
+
+  // One <img>, decoded, or a rejection. `crossOrigin` because the pixels are
+  // read back out of a canvas straight after — without it the canvas is
+  // tainted and `getImageData` throws, which is the same reason
+  // MapElevation's own createTile sets it.
+  function loadImage(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload  = () => resolve(img);
+      img.onerror = () => reject(new Error('elevation tile unavailable'));
+      img.src = url;
+    });
+  }
+
+  // The painted canvas as PNG bytes, which is what a custom protocol hands
+  // back for a raster tile.
+  function canvasBytes(canvas) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(b => (b ? resolve(b.arrayBuffer())
+                            : reject(new Error('elevation tile could not be encoded'))),
+                    'image/png');
+    });
+  }
+
+  // Registered against the library rather than against a map: protocols are
+  // global to MapLibre, this one is idempotent, and a map that is torn down and
+  // rebuilt (every render of the Stations tab) must not re-register it.
+  //
+  // A tile that cannot be had throws, which MapLibre reports as a source error
+  // and draws as nothing. That is deliberately *not* counted and said out loud
+  // the way a missing DEM tile is, and the difference is the point: flat ground
+  // where a hill should be reads as a clear path and is the one wrong answer
+  // worth a warning, while a gap in this drape shows the base map through it
+  // and is visibly a gap.
+  function registerElevProtocol() {
+    if (elevReg || !ml || typeof ml.addProtocol !== 'function') return;
+    elevReg = true;
+    ml.addProtocol(ELEV_PROTO, async (params) => {
+      const m = /:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url || '');
+      if (!m) throw new Error('bad elevation tile url');
+      const z = +m[1], x = +m[2], y = +m[3];
+      const img = await loadImage(MapElevation.tileUrl(z, x, y));
+      return { data: await canvasBytes(MapElevation.paintedTile(img, z, y)) };
+    });
+  }
+
   function loadLib() {
     if (ml) return Promise.resolve(ml);
     if (libP) return libP;
@@ -179,8 +255,11 @@ const Map3D = (function () {
       s.src = LIB_JS;
       s.async = true;
       s.onload = () => {
-        if (window.maplibregl) { ml = window.maplibregl; resolve(ml); }
-        else reject(new Error('the 3-D renderer loaded but defined nothing'));
+        if (window.maplibregl) {
+          ml = window.maplibregl;
+          registerElevProtocol();
+          resolve(ml);
+        } else reject(new Error('the 3-D renderer loaded but defined nothing'));
       };
       s.onerror = () => reject(new Error('the 3-D renderer could not be fetched'));
       document.head.appendChild(s);
@@ -255,6 +334,18 @@ const Map3D = (function () {
   // pulled in), and the opacities are the focus dim. Circles rather than
   // MapLibre Markers on purpose — a Marker is a DOM node each, and this map
   // draws ~3,174 of them.
+  // The What is here pick, as nothing or as one point. Read off MapHere rather
+  // than kept here: the pick belongs to that tool and this view is showing it,
+  // which is the same relationship the pins and links have with the 2-D map.
+  function hereFeature() {
+    const p = (typeof MapHere !== 'undefined' && MapHere.point) ? MapHere.point() : null;
+    return {
+      type: 'FeatureCollection',
+      features: p ? [{ type: 'Feature', properties: {},
+                       geometry: { type: 'Point', coordinates: [p[1], p[0]] } }] : [],
+    };
+  }
+
   function stationFeatures() {
     const out = [];
     for (const m of (state.mapMarkers || [])) {
@@ -617,9 +708,14 @@ const Map3D = (function () {
                      attribution: Terrain.attribution },
         'mn-links':    { type: 'geojson', data: linkFeatures() },
         'mn-stations': { type: 'geojson', data: stationFeatures() },
+        'mn-here':     { type: 'geojson', data: hereFeature() },
       },
       layers: [
         { id: 'mn-base', type: 'raster', source: 'mn-base' },
+        // The elevation drape goes between the base and the links, and is added
+        // by syncElevation() rather than declared here: it is off by default,
+        // its tile template carries the relief switch, and a source whose URL
+        // has to change is easier to add and drop than to edit in place.
         // The links, draped: MapLibre lays a line layer on the terrain surface,
         // which is the first of the two depictions — a line that tracks across
         // the ground.
@@ -655,6 +751,18 @@ const Map3D = (function () {
             // note says it out loud rather than leaving somebody to conclude a
             // station is not there.
           } },
+        // ── Where the last What is here pick was (#194) ───────────────────
+        // The 2-D map marks it with a Leaflet marker, which is under the
+        // canvas in this mode — so a pick made here would answer about a point
+        // with nothing on the map to say which point. Same cyan as
+        // `.mn-here-ring` / `.mn-here-dot` in styles.css, as a ring and a dot,
+        // drawn over the pins because it is the thing just asked about.
+        { id: 'mn-here-ring', type: 'circle', source: 'mn-here',
+          paint: { 'circle-radius': 11, 'circle-color': 'rgba(0,0,0,0)',
+                   'circle-stroke-color': '#00e5ff', 'circle-stroke-width': 2 } },
+        { id: 'mn-here-dot', type: 'circle', source: 'mn-here',
+          paint: { 'circle-radius': 3.5, 'circle-color': '#00e5ff',
+                   'circle-stroke-color': 'rgba(0,0,0,.5)', 'circle-stroke-width': 2 } },
       ],
       sky: {
         'sky-color': cssVar('--map3d-sky', '#7fb3e8'),
@@ -664,6 +772,53 @@ const Map3D = (function () {
         'horizon-fog-blend': 0.6,
       },
     };
+  }
+
+  // Add, drop or restyle the elevation drape to match what Map display says.
+  // Called when the style loads, and from MapElevation whenever its switch, its
+  // slider or its relief toggle moves.
+  //
+  // Opacity is a paint property and is set in place; the tile template is not,
+  // so a relief toggle rebuilds the source. That asymmetry is MapLibre's rather
+  // than a choice: `setPaintProperty` cannot change where tiles come from, and
+  // the renderer will not refetch a URL it already holds.
+  function syncElevation() {
+    if (!map || !ready) return;
+    const key = elevTiles();
+    if (key !== elevKey) {
+      if (map.getLayer('mn-elev')) map.removeLayer('mn-elev');
+      if (map.getSource('mn-elev')) map.removeSource('mn-elev');
+      elevKey = key;
+      if (key) {
+        map.addSource('mn-elev', {
+          type: 'raster', tiles: [key], tileSize: MapElevation.TILE_PX,
+          maxzoom: MapElevation.MAX_NATIVE, attribution: MapElevation.attribution,
+        });
+        // Above the base it is painted over, below everything the network draws
+        // on top of it — the same place it occupies in 2-D, where its pane sits
+        // at 245 between the base tiles and the overlays.
+        map.addLayer({ id: 'mn-elev', type: 'raster', source: 'mn-elev',
+                       paint: { 'raster-opacity': elevOpacity() } }, 'mn-links');
+      }
+      return;
+    }
+    if (key) map.setPaintProperty('mn-elev', 'raster-opacity', elevOpacity());
+  }
+
+  // Keep a click off the 2-D map underneath. The canvas is a child of the
+  // Leaflet container, so every click on it bubbles into Leaflet's own
+  // container listener and the 2-D map fires a `click` — which `initMap()`
+  // wires to `clearMapFocusRepeater()` and map-here.js to its own pick. A
+  // click this file has answered must not be answered again down there, with a
+  // coordinate from the other camera.
+  function stopBubbling(e) {
+    const ev = e && e.originalEvent;
+    if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+  }
+
+  function elevOpacity() {
+    const n = Number(state.mapElevOpacity);
+    return isFinite(n) ? Math.max(0, Math.min(1, n)) : 1;
   }
 
   function build() {
@@ -708,6 +863,7 @@ const Map3D = (function () {
       ready = true;
       map.setTerrain({ source: 'mn-dem', exaggeration: state.map3dExag || 1 });
       map.addLayer(sheetLayer);
+      syncElevation();
       queueSheets();
       setNote();
       syncCamera();
@@ -741,29 +897,66 @@ const Map3D = (function () {
     // mirror is built from, so a pin that can be clicked here is by
     // construction a pin the 2-D map drew, with the 2-D map's own idea of what
     // station it is.
-    map.on('click', 'mn-stations', e => {
-      const f  = e.features && e.features[0];
-      const id = f && f.properties ? f.properties.id : null;
-      if (id == null) return;
-      // **And it has to be kept off the 2-D map underneath.** The canvas is a
-      // child of the Leaflet container, so a click on it bubbles into Leaflet's
-      // own container listener and the 2-D map fires a `click` of its own —
-      // which `initMap()` wires to `clearMapFocusRepeater()`. Without this the
-      // focus set below was set and then cleared again in the same gesture, by
-      // a handler nothing in this file can see, and the dim never appeared.
-      // Only a click that *hit a pin* is stopped: a click on empty ground still
-      // reaches the 2-D map, which is what clears the focus and the ACMA
-      // highlight, and neither of those reads the coordinate.
-      if (e.originalEvent && e.originalEvent.stopPropagation) e.originalEvent.stopPropagation();
+    //
+    // **One handler, because the precedence matters.** In 2-D these are two
+    // separate listeners that never both run, and Leaflet is what keeps them
+    // apart: its canvas renderer calls `fakeStop` when a click lands on a
+    // layer, which stops the map firing a click of its own, so a pin click is
+    // never also a What is here pick. MapLibre has no equivalent — a
+    // layer-scoped listener and a plain one both fire, in registration order —
+    // so the order is written out here instead of relied upon.
+    map.on('click', e => {
+      const hit = map.queryRenderedFeatures(e.point, { layers: ['mn-stations'] })[0];
+      const id  = hit && hit.properties ? hit.properties.id : null;
+      if (id != null) { clickedStation(id, e); return; }
+      // Empty ground, with the pick armed: this is the bridge (#194). The 2-D
+      // map's own click carries `latlng` for that pixel on the *Leaflet* map,
+      // and in this mode that is a different camera — its own centre, zoom,
+      // pitch and bearing — so the answer it gives is confidently about the
+      // wrong ground, ~150 m out with the camera barely moved and unbounded
+      // after a pan. The renderer knows where the pointer actually is on the
+      // terrain; that is what MapHere gets, and the Leaflet click is stopped so
+      // it cannot also arrive with the other number.
+      if (typeof MapHere !== 'undefined' && MapHere.armed()
+          && MapHere.pick(e.lngLat.lat, e.lngLat.lng)) {
+        stopBubbling(e);
+        return;
+      }
+      // Empty ground with nothing armed is left to bubble into the Leaflet
+      // container below, where the 2-D map's own click handler clears the
+      // focused repeater and the ACMA highlight. Neither of those reads a
+      // coordinate, so the wrong projection cannot hurt them — and they are
+      // the one thing in the 2-D click that is still worth having here.
+    });
+
+    // A pin. The same things onStationClick() in app.js does, less the Leaflet
+    // callout, which has nowhere to open in this mode:
+    //
+    //   1. an armed link-budget picker owns the click. mapPickStation() guards
+    //      itself on `picking` and returns whether it took the click, which is
+    //      the same fast path 2-D takes.
+    //   2. a repeater toggles the focus dim. That is a *2-D* overlay, and that
+    //      is the point rather than a problem: it restyles the lines and pins
+    //      this view is mirroring, so refreshMapLayers() → Map3D.sync() lands
+    //      the dim on the terrain a frame later.
+    //   3. and the card.
+    //
+    // The station is looked up off `state.mapMarkers` rather than out of
+    // `state.data`, for this file's standing reason: that array is what the
+    // mirror is built from, so a pin that can be clicked here is by
+    // construction a pin the 2-D map drew, with the 2-D map's own idea of what
+    // station it is.
+    function clickedStation(id, e) {
+      stopBubbling(e);
       if (typeof LinkBudget !== 'undefined' && LinkBudget.mapPickStation(id)) return;
       const marker = (state.mapMarkers || []).find(m => m.mnStationId === id);
-      const s = marker && marker.mnStation;
-      if (s && s.roles && s.roles.includes('repeater')
+      const st = marker && marker.mnStation;
+      if (st && st.roles && st.roles.includes('repeater')
           && typeof setMapFocusRepeater === 'function') {
-        setMapFocusRepeater(state.mapFocusRepeaterId === s.id ? null : s.id);
+        setMapFocusRepeater(state.mapFocusRepeaterId === st.id ? null : st.id);
       }
       if (typeof showStationCard === 'function') showStationCard(id);
-    });
+    }
     map.on('mouseenter', 'mn-stations', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'mn-stations', () => { map.getCanvas().style.cursor = ''; });
   }
@@ -952,6 +1145,8 @@ const Map3D = (function () {
       const ls = map.getSource('mn-links'), ss = map.getSource('mn-stations');
       if (ls) ls.setData(linkFeatures());
       if (ss) ss.setData(stationFeatures());
+      const hs = map.getSource('mn-here');
+      if (hs) hs.setData(hereFeature());
       queueSheets();
     },
 
@@ -989,7 +1184,23 @@ const Map3D = (function () {
       if (map.getSource('mn-base')) map.removeSource('mn-base');
       map.addSource('mn-base', { type: 'raster', tiles: base.tiles, tileSize: 256,
                                  maxzoom: base.maxzoom, attribution: base.attribution });
-      map.addLayer({ id: 'mn-base', type: 'raster', source: 'mn-base' }, 'mn-links');
+      // Under the elevation drape when there is one, and under the links
+      // either way — a base re-added over the top of the ramp would put the
+      // picker's choice where Map display's overlay belongs.
+      map.addLayer({ id: 'mn-base', type: 'raster', source: 'mn-base' },
+                   map.getLayer('mn-elev') ? 'mn-elev' : 'mn-links');
+    },
+
+    // Map display's elevation switch, its opacity slider or its relief toggle
+    // moved (map-elevation.js). A no-op unless 3-D is actually open.
+    elevationChanged() { syncElevation(); },
+
+    // What is here picked a point, or closed. Same shape, and for the same
+    // reason: the pick is that tool's and this view is only showing it.
+    hereChanged() {
+      if (!map || !ready) return;
+      const s = map.getSource('mn-here');
+      if (s) s.setData(hereFeature());
     },
 
     // Put the camera back overhead without leaving 3-D — the gesture that gets
@@ -1128,6 +1339,7 @@ const Map3D = (function () {
     map = null;
     ready = false;
     buf = null;
+    elevKey = null;   // the drape goes with the map; the next one builds its own
     // Hundreds of samples a hop, and every one of them re-derivable from tiles
     // Terrain still has cached. It goes with the map.
     sheetMem.clear();

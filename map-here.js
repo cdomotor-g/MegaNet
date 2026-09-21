@@ -292,14 +292,24 @@ const MapHere = (function () {
     }
   }
 
+  // The 2-D map's own click. It is *not* the one the 3-D view uses — see pick()
+  // below for why the coordinate this carries is the wrong one while the map is
+  // tilted, and map-3d.js for the handler that stops it arriving at all.
   function onMapClick(e) {
     if (!armed || !e || !e.latlng) return;
     setPoint(e.latlng.lat, e.latlng.lng);
   }
 
+  // The pin this tool drops is a Leaflet marker, and Leaflet is under the
+  // canvas while 3-D is on. A no-op unless that mode is open.
+  function syncThreeD() {
+    if (typeof Map3D !== 'undefined' && Map3D.hereChanged) Map3D.hereChanged();
+  }
+
   function setPoint(lat, lon) {
     at = [lat, lon];
     armed = false;
+    syncThreeD();
     syncCursor();
     syncBtn();
     place(lat, lon);
@@ -335,6 +345,32 @@ const MapHere = (function () {
 
     armed() { return armed; },
 
+    // Where the last pick was, as [lat, lon], or null. The 3-D view mirrors it
+    // onto the terrain (map-3d.js): the Leaflet marker `place()` drops is under
+    // the WebGL canvas in that mode, and a card that answers about a point you
+    // cannot see on the map is half an answer.
+    point() { return at ? [at[0], at[1]] : null; },
+
+    // ── A pick from somewhere that is not a Leaflet click (#194) ─────────────
+    // `onMapClick` reads `e.latlng`, which is where that pixel is on the *2-D*
+    // map. In 3-D that is the wrong question and it has a plausible answer: the
+    // MapLibre camera has its own centre, zoom, pitch and bearing, so the two
+    // agree only while it has not been moved and diverge without limit once it
+    // has. Measured at ~150 m with the camera barely off the 2-D view.
+    //
+    // So the 3-D view does not let that click through at all; it calls this
+    // with the lngLat its own renderer computed, which is the point under the
+    // pointer on the terrain being looked at. Same pick, same card, same
+    // answers — the only difference is which projection was asked.
+    //
+    // Returns whether it took the pick, so the caller can tell a pick from an
+    // ordinary click on the ground.
+    pick(lat, lon) {
+      if (!armed || !isFinite(lat) || !isFinite(lon)) return false;
+      setPoint(lat, lon);
+      return true;
+    },
+
     // The corner button, and the card's own "pick another point" pill.
     //
     // Arming takes the other click-takers off the map, exactly as MapMovePin
@@ -359,6 +395,7 @@ const MapHere = (function () {
       armed = false;
       gen++;
       if (marker) { marker.remove(); marker = null; }
+      syncThreeD();
       syncCursor();
       syncBtn();
       render();

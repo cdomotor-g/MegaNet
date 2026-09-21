@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-21** (revision 95 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-21** (revision 96 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -490,6 +490,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Five AI rows, and six `[Human]` issues.
 >
+> **Revision 96 opened and closed #194 in the same push, and opened nothing that stays open** — the two Map display layers that stopped applying when the map was tilted. The allocation below is unchanged.
+
 > **Revision 95 opened and closed #193 in the same push, and opened nothing that stays open** — a station card that was being painted under the 3-D canvas. The allocation below is unchanged.
 
 > **Revision 94 opened and closed #192 in the same push, and opened nothing that stays open** — the Stations map's corner was regrouped from a session request, so the allocation below is exactly revision 93's. #191 is a closed non-issue: it was filed into a number the codebase had already spent, and the replacement is #192 (see the revision entry at the bottom of the file).
@@ -617,6 +619,69 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 96 — 2026-09-21: two layers that stopped applying when the map was tilted, and the one that was quietly wrong about where
+
+Asked for in the same session as #193 — *"do the bridge, please. and also please
+make it so that Elevation shading also works in 3d mode"* — filed as **#194 and
+closed in the same push**. Touched `map-3d.js`, `map-elevation.js`,
+`map-here.js`, `test/map3d.mjs`, `core.js` and the README.
+
+**Two failures, in opposite directions, and the board should keep the pair
+together because the contrast is the lesson.** The elevation ramp went *quiet*:
+it is a Leaflet tile layer, every Leaflet pane is under the canvas in 3-D, and
+so the switch stayed on, the slider stayed where it was, and the colours were
+gone. That is the hardest absence to notice on this particular view — the 3-D
+map already shows relief through shading, so the hills were still there and only
+the *meaning* of the colour had left. **What is here** did the other thing: it
+kept answering, off the 2-D map's `click`, whose `latlng` is where that pixel
+sits on the *Leaflet* map while the camera looking at the terrain has its own
+centre, zoom, pitch and bearing. Measured on a 62°-pitched view a third of the
+way down the frame: **12.6 km** between the two answers. Near the middle of the
+frame it is ~150 m, which is exactly why it survived the 3-D view shipping.
+*A missing layer is visible; a wrong answer is not.*
+
+**The drape, and the rule it was built to keep.** The ramp is a MapLibre raster
+source served by a custom protocol (`addProtocol`) that fetches the same
+terrarium tile from the same URL and hands it to **`MapElevation`'s own
+painter**. The bands, the hillshade and the relief switch stay in that file;
+`map-3d.js` holds no colours at all. This is the module's founding rule — *the
+first thing that computes its own answer is the first place the two modes can
+disagree* — applied to a raster instead of to a line, and it is what the check
+below is pointed at rather than at the picture.
+
+**The bridge.** `MapHere` grew a public `pick(lat, lon)`; the 3-D click calls it
+with the lngLat its own renderer computed and stops the DOM event so the Leaflet
+click cannot also arrive with the other number. The pick is marked on the
+terrain in the same cyan ring the 2-D marker uses, because a card answering
+about a point you cannot see on the map is half an answer. 2-D's precedence is
+kept and had to be written out: Leaflet enforces "a click on a pin is not also a
+map click" with `fakeStop`, and MapLibre has no equivalent — a layer-scoped
+listener and a plain one both fire — so the 3-D view now has one click handler
+with the order spelled out instead of two that happened not to collide.
+
+**The finding worth carrying, and it is about the check rather than the code.**
+The first version of the "does the drape actually draw" assertion screenshotted
+the canvas with the overlay off and again with it on and required the two to
+differ. **It passed with the drape pinned to zero opacity** — a deliberate break
+it existed to catch — because a terrain tile arriving between the two shots
+changes the pixels whatever the drape did. Waiting for two identical frames
+first narrowed it and did not close it. What closed it was giving up on looking:
+the check now wraps `MapElevation.paintedTile`, the one function that turns a
+terrarium tile into ramp colours, and requires the count to rise. That is a fact
+about what *ran* rather than a guess about what *appeared* — and it asserts the
+property that actually matters, because a drape rendering perfectly from its own
+pixels leaves the count at zero. **Generalisable: when "did it draw" is hard to
+assert honestly, assert what had to run for it to draw.** The previous four
+entries in this family (revision 89's panel search, #186's find box, #192's
+`[hidden]` buttons, #193's buried card) all said *ask the geometry*; this one is
+the case where the geometry cannot answer without lying, and the answer is to
+ask something else entirely rather than to accept a weak assertion.
+
+`npm run map3d` 76 → 93 assertions, confirmed red on four deliberate breaks: the
+drape added above the links instead of below, the bridge removed, the drape
+never built, and the drape painting its own tiles rather than MapElevation's —
+that last one leaves every other assertion green and reddens exactly one.
 
 ### Revision 95 — 2026-09-21: the station card in 3-D was never missing, it was underneath
 
