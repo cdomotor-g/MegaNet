@@ -658,7 +658,121 @@ const panelBtn = await page.evaluate(() => {
 ok('and the panel offers the way out', panelBtn && /Leave 3-D/.test(panelBtn.text),
    JSON.stringify(panelBtn));
 
-// ── 7. leaving the tab takes the GL context with it ─────────────────────────
+// ── 7. a pin clicked in 3-D paints a card that is on screen (#193) ──────────
+// The section above asks whether the *controls* survive the canvas. This asks
+// the same question of the thing the canvas is drawn over, and it is a separate
+// section because the answer was different and nothing here could see it.
+//
+// `map-3d.js` has painted a station card on a pin click since the view shipped,
+// and it worked: `state.stnCard.id` was set, the card took its box, and
+// `getBoundingClientRect()` answered with real numbers. It was also completely
+// invisible — 690 against the canvas's 750, in the stage's own stacking context,
+// with an opaque WebGL canvas on top. Every property a check is tempted to read
+// said the card was fine.
+//
+// So the assertion is `elementFromPoint` over the card's own rectangle: not
+// "did a card open", not "is it displayed", but **is the card the thing painted
+// where the card is**. That is `maplinks`' rule — any check about whether
+// something is on screen has to ask the geometry — applied to the one question
+// z-index can answer wrongly while every other signal reads true.
+console.log('\nA pin clicked in 3-D paints a card you can see');
+
+// A repeater, so the same click exercises the focus dim the 2-D handler runs.
+// The camera goes to it rather than hoping one is in frame.
+const pin = await page.evaluate(() => {
+  const rep = (state.mapMarkers || []).find(
+    m => m.mnStation && m.mnStation.roles && m.mnStation.roles.includes('repeater'));
+  if (!rep) return null;
+  const ll = rep.getLatLng();
+  Map3D._map().jumpTo({ center: [ll.lng, ll.lat], zoom: 12, pitch: 60, bearing: 0 });
+  return { id: rep.mnStationId, lat: ll.lat, lng: ll.lng };
+});
+ok('the file has a repeater to click', !!pin);
+
+if (pin) {
+  await page.waitForTimeout(1200);
+  // Where the renderer says the pin is, rather than where the arithmetic says
+  // it should be: pins are billboarded circles standing on terrain, and the
+  // question this check is asking is about what a *click* does.
+  const where = await page.evaluate((t) => {
+    const m = Map3D._map();
+    const p = m.project([t.lng, t.lat]);
+    const r = m.getCanvas().getBoundingClientRect();
+    const f = m.queryRenderedFeatures([p.x, p.y], { layers: ['mn-stations'] });
+    const hit = f.length ? f[0].properties.id : null;
+    const mk  = (state.mapMarkers || []).find(x => x.mnStationId === hit);
+    return { x: Math.round(r.left + p.x), y: Math.round(r.top + p.y), hit,
+             repeater: !!(mk && mk.mnStation && mk.mnStation.roles
+                          && mk.mnStation.roles.includes('repeater')) };
+  }, pin);
+  ok('the pin under the pointer is a station the 2-D map drew', where.hit != null,
+     JSON.stringify(where));
+
+  await page.evaluate(() => { state.mapFocusRepeaterId = null; closeStnCard(false); });
+  await page.mouse.click(where.x, where.y);
+  await page.waitForTimeout(500);
+
+  const card = await page.evaluate(() => {
+    const el = document.getElementById('stn-card');
+    const r  = el.getBoundingClientRect();
+    const z  = n => (n ? Number(getComputedStyle(n).zIndex) : NaN);
+    const mine = (x, y) => {
+      const t = document.elementFromPoint(x, y);
+      return { mine: !!(t && (t === el || el.contains(t))),
+               got: t ? (t.id || t.className || t.tagName) : null };
+    };
+    return {
+      id: state.stnCard.id,
+      focus: state.mapFocusRepeaterId,
+      box: r.width > 0 && r.height > 0,
+      topLeft: mine(r.left + 14, r.top + 14),
+      centre:  mine(r.left + r.width / 2, r.top + r.height / 2),
+      cardZ:   z(el),
+      hereZ:   z(document.getElementById('here-card')),
+      canvasZ: z(document.getElementById('map3d')),
+      cornerZ: z(document.querySelector('.leaflet-top')),
+    };
+  });
+
+  ok('clicking the pin opens that station’s card', card.id === where.hit,
+     JSON.stringify({ card: card.id, clicked: where.hit }));
+  ok('…and the card has a box', card.box);
+  // The two that matter. Everything above this was already true while the card
+  // was buried under the canvas.
+  ok('…and the card is what is painted at its own top-left corner',
+     card.topLeft.mine === true, `got ${card.topLeft.got}`);
+  ok('…and at its own centre', card.centre.mine === true, `got ${card.centre.got}`);
+  // The window, for the same reason the canvas's own is asserted above: over
+  // the canvas so it can be seen, under the control corners so the icon column
+  // it shares the map with stays reachable.
+  ok('the card sits above the 3-D canvas and below the control corners',
+     card.cardZ > card.canvasZ && card.cardZ < card.cornerZ,
+     JSON.stringify({ card: card.cardZ, canvas: card.canvasZ, corner: card.cornerZ }));
+  ok('and What is here’s card, which was under it too, is lifted with it',
+     card.hereZ > card.canvasZ && card.hereZ < card.cornerZ,
+     JSON.stringify({ here: card.hereZ, canvas: card.canvasZ, corner: card.cornerZ }));
+  // The rest of what a 2-D pin click does, less the callout this mode cannot
+  // draw: a repeater takes the focus dim with it.
+  if (where.repeater) {
+    ok('clicking a repeater in 3-D focuses it, as it does in 2-D',
+       card.focus === where.hit, JSON.stringify({ focus: card.focus, clicked: where.hit }));
+    // The card has to go before the pin can be clicked a second time, and that
+    // is the card working rather than the check cheating: it opens bottom-left
+    // and grows to most of the map's height, so a pin near the middle of the
+    // view is underneath it by the time it is open. `closeStnCard(false)`
+    // clears the card and nothing else — the focus is the state under test and
+    // it is left exactly as the first click set it.
+    await page.evaluate(() => closeStnCard(false));
+    await page.waitForTimeout(150);
+    await page.mouse.click(where.x, where.y);
+    await page.waitForTimeout(400);
+    ok('…and clicking it again clears the focus',
+       await page.evaluate(() => state.mapFocusRepeaterId) == null);
+  }
+  await page.evaluate(() => { state.mapFocusRepeaterId = null; closeStnCard(false); });
+}
+
+// ── 8. leaving the tab takes the GL context with it ─────────────────────────
 console.log('\nLeaving the tab takes the WebGL context with it');
 
 await page.evaluate(() => switchTab('export'));

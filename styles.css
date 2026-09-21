@@ -3420,9 +3420,17 @@ hr {
    controls, and it drives both — so a filter changed in 3-D is the same filter,
    and leaving 3-D leaves the map exactly as the controls say it should be.
 
-   The cards drawn over the map (#stn-card and the other three) are children of
-   .mn-map-stage, outside the Leaflet container entirely, so they are above this
-   already and a pin clicked in 3-D still paints one. */
+   The cards drawn over the map are a different matter, and this comment used to
+   get them wrong: it said they are children of .mn-map-stage, outside the
+   Leaflet container entirely, so they are above this already. Being outside the
+   container buys nothing — .leaflet-container is `position: relative` with
+   `z-index: auto`, which is not a stacking context, so a card's z-index is
+   compared with this 750 directly. Two of the four are above it (.acma-card and
+   #path-card, at 1100) and two were below (#stn-card and #here-card, at 690):
+   the card opened, and an opaque WebGL canvas was painted over it. Fixed at
+   #193 by the rule beside .stn-card, which lifts those two to 760 for exactly
+   as long as this canvas is on screen — and the reasoning is left here because
+   "it is outside the container" is a plausible thing to conclude twice. */
 #map3d {
   position: absolute;
   inset: 0;
@@ -5611,6 +5619,41 @@ hr {
      stays readable. Above the tooltip pane (650), where the station-name
      labels are. */
   z-index: 690;
+}
+
+/* …except while the 3-D view is open, when 690 is under the floor rather than
+   in the middle of the stack (#193).
+
+   The 3-D canvas is z 750 — chosen to cover every Leaflet pane (the topmost is
+   the popup pane at 700) and to stay under Leaflet's control corners at 1000,
+   which is what lets one set of controls drive both modes. The comment at
+   `#map3d` said the cards were safe from it because they are children of
+   `.mn-map-stage`, outside the Leaflet container entirely. **That was wrong,
+   and it is worth saying why, because the reasoning is the kind that looks
+   sound.** Being outside the container would only help if the container were a
+   stacking context, and `.leaflet-container` is `position: relative` with
+   `z-index: auto` — which is not one. So `#map3d`'s 750 and this card's 690
+   were being compared directly, in the stage's own context, and 750 won: the
+   card opened, took its box, answered `getBoundingClientRect()`, and was
+   painted underneath an opaque WebGL canvas. `elementFromPoint` over the
+   middle of it returned the canvas. Clicking a pin in 3-D *did* paint a card;
+   there was simply no way to see it, or to reach its close button.
+
+   So it is lifted over the canvas while the canvas is there, and only then.
+   Both reasons for 690 are about things the 3-D view does not draw — Leaflet's
+   callouts and its tooltip labels are under the canvas in that mode — while
+   the reason for staying below 1000 still holds exactly, because the controls
+   are the one thing that *is* still on screen. 760 is the whole of the
+   difference: over the canvas, under the corner it shares the map with.
+
+   Keyed off the canvas's own class rather than off a flag this file would have
+   to be told about: `#map3d.is-on` is added by Map3D.open() and removed by
+   close(), so the rule cannot be left behind by a mode that ended. It catches
+   `#here-card` as well as `#stn-card` — both carry `.stn-card`, both were
+   under the canvas, and a What is here card opened before ⛰️ was pressed
+   disappeared the same way. */
+.mn-map-stage:has(#map3d.is-on) .stn-card {
+  z-index: 760;
 }
 
 /* The action row is the card's last section — no rule under it. It carries no

@@ -720,13 +720,49 @@ const Map3D = (function () {
       if (src === 'mn-dem') { demFails++; setNote(); }
     });
     map.on('moveend', () => { if (state.map3dSheets) queueSheets(); });
-    // Clicking a pin in 3-D paints the same station card a pin click paints in
-    // 2-D — the card is outside the Leaflet container and is still on screen.
+    // ── Clicking a pin (#193) ──────────────────────────────────────────────
+    // A pin in 3-D does what a pin in 2-D does, less the one thing this mode
+    // has no way to draw. onStationClick() in app.js opens a Leaflet callout
+    // on the marker and then paints the card; there are no Leaflet layers on
+    // screen here, so the callout half has nowhere to go and the rest is
+    // mirrored in the order 2-D runs it:
+    //
+    //   1. an armed link-budget picker owns the click. mapPickStation() guards
+    //      itself on `picking` and returns whether it took the click, so this
+    //      is the same fast path 2-D takes without re-reading the flag.
+    //   2. a repeater toggles the focus dim, which is a *2-D* overlay — and
+    //      that is the point rather than a problem: it restyles the lines and
+    //      pins this view is mirroring, so refreshMapLayers() → Map3D.sync()
+    //      lands the dim on the terrain a frame later.
+    //   3. and the card, which is what was asked for.
+    //
+    // The station is looked up off `state.mapMarkers` rather than out of
+    // `state.data`, for this file's standing reason: that array is what the
+    // mirror is built from, so a pin that can be clicked here is by
+    // construction a pin the 2-D map drew, with the 2-D map's own idea of what
+    // station it is.
     map.on('click', 'mn-stations', e => {
-      const f = e.features && e.features[0];
-      if (f && f.properties && f.properties.id != null && typeof showStationCard === 'function') {
-        showStationCard(f.properties.id);
+      const f  = e.features && e.features[0];
+      const id = f && f.properties ? f.properties.id : null;
+      if (id == null) return;
+      // **And it has to be kept off the 2-D map underneath.** The canvas is a
+      // child of the Leaflet container, so a click on it bubbles into Leaflet's
+      // own container listener and the 2-D map fires a `click` of its own —
+      // which `initMap()` wires to `clearMapFocusRepeater()`. Without this the
+      // focus set below was set and then cleared again in the same gesture, by
+      // a handler nothing in this file can see, and the dim never appeared.
+      // Only a click that *hit a pin* is stopped: a click on empty ground still
+      // reaches the 2-D map, which is what clears the focus and the ACMA
+      // highlight, and neither of those reads the coordinate.
+      if (e.originalEvent && e.originalEvent.stopPropagation) e.originalEvent.stopPropagation();
+      if (typeof LinkBudget !== 'undefined' && LinkBudget.mapPickStation(id)) return;
+      const marker = (state.mapMarkers || []).find(m => m.mnStationId === id);
+      const s = marker && marker.mnStation;
+      if (s && s.roles && s.roles.includes('repeater')
+          && typeof setMapFocusRepeater === 'function') {
+        setMapFocusRepeater(state.mapFocusRepeaterId === s.id ? null : s.id);
       }
+      if (typeof showStationCard === 'function') showStationCard(id);
     });
     map.on('mouseenter', 'mn-stations', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'mn-stations', () => { map.getCanvas().style.cursor = ''; });

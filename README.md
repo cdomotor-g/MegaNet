@@ -856,6 +856,27 @@ cuts both ways — a station you cannot see from a given vantage has no line of
 sight from it, which is exactly the question this view is for, but a station you
 are hunting for may be over the next ridge rather than missing.
 
+**Pins are clickable here too (#193).** A pin in 3-D does what a pin in 2-D
+does, less the callout this mode has no way to draw: an armed link-budget
+picker takes the click, a repeater takes the focus dim, and the station card
+paints in the corner. It always did paint — the card was being drawn
+*underneath* the WebGL canvas, which reads exactly like a click that did
+nothing. The cause is worth recording because the reasoning that hid it looks
+sound: the cards are children of `.mn-map-stage`, outside the Leaflet container
+entirely, and the comment on the canvas said that put them above it. It does
+not. Being outside the container only matters if the container is a stacking
+context, and `.leaflet-container` is `position: relative` with `z-index: auto`,
+which is not one — so the canvas's 750 and the card's 690 were compared
+directly, and the canvas won. The card is lifted to 760 for exactly as long as
+the canvas is on screen: over the canvas so it can be read, under Leaflet's
+control corners at 1000 so the icon column it shares the map with stays
+reachable. `#here-card` rode on the same class and was lifted with it.
+
+The check that holds it asks `elementFromPoint` over the card's own rectangle —
+not *did a card open*, not *is it displayed*, but **is the card the thing
+painted where the card is**. Every other signal read true the whole time it was
+buried.
+
 Terrain is fetched for the view you are looking at and no further, which is what
 makes a whole-of-state network affordable to fly over; the sheets are capped at
 80 hops at a time and the panel says how many it left out, because an unsheeted

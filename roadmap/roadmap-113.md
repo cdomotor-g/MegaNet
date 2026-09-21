@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-20** (revision 94 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-21** (revision 95 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -490,6 +490,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Five AI rows, and six `[Human]` issues.
 >
+> **Revision 95 opened and closed #193 in the same push, and opened nothing that stays open** — a station card that was being painted under the 3-D canvas. The allocation below is unchanged.
+
 > **Revision 94 opened and closed #192 in the same push, and opened nothing that stays open** — the Stations map's corner was regrouped from a session request, so the allocation below is exactly revision 93's. #191 is a closed non-issue: it was filed into a number the codebase had already spent, and the replacement is #192 (see the revision entry at the bottom of the file).
 
 > **Revision 93 opened #186 (epic) with #187 and #188 under it, plus #189 and #190** — four pickable agent issues where there had been one, all out of the 3-D view shipping. The board has agent work at three effort levels for the first time in many revisions. Everything below about the six `[Human]` issues still stands.
@@ -615,6 +617,67 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 95 — 2026-09-21: the station card in 3-D was never missing, it was underneath
+
+Reported in session — *"i notice that in 3d mode, station cards don't come up"* —
+filed as **#193 and closed in the same push**. Touched `styles.css`,
+`map-3d.js`, `test/map3d.mjs`, `core.js` and the README.
+
+**The card was opening the whole time.** `map-3d.js` has painted one on a pin
+click since the 3-D view shipped at `d7509fc`: `state.stnCard.id` was set, the
+element was un-hidden, `getBoundingClientRect()` answered with real numbers.
+An opaque WebGL canvas was painted over the top of it, so it could not be seen
+and its close button could not be pressed.
+
+**Why it is worth a board entry rather than a line in a commit.** The comment on
+`#map3d` explained that the cards were safe from the canvas because they are
+children of `.mn-map-stage`, *outside the Leaflet container entirely*. That
+sentence is true and the conclusion does not follow: being outside the container
+only helps if the container is a **stacking context**, and `.leaflet-container`
+is `position: relative` with `z-index: auto`, which is not one. So the canvas's
+750 and the card's 690 were compared directly in the stage's own context and the
+canvas won. **The general rule: "it is in a different subtree" says nothing
+about paint order until you have shown that subtree forms a stacking context.**
+`position: relative` alone does not, and it is the most common way a container
+looks like it should.
+
+The fix is `.mn-map-stage:has(#map3d.is-on) .stn-card { z-index: 760 }` — over
+the canvas so the card can be read, under Leaflet's control corners at 1000 so
+the icon column it shares the map with stays reachable, and keyed off the
+canvas's own class so the rule cannot outlive the mode. Both reasons the card
+sat at 690 (under Leaflet's callouts at 700, under its controls) are about
+things the 3-D view does not draw. `#here-card` carries the same class and was
+lifted with it: a **What is here** card opened before ⛰️ was pressed had been
+vanishing in exactly the same way.
+
+**Two smaller things in the same click path, both found by fixing the first.**
+The 3-D pin click did less than the 2-D one — no link-budget pick, no repeater
+focus — and when the focus was added it did not appear, because *the canvas is a
+child of the Leaflet container*: a click on it bubbles into Leaflet's own
+container listener, the 2-D map fires a `click`, and `initMap()` wires that to
+`clearMapFocusRepeater()`. The focus was set and cleared in one gesture by a
+handler in another file. A click that **hit a pin** is now stopped; a click on
+empty ground still reaches the 2-D map, because that is what clears the focus
+and the ACMA highlight and neither of those reads the coordinate.
+
+**The assertion that would have caught it, and the one this board should keep
+quoting.** `npm run map3d` now asks `elementFromPoint` over the card's own
+rectangle: not *did a card open*, not *is it displayed*, but **is the card the
+thing painted where the card is**. Every other signal read true the whole time
+the card was buried — which is the fourth time this repo has met the same shape
+(revision 89's panel search, #186's find box, #192's `[hidden]` camera buttons,
+now this). 66 → 76 assertions, confirmed red on two deliberate breaks: the
+z-index rule removed (4 red) and the propagation guard removed (1 red).
+
+**What was deliberately not fixed, and is not filed yet.** With ⛰️ on, an armed
+**ℹ️ What is here** still answers about the wrong ground: the pick runs off the
+2-D map's `click`, whose `latlng` is that pixel's location on the *Leaflet*
+map, and the 3-D camera has its own centre, zoom, pitch and bearing. Measured at
+~150 m of error with the camera barely moved off the 2-D view, and unbounded
+after a pan. It is silently wrong rather than missing, which this repo rates as
+the worse failure — but fixing it is a decision (what should ℹ️ do in 3-D?)
+rather than a mechanical change, and it predates this work.
 
 ### Revision 94 — 2026-09-20: the map's corner says what its eleven buttons are for, and the 3-D view grows a camera
 
