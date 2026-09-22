@@ -9387,14 +9387,16 @@
       "lon": 152.8261,
       "elevation_ahd": 97.4,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 2050
+        "rainfall": 2050,
+        "battery": 2049
       },
       "satcom": {
         "enabled": false,
@@ -9405,6 +9407,27 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 159,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 2062,
+            "high": 2064
+          },
+          {
+            "low": 2077,
+            "high": 2079
+          },
+          {
+            "low": 4818,
+            "high": 4819
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2832,
         "number": "540247",
@@ -27848,8 +27871,8 @@
       "id": "karara_al",
       "name": "Karara AL",
       "station_number": "541142",
-      "lat": -28.1342,
-      "lon": 151.5697,
+      "lat": -28.134154,
+      "lon": 151.569738,
       "elevation_ahd": 444.9,
       "roles": [
         "field"
@@ -27859,7 +27882,9 @@
         "balonne_condamine"
       ],
       "alert_ids": {
-        "rainfall": 5763
+        "rainfall": 5762,
+        "battery": 5764,
+        "water_level": 5763
       },
       "satcom": {
         "enabled": false,
@@ -28684,7 +28709,7 @@
     },
     {
       "id": "killarney_spring_ck_2",
-      "name": "Killarney (Spring Ck) AL",
+      "name": "Killarney (Spring Ck) WTP AL",
       "station_number": "41564",
       "lat": -28.3525,
       "lon": 152.3373,
@@ -28697,7 +28722,8 @@
         "balonne_condamine"
       ],
       "alert_ids": {
-        "rainfall": 6889
+        "battery": 6890,
+        "water_level": 6889
       },
       "satcom": {
         "enabled": false,
@@ -38361,7 +38387,8 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 4000
+        "rainfall": 4000,
+        "battery": 4001
       },
       "satcom": {
         "enabled": false,
@@ -38378,6 +38405,10 @@
         "tx_mhz": 151.525,
         "pass_ranges": [
           {
+            "low": 4012,
+            "high": 4014
+          },
+          {
             "low": 4021,
             "high": 4025
           },
@@ -38387,7 +38418,19 @@
           },
           {
             "low": 4047,
-            "high": 4050
+            "high": 4053
+          },
+          {
+            "low": 4062,
+            "high": 4064
+          },
+          {
+            "low": 4077,
+            "high": 4081
+          },
+          {
+            "low": 4030,
+            "high": 4032
           }
         ],
         "exclusions": [],
@@ -51482,8 +51525,7 @@
       "lon": 146.8511,
       "elevation_ahd": 18.9,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [
         "mt_stuart"
@@ -51492,7 +51534,8 @@
         "ross"
       ],
       "alert_ids": {
-        "rainfall": 2740
+        "rainfall": 2740,
+        "battery": 2741
       },
       "satcom": {
         "enabled": false,
@@ -51503,19 +51546,6 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 935,
-      "repeater": {
-        "acma_licence": "1447471",
-        "rx_mhz": 152.4,
-        "tx_mhz": 152.4,
-        "pass_ranges": [
-          {
-            "low": 2700,
-            "high": 2899
-          }
-        ],
-        "exclusions": [],
-        "notes": ""
-      },
       "site": {
         "db_id": 2286,
         "number": "532036",
@@ -52305,8 +52335,7 @@
       "lon": 153.1211,
       "elevation_ahd": 34.6,
       "roles": [
-        "field",
-        "repeater"
+        "field"
       ],
       "radio_network_ids": [
         "constitution_hill"
@@ -52315,7 +52344,9 @@
         "logan_albert"
       ],
       "alert_ids": {
-        "rainfall": 5372
+        "rainfall": 5371,
+        "battery": 5373,
+        "water_level": 5372
       },
       "satcom": {
         "enabled": false,
@@ -52326,27 +52357,6 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 950,
-      "repeater": {
-        "acma_licence": "1410739",
-        "rx_mhz": 151.5,
-        "tx_mhz": 152.4,
-        "pass_ranges": [
-          {
-            "low": 2200,
-            "high": 2400
-          },
-          {
-            "low": 6200,
-            "high": 6274
-          },
-          {
-            "low": 4151,
-            "high": 4199
-          }
-        ],
-        "exclusions": [],
-        "notes": ""
-      },
       "site": {
         "db_id": 3142,
         "number": "540691",
@@ -54887,10 +54897,7 @@
       "lat": -27.2742,
       "lon": 151.9931,
       "elevation_ahd": 752.1,
-      "roles": [
-        "base",
-        "repeater"
-      ],
+      "roles": [],
       "radio_network_ids": [
         "mt_glorious_seqwater"
       ],
@@ -54907,23 +54914,6 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 996,
-      "repeater": {
-        "acma_licence": "",
-        "rx_mhz": 151.525,
-        "tx_mhz": 151.525,
-        "pass_ranges": [
-          {
-            "low": 6526,
-            "high": 6527
-          },
-          {
-            "low": 4000,
-            "high": 4099
-          }
-        ],
-        "exclusions": [],
-        "notes": ""
-      },
       "hub_id": "brisbane"
     },
     {
@@ -60797,8 +60787,8 @@
       "id": "widgee_ck_wide_bay",
       "name": "Widgee Ck (Wide Bay",
       "station_number": "140028",
-      "lat": -26.0913,
-      "lon": 152.5103,
+      "lat": -26.093143,
+      "lon": 152.510523,
       "elevation_ahd": 54.5,
       "roles": [
         "field"
@@ -121799,7 +121789,8 @@
       "lon": 148.676,
       "elevation_ahd": null,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -121817,6 +121808,23 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 1151,
+            "high": 1163
+          },
+          {
+            "low": 1254,
+            "high": 1255
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2441,
         "number": "534022",
@@ -130569,7 +130577,9 @@
       "lon": 146.781,
       "elevation_ahd": null,
       "roles": [
-        "field"
+        "field",
+        "repeater",
+        "base"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -130586,6 +130596,19 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 152.4,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 2700,
+            "high": 2899
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2288,
         "number": "532038",
@@ -130808,7 +130831,8 @@
       "lon": 153.2164,
       "elevation_ahd": null,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -130826,6 +130850,27 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 2200,
+            "high": 2400
+          },
+          {
+            "low": 6200,
+            "high": 6274
+          },
+          {
+            "low": 4151,
+            "high": 4199
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2087,
         "number": "40335",
@@ -150791,7 +150836,8 @@
       "lon": 153.296,
       "elevation_ahd": null,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -150809,6 +150855,19 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 2200,
+            "high": 2500
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2856,
         "number": "540287",
@@ -154424,7 +154483,8 @@
       "lon": 151.953611,
       "elevation_ahd": null,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -154441,6 +154501,23 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.525,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 6526,
+            "high": 6527
+          },
+          {
+            "low": 4000,
+            "high": 4099
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2776,
         "number": "540162",
@@ -166489,6 +166566,94 @@
         }
       ],
       "hub_id": "brisbane"
+    },
+    {
+      "id": "elpro_test",
+      "name": "ELPRO 115E-2 test unit",
+      "station_number": "999999",
+      "lat": null,
+      "lon": null,
+      "elevation_ahd": null,
+      "roles": [
+        "base"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [],
+      "alert_ids": {},
+      "satcom": {},
+      "rm_system_id": null,
+      "enabled": true,
+      "notes": "Bench/test gateway, not a site. Exists so the 115E-2 MQTT trial has somewhere to land that a person can read: see docs/elpro115e_test_card.md for the technician's half and docs/elpro115e_mqtt.md for the full provisioning guide. Publishes as elpro_test on meganet/v1/elpro_test/logger/reading/elpro. No lat/lon and no rm_system_id on purpose — there is no site and it is not a radio station. Not in stations.json, so document_managed is false and a stations load leaves it alone (0022). Retire with update meganet.station set deleted_at = now() where id = 'elpro_test'.",
+      "sensors": [
+        {
+          "alert_id": 9001,
+          "type": "Water Level",
+          "sensor_id": "elpro_test_level",
+          "device_id": null
+        },
+        {
+          "alert_id": 9002,
+          "type": "Rainfall",
+          "sensor_id": "elpro_test_rain",
+          "device_id": null
+        },
+        {
+          "alert_id": 9003,
+          "type": "Battery",
+          "sensor_id": "elpro_test_battery",
+          "device_id": null
+        }
+      ]
+    },
+    {
+      "id": "bateson_test",
+      "name": "18 Bateson workshop test rig",
+      "station_number": "999998",
+      "lat": null,
+      "lon": null,
+      "elevation_ahd": null,
+      "roles": [
+        "base"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [],
+      "alert_ids": {},
+      "satcom": {},
+      "rm_system_id": null,
+      "enabled": true,
+      "notes": "The base station at 18 Bateson and the sensors wired to its logger — a tipping bucket, two SDI-12 level sensors and the supply voltage. Not a gauging station and not network data: it is where MegaNet's ingest path is exercised live. Local channels post as station_number 999998 with a channel (s:999998/rain and so on); alert_id 8101 is the logger's ALERT2 self-test, which builds a real frame and feeds it to its own decoder. See logger/README.md and docs/live-end-to-end-test.md. No lat/lon on purpose — the site itself is on the map as 18_bateson. Not in stations.json, so document_managed is false and a stations load leaves it alone (0022). Retire with update meganet.station set deleted_at = now() where id = 'bateson_test'.",
+      "sensors": [
+        {
+          "alert_id": null,
+          "type": "Rainfall",
+          "sensor_id": "rain",
+          "device_id": null
+        },
+        {
+          "alert_id": null,
+          "type": "Water Level",
+          "sensor_id": "level_1",
+          "device_id": null
+        },
+        {
+          "alert_id": null,
+          "type": "Water Level",
+          "sensor_id": "level_2",
+          "device_id": null
+        },
+        {
+          "alert_id": null,
+          "type": "Battery",
+          "sensor_id": "battery",
+          "device_id": null
+        },
+        {
+          "alert_id": 8101,
+          "type": "Self-test",
+          "sensor_id": "alert2_selftest",
+          "device_id": null
+        }
+      ]
     }
   ]
 }
