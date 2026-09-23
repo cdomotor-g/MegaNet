@@ -4264,6 +4264,20 @@ hr {
   color: var(--bad);
 }
 
+/* turn a line round (A↔B) — the delete button's quiet look, without its red */
+.draw-flip {
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: .2rem .35rem;
+  font-size: .85rem;
+  flex-shrink: 0;
+}
+
+.draw-flip:hover {
+  color: var(--text);
+}
+
 .draw-edit {
   padding: .1rem .2rem .5rem;
   border-bottom: 1px solid var(--border);

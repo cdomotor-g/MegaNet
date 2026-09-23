@@ -240,31 +240,60 @@ const MapDraw = (function () {
     return snapCache;
   }
 
-  // The station pin a click at this position would land on, or null.
+  // What a click at this position would land on, or null: the nearest station
+  // pin or drawn 📍 pin inside SNAP_PX, whichever is closer. Normalised to one
+  // shape — { ll, sid, name, ring, key } — so the ghost, the hint and resolve()
+  // need not care which kind it was. A drawn pin hands on the station it was
+  // itself snapped to, so a line started on a pin that sits on a site is a
+  // line from that site as far as the profile's fade margin is concerned; a
+  // pin on bare ground carries only its coordinates, and the snap is then
+  // about landing exactly on it rather than a few metres off.
+  //
+  // Drawn pins are few, so they are projected per call rather than cached; the
+  // pin tool itself does not snap to them, since a pin on a pin is a duplicate.
   function snapTarget(latlng) {
-    if (!D().snap || !map || !state.mapMarkers.length) return null;
-    const { list, pts } = snapPoints();
-    const c = map.project(latlng, map.getZoom());
+    if (!D().snap || !map) return null;
+    const z = map.getZoom();
+    const c = map.project(latlng, z);
     let best = null, bestD = SNAP_PX;
-    for (let i = 0; i < pts.length; i++) {
-      const d = Math.hypot(pts[i].x - c.x, pts[i].y - c.y);
-      if (d <= bestD) { bestD = d; best = list[i]; }
+    if (state.mapMarkers.length) {
+      const { list, pts } = snapPoints();
+      for (let i = 0; i < pts.length; i++) {
+        const d = Math.hypot(pts[i].x - c.x, pts[i].y - c.y);
+        if (d <= bestD) { bestD = d; best = list[i]; }
+      }
+    }
+    if (best) {
+      const s = best.mnStation;
+      best = { ll: [s.lat, s.lon], sid: best.mnStationId, name: s.name, key: best,
+               ring: (best.mnBaseStyle ? best.mnBaseStyle.radius : 6) + 5 };
+    }
+    if (D().tool !== 'pin') {
+      for (const sh of D().shapes) {
+        if (sh.kind !== 'pin') continue;
+        const p = map.project([sh.lat, sh.lon], z);
+        const d = Math.hypot(p.x - c.x, p.y - c.y);
+        if (d <= bestD) {
+          bestD = d;
+          const sid = (sh.snappedTo && sh.snappedTo[0]) || null;
+          best = { ll: [sh.lat, sh.lon], sid, key: sh, ring: 10,
+                   name: stationName(sid) || `Pin ${sh.lat.toFixed(4)}, ${sh.lon.toFixed(4)}` };
+        }
+      }
     }
     return best;
   }
 
   // Without this the operator cannot tell whether a click snapped or not.
-  function showSnapHint(marker) {
-    if (snapHint && snapHint._mnFor === marker) return;
+  function showSnapHint(t) {
+    if (snapHint && t && snapHint._mnFor === t.key) return;
     clearSnapHint();
-    if (!marker || !map) return;
-    const s = marker.mnStation;
-    snapHint = L.circleMarker([s.lat, s.lon], {
-      radius: (marker.mnBaseStyle ? marker.mnBaseStyle.radius : 6) + 5,
-      color: colour(), weight: 2, dashArray: '4,3', fill: false, interactive: false,
+    if (!t || !map) return;
+    snapHint = L.circleMarker(t.ll, {
+      radius: t.ring, color: colour(), weight: 2, dashArray: '4,3', fill: false, interactive: false,
     }).addTo(map);
-    snapHint._mnFor = marker;
-    snapHint.bindTooltip(esc(s.name), {
+    snapHint._mnFor = t.key;
+    snapHint.bindTooltip(esc(t.name), {
       permanent: true, direction: 'top', className: 'mn-draw-label', offset: [0, -6],
     }).openTooltip();
   }
@@ -332,11 +361,11 @@ const MapDraw = (function () {
   }
 
   // Resolve a map click to the point the shape should actually use, and to the
-  // station it came from when it snapped.
+  // station it came from when it snapped (directly, or by way of a drawn pin).
   function resolve(latlng) {
     const t = snapTarget(latlng);
     return t
-      ? { ll: [t.mnStation.lat, t.mnStation.lon], sid: t.mnStationId }
+      ? { ll: t.ll.slice(), sid: t.sid }
       : { ll: [latlng.lat, latlng.lng], sid: null };
   }
 
@@ -484,6 +513,42 @@ const MapDraw = (function () {
     rerenderPanel();
   }
 
+  // Turn a line round: the last point becomes the first. The profile and its
+  // fade margin read a line's first point as A and its last as B — the chart
+  // runs left to right from A, the elevation angles and the two one-way
+  // margins are quoted A→B / B→A, the antenna-height boxes are A's and B's,
+  // and "Link budget for this path →" takes A as its transmitter — so this is
+  // how an operator says which end is which without redrawing the line.
+  //
+  // The snaps go with their points, and so do the profile card's typed antenna
+  // heights when this is the line it is describing: a height typed for a site
+  // belongs to the site, not to whichever end of the line it happens to be.
+  // The new geometry changes the profile's signature, so the terrain is walked
+  // again the other way round (the tiles are cached; it costs no fetch).
+  function flipLine(id) {
+    const sh = D().shapes.find(s => s.id === id);
+    if (!sh || sh.kind !== 'line' || sh.pts.length < 2) return;
+    const wasTarget = PathProfile.target() === sh;
+    sh.pts = sh.pts.slice().reverse();
+    if (Array.isArray(sh.snappedTo)) {
+      // A snap list is read end-first-and-last (snapLabel), so one shorter
+      // than the points is its two ends: stretched to one id per point before
+      // reversing, or the far end's id would land on a middle vertex.
+      const t = sh.snappedTo, n = sh.pts.length;
+      const full = t.length === n ? t.slice()
+        : sh.pts.map((_, i) => i === 0 ? t[0] ?? null : i === n - 1 ? t[t.length - 1] ?? null : null);
+      sh.snappedTo = full.reverse();
+    }
+    if (wasTarget) {
+      const P_ = state.path, a = P_.aglA;
+      P_.aglA = P_.aglB; P_.aglB = a;
+    }
+    D().selectedId = sh.id;
+    render();
+    rerenderPanel();
+    mapNote(`Line turned round — ${snapLabel(sh) || measure(sh)}`, 3000);
+  }
+
   function clearAll() {
     if (D().shapes.length > 1 &&
         !confirm(`Remove all ${D().shapes.length} drawings?`)) return;
@@ -547,7 +612,7 @@ const MapDraw = (function () {
     // and the result are the same thing.
     const t = D().tool ? snapTarget(e.latlng) : null;
     showSnapHint(t);
-    if (pending) showGhost(t ? [t.mnStation.lat, t.mnStation.lon] : [e.latlng.lat, e.latlng.lng]);
+    if (pending) showGhost(t ? t.ll : [e.latlng.lat, e.latlng.lng]);
 
     // The profile cursor, from the map's side: running the pointer along the
     // profiled line moves the dot on the chart and tags it with the ground
@@ -872,6 +937,10 @@ const MapDraw = (function () {
             <button class="draw-pick"
                     title="Select the stations inside this shape into the list below the map (shift-click to replace the current selection)"
                     onclick="MapDraw.selectInside('${escAttr(sh.id)}',event)">Select inside</button>` : ''}
+          ${sh.kind === 'line' ? `
+            <button class="draw-flip" title="Flip direction — swap which end is A and which is B"
+                    aria-label="Flip direction of ${escAttr(rowText(sh))}"
+                    onclick="MapDraw.flipLine('${escAttr(sh.id)}')">⇄</button>` : ''}
           <button class="draw-del" title="Delete"
                   onclick="MapDraw.remove('${escAttr(sh.id)}')">✕</button>
         </div>
@@ -936,10 +1005,10 @@ const MapDraw = (function () {
       <label class="filter-check">
         <input type="checkbox" ${D_.snap ? 'checked' : ''}
                onchange="MapDraw.toggleSnap(this.checked)">
-        Snap to stations
+        Snap to stations and pins
       </label>
       <p class="filter-hint">${D_.snap
-        ? 'Clicks within about 15 px of a station pin land on that station, and the shape is named after it.'
+        ? 'Clicks within about 15 px of a station pin land on that station, and the shape is named after it. Lines and other shapes land on your own 📍 pins the same way — nearest wins.'
         : 'Points land exactly where you click.'}</p>
       <label class="filter-check">
         <input type="checkbox" ${D_.showLabels ? 'checked' : ''}
@@ -992,7 +1061,7 @@ const MapDraw = (function () {
 
     panelHtml, rerenderPanel, render, setTool, select, remove, clearAll,
     finishLine, addFromForm, applyEdit, useMapCentre, toggleLabels, measure,
-    setColour, toggleSnap, selectInside, lineKm,
+    setColour, toggleSnap, selectInside, lineKm, flipLine,
 
     // Everything drawn, reduced to ground truth: where each shape is, what it
     // is called, what colour it was drawn in, and which stations it holds.

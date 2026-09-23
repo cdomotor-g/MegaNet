@@ -506,6 +506,147 @@ ok('…holding exactly two spans, one name per line',
 ok('…with both names in full on the title, where a clipped name goes',
    chart && /→/.test(chart.endsTitle || ''), chart && chart.endsTitle);
 
+// ── 6b. Flip direction, and a line snapping onto a drawn pin ─────────────────
+// Which end of a drawn line is A is which end the profile card treats as A —
+// the chart runs from it, the margins and angles are quoted A→B / B→A, the
+// antenna boxes are A's and B's — so the card's ⇄ button has to turn all of it
+// round, the typed antenna height going with the site it was typed for. Pressed
+// from the keyboard, and focus has to come back to it after the terrain is
+// walked again.
+
+console.log('\nFlip direction');
+
+await page.evaluate(() => { state.path.aglB = null; PathProfile.setAgl('A', '7'); });
+const endsNow = () => page.evaluate(() => {
+  const sh = PathProfile.target();
+  const dd = document.querySelector('#path-profile-panel dd.path-ends');
+  return {
+    pts: sh ? sh.pts.map(p => p.slice()) : null,
+    names: dd ? [...dd.querySelectorAll('span')].map(s => s.textContent) : [],
+    aglA: state.path.aglA, aglB: state.path.aglB,
+    svg: !!document.querySelector('#path-profile-panel svg'),
+    active: document.activeElement ? document.activeElement.id : null,
+  };
+});
+const preFlip = await endsNow();
+const flipBtn = await page.evaluate(() => {
+  const b = document.getElementById('path-flip');
+  if (!b) return null;
+  b.focus();
+  return { label: b.getAttribute('aria-label') || '', text: b.textContent.trim(),
+           row: !!document.querySelector('#map-draw-panel .draw-row.sel .draw-flip[aria-label]') };
+});
+ok('the profile card offers ⇄ Flip direction, labelled',
+   flipBtn && /Flip direction/.test(flipBtn.text) && /Flip direction/.test(flipBtn.label),
+   JSON.stringify(flipBtn));
+ok('…and so does the line’s row in the draw list', flipBtn && flipBtn.row);
+await page.keyboard.press('Enter');
+await page.waitForFunction((lon) => {
+  const sh = PathProfile.target();
+  return sh && sh.pts[0][1] === lon && !!document.querySelector('#path-profile-panel svg');
+}, HOP.lonB, { timeout: LOAD_TIMEOUT });
+await page.waitForTimeout(150);
+const postFlip = await endsNow();
+ok('Enter on it turns the line round — B is the first point now',
+   JSON.stringify(postFlip.pts) === JSON.stringify(preFlip.pts.slice().reverse()),
+   JSON.stringify(postFlip.pts));
+ok('…the Path row names the ends the other way round',
+   postFlip.names.length === 2 && postFlip.names[0] === preFlip.names[1]
+     && postFlip.names[1] === preFlip.names[0], JSON.stringify(postFlip.names));
+ok('…the antenna height typed for A goes with its site to B',
+   postFlip.aglA === null && postFlip.aglB === 7, `${postFlip.aglA} / ${postFlip.aglB}`);
+ok('…and focus is back on the button once the chart is redrawn',
+   postFlip.active === 'path-flip', String(postFlip.active));
+await page.keyboard.press('Enter');
+await page.waitForFunction((lon) => {
+  const sh = PathProfile.target();
+  return sh && sh.pts[0][1] === lon && !!document.querySelector('#path-profile-panel svg');
+}, HOP.lonA, { timeout: LOAD_TIMEOUT });
+const backFlip = await endsNow();
+ok('pressed again, it is back as it was',
+   JSON.stringify(backFlip.pts) === JSON.stringify(preFlip.pts)
+     && backFlip.aglA === 7 && backFlip.aglB === null, JSON.stringify(backFlip));
+await page.evaluate(() => PathProfile.setAgl('A', ''));
+
+console.log('\nA line snapping onto a drawn pin');
+
+// A spot on screen with no station pin within 60 px, so the only thing there
+// to snap to is the pin this block drops — well inside the map, clear of its
+// corners' controls. The view is zoomed in first so the network's pins are
+// not a carpet at the whole-network zoom.
+await page.evaluate(() => {
+  MapDraw.setTool('');
+  state.draw.shapes = []; state.draw.selectedId = null;
+  MapDraw.render(); MapDraw.rerenderPanel();
+  document.getElementById('leaflet-map').scrollIntoView({ block: 'center' });
+  state.map.setView([-27.5, 152.45], 13, { animate: false });
+});
+await settleScroll();
+await page.waitForTimeout(200);
+const spot = await page.evaluate(() => {
+  const m = state.map, r = m.getContainer().getBoundingClientRect();
+  const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight);
+  const pins = state.mapMarkers.map(k => m.latLngToContainerPoint([k.mnStation.lat, k.mnStation.lon]));
+  const clear = (x, y) => pins.every(p => Math.hypot(p.x - x, p.y - y) > 60);
+  for (let fy = 0.35; fy <= 0.75; fy += 0.05) {
+    for (let fx = 0.30; fx <= 0.70; fx += 0.05) {
+      const x = r.width * fx, y = (top - r.top) + (bottom - top) * fy;
+      const far = { x: r.width * (1 - fx), y };
+      if (clear(x, y) && clear(far.x, far.y) && Math.abs(far.x - x) > 100) {
+        return { x: r.left + x, y: r.top + y, fx: r.left + far.x, fy: r.top + far.y };
+      }
+    }
+  }
+  return null;
+});
+ok('there is a clear spot on the map to drop a pin', !!spot);
+if (spot) {
+  await page.evaluate(() => MapDraw.setTool('pin'));
+  await page.mouse.click(spot.x, spot.y);
+  await page.waitForTimeout(150);
+  const pin = await page.evaluate(() => {
+    const p = state.draw.shapes.find(s => s.kind === 'pin');
+    return p ? { lat: p.lat, lon: p.lon } : null;
+  });
+  ok('the pin tool dropped a pin', !!pin);
+  await page.evaluate(() => MapDraw.setTool('line'));
+  // 7 px off the pin: inside the 15 px snap, well outside "exactly on it".
+  await page.mouse.move(spot.x + 5, spot.y + 5);
+  await page.waitForTimeout(150);
+  const hint = await page.evaluate(() => {
+    let n = 0, tip = '';
+    state.map.eachLayer(l => {
+      if (l instanceof L.CircleMarker && l.options.dashArray === '4,3') {
+        n++; tip = l.getTooltip() ? String(l.getTooltip().getContent()) : '';
+      }
+    });
+    return { n, tip };
+  });
+  ok('hovering near the pin with the line tool rings it', hint.n === 1 && /^Pin -?\d/.test(hint.tip),
+     JSON.stringify(hint));
+  await page.mouse.click(spot.x + 5, spot.y + 5);
+  await page.waitForTimeout(150);
+  await page.mouse.click(spot.fx, spot.fy);
+  await page.waitForTimeout(150);
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(150);
+  const line = await page.evaluate(() => {
+    const l = state.draw.shapes.find(s => s.kind === 'line');
+    return l ? { pts: l.pts.map(p => p.slice()) } : null;
+  });
+  ok('the line was drawn', !!line && line.pts.length === 2, JSON.stringify(line));
+  ok('…and its first point is the pin’s own, exactly',
+     line && pin && line.pts[0][0] === pin.lat && line.pts[0][1] === pin.lon,
+     line && pin && `${line.pts[0]} vs ${pin.lat},${pin.lon}`);
+  ok('…while the far end, with nothing near it, lands where it was clicked',
+     line && pin && line.pts[1][1] !== pin.lon);
+  await page.evaluate(() => {
+    MapDraw.setTool('');
+    state.draw.shapes = []; state.draw.selectedId = null;
+    MapDraw.render(); MapDraw.rerenderPanel();
+  });
+}
+
 // ── 7. Built-up ground is not red any more ───────────────────────────────────
 // Red on this chart already means obstruction — the Fresnel intrusion overlay,
 // the worst-point marker, a blocked link on the map — so a brick-red built-up

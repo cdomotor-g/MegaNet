@@ -424,6 +424,7 @@ const PathProfile = (function () {
   // null whenever there is no chart — which is also what stops a stale pointer
   // from painting onto the chart that replaced it.
   let hoverGeom = null;
+  let refocusFlip = false;   // see rerender()
 
   const P = () => state.path;
 
@@ -1371,6 +1372,12 @@ const PathProfile = (function () {
       ${datum}
       ${elvisHtml(an)}
       <div class="path-actions">
+        <!-- Which end is A decides the chart's direction, the A→B / B→A order of
+             the margins and angles, and the budget's transmitter; this swaps
+             them without redrawing the line (MapDraw.flipLine). -->
+        <button id="path-flip" onclick="PathProfile.flip()"
+                aria-label="Flip direction: make ${escAttr(b.name)} end A and ${escAttr(a.name)} end B"
+                title="Turn the line round — ${escAttr(b.name)} becomes A, ${escAttr(a.name)} becomes B">⇄ Flip direction</button>
         <button onclick="LinkBudget.fromProfile()">Link budget for this path →</button>
         <button onclick="PathProfile.askElvis()"
                 ${cur.elvisStatus === 'loading' ? 'disabled' : ''}
@@ -1406,6 +1413,15 @@ const PathProfile = (function () {
     MapDraw.clearProfilePoint();
     el.hidden = !sh;                       // no line drawn: the panel isn't there at all
     el.innerHTML = sh ? panelHtml() : '';
+    // A flip re-walks the terrain, so the button that was pressed is replaced
+    // twice — by the "Sampling…" line and then by the new chart's own button.
+    // Focus goes back to it once it exists again, so a keyboard user can flip
+    // and flip back without hunting for it.
+    if (refocusFlip) {
+      const btn = document.getElementById('path-flip');
+      if (btn) { btn.focus(); refocusFlip = false; }
+      else if (cur.status !== 'loading') refocusFlip = false;
+    }
   }
 
   return {
@@ -1434,6 +1450,13 @@ const PathProfile = (function () {
     hoverOff() { hideCursor(); },
 
     setOpen(v) { P().open = !!v; },
+    // The profiled line, turned round (MapDraw.flipLine has the reasons).
+    flip() {
+      const sh = target();
+      if (!sh) return;
+      refocusFlip = true;
+      MapDraw.flipLine(sh.id);
+    },
     setAgl(which, v) {
       const n = v.trim() === '' ? null : Number(v);
       P()[which === 'A' ? 'aglA' : 'aglB'] = isFinite(n) ? n : null;
