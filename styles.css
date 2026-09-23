@@ -1625,7 +1625,7 @@ details.filter-block[open] > .filter-head .filter-title::before {
   display: grid;
   /* The name column gives way first on a narrow panel (a long name wraps)
      rather than pushing the figure out past the panel's edge. */
-  grid-template-columns: minmax(0, 8.5rem) minmax(3rem, 1fr) 2.8rem;
+  grid-template-columns: 1.2rem minmax(0, 7.5rem) minmax(3rem, 1fr) 2.8rem;
   align-items: center;
   gap: .5rem;
   font-size: .87rem;
@@ -1642,6 +1642,25 @@ details.filter-block[open] > .filter-head .filter-title::before {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+/* The grip that reorders the stack (map-controls.js). touch-action: none so a
+   finger drags the row rather than scrolling the flyout. */
+.mn-base-grip {
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: .1rem 0;
+  cursor: grab;
+  touch-action: none;
+  font-size: 1rem;
+  line-height: 1;
+}
+.mn-base-grip:hover,
+.mn-base-grip:focus-visible { color: var(--text); }
+.mn-base-row.is-dragging {
+  background: var(--panel-sub);
+  outline: 1px dashed var(--border);
+}
+.mn-base-row.is-dragging .mn-base-grip { cursor: grabbing; }
 .mn-base-row.is-off input[type="range"],
 .mn-base-row.is-off .mn-base-val {
   opacity: .5;

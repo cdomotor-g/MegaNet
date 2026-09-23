@@ -480,7 +480,8 @@ const HELP = {
       'The 🗺️ <strong>Map display</strong> panel starts with the <strong>base maps</strong>: tick '
       + 'more than one and give each its own opacity to blend them — Satellite at 40% over '
       + 'OSM-Topo puts the contours on the real ground — and each is drawn over the ones listed '
-      + 'above it. The mix is remembered. Below that the panel holds more than fits its first screenful — '
+      + 'above it; drag a row\'s ⠿ grip (or focus it and use the arrow keys) to change the order. '
+      + 'The mix and the order are remembered. Below that the panel holds more than fits its first screenful — '
       + 'LiDAR contours, wind regions, line-of-sight checks, survey marks, ACMA licensing — '
       + 'and the legend\'s last line names whichever of them are currently off.',
     ],

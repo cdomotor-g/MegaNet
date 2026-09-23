@@ -202,6 +202,11 @@ function addBaseLayers(map, opts = {}) {
   // private browsing, a full quota or a hand-edited value must still give a map.
   const pick = {};
   for (const n of names) pick[n] = { on: n === names[0], op: 1 };
+  // …and in what order, bottom first. Reorderable (drag the ⠿ grip, or arrow
+  // keys on it), saved beside the mix as `_order`. A saved order is taken for
+  // the names it knows and anything it does not mention keeps its default
+  // place after them, so a base added to makeBaseLayers() later still shows.
+  let order = names.slice();
   (() => {
     let raw = null;
     try { raw = localStorage.getItem(STORE); } catch (_) { return; }
@@ -213,6 +218,10 @@ function addBaseLayers(map, opts = {}) {
       return;
     }
     if (!saved || typeof saved !== 'object') return;
+    if (Array.isArray(saved._order)) {
+      const known = [...new Set(saved._order.filter(n => pick[n]))];
+      order = [...known, ...names.filter(n => !known.includes(n))];
+    }
     for (const n of names) {
       const s = saved[n];
       if (!s || typeof s !== 'object') continue;
@@ -222,14 +231,21 @@ function addBaseLayers(map, opts = {}) {
     }
   })();
   const save = () => {
-    try { localStorage.setItem(STORE, JSON.stringify(pick)); }
+    try { localStorage.setItem(STORE, JSON.stringify({ ...pick, _order: order })); }
     catch (_) { /* the mix still works for this session */ }
   };
 
-  // Stacking order is list order, stated once rather than left to the order
-  // the layers happen to be added in — ticking OSM-Topo back on after
-  // Satellite must put it back *under* Satellite.
-  names.forEach((n, i) => layers[n].setZIndex(i + 1));
+  // Stacking order is list order, stated rather than left to the order the
+  // layers happen to be added in — ticking OSM-Topo back on after Satellite
+  // must put it back *under* Satellite. The name layers follow their base's
+  // place, so a Dark laid over Satellite brings its names over Satellite's.
+  function restack() {
+    order.forEach((n, i) => {
+      layers[n].setZIndex(i + 1);
+      for (const c of companions[n] || []) c.setZIndex(i + 1);
+    });
+  }
+  restack();
 
   // A base at 0 % is ticked but not fetched: it keeps its place in the mix
   // without costing a tile request for pixels nobody can see.
@@ -248,7 +264,7 @@ function addBaseLayers(map, opts = {}) {
   // Null when nothing is showing, which Map3D reads as its own fallback.
   function lead() {
     let best = null;
-    for (const n of names) if (showing(n) && (!best || pick[n].op >= pick[best].op)) best = n;
+    for (const n of order) if (showing(n) && (!best || pick[n].op >= pick[best].op)) best = n;
     return best;
   }
   function publish() {
@@ -271,8 +287,11 @@ function addBaseLayers(map, opts = {}) {
   // while its base is off, the way Link opacity is while links are.
   const pct = n => Math.round(pick[n].op * 100);
   function html() {
-    return `<div class="map-display-h">Base maps</div>` + names.map(n => `
-      <div class="mn-base-row${pick[n].on ? '' : ' is-off'}">
+    return `<div class="map-display-h">Base maps</div>` + order.map(n => `
+      <div class="mn-base-row${pick[n].on ? '' : ' is-off'}" data-base-row="${escAttr(n)}">
+        <button type="button" class="mn-base-grip" data-base-map="${uid}" data-base="${escAttr(n)}"
+                aria-label="Move ${escAttr(n)} — arrow keys up or down, or drag"
+                title="Drag to change the stacking order (or focus and use the arrow keys)">⠿</button>
         <label class="filter-check">
           <input type="checkbox" data-base-map="${uid}" data-base="${escAttr(n)}" ${pick[n].on ? 'checked' : ''}>
           ${esc(n)}
@@ -284,7 +303,8 @@ function addBaseLayers(map, opts = {}) {
         <span class="mn-base-val" aria-hidden="true">${pct(n)}%</span>
       </div>`).join('') +
       `<p class="filter-note">Tick more than one to blend them — each is drawn
-         over the ones listed above it, at its own opacity. Satellite and Dark
+         over the ones listed above it, at its own opacity. Drag a ⠿ grip to
+         change the order. Satellite and Dark
          carry place &amp; road names; Dark strips the ground to near-black so
          the pins and links are the only thing left with any contrast.</p>`;
   }
@@ -314,6 +334,67 @@ function addBaseLayers(map, opts = {}) {
     });
     // `input`, not `change`: the blend is the thing being judged, so it has to
     // move under the thumb rather than when the thumb is let go.
+    // ── Reordering ───────────────────────────────────────────────────────────
+    // Pointer events on the grip rather than HTML5 drag-and-drop, which never
+    // fires for a finger. The row moves in the DOM as the pointer crosses the
+    // middle of a neighbour, so what is dragged is what lands; the stack is
+    // committed on release. The rows are direct children of the host block
+    // (Map display's Find box depends on that), so they move among themselves
+    // and never past the heading or the note.
+    const rowsIn = box => [...box.querySelectorAll(':scope > .mn-base-row')];
+    function commit(box, focusName) {
+      const next = rowsIn(box).map(r => r.dataset.baseRow).filter(n => pick[n]);
+      if (next.length !== order.length || next.every((n, i) => n === order[i])) return;
+      order = next;
+      restack(); publish(); save();
+      if (focusName) {
+        const g = box.querySelector(`.mn-base-grip[data-base="${CSS.escape(focusName)}"]`);
+        if (g) g.focus();
+      }
+    }
+    el.addEventListener('keydown', e => {
+      const g = e.target.closest && e.target.closest('.mn-base-grip');
+      if (!g || g.dataset.baseMap !== uid) return;
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      const row = g.closest('.mn-base-row'), box = row.parentNode;
+      const rows = rowsIn(box), i = rows.indexOf(row);
+      const j = i + (e.key === 'ArrowUp' ? -1 : 1);
+      if (j < 0 || j >= rows.length) return;
+      if (j < i) box.insertBefore(row, rows[j]);
+      else box.insertBefore(row, rows[j].nextSibling);
+      commit(box, g.dataset.base);
+    });
+    el.addEventListener('pointerdown', e => {
+      const g = e.target.closest && e.target.closest('.mn-base-grip');
+      if (!g || g.dataset.baseMap !== uid || e.button !== 0) return;
+      e.preventDefault();
+      const row = g.closest('.mn-base-row'), box = row.parentNode;
+      // Listened for on the window, not captured on the grip: moving the row
+      // re-inserts the grip, and re-insertion drops a pointer capture.
+      row.classList.add('is-dragging');
+      const move = ev => {
+        if (ev.pointerId !== e.pointerId) return;
+        for (const r of rowsIn(box)) {
+          if (r === row) continue;
+          const b = r.getBoundingClientRect(), mid = b.top + b.height / 2;
+          const above = row.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_PRECEDING;
+          if (above && ev.clientY < mid) { box.insertBefore(row, r); break; }
+          if (!above && ev.clientY > mid) box.insertBefore(row, r.nextSibling);
+        }
+      };
+      const up = ev => {
+        if (ev.pointerId !== e.pointerId) return;
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        row.classList.remove('is-dragging');
+        commit(box);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    });
     el.addEventListener('input', e => {
       const n = which(e);
       if (!n || e.target.type !== 'range') return;
@@ -328,7 +409,7 @@ function addBaseLayers(map, opts = {}) {
 
   // What a host panel needs, and what a check can read back without scraping
   // the tile panes: a copy of the mix, never the live object.
-  map.mnBases = { html, bind, mix: () => JSON.parse(JSON.stringify(pick)) };
+  map.mnBases = { html, bind, mix: () => JSON.parse(JSON.stringify(pick)), order: () => order.slice() };
 
   // First in the corner, and first in the group about what the map shows:
   // every other icon in that group is a way of drawing something *over* this.

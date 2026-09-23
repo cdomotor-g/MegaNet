@@ -1381,7 +1381,8 @@ middle. Esri needs no key and was already serving three of this app's layers.)*
 now (which took the map icon over from the 👁️ it had), and each one is a
 checkbox and an opacity slider. Tick several to mix them — Satellite at 40 % over
 OSM-Topo is the contours on the real ground cover — and each is drawn over the
-ones listed above it. Satellite's and Dark's place-name layers follow their base
+ones listed above it. The order is yours to change: drag a row's ⠿ grip up or
+down (a finger works too), or focus the grip and use the arrow keys. Satellite's and Dark's place-name layers follow their base
 on and off and at its strength. The mix is remembered (`mn-base-maps`) and shared
 by every map in the app; the other six maps, which have no Map display of their
 own, get a 🗺️ Map display holding just this section. The 3-D view drapes one

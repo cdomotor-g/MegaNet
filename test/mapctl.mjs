@@ -490,6 +490,42 @@ try {
     mix.out.Satellite?.opacity === 0.9 && mix.out['OSM-Topo']?.opacity === 0.7, JSON.stringify(mix.out));
   check('…and the lead moves with it', mix.lead === 'Satellite', mix.lead);
 
+  // The stack can be reordered: a real pointer drags Satellite's ⠿ grip up
+  // past OSM-Topo, which has to put Satellite *under* it on the map, not just
+  // higher in the list — and the arrow keys on the grip do the same job.
+  const GRIP = (n) => `.mn-mapctl[data-panel="display"] .mn-base-grip[data-base="${n}"]`;
+  const rowOrder = () => page.evaluate(() => [...document.querySelectorAll(
+    '.mn-mapctl[data-panel="display"] .mn-base-row')].map(r => r.dataset.baseRow));
+  const before = await rowOrder();
+  const g = await page.locator(GRIP('Satellite')).boundingBox();
+  const top = await page.locator(GRIP(before[0])).boundingBox();
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(g.x + g.width / 2, top.y + 2, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  mix = await readMix();
+  let ord = await rowOrder();
+  check('dragging a base\'s grip to the top of the list moves its row there',
+    ord[0] === 'Satellite' && ord.length === before.length, JSON.stringify({ before, ord }));
+  check('…and puts it under the others on the map',
+    mix.out.Satellite?.z < mix.out['OSM-Topo']?.z
+      && mix.out.labels?.z === mix.out.Satellite?.z, JSON.stringify(mix.out));
+  check('…and the order is written down with the mix',
+    JSON.stringify(mix.saved?._order) === JSON.stringify(ord), JSON.stringify(mix.saved));
+  await page.focus(GRIP('Satellite'));
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(100);
+  mix = await readMix();
+  ord = await rowOrder();
+  check('ArrowDown on the grip moves it one place down, keeping focus on it',
+    ord[1] === 'Satellite' && ord[0] === 'OSM-Topo'
+      && await page.evaluate(() => document.activeElement?.dataset?.base) === 'Satellite',
+    JSON.stringify(ord));
+  check('…and restacks the map to match', mix.out['OSM-Topo']?.z < mix.out.Satellite?.z,
+    JSON.stringify(mix.out));
+  const savedOrder = ord;
+
   // It comes back on the next visit, and the single-choice shape a saved value
   // might still be in reads as that base alone.
   const reopen = async () => {
@@ -504,6 +540,8 @@ try {
     mix.out['OSM-Topo']?.opacity === 0.7 && mix.out.Satellite?.opacity === 0.9
       && mix.ui['OSM-Topo']?.value === 70 && mix.ui.Satellite?.value === 90 && mix.ui.Satellite?.on,
     JSON.stringify({ out: mix.out, ui: mix.ui }));
+  check('…and so does the order', JSON.stringify(await rowOrder()) === JSON.stringify(savedOrder),
+    JSON.stringify(await rowOrder()));
   await page.evaluate(() => localStorage.setItem('mn-base-maps', 'Satellite'));
   await reopen();
   mix = await readMix();
