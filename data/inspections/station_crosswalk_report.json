@@ -2,7 +2,7 @@
   "_": "Match rates per tier, honestly — a blended percentage would hide that a proposed name and an exact number are different claims. Written by tools/ingest/crosswalk.py; do not edit by hand.",
   "workbook_identities": 1051,
   "inspection_rows": 14982,
-  "registry_stations": 3174,
+  "registry_stations": 3176,
   "by_tier": {
     "number": {
       "identities": 943,
