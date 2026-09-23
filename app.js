@@ -4157,7 +4157,8 @@ function clearMapSelection() {
 function stationPopupHtml(s) {
   const stnElev = [
     s.station_number ? `Stn #${esc(s.station_number)}` : '',
-    s.elevation_ahd != null ? `${esc(s.elevation_ahd)} m AHD` : '',
+    s.elevation_ahd == null ? ''
+      : `${esc(s.elevation_ahd)} m AHD${s.elevation_source ? ' (modelled)' : ''}`,
   ].filter(Boolean).join(' · ');
   const head = `
       <strong>${esc(s.name)}</strong><br>
@@ -4465,7 +4466,9 @@ function applyMapFocusStyles() {
 function exportMapSelection() {
   const rows = selectedStations();
   if (!rows.length) return;
-  const lines = ['id,name,station_number,roles,networks,alert_ids,lat,lon,elevation_ahd,enabled'];
+  // elevation_source rides beside the height: an export that dropped it would
+  // hand somebody 2,330 modelled figures with nothing to say they are modelled.
+  const lines = ['id,name,station_number,roles,networks,alert_ids,lat,lon,elevation_ahd,elevation_source,enabled'];
   for (const s of rows) {
     lines.push([
       csvEscape(s.id),
@@ -4474,7 +4477,8 @@ function exportMapSelection() {
       csvEscape(s.roles.join(' ')),
       csvEscape((s.radio_network_ids || []).map(id => netName(id)).join(' | ')),
       csvEscape(stationAlertIds(s).join(' ')),
-      s.lat ?? '', s.lon ?? '', s.elevation_ahd ?? '', s.enabled ? 1 : 0,
+      s.lat ?? '', s.lon ?? '', s.elevation_ahd ?? '', s.elevation_source ?? '',
+      s.enabled ? 1 : 0,
     ].join(','));
   }
   dlText(`meganet-selection-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
@@ -4743,7 +4747,10 @@ function stationWideCellsHtml(s) {
   return `
               <td class="small">${s.lat != null ? s.lat.toFixed(4) : ''}</td>
               <td class="small">${s.lon != null ? s.lon.toFixed(4) : ''}</td>
-              <td class="small">${s.elevation_ahd != null ? s.elevation_ahd : ''}</td>
+              <td class="small">${s.elevation_ahd == null ? ''
+                : s.elevation_source
+                  ? `<span title="${escAttr(s.elevation_source)}">${esc(s.elevation_ahd)} <span class="txt-muted">m</span></span>`
+                  : esc(s.elevation_ahd)}</td>
               <td>${s.enabled ? '✓' : ''}</td>
               <!-- stopPropagation because the whole row is a select: without it
                    a click here opens ARRO *and* pans the map to the station,
@@ -5049,6 +5056,10 @@ function goToStation(id) {
 // It says "modelled", never plain metres. A surveyed mark and a model of the
 // ground are different claims and the card must not let them read alike.
 function elvisCardAsk(elId, s) {
+  // Nothing to ask for where the file already carries a height — surveyed or
+  // modelled. Since #198's backfill that is 3,170 of the 3,176, so this is the
+  // ordinary case rather than the exception: opening a station card fires no
+  // request at all. The live lookup remains for the handful with neither.
   if (!s || s.elevation_ahd != null || s.lat == null || s.lon == null) return;
   if (typeof Elvis === 'undefined') return;
   const want = `${s.lat},${s.lon}`;
@@ -5258,7 +5269,15 @@ function stnCardHtml(s) {
       ${acmaCardRow('Stn #', s.station_number ? esc(s.station_number) : null)}
       ${acmaCardRow('Networks', nets ? esc(nets) : null)}
       ${acmaCardRow('Position', located ? esc(stationLatLonText(s)) : null)}
-      ${acmaCardRow('Elevation', s.elevation_ahd != null ? `${esc(s.elevation_ahd)} m AHD` : null)}
+      <!-- A modelled height and a surveyed one are different claims, and the
+           card must not let them read alike (#198). elevation_source carries
+           the provenance in words for the 2,330 filled from Elvis; it is null
+           where somebody put a mark on the ground. -->
+      ${acmaCardRow('Elevation', s.elevation_ahd == null ? null
+        : s.elevation_source
+          ? `<span title="${escAttr(`${s.elevation_source}. A model of the ground, not a mark on it.`)}"
+              >${esc(s.elevation_ahd)} m AHD <span class="mn-pop-note">modelled</span></span>`
+          : `${esc(s.elevation_ahd)} m AHD`)}
       <!-- Only where there is no surveyed figure, which is 2,334 of the 3,174
            (#198). Where there *is* one it stands: a surveyed mark and a model
            of the ground are answers to different questions, and the places

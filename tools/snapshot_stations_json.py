@@ -74,6 +74,7 @@ KEY_ORDER = {
                   'antenna_type', 'antenna_gain_dbi', 'antenna_height_m',
                   'rx_threshold_dbm'],
     'station': ['id', 'name', 'station_number', 'lat', 'lon', 'elevation_ahd',
+                'elevation_source',
                 'roles', 'radio_network_ids', 'catchment_ids', 'alert_ids',
                 'satcom', 'rm_system_id', 'enabled', 'notes', 'legacy_unit_id',
                 'repeater', 'site', 'sensors', 'lga', 'basin', 'hub_id',

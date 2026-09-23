@@ -331,16 +331,34 @@ check('and the program refuses anything outside them',
 
 // The self-test address must not be one a real station answers to, or a
 // commissioning shot writes a reading against somebody's gauge.
+//
+// The rigs are the exception, and they are the point rather than a loophole.
+// stations.json used to carry only real gauges; it now also carries the two
+// rows the document does not own — bateson_test and elpro_test, which
+// 0021/0026 created and which reach the file because station_json filters on
+// deleted_at alone (0022 gave the *importer* a document_managed guard and
+// never gave the view one). bateson_test carries sensor 8101 because 8101 is
+// TestId's default: the rig transmitting on the self-test address is the rig
+// working.
+//
+// So the danger is unchanged and the check keeps its teeth — it still fails if
+// any *gauge* claims the address — but the rig owning its own address is not
+// that danger.
+const RIGS = new Set(['bateson_test', 'elpro_test']);
 const stations = JSON.parse(fs.readFileSync(repo('stations.json'), 'utf8'));
 const registryIds = new Set();
+const rigIds = new Set();
 for (const s of stations.stations) {
+  const into = RIGS.has(s.id) ? rigIds : registryIds;
   for (const v of Object.values(s.alert_ids || {})) {
-    for (const x of (Array.isArray(v) ? v : [v])) if (x != null) registryIds.add(Number(x));
+    for (const x of (Array.isArray(v) ? v : [v])) if (x != null) into.add(Number(x));
   }
-  for (const sen of (s.sensors || [])) if (sen.alert_id != null) registryIds.add(Number(sen.alert_id));
+  for (const sen of (s.sensors || [])) if (sen.alert_id != null) into.add(Number(sen.alert_id));
 }
 check('the self-test address is not carried by any station in the registry',
-      !registryIds.has(TEST_ID), `${registryIds.size} addresses in stations.json`);
+      !registryIds.has(TEST_ID),
+      `${registryIds.size} gauge addresses in stations.json`
+      + (rigIds.has(TEST_ID) ? `; the rigs carry ${TEST_ID}, which is theirs to carry` : ''));
 
 // ── 5 · Both JSON shapes are JSON ────────────────────────────────────────────
 //

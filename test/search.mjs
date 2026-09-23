@@ -205,9 +205,15 @@ try {
     state.filters.searches = [row(windows)];
     state.filters.searchMode = 'any';
     r.note = searchTermsNoteHtml(0);
-    state.filters.searches = [row('9000-9100')];
+    // A window nothing is addressed in. It used to be 9000-9100, which stopped
+    // being empty the moment stations.json started carrying elpro_test: the rig
+    // answers on 9001-9003, and the document now holds the rigs as well as the
+    // gauges. 9200-9300 is clear of every address on file (the highest is
+    // 9003) and clear of the 1-8191 the wire can carry at all, so nothing real
+    // can wander into it.
+    state.filters.searches = [row('9200-9300')];
     r.emptyWindowNote = searchTermsNoteHtml(0);
-    r.emptyWindowSelects = select('9000-9100').length;
+    r.emptyWindowSelects = select('9200-9300').length;
     // A term that is on file, but not in the field this entry points at, is not
     // found — the entry said what it was a list of.
     const realNumber = String(state.data.stations.find(s => s.station_number).station_number);
@@ -436,7 +442,7 @@ try {
      /16 ALERT addresses inside the 3 ranges/.test(out.note), out.note);
   ok('and says all three were found', /all found/.test(out.note), out.note);
   ok('a window nobody has addressed is named as not on file',
-     /not in this database/.test(out.emptyWindowNote) && /9000-9100/.test(out.emptyWindowNote),
+     /not in this database/.test(out.emptyWindowNote) && /9200-9300/.test(out.emptyWindowNote),
      out.emptyWindowNote);
   ok('and selects nothing rather than everything', out.emptyWindowSelects === 0,
      `${out.emptyWindowSelects} selected`);

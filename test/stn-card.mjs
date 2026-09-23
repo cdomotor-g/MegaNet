@@ -145,7 +145,18 @@ async function main() {
       return {
         position:   rowVal('Position'), want: stationLatLonText(s),
         stn:        s.station_number ? rowVal('Stn #') === String(s.station_number) : null,
-        elev:       s.elevation_ahd != null ? rowVal('Elevation') === `${s.elevation_ahd} m AHD` : null,
+        // The height, plus "modelled" exactly when the figure is modelled
+        // (#198). 2,330 of the 3,176 carry an elevation_source now, and the
+        // whole point of that column is that the card does not let a modelled
+        // height read as a surveyed one — so this checks the marker is there
+        // when it should be and absent when it should not.
+        elev:       s.elevation_ahd == null ? null : (() => {
+                      const v = rowVal('Elevation');
+                      const base = v.startsWith(`${s.elevation_ahd} m AHD`);
+                      return base && /modelled/.test(v) === !!s.elevation_source;
+                    })(),
+        elevRaw:    rowVal('Elevation'),
+        elevSrc:    s.elevation_source || null,
         ids:        /AlertID/.test(text) && stationAlertIds(s).every(id => text.includes(String(id))),
         wind:       !!wind && wind.dataset.mnWind === `${s.lat},${s.lon}`,
         allPills:   kids.length > 0 && groups.every(g => g.classList.contains('pill-row')
@@ -174,7 +185,8 @@ async function main() {
     check('the card carries the position, as the same figure Copy hands over',
       rows.position === rows.want, `${rows.position} vs ${rows.want}`);
     check('the station number and elevation, where the station has them',
-      rows.stn !== false && rows.elev !== false);
+      rows.stn !== false && rows.elev !== false,
+      `elevation row: "${rows.elevRaw}"  source: ${rows.elevSrc}`);
     check('every ALERT id, and the wind region under its own element id',
       rows.ids && rows.wind);
     check('every action is a pill, Station details first', rows.allPills && rows.editFirst);

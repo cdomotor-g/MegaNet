@@ -203,6 +203,34 @@ try {
   // model of it are different claims, and the card must not let them read alike.
   check('…and it says "modelled", never plain metres',
     /modelled/.test(card.a), card.a.slice(0, 220));
+  // Since #198's backfill the common case is neither of the two above: the
+  // height is in the file already, carrying its provenance, so the card renders
+  // "modelled" from the data and asks Elvis nothing at all.
+  const stored = await page.evaluate(async () => {
+    Elvis.clear();
+    let asked = 0;
+    Elvis.seed(() => { asked++; return { 'SOURCE': 'No Data', 'DATASET': 'No Data',
+      'DEM RESOLUTION': 'No Data', 'HEIGHT AT LOCATION': 'No Data', 'METADATA URL': 'No Data' }; });
+    const s = (state.data.stations || []).find(x => x.elevation_source && x.elevation_ahd != null);
+    if (!s) { Elvis.seed(null); return null; }
+    showStationCard(s.id);
+    await new Promise(r => setTimeout(r, 700));
+    const el = document.getElementById('stn-card');
+    const txt = el ? el.textContent.replace(/\s+/g, ' ') : '';
+    Elvis.seed(null);
+    return { id: s.id, height: s.elevation_ahd, source: s.elevation_source, asked, txt };
+  });
+  check('the file carries modelled heights at all', !!stored,
+    stored ? `e.g. ${stored.id}` : 'no station carries elevation_source');
+  if (stored) {
+    check('a stored modelled height renders as modelled',
+      stored.txt.includes(`${stored.height} m AHD`) && /modelled/.test(stored.txt),
+      `${stored.id}: ${stored.source}`);
+    // The point of storing it: opening a card is free again.
+    check('…and asks Elvis nothing, because the answer is already in the file',
+      stored.asked === 0, `${stored.asked} request(s)`);
+  }
+
   check('a station that WAS surveyed keeps its own figure and asks nothing',
     card.b.includes(`${card.surveyed} m AHD`) && !/modelled/.test(card.b),
     `${card.surveyed} | ${card.b.slice(0, 200)}`);

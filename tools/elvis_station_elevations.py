@@ -102,6 +102,7 @@ USAGE
 
 import argparse
 import concurrent.futures
+import io
 import json
 import math
 import os
@@ -270,6 +271,105 @@ def recheck_no_data(stations, cache, timeout):
     print('    %d of %d had data after all.' % (recovered, len(suspect)), file=sys.stderr)
 
 
+# SRTM's sea-surface value over water, not a measurement of ground. These are
+# the only exact zeros in the whole run, and all three are jetties or marinas.
+# They keep falling back to the terrain tile, which is no worse than before.
+WATER_ZEROS = ('busselton_jetty', 'lochsport_marina', 'port_phillip_bay_st_kilda_marina')
+
+
+def apply_fills(args):
+    """Write the proposed heights into stations.json.
+
+    Two things make this safe to run twice, and both are the point:
+
+      * **Blanks only.** A station that already carries an `elevation_ahd` is
+        never touched, whatever this run thinks the ground is. A surveyed mark
+        and a model of it answer different questions (see WHAT IT DOES NOT DO),
+        and the second run of this tool must not start overwriting the first.
+      * **The repo's own writer.** Key order and number literals come from
+        tools/snapshot_stations_json.py rather than a second implementation of
+        them, so the bytes this produces are the bytes the weekly snapshot
+        produces. A float round-trip alone would turn 109 into 109.0 and
+        151.49999999999997 into something else, on 3,174 stations at once.
+
+    The provenance goes in `elevation_source` as readable words, not into
+    `elevation_ahd`: that column has always meant *surveyed*, and filling it
+    alone would make 2,330 modelled heights indistinguishable from survey marks
+    on the card, in the CSV export and in the table.
+    """
+    import csv as _csv
+    import decimal
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import snapshot_stations_json as snap
+    except ImportError:
+        print('apply needs tools/snapshot_stations_json.py beside this file.', file=sys.stderr)
+        return 1
+
+    fill_path = os.path.join(args.out, 'elvis-fill.csv')
+    if not os.path.exists(fill_path):
+        print('no %s \u2014 run without --apply first.' % fill_path, file=sys.stderr)
+        return 1
+    with open(fill_path, encoding='utf-8') as f:
+        fills = {r['id']: r for r in _csv.DictReader(f)}
+
+    raw = io.open(args.stations, encoding='utf-8').read()
+    doc = json.loads(raw, parse_float=decimal.Decimal)
+
+    filled = skipped_surveyed = skipped_water = 0
+    for st in doc.get('stations', []):
+        row = fills.get(st.get('id'))
+        if row is None:
+            continue
+        if st.get('elevation_ahd') not in (None, ''):
+            skipped_surveyed += 1
+            continue
+        if st['id'] in WATER_ZEROS and not args.force_water_zeros:
+            skipped_water += 1
+            continue
+        # As a Decimal, so it is written as the literal it is rather than as a
+        # float with a tail on it.
+        st['elevation_ahd'] = decimal.Decimal(row['elvis_ahd_m'])
+        st['elevation_source'] = source_words(row)
+        filled += 1
+
+    out = snap.render(doc)
+    if out == raw:
+        print('stations.json already carries these \u2014 nothing to do.', file=sys.stderr)
+        return 0
+    io.open(args.stations, 'w', encoding='utf-8').write(out)
+    print('  filled %d station(s); left %d surveyed one(s) alone'
+          % (filled, skipped_surveyed), file=sys.stderr)
+    if skipped_water:
+        print('  skipped %d at exactly 0.00 m over water (%s) \u2014 --force-water-zeros '
+              'to include them' % (skipped_water, ', '.join(WATER_ZEROS)), file=sys.stderr)
+    print('  wrote %s' % args.stations, file=sys.stderr)
+    print('\n  Next: sync it into the database, or the weekly snapshot will take it', file=sys.stderr)
+    print('  back out again:', file=sys.stderr)
+    print('    python3 tools/import_stations_json.py | psql "$MEGANET_DB_URL" '
+          '-v ON_ERROR_STOP=1 --single-transaction', file=sys.stderr)
+    return 0
+
+
+def source_words(row):
+    """The provenance, in words, for elevation_source.
+
+    A display string rather than a parsed code: the card shows it as it stands,
+    and the per-station dataset filename is in elvis-fill.csv for anyone
+    auditing a figure. '1m' reads as '1 m', '50cm' as '50 cm'.
+    """
+    res = (row.get('dem_resolution') or '').strip()
+    pretty = {'50cm': '50 cm', '1m': '1 m', '2m': '2 m', '5m': '5 m', '10m': '10 m',
+              '1 Second': '~30 m'}.get(res, res)
+    src = (row.get('source') or '').strip()
+    bits = 'Elvis'
+    if pretty:
+        bits += ' ' + pretty
+    if src:
+        bits += ' (%s)' % src
+    return bits
+
+
 def self_check():
     """The parsing, against the shapes the live service really returns.
 
@@ -391,6 +491,16 @@ def main():
                     help='ring radii in metres (default: 25,60,120)')
     ap.add_argument('--cache', default='', metavar='FILE',
                     help='read/write raw answers here so a re-run is free')
+    ap.add_argument('--apply', action='store_true',
+                    help='write the proposed heights into stations.json, with the '
+                         'provenance in elevation_source. Only fills blanks \u2014 a '
+                         'surveyed height is never touched. Idempotent: a second run '
+                         'changes nothing. Reads the CSVs under --out, so run without '
+                         '--apply first (or keep --cache) and look at them.')
+    ap.add_argument('--force-water-zeros', action='store_true',
+                    help='also write the three stations that come back as exactly '
+                         '0.00 m from SRTM over water. Off by default \u2014 see '
+                         'WATER_ZEROS.')
     ap.add_argument('--check', action='store_true',
                     help='self-test the parsing against the shapes the service really '
                          'returns, and exit. No network — this is what CI runs.')
@@ -398,6 +508,9 @@ def main():
 
     if args.check:
         return self_check()
+
+    if args.apply:
+        return apply_fills(args)
 
     stations = load_stations(args.stations)
     if args.only == 'missing':
