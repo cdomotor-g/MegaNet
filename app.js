@@ -2895,6 +2895,17 @@ function mapDisplayControlsHtml() {
              onchange="MapElevation.setRelief(this.checked)">
       Shade the slopes
     </label>
+    <!-- Which heights are painted. Same ramp either way, so the key below
+         stays true; the note says what each tile in view actually came from. -->
+    <label class="filter-field"
+           title="Elvis: Geoscience Australia's national 5 m LiDAR DEM, in AHD, from zoom 13 in, where a survey exists — the ~30 m tiles fill everywhere it does not. A picture only: profiles and coverage still read the ~30 m terrain.">
+      <span>Height source</span>
+      <select aria-label="Elevation shading source" onchange="MapElevation.setSource(this.value)">
+        ${[['srtm', '~30 m tiles (SRTM), everywhere'],
+           ['elvis', 'Elvis 5 m LiDAR where held, 30 m elsewhere']].map(([v, l]) =>
+          `<option value="${v}" ${MapElevation.source() === v ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+    </label>
     ${MapElevation.rampHtml()}` : ''}
     <p class="filter-note" id="map-elev-note">${MapElevation.noteHtml()}</p>
     <label class="filter-check">

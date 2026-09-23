@@ -143,6 +143,48 @@ await page.route(/elevation-tiles-prod\/terrarium\/(\d+)\/(\d+)\/(\d+)\.png/, ro
 });
 page.on('pageerror', e => errors.push(String(e)));
 
+// The Elvis height source's WCS (map-elevation.js), answered here with a
+// float32 GeoTIFF of the layout the live service sends — so the fetch, the
+// content-type test and the TIFF reader under test are the real ones. Three
+// kinds of ground, keyed on the box's west edge: west of 151° the service is
+// down (500), west of 152° it has no survey (every internal block unwritten),
+// and elsewhere the left half of each tile is 1234.5 m of LiDAR and the right
+// half is written but 0.0 — the service's own hole — so a tile there is
+// partly 5 m and partly the 30 m world above.
+const elvisAsked = [];
+function wcsTiff(kind) {
+  const W = 256, T = 128, IFD = 8, NTAG = 11;
+  const OFFS = IFD + 2 + NTAG * 12 + 4, LENS = OFFS + 16, DATA = LENS + 16;
+  const blocks = kind === 'empty' ? 0 : 4;
+  const buf = Buffer.alloc(DATA + blocks * T * T * 4);
+  buf.write('II', 0, 'ascii'); buf.writeUInt16LE(42, 2); buf.writeUInt32LE(IFD, 4);
+  buf.writeUInt16LE(NTAG, IFD);
+  const tags = [[256, 3, 1, W], [257, 3, 1, W], [258, 3, 1, 32], [259, 3, 1, 1], [262, 3, 1, 1],
+                [277, 3, 1, 1], [322, 3, 1, T], [323, 3, 1, T], [324, 4, 4, OFFS], [325, 4, 4, LENS],
+                [339, 3, 1, 3]];
+  tags.forEach(([tag, type, cnt, v], i) => {
+    const e = IFD + 2 + i * 12;
+    buf.writeUInt16LE(tag, e); buf.writeUInt16LE(type, e + 2); buf.writeUInt32LE(cnt, e + 4);
+    if (type === 3 && cnt === 1) buf.writeUInt16LE(v, e + 8); else buf.writeUInt32LE(v, e + 8);
+  });
+  for (let b = 0; b < blocks; b++) {
+    const at = DATA + b * T * T * 4;
+    buf.writeUInt32LE(at, OFFS + b * 4); buf.writeUInt32LE(T * T * 4, LENS + b * 4);
+    if (b % 2 === 0) for (let i = 0; i < T * T; i++) buf.writeFloatLE(1234.5, at + i * 4);
+  }
+  return buf;
+}
+await page.route(/services\.ga\.gov\.au\/.*WCSServer/, route => {
+  const url = route.request().url();
+  elvisAsked.push(url);
+  const west = Number((/BBOX=([-\d.]+)/.exec(url) || [])[1]);
+  if (west < 151) return route.fulfill({ status: 500, body: 'down',
+                                          headers: { 'Access-Control-Allow-Origin': '*' } });
+  return route.fulfill({ status: 200, contentType: 'image/tiff',
+                         body: wcsTiff(west < 152 ? 'empty' : 'mixed'),
+                         headers: { 'Access-Control-Allow-Origin': '*' } });
+});
+
 await page.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
 await page.waitForFunction(
   () => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations),
@@ -253,6 +295,85 @@ const relief = await page.evaluate(() => {
 });
 ok('the relief switch is remembered', relief.off === 'off' && relief.on === 'on' && relief.now === true,
    JSON.stringify(relief));
+
+// ── the height source: ~30 m everywhere, or Elvis 5 m where it is held ─────
+// A picture of better ground, not a new terrain source — so what is held here
+// is that it costs nothing until picked, that it draws the WCS's heights in the
+// same ramp, that it falls back to the 30 m tiles where the grid is empty, and
+// that the note says which of those is on screen.
+ok('Elvis is not asked for anything while the source is the 30 m tiles',
+   elvisAsked.length === 0, `${elvisAsked.length} request(s)`);
+
+const srcUi = await page.evaluate(() => {
+  const sel = document.querySelector('#map-display-block select[aria-label="Elevation shading source"]');
+  return { sel: !!sel, value: sel && sel.value, opts: sel ? [...sel.options].map(o => o.value) : [],
+           src: MapElevation.source() };
+});
+ok('a height-source menu sits with the elevation controls, on the 30 m tiles by default',
+   srcUi.sel && srcUi.value === 'srtm' && srcUi.src === 'srtm'
+   && JSON.stringify(srcUi.opts) === '["srtm","elvis"]', JSON.stringify(srcUi));
+
+// `want` is a status kind; the tiles load at moveend and then the queue, so a
+// wait on "any status" would read the last view's answer back as this one's.
+const elvisAt = async (ll, z, want) => {
+  await page.evaluate(([ll, z]) => state.map.setView(ll, z, { animate: false }), [ll, z]);
+  await page.waitForFunction(k => MapElevation.sourceStatus().kind === k, want,
+    { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(400);   // the note follows the tiles on a 250 ms debounce
+  return page.evaluate(() => ({ ...MapElevation.sourceStatus(),
+    note: document.getElementById('map-elev-note')?.textContent || '' }));
+};
+
+await page.evaluate(() => {
+  MapElevation._elvisReset();
+  MapElevation.setSource('elvis');
+});
+const picked = await page.evaluate(() => ({
+  stored: localStorage.getItem('mn-map-elev-src'),
+  sel: document.querySelector('#map-display-block select[aria-label="Elevation shading source"]')?.value,
+}));
+ok('picking Elvis is remembered and the menu shows it',
+   picked.stored === 'elvis' && picked.sel === 'elvis', JSON.stringify(picked));
+
+const far = await elvisAt([-27.5, 152.5], 11, 'zoom');
+ok('below its zoom floor the note says the 30 m tiles are what is drawn',
+   far.kind === 'zoom' && /zoom 13/.test(far.note), `${far.kind}: ${far.note.slice(0, 120)}`);
+ok('…and nothing is asked of Elvis out there', elvisAsked.length === 0,
+   `${elvisAsked.length} request(s)`);
+
+const near = await elvisAt([-27.5, 152.5], 14, 'partial');
+const px = await page.evaluate(() => {
+  for (const c of document.querySelectorAll('.mn-base-elev canvas.leaflet-tile-loaded')) {
+    const cx = c.getContext('2d');
+    const l = cx.getImageData(10, 128, 1, 1).data, r = cx.getImageData(250, 128, 1, 1).data;
+    if (l[3] === 255 && r[3] === 255) return { l: [...l], r: [...r] };
+  }
+  return null;
+});
+ok('with Elvis picked the WCS is asked for a GDA94 GeoTIFF of the tile',
+   elvisAsked.length > 0 && elvisAsked.every(u => /CRS=EPSG:4283/.test(u) && /FORMAT=GeoTIFF/.test(u)
+     && /WIDTH=256&HEIGHT=256/.test(u)), elvisAsked[0] || 'none');
+ok('the 5 m heights are painted in the same ramp (1234.5 m is the top band)',
+   !!px && px.l[0] === 0xff && px.l[1] === 0xff && px.l[2] === 0x80, JSON.stringify(px));
+ok('…and the grid\'s 0.0 holes are filled from the 30 m tiles, not painted as sea',
+   !!px && !(px.r[0] === 0xff && px.r[1] === 0xff && px.r[2] === 0x80)
+   && !(px.r[0] === 0 && px.r[1] === 0 && px.r[2] === 0xff), JSON.stringify(px));
+ok('the note says Elvis 5 m is in use and where it fell back',
+   near.kind === 'partial' && /Elvis 5 m/.test(near.note) && /partly/.test(near.note)
+   && /30 m/.test(near.note), `${near.kind}: ${near.note.slice(0, 160)}`);
+
+const none = await elvisAt([-27.5, 151.5], 14, 'none');
+ok('where the grid holds no survey the note says so and the tiles are 30 m',
+   none.kind === 'none' && /No Elvis 5 m grid here/.test(none.note), `${none.kind}: ${none.note.slice(0, 120)}`);
+
+const down = await elvisAt([-27.5, 150.5], 14, 'down');
+ok('a service that fails is reported as unreachable, not as "no data"',
+   down.kind === 'down' && /could not be reached/.test(down.note), `${down.kind}: ${down.note.slice(0, 120)}`);
+
+const cap = await page.evaluate(() => document.querySelectorAll('.mn-base-elev canvas.leaflet-tile').length);
+ok('tiles still paint while Elvis is down', cap > 0, `${cap} tile(s)`);
+
+await page.evaluate(() => { MapElevation.setSource('srtm'); MapElevation._elvisReset(); });
 
 await page.evaluate(() => MapElevation.setEnabled(false));
 

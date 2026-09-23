@@ -57,11 +57,65 @@
 // Bands, not a gradient: a colour file is a set of bands and Radio Mobile
 // draws it as one, so a boundary here is a real height an operator can point
 // at rather than a place where two colours happen to blend.
+//
+// ── The Elvis source: 5 m where the nation has it ───────────────────────────
+// A "Height source" menu under the switch picks between the ~30 m tiles above
+// and Geoscience Australia's national 5 m LiDAR-derived DEM — the product Elvis
+// distributes as "DEM of Australia derived from LiDAR 5 Metre Grid". Neither of
+// the Elvis hosts the app already reads can draw a map: elevation-at-point is
+// one 1.4–5 s request per *point* (elvis.js), and the coverage cache is a
+// picture of the metadata (map-elvis-coverage.js). What can is GA's WCS for
+// the same grid, which answers GetCoverage with a real float32 GeoTIFF and
+// reflects any Origin back with `Access-Control-Allow-Origin`, so a static page
+// reads it with no proxy. Measured against the live service, not assumed:
+//
+//   • CRS=EPSG:4283 (GDA94) works; CRS=EPSG:4326 answers 400, although the
+//     capabilities list it. GDA94 against WGS84 is under 2 m, well inside one
+//     5 m cell, so the grid is laid on the Web Mercator tile as if they agreed.
+//   • 256×256 comes back uncompressed float32 in 128-px internal tiles — a
+//     ~260 KB answer in 1.5–2.8 s, unchanged at 12 in flight (no degraded
+//     "No Data" shape turned up, unlike the point API). A reader for that one
+//     layout is fifty lines, so no GeoTIFF library comes with it.
+//   • Where the grid holds nothing the answer has two shapes: an internal tile
+//     never written (offset and length 0), and inside a written one, exactly
+//     0.0. Both are "no survey here", and those pixels are painted from the
+//     30 m tiles instead — 0.0 is not sea level to this reader, because a
+//     half-covered inland tile would otherwise paint its outback half as sea.
+//   • A box wholly outside the grid's extent is a 404 with an XML exception,
+//     so boxes outside it are never asked for.
+//
+// Only from ELVIS_MIN_Z: below it a tile pixel is coarser than 30 m and the
+// SRTM tiles already out-resolve the screen, so the Elvis setting draws them
+// and says so. It caps at ELVIS_MAX_NATIVE (~4 m a pixel at Queensland's
+// latitudes) and Leaflet stretches from there. The 3-D drape stays on the 30 m
+// tiles — it paints through tileUrl/paintedTile, which are unchanged.
+//
+// This is a *picture*. Nothing here reaches terrain.js, a profile or a sweep,
+// for elvis.js's reason: the physics reads one source everywhere, and a map
+// that looks sharper does not change what a clearance was computed from.
 const MapElevation = (function () {
   const TILE_URL   = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
   const TILE_PX    = 256;
   const MAX_NATIVE = 12;    // terrain.js's MAX_ZOOM, for terrain.js's reason
   const ATTRIB     = 'Elevation: AWS Terrain Tiles (SRTM/GMTED, ~30 m), height above the EGM96 geoid';
+
+  const ELVIS_WCS  = 'https://services.ga.gov.au/gis/services/DEM_LiDAR_5m_2025/MapServer/WCSServer';
+  const ELVIS_ATTRIB = 'Elevation: Elvis — Geoscience Australia 5 m LiDAR DEM (AHD) where held; '
+                     + 'AWS Terrain Tiles (~30 m, EGM96) elsewhere';
+  // W, S, E, N — the coverage's own envelope from DescribeCoverage.
+  const ELVIS_EXTENT = [114.0985, -43.4628, 153.6775, -9.8660];
+  const ELVIS_MIN_Z      = 13;   // ~17 m a pixel at 27° S: finer than 30 m from here
+  const ELVIS_MAX_NATIVE = 15;   // ~4 m a pixel — the grid's own 5 m
+  // Politeness rather than a measured ceiling (12 in flight answered cleanly):
+  // a whole z15 screen is ~40 tiles and nobody needs them all at once.
+  const ELVIS_IN_FLIGHT  = 4;
+  const ELVIS_FETCH_MS   = 20000;
+  const ELVIS_CACHE_MAX  = 48;   // decoded grids, 256 KB each
+  // Three failures in a row — a host the network denies, a service down —
+  // stops asking for this long, so a dead host costs three slow tiles a
+  // minute rather than one per tile in view.
+  const ELVIS_TRIP_AFTER = 3;
+  const ELVIS_TRIP_MS    = 60000;
 
   // Lower bound of each band, ascending, with the colour that band is painted.
   // Anything below the first band is painted the first band's colour — the sea
@@ -114,6 +168,11 @@ const MapElevation = (function () {
 
   let relief = (() => { try { return localStorage.getItem('mn-elev-relief') !== 'off'; }
                         catch (_) { return true; } })();
+  // 'srtm' or 'elvis'. Remembered like the relief switch; 'srtm' unless a
+  // person picked otherwise, because the Elvis source costs a slow request to
+  // a government server per close-in tile.
+  let source = (() => { try { return localStorage.getItem('mn-map-elev-src') === 'elvis' ? 'elvis' : 'srtm'; }
+                        catch (_) { return 'srtm'; } })();
 
   const live = new Set();   // every layer instance on any map, for a repaint
 
@@ -133,18 +192,31 @@ const MapElevation = (function () {
     return 0;
   }
 
-  function paint(canvas, img, z, ty) {
+  // Terrarium: elevation_m = (R·256 + G + B/256) − 32768. The canvas is the
+  // tile's own, used as scratch — paintHeights overwrites every pixel of it.
+  function decodeTerrarium(canvas, img) {
     const cx = canvas.getContext('2d', { willReadFrequently: true });
     cx.drawImage(img, 0, 0, TILE_PX, TILE_PX);
-    const data = cx.getImageData(0, 0, TILE_PX, TILE_PX);
-    const px = data.data;
+    const px = cx.getImageData(0, 0, TILE_PX, TILE_PX).data;
     const N = TILE_PX * TILE_PX;
-
-    // Terrarium: elevation_m = (R·256 + G + B/256) − 32768.
     const h = new Float32Array(N);
     for (let i = 0, j = 0; j < N; i += 4, j++) {
       h[j] = px[i] * 256 + px[i + 1] + px[i + 2] / 256 - 32768;
     }
+    return h;
+  }
+
+  function paint(canvas, img, z, ty) {
+    paintHeights(canvas, decodeTerrarium(canvas, img), z, ty);
+  }
+
+  // A grid of metres, 256×256 in the tile's own Web Mercator rows, painted. A
+  // NaN is a pixel no source answered for and is left transparent rather than
+  // given the sea's blue.
+  function paintHeights(canvas, h, z, ty) {
+    const cx = canvas.getContext('2d', { willReadFrequently: true });
+    const data = cx.createImageData(TILE_PX, TILE_PX);
+    const px = data.data;
 
     const res = metresPerPixel(z, ty);
     const cosZ = Math.cos(ZENITH), sinZ = Math.sin(ZENITH);
@@ -155,15 +227,18 @@ const MapElevation = (function () {
       const spanY = (yDn - yUp) * res;
       for (let x = 0; x < TILE_PX; x++, j++) {
         const v = h[j];
+        if (v !== v) continue;   // NaN: no answer, left at alpha 0
         const b = bandOf(v);
         let r = R[b], g = G[b], bl = B[b];
 
         if (relief) {
           const xL = x > 0 ? x - 1 : 0, xR = x < TILE_PX - 1 ? x + 1 : TILE_PX - 1;
           const spanX = (xR - xL) * res;
-          const dzdx = spanX > 0 ? (h[y * TILE_PX + xR] - h[y * TILE_PX + xL]) / spanX : 0;
+          let dzdx = spanX > 0 ? (h[y * TILE_PX + xR] - h[y * TILE_PX + xL]) / spanX : 0;
           // y grows southward, so north-up rise is the row above minus below.
-          const dzdy = spanY > 0 ? (h[yUp * TILE_PX + x] - h[yDn * TILE_PX + x]) / spanY : 0;
+          let dzdy = spanY > 0 ? (h[yUp * TILE_PX + x] - h[yDn * TILE_PX + x]) / spanY : 0;
+          if (dzdx !== dzdx) dzdx = 0;   // a neighbour with no answer
+          if (dzdy !== dzdy) dzdy = 0;
           const slope  = Math.atan(Z_FACTOR * Math.sqrt(dzdx * dzdx + dzdy * dzdy));
           const aspect = Math.atan2(dzdy, -dzdx);
           const hs = cosZ * Math.cos(slope) + sinZ * Math.sin(slope) * Math.cos(AZIMUTH - aspect);
@@ -180,6 +255,213 @@ const MapElevation = (function () {
       }
     }
     cx.putImageData(data, 0, 0);
+  }
+
+  // ── Elvis: reading the grid ─────────────────────────────────────────────────
+  // The one TIFF layout the WCS sends (see the header): baseline, uncompressed,
+  // one sample, float32 or 16/32-bit integers, tiled or stripped, either byte
+  // order. Anything else throws, and a throw is a failed tile drawn from the
+  // 30 m source — never a plausible-looking wrong grid.
+  function readTiff(buf) {
+    const dv = new DataView(buf);
+    const bo = dv.getUint16(0);
+    if (bo !== 0x4949 && bo !== 0x4d4d) throw new Error('not a TIFF');
+    const le = bo === 0x4949;
+    const u16 = o => dv.getUint16(o, le), u32 = o => dv.getUint32(o, le);
+    if (u16(2) !== 42) throw new Error('not a classic TIFF');
+    const ifd = u32(4), n = u16(ifd), tags = {};
+    for (let i = 0; i < n; i++) {
+      const e = ifd + 2 + i * 12, tag = u16(e), type = u16(e + 2), cnt = u32(e + 4);
+      const size = type === 3 ? 2 : type === 4 ? 4 : 1;
+      if (type !== 3 && type !== 4 && type !== 2) continue;
+      const at = cnt * size <= 4 ? e + 8 : u32(e + 8);
+      if (type === 2) {
+        tags[tag] = new TextDecoder().decode(new Uint8Array(buf, at, cnt)).replace(/\0+$/, '');
+      } else {
+        const v = [];
+        for (let k = 0; k < cnt; k++) v.push(type === 3 ? u16(at + k * 2) : u32(at + k * 4));
+        tags[tag] = v;
+      }
+    }
+    const one = (t, d) => (tags[t] ? tags[t][0] : d);
+    const W = one(256), H = one(257), bits = one(258, 1), fmt = one(339, 1);
+    if (one(259, 1) !== 1 || one(277, 1) !== 1) throw new Error('compressed or multi-band TIFF');
+    const read = fmt === 3 && bits === 32 ? o => dv.getFloat32(o, le)
+               : fmt === 2 && bits === 16 ? o => dv.getInt16(o, le)
+               : fmt === 2 && bits === 32 ? o => dv.getInt32(o, le)
+               : fmt === 1 && bits === 16 ? o => dv.getUint16(o, le)
+               : null;
+    if (!read || !W || !H) throw new Error('unsupported TIFF sample type');
+    const bpp = bits / 8;
+    const nodata = tags[42113] != null ? Number(tags[42113]) : NaN;   // GDAL_NODATA
+    const out = new Float32Array(W * H).fill(NaN);
+    // Tiles and strips are the same walk with a strip being a tile the full
+    // width of the image. An offset or length of 0 is a block never written.
+    const tiled = !!tags[322];
+    const bw = tiled ? one(322) : W, bh = tiled ? one(323) : one(278, H);
+    const offs = tags[tiled ? 324 : 273] || [], lens = tags[tiled ? 325 : 279] || [];
+    const across = Math.ceil(W / bw);
+    for (let b = 0; b < offs.length; b++) {
+      if (!offs[b] || !lens[b]) continue;
+      const x0 = (b % across) * bw, y0 = Math.floor(b / across) * bh;
+      for (let y = 0; y < bh && y0 + y < H; y++) {
+        for (let x = 0; x < bw && x0 + x < W; x++) {
+          const o = offs[b] + (y * bw + x) * bpp;
+          if (o + bpp > buf.byteLength) continue;
+          const v = read(o);
+          // 0.0 is this service's hole inside a written block (see the header);
+          // a float sentinel or GDAL's declared nodata is anyone's.
+          if (v === 0 || v === nodata || !(Math.abs(v) < 1e5)) continue;
+          out[(y0 + y) * W + x0 + x] = v;
+        }
+      }
+    }
+    return { W, H, data: out };
+  }
+
+  const tileLat = (z, y) => {
+    const n = Math.PI - 2 * Math.PI * y / Math.pow(2, z);
+    return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+  };
+  const tileLon = (z, x) => x / Math.pow(2, z) * 360 - 180;
+
+  // W, S, E, N of a tile, or null where the 5 m grid cannot have anything.
+  function elvisBox(z, x, y) {
+    const w = tileLon(z, x), e = tileLon(z, x + 1), n = tileLat(z, y), s = tileLat(z, y + 1);
+    const [W, S, E, N] = ELVIS_EXTENT;
+    return e < W || w > E || n < S || s > N ? null : [w, s, e, n];
+  }
+
+  function elvisUrl(box) {
+    return `${ELVIS_WCS}?SERVICE=WCS&VERSION=1.0.0&REQUEST=GetCoverage&COVERAGE=1`
+         + `&CRS=EPSG:4283&BBOX=${box.map(v => v.toFixed(7)).join(',')}`
+         + `&WIDTH=${TILE_PX}&HEIGHT=${TILE_PX}&FORMAT=GeoTIFF`;
+  }
+
+  // The WCS grid is evenly spaced in latitude; a Web Mercator tile is not. So
+  // each output row takes the grid row at its own latitude — nearest neighbour,
+  // which at these zooms moves nothing by more than a pixel, but done properly
+  // because it costs one atan per row.
+  function toTileRows(g, z, ty, box) {
+    const out = new Float32Array(TILE_PX * TILE_PX);
+    const [, s, , n] = box;
+    for (let py = 0; py < TILE_PX; py++) {
+      const lat = tileLat(z, ty + (py + 0.5) / TILE_PX);
+      const sr = Math.max(0, Math.min(g.H - 1, Math.floor((n - lat) / (n - s) * g.H)));
+      for (let px = 0; px < TILE_PX; px++) {
+        const sc = Math.min(g.W - 1, Math.floor(px * g.W / TILE_PX));
+        out[py * TILE_PX + px] = g.data[sr * g.W + sc];
+      }
+    }
+    return out;
+  }
+
+  // ── Elvis: asking for it ───────────────────────────────────────────────────
+  // A decoded-grid LRU (so the relief switch and a pan back cost nothing), a
+  // queue with a ceiling on what is in flight, and a breaker for a dead host.
+  // Leaflet's own updateWhenIdle is the debounce: no tile is asked for until
+  // the map stops moving.
+  const elvisGrids = new Map();     // 'z/x/y' → Float32Array | null (no cover)
+  const elvisQueue = [];
+  let elvisInFlight = 0, elvisFails = 0, elvisTrippedAt = 0;
+
+  const elvisTripped = () => elvisTrippedAt && Date.now() - elvisTrippedAt < ELVIS_TRIP_MS;
+
+  function elvisRemember(k, v) {
+    elvisGrids.delete(k);
+    elvisGrids.set(k, v);
+    if (elvisGrids.size > ELVIS_CACHE_MAX) elvisGrids.delete(elvisGrids.keys().next().value);
+  }
+
+  function elvisPump() {
+    while (elvisInFlight < ELVIS_IN_FLIGHT && elvisQueue.length) {
+      const job = elvisQueue.shift();
+      if (job.cancelled()) { job.resolve({ cancelled: true }); continue; }
+      elvisInFlight++;
+      job.run().then(job.resolve, () => job.resolve({ failed: true }))
+        .finally(() => { elvisInFlight--; elvisPump(); });
+    }
+  }
+
+  // Resolves — never rejects — to { grid } (a Float32Array of tile rows, NaN
+  // where the grid is empty), { none } (nothing to ask for), { failed } or
+  // { cancelled }.
+  function elvisGrid(z, x, y, cancelled) {
+    const k = `${z}/${x}/${y}`;
+    if (elvisGrids.has(k)) {
+      const g = elvisGrids.get(k);
+      elvisRemember(k, g);
+      return Promise.resolve(g ? { grid: g } : { none: true });
+    }
+    const box = elvisBox(z, x, y);
+    if (!box) return Promise.resolve({ none: true });
+    if (elvisTripped()) return Promise.resolve({ failed: true });
+
+    return new Promise(resolve => {
+      elvisQueue.push({
+        cancelled, resolve,
+        run() {
+          return fetchElvis(box).then(buf => {
+            if (buf == null) throw new Error('Elvis: no answer');
+            const g = toTileRows(readTiff(buf), z, y, box);
+            let any = false;
+            for (let i = 0; i < g.length && !any; i++) any = g[i] === g[i];
+            elvisFails = 0;
+            elvisRemember(k, any ? g : null);
+            return any ? { grid: g } : { none: true };
+          }).catch(err => {
+            if (++elvisFails >= ELVIS_TRIP_AFTER) elvisTrippedAt = Date.now();
+            throw err;
+          });
+        },
+      });
+      elvisPump();
+    });
+  }
+
+  function fetchElvis(box) {
+    if (typeof fetch !== 'function') return Promise.resolve(null);
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = setTimeout(() => ctl && ctl.abort(), ELVIS_FETCH_MS);
+    return fetch(elvisUrl(box), { signal: ctl ? ctl.signal : undefined })
+      .then(r => {
+        const ct = r.headers.get('content-type') || '';
+        // A 200 that is not a TIFF is a service exception in XML — a failure,
+        // not an empty answer (roadmap rev 98: a 200 is not an answer).
+        if (!r.ok || !/tiff/i.test(ct)) return null;
+        return r.arrayBuffer();
+      })
+      .finally(() => clearTimeout(timer));
+  }
+
+  // What each tile on the live overlay was drawn from, for the note. Keyed as
+  // Leaflet keys its tiles; entries leave with the tile.
+  //   'elvis'  all 5 m      'mixed'  5 m where held, 30 m in the gaps
+  //   'none'   no 5 m here  'failed' Elvis did not answer — drawn at 30 m
+  const tileKinds = new Map();
+  let noteTimer = null;
+
+  function noteTile(key, kind) {
+    tileKinds.set(key, kind);
+    refreshNoteSoon();
+  }
+
+  // The note is the one place that says what is on screen, so it follows the
+  // tiles — debounced, and by id rather than a panel rebuild, which would
+  // take the slider out from under a drag.
+  function refreshNoteSoon() {
+    if (noteTimer) return;
+    noteTimer = setTimeout(() => {
+      noteTimer = null;
+      const el = typeof document !== 'undefined' && document.getElementById('map-elev-note');
+      if (el) el.innerHTML = api.noteHtml();
+    }, 250);
+  }
+
+  function elvisSummary() {
+    const c = { elvis: 0, mixed: 0, none: 0, failed: 0 };
+    for (const k of tileKinds.values()) if (k in c) c[k]++;
+    return c;
   }
 
   // L.TileLayer, with the <img> swapped for a <canvas> we draw ourselves.
@@ -208,12 +490,23 @@ const MapElevation = (function () {
 
     onAdd(map) {
       live.add(this);
+      if (this.options.elvis) this.on('tileunload', this._mnUnload, this);
       return L.TileLayer.prototype.onAdd.call(this, map);
     },
 
     onRemove(map) {
       live.delete(this);
-      return L.TileLayer.prototype.onRemove.call(this, map);
+      const r = L.TileLayer.prototype.onRemove.call(this, map);
+      this.off('tileunload', this._mnUnload, this);
+      return r;
+    },
+
+    // A tile Leaflet has let go of: its queued Elvis request is dropped rather
+    // than fetched for nobody, and it stops counting in the note.
+    _mnUnload(e) {
+      if (e.tile) e.tile._mnGone = true;
+      tileKinds.delete(this._tileCoordsToKey(e.coords));
+      refreshNoteSoon();
     },
 
     createTile(coords, done) {
@@ -221,25 +514,55 @@ const MapElevation = (function () {
       tile.width = tile.height = TILE_PX;
       // Whatever else goes wrong, a tile that never calls done() leaves
       // Leaflet holding a loading counter that never reaches zero.
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
       const z = this._getZoomForUrl();
-      let settled = false;
+      let settled = false, timer = null;
       const finish = err => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
         done(err || null, tile);
       };
-      const timer = setTimeout(() => finish(new Error('terrain tile timed out')), 12000);
-      img.onload = () => {
-        // A tile that cannot be read back — CORS withdrawn, a tainted canvas —
-        // is a blank tile and an error, never a plausible-looking wrong colour.
-        try { paint(tile, img, z, coords.y); finish(null); }
-        catch (e) { finish(e); }
+      // The 30 m heights for this tile, handed to `use` to paint. The timer
+      // starts here rather than at createTile, so time spent in the Elvis
+      // queue is not charged to the terrarium fetch.
+      const terrarium = use => {
+        timer = setTimeout(() => finish(new Error('terrain tile timed out')), 12000);
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          // A tile that cannot be read back — CORS withdrawn, a tainted canvas —
+          // is a blank tile and an error, never a plausible-looking wrong colour.
+          try { use(decodeTerrarium(tile, img)); finish(null); }
+          catch (e) { finish(e); }
+        };
+        img.onerror = () => finish(new Error('terrain tile unavailable'));
+        img.src = this.getTileUrl(coords);
       };
-      img.onerror = () => finish(new Error('terrain tile unavailable'));
-      img.src = this.getTileUrl(coords);
+
+      if (!this.options.elvis || z < ELVIS_MIN_Z) {
+        terrarium(h => paintHeights(tile, h, z, coords.y));
+        return tile;
+      }
+
+      // Elvis first; the 30 m tile only where it leaves a gap, so a tile the
+      // 5 m grid covers whole costs one request rather than two.
+      const key = this._tileCoordsToKey(coords);
+      elvisGrid(z, coords.x, coords.y, () => !!tile._mnGone).then(r => {
+        if (r.cancelled || tile._mnGone) { finish(new Error('tile left the view')); return; }
+        const g = r.grid;
+        let full = !!g;
+        if (g) for (let i = 0; i < g.length && full; i++) full = g[i] === g[i];
+        if (full) {
+          try { paintHeights(tile, g, z, coords.y); noteTile(key, 'elvis'); finish(null); }
+          catch (e) { finish(e); }
+          return;
+        }
+        noteTile(key, g ? 'mixed' : r.none ? 'none' : 'failed');
+        terrarium(h => {
+          if (g) for (let i = 0; i < h.length; i++) if (g[i] === g[i]) h[i] = g[i];
+          paintHeights(tile, h, z, coords.y);
+        });
+      });
       return tile;
     },
     });
@@ -272,7 +595,16 @@ const MapElevation = (function () {
     if (state.mapElev) {
       if (!overlay) {
         if (!map.getPane(PANE)) map.createPane(PANE).style.zIndex = PANE_Z;
-        overlay = new (layerClass())({ pane: PANE, opacity: state.mapElevOpacity });
+        overlay = new (layerClass())(L.extend({ pane: PANE, opacity: state.mapElevOpacity },
+          source === 'elvis' ? {
+            elvis: true,
+            attribution: ELVIS_ATTRIB,
+            maxNativeZoom: ELVIS_MAX_NATIVE,
+            // Leaflet's own debounce: no tile is asked for until the map stops
+            // moving, and only a ring of one tile is kept beyond the view.
+            updateWhenIdle: true,
+            keepBuffer: 1,
+          } : {}));
       }
       if (!map.hasLayer(overlay)) overlay.addTo(map);
       overlay.setOpacity(state.mapElevOpacity);
@@ -280,6 +612,7 @@ const MapElevation = (function () {
       overlay.remove();
       overlay = null;
     }
+    refreshNoteSoon();
   }
 
   // ── The same pixels, somewhere Leaflet is not (#194) ───────────────────────
@@ -301,7 +634,7 @@ const MapElevation = (function () {
     return c;
   }
 
-  return {
+  const api = {
     RAMP,
     attribution: ATTRIB,
 
@@ -320,11 +653,14 @@ const MapElevation = (function () {
 
     layer(opts) { return new (layerClass())(opts); },
 
-    attach(m) { map = m; sync(); },
+    // zoomend keeps the note honest about the Elvis source's zoom floor, which
+    // no tile event would otherwise report — tiles below it are just 30 m.
+    attach(m) { map = m; m.on('zoomend', refreshNoteSoon); sync(); },
 
     detach() {
       if (overlay) overlay.remove();
       overlay = null;
+      if (map) map.off('zoomend', refreshNoteSoon);
       map = null;
     },
 
@@ -359,13 +695,70 @@ const MapElevation = (function () {
         return 'Ground height as colour, over whichever base map is picked — the slider decides '
              + 'which of the two you are mostly looking at.';
       }
+      const heights = source === 'elvis'
+        ? `<span id="map-elev-source">${api.sourceStatus().html}</span>`
+        : 'Heights are above the EGM96 geoid, ~30 m sampling.';
       return `Painted at <strong>${Math.round(state.mapElevOpacity * 100)}%</strong> over the base
-              map. Heights are above the EGM96 geoid, ~30 m sampling; the bands are the Radio
-              Mobile colour file's own. On Satellite and Dark the place names draw over the top
-              of it — on OSM-Topo they are in the tiles, so the slider is what brings them back.
-              In the ⛰️ 3-D view the same ramp is draped on the terrain, slider and relief switch
-              and all.`;
+              map. ${heights} The bands are the Radio Mobile colour file's own. On Satellite and
+              Dark the place names draw over the top of it — on OSM-Topo they are in the tiles, so
+              the slider is what brings them back. In the ⛰️ 3-D view the same ramp is draped on
+              the terrain, slider and relief switch and all${source === 'elvis'
+                ? ', from the ~30 m tiles only' : ''}.`;
     },
+
+    // ── Which heights are painted ────────────────────────────────────────────
+    source() { return source; },
+
+    // A new layer rather than a redraw: the source changes the layer's native
+    // zoom and attribution, which Leaflet reads once, at construction.
+    setSource(v) {
+      source = v === 'elvis' ? 'elvis' : 'srtm';
+      try { localStorage.setItem('mn-map-elev-src', source); } catch (_) {}
+      if (overlay) { overlay.remove(); overlay = null; }
+      tileKinds.clear();
+      elvisTrippedAt = 0; elvisFails = 0;   // picking it again is asking again
+      sync();
+      rerenderMapDisplayControls();
+    },
+
+    // What is on screen right now, for the note: { kind, html }. kind is
+    // 'srtm' | 'zoom' (Elvis picked, below its floor) | 'down' | 'elvis' |
+    // 'partial' (some tiles 5 m, some 30 m) | 'none' (Elvis picked, no 5 m in
+    // view) | 'loading'.
+    sourceStatus() {
+      if (source !== 'elvis') return { kind: 'srtm', html: '~30 m SRTM tiles.' };
+      const z = map ? map.getZoom() : null;
+      if (z != null && z < ELVIS_MIN_Z) {
+        return { kind: 'zoom', html: `<strong>Elvis 5 m</strong> from zoom ${ELVIS_MIN_Z} — out here a
+          screen pixel is coarser than 30 m, so the ~30 m tiles (EGM96) are what is drawn.` };
+      }
+      const c = elvisSummary();
+      const fine = c.elvis + c.mixed, all = fine + c.none + c.failed;
+      const down = elvisTripped() || (c.failed && !fine && !c.none);
+      if (down) {
+        return { kind: 'down', html: `<strong>Elvis could not be reached</strong> — every tile in
+          view fell back to the ~30 m tiles. It is asked again in a minute.` };
+      }
+      if (!all) return { kind: 'loading', html: 'Asking Elvis for 5 m heights…' };
+      const failed = c.failed ? ` ${c.failed} tile${c.failed === 1 ? '' : 's'} could not be fetched
+        and are 30 m.` : '';
+      if (!fine) {
+        return { kind: 'none', html: `<strong>No Elvis 5 m grid here</strong> — the national LiDAR
+          compilation does not cover this view, so it is the ~30 m tiles (EGM96).${failed}` };
+      }
+      const kind = fine === all && !c.mixed ? 'elvis' : 'partial';
+      const gaps = c.mixed ? ', and the gaps inside partly covered tiles,' : '';
+      const rest = kind === 'elvis' ? '' : ` The rest${gaps} fall back to the ~30 m tiles (EGM96).`;
+      return { kind, html: `<strong>Elvis 5 m LiDAR DEM</strong> (Geoscience Australia, AHD) on
+        ${fine} of ${all} tile${all === 1 ? '' : 's'} in view${c.mixed ? `, ${c.mixed} of them
+        partly` : ''}.${rest}${failed}` };
+    },
+
+    // Read by the check, which answers the WCS itself through page.route —
+    // so the fetch, the content-type test and the reader under test are real.
+    _elvisReset() { elvisGrids.clear(); elvisTrippedAt = 0; elvisFails = 0; },
+    _elvisUrl(z, x, y) { const b = elvisBox(z, x, y); return b ? elvisUrl(b) : null; },
+    _readTiff: readTiff,
 
     // The hex a height is painted, for anything that wants to agree with this
     // ramp without drawing tiles — the peak markers, a legend, a key.
@@ -396,5 +789,6 @@ const MapElevation = (function () {
       }).reverse().join('')}</ul>`;
     },
   };
+  return api;
 })();
 if (typeof window !== 'undefined') window.MapElevation = MapElevation;
