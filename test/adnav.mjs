@@ -597,7 +597,7 @@ try {
   ok('the picker offers Durikai and Tyalgum', opts.some(o => o[0] === 'durikai')
      && opts.some(o => o[0] === 'tyalgum' && /Tyalgum Bridge/.test(o[1])), JSON.stringify(opts));
 
-  await page.route('**/data/demo/tyalgum.csv', r => r.fulfill({ status: 404, body: 'not found' }));
+  await page.route('**/data/demo/aem_Tyalgum_Bridge_558088_Rainfall_558088_1_R_3467.csv', r => r.fulfill({ status: 404, body: 'not found' }));
   await page.selectOption('select.ad-demo-pick', 'tyalgum');
   await page.click('.ad-drop-acts button[onclick*="loadDemo"]');
   await page.waitForFunction(() => !window.ArroData.ad.busy, null, { timeout: LOAD_TIMEOUT });
@@ -607,11 +607,11 @@ try {
     n: window.ArroData.ad.series.length, rateOn: window.ArroData.ad.cfg.rateOn,
   }));
   ok('a missing Tyalgum file says the file has not been added yet',
-     /the Tyalgum demo file hasn't been added to data\/demo yet/.test(miss.note), miss.note);
+     /Tyalgum Bridge rainfall \(558088\) demo file hasn't been added to data\/demo yet/.test(miss.note), miss.note);
   ok('…and neither adds a series nor applies the preset', miss.n === 1 && miss.rateOn === false,
      JSON.stringify(miss));
 
-  await page.unroute('**/data/demo/tyalgum.csv');
+  await page.unroute('**/data/demo/aem_Tyalgum_Bridge_558088_Rainfall_558088_1_R_3467.csv');
   // In the same shape as the Durikai export: newest first, the codes the preset
   // excludes mixed among ones it keeps.
   const codes = ['A', 'DD', 'A', 'PD', 'A', 'ND', 'A', 'AN', 'MM', 'AS'];
@@ -621,7 +621,7 @@ try {
     const v = (100 + i * 0.2).toFixed(1);
     tya.push(`${d},${d},${v},mm,${codes[i % codes.length]},${v}`);
   }
-  await page.route('**/data/demo/tyalgum.csv', r => r.fulfill({
+  await page.route('**/data/demo/aem_Tyalgum_Bridge_558088_Rainfall_558088_1_R_3467.csv', r => r.fulfill({
     status: 200, contentType: 'text/csv', body: tya.join('\n') }));
   await page.click('.ad-drop-acts button[onclick*="loadDemo"]');
   await page.waitForFunction(() => window.ArroData.ad.series.length > 1, null, { timeout: LOAD_TIMEOUT });
@@ -649,7 +649,7 @@ try {
       pick: document.querySelector('select.ad-demo-pick').value,
     };
   });
-  ok('the Tyalgum set loads from data/demo/tyalgum.csv', got.has && got.n === 200, JSON.stringify(got));
+  ok('the Tyalgum set loads from data/demo', got.has && got.n === 200, JSON.stringify(got));
   ok('…linked to Tyalgum Bridge in the station file', got.station === 'Tyalgum Bridge', got.station);
   const wantCfg = { use357: true, small: 3, medium: 5, large: 8, breakCount: 18, startTests: 4,
                  rateOn: true, rateMax: 4, fallOn: true, fallMax: 4,
@@ -667,6 +667,28 @@ try {
       .filter(b => b.checked).map(b => b.value).sort());
   ok('the Filters panel shows the excluded codes ticked',
      JSON.stringify(qualUi) === JSON.stringify(['AN', 'DD', 'ND', 'PD']), JSON.stringify(qualUi));
+
+  // And the real file, unstubbed: the export as shipped in data/demo loads,
+  // links to its station and comes up under the same preset.
+  await page.unroute('**/data/demo/aem_Tyalgum_Bridge_558088_Rainfall_558088_1_R_3467.csv');
+  await page.evaluate(() => {
+    const A = window.ArroData;
+    A.ad.series = A.ad.series.filter(x => !/Tyalgum/.test(x.fileName));
+    A.resetCfg();
+  });
+  await page.click('.ad-drop-acts button[onclick*="loadDemo"]');
+  await page.waitForFunction(() => window.ArroData.ad.series.some(x => /Tyalgum/.test(x.fileName)),
+    null, { timeout: LOAD_TIMEOUT });
+  await page.waitForFunction(() => !window.ArroData.ad.busy, null, { timeout: LOAD_TIMEOUT });
+  const real = await page.evaluate(() => {
+    const A = window.ArroData, c = A.ad.cfg;
+    const s = A.ad.series.find(x => /Tyalgum/.test(x.fileName));
+    return { n: s.n, station: s.station && s.station.name,
+             preset: c.rateOn && c.fallOn && c.qualOn && c.rangeOn && c.large === 8 && c.breakCount === 18 };
+  });
+  ok('the shipped Tyalgum export loads — tens of thousands of readings', real.n > 40000, JSON.stringify(real));
+  ok('…linked to Tyalgum Bridge, with the preset on', real.station === 'Tyalgum Bridge' && real.preset,
+     JSON.stringify(real));
 
   ok('nothing threw', errors.length === 0, errors.join(' | '));
 

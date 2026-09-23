@@ -1412,21 +1412,16 @@ const ArroData = (function () {
       file: 'aem_Durikai_AL_541134_Rainfall_541134_0_R_5758.csv',
       description: 'Durikai rainfall, 14,942 readings over seven months, exactly as ARRO '
                  + 'exported them — uncleaned, and the file the filters were written against.' },
-    // Tyalgum Bridge (558088) is the one Tyalgum in the legacy unit list
-    // (ALL_UNITS 1014, "Tyalgum Br (Tya") and the registry's rain sensor there is
-    // 558088.1.R.3467 — so that is the name it is adopted under. Tyalgum Creek
-    // (558129, sensor 558129.1.R.7167) is the other station of the name; if the
-    // export turns out to be that one, `as` is the only line to change. The
-    // settings are the ones the export was reviewed with, and "Break after" and
-    // "Start window" are breakCount and startTests — see cfgHtml().
+    // Tyalgum Bridge (558088), rain sensor 558088.1.R.3467, as ARRO exported it
+    // — the name carries the sensor id, which is what links it to its station.
+    // The settings are the ones the export was reviewed with, and "Break after"
+    // and "Start window" are breakCount and startTests — see cfgHtml().
     { id: 'tyalgum',
       label: 'Tyalgum Bridge rainfall (558088)',
-      file: 'tyalgum.csv',
-      as: 'aem_Tyalgum_Bridge_558088_Rainfall_558088_1_R_3467.csv',
-      missing: 'the Tyalgum demo file hasn\'t been added to data/demo yet',
-      description: 'Tyalgum Bridge rainfall, loaded with the filter settings it was reviewed '
-                 + 'with: 3-5-7 at 3/5/8, rise and fall limits of 4 mm/h, quality codes DD, PD, '
-                 + 'ND and AN excluded, and a 0–1024 range.',
+      file: 'aem_Tyalgum_Bridge_558088_Rainfall_558088_1_R_3467.csv',
+      description: 'Tyalgum Bridge rainfall, 54,792 readings over a year, loaded with the filter '
+                 + 'settings it was reviewed with: 3-5-7 at 3/5/8, rise and fall limits of '
+                 + '4 mm/h, quality codes DD, PD, ND and AN excluded, and a 0–1024 range.',
       cfg: { use357: true, small: 3, medium: 5, large: 8, breakCount: 18, startTests: 4,
              rateOn: true, rateMax: 4, fallOn: true, fallMax: 4,
              qualOn: true, qualCut: ['DD', 'PD', 'ND', 'AN'],
