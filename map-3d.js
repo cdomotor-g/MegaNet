@@ -186,7 +186,9 @@ const Map3D = (function () {
   };
 
   // Which of them the 2-D map is currently showing. addBaseLayers() records it
-  // on the Leaflet map as `mnBaseName`; anything unrecognised falls back to the
+  // on the Leaflet map as `mnBaseName` — with several blended, the most opaque
+  // of them, since the drape is one raster — and null when every base is off.
+  // That, like anything unrecognised, falls back to the
   // plain OSM sheet, which is the one that carries roads, localities and
   // watercourses as *names* — what a 3-D view of unfamiliar country is for.
   function baseName() {
@@ -1238,7 +1240,8 @@ const Map3D = (function () {
       }
     },
 
-    // The 🗺️ picker changed the 2-D base map, so the drape changes with it.
+    // The 2-D base mix changed which base leads it (🗺️ Map display), so the
+    // drape changes with it.
     // The raster source's tiles cannot be swapped in place, so the source is
     // replaced and the layer re-added above the links — which keeps the layer
     // order right without rebuilding the map, the terrain or the sheets.
@@ -1335,7 +1338,8 @@ const Map3D = (function () {
                    ${on ? '' : 'disabled'}
                    oninput="Map3D.setExaggeration(this.value)">
           </label>
-          <p class="filter-note">The base map is whichever one the 🗺️ picker is on, and the
+          <p class="filter-note">The base map is the one 🗺️ Map display has on — the most
+            opaque of them, if several are blended — and the
             pins and links are the ones the 2-D map has drawn — the same filters, the same
             colouring, the same hidden and culled sets.</p>
           <p class="filter-note" id="map-3d-note">${noteHtml()}</p>

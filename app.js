@@ -2516,12 +2516,15 @@ function syncMapFullEsc() {
 // addBaseLayers() and before the modules attach.
 function stationsMapPanels(map) {
   // ── What the map shows ─────────────────────────────────────────────────────
-  // The base-map picker is the first of these and is added by addBaseLayers()
-  // (show/10), because every map in the app has one and only this map has the
-  // rest. These two are the other half of the same question: what is drawn over
-  // that base, and what do the colours on it mean.
+  // The base maps were an icon of their own (🗺️ Base map, show/10) until they
+  // became a blend rather than a choice; they are the first section of Map
+  // display now, which took over the 🗺️ from the 👁️ it had. addBaseLayers()
+  // was told not to build a panel (initMap) and publishes the section as
+  // map.mnBases instead: its markup is emitted by mapDisplayControlsHtml(), and
+  // its listeners are bound here, on the panel body, which outlives every
+  // re-render of the block inside it.
   MapChrome.panel(map, {
-    id: 'display', icon: '👁️', title: 'Map display',
+    id: 'display', icon: '🗺️', title: 'Map display',
     group: 'show', order: 20,
     html: () => `
       <div id="map-display-block">${mapDisplayControlsHtml()}</div>
@@ -2529,7 +2532,10 @@ function stationsMapPanels(map) {
     // The panel is rebuilt with the map on every render of the tab; the find
     // term is not, so a term that was in the box comes back filtering the rows
     // that were just built.
-    onMount: () => applyMapDisplayFind(),
+    onMount: body => {
+      if (map.mnBases) map.mnBases.bind(body);
+      applyMapDisplayFind();
+    },
   });
   MapChrome.panel(map, {
     id: 'legend', icon: '🔑', title: 'Legend',
@@ -2749,7 +2755,7 @@ function resetStationsMap() {
 const MAX_LINK_KM_CAP = 600;
 
 // Three group headings since #175. This flyout holds a dozen controls and the
-// whole ACMA block behind one eye icon, and scrolls: everything past "Show
+// whole ACMA block behind one icon, and scrolls: everything past "Show
 // signal links" was below the fold, and a column of unlabelled checkboxes
 // gives nobody a reason to scroll it. Inert markup — the ids, the checkboxes
 // and the panel's pointer contract (test/mapctl.mjs) are untouched.
@@ -2758,7 +2764,7 @@ function mapDisplayControlsHtml() {
   return `
     <!-- Find a control (#186). This panel is a dozen switches, three sliders,
          four selects, a radio group and the whole ACMA block, under four
-         headings and behind one eye icon, and it scrolls — so the honest
+         headings and behind one icon, and it scrolls — so the honest
          description of it is that a person who knows exactly which switch they
          want still has to go looking for it. The box filters the panel to the
          rows that match, headings and all, and matches against what each row
@@ -2777,6 +2783,7 @@ function mapDisplayControlsHtml() {
              oninput="setMapDisplayFind(this.value)">
     </div>
     <p class="filter-note" id="map-display-find-none" hidden></p>
+    ${state.map && state.map.mnBases ? state.map.mnBases.html() : ''}
     <div class="map-display-h">Stations &amp; links</div>
     <label class="filter-check"
            title="Takes the non-matching pins off the map, and the link lines that run to them with them. Tick &quot;Include related repeaters&quot; to keep the carriers and their lines.">
@@ -3184,7 +3191,7 @@ function mapLinkNoteHtml() {
 // worth discovering (the default-off, request-costing ones) invisible to
 // exactly the people who don't know to look (#175). So its last line names
 // whichever optional layers are off and where to turn them on. Text, not
-// controls: the legend stays a key, and the eye icon stays the one place a
+// controls: the legend stays a key, and the 🗺️ icon stays the one place a
 // layer is switched.
 function mapLegendOffLayersHtml() {
   const off = [
@@ -3203,7 +3210,7 @@ function mapLegendOffLayersHtml() {
   if (!off.length) return '';
   return `
     <span class="legend-item legend-off">
-      <span class="small txt-muted">Also available — turn on in 👁️ Map display: ${off.join(' · ')}</span>
+      <span class="small txt-muted">Also available — turn on in 🗺️ Map display: ${off.join(' · ')}</span>
     </span>`;
 }
 
@@ -3353,7 +3360,7 @@ function mapLegendHtml() {
     <span class="legend-item">
       <span class="legend-sq" style="--dot:${MapElevation.colourAt(600)}"></span>
       <span class="small">Elevation shading — ground height in the Radio Mobile colour file's
-        twelve bands, keyed in full in 👁️ Map display</span>
+        twelve bands, keyed in full in 🗺️ Map display</span>
     </span>` : ''}
     ${MapContours.active() ? `
     <span class="legend-item">
@@ -3364,7 +3371,7 @@ function mapLegendHtml() {
     <span class="legend-item">
       <span class="legend-sq" style="--dot:#004385"></span>
       <span class="small">Elevation data coverage — the best DEM resolution Australia holds
-        under each place, keyed in full in 👁️ Map display. Profiles still read ~30 m terrain
+        under each place, keyed in full in 🗺️ Map display. Profiles still read ~30 m terrain
         everywhere (Elvis — Geoscience Australia / ICSM)</span>
     </span>` : ''}
     ${MapPolar.active() ? mapPolarLegendHtml() : ''}
@@ -3454,8 +3461,8 @@ function maybeShowMapLayersHint() {
     try { localStorage.setItem('mn-hint-display', '1'); } catch (_) { /* see above */ }
     mapLayersHintUntil = now + MAP_LAYERS_HINT_MS;
   }
-  mapNote('Tip: the 👁️ button on the map has more layers — survey marks, LiDAR contours, '
-    + 'wind regions, ACMA licences, line of sight.', mapLayersHintUntil - now);
+  mapNote('Tip: the 🗺️ button on the map mixes the base maps and has more layers — survey '
+    + 'marks, LiDAR contours, wind regions, ACMA licences, line of sight.', mapLayersHintUntil - now);
 }
 
 // A filter change on the Stations tab drives both halves of the page: the map
@@ -3495,9 +3502,9 @@ function anySearchText() {
 
 // ── Base map layers ─────────────────────────────────────────────────────────
 // makeBaseLayers() and addBaseLayers() moved to map-controls.js at #164, with
-// the rest of the furniture the seven Leaflet maps share. Nothing about them
-// changed here: this file still calls addBaseLayers(state.map) in initMap()
-// below, exactly as the other six maps call it.
+// the rest of the furniture the seven Leaflet maps share, and nothing about
+// them changed here at the time. Since the base maps became a blend, initMap()
+// calls it with { panel: false } and Map display carries the section instead.
 
 // Take the Stations map down: on the way out of the tab, and again at the top
 // of every render of it.
@@ -3588,7 +3595,9 @@ function initMap() {
   // been set up yet. It is replaced by the fit below on the same tick.
   state.map.setView(MAP_HOME, 4);
   state.mapFitKey = null;              // a fresh map always fits its contents once
-  addBaseLayers(state.map);
+  // No panel of its own here: the base maps are the top section of this map's
+  // 🗺️ Map display flyout (stationsMapPanels, mapDisplayControlsHtml).
+  addBaseLayers(state.map, { panel: false });
   // The three panels that used to sit in the sidebar. Built before the modules
   // attach, because MapDraw.attach() can rerender its own panel and it has to
   // have somewhere to render it to.
@@ -3639,7 +3648,7 @@ function initMap() {
   MapContours.attach(state.map);
   ElvisCoverage.attach(state.map);
   MapPeaks.attach(state.map);
-  // Its own on-map panel rather than a switch in the 👁️ flyout: this one is a
+  // Its own on-map panel rather than a switch in the 🗺️ flyout: this one is a
   // dialog, not a layer — nine fields and a Draw button — and it is the same
   // shape as Radio Mobile's own window, which is what an operator coming from
   // that tool is looking for.

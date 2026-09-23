@@ -239,8 +239,8 @@ const HELP = {
            + 'card on the page, and shutting it is how the map, the path tools and the editor get '
            + 'onto one screen together; its summary keeps the live row count and names the '
            + 'selected station. The map carries its own controls in its top-right corner, in '
-           + 'groups with a hairline between them: what the map <em>shows</em> (the base map, '
-           + '<strong>Map display</strong>, the legend), the tools you point at it '
+           + 'groups with a hairline between them: what the map <em>shows</em> ('
+           + '🗺️ <strong>Map display</strong>, base maps first, and the legend), the tools you point at it '
            + '(<strong>Draw &amp; measure</strong>, <strong>Polar radio coverage</strong>, '
            + '<strong>ℹ️ What is here</strong>), the <strong>3-D view</strong> and its camera, '
            + 'how much screen the map gets (⛶ and ◫), and the one that resets it (↺). The panels '
@@ -269,7 +269,7 @@ const HELP = {
            + 'retyped sends you to the number on screen.',
     watch: [
       '<strong>3-D view</strong> — ⛰️ in the map\'s corner, or the panel of the same name — '
-      + 'tilts the map onto the ground it is drawn on: the base map you are already on, draped over '
+      + 'tilts the map onto the ground it is drawn on: the base map you are already on (the most opaque one, if you have blended several), draped over '
       + '~30 m terrain, with the pins and links you are already looking at on it. Drag to pan, '
       + 'right-drag (or Ctrl-drag, or two fingers) to tilt and rotate. It is the same map and the '
       + 'same controls, so a filter changed while it is tilted is the same filter — and the pins '
@@ -343,8 +343,8 @@ const HELP = {
       + 'question anybody is asking, and a mat of chevrons over a dense network is the picture '
       + 'nobody wanted.',
       '<strong>Elevation shading</strong>, under <em>Overlay layers</em>, paints the ground itself '
-      + 'in the Radio Mobile colour file\'s twelve height bands — over whichever base map is '
-      + 'picked, with an opacity slider. It was a fifth base map until #186 and that was the '
+      + 'in the Radio Mobile colour file\'s twelve height bands — over whichever base maps are '
+      + 'on, with an opacity slider. It was a fifth base map until #186 and that was the '
       + 'wrong shape: picked as a base it took the localities, the roads and the watercourses '
       + 'with it, and the ground and the place names are not alternatives. The slider is what '
       + 'makes them one picture. Heights are above the EGM96 geoid at ~30 m sampling.',
@@ -366,7 +366,7 @@ const HELP = {
       + 'backbone — opens a card about that hop and points the elevation profile and link budget '
       + 'panels at it. The dashes are what says <em>backbone</em>; the colour between them says '
       + 'whatever the link colouring says.',
-      'The 👁️ <strong>Map display</strong> panel has a <strong>Find a control</strong> box at the '
+      'The 🗺️ <strong>Map display</strong> panel has a <strong>Find a control</strong> box at the '
       + 'top of it. Type into it and the panel filters down to the rows that match — against the '
       + 'label, its note and its tooltip, so "wind", "dB", "contour" and "licence" all land '
       + 'somewhere. It filters what is drawn and switches nothing off, and the panel opens as '
@@ -477,7 +477,10 @@ const HELP = {
       + '<em>Station details ↓</em> on it selects the station and jumps to its details card below '
       + 'the map. On a phone the callout carries only <em>Details &amp; actions</em> and '
       + '<em>Copy lat, lon</em>, and the card opens as a sheet across the bottom of the map.',
-      'The 👁️ <strong>Map display</strong> panel holds more than fits its first screenful — '
+      'The 🗺️ <strong>Map display</strong> panel starts with the <strong>base maps</strong>: tick '
+      + 'more than one and give each its own opacity to blend them — Satellite at 40% over '
+      + 'OSM-Topo puts the contours on the real ground — and each is drawn over the ones listed '
+      + 'above it. The mix is remembered. Below that the panel holds more than fits its first screenful — '
       + 'LiDAR contours, wind regions, line-of-sight checks, survey marks, ACMA licensing — '
       + 'and the legend\'s last line names whichever of them are currently off.',
     ],

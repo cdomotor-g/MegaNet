@@ -14,7 +14,7 @@
 //   3. **The phone** — at 375 px the callout carries the identity and two fat
 //      pills, the close button is finger-sized, and Details opens the card as
 //      a sheet across the bottom of the map, with focus in it.
-//   4. **Discoverability** — the one-time tip about the 👁️ button, the legend
+//   4. **Discoverability** — the one-time tip about the 🗺️ button, the legend
 //      naming the layers that are off, and the flyout's group headings.
 //
 // Why a check of its own: every failure here renders a page that looks
@@ -627,8 +627,8 @@ async function main() {
       text:  document.getElementById('map-note').textContent,
       seen:  localStorage.getItem('mn-hint-display'),
     }));
-    check('a first visit is told about the 👁️ button, once',
-      tip.shown && /👁️/.test(tip.text) && /layers/.test(tip.text) && tip.seen === '1',
+    check('a first visit is told about the 🗺️ button, once',
+      tip.shown && /🗺️/.test(tip.text) && /layers/.test(tip.text) && tip.seen === '1',
       `shown=${tip.shown} seen=${tip.seen} "${tip.text}"`);
     await fp.reload({ waitUntil: 'load', timeout: LOAD_TIMEOUT });
     await fp.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
@@ -673,9 +673,11 @@ async function main() {
     check('the wind key lists all ten regions, with speeds and what they cost', legend.windRows);
     check('the same for line of sight', legend.losEntry);
     // Four since #186 — "Link colour" joined them when the fade-margin switch
-    // became one of three radio buttons and the frequency colouring the default.
-    check('the 👁️ flyout is grouped under four headings',
-      legend.heads.join('|') === 'Stations & links|Link colour|Overlay layers|Labels & export',
+    // became one of three radio buttons and the frequency colouring the default
+    // — and five since the base maps stopped being a panel of their own and
+    // became the first section of this one.
+    check('the 🗺️ flyout is grouped under five headings, base maps first',
+      legend.heads.join('|') === 'Base maps|Stations & links|Link colour|Overlay layers|Labels & export',
       legend.heads.join(' | '));
     await fresh.context.close();
 

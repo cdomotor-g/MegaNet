@@ -377,8 +377,9 @@ try {
     };
   });
   const whole = await panel();
-  check('the panel is four groups when nothing is typed',
-    whole.heads.join('|') === 'Stations & links|Link colour|Overlay layers|Labels & export',
+  // Five since the base maps moved in from a panel of their own, at the top.
+  check('the panel is five groups when nothing is typed, base maps first',
+    whole.heads.join('|') === 'Base maps|Stations & links|Link colour|Overlay layers|Labels & export',
     whole.heads.join(' | '));
 
   await page.fill('#map-display-find', 'contour');
@@ -399,6 +400,16 @@ try {
     narrowed.heads.length === 1 && narrowed.heads[0] === 'Overlay layers',
     narrowed.heads.join(' | '));
   check('…and the ACMA block with them', narrowed.acma === false);
+
+  // The base-map rows are rows like any other: one base's switch and slider
+  // are one row, found by its name and nothing else of the section with it.
+  await page.fill('#map-display-find', 'satellite');
+  await page.waitForTimeout(300);
+  const base = await panel();
+  check('a base map is found by name, its switch and slider together',
+    base.heads.join('|') === 'Base maps' && /Satellite/.test(base.text)
+      && !/OSM-Topo/.test(base.text) && !/OpenStreetMap/.test(base.text),
+    `${base.heads.join(' | ')}: ${base.text.slice(0, 160)}`);
 
   await page.fill('#map-display-find', 'licence');
   await page.waitForTimeout(300);

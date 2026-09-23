@@ -1,15 +1,16 @@
 // The on-map panels put themselves away (#164's control, and the defect that
 // outlived it).
 //
-// MapChrome draws four icons in the Stations map's top-right corner — Base map,
-// Map display, Draw & measure, the legend — and every one of them opens a flyout
-// *over the map*. The whole design rests on one promise, written at the top of
+// MapChrome draws its panels in the Stations map's top-right corner — 🗺️ Map
+// display (base maps first, since they stopped being a panel of their own),
+// Draw & measure, the legend — and every one of them opens a flyout *over the
+// map*. The whole design rests on one promise, written at the top of
 // both map-controls.js and the `.mn-mapctl` block in styles.css: **the pin is
 // the only way a panel stays.** Everything else that opens one is supposed to
 // expire on its own.
 //
-// It did not. Clicking any control *inside* a panel — a checkbox, a base-layer
-// radio, a colour swatch, a draw tool — focuses that control, and an ungated
+// It did not. Clicking any control *inside* a panel — a checkbox, a base-map
+// switch, a colour swatch, a draw tool — focuses that control, and an ungated
 // `focusin` promoted the panel to open-for-real on that focus. So the ordinary
 // act of using a panel welded it to the map until its icon was hunted down and
 // clicked again, and because a stuck flyout is 300 px wide and opens leftward
@@ -132,21 +133,26 @@ try {
     return at;
   };
 
+  // One base map's on/off switch and its opacity slider, inside Map display.
+  const BASE_BOX   = (n) => `.mn-base-row input[type="checkbox"][data-base="${n}"]`;
+  const BASE_RANGE = (n) => `.mn-base-row input[type="range"][data-base="${n}"]`;
+
   // ── 1. The baseline: hover shows it, leaving puts it away ─────────────────
   check('hovering the pencil opens Draw & measure', (await hover('draw')).shown);
   await leave();
   check('and moving off the control puts it away', !(await look('draw')).shown);
 
   // ── 2. The defect: using a panel must not weld it to the map ──────────────
-  // One case per panel, because the three carry different controls and the
-  // promotion fired on all of them: a checkbox, a checkbox, a radio. The pair
+  // One case per kind of control, because the promotion fired on all of them:
+  // a draw option, a filter switch, a base-map switch. The pair
   // of assertions is deliberate — "still open under the pointer" first, so a
   // fix that merely made panels close on click (breaking the panel instead of
   // fixing it) cannot pass the half that matters.
   for (const [panel, selector, label] of [
     ['draw',    'input[type="checkbox"]', 'Draw & measure ("Snap to stations")'],
-    ['display', 'input[type="checkbox"]', 'Map display (a filter checkbox)'],
-    ['basemap', 'input[type="radio"]',    'Base map (a base-layer radio)'],
+    // A direct child of the block, so not a base-map row's checkbox.
+    ['display', '#map-display-block > label.filter-check input[type="checkbox"]', 'Map display (a filter checkbox)'],
+    ['display', BASE_BOX('Satellite'), 'Map display (a base-map checkbox)'],
   ]) {
     await hover(panel);
     const hit = await clickInside(panel, selector);
@@ -184,8 +190,8 @@ try {
   // panel above it instead, and the one underneath loses the hover that was
   // showing it. §2 proves one panel closes; this proves the corner as a whole
   // only ever has one thing open in it.
-  await hover('basemap');
-  await clickInside('basemap', 'input[type="radio"]');
+  await hover('display');
+  await clickInside('display', BASE_BOX('Satellite'));
   await hover('draw');
   const openNow = await page.evaluate(() =>
     [...document.querySelectorAll('.mn-mapctl')]
@@ -267,8 +273,8 @@ try {
   // The other end of the same narrowing. A panel closing on hover-out while a
   // *clicked* checkbox still holds focus would send focus to <body>; the icon
   // is where it came from and where Tab should carry on from.
-  await hover('basemap');
-  await clickInside('basemap', 'input[type="radio"]');
+  await hover('display');
+  await clickInside('display', BASE_BOX('Satellite'));
   await leave();
   const landed = await page.evaluate(() => {
     const a = document.activeElement;
@@ -276,7 +282,7 @@ try {
       a && a.closest ? (a.closest('.mn-mapctl') || {}).dataset?.panel : null };
   });
   check('focus follows the closing panel back to its icon, not to <body>',
-    landed.tag === 'BUTTON' && /mn-mapctl-btn/.test(landed.cls) && landed.panel === 'basemap',
+    landed.tag === 'BUTTON' && /mn-mapctl-btn/.test(landed.cls) && landed.panel === 'display',
     JSON.stringify(landed));
 
   // ── 8. The pin is still the one thing that does persist ───────────────────
@@ -386,6 +392,125 @@ try {
     if (b) check(`…and is not on the map while the map is flat`, !b.shown,
       JSON.stringify(b));
   }
+
+  // ── 10. The base maps are a blend, inside Map display ─────────────────────
+  // They were a 🗺️ panel of their own holding four radios; they are the top
+  // section of Map display now, which took the 🗺️ over from the 👁️, and every
+  // base is a switch and a slider of its own. The claim that matters is the
+  // one a radio group cannot make — **two bases on at once, each at its own
+  // strength** — so it is driven through the real controls (a pointer on the
+  // switches, the keyboard on the sliders) and read back off the Leaflet
+  // layers themselves: on the map or not, at what opacity, stacked which way.
+  const iconNow = await page.evaluate(() => ({
+    basemap: !!document.querySelector('.mn-mapctl[data-panel="basemap"]'),
+    icon: (document.querySelector('.mn-mapctl[data-panel="display"] .mn-mapctl-ico') || {}).textContent,
+    first: (document.querySelector('#map-display-block .map-display-h') || {}).textContent,
+  }));
+  check('there is no separate Base map panel any more', !iconNow.basemap);
+  check('Map display wears the map icon, not the eye', iconNow.icon === '🗺️', JSON.stringify(iconNow));
+  check('and its first section is the base maps', /Base maps/.test(iconNow.first || ''), JSON.stringify(iconNow));
+
+  await page.evaluate(() => MapChrome.setPinned('display', true));
+  // Put each switch where this section wants it, by clicking it.
+  const setBase = async (n, on) => {
+    const is = await page.evaluate((q) => document.querySelector(
+      `.mn-mapctl[data-panel="display"] ${q}`).checked, BASE_BOX(n));
+    if (is !== on) await page.click(`.mn-mapctl[data-panel="display"] ${BASE_BOX(n)}`);
+  };
+  // …and each slider, from the keyboard: Home is 0 %, every → is one 5 % step.
+  const setOpacity = async (n, pct) => {
+    await page.focus(`.mn-mapctl[data-panel="display"] ${BASE_RANGE(n)}`);
+    await page.keyboard.press('Home');
+    for (let i = 0; i < pct / 5; i++) await page.keyboard.press('ArrowRight');
+  };
+  await setBase('OSM-Topo', true);
+  await setBase('Satellite', true);
+  await setBase('OpenStreetMap', false);
+  await setBase('Dark', false);
+  await setOpacity('OSM-Topo', 70);
+  await setOpacity('Satellite', 40);
+  await page.waitForTimeout(150);
+
+  // Every tile layer on the map, found by its host — the layers are a closure
+  // inside addBaseLayers, and the map's own registry is the one honest place
+  // left to ask what is drawn.
+  const readMix = () => page.evaluate(() => {
+    const out = {};
+    const hosts = { 'OSM-Topo': 'opentopomap', 'OpenStreetMap': 'tile.openstreetmap',
+                    'Satellite': 'World_Imagery', 'Dark': 'World_Dark_Gray_Base',
+                    'labels': 'World_Boundaries_and_Places' };
+    for (const l of Object.values(state.map._layers)) {
+      if (!(l instanceof L.TileLayer) || !l._url) continue;
+      for (const [n, h] of Object.entries(hosts)) {
+        if (!l._url.includes(h)) continue;
+        const c = l.getContainer && l.getContainer();
+        out[n] = { opacity: l.options.opacity, z: l.options.zIndex,
+                   css: c ? Number(getComputedStyle(c).opacity) : null };
+      }
+    }
+    const ui = {};
+    for (const r of document.querySelectorAll('.mn-mapctl[data-panel="display"] .mn-base-row')) {
+      const box = r.querySelector('input[type="checkbox"]');
+      const rng = r.querySelector('input[type="range"]');
+      ui[box.dataset.base] = { on: box.checked, value: Number(rng.value), disabled: rng.disabled,
+                               label: rng.getAttribute('aria-label'),
+                               text: rng.getAttribute('aria-valuetext') };
+    }
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('mn-base-maps')); } catch (_) { /* reported below */ }
+    return { out, ui, lead: state.map.mnBaseName, saved };
+  });
+  let mix = await readMix();
+  check('two base maps are on the map at once',
+    !!mix.out['OSM-Topo'] && !!mix.out.Satellite && !mix.out.OpenStreetMap && !mix.out.Dark,
+    JSON.stringify(mix.out));
+  check('…each at the opacity its own slider says',
+    mix.out['OSM-Topo']?.opacity === 0.7 && mix.out.Satellite?.opacity === 0.4
+      && Math.abs(mix.out['OSM-Topo']?.css - 0.7) < 0.01 && Math.abs(mix.out.Satellite?.css - 0.4) < 0.01,
+    JSON.stringify(mix.out));
+  check('…stacked in list order, the first drawn lowest',
+    mix.out['OSM-Topo']?.z < mix.out.Satellite?.z, JSON.stringify(mix.out));
+  check('…with Satellite\'s names riding along at Satellite\'s strength',
+    mix.out.labels?.opacity === 0.4, JSON.stringify(mix.out.labels));
+  check('every slider is named for its base and says its value in words',
+    Object.entries(mix.ui).every(([n, u]) => u.label === `${n} opacity` && u.text === `${u.value} per cent`),
+    JSON.stringify(mix.ui));
+  check('a base that is off has its slider disabled',
+    mix.ui.Dark?.disabled === true && mix.ui.Satellite?.disabled === false, JSON.stringify(mix.ui));
+  check('the 3-D view is told to follow the most opaque of them', mix.lead === 'OSM-Topo', mix.lead);
+  check('and the mix is written down',
+    mix.saved?.['OSM-Topo']?.on === true && mix.saved?.Satellite?.op === 0.4 && mix.saved?.Dark?.on === false,
+    JSON.stringify(mix.saved));
+
+  // Moving one slider leaves the other alone — that is what "independent" is.
+  await setOpacity('Satellite', 90);
+  await page.waitForTimeout(100);
+  mix = await readMix();
+  check('moving one base\'s slider leaves the other\'s opacity alone',
+    mix.out.Satellite?.opacity === 0.9 && mix.out['OSM-Topo']?.opacity === 0.7, JSON.stringify(mix.out));
+  check('…and the lead moves with it', mix.lead === 'Satellite', mix.lead);
+
+  // It comes back on the next visit, and the single-choice shape a saved value
+  // might still be in reads as that base alone.
+  const reopen = async () => {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
+    await page.evaluate(() => switchTab('stations'));
+    await page.waitForFunction(() => !!state.map && !!state.map.mnBases, null, { timeout: 30_000 });
+  };
+  await reopen();
+  mix = await readMix();
+  check('the blend survives a reload, switches and sliders both',
+    mix.out['OSM-Topo']?.opacity === 0.7 && mix.out.Satellite?.opacity === 0.9
+      && mix.ui['OSM-Topo']?.value === 70 && mix.ui.Satellite?.value === 90 && mix.ui.Satellite?.on,
+    JSON.stringify({ out: mix.out, ui: mix.ui }));
+  await page.evaluate(() => localStorage.setItem('mn-base-maps', 'Satellite'));
+  await reopen();
+  mix = await readMix();
+  check('an old single saved choice becomes that base alone, at full strength',
+    !!mix.out.Satellite && mix.out.Satellite.opacity === 1 && !mix.out['OSM-Topo'],
+    JSON.stringify(mix.out));
+  await page.evaluate(() => { localStorage.removeItem('mn-base-maps'); MapChrome.setPinned('display', false); });
 
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {

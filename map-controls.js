@@ -1,7 +1,8 @@
 // MegaNet — map-controls.js
 //
 //   makeBaseLayers  the shared base-map tile set, as fresh Leaflet layers.
-//   addBaseLayers   put that set on a map and give it the base-map picker.
+//   addBaseLayers   put that set on a map, blendable: a checkbox and an
+//                   opacity slider per base, in 🗺️ Map display.
 //   MapChrome       the map's corner: one column of icons, grouped and
 //                   separated by what they are for. An icon is either a panel
 //                   — a flyout that opens when the pointer is over it, and
@@ -126,20 +127,34 @@ function makeBaseLayers() {
   };
 }
 
-// Add the shared base-layer set to a map, switch it to the default (OSM-Topo)
-// and drop a base-map picker in the top-right corner.
+// Add the shared base-layer set to a map and give it the base-map controls.
 //
-// The picker was L.control.layers until #164. It is a MapChrome panel now for
-// one reason: it is no longer the only control in that corner. Leaflet's own
-// expands *in place*, which was free while it was alone up there and is not
-// free with three more icons under it — the Stations map's other three panels
-// would have been shoved down the screen every time the pointer crossed it.
-// One kind of control in the corner, one set of rules, and the picker reads and
-// behaves the same on all seven maps.
-function addBaseLayers(map) {
+// The picker was L.control.layers until #164, then a MapChrome panel of its own
+// (🗺️ Base map) holding four radios. **It is not a choice of one any more.**
+// Every base has a checkbox and an opacity slider, so bases stack and blend —
+// Satellite at 40 % over OSM-Topo is contour lines on real ground cover, which
+// no single base shows. The stack is the list: the first entry is drawn lowest
+// and each one after it paints over it (tile-layer zIndex). Nothing has to be
+// on; all four off is a blank sheet under the network, which is a legitimate
+// thing to look at.
+//
+// Where the controls are drawn is the caller's business. The Stations map
+// passes `{ panel: false }` and puts `map.mnBases.html()` at the top of its own
+// 🗺️ Map display flyout (app.js, mapDisplayControlsHtml) — a second icon that
+// was only ever "and also, underneath all that…" was one icon too many. Every
+// other map has no Map display of its own, so it gets one here, under the same
+// icon, id and title, holding just this section: one kind of control in the
+// corner, and the same one on all seven maps.
+//
+// The mix is remembered (localStorage, `mn-base-maps`) and shared by every map
+// — it is a preference about how this operator likes the ground to look, not
+// about one map. A saved value that is a bare base name, the single-choice
+// shape, is read as that base alone at full strength.
+function addBaseLayers(map, opts = {}) {
   const layers  = makeBaseLayers();
   const names   = Object.keys(layers);
-  const group   = `mn-base-${MapChrome.uid()}`;   // radios only group within one map
+  const uid     = String(MapChrome.uid());   // ties this map's inputs to this map's layers
+  const STORE   = 'mn-base-maps';
 
   // ── Names over the bases that have none ────────────────────────────────────
   // Two of the four bases arrive without place names on them and are near-
@@ -166,8 +181,9 @@ function addBaseLayers(map) {
   //
   // They live in their own pane just above Leaflet's tilePane (200) so they
   // cover the base but stay under every overlay — the overlay budget
-  // (map-survey.js) starts at mnContours' 335. Add/remove tracks the picker
-  // exactly.
+  // (map-survey.js) starts at mnContours' 335. They are on whenever their base
+  // is showing, at their base's opacity: a Satellite blended in at 30 % should
+  // not bring its names in at full strength over somebody else's.
   if (!map.getPane('mnBaseLabels')) {
     map.createPane('mnBaseLabels').style.zIndex = 250;
   }
@@ -180,60 +196,149 @@ function addBaseLayers(map) {
                   'Reference/World_Transportation'].map(refLayer),
     'Dark':      ['Canvas/World_Dark_Gray_Reference'].map(refLayer),
   };
-  function syncCompanions() {
-    for (const [base, list] of Object.entries(companions)) {
-      for (const l of list) {
-        if (base === current) { if (!map.hasLayer(l)) l.addTo(map); }
-        else if (map.hasLayer(l)) map.removeLayer(l);
-      }
+  // ── What is on, and how strongly ───────────────────────────────────────────
+  // { name: { on, op } }, op 0–1. The default is the one the radios had: the
+  // first base on at full strength and the rest off. Every read is guarded —
+  // private browsing, a full quota or a hand-edited value must still give a map.
+  const pick = {};
+  for (const n of names) pick[n] = { on: n === names[0], op: 1 };
+  (() => {
+    let raw = null;
+    try { raw = localStorage.getItem(STORE); } catch (_) { return; }
+    if (!raw) return;
+    let saved;
+    try { saved = JSON.parse(raw); } catch (_) { saved = raw; }
+    if (typeof saved === 'string') {              // the old single choice
+      if (pick[saved]) for (const n of names) pick[n] = { on: n === saved, op: 1 };
+      return;
+    }
+    if (!saved || typeof saved !== 'object') return;
+    for (const n of names) {
+      const s = saved[n];
+      if (!s || typeof s !== 'object') continue;
+      pick[n].on = !!s.on;
+      const op = Number(s.op);
+      if (Number.isFinite(op)) pick[n].op = Math.max(0, Math.min(1, op));
+    }
+  })();
+  const save = () => {
+    try { localStorage.setItem(STORE, JSON.stringify(pick)); }
+    catch (_) { /* the mix still works for this session */ }
+  };
+
+  // Stacking order is list order, stated once rather than left to the order
+  // the layers happen to be added in — ticking OSM-Topo back on after
+  // Satellite must put it back *under* Satellite.
+  names.forEach((n, i) => layers[n].setZIndex(i + 1));
+
+  // A base at 0 % is ticked but not fetched: it keeps its place in the mix
+  // without costing a tile request for pixels nobody can see.
+  const showing = n => pick[n].on && pick[n].op > 0;
+  function sync(n) {
+    for (const l of [layers[n], ...(companions[n] || [])]) {
+      if (showing(n)) { l.setOpacity(pick[n].op); if (!map.hasLayer(l)) l.addTo(map); }
+      else if (map.hasLayer(l)) map.removeLayer(l);
     }
   }
 
-  let current   = names[0];
-  layers[current].addTo(map);
-  // Which base this map is showing, published on the map itself. `current` is a
-  // closure variable and there is no other way to ask; Map3D needs the answer
-  // because the 3-D view drapes the *same* base map over the terrain, and a
-  // base that changed when you tilted would be a different map (map-3d.js).
-  map.mnBaseName = current;
-  syncCompanions();   // a no-op while the default is OSM-Topo, correct if it ever isn't
+  // Which base this map is "on", published on the map itself as mnBaseName.
+  // Map3D needs one name because the 3-D view drapes a single raster over the
+  // terrain (map-3d.js); with several blended, the fair answer is the one that
+  // dominates the picture — the most opaque, and the upper of two equals.
+  // Null when nothing is showing, which Map3D reads as its own fallback.
+  function lead() {
+    let best = null;
+    for (const n of names) if (showing(n) && (!best || pick[n].op >= pick[best].op)) best = n;
+    return best;
+  }
+  function publish() {
+    const was = map.mnBaseName;
+    map.mnBaseName = lead();
+    // A no-op unless 3-D is actually open, and only asked when the answer
+    // moved: a slider drag is dozens of input events, and each baseChanged()
+    // replaces the 3-D view's raster source.
+    if (map.mnBaseName !== was && typeof Map3D !== 'undefined') Map3D.baseChanged();
+  }
+
+  for (const n of names) sync(n);
+  map.mnBaseName = lead();
+
+  // ── The controls ───────────────────────────────────────────────────────────
+  // One row per base — checkbox, slider, readout — under a heading, as a flat
+  // run of elements: Map display's Find box filters its panel row by row off
+  // the direct children of #map-display-block (app.js, mapDisplayRows), and
+  // this markup is emitted straight into that list. The slider is disabled
+  // while its base is off, the way Link opacity is while links are.
+  const pct = n => Math.round(pick[n].op * 100);
+  function html() {
+    return `<div class="map-display-h">Base maps</div>` + names.map(n => `
+      <div class="mn-base-row${pick[n].on ? '' : ' is-off'}">
+        <label class="filter-check">
+          <input type="checkbox" data-base-map="${uid}" data-base="${escAttr(n)}" ${pick[n].on ? 'checked' : ''}>
+          ${esc(n)}
+        </label>
+        <input type="range" min="0" max="100" step="5" value="${pct(n)}"
+               data-base-map="${uid}" data-base="${escAttr(n)}"
+               aria-label="${escAttr(n)} opacity" aria-valuetext="${pct(n)} per cent"
+               ${pick[n].on ? '' : 'disabled'}>
+        <span class="mn-base-val" aria-hidden="true">${pct(n)}%</span>
+      </div>`).join('') +
+      `<p class="filter-note">Tick more than one to blend them — each is drawn
+         over the ones listed above it, at its own opacity. Satellite and Dark
+         carry place &amp; road names; Dark strips the ground to near-black so
+         the pins and links are the only thing left with any contrast.</p>`;
+  }
+
+  // Real listeners rather than inline handlers — `layers` is this map's own set
+  // and there is no global to reach it through — delegated from `el`, because
+  // the Stations map re-renders its Map display block wholesale and a listener
+  // on an input would die with the input. `data-base-map` keeps two maps'
+  // controls apart should two ever share a container.
+  function bind(el) {
+    const which = e => {
+      const t = e.target;
+      return t && t.dataset && t.dataset.baseMap === uid && pick[t.dataset.base] ? t.dataset.base : null;
+    };
+    const changed = n => { sync(n); publish(); save(); };
+    el.addEventListener('change', e => {
+      const n = which(e);
+      if (!n || e.target.type !== 'checkbox') return;
+      pick[n].on = e.target.checked;
+      const row = e.target.closest('.mn-base-row');
+      if (row) {
+        row.classList.toggle('is-off', !pick[n].on);
+        const r = row.querySelector('input[type="range"]');
+        if (r) r.disabled = !pick[n].on;
+      }
+      changed(n);
+    });
+    // `input`, not `change`: the blend is the thing being judged, so it has to
+    // move under the thumb rather than when the thumb is let go.
+    el.addEventListener('input', e => {
+      const n = which(e);
+      if (!n || e.target.type !== 'range') return;
+      const v = Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0)));
+      pick[n].op = v / 100;
+      e.target.setAttribute('aria-valuetext', `${v} per cent`);
+      const out = e.target.parentNode.querySelector('.mn-base-val');
+      if (out) out.textContent = `${v}%`;
+      changed(n);
+    });
+  }
+
+  // What a host panel needs, and what a check can read back without scraping
+  // the tile panes: a copy of the mix, never the live object.
+  map.mnBases = { html, bind, mix: () => JSON.parse(JSON.stringify(pick)) };
 
   // First in the corner, and first in the group about what the map shows:
-  // every other icon in that group is a way of drawing something *over* this
-  // choice, so this is the one they are all qualifying.
-  MapChrome.panel(map, {
-    id:    'basemap',
-    icon:  '🗺️',
-    title: 'Base map',
-    group: 'show', order: 10,
-    html: () => names.map(n => `
-      <label class="filter-check">
-        <input type="radio" name="${group}" value="${escAttr(n)}" ${n === current ? 'checked' : ''}>
-        ${esc(n)}
-      </label>`).join('') +
-      `<p class="filter-note">Satellite and Dark both carry place &amp; road names.
-         Dark strips the ground back to near-black so the pins and links are the
-         only thing left with any contrast.</p>
-       <p class="filter-note">Elevation moved out of this picker at #186: it is an
-         overlay on the 👁️ <strong>Map display</strong> panel now, with an opacity
-         slider, so the ground and the place names can both be on screen.</p>`,
-    // A real listener rather than an inline handler: `layers` is this map's own
-    // set of tile layers and there is no global to reach it through.
-    onMount(body) {
-      body.addEventListener('change', e => {
-        const name = e.target && e.target.value;
-        if (!layers[name] || name === current) return;
-        map.removeLayer(layers[current]);
-        layers[name].addTo(map);
-        current = name;
-        map.mnBaseName = current;
-        syncCompanions();
-        // The 3-D view is draped in whatever this picker is on, so a change
-        // here has to reach it. A no-op unless 3-D is actually open.
-        if (typeof Map3D !== 'undefined') Map3D.baseChanged();
-      });
-    },
-  });
+  // every other icon in that group is a way of drawing something *over* this.
+  if (opts.panel !== false) {
+    MapChrome.panel(map, {
+      id: 'display', icon: '🗺️', title: 'Map display',
+      group: 'show', order: 10,
+      html, onMount: bind,
+    });
+  }
   // The credit line, off the map and under it. Every map calls addBaseLayers,
   // so every map gets it — which is the point (see mapAttributionBelow).
   mapAttributionBelow(map);

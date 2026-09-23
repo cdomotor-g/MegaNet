@@ -152,7 +152,7 @@ const MapElevation = (function () {
   // shading only says which way the ground is leaning, which is what makes a
   // ridge line visible between two contours of the same colour.
   //
-  // It can be switched off from the Base map panel for anyone comparing this
+  // It can be switched off in the base-map section of Map display for anyone comparing this
   // against Radio Mobile's own flat rendering of the same colour file.
   //
   // The gradient at a tile's edge is taken from the pixel one step inside it,

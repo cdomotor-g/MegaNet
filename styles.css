@@ -1616,6 +1616,37 @@ details.filter-block[open] > .filter-head .filter-title::before {
   opacity: .5;
 }
 
+/* One base map in Map display's blend: checkbox and name, its opacity slider,
+   and the figure — on one line, so the four bases read as a stack of layers
+   rather than eight rows of controls. The name column is sized to the longest
+   name so the sliders line up where there is room for it. An unticked base keeps its slider (disabled,
+   at the strength it will come back at) and dims only that half. */
+.mn-base-row {
+  display: grid;
+  /* The name column gives way first on a narrow panel (a long name wraps)
+     rather than pushing the figure out past the panel's edge. */
+  grid-template-columns: minmax(0, 8.5rem) minmax(3rem, 1fr) 2.8rem;
+  align-items: center;
+  gap: .5rem;
+  font-size: .87rem;
+}
+.mn-base-row .filter-check {
+  margin: .2rem 0;
+}
+.mn-base-row input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+.mn-base-val {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mn-base-row.is-off input[type="range"],
+.mn-base-row.is-off .mn-base-val {
+  opacity: .5;
+}
+
 /* ── Where the filter text was found ──────────────────────────────────────
    Knowing that a row matched is half an answer — "491" can land in a station
    number, an ALERT address or a name, and the row alone doesn't say which.
@@ -8702,6 +8733,9 @@ code {
   align-items: center;
   justify-content: center;
 }
+/* Which demo set the button loads. Capped at the rail's width so a long label
+   wraps the row onto a second line rather than pushing the zone sideways. */
+.ad-demo-pick { max-width: 100%; font-size: .8rem; }
 
 /* The mark legend (#191): the shape a switch puts on the chart, drawn beside
    the switch. Inline with the text baseline rather than floated beside it, so a
@@ -8733,9 +8767,6 @@ code {
 .ad-edit-head {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3);
 }
-/* Which demo set the button loads. Capped at the rail's width so a long label
-   wraps the row onto a second line rather than pushing the zone sideways. */
-.ad-demo-pick { max-width: 100%; font-size: .8rem; }
 .ad-edit-head .ad-x { margin-left: auto; }
 .ad-edit-row {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2);

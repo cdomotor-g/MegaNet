@@ -1041,8 +1041,8 @@ fit inside the map with a finger-sized close button, and the card opens from
 time: opening this one, the ACMA transmitter card or the radio-path card closes
 the other two — which also ends the case where the last two, drawn in the same
 rectangle, simply covered each other. The legend's last line names whichever
-optional layers are off and that the 👁️ button is where they are turned on, the
-👁️ flyout is grouped under four headings — each drawing a rule above itself
+optional layers are off and that the 🗺️ button is where they are turned on, the
+🗺️ flyout is grouped under five headings (base maps first) — each drawing a rule above itself
 since #191, because uppercase small caps in `--muted` was the whole of the
 separation and an eye going down a single column of tick boxes reads a heading
 as one more row unless something physically stops it — and a first visit is told
@@ -1057,7 +1057,7 @@ something on this map and every one of them has its own way of taking it off
 again — right for each of them in isolation, and adding up to a map nobody can
 get back to a clean state without remembering all eleven.
 
-What it deliberately leaves alone is everything in the 👁️ flyout: the base map,
+What it deliberately leaves alone is everything in the 🗺️ flyout: the base-map mix,
 the overlay layers, the link colouring, the label mode, the opacity sliders.
 Those are settings rather than clicks — somebody who has turned the contours on
 and the links off has said how they want to *read* a map, not made a selection —
@@ -1368,15 +1368,27 @@ pane above and keeps its full brightness, so the place names stay readable over
 black ground.
 
 It is offered on all seven maps, is never the default, and is independent of the
-app's own light/dark theme — pick it from the **Base map** icon. It is not
+app's own light/dark theme — tick it under **Base maps** at the top of the 🗺️
+**Map display** flyout, alone or blended with another. It is not
 offered as a base for **Map Generator** sheets: the print palette is drawn to
 sit on a light base and would disappear into a black one, and both laser modes
 want no raster at all. *(CARTO's Dark Matter was the first choice and was
 dropped: its keyless tiles now come back stamped "API KEY REQUIRED" across the
 middle. Esri needs no key and was already serving three of this app's layers.)*
 
+**Base maps, blended.** The four base maps were a radio group under their own
+🗺️ *Base map* icon; they are the first section of the 🗺️ **Map display** flyout
+now (which took the map icon over from the 👁️ it had), and each one is a
+checkbox and an opacity slider. Tick several to mix them — Satellite at 40 % over
+OSM-Topo is the contours on the real ground cover — and each is drawn over the
+ones listed above it. Satellite's and Dark's place-name layers follow their base
+on and off and at its strength. The mix is remembered (`mn-base-maps`) and shared
+by every map in the app; the other six maps, which have no Map display of their
+own, get a 🗺️ Map display holding just this section. The 3-D view drapes one
+raster, so it follows the most opaque base that is on.
+
 **Elevation shading — an overlay, not a fifth base map.** *Elevation shading*,
-under **Overlay layers** in the 👁️ panel, paints the ground itself in the Radio
+under **Overlay layers** in the 🗺️ panel, paints the ground itself in the Radio
 Mobile colour file's twelve height bands: terrarium tiles decoded in the browser,
 the same ones the elevation profile is built on. It shipped as a *base* map, one
 radio beside OSM-Topo, on the reasoning that "what does this country look like"
