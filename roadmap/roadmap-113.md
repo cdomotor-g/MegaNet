@@ -492,6 +492,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Five AI rows, and six `[Human]` issues.
 >
+> **Revision 99 opened and closed nothing** — it is #198's backfill landing in the data: 2,330 stations gained a modelled AHD height and a new `elevation_source` column saying where it came from, in the file and in the database. The allocation below is unchanged. It leaves one thing for somebody to decide rather than filing it: `station_json` filters on `deleted_at` alone, so `stations_doc()` hands out the two rows the document does not own (`bateson_test`, `elpro_test`). 0022 gave the *importer* a `document_managed` guard and never gave the *view* one. The file now carries them, which is a decision taken here and reversible; teaching the view to filter would stop the app seeing rows 0026's rig work may expect.
+
 > **Revision 98 opened and closed #196, #197, #198 and #199 in the same push, and opened nothing that stays open** — paths made clickable in the 3-D view, and three pieces of Elvis (Geoscience Australia / ICSM) elevation work out of a session asking what that platform could give this app. The allocation below is unchanged. One human step falls out of it and is **not** filed: a check that `api-elevation.fsdf.org.au` and `s3-ap-southeast-2.amazonaws.com` load from a Bureau machine, since `docs/floodwarning-net.md` records that the filter default-denies hostnames it has never categorised. Nothing shipped depends on it — every Elvis feature is off by default or asked for — so it is a "confirm before relying on it", not a blocker.
 
 > **Revision 97 opened and closed #195 in the same push, and opened nothing that stays open** — the side-by-side columns collapsing to their floor when something else on the page overflowed. The allocation below is unchanged.
@@ -625,6 +627,75 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 99 — 2026-09-23: 2,330 stations learn how high they are, and that it was modelled
+
+#198 measured the ground under every station and wrote the answers to a CSV.
+This is that CSV landing in the data — in `stations.json` **and** in Postgres,
+which is the order that matters and the part worth writing down.
+
+**`stations.json` is a copy, not the original.** The station editor writes to the
+database; `stations-snapshot.yml` regenerates the file from
+`meganet.stations_doc()` every Sunday and opens a pull request when it moves.
+Editing the file alone is undone within a week — and it comes back looking like
+the database *losing* 2,330 elevations. Anything written into station data has to
+reach the database or it is not written at all. That is the trap most likely to
+catch the next person, and it caught this work first.
+
+**The file was behind before any of this.** A snapshot went in on its own
+(`ea54c71`) so the elevations would not arrive mixed into somebody else's work:
+14 stations edited through the app, six gaining the repeater role and three
+losing it, two pins moved, 8 sensors. One of those matters beyond bookkeeping —
+`toowoomba_al` moved 224 m **and became a repeater**, so it was re-measured
+rather than filled from the run: 708.87 m at the new pin against 694.21 m at the
+old. A repeater is the hub end of every link terminating there, and 15 m of it
+would have been wrong.
+
+**The height and its provenance are separate columns, and that is the whole
+design.** `elevation_ahd` has always meant *surveyed*. Filling it alone would
+make 2,330 modelled figures read as survey marks and delete, in the same stroke,
+the distinction #198 exists to draw. So `elevation_source` (0029) answers "where
+did this come from" in words — `Elvis 1 m (QLD Government)` — null where somebody
+put a mark on the ground. Nothing that reads `elevation_ahd` had to change.
+
+> **What restating a view costs, and the edit that is silent when missed.**
+> `station_json` builds its object from an explicit key list, so a new column is
+> invisible until the view says its name; `stations_json` needed nothing because
+> it aggregates `doc` out of that view. Both write paths needed it too —
+> `save_station()`, or the editor nulls the provenance on the next save, and
+> `load_stations_doc()`. In that last one the `is distinct from` pair is what
+> decides whether a row actually changed, so the column goes in **both** halves
+> or a provenance-only re-import reads as "nothing changed" and is skipped.
+> Every substitution was asserted to match exactly once before being applied.
+
+**No cache version was bumped, and that is deliberate.** The instinct is to
+invalidate the fade margins and LOS verdicts, and it is wrong: both signatures
+already carry the endpoint elevation (`map-los.js` `pa.elev == null ? '' :
+pa.elev`, `map-fade.js` the same). A station going from nothing to 137.2 changes
+its own signature, so every affected result recomputes on its own. `itm-p2p/2`
+documents a change in *how the margin is derived*; this is a change in *input
+data*. Bumping would also have discarded the ~840 links whose ends never moved.
+**The self-invalidating signature is not decoration — it is the thing that makes
+a data change safe.**
+
+**Two checks failed on the data rather than on code, and both were right to.**
+The logger asserts no station carries the self-test address — but the document
+now holds the rigs as well as the gauges, and `bateson_test` carries 8101
+because 8101 is `TestId`'s default: the rig transmitting on the self-test address
+is the rig working. It separates rigs from gauges now and keeps its teeth for the
+case that matters. And `search.mjs` used `9000-9100` as "a window nobody has
+addressed", which stopped being true when `elpro_test` arrived on 9001-9003.
+**A test that hardcodes an absence is a test with an expiry date on it**, and
+both of these had quietly reached theirs.
+
+Three stations stay blank on purpose: `busselton_jetty`, `lochsport_marina` and
+`port_phillip_bay_st_kilda_marina` come back as exactly 0.00 m from SRTM, which
+is its sea-surface value over water rather than ground — the only exact zeros in
+the run. The eighteen genuinely sub-zero values are kept: tide and bar gauges,
+where -1.29 m AHD at `brisbane_bar_tide_tm` is correct.
+
+`snapshot_stations_json.py --check` exits 0 — the file and the database's
+document are the same document.
 
 ### Revision 98 — 2026-09-21: the paths in 3-D start answering, and the nation's own elevation data arrives
 
