@@ -1026,6 +1026,10 @@ const MapDraw = (function () {
     // being dragged out never gets here, which is the debounce — PathProfile
     // compares the geometry itself and only fetches when it actually moved.
     PathProfile.sync();
+    // The repeater site finder selects its sites with this module's circle, so
+    // it has to hear the circle land — and its list of drawn shapes to take
+    // stations from goes stale with every add and delete, for the same reason.
+    if (typeof MapSites !== 'undefined') MapSites.drawingChanged();
   }
 
   return {

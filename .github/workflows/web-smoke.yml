@@ -529,6 +529,16 @@ jobs:
         working-directory: test
         run: npm run terrain
 
+      # The repeater site finder (map-sites.js), on the terrain kit's hilly
+      # world, seeded land cover and a stubbed Queensland cadastre: the paste
+      # exact before loose, summits rather than hillsides, results spaced, the
+      # quoted margin the link budget card's own arithmetic, a weight a re-rank
+      # rather than a re-run, the road asked only when it is wanted, the circle
+      # armed and landed with a real pointer, and reset taking all of it away.
+      - name: Repeater site finder — sites in, three to five places out
+        working-directory: test
+        run: npm run sites
+
       # The 3-D view (map-3d.js). Invisible to every check above it: `smoke`
       # opens the Stations tab and a ⛰️ button that does nothing at all passes,
       # `registry` looks for Leaflet maps and a WebGL context outliving its div

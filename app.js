@@ -2553,7 +2553,8 @@ function stationsMapPanels(map) {
     group: 'tools', order: 10,
     html: () => `<div id="map-draw-panel">${MapDraw.panelHtml()}</div>`,
   });
-  // 📡 Polar radio coverage is tools/20 — MapPolar.attach(), which runs later.
+  // 📡 Polar radio coverage is tools/20 — MapPolar.attach(), which runs later —
+  // and 🗼 Repeater site finder tools/25, from MapSites.attach() after it.
   //
   // What is here (#186) — arm it, click the map, and the card in the opposite
   // corner says what the app knows about that point. A plain corner button
@@ -2671,7 +2672,8 @@ function stationsMapPanels(map) {
 // What it clears is everything the *operator* put there: the filters and the
 // search behind them, the selection and the box-select, the focused repeater
 // and its blast ring, every drawing, both link-budget ends, the polar plot,
-// the spiderfied cluster, whatever mode was armed, and all four of the cards
+// the repeater site finder's sites and answer, the spiderfied cluster,
+// whatever mode was armed, and all four of the cards
 // in the map's corners.
 //
 // What it deliberately leaves alone is everything in the Map display flyout —
@@ -2721,6 +2723,7 @@ function resetStationsMap() {
   });
   try_(() => LinkBudget.reset());
   try_(() => { if (MapPolar.active()) MapPolar.clear(); });
+  try_(() => MapSites.clear());
   try_(() => MapSpider.reset());
 
   // 4. The selection, the focus and the blast ring that rides on it. The blast
@@ -3375,6 +3378,7 @@ function mapLegendHtml() {
         everywhere (Elvis — Geoscience Australia / ICSM)</span>
     </span>` : ''}
     ${MapPolar.active() ? mapPolarLegendHtml() : ''}
+    ${MapSites.active() ? MapSites.legendHtml() : ''}
     ${MapPeaks.active() ? `
     <span class="legend-item">
       <span class="legend-peak" aria-hidden="true">▲</span>
@@ -3541,6 +3545,7 @@ function stopStationsMap() {
   ElvisCoverage.detach();
   MapPeaks.detach();
   MapPolar.detach();
+  MapSites.detach();
   Places.detach();
   MapRoads.detach();
   MapWind.detach();
@@ -3653,6 +3658,11 @@ function initMap() {
   // shape as Radio Mobile's own window, which is what an operator coming from
   // that tool is looking for.
   MapPolar.attach(state.map);
+  // The repeater site finder, a dialog of the same kind: the sites a new
+  // repeater has to serve go in, and the places it would serve them from come
+  // out. After MapDraw, whose circle it selects with — though like every other
+  // attach here it only needs the map it is handed.
+  MapSites.attach(state.map);
   // No layer of its own until somebody types somewhere into the filter box —
   // attached for MapSpider's reason: it has to know which map it would be
   // dropping a pin on before anybody asks it to.

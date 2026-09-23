@@ -6,10 +6,11 @@
 //              a road reserve and which road it is (#176).
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for `state` and `esc`; across to app.js for
-// rerenderMapLegend. Both only from inside MapRoads' own functions, so this
-// file's position among the modules is free, the same way #120 left it for
-// MapSurvey.
+// Reaches back to core.js for `state`, `esc`, KM_PER_DEG_LAT and kmPerDegLon;
+// across to app.js for rerenderMapLegend. All only from inside MapRoads' own
+// functions — near(), the point question the repeater site finder asks, among
+// them — so this file's position among the modules is free, the same way #120
+// left it for MapSurvey.
 //
 // ── Why the parcel and not the road ──────────────────────────────────────────
 // Every basemap in the picker already draws roads. What none of them draws is
@@ -556,6 +557,62 @@ const MapRoads = (function () {
 
     // The legend's swatch colour, so the key and the map cannot drift apart.
     legendColour() { return LINE_COLOR; },
+
+    // Is this point in a road reserve, and if not, how far is the nearest one?
+    // Asked by the repeater site finder (map-sites.js) of a handful of
+    // candidate masts, so it is the layer's own query — the same service, the
+    // same two parcel types, the same intersection guard — over a box a few
+    // hundred metres across rather than over the view. Independent of the
+    // switch and of the view: nothing is drawn, nothing is cached against the
+    // layer, and a failure here is not the layer's failure (failedAt is left
+    // alone), because the question is about a point, not about the map.
+    //
+    // Resolves — never rejects — to one of:
+    //   { ok: false, error }
+    //   { ok: true, count, inside, distM, point: [lat, lon], label }
+    // where count is the parcels the box held (0 is also what the service says
+    // outside Queensland), distM is null when there were none, and point is
+    // the nearest place on a road parcel's boundary — or the point itself when
+    // it is already inside one.
+    async near(lat, lon, radiusM) {
+      const r = Math.max(20, Math.min(2000, +radiusM || 250));
+      const dLat = r / 1000 / KM_PER_DEG_LAT, dLon = r / 1000 / kmPerDegLon(lat);
+      const b = { s: lat - dLat, w: lon - dLon, n: lat + dLat, e: lon + dLon };
+      let parcels;
+      try {
+        const id = await resolveLayer();
+        parcels = joinNodes(parcelsFrom(await askJson(queryUrl(id, b))));
+      } catch (e) {
+        return { ok: false, error: (e && e.message) || 'the Queensland spatial data service could not be reached' };
+      }
+      // Metres on a plane tangent at the point — over a few hundred metres the
+      // difference from the ellipsoid is well under the ~10 m the service's
+      // own generalisation already takes off the boundary.
+      const kx = kmPerDegLon(lat) * 1000, ky = KM_PER_DEG_LAT * 1000;
+      let best = null;
+      for (const p of parcels) {
+        let hits = 0;
+        for (const ring of p.rings) if (inRing(lat, lon, ring)) hits++;
+        if (hits % 2 === 1) { best = { p, d: 0, pt: [lat, lon] }; break; }
+        for (const ring of p.rings) {
+          for (let i = 1; i < ring.length; i++) {
+            const ax = (ring[i - 1][1] - lon) * kx, ay = (ring[i - 1][0] - lat) * ky;
+            const bx = (ring[i][1] - lon) * kx,     by = (ring[i][0] - lat) * ky;
+            const dx = bx - ax, dy = by - ay, len = dx * dx + dy * dy;
+            const t = len > 0 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len)) : 0;
+            const x = ax + t * dx, y = ay + t * dy, d = Math.hypot(x, y);
+            if (!best || d < best.d) best = { p, d, pt: [lat + y / ky, lon + x / kx] };
+          }
+        }
+      }
+      return {
+        ok: true, count: parcels.length,
+        inside: !!best && best.d === 0,
+        distM: best ? best.d : null,
+        point: best ? best.pt : null,
+        label: best ? parcelLabel(best.p) : '',
+      };
+    },
 
     noteHtml,
 

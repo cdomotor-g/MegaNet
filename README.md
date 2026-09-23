@@ -804,10 +804,11 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Export the whole drawing to Google Earth as a KML — the shapes in their own colours, and the stations they enclose or run between
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
+- **Repeater site finder** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve — see *Repeater site finder* under §17
 - Leaflet.js, with the map's own controls in its top-right corner, grouped by what they are for
   and separated by a hairline: what the map **shows** (base map — OSM-Topo by default,
   OpenStreetMap, Satellite or Dark — **Map display**, the **legend**), the tools you point at it
-  (**Draw & measure**, **Polar radio coverage**, **What is here**), the **3-D view** and its
+  (**Draw & measure**, **Polar radio coverage**, **Repeater site finder**, **What is here**), the **3-D view** and its
   camera, how much screen the map gets (⛶ full screen, ◫ side by side), and ↺ reset on its own at
   the bottom. Each panel is an icon and nothing else until you point at it, click it or tab to it,
   and each can be pinned open — a pin that is remembered between visits
@@ -1051,8 +1052,9 @@ about the button once.
 **Reset (#191).** A fifth corner button, **↺**, and the one gesture that puts the
 map back the way it was found: the filters and the search behind them, the
 selection and the box-select, the focused repeater and its blast ring, every
-drawing, both link-budget ends, the polar plot, the spiderfied cluster, whatever
-mode was armed, and all four of the corner cards. Eleven modules can put
+drawing, both link-budget ends, the polar plot, the repeater site finder's sites
+and answer, the spiderfied cluster, whatever mode was armed, and all four of the
+corner cards. Eleven modules can put
 something on this map and every one of them has its own way of taking it off
 again — right for each of them in isolation, and adding up to a map nobody can
 get back to a clean state without remembering all eleven.
@@ -2726,6 +2728,64 @@ clutter, climate and refractivity, statistical reliability, real antenna
 patterns, multipath, polarisation, noise floor. Nearly all of those *reduce*
 real-world margin, which is why "indicative" here mostly means **optimistic**:
 a good margin is permission to model the path properly, never a result.
+
+#### Repeater site finder
+
+The tools above answer questions about a path somebody has already drawn. Siting
+a new repeater starts from the other end: *these* gauges have to be heard —
+where does the mast go? **🗼 Repeater site finder**, in the map's corner among the
+tools you point at the map, answers it.
+
+**The sites to serve**, three ways, in any mixture and up to forty:
+
+- **Add the map selection** — whatever is picked on the map (shift-click, box
+  select, *Select inside*).
+- **Draw a circle** — arms Draw & measure's own circle tool; click the middle,
+  click the edge, and the stations inside land in the set. The circle stays on
+  the map, can be typed to an exact radius, and is offered again under the button.
+- **Paste a list** — station numbers, names, ALERT addresses and `4021-4025`
+  windows, one per line or comma-separated, and a `lat, lon` on a line of its own
+  for a proposed site with no station yet. Exact matches win over substrings, so a
+  pasted column of station numbers does not quietly enrol every station sharing a
+  digit run; a term that matches nothing is named, a word that matches many is
+  handed back ("“creek” matches 457 — give the station number or the full name"),
+  and both stay in the box to be corrected. Add the base or the next repeater too,
+  if the new one has to reach it.
+
+**Find sites** then works in two passes. It fetches one terrain grid over a
+circle round the sites (the *Beyond the furthest site* margin, 5 km by default),
+takes the highest summits in it — thinned so no two are the same hill, plus the
+highest in each of a 5×5 set of blocks so a lower hill in the middle of the sites
+is weighed against the range on the edge — and **screens** every one against every
+site with `pathAnalyse` over bare ground. The best few (the number asked for plus
+three spare) are then **refined** the link budget card's way: 256 samples off the
+tiles with the land cover stood on them and P.2108 charged at a mast under trees —
+so the fade margin quoted for a result is the figure the card will show when the
+path is opened in it. The two passes are never mixed in one ranking.
+
+**The score** is four figures, each 0–100, weighted by four sliders you own and
+all printed beside every result: **elevation** (across the candidates' range),
+**line of sight** (clear 1, marginal ½, obstructed 0, averaged over the sites),
+**fade margin** (the worse direction of each path, as a fraction of the map's own
+*good* band) and **road reserve** — on a Queensland road parcel scores 1, falling
+to 0 at 250 m, asked of the cadastre for the finalists only and only while its
+slider is above nought. A mast on road reserve is the rare happy case — no
+landholder, no lease, a road to it — so it is a bonus, never a filter, and a
+cadastre that cannot be reached is said to have failed rather than read as "no
+road here". Moving a slider re-ranks at once without re-running anything; changing
+the sites, the radio or the search area takes the answer away, because a list of
+results still on screen under a question it does not answer is the one way this
+can mislead.
+
+Pick a result and its paths are drawn coloured by fade margin (dashed where the
+ground cuts the line) with every site listed against it; **Profile the worst
+path** opens that one in the elevation profile. **Also score existing station
+sites** weighs the masts already standing in the area against the bare hills —
+a site with power, a track and a willing landholder is worth metres. **Save CSV**
+writes every result against every site. It is indicative in exactly the ways the
+rest of this section is — ~30 m terrain, omnidirectional antennas, representative
+cover heights, no buildings — a short list to take to a map and a landholder, not
+a site survey. `npm run sites` holds it to all of this on a synthetic hilly world.
 
 ---
 
