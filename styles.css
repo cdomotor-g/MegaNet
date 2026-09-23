@@ -8733,6 +8733,9 @@ code {
 .ad-edit-head {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3);
 }
+/* Which demo set the button loads. Capped at the rail's width so a long label
+   wraps the row onto a second line rather than pushing the zone sideways. */
+.ad-demo-pick { max-width: 100%; font-size: .8rem; }
 .ad-edit-head .ad-x { margin-left: auto; }
 .ad-edit-row {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2);

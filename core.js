@@ -898,11 +898,19 @@ const HELP = {
       + 'to ARRO</strong> and closing the tab loses the lot — an edited series says so in the rail '
       + 'and carries a <em>revert</em> that puts its values back as loaded. Deleted rows do not '
       + 'come back.',
-      '<strong>Demo data</strong> in the drop zone loads a real ARRO export shipped with the app — '
-      + 'Durikai\'s rain accumulator, seven months, 14,942 readings, uncleaned. It is the file the '
-      + 'filters were written against: 8,831 repeat timestamps, 395 values ARRO wrote with a '
-      + 'thousands separator in an unquoted field, and the single-reading spikes to 1234 that read '
-      + 'as rollovers unless the 357 walk removes them first.',
+      '<strong>Demo data</strong> in the drop zone loads a real ARRO export shipped with the app; '
+      + 'the list beside it picks which. <b>Durikai</b> is Durikai\'s rain accumulator, seven '
+      + 'months, 14,942 readings, uncleaned — the file the filters were written against: 8,831 '
+      + 'repeat timestamps, 395 values ARRO wrote with a thousands separator in an unquoted field, '
+      + 'and the single-reading spikes to 1234 that read as rollovers unless the 357 walk removes '
+      + 'them first. <b>Tyalgum Bridge</b> loads with the filter settings it was reviewed with '
+      + '(3-5-7 at 3/5/8, rise and fall limits of 4 mm/h, quality codes DD, PD, ND and AN left '
+      + 'out, a 0–1024 range) already set; <em>defaults</em> in the Filters panel undoes them.',
+      '<strong>Mark</strong> on the chart toolbar has one tick per kind of mark — the 357 ✕, the '
+      + 'range square, the rise and fall triangles, the quality diamond, repeats and rollover '
+      + 'seams — so a flood of one kind can be switched off to see the others. Each kind is drawn '
+      + 'up to 25,000 marks in the window; past that the chart names which kinds were capped, and '
+      + 'zooming in shows the rest.',
     ],
     links: [
       { label: 'How the 357 filter works — the test, drawn', call: 'ArroData.explain()' },

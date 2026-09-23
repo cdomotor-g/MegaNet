@@ -463,6 +463,211 @@ try {
   ok('the last reading has no next', /last reading/.test(ends.last[1] || ''),
      JSON.stringify(ends.last));
 
+  // ── 7. One Mark tick per kind of mark ─────────────────────────────────────
+  // There were three ticks and "removed" governed five shapes at once, so a
+  // chart flooded with one kind could not be thinned to the others. Now each
+  // AD_MARKS kind has a tick of its own, carrying its own glyph, and each
+  // switches exactly its own <path> on the chart and nothing else.
+  const KINDS = ['removed', 'range', 'rate', 'fall', 'qual', 'repeat', 'rollover'];
+  await page.evaluate(() => {
+    const A = window.ArroData;
+    A.ad.view = null;
+    A.setCfg('rangeOn', true);
+    // A ceiling at the record's median, so half of what the 357 walk keeps is
+    // over it — Durikai's own values are otherwise all inside any sane range.
+    const s = A.ad.series[0];
+    const sorted = Array.from(s.v).sort((a, b) => a - b);
+    A.setCfg('rangeMax', sorted[s.n >> 1]);
+  });
+  await page.waitForTimeout(250);
+  const ticks = () => page.evaluate(() => [...document.querySelectorAll('.ad-marks label[data-mark]')]
+    .map(l => ({ k: l.dataset.mark, glyph: !!l.querySelector('svg.ad-mark'),
+                 on: l.querySelector('input').checked, off: l.classList.contains('ad-chk--off') })));
+  const drawn = () => page.evaluate(() => Object.fromEntries(
+    [...document.querySelectorAll('#ad-svg path.ad-mk')]
+      .map(p => [p.getAttribute('class').replace(/^ad-mk ad-mk--/, ''), +(p.dataset.n || 1)])));
+  const t0 = await ticks();
+  ok('the Mark group has one tick per kind of mark, in order',
+     JSON.stringify(t0.map(t => t.k)) === JSON.stringify(KINDS), JSON.stringify(t0.map(t => t.k)));
+  ok('every tick carries its legend glyph', t0.every(t => t.glyph));
+  ok('repeats start off and every other kind starts on',
+     t0.every(t => t.on === (t.k !== 'repeat')), JSON.stringify(t0));
+  ok('a kind whose filter is off is dimmed, one whose filter runs is not',
+     t0.find(t => t.k === 'rate').off && !t0.find(t => t.k === 'range').off
+     && !t0.find(t => t.k === 'removed').off, JSON.stringify(t0));
+  const d0 = await drawn();
+  ok('357 failures and range rejections are both drawn, each as its own path',
+     d0.removed > 0 && d0.range > 0, JSON.stringify(d0));
+  ok('repeats are not drawn while their tick is off', !('repeat' in d0), JSON.stringify(d0));
+
+  const clickTick = k => page.click(`.ad-marks label[data-mark="${k}"] input`);
+  await clickTick('repeat');
+  await page.waitForTimeout(200);
+  await clickTick('removed');
+  await page.waitForTimeout(200);
+  const d1 = await drawn();
+  ok('ticking repeats draws them', d1.repeat > 0, JSON.stringify(d1));
+  ok('unticking the 357 kind takes its ✕s off and leaves the range squares',
+     !('removed' in d1) && d1.range === d0.range, JSON.stringify(d1));
+  await clickTick('range');
+  await page.waitForTimeout(200);
+  const d2 = await drawn();
+  ok('unticking range takes only the range squares off', !('range' in d2) && d2.repeat === d1.repeat,
+     JSON.stringify(d2));
+  // Kept in the instance like every other chart setting — across a tab change.
+  await page.evaluate(async () => {
+    switchTab('arro'); await new Promise(r => setTimeout(r, 40));
+    switchTab('arrodata'); await new Promise(r => setTimeout(r, 200));
+  });
+  const t1 = await ticks();
+  ok('the ticks are remembered across leaving the tab and coming back',
+     !t1.find(t => t.k === 'removed').on && !t1.find(t => t.k === 'range').on
+     && t1.find(t => t.k === 'repeat').on, JSON.stringify(t1));
+  ok('the hover still reaches removed readings while any cut kind is ticked',
+     await page.evaluate(() => window.ArroData.ad.marks.rate === true));
+
+  // ── 8. The cap is per kind, and names the kind that hit it ────────────────
+  // 80,000 readings, half of them coded X with values scattered over the whole
+  // scale (so almost every one lands on a pixel of its own), half a smooth
+  // ramp coded A with five spikes the 357 walk has to reject. The X flood must
+  // hit the cap without taking a single ✕ with it — under one shared budget,
+  // filled in time order, it took the lot.
+  const cap = await page.evaluate(async () => {
+    const A = window.ArroData;
+    for (const s of A.ad.series) s.visible = false;
+    A.ad.marks = { removed: true, range: true, rate: true, fall: true, qual: true,
+                   repeat: false, rollover: true };
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = ms => { const d = new Date(ms);
+      return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} `
+           + `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`; };
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const rows = ['Reading,Receive,Value,Unit,Data Quality,Raw Value'];
+    const T0 = Date.UTC(2025, 0, 1), N = 80000, spikes = new Set([9001, 23001, 41001, 57001, 71001]);
+    for (let i = 0; i < N; i++) {
+      const t = stamp(T0 + i * 60000);
+      const flood = i % 2 === 0;
+      const v = flood ? Math.round(rnd() * 1000 * 10) / 10
+              : spikes.has(i) ? 900 : Math.round(i / 400 * 10) / 10;
+      rows.push(`${t},${t},${v},m,${flood ? 'X' : 'A'},${v}`);
+    }
+    const parsed = A.parseCsv(rows.join('\n'));
+    A.adoptSeries(parsed, { label: 'Cap fixture', fileName: 'cap-fixture.csv', kind: 'WL' });
+    A.ad.cfg = { ...A.ad.cfg, rangeOn: false, qualOn: true, qualCut: ['X'] };
+    for (const s of A.ad.series) { s.filt = null; s.tracks = null; }
+    // Its own span, not the extent: the hidden Durikai series is a year later
+    // and would squeeze the fixture into a sliver of the chart.
+    const cs = A.ad.series.find(x => x.fileName === 'cap-fixture.csv');
+    A.ad.view = { t0: cs.t[0], t1: cs.t[cs.n - 1] };
+    A.ad.mode = 'filtered';
+    A.ad.yMode = 'manual'; A.ad.yMin = '0'; A.ad.yMax = '1000';
+    renderMain();
+    await new Promise(r => setTimeout(r, 300));
+    const paths = Object.fromEntries([...document.querySelectorAll('#ad-svg path.ad-mk')]
+      .map(p => [p.getAttribute('class').replace(/^ad-mk ad-mk--/, ''), +(p.dataset.n || 0)]));
+    const note = document.querySelector('#ad-svg .ad-mk-capped');
+    // How many elements the marks cost: one path per kind, not one per mark.
+    const nodes = document.querySelectorAll('#ad-svg [class^="ad-mk"]').length;
+    return { paths, note: note ? note.textContent.replace(/\s+/g, ' ').trim() : '', nodes };
+  });
+  ok('the quality flood is drawn up to a cap far above the old 2,500',
+     cap.paths.qual === 25000, JSON.stringify(cap.paths));
+  ok('…without starving the 357 ✕s that come after it in time',
+     cap.paths.removed >= 5, JSON.stringify(cap.paths));
+  ok('the capped note names the kind that was capped, and only that one',
+     /quality/.test(cap.note) && !/357/.test(cap.note) && /25,000/.test(cap.note), cap.note);
+  ok('25,000 marks cost a handful of elements, not 25,000', cap.nodes < 12, `${cap.nodes} elements`);
+
+  // ── 9. The demo set picker, and the Tyalgum preset ────────────────────────
+  // The Tyalgum export is registered before its file is committed, so the
+  // first load has to say that plainly and leave the filters alone; once the
+  // file is there it loads, links to its station, and sets the filters it was
+  // reviewed with. Served by a route here: the file is not in the repo.
+  await page.evaluate(() => {
+    const A = window.ArroData;
+    A.ad.series = A.ad.series.filter(s => s.fileName !== 'cap-fixture.csv');
+    for (const s of A.ad.series) s.visible = true;
+    A.ad.yMode = 'auto';
+    A.resetCfg();
+  });
+  await page.waitForTimeout(200);
+  const opts = await page.evaluate(() =>
+    [...document.querySelectorAll('select.ad-demo-pick option')].map(o => [o.value, o.textContent.trim()]));
+  ok('the picker offers Durikai and Tyalgum', opts.some(o => o[0] === 'durikai')
+     && opts.some(o => o[0] === 'tyalgum' && /Tyalgum Bridge/.test(o[1])), JSON.stringify(opts));
+
+  await page.route('**/data/demo/tyalgum.csv', r => r.fulfill({ status: 404, body: 'not found' }));
+  await page.selectOption('select.ad-demo-pick', 'tyalgum');
+  await page.click('.ad-drop-acts button[onclick*="loadDemo"]');
+  await page.waitForFunction(() => !window.ArroData.ad.busy, null, { timeout: LOAD_TIMEOUT });
+  await page.waitForTimeout(150);
+  const miss = await page.evaluate(() => ({
+    note: (document.getElementById('ad-note') || {}).textContent || '',
+    n: window.ArroData.ad.series.length, rateOn: window.ArroData.ad.cfg.rateOn,
+  }));
+  ok('a missing Tyalgum file says the file has not been added yet',
+     /the Tyalgum demo file hasn't been added to data\/demo yet/.test(miss.note), miss.note);
+  ok('…and neither adds a series nor applies the preset', miss.n === 1 && miss.rateOn === false,
+     JSON.stringify(miss));
+
+  await page.unroute('**/data/demo/tyalgum.csv');
+  // In the same shape as the Durikai export: newest first, the codes the preset
+  // excludes mixed among ones it keeps.
+  const codes = ['A', 'DD', 'A', 'PD', 'A', 'ND', 'A', 'AN', 'MM', 'AS'];
+  const tya = ['Reading,Receive,Value,Unit,Data Quality,Raw Value'];
+  for (let i = 199; i >= 0; i--) {
+    const d = new Date(Date.UTC(2026, 1, 1) + i * 300000).toISOString().slice(0, 19).replace('T', ' ');
+    const v = (100 + i * 0.2).toFixed(1);
+    tya.push(`${d},${d},${v},mm,${codes[i % codes.length]},${v}`);
+  }
+  await page.route('**/data/demo/tyalgum.csv', r => r.fulfill({
+    status: 200, contentType: 'text/csv', body: tya.join('\n') }));
+  await page.click('.ad-drop-acts button[onclick*="loadDemo"]');
+  await page.waitForFunction(() => window.ArroData.ad.series.length > 1, null, { timeout: LOAD_TIMEOUT });
+  await page.waitForTimeout(200);
+  const got = await page.evaluate(() => {
+    const A = window.ArroData, c = A.ad.cfg;
+    const s = A.ad.series.find(x => /Tyalgum/.test(x.fileName));
+    const f = s && A.runFilter(s, c);
+    let cutDD = 0, keptA = 0;
+    if (f) for (let i = 0; i < s.n; i++) {
+      const code = s.qcodes[s.q[i]];
+      if (['DD', 'PD', 'ND', 'AN'].includes(code) && f.status[i] === AD_QUAL) cutDD++;
+      if (['A', 'MM', 'AS'].includes(code) && f.status[i] === AD_QUAL) keptA++;
+    }
+    return {
+      has: !!s, station: s && s.station && s.station.name, n: s && s.n,
+      cfg: { use357: c.use357, small: c.small, medium: c.medium, large: c.large,
+             breakCount: c.breakCount, startTests: c.startTests,
+             rateOn: c.rateOn, rateMax: c.rateMax, fallOn: c.fallOn, fallMax: c.fallMax,
+             qualOn: c.qualOn, qualCut: [...c.qualCut].sort(),
+             rangeOn: c.rangeOn, rangeMin: c.rangeMin, rangeMax: c.rangeMax,
+             cycle: c.cycle, oosOn: c.oosOn, minGapSec: c.minGapSec },
+      cutDD, keptA,
+      note: (document.getElementById('ad-note') || {}).textContent || '',
+      pick: document.querySelector('select.ad-demo-pick').value,
+    };
+  });
+  ok('the Tyalgum set loads from data/demo/tyalgum.csv', got.has && got.n === 200, JSON.stringify(got));
+  ok('…linked to Tyalgum Bridge in the station file', got.station === 'Tyalgum Bridge', got.station);
+  const wantCfg = { use357: true, small: 3, medium: 5, large: 8, breakCount: 18, startTests: 4,
+                 rateOn: true, rateMax: 4, fallOn: true, fallMax: 4,
+                 qualOn: true, qualCut: ['AN', 'DD', 'ND', 'PD'],
+                 rangeOn: true, rangeMin: 0, rangeMax: 1024,
+                 cycle: 2048, oosOn: true, minGapSec: 0 };
+  ok('its preset is applied over the defaults, and nothing else moves',
+     JSON.stringify(got.cfg) === JSON.stringify(wantCfg), JSON.stringify(got.cfg));
+  ok('the excluded codes are cut and A, MM, AS are kept', got.cutDD === 80 && got.keptA === 0,
+     `cut ${got.cutDD}, kept-codes cut ${got.keptA}`);
+  ok('the note says the preset was applied', /preset was applied/.test(got.note), got.note);
+  ok('the picker still shows Tyalgum after the re-render', got.pick === 'tyalgum', got.pick);
+  const qualUi = await page.evaluate(() =>
+    [...document.querySelectorAll('.ad-qual-row input[type="checkbox"]')]
+      .filter(b => b.checked).map(b => b.value).sort());
+  ok('the Filters panel shows the excluded codes ticked',
+     JSON.stringify(qualUi) === JSON.stringify(['AN', 'DD', 'ND', 'PD']), JSON.stringify(qualUi));
+
   ok('nothing threw', errors.length === 0, errors.join(' | '));
 
   await context.close();
@@ -475,5 +680,7 @@ console.log(failures
   ? `\nFAIL — ${failures} check(s) failed.`
   : '\nPASS — the navigator handles answer the pointer where they are drawn, the\n'
     + '       wheel pans sideways and steps evenly, and both the balloon and the\n'
-    + '       callout say what the reading did either side of itself.');
+    + '       callout say what the reading did either side of itself; every mark\n'
+    + '       kind has its own tick and its own cap; and the demo picker loads\n'
+    + '       Tyalgum with its preset.');
 process.exit(failures ? 1 : 0);

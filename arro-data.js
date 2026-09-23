@@ -215,20 +215,24 @@ const AD_Y_LABEL = { auto: 'Auto', kept: 'Kept', zero: 'Zero', manual: 'Fixed' }
 // label already knows what colour it is. The chart resolves the same shapes
 // against theme() for the same reason it always has — it has to survive being
 // serialised into a PNG with no stylesheet.
+// `word` is what the Mark tick box for that shape says beside it (one box per
+// shape since the per-type toggles — see markKinds()), short because seven of
+// them share a toolbar row; `label` is the sentence the tooltip and the capped
+// note use.
 const AD_MARKS = {
-  removed:  { label: 'failed the 357 test',            tone: 'bad',
+  removed:  { label: 'failed the 357 test',            tone: 'bad',  word: '357',
               d: '<path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" fill="none"/>' },
-  range:    { label: 'outside the range limits',        tone: 'warn',
+  range:    { label: 'outside the range limits',        tone: 'warn', word: 'range',
               d: '<rect x="4.2" y="4.2" width="7.6" height="7.6" fill="none" stroke="currentColor" stroke-width="1.8"/>' },
-  rate:     { label: 'rose faster than the rate limit', tone: 'warn',
+  rate:     { label: 'rose faster than the rate limit', tone: 'warn', word: 'rise',
               d: '<path d="M8 3.6l4.4 7.6H3.6Z" fill="currentColor"/>' },
-  fall:     { label: 'fell faster than the rate limit', tone: 'warn',
+  fall:     { label: 'fell faster than the rate limit', tone: 'warn', word: 'fall',
               d: '<path d="M8 12.4L3.6 4.8h8.8Z" fill="currentColor"/>' },
-  qual:     { label: 'excluded by its quality code',    tone: 'warn',
+  qual:     { label: 'excluded by its quality code',    tone: 'warn', word: 'quality',
               d: '<path d="M8 3.3l4.7 4.7L8 12.7 3.3 8Z" fill="none" stroke="currentColor" stroke-width="1.7"/>' },
-  repeat:   { label: 'a repeat timestamp',              tone: 'muted',
+  repeat:   { label: 'a repeat timestamp',              tone: 'muted', word: 'repeats',
               d: '<circle cx="8" cy="8" r="2.2" fill="currentColor" opacity=".55"/>' },
-  rollover: { label: 'an accumulator wrap corrected',   tone: 'warn',
+  rollover: { label: 'an accumulator wrap corrected',   tone: 'warn', word: 'rollovers',
               d: '<path d="M8 2v12" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 2.5" fill="none"/>' },
 };
 
@@ -278,7 +282,7 @@ const ArroData = (function () {
       // question somebody actually arrives with, which is "what does this gauge
       // say?". Two overlaid traces per series is also where a four-series chart
       // stops being readable. The removals are still one click away on the
-      // Series control, still marked on the chart by Mark ▸ removed, and still
+      // Series control, still marked on the chart by the Mark ticks, and still
       // counted in the rail; what changed is which of the three the tab opens
       // holding.
       mode:      'filtered',     // raw | filtered | both
@@ -286,8 +290,15 @@ const ArroData = (function () {
       chartType: 'line',
       yMode:     'auto',         // auto | zero | manual
       yMin:      '', yMax: '',
-      showRemoved:  true,
-      showRollover: true,
+      // One switch per mark shape (AD_MARKS), where there used to be three —
+      // "removed" governing five shapes at once, "repeats" and "rollovers". A
+      // chart with 20,000 quality-code rejections on it could not be asked to
+      // show the eleven 357 failures among them without also showing the
+      // 20,000. Repeats start off, as the old "repeats" box did: the demo
+      // record alone has 8,831 of them and they are not a verdict on anything.
+      // Per instance, so the two tabs keep their own, like every setting here.
+      marks: { removed: true, range: true, rate: true, fall: true, qual: true,
+               repeat: false, rollover: true },
       compare:      false,       // side-by-side raw/filtered panes, folded away
       tableOpen:    false,       // the readings table under the chart (#141), folded away
       tableSig:     '',          // what it was last built from — see renderTable()
@@ -330,6 +341,7 @@ const ArroData = (function () {
       sensorIdxFor: null,
       busy:      0,
       fq:        null,           // the Field tab's picker; null on the ARRO tab
+      demoSet:   'durikai',      // which AD_DEMO_SETS entry the Demo data button loads
     };
   }
 
@@ -1377,23 +1389,90 @@ const ArroData = (function () {
   // exactly as it would for a file dropped from a desktop. There is no demo
   // code path in the chart — the demo is a file, and everything downstream of
   // it is the ordinary one.
-  const AD_DEMO_FILE = 'aem_Durikai_AL_541134_Rainfall_541134_0_R_5758.csv';
-  const AD_DEMO_URL  = `data/demo/${AD_DEMO_FILE}`;
+  //
+  // More than one set since the Tyalgum export: a small registry, a picker
+  // beside the button, and a set may carry the filter settings it is meant to
+  // be looked at with. Each entry:
+  //
+  //   id, label    the picker's value and its words
+  //   file         under data/demo/ — what is fetched
+  //   as           the name the series is adopted under, when `file` is not
+  //                itself an ARRO export name. parseName reads the sensor id
+  //                out of the *name*, so this is what links it to its station
+  //   description  the picker's tooltip, and the note once it has loaded
+  //   cfg          optional: filter settings applied on load, over the
+  //                defaults (not over whatever was set before — a preset that
+  //                merged with leftovers would be a different preset each time)
+  //   presetNote   what the note says the preset did, in words
+  //
+  // Durikai carries no preset: it is the file the defaults were argued from.
+  const AD_DEMO_SETS = [
+    { id: 'durikai',
+      label: 'Durikai AL rainfall (541134)',
+      file: 'aem_Durikai_AL_541134_Rainfall_541134_0_R_5758.csv',
+      description: 'Durikai rainfall, 14,942 readings over seven months, exactly as ARRO '
+                 + 'exported them — uncleaned, and the file the filters were written against.' },
+    // Tyalgum Bridge (558088) is the one Tyalgum in the legacy unit list
+    // (ALL_UNITS 1014, "Tyalgum Br (Tya") and the registry's rain sensor there is
+    // 558088.1.R.3467 — so that is the name it is adopted under. Tyalgum Creek
+    // (558129, sensor 558129.1.R.7167) is the other station of the name; if the
+    // export turns out to be that one, `as` is the only line to change. The
+    // settings are the ones the export was reviewed with, and "Break after" and
+    // "Start window" are breakCount and startTests — see cfgHtml().
+    { id: 'tyalgum',
+      label: 'Tyalgum Bridge rainfall (558088)',
+      file: 'tyalgum.csv',
+      as: 'aem_Tyalgum_Bridge_558088_Rainfall_558088_1_R_3467.csv',
+      missing: 'the Tyalgum demo file hasn\'t been added to data/demo yet',
+      description: 'Tyalgum Bridge rainfall, loaded with the filter settings it was reviewed '
+                 + 'with: 3-5-7 at 3/5/8, rise and fall limits of 4 mm/h, quality codes DD, PD, '
+                 + 'ND and AN excluded, and a 0–1024 range.',
+      cfg: { use357: true, small: 3, medium: 5, large: 8, breakCount: 18, startTests: 4,
+             rateOn: true, rateMax: 4, fallOn: true, fallMax: 4,
+             qualOn: true, qualCut: ['DD', 'PD', 'ND', 'AN'],
+             rangeOn: true, rangeMin: 0, rangeMax: 1024 },
+      presetNote: 'Its filter preset was applied: 3-5-7 test at 3/5/8 with break after 18 and '
+                + 'a start window of 4; rate of rise and of fall each limited to 4 mm/h; '
+                + 'quality codes DD, PD, ND and AN excluded; minimum 0, maximum 1024. '
+                + 'Everything else is at its default — "defaults" in the Filters panel undoes it.' },
+  ];
+  const demoSet = id => AD_DEMO_SETS.find(d => d.id === id) || AD_DEMO_SETS[0];
 
-  async function loadDemo() {
+  // The picker only chooses; the button loads. A select that fetched on change
+  // would load a file every time somebody arrowed past it.
+  // The two tooltips follow it by hand rather than by a re-render, which would
+  // take the focus off the select mid-choice.
+  function setDemo(id, el) {
+    const set = demoSet(id);
+    ad.demoSet = set.id;
+    if (el) {
+      el.title = set.description;
+      const btn = el.parentElement && el.parentElement.querySelector('button[onclick*="loadDemo"]');
+      if (btn) btn.title = set.description;
+    }
+  }
+
+  async function loadDemo(id) {
     if (ad.busy) return;
+    const set = demoSet(id || ad.demoSet);
+    ad.demoSet = set.id;
+    const name = set.as || set.file;
     // Already loaded is a no-op with an explanation rather than a second copy:
     // two identical series on one chart is a puzzle, not a demonstration.
-    if (ad.series.some(x => x.fileName === AD_DEMO_FILE)) {
-      note('The demo series is already loaded — it is in the list below.');
+    if (ad.series.some(x => x.fileName === name)) {
+      note(`The ${set.label} demo series is already loaded — it is in the list below.`);
       return;
     }
     const inst = ad;
     inst.busy++;
     renderSide();
     const problems = [];
+    let missing = false, added = false;
     try {
-      const res = await fetch(AD_DEMO_URL, { cache: 'force-cache' });
+      const res = await fetch(`data/demo/${set.file}`, { cache: 'force-cache' });
+      // A set registered before its file was committed. Said plainly, because
+      // "HTTP 404" reads as the app being broken rather than a file not there.
+      if (res.status === 404) { missing = true; throw new Error('missing'); }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       // The tab may have been switched while the file was in flight, and a
@@ -1401,9 +1480,22 @@ const ArroData = (function () {
       // `ad` above.
       const was = ad;
       ad = inst;
-      try { addSeries(AD_DEMO_FILE, text, problems); } finally { ad = was; }
+      try {
+        const before = inst.series.length;
+        addSeries(name, text, problems);
+        added = inst.series.length > before;
+        // The preset goes on only once the series is in: a file that failed to
+        // load must not leave the panel set up for a record that is not there.
+        if (added && set.cfg) {
+          inst.cfg = { ...AD_CFG_DEFAULT, ...set.cfg, qualCut: [...(set.cfg.qualCut || [])] };
+          for (const s of inst.series) { s.filt = null; s.tracks = null; }
+        }
+      } finally { ad = was; }
     } catch (err) {
-      problems.push(`Demo data: ${err && err.message || err}.`);
+      problems.push(missing
+        ? `Demo data: ${set.missing || `the ${set.label} demo file hasn't been added to data/demo yet`}`
+          + ` — it is expected at data/demo/${set.file}.`
+        : `Demo data: ${err && err.message || err}.`);
     } finally {
       inst.busy = Math.max(0, inst.busy - 1);
     }
@@ -1411,8 +1503,8 @@ const ArroData = (function () {
     ad.view = null;
     renderAll();
     note(problems.length ? problems.join(' ')
-         : 'Demo data loaded — Durikai rainfall, 14,942 readings over seven months, '
-         + 'exactly as ARRO exported them. Nothing was uploaded.',
+         : `Demo data loaded — ${set.description} Nothing was uploaded.`
+           + (set.cfg && added ? ` ${set.presetNote || 'Its filter preset was applied.'}` : ''),
          !!problems.length);
   }
 
@@ -2657,8 +2749,16 @@ const ArroData = (function () {
                is one somebody has to go and fetch out of ARRO first. This is
                the real one (#191). -->
           <button class="btn-link" onclick="ArroData.loadDemo()" ${ad.busy ? 'disabled' : ''}
-                  title="One real ARRO export shipped with the app — Durikai's rain accumulator, seven months, 14,942 readings, uncleaned"
-                  aria-label="Load the bundled demo export">Demo data</button>
+                  title="${escAttr(demoSet(ad.demoSet).description)}"
+                  aria-label="Load the demo export chosen beside it">Demo data</button>
+          <!-- Which demo, beside the button that loads it. Choosing does not
+               load: see setDemo(). -->
+          <select class="ad-demo-pick" aria-label="Demo data set"
+                  title="${escAttr(demoSet(ad.demoSet).description)}"
+                  onchange="ArroData.setDemo(this.value, this)">
+            ${AD_DEMO_SETS.map(d => `<option value="${escAttr(d.id)}" title="${escAttr(d.description)}"
+                ${d.id === demoSet(ad.demoSet).id ? 'selected' : ''}>${esc(d.label)}</option>`).join('')}
+          </select>
         </div>
         ${ad.busy ? `<div class="small ad-drop-busy">Reading ${ad.busy} file${ad.busy === 1 ? '' : 's'}…</div>` : ''}
       </div>`;
@@ -3821,33 +3921,27 @@ const ArroData = (function () {
                        aria-label="Show ${l === 'All' ? 'the whole record' : 'the last ' + l}"
                        title="Show the last ${l === 'All' ? 'of everything' : l}">${l}</button>`).join('')}
             </span>`)}
-          <!-- Each tick carries the mark it switches on (#191). "removed" was
-               three words beside three identical boxes and the shapes they put
-               on the chart were only written down inside draw(); a person who
-               ticked one still had to work out which of five marks had just
-               appeared. "removed" is the one that draws more than one shape —
-               the 357 test's ✕ and whichever limit filters are running — so it
-               shows them all, and the set it shows follows the switches in the
-               filter panel rather than being a fixed three. -->
+          <!-- Each tick carries the mark it switches on (#191), and there is
+               one tick per mark. There used to be three — "removed" switched
+               the 357 ✕ and all four limit filters' shapes together — so a
+               chart flooded with one kind could not be thinned to the others.
+               A tick whose filter is not running is dimmed rather than hidden,
+               so the row does not reflow under the pointer as filters go on
+               and off, and it keeps its state for when the filter comes back. -->
           ${grp('Mark', `
-            <span class="ad-tool-grp">
-              <label class="ad-chk${anyFilt ? '' : ' ad-chk--off'}" title="Mark every reading the filter rejected${
-                anyFilt ? '' : ' — no filter is running on the Raw series'}">
-                <input type="checkbox" ${ad.showRemoved ? 'checked' : ''} ${anyFilt ? '' : 'disabled'}
-                       onchange="ArroData.setFlag('showRemoved', this.checked)">
-                ${['removed', ad.cfg.rangeOn ? 'range' : '', ad.cfg.rateOn ? 'rate' : '',
-                   ad.cfg.fallOn ? 'fall' : '',
-                   ad.cfg.qualOn && (ad.cfg.qualCut || []).length ? 'qual' : ''
-                  ].filter(Boolean).map(adMarkSvg).join('')}
-                removed</label>
-              <label class="ad-chk" title="Mark repeat timestamps dropped before filtering">
-                <input type="checkbox" ${ad.showDupes ? 'checked' : ''}
-                       onchange="ArroData.setFlag('showDupes', this.checked)">
-                ${adMarkSvg('repeat')} repeats</label>
-              <label class="ad-chk" title="Mark where an accumulator wrap was corrected">
-                <input type="checkbox" ${ad.showRollover ? 'checked' : ''}
-                       onchange="ArroData.setFlag('showRollover', this.checked)">
-                ${adMarkSvg('rollover')} rollovers</label>
+            <span class="ad-tool-grp ad-marks">
+              ${markKinds().map(k => {
+                const why = markIdle(k);
+                const cut = k !== 'repeat' && k !== 'rollover';
+                const off = cut && !anyFilt;       // nothing is removed on the Raw series
+                return `<label class="ad-chk${why || off ? ' ad-chk--off' : ''}" data-mark="${k}"
+                         title="Mark on the chart: ${escAttr(AD_MARKS[k].label)}${
+                           off ? ' — no filter is running on the Raw series' : why ? ` — ${escAttr(why)}` : ''}">
+                  <input type="checkbox" ${ad.marks[k] ? 'checked' : ''} ${off ? 'disabled' : ''}
+                         aria-label="Mark: ${escAttr(AD_MARKS[k].label)}"
+                         onchange="ArroData.setMark('${k}', this.checked)">
+                  ${adMarkSvg(k)} ${esc(AD_MARKS[k].word)}</label>`;
+              }).join('')}
             </span>`)}
           <!-- One choice, not two switches (#191). These were two independent
                tick boxes and both could be on at once — which a drag cannot
@@ -4550,7 +4644,159 @@ const ArroData = (function () {
   // zoom reaches easily. Taking at most a third from either side always leaves
   // a third in the middle to grab.
   const navGrip = (lo, hi) => Math.max(3, Math.min(AD_OV_GRIP, (hi - lo) / 3));
-  const MARK_CAP = 2500;      // removed-point markers drawn before we stop
+  // Marks drawn per *type* before we stop, and per type on purpose. It was one
+  // shared budget of 2,500 across every shape, filled in time order — so a
+  // quality-code flood early in the window used the lot and the 357 failures
+  // after it were simply not drawn, with a note that said "zoom in" about the
+  // wrong thing. Now a flood of one shape cannot starve another, and the number
+  // is ten times larger because each shape is one <path> rather than one element
+  // per mark (see draw()), and a mark that lands on a pixel already marked with
+  // the same shape is not drawn twice — so the budget is spent on marks a
+  // person can actually tell apart, and a long record at full zoom-out rarely
+  // reaches it at all.
+  const MARK_CAP = 25000;
+  // The per-point dots of the Dots chart type. densify() already bounds a
+  // track to four points per pixel column, so this is a backstop rather than a
+  // limit anybody should meet: it was 4,000, which cut a dense series off
+  // part-way across a wide chart with nothing to say so.
+  const DOT_CAP = 20000;
+  // Rings round picked readings — one element each, and a selection past a few
+  // thousand is a solid band whatever the cap, so this stays where it was.
+  const PICK_CAP = 2500;
+  const CMP_MARK_CAP = 1500;   // per type, in each comparison pane
+
+  // Each removal shape as one <path>, the whole window's worth of that shape in
+  // its `d`. The previous drawing was an element per mark, each with a <title>
+  // of its own, which is what held the cap at 2,500: tens of thousands of DOM
+  // nodes rebuilt on every pointer move is a chart that stops following the
+  // hand. One path per shape is seven nodes however many marks, and the string
+  // is cached against everything it depends on so a crosshair moving over a
+  // still chart does not rebuild it — only the view, the size, the scales, the
+  // switches or a re-run of the filter can change it.
+  //
+  // The shapes are AD_MARKS' geometry at chart size (see the note there), and
+  // the ones outside the scale become a small wedge on the top edge in the
+  // shape's own colour, so "Kept" cannot quietly hide the very readings it is
+  // scaled to exclude.
+  let markCache = null;
+  function removalMarks(g, c, capped) {
+    if (ad.transform !== 'value') return '';   // a removed step has no meaningful height
+    const kinds = markKinds().filter(k => k !== 'rollover' && markOn(k));
+    if (!kinds.length) return '';
+    const vis = shown();
+    const fs = vis.map(s => runFilter(s, ad.cfg));
+    const sig = [g.v.t0, g.v.t1, g.w, g.h, g.padR, g.yr.lo, g.yr.hi,
+                 g.yrR ? `${g.yrR.lo},${g.yrR.hi}` : '', kinds.join(), c.bad, c.warn, c.muted,
+                 vis.map(s => `${s.key}${s.axis}`).join()].join('|');
+    // A reading dragged by hand is written into s.v on every frame without the
+    // filter re-running, so while that is happening nothing is cached.
+    const moving = ad.drag && ad.drag.mode === 'movept';
+    if (!moving && markCache && markCache.inst === ad && markCache.sig === sig
+        && markCache.fs.length === fs.length && markCache.fs.every((f, j) => f === fs[j])
+        && markCache.vs.every((v, j) => v === vis[j].v)) {
+      for (const k of markCache.capped) capped.add(k);
+      return markCache.out;
+    }
+    const want = new Set(kinds);
+    const d = {}, n = {}, seen = {};
+    for (const k of kinds) { d[k] = ''; n[k] = 0; seen[k] = new Set(); }
+    const above = { bad: '', warn: '', muted: '' };
+    const kindCapped = new Set();
+    const f1 = v => (Math.round(v * 10) / 10);
+    const bottom = g.h - PADB;
+    vis.forEach((s, j) => {
+      const f = fs[j];
+      const sy = g.yOf(s);
+      const i0 = lower(s.t, s.n, g.v.t0), i1 = lower(s.t, s.n, g.v.t1);
+      for (let i = i0; i < i1; i++) {
+        const k = AD_MARK_FOR[f.status[i]];
+        if (!k || !want.has(k)) continue;
+        if (n[k] >= MARK_CAP) {
+          kindCapped.add(k);
+          // Every shape asked for has run out: nothing left to find.
+          if (kindCapped.size === want.size) break;
+          continue;
+        }
+        const px = f1(g.x(s.t[i])), rawY = sy(s.v[i]);
+        if (rawY > bottom) continue;
+        const up = rawY < PADT;
+        const py = up ? PADT : f1(rawY);
+        // One mark per pixel per shape. Twenty repeats of a reading at one
+        // point on a zoomed-out chart are one dot however they are drawn.
+        const key = Math.round(px) * 8192 + Math.round(py);
+        if (seen[k].has(key)) continue;
+        seen[k].add(key);
+        n[k]++;
+        if (up) { above[AD_MARKS[k].tone] += `M${px} ${PADT}l-4 7h8Z`; continue; }
+        switch (k) {
+          case 'removed': d[k] += `M${f1(px - 3)} ${f1(py - 3)}l6 6M${f1(px + 3)} ${f1(py - 3)}l-6 6`; break;
+          case 'range':   d[k] += `M${f1(px - 2.8)} ${f1(py - 2.8)}h5.6v5.6h-5.6Z`; break;
+          case 'rate':    d[k] += `M${px} ${f1(py - 3.6)}l3.4 5.8h-6.8Z`; break;
+          // The mirror of it, pointing the way the reading went — the same
+          // pair of shapes the two filter blocks put beside their own names.
+          case 'fall':    d[k] += `M${px} ${f1(py + 3.6)}l3.4 -5.8h-6.8Z`; break;
+          // Hollow on purpose: the range and quality marks say "something
+          // outside this reading rejected it", the filled triangles "the step
+          // to it was impossible". A diamond against the range filter's square
+          // because at four pixels those are the two outlines that stay apart.
+          case 'qual':    d[k] += `M${px} ${f1(py - 3.4)}l3.4 3.4l-3.4 3.4l-3.4 -3.4Z`; break;
+          case 'repeat':  d[k] += `M${f1(px - 1.6)} ${py}a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0`; break;
+        }
+      }
+    });
+    const tip = k => `<title>${esc(AD_MARKS[k].label)} · ${n[k].toLocaleString()} marked in view${
+      kindCapped.has(k) ? ' (capped)' : ''}</title>`;
+    const paint = {
+      removed: `stroke="${c.bad}" stroke-width="1.4" fill="none" opacity=".92"`,
+      range:   `stroke="${c.warn}" stroke-width="1.4" fill="none"`,
+      rate:    `fill="${c.warn}" opacity=".92"`,
+      fall:    `fill="${c.warn}" opacity=".92"`,
+      qual:    `stroke="${c.warn}" stroke-width="1.4" fill="none"`,
+      repeat:  `fill="${c.muted}" opacity=".5"`,
+    };
+    // Repeats first, so the faint dots sit under every verdict mark.
+    let out = '';
+    for (const k of ['repeat', 'qual', 'range', 'rate', 'fall', 'removed']) {
+      if (!want.has(k) || !d[k]) continue;
+      out += `<path class="ad-mk ad-mk--${k}" data-n="${n[k]}" d="${d[k]}" ${paint[k]}>${tip(k)}</path>`;
+    }
+    for (const [tone, col] of [['muted', c.muted], ['warn', c.warn], ['bad', c.bad]]) {
+      if (above[tone]) {
+        out += `<path class="ad-mk ad-mk--above" d="${above[tone]}" fill="${col}" opacity=".9"><title>Marked
+                readings above the top of the scale</title></path>`;
+      }
+    }
+    if (!moving) markCache = { inst: ad, sig, fs, vs: vis.map(s => s.v), out, capped: kindCapped };
+    for (const k of kindCapped) capped.add(k);
+    return out;
+  }
+
+  // The mark shapes in toolbar order, and which of them is a *removal* (only
+  // meaningful when a filter is running) rather than an annotation.
+  function markKinds() { return ['removed', 'range', 'rate', 'fall', 'qual', 'repeat', 'rollover']; }
+  // Why a shape cannot currently appear, or '' if it can: the filter that
+  // produces it is switched off. Said in the tick's tooltip, and the tick is
+  // dimmed, but it keeps its state — see the Mark group in the toolbar.
+  function markIdle(k) {
+    const c = ad.cfg;
+    switch (k) {
+      case 'removed':  return c.use357 ? '' : 'the 3-5-7 test is off';
+      case 'range':    return c.rangeOn ? '' : 'the minimum/maximum filter is off';
+      case 'rate':     return c.rateOn ? '' : 'the rate-of-rise filter is off';
+      case 'fall':     return c.fallOn ? '' : 'the rate-of-fall filter is off';
+      case 'qual':     return c.qualOn && (c.qualCut || []).length ? '' : 'no quality code is being excluded';
+      case 'repeat':   return c.oosOn || c.dedupeOn ? '' : 'repeat timestamps are not being dropped';
+      case 'rollover': return c.rolloverOn ? '' : 'rollover correction is off';
+    }
+    return '';
+  }
+  // Is this shape to be drawn at all? The removal shapes additionally need the
+  // chart to be showing a filtered layer — on Raw nothing was removed.
+  function markOn(k) {
+    if (!ad.marks || !ad.marks[k]) return false;
+    return k === 'repeat' || k === 'rollover' || ad.mode !== 'raw';
+  }
+  const anyCutMark = () => ['removed', 'range', 'rate', 'fall', 'qual'].some(markOn);
   // Vertical throw, in viewBox px, below which a zoom box means "time only".
   // Years of x-only brushing taught a flat sweep across the chart; a hand that
   // wobbles a few pixels while making one must not be answered with a squashed
@@ -4609,6 +4855,7 @@ const ArroData = (function () {
     const g = geom();
     if (!g) { svg.innerHTML = ''; return; }
     const c = theme();
+    const capped = new Set();          // mark kinds that reached MARK_CAP this draw
     svg.setAttribute('viewBox', `0 0 ${g.w} ${g.h}`);
     // Fill the box rather than fit inside it. The default, `xMidYMid meet`,
     // scales the viewBox uniformly and centres the leftovers — so a viewBox
@@ -4652,22 +4899,32 @@ const ArroData = (function () {
             fill="${c.muted}">${esc(fmtTick(t, step))}</text>`).join('');
 
     // Rollover seams sit under the curves — they explain a step, they are not
-    // a reading in their own right.
-    if (ad.showRollover) {
+    // a reading in their own right. One path for all of them, capped like the
+    // other marks, rather than a <line> each.
+    if (markOn('rollover')) {
+      let d = '', n = 0;
+      const seen = new Set();
       for (const s of shown()) {
         const f = runFilter(s, ad.cfg);
         for (const i of f.rolls) {
           if (s.t[i] < g.v.t0 || s.t[i] > g.v.t1) continue;
-          out += `<line x1="${g.x(s.t[i]).toFixed(1)}" y1="${PADT}" x2="${g.x(s.t[i]).toFixed(1)}"
-                        y2="${g.h - PADB}" stroke="${c.warn}" stroke-width="1.2" stroke-dasharray="4 3"
-                        opacity=".8"><title>Accumulator wrap corrected · ${esc(fmtFull(s.t[i]))}</title></line>`;
+          const px = Math.round(g.x(s.t[i]) * 2) / 2;
+          if (seen.has(px)) continue;
+          if (n >= MARK_CAP) { capped.add('rollover'); break; }
+          seen.add(px); n++;
+          d += `M${px} ${PADT}V${g.h - PADB}`;
         }
+      }
+      if (d) {
+        out += `<path class="ad-mk ad-mk--rollover" d="${d}" stroke="${c.warn}" stroke-width="1.2"
+                      stroke-dasharray="4 3" opacity=".8" fill="none"><title>Accumulator wrap corrected ·
+                      ${n.toLocaleString()} in view</title></path>`;
       }
     }
 
     const stepped = ad.chartType === 'step';
     const dots = ad.chartType === 'dots';
-    let markers = '', nMark = 0;
+    let markers = '';
     let series = '';
 
     for (const s of shown()) {
@@ -4683,7 +4940,7 @@ const ArroData = (function () {
         const ghost = ad.mode === 'both' && kind === 'raw';
         const shape = seriesShape(s);
         if (dots) {
-          markers += pts.slice(0, 4000).map(p =>
+          markers += pts.slice(0, DOT_CAP).map(p =>
             shapeMark(shape, p[0], sy(p[1]), ghost ? 1.3 : 2, escAttr(s.color), ghost ? .3 : .9)).join('');
         } else {
           // The dash is the series' identity without its colour — see AD_DASH.
@@ -4702,60 +4959,10 @@ const ArroData = (function () {
           }
         }
       }
-
-      // What the filter took out, and what never made it in.
-      const f = runFilter(s, ad.cfg);
-      const wantBad = ad.showRemoved && ad.mode !== 'raw';
-      if (wantBad || ad.showDupes) {
-        const i0 = lower(s.t, s.n, g.v.t0), i1 = lower(s.t, s.n, g.v.t1);
-        for (let i = i0; i < i1 && nMark < MARK_CAP; i++) {
-          const st = f.status[i];
-          const isDup = st === AD_OOS;
-          const isCut = st === AD_BAD || st === AD_RANGE || st === AD_RATE
-                     || st === AD_FALL || st === AD_QUAL;
-          if (!(isCut && wantBad) && !(isDup && ad.showDupes)) continue;
-          if (ad.transform !== 'value') continue;   // a removed step has no meaningful height
-          const px = g.x(s.t[i]), py = sy(s.v[i]);
-          // Which filter took it out, told apart by shape as well as colour —
-          // at four pixels a colour alone is a guess.
-          const col = st === AD_BAD ? c.bad : isDup ? c.muted : c.warn;    // AD_RANGE/RATE/FALL/QUAL are all warn
-          nMark++;
-          // A removal above the top of the scale still has to be visible, or
-          // "Kept" would quietly hide the very readings it is scaled to exclude.
-          if (py < PADT) {
-            markers += `<path d="M${px.toFixed(1)} ${PADT}l-4 7h8Z" fill="${col}"
-                              opacity=".9"><title>${esc(fmtVal(s.v[i]))} ${esc(s.unit)} — ${esc(AD_STATUS_LABEL[st])}, above the scale</title></path>`;
-            continue;
-          }
-          if (py > g.h - PADB) continue;
-          markers += st === AD_BAD
-            ? `<path d="M${(px - 3).toFixed(1)} ${(py - 3).toFixed(1)}l6 6M${(px + 3).toFixed(1)} ${(py - 3).toFixed(1)}l-6 6"
-                     stroke="${c.bad}" stroke-width="1.4" opacity=".92"><title>failed the 357 test</title></path>`
-            : st === AD_RANGE
-            ? `<rect x="${(px - 2.8).toFixed(1)}" y="${(py - 2.8).toFixed(1)}" width="5.6" height="5.6"
-                     fill="none" stroke="${c.warn}" stroke-width="1.4"><title>outside the range limits</title></rect>`
-            : st === AD_RATE
-            ? `<path d="M${px.toFixed(1)} ${(py - 3.6).toFixed(1)}l3.4 5.8h-6.8Z" fill="${c.warn}"
-                     opacity=".92"><title>rose faster than the rate limit</title></path>`
-            // The mirror of it, pointing the way the reading went — the same
-            // pair of shapes the two filter blocks put beside their own names.
-            : st === AD_FALL
-            ? `<path d="M${px.toFixed(1)} ${(py + 3.6).toFixed(1)}l3.4 -5.8h-6.8Z" fill="${c.warn}"
-                     opacity=".92"><title>fell faster than the rate limit</title></path>`
-            // A hollow diamond, and hollow on purpose: the two range/quality
-            // marks are the ones that say "something outside this reading
-            // rejected it", and the filled triangles the ones that say "the step
-            // to it was impossible". Diamond against the range filter's square
-            // because at four pixels a rotated square and a square are the only
-            // two outlines that stay apart.
-            : st === AD_QUAL
-            ? `<path d="M${px.toFixed(1)} ${(py - 3.4).toFixed(1)}l3.4 3.4l-3.4 3.4l-3.4 -3.4Z"
-                     fill="none" stroke="${c.warn}" stroke-width="1.4"><title>excluded by its quality code</title></path>`
-            : `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="1.6" fill="${c.muted}" opacity=".5"/>`;
-        }
-      }
     }
-    out += `<g clip-path="url(#ad-clip)">${series}${markers}</g>`;
+    // What the filter took out, and what never made it in — after every series'
+    // curve, so no line is drawn over a mark.
+    out += `<g clip-path="url(#ad-clip)">${series}${markers}${removalMarks(g, c, capped)}</g>`;
 
     // Crosshair and the nearest-reading halo.
     if (ad.hover) {
@@ -4770,14 +4977,14 @@ const ArroData = (function () {
     }
     // Everything picked, ringed (#191). Over the curves and under the pin, so a
     // pinned reading inside a selection still reads as the pinned one. Capped
-    // the way the removal marks are: "all in view" can pick ten thousand
+    // on its own budget, lower than the marks': "all in view" can pick ten thousand
     // readings and ten thousand rings is a solid bar, not a selection.
     if (ad.picked.size && ad.transform === 'value') {
       let rings = '', n = 0;
       for (const s of shown()) {
         const sy = g.yOf(s);
         const i0 = lower(s.t, s.n, g.v.t0), i1 = lower(s.t, s.n, g.v.t1);
-        for (let i = i0; i < i1 && n < MARK_CAP; i++) {
+        for (let i = i0; i < i1 && n < PICK_CAP; i++) {
           if (!isPicked(s.key, i)) continue;
           const py = sy(s.v[i]);
           if (py < PADT || py > g.h - PADB) continue;
@@ -4847,9 +5054,12 @@ const ArroData = (function () {
                       fill="${c.muted}">${esc(rightLabel)}</text>`;
       }
     }
-    if (nMark >= MARK_CAP) {
-      out += `<text x="${g.w - g.padR}" y="${PADT + 10}" font-size="10" text-anchor="end" fill="${c.muted}">
-                marks capped at ${MARK_CAP} — zoom in for the rest</text>`;
+    // Which shapes ran out, by name: "marks capped" on its own sent people
+    // zooming to find more of a shape that had in fact all been drawn.
+    if (capped.size) {
+      const names = markKinds().filter(k => capped.has(k)).map(k => AD_MARKS[k].word).join(', ');
+      out += `<text class="ad-mk-capped" x="${g.w - g.padR}" y="${PADT + 10}" font-size="10" text-anchor="end"
+                    fill="${c.muted}">${esc(names)} marks capped at ${MARK_CAP.toLocaleString()} each — zoom in for the rest</text>`;
     }
     svg.innerHTML = out;
   }
@@ -5107,7 +5317,7 @@ const ArroData = (function () {
 
     const w = Math.max(240, Math.round(a.parentElement.getBoundingClientRect().width));
     const h = Math.round(Math.max(160, Math.min(300, w * 0.62)));
-    const sig = [v.t0, v.t1, w, h, ad.transform, ad.chartType, ad.showRemoved, ad.showDupes,
+    const sig = [v.t0, v.t1, w, h, ad.transform, ad.chartType, markKinds().map(k => (ad.marks[k] ? 1 : 0)).join(''),
                  ad.yMode, ad.yMin, ad.yMax,
                  cfgKey(ad.cfg, 'cmp'),
                  vis.map(s => `${s.key}${s.color}${s.kind}${s.axis}${s.dash}`).join(',')].join('|');
@@ -5219,13 +5429,22 @@ const ArroData = (function () {
       if (kind === 'raw' && ad.transform === 'value') {
         const f = runFilter(s, ad.cfg);
         const j0 = lower(s.t, s.n, v.t0), j1 = lower(s.t, s.n, v.t1);
-        let n = 0;
-        for (let i = j0; i < j1 && n < 900; i++) {
+        // The same per-type ticks as the main chart, and the same per-type
+        // budget, smaller: these are circles with a tooltip each, in a pane a
+        // third the size. Unlike the main chart the cut shapes show here even
+        // when the main chart is on Raw — this pane *is* the raw one.
+        const n = {}, seen = new Set();
+        for (let i = j0; i < j1; i++) {
           const st = f.status[i];
-          if (st === AD_GOOD || (st === AD_OOS && !ad.showDupes)) continue;
+          const mk = AD_MARK_FOR[st];
+          if (!mk || !ad.marks[mk]) continue;
+          if ((n[mk] || 0) >= CMP_MARK_CAP) continue;
           const px = x(s.t[i]), py = sy(s.v[i]);
           if (py < CMP_PADT - 4 || py > h - CMP_PADB + 4) continue;
-          n++;
+          const key = `${mk}${Math.round(px)},${Math.round(py)}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          n[mk] = (n[mk] || 0) + 1;
           const col = st === AD_BAD ? c.bad : st === AD_OOS ? c.muted : c.warn;   // range/rate/fall/qual all warn
           body += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2.4" fill="none"
                            stroke="${col}" stroke-width="1.3" opacity=".9"><title>${esc(AD_STATUS_LABEL[st])}
@@ -5309,7 +5528,7 @@ const ArroData = (function () {
   function hoverLayers(s) {
     const out = layers(s);
     if (ad.mode === 'raw' || out.some(l => l.kind === 'raw')) return out;
-    if (!ad.showRemoved) return out;
+    if (!anyCutMark()) return out;
     return [...out, { track: tracks(s).raw, kind: 'raw' }];
   }
 
@@ -6110,6 +6329,13 @@ const ArroData = (function () {
     draw(); drawVov();
   }
   function setFlag(k, v)   { ad[k] = v; renderMainOnly(); }
+  // One Mark tick. Replaces the object rather than writing into it, so a
+  // marks set captured elsewhere cannot change under it.
+  function setMark(k, on) {
+    if (!(k in AD_MARKS)) return;
+    ad.marks = { ...ad.marks, [k]: !!on };
+    renderMainOnly();
+  }
   // Select works against where a reading is *drawn*, which only means the
   // reading itself while the chart is showing values — on Increment or Rate the
   // height of a point is a difference between two readings, and a box drawn
@@ -6395,9 +6621,9 @@ const ArroData = (function () {
     // Both instances' series at once, for the memory meter — which is asking
     // about the page's footprint, not about either tab.
     allSeries: () => Object.values(instances).flatMap(i => i.series),
-    render, init, stop, repaint, importFiles, pick, loadDemo,
+    render, init, stop, repaint, importFiles, pick, loadDemo, setDemo,
     toggle, setColor, colourToggle, setDash, setAxis, setKind, solo, zoomTo, remove, clearAll, showStation,
-    setCfg, resetCfg, setQual, setMode, setTransform, setChart, setY, setYRange, setFlag, setDrag,
+    setCfg, resetCfg, setQual, setMode, setTransform, setChart, setY, setYRange, setFlag, setMark, setDrag,
     resetView, toggleFull,
     // Editing readings (#191), and the selection it works over
     pickToggle, pickClear, pickAllInView, editValue, editQuality, editDelete,
