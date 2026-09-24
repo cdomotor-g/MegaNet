@@ -238,6 +238,10 @@ function editorForm(s) {
       <label class="check-label ef-enabled">
         <input type="checkbox" id="ef-enabled" ${s.enabled ? 'checked' : ''}> Enabled
       </label>
+      <!-- Who owns the station, recorded on it (0030). Blank means not recorded,
+           and the card then shows only what the 2018 SLS says, if anything. -->
+      <label class="full">Owner<input type="text" id="ef-owner" value="${escAttr(s.owner || '')}"
+             placeholder="e.g. Toowoomba Regional Council"></label>
       <label class="full">Notes<textarea id="ef-notes">${esc(s.notes || '')}</textarea></label>
     </div>
     ${hasRep ? `
@@ -552,6 +556,10 @@ function editorReadForm() {
   if (bucket != null && bucket > 0) d.TBRGbucketSize = bucket; else delete d.TBRGbucketSize;
   d.enabled        = document.getElementById('ef-enabled')?.checked ?? true;
   d.notes          = document.getElementById('ef-notes')?.value || '';
+  // Absent rather than empty when the box is blank — the shape station_json
+  // emits, so a save that set nothing round-trips without gaining a key.
+  const owner = document.getElementById('ef-owner')?.value.trim() || '';
+  if (owner) d.owner = owner; else delete d.owner;
   d.roles          = [...document.querySelectorAll('input[name="ef-roles"]:checked')].map(b => b.value);
   const inspCfg = document.getElementById('ef-insp-config')?.value || '';
   if (inspCfg) d.inspection_config_key = inspCfg; else delete d.inspection_config_key;

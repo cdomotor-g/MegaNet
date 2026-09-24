@@ -290,7 +290,7 @@ def build(data, out):
     # trip; tools/check_stations_doc.py is what proves that rather than assuming.
     emit_sync(out, 'station',
               ['id', 'ord', 'name', 'station_number', 'lat', 'lon', 'elevation_ahd',
-               'elevation_source',
+               'elevation_source', 'owner',
                'roles', 'radio_network_ids', 'catchment_ids', 'alert_ids', 'satcom',
                'rm_system_id', 'enabled', 'notes', 'legacy_unit_id', 'site', 'lga',
                'basin', 'location_types'],
@@ -300,6 +300,8 @@ def build(data, out):
                 # Absent where the height was surveyed; the view turns a null
                 # back into an absent key, so the round trip is clean.
                 q(s.get('elevation_source')),
+                # Absent where not recorded, and a blank is not a value.
+                q((s.get('owner') or '').strip() or None),
                 qarray(s.get('roles') or []), qarray(s.get('radio_network_ids') or []),
                 qarray(s.get('catchment_ids') or []), qjson(s.get('alert_ids') or {}),
                 qjson(s.get('satcom') or {}), q(s.get('rm_system_id')),

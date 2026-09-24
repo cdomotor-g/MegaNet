@@ -5278,6 +5278,10 @@ function stnCardHtml(s) {
     <div class="acma-sect">
       ${acmaCardRow('Stn #', s.station_number ? esc(s.station_number) : null)}
       ${acmaCardRow('Networks', nets ? esc(nets) : null)}
+      <!-- The owner as recorded on the station (0030). The SLS section below has
+           its own "Station owner" row, which is what the 2018 document says —
+           a different source, and the only one for most stations. -->
+      ${acmaCardRow('Owner', s.owner ? esc(s.owner) : null)}
       ${acmaCardRow('Position', located ? esc(stationLatLonText(s)) : null)}
       <!-- A modelled height and a surveyed one are different claims, and the
            card must not let them read alike (#198). elevation_source carries

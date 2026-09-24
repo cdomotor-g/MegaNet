@@ -2207,11 +2207,12 @@
     },
     {
       "id": "athol_westbrook_crk",
-      "name": "Athol (Newton Rd East) TM",
+      "name": "Athol - Westbrook Ck (Newton Rd East) TM",
       "station_number": "541174",
-      "lat": -27.613,
-      "lon": 151.793,
+      "lat": -27.61294,
+      "lon": 151.79309,
       "elevation_ahd": 487.1,
+      "owner": "Toowoomba Regional Council",
       "roles": [
         "field"
       ],
@@ -10589,11 +10590,12 @@
     },
     {
       "id": "cambooya_hodgson_crk",
-      "name": "Cambooya (Rolleston Park) TM",
+      "name": "Cambooya - Hodgson Ck (Rolleston Park) TM",
       "station_number": "541170",
-      "lat": -27.706,
-      "lon": 151.862,
+      "lat": -27.70562,
+      "lon": 151.86240,
       "elevation_ahd": 465.9,
+      "owner": "Toowoomba Regional Council",
       "roles": [
         "field"
       ],
@@ -10622,12 +10624,25 @@
           "type": "Water Level",
           "sensor_id": "541170.0.H",
           "device_id": 1
+        },
+        {
+          "alert_id": null,
+          "type": "Rainfall",
+          "sensor_id": "541170.0.R",
+          "device_id": 2
+        },
+        {
+          "alert_id": null,
+          "type": "Rainfall Increment",
+          "sensor_id": "541170.0.R",
+          "device_id": 3
         }
       ],
       "lga": "Toowoomba Regional",
       "basin": "Condamine-Culgoa Rivers",
       "hub_id": "brisbane",
       "location_types": [
+        "Rain Gauge",
         "Water Level"
       ]
     },
@@ -44420,11 +44435,12 @@
     },
     {
       "id": "pilton_kings_crk_gat",
-      "name": "Pilton (Gatton-Clifton Rd) TM",
+      "name": "Pilton - Kings Ck (Gatton-Clifton Rd) TM",
       "station_number": "541168",
-      "lat": -27.859,
-      "lon": 152.056,
+      "lat": -27.85899,
+      "lon": 152.05603,
       "elevation_ahd": 491.1,
+      "owner": "Toowoomba Regional Council",
       "roles": [
         "field"
       ],
@@ -45442,11 +45458,12 @@
     },
     {
       "id": "quinalow_peranga_rd",
-      "name": "Peranga (Haden-Maclagan Rd) TM",
+      "name": "Peranga - Myall Ck (Haden-Maclagan Rd / Quinalow Peranga Rd) TM",
       "station_number": "541167",
-      "lat": -27.106,
-      "lon": 151.624,
+      "lat": -27.10660,
+      "lon": 151.62415,
       "elevation_ahd": 439.8,
+      "owner": "Toowoomba Regional Council",
       "roles": [
         "field"
       ],
