@@ -691,6 +691,22 @@ const late = await page.evaluate(async () => {
 ok('a layer\'s pane made after the slider moved is dimmed as it appears — and one under the overlays is not',
    late.high === '0.2' && late.low === '1', JSON.stringify(late));
 
+// At nought the network is out of sight, and it has to be out of reach too: a
+// transparent canvas still hit-tests, so a click on what looked like empty
+// ground used to open the callout and card of a station nobody could see.
+await page.locator('#sites-dim').fill('0');
+const p0 = await page.evaluate(() => Object.fromEntries(Object.entries(state.map.getPanes())
+  .map(([n, el]) => [n, { op: getComputedStyle(el).opacity, pe: getComputedStyle(el).pointerEvents }])));
+ok('at 0 % the faded panes stop taking the pointer, and the finder\'s own panes and the popups do not',
+   ['overlayPane', 'markerPane', 'tooltipPane'].every(n => p0[n].op === '0' && p0[n].pe === 'none')
+   // mnSitesLines never takes the pointer at any strength (its lines are
+   // pictures, and the network's canvas is above them), so it is not asked.
+   && ['mnSites', 'popupPane'].every(n => p0[n].op === '1' && p0[n].pe !== 'none'),
+   JSON.stringify(Object.fromEntries(Object.entries(p0).map(([n, v]) => [n, `${v.op}/${v.pe}`]))));
+await page.locator('#sites-dim').fill('20');
+const p20b = await page.evaluate(() => getComputedStyle(state.map.getPane('overlayPane')).pointerEvents);
+ok('…and above nought they are faint but still clickable', p20b !== 'none', p20b);
+
 // ── 2e. in 3-D ───────────────────────────────────────────────────────────────
 console.log('\nIn 3-D');
 
@@ -804,6 +820,36 @@ if (!gl2) {
 await page.evaluate(() => MapSites.select(1));
 // Left dimmed for the rest of the run, so ↺ has a dim to take away.
 await page.locator('#sites-dim').fill('20');
+
+// ── 2f. in the default layout, with the cards in the side panel ─────────────
+// Everything above runs with ◫ off, so the Stations cards are under the map and
+// the finder is the side panel's only pane. That is not how anybody meets it:
+// by default the cards are in the side panel too, in a pane of their own, and
+// "Profile the worst path" draws into the profile card in that other pane. It
+// used to leave the card hidden there and say it was "under the map".
+console.log('\nIn the default layout');
+
+await page.evaluate(() => { toggleStationsSplit(true); setDockTab('map-sites'); });
+await page.waitForTimeout(300);
+const beforeProf = await page.evaluate(() => ({ showing: dockShowing(),
+  cards: !!document.querySelector('#help-panel .dock-pane-stations #stations-cards') }));
+ok('with ◫ on the cards are in the side panel beside the pinned finder, and the finder is the pane on screen',
+   beforeProf.showing === 'map-sites' && beforeProf.cards, JSON.stringify(beforeProf));
+await page.locator('.sites-panel button', { hasText: 'Profile the worst path' }).first().click();
+await page.waitForTimeout(400);
+const afterProf = await page.evaluate(() => {
+  const el = document.getElementById('path-profile-panel');
+  return { showing: dockShowing(), open: state.path.open,
+           visible: !!el && el.checkVisibility(),
+           note: document.getElementById('map-note')?.textContent || '' };
+});
+ok('Profile the worst path brings the profile card up in the side panel, open',
+   afterProf.showing === 'stations' && afterProf.visible && afterProf.open === true, JSON.stringify(afterProf));
+ok('…and the note says where the card is', /side panel/.test(afterProf.note) && !/under the map/.test(afterProf.note),
+   afterProf.note);
+// Back to the layout the rest of the run was written for.
+await page.evaluate(() => { toggleStationsSplit(false); setDockTab('map-sites'); });
+await page.waitForTimeout(300);
 
 // ── 3. the weights ───────────────────────────────────────────────────────────
 console.log('\nThe weights');

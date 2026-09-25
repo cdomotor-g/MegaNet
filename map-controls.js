@@ -697,13 +697,24 @@ const MapChrome = (function () {
                    rank: groupRank(opts), order: Number(opts.order) || 0 };
     if (want) {
       wrap.classList.add('is-docked');
-      host.adopt(wrap, { ...info, reason: pinning === id ? 'pin' : (home.built ? 'back' : 'build') });
+      // `focused`: somebody is in this panel as it moves — typing in it in the
+      // corner when full screen ended, say. The side panel then opens on it,
+      // or the panel they were using would land in a hidden pane and the
+      // refocus below would fail silently, leaving the next keystroke on
+      // <body>.
+      host.adopt(wrap, { ...info, focused: !!had,
+                         reason: pinning === id ? 'pin' : (home.built ? 'back' : 'build') });
       return had;
     }
     wrap.classList.remove('is-docked');
-    host.release(wrap, { ...info, reason: state.mapPanelsPinned.has(id) ? 'away' : 'unpin' });
+    const still = state.mapPanelsPinned.has(id);
+    host.release(wrap, { ...info, reason: still ? 'away' : 'unpin' });
     place(home.map, wrap, opts);
-    return had && wrap.querySelector('.mn-mapctl-btn');
+    // Only a real unpin comes back shut, with its icon to hold focus. A panel
+    // going 'away' — to the corner for full screen or a phone — is still
+    // pinned there, open and in view, and its icon is the one thing hidden
+    // (`.is-pinned > .mn-mapctl-btn`): focus stays on whatever it was on.
+    return had && (still ? had : wrap.querySelector('.mn-mapctl-btn'));
   }
 
   // Push the open/pinned state onto one control's DOM, and the control to where

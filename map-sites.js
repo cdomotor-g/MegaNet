@@ -935,7 +935,7 @@ const MapSites = (function () {
   // The panes this has touched are remembered, so taking the dim away puts
   // back exactly what it changed and nothing another module set.
   function undim() {
-    for (const el of dimmed) el.style.opacity = '';
+    for (const el of dimmed) { el.style.opacity = ''; el.style.pointerEvents = ''; }
     dimmed.clear();
   }
 
@@ -951,6 +951,11 @@ const MapSites = (function () {
       const z = parseInt(el.style.zIndex || getComputedStyle(el).zIndex, 10);
       if (!(z >= DIM_FLOOR_Z)) continue;
       el.style.opacity = String(k);
+      // At nought the pane is out of sight, and it goes out of reach with it:
+      // a transparent canvas still hit-tests, so a click on what looked like
+      // empty ground opened the callout and card of a station nobody could
+      // see. Anything above nought is faint but visible, and stays clickable.
+      el.style.pointerEvents = k === 0 ? 'none' : '';
       dimmed.add(el);
     }
   }
@@ -1632,10 +1637,30 @@ const MapSites = (function () {
       const t = found && found.targets[+k];
       if (!r || !t) return;
       const pa = [r.c.lat, r.c.lon], pb = [t.lat, t.lon];
+      // The card lives with the Stations cards — in the side panel beside the
+      // map, or under it — never on the map, so full screen is left first,
+      // the way the station card's Edit leaves it: a profile drawn behind the
+      // full-screen map is a button that did nothing.
+      if (state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
+      // Open before the line goes in, for LinkBudget.showProfile's reason:
+      // adding the shape repaints the card at once and the terrain takes
+      // seconds, and a card that opens only afterwards sits shut and empty.
+      state.path.open = true;
       const existing = MapDraw.findLine(pa, pb);
       if (existing) MapDraw.focus(existing.id);
       else MapDraw.addLine([pa, pb], [r.c.sid || null, t.sid || null]);
-      mapNote(`Profiling site #${r.rank} → ${t.name} — the card is under the map.`, 5000);
+      // …and brought on screen. With this panel pinned into the side panel the
+      // card is in another pane of it (the Stations one), which a scroll alone
+      // cannot reach — a hidden element does not scroll into view — so that
+      // pane is opened first, the same helper every other "show me the card"
+      // path uses. 🗼 in the strip brings the finder back.
+      const el = document.getElementById('path-profile-panel');
+      if (el) {
+        if (typeof dockReveal === 'function') dockReveal(el);
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      const where = typeof stationsCardsWhere === 'function' ? stationsCardsWhere() : 'with the station cards';
+      mapNote(`Profiling site #${r.rank} → ${t.name} — the card is ${where}.`, 5000);
     },
 
     save() {

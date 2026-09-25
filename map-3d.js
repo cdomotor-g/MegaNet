@@ -485,8 +485,16 @@ const Map3D = (function () {
     // and the pins in their own; here both are markers on the terrain, the
     // marks first so a candidate standing on a site is drawn over its mark.
     const each = fn => { if (d.lines) d.lines.eachLayer(fn); if (d.pins) d.pins.eachLayer(fn); };
+    // A site's mark sits under the station's own pin in 2-D (its pane is below
+    // the network's canvas), so at full strength the station's colour is what
+    // shows and the mark only appears once the network is faded. A DOM marker
+    // here is above every WebGL circle whatever it is, so the same stacking
+    // is kept by drawing the marks only while the network is faded — the
+    // ring on the terrain says where each site is either way.
+    const faded = typeof MapSites !== 'undefined' && MapSites.dimOthers ? Number(MapSites.dimOthers()) < 1 : false;
     each(l => {
       if (l.mn3d !== 'site' && l.mn3d !== 'tmark') return;
+      if (l.mn3d === 'tmark' && !faded) return;
       const icon = l.options.icon && l.options.icon.options;
       if (!icon || !icon.html) return;
       const el = document.createElement('div');
@@ -1135,7 +1143,13 @@ const Map3D = (function () {
     // layer-scoped listener and a plain one both fire, in registration order —
     // so the order is written out here instead of relied upon.
     map.on('click', e => {
-      const hit = map.queryRenderedFeatures(e.point, { layers: ['mn-stations'] })[0];
+      // With the site finder's "everything else" slider at nought the network
+      // is drawn at zero opacity, and MapLibre still hit-tests a feature it
+      // draws invisibly — so the pins and paths are left out of the question
+      // altogether, as the 2-D panes are (map-sites.js applyDim), and a click
+      // on empty-looking ground is a click on empty ground.
+      const hid = dimK === 0;
+      const hit = hid ? null : map.queryRenderedFeatures(e.point, { layers: ['mn-stations'] })[0];
       const id  = hit && hit.properties ? hit.properties.id : null;
       if (id != null) { clickedStation(id, e); return; }
       // Then a path (#196). Pins are asked first and the order is not
@@ -1150,7 +1164,7 @@ const Map3D = (function () {
       const pad  = LINK_HIT_PX;
       const near = [[e.point.x - pad, e.point.y - pad],
                     [e.point.x + pad, e.point.y + pad]];
-      const line = map.queryRenderedFeatures(near, { layers: ['mn-links'] })[0];
+      const line = hid ? null : map.queryRenderedFeatures(near, { layers: ['mn-links'] })[0];
       if (line && line.properties) { clickedLink(line.properties, e); return; }
       // Empty ground, with the pick armed: this is the bridge (#194). The 2-D
       // map's own click carries `latlng` for that pixel on the *Leaflet* map,

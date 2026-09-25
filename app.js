@@ -1752,6 +1752,20 @@ function dockEl() {
 // can be reached at every window height. The Stations pane carries its own h2,
 // out of sight, so that the cards' h3s step from something when they are here —
 // in <main> they step from the tab's own h2.
+//
+// The strip is written BEFORE the panes, although it is drawn after them on
+// the panel's outer edge (styles.css puts it there with `order`). Focus follows
+// the markup, not the picture: with the strip last, Tab from a button that had
+// just opened its pane left the panel altogether — to <body>, then the skip
+// link at the top of the page — and the pane could only be reached backwards,
+// landing on its last link. The old rail's toggle came before its text for the
+// same reason, and on a phone this is also what keeps the drawer's ✕ ahead of
+// the drawer it closes.
+//
+// The help button's mark is a plain "?", not the ❔ emoji it briefly was. That
+// emoji draws as a pale grey ornament whatever colour the button asks for —
+// about 1.8:1 on the strip's tint in the light theme — while text takes the
+// strip's own muted ink.
 function dockSkeleton(panel) {
   panel.innerHTML = `
     <div class="dock-inner">
@@ -1759,6 +1773,11 @@ function dockSkeleton(panel) {
            aria-label="Side panel width" aria-controls="help-panel"
            title="Drag to make the side panel wider or narrower, or use the arrow keys"
            onpointerdown="dockResizeStart(event)" onkeydown="dockResizeKey(event)"></div>
+      <div class="dock-strip" role="group" aria-label="Side panel" onkeydown="dockStripKey(event)">
+        <button type="button" class="dock-tab help-toggle" data-dock="help"
+                aria-controls="${dockPaneId('help')}" aria-expanded="false"
+                onclick="toggleHelp()"><span class="dock-ico" aria-hidden="true">?</span></button>
+      </div>
       <div class="dock-panes">
         <div class="help-inner dock-pane" id="${dockPaneId('help')}" data-dock="help" hidden>
           <div class="help-body"></div>
@@ -1766,11 +1785,6 @@ function dockSkeleton(panel) {
         <div class="dock-pane dock-pane-stations" id="${dockPaneId('stations')}" data-dock="stations" hidden>
           <h2 class="sr-only">Stations — filters, station list, path tools and station details</h2>
         </div>
-      </div>
-      <div class="dock-strip" role="group" aria-label="Side panel" onkeydown="dockStripKey(event)">
-        <button type="button" class="dock-tab help-toggle" data-dock="help"
-                aria-controls="${dockPaneId('help')}" aria-expanded="false"
-                onclick="toggleHelp()"><span class="dock-ico" aria-hidden="true">❔</span></button>
       </div>
     </div>`;
 }
@@ -1846,7 +1860,7 @@ function helpShowing() {
 // were pinned, and not by the order they were built, which for the polar plot
 // and the site finder is long after the rest.
 function dockTabs() {
-  const tabs = [{ id: 'help', icon: '❔', label: 'Help' }];
+  const tabs = [{ id: 'help', icon: '?', label: 'Help' }];
   if (dockStationsHere()) {
     tabs.push({ id: 'stations', icon: '📋',
                 label: 'Stations — filters, station list, ground profile, link budget and station details' });
@@ -2053,7 +2067,7 @@ function syncDockStrip(showing) {
     b.classList.toggle('is-on', on);
     if (t.id === 'help') {
       const ico = b.querySelector('.dock-ico');
-      if (ico) ico.textContent = closing ? '✕' : '❔';
+      if (ico) ico.textContent = closing ? '✕' : '?';
     }
   });
   if (had && had !== document.activeElement && strip.contains(had)) had.focus({ preventScroll: true });
@@ -2283,6 +2297,11 @@ function dockAdoptPanel(wrap, info) {
   if (info.reason === 'pin') {
     if (dockShowing() !== id) dockBack.push({ tab: state.dockTab, open: state.dockOpen });
     setDockTab(id);
+  } else if (info.focused) {
+    // Coming back from the corner with focus inside it (see relocate() in
+    // map-controls.js): shown at once, so the control that has focus is still
+    // on screen when it is focused again.
+    setDockTab(id, { instant: true });
   } else {
     renderDock({ instant: true });
   }
@@ -2521,7 +2540,7 @@ function renderStationsHtml() {
            which is what makes the outline step by one; it is sr-only because
            the nav and the header already say where you are, and this tab has
            less vertical room to spare than any other. -->
-      <h2 class="sr-only">Stations — map, filters and station list</h2>
+      <h2 class="sr-only" id="stations-main-h">${esc(stationsMainHeading())}</h2>
       <!-- One column since #165. This tab spent its whole life as a two-pane
            split: a filter rail on the left, the map and the table on the right,
            a draggable divider between them and a scroller inside each. #164
@@ -2978,10 +2997,28 @@ function syncStationsCardsHome(opts) {
     dockEl();
     const pane = stationsSplitActive() ? document.getElementById(dockPaneId('stations')) : null;
     const home = pane || main;
-    if (cards.parentNode !== home) home.appendChild(cards);
+    if (cards.parentNode !== home) {
+      // Moving a node that holds focus blurs it, and the blur lands on <body>:
+      // a row button or the editor's Name field someone was in when the window
+      // crossed the fold would send the next Tab back to the top of the page.
+      // So focus is carried across the move. The old fold was CSS alone and
+      // never had to.
+      const had = cards.contains(document.activeElement) ? document.activeElement : null;
+      home.appendChild(cards);
+      if (had && document.contains(had)) had.focus({ preventScroll: true });
+    }
     main.classList.toggle('is-split', !!pane);
   }
+  // <main>'s own heading says what is in <main>: with the cards in the side
+  // panel that is the map alone, and a screen reader walking the headings
+  // should not be told the filters and the list are here when they are not.
+  const h = document.getElementById('stations-main-h');
+  if (h) h.textContent = stationsMainHeading();
   renderDock(opts);
+}
+
+function stationsMainHeading() {
+  return stationsSplitActive() ? 'Stations — map' : 'Stations — map, filters and station list';
 }
 
 // The cards out of the side panel, wherever they are. Called before the tab is
@@ -3004,6 +3041,8 @@ function dropStationsCards() {
 // under them.
 function stationsLayoutChanged() {
   if (state.activeTab === 'stations') syncStationsCardsHome({ instant: true });
+  // ◫ describes where the cards are, and crossing the fold has just moved them.
+  syncMapSplitBtn(document.querySelector('.mn-map-split'));
   syncStationsTableCols();
   syncStationsSplitHeight();
   // The station card on the map points at the cards — "shown in the side
@@ -3044,7 +3083,9 @@ function toggleStationsSplit(on) {
   // The height changed with no transition; the side panel's width, which
   // slides, is re-measured by renderDock() once the slide is done.
   invalidateMapSizes(0);
-  announce(state.mapSplit
+  announce(!stationsSplitActive() && state.mapSplit
+    ? 'Station cards go in the side panel on wider windows; at this width they stay under the map.'
+    : state.mapSplit
     ? 'Station cards in the side panel, beside the map. Its edge can be dragged, or moved with the arrow keys.'
     : 'Station cards back under the map.');
 }
@@ -3056,7 +3097,12 @@ function syncMapSplitBtn(b) {
   if (!b) return;
   const on = state.mapSplit;
   b.setAttribute('aria-pressed', String(on));
-  const label = on
+  // Below the fold the setting is kept but cannot be honoured — the cards are
+  // under the map whatever it says — so the label says that, rather than
+  // claiming a side panel that is not holding them.
+  const label = !stationsSplitActive() && on
+    ? 'Station cards go in the side panel on wider windows — at this width they are under the map'
+    : on
     ? 'Station cards are in the side panel — put them under the map'
     : 'Station cards are under the map — put them in the side panel beside it';
   b.title = label;
@@ -5848,10 +5894,15 @@ function closeStnCard(refocus = true) {
   ].filter(t => t && (!full || full.contains(t)));
   for (const t of candidates) {
     // The row may be in the side panel's Stations pane with another pane on
-    // screen, and a hidden button refuses focus without a word — so its pane
-    // is brought up first, and only for the row: the opener and the map are
-    // where they were.
-    if (t === row) dockReveal(row);
+    // screen, or with the panel shut. It is then skipped, not revealed:
+    // closing a card must never change the layout, and bringing the pane up
+    // only to park focus in it reopened a panel the operator had just shut
+    // for the map's sake, or swapped Help for the cards under them. A hidden
+    // button refuses focus without a word anyway, so the map is the answer.
+    if (t === row) {
+      const pane = row.closest('#help-panel .dock-pane');
+      if (pane && (pane.hidden || dockShowing() !== pane.dataset.dock)) continue;
+    }
     t.focus({ preventScroll: true });
     if (document.activeElement === t) return;
   }

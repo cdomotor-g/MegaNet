@@ -411,6 +411,50 @@ try {
     (await wrapAt('display')).where === 'dock' && (await wrapAt('sites')).where === 'dock'
       && s.showing === 'map-display' && s.leafletW === s.mapClientW, JSON.stringify(s));
 
+  // ── 6b. the keyboard, and a card that closes ─────────────────────────────
+  // The strip is drawn on the panel's outer edge but written before the panes,
+  // so Tab from a button that has just opened its pane goes into that pane.
+  // Written after them (as it first was), Tab left the panel for <body> and
+  // the skip link, and the pane could only be reached backwards.
+  await page.evaluate(() => setDockTab('stations', { instant: true }));
+  await page.focus('#help-panel .help-toggle');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(300);
+  const tabbed = [];
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press('Tab');
+    const at = await page.evaluate(() => {
+      const a = document.activeElement;
+      return { tag: a ? a.tagName : '', inHelp: !!(a && a.closest('#dock-pane-help')),
+               inStrip: !!(a && a.closest('#help-panel .dock-strip')) };
+    });
+    tabbed.push(at);
+    if (!at.inStrip) break;
+  }
+  const landed = tabbed[tabbed.length - 1];
+  check('Tab from ❔, once it has opened Help, walks the strip and then into the help it opened',
+    landed.inHelp && tabbed.slice(0, -1).every(t => t.inStrip), JSON.stringify(tabbed));
+
+  // Closing a station card must never change the layout — not reopen a side
+  // panel the operator shut for the map's sake, and not swap Help for the
+  // cards to park focus on a row it cannot see.
+  await page.evaluate(() => setDockTab('stations', { instant: true }));
+  await page.click('#stations-table-wrap tr[data-sid] button');
+  await page.waitForTimeout(300);
+  await page.click('#help-panel .dock-tab[data-dock="stations"]');
+  await page.waitForTimeout(400);
+  const shut = await look();
+  await page.click('#stn-card button[aria-label="Close the station card"]');
+  await page.waitForTimeout(400);
+  const closed = await look();
+  check('closing the station card leaves a shut side panel shut, and the map its width',
+    shut.showing === null && closed.showing === null && closed.leafletW === shut.leafletW,
+    JSON.stringify({ shut: [shut.showing, shut.leafletW], closed: [closed.showing, closed.leafletW] }));
+  await page.evaluate(() => setDockTab('stations', { instant: true }));
+  await page.waitForTimeout(300);
+  check('<main>\'s own heading says it holds the map alone while the cards are beside it',
+    await page.evaluate(() => document.getElementById('stations-main-h')?.textContent === 'Stations — map'));
+
   // ── 7. ◫, the fold, a phone ──────────────────────────────────────────────
   await page.evaluate(() => { state.map.__probe = 'same'; toggleStationsSplit(false); });
   await page.waitForTimeout(500);
@@ -424,8 +468,22 @@ try {
     s.cardsIn === 'dock' && s.showing === 'stations' && await page.evaluate(() => state.map.__probe === 'same'),
     JSON.stringify(s));
 
+  // Focus is carried across the fold: moving the cards with a row button
+  // focused used to drop the keyboard user back on <body>.
+  await page.focus('#stations-table-wrap tr[data-sid] button');
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.waitForTimeout(600);
+  const foldFocus = await page.evaluate(() => {
+    const a = document.activeElement;
+    return { tag: a ? a.tagName : '', row: !!(a && a.closest('#stations-table-wrap tr[data-sid]')) };
+  });
+  check('crossing the 1100 px fold with a row focused keeps focus on that row', foldFocus.row, JSON.stringify(foldFocus));
+  const folded = await page.evaluate(() => ({
+    split: document.querySelector('.mn-map-split')?.getAttribute('aria-label') || '',
+    h: document.getElementById('stations-main-h')?.textContent || '',
+  }));
+  check('…and below it ◫ says the side panel is for wider windows, and <main>\'s heading names the cards again',
+    /wider windows/.test(folded.split) && /filters and station list/.test(folded.h), JSON.stringify(folded));
   s = await look();
   check('at 1000 px the cards fold under the map, and the side panel keeps Help and the pins',
     s.cardsIn === 'main' && !s.strip.includes('stations') && s.strip.includes('help')

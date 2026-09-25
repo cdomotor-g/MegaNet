@@ -6841,6 +6841,7 @@ hr {
    at eight buttons it has not yet. */
 .dock-strip {
   flex: 0 0 auto;
+  order: 2;                /* after the panes on screen, before them in the markup */
   width: calc(var(--mn-help-rail, 45px) - 1px);
   display: flex;
   flex-direction: column;
@@ -6882,6 +6883,13 @@ hr {
 .dock-ico {
   display: block;
   transform: translateY(.5px);
+}
+
+/* The help button's "?" is text, so it is set as text: heavier and a touch
+   larger than the emoji beside it, so the two read as the same size of mark. */
+.dock-tab.help-toggle .dock-ico {
+  font-size: 1.2rem;
+  font-weight: 700;
 }
 
 /* The handle: a 10 px hit target laid over the panel's inner edge — half over
