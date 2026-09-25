@@ -1644,6 +1644,21 @@ parcel is an enormous target, and a layer that opened a callout every time
 somebody clicked inside one would swallow the *click the empty map to clear the
 focus* gesture the pins, the ACMA card and the repeater focus all depend on.
 
+**Property boundaries.** *Property boundaries (Qld)*, in the same **Map
+display** panel, draws every lot in the same cadastre — the land parcels
+Queensland Globe draws — as a white line over a dark casing, so it reads on the
+topo and the imagery alike, with each lot's lot/plan written in from about
+1:5,000. **On by default**, and remembered between visits, on the road parcels'
+terms: the lines draw below about 1:40,000 and the Stations map opens on the
+whole network, so a cold load makes no request and the first one goes out when
+somebody zooms to a site. An operator who switches them off means it. The layer
+was off by default for its first release, and its switch has a new storage key
+(`mn-property-boundaries`) so that an *off* saved back then — which only ever
+meant "back to the default" — does not keep it hidden now. One server-rendered
+image per view rather than vectors, because a suburban screenful is thousands
+of lots; nothing in it takes the pointer, and the lot/plan label says what a
+callout would have.
+
 **Wind loading regions.** *Wind regions (AS/NZS 1170.2)*, another **Map
 display** switch, draws the Standard's wind loading regions — A0–A5, B1, B2,
 C and D — under the pins, on the severity ramp the Standard's own map uses:

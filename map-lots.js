@@ -64,7 +64,10 @@ const MapLots = (function () {
   let map = null, overlay = null, timer = null, seq = 0, failedAt = 0;
   let layerId = null, resolving = null;
   let drawnBox = null;               // { bounds, zoom } the overlay covers
-  let note = { kind: 'off' };
+  // Null until the first run(), for MapSurvey's reason: the panel renders
+  // before attach() has run, and with the switch on by default a seeded 'off'
+  // would put "Property boundaries are hidden" under a ticked box.
+  let note = null;
 
   function viewScale() {
     const z   = map.getZoom();
@@ -133,7 +136,10 @@ const MapLots = (function () {
   }
 
   function noteHtml() {
-    switch (note.kind) {
+    // Before the first run() the answer is whatever run() is about to reach:
+    // "zoom in" with the switch on, because the map opens on the whole network.
+    const n = note || { kind: state.mapLots ? 'zoom' : 'off' };
+    switch (n.kind) {
       case 'off':     return 'Property boundaries are hidden.';
       case 'zoom':    return 'Zoom in to draw property boundaries — they are drawn below about 1:40,000.';
       case 'loading': return 'Drawing property boundaries…';
@@ -231,13 +237,13 @@ const MapLots = (function () {
 
     noteHtml,
 
-    // Off by default and remembered, on MapCatchments' terms: a boundary is
-    // context somebody goes looking for, and one who turned it on for a site
-    // visit wants it there next time. The scale gate keeps a cold load with it
-    // on to no request at all — the map opens on the whole network.
+    // On by default and remembered, on MapRoads' terms: the scale gate keeps a
+    // cold load to no request at all — the map opens on the whole network —
+    // and an operator who switches the lines off means it. core.js says why
+    // the key is not the 'mn-lots' this layer shipped with.
     setEnabled(on) {
       state.mapLots = on;
-      try { localStorage.setItem('mn-lots', on ? 'on' : 'off'); } catch (_) {}
+      try { localStorage.setItem('mn-property-boundaries', on ? 'on' : 'off'); } catch (_) {}
       if (!on) { clearTimeout(timer); clearOverlay(); setNote('off'); return; }
       setNote(map && viewScale() <= MAX_SCALE ? 'loading' : 'zoom');
       sync();

@@ -2052,9 +2052,18 @@ const state = {
   // the moment a checkbox stands between the operator and the answer.
   mapRoads:       localStorage.getItem('mn-roads') !== 'off',
   // Property / lot boundaries from the same Queensland cadastre (see MapLots).
-  // Off by default and remembered: context somebody goes looking for, and its
-  // scale gate means a cold load with it on still makes no request.
-  mapLots:        localStorage.getItem('mn-lots') === 'on',
+  // On by default and remembered, on MapRoads' terms and for MapRoads' reason:
+  // the scale gate does the work the default-off was doing. The lines draw
+  // below about 1:40,000 and the Stations map opens fitted to the whole
+  // network, so a cold load still makes no request — the first goes out when
+  // somebody zooms to a site, which is when "whose land is this mast on?" gets
+  // asked. An operator who switches them off means it.
+  //
+  // Its own key rather than the 'mn-lots' the layer shipped with. That one was
+  // written while the layer was off by default, when unticking it only meant
+  // "back to the default"; read under this default, it would keep the lines
+  // hidden from exactly the people who had tried them once.
+  mapLots:        localStorage.getItem('mn-property-boundaries') !== 'off',
   // The 77 Queensland drainage basins (see MapCatchments). Off by default and
   // remembered, on MapContours' terms rather than MapWind's: nothing else in
   // the app asks data/qld-basins.geojson for anything, so unlike the wind
