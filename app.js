@@ -2841,6 +2841,7 @@ function renderMain() {
     case 'field':      el.innerHTML = ArroData.render('field'); ArroData.init();  break;
     case 'msglog':     el.innerHTML = MessageLog.render();      MessageLog.init(); break;
     case 'mapgen':     el.innerHTML = MapGen.render();          MapGen.init();     break;
+    case 'twin':       el.innerHTML = DigitalTwin.render();     DigitalTwin.init(); break;
     case 'inspections': el.innerHTML = Inspections.render();  Inspections.init(); break;
     case 'maintenance': el.innerHTML = Maintenance.render();  Maintenance.init(); break;
     case 'history':    el.innerHTML = History.render();       History.init();      break;
@@ -5453,6 +5454,7 @@ function stationActionGroups(s, { edit = false } = {}) {
       `<button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
            title="Zoom the map to the ~50 km area around this station">🔍 Zoom to station</button>`,
       fieldDataPillHtml(s),
+      twinPillHtml(s),
       MapBlast.popupLinkHtml(s),
     ] },
     { label: 'Position', pills: [
@@ -5479,6 +5481,18 @@ function stationActionGroups(s, { edit = false } = {}) {
     ] },
   ].map(g => ({ label: g.label, pills: g.pills.filter(Boolean) }))
    .filter(g => g.pills.length);
+}
+
+// "Digital twin →": the station's own patch of ground in three dimensions, on
+// the tab that builds it (digital-twin.js). Only for a station with a position
+// — there is no ground to stand a pole on otherwise — and only when the module
+// is loaded, for fieldDataPillHtml's reason below.
+function twinPillHtml(s) {
+  if (typeof DigitalTwin === 'undefined' || !DigitalTwin.openStation) return '';
+  if (!isFinite(s.lat) || !isFinite(s.lon)) return '';
+  return `<button type="button" class="pill mn-twin" onclick="DigitalTwin.openStation('${escAttr(s.id)}')"
+           title="Open the Digital Twin tab on this station: its ground in 3-D, a 2 m pole where it stands"
+           >🧊 Digital twin →</button>`;
 }
 
 // "Field data →": the station's readings, on the tab that draws them. The

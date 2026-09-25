@@ -619,6 +619,21 @@ jobs:
         working-directory: test
         run: npm run map3d
 
+      # The Digital Twin tab (digital-twin.js). `smoke` opens it and, with
+      # every elevation host blocked, a tab that says "no ground could be
+      # read" passes; `tabs` measures its panels in that same state. What is
+      # asserted here is the scene: the State's GeoTIFF read into the mesh
+      # with each pixel centre on its vertex, the 2 m × 300 mm pole standing
+      # on the ground at the origin and the 1.75 m figure on the ground
+      # beside it, the imagery draped, the .glb round-tripping, the fallbacks
+      # (empty raster → the tiles, blank imagery → Esri, nothing → said so),
+      # walk mode at eye height, and the renderer going with the tab. Needs
+      # WebGL2 through SwiftShader, like map3d; skips rather than fails
+      # without it.
+      - name: The Digital Twin — the ground, the pole and the figure on it, the .glb, the teardown
+        working-directory: test
+        run: npm run twin
+
       # The two navigators under and beside the Arrow chart. Their edge handles
       # were ungrabbable for a reason no check here could see: the drawing and
       # the hit-test each converted client coordinates to viewBox coordinates

@@ -54,6 +54,15 @@ function maplibreDist() {
   return path.dirname(require.resolve('maplibre-gl/dist/maplibre-gl.js'));
 }
 
+// And for the Digital Twin's renderer, three.js, on the same terms: fetched by
+// a dynamic import() on the first visit to that tab (digital-twin.js) and
+// absent from every check that does not go there. `three`'s package `main` is
+// build/three.cjs, so resolving the bare name lands in build/, where the ESM
+// build and the core it imports by a relative path both live.
+function threeDist() {
+  return path.dirname(require.resolve('three'));
+}
+
 const CONTENT_TYPE = {
   '.js':  'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -101,6 +110,23 @@ export async function applyNetworkPolicy(page, origin) {
       try { dist3d = maplibreDist(); } catch (_) { dist3d = null; }
       const file = dist3d && path.join(dist3d, path.normalize(maplibre[1]));
       if (file && file.startsWith(dist3d + path.sep) && fs.existsSync(file)) {
+        return route.fulfill({
+          status: 200,
+          contentType: CONTENT_TYPE[path.extname(file)] || 'application/octet-stream',
+          body: fs.readFileSync(file),
+        });
+      }
+    }
+
+    // `build/` — three.module.min.js and the three.core.min.js it imports.
+    // Served from the `three` devDependency, pinned to the same 0.185.1 the
+    // module asks for. Real three, real WebGL, no network.
+    const three = url.match(/unpkg\.com\/three@[\d.]+\/build\/([^?#]+)/);
+    if (three) {
+      let dist3 = null;
+      try { dist3 = threeDist(); } catch (_) { dist3 = null; }
+      const file = dist3 && path.join(dist3, path.normalize(three[1]));
+      if (file && file.startsWith(dist3 + path.sep) && fs.existsSync(file)) {
         return route.fulfill({
           status: 200,
           contentType: CONTENT_TYPE[path.extname(file)] || 'application/octet-stream',

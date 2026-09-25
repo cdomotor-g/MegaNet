@@ -116,6 +116,8 @@ const TABS = [
       find: 'csv radio mobile networks clusters download stations.json backup escape hatch data source' },
     { id: 'mapgen',     label: 'Map Generator',          icon: '🖨️',
       find: 'print paper a4 svg laser cut engrave k40 whisperer contour elevation layers billet plate title block scale bar graticule sheet' },
+    { id: 'twin',       label: 'Digital Twin',         icon: '🧊',
+      find: '3d three dimensional scene render explore walk site model elvis lidar dem ground terrain relief imagery aerial drape blender glb export point cloud pole figure' },
   ] },
   { group: 'Interference', tabs: [
     { id: 'rf',         label: 'RF Environment',         icon: '📶',
@@ -1139,6 +1141,39 @@ const HELP = {
       + 'what is missing — a blank-based laser plate needs none of it to be complete.',
     ],
     related: ['stations', 'maps', 'export'],
+  },
+
+  twin: {
+    summary: 'One station\'s patch of ground in three dimensions — the real relief under it from the '
+           + 'best public elevation model there is (Queensland\'s 0.5–1 m LiDAR where it exists, the '
+           + '~30 m SRTM elsewhere), the aerial imagery draped over it, a <strong>2 m × 300 mm pole</strong> '
+           + 'where the station stands and a 1.75 m figure beside it for scale. Orbit it, look straight '
+           + 'down on it, or walk about in it at eye height; click the ground for its height; and '
+           + 'download the whole scene as a <code>.glb</code> that Blender opens in one step.',
+    watch: [
+      '<strong>The ground is a model, not a survey.</strong> Queensland\'s service is bare-earth LiDAR '
+      + 'in AHD at 0.5–1 m where the State has flown it and SRTM where it has not, and it does not say '
+      + 'which per pixel — a patch that looks smooth may be the 30 m data. Outside Queensland the '
+      + 'ground is the same ~30 m terrain tiles every profile in this app reads, and the notes say so: '
+      + 'at that resolution the channel a gauge sits in is not there.',
+      'A recorded height well above the ground at the pin usually means the <strong>coordinate is the '
+      + 'gauge down in the channel and the mark is the hut on the bank</strong> — a flag on the '
+      + 'position, not a correction to the height. The Ground truth panel puts the two side by side, '
+      + 'with what Elvis says at the point and which dataset it read.',
+      'Vertical exaggeration stretches the relief and nothing else: the pole is 2.000 m tall and '
+      + '300 mm across and the figure 1.75 m at every setting. They are the ruler.',
+      'Everything arrives over the network — the renderer on the first visit (~750 KB), then one '
+      + 'raster and one image per patch. Whatever fails, the tab says which and draws what it did get; '
+      + 'a ground that could not be read is never drawn flat.',
+      'The <code>.glb</code> is in metres, y up, with its origin on the ground at the pole and the '
+      + 'station\'s coordinates and datum in its header. Blender: <em>File → Import → glTF 2.0</em>, '
+      + 'and it lands z-up. Point cloud data, when it is ingested, will sit in this same scene.',
+    ],
+    related: ['stations', 'mapgen', 'maps'],
+    links: [
+      { label: 'Digital twin — where the ground and the imagery come from, and the Blender workflow',
+        href: 'docs/digital-twin.md' },
+    ],
   },
 
   inspections: {

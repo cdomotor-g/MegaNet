@@ -578,3 +578,21 @@ if getattr(resp, "container", None):
 See `meganet_agent.py` (`_run_turn` and the loop in `run_agent`) for the full,
 commented implementation, including `pause_turn` handling and returning tool
 results as *only* `tool_result` blocks (required for programmatic tool calls).
+
+## Blender: the Digital Twin's `.glb`
+
+`blender/import_twin.py` is the one script here that runs under Blender's
+Python rather than the system one. The Digital Twin tab downloads a station's
+patch of ground — relief, imagery, the 2 m pole and the figure — as a glTF
+binary that Blender opens with *File → Import → glTF 2.0* and nothing more;
+this script is the ten clicks after that: metres, a sun from the north, a
+camera framed on the pole, the station's coordinates (written into the file's
+header by the app, and dropped by Blender's importer) carried onto the scene
+as custom properties, and optionally a render or a saved `.blend`.
+
+```bash
+blender --background --python tools/blender/import_twin.py -- twin-loudoun_br_al-400m.glb --render twin.png
+blender --python tools/blender/import_twin.py -- twin.glb          # and stay open
+```
+
+`docs/digital-twin.md` has the file's layout and where its ground comes from.

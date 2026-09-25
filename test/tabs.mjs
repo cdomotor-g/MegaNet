@@ -415,6 +415,34 @@ const SEED_HFEM = `() => {
   for (const d of document.querySelectorAll('#main-content details')) d.open = true;
 }`;
 
+// The Digital Twin draws nothing until a station is chosen, and under this
+// harness draws nothing even then: its renderer arrives from disk, but every
+// elevation and imagery host is blocked, so the stage says so and the panels
+// around it — the finder, the settings, the Ground truth list, the empty
+// table — are what is measured here. The built scene, with its ground and
+// its canvas name, is `npm run twin`'s to hold. Two entries: no station at
+// all, and a station whose ground could not be read.
+const SEED_TWIN_NONE = `async () => {
+  state.selectedId = null;
+  DigitalTwin._clear();
+  renderMain();
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
+const SEED_TWIN = `async () => {
+  const s = state.data.stations.find(x => isFinite(x.lat) && isFinite(x.lon));
+  DigitalTwin.pick(s.id);
+  // The build ends — with a scene, or with a status that says why not — in a
+  // sentence that does not trail off. Bounded, so a harness with no WebGL is
+  // still measured rather than hung.
+  await new Promise(res => {
+    const t0 = Date.now();
+    const tick = () => (!DigitalTwin.debug().status.endsWith('…') || Date.now() - t0 > 20000) ? res() : setTimeout(tick, 100);
+    tick();
+  });
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
@@ -443,6 +471,8 @@ const CONVERTED = [
   { id: 'stations',   label: 'Stations — a drawn path, its profile and its link budget', issue: '#136', seed: SEED_STATIONS_PATH },
   { id: 'hfem',       label: 'HFEM Messages — empty, with the builder and the reference', issue: 'born converted at #154' },
   { id: 'hfem',       label: 'HFEM Messages — the spec\'s ten examples decoded', issue: 'born converted at #154', seed: SEED_HFEM },
+  { id: 'twin',       label: 'Digital Twin — no station chosen', issue: 'born converted', seed: SEED_TWIN_NONE },
+  { id: 'twin',       label: 'Digital Twin — a station, its ground unreachable', issue: 'born converted', seed: SEED_TWIN },
 ];
 
 

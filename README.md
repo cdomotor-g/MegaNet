@@ -87,6 +87,8 @@ MegaNet/
 ├── map-move-pin.js         ← MapMovePin — drag one station's pin to where the
 │                             station is, and save the coordinates
 ├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
+├── digital-twin.js         ← DigitalTwin — Digital Twin tab: one station's ground in
+│                             3-D, a 2 m pole and a figure on it, a .glb for Blender
 ├── modal.js                ← Modal     — the shared dialog shell
 ├── packets.js              ← Packets   — ALERT / ERTS codec, and its tab
 ├── alert2.js               ← Alert2    — ALERT2 / ERT-A2 tab
@@ -2317,7 +2319,7 @@ on a narrow window.
 
 | Group | Tabs |
 | --- | --- |
-| **Stations & networks** | Stations · Radio Path Maps · Pass Ranges · Export · Map Generator |
+| **Stations & networks** | Stations · Radio Path Maps · Pass Ranges · Export · Map Generator · Digital Twin |
 | **Interference** | RF Environment · RF Changes · Interference Workbench |
 | **ALERT** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · HFEM Messages · Serial Monitor |
 | **Data** | ARRO Launcher · ARRO Data · Field Data · Message Log |
@@ -3520,6 +3522,60 @@ every way this decays is silent. A doc link that 404s, a *see also* naming a tab
 that was renamed, a placeholder that shipped and a walkthrough with no `<title>`
 all render a perfectly good-looking panel — `npm run smoke` opens the tab and
 the tab is fine. See **Testing** below.
+
+### 21. Digital Twin (One Station's Ground in Three Dimensions)
+One station's patch of ground — 200 to 1600 m square — with the real relief
+under it, the aerial imagery draped over it, a **2 m × 300 mm pole** where the
+station stands and a **1.75 m figure** beside it for scale. Orbit it, look
+straight down on it, or walk about in it at eye height with the keys; click
+the ground for its height; and download the whole scene as a `.glb` that
+Blender opens with one import. It is `digital-twin.js`, the **Digital Twin**
+tab under *Stations & networks*, and a 🧊 pill on every station card.
+
+**The ground is the State's, then the tiles'.** Queensland's own elevation
+service (`Elevation/QldDem` on `spatial-img.information.qld.gov.au`) holds
+the public 0.5–1 m LiDAR DTMs where they have been flown and SRTM elsewhere,
+bare earth, in AHD — the same Queensland LiDAR Elvis lists, served by the
+agency that flew it — and answers one request with a GeoTIFF of 32-bit
+floats for the whole patch, which the module reads in a hundred lines with
+no library. Where that service has nothing (New South Wales, the sea, an
+outage) the ground is the ~30 m SRTM every profile in this app reads,
+lifted from `terrain.js`'s lattice, and the notes say so: at 30 m the
+channel a gauge sits in is not there. Elvis's own API is asked for the one
+number it is best at — the AHD height at the pin and which dataset it came
+from — because its point call is ~2.5 s each with no batch (`elvis.js`
+measured it) and its bulk download is a job that arrives by email. A patch
+neither source answers is an empty stage that says why, never flat ground.
+
+**The imagery is the State's aerial program, then Esri's tiles, then a
+height ramp.** One JPEG of the patch from `LatestStateProgram_AllUsers`
+(10–20 cm in the towns), with the plain grey sheet it returns outside its
+photography told apart from a real one by its variance; Esri World Imagery
+stitched on a canvas where that fails; and the ground coloured by height
+where nothing can be had.
+
+**The request box is the patch grown by half a sample**, so the 201 pixel
+centres the service returns are the 201 mesh vertices and the middle one is
+the station. Vertical exaggeration scales the relief and nothing else — the
+pole and the figure are the ruler at every setting. The **Ground truth**
+panel puts the station's recorded height, the ground at the pin, Elvis's
+answer and the difference side by side, with the one thing worth knowing
+about that difference: a mark well above the ground usually means the
+coordinate is the gauge in the channel and the mark is the hut on the bank.
+
+**The renderer is three.js, fetched on the first visit** and never for a
+session that does not come here — MapLibre's terms — by a dynamic
+`import()` of the pinned ESM build, because three has shipped no UMD build
+since r160. The page stays classic scripts; the call is from inside a
+function. The `.glb` is written by the module itself (metres, y up, origin
+on the ground at the pole, the station's coordinates and datum in its
+header; the imagery embedded) and `tools/blender/import_twin.py` sets the
+scene up in Blender — units, a sun from the north, a camera on the pole.
+Point clouds, when they are ingested, will land in this same frame.
+
+`docs/digital-twin.md` has the measurements behind every claim above, the
+controls, the hosts a network has to allow, and the Blender workflow.
+`npm run twin` holds the geometry — see **Testing** below.
 
 ---
 
