@@ -44,10 +44,14 @@
 //      author rule beats the browser's own `[hidden] { display: none }` at the
 //      same specificity. **A check reading the property would have agreed with
 //      the bug**, which is the reason this file says so out loud.
-//   9. **Side by side is two columns and a divider that moves.** Asserted by
-//      the map's own width against the container's, before and after the
-//      divider is moved from the keyboard, and by the map object surviving the
-//      toggle — the whole reason it is a class rather than a re-render.
+//   9. **Side by side is the map and the cards beside it, in the side panel,
+//      with a handle that moves.** Rewritten for the side panel (the dock): the
+//      cards were a column inside <main> with a divider of their own, and are a
+//      pane of #help-panel now, sized by its width handle. Asserted by the
+//      map's own width against the container's, before and after the handle is
+//      moved from the keyboard, by where the cards wrapper is, by the fold at
+//      `lg`, and by the map object surviving the toggle — the whole reason it
+//      is a move rather than a re-render.
 //
 // Everything runs against the bundled `stations.json` on loopback with the
 // network policy in force: none of it needs a tile, a terrain fetch or the
@@ -444,18 +448,28 @@ try {
 
   // ── 9. Side by side ──────────────────────────────────────────────────────
   // The default since the follow-up to #186 — the single column put the map's
-  // own answer below the fold, so reading it cost the map. The check drives it
-  // the other way round: it opens split, and the assertion about the stacked
-  // shape is made by switching it off.
+  // own answer below the fold, so reading it cost the map. Since the side
+  // panel took the right-hand column over, "side by side" is the map filling
+  // the page and the station cards in the side panel's Stations pane, and the
+  // old divider is the side panel's own width handle: this section was
+  // rewritten for that, and asserts the same four things it always did — the
+  // two layouts, the map object surviving the switch, a separator that moves,
+  // and one scroll region rather than three — against the shape they have now.
+  // The check drives it the other way round: it opens side by side, and the
+  // assertion about the stacked shape is made by switching it off.
   const mapId = await page.evaluate(() => { state.map.__probe = 'same'; return true; });
   const opened = await page.evaluate(() => ({
     split: state.mapSplit,
     onClass: document.getElementById('stations-main').classList.contains('is-split'),
-    // One scroll region, not three: the columns scroll, the page does not.
+    showing: dockShowing(),
+    cardsInDock: !!document.querySelector('#help-panel #dock-pane-stations > #stations-cards'),
+    // One scroll region, not three: the pane scrolls, the page does not.
     docScrolls: document.documentElement.scrollHeight > window.innerHeight + 1,
   }));
-  check('the tab opens side by side', opened.split && opened.onClass, JSON.stringify(opened));
-  check('…and the page itself does not scroll behind the two columns that do',
+  check('the tab opens side by side, the cards in the side panel beside the map',
+    opened.split && opened.onClass && opened.showing === 'stations' && opened.cardsInDock,
+    JSON.stringify(opened));
+  check('…and the page itself does not scroll behind the pane that does',
     !opened.docScrolls, JSON.stringify(opened));
 
   await page.evaluate(() => toggleStationsSplit(false));
@@ -464,61 +478,72 @@ try {
     const main = document.getElementById('stations-main');
     return {
       split: main.classList.contains('is-split'),
+      cardsUnder: !!main.querySelector(':scope > #stations-cards'),
+      paneButton: !!document.querySelector('#help-panel .dock-tab[data-dock="stations"]'),
+      showing: dockShowing(),
       mapW: Math.round(document.getElementById('leaflet-map').getBoundingClientRect().width),
       mainW: Math.round(main.getBoundingClientRect().width),
-      bar: document.querySelector('.stn-split-bar').getClientRects().length > 0,
+      handle: document.querySelector('#help-panel .dock-resize').getClientRects().length > 0,
       mapObj: !!state.map,
     };
   });
-  check('switched off it is one column, with no divider on screen',
-    !before.split && !before.bar && before.mapW > before.mainW * 0.9, JSON.stringify(before));
+  check('switched off, the cards are under the map and the side panel has no Stations pane',
+    !before.split && before.cardsUnder && !before.paneButton && before.showing === null,
+    JSON.stringify(before));
+  check('…and the map has the page to itself, with no handle on screen',
+    !before.handle && before.mapW > before.mainW * 0.9, JSON.stringify(before));
 
   await page.evaluate(() => toggleStationsSplit(true));
   await page.waitForTimeout(600);
   const split = await page.evaluate(() => {
-    const main = document.getElementById('stations-main');
-    const bar = document.querySelector('.stn-split-bar');
+    const handle = document.querySelector('#help-panel .dock-resize');
+    const pane = document.getElementById('dock-pane-stations');
+    const map = document.getElementById('leaflet-map').getBoundingClientRect();
+    const panel = document.getElementById('help-panel').getBoundingClientRect();
     return {
-      mapW: Math.round(document.getElementById('leaflet-map').getBoundingClientRect().width),
-      mainW: Math.round(main.getBoundingClientRect().width),
-      restW: Math.round(document.querySelector('.stn-split-rest').getBoundingClientRect().width),
-      bar: bar.getClientRects().length > 0,
-      role: bar.getAttribute('role'),
-      now: Number(bar.getAttribute('aria-valuenow')),
-      pct: state.mapSplitPct,
+      mapW: Math.round(map.width),
+      mapRight: Math.round(map.right),
+      panelLeft: Math.round(panel.left),
+      paneW: Math.round(pane.getBoundingClientRect().width),
+      cardsInDock: !!pane.querySelector(':scope > #stations-cards'),
+      handle: handle.getClientRects().length > 0,
+      role: handle.getAttribute('role'),
+      orient: handle.getAttribute('aria-orientation'),
+      now: Number(handle.getAttribute('aria-valuenow')),
+      width: dockWidth(),
       sameMap: state.map.__probe === 'same',
-      restScrolls: getComputedStyle(document.querySelector('.stn-split-rest')).overflowY,
+      paneScrolls: getComputedStyle(pane).overflowY,
     };
   });
-  check('side by side puts the list beside the map, not under it',
-    split.mapW < before.mapW && split.restW > 200
-      && split.mapW + split.restW <= split.mainW + 20, JSON.stringify(split));
+  check('side by side puts the cards beside the map, not under it',
+    split.mapW < before.mapW && split.paneW > 200 && split.cardsInDock
+      && split.mapRight <= split.panelLeft, JSON.stringify(split));
   check('…with the same Leaflet map, never a rebuilt one',
     mapId && split.sameMap, JSON.stringify(split));
-  check('…a real separator carrying its value', split.bar && split.role === 'separator'
-    && split.now === split.pct, JSON.stringify(split));
-  check('…and a right column that scrolls on its own',
-    /auto|scroll/.test(split.restScrolls), split.restScrolls);
+  check('…a real separator carrying its value', split.handle && split.role === 'separator'
+    && split.orient === 'vertical' && split.now === split.width, JSON.stringify(split));
+  check('…and a pane that scrolls on its own',
+    /auto|scroll/.test(split.paneScrolls), split.paneScrolls);
 
-  // **The columns are only charged for the overflow they caused.**
+  // **The map is only charged for the overflow it caused.**
   //
-  // syncStationsSplitHeight measures the split's height, applies it, and then
+  // syncStationsSplitHeight measures the map's height, applies it, and then
   // corrects itself against whatever the document turns out to overflow by. The
   // first version subtracted the *whole* of that overflow, on the reasoning
-  // that the only thing below the fold could be the columns it had just sized.
-  // Let anything else stick out down there and the columns paid for it: the
-  // reported case came back with a 306 px map and a 360 px right-hand pane —
-  // `.stn-split.is-split`'s own min-height, hit from above — on a window with
-  // room for 929, and the page shortened in the same gesture.
+  // that the only thing below the fold could be the column it had just sized.
+  // Let anything else stick out down there and the map paid for it: the
+  // reported case came back with a 306 px map — `.stn-split.is-split`'s own
+  // min-height, hit from above — on a window with room for 929, and the page
+  // shortened in the same gesture.
   //
-  // Nothing about that state looks broken from inside the app. The two columns
-  // are still two columns, `state.mapSplit` is still on, the class is still
+  // Nothing about that state looks broken from inside the app. The cards are
+  // still beside the map, `state.mapSplit` is still on, the class is still
   // there, and every number in the calculation is a real measurement of
   // something. So the assertion cannot be "the split has a height" or "the
   // class survived" — it has to be the height itself, against a page that is
   // deliberately made to overflow by something the split has no part in and
   // cannot shrink away. An absolutely positioned strip in the document does
-  // that honestly: it is not in either column, it is not in a scroller, and
+  // that honestly: it is not in the map's column, it is not in a scroller, and
   // shrinking the map by a pixel does nothing for it.
   const beforeSpacer = await page.evaluate(() => ({
     splitH: document.getElementById('stations-main').style.getPropertyValue('--mn-split-h'),
@@ -534,14 +559,14 @@ try {
       over: document.documentElement.scrollHeight - window.innerHeight,
       splitH: document.getElementById('stations-main').style.getPropertyValue('--mn-split-h'),
       mapH: Math.round(document.getElementById('leaflet-map').getBoundingClientRect().height),
-      restH: Math.round(document.querySelector('.stn-split-rest').getBoundingClientRect().height),
+      paneH: Math.round(document.getElementById('dock-pane-stations').getBoundingClientRect().height),
     };
   });
-  check('a page that overflows for somebody else does not shrink the columns',
+  check('a page that overflows for somebody else does not shrink the map',
     spaced.over > 1000 && spaced.mapH >= beforeSpacer.mapH - 8,
     `${beforeSpacer.mapH} → ${spaced.mapH} with ${spaced.over} px of overflow elsewhere`);
-  check('…and the right-hand pane keeps its height with it',
-    spaced.restH > 600, `${spaced.restH} px`);
+  check('…and the side panel\'s pane keeps its height with it',
+    spaced.paneH > 600, `${spaced.paneH} px`);
   const unspaced = await page.evaluate(() => {
     document.getElementById('mn-overflow-probe').remove();
     updateChromeHeight();
@@ -554,28 +579,30 @@ try {
     unspaced.over <= 1 && Math.abs(unspaced.mapH - beforeSpacer.mapH) <= 2,
     `${beforeSpacer.mapH} → ${unspaced.mapH}, over ${unspaced.over}`);
 
-  // The divider, from the keyboard — the reason it is a focusable separator.
-  await page.focus('.stn-split-bar');
+  // The handle, from the keyboard — the reason it is a focusable separator.
+  // ArrowLeft widens the pane: the handle is on its left edge, and that is the
+  // way the edge moves.
+  await page.focus('#help-panel .dock-resize');
   for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowLeft');
   await page.waitForTimeout(400);
   const moved = await page.evaluate(() => ({
-    pct: state.mapSplitPct,
-    now: Number(document.querySelector('.stn-split-bar').getAttribute('aria-valuenow')),
+    width: dockWidth(),
+    now: Number(document.querySelector('#help-panel .dock-resize').getAttribute('aria-valuenow')),
     mapW: Math.round(document.getElementById('leaflet-map').getBoundingClientRect().width),
-    stored: Number(localStorage.getItem('mn-map-split-pct')),
+    stored: Number(localStorage.getItem('mn-dock-w')),
   }));
-  check('the arrow keys move the divider and the map narrows with it',
-    moved.pct < split.pct && moved.mapW < split.mapW && moved.now === moved.pct,
+  check('the arrow keys move the handle and the map narrows with it',
+    moved.width > split.width && moved.mapW < split.mapW && moved.now === moved.width,
     JSON.stringify(moved));
-  check('…and where it was left is remembered', moved.stored === moved.pct, JSON.stringify(moved));
+  check('…and where it was left is remembered', moved.stored === moved.width, JSON.stringify(moved));
 
-  // The fold at `lg`, with the split left on — and this one is here because the
-  // first version of it did not work. Every fold-back selector is the same one
-  // at the same specificity as the rule it undoes, so source order is the whole
-  // of what decides, and written eight hundred lines up with the other `lg`
-  // rules it lost: 381 px of map in a 688 px column at 1000 px wide, which is
-  // the state the fold exists to prevent. Nothing about the *setting* may change
-  // — a laptop docked to a wide screen has to find its split again.
+  // The fold at `lg`, with the setting left on — and this one is here because
+  // the first version of the split's fold did not work: 381 px of map in a
+  // 688 px column at 1000 px wide, which is the state the fold exists to
+  // prevent. Below `lg` the cards go back under the map, the side panel loses
+  // its Stations pane (and is shut, since that was the pane on screen), and
+  // nothing about the *setting* may change — a laptop docked to a wide screen
+  // has to find the cards beside its map again.
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.waitForTimeout(700);
   const folded = await page.evaluate(() => {
@@ -583,41 +610,47 @@ try {
     return {
       mapW: Math.round(document.getElementById('leaflet-map').getBoundingClientRect().width),
       mainW: Math.round(main.getBoundingClientRect().width),
-      bar: document.querySelector('.stn-split-bar').getClientRects().length > 0,
+      cardsUnder: !!main.querySelector(':scope > #stations-cards'),
+      paneButton: !!document.querySelector('#help-panel .dock-tab[data-dock="stations"]'),
+      handle: document.querySelector('#help-panel .dock-resize').getClientRects().length > 0,
       stillSet: state.mapSplit,
+      preference: state.dockTab,
       splitH: main.style.getPropertyValue('--mn-split-h'),
       sideways: document.documentElement.scrollWidth > window.innerWidth,
     };
   });
-  check('below the lg breakpoint the split folds back to one column',
-    !folded.bar && folded.mapW > folded.mainW * 0.9 && !folded.sideways,
-    JSON.stringify(folded));
-  check('…without forgetting that the split is on', folded.stillSet === true,
-    JSON.stringify(folded));
-  // And nothing is written down while it is folded. Below `lg` the stack is
-  // `height: auto` and the page is one long scroller on purpose, so a height
-  // measured against it is a measurement of a layout that is not on screen —
-  // and it used to be stored anyway, as the floor, because the correction above
-  // read that scroller as the columns being too tall. It survived the fold
-  // because the variable does: what clears it is the next measurement, which
-  // is a window resize that may never come.
+  check('below the lg breakpoint the cards fold back under the map',
+    folded.cardsUnder && !folded.paneButton && !folded.handle
+      && folded.mapW > folded.mainW * 0.9 && !folded.sideways, JSON.stringify(folded));
+  check('…without forgetting that side by side is on, or which pane was open',
+    folded.stillSet === true && folded.preference === 'stations', JSON.stringify(folded));
+  // And nothing is written down while it is folded. Below `lg` the page is one
+  // long scroller on purpose, so a height measured against it is a
+  // measurement of a layout that is not on screen — and it used to be stored
+  // anyway, as the floor, because the correction above read that scroller as
+  // the map being too tall.
   check('…and nothing is measured against the folded page',
     folded.splitH === '', `--mn-split-h: ${JSON.stringify(folded.splitH)}`);
   await page.setViewportSize({ width: 1500, height: 950 });
   await page.waitForTimeout(700);
-  // Nothing is asserted about the way back up: crossing `lg` is a viewport
-  // change, so the resize listener re-measures on the same gesture whatever was
-  // or was not stored. An assertion there would be green against the bug too.
+  const unfolded = await page.evaluate(() => ({
+    showing: dockShowing(),
+    cardsInDock: !!document.querySelector('#dock-pane-stations > #stations-cards'),
+    sameMap: state.map.__probe === 'same',
+  }));
+  check('…and back above it the cards are beside the map again, on the same map',
+    unfolded.showing === 'stations' && unfolded.cardsInDock && unfolded.sameMap,
+    JSON.stringify(unfolded));
 
   await page.evaluate(() => toggleStationsSplit(false));
   await page.waitForTimeout(500);
   const stacked = await page.evaluate(() => ({
     mapW: Math.round(document.getElementById('leaflet-map').getBoundingClientRect().width),
-    bar: document.querySelector('.stn-split-bar').getClientRects().length > 0,
+    cardsUnder: !!document.querySelector('#stations-main > #stations-cards'),
     sameMap: state.map.__probe === 'same',
   }));
   check('and switching back stacks it again, still the same map',
-    stacked.mapW >= before.mapW - 2 && !stacked.bar && stacked.sameMap, JSON.stringify(stacked));
+    stacked.mapW >= before.mapW - 2 && stacked.cardsUnder && stacked.sameMap, JSON.stringify(stacked));
   await page.evaluate(() => toggleStationsSplit(true));
   await page.waitForTimeout(500);
 
@@ -780,4 +813,4 @@ if (failed.length) {
   process.exit(1);
 }
 console.log('PASS — the links say what channel they are on and which way they run, the credit');
-console.log('       line is off the map, and the tab can hold the map beside its answer.');
+console.log('       line is off the map, and the side panel can hold the map\'s answer beside it.');

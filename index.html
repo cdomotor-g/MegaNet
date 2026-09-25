@@ -116,18 +116,29 @@
       <!-- rendered by app.js -->
     </main>
 
-    <!-- Starts collapsed in the markup so the paint before app.js runs matches
-         the default it will almost always settle on. A stored "expanded" is
-         applied by the first renderHelp(), before the width transition is
-         allowed — see .help-ready.
+    <!-- The side panel (the "dock"): a strip of buttons on the outer edge — ❔
+         Help, 📋 the Stations cards on that tab, and one per map panel pinned
+         into it — and, open, one pane beside the strip, with a handle on its
+         inner edge that sets its width. The one complementary landmark on the
+         page, and still #help-panel, the id the help rail it grew out of had:
+         the print sheet, the reduced-motion rule and every check that finds
+         the ❔ toggle reach it by that name.
+
+         Its skeleton is built once, by the first renderHelp() (app.js,
+         dockSkeleton), and never rewritten wholesale after — the panes hold
+         live things, the Stations cards and pinned map panels, that a
+         template written over them would destroy. It starts collapsed in the
+         markup so the paint before app.js runs is the strip alone; the state
+         is applied before the width transition is allowed — see .help-ready.
 
          No header button pairs with this the way ☰ pairs with the nav: the
          header had a slot on the left for ☰ and has none on the right, and a
          seventh button there wrapped the banner onto another row on a phone.
          Below 560 px the strip becomes a fixed tab on the screen edge instead
-         — still always present, but costing no layout width. See styles.css. -->
-    <aside id="help-panel" class="collapsed" aria-label="Help">
-      <!-- rendered by app.js -->
+         — still always present, but costing no layout width — and help opens
+         as a drawer. See styles.css. -->
+    <aside id="help-panel" class="collapsed" aria-label="Side panel">
+      <!-- built by app.js -->
     </aside>
   </div>
 

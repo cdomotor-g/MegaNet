@@ -794,7 +794,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Limit link/path length*)
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
-- Map and station list side by side by default, with a divider that drags — and a five-column list beside it (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape has room for
+- Map and station cards side by side by default — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape has room for
 - **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub and nearest station, repeater and survey mark
 - **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
 - Elevation shading over any base map, with an opacity slider
@@ -809,9 +809,10 @@ Each entry in the `stations` array represents one node in the network. A node ca
   and separated by a hairline: what the map **shows** (base map — OSM-Topo by default,
   OpenStreetMap, Satellite or Dark — **Map display**, the **legend**), the tools you point at it
   (**Draw & measure**, **Polar radio coverage**, **Repeater site finder**, **What is here**), the **3-D view** and its
-  camera, how much screen the map gets (⛶ full screen, ◫ side by side), and ↺ reset on its own at
+  camera, how much screen the map gets (⛶ full screen, ◫ the cards beside the map or under it), and ↺ reset on its own at
   the bottom. Each panel is an icon and nothing else until you point at it, click it or tab to it,
-  and each can be pinned open — a pin that is remembered between visits
+  and each can be pinned open — which moves it off the map into the side panel (§20), and is a pin
+  that is remembered between visits
 
 **Reading the map.** Every pin carries a white ring so it separates from the
 base map and from its neighbours; ACMA transmitter squares carry the same ring.
@@ -1124,16 +1125,19 @@ panel and removing it later never moves or rebuilds the map at all. Full
 screen is something an operator is doing, not a preference, so it lasts the
 session and is not remembered.
 
-**Side by side, and it is how the tab opens.** The map on the left, and
-everything normally under it — the filters, the station list, the path tools,
-the details card — on the right, each column its own scroller at the height of
-the viewport, with a divider between them that drags. That is the whole point of
-it: the map stays in view while the list under it is read. ◫ beside ⛶ switches
-back to the stack. The divider can be dragged with a pointer or moved with the
-arrow keys (it is a real ARIA separator with a value on it, and Home/End take it
-to either limit), and where it was left is remembered.
+**Side by side, and it is how the tab opens.** The map filling the page on the
+left, and everything normally under it — the filters, the station list, the path
+tools, the details card — in the side panel on the right (§20), the map at the
+height of the viewport and the cards a pane that scrolls on its own. That is the
+whole point of it: the map stays in view while the list beside it is read. ◫
+beside ⛶ puts the cards back under the map. Until the side panel it was three
+columns inside `<main>` — the map, a divider that dragged and a column of cards —
+beside a help rail that was a second right-hand column; the divider is the side
+panel's own width handle now (a real ARIA separator with a value in px, dragged
+with a pointer or moved with the arrow keys), and where it was left is
+remembered.
 
-> The height of those two columns is *measured*, not computed from tokens. The
+> The height of the map beside the cards is *measured*, not computed from tokens. The
 > first version guessed `calc(100dvh - var(--mn-chrome) - 2rem)`, which missed
 > `#main-content`'s own padding and the gap above the panel, and left the **page**
 > scrolling behind two columns that were each already scrolling — three scroll
@@ -1176,10 +1180,9 @@ without touching the setting: two 400 px columns are two things too narrow to re
 rather than two things in view, and a laptop docked to a wide screen finds its
 split again where it left it.
 
-Like full screen, it is a class toggled on the container the markup already
-emits — the three children are always there — so switching between the two
-readings moves nothing in the DOM and the Leaflet map keeps its view, its layers
-and its in-flight requests.
+Like full screen, switching between the two readings never rebuilds the map:
+the cards are one wrapper, *moved* between the side panel and the page, and the
+Leaflet map keeps its view, its layers and its in-flight requests.
 
 **The station list carries fewer columns beside the map.** Ten columns in a
 420 px column is ten columns nothing fits in — measured at 1440 px, every
@@ -3253,9 +3256,16 @@ summary says so rather than inventing one.
 > Fields and elements with no such evidence behind them are marked *constant only*
 > in the tab's own reference rather than guessed at.
 
-### 20. Help Panel (Contextual, Right-Hand)
-A right-hand rail that says what the open tab is for and what to watch out for
-on it. It exists because a real amount of explanation was already scattered
+### 20. Side Panel (Help, the Stations Cards, Pinned Map Panels)
+One column on the right of every tab, the *side panel* (`#help-panel`, called
+"the dock" in the code): a strip of buttons on the screen's edge and, open, one
+pane beside it. ❔ is the help described below; 📋, on the Stations tab, is the
+Stations cards; and every map panel pinned with its 📌 gets a button of its own.
+It is the help rail and the Stations tab's right-hand column of cards merged
+into one — see *The side panel as a dock* at the end of this section.
+
+The help is what says what the open tab is for and what to watch out for on
+it. It exists because a real amount of explanation was already scattered
 through the app — the 357 filter modal, `docs/serial-help.html`, the ARRO id
 disambiguation copy in the station editor, the hints in the Stations filter card
 — with no single surface a first-time user could open to find any of it.
@@ -3304,29 +3314,74 @@ hints stay, because they are generated from the loaded file and cannot be lifted
 into a static string.
 
 It borrows the nav's interaction contract on purpose (§14): it collapses to a
-strip rather than to nothing, keeps its state in `localStorage` under `mn-help`
-beside `mn-nav` / `mn-theme` / `mn-filters`, and re-measures every Leaflet map
-once its width transition has finished rather than during it. Three places it
-deliberately differs, because a reference surface is not a navigation one:
+strip rather than to nothing, keeps its state in `localStorage` beside `mn-nav`
+/ `mn-theme` / `mn-filters`, and re-measures every Leaflet map once its width has
+settled rather than during the slide. Where it differs:
 
-- **It starts collapsed at every width**, not just under 900 px. The nav is used
-  on every interaction and earns its column; this is read once and closed. A
-  stored preference always wins, as it does for the nav.
-- **Under 560 px it becomes a drawer, and the two are mutually exclusive.**
-  Opening either closes the other, so a 390 px screen is never asked to hold two
-  drawers at once.
-- **Its phone toggle stays on the panel, not in the header.** The nav could move
-  ☰ into the header because the header already had a slot on the left. There is
-  none on the right, and a seventh header button measured 30 px taller at 390 px
-  — a permanent cost to the banner for a control that only matters when you go
-  looking for it. So the strip becomes a fixed tab on the screen edge instead:
-  still always present, costing no layout width.
+- **Two things are remembered, not one**: whether it is open (`mn-help`,
+  `expanded`/`collapsed`, as it always was) and which pane it would like to show
+  (`mn-dock-tab`: `help`, `stations`, or `map-<panel>`). A pane that is not
+  there on the current tab — the Stations cards anywhere but Stations — leaves
+  the panel shut *there* without the preference changing, so coming back finds
+  it open on the same pane. A fresh visit prefers the Stations cards, which is
+  why the Stations tab opens with them beside the map and every other tab opens
+  with help shut, the way the rail always did: help opens itself nowhere. (A
+  browser holding only the old help rail's `mn-help` answer, and no
+  `mn-dock-tab`, is treated as a fresh visit: its "collapsed" was said about the
+  help, not about the Stations cards.)
+- **Its width is yours.** The handle on the pane's inner edge is a real
+  separator (`role="separator"`, a value in px): drag it with a pointer, or
+  focus it and use ← → (a step), PageUp/PageDown (a big one), Home/End (its
+  narrowest and widest). The width is stored as `mn-dock-w` and clamped to the
+  window at the moment of use — never below 300 px while there is room, and
+  never so wide that the page keeps less than 400 px, so the Stations map beside
+  it is never a strip. On a window too narrow for both (a tablet in portrait,
+  where the cards are under the map anyway) it may take up to 55 % of the room
+  instead; either way the page never scrolls sideways.
+- **Pressing the button of the pane that is showing shuts the panel**, and the
+  map gets the width. Any other button opens it on that pane.
+- **Under 560 px it is the help rail exactly**: a drawer from the right,
+  mutually exclusive with the nav's, opened from a tab fixed on the screen edge —
+  the nav could move ☰ into the header because the header had a slot on the
+  left, and there is none on the right. Only help is a pane there. The Stations
+  cards stay under the map and a pinned map panel stays docked in the map's
+  corner, because a drawer over a 390 px map is a drawer over the thing it is
+  describing. **A phone design for the side panel is out of scope for this
+  change** and left for its own issue.
 
-The widths in between need no special case. The Stations tab is a single column
-at every width since #165, so the nav and this panel are the only two things
-holding width beside it. `--mn-help`
-narrows from 300 px to 260 px below 1400 px all the same, so the map keeps a
-usable share of a laptop with everything open.
+#### The side panel as a dock
+
+**The Stations cards.** The filters, the station list, the elevation profile,
+the link budget, *Repeaters listening*, the blast radius and the station editor
+are one wrapper (`#stations-cards`), emitted under the map by the tab's render
+and *moved* — never re-rendered — into the side panel's Stations pane while
+◫ is on and the window is wider than 1,100 px. `#stations-main.is-split` then
+means "the cards are beside the map", and the map fills the height of the window
+on its own. ◫ moves them back under the map without rebuilding the Leaflet map;
+below 1,100 px they fold under it whatever ◫ says, and come back beside it when
+the window is wide again. Every card is re-rendered in place by its own id, so
+none of them knows it has moved; leaving the tab takes the wrapper out of the
+side panel (a registered tab teardown), because a great deal of the app reads
+"no `#stations-table-wrap`" as "not on the Stations tab". Everything that jumps
+to a card — *Show in the list*, *Station details*, the radio path card's links,
+*Link budget for this path* — opens the side panel on the cards first
+(`dockReveal`), because a scroll to an element in a hidden pane does nothing at
+all. The elevation profile is always a card now, and with no line drawn it says
+how to get one.
+
+**Pinned map panels.** On the Stations map, pinning a panel (📌 in its heading,
+or `MapChrome.setPinned`) moves its whole `.mn-mapctl` wrapper — icon, heading,
+pin and body — into a pane of its own, with a button in the strip ordered the
+way the icons are ordered in the map's corner, and opens the side panel on it.
+Unpinning it there puts it back in the corner, shut, with focus on its icon, and
+the side panel goes back to the pane it showed before. The pin is still
+`mn-map-panels` and still survives a reload; the map is rebuilt on every visit
+to the tab and its panels dock themselves again as they are built. Full screen
+covers the side panel, so while it is on the pinned panels go back into the
+map's corner, docked there the old way, and return afterwards; a phone does the
+same. The other six Leaflet maps keep docking pinned panels into their own
+corners, because none of them sits beside the side panel (`MapChrome.dockInto`
+is per map). `npm run dock` holds all of this.
 
 **The content has a check of its own**, `npm run help`, and it exists because
 every way this decays is silent. A doc link that 404s, a *see also* naming a tab

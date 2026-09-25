@@ -23,7 +23,8 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm, acmaHaversineKm;
 // across to app.js for repeaterList, passRelationIndex, passRangeCoversId,
-// stationAlertIdTypes, focusStation, zoomToStation and switchTab; and
+// stationAlertIdTypes, focusStation, zoomToStation, switchTab and
+// dockReveal; and
 // sideways to map-draw.js (MapDraw), link-budget.js (LinkBudget,
 // lbMarginClass) and path-profile.js (PathProfile, rmSystemOf, fsplDb,
 // wattsToDbm, PATH_DEFAULT_MHZ). See path-profile.js's header for why the
@@ -381,10 +382,10 @@ const MapBackbone = (function () {
         ${row('Fade margin', marginHtml(r))}
       </div>
       <p class="small acma-card-note">Indicative only — the margin is the link budget card's figure
-        (free-space until the terrain profile lands). The elevation profile and link budget panels
-        under the map are open on this exact path:
-        <a href="#" onclick="MapBackbone.scrollTo('path-profile-panel');return false">elevation profile ↓</a> ·
-        <a href="#" onclick="MapBackbone.scrollTo('link-budget-panel');return false">fade margin ↓</a></p>`;
+        (free-space until the terrain profile lands). The elevation profile and link budget cards
+        ${stationsCardsWhere()} are open on this exact path:
+        <a href="#" onclick="MapBackbone.scrollTo('path-profile-panel');return false">elevation profile ${stationsCardsArrow()}</a> ·
+        <a href="#" onclick="MapBackbone.scrollTo('link-budget-panel');return false">fade margin ${stationsCardsArrow()}</a></p>`;
   }
 
   // Paint only — open() moves focus in once; a repaint (terrain landing) must
@@ -504,9 +505,13 @@ const MapBackbone = (function () {
     // LinkBudget.profileChanged.
     profileChanged() { if (cur) render(); },
 
+    // Out of full screen first, for editStationFromCard's reason — there is no
+    // card to scroll to under a fixed panel — and the side panel's Stations
+    // pane on screen, for dockReveal's.
     scrollTo(id) {
+      if (state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
       const el = document.getElementById(id);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (el) { dockReveal(el); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
     },
   };
 })();

@@ -6,7 +6,8 @@
 //
 // What is left here, and why each of it is:
 //
-//   the theme and file-loading helpers, the side nav, the help panel and
+//   the theme and file-loading helpers, the side nav, the side panel (the
+//   help, the Stations cards and pinned map panels, in one tabbed column) and
 //   renderMain()   the app shell. #109 (U0) is the issue that owns it.
 //
 //   the Stations map core, the station table and its repeater list, and the
@@ -1472,7 +1473,12 @@ function switchTab(id) {
   // Read before anything re-renders — afterwards the element is gone and the
   // question "was the user in the nav" can no longer be asked.
   const from = document.activeElement;
-  const cameFromShell = !!(from && from.closest && (from.closest('#tab-nav') || from.closest('#help-panel')));
+  // The shell is the nav, the side panel's strip and its help pane — the places
+  // a tab is switched *from* as navigation. Not the rest of the side panel: the
+  // Stations cards live there now, and a switchTab() from a button inside the
+  // editor card is a deep link out of a tab, the same as one inside <main>.
+  const cameFromShell = !!(from && from.closest && (from.closest('#tab-nav')
+    || from.closest('#help-panel .dock-strip') || from.closest('#dock-pane-help')));
   // Every module that has run and has something to stop — an animation frame
   // loop, a ResizeObserver, a Leaflet map on a div that is about to be thrown
   // away. Leaving the tab is the moment they have to stop: a force layout
@@ -1505,12 +1511,15 @@ function switchTab(id) {
   // and a drawer left over the tab you were sent to is in the way. The panel
   // itself stays open above the breakpoint, where it is a column and not a
   // drawer — it is meant to be read alongside the tab it describes.
-  if (!state.helpCollapsed && isPhoneNav()) {
-    state.helpCollapsed = true;
-    localStorage.setItem('mn-help', 'collapsed');
+  if (helpShowing() && isPhoneNav()) {
+    state.dockOpen = false;
+    dockPersist();
   }
   renderTabs();
-  renderHelp();
+  // Instant, and the maps left alone: the side panel may open or shut here (the
+  // Stations cards are a pane on one tab only), and the tab about to be drawn
+  // builds its map after this, at whatever width this leaves it.
+  renderHelp({ instant: true, remeasure: false });
   renderMain();
   refocusAfterTabSwitch(cameFromShell);
   // What changed, said once, politely (#109's live-region policy — see
@@ -1569,13 +1578,16 @@ function setNavCollapsed(collapsed) {
   // box it was typed into is not rendered there, and the rail would simply be
   // short by however many tabs the query had removed. Collapsing ends it.
   if (state.navCollapsed) state.navQuery = '';
-  // The other half of the one-drawer-at-a-time rule — see setHelpCollapsed().
-  if (!state.navCollapsed && isPhoneNav() && !state.helpCollapsed) {
-    state.helpCollapsed = true;
-    localStorage.setItem('mn-help', 'collapsed');
-    renderHelp();
+  // The other half of the one-drawer-at-a-time rule — see setDockTab().
+  if (!state.navCollapsed && isPhoneNav() && helpShowing()) {
+    state.dockOpen = false;
+    dockPersist();
   }
   renderTabs();
+  // The side panel's widest is measured against the nav's width, so it may
+  // have to narrow as the nav opens. It slides with the nav and is measured
+  // with it, by the call below — one re-measure for the one gesture.
+  renderDock({ remeasure: false });
   // The nav just took a column from the main area, or gave one back. Leaflet
   // only watches the window, so a map left unmeasured renders grey tiles and
   // hands back click coordinates offset by however much the width moved.
@@ -1603,32 +1615,54 @@ function invalidateMapSizes(delay) {
   }, delay || 0);
 }
 
-// ── Help panel ────────────────────────────────────────────────────────────────
-// A right-hand rail carrying whatever HELP has to say about the open tab. It
-// borrows the left nav's interaction contract wholesale (#47 / README §14): it
-// collapses to a strip rather than to nothing, it remembers which it was, and
-// it re-measures the maps after the width transition instead of during it.
+// ── The side panel (#help-panel) ──────────────────────────────────────────────
+// Everything on the right-hand side of the app, in one column: a strip of
+// buttons on the outer edge, and — while it is open — one pane beside it. It
+// was two columns until this, a help rail on the edge of the page and the
+// Stations tab's own right-hand column of cards inside <main>, and two
+// right-hand columns side by side was one more than a page whose map is the
+// thing everyone came for could spare.
 //
-// Where it deliberately differs, and why — a reference surface is not a
-// navigation one, and this is the third column on a page that already budgets
-// for two:
+// The panes, in the order their buttons stand in the strip:
 //
-//  * It starts collapsed at every width (see state.helpCollapsed), not just
-//    under 900 px the way the nav does.
-//  * Under 560 px, where the nav leaves the layout and opens as a drawer, this
-//    does the same — but the two are mutually exclusive. Opening either closes
-//    the other, so a 390 px screen is never asked to hold two drawers at once.
-//  * The nav's phone answer was to move its toggle into the header, which works
-//    because ☰ already had the slot on the left. There is no matching slot on
-//    the right, and a seventh header button cost the banner a whole extra row
-//    at 390 px. So the strip stays — it just stops taking a column and becomes
-//    a fixed tab on the screen edge instead, which is what "collapses to a
-//    strip, never to nothing" was supposed to mean anyway.
+//   ❔ Help        whatever HELP says about the open tab. Always there.
+//   📋 Stations    the Stations cards — filters, list, ground profile, link
+//                  budget, the editor — while that tab is open and they are
+//                  beside the map rather than under it (toggleStationsSplit).
+//   one per map panel pinned into it — Map display, Draw & measure, the polar
+//                  plot, the repeater site finder… — in the order their icons
+//                  stand in the map's corner (MapChrome, map-controls.js).
 //
-// Above 560 px both are ordinary columns and may be open together: the Stations
-// tab drops to a single column at 1100 px, so the only widths where nav + filter
-// pane + help all take width at once are the ones with width to give.
-
+// It keeps the help rail's interaction contract (#47 / README §20) — it
+// collapses to its strip rather than to nothing, it remembers which it was, and
+// the maps are re-measured once its width has settled rather than during the
+// slide — and differs where a panel holding tools has to:
+//
+//  * Two things are remembered rather than one: whether it is open, and which
+//    pane (state.dockOpen / state.dockTab). A pane that is not there on this
+//    tab leaves the panel shut here, and is not forgotten for the tab that has
+//    it — which is what keeps help from opening itself: a fresh visit prefers
+//    the Stations cards, and only one tab has those.
+//  * Its width is the operator's. The handle on its inner edge is a separator
+//    that drags and takes the arrow keys, and the figure is kept in px.
+//  * Pressing the button of the pane that is showing shuts the panel and gives
+//    the map the width. Pressing any other opens the panel on that one.
+//  * Under 560 px it is still what the help rail was: the strip is the fixed
+//    tab on the screen edge and help is the drawer, mutually exclusive with the
+//    nav's. Nothing else becomes a pane there — the Stations cards stay under
+//    the map and a pinned panel stays docked in the map's corner — because a
+//    drawer over a 390 px map is a drawer over the thing it is about. How a
+//    phone should hold all this is a question for its own issue.
+//
+// **Built once, and never rewritten wholesale.** renderHelp() used to write the
+// whole <aside> from a template on every call — every tab switch, every toggle,
+// every phone-breakpoint crossing — and nothing in it minded, because nothing in
+// it was alive. The panes now hold things that are: the Stations cards, whose
+// editor has a caret in it and whose table has a keyboard's place in it, and map
+// panels whose listeners and captured nodes belong to a Leaflet map. So the
+// skeleton is made once (dockSkeleton), and after that the only thing ever
+// written from a template is the help body. Everything else is attributes on
+// elements that stay where they are, or elements *moved* in and out whole.
 // Where a help link into docs/ should point. Markdown served off GitHub Pages
 // is a download rather than a page, so .md goes to GitHub's renderer while
 // anything already HTML is served from the site itself. Derived from the raw
@@ -1653,63 +1687,652 @@ function docUrl(path) {
                        .replace(/\/main\/.*$/, '/blob/main/') + enc + frag;
 }
 
+// One arrow-key press on the width handle, and one PageUp / PageDown.
+const DOCK_STEP = 20;
+const DOCK_PAGE_STEP = 100;
+
+// The map panels pinned into the side panel, by pane id ('map-display', …).
+// Held here rather than read back off the DOM, because a pane's place in the
+// strip is where its panel stood in the map's corner, and only MapChrome knew
+// that — it says so once, when it hands the panel over (dockAdoptPanel).
+const dockMapPanes = new Map();   // pane id → { id, pane, wrap, icon, title, rank, order }
+
+// Which panel ids the Stations map built last time. See dockMapExpected().
+let dockStationsPanelIds = null;
+
+// Where the side panel was before a pin opened it on a map panel, most recent
+// last — so unpinning that panel puts the operator back on the pane they were
+// reading, or shuts the panel again if it was shut. Session-only: after a
+// reload an unpin falls back to the Stations cards, which is the default.
+const dockBack = [];
+
+// px the side panel was last laid out at, strip included, and the pane it was
+// showing. What renderDock() compares against to decide whether the maps need
+// re-measuring and whether the Stations pane has just come into view.
+let dockLastW = null;
+let dockLastShowing = null;
+
 // The one piece of chrome that lives outside #help-panel and has to agree with
-// it: the backdrop that dismisses the phone drawer. (The nav needs syncNavChrome
-// to keep the header's ☰ in step as well; this panel keeps its only toggle
-// inside itself at every width, so there is nothing else to sync.)
-function syncHelpChrome(collapsed) {
+// it: the backdrop that dismisses the phone drawer. (The nav needs
+// syncNavChrome to keep the header's ☰ in step as well; this panel keeps its
+// only toggle inside itself at every width, so there is nothing else to sync.)
+function syncHelpChrome() {
   const backdrop = document.getElementById('help-backdrop');
-  if (backdrop) backdrop.hidden = collapsed || !isPhoneNav();
+  if (backdrop) backdrop.hidden = !(isPhoneNav() && helpShowing());
 }
 
-function toggleHelp() {
-  setHelpCollapsed(!state.helpCollapsed);
+// The id of the element a pane is, for aria-controls and for finding it again.
+function dockPaneId(id) {
+  return `dock-pane-${id}`;
 }
 
-function setHelpCollapsed(collapsed) {
-  state.helpCollapsed = !!collapsed;
-  localStorage.setItem('mn-help', state.helpCollapsed ? 'collapsed' : 'expanded');
-  // One drawer at a time on a phone. Written out here rather than by calling
-  // setNavCollapsed(), which would call straight back into this one.
-  if (!state.helpCollapsed && isPhoneNav() && !state.navCollapsed) {
-    state.navCollapsed = true;
-    localStorage.setItem('mn-nav', 'collapsed');
-    renderTabs();
-  }
-  renderHelp();
-  // The panel just took a column from the main area or gave one back, and
-  // Leaflet only watches the window — the same trap the nav documents. Not on a
-  // phone, where the drawer floats and the main area never moves.
-  if (!isPhoneNav()) invalidateMapSizes(HELP_TRANSITION_MS + 40);
-  // Focus follows the button through the re-render, or a keyboard collapse
-  // drops the user back at the top of the page. One target at every width: the
-  // toggle is inside the panel whether the panel is a column, a strip or an
-  // edge tab.
-  const btn = document.querySelector('#help-panel .help-toggle');
-  if (btn) btn.focus();
-}
-
-function renderHelp() {
+// The side panel's element, with its skeleton built the first time anything
+// asks for it.
+function dockEl() {
   const panel = document.getElementById('help-panel');
+  if (panel && !panel.querySelector('.dock-inner')) dockSkeleton(panel);
+  return panel;
+}
+
+// The skeleton, once. The order inside .dock-inner is the order on screen, left
+// to right: the width handle on the panel's inner edge, the panes, and the
+// strip on the outer edge of the window — the outer edge because that is where
+// the help rail's one button has always been, so the ❔ an operator has learnt
+// to reach for is still where their hand goes.
+//
+// The strip is a labelled group of plain disclosure buttons rather than a
+// tablist or a <nav>. A <nav> would be the page's second navigation landmark,
+// and this is not navigation — nothing here changes what page you are on, only
+// what is open beside it (`npm run shell` counts exactly one nav). And each
+// button does what a disclosure does: it shows its pane, says so with
+// aria-expanded, and pressed again it puts the pane away.
+//
+// The help pane keeps .help-inner, which is the class the rail's scroller has
+// always had and the element `npm run shell` scrolls to prove every link in it
+// can be reached at every window height. The Stations pane carries its own h2,
+// out of sight, so that the cards' h3s step from something when they are here —
+// in <main> they step from the tab's own h2.
+function dockSkeleton(panel) {
+  panel.innerHTML = `
+    <div class="dock-inner">
+      <div class="dock-resize" role="separator" tabindex="0" aria-orientation="vertical"
+           aria-label="Side panel width" aria-controls="help-panel"
+           title="Drag to make the side panel wider or narrower, or use the arrow keys"
+           onpointerdown="dockResizeStart(event)" onkeydown="dockResizeKey(event)"></div>
+      <div class="dock-panes">
+        <div class="help-inner dock-pane" id="${dockPaneId('help')}" data-dock="help" hidden>
+          <div class="help-body"></div>
+        </div>
+        <div class="dock-pane dock-pane-stations" id="${dockPaneId('stations')}" data-dock="stations" hidden>
+          <h2 class="sr-only">Stations — filters, station list, path tools and station details</h2>
+        </div>
+      </div>
+      <div class="dock-strip" role="group" aria-label="Side panel" onkeydown="dockStripKey(event)">
+        <button type="button" class="dock-tab help-toggle" data-dock="help"
+                aria-controls="${dockPaneId('help')}" aria-expanded="false"
+                onclick="toggleHelp()"><span class="dock-ico" aria-hidden="true">❔</span></button>
+      </div>
+    </div>`;
+}
+
+// ── Which panes exist, and which one is showing ──────────────────────────────
+
+// Whether the Stations cards are a pane here. The same condition the table's
+// narrow column set follows (stationsSplitActive) plus the tab being open and a
+// file being loaded — the cards are not drawn without one.
+function dockStationsHere() {
+  return state.activeTab === 'stations' && !!state.data && stationsSplitActive();
+}
+
+// Whether map panels may be docked into the side panel at all right now. Not
+// in full screen — the full-screen map is fixed over the whole shell, this
+// panel included, so a panel docked here would be under it — and not on a
+// phone, where the side panel is a drawer over the map it would be describing.
+// MapChrome asks this of the Stations map's host (stationsDockHost) and puts a
+// pinned panel back in the corner, docked there the old way, whenever it says no.
+function dockAcceptsPanels() {
+  return !state.mapFullscreen && !isPhoneNav();
+}
+
+// A map panel's pane that is *about to* exist: pinned, on the Stations tab,
+// with the map it lives on still being built. Counted as there so that a tab
+// switch or a render of the Stations tab opens the side panel at its final
+// width *before* the map is built, rather than building the map, then opening
+// the panel under it and re-measuring it. Leaflet takes its size once, at
+// L.map(), and a fit made against a width the page is about to lose is a view
+// that is off by however much it lost.
+//
+// Only panels the Stations map is known to build, once it has been built once:
+// a pin stored under an id no map builds any more would otherwise hold the side
+// panel open on nothing for as long as it was remembered.
+function dockMapExpected(id) {
+  const pid = id.slice(4);
+  return id.startsWith('map-') && state.activeTab === 'stations' && !!state.data
+    && state.mapPanelsPinned.has(pid) && dockAcceptsPanels()
+    && (!dockStationsPanelIds || dockStationsPanelIds.has(pid));
+}
+
+function dockHas(id) {
+  if (id === 'help') return true;
+  if (id === 'stations') return dockStationsHere();
+  return dockMapPanes.has(id) || dockMapExpected(id);
+}
+
+// The pane the side panel would like to show. What was stored, except for a map
+// panel whose pin has gone — unpinned from another map, where MapChrome's pin is
+// the same one (the pin set is per panel, not per map). A preference for a pane
+// that can no longer exist anywhere is not a preference, and read literally it
+// would leave the Stations tab opening with the side panel shut for no reason
+// anyone could see; it reads as the default instead.
+function dockPreferred() {
+  const t = state.dockTab || 'stations';
+  return t.startsWith('map-') && !state.mapPanelsPinned.has(t.slice(4)) ? 'stations' : t;
+}
+
+// The pane on screen, or null for a shut panel. The preference is shown when it
+// exists here; when it does not, the panel is shut here and the preference is
+// left exactly as it was.
+function dockShowing() {
+  const t = dockPreferred();
+  return state.dockOpen && dockHas(t) ? t : null;
+}
+
+function helpShowing() {
+  return dockShowing() === 'help';
+}
+
+// Every pane there is right now, in strip order: help, the cards, then the map
+// panels by their corner group and their place in it — not by the order they
+// were pinned, and not by the order they were built, which for the polar plot
+// and the site finder is long after the rest.
+function dockTabs() {
+  const tabs = [{ id: 'help', icon: '❔', label: 'Help' }];
+  if (dockStationsHere()) {
+    tabs.push({ id: 'stations', icon: '📋',
+                label: 'Stations — filters, station list, ground profile, link budget and station details' });
+  }
+  const maps = [...dockMapPanes.values()].sort((a, b) => a.rank - b.rank || a.order - b.order);
+  for (const m of maps) tabs.push({ id: m.id, icon: m.icon, label: m.title });
+  return tabs;
+}
+
+// ── How wide ─────────────────────────────────────────────────────────────────
+
+// A custom property in px, read as a number.
+function dockCssPx(name, fallback) {
+  const v = parseFloat(cssVar(name, ''));
+  return isFinite(v) ? v : fallback;
+}
+
+// How wide the pane may be at this window width. The rule is DOCK_MAIN_MIN:
+// whatever the side panel takes, the page keeps 400 px of it, so the Stations
+// map beside the pane never becomes a strip. The nav's width is read from its
+// tokens and its *state* rather than from its box, because the nav may be
+// half-way through its own slide when this is asked.
+//
+// Below the width at which that rule leaves no pane worth having — a tablet in
+// portrait, where 400 px of page is most of the window — the pane may take up
+// to 55 % of the room instead. There is no map beside it there (the Stations
+// cards fold under the map below `lg`, and with them the reason for the rule),
+// and what it squeezes is prose, which wraps. Either way the panel never
+// reaches the window's edge from the nav's, so the page never scrolls sideways.
+function dockWidthRange() {
+  const vw = document.documentElement.clientWidth || window.innerWidth || 0;
+  const navW = isPhoneNav() ? 0
+    : state.navCollapsed ? dockCssPx('--mn-nav-rail', 56) : dockCssPx('--mn-nav', 236);
+  const room = Math.max(0, vw - navW - dockCssPx('--mn-help-rail', 45));
+  const max = Math.max(0, Math.round(Math.max(room - DOCK_MAIN_MIN, room * 0.55)));
+  return { min: Math.min(DOCK_MIN_W, max), max };
+}
+
+// The pane's width now: what the operator left it at, inside what the window
+// allows.
+function dockWidth() {
+  const r = dockWidthRange();
+  return Math.max(r.min, Math.min(r.max, Math.round(state.dockW) || DOCK_DEFAULT_W));
+}
+
+// Put the width on the panel and on the handle's value. The panel's box reads
+// it as --mn-dock-w (styles.css), set here as a custom property rather than as
+// a width so the phone breakpoint can go on ignoring it, and the separator
+// carries it in the same px the operator is moving it in.
+function syncDockWidth() {
+  const panel = document.getElementById('help-panel');
+  if (!panel) return 0;
+  const r = dockWidthRange();
+  const w = dockWidth();
+  panel.style.setProperty('--mn-dock-w', `${w}px`);
+  const handle = panel.querySelector('.dock-resize');
+  if (handle) {
+    handle.setAttribute('aria-valuemin', String(r.min));
+    handle.setAttribute('aria-valuemax', String(r.max));
+    handle.setAttribute('aria-valuenow', String(w));
+    handle.setAttribute('aria-valuetext', `${w} pixels wide`);
+  }
+  return w;
+}
+
+// The width the panel takes out of the row, strip included — 0 on a phone,
+// where it is a drawer over the page and takes none.
+function dockTakes(showing, w) {
+  if (isPhoneNav()) return 0;
+  const rail = dockCssPx('--mn-help-rail', 45);
+  return showing ? rail + w : rail;
+}
+
+// ── Painting it ──────────────────────────────────────────────────────────────
+
+// Everything about the side panel that follows from state, written onto the
+// elements that are already there. Safe to call as often as anything likes —
+// it creates nothing that exists and moves nothing that is where it belongs —
+// which is what lets every path that changes a pane just call it rather than
+// working out which parts it touched.
+//
+//   instant    no slide. For changes that are part of something bigger: a tab
+//              switch, a render of the Stations tab, a card being brought into
+//              view, a window resize. A slide there is a map measured against
+//              a width that is still moving.
+//   remeasure  false when the caller re-measures the maps itself, or builds
+//              them afterwards: the nav (which slides at the same moment and
+//              waits the same slide out), and a tab switch or a Stations render
+//              (whose map is built after this, at the width this has just set).
+//              Otherwise the maps are re-measured once the width has settled —
+//              after the slide, or at once for an instant change — and only
+//              when it actually moved. Once per change, which `npm run
+//              registry` counts.
+//
+// Focus is never moved from here, and nothing is announced: a repaint is not
+// something the operator did.
+function renderDock(opts = {}) {
+  const panel = dockEl();
   if (!panel) return;
-  const collapsed = state.helpCollapsed;
-  panel.classList.toggle('collapsed', collapsed);
-  syncHelpChrome(collapsed);
+  const showing = dockShowing();
+  const w = dockWidth();
+  const takes = dockTakes(showing, w);
+  const moved = dockLastW !== null && takes !== dockLastW;
+  const instant = !!opts.instant && moved && panel.classList.contains('help-ready');
+  if (instant) panel.classList.add('dock-instant');
+
+  panel.classList.toggle('collapsed', !showing);
+  syncDockWidth();
+  syncDockStrip(showing);
+  for (const pane of panel.querySelectorAll('.dock-pane')) pane.hidden = pane.dataset.dock !== showing;
+  syncHelpChrome();
 
   // Same reason renderTabs() does this — a map built on the opening render must
-  // not measure itself against a rail that is still sliding. The class is its
-  // own flag and survives every re-render.
+  // not measure itself against a panel that is still sliding. The class is its
+  // own flag and survives every repaint.
   if (!panel.classList.contains('help-ready')) {
     void panel.offsetWidth;
     panel.classList.add('help-ready');
   }
+  if (instant) {
+    void panel.offsetWidth;
+    panel.classList.remove('dock-instant');
+  }
 
-  const toggle = collapsed
-    ? { icon: '?', label: 'Help',  title: 'Open help for this tab' }
-    : isPhoneNav()
-      ? { icon: '✕', label: 'Close', title: 'Close help' }
-      : { icon: '»', label: 'Hide',  title: 'Collapse help' };
+  // The panel just took width from the main area or gave some back, and
+  // Leaflet only watches the window — the trap the nav documents. Not on a
+  // phone, where the drawer floats and the main area never moves.
+  if (moved && opts.remeasure !== false) {
+    if (instant || !panel.classList.contains('help-ready')) invalidateMapSizes(0);
+    else dockAfterSlide(panel);
+  }
+  dockLastW = takes;
 
+  // The search box grows to fit what was pasted into it, and a box measured
+  // while its pane was hidden measured nothing (autoGrowSearch) — so it is
+  // measured again the moment the cards come into view.
+  if (showing === 'stations' && dockLastShowing !== 'stations') {
+    document.querySelectorAll('#stations-filter-card .filter-search').forEach(autoGrowSearch);
+  }
+  dockLastShowing = showing;
+}
+
+// Re-measure the maps once the panel's width has finished sliding — on the
+// slide's own transitionend rather than on a timer guessed to outlast it. The
+// nav's timer (NAV_TRANSITION_MS + 40) is right on an idle machine and wrong on
+// a busy one, where the slide finishes late and the map is measured part-way:
+// a map one pixel wider than Leaflet thinks takes every click one pixel off,
+// and nothing looks wrong. The timer is still here, longer, for a slide that
+// never runs (a width that did not actually change, a transition switched off)
+// — whichever comes first does the measuring, once.
+let dockSlideDone = null;
+function dockAfterSlide(panel) {
+  if (dockSlideDone) dockSlideDone(false);
+  let timer = null;
+  const onEnd = e => { if (e.target === panel && e.propertyName === 'width') finish(true); };
+  const finish = (measure) => {
+    panel.removeEventListener('transitionend', onEnd);
+    clearTimeout(timer);
+    dockSlideDone = null;
+    if (measure) liveMaps().forEach(m => { try { m.invalidateSize(); } catch (_) {} });
+  };
+  panel.addEventListener('transitionend', onEnd);
+  timer = setTimeout(() => finish(true), HELP_TRANSITION_MS + 400);
+  dockSlideDone = finish;
+}
+
+// The strip, reconciled with the panes that exist: a button made for a new
+// pane, a button dropped with its pane, and the rest put in order. Buttons that
+// are already there are left where they are and only have their attributes
+// written — a button that is replaced is a button that loses focus, and the one
+// most likely to have it is the one that was just pressed.
+function syncDockStrip(showing) {
+  const strip = document.querySelector('#help-panel .dock-strip');
+  if (!strip) return;
+  const phone = isPhoneNav();
+  const want = dockTabs();
+  const had = document.activeElement;
+  for (const b of [...strip.querySelectorAll('.dock-tab')]) {
+    if (!want.some(t => t.id === b.dataset.dock)) b.remove();
+  }
+  want.forEach((t, i) => {
+    let b = strip.querySelector(`.dock-tab[data-dock="${CSS.escape(t.id)}"]`);
+    if (!b) {
+      b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dock-tab';
+      b.dataset.dock = t.id;
+      b.setAttribute('aria-controls', dockPaneId(t.id));
+      b.setAttribute('onclick', `toggleDockTab('${t.id}')`);
+      b.innerHTML = `<span class="dock-ico" aria-hidden="true">${t.icon}</span>`;
+    }
+    if (strip.children[i] !== b) strip.insertBefore(b, strip.children[i] || null);
+    const on = showing === t.id;
+    // On a phone the open help pane is a drawer and this button is the tab on
+    // its edge, so it is the drawer's close button and says so. Everywhere else
+    // the name stays the pane's name and aria-expanded carries the state; the
+    // tooltip says what a second press does, because "shut the whole panel"
+    // is not what a sighted user expects a tab to do until told.
+    const closing = on && phone && t.id === 'help';
+    const label = closing ? 'Close help' : t.label;
+    b.setAttribute('aria-label', label);
+    b.title = on && !phone ? `${label} — press again to hide the side panel` : label;
+    b.setAttribute('aria-expanded', String(on));
+    b.classList.toggle('is-on', on);
+    if (t.id === 'help') {
+      const ico = b.querySelector('.dock-ico');
+      if (ico) ico.textContent = closing ? '✕' : '❔';
+    }
+  });
+  if (had && had !== document.activeElement && strip.contains(had)) had.focus({ preventScroll: true });
+}
+
+// ── Opening, shutting, switching ─────────────────────────────────────────────
+
+function dockPersist() {
+  try {
+    localStorage.setItem('mn-help', state.dockOpen ? 'expanded' : 'collapsed');
+    localStorage.setItem('mn-dock-tab', state.dockTab);
+  } catch (_) { /* private browsing, a full quota — it still works this session */ }
+}
+
+// Open the side panel on one pane. Moves no focus: whoever asked is either the
+// strip button that keeps it, or code bringing something into view, which
+// moves focus itself if it means to.
+function setDockTab(id, opts = {}) {
+  state.dockTab = id;
+  state.dockOpen = true;
+  dockPersist();
+  // One drawer at a time on a phone. Written out here rather than by calling
+  // setNavCollapsed(), which would call straight back into this.
+  if (isPhoneNav() && helpShowing() && !state.navCollapsed) {
+    state.navCollapsed = true;
+    localStorage.setItem('mn-nav', 'collapsed');
+    renderTabs();
+  }
+  renderDock(opts);
+}
+
+// Shut it, keeping which pane it would open on.
+function shutDock(opts = {}) {
+  state.dockOpen = false;
+  dockPersist();
+  renderDock(opts);
+}
+
+// A strip button. The pane that is showing shuts the panel — the map gets the
+// width — and any other pane opens it on that one.
+function toggleDockTab(id) {
+  if (dockShowing() === id) shutDock();
+  else setDockTab(id);
+}
+
+function toggleHelp() {
+  toggleDockTab('help');
+}
+
+// The help rail's own entry point, and the one the tests, the phone backdrop
+// and Escape use: false is "open the side panel on Help", true is "shut the
+// side panel". Focus follows the ❔ at every width — it is inside the panel
+// whether that is a column, a strip or an edge tab.
+function setHelpCollapsed(collapsed) {
+  if (collapsed) shutDock();
+  else setDockTab('help');
+  const btn = document.querySelector('#help-panel .help-toggle');
+  if (btn) btn.focus();
+}
+
+// Up and down walk the strip, Home and End go to either end — the strip reads
+// as one column of buttons, so it drives as one, the way navKey drives the nav.
+function dockStripKey(e) {
+  const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
+  if (!keys.includes(e.key)) return;
+  const items = [...document.querySelectorAll('#help-panel .dock-strip .dock-tab')];
+  const i = items.indexOf(document.activeElement);
+  if (i < 0 || !items.length) return;
+  const next = e.key === 'Home' ? items[0]
+    : e.key === 'End' ? items[items.length - 1]
+    : items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length];
+  if (next) { next.focus(); e.preventDefault(); }
+}
+
+// Bring the pane that holds `el` on screen, opening the side panel on it if it
+// was shut or showing something else. The step every "take me to that card"
+// path has to take first: scrollIntoView() on an element in a hidden pane does
+// nothing at all, and says nothing about it. Instant rather than a slide,
+// because the caller is about to scroll to the element and a scroll measured
+// against a pane still opening lands wherever the slide had got to.
+//
+// Returns false for an element that is not in the side panel — the cards under
+// the map, where there is nothing to open and the page's own scroll does it.
+function dockReveal(el) {
+  const pane = el && el.closest ? el.closest('#help-panel .dock-pane') : null;
+  if (!pane) return false;
+  if (dockShowing() !== pane.dataset.dock) setDockTab(pane.dataset.dock, { instant: true });
+  return true;
+}
+
+// ── The width handle ─────────────────────────────────────────────────────────
+// A separator with a value on it rather than a styled border, for the reason
+// the split divider it replaces was one: how much of the screen the map gets is
+// not a decision to hand only to people who can hold a mouse steady. Dragged
+// with a pointer, or moved with the arrow keys; the value is the pane's width in
+// px, and ArrowLeft makes it wider, because the handle is on the pane's left and
+// that is the way it moves.
+
+// The maps are re-measured while the handle moves, not only when it is let go
+// — a map that redraws on release is a map you are sizing blind. Once a frame:
+// invalidateSize() re-reads the container, re-lays the tiles and fires
+// `resize`, which the arrow canvas redraws off, and doing that per pointermove
+// rather than per frame is several times the work for the same picture.
+let dockResizeRaf = null;
+function dockResized() {
+  if (dockResizeRaf) return;
+  dockResizeRaf = requestAnimationFrame(() => {
+    dockResizeRaf = null;
+    liveMaps().forEach(m => { try { m.invalidateSize({ pan: false }); } catch (_) {} });
+  });
+}
+
+// Set the width, clamped. Stored when `persist` — on release and on every key
+// press, never on every frame of a drag: one write per gesture, and the figure
+// stored is the one the operator settled on.
+function dockSetWidth(px, persist) {
+  const r = dockWidthRange();
+  state.dockW = Math.max(r.min, Math.min(r.max, Math.round(px)));
+  if (persist) { try { localStorage.setItem('mn-dock-w', String(state.dockW)); } catch (_) {} }
+  const w = syncDockWidth();
+  dockLastW = dockTakes(dockShowing(), w);
+  return w;
+}
+
+function dockResizeStart(e) {
+  const panel = document.getElementById('help-panel');
+  if (!panel || !dockShowing() || isPhoneNav()) return;
+  if (e.button != null && e.button !== 0) return;
+  const handle = e.currentTarget;
+  e.preventDefault();                       // no text selection while dragging
+  // Pointer capture, so the drag survives the pointer leaving a 10 px handle —
+  // which it does at once, since the handle is what is being moved out from
+  // under it. Without this the drag ends on the first fast flick.
+  try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+  // No slide while dragging: the width follows the pointer, and a transition
+  // would have it trailing 160 ms behind.
+  panel.classList.add('is-resizing');
+  document.body.classList.add('mn-dock-dragging');
+  // The panel's right edge is the window's and does not move during the drag,
+  // so the pane's width is simply how far left of the strip the pointer is.
+  const strip = panel.querySelector('.dock-strip');
+  const edge = panel.getBoundingClientRect().right - (strip ? strip.getBoundingClientRect().width : 0);
+  const move = ev => {
+    dockSetWidth(edge - ev.clientX, false);
+    dockResized();
+  };
+  const end = () => {
+    handle.removeEventListener('pointermove', move);
+    handle.removeEventListener('pointerup', end);
+    handle.removeEventListener('pointercancel', end);
+    panel.classList.remove('is-resizing');
+    document.body.classList.remove('mn-dock-dragging');
+    dockSetWidth(state.dockW, true);
+    invalidateMapSizes(0);
+  };
+  handle.addEventListener('pointermove', move);
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+}
+
+// The same handle from the keyboard — the ARIA window-splitter pattern. Arrows
+// move it a step, PageUp and PageDown a big one, Home and End take the pane to
+// its narrowest and its widest. Instant, like the drag: a key held down is a
+// width that moves every 30 ms, and a slide per press would never catch up.
+function dockResizeKey(e) {
+  const panel = document.getElementById('help-panel');
+  if (!panel) return;
+  const r = dockWidthRange();
+  const w = dockWidth();
+  const step = { ArrowLeft: DOCK_STEP, ArrowUp: DOCK_STEP, ArrowRight: -DOCK_STEP, ArrowDown: -DOCK_STEP,
+                 PageUp: DOCK_PAGE_STEP, PageDown: -DOCK_PAGE_STEP };
+  let next = null;
+  if (e.key in step)         next = w + step[e.key];
+  else if (e.key === 'Home') next = r.min;
+  else if (e.key === 'End')  next = r.max;
+  if (next == null) return;
+  e.preventDefault();
+  panel.classList.add('is-resizing');
+  const now = dockSetWidth(next, true);
+  void panel.offsetWidth;
+  panel.classList.remove('is-resizing');
+  if (now !== w) invalidateMapSizes(0);
+}
+
+// ── Map panels in the side panel ─────────────────────────────────────────────
+// The other half of MapChrome.dockInto (map-controls.js). The Stations map is
+// the one map that hands its pinned panels over; the other six keep docking
+// theirs into their own corner, the way every map did before this, because
+// none of them sits beside this panel.
+
+// What the Stations map hands MapChrome: the questions it asks, and the two
+// things it does with a panel.
+function stationsDockHost() {
+  return {
+    accepts: dockAcceptsPanels,
+    adopt: dockAdoptPanel,
+    release: dockReleasePanel,
+  };
+}
+
+// A panel arrives — its whole .mn-mapctl wrapper, icon, heading, pin and body,
+// moved rather than copied, so everything its module captured and every id in
+// it goes on working (map-controls.js says why the wrapper and nothing smaller).
+// `info.reason` says why:
+//
+//   pin     the operator has just pinned it, so the side panel opens on it —
+//           a pinned panel that is not on screen is a pin that did nothing.
+//   build   its map has just been built with it pinned (a tab switch, a
+//           reload). Whether it shows is the side panel's own preference.
+//   back    it is coming back from the map's corner (full screen has ended,
+//           the window is wider than a phone again). Same.
+function dockAdoptPanel(wrap, info) {
+  const panel = dockEl();
+  if (!panel) return;
+  const id = `map-${info.id}`;
+  const old = dockMapPanes.get(id);
+  if (old && old.wrap !== wrap) old.pane.remove();
+  const pane = (old && old.wrap === wrap) ? old.pane : document.createElement('div');
+  pane.className = 'dock-pane dock-pane-map';
+  pane.id = dockPaneId(id);
+  pane.dataset.dock = id;
+  pane.hidden = true;
+  if (wrap.parentNode !== pane) pane.appendChild(wrap);
+  if (pane.parentNode !== panel.querySelector('.dock-panes')) panel.querySelector('.dock-panes').appendChild(pane);
+  dockMapPanes.set(id, { id, pane, wrap, icon: info.icon, title: info.title,
+                         rank: info.rank, order: info.order });
+  if (info.reason === 'pin') {
+    if (dockShowing() !== id) dockBack.push({ tab: state.dockTab, open: state.dockOpen });
+    setDockTab(id);
+  } else {
+    renderDock({ instant: true });
+  }
+}
+
+// …and leaves. `info.reason` is 'unpin' when the operator unpinned it, and
+// 'away' when it is going back to the corner for full screen or a phone and
+// will be back. Only an unpin changes what the side panel would like to show:
+// it goes back to where it was before the pin opened it.
+function dockReleasePanel(wrap, info) {
+  const id = `map-${info.id}`;
+  const entry = dockMapPanes.get(id);
+  if (!entry || entry.wrap !== wrap) return;
+  dockMapPanes.delete(id);
+  entry.pane.remove();
+  if (info.reason === 'unpin' && state.dockTab === id) {
+    let prev = null;
+    while (dockBack.length) {
+      const p = dockBack.pop();
+      if (p.tab !== id && dockHas(p.tab)) { prev = p; break; }
+    }
+    state.dockTab = prev ? prev.tab : 'stations';
+    if (prev) state.dockOpen = prev.open;
+    dockPersist();
+    renderDock();
+  } else {
+    renderDock({ instant: info.reason !== 'unpin' });
+  }
+}
+
+// Every map panel out of the side panel, at once and without ceremony: their
+// map is being taken down (stopStationsMap). Leaflet's own teardown removes the
+// controls it holds, and these are not in it any more — so without this the
+// old map's panels would outlive it here, and the next build would put a second
+// copy of every id on the page, where getElementById finds the stale one first.
+// No repaint: whatever called this is about to build the map again or leave the
+// tab, and either repaints the panel itself.
+function dockDropMapPanes() {
+  for (const entry of dockMapPanes.values()) entry.pane.remove();
+  dockMapPanes.clear();
+}
+
+// ── Help: the prose ──────────────────────────────────────────────────────────
+
+// The Help pane's body, and the only part of the side panel still written from
+// a template. Called on every tab switch; nothing in it is live.
+function renderHelpBody() {
+  dockEl();
+  const bodyEl = document.querySelector('#dock-pane-help .help-body');
+  if (!bodyEl) return;
   const tab = TAB_LIST.find(t => t.id === state.activeTab);
   const h   = HELP[state.activeTab];
 
@@ -1771,22 +2394,20 @@ function renderHelp() {
        ${section('Read more', links)}`
     : `<p class="help-summary help-empty">Nothing written for this tab yet.</p>`;
 
-  panel.innerHTML = `
-    <div class="help-inner">
-      <button class="help-toggle" onclick="toggleHelp()" aria-controls="help-panel"
-              aria-expanded="${collapsed ? 'false' : 'true'}"
-              title="${toggle.title}">
-        <span class="nav-icon" aria-hidden="true">${toggle.icon}</span>
-        <span class="nav-label">${toggle.label}</span>
-      </button>
-      <div class="help-body">
+  bodyEl.innerHTML = `
         <h2 class="help-tab">
           <span class="nav-icon" aria-hidden="true">${tab ? tab.icon : '❔'}</span>
           <span>${esc(tab ? tab.label : 'Help')}</span>
         </h2>
-        ${body}
-      </div>
-    </div>`;
+        ${body}`;
+}
+
+// The side panel and the help in it, both. The name the help rail had, kept
+// because it is what switchTab(), init.js and the phone-breakpoint listener
+// have always called; `opts` goes to renderDock().
+function renderHelp(opts) {
+  renderDock(opts);
+  renderHelpBody();
 }
 
 // Up and down walk the tabs, ignoring the group headings — the list reads as
@@ -1825,9 +2446,20 @@ function renderMain() {
   // no station file at all — only the pins and their names do, and the sheet
   // simply generates without them until one loads.
   const noDataTabs = ['packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen'];
+  // The Stations cards may be in the side panel rather than in here, and the
+  // innerHTML below does not reach them there. Out first, whatever is about to
+  // be drawn: a render of the Stations tab emits a fresh copy of every card,
+  // and two copies of one id is a page where getElementById finds the stale one.
+  dropStationsCards();
   if (!state.data && !noDataTabs.includes(state.activeTab)) { el.innerHTML = renderEmpty(); return; }
   switch (state.activeTab) {
-    case 'stations':   el.innerHTML = renderStationsHtml();  initStationFilters(); initMap(); break;
+    // The cards go to wherever they belong before anything paints into them or
+    // measures them, and before the map is built — so the side panel is at its
+    // final width when Leaflet takes the map's size, and has nothing to
+    // re-measure afterwards.
+    case 'stations':   el.innerHTML = renderStationsHtml();
+                       syncStationsCardsHome({ instant: true, remeasure: false });
+                       initStationFilters(); initMap(); break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
     case 'passranges': el.innerHTML = renderPassRangesHtml();             break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;
@@ -1898,18 +2530,17 @@ function renderStationsHtml() {
            filters — and puts it under the map as a collapsible card, which
            leaves nothing on the left to keep a column for. The map is ~320 px
            wider on every screen as a result, which is the point. -->
-      <!-- Three children, always, and a class that decides whether they are a
-           stack or two columns (#186). The map, a divider, and everything that
-           is normally under the map. Emitted this way even when the split is
-           off — with is-split absent the wrappers are transparent, the
-           divider is display:none, and the page is the single column it has
-           been since #165 — because the alternative is two markup shapes for
-           one tab, and switching between them would mean rebuilding the DOM
-           the Leaflet map is standing in. As one shape, the toggle is a class
-           on this div and the map never moves. -->
-      <div class="stack stn-split${state.mapSplit ? ' is-split' : ''}" id="stations-main"
-           style="--mn-split:${state.mapSplitPct}%">
-       <div class="stn-split-map">
+      <!-- The map, and the cards — the filters, the list, the path tools, the
+           editor — in one wrapper after it (#186, and the side panel since).
+           Where the wrapper lives is the one thing that changes. Beside the
+           map, it is moved whole into the side panel's Stations pane
+           (syncStationsCardsHome), #stations-main carries is-split, and the map
+           fills the height of the window on its own; under the map, it is
+           left here and the page is the single column it was designed as.
+           Moved, never re-emitted: every card is re-rendered in place by its
+           own id, a moved node keeps its listeners, its <details> state and
+           its caret, and the Leaflet map beside it never notices. -->
+      <div class="stack stn-split${stationsSplitActive() ? ' is-split' : ''}" id="stations-main">
         <div class="panel map-panel${state.mapFullscreen ? ' is-full' : ''}">
          <!-- The map, and everything drawn *over* the map: the note strip, the
               three cards, and the accessible description that stands in for
@@ -1934,13 +2565,13 @@ function renderStationsHtml() {
                aria-describedby="map-alt"></div>
           <p id="map-alt" class="sr-only">
             This map is drawn as a picture and has no per-station markup. The same set it is
-            showing is listed as text beside it: the match note directly under the map says how
-            many stations matched and how many were pulled in by a pass range, and the
-            <strong>Stations</strong> table — in the column beside this map, or under it when the
-            two are stacked — is the same filtered set, one row per station, with the name,
-            number, roles and ALERT addresses of each, and a button on every row that selects it
-            here. Its own caption names the columns it is carrying, which is not the same
-            list in both shapes.
+            showing is listed as text: the match note on the Filters card says how many stations
+            matched and how many were pulled in by a pass range, and the
+            <strong>Stations</strong> table — in the side panel beside this map, or under the map
+            when the cards are stacked below it — is the same filtered set, one row per station,
+            with the name, number, roles and ALERT addresses of each, and a button on every row
+            that selects it here. Its own caption names the columns it is carrying, which is not
+            the same list in both places.
           </p>
           <div id="map-note" class="map-note" hidden></div>
           <div id="acma-card" class="acma-card" hidden></div>
@@ -1958,22 +2589,7 @@ function renderStationsHtml() {
           <div id="here-card" class="acma-card stn-card" hidden></div>
          </div>
         </div>
-       </div>
-       <!-- The divider. A real separator with a value on it, so it can be
-            dragged with a pointer *and* moved with the arrow keys — this sets
-            how much of the screen the map gets, which is not a decision to
-            hand only to people who can hold a mouse steady. Hidden by CSS
-            while the split is off; it divides nothing then. -->
-       <div class="stn-split-bar" role="separator" tabindex="0"
-            aria-orientation="vertical"
-            aria-label="How much width the map takes beside the list"
-            aria-valuemin="${STATIONS_SPLIT_MIN}" aria-valuemax="${STATIONS_SPLIT_MAX}"
-            aria-valuenow="${state.mapSplitPct}"
-            aria-valuetext="Map takes ${state.mapSplitPct} per cent of the width"
-            title="Drag to re-split, or use the arrow keys"
-            onpointerdown="stationsSplitDragStart(event)"
-            onkeydown="stationsSplitKey(event)"></div>
-       <div class="stn-split-rest">
+       <div class="stn-cards" id="stations-cards">
         <!-- Directly under the map (#165), and shut on arrival (#181). It is a
              disclosure built out of a button and a panel rather than the
              <details> the three cards below it still are, and that is a
@@ -2041,7 +2657,10 @@ function renderStationsHtml() {
             </div>
           </details>
         </div>
-        <div class="panel" id="path-profile-panel" hidden></div>
+        <!-- The ground under a drawn line or a clicked radio path. Always a
+             card now, and with no line it says how to draw one (PathProfile's
+             empty state) — painted by PathProfile.sync() from initMap(). -->
+        <div class="panel" id="path-profile-panel"></div>
         <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
         <div class="panel" id="stations-carriers-card" ${carriers ? '' : 'hidden'}>
           ${carriers}
@@ -2088,29 +2707,30 @@ function updateChromeHeight() {
   const bar = document.getElementById('mem-bar');
   const h = (hdr ? hdr.offsetHeight : 0) + (bar && !bar.hidden ? bar.offsetHeight : 0);
   document.documentElement.style.setProperty('--mn-chrome', `${h}px`);
-  // The side-by-side split is the other thing whose height is "the viewport,
-  // less whatever is above it", and it is measured here for the same reason:
+  // The Stations map beside its cards is the other thing whose height is "the
+  // viewport, less whatever is above it", and it is measured here for the same
+  // reason:
   // this function already runs on every resize and every time the memory strip
   // enters or leaves the layout, which is the whole list of things that move it.
   syncStationsSplitHeight();
 }
 
-// How tall the side-by-side split may be: from where it starts to the bottom of
-// the window. Measured rather than computed from tokens, and that is the point
-// — the first version guessed `calc(100dvh - var(--mn-chrome) - 2rem)`, which
-// missed #main-content's own padding and the layout gap above the panel, and
-// left the *page* scrolling behind two columns that were each already scrolling.
-// Three scroll regions where there should be one is what "the scroll is a bit
-// funny" describes.
+// How tall the Stations map may be while its cards are beside it in the side
+// panel: from where it starts to the bottom of the window. Measured rather than
+// computed from tokens, and that is the point — the first version guessed
+// `calc(100dvh - var(--mn-chrome) - 2rem)`, which missed #main-content's own
+// padding and the layout gap above the panel, and left the *page* scrolling
+// behind columns that were each already scrolling. Three scroll regions where
+// there should be one is what "the scroll is a bit funny" describes.
 //
 // The element's own top is the honest figure, whatever the padding above it
 // turns out to be, so nothing here has to be kept in step with the stylesheet.
 function syncStationsSplitHeight() {
   const main = document.getElementById('stations-main');
   if (!main) return;
-  // Not while the split is off, and — the part that was missing — not while it
-  // is *folded*. Below `lg` the stylesheet puts the two columns back into one
-  // stack at `height: auto`, so this variable is not read there at all, and the
+  // Not while the cards are under the map, and — the part that was missing —
+  // not while they are *folded* there. Below `lg` they go back under the map
+  // and is-split comes off, so this variable is not read there at all, and the
   // page is deliberately one long scroller. Measuring against that page and
   // writing the answer down anyway is how the floor below used to get stored:
   // the figure meant nothing at the width it was taken, and it was still there
@@ -2264,6 +2884,12 @@ function toggleMapFullscreen(on) {
   const b = document.querySelector('.mn-map-full');
   if (b) syncMapFullBtn(b);
   syncMapFullEsc();
+  // The full-screen map is fixed over the whole shell, the side panel included,
+  // so a map panel pinned into the side panel would be under it for as long as
+  // full screen lasts. They go back to the map's corner — docked there, the way
+  // pinning looked before the side panel — and come back to it when full
+  // screen ends (dockAcceptsPanels is the rule, MapChrome.redock the asking).
+  if (state.map) MapChrome.redock(state.map);
   // No CSS transition on the class, so the container is already its new size.
   invalidateMapSizes(0);
   announce(state.mapFullscreen
@@ -2272,9 +2898,11 @@ function toggleMapFullscreen(on) {
 }
 
 // ── Side by side ─────────────────────────────────────────────────────────────
-// The map on the left, and everything that is normally under it — the filters,
-// the station list, the path tools, the editor — on the right, with a divider
-// that drags (#186).
+// The map filling the page on the left, and everything that is normally under
+// it — the filters, the station list, the path tools, the editor — in the side
+// panel beside it (#186, and the dock since). The ◫ corner button chooses
+// between that and the cards under the map, and nothing else about the tab
+// changes with it.
 //
 // This tab was two columns once and stopped being them at #165, and this is not
 // that split coming back: what went away was a *filter rail* beside the map,
@@ -2282,38 +2910,42 @@ function toggleMapFullscreen(on) {
 // What this puts beside the map is the map's own answer — the list of what
 // matched, the card of what is selected, the profile of the path just clicked —
 // so the two halves are one question and its answer rather than a tool and its
-// settings. It is off by default and remembered, because which of those two
+// settings. It is on by default and remembered, because which of those two
 // readings a person wants is a preference and not a mode.
 //
-// Both columns are their own scroller at the height of the viewport, which is
-// the whole point of asking for it: the map stays in view while the list under
-// it is read. That is also why the split is *not* offered below the `lg`
-// breakpoint — two 400 px columns are two things too narrow to read rather than
-// two things in view — and styles.css folds it back to one column there without
-// touching the setting, so a laptop that is docked to a wide screen finds its
-// split again.
-// What is left under the split: the page's own bottom padding. Small, and a
-// figure rather than a measurement because there is nothing below the columns
-// to measure — it is the gap that stops the divider ending flush with the
-// window edge.
+// It was a grid of three columns inside <main> until the side panel took the
+// right-hand one: the map, a divider that dragged, and a column of cards with a
+// scroller of its own — beside a help rail that was a second right-hand column
+// with a scroller of its own. Two columns doing one job. The cards are a pane of
+// the side panel now, the divider is the panel's own width handle, and the
+// width it sets is the panel's rather than a percentage of <main>.
+//
+// The map still fills the height of the window rather than the page scrolling
+// past it — which is the whole point of having the cards beside it: the map
+// stays in view while the list beside it is read. That is also why the cards
+// are *not* put beside the map below the `lg` breakpoint — a 400 px map beside
+// a 400 px pane is two things too narrow to read rather than two things in view
+// — and they fold back under it there without the setting moving, so a laptop
+// docked to a wide screen finds them beside the map again.
+//
+// What is left under the map: the page's own bottom padding. Small, and a
+// figure rather than a measurement because there is nothing below the map to
+// measure — it is the gap that stops the map ending flush with the window edge.
 const STATIONS_SPLIT_FOOT = 12;
-// The shortest the columns may be made, whatever the measurement says. The same
+// The shortest the map may be made, whatever the measurement says. The same
 // figure as `.stn-split.is-split`'s own min-height — the stylesheet holds the
 // floor for the frame before the first measurement, this holds it for every
-// measurement after — and below it two columns stop being two columns.
+// measurement after.
 const STATIONS_SPLIT_FLOOR = 360;
-const STATIONS_SPLIT_MIN = 25;   // per cent of the width the map may shrink to
-const STATIONS_SPLIT_MAX = 75;   // …and grow to. Both leave the other side usable.
-const STATIONS_SPLIT_STEP = 2;   // one arrow-key press
 
-// Whether the split is actually in effect, which is not the same question as
-// whether it is switched on: below `lg` styles.css folds the two columns back
-// into one and deliberately leaves the *setting* alone, so a laptop docked to a
-// wide screen finds its split again. Anything that changes with the layout —
-// the station table's columns — has to ask this rather than state.mapSplit.
-// Named off BREAKPOINTS for the same reason isPhoneNav() is: the media query
-// here and the one in the stylesheet are the same fold, and `npm run shell`
-// holds the stylesheet to that list.
+// Whether the cards are beside the map, which is not the same question as
+// whether ◫ is on: below `lg` they fold back under it and the *setting* is
+// deliberately left alone, so a laptop docked to a wide screen finds them
+// beside it again. Anything that changes with the layout — the station table's
+// columns, the map's height, whether the side panel has a Stations pane — has
+// to ask this rather than state.mapSplit. Named off BREAKPOINTS for the same
+// reason isPhoneNav() is: the media query here and the fold are the same
+// breakpoint, and `npm run shell` holds the stylesheet to that list.
 function stationsSplitActive() {
   return state.mapSplit && !window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).matches;
 }
@@ -2329,117 +2961,106 @@ function syncStationsTableCols() {
   rerenderStations();
 }
 
+// Put the cards where stationsSplitActive() says they go — the side panel's
+// Stations pane, or under the map — and paint the side panel to match. A move,
+// never a re-render: the wrapper is one element and every card in it is
+// re-rendered in place by its own id wherever it is, so moving it keeps the
+// table's scroll, the editor's caret and every <details> as they were, and the
+// Leaflet map beside it is not rebuilt.
+//
+// `opts` goes to renderDock(). A render of the tab passes instant and no
+// re-measure, because its map is built after this; the toggle and the fold
+// leave the side panel to slide and re-measure the map for itself.
+function syncStationsCardsHome(opts) {
+  const cards = document.getElementById('stations-cards');
+  const main  = document.getElementById('stations-main');
+  if (cards && main) {
+    dockEl();
+    const pane = stationsSplitActive() ? document.getElementById(dockPaneId('stations')) : null;
+    const home = pane || main;
+    if (cards.parentNode !== home) home.appendChild(cards);
+    main.classList.toggle('is-split', !!pane);
+  }
+  renderDock(opts);
+}
+
+// The cards out of the side panel, wherever they are. Called before the tab is
+// rendered again — so the fresh copy that render emits is the only copy on the
+// page, rather than a second #stations-editor-card that getElementById would
+// find *after* the stale one in the side panel — and when the tab is left,
+// because a great deal of this file reads "no #stations-table-wrap" as "not on
+// the Stations tab" (syncStationsTableCols, repaintStnCard, LinkBudget and
+// PathProfile's rerenders, MapBlast's card…), and a stale card left in the side
+// panel would have them painting into it behind every other tab.
+function dropStationsCards() {
+  const pane = document.getElementById(dockPaneId('stations'));
+  const cards = pane && pane.querySelector('#stations-cards');
+  if (cards) cards.remove();
+}
+
+// The lg crossing (init.js), and anything else that changes whether the cards
+// fit beside the map: move them, repaint the table's column set, and re-measure
+// the map's height — which is the window's beside the cards and the page's
+// under them.
+function stationsLayoutChanged() {
+  if (state.activeTab === 'stations') syncStationsCardsHome({ instant: true });
+  syncStationsTableCols();
+  syncStationsSplitHeight();
+  // The station card on the map points at the cards — "shown in the side
+  // panel →" or "under the map ↓" — and has just started pointing the wrong way.
+  repaintStnCard();
+}
+
 function toggleStationsSplit(on) {
   state.mapSplit = on == null ? !state.mapSplit : !!on;
   try { localStorage.setItem('mn-map-split', state.mapSplit ? 'on' : 'off'); } catch (_) {}
-  // A class, not a re-render: the wrappers are in the markup either way, so
-  // nothing moves in the DOM and the Leaflet map keeps its view, its layers and
-  // its in-flight requests. Same reasoning as toggleMapFullscreen above.
-  const main = document.getElementById('stations-main');
-  if (main) main.classList.toggle('is-split', state.mapSplit);
+  // Switched on where the cards fit beside the map, it is asking to see them
+  // there — so the side panel opens on them, whatever it was showing. Off, the
+  // cards go under the map and the side panel loses its Stations pane; if that
+  // was the pane on screen the panel shuts and the map has the width, and the
+  // preference is kept for the next time they are beside it.
+  if (state.mapSplit && stationsSplitActive()) {
+    state.dockTab = 'stations';
+    state.dockOpen = true;
+    dockPersist();
+  }
+  // A move, not a re-render (see syncStationsCardsHome): the Leaflet map keeps
+  // its view, its layers and its in-flight requests. Same reasoning as
+  // toggleMapFullscreen above.
+  syncStationsCardsHome();
   const b = document.querySelector('.mn-map-split');
   if (b) syncMapSplitBtn(b);
-  // The height is measured off where the container starts, so it has to be
-  // taken after the class is on — and taken away again when it comes off.
+  // The height is measured off where the map starts and what is under it, so
+  // it has to be taken after the cards have moved — and taken away again when
+  // they come back under it.
   syncStationsSplitHeight();
   // The list beside the map is a narrower list, and carries a narrower set of
   // columns for it (see stationsTable). Unlike the height this is a re-render,
   // because the columns are markup — but only of the table, and only when the
   // set it is holding is the wrong one.
   syncStationsTableCols();
-  // No transition on the class, so the container is already its new size.
+  // …and the station card's pointer to them (stationsLayoutChanged says why).
+  repaintStnCard();
+  // The height changed with no transition; the side panel's width, which
+  // slides, is re-measured by renderDock() once the slide is done.
   invalidateMapSizes(0);
   announce(state.mapSplit
-    ? 'Map and station list side by side. The divider between them can be dragged, or moved with the arrow keys.'
-    : 'Map back above the station list.');
+    ? 'Station cards in the side panel, beside the map. Its edge can be dragged, or moved with the arrow keys.'
+    : 'Station cards back under the map.');
 }
 
-// The same, for side by side, and the same note about the icon.
+// The ◫ button, told which of the two it is doing. The label says where the
+// cards are and what pressing it does, because an icon of two panes cannot say
+// which of them the cards are in.
 function syncMapSplitBtn(b) {
   if (!b) return;
   const on = state.mapSplit;
   b.setAttribute('aria-pressed', String(on));
-  const label = on ? 'Stack the map above the list' : 'Map and list side by side';
+  const label = on
+    ? 'Station cards are in the side panel — put them under the map'
+    : 'Station cards are under the map — put them in the side panel beside it';
   b.title = label;
   b.setAttribute('aria-label', label);
-}
-
-// Where the divider sits, as a percentage of the row. Written to a custom
-// property rather than to the grid template, so the drag touches one declaration
-// on one element and the layout rules stay in the stylesheet.
-function setStationsSplitPct(pct, persist) {
-  const v = Math.max(STATIONS_SPLIT_MIN, Math.min(STATIONS_SPLIT_MAX, Math.round(pct)));
-  state.mapSplitPct = v;
-  const main = document.getElementById('stations-main');
-  if (main) main.style.setProperty('--mn-split', `${v}%`);
-  const bar = main && main.querySelector('.stn-split-bar');
-  if (bar) {
-    bar.setAttribute('aria-valuenow', String(v));
-    bar.setAttribute('aria-valuetext', `Map takes ${v} per cent of the width`);
-  }
-  if (persist) { try { localStorage.setItem('mn-map-split-pct', String(v)); } catch (_) {} }
-}
-
-// The map is re-measured while the divider is moving, not only when it is let
-// go — a map that redraws on mouse-up is a map you are sizing blind. Throttled
-// to one measure a frame: invalidateSize() re-reads the container, re-lays the
-// tiles and fires `resize`, which the arrow canvas redraws off, and doing that
-// per pointermove event rather than per frame is several times the work for the
-// same picture.
-let stationsSplitRaf = null;
-function stationsSplitResized() {
-  if (stationsSplitRaf) return;
-  stationsSplitRaf = requestAnimationFrame(() => {
-    stationsSplitRaf = null;
-    try { if (state.map) state.map.invalidateSize({ pan: false }); } catch (_) {}
-  });
-}
-
-function stationsSplitDragStart(e) {
-  const main = document.getElementById('stations-main');
-  if (!main || !state.mapSplit) return;
-  const bar = e.currentTarget;
-  e.preventDefault();                       // no text selection while dragging
-  // Pointer capture, so the drag survives the pointer leaving the 8 px bar —
-  // which it does immediately, since the bar is what is being moved out from
-  // under it. Without this the drag ends on the first fast flick.
-  try { bar.setPointerCapture(e.pointerId); } catch (_) {}
-  document.body.classList.add('mn-split-dragging');
-  const move = ev => {
-    const r = main.getBoundingClientRect();
-    if (!r.width) return;
-    setStationsSplitPct(((ev.clientX - r.left) / r.width) * 100, false);
-    stationsSplitResized();
-  };
-  const end = () => {
-    bar.removeEventListener('pointermove', move);
-    bar.removeEventListener('pointerup', end);
-    bar.removeEventListener('pointercancel', end);
-    document.body.classList.remove('mn-split-dragging');
-    // Remembered on release rather than on every frame of the drag: one write
-    // per gesture, and the figure stored is the one the operator settled on.
-    setStationsSplitPct(state.mapSplitPct, true);
-    invalidateMapSizes(0);
-  };
-  bar.addEventListener('pointermove', move);
-  bar.addEventListener('pointerup', end);
-  bar.addEventListener('pointercancel', end);
-}
-
-// The same divider from the keyboard. Left/Right move it a step, Home/End take
-// it to either limit — the ARIA separator pattern, and the reason the bar is a
-// focusable element with a value on it rather than a styled border.
-function stationsSplitKey(e) {
-  const step = { ArrowLeft: -STATIONS_SPLIT_STEP, ArrowRight: STATIONS_SPLIT_STEP,
-                 ArrowDown: -STATIONS_SPLIT_STEP, ArrowUp: STATIONS_SPLIT_STEP };
-  let next = null;
-  if (e.key in step)        next = state.mapSplitPct + step[e.key];
-  else if (e.key === 'Home') next = STATIONS_SPLIT_MIN;
-  else if (e.key === 'End')  next = STATIONS_SPLIT_MAX;
-  if (next == null) return;
-  e.preventDefault();
-  setStationsSplitPct(next, true);
-  invalidateMapSizes(0);
 }
 
 // The corner button, told what it is currently doing. Called on build and
@@ -2595,7 +3216,7 @@ function stationsMapPanels(map) {
   // what the relief is made of and what it cannot be trusted to say. The button
   // above is the mode; this is everything about it (map-3d.js).
   MapChrome.panel(map, {
-    id: '3d', icon: '▾', title: '3-D view',
+    id: '3d', icon: '▾', dockIcon: '⛰️', title: '3-D view',
     btnLabel: '3-D view settings — exaggeration, line-of-sight sheets, what the relief is',
     caret: true, pair: '3d',
     group: '3d', order: 20,
@@ -3554,6 +4175,11 @@ function stopStationsMap() {
   // the generation, or four-at-a-time terrain fetches carry on for minutes
   // behind whatever tab replaced this one.
   MapLos.newGeneration();
+  // The map panels pinned into the side panel are this map's, and Leaflet's
+  // own teardown only reaches the controls still inside its container — which
+  // these are not. Out before the map goes, and whether or not remove() below
+  // manages to (removeMap swallows the throw a reused container makes).
+  dockDropMapPanes();
   state.map = removeMap(state.map);
   state.mapMarkers = [];
   state.mapLines   = [];
@@ -3574,6 +4200,11 @@ function initMap() {
   // leaves a teardown registered for the render that built one. Keyed by name
   // and safe to repeat — this runs on every render of the tab (#142).
   registerTabTeardown('Stations', stopStationsMap);
+  // The cards, when they are in the side panel: leaving the tab has to take
+  // them out of it, for the reasons at dropStationsCards(). The pane's button
+  // goes with them in the repaint switchTab() makes straight after, which is
+  // the first moment the side panel can know which tab it is on.
+  registerTabTeardown('Stations cards', dropStationsCards);
   // Belt and braces: a re-render *inside* the tab never goes through
   // switchTab(), so it never sees the teardown, and this map is rebuilt on
   // every one of them.
@@ -3593,6 +4224,10 @@ function initMap() {
   // The one map still declared in the file that re-measures them all. It says
   // so the same way the other four do, so that stays true if it ever moves.
   registerLiveMap('Stations', () => state.map);
+  // The one map whose pinned panels go into the side panel rather than into its
+  // own corner — it is the one map the side panel sits beside. Before any panel
+  // is built, so each one docks itself as it is made (MapChrome.dockInto).
+  MapChrome.dockInto(state.map, stationsDockHost());
   // A view before anything is added to the map. Leaflet defers every layer add
   // until the map has one, and the deferred adds then run in an order nothing
   // controls: a path registers the shared SVG renderer as it is queued, so a
@@ -3634,9 +4269,9 @@ function initMap() {
   // Before MapDraw, for MapMovePin's reason: the tools that take a map click
   // have to know which map before anybody arms one.
   MapHere.attach(state.map);
-  // The split is remembered and on by default, so the tab can render straight
-  // into it — and the height it needs cannot be known until the markup is in
-  // the document.
+  // Side by side is remembered and on by default, so the tab can render
+  // straight into it — and the height the map needs cannot be known until the
+  // markup is in the document and the cards have gone to the side panel.
   //
   // It re-measures the map when it changes that height, which matters here more
   // than anywhere: Leaflet caches the container's size at L.map() time, which
@@ -3692,6 +4327,13 @@ function initMap() {
   // that is the map's own memory of what you were looking at must not.
   repaintStnCard();
   maybeShowMapLayersHint();
+  // Every panel this map has is built by now, polar plot and site finder
+  // included. Which ones is what dockMapExpected() needs to stop expecting a
+  // pinned panel this map does not make — and the side panel is settled once
+  // against what actually arrived. Nothing moves in the ordinary case: the
+  // panel was opened at this width before the map was built.
+  dockStationsPanelIds = new Set(MapChrome.panelIds(state.map));
+  renderDock({ instant: true });
 }
 
 // Panels that depend on loaded ACMA data, refreshed without rebuilding the tab.
@@ -4217,9 +4859,10 @@ function stationPopupHtml(s) {
 //   Records             the paperwork — ARRO's admin page, the two libraries
 //
 // Every pill carries an icon now, for the same reason: at a glance the icon
-// is what separates *Zoom to station* from *Show in the list below* before
-// either label has been read. The trailing marks stay and mean what they
-// always did — ↓ goes down this page, ↗ leaves the site, ⬇ downloads.
+// is what separates *Zoom to station* from *Show in the list* before either
+// label has been read. The trailing marks stay and mean what they always did —
+// ↓ goes down this page (→ into the side panel, when the Stations cards are
+// there: stationsCardsArrow), ↗ leaves the site, ⬇ downloads.
 //
 // A group whose pills a station doesn't get (no position, not a repeater, no
 // ARRO id) drops out entirely rather than drawing an empty rule.
@@ -4232,9 +4875,9 @@ function stationActionGroups(s, { edit = false } = {}) {
   return [
     { label: 'In MegaNet', pills: [
       edit ? `<button type="button" class="pill mn-edit-station" onclick="editStationFromCard('${escAttr(s.id)}')"
-           title="Select this station and jump to its details card below the map">✏️ Station details ↓</button>` : '',
+           title="Select this station and jump to its details card ${stationsCardsWhere()}">✏️ Station details ${stationsCardsArrow()}</button>` : '',
       `<button type="button" class="pill" onclick="focusStation('${escAttr(s.id)}')"
-           title="Select this station in the list under the map">🗒️ Show in the list below ↓</button>`,
+           title="Select this station in the Stations list ${stationsCardsWhere()}">🗒️ Show in the list ${stationsCardsArrow()}</button>`,
       `<button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
            title="Zoom the map to the ~50 km area around this station">🔍 Zoom to station</button>`,
       fieldDataPillHtml(s),
@@ -4935,11 +5578,13 @@ function zoomToStation(id) {
 
 // Scroll a station's row into the middle of the table viewport, so a station
 // arrived at from another tab isn't left somewhere in 1300 rows.
+// In the side panel the table is in a pane that may be shut or showing
+// something else, so that pane comes on screen first (dockReveal).
 function scrollStationRowIntoView(id) {
   const wrap = document.getElementById('stations-table-wrap');
   if (!wrap) return;
   const row = [...wrap.querySelectorAll('tr[data-sid]')].find(tr => tr.dataset.sid === id);
-  if (row) row.scrollIntoView({ block: 'center' });
+  if (row) { dockReveal(row); row.scrollIntoView({ block: 'center' }); }
 }
 
 // Select a station and load it into the editor card, without touching the DOM.
@@ -5195,12 +5840,18 @@ function closeStnCard(refocus = true) {
   // counts — a row or a header button is underneath it, invisible, and the
   // panel's own Tab walls exist to keep focus out of exactly there.
   const full = state.mapFullscreen ? document.querySelector('.map-panel.is-full') : null;
+  const row = id ? document.querySelector(`#stations-table-wrap tr[data-sid="${CSS.escape(id)}"] button`) : null;
   const candidates = [
     live ? back : null,
-    id ? document.querySelector(`#stations-table-wrap tr[data-sid="${CSS.escape(id)}"] button`) : null,
+    row,
     document.getElementById('leaflet-map'),
   ].filter(t => t && (!full || full.contains(t)));
   for (const t of candidates) {
+    // The row may be in the side panel's Stations pane with another pane on
+    // screen, and a hidden button refuses focus without a word — so its pane
+    // is brought up first, and only for the row: the opener and the map are
+    // where they were.
+    if (t === row) dockReveal(row);
     t.focus({ preventScroll: true });
     if (document.activeElement === t) return;
   }
@@ -5236,18 +5887,33 @@ function editStationFromCard(id) {
   requestAnimationFrame(() => {
     const card = document.getElementById('stations-editor-card');
     if (!card) return;
+    dockReveal(card);
     card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     const first = card.querySelector('input:not([disabled]):not([type="hidden"]), select, textarea, button');
     if (first) first.focus({ preventScroll: true });
   });
 }
 
-// "shown under the map ↓" on the card's footer — the map advertising the
-// Repeaters listening card, rather than that card advertising itself.
+// "shown in the side panel →" (or "under the map ↓") on the card's footer —
+// the map advertising the Repeaters listening card, rather than that card
+// advertising itself.
 function stnCardScrollToCarriers() {
   if (state.mapFullscreen) toggleMapFullscreen(false);
   const el = document.getElementById('stations-carriers-card');
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (el) { dockReveal(el); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
+
+// Where the Stations cards are, in words and as an arrow, for the copy on the
+// map that points at them — the station card's footer, the callout's pills,
+// the radio path card. "Under the map ↓" was true of every screen until the
+// cards moved beside it, and a pointer in the wrong direction is worse than
+// none.
+function stationsCardsWhere() {
+  return stationsSplitActive() ? 'in the side panel' : 'under the map';
+}
+
+function stationsCardsArrow() {
+  return stationsSplitActive() ? '→' : '↓';
 }
 
 // The card's body. acmaCardRow draws the label/value rows, so the two cards
@@ -5344,9 +6010,9 @@ function stnCardHtml(s) {
     </div>
     <p class="small acma-card-note">
       ${carriers.length ? `Carried by ${carriers.length} repeater${carriers.length === 1 ? '' : 's'}${selected
-        ? ` — <button type="button" class="link-btn" onclick="stnCardScrollToCarriers()">shown under the map ↓</button>` : ''}. ` : ''}
+        ? ` — <button type="button" class="link-btn" onclick="stnCardScrollToCarriers()">shown ${stationsCardsWhere()} ${stationsCardsArrow()}</button>` : ''}. ` : ''}
       ${isPhoneNav() ? 'This card does not change the selection' : 'Pin clicks show this card without changing the selection'};
-      <em>Station details ↓</em> selects it.
+      <em>Station details ${stationsCardsArrow()}</em> selects it.
     </p>`;
 }
 

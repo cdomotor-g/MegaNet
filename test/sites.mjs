@@ -159,16 +159,23 @@ const panel = await page.evaluate(() => {
   const polar = document.querySelector('.mn-mapctl[data-panel="polar"]');
   const here = document.querySelector('.mn-map-here');
   const order = el => [...document.querySelectorAll('.leaflet-control-container .mn-mapctl, .leaflet-control-container .mn-map-here')].indexOf(el);
+  // Pinned, the panel is in the side panel beside the Stations map rather than
+  // in its corner (the dock), so its place in the corner is read with the pin
+  // off for a moment and put back straight after.
+  const docked = !!wrap && !!wrap.closest('#help-panel');
+  MapChrome.setPinned('sites', false);
+  const afterPolar = !!(wrap && polar) && order(wrap) > order(polar);
+  const beforeHere = !!(wrap && here) && order(wrap) < order(here);
+  MapChrome.setPinned('sites', true);
   return {
-    present: !!wrap, title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
-    afterPolar: !!(wrap && polar) && order(wrap) > order(polar),
-    beforeHere: !!(wrap && here) && order(wrap) < order(here),
+    present: !!wrap, docked, title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
+    afterPolar, beforeHere,
     runDisabled: document.getElementById('sites-run')?.disabled,
     status: document.getElementById('sites-status')?.textContent || '',
   };
 });
-ok('a 🗼 Repeater site finder panel sits in the map corner', panel.present && panel.title === 'Repeater site finder',
-   JSON.stringify(panel));
+ok('a 🗼 Repeater site finder panel sits in the map corner, and pinned in the side panel',
+   panel.present && panel.docked && panel.title === 'Repeater site finder', JSON.stringify(panel));
 ok('…in the tools group, after the polar plot and before What is here',
    panel.afterPolar && panel.beforeHere, JSON.stringify(panel));
 ok('Find sites is disabled with nothing to serve, and the panel says what is missing',

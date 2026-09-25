@@ -506,6 +506,19 @@ jobs:
         working-directory: test
         run: npm run maplinks
 
+      # The side panel (#help-panel, the dock): the help, the Stations cards and
+      # any map panel pinned into it, in one resizable, tabbed column. Every
+      # check above sees one piece of it — `shell` the landmark and the ❔
+      # toggle, `help` the prose, `maplinks` the map beside the cards — and none
+      # sees the seams: a card left behind in the panel when the tab goes (two
+      # copies of one id, and getElementById painting the stale one), a pinned
+      # panel that does not come back after its map is rebuilt, a width handle
+      # that drags and is not re-measured, full screen burying a pinned panel.
+      # Real pointers on the handle and the pins; ids counted document-wide.
+      - name: Side panel — tabbed, resizable, and nothing left behind
+        working-directory: test
+        run: npm run dock
+
       # The drawing leaving for Google Earth (#183). Nothing else here can see
       # a KML at all: `smoke` presses the button and never opens the file, and
       # a wrong one opens perfectly — Google Earth ignores a `<styleUrl>`

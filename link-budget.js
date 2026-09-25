@@ -10,7 +10,8 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm, acmaHaversineKm and
-// RM_NET_DEFAULTS; across to app.js for mapNote and for the search the whole
+// RM_NET_DEFAULTS; across to app.js for mapNote, dockReveal (to open the
+// side panel on this card before scrolling to it) and for the search the whole
 // app shares — prepareSearch, stationMatchesSearch, markHits and
 // tableStations; and sideways to path-profile.js for PATH_DEFAULT_MHZ,
 // PATH_DEFAULT_AGL, PATH_VERDICT, fsplDb, wattsToDbm, rmSystemOf and
@@ -234,7 +235,7 @@ const LinkBudget = (function () {
         </div>
         <p class="small lb-find-hint" id="lb-find-hint-${which}">${on
           ? `<strong>End ${tag} is armed.</strong> Click a station pin or any point on the map,
-             or a row in the <strong>Stations</strong> list below — in whatever state the filters
+             or a row in the <strong>Stations</strong> list above — in whatever state the filters
              have it — and it lands here.
              <button type="button" class="lb-link" id="lb-arm-${which}"
                      onclick="LinkBudget.disarm()">Stop picking end ${tag}</button>`
@@ -313,8 +314,11 @@ const LinkBudget = (function () {
     // where the click happened, so the note strip says it where the eyes are.
     if (!ready) mapNote('Sampling terrain for the ground profile — a few seconds.', 4000);
     if (scroll) {
+      // In the side panel the card is in a pane that may be shut or showing
+      // something else, and a scroll to a hidden element does nothing at all —
+      // so the pane comes on screen first.
       const el = document.getElementById('path-profile-panel');
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (el) { dockReveal(el); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
     }
   }
 
@@ -1359,8 +1363,11 @@ const LinkBudget = (function () {
       const d = document.querySelector('#link-budget-panel > details.lb-panel');
       if (d && !d.open) d.open = true;
       rerender();
+      // Every radio-path click lands here (MapBackbone.open), which is a click
+      // asking for this card — so in the side panel it brings the Stations pane
+      // on screen before the scroll that would otherwise do nothing.
       const el = document.getElementById('link-budget-panel');
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (el) { dockReveal(el); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
     },
 
     // The other direction: draw the budget's two ends as a line so the profile

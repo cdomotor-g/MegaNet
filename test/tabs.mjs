@@ -56,6 +56,15 @@
 //                   and passed. Three of the four tabs #141 converted were doing
 //                   exactly that, and this check said nothing about any of them.
 //
+//   Scope.          Every check above reads #main-content **plus the side
+//                   panel's pane on screen**, if one is. Since the side panel
+//                   (the dock) took the Stations cards out of <main> — the
+//                   filters, the station table, the link budget, the editor —
+//                   a check scoped to <main> alone passed all three Stations
+//                   entries while measuring nothing but the map. The pane's
+//                   headings follow <main>'s in the outline, which is the order
+//                   the document reads them in.
+//
 //   Overflow.       No sideways scroll of the document at 375, 768 and 1440, in
 //                   both themes. Same assertion shell.mjs makes about the shell,
 //                   made about each converted tab — which is where the wide
@@ -490,6 +499,10 @@ try {
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       const main = document.getElementById('main-content');
       const visible = el => !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+      // <main>, and the side panel's pane on screen — see "Scope" above.
+      const roots = [main, ...[...document.querySelectorAll('#help-panel .dock-pane')]
+        .filter(p => !p.hidden && visible(p))];
+      const all = sel => roots.flatMap(r => [...r.querySelectorAll(sel)]);
 
       // A <col> carries a width and nothing else, and a declaration block that
       // is *only* custom properties is a token override rather than a decision
@@ -504,13 +517,13 @@ try {
       // inside the container it owns; that is the library's decision, not the
       // tab's, so its subtree is outside the rule (design-system.md §6 — first
       // needed by the Map Generator, whose view-picker map is always up).
-      const inline = [...main.querySelectorAll('[style]')]
+      const inline = all('[style]')
         .filter(el => el.tagName !== 'COL')
         .filter(el => !el.closest('.leaflet-container'))
         .filter(el => !tokenOnly(el.getAttribute('style') || ''))
         .map(el => el.tagName.toLowerCase() + '[style="' + el.getAttribute('style') + '"]');
 
-      const tables = [...main.querySelectorAll('table')];
+      const tables = all('table');
       const unwrapped = tables.filter(t => !t.closest('.table-wrap'));
       const uncaptioned = tables.filter(t => !(t.caption?.textContent || '').trim());
       const unscoped = tables.filter(t =>
@@ -519,21 +532,21 @@ try {
       // Pattern 7a applies to the wrappers that can scroll — the ones that cap
       // their own height. A plain wrapper around a short table is not a region
       // and must not become a tab stop for nothing.
-      const capped = [...main.querySelectorAll('.table-wrap.tall, .table-wrap.medium')];
+      const capped = all('.table-wrap.tall, .table-wrap.medium');
       const unregioned = capped.filter(w =>
         w.getAttribute('role') !== 'region'
         || w.getAttribute('tabindex') !== '0'
         || !accName(w));
 
       // Pattern 7b.
-      const clickRows = [...main.querySelectorAll('tr[onclick]')];
+      const clickRows = all('tr[onclick]');
       const deadRows = clickRows.filter(tr =>
         !tr.querySelector('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'));
 
-      const asides = [...main.querySelectorAll('aside')].filter(a => !accName(a));
+      const asides = all('aside').filter(a => !accName(a));
 
-      const controls = [...main.querySelectorAll(
-        'a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])')]
+      const controls = all(
+        'a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])')
         .filter(visible);
       const unnamed = controls.filter(el => !accName(el))
         .map(el => el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).split(/\s+/)[0] : ''));
@@ -545,7 +558,7 @@ try {
       // the app an h2 it had not written (#141).
       const levels = [
         ...[...document.querySelectorAll('header h1')].filter(visible).map(() => 1),
-        ...[...main.querySelectorAll('h1, h2, h3, h4, h5, h6')].filter(visible)
+        ...all('h1, h2, h3, h4, h5, h6').filter(visible)
           .map(h => Number(h.tagName[1])),
       ];
       const skips = [];

@@ -935,7 +935,7 @@ const MapDraw = (function () {
           </button>
           ${canPick ? `
             <button class="draw-pick"
-                    title="Select the stations inside this shape into the list below the map (shift-click to replace the current selection)"
+                    title="Select the stations inside this shape into the Stations list (shift-click to replace the current selection)"
                     onclick="MapDraw.selectInside('${escAttr(sh.id)}',event)">Select inside</button>` : ''}
           ${sh.kind === 'line' ? `
             <button class="draw-flip" title="Flip direction — swap which end is A and which is B"

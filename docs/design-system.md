@@ -243,11 +243,11 @@ which is the only place the numbers are written down.
 
 | Name | Width | What happens |
 |---|---|---|
-| `xl` | 1400 | The widest layouts give up a column — the help panel narrows to 260 px, `.crud-layout` and the Workbench rail stack |
-| `lg` | 1100 | Side-by-side becomes stacked — `.layout`, `.map-layout`, Radio Path Maps, the Workbench |
+| `xl` | 1400 | The widest layouts give up a column — `.crud-layout` and the Workbench rail stack |
+| `lg` | 1100 | Side-by-side becomes stacked — `.layout`, `.map-layout`, Radio Path Maps, the Workbench, and the Stations cards leave the side panel for the page under the map |
 | `md` | 900 | **A tablet.** The nav auto-collapses to the icon rail, header buttons drop their labels, tables switch to automatic layout and scroll inside their wrapper |
 | `sm` | 700 | Two-column content folds to one — forms, pickers, optional table columns |
-| `xs` | 560 | **A phone.** The nav and the help panel stop being columns and become drawers over the page |
+| `xs` | 560 | **A phone.** The nav and the side panel stop being columns and become drawers over the page — the side panel's only pane there is help, and a pinned map panel stays in the map's corner |
 | `xxs` | 380 | The smallest phone. The banner shrinks its title rather than pushing a button off the edge |
 
 They are in `core.js` and not in `styles.css` for two reasons. CSS custom
@@ -743,12 +743,16 @@ serves.
 
 ### The two rails — a sticky box is sized against the screen it is seen in
 
-The nav and the help panel are the same shape: a full-height column whose
-border runs the length of the page, with a `position: sticky` inner box that
-scrolls on its own. The inner box's height is the one thing about them that is
-easy to get wrong, and was:
+The nav and the side panel (`#help-panel`) are the same shape: a full-height
+column whose border runs the length of the page, with a `position: sticky`
+inner box that scrolls on its own — `.nav-inner` in the nav, and in the side
+panel `.dock-inner`, a row of the width handle, the panes and the button strip,
+each pane (the help pane is still `.help-inner`) scrolling inside it. The inner
+box's height is the one thing about them that is easy to get wrong, and was:
 
-> `max-height: calc(100dvh - var(--mn-chrome, 96px))`, with `top: 0`.
+> `max-height: calc(100dvh - var(--mn-chrome, 96px))`, with `top: 0` — and
+> `height:` rather than `max-height` on the side panel's `.dock-inner`, whose
+> panes fill it and scroll, so a long pane never makes the page taller.
 
 Not `100dvh`. The banner is part of the document and scrolls away with it, so a
 rail sized to the whole viewport begins at the banner's foot and therefore ends
@@ -768,6 +772,17 @@ Below `xs` neither rail is a column at all — both become fixed drawers with
 `inset: 0` and `max-height: none`, so the rule does not apply and does not need
 to.
 
+The side panel is also the one rail whose width is the operator's: the handle on
+its inner edge is a `role="separator"` with a value in px, dragged with a
+pointer or moved with the arrow keys, stored as `mn-dock-w` and clamped to the
+window when it is used (never below 300 px while there is room, never leaving
+the page less than 400 px — or, on a window too narrow for both, never more than
+55 % of the room). On the Stations tab it is also the tab's right-hand
+column: the station cards are one wrapper moved into its Stations pane, and a
+map panel pinned on the Stations map is moved into a pane of its own. Neither is
+ever re-rendered to get there, which is what lets the Leaflet map beside them
+keep its view.
+
 `npm run shell` holds it, as the claim an operator would make: every button in
 either rail can be brought on screen with that rail's own scrollbar, at the top
 of the page and again scrolled to the foot of it, at four viewport heights.
@@ -782,9 +797,12 @@ and do not opt out of them.
 ### Landmarks
 
 `<header>` (banner) · `<nav id="tab-nav" aria-label="Sections">` ·
-`<main id="main-content">` · `<aside id="help-panel" aria-label="Help">`
+`<main id="main-content">` · `<aside id="help-panel" aria-label="Side panel">`
 (complementary). Exactly one of each. A tab renders *inside* `main` and does
-not add landmarks of its own.
+not add landmarks of its own — and what it puts in the side panel (the Stations
+cards) is content of the aside, not a landmark of its own either. The side
+panel's button strip is a labelled `role="group"`, not a second `<nav>`: it
+opens things beside the page and navigates nowhere.
 
 ### Skip link
 
@@ -805,11 +823,14 @@ everything.
 | Moment | Where focus goes |
 |---|---|
 | Skip link | `#main-content` |
-| Tab switch, from the nav or help panel | The new tab's own nav button — the element that just became `aria-current="page"` |
+| Tab switch, from the nav, the side panel's strip or its help pane | The new tab's own nav button — the element that just became `aria-current="page"`. Not from the side panel's other panes: a switch from inside the Stations cards is a deep link, the row below |
 | Tab switch, on a phone | `#main-content`, because the drawer has closed and that button is off-screen |
 | Tab switch, from anywhere else | Nowhere. It stays put |
 | Nav collapse/expand | The toggle, through the re-render. On a phone collapse, the header's ☰ |
-| Help collapse/expand | The help toggle, at every width |
+| Help collapse/expand | The help toggle (❔), at every width |
+| A side-panel strip button | Stays on the button, which is never re-rendered — ↑ ↓ Home End walk the strip |
+| A map panel pinned into the side panel | Stays on its 📌, which moved with it. Unpinned there, it goes back to its icon in the map's corner |
+| A card brought into view (*Station details*, a row) | The code that brought it moves focus if it means to; opening the side panel on it moves none |
 | Modal open / close | The dialog card / whatever opened it. `Modal` already does this; `MemMeter` does now too |
 
 The tab-switch rule exists because `renderTabs()` replaces the nav's
@@ -823,7 +844,8 @@ and a page that grabs focus on load is worse than the problem being fixed.
 
 `aria-current="page"` on the active nav item — exactly one, always.
 `aria-expanded` + `aria-controls` on every disclosure: the header ☰, the nav
-toggle, the help toggle, and the memory strip. If you add a control that opens
+toggle, every button in the side panel's strip (❔ reports whether *help* is the
+pane showing, not whether the panel is open), and the memory strip. If you add a control that opens
 something, it says so and it says when.
 
 ### The live region

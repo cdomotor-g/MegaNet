@@ -231,10 +231,16 @@ try {
     // "the AlertID column" is the fourth cell in one shape and the fifth in the
     // other, and a hard-coded index silently tests the wrong cell in whichever
     // shape it was not written for.
-    const colOf = head => 1 + [...document.querySelectorAll('#main-content table thead th')]
+    //
+    // By the table's own wrapper rather than by #main-content, which this read
+    // until the side panel: beside the map the table is in the side panel's
+    // Stations pane, outside <main>, and a query scoped to <main> found no rows
+    // at all. The wrapper is the table wherever it is.
+    const TABLE = '#stations-table-wrap table';
+    const colOf = head => 1 + [...document.querySelectorAll(`${TABLE} thead th`)]
       .findIndex(th => th.textContent.trim() === head);
     const marksIn = head => [...document.querySelectorAll(
-      `#main-content table tbody tr td:nth-child(${colOf(head)}) mark.hit`)]
+      `${TABLE} tbody tr td:nth-child(${colOf(head)}) mark.hit`)]
         .map(m => m.textContent.trim());
     const draw = async rows => {
       state.filters.searches = rows;
@@ -243,7 +249,7 @@ try {
     };
 
     await draw([row('4021-4025')]);
-    r.rowsDrawn   = document.querySelectorAll('#main-content table tbody tr').length;
+    r.rowsDrawn   = document.querySelectorAll(`${TABLE} tbody tr`).length;
     r.markedWhole = marksIn('AlertID').some(t => /^40(2[1-5])$/.test(t));
     r.markedWindowText = marksIn('AlertID').concat(marksIn('Stn #')).some(t => t.includes('-'));
 

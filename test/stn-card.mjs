@@ -174,7 +174,9 @@ async function main() {
         editFirst:  kids[0] && kids[0].classList.contains('mn-edit-station')
                     && kids[0].tagName === 'BUTTON' && kids[0].type === 'button',
         hasCopy:    !!acts.querySelector('.mn-copy-latlon'),
-        hasList:    kids.some(e => /Show in the list below/.test(e.textContent.trim())),
+        // "Show in the list ↓" under the map, "…→" with the cards in the side
+        // panel — the arrow says which, so the name is matched without it.
+        hasList:    kids.some(e => /Show in the list/.test(e.textContent.trim())),
         count:      kids.length, expect: stationActionPills(s).length + 1,
         footer:     /Pin clicks show this card without changing the selection/.test(text),
         carried:    findRepeaterMatches(s).length,

@@ -211,7 +211,7 @@ const TAB_LIST = TABS.flatMap(g => g.tabs);
 //  * The 357 filter explainer (#80) — **linked, not moved.** It is a wide modal
 //    carrying two drawings, one of which is a worked example coloured by what
 //    walk357() actually returns for those readings. Re-typing that into a
-//    300 px rail would produce a second, worse copy that drifts from the code;
+//    side-panel pane would produce a second, worse copy that drifts from the code;
 //    the panel opens the real one instead (ArroData.explain()).
 //  * docs/serial-help.html — **linked, not moved.** Its whole job is to be
 //    forwarded to somebody's IT department, which needs a page with its own URL
@@ -230,15 +230,24 @@ const TAB_LIST = TABS.flatMap(g => g.tabs);
 //    yet" bucket is ticked by default.
 const HELP = {
   stations: {
-    summary: 'The map, the filters and the station list, down one column. The '
-           + '<strong>Filters</strong> card under the map drives the map and the list at once, and '
-           + 'is built from whatever <code>stations.json</code> holds — every option carries the '
-           + 'number of stations behind it, and nothing is offered that no station uses. It '
-           + 'collapses, and its summary line says what the filters are doing while it is shut. '
-           + 'The <strong>Stations</strong> list below collapses the same way — it is the tallest '
-           + 'card on the page, and shutting it is how the map, the path tools and the editor get '
-           + 'onto one screen together; its summary keeps the live row count and names the '
-           + 'selected station. The map carries its own controls in its top-right corner, in '
+    summary: 'The map fills the page, and its cards sit beside it in the <strong>side panel</strong> '
+           + 'on the right: press 📋 in the strip on its edge, under ❔, for the '
+           + '<strong>Filters</strong>, the <strong>Stations</strong> list, the elevation profile, the '
+           + 'link budget and the station details, one column that scrolls on its own. Press the '
+           + 'button of the pane that is showing and the side panel shuts, giving the map the '
+           + 'width; drag its left edge (or focus it and use the arrow keys) to make it wider or '
+           + 'narrower. Pin a map panel with its 📌 — Map display, Draw &amp; measure, the polar '
+           + 'plot, the site finder — and it moves off the map into the side panel with a button of '
+           + 'its own in that strip; unpin it there and it goes back to its icon on the map. ◫ in the '
+           + 'map\'s corner puts the cards back under the map instead, and below 1,100 px they are '
+           + 'under it whatever ◫ says. The <strong>Filters</strong> card drives the map and the list '
+           + 'at once, and is built from whatever <code>stations.json</code> holds — every option '
+           + 'carries the number of stations behind it, and nothing is offered that no station uses. '
+           + 'It collapses, and its summary line says what the filters are doing while it is shut. '
+           + 'The <strong>Stations</strong> list under it collapses the same way — it is the tallest '
+           + 'card there, and shutting it is how the path tools and the editor get onto one screen '
+           + 'together; its summary keeps the live row count and names the selected station. The '
+           + 'map carries its own controls in its top-right corner, in '
            + 'groups with a hairline between them: what the map <em>shows</em> ('
            + '🗺️ <strong>Map display</strong>, base maps first, and the legend), the tools you point at it '
            + '(<strong>Draw &amp; measure</strong>, <strong>Polar radio coverage</strong>, '
@@ -246,7 +255,8 @@ const HELP = {
            + '<strong>ℹ️ What is here</strong>), the <strong>3-D view</strong> and its camera, '
            + 'how much screen the map gets (⛶ and ◫), and the one that resets it (↺). The panels '
            + 'among them open when the pointer is on them and can be pinned open. '
-           + 'The elevation profile and link budget sit under the map. Selecting a '
+           + 'The elevation profile and link budget follow the list; the profile says how to '
+           + 'draw a path until there is one. Selecting a '
            + 'station opens <strong>Repeaters listening</strong> between the list and the editor: '
            + 'every repeater with a pass range open to that station\'s addresses, nearest first. '
            + 'Clicking one puts the map on it and dims everything off its paths — the filters, the '
@@ -402,17 +412,18 @@ const HELP = {
       + 'label, its note and its tooltip, so "wind", "dB", "contour" and "licence" all land '
       + 'somewhere. It filters what is drawn and switches nothing off, and the panel opens as '
       + 'tall as the map so there is something for it to filter.',
-      'The ◫ button beside ⛶ puts the map and everything normally under it '
-      + '<strong>side by side</strong>, each its own scroller at the height of the window, with a '
-      + 'divider between them that drags (or moves with the arrow keys). This is how the tab '
-      + 'opens — the single column put the map\'s own answer below the fold, so reading it cost '
-      + 'you the map — and ◫ switches back to the stack. Where you leave the divider is '
-      + 'remembered, and the split folds back to one column on a narrow screen without forgetting '
-      + 'it. The station list beside the map carries five columns rather than ten — name, station '
-      + 'number, roles, AlertID and <strong>SLS catchment</strong> — because ten of them in a '
-      + '420 px column is ten columns nothing fits in. The network, position, elevation, the '
-      + 'enabled tick and the ARRO link are all on the station\'s card, which a click on any row '
-      + 'opens; stack the tab again and the table has them back.',
+      'The ◫ button beside ⛶ chooses where the station cards go: in the <strong>side '
+      + 'panel</strong> beside the map (📋), the map filling the height of the window and the '
+      + 'cards scrolling on their own, or back under the map in one long page. Beside it is how '
+      + 'the tab opens — the single column put the map\'s own answer below the fold, so reading '
+      + 'it cost you the map. The side panel\'s width is yours: drag its left edge, or focus it '
+      + 'and use the arrow keys, and it is remembered. Below 1,100 px the cards fold back under '
+      + 'the map without the setting forgetting where you wanted them. The station list in the '
+      + 'side panel carries five columns rather than ten — name, station number, roles, AlertID '
+      + 'and <strong>SLS catchment</strong> — because ten of them in a 420 px pane is ten columns '
+      + 'nothing fits in. The network, position, elevation, the enabled tick and the ARRO link '
+      + 'are all on the station\'s card, which a click on any row opens; put the cards under the '
+      + 'map and the table has them back.',
       '<strong>Clear filters</strong> also clears the repeater focus — the dim that a click on a '
       + 'repeater pin puts over everything not on its own paths. Both are ways of saying "back to '
       + 'the whole network", so both buttons do both, and both are enabled by a focus even with no '
@@ -505,9 +516,10 @@ const HELP = {
       + 'the full details and every action, without changing the selection — and the callout '
       + 'on the pin is a signpost: name, roles, and an <em>Actions</em> button that opens the '
       + 'pills. The card stays put while callouts come and go, and while the filters change; '
-      + '<em>Station details ↓</em> on it selects the station and jumps to its details card below '
-      + 'the map. On a phone the callout carries only <em>Details &amp; actions</em> and '
-      + '<em>Copy lat, lon</em>, and the card opens as a sheet across the bottom of the map.',
+      + '<em>Station details</em> on it selects the station and jumps to its details card — in '
+      + 'the side panel, or under the map when the cards are there. On a phone the callout '
+      + 'carries only <em>Details &amp; actions</em> and <em>Copy lat, lon</em>, and the card '
+      + 'opens as a sheet across the bottom of the map.',
       'The 🗺️ <strong>Map display</strong> panel starts with the <strong>base maps</strong>: tick '
       + 'more than one and give each its own opacity to blend them — Satellite at 40% over '
       + 'OSM-Topo puts the contours on the real ground — and each is drawn over the ones listed '
@@ -1257,6 +1269,22 @@ const NAV_AUTO_COLLAPSE_PX = BREAKPOINTS.md;
 // NAV_TRANSITION_MS does: the maps are re-measured once the slide has finished
 // rather than part-way through it. Kept in step with styles.css.
 const HELP_TRANSITION_MS = 160;
+
+// The side panel's pane, in px (the strip beside it is --mn-help-rail). 420 is
+// wide enough for the station table's five columns and the link budget's
+// two-column rows without either wrapping, and leaves a 1440 px laptop with the
+// nav open a map of about 700 px — wider than the side-by-side split it
+// replaced ever gave it.
+const DOCK_DEFAULT_W = 420;
+// The narrowest a pane may be dragged to while there is room for more. Below
+// this the filter card's head row — the search box, the match note and two
+// Clear buttons — wraps onto four lines, and a card is not readable at that.
+const DOCK_MIN_W = 300;
+// What the side panel always leaves the page, in px: a map that is a strip is
+// not a map, and the Stations map beside the pane is the reason the pane is
+// resizable at all. Taken off the width #main-content would have, so the map
+// itself is this less the layout's padding — about 360 px of map at worst.
+const DOCK_MAIN_MIN = 400;
 
 const ROLE_COLOR = {
   field:    '#107c10',
@@ -2068,12 +2096,14 @@ const state = {
   // right now, not a standing preference — and a page that *opens* with a
   // full-screen map has hidden its own navigation.
   mapFullscreen:  false,
-  // The Stations tab side by side: the map in one column, everything normally
-  // under it in the other, with a draggable divider (#186 — see
+  // The Stations tab side by side: the map filling the page on the left, and
+  // the station cards — the filters, the list, the path tools, the editor — in
+  // the side panel beside it (#186, and the dock since; see
   // toggleStationsSplit, app.js). Remembered, unlike full screen, and for the
   // opposite reason: this is not something an operator is doing right now, it
   // is which of two readings of the tab they prefer, and a preference that has
-  // to be re-made on every visit is not one.
+  // to be re-made on every visit is not one. Off puts the cards back under the
+  // map, in the page, the way the tab was designed.
   //
   // **On by default**, by request. The single column was the shape the tab was
   // designed in and it is the shape that puts the map's own answer — what
@@ -2082,12 +2112,6 @@ const state = {
   // whatever this says, so the default is only ever the default on a screen
   // wide enough to hold both halves.
   mapSplit:       localStorage.getItem('mn-map-split') !== 'off',
-  // Where the divider sits, as a percentage of the row given to the map. 58 by
-  // default: the map is the half being *looked* at and the list beside it is
-  // being read a row at a time, so an even split gives the map less than it
-  // wants and the list more than it needs.
-  mapSplitPct:    Math.max(25, Math.min(75,
-                    Number(localStorage.getItem('mn-map-split-pct')) || 58)),
   // Which on-map control panels (see MapChrome, map-controls.js) the operator
   // has pinned open. Persisted, and the one thing about those panels that is:
   // a pin is a standing preference about how this operator reads a map, not
@@ -2163,14 +2187,40 @@ const state = {
   // broken rather than as remembered. It is cleared by Escape, by picking a tab,
   // and by every reload.
   navQuery:       '',
-  // Right-hand help panel: a strip, or a strip plus what it has to say about
-  // the open tab. Kept under 'mn-help', in the same family as the three above.
-  // Deliberately *not* given the nav's width test: it starts collapsed at every
-  // width, because a reference surface that opens itself on every load is one
-  // people learn to close rather than read, and because it is the third column
-  // on a page that already budgets carefully for two. A stored preference wins,
-  // exactly as it does for the nav.
-  helpCollapsed:  (localStorage.getItem('mn-help') || 'collapsed') === 'collapsed',
+  // The side panel (#help-panel, the "dock"): a strip of tab buttons on the
+  // right-hand edge, and — while it is open — one pane beside it, which is the
+  // help for this tab, the Stations cards, or a map panel pinned into it. Two
+  // questions kept apart on purpose, because they are answered at different
+  // times: *whether* it is open, and *which* pane it would like to show.
+  //
+  // Open or shut is kept under 'mn-help', the key the help rail it grew out of
+  // used, and with the same two words in it. What changed is the default: open.
+  // It used to start shut at every width, because a reference surface that
+  // opens itself on every load is one people learn to close rather than read.
+  // That argument is about help, and the pane this opens on by default is not
+  // help — it is the Stations cards, which are half of what that tab is.
+  //
+  // A browser that has a 'mn-help' but no 'mn-dock-tab' is one whose answer was
+  // given about the help rail, before there was a side panel to give it about:
+  // "collapsed" there meant "I have read the help", not "hide the Stations cards
+  // from me". So until the side panel has been used once — every change to it
+  // writes both keys (dockPersist, app.js) — the first visit is treated as a
+  // fresh one, and the Stations tab opens with its cards beside the map.
+  dockOpen:       localStorage.getItem('mn-dock-tab') == null
+                  || (localStorage.getItem('mn-help') || 'expanded') === 'expanded',
+  // Which pane, remembered: 'help', 'stations', or 'map-<panel id>' for a map
+  // panel pinned into it. A pane that does not exist where you are — the
+  // Stations cards on any other tab, a map panel on a tab with no Stations map
+  // — leaves the side panel shut *there* without this being touched, so
+  // coming back to the tab that has it opens it again. That is also what keeps
+  // help from opening itself: on a fresh visit this says 'stations', and only
+  // one tab has those.
+  dockTab:        localStorage.getItem('mn-dock-tab') || 'stations',
+  // How wide the open pane is, in px, not counting the strip. Stored as the
+  // operator left it and clamped at the moment of use (dockWidthRange, app.js)
+  // — never clamped in storage, so a window that was narrow for a while gives
+  // the wider figure back when it is wide again.
+  dockW:          Number(localStorage.getItem('mn-dock-w')) || DOCK_DEFAULT_W,
   // Draw & measure overlay (Stations map). Plain geometry only — the Leaflet
   // layers are rebuilt from it whenever the map is, so a tab switch doesn't
   // throw the sketch away. Deliberately not persisted: see MapDraw.

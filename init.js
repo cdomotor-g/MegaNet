@@ -30,26 +30,33 @@
   renderMain();
   // The header's height and the shape of both rails depend on the width, so all
   // three are re-checked when it changes — crossing the phone breakpoint with a
-  // drawer open would otherwise leave its backdrop behind.
+  // drawer open would otherwise leave its backdrop behind. The side panel's
+  // width is re-clamped with them: its widest is whatever leaves the page its
+  // share of this window, which a narrower window has less of. Instant, so the
+  // clamp does not slide behind a window that is being dragged.
   window.addEventListener('resize', () => {
     updateChromeHeight();
     syncNavChrome(state.navCollapsed);
-    syncHelpChrome(state.helpCollapsed);
+    syncHelpChrome();
+    renderDock({ instant: true });
   });
   // Crossing the phone breakpoint changes what the two rails *are* — columns or
   // drawers — and so what their toggles should say. Re-rendered on the crossing
-  // itself rather than on every resize event: both are rebuilt wholesale.
+  // itself rather than on every resize event. It also changes where a pinned
+  // Stations map panel belongs — the side panel, or back in the map's corner,
+  // docked there the way pinning used to look — so MapChrome is asked again.
   window.matchMedia(`(max-width: ${BREAKPOINTS.xs}px)`).addEventListener('change', () => {
     renderTabs();
     renderHelp();
+    if (state.map) MapChrome.redock(state.map);
   });
-  // Crossing `lg` folds the Stations split back to one column and unfolds it
-  // again (styles.css), without the setting moving either way — and the station
-  // table's columns follow the *layout*, not the setting: five of them beside
-  // the map, ten of them across the page. Same reasoning as the rail above, and
-  // the same shape: the crossing repaints the table, the 300 resize events
-  // between two crossings do not.
-  window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).addEventListener('change', syncStationsTableCols);
+  // Crossing `lg` folds the Stations cards back under the map and unfolds them
+  // into the side panel again, without the setting moving either way — and the
+  // station table's columns follow the *layout*, not the setting: five of them
+  // in the side panel, ten of them across the page. Same reasoning as the rail
+  // above, and the same shape: the crossing moves the cards and repaints the
+  // table, the 300 resize events between two crossings do not.
+  window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).addEventListener('change', stationsLayoutChanged);
   // On a phone both rails are drawers laid over the page, and a drawer that
   // only closes by picking a tab is a trap — Escape backs out of either.
   document.addEventListener('keydown', e => {
@@ -58,9 +65,10 @@
     // the fullscreen map's Escape stands down for a claimed key, and an
     // Escape that closed nothing here should still be free to mean something
     // to whoever else is listening.
-    if (!state.navCollapsed || !state.helpCollapsed) e.preventDefault();
-    if (!state.navCollapsed)  setNavCollapsed(true);
-    if (!state.helpCollapsed) setHelpCollapsed(true);
+    const help = helpShowing();
+    if (!state.navCollapsed || help) e.preventDefault();
+    if (!state.navCollapsed) setNavCollapsed(true);
+    if (help)                setHelpCollapsed(true);
   });
   // Ctrl/Cmd+K — jump to a tab without going to the nav to find it (#108).
   // Registered here rather than on the nav because the whole value of it is that

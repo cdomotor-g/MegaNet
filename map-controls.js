@@ -8,7 +8,8 @@
 //                   — a flyout that opens when the pointer is over it, and
 //                   when it is clicked, tapped or opened with Enter, and that
 //                   can be pinned open, which docks it into the corner for
-//                   good — or a plain button that does one thing.
+//                   good, or into the side panel beside the map for a map that
+//                   has one (dockInto) — or a plain button that does one thing.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc and escAttr, and across to
@@ -47,8 +48,31 @@
 // helped. The pin is remembered between visits (see state.mapPanelsPinned) —
 // an operator who pins the legend means it.
 //
+// ── …and where "docked" is, which a map may decide (the side panel) ─────────
+// On the Stations map a pinned panel does not stay on the map at all. That map
+// has the app's side panel beside it (#help-panel, app.js), and a pinned panel
+// is moved into it — the whole wrapper, icon, heading, pin and body, as one
+// node — and gets a pane and a button there of its own. Map display and Draw &
+// measure were the complaint: pinned in the corner they are a 19 rem column
+// over the map, and pinned beside it they are as tall and as wide as they need
+// to be and cover nothing.
+//
+// It is opt-in per map, and one map opts in: MapChrome.dockInto(map, host).
+// The other six keep the corner, because none of them has the side panel
+// beside it. The host is asked, every time, whether it will take a panel right
+// now (host.accepts) — the Stations map's says no in full screen, which covers
+// the side panel, and on a phone, where the side panel is a drawer over the
+// map — and a panel it will not take is docked into the corner the old way
+// until it will. Why the *wrapper* and nothing smaller: every rule in
+// styles.css that shows, hides or pins a panel is written against
+// `.mn-mapctl > .mn-mapctl-body`; Map display's listeners are bound on its
+// `.mn-mapctl-content` and its ACMA block is that element's other child; and
+// MapPolar and MapSites write into the content node they were handed at
+// onMount. A wrapper moved whole keeps all of that, and a body or a content
+// node moved on its own breaks some of it.
+//
 // ── And why the third state has to be "shut" ─────────────────────────────────
-// The pin is the *only* way a panel stays on the map, and that is the contract
+// The pin is the *only* way a panel stays on screen, and that is the contract
 // rather than an implementation detail: a map is the one surface in this app
 // where the content is the whole panel, so anything covering a corner of it
 // without being asked to is in the way. Everything below that keeps a flyout
@@ -508,6 +532,17 @@ const MapChrome = (function () {
   const STORE = 'mn-map-panels';
   let seq = 0;
 
+  // Where each panel came from — its map and the options it was built with —
+  // so that one moved out of its corner can be put back in the same slot. The
+  // group and order used to live only on the corner's own elements, and a
+  // wrapper that has left the corner no longer knows either.
+  const homes = new WeakMap();   // wrapper → { map, opts }
+
+  // Set while setPinned() is applying an operator's pin, so that relocate()
+  // can tell "pinned just now" (open the side panel on it) from "built pinned"
+  // (the side panel's own preference decides).
+  let pinning = null;
+
   // ── The corner, and why it is one control now (#192) ─────────────────────
   // Eleven icons had accumulated in the Stations map's top-right corner, each
   // one its own Leaflet control carrying Leaflet's own 10 px margin: a 500-pixel
@@ -619,10 +654,64 @@ const MapChrome = (function () {
     return el;
   }
 
-  // Push the open/pinned state onto one control's DOM. Called on build and
-  // again whenever either changes, so the classes, aria-expanded and
-  // aria-pressed never drift apart from each other.
+  // A group's place in the column, for anything outside the corner that has to
+  // put panels in the same order — the side panel's strip.
+  function groupRank(opts) {
+    const name = GROUPS[opts.group] ? opts.group : 'tools';
+    return ORDER.indexOf(name);
+  }
+
+  // Put one panel where its pin and its map's host say it belongs: in the
+  // corner, or in the side panel. Called from apply(), so every path that
+  // changes the pin — the pin button, setPinned() from anywhere, a rebuild of
+  // the map with the pin remembered — arrives here, and from redock() when
+  // what the host will take has changed. Does nothing for a panel whose map
+  // has no host, which is six of the seven: their pinned panels dock into the
+  // corner as they always have, by CSS alone.
+  //
+  // Moving a node blurs whatever inside it had focus, so this returns where
+  // focus should go back to, for apply() to put it once the classes agree with
+  // the move — on the same element when the panel went into the side panel
+  // (the pin that was just pressed is still the pin), and on the corner icon
+  // when it came back, because the panel comes back shut and the icon is what
+  // is left of it on screen. Only when focus was inside the panel to begin
+  // with: a pin set from code must not pull focus to a map somebody is not
+  // looking at.
+  function relocate(wrap) {
+    const home = homes.get(wrap);
+    if (!home) return null;
+    const host = home.map && home.map._mnDockHost;
+    if (!host) return null;
+    const id = wrap.dataset.panel;
+    const want = state.mapPanelsPinned.has(id) && !!host.accepts();
+    const docked = wrap.classList.contains('is-docked');
+    if (want === docked) return null;
+    const active = document.activeElement;
+    const had = active && active !== document.body && wrap.contains(active) ? active : null;
+    // Neither of these means anything once the panel has left the corner, and
+    // either would come back with it: a panel that returns from the side panel
+    // returns shut, the way a pin that is dropped has always left it.
+    wrap.classList.remove('is-open', 'is-shut');
+    const opts = home.opts;
+    const info = { id, title: opts.title, icon: opts.dockIcon || opts.icon,
+                   rank: groupRank(opts), order: Number(opts.order) || 0 };
+    if (want) {
+      wrap.classList.add('is-docked');
+      host.adopt(wrap, { ...info, reason: pinning === id ? 'pin' : (home.built ? 'back' : 'build') });
+      return had;
+    }
+    wrap.classList.remove('is-docked');
+    host.release(wrap, { ...info, reason: state.mapPanelsPinned.has(id) ? 'away' : 'unpin' });
+    place(home.map, wrap, opts);
+    return had && wrap.querySelector('.mn-mapctl-btn');
+  }
+
+  // Push the open/pinned state onto one control's DOM, and the control to where
+  // that state says it goes. Called on build and again whenever either
+  // changes, so the classes, aria-expanded, aria-pressed and the panel's place
+  // never drift apart from each other.
   function apply(wrap) {
+    const refocus = relocate(wrap);
     const id     = wrap.dataset.panel;
     const pinned = state.mapPanelsPinned.has(id);
     const open   = wrap.classList.contains('is-open');
@@ -631,10 +720,21 @@ const MapChrome = (function () {
     wrap.classList.toggle('is-pinned', pinned);
     if (btn) btn.setAttribute('aria-expanded', String(open || pinned));
     if (pin) {
+      const docked = wrap.classList.contains('is-docked');
       pin.setAttribute('aria-pressed', String(pinned));
-      pin.title = pinned ? 'Unpin — collapse to its icon again' : 'Keep this panel open';
+      const host = hostOf(wrap);
+      pin.title = !pinned ? (host && host.accepts() ? 'Keep this panel open, in the side panel' : 'Keep this panel open')
+        : docked ? 'Unpin — put it back on the map, as its icon'
+        : 'Unpin — collapse to its icon again';
       pin.setAttribute('aria-label', pinned ? 'Unpin this panel' : 'Keep this panel open');
     }
+    if (refocus && document.contains(refocus)) refocus.focus({ preventScroll: true });
+  }
+
+  // The side panel that takes this panel's map's pins, if it has one.
+  function hostOf(wrap) {
+    const home = homes.get(wrap);
+    return home && home.map && home.map._mnDockHost ? home.map._mnDockHost : null;
   }
 
   // Is this control on screen *because the pointer is on it*? Asked before the
@@ -656,12 +756,52 @@ const MapChrome = (function () {
     groups() { return { ...GROUPS }; },
 
     // Pin or unpin by id, from anywhere. Every control carrying that id is
-    // updated, because the same panel can exist on more than one map.
+    // updated, because the same panel can exist on more than one map — and on a
+    // map with a side panel, the update is the move into it or out of it.
     setPinned(id, on) {
       if (on) state.mapPanelsPinned.add(id);
       else state.mapPanelsPinned.delete(id);
       persist();
-      for (const el of document.querySelectorAll(`.mn-mapctl[data-panel="${id}"]`)) apply(el);
+      pinning = on ? id : null;
+      try {
+        for (const el of document.querySelectorAll(`.mn-mapctl[data-panel="${id}"]`)) apply(el);
+      } finally {
+        pinning = null;
+      }
+    },
+
+    // Hand this map's pinned panels to a side panel instead of its corner.
+    // `host` answers three things (app.js, stationsDockHost):
+    //
+    //   accepts()            will it take a pinned panel right now? Asked on
+    //                        every change, so a no is never remembered
+    //   adopt(wrap, info)    here is one — `info` carries its id, title,
+    //                        icon (opts.dockIcon, else opts.icon), the rank of
+    //                        its corner group and its order within it, and the
+    //                        reason: 'pin' (just pinned), 'build' (built
+    //                        pinned) or 'back' (returning from the corner)
+    //   release(wrap, info)  give it back — reason 'unpin', or 'away' when it
+    //                        is still pinned and is only going back to the
+    //                        corner because accepts() has started saying no
+    //
+    // Called once per map, before its panels are built.
+    dockInto(map, host) {
+      if (map) map._mnDockHost = host || null;
+    },
+
+    // Ask every panel on `map` again where it belongs — for the moments what
+    // the host will take changes without a pin changing: full screen on and
+    // off, a window crossing the phone breakpoint.
+    redock(map) {
+      for (const wrap of (map && map._mnPanels) || []) {
+        if (!document.contains(wrap)) continue;
+        apply(wrap);
+      }
+    },
+
+    // The ids of the panels `map` has built, in build order.
+    panelIds(map) {
+      return ((map && map._mnPanels) || []).map(w => w.dataset.panel);
     },
 
     // ── A plain corner button ────────────────────────────────────────────────
@@ -735,6 +875,10 @@ const MapChrome = (function () {
     //   onMount   optional, (bodyEl) => void, for a caller that needs real
     //             listeners rather than inline handlers
     //   pinnable  false drops the pin — a panel nobody would want kept open
+    //   dockIcon  optional, the glyph its button in the side panel wears when
+    //             it is not `icon`. The 3-D caret's icon is ▾, which says
+    //             "the half of ⛰️ that opens" beside ⛰️ and nothing at all in a
+    //             strip of its own; there it is ⛰️
     //
     // Returns the wrapper element. It was the Leaflet control until the corner
     // became a bar; no caller ever used it, and there is no control of its own
@@ -875,9 +1019,20 @@ const MapChrome = (function () {
       // downstream loses one.
       L.DomEvent.on(wrap, 'click', L.DomEvent.stopPropagation);
 
+      // Placed first, then mounted, then the state applied — and both halves of
+      // that order are fixes rather than preferences. apply() may move a pinned
+      // panel into the side panel, and a place() after it would put it straight
+      // back in the corner. And onMount() used to run on a wrapper that was not
+      // in the document yet, so anything it looked up by id found nothing: Map
+      // display's find term, re-applied from there on every rebuild of the
+      // map, was re-applied to no rows at all.
+      homes.set(wrap, { map, opts, built: false });
+      (map._mnPanels || (map._mnPanels = [])).push(wrap);
+      place(map, wrap, opts);
       if (typeof opts.onMount === 'function') opts.onMount(content);
       apply(wrap);
-      return place(map, wrap, opts);
+      homes.get(wrap).built = true;
+      return wrap;
     },
   };
 })();

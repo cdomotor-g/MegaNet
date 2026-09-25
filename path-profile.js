@@ -1402,6 +1402,25 @@ const PathProfile = (function () {
       </details>`;
   }
 
+  // No line to profile. The card used to not be there at all until there was
+  // one, which was tidy under the map and is a mystery in the side panel: a
+  // card nobody has seen is a feature nobody knows to ask for, and the way to
+  // ask for this one — draw something, or click something — is on the map, not
+  // on the card. So it is always there, and with nothing to draw it says how to
+  // get something drawn.
+  function emptyHtml() {
+    return `
+      <div class="path-empty-head">
+        <h3>Elevation profile</h3>
+        <span class="small">No path yet</span>
+      </div>
+      <p class="small path-empty">
+        Draw a <strong>Line</strong> with ✏️ <strong>Draw &amp; measure</strong> on the map, or click
+        a radio path between two stations, and the ground between its two ends is drawn here — with
+        the line of sight, the Fresnel zone over it and what stands in the way.
+      </p>`;
+  }
+
   function rerender() {
     const el = document.getElementById('path-profile-panel');
     if (!el) return;
@@ -1411,8 +1430,8 @@ const PathProfile = (function () {
     // distance along a path that may not be the current one any more.
     hoverGeom = null;
     MapDraw.clearProfilePoint();
-    el.hidden = !sh;                       // no line drawn: the panel isn't there at all
-    el.innerHTML = sh ? panelHtml() : '';
+    el.hidden = false;
+    el.innerHTML = sh ? panelHtml() : emptyHtml();
     // A flip re-walks the terrain, so the button that was pressed is replaced
     // twice — by the "Sampling…" line and then by the new chart's own button.
     // Focus goes back to it once it exists again, so a keyboard user can flip

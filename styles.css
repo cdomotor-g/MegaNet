@@ -163,11 +163,13 @@
      its own tab names is worse than a wider one. */
   --mn-nav: 236px;
   --mn-nav-rail: 56px;
-  /* The help panel opposite it. Narrower than the nav expanded — it holds prose
-     at a readable measure, not a column of buttons — and narrower collapsed,
-     because its strip carries one control where the nav's carries fifteen. */
-  --mn-help: 300px;
-  --mn-help-rail: 44px;
+  /* The side panel opposite it (#help-panel). The rail is its strip: a column
+     of 44 px buttons and the 1 px border that separates it from the page. The
+     open pane's width is the operator's and is set by app.js as --mn-dock-w;
+     --mn-help is only the phone drawer's, where help is a drawer over the page
+     and the other panes are not there at all. */
+  --mn-help: 260px;
+  --mn-help-rail: 45px;
   /* Search hits in the station table. Amber, to match the map's "matches
      filter" pin ring, so the same match reads the same way in both halves of
      the Stations tab. */
@@ -3048,6 +3050,10 @@ hr {
                          saying "I am working in this one", and a tool in use
                          should not be sharing pixels with the map under it.
                          Remembered between visits — see state.mapPanelsPinned.
+                         On the Stations map a pinned panel leaves the map
+                         altogether, for a pane of the side panel beside it
+                         (MapChrome.dockInto; the rules are with #help-panel's),
+                         and is docked here only in full screen and on a phone.
 
    Neither state is a modal and neither traps focus: this is a disclosure, the
    button says so with aria-expanded, and Shift+Tab off the first control in
@@ -3108,7 +3114,17 @@ hr {
   margin-top: 3px;
 }
 
-.mn-mapbar-group + .mn-mapbar-group::before {
+/* The hairline goes above every group that has another *non-empty* group
+   somewhere before it — not merely a group before it. On the Stations map a
+   pinned panel leaves the corner for the side panel, and a group whose every
+   panel has gone is an empty element still standing in the column: the plain
+   `+` sibling rule drew a separator under nothing at the top of the corner. The
+   empty group itself takes no room. */
+.mn-mapbar-group:empty {
+  display: none;
+}
+
+.mn-mapbar-group:not(:empty) ~ .mn-mapbar-group:not(:empty)::before {
   content: '';
   width: 1.125rem;
   height: 2px;
@@ -4832,6 +4848,31 @@ hr {
 
 .path-panel > summary span,
 .lb-panel > summary span { color: var(--muted); }
+
+/* The elevation profile with no path to profile (PathProfile's empty state).
+   Not a <details> — there is nothing to open — so its head is drawn to line up
+   with the summaries of the cards either side of it: same heading size, same
+   muted note beside it, and no ▸ to promise a body that is not there. */
+.path-empty-head {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  padding: .1rem 0;
+}
+
+.path-empty-head h3 {
+  margin: 0;
+  font-size: .95rem;
+}
+
+.path-empty-head .small,
+.path-empty {
+  color: var(--muted);
+}
+
+.path-empty {
+  margin: .4rem 0 0;
+}
 
 /* The stations card is deliberately not in the rule above, and this is the one
    place the two differ. That selector is `summary span` — every span *inside*
@@ -6642,8 +6683,7 @@ hr {
 /* Collapsed: labels and headings are clipped rather than removed, so every
    button keeps its accessible name and the title attribute does the rest. */
 #tab-nav.collapsed .nav-label,
-#tab-nav.collapsed .nav-heading,
-#help-panel.collapsed .nav-label {
+#tab-nav.collapsed .nav-heading {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -6718,93 +6758,223 @@ hr {
   }
 }
 
-/* ── Help panel ─────────────────────────────────────────────────────────────
-   The right-hand counterpart to the nav rail — see issue #104 and README §20.
-   It borrows the nav's interaction contract on purpose (collapse to a strip and
-   never to nothing; --mn-help / 'mn-help' in localStorage; re-measure the maps
-   once the width transition has finished, not during it), and differs only
-   where a reference surface should:
+/* ── The side panel (#help-panel) ───────────────────────────────────────────
+   The right-hand counterpart to the nav rail: a strip of buttons on the outer
+   edge and, open, one pane beside it — the help for this tab, the Stations
+   cards, or a map panel pinned into it (app.js, "The side panel", holds the
+   reasoning). It keeps the nav's interaction contract (collapse to a strip and
+   never to nothing; the state in localStorage; re-measure the maps once the
+   width has settled rather than during the slide) and differs where a panel of
+   tools has to:
 
-   * Collapsed is the default at every width, not just under 900 px.
-   * Under 560 px it becomes a drawer, as the nav does — but app.js closes one
-     when the other opens, so a phone never carries two.
+   * Its pane's width is the operator's — the handle on its inner edge drags
+     and takes the arrow keys, and app.js writes the result as --mn-dock-w on
+     this element. The fallback is the default width, for the paint before the
+     first render.
+   * Under 560 px it is exactly what the help rail was: the strip becomes a tab
+     on the screen edge and help becomes a drawer, and app.js closes one of the
+     two drawers when the other opens, so a phone never carries two.
 
-   The widths in between need no special case: the Stations tab already drops to
-   a single column at 1100 px, so nav + filter pane + help only ever hold width
-   together above that, where there is width to hold. --mn-help narrows once on
-   the way down all the same, so the map keeps a usable share of a 1200 px
-   laptop with everything open. */
-
+   Collapsed is the class the markup ships with, so the pre-JS paint is the
+   strip alone, and app.js takes it off before .help-ready allows the slide. */
 #help-panel {
   flex: 0 0 auto;
-  width: var(--mn-help-rail, 44px);
+  width: var(--mn-help-rail, 45px);
   background: var(--panel);
   border-left: 1px solid var(--border);
 }
 
-/* Expanded is the exception, because collapsed is the default the markup ships
-   with — the pre-JS paint then matches what app.js will almost always settle
-   on, and a stored "expanded" is applied before .help-ready allows the slide. */
 #help-panel:not(.collapsed) {
-  width: var(--mn-help, 300px);
+  width: calc(var(--mn-help-rail, 45px) + var(--mn-dock-w, 420px));
 }
 
 #help-panel.help-ready {
   transition: width .16s ease;
 }
 
-/* Stretches so the border runs the page's full height; only the contents stick,
-   and only as far as one screen — the screen below the banner, for the reason
-   written out over .nav-inner. As .nav-inner. */
-.help-inner {
+/* No slide while the handle is being dragged — the width follows the pointer,
+   and a transition would have it trailing behind — and none for a change that
+   is part of something bigger (a tab switch, a card brought into view), where
+   app.js re-measures the map at once instead of after the slide. After
+   .help-ready and at its specificity, so source order is what makes it win. */
+#help-panel.is-resizing,
+#help-panel.dock-instant {
+  transition: none;
+}
+
+/* The panel stretches so its border runs the page's full height; only this
+   sticks, and only as far as one screen — the screen below the banner, for the
+   reason written out over .nav-inner. It is a row: the handle, the panes, the
+   strip. Each pane is its own scroller at this height, so a long one scrolls
+   inside the panel and the map beside it stays where it is. */
+.dock-inner {
   position: sticky;
   top: 0;
-  max-height: calc(100dvh - var(--mn-chrome, 96px));
+  height: calc(100dvh - var(--mn-chrome, 96px));
+  display: flex;
+}
+
+.dock-panes {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dock-pane {
+  height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: .5rem .4rem 1rem;
+}
+
+/* The Stations cards, as a column. The same 1rem gap they have under the map,
+   and a gutter of the panel's own round them rather than the page's. */
+.dock-pane-stations {
+  padding: var(--sp-2) var(--sp-2) var(--sp-4);
+}
+
+.dock-pane-map {
+  padding: var(--sp-2);
+}
+
+/* The strip. A column of 44 px square buttons (EPIC #107's floor) on a tint of
+   its own, so the pane beside it reads as the thing that is open and the strip
+   as what opens it. It scrolls if it ever has more buttons than screen, which
+   at eight buttons it has not yet. */
+.dock-strip {
+  flex: 0 0 auto;
+  width: calc(var(--mn-help-rail, 45px) - 1px);
   display: flex;
   flex-direction: column;
-  gap: .1rem;
+  gap: var(--sp-1);
+  padding: var(--sp-2) 0;
+  background: var(--panel-sub);
+  overflow-y: auto;
 }
 
-#help-panel .help-toggle {
+.dock-tab {
   display: flex;
   align-items: center;
-  gap: .55rem;
-  width: 100%;
-  margin-bottom: .35rem;
-  padding: .42rem .45rem;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--muted);
-  font-size: .85rem;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
-#help-panel .help-toggle:hover {
+.dock-tab:hover {
   background: var(--subtle);
   border-color: var(--border);
 }
 
-#help-panel.collapsed .help-toggle {
-  justify-content: center;
-  gap: 0;
-  padding-left: .2rem;
-  padding-right: .2rem;
+/* The pane that is open. Not colour alone: the ring is a second channel, and
+   aria-expanded carries it to anything not reading pixels. */
+.dock-tab.is-on {
+  background: var(--panel);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-/* Unlike the nav's labels, this is removed rather than clipped when collapsed.
-   A clipped label keeps a button's accessible name, which is why the nav does
-   it; several hundred words of prose left in the accessibility tree behind a
-   closed panel is not the same trade. */
-#help-panel.collapsed .help-body {
+.dock-ico {
+  display: block;
+  transform: translateY(.5px);
+}
+
+/* The handle: a 10 px hit target laid over the panel's inner edge — half over
+   the page, half over the pane, so it takes no width from either — with a
+   short grip drawn down the middle of it. Focusable, and it keeps the browser's
+   focus ring: a separator is a control, and `npm run shell` allows no
+   `outline: none` here. */
+.dock-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -5px;
+  width: 10px;
+  z-index: 5;
+  cursor: col-resize;
+  touch-action: none;    /* the pointer drag is ours, not the page's scroll */
+}
+
+.dock-resize::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 4px;
+  height: 2.5rem;
+  margin-top: -1.25rem;
+  border-radius: var(--r-pill);
+  background: var(--border);
+}
+
+.dock-resize:hover::before,
+.dock-resize:focus-visible::before {
+  background: var(--accent);
+}
+
+#help-panel.collapsed .dock-resize {
   display: none;
 }
 
+/* While the handle is being dragged the pointer is over the map, the table or
+   anything else it has been pulled across, and none of them should be
+   selecting text or fighting for the cursor. */
+body.mn-dock-dragging {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* The help pane. .help-inner is the class the rail's scroller always had —
+   `npm run shell` scrolls it to prove every link in it can be reached — and it
+   is still that: the pane scrolls, at the height .dock-inner gives it. */
+.help-inner {
+  padding: .6rem .5rem 1rem;
+}
+
+/* ── A map panel, pinned into the side panel ──────────────────────────────
+   The whole .mn-mapctl wrapper moves here — icon, heading, pin and body — and
+   everything below undoes what the map's corner does to it: the body is no
+   longer a flyout positioned off its icon, it is the pane's content, as wide as
+   the pane, with no scroll cap of its own (the pane scrolls). The icon is
+   hidden, because the strip button is what it was.
+
+   And the type. On the map a panel inherits Leaflet's container typography —
+   `.leaflet-container` sets 12 px (0.75rem) at a line height of 1.5 in
+   Helvetica Neue — and every rule written for these panels was written against
+   that. Out here it would inherit the page's instead, and every row would jump
+   a size on the way across. The stack is Leaflet's own, restated as a literal
+   because it is Leaflet's decision rather than a token of this app's. */
+.dock-pane > .mn-mapctl {
+  display: block;
+  font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+  font-size: .75rem;
+  line-height: 1.5;
+}
+
+.dock-pane > .mn-mapctl > .mn-mapctl-btn {
+  display: none;
+}
+
+.dock-pane > .mn-mapctl > .mn-mapctl-body {
+  display: block;
+  position: static;
+  width: auto;
+  box-shadow: none;
+}
+
+.dock-pane > .mn-mapctl > .mn-mapctl-body::after {
+  content: none;
+}
+
+.dock-pane > .mn-mapctl .mn-mapctl-content {
+  max-height: none;
+  overflow: visible;
+}
 .help-body {
   padding: 0 .35rem;
   font-size: .86rem;
@@ -6856,10 +7026,11 @@ hr {
 }
 
 /* The walkthrough, on the two tabs that have one (#105). The drawing scales to
-   whatever the rail is — 300 px, or 260 px below 1400 px, or the full width of
-   a phone drawer — so it is authored with a viewBox and no width, and the rule
-   below is what actually sizes it. A fixed width here would either overflow the
-   narrow case or waste the wide one. */
+   whatever the pane is — anything from 300 px to most of the window, since the
+   side panel's width is the operator's, or the full width of a phone drawer —
+   so it is authored with a viewBox and no width, and the rule below is what
+   actually sizes it. A fixed width here would either overflow the narrow case
+   or waste the wide one. */
 .help-fig {
   margin: .1rem 0 0;
 }
@@ -6927,17 +7098,12 @@ hr {
   background: var(--subtle);
 }
 
-/* Everything open on a 1200 px laptop is 236 px of nav plus a 320 px filter pane
-   plus this; 300 px of help would leave the Stations map under a third of the
-   window. The panel gives up the width rather than the map. */
-@media (max-width: 1400px) {
-  :root { --mn-help: 260px; }
-}
-
-/* Past here the panel gives up its column, for the reason the nav gives up its
-   rail: 44 px of it is a ninth of a 390 px screen and the tables and maps need
-   it more. Expanded it becomes a drawer from the right, exactly as the nav's
-   becomes one from the left, and app.js closes whichever was open when the
+/* Past here the side panel gives up its column, for the reason the nav gives up
+   its rail: 45 px of it is a ninth of a 390 px screen and the tables and maps
+   need it more. Help is the only pane it has here — the Stations cards fold
+   under the map below `lg`, and a pinned map panel stays docked in the map's
+   corner (app.js) — and open, help is a drawer from the right, exactly as the
+   nav's becomes one from the left; app.js closes whichever was open when the
    other opens.
 
    Collapsed is where the two part company. The nav could move its toggle into
@@ -6945,7 +7111,8 @@ hr {
    the right, and measuring a seventh header button at 390 px put the banner on
    another row — 30 px of chrome, permanently, to save a control that only
    matters when you go looking for it. So the strip stays visible and stops
-   taking layout width instead: a fixed tab on the screen edge. Either way the
+   taking layout width instead: a fixed tab on the screen edge, and — open — the
+   same tab on the drawer's edge, as the drawer's close button. Either way the
    main area never changes width, so no map needs re-measuring here. */
 @media (max-width: 560px) {
   #help-panel,
@@ -6956,14 +7123,23 @@ hr {
     overflow: visible;          /* both forms are fixed children of a 0-wide box */
   }
 
+  .dock-inner {
+    position: static;
+    height: 0;
+  }
+
+  .dock-resize {
+    display: none;
+  }
+
   /* The edge tab. Vertically centred to stay clear of Leaflet's zoom and layer
      controls, which sit in the map's top corners, and below the backdrop's
      1150 so the nav drawer dims it along with everything else. */
-  #help-panel.collapsed .help-inner {
+  .dock-strip {
     position: fixed;
     inset: 50% 0 auto auto;
     transform: translateY(-50%);
-    max-height: none;
+    width: auto;
     padding: 0;
     border: 1px solid var(--border);
     border-right: 0;
@@ -6973,18 +7149,29 @@ hr {
     z-index: 1100;
   }
 
-  #help-panel.collapsed .help-toggle {
+  .dock-tab {
     width: 2rem;
     height: 2.9rem;
-    margin: 0;
     font-size: 1rem;
+  }
+
+  .dock-tab.is-on {
+    box-shadow: none;
+    border-color: transparent;
+  }
+
+  /* Open, the tab rides on the drawer's left edge — above the backdrop with
+     the drawer, so it is the one thing outside the drawer still lit. */
+  #help-panel:not(.collapsed) .dock-strip {
+    right: min(var(--mn-help, 260px), 86vw);
+    z-index: 1200;
   }
 
   #help-panel:not(.collapsed) .help-inner {
     position: fixed;
     inset: 0 0 0 auto;
-    width: min(var(--mn-help, 300px), 86vw);
-    max-height: none;
+    width: min(var(--mn-help, 260px), 86vw);
+    height: auto;
     padding: .6rem .7rem 1.5rem;
     background: var(--panel);
     border-left: 1px solid var(--border);
@@ -7075,176 +7262,66 @@ hr {
 }
 
 /* ── Stations tab: side by side (#186) ─────────────────────────────────────
-   The map in one column, everything normally under it in the other, and a
-   divider that drags. Off by default; app.js toggles `is-split` on the same
-   #stations-main the single column uses, so nothing in the DOM moves and the
-   Leaflet map is never rebuilt — the reasoning is at toggleStationsSplit().
+   The map filling the page, and the station cards beside it in the side
+   panel's Stations pane (#help-panel, above). Under the map, the cards wrapper
+   (#stations-cards) is the stack's second item and the page is the one column
+   it was designed as; beside it, app.js moves the wrapper into the side panel
+   whole and puts is-split on #stations-main, and the map takes the height of
+   the window. Nothing is re-rendered either way, so the Leaflet map is never
+   rebuilt — the reasoning is at toggleStationsSplit().
 
-   With the split off, the three wrappers have to be invisible: the two panels
-   are the grid items the stack has always laid out, so .stn-split-map has to
-   disappear into it (`display: contents`) and the divider has to not exist. The
-   right-hand wrapper is a grid of its own either way — same 1rem gap as the
-   stack it sits in, so the cards below the map are spaced identically whichever
-   way the tab is facing.
+   The cards are a grid of their own wherever they are, with the same 1rem gap
+   as the stack, so they are spaced identically under the map and beside it.
 
    This is not #165's filter rail coming back. What sat beside the map then was
    the map's *settings*; what sits beside it now is the map's *answer*. */
-.stn-split-map { display: contents; }
-
-.stn-split-rest {
+.stn-cards {
   display: grid;
   gap: 1rem;
   align-content: start;
   min-width: 0;
 }
 
-.stn-split-bar { display: none; }
+/* The map alone, filling what is left of the window below the banner — so the
+   page itself does not scroll behind a side panel that does. --mn-split-h is
+   measured from where this element actually starts (syncStationsSplitHeight,
+   app.js) and is the figure that makes that true. The calc() behind it is the
+   fallback for the frame before the first measurement, and it is deliberately
+   the *approximate* one it always was: --mn-chrome covers the banner and the
+   memory strip but not #main-content's own padding, so on its own it left the
+   page scrolling behind a map that was meant to hold still.
 
+   app.js only puts is-split on above `lg`, where the cards fit beside the map
+   (stationsSplitActive), so nothing here needs a fold of its own — below it the
+   class is simply not there. */
 .stn-split.is-split {
-  grid-template-columns: minmax(0, var(--mn-split, 58%)) 10px minmax(0, 1fr);
-  align-items: stretch;
-  gap: 0;
-  /* Both columns scroll inside the viewport rather than the page scrolling
-     past them — which is the whole request: the map stays in view while the
-     list beside it is read.
-
-     --mn-split-h is measured from where this element actually starts
-     (syncStationsSplitHeight, app.js) and is the figure that makes that true.
-     The calc() behind it is the fallback for the frame before the first
-     measurement, and it is deliberately the *approximate* one it always was:
-     --mn-chrome covers the banner and the memory strip but not #main-content's
-     own padding or the gap above the panel, so it left the page scrolling
-     behind two columns that were each already scrolling. Three scroll regions
-     where there should be one. */
+  display: flex;
+  flex-direction: column;
   height: var(--mn-split-h, calc(100dvh - var(--mn-chrome, 0px) - 2rem));
   min-height: 360px;
-}
-
-.stn-split.is-split > .stn-split-map {
-  display: flex;
-  min-width: 0;
-  overflow: hidden;      /* the map fills this column; it never scrolls */
 }
 
 /* The map panel becomes the column, and the map inside it takes whatever is
    left after the credit line under it. Same shape as .map-panel.is-full, for
    the same reason — a panel holding two things in a column instead of one
    thing with a fixed height. */
-.stn-split.is-split > .stn-split-map > .map-panel {
+.stn-split.is-split > .map-panel {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   margin: 0;
 }
 
-.stn-split.is-split > .stn-split-map > .map-panel > .mn-map-stage {
+.stn-split.is-split > .map-panel > .mn-map-stage {
   flex: 1 1 auto;
   min-height: 0;
 }
 
-.stn-split.is-split > .stn-split-map > .map-panel #leaflet-map {
+.stn-split.is-split > .map-panel #leaflet-map {
   height: 100%;
   min-height: 240px;
-}
-
-.stn-split.is-split > .stn-split-rest {
-  overflow-y: auto;
-  padding: 0 var(--sp-1) var(--sp-2);
-}
-
-/* The divider itself: a full-height hit target with a hairline down the middle,
-   which is what makes an 10 px grab area look like a 1 px rule. */
-.stn-split.is-split > .stn-split-bar {
-  display: block;
-  position: relative;
-  cursor: col-resize;
-  border: 0;
-  background: transparent;
-  touch-action: none;    /* the pointer drag is ours, not the page's scroll */
-}
-
-.stn-split.is-split > .stn-split-bar::before {
-  content: "";
-  position: absolute;
-  inset: var(--sp-2) 4px;
-  border-radius: 999px;
-  background: var(--border);
-}
-
-.stn-split.is-split > .stn-split-bar:hover::before,
-.stn-split.is-split > .stn-split-bar:focus-visible::before {
-  background: var(--accent);
-}
-
-/* While the divider is being dragged the pointer is over the map, the table or
-   anything else the bar has been pulled across, and none of them should be
-   selecting text or fighting for the cursor. */
-body.mn-split-dragging {
-  cursor: col-resize;
-  user-select: none;
-}
-
-/* The split folds back to one column at `lg` (#186). Two columns of about
-   400 px are two things too narrow to read rather than two things in view,
-   which is the only thing the split is for. The *setting* is untouched — this
-   is a fold, not a switch-off, so a laptop docked to a wide screen finds its
-   split again where it left it.
-
-   These two blocks are here, immediately under the rules they undo, rather than
-   with the other `lg` and `sm` rules eight hundred lines up: every selector is
-   the same one at the same specificity, so **source order is the whole of what
-   decides**, and up there the base rules came later and won. The first version
-   of this was written up there and folded nothing — 381 px of map in a 688 px
-   column at 1000 px wide, which is exactly the state the fold exists to
-   prevent.
-
-   Every declaration the split makes is undone rather than left to interact with
-   the single column, the map's own height included: with the wrappers back to
-   `display: contents` the panel is a plain block again, and a map left on
-   `flex: 1 1 auto` inside one collapses to its min-height. */
-@media (max-width: 1100px) {
-  .stn-split.is-split {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
-    height: auto;
-    min-height: 0;
-  }
-
-  .stn-split.is-split > .stn-split-map {
-    display: contents;
-    overflow: visible;
-  }
-
-  .stn-split.is-split > .stn-split-bar { display: none; }
-
-  .stn-split.is-split > .stn-split-rest {
-    overflow-y: visible;
-    padding: 0;
-  }
-
-  .stn-split.is-split > .stn-split-map > .map-panel {
-    display: block;
-  }
-
-  .stn-split.is-split > .stn-split-map > .map-panel > .mn-map-stage {
-    flex: 0 1 auto;
-  }
-
-  .stn-split.is-split > .stn-split-map > .map-panel #leaflet-map {
-    height: min(62vh, 720px);
-    min-height: 360px;
-  }
-}
-
-/* And the phone's own map height, restated at the specificity the rule above
-   uses — `#leaflet-map` alone is outranked by it, so without this a 390 px
-   screen with the split remembered as on would take the laptop figure. */
-@media (max-width: 700px) {
-  .stn-split.is-split > .stn-split-map > .map-panel #leaflet-map {
-    height: 52dvh;
-    min-height: 260px;
-  }
 }
 
 /* Code elements */
