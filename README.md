@@ -822,9 +822,8 @@ Each entry in the `stations` array represents one node in the network. A node ca
   (**Draw & measure**, **Polar radio coverage**, **Repeater site finder**, **What is here**), the **3-D view**, its
   settings (🎚️) and its camera, how much screen the map gets (⛶ full screen, ◫ the cards beside the map or under it),
   and ↺ reset on its own at the bottom. A panel opens as a pane of the side panel from its button in the strip; a
-  button does its one thing; the map's top-right corner is left empty. On a phone they are on the map in its
-  top-right corner instead, where each panel is an icon and nothing else until you point at it, click it or tab
-  to it, and can be pinned open there — a pin that is remembered between visits
+  button does its one thing; the map's top-right corner is left empty. On a phone the strip is a rail down the
+  right-hand edge, beside the map rather than on it, and a panel opens from it as a drawer over the page
 
 **Reading the map.** Every pin carries a white ring so it separates from the
 base map and from its neighbours; ACMA transmitter squares carry the same ring.
@@ -1016,11 +1015,14 @@ other tools instead of at the bottom where attaching last used to put it. The
 groups are real ARIA groups with names, so a screen reader is told *3-D view*
 where a sighted operator is shown a hairline; a separator that existed only in
 the stylesheet would have made the corner prettier and no more navigable. And
-when the corner is taller than the map — a phone at 52 dvh with 44 px touch
-targets — the groups that do not fit wrap, whole, into a second column over the
-map rather than hanging off the bottom edge. Above a phone's width the column is
-not on the map at all: it stands in the side panel's strip, in the same groups
-and the same order with the same hairlines and the same ARIA names (§20).
+when a corner is taller than its map, the groups that do not fit wrap, whole,
+into a second column over the map rather than hanging off the bottom edge. The
+Stations map's column is not on the map at all, at any width: it stands in the
+side panel's strip, in the same groups and the same order with the same
+hairlines and the same ARIA names (§20) — on a phone, a rail beside the map.
+That is where it went last, and the phone is why. Below 560 px it used to come
+back to the corner, where at 52 dvh with 44 px touch targets it was two columns
+of buttons over a quarter of a map the width of the screen.
 
 **The 3-D pair is one split button, and it has a camera (#192).** The mountain
 and its panel share an edge now, the panel drawn as a thin caret under the
@@ -1037,8 +1039,8 @@ at 37° is how you *find out* the map is not facing north. Neither is offered on
 the flat map — Leaflet has no pitch and no bearing, so there is no camera to
 reset, and a button that can do nothing is not shown. In the side panel's
 strip, where there is no split button to be half of, the settings are a button
-of their own under ⛰️ and wear 🎚️ rather than a second mountain; the pair is
-one split control on a phone, in the map's corner.
+of their own under ⛰️ and wear 🎚️ rather than a second mountain — at every
+width, a phone's rail included.
 
 **The station card, and the callout as a signpost (#175).** Clicking a pin
 paints a card in the map's bottom-left corner — the station's number,
@@ -1140,9 +1142,10 @@ it had, above the header, with its strip and its open pane: the map's tools
 live in that strip, and a full-screen map that had covered them could only be
 looked at. The map's edge follows the side panel's as a pane opens, the panel
 shuts or its handle is dragged, re-measured each time; Tab walks the map and the
-side panel and nothing under them; leaving the tab ends it. On a phone, where
-the tools are on the map, it covers the whole screen as it always did. Press ⛶
-again, or Escape, to put the page back;
+side panel and nothing under them; leaving the tab ends it. On a phone that is
+the rail alone — the map takes the rest of the screen, and a panel opened from
+the rail is a drawer over it, which a tap on the sliver of map beside it puts
+away. Press ⛶ again, or Escape, to put the page back;
 Escape defers to any dialog open over the map, and the bug reporter still
 opens on top. It is deliberately not a modal, though "a modal map" is how the
 ask arrives: the shared dialog shell wipes its content on every exit, which
@@ -3369,18 +3372,32 @@ settled rather than during the slide. Where it differs:
   instead; either way the page never scrolls sideways.
 - **Pressing the button of the pane that is showing shuts the panel**, and the
   map gets the width. Any other button opens it on that pane.
-- **Under 560 px it is the help rail exactly**: a drawer from the right,
-  mutually exclusive with the nav's, opened from a tab fixed on the screen edge —
-  the nav could move ☰ into the header because the header had a slot on the
-  left, and there is none on the right. Only help is a pane there. The Stations
-  cards stay under the map and the map's controls go back to its corner, as
-  flyouts with pins, because a drawer over a 390 px map is a drawer over the
-  thing it is describing. Crossing 560 px moves them either way without
-  rebuilding the map and without losing focus: a strip button's focus goes to
-  its panel's icon in the corner and back, a caret in a panel stays in it (the
-  flyout comes back open round it), and a button keeps its own. **A phone design
-  for the side panel is out of scope for this change** and left for its own
-  issue.
+- **Under 560 px a pane is a drawer** from the right, over the page, mutually
+  exclusive with the nav's, with a backdrop that a tap puts it away on, and
+  Escape. What it opens from depends on the tab:
+  - **On the Stations tab the strip is still a rail** down the right-hand edge,
+    48 px wide, sticky under the banner and taking its width from the page — so
+    the map ends where the rail begins and nothing stands on it. It holds ❔ and
+    every one of the map's controls, in the same groups and order as on a
+    desktop; a panel's drawer opens on the rail's inner edge, and the rail stays
+    lit above the backdrop, so its buttons go on switching panes and the lit one
+    puts its drawer away. The rail and its drawer run to the foot of the screen
+    once the banner has scrolled away, and the last button can be scrolled up
+    above the fold at the top of the page. The Stations cards stay under the
+    map (they fold there below 1,100 px). Until this the map's controls went
+    back to its corner on a phone, as flyouts with pins — two columns of 44 px
+    buttons over a quarter of a map the width of the screen, which is the
+    complaint that moved them.
+  - **Everywhere else it is the help rail exactly**: the strip holds only ❔
+    there, and rather than a rail for one button it is a tab fixed on the
+    screen edge, with help the drawer that tab rides on — the nav could move ☰
+    into the header because the header had a slot on the left, and there is
+    none on the right.
+
+  Crossing 560 px changes none of what is in the strip, so nothing moves and
+  focus stays where it was — on a strip button, or typing in a pane that turns
+  into a drawer and back — and every map is measured again once the rails have
+  settled, because a phone turned on its side crosses it.
 - **It stays beside the map in full screen**, at its width, above the header,
   and everything in it goes on working; the map stops at its edge and follows
   it (see *Full screen* under the Stations tab).
@@ -3408,7 +3425,9 @@ side panel (a registered tab teardown), because a great deal of the app reads
 to a card — *Show in the list*, *Station details*, the radio path card's links,
 *Link budget for this path*, *Finish line*, the site finder's *Profile the worst
 path* — opens the side panel on the pane holding that card first (`dockReveal`),
-because a scroll to an element in a hidden pane does nothing at all. The elevation profile is always a card now, and with no line drawn it says
+because a scroll to an element in a hidden pane does nothing at all; and on a
+phone, where those cards are under the map, it puts away the drawer the press
+came from, which would otherwise be over the card it scrolled to. The elevation profile is always a card now, and with no line drawn it says
 how to get one.
 
 **The radio path card.** Clicking a radio path on the map — a field link or a
@@ -3427,8 +3446,8 @@ path — another line drawn or selected, or its line deleted — because it says
 those two are open on this exact path.
 
 **The Stations map's controls.** Everything MapChrome would put in the map's
-top-right corner lives in the strip instead, above a phone's width, and the
-corner holds nothing. Each panel — 🗺️ Map display, 🔑 Legend, ✏️ Draw & measure,
+top-right corner lives in the strip instead, at every width — a phone's rail
+included, where a pane is a drawer — and the corner holds nothing. Each panel — 🗺️ Map display, 🔑 Legend, ✏️ Draw & measure,
 📡 Polar radio coverage, 🗼 Repeater site finder, 🎚️ the 3-D settings — moves
 its whole `.mn-mapctl` wrapper (icon, heading, pin and body) into a pane of its
 own the moment it is built, with a button in the strip; its corner icon and its
@@ -3444,9 +3463,9 @@ and its new controls land in the *same* panes and strip buttons, so the pane
 that was showing stays showing, a focused strip button keeps focus, focus on a
 control of the old map goes to the same control of the new one, and the pane's
 scroll comes back. The pin (`mn-map-panels`) means what it always did only where
-a panel is in a corner: on a phone, and on the other six Leaflet maps, which
-keep their corners because none of them sits beside the side panel
-(`MapChrome.dockInto` is per map). This used to be opt-in, a panel moving in
+a panel is in a corner: on the other six Leaflet maps, which keep their corners
+because none of them sits beside the side panel (`MapChrome.dockInto` is per
+map). This used to be opt-in, a panel moving in
 only when its 📌 was pressed — which left the right-hand edge of the page two
 places to look for the same kind of tool — and it is not any more.
 `npm run dock` holds all of this.

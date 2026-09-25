@@ -43,7 +43,7 @@
 // Where the panel is drawn changed at #164 and nothing else did. It was a panel
 // in the Stations sidebar; it is a MapChrome panel now (map-controls.js),
 // opened from ✏️ — a pane of the side panel beside the map, from its strip,
-// and on a phone a flyout from the map's own corner, pinnable open — which is
+// and on a phone a drawer from the rail beside the map — which is
 // the shape this tool always wanted, since every one of its controls is about
 // something you are doing on the map a few hundred pixels away. panelHtml()
 // still renders into #map-draw-panel and rerenderPanel() still finds it there

@@ -1408,8 +1408,8 @@ const PathProfile = (function () {
   // ask for this one — draw something, or click something — is on the map, not
   // on the card. So it is always there, and with nothing to draw it says how to
   // get something drawn. It says where the line is drawn rather than where the
-  // ✏️ is, because the ✏️ is in two places: the side panel's strip, and the
-  // map's own corner on a phone.
+  // ✏️ is, because where the ✏️ is — the side panel's strip, or a phone's rail —
+  // is the side panel's business and can move again.
   function emptyHtml() {
     return `
       <div class="path-empty-head">

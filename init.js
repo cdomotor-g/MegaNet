@@ -42,15 +42,25 @@
   });
   // Crossing the phone breakpoint changes what the two rails *are* — columns or
   // drawers — and so what their toggles should say. Re-rendered on the crossing
-  // itself rather than on every resize event. It also changes where the
-  // Stations map's controls belong — the side panel's strip, or the map's own
-  // corner — so MapChrome is asked again, and asked *before* the side panel is
+  // itself rather than on every resize event. MapChrome is asked again where
+  // the Stations map's controls belong, and asked *before* the side panel is
   // painted: a control moving takes focus with it (MapChrome's relocate), and
   // it can only do that while the strip button it is leaving is still there.
+  // (The answer is the side panel's strip at every width now, a phone's rail
+  // included, so nothing moves; the question is still the host's to answer.)
+  //
+  // And the maps are measured again once the crossing has settled. The nav's
+  // rail comes out of the row or goes back into it here, sliding as it does
+  // (styles.css, #tab-nav), and Leaflet only watches the window: it measured
+  // itself on the resize, against a page still carrying the rail's width, and
+  // nothing after that told it otherwise — a phone turned on its side (390 px
+  // to 844, and back) left the Stations map 56 px out, clicks landing that far
+  // from where they were aimed.
   window.matchMedia(`(max-width: ${BREAKPOINTS.xs}px)`).addEventListener('change', () => {
     renderTabs();
     if (state.map) MapChrome.redock(state.map);
     renderHelp();
+    invalidateMapSizes(NAV_TRANSITION_MS + 40);
   });
   // Crossing `lg` folds the Stations cards back under the map and unfolds them
   // into the side panel again, without the setting moving either way — and the
@@ -60,17 +70,23 @@
   // table, the 300 resize events between two crossings do not.
   window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).addEventListener('change', stationsLayoutChanged);
   // On a phone both rails are drawers laid over the page, and a drawer that
-  // only closes by picking a tab is a trap — Escape backs out of either.
+  // only closes by picking a tab is a trap — Escape backs out of either: the
+  // nav's, or whichever pane the side panel has open (help, or one of the
+  // Stations map's panels beside its rail).
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape' || !isPhoneNav()) return;
+    // …and stand down for a key already claimed: a dialog opened over a drawer
+    // (help's "Read more" can open one) takes its Escape in the capture phase,
+    // and one press should close the dialog, not the drawer under it as well.
+    if (e.defaultPrevented) return;
     // Claim the key only when a drawer actually closes (the Modal contract):
     // the fullscreen map's Escape stands down for a claimed key, and an
     // Escape that closed nothing here should still be free to mean something
     // to whoever else is listening.
-    const help = helpShowing();
-    if (!state.navCollapsed || help) e.preventDefault();
+    const drawer = dockDrawerOpen();
+    if (!state.navCollapsed || drawer) e.preventDefault();
     if (!state.navCollapsed) setNavCollapsed(true);
-    if (help)                setHelpCollapsed(true);
+    if (drawer)              dockDrawerClose();
   });
   // Ctrl/Cmd+K — jump to a tab without going to the nav to find it (#108).
   // Registered here rather than on the nav because the whole value of it is that

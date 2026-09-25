@@ -1,6 +1,7 @@
 // The side panel (#help-panel, "the dock"): one resizable, vertically tabbed
-// column on the right that holds the help, the Stations cards and — above a
-// phone's width — every one of the Stations map's own controls.
+// column on the right that holds the help, the Stations cards and every one of
+// the Stations map's own controls — on a phone, a rail beside the map whose
+// panes are drawers.
 //
 // It replaced two things that each had checks of their own — the help rail
 // (`shell`, `help`) and the Stations tab's right-hand column of cards
@@ -40,10 +41,17 @@
 //      two of them and Escape from the side panel ends it.
 //   7. **◫, the lg fold and a phone**: the cards under the map and back with
 //      the same Leaflet map; below 1,100 px the cards fold under the map and
-//      the strip keeps Help and the map's controls; at 375 px it is the old
-//      phone shape exactly — no column, the help edge tab, the cards under the
-//      map, and the map's controls back in its corner as flyouts whose pins
-//      dock them there. Crossing 560 px either way keeps focus.
+//      the strip keeps Help and the map's controls; at 375 px the Stations
+//      tab's strip is a rail beside the map, the map ending where it begins
+//      and nothing left in the map's corner — every control in the rail, a
+//      panel opening as a drawer on the rail's inner edge over the map, with a
+//      backdrop behind it and the rail lit above that, which the lit button,
+//      a tap on the dimmed page and Escape each put away, one drawer at a time
+//      with the nav's; the rail's last button reachable above the fold and
+//      the rail and drawer running to the foot of a scrolled screen; every
+//      other tab keeping the old help edge tab and its drawer; and full screen
+//      keeping the rail beside the map, its drawer over it. Crossing 560 px
+//      either way keeps focus, typing included.
 //   8. **No sideways scroll** at 375, 768 and 1440 with the side panel open,
 //      and a strip taller than the window that scrolls, with every button in
 //      reach and a scrollbar that stands beside the buttons, not over them.
@@ -179,6 +187,7 @@ try {
   }, id);
 
   // What is drawn in the map's top-right corner, as boxes the browser gave it.
+  // Nothing, at any width: a phone's too.
   const cornerNow = () => page.evaluate(() => {
     const c = document.querySelector('#leaflet-map .leaflet-top.leaflet-right');
     if (!c) return { missing: true, drawn: [] };
@@ -925,76 +934,158 @@ try {
     && await page.evaluate(() => state.mapSplit === true), JSON.stringify(s));
   check('…and still nothing in the map\'s corner', (await cornerNow()).drawn.length === 0);
 
-  // Crossing a phone's width with focus on a pane's strip button: it goes to
-  // that panel's icon in the map's corner, which is what that button becomes.
-  // The nav is put to its rail first — an expanded nav is a drawer over the
-  // page on a phone, and the corner would be under it.
+  // ── 7b. A phone ──────────────────────────────────────────────────────────
+  // On the Stations tab a phone's strip is a rail down the right-hand edge,
+  // holding every one of the map's controls off the map, and a pane is a
+  // drawer beside it. They used to go back to the map's corner below 560 px —
+  // two columns of 44 px buttons over a quarter of a map the width of the
+  // screen — and that is what this replaces. Everything here is measured off the boxes the browser gave the
+  // elements and off what is under a point, because a drawer that says it is
+  // open behind the map, or a rail the map runs under, reads as right to
+  // every attribute it carries.
+  //
+  // Crossing a phone's width with focus on a pane's strip button: the button
+  // is the same element in the rail, so focus stays on it. The nav is put to
+  // its rail first — an expanded nav is a drawer over the page on a phone.
   await page.evaluate(() => setNavCollapsed(true));
   await page.waitForTimeout(300);
   await page.focus('#help-panel .dock-tab[data-dock="map-draw"]');
   await page.setViewportSize({ width: 375, height: 700 });
   await page.waitForTimeout(600);
-  const toPhone = await page.evaluate(() => {
+  const toPhone = await page.evaluate(() => ({ dock: document.activeElement?.dataset?.dock || null,
+    inStrip: !!document.activeElement?.closest('#help-panel .dock-strip') }));
+  check('crossing to a phone with focus on ✏️ in the strip leaves it there, in the rail',
+    toPhone.dock === 'map-draw' && toPhone.inStrip, JSON.stringify(toPhone));
+  const PHONE_STRIP = STRIP.filter(k => k !== 'stations' && k !== 'paths');
+  // The rail, the drawer and the map, in the terms the phone's assertions use.
+  const phoneLook = () => page.evaluate(() => {
+    const panel = document.getElementById('help-panel');
+    const strip = panel.querySelector('.dock-strip');
+    const panes = panel.querySelector('.dock-panes');
+    const map = document.getElementById('leaflet-map');
+    const r = el => { const b = el.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom), w: Math.round(b.width), h: Math.round(b.height) }; };
+    const showing = dockShowing();
+    const tab = showing && panel.querySelector(`.dock-tab[data-dock="${showing}"]`);
+    const at = (x, y) => { const t = document.elementFromPoint(x, y); return !t ? null : t.closest('.dock-strip') ? 'rail'
+      : t.closest('.dock-panes') ? 'drawer' : t.id === 'help-backdrop' ? 'backdrop' : t.closest('#leaflet-map') ? 'map' : (t.id || t.tagName); };
+    const m = r(map);
+    const tb = tab ? r(tab) : null;
     const a = document.activeElement;
-    return { icon: !!(a && a.classList.contains('mn-mapctl-btn') && a.closest('.mn-mapctl')?.dataset.panel === 'draw'),
-             corner: !!(a && a.closest('.leaflet-control-container')), cls: a && a.className };
+    return {
+      rail: panel.classList.contains('has-map-tools'), panel: r(panel), strip: r(strip), map: m,
+      stripFixed: getComputedStyle(strip).position === 'fixed',
+      drawer: showing ? r(panes) : null, showing, backdrop: !document.getElementById('help-backdrop').hidden,
+      leafletW: state.map.getSize().x, mapClientW: map.clientWidth,
+      overMap: at(m.l + m.w / 2, m.t + m.h / 2), onTab: tb ? at(tb.l + tb.w / 2, tb.t + tb.h / 2) : null,
+      sliver: at(6, m.t + m.h / 2),
+      active: a ? (a.dataset?.dock || a.id || [...a.classList].find(c => c.startsWith('mn-map-')) || a.tagName) : null,
+      winW: innerWidth, winH: innerHeight,
+    };
   });
-  check('crossing to a phone with focus on ✏️ in the strip puts focus on ✏️ in the map\'s corner',
-    toPhone.icon && toPhone.corner, JSON.stringify(toPhone));
   const phone = await page.evaluate((cls) => {
     const panel = document.getElementById('help-panel');
-    const tab = panel.querySelector('.help-toggle');
-    const r = tab.getBoundingClientRect();
+    const btns = [...panel.querySelectorAll('.dock-strip button')].filter(b => b.getClientRects().length);
     return {
-      panelW: Math.round(panel.getBoundingClientRect().width),
-      tabShown: r.width > 0 && r.height > 0 && getComputedStyle(tab.closest('.dock-strip')).position === 'fixed',
-      tabAtEdge: Math.round(r.right) >= innerWidth - 1,
-      strip: [...panel.querySelectorAll('.dock-strip button')].map(b => b.dataset.dock || b.className),
+      strip: [...panel.querySelectorAll('.dock-strip button')]
+        .map(b => b.dataset.dock || [...b.classList].find(c => c.startsWith('mn-map-')) || b.className),
+      square: btns.map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }),
       cards: !!document.querySelector('#main-content #stations-cards'),
-      panels: [...document.querySelectorAll('.mn-mapctl')].map(w => (w.closest('.leaflet-control-container') ? 'corner' : 'elsewhere')),
-      buttons: cls.map(c => !!document.querySelector('.' + c)?.closest('.leaflet-control-container')),
+      panels: [...document.querySelectorAll('.mn-mapctl')].map(w => (w.closest('#help-panel .dock-pane') ? 'pane' : 'elsewhere')),
+      buttons: cls.map(c => !!document.querySelector('.' + c)?.closest('#help-panel .dock-strip')),
       sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     };
   }, BUTTONS);
-  check('at 375 px there is no side-panel column, only the help tab on the screen edge',
-    phone.panelW === 0 && phone.tabShown && phone.tabAtEdge && JSON.stringify(phone.strip) === '["help"]',
+  let p = await phoneLook();
+  check('at 375 px the Stations tab\'s strip is a rail down the right-hand edge, in the row rather than over it',
+    p.rail && p.panel.w === 48 && p.panel.r === p.winW && !p.stripFixed && p.strip.w >= 44, JSON.stringify(p));
+  check('…holding ❔ and every one of the map\'s controls, in the corner\'s order, each 44 px square',
+    JSON.stringify(phone.strip) === JSON.stringify(PHONE_STRIP) && phone.square.every(([w, h]) => w === 44 && h === 44)
+      && phone.panels.length === 6 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
     JSON.stringify(phone));
-  check('…the cards are under the map, and every one of the map\'s controls is back in its corner',
-    phone.cards && phone.panels.length === 6 && phone.panels.every(p => p === 'corner') && phone.buttons.every(Boolean)
-      && !phone.sideways, JSON.stringify(phone));
-  // …where they are flyouts again, with pins that mean what they always did.
-  // By the keyboard, which is the path a disclosure has to have; `mapctl`
-  // drives the same flyouts with a real pointer.
-  await page.mouse.move(10, 690);
-  await page.focus('.leaflet-control-container .mn-mapctl[data-panel="legend"] .mn-mapctl-btn');
+  check('…the map ending where the rail begins, measured to it, and nothing standing in its corner',
+    p.map.r <= p.panel.l && p.leafletW === p.mapClientW && (await cornerNow()).drawn.length === 0, JSON.stringify(p));
+  check('…the cards under the map, and nothing scrolling sideways', phone.cards && !phone.sideways, JSON.stringify(phone));
+
+  // A panel from the rail, by the keyboard: a drawer beside the rail, over the
+  // map, with the backdrop behind it — and the rail still lit above that
+  // backdrop, its button the thing under a finger, and the map not moved.
+  await page.focus('#help-panel .dock-tab[data-dock="map-legend"]');
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(200);
-  const flyout = await wrapAt('legend');
-  check('…where Enter on a panel\'s icon opens it as a flyout, its 📌 on screen',
-    flyout.where === 'corner' && flyout.shown && flyout.pin && !flyout.pinned, JSON.stringify(flyout));
-  await page.keyboard.press('Tab');
-  const onPin = await page.evaluate(() => document.activeElement?.classList.contains('mn-mapctl-pin'));
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(150);
-  await page.evaluate(() => document.activeElement && document.activeElement.blur());
-  await page.mouse.click(60, 650);
+  await page.waitForTimeout(300);
+  const shutP = p;
+  p = await phoneLook();
+  check('Enter on 🔑 in the rail opens the legend as a drawer on the rail\'s inner edge, over the map',
+    p.showing === 'map-legend' && (await wrapAt('legend')).shown && Math.abs(p.drawer.r - p.panel.l) <= 1
+      && p.drawer.w > 250 && p.overMap === 'drawer', JSON.stringify(p));
+  check('…with the backdrop behind it and the rail lit above that, its own button the thing under a finger',
+    p.backdrop && p.onTab === 'rail' && p.active === 'map-legend'
+      && await page.evaluate(() => document.querySelector('#help-panel .dock-tab[data-dock="map-legend"]').getAttribute('aria-expanded')) === 'true',
+    JSON.stringify(p));
+  check('…and the map neither moved nor re-measured: a drawer takes no width',
+    p.map.w === shutP.map.w && p.map.l === shutP.map.l && p.leafletW === shutP.leafletW, JSON.stringify({ shut: shutP.map, open: p.map }));
+  await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
   await page.waitForTimeout(250);
-  const pinnedPhone = await wrapAt('legend');
-  check('…and its pin docks it open in the corner, still there after a click elsewhere',
-    onPin && pinnedPhone.where === 'corner' && pinnedPhone.pinned && pinnedPhone.shown, JSON.stringify({ onPin, pinnedPhone }));
-  await page.evaluate(() => MapChrome.setPinned('legend', false));
+  p = await phoneLook();
+  check('another button in the rail switches the drawer to its panel',
+    p.showing === 'map-draw' && (await wrapAt('draw')).shown && !(await wrapAt('legend')).shown && p.backdrop, JSON.stringify(p));
+  await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
+  await page.waitForTimeout(250);
+  p = await phoneLook();
+  check('…and the lit one puts the drawer away, backdrop and all, focus staying on it',
+    p.showing === null && !p.backdrop && p.drawer === null && p.active === 'map-draw', JSON.stringify(p));
+  // The backdrop: the finger's width of dimmed page beside the drawer.
+  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await page.waitForTimeout(250);
+  p = await phoneLook();
+  const sliverAt = p.sliver;
+  await page.mouse.click(6, p.map.t + p.map.h / 2);
+  await page.waitForTimeout(250);
+  p = await phoneLook();
+  check('a tap on the dimmed page beside the drawer puts it away, focus back on its button',
+    sliverAt === 'backdrop' && p.showing === null && !p.backdrop && p.active === 'map-display', JSON.stringify({ sliverAt, p }));
+  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await page.waitForTimeout(250);
+  await page.focus('#map-display-find');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  p = await phoneLook();
+  check('…and so does Escape, from inside it', p.showing === null && !p.backdrop && p.active === 'map-display', JSON.stringify(p));
+  // One drawer at a time, both ways round.
+  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => setNavCollapsed(false));
+  await page.waitForTimeout(250);
+  const navOver = await page.evaluate(() => ({ nav: !state.navCollapsed, showing: dockShowing(), backdrop: !document.getElementById('help-backdrop').hidden }));
+  await page.evaluate(() => setDockTab('map-legend'));
+  await page.waitForTimeout(250);
+  const dockOver = await page.evaluate(() => ({ nav: !state.navCollapsed, showing: dockShowing() }));
+  check('one drawer at a time: the nav\'s opening puts a panel\'s drawer away, and a panel\'s opening the nav\'s',
+    navOver.nav && navOver.showing === null && !navOver.backdrop && !dockOver.nav && dockOver.showing === 'map-legend',
+    JSON.stringify({ navOver, dockOver }));
+  // ❔ is in the rail too, and help opens in the same drawer as the panels.
+  await page.evaluate(() => setHelpCollapsed(false));
+  await page.waitForTimeout(250);
+  p = await phoneLook();
+  check('❔ in the rail opens help in the same drawer, beside the rail',
+    p.showing === 'help' && Math.abs(p.drawer.r - p.panel.l) <= 1 && p.backdrop
+      && await page.evaluate(() => document.getElementById('dock-pane-help').checkVisibility()), JSON.stringify(p));
+  // A dialog opened over the drawer (help's "Read more" can open one) claims
+  // its Escape, and one press closes the dialog, not the drawer under it too.
+  await page.evaluate(() => Modal.open({ title: 'Probe', html: '<button id="probe-a">A</button>' }));
+  await page.keyboard.press('Escape');
   await page.waitForTimeout(150);
-  // …and back, the other way: the corner icon becomes the strip button.
-  await page.focus('.leaflet-control-container .mn-mapctl[data-panel="draw"] .mn-mapctl-btn');
+  const underDialog = await page.evaluate(() => ({ modal: !!document.querySelector('#app-modal .modal-card'), help: helpShowing() }));
+  check('…where Escape in a dialog opened over it closes the dialog alone, the drawer staying',
+    !underDialog.modal && underDialog.help, JSON.stringify(underDialog));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  check('…which Escape closes', await page.evaluate(() => !helpShowing() && document.getElementById('help-backdrop').hidden));
+
+  // Somebody typing in a pane as the window crosses a phone's width, either
+  // way: the field keeps focus and its caret, in a pane that is showing — a
+  // drawer on the phone, a pane beside the map above it.
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.waitForTimeout(600);
-  const toDesk = await page.evaluate(() => ({ dock: document.activeElement?.dataset?.dock || document.activeElement?.className }));
-  s = await look();
-  check('crossing back with focus on ✏️ in the corner puts focus on ✏️ in the strip, the strip whole again',
-    toDesk.dock === 'map-draw' && JSON.stringify(s.strip) === JSON.stringify(STRIP.filter(k => k !== 'stations' && k !== 'paths'))
-      && (await cornerNow()).drawn.length === 0, JSON.stringify({ toDesk, strip: s.strip }));
-  // Somebody typing in a pane as the window narrows: the field keeps focus,
-  // in a flyout that stays open round it, and back in a pane that is showing.
   await page.click('#help-panel .dock-tab[data-dock="map-display"]');
   await page.waitForTimeout(250);
   await page.focus('#map-display-find');
@@ -1003,50 +1094,87 @@ try {
   await page.waitForTimeout(600);
   const typing = await page.evaluate(() => ({
     focus: document.activeElement?.id, value: document.getElementById('map-display-find').value,
-    corner: !!document.activeElement?.closest('.leaflet-control-container'),
+    showing: dockShowing(), seen: document.getElementById('map-display-find').checkVisibility(),
+    backdrop: !document.getElementById('help-backdrop').hidden,
   }));
-  const typingWrap = await wrapAt('display');
-  check('crossing to a phone while typing in Map display keeps the caret in the box, in an open flyout',
-    typing.focus === 'map-display-find' && typing.value === 'wind' && typing.corner && typingWrap.shown,
-    JSON.stringify({ typing, typingWrap }));
+  check('crossing to a phone while typing in Map display keeps the caret in the box, in a drawer that is showing',
+    typing.focus === 'map-display-find' && typing.value === 'wind' && typing.showing === 'map-display' && typing.seen && typing.backdrop,
+    JSON.stringify(typing));
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.waitForTimeout(600);
   const typingBack = await page.evaluate(() => ({ focus: document.activeElement?.id, showing: dockShowing(),
-    inSide: !!document.activeElement?.closest('#help-panel') }));
-  check('…and crossing back keeps it there, in the pane, which is showing',
-    typingBack.focus === 'map-display-find' && typingBack.inSide && typingBack.showing === 'map-display',
+    inSide: !!document.activeElement?.closest('#help-panel'), backdrop: !document.getElementById('help-backdrop').hidden }));
+  check('…and crossing back keeps it there, in the pane beside the map, the backdrop gone',
+    typingBack.focus === 'map-display-find' && typingBack.inSide && typingBack.showing === 'map-display' && !typingBack.backdrop,
     JSON.stringify(typingBack));
   await page.fill('#map-display-find', '');
-  // A pane somebody typed in and then left — focus back on the map — goes to
-  // a phone's corner shut, like every other panel nobody is in. The focusin
-  // promotion used to mark it open while it was a pane, and it came back as a
-  // flyout over the map that nobody had asked for.
-  await page.focus('#map-display-find');
-  await page.keyboard.type('x');
-  await page.fill('#map-display-find', '');
-  await page.evaluate(() => document.getElementById('leaflet-map').focus());
-  await page.setViewportSize({ width: 375, height: 700 });
-  await page.waitForTimeout(600);
-  const leftShut = await wrapAt('display');
-  check('a pane that was typed in, then left, comes back to a phone\'s corner shut',
-    leftShut.where === 'corner' && !leftShut.shown && !leftShut.pinned, JSON.stringify(leftShut));
-  await page.setViewportSize({ width: 1000, height: 900 });
-  await page.waitForTimeout(600);
   // One of the map's own buttons: the same element, wherever it stands.
   await page.focus('#help-panel .dock-strip .mn-map-reset');
   await page.setViewportSize({ width: 375, height: 700 });
   await page.waitForTimeout(600);
   const btnPhone = await page.evaluate(() => ({ reset: !!document.activeElement?.classList.contains('mn-map-reset'),
-    corner: !!document.activeElement?.closest('.leaflet-control-container') }));
+    strip: !!document.activeElement?.closest('#help-panel .dock-strip') }));
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.waitForTimeout(600);
   const btnDesk = await page.evaluate(() => ({ reset: !!document.activeElement?.classList.contains('mn-map-reset'),
-    strip: !!document.activeElement?.closest('#help-panel .dock-strip') }));
-  check('focus on ↺ goes with it to the corner and back to the strip',
-    btnPhone.reset && btnPhone.corner && btnDesk.reset && btnDesk.strip, JSON.stringify({ btnPhone, btnDesk }));
+    strip: !!document.activeElement?.closest('#help-panel .dock-strip'),
+    leafletW: state.map.getSize().x, mapClientW: document.getElementById('leaflet-map').clientWidth }));
+  check('focus on ↺ stays on ↺ in the strip across a phone\'s width, both ways',
+    btnPhone.reset && btnPhone.strip && btnDesk.reset && btnDesk.strip, JSON.stringify({ btnPhone, btnDesk }));
+  // Coming up out of a phone's width the nav's rail goes back into the row
+  // beside the map, and Leaflet — which measured itself on the resize, before
+  // the rail had its width back — has to have been told.
+  check('…and the map, crossing back, measured to the width the rails leave it',
+    btnDesk.leafletW === btnDesk.mapClientW, JSON.stringify(btnDesk));
 
+  // The rail is taller than a small phone's screen below the banner. At the top
+  // of the page its last button can still be brought up above the fold; with
+  // the banner scrolled away the rail, and a drawer beside it, run to the foot
+  // of the screen rather than stopping a banner's height short of it.
+  await page.evaluate(() => shutDock({ instant: true }));
+  await page.setViewportSize({ width: 375, height: 600 });
+  await page.waitForTimeout(600);
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.focus('#help-panel .help-toggle');
+  await page.keyboard.press('End');
+  await page.waitForTimeout(150);
+  const lastUp = await page.evaluate(() => {
+    const a = document.activeElement, r = a.getBoundingClientRect();
+    const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return { reset: a.classList.contains('mn-map-reset'), bottom: Math.round(r.bottom), winH: innerHeight, hit: !!t && (t === a || a.contains(t)) };
+  });
+  check('at the top of a short phone\'s page, End in the rail brings ↺ up above the fold, under a finger',
+    lastUp.reset && lastUp.bottom <= lastUp.winH && lastUp.hit, JSON.stringify(lastUp));
+  await page.evaluate(() => scrollTo(0, 1200));
+  await page.waitForTimeout(200);
+  await page.evaluate(() => setDockTab('map-legend', { instant: true }));
+  await page.waitForTimeout(200);
+  p = await phoneLook();
+  check('…and scrolled down the page, the rail and the drawer beside it run from the top of the screen to its foot',
+    p.strip.t === 0 && p.strip.b === p.winH && p.drawer.t === 0 && p.drawer.b === p.winH, JSON.stringify(p));
+  await page.evaluate(() => { shutDock({ instant: true }); scrollTo(0, 0); });
   await page.setViewportSize({ width: 375, height: 700 });
   await page.waitForTimeout(600);
+
+  // Every other tab keeps the edge tab: the strip holds only ❔ there, and a
+  // rail for one button is not worth a seventh of the screen.
+  await page.evaluate(() => switchTab('passranges'));
+  await page.waitForTimeout(400);
+  const edge = await page.evaluate(() => {
+    const panel = document.getElementById('help-panel');
+    const tab = panel.querySelector('.help-toggle');
+    const r = tab.getBoundingClientRect();
+    return {
+      rail: panel.classList.contains('has-map-tools'),
+      panelW: Math.round(panel.getBoundingClientRect().width),
+      tabShown: r.width > 0 && r.height > 0 && getComputedStyle(tab.closest('.dock-strip')).position === 'fixed',
+      tabAtEdge: Math.round(r.right) >= innerWidth - 1,
+      strip: [...panel.querySelectorAll('.dock-strip button')].map(b => b.dataset.dock || b.className),
+    };
+  });
+  check('on any other tab at 375 px there is no rail, only the help tab on the screen edge',
+    !edge.rail && edge.panelW === 0 && edge.tabShown && edge.tabAtEdge && JSON.stringify(edge.strip) === '["help"]',
+    JSON.stringify(edge));
   await page.evaluate(() => setHelpCollapsed(false));
   await page.waitForTimeout(300);
   const drawer = await page.evaluate(() => {
@@ -1055,31 +1183,50 @@ try {
     return { fixed: getComputedStyle(pane).position === 'fixed', right: Math.round(r.right), w: Math.round(r.width),
              backdrop: !document.getElementById('help-backdrop').hidden, help: document.querySelector('.help-toggle').getAttribute('aria-expanded') };
   });
-  check('…and ❔ opens help as the drawer it always was, with its backdrop',
+  check('…where ❔ opens help as the drawer it always was, with its backdrop',
     drawer.fixed && drawer.right >= 374 && drawer.w > 200 && drawer.backdrop && drawer.help === 'true',
     JSON.stringify(drawer));
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
   check('…which Escape closes', await page.evaluate(() => !helpShowing()
     && document.getElementById('help-backdrop').hidden));
-  // Full screen on a phone is what it was: the map over everything, its tools
-  // on it, the side panel's edge tab under it.
-  await page.evaluate(() => toggleMapFullscreen(true));
-  await page.waitForTimeout(300);
+  await toStations();
+
+  // Full screen on a phone: the map fills the window except the rail, which
+  // stays beside it with the tools in it — ⛶ included — and a panel is a drawer
+  // over the full-screen map, the sliver of map beside it the backdrop.
+  await page.click('#help-panel .dock-strip .mn-map-full');
+  await page.waitForTimeout(400);
   const phoneFull = await page.evaluate(() => {
     const fp = document.querySelector('.map-panel.is-full').getBoundingClientRect();
-    const tab = document.querySelector('#help-panel .help-toggle').getBoundingClientRect();
-    const t = document.elementFromPoint(tab.left + tab.width / 2, tab.top + tab.height / 2);
-    return { w: Math.round(fp.width), winW: innerWidth, tabCovered: !!(t && !t.closest('#help-panel')),
-             full: !!document.querySelector('.leaflet-control-container .mn-map-full') };
+    const side = document.getElementById('help-panel').getBoundingClientRect();
+    const full = document.querySelector('.mn-map-full');
+    return { mapR: Math.round(fp.right), mapL: Math.round(fp.left), sideL: Math.round(side.left), sideR: Math.round(side.right),
+             sideT: Math.round(side.top), sideH: Math.round(side.height), winW: innerWidth, winH: innerHeight,
+             inRail: !!full.closest('#help-panel .dock-strip'), pressed: full.getAttribute('aria-pressed'),
+             leafletW: state.map.getSize().x, mapClientW: document.getElementById('leaflet-map').clientWidth };
   });
-  check('full screen on a phone covers the whole window, the edge tab included, with ⛶ on the map',
-    phoneFull.w === phoneFull.winW && phoneFull.tabCovered && phoneFull.full, JSON.stringify(phoneFull));
-  await page.evaluate(() => toggleMapFullscreen(false));
-  await page.waitForTimeout(200);
+  check('full screen on a phone fills the window except the rail, which stays beside it the window tall, ⛶ in it',
+    phoneFull.mapL === 0 && Math.abs(phoneFull.mapR - phoneFull.sideL) <= 1 && phoneFull.sideR === phoneFull.winW
+      && phoneFull.sideT === 0 && phoneFull.sideH === phoneFull.winH && phoneFull.inRail && phoneFull.pressed === 'true'
+      && phoneFull.leafletW === phoneFull.mapClientW, JSON.stringify(phoneFull));
+  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await page.waitForTimeout(250);
+  p = await phoneLook();
+  check('…a panel from the rail is a drawer over the full-screen map, the sliver of map beside it the backdrop',
+    p.showing === 'map-display' && p.overMap === 'drawer' && p.sliver === 'backdrop' && p.onTab === 'rail', JSON.stringify(p));
+  await page.mouse.click(6, p.map.t + p.map.h / 2);
+  await page.waitForTimeout(250);
+  p = await phoneLook();
+  check('…which a tap there puts away, full screen kept',
+    p.showing === null && !p.backdrop && await page.evaluate(() => mapFullOnScreen()), JSON.stringify(p));
+  await page.focus('#help-panel .dock-strip .mn-map-full');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  check('…and Escape from the rail ends full screen', await page.evaluate(() => !mapFullOnScreen() && !state.mapFullscreen));
 
   // ── 8. No sideways scroll with the side panel open ───────────────────────
-  for (const [width, how] of [[375, 'help'], [768, 'help'], [768, 'map-display'], [1440, 'stations'], [1440, 'map-display']]) {
+  for (const [width, how] of [[375, 'help'], [375, 'map-display'], [768, 'help'], [768, 'map-display'], [1440, 'stations'], [1440, 'map-display']]) {
     await page.setViewportSize({ width, height: 800 });
     await page.waitForTimeout(400);
     const over = await page.evaluate(async (t) => {

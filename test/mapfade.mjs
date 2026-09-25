@@ -145,9 +145,9 @@ await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: LOA
 // this map at this width: panes of the side panel beside it, each opened from
 // its button in the side panel's strip (MapChrome.dockInto). They were flyouts
 // in the map's corner when this file was written, reached by hovering an icon
-// and moving along the panel; the corner and its flyouts are `mapctl`'s now,
-// on a phone. The panel is still measured off the box the browser gave it
-// rather than off a class, and every click is still a real one.
+// and moving along the panel; the corner and its flyouts are `mapctl`'s now.
+// The panel is still measured off the box the browser gave it rather than off
+// a class, and every click is still a real one.
 
 const look = (panel) => page.evaluate((p) => {
   const wrap = document.querySelector(`.mn-mapctl[data-panel="${p}"]`);
@@ -282,8 +282,8 @@ const linkState = () => page.evaluate(() => ({
 // over it, so the click that armed the tool has further to leak — but the same
 // wrapper, with the same stoppers on it, goes with it (map-controls.js), and the
 // question is the same one with the same proof: two clicks on the map after
-// arming are a two-point line, not three. On a phone the panel is a flyout on
-// the map again, and `mapctl` arms a tool from it with the same real pointer.
+// arming are a two-point line, not three. As a flyout in the map's corner the
+// panel is `mapctl`'s, which arms a tool from it with the same real pointer.
 
 console.log('\nArming a draw tool from the Draw & measure pane in the side panel');
 

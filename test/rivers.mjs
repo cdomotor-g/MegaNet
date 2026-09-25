@@ -118,9 +118,9 @@ try {
   // focus the button, then Enter.
   //
   // The extra step is #164: the note is inside the map-display panel, and that
-  // panel is not a block in the sidebar any more. At this width it is a pane of
-  // the side panel, opened from 🗺️ in the side panel's strip (on a phone, an
-  // icon on the map). So the keyboard path this check exists to prove is one
+  // panel is not a block in the sidebar any more. It is a pane of the side
+  // panel, opened from 🗺️ in the side panel's strip (on a phone, a drawer from
+  // its rail). So the keyboard path this check exists to prove is one
   // step longer than it was — reach the button, open it, then the buttons are
   // there — and proving the whole of it is the point. Enter on the button
   // rather than a pane opened by script: the disclosure has to actually work

@@ -72,10 +72,13 @@
 // It is opt-in per map, and one map opts in: MapChrome.dockInto(map, host).
 // The other six keep the corner, because none of them has the side panel
 // beside it. The host is asked, every time, whether it will take the controls
-// right now (host.accepts) — the Stations map's says no on a phone, where the
-// side panel is a drawer over the map it would be describing — and while it
-// says no they are this file's again: flyouts in the corner, with pins that
-// dock them there, exactly as on the other six maps. What the host is handed
+// right now (host.accepts), and while it says no they are this file's again:
+// flyouts in the corner, with pins that dock them there, exactly as on the
+// other six maps. The Stations map's host said no on a phone until a phone's
+// side panel became a rail beside the map with its panes as drawers from it —
+// the corner was the worst place for them there, two columns of 44 px buttons
+// over a quarter of a map the width of the screen — and it says yes at every
+// width now; the question stays the host's to answer. What the host is handed
 // is the *element*, moved, never a copy: a plain button keeps the class its
 // module finds it by (`.mn-map-3d`, …) and the listener MapChrome gave it, and
 // a panel moves as its whole wrapper. Why the wrapper and nothing smaller:
@@ -746,7 +749,7 @@ const MapChrome = (function () {
     // way back too: a pane that was clicked or tabbed into picked up is-open
     // from the focusin promotion (now skipped while docked, below, but a panel
     // docked before that guard existed could still carry it), and it would
-    // otherwise come back to a phone as an open flyout over the map that
+    // otherwise come back to the corner as an open flyout over the map that
     // nobody asked for. `had` puts is-open back for the one case that wants it.
     if (panel) el.classList.remove('is-open', 'is-shut');
     const tabHad = !!host.release(el, info);
@@ -858,7 +861,9 @@ const MapChrome = (function () {
     },
 
     // Ask every control on `map` again where it belongs — for the moment what
-    // the host will take changes: a window crossing the phone breakpoint.
+    // the host will take may have changed: a window crossing the phone
+    // breakpoint, which is where the Stations map's host used to change its
+    // answer and is still where it is asked again.
     redock(map) {
       for (const el of (map && map._mnItems) || []) {
         if (!document.contains(el)) continue;
@@ -1045,8 +1050,8 @@ const MapChrome = (function () {
       L.DomEvent.on(wrap, 'focusin', e => {
         if (e.target === btn) return;
         // A pane in the side panel is already open, and is-open means nothing
-        // there — except that it would come back with the panel to a phone's
-        // corner as a flyout left open over the map.
+        // there — except that it would come back with the panel to the map's
+        // corner, if it were ever handed back, as a flyout left open over it.
         if (wrap.classList.contains('is-docked')) return;
         if (wrap.classList.contains('is-open') || state.mapPanelsPinned.has(id)) return;
         if (!(e.target.matches && e.target.matches(':focus-visible'))) return;

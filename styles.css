@@ -3129,11 +3129,12 @@ hr {
                          should not be sharing pixels with the map under it.
                          Remembered between visits — see state.mapPanelsPinned.
 
-   On the Stations map none of this is on the map above a phone's width: every
-   panel and every button leaves the corner for the side panel beside it, a
-   pane and a strip button each (MapChrome.dockInto; the rules are with
-   #help-panel's), and the corner holds nothing. On a phone they are back here,
-   and everything in this block is what they are.
+   On the Stations map none of this is on the map, at any width: every panel
+   and every button leaves the corner for the side panel beside it, a pane and
+   a strip button each (MapChrome.dockInto; the rules are with #help-panel's),
+   and the corner holds nothing — a phone's included, where the strip is a
+   rail beside the map and a pane is a drawer from it. Everything in this block
+   is what the six other maps' corners are, at every width.
 
    Neither state is a modal and neither traps focus: this is a disclosure, the
    button says so with aria-expanded, and Shift+Tab off the first control in
@@ -3169,14 +3170,15 @@ hr {
   flex-direction: column;
   align-items: flex-end;
   /* …and when there is more corner than there is map, a second column rather
-     than a button hanging off the bottom edge. The column is ~463 px with
-     everything shut and 44 px targets on a touch screen make it 560, which is
-     taller than this map is on a phone (52 dvh) — so the groups that do not
-     fit wrap, whole, into a column beside the first. `wrap-reverse` is what
-     sends that column *inwards*, over the map, instead of off the right edge
-     of the screen. --mn-map-h is the map's own height, published by
-     trackMapHeight() in map-controls.js; the 20 px is Leaflet's corner margin
-     at each end. */
+     than a button hanging off the bottom edge. The Stations map's column was
+     ~463 px with everything shut, and 44 px targets on a touch screen made it
+     560, taller than that map is on a phone (52 dvh) — so the groups that did
+     not fit wrapped, whole, into a column beside the first. (That column is in
+     the side panel's rail now, at every width; the rule stays for any corner
+     that outgrows its map.) `wrap-reverse` is what sends that column
+     *inwards*, over the map, instead of off the right edge of the screen.
+     --mn-map-h is the map's own height, published by trackMapHeight() in
+     map-controls.js; the 20 px is Leaflet's corner margin at each end. */
   flex-wrap: wrap-reverse;
   max-height: calc(var(--mn-map-h, 62vh) - 20px);
 }
@@ -6261,12 +6263,12 @@ hr {
     width: auto;
     max-width: none;
     max-height: 48%;
-    /* A sheet across the whole width has a right edge, and the icon column
-       sits on it: at this height the full-screen icon lands exactly on the
-       sheet's close button. So on a phone the sheet goes over the controls
-       instead, as the ACMA card does at every width — it opens only on a
-       deliberate tap and closes with one, and the icons are back the moment
-       it is gone. */
+    /* Over the map's controls rather than under them, as the ACMA card is at
+       every width — it opens only on a deliberate tap and closes with one.
+       It went up when the Stations map's icon column stood on the sheet's
+       right edge, with the full-screen icon exactly on its close button; the
+       column is in the side panel's rail now, and the sheet has stayed where
+       nothing a phone map draws can land on it. */
     z-index: 1100;
   }
   /* Every callout fits a phone (#175), not just the station one: Leaflet
@@ -6274,9 +6276,11 @@ hr {
      the survey-mark and ACMA callouts ask for 300 px, which with Leaflet's
      margins and the finger-sized close button below is wider than the map.
      max-width outranks an inline width, and 7rem is the two margins plus
-     the page's own edges. */
+     the page's own edges — and --mn-side-w is the side panel's rail, which
+     the Stations map shares the screen's width with (0 on the other tabs,
+     where the side panel is a tab on the screen edge and takes none). */
   .leaflet-container .leaflet-popup-content {
-    max-width: calc(100vw - 7rem);
+    max-width: calc(100vw - 7rem - var(--mn-side-w, 0px));
   }
 }
 
@@ -6910,9 +6914,11 @@ hr {
      and takes the arrow keys, and app.js writes the result as --mn-dock-w on
      this element. The fallback is the default width, for the paint before the
      first render.
-   * Under 560 px it is exactly what the help rail was: the strip becomes a tab
-     on the screen edge and help becomes a drawer, and app.js closes one of the
-     two drawers when the other opens, so a phone never carries two.
+   * Under 560 px a pane is a drawer over the page, and app.js closes one of
+     the two drawers when the other opens, so a phone never carries two. On
+     the Stations tab the strip is still a rail, holding the map's controls off
+     the map, and the drawer opens beside it; everywhere else it is the tab on
+     the screen edge the help rail always was.
 
    Collapsed is the class the markup ships with, so the pre-JS paint is the
    strip alone, and app.js takes it off before .help-ready allows the slide. */
@@ -7197,8 +7203,8 @@ body.mn-dock-dragging {
    the pane, with no scroll cap of its own (the pane scrolls). The icon is
    hidden, because the strip button is what it was, and so is the pin: a pane is
    a panel that stays open already, and a pin here would be a button that
-   changed nothing anyone could see. Both come back with the panel when it goes
-   back to the map's corner on a phone, where they mean what they always did.
+   changed nothing anyone could see. Both would come back with the panel if it
+   ever went back to the map's corner, where they mean what they always did.
 
    And the type. On the map a panel inherits Leaflet's container typography —
    `.leaflet-container` sets 12 px (0.75rem) at a line height of 1.5 in
@@ -7356,44 +7362,64 @@ body.mn-dock-dragging {
   background: var(--subtle);
 }
 
-/* Past here the side panel gives up its column, for the reason the nav gives up
-   its rail: 45 px of it is a ninth of a 390 px screen and the tables and maps
-   need it more. Help is the only pane it has here — the Stations cards fold
-   under the map below `lg`, and a pinned map panel stays docked in the map's
-   corner (app.js) — and open, help is a drawer from the right, exactly as the
-   nav's becomes one from the left; app.js closes whichever was open when the
-   other opens.
+/* Past here there is no room for a pane beside anything, so whatever the side
+   panel shows is a drawer over the page from the right, exactly as the nav's
+   becomes one from the left; app.js closes whichever was open when the other
+   opens, and the backdrop and Escape put either away. The Stations cards are
+   never one of its panes here — they fold under the map below `lg`.
 
-   Collapsed is where the two part company. The nav could move its toggle into
-   the header because ☰ already had the slot on the left; there is no slot on
-   the right, and measuring a seventh header button at 390 px put the banner on
+   What the strip is depends on what it is holding.
+
+   On every tab but Stations it holds only ❔, and it gives up its column for
+   the reason the nav gives up its rail: a rail is a seventh of a 390 px screen
+   and the tables and maps need it more. The nav could move its toggle into the
+   header because ☰ already had the slot on the left; there is no slot on the
+   right, and measuring a seventh header button at 390 px put the banner on
    another row — 30 px of chrome, permanently, to save a control that only
    matters when you go looking for it. So the strip stays visible and stops
    taking layout width instead: a fixed tab on the screen edge, and — open — the
    same tab on the drawer's edge, as the drawer's close button. Either way the
-   main area never changes width, so no map needs re-measuring here. */
-@media (max-width: 560px) {
-  #help-panel,
-  #help-panel.collapsed,
-  #help-panel:not(.collapsed) {
-    width: 0;
-    border-left: 0;
-    overflow: visible;          /* both forms are fixed children of a 0-wide box */
-  }
+   main area never changes width, so no map needs re-measuring there.
 
-  .dock-inner {
-    position: static;
-    height: 0;
+   On the Stations tab it holds the map's controls as well (app.js puts
+   has-map-tools on it), and there the rail is worth its width. Those controls
+   used to go back to the map's corner on a phone, and the corner is where they
+   cost the most: 44 px buttons down a 350 px map, in two columns because one
+   was taller than the map, covering a quarter of the thing the phone was
+   opened to look at. So they keep the rail they have on a desktop — the strip
+   down the right-hand edge, sticky under the banner, taking its width from the
+   page so the map ends where the rail begins and nothing stands on it — and a
+   pane opens as a drawer beside the rail rather than beside the page. The rail
+   stays lit over the backdrop with it, so its buttons go on switching panes and
+   the lit one puts its drawer away again. */
+@media (max-width: 560px) {
+  /* 44 px buttons and a hair either side of them. The desktop rail keeps room
+     for a scrollbar beside its buttons; a phone's scrollbar floats over what it
+     scrolls, and the rail hides its own (below), so none is kept here. */
+  :root {
+    --mn-help-rail: 48px;
   }
 
   .dock-resize {
     display: none;
   }
 
-  /* The edge tab. Vertically centred to stay clear of Leaflet's zoom and layer
-     controls, which sit in the map's top corners, and below the backdrop's
-     1150 so the nav drawer dims it along with everything else. */
-  .dock-strip {
+  /* ── The edge tab: every tab but Stations ── */
+  #help-panel:not(.has-map-tools) {
+    width: 0;
+    border-left: 0;
+    overflow: visible;          /* both forms are fixed children of a 0-wide box */
+  }
+
+  #help-panel:not(.has-map-tools) .dock-inner {
+    position: static;
+    height: 0;
+  }
+
+  /* Vertically centred to stay clear of Leaflet's zoom and layer controls,
+     which sit in a map's top corners, and below the backdrop's 1150 so the nav
+     drawer dims it along with everything else. */
+  #help-panel:not(.has-map-tools) .dock-strip {
     position: fixed;
     inset: 50% 0 auto auto;
     transform: translateY(-50%);
@@ -7407,25 +7433,25 @@ body.mn-dock-dragging {
     z-index: 1100;
   }
 
-  .dock-tab {
+  #help-panel:not(.has-map-tools) .dock-tab {
     width: 2rem;
     height: 2.9rem;
     font-size: 1rem;
   }
 
-  .dock-tab.is-on {
+  #help-panel:not(.has-map-tools) .dock-tab.is-on {
     box-shadow: none;
     border-color: transparent;
   }
 
   /* Open, the tab rides on the drawer's left edge — above the backdrop with
      the drawer, so it is the one thing outside the drawer still lit. */
-  #help-panel:not(.collapsed) .dock-strip {
+  #help-panel:not(.has-map-tools):not(.collapsed) .dock-strip {
     right: min(var(--mn-help, 260px), 86vw);
     z-index: 1200;
   }
 
-  #help-panel:not(.collapsed) .help-inner {
+  #help-panel:not(.has-map-tools):not(.collapsed) .help-inner {
     position: fixed;
     inset: 0 0 0 auto;
     width: min(var(--mn-help, 260px), 86vw);
@@ -7435,6 +7461,70 @@ body.mn-dock-dragging {
     border-left: 1px solid var(--border);
     box-shadow: 0 0 24px rgba(0, 0, 0, .3);
     z-index: 1200;
+  }
+
+  /* ── The rail: the Stations tab ── */
+  /* The same width shut and open: a drawer takes nothing from the row, so
+     opening one moves no map. */
+  #help-panel.has-map-tools {
+    width: var(--mn-help-rail, 48px);
+  }
+
+  /* The rail is sticky, as the desktop strip is, which makes it a stacking
+     context of its own — so the drawer inside it can be no higher than it is.
+     Shut, it sits where the edge tab did, under the backdrops, and the nav
+     drawer dims it with the page; open, it goes up to the drawers' 1200 over
+     its own backdrop, lit with the drawer beside it. Above Leaflet's control
+     corners (1000) either way, and clear of them: they are inside the map, and
+     the map ends where the rail begins.
+
+     And the window's height rather than the window's less the banner's, so
+     that once the banner has scrolled away the rail and the drawer beside it
+     run to the foot of the screen — a phone scrolls the page under the map far
+     more than a laptop does, and a drawer ending a banner's height short of
+     the bottom, over a dimmed strip of page, reads as a drawer that did not
+     open all the way. At the top of the page that leaves the last --mn-chrome
+     px of both below the fold, which is the trap .nav-inner describes: a
+     scroller cannot scroll what is inside it into the part of its own box that
+     is off screen. So each ends with that much empty room (below), and
+     whatever was last in it can still be brought up above the fold. */
+  #help-panel.has-map-tools .dock-inner {
+    height: 100dvh;
+    z-index: 1100;
+  }
+
+  #help-panel.has-map-tools:not(.collapsed) .dock-inner {
+    z-index: 1200;
+  }
+
+  #help-panel.has-map-tools .dock-strip {
+    padding-bottom: calc(var(--sp-2) + var(--mn-chrome, 0px));
+    scrollbar-width: none;
+  }
+
+  #help-panel.has-map-tools .dock-pane::after {
+    content: '';
+    display: block;
+    height: var(--mn-chrome, 0px);
+  }
+
+  /* The drawer: the rail's height and top — under the banner at the top of the
+     page, and at the window's top once the banner has scrolled away — on the
+     rail's inner edge, and wide enough for Map display's rows while leaving a
+     finger's width of the page beside it, dimmed, to tap it shut on. */
+  #help-panel.has-map-tools .dock-panes {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 100%;
+    width: min(24rem, calc(100vw - var(--mn-help-rail, 48px) - 2.75rem));
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    box-shadow: -6px 0 24px rgba(0, 0, 0, .28);
+  }
+
+  #help-panel.has-map-tools.collapsed .dock-panes {
+    display: none;
   }
 }
 
@@ -7496,8 +7586,9 @@ body.mn-dock-dragging {
 
    It stops short of the window's right edge by the side panel's width, strip
    and open pane (--mn-side-w, kept current by app.js), because the side panel
-   stays on screen beside it — the map's tools are in its strip. 0 on a phone,
-   where the side panel takes no width and the tools are on the map. */
+   stays on screen beside it — the map's tools are in its strip. On a phone
+   that is the rail alone: a pane there is a drawer over the map, and takes no
+   width from it. */
 .map-panel.is-full {
   position: fixed;
   inset: 0 var(--mn-side-w, 0px) 0 0;
@@ -7533,7 +7624,8 @@ body.mn-dock-dragging {
    every change instant and re-measures the map at once), and a panel sliding
    beside it would open a gap or an overlap for the length of the slide. Keyed
    off the full-screen class rather than a flag of its own, so it cannot
-   outlive the map it is beside. The phone block below puts all of this back. */
+   outlive the map it is beside. A phone's rail is kept beside it the same way
+   (the phone block below). */
 body:has(.map-panel.is-full) #help-panel {
   position: fixed;
   top: 0;
@@ -7547,19 +7639,20 @@ body:has(.map-panel.is-full) .dock-inner {
   height: 100dvh;
 }
 
-/* On a phone the side panel is a 0-wide box with a fixed edge tab and a drawer
-   in it, and the map's tools are on the map, so full screen is what it always
-   was there: the map over everything, the edge tab under it with the rest of
-   the page. Here rather than in the side panel's own phone block because these
-   have to come after the rules they undo. */
+/* A phone keeps its rail beside the full-screen map the same way — the map's
+   tools are in it there too, and --mn-side-w is the rail's width alone,
+   because a pane is a drawer over the map rather than a column beside it. The
+   drawer's backdrop is 1150, which is under the map, so while a drawer is open
+   it is lifted over the map and the side panel over it: a tap on the sliver of
+   map beside the drawer puts the drawer away, as it does over the page, rather
+   than landing on a map the drawer is covering most of. */
 @media (max-width: 560px) {
-  body:has(.map-panel.is-full) #help-panel {
-    position: static;
-    z-index: auto;
+  body:has(.map-panel.is-full) #help-backdrop {
+    z-index: 1901;
   }
 
-  body:has(.map-panel.is-full) .dock-inner {
-    height: 0;
+  body:has(.map-panel.is-full) #help-panel:not(.collapsed) {
+    z-index: 1902;
   }
 }
 

@@ -1430,9 +1430,9 @@ const Map3D = (function () {
   }
 
   // ── The camera buttons (#192) ──────────────────────────────────────────────
-  // 🧭 and the tilt quad, in the ⛰️ cluster — in the side panel's strip, or in
-  // the map's corner on a phone (MapChrome decides; nothing here needs to know
-  // which, because they are found by class wherever they stand). They exist
+  // 🧭 and the tilt quad, in the ⛰️ cluster — in the side panel's strip, a
+  // phone's rail included (MapChrome decides where; nothing here needs to know,
+  // because they are found by class wherever they stand). They exist
   // because the two things a right-drag does are the two things it is hardest
   // to undo: a map turned 37° is a map you have to turn 37° back by hand, and
   // a camera dropped to the horizon cannot be raised by any gesture a mouse

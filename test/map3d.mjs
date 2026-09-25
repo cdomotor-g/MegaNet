@@ -784,8 +784,8 @@ if (pin) {
   ok('…and at its own centre', card.centre.mine === true, `got ${card.centre.got}`);
   // The window, for the same reason the canvas's own is asserted above: over
   // the canvas so it can be seen, under the control corners so the controls it
-  // shares the map with stay reachable — Leaflet's zoom, and on a phone the
-  // whole icon column.
+  // shares the map with stay reachable — Leaflet's zoom, and on any other map
+  // the whole icon column.
   ok('the card sits above the 3-D canvas and below the control corners',
      card.cardZ > card.canvasZ && card.cardZ < card.cornerZ,
      JSON.stringify({ card: card.cardZ, canvas: card.canvasZ, corner: card.cornerZ }));

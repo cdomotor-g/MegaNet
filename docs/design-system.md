@@ -247,7 +247,7 @@ which is the only place the numbers are written down.
 | `lg` | 1100 | Side-by-side becomes stacked — `.layout`, `.map-layout`, Radio Path Maps, the Workbench, and the Stations cards leave the side panel for the page under the map |
 | `md` | 900 | **A tablet.** The nav auto-collapses to the icon rail, header buttons drop their labels, tables switch to automatic layout and scroll inside their wrapper |
 | `sm` | 700 | Two-column content folds to one — forms, pickers, optional table columns |
-| `xs` | 560 | **A phone.** The nav and the side panel stop being columns and become drawers over the page — the side panel's only pane there is help, and the Stations map's controls leave its strip for the map's own corner, as flyouts with pins |
+| `xs` | 560 | **A phone.** The nav and the side panel's panes stop being columns and become drawers over the page. The side panel's strip stays a rail on the Stations tab, holding the map's controls beside the map rather than on it, with its panes as drawers from the rail; on every other tab it is a tab on the screen edge, with help its drawer |
 | `xxs` | 380 | The smallest phone. The banner shrinks its title rather than pushing a button off the edge |
 
 They are in `core.js` and not in `styles.css` for two reasons. CSS custom
@@ -701,18 +701,20 @@ overlapping, and the icon is dropped while it is docked. Pinning is remembered
 (`state.mapPanelsPinned`, one localStorage key); nothing else about a panel is.
 
 **A map with a side panel beside it hands the whole corner over.** One map does:
-the Stations map, above a phone's width (`MapChrome.dockInto(map, host)`, the
-host being the side panel). There every panel is moved, whole, into a pane of
-the side panel with a button in its strip, and every plain button is moved into
-the strip itself — in the corner's groups and order, a labelled group each with
-the corner's hairline between them — and the corner is left holding nothing. The
+the Stations map, at every width (`MapChrome.dockInto(map, host)`, the host
+being the side panel). There every panel is moved, whole, into a pane of the
+side panel with a button in its strip, and every plain button is moved into the
+strip itself — in the corner's groups and order, a labelled group each with the
+corner's hairline between them — and the corner is left holding nothing. The
 corner icon and the 📌 are hidden in a pane: a pane already stays open, and a pin
-there would change nothing anyone could see. On a phone the controls come back
-to the corner and everything above is what they are again. It used to be the
-pin that moved a panel into the side panel, one at a time; that made the right
-edge of the page two places to look for the same kind of tool, and it was
-replaced by this. A new map that sits beside the side panel opts in the same
-way; every other map keeps its corner.
+there would change nothing anyone could see. On a phone the strip is a rail
+beside the map and a pane is a drawer from it. The controls used to come back
+to the corner there, and a phone is where the corner costs most: 44 px touch
+targets in two columns over a quarter of a map the width of the screen. It used
+to be the pin that moved a panel into the side panel, one at a time; that made
+the right edge of the page two places to look for the same kind of tool, and it
+was replaced by this. A new map that sits beside the side panel opts in the
+same way; every other map keeps its corner.
 
 Three things that are not optional:
 
@@ -743,9 +745,11 @@ the whole working surface along and back with nothing moved or rebuilt; a
 Leaflet map needs one `invalidateSize()` after the toggle and nothing else.
 
 **The screen, less the side panel, when the surface's tools are in it.** The
-Stations map's controls live in the side panel's strip above a phone's width,
-so its full screen stops at the side panel's edge (`inset: 0 var(--mn-side-w) 0
-0`, the side panel writing its own width to the root) and the side panel is
+Stations map's controls live in the side panel's strip — a phone's rail
+included, where the side panel's width is the rail's alone and a pane is a
+drawer over the map — so its full screen stops at the side panel's edge
+(`inset: 0 var(--mn-side-w) 0 0`, the side panel writing its own width to the
+root) and the side panel is
 fixed to the right edge above the header for as long as it lasts — at the same
 z-index, after the map in the page — with no width transition, so the map's edge
 and the panel's move together and the map is re-measured at once. The Tab walls

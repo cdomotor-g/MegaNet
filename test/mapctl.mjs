@@ -27,13 +27,19 @@
 //
 // Runs on the Stations map because it is the one carrying all four panels; the
 // primitive is shared, so what passes here is what the other six Leaflet maps
-// get. **At a phone's width**, which is the one width the Stations map still
-// keeps its corner at: above it every one of its controls is in the side
-// panel's strip instead (MapChrome.dockInto; `npm run dock` holds that
-// contract, and §9b below checks the corner is empty there). The flyouts, their
-// pins and their corner are the same code on a phone and on the other six maps
-// at any width — §11 checks one of those still has its corner — so this is
-// where the contract is proved, with the same real pointer as before.
+// get. **With its side panel told to decline them.** The Stations map keeps no
+// corner at any width now: every one of its controls is in the side panel's
+// strip — a rail beside the map on a phone — and `npm run dock` holds that
+// contract, while §9b below checks the corner is empty, at a phone's width and
+// a wide one. What puts a control in the corner or in the strip is one
+// question, asked of the host the map was handed (MapChrome.dockInto,
+// host.accepts, which is app.js's dockAcceptsPanels), and while the host says
+// no, every control is this file's again: a flyout in the corner with a pin
+// that docks it there — the same code the other six maps run at every width,
+// §11 checking that one of those still has its corner. So the host is made to
+// say no for §1–§9, the way `claim` stands in for the datastore, and the
+// contract is proved on the richest corner there is, with the same real
+// pointer as before; §9b gives the host its own answer back.
 //
 // ── And since #192, the corner they stand in ────────────────────────────────
 // The eleven icons were regrouped into one control holding five labelled
@@ -82,8 +88,16 @@ try {
 
   await page.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
+  // The host declines, before the map that asks it is built (see the header):
+  // a top-level function of a classic script is a property of the window, and
+  // stationsDockHost() hands MapChrome whatever that property holds when the
+  // map is built. Kept, to be given back in §9b.
+  await page.evaluate(() => { window.__accepts = dockAcceptsPanels; window.dockAcceptsPanels = () => false; });
   await page.evaluate(() => switchTab('stations'));
   await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
+  check('with its side panel declining them, the Stations map\'s controls stand in its corner',
+    await page.evaluate(() => document.querySelectorAll('#leaflet-map .leaflet-top.leaflet-right .mn-mapctl').length === 6
+      && !document.querySelector('#help-panel .mn-mapctl')));
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -422,14 +436,18 @@ try {
       JSON.stringify(b));
   }
 
-  // ── 9b. …and above a phone's width there is no corner at all ──────────────
-  // The Stations map hands every control to the side panel's strip there, so
-  // everything above is about a corner that is, on a wide screen, empty — and
-  // that is asserted rather than assumed, as geometry: nothing in the map's
-  // top-right corner has a box, and every one of those controls is in the strip.
-  await page.setViewportSize({ width: 1440, height: 950 });
-  await page.waitForTimeout(600);
-  const wide = await page.evaluate(() => {
+  // ── 9b. …and with its own host's answer, there is no corner at all ────────
+  // The side panel takes every one of the Stations map's controls at every
+  // width, so everything above is about a corner that is, in the app, empty —
+  // on this phone's width as on a wide screen, where the strip is a rail
+  // beside the map and a column beside its cards. That is asserted rather than
+  // assumed, as geometry: nothing in the map's top-right corner has a box, and
+  // every one of those controls is in the side panel. The host is given its
+  // own answer back and the map built again, since what MapChrome asks is the
+  // host it was handed when the map was built.
+  await page.evaluate(() => { window.dockAcceptsPanels = window.__accepts; renderMain(); });
+  await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
+  const emptyCorner = () => page.evaluate(() => {
     const c = document.querySelector('#leaflet-map .leaflet-top.leaflet-right');
     const drawn = [...c.querySelectorAll('*')].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
     const inStrip = sel => [...document.querySelectorAll(sel)].every(el => !!el.closest('#help-panel'));
@@ -440,7 +458,13 @@ try {
       buttonsInStrip: inStrip('.mn-map-here, .mn-map-3d, .mn-map-north, .mn-map-tilt, .mn-map-full, .mn-map-split, .mn-map-reset'),
     };
   });
-  check('above a phone\'s width the Stations map\'s corner is empty, every control in the side panel',
+  const narrow = await emptyCorner();
+  check('at a phone\'s width the Stations map\'s corner is empty, every control in the side panel\'s rail',
+    narrow.drawn.length === 0 && narrow.panels === 6 && narrow.panelsInSide && narrow.buttonsInStrip, JSON.stringify(narrow));
+  await page.setViewportSize({ width: 1440, height: 950 });
+  await page.waitForTimeout(600);
+  const wide = await emptyCorner();
+  check('…and above it, every control in the side panel\'s strip',
     wide.drawn.length === 0 && wide.panels === 6 && wide.panelsInSide && wide.buttonsInStrip, JSON.stringify(wide));
 
   // ── 10. The base maps are a blend, inside Map display ─────────────────────

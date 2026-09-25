@@ -249,9 +249,10 @@ const HELP = {
            + '<strong>⛶ Full screen</strong> gives the map the whole window except the side panel, '
            + 'which stays beside it with the tools in it; Escape brings the page back. ◫ puts the '
            + 'cards back under the map instead, and below 1,100 px they are under it whatever ◫ '
-           + 'says. On a phone the side panel is only the help drawer, and the controls are on the '
-           + 'map in its top-right corner: a panel there opens when the pointer is on it or it is '
-           + 'tapped, and its 📌 keeps it open. The <strong>Filters</strong> card drives the map and the list '
+           + 'says. On a phone the strip is a rail down the right-hand edge, beside the map rather '
+           + 'than on it, with ❔ and the map\'s controls in it and the cards under the map; a panel '
+           + 'opens as a drawer beside the rail, and pressing its button again, tapping the dimmed '
+           + 'page or pressing Escape puts it away. The <strong>Filters</strong> card drives the map and the list '
            + 'at once, and is built from whatever <code>stations.json</code> holds — every option '
            + 'carries the number of stations behind it, and nothing is offered that no station uses. '
            + 'It collapses, and its summary line says what the filters are doing while it is shut. '
@@ -296,8 +297,7 @@ const HELP = {
       + 'underneath it on the flat map — which on a tilted view are not the same place, and can '
       + 'be kilometres apart. The one thing the tilted map cannot draw is the callout balloon on '
       + 'the pin itself. Press the mountain to tilt, and 🎚️ under it for everything about the '
-      + 'tilt (on a phone the two are one split control in the map\'s corner, the mountain and a '
-      + 'caret under it) — and two more buttons appear under them '
+      + 'tilt — and two more buttons appear under them '
       + 'while it is on: a <strong>compass</strong> that shows which way north has gone and puts '
       + 'you back facing it, and a <strong>tilt</strong> button that shows how far the camera has '
       + 'dropped, flattens it to straight down on one press and returns it to 62° on the next. '
@@ -366,7 +366,7 @@ const HELP = {
       '<strong>Limit link length</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
       + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 100 km; '
-      + '🗺️ <strong>Map display</strong> (in the side panel\'s strip; on a phone, on the map) says how many links were drawn and how '
+      + '🗺️ <strong>Map display</strong> (in the side panel\'s strip) says how many links were drawn and how '
       + 'many were culled, so check that before concluding the path isn\'t there.',
       'The strip belongs to the box the caret is in and goes when focus leaves it — the results '
       + 'are kept, so clicking back into the box brings the same strip back without a second '
@@ -2139,9 +2139,9 @@ const state = {
   // something they are doing right now. Everything else about a panel — which
   // one is hovered, which one was clicked open — dies with the map it was on.
   // It means something only where a panel is in a map's corner: the six maps
-  // that have no side panel beside them, and the Stations map on a phone. The
-  // Stations map's panels are panes of the side panel everywhere else, and a
-  // pane has no pin.
+  // that have no side panel beside them. The Stations map's panels are panes
+  // of the side panel at every width — drawers from its rail on a phone — and
+  // a pane has no pin.
   mapPanelsPinned: new Set((localStorage.getItem('mn-map-panels') || '')
                              .split(',').map(s => s.trim()).filter(Boolean)),
   mapMatchLabels: new Set(),  // ids the current filter earned a label (see mapLabelIds)
@@ -2215,7 +2215,8 @@ const state = {
   // The side panel (#help-panel, the "dock"): a strip of tab buttons on the
   // right-hand edge, and — while it is open — one pane beside it, which is the
   // help for this tab, the Stations cards, or one of the Stations map's panels
-  // (all of which live there above a phone's width). Two
+  // (on a phone, beside the Stations tab's rail or the help's edge tab, as a
+  // drawer over the page). Two
   // questions kept apart on purpose, because they are answered at different
   // times: *whether* it is open, and *which* pane it would like to show.
   //
@@ -2236,8 +2237,8 @@ const state = {
                   || (localStorage.getItem('mn-help') || 'expanded') === 'expanded',
   // Which pane, remembered: 'help', 'stations', or 'map-<panel id>' for one of
   // the Stations map's panels. A pane that does not exist where you are — the
-  // Stations cards on any other tab, a map panel on a tab with no Stations map
-  // or on a phone — leaves the side panel shut *there* without this being touched, so
+  // Stations cards on any other tab or on a phone, a map panel on a tab with no
+  // Stations map — leaves the side panel shut *there* without this being touched, so
   // coming back to the tab that has it opens it again. That is also what keeps
   // help from opening itself: on a fresh visit this says 'stations', and only
   // one tab has those.
