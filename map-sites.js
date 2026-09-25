@@ -1650,7 +1650,7 @@ const MapSites = (function () {
       if (existing) MapDraw.focus(existing.id);
       else MapDraw.addLine([pa, pb], [r.c.sid || null, t.sid || null]);
       // …and brought on screen. With this panel pinned into the side panel the
-      // card is in another pane of it (the Stations one), which a scroll alone
+      // card is in another pane of it (〽️, the path tools), which a scroll alone
       // cannot reach — a hidden element does not scroll into view — so that
       // pane is opened first, the same helper every other "show me the card"
       // path uses. 🗼 in the strip brings the finder back.

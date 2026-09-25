@@ -161,6 +161,10 @@ const Map3D = (function () {
   let buf      = null;   // { pos, clr, count } — the sheet geometry, in mercator
   let sitePins = [];     // the site finder's pins and site marks, as ml.Markers
   let dimK     = 1;      // MapSites.dimOthers(), as last applied — 1 when idle
+  let lfHeld   = [];     // Leaflet's own handlers this file switched off (holdLeaflet)
+  let lfMoving = false;  // the 2-D map was moved, and the camera has not followed yet
+  let lfQuiet  = false;  // this file is moving one map to match the other
+  let lfZoom   = null;   // the 2-D map's zoom as this file last left it
 
   // ── base maps ────────────────────────────────────────────────────────────
   // The four the 2-D map already offers, as MapLibre raster sources. They are
@@ -1053,6 +1057,140 @@ const Map3D = (function () {
     return isFinite(n) ? Math.max(0, Math.min(1, n)) : 1;
   }
 
+  // ── One view, whichever map is drawing it ─────────────────────────────────
+  // Everything in this app that moves "the map" moves the Leaflet one: a row of
+  // the station list (focusStationOnMap), the Repeaters listening card, Zoom to
+  // station, the fit a new filter makes, the place search, the site finder's
+  // answer. Each is a setView, fitBounds or flyTo on state.map — and in 3-D
+  // that map is under the canvas, so every one of them moved a map nobody could
+  // see while the camera stayed where it was.
+  //
+  // So the camera follows the 2-D map, rather than every one of those callers
+  // learning that there is a second map to move. It is the header's rule again:
+  // this file does not decide where to go, it reads where the 2-D map went.
+  //
+  // Following is half of it. The other half is the 2-D map following the
+  // camera, quietly, whenever the camera stops — the operator's own drag, tilt
+  // and zoom, and the follow's own ease. Without that, "where the 2-D map is"
+  // would be wherever 3-D was opened, and three things read it:
+  //   * the callers above: focusStationOnMap goes to max(zoom, 11), and a stale
+  //     zoom of 4 pulled a camera the operator had brought down to a street
+  //     back out to 10;
+  //   * a move to where the 2-D map already stands is no move at all to
+  //     Leaflet — a zero pan, with no movestart — so a row whose station the
+  //     camera had panned away from would go nowhere the second time;
+  //   * leaving 3-D, which shows the 2-D map where it is. That is now where the
+  //     camera was looking, give or take the tilt.
+  //
+  // A move to follow is a Leaflet `movestart` this file did not cause, then its
+  // `moveend`. Not a bare `moveend`: invalidateSize() fires one with no
+  // movestart every time the side panel or the window changes width, and
+  // following those would throw the camera back on every slide of the panel.
+  //
+  // And Leaflet's own handlers are off while the canvas is over the map. The
+  // canvas is a child of Leaflet's container, so a drag, a wheel or a double
+  // click on the 3-D view bubbled down and dragged and zoomed the 2-D map too —
+  // out of sight, and by the wrong amounts, since the two cameras do not agree
+  // on what a pixel is — and a mousedown handed keyboard focus to Leaflet's
+  // container, so the arrow keys panned the hidden map instead of this one.
+  // With the camera following the 2-D map, a drag that moved both would also
+  // be a drag that fought itself. Leaflet's zoom buttons are not a handler and
+  // stay: with the follow they zoom the 3-D view, which they never did.
+  const LF_HANDLERS = ['dragging', 'touchZoom', 'doubleClickZoom', 'scrollWheelZoom', 'boxZoom', 'keyboard'];
+
+  // A Leaflet map that has been taken down has no panes left. A render of the
+  // Stations tab, and leaving it, both remove the old map before this file
+  // lets go of it.
+  function leafletLive() {
+    return !!(leaflet && leaflet.getPane('mapPane'));
+  }
+
+  function holdLeaflet() {
+    lfHeld = LF_HANDLERS.filter(k => leaflet[k] && leaflet[k].enabled());
+    for (const k of lfHeld) leaflet[k].disable();
+    leaflet.on('movestart', onLeafletStart);
+    leaflet.on('moveend', onLeafletEnd);
+    lfZoom = leaflet.getZoom();
+    lfMoving = false;
+  }
+
+  // Given back as they were — but not to a map that has been taken down, where
+  // switching a handler on is listeners on a detached node, or a throw.
+  function releaseLeaflet() {
+    if (!leaflet) return;
+    leaflet.off('movestart', onLeafletStart);
+    leaflet.off('moveend', onLeafletEnd);
+    if (leafletLive()) {
+      for (const k of lfHeld) { try { leaflet[k].enable(); } catch (_) {} }
+    }
+    lfHeld = [];
+    lfMoving = false;
+  }
+
+  function onLeafletStart() {
+    if (!lfQuiet) lfMoving = true;
+  }
+
+  function onLeafletEnd() {
+    if (lfQuiet || !lfMoving) return;
+    lfMoving = false;
+    follow();
+  }
+
+  // The camera to where the 2-D map has gone, keeping the tilt and the heading,
+  // which are the operator's. The zoom is the 2-D map's less one (build() says
+  // why) — but only when the 2-D zoom actually changed. A move that kept it (a
+  // row at max(zoom, 11) from a camera already closer than that) keeps the
+  // camera's own zoom, rather than rounding it to Leaflet's whole steps. Eased
+  // when the place is in view and jumped to when it is not, which is Leaflet's
+  // own rule for a pan, and never animated for someone who has asked for less
+  // motion.
+  //
+  // The ease freezes the terrain height under the camera for its length and
+  // settles it at the end — `freezeElevation`, which is what MapLibre's own
+  // gestures ask for. Without it MapLibre 5 sets the freeze when the ease
+  // starts and never lifts it: the camera keeps the ground height of wherever
+  // the ease was aimed, and after the next jump project() and unproject()
+  // answer for ground that is not under them any more (a pin drawn at one
+  // place is reported seven pixels from it) until somebody drags the map.
+  function follow() {
+    if (!map || !leafletLive()) return;
+    const c = leaflet.getCenter(), z = leaflet.getZoom();
+    const zoom = z === lfZoom ? map.getZoom() : Math.max(0, z - 1);
+    lfZoom = z;
+    const to = { center: [c.lng, c.lat], zoom };
+    const still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    lfQuiet = true;
+    try {
+      if (still || !map.getBounds().contains(to.center)) map.jumpTo(to);
+      else map.easeTo({ ...to, duration: 500, freezeElevation: true });
+    } finally { lfQuiet = false; }
+  }
+
+  // …and the 2-D map to where the camera has stopped. Not while a move of the
+  // 2-D map's own is still on its way here — setting its view now would stop
+  // that move part-way, and it would never be followed — unless this stop is
+  // the operator's own gesture, which wins. And nothing at all when it is
+  // already there, so a camera that stops where the follow put it does not set
+  // every `moveend` listener on the 2-D map (labels, rivers, contours…)
+  // running again for no move.
+  function onCameraEnd(e) {
+    if (lfQuiet || !map || !leafletLive()) return;
+    if (lfMoving && !(e && e.originalEvent)) return;
+    lfMoving = false;
+    const c = map.getCenter(), z = map.getZoom() + 1;
+    const p = leaflet.latLngToContainerPoint([c.lat, c.lng]), sz = leaflet.getSize();
+    if (Math.abs(p.x - sz.x / 2) < 1 && Math.abs(p.y - sz.y / 2) < 1
+        && Math.abs(leaflet.getZoom() - z) < 0.5) {
+      lfZoom = leaflet.getZoom();
+      return;
+    }
+    lfQuiet = true;
+    try { leaflet.setView([c.lat, c.lng], z, { animate: false }); }
+    finally { lfQuiet = false; }
+    lfZoom = leaflet.getZoom();
+  }
+
   function build() {
     const c = leaflet.getCenter(), z = leaflet.getZoom();
     map = new ml.Map({
@@ -1113,6 +1251,9 @@ const Map3D = (function () {
       if (src === 'mn-dem') { demFails++; setNote(); }
     });
     map.on('moveend', () => { if (state.map3dSheets) queueSheets(); });
+    // The 2-D map under the canvas goes where the camera stopped (see "One
+    // view" above).
+    map.on('moveend', onCameraEnd);
     // ── Clicking a pin (#193) ──────────────────────────────────────────────
     // A pin in 3-D does what a pin in 2-D does, less the one thing this mode
     // has no way to draw. onStationClick() in app.js opens a Leaflet callout
@@ -1637,6 +1778,7 @@ const Map3D = (function () {
       host.classList.remove('is-loading');
       host.classList.add('is-on');
       build();
+      holdLeaflet();
       repaintPanel();
       modeToSites();
       announce('3-D view on. Right-drag or Ctrl-drag to tilt and rotate.');
@@ -1657,6 +1799,9 @@ const Map3D = (function () {
   }
 
   function close() {
+    // Leaflet's handlers back, and the follow off, before anything else — this
+    // runs on every attach() and every stop(), open or not.
+    releaseLeaflet();
     // The finder's pins are markers on this map; they would go with it, but
     // each also holds listeners on it, so they are taken off first.
     for (const p of sitePins) { try { p.remove(); } catch (_) {} }

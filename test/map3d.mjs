@@ -703,6 +703,19 @@ ok('and the panel offers the way out', panelBtn && /Leave 3-D/.test(panelBtn.tex
 // z-index can answer wrongly while every other signal reads true.
 console.log('\nA pin clicked in 3-D paints a card you can see');
 
+// The camera has stopped and the tiles it asked for are in. A pin stands on
+// the terrain under it, so until the DEM tiles for a new view have landed it
+// is drawn a few pixels from where project() puts it, and a click aimed from a
+// fixed wait misses by that much whenever the page is busy. The 2-D map under
+// the canvas follows the camera, so a jump is a round of that map's tiles too,
+// which is exactly when the page is busy. Used after the fixed wait, not
+// instead of it: areTilesLoaded() is true for a moment before a jump's first
+// frame has asked for anything.
+const idle3d = () => page.waitForFunction(() => {
+  const m = Map3D._map();
+  return !!m && !m.isMoving() && m.areTilesLoaded();
+}, null, { timeout: GL_TIMEOUT }).catch(() => {});
+
 // A repeater, so the same click exercises the focus dim the 2-D handler runs.
 // The camera goes to it rather than hoping one is in frame.
 const pin = await page.evaluate(() => {
@@ -717,6 +730,7 @@ ok('the file has a repeater to click', !!pin);
 
 if (pin) {
   await page.waitForTimeout(1200);
+  await idle3d();
   // Where the renderer says the pin is, rather than where the arithmetic says
   // it should be: pins are billboarded circles standing on terrain, and the
   // question this check is asking is about what a *click* does.
@@ -1058,6 +1072,7 @@ ok('the file has a path to click', !!line);
 
 if (line) {
   await page.waitForTimeout(1200);
+  await idle3d();
   const where = await page.evaluate((t) => {
     const m = Map3D._map();
     const p = m.project(t.mid);
@@ -1121,6 +1136,7 @@ const endpoint = await page.evaluate(() => {
 });
 if (endpoint) {
   await page.waitForTimeout(1200);
+  await idle3d();
   const both = await page.evaluate((t) => {
     const m = Map3D._map();
     const p = m.project([t.lng, t.lat]);
@@ -1146,6 +1162,170 @@ if (endpoint) {
     ok('where a pin and a path overlap, the pin takes the click', true,
        `no overlap in frame (pin ${both.pin}, line ${both.line}) — not exercised`);
   }
+}
+
+// ── what moves the 2-D map moves the camera ─────────────────────────────────
+// Every "take me there" in the app — a row of the station list, the Repeaters
+// listening card, Zoom to station, the fit a new filter makes — is a setView or
+// a fitBounds on the Leaflet map, and in 3-D that map is under the canvas. Each
+// one moved it, out of sight, and the camera stayed where it was. So these are
+// driven by what a row's own button calls (selectStation) and read off the
+// camera, not off Leaflet.
+//
+// The other half is the 2-D map keeping up with the camera, and that is held
+// here too: without it the second press of a row whose station the camera had
+// since panned away from was a zero pan to Leaflet, and went nowhere.
+console.log('\nWhat moves the 2-D map moves the camera');
+
+// Read in pixels rather than degrees. With terrain on, MapLibre keeps the
+// camera where it is and re-grounds its centre as the DEM tiles land, which at
+// 55° of tilt moves the centre a few hundred metres off the station the camera
+// was sent to while the station stays in the middle of the view — so "there"
+// is where the operator sees it: `off`, the station's distance from the middle
+// of the canvas. And the 2-D map is set to whole pixels, so `lfOff` is how far
+// its centre is from the camera's, in its own pixels.
+const view3 = (s = null) => page.evaluate((s) => {
+  const m = Map3D._map(), c = m.getCenter(), l = state.map.getCenter();
+  const cv = m.getCanvas().getBoundingClientRect();
+  const sp = s ? m.project([s.lon, s.lat]) : null;
+  const lp = state.map.latLngToContainerPoint([c.lat, c.lng]), ls = state.map.getSize();
+  return { lat: c.lat, lng: c.lng, zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing(),
+           off: sp ? Math.hypot(sp.x - cv.width / 2, sp.y - cv.height / 2) : null,
+           lfOff: Math.hypot(lp.x - ls.x / 2, lp.y - ls.y / 2),
+           lf: { lat: l.lat, lng: l.lng, zoom: state.map.getZoom() } };
+}, s);
+// Leaflet's own move first (an animated pan is a quarter of a second), then the
+// camera's ease after it.
+const settle3 = async () => {
+  await page.waitForTimeout(400);
+  await page.waitForFunction(() => { const m = Map3D._map(); return !!m && !m.isMoving(); },
+    null, { timeout: GL_TIMEOUT });
+  await page.waitForTimeout(150);
+};
+const at = v => v.off != null && v.off <= 20;
+
+// Two located stations well apart, neither of them selected — selectStation on
+// the selected one is the toggle that clears it.
+const ends = await page.evaluate(() => {
+  closeStnCard(false);
+  if (MapHere.armed()) MapHere.arm(false);
+  const pool = state.data.stations.filter(s => s.lat != null && s.lon != null && s.id !== state.selectedId);
+  const a = pool[0];
+  const b = pool.find(s => acmaHaversineKm(a.lat, a.lon, s.lat, s.lon) > 150);
+  const c = pool.find(s => s !== a && s !== b && acmaHaversineKm(a.lat, a.lon, s.lat, s.lon) > 150
+                                              && acmaHaversineKm(b.lat, b.lon, s.lat, s.lon) > 150);
+  return [a, b, c].map(s => s && { id: s.id, lat: s.lat, lon: s.lon, name: s.name });
+});
+const [SA, SB, SC] = ends;
+ok('the file has three located stations far enough apart to tell apart', !!(SA && SB && SC),
+   JSON.stringify(ends));
+
+if (SA && SB && SC) {
+  // Somewhere else entirely, turned and tilted, zoomed well out.
+  await page.evaluate(() => Map3D._map().jumpTo({ center: [134, -26], zoom: 5, pitch: 55, bearing: 25 }));
+  await settle3();
+
+  await page.evaluate(id => selectStation(id), SA.id);
+  await settle3();
+  const v1 = await view3(SA);
+  ok('a row of the station list takes the camera to its station', at(v1),
+     `${SA.name}: ${Math.round(v1.off)} px from the middle of the view`);
+  ok('…at the zoom the 2-D map went to, less the one step the two scales differ by',
+     near(v1.zoom, v1.lf.zoom - 1, 0.3) && v1.lf.zoom >= 11, JSON.stringify(v1));
+  ok('…keeping the tilt and the heading the operator chose',
+     near(v1.pitch, 55, 0.5) && near(v1.bearing, 25, 0.5), `${v1.pitch}°, ${v1.bearing}°`);
+
+  // The operator brings the camera down closer than a row would put it. A row
+  // then keeps that zoom rather than pulling the camera back out to 11.
+  await page.evaluate(() => Map3D._map().jumpTo({ zoom: 13.4 }));
+  await settle3();
+  const v2 = await view3();
+  ok('the 2-D map keeps up with the camera: same place, the zoom a step closer',
+     v2.lfOff <= 2 && v2.lf.zoom === 14, JSON.stringify(v2));
+  await page.evaluate(id => selectStation(id), SB.id);
+  await settle3();
+  const v3 = await view3(SB);
+  ok('another row takes the camera to its station', at(v3),
+     `${SB.name}: ${Math.round(v3.off)} px from the middle of the view`);
+  // Near rather than equal: an ease settles the ground height under the camera
+  // when it lands, and the zoom is re-read against it.
+  ok('…and keeps the camera\'s own zoom, which was already closer than the row asks for',
+     near(v3.zoom, 13.4, 0.3) && v3.zoom > 13, String(v3.zoom));
+
+  // Panned away by hand, then the same station asked for again (off, and on):
+  // to a 2-D map left where the row put it, that is a pan of nothing.
+  await page.evaluate(([lat, lon]) => Map3D._map().jumpTo({ center: [lon + 0.4, lat + 0.3] }), [SB.lat, SB.lon]);
+  await settle3();
+  await page.evaluate(id => { selectStation(id); selectStation(id); }, SB.id);
+  await settle3();
+  const v4 = await view3(SB);
+  ok('panned away and asked for again, the camera goes back to it', at(v4),
+     `${Math.round(v4.off)} px from the middle of the view`);
+
+  // Zoom to station is a fitBounds, not a setView — the other way the 2-D map is moved.
+  await page.evaluate(id => zoomToStation(id), SC.id);
+  await settle3();
+  const v5 = await view3(SC);
+  ok('Zoom to station (a fit, not a pan) takes the camera there too', at(v5)
+     && near(v5.zoom, v5.lf.zoom - 1, 0.3), JSON.stringify(v5));
+
+  // The side panel's edge dragged: the 2-D map is re-measured on every frame
+  // of it without being panned (dockResized), so its centre moves by half of
+  // what the width did, and Leaflet reports a `moveend` for it. That is not a
+  // move of anybody's, and the camera stays put — a follow of it would be a
+  // jump of ~60 px here on each frame of the drag.
+  const v6 = await view3();
+  await page.evaluate(() => { dockSetWidth(state.dockW + 120, false); dockResized(); });
+  await page.waitForTimeout(600);
+  await settle3();
+  const v7 = await view3();
+  await page.evaluate(() => { dockSetWidth(state.dockW - 120, false); dockResized(); });
+  await page.waitForTimeout(600);
+  await settle3();
+  ok('dragging the side panel\'s edge does not move the camera',
+     near(v7.lat, v6.lat, 1e-4) && near(v7.lng, v6.lng, 1e-4) && near(v7.zoom, v6.zoom, 1e-3),
+     JSON.stringify([v6, v7]));
+
+  // A drag on the canvas moves the camera and nothing else: Leaflet's own drag
+  // is off while the canvas is over it, so the 2-D map ends where the camera
+  // stopped rather than wherever its own drag of the same pixels took it.
+  const held = await page.evaluate(() =>
+    ['dragging', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard', 'touchZoom']
+      .filter(k => state.map[k] && state.map[k].enabled()));
+  ok('Leaflet\'s own drag, wheel, double-click and keys are off under the canvas', held.length === 0,
+     held.join(', '));
+  // The row and the zoom opened the station card, which grows over most of
+  // the map's height from its bottom-left corner — and a drag that starts on
+  // the card drags nothing.
+  await page.evaluate(() => closeStnCard(false));
+  const cbox = await page.locator('#map3d canvas').boundingBox();
+  await page.mouse.move(cbox.x + cbox.width / 2, cbox.y + cbox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cbox.x + cbox.width / 2 + 160, cbox.y + cbox.height / 2 + 60, { steps: 8 });
+  await page.mouse.up();
+  await settle3();
+  const v8 = await view3();
+  ok('a drag in 3-D moves the camera', !(near(v8.lat, v7.lat, 1e-3) && near(v8.lng, v7.lng, 1e-3)),
+     JSON.stringify(v8));
+  ok('…and the 2-D map ends where the camera stopped', v8.lfOff <= 2, JSON.stringify(v8));
+
+  // Leaving 3-D shows the 2-D map where the camera was looking, and gives
+  // Leaflet its handlers back.
+  await page.evaluate(() => Map3D.toggle());
+  await page.waitForTimeout(300);
+  const flat = await page.evaluate(v => {
+    const p = state.map.latLngToContainerPoint([v.lat, v.lng]), sz = state.map.getSize();
+    return { off: Math.hypot(p.x - sz.x / 2, p.y - sz.y / 2),
+             on: ['dragging', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard', 'touchZoom']
+               .filter(k => state.map[k] && state.map[k].enabled()).length };
+  }, v8);
+  ok('leaving 3-D shows the 2-D map where the camera was', flat.off <= 2, JSON.stringify(flat));
+  ok('…with its own drag, wheel, double-click and keys back', flat.on === 6, `${flat.on} of 6`);
+
+  // Back into 3-D for the teardown below, which is about leaving the tab with it on.
+  await btn3d.click();
+  await page.waitForFunction(
+    () => !!Map3D._map() && Map3D._map().isStyleLoaded(), null, { timeout: GL_TIMEOUT });
 }
 
 console.log('\nLeaving the tab takes the WebGL context with it');

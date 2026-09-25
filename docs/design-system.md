@@ -804,8 +804,9 @@ pointer or moved with the arrow keys, stored as `mn-dock-w` and clamped to the
 window when it is used (never below 300 px while there is room, never leaving
 the page less than 400 px — or, on a window too narrow for both, never more than
 55 % of the room). On the Stations tab it is also the tab's right-hand
-column: the station cards are one wrapper moved into its Stations pane, and
-every one of the Stations map's controls is moved into its strip — a panel into
+column: the station cards are one wrapper moved into its Stations pane (📋),
+the path tools (the elevation profile and the link budget) a second wrapper
+moved into a pane of their own (〽️), and every one of the Stations map's controls is moved into its strip — a panel into
 a pane of its own. None of them is ever re-rendered to get there, which is what
 lets the Leaflet map beside them keep its view. The strip scrolls when it is
 taller than the window, which with the map's controls in it it is on a laptop;
@@ -829,7 +830,7 @@ and do not opt out of them.
 `<main id="main-content">` · `<aside id="help-panel" aria-label="Side panel">`
 (complementary). Exactly one of each. A tab renders *inside* `main` and does
 not add landmarks of its own — and what it puts in the side panel (the Stations
-cards) is content of the aside, not a landmark of its own either. The side
+cards and the path tools) is content of the aside, not a landmark of its own either. The side
 panel's button strip is a labelled `role="group"`, not a second `<nav>`: it
 opens things beside the page and navigates nowhere.
 

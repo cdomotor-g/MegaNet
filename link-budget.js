@@ -11,7 +11,8 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm, acmaHaversineKm and
 // RM_NET_DEFAULTS; across to app.js for mapNote, dockReveal (to open the
-// side panel on this card before scrolling to it) and for the search the whole
+// side panel on this card before scrolling to it), stationsSplitActive (to say
+// where the Stations list is from here) and for the search the whole
 // app shares — prepareSearch, stationMatchesSearch, markHits and
 // tableStations; and sideways to path-profile.js for PATH_DEFAULT_MHZ,
 // PATH_DEFAULT_AGL, PATH_VERDICT, fsplDb, wattsToDbm, rmSystemOf and
@@ -206,6 +207,15 @@ const LinkBudget = (function () {
       </div>`;
   }
 
+  // Where the Stations list is from this card. Beside the map the two are in
+  // different panes of the side panel — this one under 〽️, the list under 📋 —
+  // and "above" would send the operator scrolling up a pane that has no list
+  // in it. Under the map it is above, past the elevation profile.
+  function listWhere() {
+    return typeof stationsSplitActive === 'function' && stationsSplitActive()
+      ? '(📋 in the side panel)' : 'above';
+  }
+
   // The box itself, plus the sentence that says what arming an end means. The
   // input is never re-rendered by typing into it — setSearch repaints only the
   // list below — so the caret survives a paste, exactly as the Stations filter
@@ -235,8 +245,8 @@ const LinkBudget = (function () {
         </div>
         <p class="small lb-find-hint" id="lb-find-hint-${which}">${on
           ? `<strong>End ${tag} is armed.</strong> Click a station pin or any point on the map,
-             or a row in the <strong>Stations</strong> list above — in whatever state the filters
-             have it — and it lands here.
+             or a row in the <strong>Stations</strong> list ${listWhere()} — in whatever state the
+             filters have it — and it lands here.
              <button type="button" class="lb-link" id="lb-arm-${which}"
                      onclick="LinkBudget.disarm()">Stop picking end ${tag}</button>`
           : `Type to search, or <button type="button" class="lb-link" id="lb-arm-${which}"
@@ -1364,8 +1374,8 @@ const LinkBudget = (function () {
       if (d && !d.open) d.open = true;
       rerender();
       // Every radio-path click lands here (MapBackbone.open), which is a click
-      // asking for this card — so in the side panel it brings the Stations pane
-      // on screen before the scroll that would otherwise do nothing.
+      // asking for this card — so in the side panel it brings the path tools'
+      // pane (〽️) on screen before the scroll that would otherwise do nothing.
       const el = document.getElementById('link-budget-panel');
       if (el) { dockReveal(el); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
     },

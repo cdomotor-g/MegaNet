@@ -517,8 +517,9 @@ const MapBackbone = (function () {
     profileChanged() { if (cur) render(); },
 
     // Out of full screen first, for editStationFromCard's reason — there is no
-    // card to scroll to under a fixed panel — and the side panel's Stations
-    // pane on screen, for dockReveal's.
+    // card to scroll to under a fixed panel — and the side panel's pane that
+    // holds the card (〽️ for the profile and the fade margin) on screen, for
+    // dockReveal's.
     scrollTo(id) {
       if (state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
       const el = document.getElementById(id);

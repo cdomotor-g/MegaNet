@@ -574,8 +574,8 @@ const MapDraw = (function () {
       const f = document.activeElement;
       const fromPane = !!(f && f.closest && f.closest('#map-draw-panel'));
       add({ kind: 'line', pts: pending.pts, snappedTo: pending.sids.slice() });
-      // A line is drawn to see the ground under it, and that card is with the
-      // Stations cards — in the side panel's Stations pane when they are
+      // A line is drawn to see the ground under it, and that card is one of
+      // the path tools — in the side panel's 〽️ pane when the cards are
       // beside the map, which this pane (Draw & measure) is hiding. So the
       // pane that has the profile comes up, the way the link budget's and the
       // site finder's profile buttons bring it up; the tool stays armed, so

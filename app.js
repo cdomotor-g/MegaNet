@@ -1629,9 +1629,16 @@ function invalidateMapSizes(delay) {
 // What stands in the strip, top to bottom:
 //
 //   ❔ Help        whatever HELP says about the open tab. Always there.
-//   📋 Stations    the Stations cards — filters, list, ground profile, link
-//                  budget, the editor — while that tab is open and they are
-//                  beside the map rather than under it (toggleStationsSplit).
+//   📋 Stations    the Stations cards — filters, list, the editor — while
+//                  that tab is open and they are beside the map rather than
+//                  under it (toggleStationsSplit).
+//   〽️ Path tools  the elevation profile and the link budget (its fade
+//                  margin), under the same condition. A pane of their own
+//                  rather than two more cards at the foot of 📋's column: they
+//                  answer "what is between these two points", a question
+//                  asked of the map rather than of the list, and they are the
+//                  cards the map itself sends people to (a drawn line, a
+//                  clicked radio path, the site finder's worst path).
 //   the Stations map's own controls, all of them — everything MapChrome would
 //                  otherwise have put in the map's top-right corner, in the
 //                  same groups and the same order, a hairline between groups
@@ -1783,9 +1790,9 @@ function dockEl() {
 //
 // The help pane keeps .help-inner, which is the class the rail's scroller has
 // always had and the element `npm run shell` scrolls to prove every link in it
-// can be reached at every window height. The Stations pane carries its own h2,
-// out of sight, so that the cards' h3s step from something when they are here —
-// in <main> they step from the tab's own h2.
+// can be reached at every window height. The Stations pane and the path tools'
+// pane each carry their own h2, out of sight, so that the cards' h3s step from
+// something when they are here — in <main> they step from the tab's own h2.
 //
 // The strip is written BEFORE the panes, although it is drawn after them on
 // the panel's outer edge (styles.css puts it there with `order`). Focus follows
@@ -1802,7 +1809,7 @@ function dockEl() {
 // strip's own muted ink.
 //
 // The strip is a column of groups, the way the map's corner is (MapChrome): the
-// side panel's own two buttons first, then one group per corner group the map's
+// side panel's own buttons first, then one group per corner group the map's
 // controls came from, each labelled as that group is. Only the first is here
 // from the start; syncDockStrip() makes the rest as their controls arrive.
 function dockSkeleton(panel) {
@@ -1824,7 +1831,10 @@ function dockSkeleton(panel) {
           <div class="help-body"></div>
         </div>
         <div class="dock-pane dock-pane-stations" id="${dockPaneId('stations')}" data-dock="stations" hidden>
-          <h2 class="sr-only">Stations — filters, station list, path tools and station details</h2>
+          <h2 class="sr-only">Stations — filters, station list and station details</h2>
+        </div>
+        <div class="dock-pane dock-pane-stations" id="${dockPaneId('paths')}" data-dock="paths" hidden>
+          <h2 class="sr-only">Path tools — elevation profile and link budget</h2>
         </div>
       </div>
     </div>`;
@@ -1832,9 +1842,10 @@ function dockSkeleton(panel) {
 
 // ── Which panes exist, and which one is showing ──────────────────────────────
 
-// Whether the Stations cards are a pane here. The same condition the table's
-// narrow column set follows (stationsSplitActive) plus the tab being open and a
-// file being loaded — the cards are not drawn without one.
+// Whether the Stations cards are a pane here — and the path tools with them,
+// which go wherever the cards go. The same condition the table's narrow column
+// set follows (stationsSplitActive) plus the tab being open and a file being
+// loaded — the cards are not drawn without one.
 function dockStationsHere() {
   return state.activeTab === 'stations' && !!state.data && stationsSplitActive();
 }
@@ -1880,7 +1891,7 @@ function dockMapListed(e) {
 // the width it will have.
 function dockHas(id) {
   if (id === 'help') return true;
-  if (id === 'stations') return dockStationsHere();
+  if (id === 'stations' || id === 'paths') return dockStationsHere();
   if (!id.startsWith('map-') || state.activeTab !== 'stations') return false;
   const e = dockMapItems.get(id);
   if (e) return dockMapListed(e);
@@ -1912,9 +1923,9 @@ function helpShowing() {
 }
 
 // Everything in the strip right now, as the groups it stands in: the side
-// panel's own (help, the cards), then the map's controls by their corner group
-// and their place in it — not by the order they were built, which for the
-// polar plot and the site finder is long after the rest. Each item is either a
+// panel's own (help, the cards, the path tools), then the map's controls by
+// their corner group and their place in it — not by the order they were built,
+// which for the polar plot and the site finder is long after the rest. Each item is either a
 // pane's button ('tab', made and kept by syncDockStrip) or one of MapChrome's
 // own buttons ('action', the element itself). A button whose map is being
 // built again has no element to stand in the strip until the new one arrives,
@@ -1923,7 +1934,9 @@ function dockStripGroups() {
   const side = [{ key: 'help', kind: 'tab', icon: '?', label: 'Help' }];
   if (dockStationsHere()) {
     side.push({ key: 'stations', kind: 'tab', icon: '📋',
-                label: 'Stations — filters, station list, ground profile, link budget and station details' });
+                label: 'Stations — filters, station list and station details' });
+    side.push({ key: 'paths', kind: 'tab', icon: '〽️',
+                label: 'Path tools — elevation profile and link budget (fade margin)' });
   }
   const groups = [{ name: 'side', label: '', items: side }];
   const map = [...dockMapItems.values()]
@@ -2135,7 +2148,7 @@ function syncDockStrip(showing) {
       box.dataset.group = g.name;
       // The same labelled group the corner made of it (MapChrome), so that a
       // screen reader is told "3-D view" where a sighted operator is shown a
-      // hairline. The side panel's own pair needs no name: the strip is it.
+      // hairline. The side panel's own group needs no name: the strip is it.
       if (g.label) {
         box.setAttribute('role', 'group');
         box.setAttribute('aria-label', g.label);
@@ -2777,7 +2790,8 @@ function renderStationsHtml() {
       <!-- The map, and the cards — the filters, the list, the path tools, the
            editor — in one wrapper after it (#186, and the side panel since).
            Where the wrapper lives is the one thing that changes. Beside the
-           map, it is moved whole into the side panel's Stations pane
+           map, it is moved whole into the side panel's Stations pane — less
+           the path tools, which go to a pane of their own —
            (syncStationsCardsHome), #stations-main carries is-split, and the map
            fills the height of the window on its own; under the map, it is
            left here and the page is the single column it was designed as.
@@ -2901,11 +2915,18 @@ function renderStationsHtml() {
             </div>
           </details>
         </div>
-        <!-- The ground under a drawn line or a clicked radio path. Always a
-             card now, and with no line it says how to draw one (PathProfile's
-             empty state) — painted by PathProfile.sync() from initMap(). -->
-        <div class="panel" id="path-profile-panel"></div>
-        <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
+        <!-- The path tools: the ground under a drawn line or a clicked radio
+             path, and the link budget over it. A wrapper of their own inside
+             the cards, because beside the map they are not in 📋's column but
+             in a pane of their own (〽️) — syncStationsCardsHome moves this
+             whole, and puts it back here, before the carriers card, when the
+             cards go under the map. The profile is always a card, and with no
+             line it says how to draw one (PathProfile's empty state) — painted
+             by PathProfile.sync() from initMap(). -->
+        <div class="stn-cards" id="stations-path-cards">
+          <div class="panel" id="path-profile-panel"></div>
+          <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
+        </div>
         <div class="panel" id="stations-carriers-card" ${carriers ? '' : 'hidden'}>
           ${carriers}
         </div>
@@ -3232,22 +3253,23 @@ function syncStationsTableCols() {
 // `opts` goes to renderDock(). A render of the tab passes instant and no
 // re-measure, because its map is built after this; the toggle and the fold
 // leave the side panel to slide and re-measure the map for itself.
+//
+// The path tools (#stations-path-cards) go with the cards but not *in* them:
+// beside the map they are the side panel's 〽️ pane, and under it they go back
+// into the column where the render emitted them — after the list, before the
+// carriers card — so the single column reads as it always did.
 function syncStationsCardsHome(opts) {
   const cards = document.getElementById('stations-cards');
+  const paths = document.getElementById('stations-path-cards');
   const main  = document.getElementById('stations-main');
   if (cards && main) {
     dockEl();
-    const pane = stationsSplitActive() ? document.getElementById(dockPaneId('stations')) : null;
-    const home = pane || main;
-    if (cards.parentNode !== home) {
-      // Moving a node that holds focus blurs it, and the blur lands on <body>:
-      // a row button or the editor's Name field someone was in when the window
-      // crossed the fold would send the next Tab back to the top of the page.
-      // So focus is carried across the move. The old fold was CSS alone and
-      // never had to.
-      const had = cards.contains(document.activeElement) ? document.activeElement : null;
-      home.appendChild(cards);
-      if (had && document.contains(had)) had.focus({ preventScroll: true });
+    const split = stationsSplitActive();
+    const pane = split ? document.getElementById(dockPaneId('stations')) : null;
+    moveCardsKeepingFocus(cards, pane || main);
+    if (paths) {
+      if (split) moveCardsKeepingFocus(paths, document.getElementById(dockPaneId('paths')));
+      else moveCardsKeepingFocus(paths, cards, document.getElementById('stations-carriers-card'));
     }
     main.classList.toggle('is-split', !!pane);
   }
@@ -3259,22 +3281,39 @@ function syncStationsCardsHome(opts) {
   renderDock(opts);
 }
 
+// Put a wrapper of cards into `parent` — before `before` when there is one —
+// unless it is already there. Moving a node that holds focus blurs it, and the
+// blur lands on <body>: a row button or the editor's Name field someone was in
+// when the window crossed the fold would send the next Tab back to the top of
+// the page. So focus is carried across the move. The old fold was CSS alone and
+// never had to.
+function moveCardsKeepingFocus(node, parent, before = null) {
+  if (!parent) return;
+  if (node.parentNode === parent && (!before || node.nextElementSibling === before)) return;
+  const had = node.contains(document.activeElement) ? document.activeElement : null;
+  parent.insertBefore(node, before && before.parentNode === parent ? before : null);
+  if (had && document.contains(had)) had.focus({ preventScroll: true });
+}
+
 function stationsMainHeading() {
   return stationsSplitActive() ? 'Stations — map' : 'Stations — map, filters and station list';
 }
 
-// The cards out of the side panel, wherever they are. Called before the tab is
-// rendered again — so the fresh copy that render emits is the only copy on the
-// page, rather than a second #stations-editor-card that getElementById would
-// find *after* the stale one in the side panel — and when the tab is left,
-// because a great deal of this file reads "no #stations-table-wrap" as "not on
-// the Stations tab" (syncStationsTableCols, repaintStnCard, LinkBudget and
-// PathProfile's rerenders, MapBlast's card…), and a stale card left in the side
-// panel would have them painting into it behind every other tab.
+// The cards and the path tools out of the side panel, wherever they are.
+// Called before the tab is rendered again — so the fresh copy that render emits
+// is the only copy on the page, rather than a second #stations-editor-card that
+// getElementById would find *after* the stale one in the side panel — and when
+// the tab is left, because a great deal of this file reads "no
+// #stations-table-wrap" as "not on the Stations tab" (syncStationsTableCols,
+// repaintStnCard, LinkBudget and PathProfile's rerenders, MapBlast's card…),
+// and a stale card left in the side panel would have them painting into it
+// behind every other tab.
 function dropStationsCards() {
-  const pane = document.getElementById(dockPaneId('stations'));
-  const cards = pane && pane.querySelector('#stations-cards');
-  if (cards) cards.remove();
+  for (const [key, id] of [['stations', 'stations-cards'], ['paths', 'stations-path-cards']]) {
+    const pane = document.getElementById(dockPaneId(key));
+    const cards = pane && pane.querySelector(`#${id}`);
+    if (cards) cards.remove();
+  }
 }
 
 // The lg crossing (init.js), and anything else that changes whether the cards
@@ -3288,9 +3327,10 @@ function stationsLayoutChanged() {
   // box nobody can see. So it goes to ◫, the control that says where the
   // cards went, and failing that to the map.
   const cards = document.getElementById('stations-cards');
-  const hidFocus = state.mapFullscreen && cards && cards.contains(document.activeElement);
+  const held = [cards, document.getElementById('stations-path-cards')];
+  const hidFocus = state.mapFullscreen && held.some(c => c && c.contains(document.activeElement));
   if (state.activeTab === 'stations') syncStationsCardsHome({ instant: true });
-  if (hidFocus && cards.closest('#stations-main')) {
+  if (hidFocus && cards && cards.closest('#stations-main')) {
     const to = [document.querySelector('#help-panel .mn-map-split'), document.getElementById('leaflet-map')]
       .find(n => n && n.getClientRects().length);
     if (to) to.focus({ preventScroll: true });
@@ -3309,9 +3349,9 @@ function toggleStationsSplit(on) {
   try { localStorage.setItem('mn-map-split', state.mapSplit ? 'on' : 'off'); } catch (_) {}
   // Switched on where the cards fit beside the map, it is asking to see them
   // there — so the side panel opens on them, whatever it was showing. Off, the
-  // cards go under the map and the side panel loses its Stations pane; if that
-  // was the pane on screen the panel shuts and the map has the width, and the
-  // preference is kept for the next time they are beside it.
+  // cards go under the map and the side panel loses its Stations and path
+  // tools panes; if one of those was on screen the panel shuts and the map has
+  // the width, and the preference is kept for the next time they are beside it.
   if (state.mapSplit && stationsSplitActive()) {
     state.dockTab = 'stations';
     state.dockOpen = true;

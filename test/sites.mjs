@@ -829,9 +829,9 @@ await page.locator('#sites-dim').fill('20');
 // ── 2f. in the default layout, with the cards in the side panel ─────────────
 // Everything above runs with ◫ off, so the Stations cards are under the map and
 // the finder is the side panel's only pane. That is not how anybody meets it:
-// by default the cards are in the side panel too, in a pane of their own, and
-// "Profile the worst path" draws into the profile card in that other pane. It
-// used to leave the card hidden there and say it was "under the map".
+// by default the cards are in the side panel too, the profile card in the path
+// tools' pane (〽️), and "Profile the worst path" draws into it there. It used
+// to leave the card hidden there and say it was "under the map".
 console.log('\nIn the default layout');
 
 await page.evaluate(() => { toggleStationsSplit(true); setDockTab('map-sites'); });
@@ -849,7 +849,7 @@ const afterProf = await page.evaluate(() => {
            note: document.getElementById('map-note')?.textContent || '' };
 });
 ok('Profile the worst path brings the profile card up in the side panel, open',
-   afterProf.showing === 'stations' && afterProf.visible && afterProf.open === true, JSON.stringify(afterProf));
+   afterProf.showing === 'paths' && afterProf.visible && afterProf.open === true, JSON.stringify(afterProf));
 ok('…and the note says where the card is', /side panel/.test(afterProf.note) && !/under the map/.test(afterProf.note),
    afterProf.note);
 // Back to the layout the rest of the run was written for.

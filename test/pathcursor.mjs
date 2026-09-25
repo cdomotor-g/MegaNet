@@ -182,9 +182,13 @@ try {
   // view before reaching for it, and re-reads the rectangle afterwards, because
   // scrolling one out of the way is exactly what putting the other in view does.
   await page.evaluate(() => {
+    // The chart is in the side panel's 〽️ pane, which is not the pane a
+    // fresh visit shows — and a scroll to an element in a hidden pane does
+    // nothing — so the pane comes up first, the way every "show me the card"
+    // path in the app brings it up (dockReveal; a no-op for the map).
     window.__scrollTo = (sel) => {
       const el = document.querySelector(sel);
-      if (el) el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      if (el) { dockReveal(el); el.scrollIntoView({ block: 'center', behavior: 'instant' }); }
     };
   });
   const showChart = async () => {

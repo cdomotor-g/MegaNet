@@ -403,6 +403,11 @@ async function main() {
     const rowSid = await page.evaluate(() => [...document.querySelectorAll('#stations-table-wrap tr[data-sid]')]
       .find(tr => tr.dataset.sid !== state.selectedId).dataset.sid);
     const rowBtn = page.locator(`#stations-table-wrap tr[data-sid="${rowSid}"] button`).first();
+    // The radio path clicked above brought the link budget up, and beside the
+    // map that is the side panel's 〽️ pane, with the list under 📋 hidden — a
+    // row there cannot take focus. So the list's pane comes up first, as 📋
+    // would bring it.
+    await page.evaluate(sid => dockReveal(document.querySelector(`#stations-table-wrap tr[data-sid="${sid}"]`)), rowSid);
     await rowBtn.focus();
     await page.keyboard.press('Enter');
     const keyed = await page.evaluate(sid => {

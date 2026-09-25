@@ -6839,8 +6839,9 @@ hr {
   overscroll-behavior: contain;
 }
 
-/* The Stations cards, as a column. The same 1rem gap they have under the map,
-   and a gutter of the panel's own round them rather than the page's. */
+/* The Stations cards, as a column — and the path tools, in their own pane
+   (〽️) with the same dress. The same 1rem gap they have under the map, and a
+   gutter of the panel's own round them rather than the page's. */
 .dock-pane-stations {
   padding: var(--sp-2) var(--sp-2) var(--sp-4);
 }
@@ -6854,7 +6855,7 @@ hr {
    as what opens it.
 
    It scrolls, and on the Stations tab it has to: the map's thirteen controls and
-   the side panel's own two are ~700 px of column, and a laptop's window below
+   the side panel's own three are ~750 px of column, and a laptop's window below
    the banner is less than that. The scrollbar is the thin one and the rail is
    wide enough to hold it beside the buttons (--mn-help-rail), so a bar that
    appears pushes nothing under itself; `overflow-x: hidden` is what a browser
@@ -6875,7 +6876,7 @@ hr {
   scrollbar-width: thin;
 }
 
-/* One group of buttons: the side panel's own pair, then one per group the map's
+/* One group of buttons: the side panel's own three, then one per group the map's
    corner had (MapChrome, map-controls.js). The same spacing the corner used and
    for the same reason — 3 px inside a group so a run reads as one, and a gap
    with a short hairline between groups so the runs read as separate. The

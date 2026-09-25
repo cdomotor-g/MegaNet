@@ -78,6 +78,9 @@ async function reset() {
   await page.evaluate(() => {
     const d = document.querySelector('#link-budget-panel > details.lb-panel');
     if (d && !d.open) d.open = true;
+    // …in the side panel's 〽️ pane, which a fresh visit does not show, and
+    // which block 5 leaves for 📋 to reach the Stations list.
+    dockReveal(document.getElementById('link-budget-panel'));
     LinkBudget.setOpen(true);
     LinkBudget.reset();
     LinkBudget.disarm();
@@ -208,6 +211,13 @@ const rowPick = await page.evaluate(() => {
 });
 ok('the filter narrowed the list first', rowPick.rows > 0 && rowPick.rows < 3174,
    `${rowPick.rows} rows`);
+// Beside the map the list and this card are in two panes of the side panel —
+// the card under 〽️, the list under 📋 — so the way to the row is the way an
+// operator takes: 📋, with end B still armed from the 〽️ pane.
+await page.click('#help-panel .dock-tab[data-dock="stations"]');
+await page.waitForTimeout(150);
+ok('going to 📋 for the list leaves end B armed', (await linkState()).target === 'b',
+   JSON.stringify(await linkState()));
 await page.click(`#stations-table-wrap tr[data-sid="${rowPick.id}"]`);
 await page.waitForTimeout(150);
 st = await linkState();

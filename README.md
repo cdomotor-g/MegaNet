@@ -3276,7 +3276,8 @@ summary says so rather than inventing one.
 One column on the right of every tab, the *side panel* (`#help-panel`, called
 "the dock" in the code): a strip of buttons on the screen's edge and, open, one
 pane beside it. ❔ is the help described below; 📋, on the Stations tab, is the
-Stations cards; and under them, on that tab, every one of the Stations map's own
+Stations cards; 〽️ is the path tools (the elevation profile and the link budget);
+and under them, on that tab, every one of the Stations map's own
 controls — its panels as panes with a button each, its buttons as themselves.
 It is the help rail and the Stations tab's right-hand column of cards merged
 into one — see *The side panel as a dock* at the end of this section.
@@ -3379,7 +3380,12 @@ settled rather than during the slide. Where it differs:
 the link budget, *Repeaters listening*, the blast radius and the station editor
 are one wrapper (`#stations-cards`), emitted under the map by the tab's render
 and *moved* — never re-rendered — into the side panel's Stations pane while
-◫ is on and the window is wider than 1,100 px. `#stations-main.is-split` then
+◫ is on and the window is wider than 1,100 px. The elevation profile and the
+link budget are a wrapper of their own inside it (`#stations-path-cards`), and
+beside the map that goes to a pane of its own, 〽️ *Path tools*, under 📋: they
+answer a question asked of the map rather than of the list, and they are the
+cards the map sends people to. Under the map it goes back into the column
+between the list and *Repeaters listening*, where the render emitted it. `#stations-main.is-split` then
 means "the cards are beside the map", and the map fills the height of the window
 on its own. ◫ moves them back under the map without rebuilding the Leaflet map;
 below 1,100 px they fold under it whatever ◫ says, and come back beside it when
@@ -3388,9 +3394,9 @@ none of them knows it has moved; leaving the tab takes the wrapper out of the
 side panel (a registered tab teardown), because a great deal of the app reads
 "no `#stations-table-wrap`" as "not on the Stations tab". Everything that jumps
 to a card — *Show in the list*, *Station details*, the radio path card's links,
-*Link budget for this path* — opens the side panel on the cards first
-(`dockReveal`), because a scroll to an element in a hidden pane does nothing at
-all. The elevation profile is always a card now, and with no line drawn it says
+*Link budget for this path*, *Finish line*, the site finder's *Profile the worst
+path* — opens the side panel on the pane holding that card first (`dockReveal`),
+because a scroll to an element in a hidden pane does nothing at all. The elevation profile is always a card now, and with no line drawn it says
 how to get one.
 
 **The Stations map's controls.** Everything MapChrome would put in the map's
