@@ -57,10 +57,10 @@
 //
 // ── One card at a time ───────────────────────────────────────────────────────
 //
-// This card shares its rectangle with the station card, the ACMA transmitter
-// card and the radio-path card, and joins their exclusion: opening any of them
-// closes the others. Four cards stacked in one corner is the failure that rule
-// was written for.
+// This card shares its rectangle with the station card and the ACMA
+// transmitter card, and joins their exclusion: opening any of them closes the
+// others. Cards stacked in one corner is the failure that rule was written
+// for. (The radio-path card was a fourth, until it moved into the path tools.)
 const MapHere = (function () {
   const CARD_ID = 'here-card';
   // How far apart the two land-cover samples are, in degrees of longitude —
@@ -368,11 +368,11 @@ const MapHere = (function () {
     syncCursor();
     syncBtn();
     place(lat, lon);
-    // The other three cards share this rectangle; only one of them is ever the
-    // answer to what somebody just did.
+    // The other two cards share this rectangle; only one of them is ever the
+    // answer to what somebody just did. (The radio path card is in the path
+    // tools, not over the map, and stays open.)
     if (state.stnCard && state.stnCard.id) closeStnCard(false);
     if (state.acma && state.acma.cardDeviceId) closeAcmaCard(false);
-    MapBackbone.closeCard(false);
     ask(lat, lon);
     render();
     announce(`What is here: ${stationLatLonText({ lat, lon })}. The card is under the map's left edge.`);

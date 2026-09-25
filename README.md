@@ -1047,9 +1047,10 @@ carrying all of that *and* ten pills was a lot. On a phone the callout is the
 identity and two fat pills, *Details & actions* and *Copy lat, lon*, sized to
 fit inside the map with a finger-sized close button, and the card opens from
 *Details* as a sheet across the bottom of the map. One card over the map at a
-time: opening this one, the ACMA transmitter card or the radio-path card closes
-the other two — which also ends the case where the last two, drawn in the same
-rectangle, simply covered each other. The legend's last line names whichever
+time: opening this one, the ACMA transmitter card or *What is here* closes the
+others — which also ended the case where the ACMA card and the radio-path card,
+drawn in the same rectangle, simply covered each other. (The radio-path card has
+since left the map: it heads the path tools, and stays open beside these.) The legend's last line names whichever
 optional layers are off and that the 🗺️ button is where they are turned on, the
 🗺️ flyout is grouped under five headings (base maps first) — each drawing a rule above itself
 since #191, because uppercase small caps in `--muted` was the whole of the
@@ -1461,9 +1462,8 @@ weaker than they look:
 - **Land cover** is a 10 m raster class: a category, not a measurement of the
   tree in front of you.
 
-The card shares one rectangle with the station card, the ACMA transmitter card
-and the radio-path card, and joins their exclusion — opening any of them closes
-the others.
+The card shares one rectangle with the station card and the ACMA transmitter
+card, and joins their exclusion — opening any of them closes the others.
 
 **Centring a Map Generator sheet on a station.** The **Map Generator** tab —
 the one that turns the network into a printable sheet or a laser plate — frames
@@ -3376,12 +3376,13 @@ settled rather than during the slide. Where it differs:
 
 #### The side panel as a dock
 
-**The Stations cards.** The filters, the station list, the elevation profile,
-the link budget, *Repeaters listening*, the blast radius and the station editor
-are one wrapper (`#stations-cards`), emitted under the map by the tab's render
-and *moved* — never re-rendered — into the side panel's Stations pane while
-◫ is on and the window is wider than 1,100 px. The elevation profile and the
-link budget are a wrapper of their own inside it (`#stations-path-cards`), and
+**The Stations cards.** The filters, the station list, the radio path card,
+the elevation profile, the link budget, *Repeaters listening*, the blast radius
+and the station editor are one wrapper (`#stations-cards`), emitted under the
+map by the tab's render and *moved* — never re-rendered — into the side panel's
+Stations pane while ◫ is on and the window is wider than 1,100 px. The radio
+path card, the elevation profile and the link budget are a wrapper of their own
+inside it (`#stations-path-cards`), and
 beside the map that goes to a pane of its own, 〽️ *Path tools*, under 📋: they
 answer a question asked of the map rather than of the list, and they are the
 cards the map sends people to. Under the map it goes back into the column
@@ -3398,6 +3399,21 @@ to a card — *Show in the list*, *Station details*, the radio path card's links
 path* — opens the side panel on the pane holding that card first (`dockReveal`),
 because a scroll to an element in a hidden pane does nothing at all. The elevation profile is always a card now, and with no line drawn it says
 how to get one.
+
+**The radio path card.** Clicking a radio path on the map — a field link or a
+backbone path, in 2-D or 3-D — opens a card about that hop (the two ends, the
+ALERT IDs on it, its frequency, distance and fade margin) at the top of the
+path tools, above the profile and the budget it points at the same hop. It used
+to sit over the map in the ACMA card's rectangle, which covered the map it had
+been clicked on and left it a pane away from the two cards it summarises. The
+click opens 〽️ (or scrolls the column under the map, leaving a full-screen map
+first if the column is behind it) and puts focus on the card; × or Escape
+closes it back to whatever opened it. It no longer joins the map cards'
+one-at-a-time rule, since it is not over the map: the station card or the
+transmitter card stays open beside it. It survives a render of the tab the way
+the profile and the budget do, and closes itself once the profile moves off its
+path — another line drawn or selected, or its line deleted — because it says
+those two are open on this exact path.
 
 **The Stations map's controls.** Everything MapChrome would put in the map's
 top-right corner lives in the strip instead, above a phone's width, and the

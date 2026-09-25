@@ -1632,8 +1632,9 @@ function invalidateMapSizes(delay) {
 //   📋 Stations    the Stations cards — filters, list, the editor — while
 //                  that tab is open and they are beside the map rather than
 //                  under it (toggleStationsSplit).
-//   〽️ Path tools  the elevation profile and the link budget (its fade
-//                  margin), under the same condition. A pane of their own
+//   〽️ Path tools  the radio path card (while a path is open), the elevation
+//                  profile and the link budget (its fade margin), under the
+//                  same condition. A pane of their own
 //                  rather than two more cards at the foot of 📋's column: they
 //                  answer "what is between these two points", a question
 //                  asked of the map rather than of the list, and they are the
@@ -1834,7 +1835,7 @@ function dockSkeleton(panel) {
           <h2 class="sr-only">Stations — filters, station list and station details</h2>
         </div>
         <div class="dock-pane dock-pane-stations" id="${dockPaneId('paths')}" data-dock="paths" hidden>
-          <h2 class="sr-only">Path tools — elevation profile and link budget</h2>
+          <h2 class="sr-only">Path tools — radio path, elevation profile and link budget</h2>
         </div>
       </div>
     </div>`;
@@ -1936,7 +1937,7 @@ function dockStripGroups() {
     side.push({ key: 'stations', kind: 'tab', icon: '📋',
                 label: 'Stations — filters, station list and station details' });
     side.push({ key: 'paths', kind: 'tab', icon: '〽️',
-                label: 'Path tools — elevation profile and link budget (fade margin)' });
+                label: 'Path tools — radio path, elevation profile and link budget (fade margin)' });
   }
   const groups = [{ name: 'side', label: '', items: side }];
   const map = [...dockMapItems.values()]
@@ -2833,17 +2834,18 @@ function renderStationsHtml() {
           </p>
           <div id="map-note" class="map-note" hidden></div>
           <div id="acma-card" class="acma-card" hidden></div>
-          <div id="path-card" class="acma-card" hidden></div>
           <!-- The Stations map's own card (#175): the station under the last
                pin click or row selection, bottom-left. Stations-only markup
                on purpose — #acma-card is three tabs' shared furniture, this
                is one map's. State-driven, so it is repainted from initMap()
                after every full render rather than dying with the div. -->
           <div id="stn-card" class="acma-card stn-card" hidden></div>
-          <!-- What is here (#186): the fourth card in this one rectangle, and
+          <!-- What is here (#186): the third card in this one rectangle, and
                the only one that is about the ground rather than about something
-               on it. Same dress and same exclusion — opening any of the four
-               closes the others. -->
+               on it. Same dress and same exclusion — opening any of the three
+               closes the others. (The radio path card was a fourth until it
+               moved into the path tools, where it heads the profile and the
+               budget it quotes.) -->
           <div id="here-card" class="acma-card stn-card" hidden></div>
          </div>
         </div>
@@ -2915,15 +2917,19 @@ function renderStationsHtml() {
             </div>
           </details>
         </div>
-        <!-- The path tools: the ground under a drawn line or a clicked radio
-             path, and the link budget over it. A wrapper of their own inside
-             the cards, because beside the map they are not in 📋's column but
-             in a pane of their own (〽️) — syncStationsCardsHome moves this
-             whole, and puts it back here, before the carriers card, when the
-             cards go under the map. The profile is always a card, and with no
-             line it says how to draw one (PathProfile's empty state) — painted
-             by PathProfile.sync() from initMap(). -->
+        <!-- The path tools: the clicked radio path, the ground under it (or
+             under a drawn line), and the link budget over it. A wrapper of
+             their own inside the cards, because beside the map they are not in
+             📋's column but in a pane of their own (〽️) — syncStationsCardsHome
+             moves this whole, and puts it back here, before the carriers card,
+             when the cards go under the map. The profile is always a card, and
+             with no line it says how to draw one (PathProfile's empty state) —
+             painted by PathProfile.sync() from initMap(). The radio path card
+             is only there while a path is open (MapBackbone), and heads the
+             two cards it quotes rather than sitting over the map it was
+             clicked on. -->
         <div class="stn-cards" id="stations-path-cards">
+          <div class="panel path-card" id="path-card" hidden></div>
           <div class="panel" id="path-profile-panel"></div>
           <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
         </div>
@@ -3133,7 +3139,7 @@ function refreshStationsListNote() {
 // Not a modal, and deliberately not Modal: Modal.close() wipes its innerHTML
 // down all three of its exits, which would destroy a live Leaflet map's DOM
 // mid-flight. Instead the existing .map-panel — the positioning anchor every
-// map overlay (map-note, ACMA and path cards, corner controls) already hangs
+// map overlay (map-note, the ACMA and station cards, corner controls) already hangs
 // off — is fixed to the viewport with a class, so the whole working surface
 // comes along and the map object is never moved or rebuilt. The flag lives in
 // state so renderStationsHtml() re-emits the class across in-tab re-renders
@@ -3752,9 +3758,10 @@ function resetStationsMap() {
   try_(() => { if (MapMovePin.armed()) MapMovePin.cancel(); });
   try_(() => LinkBudget.setPicking(false));
 
-  // 2. The cards in the four corners. `false` on the two that take it: nothing
-  //    is being closed on purpose by a keyboard here, so focus stays where the
-  //    reset button put it rather than being thrown at a row underneath.
+  // 2. The cards on the map, and the radio path card at the head of the path
+  //    tools. `false` on the two that take it: nothing is being closed on
+  //    purpose by a keyboard here, so focus stays where the reset button put
+  //    it rather than being thrown at a row underneath.
   try_(() => closeStnCard(false));
   try_(() => { if (state.acma.cardDeviceId) closeAcmaCard(false); });
   try_(() => MapHere.close());
@@ -4780,9 +4787,13 @@ function initMap() {
   }
   // The station card is state, and renderStationsHtml() re-emitted its div
   // empty and hidden — so it is painted back here, on every render of the tab
-  // (#175). The ACMA and path cards accept dying with a full render; a card
-  // that is the map's own memory of what you were looking at must not.
+  // (#175). The ACMA card accepts dying with a full render; a card that is the
+  // map's own memory of what you were looking at must not. Nor must the radio
+  // path card: it heads the profile and the budget, which both come back from
+  // a render on the same path, and a column that kept those and lost their
+  // heading would be describing a path nobody could say the name of.
   repaintStnCard();
+  MapBackbone.repaint();
   maybeShowMapLayersHint();
   // Every control this map has is built by now, polar plot and site finder
   // included, and the side panel is settled once against what actually arrived
@@ -6119,8 +6130,8 @@ function goToStation(id) {
 // Why a card and not a bigger callout: a callout is Leaflet's. Leaflet tears
 // it down with the marker on every filter keystroke (refreshMapLayers rebuilds
 // all ~3,174 pins), pans the map to fit it, and on a phone covers the map it
-// is annotating. This is a plain element in .map-panel, like #acma-card and
-// #path-card: it outlives the markers, it never moves the map, it rides the
+// is annotating. This is a plain element in .map-panel, like #acma-card: it
+// outlives the markers, it never moves the map, it rides the
 // full-screen panel for free, and on a phone it is a sheet across the bottom
 // rather than a balloon over the middle. Bottom-right rather than the other
 // cards' top-right, so the map's icon column and its flyouts — the tab's whole
@@ -6140,11 +6151,13 @@ function goToStation(id) {
 // paint: a pin click has no focus to protect, and a repaint after a save must
 // not steal the cursor back out of the form.
 //
-// One card over the map at a time. #acma-card and #path-card occupy the same
-// rectangle and until now neither closed the other — open both and the later
-// sibling simply covered the first. Opening any of the three now closes the
-// other two, without handing focus around (refocus:false): a card nobody
-// asked to close has no business moving the cursor.
+// One card over the map at a time. #acma-card and #path-card occupied the same
+// rectangle and until #175 neither closed the other — open both and the later
+// sibling simply covered the first. Opening any of the map's cards closes the
+// others, without handing focus around (refocus:false): a card nobody asked
+// to close has no business moving the cursor. The radio path card has since
+// left the map for the path tools (〽️), and with it this rule: it sits in a
+// column of its own, and opening it takes nothing off the map.
 //
 // Closing it is a decision that holds: nothing passive brings it back. The
 // repaint hooks (initMap, rerenderStationEditorCard) paint from
@@ -6202,7 +6215,6 @@ function showStationCard(id, { takeFocus = false, opener = document.activeElemen
   const card = document.getElementById('stn-card');
   if (!(card && opener && card.contains(opener))) state.stnCard.opener = opener;
   if (state.acma.cardDeviceId) closeAcmaCard(false);
-  MapBackbone.closeCard(false);
   MapHere.close();
   state.stnCard.id = id;
   repaintStnCard();
@@ -6366,10 +6378,10 @@ function stnCardScrollToCarriers() {
 }
 
 // Where the Stations cards are, in words and as an arrow, for the copy on the
-// map that points at them — the station card's footer, the callout's pills,
-// the radio path card. "Under the map ↓" was true of every screen until the
-// cards moved beside it, and a pointer in the wrong direction is worse than
-// none.
+// map that points at them — the station card's footer and the callout's pills.
+// (The radio path card was a third until it moved in among the cards.) "Under
+// the map ↓" was true of every screen until the cards moved beside it, and a
+// pointer in the wrong direction is worse than none.
 function stationsCardsWhere() {
   return stationsSplitActive() ? 'in the side panel' : 'under the map';
 }
@@ -7904,12 +7916,13 @@ function showAcmaCard(deviceId, anchorId) {
   state.acma.cardDeviceId = deviceId;
   state.acma.cardAnchorId = anchorId || null;
   state.acma.cardOpener = document.activeElement;
-  // One card over the map at a time (#175) — the station card and the path
-  // card share this rectangle. Closed without refocusing: nobody asked them
+  // One card over the map at a time (#175) — the station card and What is
+  // here share this rectangle. Closed without refocusing: nobody asked them
   // to close, so they have no business moving the cursor. On the two tabs
   // without a station card, closeStnCard finds no element and does nothing.
+  // (The radio path card is not over the map any more: it is in the path
+  // tools, and stays open beside this one.)
   closeStnCard(false);
-  MapBackbone.closeCard(false);
   MapHere.close();
   const el = document.getElementById('acma-card');
   if (el) {

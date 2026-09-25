@@ -238,11 +238,18 @@ function repeaterDelayLabel(station) {
 
 // ── The radio-path card and path clicks ──────────────────────────────────────
 // Clicking any radio path on the Stations map — a field-station signal link or
-// a backbone path — opens three things for that exact hop: this card over the
-// map (who, what addresses, how far, what margin), the elevation profile
-// panel, and the link budget panel, both already pointed at the clicked path.
-// The card follows the #acma-card conventions: role=dialog, focus moves in,
-// Escape closes back to the map.
+// a backbone path — opens three things for that exact hop: this card (who,
+// what addresses, how far, what margin), the elevation profile panel, and the
+// link budget panel, both already pointed at the clicked path.
+//
+// The card is the first of the path tools (#stations-path-cards), not a card
+// over the map. It was one, in the rectangle the ACMA card uses, and that put
+// the summary of a path on top of the map it was clicked on and a pane away
+// from the profile and the budget it summarises. So it heads those two now:
+// in the side panel's 〽️ pane beside the map, or in the column under it — it
+// goes wherever the path tools go (syncStationsCardsHome). Opening it brings
+// that pane on screen, scrolls the card into view and moves focus to it;
+// Escape and × close it and hand focus back to whatever opened it.
 
 const MapBackbone = (function () {
   let opener = null;   // element focus goes back to when the card closes
@@ -255,7 +262,7 @@ const MapBackbone = (function () {
   function cardEl() { return document.getElementById('path-card'); }
 
   // The budget the link-budget card is showing, when it is showing this exact
-  // pair — so the card and the panel under it quote the same figure, terrain
+  // pair — so the card and the panel below it quote the same figure, terrain
   // term included once the profile lands. Anything else falls back to a plain
   // free-space margin computed from the same primitives.
   function budgetFor(a, b) {
@@ -372,30 +379,45 @@ const MapBackbone = (function () {
     return isBaseHop(a, b) ? 'Repeater to base path' : 'Repeater backbone path';
   }
 
+  // A card in the path tools' column, so it is dressed as the two below it
+  // are — an h3 under the pane's h2, and the note beside it muted — with the
+  // label/value rows the map's cards use (.acma-row), because it quotes the
+  // same kind of figure they do.
   function cardHtml(kind, a, b) {
     const backbone = kind === 'backbone';
     const r = budgetFor(a, b) || freeSpaceMargin(a, b);
     const km = acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
     return `
-      <div class="acma-card-head">
-        <span>
-          <strong id="path-card-title">${backbone ? backboneTitle(a, b) : 'Radio path'}</strong><br>
-          <span class="small txt-muted">${esc(a.name)} ⇄ ${esc(b.name)}</span>
-        </span>
-        <span><button type="button" onclick="MapBackbone.closeCard()"
-          aria-label="Close the radio path details"><span aria-hidden="true">×</span></button></span>
+      <div class="path-card-head">
+        <h3 id="path-card-title">${backbone ? backboneTitle(a, b) : 'Radio path'}</h3>
+        <span class="small">${esc(a.name)} ⇄ ${esc(b.name)}</span>
+        <button type="button" class="path-card-close" onclick="MapBackbone.closeCard()"
+          aria-label="Close the radio path details"><span aria-hidden="true">×</span></button>
       </div>
-      <div class="acma-sect">
+      <div class="path-card-rows">
         ${backbone ? backboneRows(a, b) : fieldRows(a, b)}
         ${row('Frequency', freqHtml(a, b))}
         ${row('Distance', fmtKm(km))}
         ${row('Fade margin', marginHtml(r))}
       </div>
-      <p class="small acma-card-note">Indicative only — the margin is the link budget card's figure
-        (free-space until the terrain profile lands). The elevation profile and link budget cards
-        ${stationsCardsWhere()} are open on this exact path:
-        <a href="#" onclick="MapBackbone.scrollTo('path-profile-panel');return false">elevation profile ${stationsCardsArrow()}</a> ·
-        <a href="#" onclick="MapBackbone.scrollTo('link-budget-panel');return false">fade margin ${stationsCardsArrow()}</a></p>`;
+      <p class="small path-card-note">Indicative only — the margin is the link budget card's figure
+        (free-space until the terrain profile lands). The elevation profile and link budget below
+        are open on this exact path:
+        <a href="#" onclick="MapBackbone.scrollTo('path-profile-panel');return false">elevation profile ↓</a> ·
+        <a href="#" onclick="MapBackbone.scrollTo('link-budget-panel');return false">fade margin ↓</a></p>`;
+  }
+
+  // Whether the profile below is still on this path. The card heads the
+  // profile and the budget and says they are "open on this exact path", so
+  // once the profile has moved on — another line drawn or selected, this one
+  // deleted or dragged off its stations — the card is describing something
+  // the column under it no longer shows, and it goes. The same ends either way
+  // round (a flipped line is the same path), found the way open() found them.
+  function onProfile(a, b) {
+    if (typeof PathProfile === 'undefined' || typeof MapDraw === 'undefined') return true;
+    const line = MapDraw.findLine([a.lat, a.lon], [b.lat, b.lon]);
+    const t = PathProfile.target();
+    return !!(line && t && t.id === line.id);
   }
 
   // Paint only — open() moves focus in once; a repaint (terrain landing) must
@@ -405,21 +427,46 @@ const MapBackbone = (function () {
     if (!el || !cur) return;
     const a = stationById(cur.aId), b = stationById(cur.bId);
     if (!a || !b) { close(); return; }
+    // Closed rather than repainted, and focus handed back only if it was in
+    // here: a profile that moved on under a card nobody is in is no reason to
+    // move anyone's cursor.
+    if (!onProfile(a, b)) { close(el.contains(document.activeElement)); return; }
     el.hidden = false;
     el.innerHTML = cardHtml(cur.kind, a, b);
-    el.setAttribute('role', 'dialog');
+    // A region rather than the dialog it was over the map: it is a card in a
+    // column now, reached by scrolling as well as by being sent to it, and the
+    // name is what focus announces when a click on the map puts focus here.
+    el.setAttribute('role', 'region');
     el.setAttribute('aria-labelledby', 'path-card-title');
     el.tabIndex = -1;
     el.onkeydown = key;
+  }
+
+  // Bring the card on screen, with focus on it. In the side panel that is its
+  // pane (〽️), opened if it was shut or showing something else (dockReveal).
+  // Under the map there is no pane — the page scrolls — but a full-screen map
+  // covers the column, so full screen is left first, for scrollTo's reason
+  // below; beside the map the side panel stays on screen in full screen and
+  // nothing needs leaving. `nearest` rather than `start`, so that under the map
+  // the page scrolls only as far as the card and the map stays as much in view
+  // as it can.
+  function reveal(el) {
+    if (state.mapFullscreen && !el.closest('#help-panel') && typeof toggleMapFullscreen === 'function') {
+      toggleMapFullscreen(false);
+    }
+    dockReveal(el);
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function key(e) {
     if (e.key === 'Escape') { e.stopPropagation(); close(); }
   }
 
-  // `refocus` is false only when another map card is closing this one on its
-  // way open (#175); every zero-argument call — the × button, Escape, a path
-  // that stopped existing — is the real thing and gets the focus restore.
+  // `refocus` is false only when closing it is nobody's gesture — a profile
+  // that moved on under a card focus was not in (render). Every zero-argument
+  // call — the × button, Escape, a path that stopped existing, a reset — is
+  // the real thing and gets the focus restore.
   function close(refocus = true) {
     cur = null;
     const el = cardEl();
@@ -432,14 +479,14 @@ const MapBackbone = (function () {
   function open(kind, aId, bId) {
     const a = stationById(aId), b = stationById(bId);
     if (!a || !b || a.lat == null || a.lon == null || b.lat == null || b.lon == null) return;
-    opener = document.activeElement;
-    // One card over the map at a time (#175). The ACMA card and this one have
-    // shared a rectangle since #138 and never closed each other — open both
-    // and this, the later sibling, simply covered that. typeof-guarded because
-    // this module also serves maps app.js has not dressed with either card.
-    if (typeof closeStnCard === 'function') closeStnCard(false);
-    if (typeof closeAcmaCard === 'function' && state.acma && state.acma.cardDeviceId) closeAcmaCard(false);
-    if (typeof MapHere !== 'undefined') MapHere.close();
+    // An opener inside the card — a second path opened while focus is still
+    // on this one — is no opener at all; the one recorded when it opened
+    // still stands, as showStationCard keeps its own.
+    const el = cardEl();
+    if (!(el && el.contains(document.activeElement))) opener = document.activeElement;
+    // No closing of the map's cards (#175's rule) any more: this card left
+    // their rectangle for the path tools, so the station card or the
+    // transmitter card someone was reading stays open beside it.
     cur = { kind, aId, bId };
     // The elevation profile follows the drawn line, so the clicked path becomes
     // one. The panel opens BEFORE the line goes in and an existing line is
@@ -452,13 +499,17 @@ const MapBackbone = (function () {
     else MapDraw.addLine([pa, pb], [aId, bId]);
     LinkBudget.fromProfile();
     render();
-    const el = cardEl();
-    if (el) el.focus();
+    // After the budget's own scroll to itself (fromProfile), so the card —
+    // the answer to the click — is what ends up in view.
+    if (el && cur) reveal(el);
   }
 
   return {
     open,
     closeCard: close,
+    // Paint the card back after a full render of the Stations tab, which
+    // re-emitted its div hidden and empty (initMap, beside repaintStnCard).
+    repaint() { if (cur) render(); },
 
     // Click handler for the Stations map's radio-path polylines (field links
     // and backbone paths both). While a draw tool is armed the click falls
@@ -473,7 +524,7 @@ const MapBackbone = (function () {
 
     // The Network View mini-map has no profile or budget panel to open, so its
     // paths get a popup with the same figures and a hand-off to the Stations
-    // tab, where the full three-card treatment runs.
+    // tab, where the full treatment — this card heading the path tools — runs.
     popupHtml(kind, aId, bId) {
       const a = stationById(aId), b = stationById(bId);
       if (!a || !b) return '';
@@ -516,14 +567,20 @@ const MapBackbone = (function () {
     // LinkBudget.profileChanged.
     profileChanged() { if (cur) render(); },
 
-    // Out of full screen first, for editStationFromCard's reason — there is no
-    // card to scroll to under a fixed panel — and the side panel's pane that
-    // holds the card (〽️ for the profile and the fade margin) on screen, for
-    // dockReveal's.
+    // The profile or the budget, from the links on this card. Out of full
+    // screen first when the card is under the map, for editStationFromCard's
+    // reason — there is nothing to scroll to under a fixed panel — but not in
+    // the side panel, which stays on screen beside a full-screen map and is
+    // where the link was pressed. Then the pane that holds it on screen (〽️),
+    // for dockReveal's.
     scrollTo(id) {
-      if (state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
       const el = document.getElementById(id);
-      if (el) { dockReveal(el); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+      if (!el) return;
+      if (state.mapFullscreen && !el.closest('#help-panel') && typeof toggleMapFullscreen === 'function') {
+        toggleMapFullscreen(false);
+      }
+      dockReveal(el);
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     },
   };
 })();

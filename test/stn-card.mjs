@@ -7,10 +7,10 @@
 //      a filter keystroke rebuilds every marker and destroys the callout, and
 //      the card has to still be there afterwards. Station details ↓ on it is the
 //      first thing in the app that scrolls the editor into view.
-//   2. **One card at a time** — this card, the ACMA transmitter card and the
-//      radio-path card share one rectangle. The two older ones never closed
-//      each other, so the assertion that covers the new exclusion also pins
-//      the fix for that.
+//   2. **One card at a time** — this card and the ACMA transmitter card share
+//      one rectangle, and each closes the other. The radio-path card shared
+//      it too until it moved into the path tools; it is held to staying out
+//      of the exclusion now, since it is no longer over the map.
 //   3. **The phone** — at 375 px the callout carries the identity and two fat
 //      pills, the close button is finger-sized, and Details opens the card as
 //      a sheet across the bottom of the map, with focus in it.
@@ -361,25 +361,30 @@ async function main() {
         return null;
       })();
       if (pair) {
+        showStationCard(s.id);
         MapBackbone.open('field', pair[0].id, pair[1].id);
-        out.pathHidesStn = el('stn-card').hidden && !el('path-card').hidden;
+        out.pathOffMap = !document.querySelector('.mn-map-stage #path-card')
+          && !!el('path-card').closest('#stations-path-cards');
+        out.pathKeepsStn = !el('stn-card').hidden && !el('path-card').hidden;
         showAcmaCard('no-such-device');
-        out.acmaHidesPath = el('path-card').hidden && !el('acma-card').hidden;
+        out.acmaKeepsPath = !el('path-card').hidden && !el('acma-card').hidden;
         MapBackbone.open('field', pair[0].id, pair[1].id);
-        out.pathHidesAcma = el('acma-card').hidden && !el('path-card').hidden;
+        out.pathKeepsAcma = !el('acma-card').hidden && !el('path-card').hidden;
         MapBackbone.closeCard();
       } else {
-        out.pathHidesStn = out.acmaHidesPath = out.pathHidesAcma = 'no pair';
+        out.pathOffMap = out.pathKeepsStn = out.acmaKeepsPath = out.pathKeepsAcma = 'no pair';
       }
       closeAcmaCard();
       return out;
     });
     check('the ACMA card closes the station card on its way open', excl.acmaHidesStn);
     check('and the station card closes the ACMA card', excl.stnHidesAcma);
-    check('the path card closes the station card', excl.pathHidesStn === true, String(excl.pathHidesStn));
-    check('the ACMA card and the path card, which shared a rectangle, now close each other',
-      excl.acmaHidesPath === true && excl.pathHidesAcma === true,
-      `${excl.acmaHidesPath} / ${excl.pathHidesAcma}`);
+    check('the radio path card is in the path tools, not over the map', excl.pathOffMap === true,
+      String(excl.pathOffMap));
+    check('…so opening it leaves the station card open', excl.pathKeepsStn === true, String(excl.pathKeepsStn));
+    check('…and it and the ACMA card no longer close each other',
+      excl.acmaKeepsPath === true && excl.pathKeepsAcma === true,
+      `${excl.acmaKeepsPath} / ${excl.pathKeepsAcma}`);
 
     log('\nA row selection paints it too — the keyboard\'s way onto the map\n');
 

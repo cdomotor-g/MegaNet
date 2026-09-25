@@ -738,7 +738,7 @@ and take the class off to exit — never reparent it, and least of all into
 `Modal`, which wipes its `innerHTML` down all three of its exits and would
 destroy a live Leaflet map's DOM mid-flight. The Stations map's `.map-panel`
 is already the containing block for everything that works over the map — the
-match note, the ACMA and path cards, the corner controls — so one class takes
+match note, the ACMA and station cards, the corner controls — so one class takes
 the whole working surface along and back with nothing moved or rebuilt; a
 Leaflet map needs one `invalidateSize()` after the toggle and nothing else.
 

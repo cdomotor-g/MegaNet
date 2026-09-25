@@ -1275,7 +1275,7 @@ const LinkBudget = (function () {
       S().freqMhz = isFinite(n) && n > 0 ? n : null;
       rerender();
       // The profile chart's curvature and cover terms do not move with the
-      // frequency, but the map's radio-path card quotes this budget.
+      // frequency, but the radio-path card above it quotes this budget.
       MapBackbone.profileChanged();
     },
 

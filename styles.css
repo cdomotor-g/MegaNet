@@ -3503,8 +3503,9 @@ hr {
    Leaflet container entirely, so they are above this already. Being outside the
    container buys nothing — .leaflet-container is `position: relative` with
    `z-index: auto`, which is not a stacking context, so a card's z-index is
-   compared with this 750 directly. Two of the four are above it (.acma-card and
-   #path-card, at 1100) and two were below (#stn-card and #here-card, at 690):
+   compared with this 750 directly. Two of the four were above it (.acma-card and
+   #path-card, at 1100 — the path card has since left the map for the path
+   tools) and two were below (#stn-card and #here-card, at 690):
    the card opened, and an opaque WebGL canvas was painted over it. Fixed at
    #193 by the rule beside .stn-card, which lifts those two to 760 for exactly
    as long as this canvas is on screen — and the reasoning is left here because
@@ -4886,6 +4887,58 @@ hr {
   margin: .4rem 0 0;
 }
 
+/* The radio path card (MapBackbone), at the head of the path tools. It was a
+   card over the map in .acma-card's dress until it moved here; now it is a
+   panel in the same column as the profile and the budget, so its head is drawn
+   the way the profile's empty state is — same heading size, the muted note
+   beside it — to line up with the summaries under it, with × pushed to the far
+   end. Not a <details>: it is there because a path was clicked, and × is how
+   it goes. The rows keep the map cards' label/value grammar (.acma-row), at
+   their size. */
+.path-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  padding: .1rem 0;
+}
+
+.path-card-head h3 {
+  margin: 0;
+  font-size: .95rem;
+  white-space: nowrap;
+}
+
+.path-card-head .small {
+  color: var(--muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.path-card-close {
+  margin-left: auto;
+  align-self: center;
+  padding: 0 .45rem;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.path-card-rows {
+  margin-top: var(--sp-2);
+  font-size: .88rem;
+}
+
+/* The map cards keep a label on one line, which a 370 px card could afford.
+   A row here can be "Delay — " and a station's whole name, in a column as
+   narrow as a phone, so the label wraps rather than pushing the page sideways. */
+.path-card-rows .acma-row > span:first-child {
+  white-space: normal;
+}
+
+.path-card-note {
+  color: var(--muted);
+  margin: var(--sp-2) 0 0;
+}
+
 /* The stations card is deliberately not in the rule above, and this is the one
    place the two differ. That selector is `summary span` — every span *inside*
    the summary, at any depth — and the stations card's heading carries the live
@@ -6038,8 +6091,7 @@ hr {
    zoom control at the top and nothing at the bottom but the move-pin panel,
    which this card gives way to (map-move-pin.js). It caps its own height and
    scrolls inside, rather than running the full height of the map the way the
-   ACMA and path cards do: it is a companion to the map, not a replacement
-   for it. */
+   ACMA card does: it is a companion to the map, not a replacement for it. */
 .stn-card {
   top: auto;
   right: auto;
@@ -6178,7 +6230,8 @@ hr {
   .leaflet-container .leaflet-popup-content {
     margin-right: 2.9rem;
   }
-  .acma-card-head button {
+  .acma-card-head button,
+  .path-card-close {
     min-width: 2.75rem;
     min-height: 2.75rem;
   }
@@ -7335,7 +7388,7 @@ body.mn-dock-dragging {
    phone breakpoint can have an opinion about it — 62vh of map plus a 360 px
    floor left a 664 px screen with barely a band of page under it. */
 /* The panel the map sits in (#136). `position: relative` is what the map note,
-   the transmitter card and the path card are positioned against; the tighter
+   the transmitter card and the station card are positioned against; the tighter
    padding is the map's own, because a map does not want a panel's gutter
    around it. Was an inline style on the div. */
 .map-panel {

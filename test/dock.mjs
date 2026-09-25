@@ -78,7 +78,7 @@ function check(name, pass, detail = '') {
 // Every id the Stations cards are found by. Each must be on the page exactly
 // once on the Stations tab and not at all anywhere else.
 const CARD_IDS = ['stations-cards', 'stations-filter-card', 'stations-list-card', 'stations-table-wrap',
-                  'stations-path-cards', 'path-profile-panel', 'link-budget-panel', 'stations-carriers-card',
+                  'stations-path-cards', 'path-card', 'path-profile-panel', 'link-budget-panel', 'stations-carriers-card',
                   'blast-card', 'stations-editor-card'];
 
 // …and every id the map's panels are found by, for the same rule.
@@ -806,6 +806,80 @@ try {
     drew.lines === 1 && drew.showing === 'paths' && drew.visible && drew.focusSeen, JSON.stringify(drew));
   await page.evaluate(() => { MapDraw.setTool(''); state.draw.shapes = []; state.draw.selectedId = null; MapDraw.render(); MapDraw.rerenderPanel(); });
   await page.waitForTimeout(200);
+
+  // A radio path clicked on the map: its card is the first of the path tools,
+  // not a card over the map. The click brings 〽️ up whatever was showing, puts
+  // focus on the card, and leaves the station card — which it used to close —
+  // open on the map. Escape shuts it back to what opened it; a render of the
+  // tab paints it back, as the profile and budget under it come back; and once
+  // the profile moves to another line it goes.
+  await page.evaluate(() => setDockTab('stations', { instant: true }));
+  await page.waitForTimeout(250);
+  const pathPair = await page.evaluate(() => {
+    for (const f of state.data.stations) {
+      if (f.lat == null) continue;
+      const r = findRepeaterMatches(f).find(x => x.lat != null);
+      if (r) return [f.id, r.id];
+    }
+    return null;
+  });
+  check('the file has a field station and a repeater to open a radio path between', !!pathPair);
+  if (pathPair) {
+    const pathCard = () => page.evaluate(() => {
+      const el = document.getElementById('path-card');
+      const wrap = document.getElementById('stations-path-cards');
+      const a = document.activeElement;
+      return {
+        showing: dockShowing(),
+        hidden: !el || el.hidden,
+        visible: !!el && el.checkVisibility(),
+        inPane: !!(el && el.closest('#dock-pane-paths')),
+        first: !!(el && wrap && wrap.firstElementChild === el),
+        onMap: !!document.querySelector('.mn-map-stage #path-card'),
+        focusIn: !!(el && el.contains(a)),
+        focusTag: a ? (a.id || a.tagName) : null,
+        title: document.getElementById('path-card-title')?.textContent || '',
+        stn: !document.getElementById('stn-card')?.hidden,
+        n: document.querySelectorAll('#path-card').length,
+      };
+    });
+    await page.evaluate(([f]) => showStationCard(f), pathPair);
+    await page.focus('#help-panel .dock-tab[data-dock="stations"]');
+    await page.evaluate(([f, r]) => MapBackbone.open('field', f, r), pathPair);
+    await page.waitForTimeout(400);
+    const pc = await pathCard();
+    check('a radio path opens its card at the head of the path tools, in the 〽️ pane, not over the map',
+      pc.showing === 'paths' && !pc.hidden && pc.visible && pc.inPane && pc.first && !pc.onMap && pc.title === 'Radio path',
+      JSON.stringify(pc));
+    check('…with focus on the card, and the station card left open on the map', pc.focusIn && pc.stn, JSON.stringify(pc));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    const esc = await pathCard();
+    check('Escape closes the radio path card, focus back on what opened it',
+      esc.hidden && esc.focusTag !== 'BODY' && await page.evaluate(() =>
+        document.activeElement?.matches('#help-panel .dock-tab[data-dock="stations"]')),
+      JSON.stringify(esc));
+    await page.evaluate(([f, r]) => MapBackbone.open('field', f, r), pathPair);
+    await page.waitForTimeout(300);
+    await page.evaluate(() => renderMain());
+    await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
+    await page.waitForTimeout(400);
+    const again = await pathCard();
+    check('a render of the tab paints the radio path card back, in its pane',
+      !again.hidden && again.inPane && again.first && again.n === 1, JSON.stringify(again));
+    await page.evaluate(() => {
+      const r = document.getElementById('leaflet-map').getBoundingClientRect();
+      const a = state.map.containerPointToLatLng([r.width * 0.3, r.height * 0.3]);
+      const b = state.map.containerPointToLatLng([r.width * 0.6, r.height * 0.6]);
+      MapDraw.addLine([[a.lat, a.lng], [b.lat, b.lng]]);
+      MapBackbone.repaint();
+    });
+    await page.waitForTimeout(200);
+    const moved = await pathCard();
+    check('once the profile is on another line, the radio path card closes', moved.hidden, JSON.stringify(moved));
+    await page.evaluate(() => { closeStnCard(false); state.draw.shapes = []; state.draw.selectedId = null; MapDraw.render(); MapDraw.rerenderPanel(); });
+    await page.waitForTimeout(200);
+  }
 
   // ── 7. ◫, the fold, a phone ──────────────────────────────────────────────
   await page.evaluate(() => { state.map.__probe = 'same'; });
