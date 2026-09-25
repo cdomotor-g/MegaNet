@@ -51,6 +51,11 @@ on:
       - 'tools/ingest/**'
       - 'data/inspections/**'
       - 'archive/QLD All Site Inspections.xlsx'
+      # The Bureau's river height station lists and what tools/ingest/
+      # river_height_stations.py reads out of them (0031): the same derived-file
+      # rule, one document further on.
+      - 'archive/river-height-stations/**'
+      - 'data/river-height-stations.json'
       # The base station program and the migration that gives its readings a
       # station are one contract across two files, and `npm run logger` is the
       # only thing holding them together — so a push touching either has to run
@@ -95,6 +100,11 @@ on:
       - 'tools/ingest/**'
       - 'data/inspections/**'
       - 'archive/QLD All Site Inspections.xlsx'
+      # The Bureau's river height station lists and what tools/ingest/
+      # river_height_stations.py reads out of them (0031): the same derived-file
+      # rule, one document further on.
+      - 'archive/river-height-stations/**'
+      - 'data/river-height-stations.json'
       # The base station program and the migration that gives its readings a
       # station are one contract across two files, and `npm run logger` is the
       # only thing holding them together — so a push touching either has to run
@@ -457,6 +467,15 @@ jobs:
         working-directory: test
         run: npm run sls
 
+      # The flood classes, crossings and gauge survey from the Bureau's river
+      # height station lists (0031), on the card and in the editor. The
+      # assertion that matters most is invisible when it breaks: a save sends
+      # only the lists the form changed, because an untouched list resent
+      # through the browser's parse would come back with 94.50 as 94.5.
+      - name: River height station details — the card says what holds now, a save sends what changed
+        working-directory: test
+        run: npm run riverdetails
+
       - name: Claim an address from the message that arrived on it
         working-directory: test
         run: npm run claim
@@ -658,6 +677,13 @@ jobs:
       - name: Service Level Specification — the extraction still matches the document
         run: python3 tools/ingest/sls.py --check
 
+      # The river height station lists, on the same footing: data/river-height-
+      # stations.json is derived from four fixed-width reports in archive/ whose
+      # long names carry on onto the next line, and the reader that joins them
+      # back is the part worth re-running. Standard library only.
+      - name: River height station lists — the extraction still matches the reports
+        run: python3 tools/ingest/river_height_stations.py --check
+
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —
 # as a per-push gate it would train everyone to re-record the baseline without
@@ -736,3 +762,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
       - name: check_inspection_history.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspection_history.sql
+      - name: check_river_height_details.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_river_height_details.sql

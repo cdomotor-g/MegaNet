@@ -1,0 +1,1152 @@
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:    1
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+SOUTH COAST           540612 LITTLE NERANG DAM HW TM   NERANG                   168.02 S    Spillway Level                                    
+                      540054 LITTLE NERANG DAM ALERT   LITTLE NERANG CREEK        0.00 S    Spillway Level                                    
+                      040584 HINZE DAM                 NERANG RIVER               0.00 S    Hinze Dam spillway                                
+                      540610 HINZE DAM HW TM           NERANG RIVER              94.50 S    Hinze Dam spillway                                
+                      040847 HINZE DAM HW ALERT        NERANG RIVER               0.00 S    Hinze Dam spillway                                
+                      540440 NERANWOOD ALERT           MUDGEERABA CREEK           0.00 C    Springbrook Road Crossing                         
+                      540453 BONOGIN CK (HARDYS RD)    BONOGIN CREEK              1.14 C                                                      
+                             ALERT                                                                                                            
+                                                                                                                                              
+                      540254 MUDGEERABA ALERT          MUDGEERABA CREEK           4.60 B    Pacific Highway Bridge                            
+                      540001 GOLD COAST TIDE TM        BROADWATER                 1.91 T                                                      
+                      540366 TALLEBUDGERA CK DAM ALERT TALLEBUDGERA CK            0.00 S                                                      
+                      540320 COPLICKS BRIDGE ALERT     TALLEBUDGERA CREEK         4.59 B    Tallebudgera Connection Road                      
+                      540291 CLAGIRABA ROAD ALERT      COOMERA RIVER             -0.03 C    Clagiraba Road Causeway                           
+                      540294 KERKIN ROAD ALERT         PIMPAMA RIVER              3.10 C    Kerkin Road Causeway                              
+                                                                                                                                              
+LOGAN-ALBERT          540303 LUMEAH TM                 ALBERT RIVER               9.30 B    Nindooinbah Br (Nindooinbah Estate Rd)            
+                      040936 LUMEAH ALERT              ALBERT RIVER               9.30 B    Nindooinbah Br (Nindooinbah Estate Rd)            
+                      540614 NINDOOINBAH DAM HW TM     ALBERT R                 122.00 F                                                      
+                      540480 NINDOOINBAH DAM ALERT     ALBERT RIVER             122.00 F                                                      
+                      540715 DOUBLE CROSSING RD ALERT  CANUNGRA                   0.50 B    Double Crossing Rd Bridge                         
+                      540073 BENOBBLE TM               CANUNGRA CREEK             9.10 B    Benobble Br (Beaudesert-Nerang Rd)                
+                      040937 BENOBBLE ALERT            CANUNGRA CREEK             9.10 B    Benobble Br (Beaudesert-Nerang Rd)                
+                      040738 BROMFLEET TM              ALBERT RIVER              16.80 B    Mundoolun Br (Beaudesert-Beenleigh Rd)            
+                      040938 BROMFLEET ALERT           ALBERT RIVER              16.80 B    Mundoolun Br (Beaudesert-Beenleigh Rd)            
+                      540691 TAMBORINE ALERT           ALBERT RIVER              15.40 B                                                      
+                      040677 MAROON DAM                BURNETT CREEK              0.00 S    Heights over Spillway                             
+                      540229 MAROON DAM HW TM          BURNETT CREEK            207.14 F                                                      
+                      540475 MAROON DAM HW ALERT       BURNETT CREEK              0.00 F                                                      
+                      040832 FOREST HOME TM            LOGAN RIVER                3.80 B    Addis Bridge                                      
+                      540074 DIECKMANS BRIDGE TM       RUNNING CREEK              4.65 B    Dieckmann Br (Running Creek Rd)                   
+                      040943 DIECKMANS BRIDGE ALERT    RUNNING CREEK              4.65 B    Dieckmann Br (Running Creek Rd)                   
+                      040944 RUDDS LANE ALERT          CHRISTMAS CREEK            8.60 B    Christmas Creek Bridge                            
+                      540714 KOORALBYN BRIDGE ALERT    CANNON CREEK               7.34 B    Kooralbyn Bridge                                  
+                      040714 ROUND MOUNTAIN TM         LOGAN RIVER               13.00 B    Williams Br (Mt Lindesay Hwy, Laravale)           
+                      040945 ROUND MOUNTAIN ALERT      LOGAN RIVER               13.00 B    Williams Br (Mt Lindesay Hwy, Laravale)           
+                      540713 HARPERS CROSSING ALERT    TEVIOT BROOK               3.23 B    Harpers Crossing Bridge                           
+                      040729 BOONAH                    TEVIOT BROOK               5.38 B    Chinamans Bridge (Allandale Rd)                   
+                      040949 BOONAH ALERT              TEVIOT BROOK               5.38 B    Chinamans Bridge (Allandale Rd)                   
+                      540510 COULSON CROSSING ALERT    TEVIOT BROOK               3.51 B    Coulson Crossing                                  
+                      540530 WYARALONG DAM             TEVIOT BROOK              63.60 S                                                      
+                      540615 WYARALONG DAM HW TM       TEVIOT BROOK              63.60 S    Wyaralong Dam spillway                            
+                      540512 WYARALONG DAM ALERT       TEVIOT BROOK               0.00 S    Wyaralong Dam spillway                            
+                      540690 KILMOYLAR RD ALERT        TEVIOT BROOK               6.70 B    Edward O'Neil Bridge                              
+                      540590 CEDAR GROVE WEIR HW TM    LOGAN RIVER               20.50 F                                                      
+                      040710 YARRAHAPPINI              LOGAN RIVER               17.40 B    Paynes Bridge                                     
+                      040762 YARRAHAPPINI TM           LOGAN RIVER               17.40 B    Paynes Bridge                                     
+                      040940 YARRAHAPPINI ALERT        LOGAN RIVER               17.40 B    Paynes Bridge                                     
+                      540725 HENDERSON CK ALERT        HENDERSON CK               2.40 R                                                      
+                      540689 FLAGSTONE CK (JIMBOOMBA)                             8.00 R                                                      
+                             ALERT                                                                                                            
+                                                                                                                                              
+                      040542 MACLEAN BRIDGE            LOGAN RIVER               17.00 A    Maclean Br (Mt Lindesay Hwy)                      
+                      040935 MACLEAN BRIDGE ALERT      LOGAN RIVER               17.00 A    Maclean Br (Mt Lindesay Hwy)                      
+                      540726 UPPER QUINZEH ALERT       QUINZEH CREEK              2.00 R                                                      
+                      540688 LOWER QUINZEH ALERT       QUINZEH CK                 4.20 R    Quinzeh Ck @ Miller Road                          
+                      540674 BAYES RD ALERT                                       8.00 R    Bayes Road                                        
+                      540675 SCHMIDTS RD ALERT         SCHMIDTS CREEK             4.00 R    Schmidts road                                     
+                      040665 WATERFORD                 LOGAN RIVER               11.00 B    New Waterford Bridge                              
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:    2
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+LOGAN-ALBERT          040878 WATERFORD ALERT           LOGAN RIVER               11.00 B    Waterford Bridge                                  
+                      540692 WALLER RD ALERT           SCRUBBY CK                 5.40 R                                                      
+                      540737 KURRAJONG TM              SCRUBBY CK                 8.00 R    Kurrajong Drive                                   
+                      540091 SLACKS CK(LOGANLEA RD)AL  SLACKS CREEK               8.50 B    Loganlea Road Bridge                              
+                      040709 EAGLEBY                   LOGAN RIVER               10.40 B    Pacific Highway Bridge                            
+                      540611 LESLIE HARRISON DAM HW TM TINGALPA CREEK            15.24 F                                                      
+                      540384 LESLIE HARRISON DAM ALERT TINGALPA CREEK            15.24 F                                                      
+                                                                                                                                              
+BRISBANE              540337 WOODFORD ALERT-P          STANLEY RIVER              6.10 B                                                      
+                      540338 WOODFORD ALERT-B          STANLEY RIVER              6.10 B                                                      
+                      540485 WOODFORD TM               STANLEY RIVER              6.10 B                                                      
+                      040627 WOODFORD                  STANLEY RIVER              6.10 B    Stanley River Bridge                              
+                      538013 MT KILCOY WEIR ALERT      KILCOY CREEK               0.00 W    Mt Kilcoy Weir                                    
+                      040820 SOMERSET DAM TM           STANLEY RIVER             97.00 F    Operational Full Supply Level                     
+                      540159 SOMERSET DAM HW ALERT-P   STANLEY RIVER             97.00 F    Operational Full Supply Level                     
+                      540160 SOMERSET DAM HW ALERT-B   STANLEY RIVER             97.00 F    Operational Full Supply Level                     
+                      040387 LINVILLE                  BRISBANE RIVER             9.50 B    Sandy Creek Bridge                                
+                      540142 CRESSBROOK DAM ALERT      CRESSBROOK CREEK         280.00 S                                                      
+                      040763 WIVENHOE DAM              BRISBANE RIVER            65.90 F    Operational Full Supply Level                     
+                      540049 WIVENHOE DAM HW TM        BRISBANE RIVER            67.00 F                                                      
+                      540177 WIVENHOE DAM HW ALERT-P   BRISBANE RIVER            65.90 F    Operational Full Supply Level                     
+                      540302 WIVENHOE DAM HW ALERT-B   BRISBANE RIVER            67.00 F                                                      
+                      540386 SANDY CREEK ROAD ALERT    SANDY CREEK                1.90 X    Sandy Creek Road Crossing                         
+                      540568 JUNCTION VIEW ALERT       BLACK DUCK CREEK           1.00 X                                                      
+                      040444 GATTON                    LOCKYER CREEK              3.90 B    Smithfield Road Bridge                            
+                      540567 MOON ROAD ALERT           LOCKYER CREEK              0.86 X    Moon Road Crossing                                
+                      540789 THORNTON (SCHOOL ROAD)    LAIDLEY CREEK              5.20 B    School Road                                       
+                             ALERT                                                                                                            
+                                                                                                                                              
+                      040751 THORNTON                  LAIDLEY CREEK              4.60 B    Clarkes Bridge                                    
+                      540528 MULGOWIE ALERT            LAIDLEY CREEK              9.05 B    Laidley Creek Bridge                              
+                      040835 MULGOWIE TM               LAIDLEY CREEK              9.05 B    Laidley Creek Bridge                              
+                      040716 LAIDLEY                   LAIDLEY CREEK              8.50 B    Campbell Bridge                                   
+                      540721 NARDA LAGOON ALERT        LAIDLEY CK                 1.75 B    Laidley Creek Anabranch                           
+                      540047 SHOWGROUND WEIR HW TM     LAIDLEY CREEK              4.15 W                                                      
+                      540158 SHOWGROUND WEIR ALERT     LAIDLEY CREEK              4.15 W                                                      
+                      540563 BILL GUNN DAM TM          LAIDLEY CREEK            110.00 S    Bill Gunn Dam spillway                            
+                      540472 BILL GUNN DAM ALERT       LAIDLEY CREEK            110.00 S    Bill Gunn Dam spillway                            
+                      540546 LAKE CLARENDON HW TM      LOCKYER CREEK             96.00 F                                                      
+                      540473 LAKE CLARENDON ALERT      LOCKYER CREEK             96.00 F                                                      
+                      040662 LYONS BRIDGE              LOCKYER CREEK             10.10 B    Lyons Bridge                                      
+                      540547 ATKINSON DAM HW TM        ATKINSON CREEK            65.72 S    Atkinson Dam Spillway                             
+                      540479 ATKINSON DAM ALERT        ATKINSON CREEK            65.72 S    Atkinson Dam Spillway                             
+                      540051 O'REILLY'S WEIR TM        LOCKYER CREEK              7.66 W                                                      
+                      540153 O'REILLY'S WEIR ALERT     LOCKYER CREEK              7.66 W                                                      
+                      040441 LOWOOD                    BRISBANE RIVER             6.70 B    Brisbane River Bridge (Fernvale)                  
+                      540066 SAVAGES CROSSING TM       BRISBANE RIVER             2.90 B                                                      
+                      540150 SAVAGES CROSSING ALERT    BRISBANE RIVER             2.90 B                                                      
+                      540312 MARBURG ALERT             BLACK SNAKE CREEK          7.50 S                                                      
+                      540257 BURTONS BRIDGE ALERT      BRISBANE RIVER             4.80 B                                                      
+                      540606 LAKE MANCHESTER HW TM     CABBAGE TREE CREEK        50.90 S                                                      
+                      540028 LAKE MANCHESTER ALERT     CABBAGE TREE CREEK        50.90 S                                                      
+                      540256 KHOLO BRIDGE ALERT        BRISBANE RIVER             4.82 B    Kholo Bridge                                      
+                      040142 MT CROSBY                 BRISBANE RIVER            15.50 B    Mt Crosby Weir Bridge                             
+                      040818 MT CROSBY TM              BRISBANE RIVER            15.50 B    Mt Crosby Weir Bridge                             
+                      540199 MT CROSBY ALERT           BRISBANE RIVER            15.50 B    Mt Crosby Weir Bridge                             
+                      040702 STOKES CROSSING           BREMER RIVER               1.10 C    Stokes Crossing                                   
+                      540314 SPRESSERS BRIDGE ALERT    BREMER RIVER               4.80 B    Rosewood to Warrill View Road Bridge              
+                      540317 GREY'S PLAINS ROAD ALERT  SPRING CREEK               2.00 B                                                      
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:    3
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+BRISBANE              540064 GRANDCHESTER ALERT        WESTERN CREEK              4.60 B    Grandchester to Mt Mort Road bridge.              
+                      040701 KUSS ROAD                 WESTERN CREEK              7.60 B    Kuss Road Bridge                                  
+                      540583 KUSS ROAD TM              WESTERN CREEK              7.60 B    Western Creek Bridge                              
+                      540194 KUSS ROAD ALERT           WESTERN CREEK              7.60 B                                                      
+                      540313 ROSEWOOD WWTP ALERT       WESTERN CREEK              7.25 A    Rosewood-Warrill View Road Bridge                 
+                      040549 ROSEWOOD                  BREMER RIVER               5.20 B    Seven Mile Bridge                                 
+                      540388 ROSEWOOD AL-B             BREMER RIVER               5.20 B    Bremer River Bridge                               
+                      540193 ROSEWOOD ALERT            BREMER RIVER               5.20 B    Seven Mile Bridge                                 
+                      540147 FIVE MILE BR ALERT        BREMER RIVER               4.20 B    Five Mile Bridge                                  
+                      040838 THREE MILE BRIDGE ALERT   BREMER RIVER              19.10 B    Three Mile Bridge                                 
+                      040135 MOOGERAH DAM              REYNOLDS CREEK             0.00 S    Heights over Spillway                             
+                      540364 MOOGERAH DAM HW TM        REYNOLDS CK              154.81 F    Full Supply Level                                 
+                      540474 MOOGERAH DAM HW ALERT     WARRILL CREEK              0.00 F    Full Supply Level                                 
+                      540058 KALBAR WEIR HW TM         WARRILL CREEK             74.77 W    Junction Weir Crest Level (74.77mAHD)             
+                      540151 KALBAR WEIR ALERT         WARRILL CREEK             74.77 W    Junction Weir Crest Level (74.77m AHD)            
+                      040440 KALBAR                    WARRILL CREEK              7.00 B    Warrill Creek Bridge                              
+                      040445 HARRISVILLE               WARRILL CREEK              5.50 B    Warrill Creek Bridge                              
+                      540154 HARRISVILLE ALERT         WARRILL CREEK              5.50 B    Warrill Creek Bridge                              
+                      540387 HARRISVILLE AL-B          WARRILL CREEK              5.50 B    Warrill Creek Bridge                              
+                      540217 CHURCHBANK WEIR TM        WARRILL CREEK             38.62 W                                                      
+                      540316 CHURCHBANK WEIR ALERT     WARRILL CREEK              0.00 W                                                      
+                      540065 PEAK CROSSING ALERT       PURGA CREEK                5.10 B    Ipswich to Boonah Road Bridge                     
+                      040836 ONE MILE BRIDGE ALERT     BREMER RIVER              17.20 B    One Mile Bridge                                   
+                      540250 BRASSALL(HANCOCKS BR) AL  BREMER RIVER              13.80 B    Hancocks Bridge                                   
+                      040101 IPSWICH                   BREMER RIVER              24.88 B    David Trumpy Bridge                               
+                      040831 IPSWICH ALERT             BREMER RIVER              24.88 B    David Trumpy Bridge                               
+                      540192 JINDALEE ALERT            BRISBANE RIVER             1.87 T                                                      
+                      040713 CENTENARY BRIDGE          BRISBANE RIVER             1.87 T                                                      
+                      540727 SOUTH RIPLEY (JAMES IVORY BUNDAMBA CREEK            46.08 B    James Ivory Bridge                                
+                             BR)                                                                                                              
+                                                                                                                                              
+                      040872 BLACKSTONE BRIDGE ALERT   BUNDAMBA CREEK            20.80 B    Blackstone Bridge                                 
+                      040875 BUNDAMBA SCHOOL ALERT     BUNDAMBA CREEK            16.30 B    Bundamba Bridge                                   
+                      540646 OXLEY CK ALERT                                      41.80 R    Goodna Rd                                         
+                      540535 LAKESIDE CRESCENT ALERT   OXLEY CREEK               36.50 F                                                      
+                      540609 GOLD CK RESERVOIR HW TM   GOLD CREEK                92.75 F                                                      
+                      540107 GOLD CK RESERVOIR ALERT   GOLD CREEK                92.75 F                                                      
+                      540604 ENOGGERA DAM HW TM        ENOGGERA CREEK            74.40 S    Enoggera Dam spillway                             
+                      540119 ENOGGERA DAM ALERT        ENOGGERA CREEK            74.40 S    Enoggera Dam spillway                             
+                      540784 BARDON (DETENTION BASIN)  ITHACA CREEK              76.00 F    Top of Detention Basin wall (FSL)                 
+                             ALERT                                                                                                            
+                                                                                                                                              
+                                                                                                                                              
+PINE                  540826 LEES CROSSING AL          NORTH PINE RIVER           1.02 R    Lees Crossing Rd                                  
+                      540202 NORTH PINE DAM ALERT      NORTH PINE RIVER          36.00 F                                                      
+                      540277 NORTH PINE DAM ALERT-B    NORTH PINE RIVER          36.00 F                                                      
+                      540605 LAKE KURWONGBAH HW TM     PINE RIVER                20.37 S    Sideling Creek Dam Spillway                       
+                      540204 LAKE KURWONGBAH ALERT     SIDELING CREEK            20.37 S    Sideling Creek Dam Spillway                       
+                      540412 YOUNGS CROSSING ALERT     NORTH PINE RIVER           2.66 C    Youngs Crossing                                   
+                      540762 SHORNCLIFFE TIDE TM                                  2.83 T                                                      
+                      540730 SCARBOROUGH TIDE TM                                  2.61 T                                                      
+                      540508 NARANGBA (OAKEY FLAT RD)  BURPENGARY CREEK          27.80 B                                                      
+                             AL                                                                                                               
+                                                                                                                                              
+                      540244 WAMURAN ALERT             WARARBA CREEK             30.60 B    Cambells Pocket Bridge                            
+                      540624 CABOOLTURE (BRUCE HWAY)   KING JOHN CK               8.76 B    Bruce Highway                                     
+                             ALERT                                                                                                            
+                                                                                                                                              
+                                                                                                                                              
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:    4
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+MAROOCHY              540603 EWEN MADDOCK DAM HW TM    MOOLOOLAH RIVER           25.38 S    Ewen Maddock Dam                                  
+                      540346 EWEN MADDOCK DAM AL       MOOLOOLAH RIVER           25.38 S    Ewen Maddock Dam                                  
+                      540351 MERIDAN WAY AL            CURRIMUNDI CREEK           2.60 A    Road level near gauge                             
+                      540348 PARREARRA WEIR U/S AL     MOOLOOLAH RIVER            1.75 W    Parrearra Weir                                    
+                      540421 TANAWHA ALERT             MOUNTAIN CREEK             1.10 A    Crosby Hill Road Crossing                         
+                      540220 MOUNTAIN CREEK ALERT      MOUNTAIN CREEK             4.75 R    Road level                                        
+                      540037 MOOLOOLABA TIDE TM        MOOLOOLAH RIVER            2.17 T                                                      
+                      540347 MOOLOOLABA TIDE AL        MOOLOOLAH RIVER            2.17 T                                                      
+                      540761 GOLDEN BEACH TIDE TM      MOOLOOLAH RIVER            1.44 T                                                      
+                      540448 GOLDEN BEACH TIDE AL        PUMICESTONE PASSAGE      1.44 T                                                      
+                      540342 OLD GYMPIE RD AL          COOCHIN CREEK              3.35 R    Old Gympie Rd                                     
+                      540343 BEERWAH AL                COOCHIN CREEK              8.10 B    Old Bruce Highway Bridge                          
+                      540608 COOLOOLABIN DAM HW TM     MAROOCHY RIVER           293.00 S    Cooloolabin Dam Spillway                          
+                      540460 COOLOOLABIN DAM ALERT     ROCKY CREEK              293.00 S    Cooloolabin Dam Spillway                          
+                      540616 WAPPA DAM HW TM           MAROOCHY RIVER            44.81 F                                                      
+                      540462 WAPPA DAM ALERT           SOUTH MAROOCHY RIVER      44.81 F    Full Supply Level                                 
+                      540613 MAROOCHY INTAKE WEIR TM   MAROOCHY                 164.60 W                                                      
+                      540599 MAROOCHY INTAKE WEIR AL   MAROOCHY                 164.60 W                                                      
+                      540617 POONA DAM HW TM           MAROOCHY RIVER           152.70 S    Poona Dam Spillway                                
+                      540461 POONA DAM ALERT           SOUTH MAROOCHY RIVER     152.70 S    Poona Dam Spillway                                
+                      540223 YANDINA CREEK ALERT       YANDINA CREEK              4.05 R    Road Level                                        
+                      540218 DOONAN CREEK ALERT        DOONAN CREEK               4.00 R                                                      
+                      540499 COOLUM WEST ALERT         DOONAN CREEK               2.95 R    Yandina Coolum Road                               
+                      540419 WEST WOOMBYE ALERT        PETRIE CREEK               3.35 R    Road level                                        
+                      540420 PALMWOODS SPORTSGROUND    PAYNTER CREEK              3.80 R    Jubliee Dr                                        
+                             ALERT                                                                                                            
+                                                                                                                                              
+                      540222 EUDLO ALERT               EUDLO CREEK                3.25 R    Rail underpass                                    
+                      540087 KIELS MOUNTAIN ALERT      EUDLO CREEK                3.05 B    Eudlo Creek Bridge                                
+                      540094 PICNIC POINT ALERT        MAROOCHY RIVER             1.25 R    Bradman Ave                                       
+                                                                                                                                              
+NOOSA                 540774 WAHPUNGA LANE ALERT       KIN KIN CREEK              6.00 B                                                      
+                      040772 TEWANTIN                  NOOSA RIVER                0.90 R    Doonella Bridge (Cooroy-Tewantin Road)            
+                      540310 TEWANTIN ALERT            NOOSA RIVER                0.90 R                                                      
+                                                                                                                                              
+MARY                  540647 BAROON POCKET DAM HW TM   OBI OBI CK               217.00 S    Baroon Pocket Dam Spillway                        
+                      540426 BAROON POCKET DAM HW      OBI OBI CREEK              0.00 S    Baroon Pocket Dam Spillway                        
+                             ALERT                                                                                                            
+                                                                                                                                              
+                      540620 CONONDALE ALERT           MARY RIVER                 5.65 A    Conondale Bridge                                  
+                      040386 KENILWORTH BRIDGE         MARY RIVER                11.20 B    Mary River Bridge                                 
+                      540264 BORUMBA DAM HW TM         YABBA CREEK              135.01 S    Heights over Spillway                             
+                      540575 BORUMBA DAM HW AL         YABBA CREEK                0.00 S    Heights over Spillway                             
+                      040099 IMBIL POST OFFICE         YABBA CREEK                6.10 B    Yabba Creek Bridge                                
+                      540779 COOROY (GARNET ST) ALERT  COOROY CREEK               2.90 B                                                      
+                      540778 COOROY (ELM ST) ALERT     SIX MILE CREEK             3.10 B                                                      
+                      540327 LAKE MACDONALD DRIVE AL   SIX MILE CREEK             4.95 B    Six Mile Creek Bridge                             
+                      540755 LAKE MACDONALD DAM HW TM  SIX MILE CREEK            95.32 S                                                      
+                      540463 LAKE MACDONALD DAM ALERT  SIX MILE CREEK            95.32 S                                                      
+                      540775 POMONA (HILL ST) ALERT    COOROORA CREEK             2.10 B                                                      
+                      540776 POMONA (SUBWAY AVE) ALERT COOROORA CREEK             0.10 R                                                      
+                      040755 COORAN                    SIX MILE CREEK             7.20 B    Victor Giles Bridge                               
+                      540572 CEDAR POCKET DAM HW TM    DEEP CREEK               101.07 S    Cedar Pocket Dam Spillway                         
+                      540476 CEDAR POCKET DAM ALERT    DEEP CREEK               101.07 S    Cedar Pocket Dam Spillway                         
+                      040426 GYMPIE                    MARY RIVER                 9.90 B    Kidd Bridge                                       
+                      040993 GYMPIE ALERT              MARY RIVER                 9.90 B    Kidd Bridge                                       
+                      040365 WOOLOOGA                  WIDE BAY CREEK             2.40 B    Smiths Road Bridge                                
+                      040688 MIVA                      MARY RIVER                22.00 B    Dickabram Bridge                                  
+                      040826 MIVA TM                   MARY RIVER                22.00 B    Mary River Bridge                                 
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:    5
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+MARY                  040203 TIARO                     MARY RIVER                 6.60 B    Mary River Bridge                                 
+                      540706 TIARO ALERT                                          6.60 B    Mary River Bridge                                 
+                      540039 THE BARRAGE TM            MARY RIVER                 2.90 W                                                      
+                      540288 TAGIGAN ROAD TM           TINANA CREEK               4.00 B                                                      
+                      040679 BAUPLE EAST TM            TINANA CREEK               4.09 B    Missing's Bridge                                  
+                      040896 TEDDINGTON WEIR HW TM     TINANA CREEK               8.68 W                                                      
+                      040390 TEDDINGTON WATERWORKS     TINANA CREEK               8.68 W    Weir crest level - 8.68m AHD                      
+                      540027 TINANA BARRAGE HW TM      TINANA CREEK               2.50 W                                                      
+                      040443 MARYBOROUGH               MARY RIVER                 5.50 B    Lamington Bridge                                  
+                      540708 PORTSIDE ALERT                                       5.50 B    Lamington Bridge                                  
+                      540452 BOORAL ROAD ALERT         BUNYA CREEK                0.00 R    Booral Rd                                         
+                      540450 BLACK SWAMP ALERT         BLACK SWAMP CK             0.00 C                                                      
+                                                                                                                                              
+BURRUM                540036 URANGAN TIDE TM           MARY RIVER                 4.28 T                                                      
+                      540267 LENTHALLS DAM HW TM       BURRUM RIVER              26.00 F    Full Supply Level                                 
+                      040906 LENTHALLS DAM ALERT       BURRUM RIVER              26.00 F    Full Supply Level                                 
+                      540449 TORBANLEA ALERT           BURRUM RIVER               0.00 R    Torbanlea-Pialba Rd                               
+                      040907 HOWARD ALERT              BURRUM RIVER               4.87 W                                                      
+                      540076 ISIS RIVER(BRUCE HIGHWAY  ISIS RIVER                14.45 B    New Bruce Highway Bridge                          
+                             TM)                                                                                                              
+                                                                                                                                              
+                      539061 GREGORY RIVER(BURRUM HWY  GREGORY RIVER             13.00 B    New Isis Highway Bridge                           
+                             TM)                                                                                                              
+                                                                                                                                              
+                      539060 DR MAYS CROSSING TM       ELLIOTT RIVER              1.60 C                                                      
+                                                                                                                                              
+BURNETT               539064 CANIA DAM                 THREE MOON CREEK           0.00 S    Heights over Spillway                             
+                      539092 CANIA DAM HW TM           THREE MOON CK              0.00 S                                                      
+                      539182 CANIA DAM HW ALERT                                   0.00 S                                                      
+                      039165 MONTO                     THREE MOON CREEK           7.40 B    New Huntings Bridge (Burnett Highway)             
+                      039000 ABERCORN                  THREE MOON CREEK           6.40 B    Railway Bridge                                    
+                      539035 JOHN GOLEBY WEIR HW TM    BURNETT RIVER              0.00 W                                                      
+                      039236 WURUMA DAM                NOGO RIVER                 0.00 S    Heights over Spillway                             
+                      539051 WURUMA DAM HW TM          NOGO RIVER                 0.00 S    Spillway                                          
+                      539203 WURUMA HW ALERT                                      0.00 S    Crest level is 228.292m AHD                       
+                      039259 EIDSVOLD BRIDGE           BURNETT RIVER              6.00 B    Eidsvold Station Bridge (Cracow Road)             
+                      539257 COONAMBULA ALERT                                     0.70 X                                                      
+                      042059 AUBURN                    AUBURN RIVER               2.40 B    Auburn River Bridge                               
+                      039177 GLENWOOD                  AUBURN RIVER               4.00 B    Dykehead Bridge (Hawkwood Road)                   
+                      540056 CARTERS TM                BOYNE RIVER                5.50 B    Carters Bridge                                    
+                      540231 WEENS BRIDGE TM           STUART RIVER               6.10 B    Weens Road Bridge                                 
+                      540055 PROSTON TM                STUART RIVER               5.60 B    Proston Bridge                                    
+                      040722 BOONDOOMA DAM             BOYNE RIVER                0.00 S    Heights over Spillway                             
+                      540262 BOONDOOMA DAM HW TM       BOYNE RIVER                0.00 S    Spillway                                          
+                      540698 BOONDOOMA HW AL                                      0.00 S    Crest level is 280.400 AHD                        
+                      040455 DUNOLLIE                  BOYNE RIVER                2.75 B    Boondooma Road Bridge                             
+                      539038 DERRA TM                  BOYNE RIVER                3.80 B                                                      
+                      539187 DERRA ALERT               BOYNE RIVER                3.80 B                                                      
+                      539066 JONES WEIR HW TM          BURNETT RIVER            110.00 W    Jines Weir Crest                                  
+                      039320 JONES WEIR TW TM          BURNETT RIVER             16.30 B    Dimitrios Bridge (Mundubbera-Durong Rd)           
+                      039073 MUNDUBBERA                BURNETT RIVER             17.00 B    Dimitrios Bridge (Mundubbera-Durong Rd)           
+                      539197 MUNDUBBERA ALERT                                    17.00 B    Dimitrios Bridge (Mundubbera-Durong Rd)           
+                      039191 GAYNDAH                   BURNETT RIVER             18.10 B    Les Baker Bridge                                  
+                      540041 BROOKLANDS TM             BARKER CREEK               4.30 B    Brooklands Bridge                                 
+                      040500 EMBREYS BRIDGE            BARKER CREEK               7.40 B    Embreys Bridge                                    
+                      540042 GLENMORE TM               BARKER CREEK               3.80 H    Burnett Highway                                   
+                      540090 BJELKE-PETERSEN DAM       BARKER CREEK               1.30 B    Memerambi Barkers Ck Br                           
+                      540053 BJELKE-PETERSEN DAM HW TM BARKER CREEK               1.30 B    Memerambi Barkers Ck Br                           
+                      540025 WEST BARAMBAH TM          BARAMBAH CREEK            10.20 B    West Barambah Bridge                              
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:    6
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+BURNETT               540362 JOE SIPPEL WEIR HW TM     BARAMBAH CK                0.00 W                                                      
+                      540361 JOE SIPPEL WEIR TW TM     BARAMBAH CK                8.50 B    Angels Bridge                                     
+                      540679 CHERBOURG TM              BARAMBAH CREEK             8.70 B    Barambah Creek Bridge                             
+                      540077 FICKS CROSSING TM         BARAMBAH CREEK             8.20 B    John Krebs Bridge (Murgon-Wondai Road)            
+                      539077 SILVERLEAF WEIR HW TM     BARAMBAH CREEK             2.80 B    Byee Bridge                                       
+                      539073 SILVERLEAF WEIR TW TM     BARAMBAH CREEK             6.90 B    Sliver Leaf TW Bridge                             
+                      040428 BRIAN PASTURES            BARAMBAH CREEK             9.10 B    Barambah Bridge (Burnett Highway)                 
+                      039193 MT LAWLESS TM             BURNETT RIVER              6.10 B    Burnett River Bridge?                             
+                      539151 MT LAWLESS ALERT          BURNETT RIVER              6.10 B    Burnett River Bridge                              
+                      539150 MINGO CROSSING ALERT      BURNETT R                  8.70 B    Mingo Crossing Bridge.                            
+                      039184 PARADISE DAM              BURNETT RIVER              0.00 S    Spillway RL= 61.80 m AHD                          
+                      539108 PARADISE DAM HW TM        BURNETT RIVER              0.00 S    Spillway RL= 61.80 m AHD                          
+                      539152 PARADISE DAM ALERT        BURNETT RIVER              0.00 S    Spillway RL= 61.80 m AHD                          
+                      539147 MT RAWDON ALERT           PERRY R                    0.00 W                                                      
+                      539231 MORGANVILLE ALERT         PERRY RIVER                3.91 B    Perry River Bridge (Walla Rd)                     
+                      039258 WALLA ALERT-B             BURNETT RIVER              5.50 O    Burnett River Bridge                              
+                      539215 ST AGNES CK ALERT                                    7.60 B    St Agnes Bridge(Walla Rd)                         
+                      539089 NED CHURCHWARD WEIR HW TM BURNETT RIVER             19.00 W                                                      
+                      539149 NED CHURCHWARD WEIR HW    BURNETT R                 19.00 W                                                      
+                             ALERT                                                                                                            
+                                                                                                                                              
+                      539262 BUNGADOO GOONDOON ROAD AL GERMANBULYAN CK            5.60 B                                                      
+                      539261 CHERRY CK (LENIHANS RD)   CHERRY CREEK               3.91 B                                                      
+                             AL                                                                                                               
+                                                                                                                                              
+                      539263 PINE CREEK RD AL          PINE CK                    5.76 B    Pine Creek Bridge                                 
+                      039170 BUNDABERG                 BURNETT RIVER             11.40 B    Burnett River Bridge                              
+                      039352 BUNDABERG ALERT           BURNETT R                 11.40 B    Burnett River Bridge                              
+                      539260 BAROLIN ST ALERT          SALTWATER CK               3.64 R                                                      
+                      539143 BUNDABERG SOUTH ALERT     BUNDABERG CK               5.60 X    Ford St Culvert.                                  
+                      539076 BURNETT HEADS TIDE TM     BUNDABERG HARBOUR          3.67 T                                                      
+                                                                                                                                              
+KOLAN                 039137 MOLANGOOL                 KOLAN RIVER                1.00 C    Kolan River Causeway (Kalpowar Road)              
+                      539050 FRED HAIGH DAM HW TM      KOLAN RIVER                0.00 S    Spillway                                          
+                      539207 FRED HAIGH HW ALERT       KOLAN RIVER                0.00 S    Spillway=75.56m                                   
+                      039011 MONDURAN                  KOLAN RIVER                3.40 B    Monduran Bridge (Rosedale Road)                   
+                      539206 MOOLBOOLAMAN ALERT        GIN GIN CREEK              0.24 X    Duckpond Rd Crossing                              
+                      539047 BUCCA WEIR HW TM          KOLAN RIVER               16.20 W                                                      
+                      539205 BUCCA WEIR ALERT          KOLAN RIVER               16.20 W    FSL=16.2m                                         
+                      539265 HERMANS GULLY AL          HERMANS GULLY              1.64 R                                                      
+                      539264 STONY CREEK (BUCCA ROAD)  STONY CREEK                4.04 X                                                      
+                             AL                                                                                                               
+                                                                                                                                              
+                                                                                                                                              
+BAFFLE                539220 ALLIGATOR FLATS ALERT     BAFFLE CREEK               1.55 B                                                      
+                      039267 ESSENDEAN BRIDGE          BAFFLE CREEK               6.20 B    Essendean Bridge                                  
+                      539126 ESSENDEAN BRIDGE ALERT    BAFFLE CREEK               6.20 B    Essendean Bridge                                  
+                      539135 HILLS ROAD ALERT          EULEILAH CK                3.20 B                                                      
+                                                                                                                                              
+BOYNE                 539086 AWOONGA DAM HW TM         BOYNE RIVER               40.00 S                                                      
+                      539131 AWOONGA DAM ALERT         BOYNE R                   40.00 S                                                      
+                      539032 GLADSTONE TIDE TM         BOYNE RIVER                4.63 T                                                      
+                                                                                                                                              
+CALLIOPE              539228 POLICE CREEK ALERT        POLICE CREEK               7.80 B    Dawson Highway Bridge                             
+                                                                                                                                              
+FITZROY               035271 TARANA CROSSING           DAWSON RIVER               0.70 X    Tarana Crossing (Dawson River)                    
+                      535142 TARANA CROSSING ALERT     DAWSON RIVER               0.70 X    Tarana Crossing                                   
+                      035115 TAROOM                    DAWSON RIVER               6.70 A    WH Copeland Bridge (Leichhardt Highway)           
+                      035282 TAROOM TM                 DAWSON RIVER               6.70 A    WH Copeland Bridge (Leichhardt Highway)           
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:    7
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+FITZROY               535044 GLEBE WEIR HW TM          DAWSON RIVER               0.00 W                                                      
+                      539070 GYRANDA WEIR TM           DAWSON RIVER               0.00 W                                                      
+                      539163 GYRANDA WEIR ALERT        DAWSON RIVER               0.00 W                                                      
+                      539172 CASTLE CREEK ALERT        CASTLE CK                  3.62 R    Castle Creek Bridge (Defence Rd)                  
+                      039315 THEODORE                  DAWSON RIVER               5.90 W                                                      
+                      535110 THEODORE WEIR TM          DAWSON RIVER               5.90 W                                                      
+                      539175 LONESOME CREEK ALERT      LONESOME CK                3.95 B    Leichhardt Hway                                   
+                      039296 MOURA                     DAWSON RIVER              12.50 B    Dawson Highway Bridge                             
+                      539081 MOURA WEIR TM             DAWSON RIVER               0.00 W                                                      
+                      539165 MOURA WEIR ALERT          DAWSON R                   0.00 W                                                      
+                      039143 BARALABA                  DAWSON RIVER               8.84 B    Dawson River Bridge                               
+                      539080 BARALABA HW TM            DAWSON RIVER               0.00 W                                                      
+                      539079 BARALABA TW TM            DAWSON RIVER               9.04 B    Dawson River Bridge                               
+                      539112 KROOMBIT DAM HW TM        KROOMBIT CREEK             0.00 F    Full Supply Level                                 
+                      539241 KROOMBIT DAM ALERT        KROOMBIT CREEK             0.00 F    Full Supply Level                                 
+                      539232 BILOELA ALERT             KROOMBIT CREEK             5.60 B    Dawson Highway Bridge                             
+                      539071 CALLIDE DAM HW TM         CALLIDE CREEK              0.00 F                                                      
+                      539235 CALLIDE DAM HW ALERT      CALLIDE CREEK              0.00 F                                                      
+                      539240 JAMBIN ALERT              CALLIDE CREEK              2.70 B    Jambin-Goovigen Rd Bridge                         
+                      539219 DULULU TM                 DEE RIVER                  3.80 C    Dee River Culvert                                 
+                      039308 RANNES                    DON RIVER                  2.50 C    Rannes Homestead Causeway                         
+                      539057 RANNES TM                 DON RIVER                  2.50 C    Rannes Homestead Causeway                         
+                      535200 ARCADIA VALLEY SCHOOL     ARCADIA CREEK              2.78 B                                                      
+                             ALERT                                                                                                            
+                                                                                                                                              
+                      035145 ROLLESTON                 COMET RIVER                5.27 B    Comet River Bridge (Tom Strandquist Br)           
+                      535109 ROLLESTON ALERT           COMET RIVER                5.27 B    Comet River Bridge                                
+                      535214 PANORAMA CK (DAWSON HWAY) PANORAMA CK                1.75 B    Panorama Ck Bridge                                
+                             AL                                                                                                               
+                                                                                                                                              
+                      535025 COMET WEIR TM             COMET RIVER               10.90 B    Comet Bridge                                      
+                      535094 COMET WEIR ALERT          COMET RIVER               10.90 B    Comet Bridge.                                     
+                      035150 RAYMOND                   NOGOA RIVER                3.85 B    Nogoa River Bridge                                
+                      535099 RAYMOND ALERT             NOGOA RIVER                3.85 B    Nogoa River Bridge                                
+                      535153 GLENLEE ALERT             NOGOA RIVER                5.35 B    Glenlee Road bridge.                              
+                      535175 BORILLA CK ALERT          BORILLA CREEK              2.05 B    Borilla Creek bridge                              
+                      035241 FAIRBAIRN DAM             NOGOA RIVER                0.00 S    Heights over Spillway                             
+                      535019 FAIRBAIRN DAM TM          NOGOA RIVER                0.00 S    Spillway                                          
+                      535101 FAIRBAIRN DAM AL          NOGOA RIVER                0.00 S    Spillway                                          
+                      035260 EMERALD                   NOGOA RIVER               14.50 A    Approaches to Vince Lester Bridge                 
+                      535076 EMERALD ALERT             NOGOA RIVER               14.50 A    Approaches to Vince Lester bridge.                
+                      535103 SANDY CREEK BRIDGE TM     SANDY CREEK                9.50 B    Sandy Creek Bridge                                
+                      035232 VALERIA                   THERESA CREEK              4.00 B    Theresa Creek Bridge                              
+                      535018 VALERIA TM                THERESA CREEK              4.00 B    Theresa Creek Bridge                              
+                      035187 VALERIA AL                THERESA CREEK              4.00 B    Theresa Creek bridge.                             
+                      535100 SAPPHIRE AL               RETREAT CREEK              9.10 B    Retreat Creek Bridge                              
+                      535077 RUBYVALE ALERT            POLICEMANS CREEK           1.29 X                                                      
+                      535017 GREGORY HIGHWAY TM        THERESA CREEK              9.00 R    Road level from council (Nov 21)                  
+                      535098 GREGORY HIGHWAY ALERT     THERESA CREEK              9.00 R    Road level from council (Nov 21)                  
+                      535046 RILEY'S CROSSING TM       MACKENZIE RIVER            5.95 B    Riley's Crossing                                  
+                      535095 RILEYS CROSSING ALERT     MACKENZIE RIVER            5.95 B    Riley's Crossing                                  
+                      535027 BEDFORD WEIR HW TM        MACKENZIE RIVER            0.00 W    Crest level                                       
+                      535026 BEDFORD WEIR TW TM        MACKENZIE RIVER            2.25 B    Bedford Weir Crossing                             
+                      535096 BEDFORD WEIR TW ALERT     MACKENZIE RIVER            2.25 B    Bedford Weir Crossing                             
+                      535023 BINGEGANG HW TM           MACKENZIE RIVER            7.45 W                                                      
+                      035295 BINGEGANG WEIR HW ALERT   MACKENZIE RIVER            7.45 W                                                      
+                      035266 BINGEGANG                 MACKENZIE RIVER           14.60 B    Robert Acton Br (Mt Flora-Dingo Beef Rd)          
+                      034082 TARTRUS                   MACKENZIE RIVER            5.70 W                                                      
+                      034096 TARTRUS TM                MACKENZIE RIVER            5.67 W    Tartrus Weir                                      
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:    8
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+FITZROY               534043 TARTRUS ALERT             MACKENZIE RIVER            5.67 W    Tartrus Weir                                      
+                      535113 FOLEYVALE ALERT           MACKENZIE RIVER            3.55 B    Apis Ck Road Bridge                               
+                      534026 ISAAC RIVER BRIDGE TM     ISAAC RIVER                8.90 B    Peak Downs Highway                                
+                      534028 FITZROY DEVELOPMENTAL RD  ISAAC RIVER               10.25 B    Fitzroy Developmental Road                        
+                             BR TM                                                                                                            
+                                                                                                                                              
+                      533122 UPPER BEE CK TM           BEE CREEK                  3.70 B    Suttor Development Rd                             
+                      534027 BEE CREEK TM              BEE CREEK                 11.70 B    Peak Downs Highway                                
+                      533030 BRAESIDE TM               DENISON CREEK              3.50 B    Denison Ck                                        
+                      534039 OXFORD DOWNS-SARINA RD TM DENISON CREEK              0.00 B                                                      
+                      533113 PROSPECT CK TM            PROSPECT CK                0.00 B    Marlborough-Sarina Rd                             
+                      533185 FUNNEL CREEK BR TM        FUNNEL CREEK               0.00 B                                                      
+                      534005 FUNNEL CREEK TM           FUNNEL CREEK               4.50 B    Old Bruce Highway Bridge                          
+                      034083 WAITARA                   FUNNEL CREEK               3.00 B    Funnel Creek Bridge (Old Bruce Highway)           
+                      033083 CARDOWAN                  CONNORS RIVER              5.00 B    Connors River Bridge                              
+                      534038 MAY DOWNS RD TM           ISAAC RIVER                1.29 B    May Downs Road Bridge                             
+                      534015 MAY DOWNS ROAD BRIDGE     ISSAC RIVER                1.50 B    May Downs Road Bridge                             
+                      039044 RIVERSLEA TM              FITZROY RIVER             21.60 B    Fitzroy River Bridge                              
+                      033076 YAAMBA                    FITZROY RIVER             18.50 A    Bruce Highway Bridge (Alligator Creek)            
+                      539075 PORT ALMA TIDE TM         FITZROY DELTA              5.98 T                                                      
+                      533085 ROSSLYN BAY TIDE TM       FITZROY RIVER              5.14 T                                                      
+                                                                                                                                              
+PLANE                 533143 SUCROGEN WEIR ALERT       PLANE CREEK                9.80 B    Bruce Highway                                     
+                      533012 HAY POINT TIDE TM         PIONEER RIVER              7.14 T                                                      
+                      533010 DALRYMPLE BAY TIDE TM     PIONEER RIVER              7.14 T                                                      
+                      533124 KINCHANT DAM TM           NORTH SANDY CREEK          0.00 F    Full Supply Level                                 
+                      533198 ANTONEYS CROSSING ALERT   SANDY CK (NORTH BRANCH     2.10 R    Sandy Creek crossing                              
+                                                       )                                                                                      
+                                                                                                                                              
+                                                                                                                                              
+PIONEER               533064 TEEMBURRA DAM HW TM       TEEMBURRA CREEK          290.00 S    Spillway                                          
+                      533041 TEEMBURRA DAM ALERT       TEEMBURRA CREEK            0.00 S    Teemburra Dam Spillway                            
+                      033141 FINCH HATTON              CATTLE CREEK              10.00 B    Highams Bridge (Finch Hatton Gorge Road)          
+                      533092 FINCH HATTON TM           CATTLE CREEK              10.00 B    Highams Bridge                                    
+                      533059 FINCH HATTON ALERT        CATTLE CREEK              10.00 B    Highams Bridge (Finch Hatton Gorge Road)          
+                      533177 MATTIE O'NEILL BR ALERT   CATTLE CREEK               3.60 B    Cattle Creek bridge crossing                      
+                      033281 GARGETT TM                CATTLE CREEK              17.90 B    Frank Neilson Bridge                              
+                      033304 GARGETT ALERT             CATTLE CREEK              17.90 B    Frank Neilsen Br                                  
+                      533069 MIRANI WEIR HW TM         PIONEER RIVER             45.20 W                                                      
+                      033152 MIRANI                    PIONEER RIVER             15.80 B    Pioneer River Bridge                              
+                      533125 MARIAN WEIR TM            PIONEER RIVER              0.00 W                                                      
+                      533145 MARIAN WEIR ALERT         PIONEER RIVER              0.00 W                                                      
+                      033283 DUMBLETON ROCKS TM        PIONEER RIVER             14.00 F    Pioneer River Causeway                            
+                      033300 DUMBLETON ROCKS ALERT     PIONEER RIVER             14.00 F    Pioneer River Causeway                            
+                      533060 HOSPITAL BRIDGE ALERT     PIONEER RIVER              6.64 O    Old Hospital Bridge                               
+                      033246 MACKAY                    PIONEER RIVER              9.60 B    Forgan Smith Bridge                               
+                      033303 MACKAY ALERT              PIONEER RIVER              9.60 B    Forgan-Smith Bridge                               
+                      533009 OUTER HARBOUR TIDE TM     PIONEER RIVER              6.58 T                                                      
+                      033305 OUTER HARBOUR TIDE ALERT  PIONEER RIVER              6.58 T                                                      
+                      533061 GOOSEPONDS ALERT          GOOSEPOND CREEK            6.40 B    Willetts Road Bridge                              
+                                                                                                                                              
+PROSERPINE            033273 PETER FAUST DAM           PROSERPINE RIVER           0.00 S    Heights over Spillway                             
+                      533019 PETER FAUST DAM HW TM     PROSERPINE RIVER           0.00 S    Heights over Spillway                             
+                      533172 PETER FAUST DAM HW ALERT  PROSERPINERIVER            0.00 S    Heights over Spillway                             
+                      533086 LAGUNA QUAYS TIDE TM      PROSERPINE RIVER           6.30 T                                                      
+                      533008 SHUTE HARBOUR TIDE TM     SHUTE HARBOUR              4.33 T                                                      
+                                                                                                                                              
+DON                   033267 MT DANGAR ALERT           DON RIVER                  2.10 C    Mt Dangar Causeway                                
+                      033264 BOWEN PUMP STATION ALERT  DON RIVER                  2.00 B    Inverdon Bridge                                   
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:    9
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+DON                   533048 BOWEN TIDE TM             PORT OF BOWEN              3.73 T                                                      
+                                                                                                                                              
+BURDEKIN              032063 BLUE RANGE                BURDEKIN RIVER             3.20 B    Burdekin River Bridge                             
+                      532017 BLUE RANGE TM             BURDEKIN RIVER             3.20 B    Burdekin River Bridge                             
+                      532063 PALUMA DAM ALERT          BURDEKIN RIVER             0.00 S                                                      
+                      034085 SELLHEIM                  BURDEKIN RIVER            13.50 B    Macrossan Bridge (Flinders Highway)               
+                      533011 SELLHEIM TM               BURDEKIN RIVER            13.50 B    Macrossan Bridge (Flinders Highway)               
+                      533075 SELLHEIM ALERT            BURDEKIN RIVER            13.50 B    Macrossan Bridge                                  
+                      035236 RIVINGTON                 ALPHA CREEK                2.20 B    Alpha Creek Bridge                                
+                      535296 RIVINGTON ALERT           ALPHA CREEK                2.20 X    Alpha Ck bridge                                   
+                      035229 ALPHA                     ALPHA CREEK               11.20 B    Arthur Palmer Bridge                              
+                      535102 UPPER BELYANDO TM         BELYANDO RIVER             2.90 B    Clermont Alpha Road                               
+                      036083 ALBRO                     BURDEKIN RIVER             0.01 X                                                      
+                      536013 LAGLAN RD TM              MISTAKE CREEK              0.77 B    Laglan Rd Bridge                                  
+                      536007 BELYANDO CROSSING TM      BELYANDO RIVER             7.85 B    Belyando Crossing                                 
+                      034022 MT DOUGLAS                BELYANDO RIVER             9.20 B    Belyando River Bridge                             
+                      534024 LOGAN CREEK TM            LOGAN CREEK                2.80 B    Diamomd Downs Rd                                  
+                      034087 SCARTWATER                SUTTOR RIVER               1.20 B    Suttor River Bridge                               
+                      034094 TAEMAS                    CAPE RIVER                 9.07 B                                                      
+                      534017 TAEMAS TM                 CAPE RIVER                 9.07 B                                                      
+                      534010 TAEMAS ALERT              CAPE RIVER                 9.07 B                                                      
+                      034029 BURDEKIN DAM              BURDEKIN RIVER             0.00 S    Burdekin Dam Causeway                             
+                      534001 BURDEKIN DAM TM           BURDEKIN RIVER             0.00 S    Spillway                                          
+                      034097 BURDEKIN DAM ALERT        BURDEKIN RIVER             0.00 S    Spillway                                          
+                      534045 BURDEKIN FALLS DAM HW     BURDEKIN RIVER             0.00 S    Spillway                                          
+                             ALERT                                                                                                            
+                                                                                                                                              
+                      533123 EUNGELLA DAM HW TM        BROKEN RIVER               0.00 F                                                      
+                      533090 CLARE WEIR TM             BURDEKIN RIVER            20.54 S                                                      
+                      033204 INKERMAN BRIDGE           BURDEKIN RIVER            18.30 B    Inkerman Bridge                                   
+                      033288 INKERMAN BRIDGE ALERT     BURDEKIN RIVER            18.30 B    Inkerman Bridge                                   
+                      533057 RITA ISLAND ALERT         BURDEKIN RIVER             0.00 B    Rita Island Bridge                                
+                      533118 AYR ALERT                 PLANTATION CREEK           1.80 X    Bruce Highway                                     
+                      533117 BRANDON ALERT             DAL SANTOS                 2.90 C    Bruce Highway                                     
+                                                                                                                                              
+HAUGHTON              533116 EAST BARRATTAS ALERT      EAST BARRATTA CK           5.20 A    Bruce Highway                                     
+                      033207 FLORA VALLEY              REID RIVER                12.00 B    Reid River Bridge (Flinders Highway)              
+                      033249 HUSTONS FARM              HAUGHTON RIVER             6.10 B    Haughton River Bridge                             
+                      533160 VAL BIRD WEIR TM          HAUGHTON RIVER             0.00 F    FSL = 6.70m AHD                                   
+                      533150 REED BEDS ALERT           HAUGHTON R                 1.50 B                                                      
+                      533161 GIRU WEIR TM              HAUGHTON RIVER             0.00 F    FSL = 3.85m AHD                                   
+                                                                                                                                              
+ROSS                  532005 CAPE FERGUSON TIDE TM                                3.84 T                                                      
+                      532035 STUART CREEK ALERT        STUART CREEK               6.90 B    Bruce Highway                                     
+                      532020 ROSS RIVER DAM ALERT      ROSS RIVER                38.55 S    Spillway                                          
+                      532030 BLACK WEIR (RIVERWAY) AL  ROSS RIVER                 0.00 W                                                      
+                      532029 APLIN WEIR ALERT          ROSS RIVER                 0.00 W                                                      
+                      532037 MYSTERTON ALERT           ROSS RIVER                 3.80 B    Townsend St                                       
+                      532004 TOWNSVILLE TIDE TM        ROSS RIVER                 4.11 T                                                      
+                      532033 TOWNSVILLE TIDE ALERT     ROSS RIVER                 4.11 T                                                      
+                      532032 LOUISA CREEK ALERT        LOUISA CREEK               6.40 B    Bayswater Rd bridge.                              
+                      532089 DALRYMPLE ROAD ALERT      BOHLE RIVER               13.56 B    Dalrymple Rd.                                     
+                                                                                                                                              
+HERBERT               531111 CROOKS DAM HW TM          RETURN CREEK             691.30 S                                                      
+                      532028 ABERGOWRIE BRIDGE ALERT   HERBERT RIVER             10.10 B    Abergowrie Bridge                                 
+                      032091 ELPHINSTONE PKT           HERBERT RIVER             10.10 B    Abergowrie Bridge                                 
+                      032149 PEACOCK SIDING            STONE RIVER                0.50 B    Seri Bridge (Property/Farm Bridge)                
+                      032094 GAIRLOCH                  HERBERT RIVER              4.10 B    Herbert River Bridge                              
+                      532027 GAIRLOCH ALERT            HERBERT RIVER              4.10 B    Herbert R bridge                                  
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:   10
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+HERBERT               032156 HALIFAX                   HERBERT RIVER              6.50 A    Herbert River Bridge                              
+                      032185 HALIFAX ALERT             HERBERT RIVER              6.50 A    Herbert River Bridge                              
+                      532019 LUCINDA OFFSHORE TIDE TM  HINCHINBROOK CHANNEL       3.96 T                                                      
+                                                                                                                                              
+TULLY                 532003 CARDWELL TIDE TM          TULLY RIVER                4.13 T                                                      
+                      532113 CARDWELL TIDE  ALERT                                 4.13 T                                                      
+                      532060 MURRAY FLATS ALERT        MURRAY RIVER               8.50 A    Bruce Highway Bridge(new)                         
+                      032115 EURAMO                    TULLY RIVER                8.70 A    Tully River Bridge (New)                          
+                      032167 EURAMO TM                 TULLY RIVER                8.70 A    Tully River Bridge (new)                          
+                      532059 EURAMO ALERT              TULLY RIVER                8.70 A    Bruce Highway Bridge(new)                         
+                      532002 CLUMP POINT TIDE TM       TULLY RIVER                3.62 T                                                      
+                      532114 CLUMP POINT TIDE ALERT                               3.62 T                                                      
+                                                                                                                                              
+JOHNSTONE             532023 MCAVOY BRIDGE ALERT       NTH JOHNSTONE RIVER        7.10 B    McAvoy Bridge (Bruce Highway)                     
+                      032155 CENTRAL MILL TM           STH JOHNSTONE RIVER        3.90 O    Old Bridge at Central Mill                        
+                      032160 CENTRAL MILL ALERT        STH JOHNSTONE RIVER        3.90 O    Old Central Mill Bridge                           
+                      532024 MOURILYAN HARBOUR ALERT   MORESBY RIVER              3.50 T                                                      
+                      532018 MOURILYAN TIDE TM         MOURILYAN HARBOUR          3.50 T                                                      
+                                                                                                                                              
+MULGRAVE-RUSSELL      531046 THE FISHERIES TM          MULGRAVE RIVER             1.85 B                                                      
+                      531076 THE FISHERIES ALERT       MULGRAVE RIVER             1.85 B                                                      
+                      531023 PEETS BRIDGE TM           MULGRAVE RIVER             5.00 B    Peets Bridge                                      
+                      531052 PEETS BRIDGE ALERT        MULGRAVE RIVER             5.00 B    Peets Bridge                                      
+                      531051 GORDONVALE ALERT          MULGRAVE RIVER            20.18 B    Desmond Trannore Bridge                           
+                      531074 CLYDE RD ALERT            RUSSELL RIVER              0.00 B    Clyde Rd Bridge                                   
+                                                                                                                                              
+BARRON                031075 TINAROO FALLS DAM         BARRON RIVER               0.00 S    Heights over Spillway                             
+                      531017 TINAROO DAM TM            BARRON RIVER               0.00 S    Spillway Level                                    
+                      531034 TINAROO DAM ALERT         BARRON RIVER               0.00 S    Spillway Level                                    
+                      031188 MAREEBA TM                BARRON RIVER               4.80 B    Barron River Bridge                               
+                      531033 MAREEBA ALERT             BARRON RIVER               4.80 B    Barron River Bridge                               
+                      531037 BOLTON ROAD ALERT         CLOHESY RIVER              1.50 B    Clohesy River Bridge                              
+                      031173 MYOLA TM                  BARRON RIVER               5.00 B    Russett Park Bridge                               
+                      531040 MYOLA ALERT               BARRON RIVER               5.00 B    Russett Park Bridge                               
+                      531048 KAMERUNGA BR ALERT        BARRON                    11.30 B    Kamerunga Bridge                                  
+                      031205 COPPERLODE DAM ALERT      FRESHWATER CREEK           0.00 S                                                      
+                      531061 REDLYNCH TM               FRESHWATER CREEK           5.72 B    Freshwater Creek Bridge                           
+                      531072 REDLYNCH ALERT            FRESHWATER CREEK           5.72 B    Freshwater Creek Bridge                           
+                      531044 CAIRNS HARBOUR TIDE TM    CAIRNS HARBOUR             3.50 T                                                      
+                      531050 CAIRNS HARBOUR TIDE AL    CAIRNS HARBOUR             3.50 T                                                      
+                                                                                                                                              
+MOSSMAN               531089 PALM COVE TIDE TM         CORAL SEA                  3.28 T                                                      
+                      531016 PORT DOUGLAS TIDE TM      MOSSMAN RIVER              3.36 T                                                      
+                      531014 MOSSMAN TIDE TM           NEWELL BEACH JETTY         3.05 T                                                      
+                                                                                                                                              
+ENDEAVOUR             531013 COOKTOWN TIDE TM          ENDEAVOUR RIVER            3.20 T                                                      
+                                                                                                                                              
+NORMANBY              528004 LAURA RIVER TM            COALSEAM CREEK             3.50 B    North Laura Crossing                              
+                      528005 KALPOWAR CROSSING TM      NORMANBY RIVER             1.90 C    Kalpowar Crossing                                 
+                      528016 MOREHEAD RIVER TM         MOREHEAD RIVER             0.00 B    Morehead River                                    
+                                                                                                                                              
+CONDAMINE-BALONNE     041463 KILLARNEY                 CONDAMINE RIVER            6.15 B    Ellen Backhouse Bridge                            
+                      041537 KILLARNEY ALERT           CONDAMINE RIVER            6.15 B    Ellen Backhouse Bridge                            
+                      541035 EMU VALE TM               EMU CREEK                  7.10 B    Emu Creek Bridge                                  
+                      041533 EMU VALE ALERT            EMU CREEK                  7.10 B    Emu Creek Bridge                                  
+                      041536 MURRAYS BRIDGE ALERT      CONDAMINE RIVER            7.10 B    Bridge deck from council (Dec 21)                 
+                      041343 YANGAN                    SWAN CREEK                 6.10 B    Yangan Bridge (Emu Vale-Killarney Road)           
+                      041530 YANGAN ALERT              SWAN CREEK                 6.10 B    Yangan Bridge (Yangan - Killarney Road)           
+                      041477 CONNOLLY DAM              ROSENTHAL CREEK            0.00 S    Spillway                                          
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:   11
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+CONDAMINE-BALONNE     041532 CONNOLLY DAM ALERT        ROSENTHAL CREEK            0.00 S    Spillway                                          
+                      041357 WARWICK                   CONDAMINE RIVER            7.00 B    McCahon Bridge                                    
+                      041534 WARWICK ALERT             CONDAMINE RIVER            7.00 B    McCahon Bridge                                    
+                      041445 LESLIE DAM                SANDY CREEK                0.00 S    Heights over Spillway                             
+                      541055 LESLIE DAM HW TM          SANDY CREEK                0.00 F                                                      
+                      041531 GLENGALLAN CREEK ALERT    BACKWATER CREEK            4.80 B    New England Highway Bridge                        
+                      041473 PRATTEN CONDAMINE RIVER   CONDAMINE RIVER            4.30 B    Ryans Bridge                                      
+                      541049 TALGAI WEIR HW TM         CONDAMINE RIVER            0.00 W                                                      
+                      041345 ALLORA                    DALRYMPLE CREEK            7.90 B    Centenary Bridge                                  
+                      541048 VICTORIA HILL ALERT       DALRYMPLE CREEK            3.90 B    Ryleford - Pratten Road Bridge                    
+                      041352 CLIFTON                   KINGS CREEK                6.60 B    Aides Bridge                                      
+                      041518 AIDES BRIDGE TM           KINGS CREEK                6.60 B    Aides Bridge                                      
+                      541050 MILLBROOK ALERT           CONDAMINE RIVER            5.20 B    Clifton - Leyburn Road Bridge                     
+                      041404 ELLANGOWAN                THANES CREEK               3.00 B    Thanes Creek Bridge                               
+                      041405 FELTON                    HODGSON CREEK              3.80 B    Hodgson Creek Bridge                              
+                      041060 LEYBURN                   CANAL CREEK                2.10 B    McIntyre Street Bridge                            
+                      041514 LEYBURN TM                CANAL CREEK                0.67 X    Donovan Rd Crossing                               
+                      041342 TUMMAVILLE                CONDAMINE RIVER            4.30 B    Condamine River Bridge                            
+                      041499 TUMMAVILLE TM             CONDAMINE RIVER            4.30 B    Condamine River Bridge                            
+                      041472 CENTENARY BRIDGE          CONDAMINE RIVER            6.25 A    Centenary Bridge (Gore Highway)                   
+                      541158 CENTENARY BRIDGE TM       CONDAMINE RIVER            6.25 A    Centenary Bridge (Gore Highway)                   
+                      541096 LEMON TREE WEIR TM        CONDAMINE RIVER          370.01 F                                                      
+                      041410 CECIL PLAINS              CONDAMINE RIVER            6.90 B    Condamine River Bridge                            
+                      041498 CECIL PLAINS TM           CONDAMINE RIVER            6.90 B    Condamine River Bridge                            
+                      041358 TIPTON BRIDGE             CONDAMINE RIVER            8.40 B    Tipton Bridge                                     
+                      041008 BOWENVILLE                OAKEY CREEK                0.80 C    Oakey Creek Causeway (Norwin Road)                
+                      541042 MOFFATT ALERT             NORTH MYALL CREEK          2.00 X    North Myall Creek Crossing                        
+                      041479 FAIRVIEW TM               OAKEY CREEK                6.00 B    Oakey Creek Bridge                                
+                      041478 DALBY                     MYALL CREEK                1.90 B    Patrick Street Bridge                             
+                      541041 DALBY ALERT               MYALL CREEK                1.87 B    Patrick Street Bridge                             
+                      541054 LOUDOUN WEIR TM           CONDAMINE RIVER            1.78 W                                                      
+                      041339 LOUDOUN BRIDGE            CONDAMINE RIVER            9.10 A    Loudoun Bridge                                    
+                      541155 LOUDOUN BRIDGE ALERT      CONDAMINE RIVER            9.10 A                                                      
+                      041346 RANGES BRIDGE             CONDAMINE RIVER            7.46 B    Ranges Bridge                                     
+                      541197 RANGES BRIDGE AL          CONDAMINE RIVER            7.46 B    Ranges Bridge                                     
+                      041486 WARRA-KOGAN RD BR         CONDAMINE RIVER            9.10 B    Norm Bryant Bridge                                
+                      541122 JANDOWAE-MACALISTER ROAD                             3.07 X                                                      
+                             AL                                                                                                               
+                                                                                                                                              
+                      541162 JANDOWAE DAM ALERT        JANDOWAE CREEK             0.00 S    Spillway                                          
+                      541118 JANDOWAE AL                                          2.20 B                                                      
+                      541154 WARRA ALERT               COORANGA CK                4.00 B    Warrego Highway Bridge                            
+                      541071 CHINCHILLA WEIR HW TM     CONDAMINE RIVER            0.00 W                                                      
+                      041411 CHINCHILLA WEIR TW        CONDAMINE RIVER           10.00 R    George Gray Bridge (Chinchilla-Tara Rd)           
+                      041517 CHINCHILLA WEIR TW TM     CONDAMINE RIVER           10.00 R    George Gray Bridge (Chinchilla-Tara Rd)           
+                      041409 BERUNA                    CHARLEYS CREEK             5.80 B    Charleys Creek Bridge                             
+                      541126 BERUNA AL                                            5.80 B    Charleys Creek Bridge                             
+                      541125 SEVEN OAKS AL                                        2.40 B    Charley's Creek Crossing                          
+                      041476 BURNCLUITH BRIDGE         CHARLEYS CREEK             3.70 B    Burncluith Bridge                                 
+                      541124 BURNCLUITH BRIDGE AL                                 3.70 B    Burncluith Bridge                                 
+                      041351 CHINCHILLA                CHARLEYS CREEK             5.20 B    Warrego Highway Bridge                            
+                      541123 CHINCHILLA AL             CHARLEYS CREEK             5.20 B    Warrego Highway Bridge                            
+                      541074 CHINCHILLA TM             CHARLEYS CREEK             5.00 W                                                      
+                      042048 CONDAMINE                 CONDAMINE RIVER           10.10 B    Crawford Bridge                                   
+                      542019 CONDAMINE ALERT           CONDAMINE R               10.10 B    Crawford Bridge.                                  
+                      042110 LEICHHARDT HIGHWAY        UNDULLA CREEK              1.10 B    Bigambul Crossing (Leichhardt Highway)            
+                      042098 COTSWOLD TM               CONDAMINE RIVER            4.29 W                                                      
+                      042049 MILES                     DOGWOOD CREEK             10.10 B    R.J. Simmonds Bridge (Warrego Highway)            
+                      542023 MILES ALERT               DOGWOOD CREEK             10.10 B    Warrego Highway bridge.                           
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:   12
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+CONDAMINE-BALONNE     042107 GILWEIR TM                DOGWOOD CREEK              7.63 W                                                      
+                      042113 PINE HILL CROSSING        DOGWOOD CREEK              2.44 B    Drillham Road Bridge                              
+                      043052 WARKON                    BALONNE RIVER              3.20 B    Balonne River Bridge                              
+                      043063 SURAT                     BALONNE RIVER             11.00 B    Balonne River Bridge                              
+                      543005 SURAT TM                  BALONNE RIVER             10.80 B                                                      
+                      543025 KNAYERS LANE TM           BUNGIL CREEK               0.31 X                                                      
+                      043074 ROMA                      BUNGIL CREEK               6.30 B    F.H.(Joe) Orr Bridge                              
+                      543010 ROMA TM                   BUNGIL CREEK               5.25 B    F.H. (Joe) Orr Bridge                             
+                      043080 KAROOLA PARK              MUCKADILLA CREEK           3.00 B    Maranoa Road Bridge                               
+                      043107 WARROO                    BALONNE RIVER              8.80 B    Warroo Bridge                                     
+                      543016 WARROO TM                 BALONNE RIVER              8.80 B    Warroo Bridge                                     
+                      043009 FOREST VALE               MARANOA RIVER              0.00 C    Maranoa River Causeway                            
+                      543007 FOREST VALE TM            MARANOA RIVER              0.00 C    Hayley Creek Rd                                   
+                      043064 MITCHELL                  MARANOA RIVER              9.00 B    New Warrego Highway Bridge                        
+                      043102 MITCHELL TM               MARANOA RIVER              1.00 C    Maranoa River Causeway                            
+                      043000 AMBY                      AMBY CREEK                 6.90 B    Amby Creek Bridge                                 
+                      043099 SPRINGFIELD               MARANOA RIVER              0.90 C    Springfield Crossing                              
+                      043103 BEARDMORE DAM TM          BALONNE RIVER              0.00 F    FSL = 207.12m AHD                                 
+                      543004 JACK TAYLOR WEIR TM       BALONNE RIVER              0.00 F                                                      
+                      043053 ST GEORGE                 BALONNE RIVER             10.70 B    Andrew Nixon Bridge                               
+                      044154 WHYENBAH                  BALONNE RIVER              5.30 B    Whyenbah Bridge                                   
+                      044197 BRIARIE CREEK TM          BRIARIE CREEK              2.35 X    Woolerbilla-Hebel Road                            
+                      044117 DIRRANBANDI               BALONNE MINOR              5.20 B    Balonne Minor Bridge                              
+                      544012 NARRAN RIVER TM           NARRAN RIVER               5.00 B    Dirranbandi-Hebel Road Bridge                     
+                      044144 HOMEBOIN                  WALLAM CREEK               0.50 X    Wallam Creek Crossing                             
+                      044056 MUNGALLALA                MUNGALLALA CREEK           4.20 B    Mungallala Creek Bridge                           
+                      044131 DEELAMON                  MUNGALLALA CREEK           0.20 X    Mungallala Creek Crossing                         
+                                                                                                                                              
+BORDER RIVERS         554001 PINDARI DAM LEVEL         SEVERN RIVER             516.00 S    Spillway                                          
+                      054035 YETMAN                    MACINTYRE RIVER           14.00 B    Macintyre River Bridge                            
+                      554014 YETMAN (BRIDGE GAUGE)     MACINTYRE RIVER           14.00 B                                                      
+                      541083 STORM KING DAM INFLOW     QUART POT CREEK            2.71 B    Pyramids Road Bridge                              
+                             ALERT                                                                                                            
+                                                                                                                                              
+                      541082 MOUNTAIN STATION CREEK    MOUNTAIN STATION CK        1.60 R    Eukey Road                                        
+                             ALERT                                                                                                            
+                                                                                                                                              
+                      541081 STORM KING DAM HEADWATER  QUART POT CREEK            0.00 S    Storm King Dam Spillway                           
+                             ALERT                                                                                                            
+                                                                                                                                              
+                      541085 DALCOUTH AL               QUART POT CREEK            1.30 C    Dalcouth Road                                     
+                      541084 KETTLE SWAMP CREEK AL     KETTLE SWAMP CREEK         1.28 R    Diamondvale Road                                  
+                      541086 GRANITE STREET ALERT      QUART POT CREEK            0.61 R    Granite Street                                    
+                      541189 GLEN NIVEN DAM HW TM      FOUR MILE CREEK          879.35 S                                                      
+                      541032 BALLANDEAN TM             SEVERN RIVER               1.90 A                                                      
+                      541089 BALLANDEAN ALERT          SEVERN RIVER               1.90 A                                                      
+                      541076 ACCOMMODATION CREEK TM    ACCOMODATION CREEK         1.70 X                                                      
+                      541090 ACCOMMODATION CREEK ALERT ACCOMODATION CREEK         1.70 B                                                      
+                      041430 GLENLYON DAM              PIKE CREEK                 0.00 S    Heights over Spillway                             
+                      541051 GLENLYON DAM HW TM        PIKE CREEK                32.00 S    Spillway                                          
+                      041087 RIVERTON                  DUMARESQ RIVER             2.80 B    Hynes Bridge                                      
+                      041403 TEXAS                     DUMARESQ RIVER             7.50 R    Dumaresq River Bridge                             
+                      041548 TEXAS TM                  DUMARESQ RIVER             7.50 R    Dumaresq River Bridge                             
+                      041457 COOLMUNDA DAM             MACINTYRE BROOK            0.50 C    Macintyre Brook Causeway                          
+                      541033 COOLMUNDA DAM HW TM       MACINTYRE BROOK            0.00 F                                                      
+                      541109 COOLMUNDA DAM TW ALERT    MACINTYRE BROOK            0.50 C    Macintyre Brook Causeway                          
+                      041391 WOODSPRING                CANNING CREEK              7.00 B    Inglewood-Millmerran Road Bridge                  
+                      541108 WOODSPRING ALERT          CANNING CREEK              7.00 B    Millmerran Road Bridge                            
+                      041406 INGLEWOOD BRIDGE          MACINTYRE BROOK           10.40 B    Inglewood Bridge (Cunningham Highway)             
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:   13
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+BORDER RIVERS         541107 INGLEWOOD BRIDGE ALERT    MACINTYRE BROOK           10.40 B    Inglewood Bridge (Cunningham Highway)             
+                      541094 WHETSTONE WEIR TM         MACINTYRE BROOK            0.00 W                                                      
+                      541095 BEN DOR WEIR TM           MACINTYRE BROOK            0.00 W                                                      
+                      041350 GOONDIWINDI               MACINTYRE RIVER           12.20 B    Macintyre River Bridge                            
+                      041500 GOONDIWINDI TM            MACINTYRE RIVER           12.20 B    Macintyre River Bridge                            
+                      541030 GOONDIWINDI WEIR TM       MACINTYRE RIVER            1.50 W                                                      
+                      541070 CARANA WEIR TM            MACINTYRE RIVER            2.00 W                                                      
+                      041485 RETREAT BRIDGE TM         WEIR RIVER                12.50 B    The Glasser Bridge                                
+                      041488 BALLYMENA TM              WEIR RIVER                 3.00 B    The Edgar Giltrow Bridge                          
+                      542004 GUNN BRIDGE (DNRM) TM     WEIR RIVER                 6.98 B    Walter Gunn Bridge                                
+                      041124 KILBRONAE TM              WYAGA CREEK                2.60 X    Kilbronae Crossing (Gore Highway)                 
+                      041489 MEDPARK BRIDGE TM         YARRILL CREEK              4.60 B    Leichhardt Highway Bridge (Yarrill Ck)            
+                      041366 GIDDI GIDDI SOUTH         WEIR RIVER                 1.40 B    Weir River Bridge                                 
+                      041112 GIDDI GIDDI SOUTH TM      WEIR RIVER                 1.40 B    Weir River Bridge                                 
+                      042097 HARTMANN BRIDGE TM        WEIR RIVER                 5.70 B    Hartmann Bridge (Toobeah-Moonie Hwy Rd)           
+                      042104 SURREY TM                 WEIR RIVER                 4.80 B    Weir River Bridge (Bungunya-Westmar Rd)           
+                      042066 TALWOOD                   WEIR RIVER                 3.70 B    Weir River Bridge                                 
+                      042108 TALWOOD TM                WEIR RIVER                 4.40 B    Weir River Bridge                                 
+                      542005 JERICHO TM                WEIR RIVER                 1.00 X                                                      
+                                                                                                                                              
+MOONIE                041493 THE DEEP CROSSING         MOONIE RIVER               0.23 C    Old Moonie Road Causeway                          
+                      041368 TARTHA                    MOONIE RIVER               1.60 C    Moonie River Causeway                             
+                      042100 SOUTHWOOD                 MOONIE RIVER               0.80 C    Moonie River Causeway                             
+                      042111 KINKORA                   MOONIE RIVER               0.06 X    Kinkora Crossing                                  
+                      042053 FLINTON                   MOONIE RIVER               0.90 C    Moonie River Causeway                             
+                      043097 TEELBA                    TEELBA CREEK               0.50 X    Teelba Creek Crossing                             
+                      043045 WARRIE STATION            MOONIE RIVER               0.70 X    Warrie Crossing                                   
+                      044194 NINDIGULLY                MOONIE RIVER               3.50 A    Moonie River Overflow (St George side)            
+                      542009 THALLON BRIDGE            MOONIE RIVER               4.90 B    Old Bullamon Bridge                               
+                                                                                                                                              
+WARREGO               044118 AUGATHELLA                WARREGO RIVER              6.00 A    Landsborough Highway Bridge                       
+                      544011 AUGATHELLA TM             WARREGO RIVER              6.00 A    Landsborough Highway Bridge                       
+                      044193 THE 27 MILE GARDEN        WARREGO RIVER              3.90 A    The 27 Mile Bridge                                
+                      044232 THE 27 MILE GARDEN AL     WARREGO RIVER              3.90 A    27 Mile Garden Bridge                             
+                      044156 CHARLEVILLE RV            WARREGO RIVER              6.10 B    Sturt Street Bridge                               
+                      044229 CHARLEVILLE AL            WARREGO RIVER              6.10 B    Sturt Street Bridge                               
+                      044208 WARILDA                   LANGLO RIVER               3.40 B    Langlo River Bridge                               
+                      544058 WARILDA ALERT             LANGLO RIVER               3.40 B    Langlo River Bridge                               
+                      044209 OAKPARK                   WARD RIVER                 2.50 B    Charleville-Adavale Road Bridge                   
+                      044224 BINNOWEE                  WARD RIVER                 6.20 A    New Ward River Bridge Approaches                  
+                      544021 BINNOWEE TM               WARD RIVER                 6.20 A    New Ward River Bridge Approaches.                 
+                      044230 BINNOWEE AL               WARD RIVER                 6.20 A    New Ward River Bridge                             
+                      044188 AUTHORINGA                ANGELLALA CREEK            1.50 C    Nooraloo Road Causeway                            
+                      044157 MURWEH                    WARREGO RIVER              1.50 B    Yanna Bridge                                      
+                      044158 WYANDRA                   WARREGO RIVER              7.60 A    Warrego River Bridge                              
+                      544014 WYANDRA TM                WARREGO RIVER              7.60 B    Warrego River Bridge                              
+                      044174 WALLEN                    WARREGO RIVER              1.35 X    Wallen Crossing                                   
+                      044116 CUNNAMULLA BRIDGE         WARREGO RIVER             10.10 B    Darby Land Bridge                                 
+                      544019 CUNNAMULLA WEIR TM        WARREGO RIVER              5.51 W                                                      
+                      044210 ROCKY                     WARREGO RIVER              1.00 X    Rocky Crossing                                    
+                                                                                                                                              
+PAROO                 044085 HUMEBURN                  PAROO RIVER                4.50 B    Humeburn Crossing                                 
+                      544075 HUMEBURN AL               PAROO RIVER                4.50 B    Humeburn Crossing                                 
+                      044235 FARNHAM PLAINS            PAROO RIVER                2.70 B    Eulo road bridge                                  
+                      044153 EULO                      PAROO RIVER                3.00 A    Paroo River Bridge                                
+                      044181 HUNGERFORD                PAROO RIVER                1.00 X    Paroo River Crossing                              
+                                                                                                                                              
+BULLOO                045043 ADAVALE                   BLACKWATER CREEK           2.20 X    Blackwater Creek Crossing                         
+                      045044 QUILPIE                   BULLOO RIVER               4.60 B    John Waugh Bridge                                 
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:   14
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+BULLOO                545007 QUILPIE TM                BULLOO RIVER               4.60 B    Bulloo River Bridge                               
+                      545008 WINBIN CREEK TM           WINBIN CREEK               1.56 B    Warrego Highway                                   
+                      545004 SOUTH COMONGIN TM         BULLOO RIVER               1.85 B    Quilpie-Thargomindah Rd                           
+                      045003 SOUTH COMONGIN            BULLOO RIVER               1.20 B    South Comongin Bridge                             
+                      545005 SOONAH CROSSING TM        BULLOO RIVER               0.97 C    Soonah Crossing                                   
+                      045045 THARGOMINDAH              BULLOO RIVER               4.10 B    Bulloo River bridge                               
+                                                                                                                                              
+COOPER CREEK          536006 BOWEN DOWNS TM            CORNISH CK                 4.32 B    Torrens Creek Road                                
+                      536015 TRAGOWEL TM               LANDSBOROUGH RIVER         1.75 B    Hughenden-Muttaburra Rd                           
+                      036037 MUTTABURRA                LANDSBOROUGH RIVER         4.00 B    Landsborough Creek Bridge                         
+                      536014 MUTTABURRA TM             THOMSON RIVER              2.90 B    Landsborough Creek Bridge                         
+                      036162 ARAMAC                    ARAMAC CREEK               1.70 B    Aramac-Barcaldine Road Bridge                     
+                      036013 CAMOOLA PARK              THOMSON RIVER              0.40 X    Thomson River Crossing                            
+                      036161 LONGREACH TM              THOMSON RIVER              3.50 O    Thomson River Bridge (Landsborough Hwy)           
+                      536005 DARR TM                   DARR RIVER                 4.70 B    Darr River Bridge                                 
+                      537007 BOGEWONG TM                                          3.11 B    Bogewong-Alroy Rd Bridge                          
+                      537008 VERGEMONT CREEK TM        VERGEMONT CREEK            0.00 X    Tonkoro Rd                                        
+                      537004 STONEHENGE TM             THOMSON RIVER              3.10 B     Western Thomson Crossing                         
+                      037040 STONEHENGE                THOMSON RIVER              1.60 A    Thomson River Bridge (1st Bdge east end)          
+                      538012 JUNDAH TM                 THOMSON RIVER              3.80 A    Thomson River Bridge                              
+                      038037 JUNDAH                    THOMSON RIVER              3.80 A    Thomson River Bridge                              
+                      035284 TAMBO                     BARCOO RIVER               2.80 A    Tambo-Alpha-Springsure Road Bridge                
+                      035049 GILLESPIE                 BARCOO RIVER               6.40 B    Barcoo River Bridge (Landsborough Hwy)            
+                      535152 GILLESPIE ALERT           BARCOO R                   6.40 B    Barcoo River bridge(Landsborough Hway)            
+                      035259 DUNEIRA                   BARCOO RIVER               1.40 B    Barcoo River Bdge (Isisford-Blackall Rd)          
+                      535126 DUNEIRA ALERT             BARCOO R                   1.40 B    Barcoo River Bdge (Isisford-Blackall Rd)          
+                      036155 BLACKALL                  BARCOO RIVER               3.50 B    New Barcoo River Bridge.                          
+                      536003 BLACKALL TM               BARCOO RIVER               3.70 B    Barcoo River Bridge                               
+                      536009 BLACKALL AL               BARCOO RIVER               3.70 B    Barcoo R Bridge.                                  
+                      035286 GLENCOE                   JORDAN RIVER               1.00 X    Jordan River Crossing                             
+                      535104 GLENCOE ALERT             BARCOO RIVER               1.00 X    Jordan R bridge                                   
+                      535150 JERICHO ALERT                                        3.20 B    Capricorn Highway bridge                          
+                      035285 JERICHO                   JORDAN RIVER               2.30 B    Capricorn Highway Bridge                          
+                      036170 CAPRICORN HIGHWAY         ALICE RIVER                4.40 B    Capricorn Highway Bridge                          
+                      036157 BARCALDINE                ALICE RIVER                5.60 B    Landsborough Highway Bridge                       
+                      536002 BARCALDINE WEIR TM        ALICE RIVER                4.56 W    Lloyd Jones Weir                                  
+                      036026 ISISFORD                  BARCOO RIVER               4.00 B    Barcoo River Bridge                               
+                      036104 OMA                       BARCOO RIVER               1.50 B                                                      
+                      036094 WAHROONGHA                BARCOO RIVER               0.55 X    Barcoo River Crossing                             
+                      038034 GLENLOCK                  BARCOO RIVER               0.90 X    Barcoo River Crossing                             
+                      538011 POWELL CREEK TM           POWELL CREEK               1.25 X                                                      
+                      538001 RETREAT TM                BARCOO RIVER               1.94 C    Barcoo River Causeway                             
+                      038018 RETREAT (BARCOO RIVER)    BARCOO RIVER               1.44 C    Barcoo River Causeway                             
+                      538008 WINDORAH (LIGNUM CHANNEL)                            0.00 C                                                      
+                             TM                                                                                                               
+                                                                                                                                              
+                      538009 WINDORAH (EATON CHANNEL)  COOPER CREEK               0.00 X                                                      
+                             TM                                                                                                               
+                                                                                                                                              
+                      538010 WINDORAH (MAIN CHANNEL)   COOPER CREEK               4.37 A                                                      
+                             TM                                                                                                               
+                                                                                                                                              
+                      038038 WINDORAH (LONG CROSSING)  COOPER CREEK               4.38 A    Diamantina Development Road                       
+                      538006 WINDORAH (LONG CROSSING)                             4.37 A                                                      
+                             TM                                                                                                               
+                                                                                                                                              
+                      045005 DURHAM DOWNS              COOPER CREEK               1.90 B    Cooper Creek Bridge                               
+                      545003 BALLERA JACKSON RD        COOPER CREEK              71.57 X    Ballera Bridge                                    
+                             CROSSING TM                                                                                                      
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:   15
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+                                                                                                                                              
+COOPER CREEK          545012 BELLALIE TM               GINNIAPAPA CREEK           0.59 C    Cooper Development Road                           
+                      545006 NOCKATUNGA TM             WILSON RIVER               1.15 X    Wilson River                                      
+                      045057 NOCCUNDRA HOTEL           WILSON RIVER               1.30 X    Wilson River Crossing                             
+                      045012 NAPPA MERRIE              COOPER CREEK               7.20 B    Cooper Creek Bridge                               
+                      545002 NAPPA MERRIE TM           COOPER CREEK               7.20 B    Cooper Creek bridge                               
+                                                                                                                                              
+DIAMANTINA            037082 OONDOOROO                 MILLS CREEK                0.60 C    Mills Creek Causeway                              
+                      537005 OONDOOROO TM              MILLS CREEK                2.80 C    Mills Creek Causeway                              
+                      037018 WINTON                    WESTERN RIVER              1.30 B    Manuka Street Bridge                              
+                      037046 ELDERSLIE                 DIAMANTINA RIVER           1.60 C    Diamantina River Causeway                         
+                      537020 WINTON JUNDAH RD TM       MAYNE RIVER                2.60 X    Winton/Jundah Road                                
+                      538003 DIAMANTINA LAKES TM       DIAMANTINA RIVER           2.10 C    Springvale Diamantina Lakes Rd Causeway           
+                      038015 MONKIRA                   DIAMANTINA RIVER           2.90 C    Monkira causeway                                  
+                      538025 MONKIRA TM                DIAMANTINA RIVER          -1.23 C    Monkira causeway                                  
+                      538007 FARRARS CK TM                                        0.00 C    Diamantina Development Rd                         
+                      038002 BIRDSVILLE                DIAMANTINA RIVER           5.10 A    Diamantina River Bridge                           
+                                                                                                                                              
+GEORGINA              037010 CAMOOWEAL                 GEORGINA RIVER             8.30 B    Barkly Highway Bridge                             
+                      037043 URANDANGI                 GEORGINA RIVER             0.20 X    Georgina River Crossing                           
+                      537043 URANDANGI TM              GEORGINA RIVER             0.00 X    Urandangi Border Rd                               
+                      538019 PITTURI CREEK TM          PITTURI CREEK              0.00 X    Pitturi Creek                                     
+                      038010 GLENORMISTON              GEORGINA RIVER             2.60 B    Donohue Highway Bridge                            
+                      537039 WILLS CREEK (SELWYN ROAD) WILLS CREEK                0.00 X    Selwyn Road                                       
+                             TM                                                                                                               
+                                                                                                                                              
+                      038055 BOULIA                    BURKE RIVER                4.55 B    Burke River Bridge                                
+                      538002 BOULIA TM                 BURKE RIVER                4.55 B    Burke River Bridge                                
+                      038014 MARION DOWNS              GEORGINA RIVER             3.50 A    Georgina River Bridge (Bedourie Road)             
+                      038000 BEDOURIE                  EYRE CREEK                 4.40 B    Eyre Creek Bridge                                 
+                      038005 CLUNY                     KING CREEK                 3.10 A    Diamantina Developmental Road                     
+                      038009 GLENGYLE                  EYRE CREEK                 3.30 B    Eyre Creek Bdge (Birdsville-Bedourie Rd)          
+                                                                                                                                              
+MORNINGTON ISLAND     529020 MORNINGTON ISLAND TIDE TM                            3.87 T                                                      
+                                                                                                                                              
+NICHOLSON             029158 DOOMADGEE TOWNSHIP        NICHOLSON RIVER            0.50 X    Below Gunnalunja Weir (2km d/s of gauges          
+                      029031 LAWN HILL                 LAWN HILL CREEK            0.10 X    Doomadgee Road Crossing                           
+                      529009 GREGORY DOWNS TM          GREGORY RIVER              9.30 B    New Gregory Road Bridge                           
+                      029159 ESCOTT STATION            NICHOLSON RIVER            0.50 C                                                      
+                      529040 BURKETOWN TIDE TM                                    4.49 T                                                      
+                                                                                                                                              
+LEICHHARDT            529019 JULIUS DAM TM             LEICHHARDT RIVER           0.00 S    Heights above Spillway                            
+                      529010 FLORAVILLE TM             LEICHHARDT RIVER           1.50 C    Leichhardt River Causeway                         
+                                                                                                                                              
+FLINDERS              030024 HUGHENDEN                 FLINDERS RIVER             3.80 B    Ernest Henry Bridge                               
+                      030045 RICHMOND                  FLINDERS RIVER             5.80 B    Flinders River Bridge (on Croydon road)           
+                      530009 RICHMOND TM               FLINDERS RIVER             6.38 B    Flinders R.(Richmond-Croydon Rd)                  
+                      530163 HULBERTS BRIDGE TM        FLINDERS RIVER             3.90 B    Hulberts Bridge                                   
+                      030159 HULBERTS BRIDGE           FLINDERS RIVER             3.90 B    Hulberts Bridge                                   
+                      029161 BRIGHTLANDS STATION       CLONCURRY RIVER            1.00 C    Cloncurry River Causeway                          
+                      029143 CLONCURRY                 CLONCURRY RIVER           10.50 B    Ernest Henry Bridge                               
+                      529011 CLONCURRY TM              CLONCURRY RIVER           10.50 B    Ernest Henry Bridge                               
+                      029075 FT CONSTANTINE            FLINDERS RIVER             1.00 C                                                      
+                      529054 CORELLA DAM HW TM         CORELLA RIVER            297.90 S                                                      
+                      029086 COWAN DOWNS               CLONCURRY RIVER            0.00 X                                                      
+                      029005 BUNDA BUNDA               SAXBY RIVER                0.60 X    Bunda Bunda Crossing                              
+                      029147 WALKERS BEND              FLINDERS RIVER             5.40 B    Flinders River Bridge                             
+                      529007 WALKERS BEND TM           FLINDERS RIVER             5.40 B    Flinders River Bridge                             
+                                                                                                                                              
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         
+
+Date: 25/09/2026                                                   SECTION 5                                                        Page:   16
+                                                                                                                                              
+                                                QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS                                                
+                                                             DETAILS OF CROSSINGS                                                             
+                                                                                                                                              
+                     Station                                                  Crossing                                                        
+Basin                   No   Station Name              Stream                   Height Type Name of Crossing                                  
+-------------------- ------- ------------------------- ---------------------- -------- ---- ----------------------------------------          
+NORMAN                029023 IFFLEY STATION            SPEAR CREEK                0.00 X                                                      
+                      529026 MOMBA                     CLARA RIVER                0.00 X                                                      
+                      029154 YAPPAR RIVER              NORMAN RIVER               0.00 X    Norman River Crossing                             
+                      529025 GUILDFORD                 BELMORE CREEK              0.00 X                                                      
+                      529012 GLENORE WEIR TM           NORMAN RIVER               9.57 B    Norman River Bridge                               
+                      029155 NORMANTON                 NORMAN RIVER               2.83 A    Normanton-Karumba Road Approaches                 
+                      529049 NORMANTON TM              NORMAN R                   2.83 A    Normanton-Karumba Road Approaches                 
+                      529048 LOWER WALKER CK TM        WALKER CK                  6.40 B                                                      
+                      529003 KARUMBA TIDE TM           NORMAN RIVER               4.88 T                                                      
+                                                                                                                                              
+GILBERT               030019 GILBERTON                 GILBERT RIVER              0.00 X                                                      
+                      030147 COBBOLD GORGE             ROBERTSON RIVER            0.00 X                                                      
+                      030158 GREEN HILLS               GILBERT RIVER              0.00 X    Gilbert River Crossing                            
+                      030157 RIVERVIEW (GILBERT RV)    GILBERT RIVER              0.00 X    Gilbert River Crossing                            
+                      533095 ROCKFIELDS TM             GILBERT RIVER              6.00 B    A J Bond Bridge - Gulf Development Road.          
+                      029054 INORUNIE STATION          LITTLE RIVER               0.00 X                                                      
+                      029045 STRATHMORE                GILBERT RIVER              0.30 X    Gilbert River Crossing                            
+                      030039 OAK PARK STATION          COPPERFIELD                0.00 X                                                      
+                      530014 KIDSTON DAM HW TM         COPPERFIELD RIVER        586.00 S    Spillway                                          
+                      030103 EVELEIGH                  EINASLEIGH RIVER           8.58 B    Bib Loudon Bridge                                 
+                      030073 VAN LEE                   EINASLEIGH RIVER           5.00 X    Einasleigh River Crossing                         
+                      030055 FORSAYTH                  DELANEY RIVER              0.00 X                                                      
+                      030018 GEORGETOWN                ETHERIDGE RIVER            4.20 B    Etheridge River Bridge                            
+                      029037 MIRANDA DOWNS             GILBERT RIVER              1.00 X                                                      
+                      529053 BURKE DEV RD TM           GILBERT RIVER              4.50 B    Gilbert River bridge.                             
+                                                                                                                                              
+MITCHELL              531083 MCLEOD RIVER TM           MACLEOD RIVER              4.50 A    Mulligan Highway Bridge                           
+                      528009 ROOKWOOD TM               WALSH RIVER                3.40 C    Fergusons Crossing                                
+                      528003 TRIMBLES CROSSING TM      WALSH RIVER                1.20 C                                                      
+                      529024 DUNBAR TM                 MITCHELL RIVER             1.15 C    Mitchell River Crossing                           
+                      029038 KOWANYAMA AP              MAGNIFICENT CREEK          1.50 B    Magnificent Creek Bridge                          
+                                                                                                                                              
+ARCHER                527003 TELEGRAPH CROSSING TM     ARCHER RIVER               3.80 C    Archer River Crossing                             
+                                                                                                                                              
+EMBLEY                527004 WEIPA TIDE TM             EMBLEY RIVER               3.38 T                                                      
+                                                                                                                                              
+WENLOCK               027015 MORETON                   WENLOCK RIVER              6.60 B    Wenlock River Bridge                              
+                      527006 MORETON TM                WENLOCK RIVER              6.60 B    Wenlock River Bridge                              
+                                                                                                                                              
+TORRES STRAIT ISLAND  527019 BOIGU ISLAND TIDE TM                                 4.77 T                                                      
+                      527020 DAUAN ISLAND TIDE TM                                 4.01 T                                                      
+                      527022 UGAR ISLAND TIDE TM                                  4.11 T                                                      
+                      527018 IAMA ISLAND TIDE TM                                  4.16 T                                                      
+                      527021 MOA ISLAND (ST PAULS)     MOA ISLAND                 4.13 T                                                      
+                             TIDE TM                                                                                                          
+                                                                                                                                              
+                      527017 MOA ISLAND (KUBIN) TIDE   MOA ISLAND                 3.77 T                                                      
+                             TM                                                                                                               
+                                                                                                                                              
+                      527005 THURSDAY ISLAND TIDE TM   THURSDAY ISLAND            3.86 T                                                      
+                                                                                                                                              
+
+
+
+
+
+
+
+
+                                                                                                                                              
+                                  B: Bridge      C: Causeway    A: Approaches  X: Crossing    R: Road                                         
+                                  O: Old Bridge  H: Highway     F: Full Supply W: Weir        S: Spillway                                     
+                                                         T: Highest Astronomical Tide                                                         

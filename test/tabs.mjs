@@ -359,9 +359,15 @@ const SEED_NETWORK = `async () => {
 // table). This seed produces all three, through the tab's own handlers.
 const SEED_STATIONS = `async () => {${SEED_ACMA}
   // A station with an ALERT address, so the carriers card has rows to draw
-  // rather than its no-address note.
-  const withId = state.data.stations.find(s =>
-    s.lat != null && (s.sensors || []).some(x => Number.isInteger(x.alert_id)));
+  // rather than its no-address note — and, where one exists, one the Bureau's
+  // river height station lists name (0031), so the editor's flood classes,
+  // crossings and gauge survey are drawn with rows in them. One row of each is
+  // opened: a shut <details> is display:none inside, and its boxes would be
+  // filtered out of every check below as invisible.
+  const hasId = s => s.lat != null && (s.sensors || []).some(x => Number.isInteger(x.alert_id));
+  const withId = state.data.stations.find(s => hasId(s)
+      && ['flood_classes', 'crossings', 'gauge_survey'].every(k => (s[k] || []).length))
+    || state.data.stations.find(hasId);
   if (withId) selectStation(withId.id);
   addToMapSelection(state.data.stations.slice(0, 3).map(s => s.id));
   rerenderStations();
@@ -373,6 +379,8 @@ const SEED_STATIONS = `async () => {${SEED_ACMA}
   setStationFiltersOpen(true);
   for (const d of document.querySelectorAll(
     '#station-filters details, #acma-filter-block details')) d.open = true;
+  // Last, because the re-renders above draw the editor afresh, shut.
+  for (const d of document.querySelectorAll('.rhs-list .rhs-row:first-child')) d.open = true;
   await new Promise(r => setTimeout(r, 350));
 }`;
 

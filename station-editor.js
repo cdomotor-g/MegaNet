@@ -24,9 +24,12 @@
 // setEditorStatus, editorStatusHtml and editorWritesGoToDatabase; to inspections.js for
 // Inspections.configs and Inspections.ensureRefs — the telemetry pick-list
 // (#147) reads the same meganet.inspection_config list the Inspections tab
-// renders its form from, rather than keeping a second copy; and to
+// renders its form from, rather than keeping a second copy; to
 // station-inspections.js for StationInspections.sectionHtml, the Inspections
-// section under the ARRO block at the foot of the form.
+// section under the ARRO block at the foot of the form; and to
+// river-details.js for RiverDetails — the flood classes, crossings and gauge
+// survey above the ARRO block (0031), which editorReadForm() reads back and
+// editorSave() asks formProblem() about first.
 //
 // This file is the form, not its host. The card is rendered by the Stations
 // tab, which is frozen in app.js for the whole of #129 — so a change to where
@@ -273,6 +276,7 @@ function editorForm(s) {
           <textarea id="ef-excl" rows="3">${(s.repeater?.exclusions || []).map(r => `${r.low}-${r.high}`).join('\n')}</textarea>
         </label>
       </div>` : ''}
+    ${RiverDetails.editorHtml(s)}
     ${editorArroSection(s, sensors)}
     ${StationInspections.sectionHtml(s)}`;
 }
@@ -568,6 +572,13 @@ function editorReadForm() {
   const a2stn = pInt(document.getElementById('ef-a2stn')?.value);
   if (a2stn != null) d.alert2_station_id = a2stn; else delete d.alert2_station_id;
 
+  // The river height station lists (0031): only the ones this form changed go
+  // in the document. A list left out is one save_station() leaves as it is —
+  // which is what keeps an untouched 94.50 from coming back as 94.5 (see the
+  // head of river-details.js).
+  for (const k of RiverDetails.LIST_KEYS) delete d[k];
+  Object.assign(d, RiverDetails.readForm(state.editorDraft));
+
   // Sensors — read the editable rows, preserving national-export metadata.
   //
   // A row survives if it carries *either* address. It used to need an ALERT id,
@@ -638,6 +649,14 @@ async function editorSave() {
       text: 'The station list on screen did not come from the datastore, so saving it would'
           + ' overwrite the database with a copy that may be older. Load from the datastore first.',
     });
+    return;
+  }
+
+  // A figure the browser could not read reads back as empty, and would be
+  // dropped from the save without a word; say which one instead.
+  const unreadable = RiverDetails.formProblem();
+  if (unreadable) {
+    setEditorStatus({ kind: 'error', text: unreadable });
     return;
   }
 

@@ -74,6 +74,32 @@ what caught Schedules 4 and 7 changing column count mid-schedule. Those three
 are read by value instead, which is only safe because their fields are closed
 vocabularies.
 
+## The river height station lists (0031)
+
+`ingest/river_height_stations.py` reads four sections of the Bureau's
+*Queensland Flood Warning River Height Stations* out of
+`archive/river-height-stations/` — flood classifications as at 2026 and 2014,
+the crossings, and the survey details — into `data/river-height-stations.json`,
+and prints the SQL that attaches each row to the station it describes.
+
+```bash
+python3 tools/ingest/river_height_stations.py            # rewrite the JSON
+python3 tools/ingest/river_height_stations.py --report   # what came out, in prose
+python3 tools/ingest/river_height_stations.py --check    # fail on drift (CI does this)
+python3 tools/ingest/river_height_stations.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+Three of the four are fixed-width, and the column rule under each page's
+headings is read as the layout rather than written down here. The trap is the
+wrapping: a name too long for its column carries on underneath, on a line with
+no station number — sometimes after a page break — and the station name wraps
+at a word while the stream is cut mid-word, so the two join differently. The
+2014 edition prints the same names unwrapped, and every joined name agrees with
+it. The SQL attaches only to live stations and only where the station has none
+of its own rows yet, so it is safe to run again; `check_river_height_details.sql`
+is the database's half.
+
 ## `ingest/` — the historical inspection workbook (#122)
 
 `ingest/xlsx.py` is a read-only .xlsx reader with nothing but the standard
@@ -349,6 +375,19 @@ block, below, and it is exactly the half that went missing last time.
 
 Run it after applying `db/migrations/0010_attachments.sql`, and again after
 touching anything in it.
+
+## `check_river_height_details.sql` — prove the river height station details
+
+30 checks over `0031`, in a transaction that rolls back: the five tables and
+their RLS and grants, the crossing-type and datum vocabularies against the
+Bureau's legend, `save_station()` writing the three lists — including leaving a
+list the document does not mention alone, and clearing one it sends empty — its
+refusals of an unknown code and of a signed-in non-editor, and the loader's
+sync and its `document_managed` guard. CI runs it after the stations load.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_river_height_details.sql
+```
 
 ## `storage_bucket.sql` — create the `inspections` bucket and its policies
 

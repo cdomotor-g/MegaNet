@@ -22,7 +22,9 @@ That makes this the way to reload a snapshot into any empty database — includi
 the one inside the corporate network, which is the whole reason the schema is
 portable SQL in the first place.
 
-Requires 0002_stations.sql to have been applied. Standard library only.
+Requires the migrations through 0031_river_height_details.sql to have been
+applied — the station's flood classes, crossings and gauge survey are synced
+into the tables that file creates. Standard library only.
 """
 
 from __future__ import annotations
@@ -161,6 +163,20 @@ def emit_sync(out, table, columns, key, rows, batch=500, prune_where=None):
 
 
 IMPORT_TAG = 'import_stations_json.py'
+
+# The station's own lists that 0031 added: document key, table, and the columns
+# in the order a row carries them. The key and the column names are the same
+# words in the document and in the table.
+STATION_LISTS = [
+    ('flood_classes', 'station_flood_class',
+     ['as_at', 'first_report_m', 'crossing_height_m', 'crossing_type', 'minor_m',
+      'crops_grazing_m', 'moderate_m', 'towns_m', 'major_m', 'note']),
+    ('crossings', 'station_crossing',
+     ['as_at', 'stream', 'name', 'height_m', 'crossing_type', 'note']),
+    ('gauge_survey', 'station_gauge_survey',
+     ['valid_from', 'valid_to', 'gauge_zero_m', 'datum', 'amtd_km',
+      'catchment_area_km2', 'note']),
+]
 
 
 def owned_by_document(station_col):
@@ -342,9 +358,25 @@ def build(data, out):
               ['repeater_id', 'kind', 'lo', 'hi'], ranges,
               prune_where=owned_by_document('repeater_id'))
 
+    # The three lists 0031 hangs off a station: the Bureau's flood
+    # classifications, crossings and gauge survey. Keyed by (station, position),
+    # like load_stations_doc() keys them, and a key absent from a row is a null
+    # column — the view strips nulls back out, so the round trip is clean.
+    details = {}
+    for key, table, columns in STATION_LISTS:
+        rows = []
+        for s in stations:
+            for i, row in enumerate(s.get(key) or []):
+                rows.append([q(s['id']), q(i)] + [q(row.get(c)) for c in columns])
+        emit_sync(out, table, ['station_id', 'ord'] + columns, ['station_id', 'ord'], rows,
+                  prune_where=owned_by_document('station_id'))
+        details[key] = len(rows)
+
     out.write('\n-- Row counts after this file, for the record:\n')
     out.write('--   stations %d · sensors %d · repeaters %d · pass ranges %d\n'
               % (len(stations), len(sensors), len(repeaters), len(ranges)))
+    out.write('--   flood classes %d · crossings %d · gauge surveys %d\n'
+              % (details['flood_classes'], details['crossings'], details['gauge_survey']))
 
     # A registry sync is the event that makes a previously unresolvable health
     # key resolvable, so it is where the fold runs (#162). Guarded, so this
@@ -361,6 +393,8 @@ def build(data, out):
     return {
         'stations': len(stations), 'sensors': len(sensors),
         'repeaters': len(repeaters), 'ranges': len(ranges),
+        'flood_classes': details['flood_classes'], 'crossings': details['crossings'],
+        'gauge_survey': details['gauge_survey'],
         'radio_networks': len(data.get('radio_networks', [])),
         'catchments': len(data.get('catchments', [])),
         'rm_systems': len(data.get('rm_systems', [])),
@@ -387,8 +421,8 @@ def main():
         if args.out:
             handle.close()
 
-    for k in ('stations', 'sensors', 'repeaters', 'ranges',
-              'radio_networks', 'catchments', 'rm_systems'):
+    for k in ('stations', 'sensors', 'repeaters', 'ranges', 'flood_classes',
+              'crossings', 'gauge_survey', 'radio_networks', 'catchments', 'rm_systems'):
         print('%-16s %6d' % (k, stats[k]), file=sys.stderr)
     if args.out:
         print('wrote %s' % args.out, file=sys.stderr)

@@ -35,3 +35,13 @@ Editable / email originals of maps that already exist as finished PDFs in
 |------|--------------|
 | `Path Maps of SWRED locations.msg`, `SWRED Western Maps.msg` | Outlook message files the path-map PDFs came from. |
 | `NSW North Coast_repeaters.pptx`, `NSW_North Coast_repeaters .docx` | PowerPoint / Word sources for the NSW repeater PDFs (`../maps/nsw-border/`). |
+
+## Source documents the app's data is read from
+
+Unlike everything above, these are read by a tool in `../tools/` — keep them
+byte-for-byte, trailing spaces and tabs included, because the reader works by
+column position.
+
+| File | What reads it |
+|------|---------------|
+| `river-height-stations/section-4-flood-classifications-2026-09-25.txt`, `section-4b-flood-classifications-2014-01-15.txt`, `section-5-crossings-2026-09-25.txt`, `section-6-survey-details-2026-09-25.txt` | The Bureau's *Queensland Flood Warning River Height Stations*, Sections 4, 4 (B), 5 and 6, as printed. `tools/ingest/river_height_stations.py` reads them into `../data/river-height-stations.json` and the station records (`db/migrations/0031_river_height_details.sql`). |

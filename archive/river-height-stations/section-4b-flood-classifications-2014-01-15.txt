@@ -1,0 +1,1889 @@
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 1
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+
+SOUTH COAST
+
+ 540054 LITTLE NERANG DAM ALERT 		       0.0   S	   1.0		     2.0	       3.0
+ 540612 LITTLE NERANG DAM HW TM 		       0.0   S	   1.0		     2.0	       3.0
+ 540438 NUMINBAH VALLEY ALERT
+ 540437 NUMINBAH VALLEY TM
+ 040584 HINZE DAM				      94.5   S
+ 540374 HINZE DAM ALERT-B			       0.0   S	   3.6		     6.2	       7.8
+ 540610 HINZE DAM HW TM 			       0.0   S	   3.6		     6.2	       7.8
+ 040846 CLEARVIEW ALERT 					   6.0		     8.0	       9.0
+ 040416 CLEARVIEW TM						   6.0		     8.0	       9.0
+ 540319 CARRARA ALERT						   3.5		     4.0	       4.5
+ 540453 BONOGIN CK (HARDYS RD) ALERT		       1.1   B
+ 540597 WORONGARY CREEK ALERT
+ 540440 NERANWOOD ALERT
+ 540399 MUDGEERABA CK TM
+ 540254 MUDGEERABA ALERT			       4.6   B	   2.5	    3.5      3.5	       4.5
+ 540253 BOOBEGAN CREEK LOCK AL
+ 540318 EVANDALE ALERT						   1.8		     2.3      1.8      2.5
+ 040684 EVANDALE				1.7		   1.8		     2.3      1.8      2.5
+ 540360 BIGGERA CK DAM ALERT			      12.2   S
+ 540359 LODER CK DAM ALERT			      11.8   S
+ 540238 LODER CREEK ALERT
+ 040881 AIR SEA RESCUE ALERT
+ 540001 GOLD COAST TIDE TM
+ 040981 BURLEIGH WATERS ALERT
+ 540564 LAKE ORR ALERT
+ 540565 LAKE ORR WEIR TW ALERT
+ 540366 TALLEBUDGERA CK DAM ALERT
+ 540356 TALLEBUDGERA CK RD AL					   4.0		     5.0	       6.0
+ 540355 TALLEBUDGERA CK RD TM					   4.0		     5.0	       6.0
+ 540320 COPLICKS BRIDGE ALERT					   2.0		     3.0	       4.0
+ 540252 OYSTER CREEK ALERT
+ 540577 TALLEBUDGERA CK MOUTH ALERT
+ 540640 CURRUMBIN CK ALERT
+ 540070 NICOLLS BRIDGE ALERT
+ 540368 NICOLLS BRIDGE TM
+ 540290 CANUNGRA ARMY ALERT					   5.0		     6.0	       7.0
+ 540228 CANUNGRA ARMY TM					   5.0		     6.0	       7.0
+ 540230 BEECHMONT (DNRM) TM
+ 540291 CLAGIRABA ROAD ALERT			      -0.0   C	   0.5		     1.5	       2.5
+ 540292 OXENFORD WEIR ALERT					   4.0		     5.0	       6.0
+ 540269 MONTEREY KEYS ALERT
+ 540293 COOMERA SHORES ALERT					   1.4		     1.6	       2.6
+ 540376 HOTHAM CREEK ALERT
+ 540377 STEWARTS RD ALERT
+ 540408 NORWELL  ALERT
+ 540294 KERKIN ROAD ALERT			       3.1   C	   3.0		     3.5	       4.0
+ 540295 STEIGLITZ WHARF ALERT
+
+LOGAN-ALBERT
+
+ 040936 LUMEAH ALERT				       9.3   B	   5.0		     7.0	       9.0
+ 540303 LUMEAH TM				       9.3   B	   5.0		     7.0	       9.0
+ 540480 NINDOOINBAH DAM ALERT			     122.8   F
+ 540614 NINDOOINBAH DAM HW TM			     122.8   F
+ 540375 CAINBABLE CREEK TM
+ 040937 BENOBBLE ALERT				       9.1   B	   3.0		     4.5	       6.0
+ 540073 BENOBBLE TM				       9.1   B	   3.0		     4.5	       6.0
+ 040544 BROMFLEET				4.0   16.8   B	   9.0	   16.0     12.0	      16.0
+ 040938 BROMFLEET ALERT 			      16.8   B	   9.0	   16.0     12.0	      16.0
+ 040738 BROMFLEET TM				      16.8   B	   9.0	   16.0     12.0	      16.0
+ 040761 WOLFFDENE ALERT 					   6.0		     8.0	      10.0
+ 540598 BAHRS SCRUB ALERT					   7.5		     8.0	       8.5
+ 040723 BEENLEIGH				2.0		   3.0	    3.0      4.5	       6.0
+ 040832 FOREST HOME TM				       3.8   B	   3.0		     5.0	       7.0
+ 540407 MAROON DAM INFLOW TM
+ 540475 MAROON DAM ALERT			     207.1   F
+ 040677 MAROON DAM				1.5    0.0   S	   1.8		     2.2	       2.5
+ 540229 MAROON DAM HW TM			       0.0   F
+ 540591 MAROON DAM TW TM
+ 540436 WARD ROAD TM
+ 040946 RATHDOWNEY ALERT					   3.0		     6.0	       9.0
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 2
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 040754 RATHDOWNEY TM						   3.0		     6.0	       9.0
+ 040943 DIECKMANS BRIDGE ALERT			       4.7   B	   3.0		     4.5	       6.0
+ 540074 DIECKMANS BRIDGE TM			       4.7   B	   3.0		     4.5	       6.0
+ 040539 DULBOLLA				4.0		   6.0	   12.0     10.0     12.5     12.0
+ 040944 RUDDS LANE ALERT			       8.6   B	   4.0		     5.5	       6.5
+ 540402 TRAMWAY LANE TM
+ 040945 ROUND MOUNTAIN ALERT			      13.0   B	   6.0		     9.5	      13.0
+ 040714 ROUND MOUNTAIN TM			      13.0   B	   6.0		     9.5	      13.0
+ 540270 BROMELTON WEIR HW TM
+ 540271 BROMELTON WEIR TW TM
+ 040939 BEAUDESERT ALERT			       9.8   B	   5.5		     7.8	       8.3
+ 540607 BROMELTON DAM HW TM
+ 540481 BROMELTON DAM ALERT
+ 040947 CROFTBY ALERT						   3.0		     4.5	       6.0
+ 040841 CROFTBY TM						   3.0		     4.5	       6.0
+ 040729 BOONAH					4.0    6.0   B	   4.0	    4.0      5.0      7.0      6.0
+ 040949 BOONAH ALERT				       6.0   B	   4.0	    4.0      5.0      7.0      6.0
+ 540510 COULSON ALERT
+ 540509 COULSON TM
+ 540615 WYARALONG DAM HW TM
+ 540512 WYARALONG DAM ALERT			      63.6   S
+ 540530 WYARALONG DAM				      63.6   S
+ 540590 CEDAR GROVE WEIR HW TM			      20.5   F
+ 040940 YARRAHAPPINI ALERT			      17.4   B	  10.0	   12.0     14.0	      16.0
+ 040762 YARRAHAPPINI TM 			      17.4   B	  10.0	   12.0     14.0	      16.0
+ 040710 JIMBOOMBA			       10.0   17.4   B	  10.0	   12.0     14.0	      16.0
+ 540214 SOUTH MACLEAN TM					   8.0		    12.0	      14.0
+ 540515 SOUTH MACLEAN TW TM
+ 040542 MACLEAN BRIDGE				6.0   17.0   A	  10.0		    13.5     15.2     16.0
+ 040935 MACLEAN BRIDGE ALERT			      17.0   A	  10.0		    13.5     15.2     16.0
+ 540596 LOGAN VILLAGE ALERT					   6.0		     9.0	      11.0
+ 040665 WATERFORD				4.0   11.0   B	   6.0		     7.5      9.0      9.0
+ 040878 WATERFORD ALERT 			      11.0   B	   6.0		     7.5      9.0      9.0
+ 540079 SLACKS CK(RESERVE PK) AL				   8.0		     9.0	      10.0
+ 540078 MARSDEN (FIRST AVE) AL					   9.0		    10.0	      11.0
+ 540091 SLACKS CK(LOGANLEA RD)AL		       8.5   B	   4.0		     6.0	       7.5
+ 040709 EAGLEBY 				3.0   10.4   B	   3.0	    3.5      4.0      7.0      5.0
+ 540236 CARBROOK(RIEDEL ROAD) AL				   2.0		     3.0	       4.0
+ 540384 LESLIE HARRISON DAM ALERT		      18.3   F
+ 540611 LESLIE HARRISON DAM HW TM		      18.3   F
+
+STRADBROKE ISLANDS
+
+ 540576 COURAN POINT ALERT
+
+BRISBANE
+
+ 540059 PEACHESTER ALERT					   5.0		     8.0	       9.0
+ 540046 PEACHESTER WRC TM					   5.0		     8.0	       9.0
+ 540337 WOODFORD ALERT-P			5.0    6.1   B	   6.1	    5.0      8.5     10.7      9.0
+ 540338 WOODFORD ALERT-B			5.0    6.1   B	   6.1	    5.0      8.5     10.7      9.0
+ 540485 WOODFORD TM				5.0    6.1   B	   6.1	    5.0      8.5     10.7      9.0
+ 040627 WOODFORD				5.0    6.1   B	   6.1	    5.0      8.5     10.7      9.0
+ 540482 MT KILCOY WEIR ALERT
+ 540373 MT KILCOY WEIR TM
+ 540159 SOMERSET DAM HW ALERT-P 		      99.0   F
+ 540471 SOMERSET DAM HW ALERT-P2		      99.0   F
+ 540160 SOMERSET DAM HW ALERT-B 		      99.0   F	 102.0		   103.0	     104.0
+ 040820 SOMERSET DAM TM 			      99.0   F	 102.0		   103.0	     104.0
+ 540044 COOYAR CREEK TM 					   5.0		     6.5	       8.0
+ 540146 COOYAR CREEK ALERT					   5.0		     6.5	       8.0
+ 540261 LINVILLE ALERT						   2.0		     5.5	       6.5
+ 540040 LINVILLE TM						   2.0		     5.5	       6.5
+ 040387 LINVILLE				3.0    9.5   B	   3.0	    9.0      7.0	       8.0
+ 540188 DEVON HILLS ALERT					   2.0		     6.0	       7.0
+ 540141 BOAT MOUNTAIN ALERT					   4.5		     6.0	       7.5
+ 540045 BOAT MOUNTAIN TM					   4.5		     6.0	       7.5
+ 540446 GLENDALE TM
+ 540139 GREGOR CK ALERT-P					   3.5		     4.5	       7.5
+ 540140 GREGOR CK ALERT-B					   3.5		     4.5	       7.5
+ 040822 GREGOR CREEK TM 					   3.5		     4.5	       7.5
+ 540276 UPPER CRESSBROOK ALERT
+ 540272 LITTLE OAKEY CREEK ALERT
+ 540142 CRESSBROOK DAM ALERT			       0.0   S
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 3
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 540148 ROSENTRETERS BRIDGE AL					   3.0		     4.0	       5.0
+ 040823 ROSENTRETERS BRIDGE TM					   3.0		     4.0	       5.0
+ 540560 MT BYRON TM
+ 540441 FALLS RD TM
+ 540260 SPLITYARD CREEK DAM AL
+ 040763 WIVENHOE DAM				      67.0   F
+ 540177 WIVENHOE DAM HW ALERT-B 		      67.0   F
+ 540302 WIVENHOE DAM HW ALERT-B2		      67.0   F
+ 540049 WIVENHOE DAM HW TM			      67.0   F
+ 540178 WIVENHOE DAM TW ALERT-P
+ 540069 WIVENHOE DAM TW TM
+ 540589 SPRING BLUFF RADAR TM
+ 540507 SPRING BLUFF TM
+ 540527 SPRING BLUFF ALERT
+ 540566 UPPER LOCKYER ALERT					   2.0		     4.0	       6.0
+ 540143 HELIDON ALERT						   4.0		     6.5	       8.0
+ 040829 HELIDON TM						   4.0		     6.5	       8.0
+ 540405 FLAGSTONE CK TM
+ 540517 FLAGSTONE CREEK ALERT
+ 540386 SANDY CREEK ROAD ALERT			       1.9   X	   2.0		     3.0	       4.0
+ 540518 MA MA CREEK ALERT
+ 540406 MA MA CREEK TM
+ 540568 JUNCTION VIEW ALERT			       0.7   X	   1.0		     2.0	       3.0
+ 540152 TENTHILL ALERT						   4.5		     5.0	       6.5
+ 540067 TENTHILL TM						   4.5		     5.0	       6.5
+ 040444 GATTON					3.0    3.9   B	   7.0	   13.0     10.0     18.3     15.0
+ 540156 GATTON ALERT						   7.0		    10.0	      15.0
+ 540363 GATTON TM						   7.0		    10.0	      15.0
+ 540567 MOON ROAD ALERT 			       0.9   X	   2.0		     4.0	       5.0
+ 540516 FOREST HILL ALERT
+ 540511 FOREST HILL TM
+ 040751 THORNTON				3.5    4.6   B	   4.5	    5.3      4.7	       5.3
+ 540528 MULGOWIE ALERT				       7.1   B	   5.0	    7.0      6.0      7.1      7.0
+ 040835 MULGOWIE TM				       7.1   B	   5.0	    7.0      6.0      7.1      7.0
+ 040716 LAIDLEY 				5.0    8.5   B	   5.0	    8.5      6.0      9.0      7.0
+ 540158 SHOWGROUND WEIR ALERT			       4.2   W	   6.0		     7.0	       7.8
+ 540047 SHOWGROUND WEIR HW TM			       4.2   W	   6.0		     7.0	       7.8
+ 540472 BILL GUNN DAM ALERT			     110.0   S
+ 540563 BILL GUNN DAM TM			     110.0   S
+ 540529 WARREGO HIGHWAY ALERT					   4.5		     5.2	       5.5
+ 540050 WARREGO HIGHWAY TM					   4.5		     5.2	       5.5
+ 540473 LAKE CLARENDON ALERT			      96.0   F
+ 540546 LAKE CLARENDON HW TM			      96.0   F
+ 540149 GLENORE GROVE ALERT					   8.0		    11.0	      13.0
+ 040662 LYONS BRIDGE				4.0   10.1   B	  10.0		    11.5	      13.0
+ 540174 LYONS BRIDGE ALERT-P			      10.1   B	  10.0		    11.5	      13.0
+ 540544 RIFLE RANGE ROAD ALERT					  10.5		    12.0	      13.5
+ 040817 RIFLE RANGE ROAD TM					  10.5		    12.0	      13.5
+ 540479 ATKINSON DAM ALERT			      65.7   S
+ 540547 ATKINSON DAM HW TM			      65.7   S
+ 540259 BUARABA CREEK ALERT
+ 540051 O'REILLY'S WEIR TM			       7.7   W	  12.0		    14.0	      16.0
+ 540153 O'REILLY'S WEIR ALERT			       7.7   W	  12.0		    14.0	      16.0
+ 540183 LOWOOD PUMP STN ALERT-B
+ 040441 LOWOOD					4.0    6.7   B	   8.0	   18.0     15.0     21.0     20.0
+ 540182 LOWOOD ALERT-P						   8.6		    15.9	      21.2
+ 540150 SAVAGES CROSSING ALERT			       2.9   B	   9.0		    16.0	      21.0
+ 540066 SAVAGES CROSSING TM			       2.9   B	   9.0		    16.0	      21.0
+ 540312 MARBURG ALERT				       7.5   S
+ 540257 BURTONS BRIDGE ALERT			       4.4   B
+ 540028 LAKE MANCHESTER ALERT			      50.9   S
+ 540606 LAKE MANCHESTER HW TM			      51.1   F
+ 540256 KHOLO BRIDGE ALERT			       0.0   B
+ 040142 MT CROSBY			       10.0   12.4   B	  11.0	   13.0     13.0	      21.0
+ 540199 MT CROSBY ALERT 			      12.4   B	  11.0	   13.0     13.0	      21.0
+ 040818 MT CROSBY TM				      12.4   B	  11.0	   13.0     13.0	      21.0
+ 540063 COLLEGES CROSSING ALERT 		       2.7   X
+ 040812 MOGGILL ALERT						  10.0		    13.0	      15.5
+ 540200 MOGGILL ALERT-P 					  10.0		    13.0	      15.5
+ 540157 ADAMS BRIDGE ALERT					   4.0		     5.0	       6.0
+ 540068 ADAMS BRIDGE TM 					   4.0		     5.0	       6.0
+ 040702 STOKES CROSSING 			3.0    1.1   C	   4.0		     5.0	       6.0
+ 540574 LOWER MT WALKER ALERT
+ 540314 SPRESSERS BRIDGE ALERT			       4.8   B	   4.0		     4.4	       4.8
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 4
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 540317 GREY'S PLAINS ROAD ALERT		       2.0   B
+ 540064 GRANDCHESTER ALERT			       4.6   B	   3.0		     4.0	       5.0
+ 040701 KUSS ROAD				4.0    7.6   B	   6.0		     7.0	       8.0
+ 540194 KUSS ROAD ALERT 			       7.6   B	   6.0		     7.0	       8.0
+ 540583 KUSS ROAD TM				       7.6   B	   6.0		     7.0	       8.0
+ 540313 ROSEWOOD WWTP ALERT			       7.3   A	   7.3		     8.3      9.3      9.3
+ 540503 ROSEWOOD DETENTION BASIN AL
+ 040549 ROSEWOOD				2.0    5.2   B	   4.0	    5.0      5.0	       6.0
+ 540388 ROSEWOOD AL-B				       5.2   B	   4.0	    5.0      5.0	       6.0
+ 540193 ROSEWOOD ALERT				       5.2   B	   4.0	    5.0      5.0	       6.0
+ 540669 SEVEN MILE BR ALERT
+ 540147 WALLOON ALERT-P 			       4.5   A	   3.5		     5.5	       7.0
+ 540081 WALLOON TM						   5.0		     6.5	       8.5
+ 540504 WALLOON (DNRM) AL					   5.0		     6.5	       8.5
+ 040838 THREE MILE BRIDGE ALERT 		      19.1   B	  14.0		    16.0	      18.0
+ 040135 MOOGERAH DAM				0.5    0.0   S	   1.0		     2.0	       3.0
+ 540474 MOOGERAH DAM HW ALERT			       0.0   F
+ 540364 MOOGERAH DAM HW TM			       0.0   F
+ 540513 MOOGERAH DAM TW TM
+ 540549 TOOHILLS CROSSING ALERT
+ 540365 TOOHILLS CROSSING TM
+ 540151 KALBAR WEIR ALERT			      74.8   W	  76.8		    77.8	      78.8
+ 540058 KALBAR WEIR HW TM			      74.8   W	  76.8		    77.8	      78.8
+ 540057 KALBAR WEIR TW TM					   6.0		     7.5	       9.0
+ 040440 KALBAR					4.0    7.0   B	   6.0	    7.0      7.0	       9.0
+ 040445 HARRISVILLE				3.0    5.5   B	   3.0	    5.0      4.0	       5.0
+ 540154 HARRISVILLE ALERT			       5.5   B	   3.0	    5.0      4.0	       5.0
+ 540387 HARRISVILLE AL-B			       5.5   B	   3.0	    5.0      4.0	       5.0
+ 540316 CHURCHBANK WEIR ALERT			       0.0   W	   1.0		     2.0	       3.0
+ 540217 CHURCHBANK WEIR TM			       0.0   W	   1.0		     2.0	       3.0
+ 540180 AMBERLEY ALERT-P					   4.0		     5.5	       6.5
+ 540505 AMBERLEY (DNRM) AL					   4.5		     6.5	       7.5
+ 040816 AMBERLEY (DNRM) TM					   4.5		     6.5	       7.5
+ 540195 WASHPOOL ALERT						   2.5		     3.5	       4.5
+ 540065 PEAK CROSSING ALERT			       5.1   B	   2.0		     3.5	       5.0
+ 540062 LOAMSIDE ALERT						   5.0		     6.5	       8.0
+ 540210 LOAMSIDE TM						   5.0		     6.5	       8.0
+ 540502 BERRYS LAGOON AL
+ 540550 BERRYS LAGOON ALERT-B
+ 540216 BERRY'S LAGOON TM
+ 040836 ONE MILE BRIDGE ALERT			      17.2   B	  10.0		    12.0	      14.0
+ 540250 BRASSALL(HANCOCKS BR) AL		      13.8   B	   8.0		    10.0	      12.0
+ 040101 IPSWICH 				4.0   24.9   B	   7.0	    7.0      9.0      7.4     11.7
+ 040831 IPSWICH ALERT				      24.9   B	   7.0	    7.0      9.0      7.4     11.7
+ 540661 KARALEE ALERT
+ 540670 GOODNA ALERT
+ 540192 JINDALEE ALERT
+ 040713 JINDALEE BRIDGE 					   6.0		     8.0	      10.0
+ 540198 BRISBANE CITY ALERT					   1.7		     2.6	       3.5
+ 540495 WHYTE ISLAND ALERT
+ 040647 BRISBANE BAR TIDE TM
+ 540248 CHURCHILL ALERT 					   2.0		     4.0	       6.0
+ 040792 RIPLEY ALERT						  52.0		    53.0	      54.0
+ 540666 SOUTH RIPLEY ALERT
+ 040873 HARDING STREET ALERT					  24.0		    25.0	      26.0
+ 040872 BLACKSTONE BRIDGE ALERT 		      20.8   B	  19.0		    20.0	      21.0
+ 040875 BUNDAMBA SCHOOL ALERT			      16.3   B	  14.5		    16.0	      17.5
+ 540249 BUNDAMBA (HANLON ST) AL
+ 540501 SPRINGFIELD LAKES AL
+ 040985 BELLBIRD PARK ALERT
+ 040795 OPOSSUM ALERT						  21.0		    22.0	      23.0
+ 540672 COLLINGWOOD PARK ALERT
+ 040874 BRISBANE ROAD ALERT					   4.0		     5.0	       6.0
+ 540378 WOLSTON CREEK ALERT
+ 540097 NEW BEITH ALERT 					   4.0		     5.0	       6.0
+ 040719 NEW BEITH TM						   4.0		     5.0	       6.0
+ 040796 BEATTY ROAD ALERT					   6.2		     7.0	       8.2
+ 040789 DURACK KING AVE ALERT					   8.2		     8.8	       9.2
+ 540535 LAKESIDE CRESCENT ALERT
+ 040791 COOPERS PLAINS ALERT					   7.0		     8.0	       8.5
+ 540432 MARSHALL RD AL						   3.0		     5.0	       7.0
+ 540071 CORINDA HIGH ALERT					   3.5		     4.5	       6.1
+ 540433 MURIEL AVE AL						   4.2		     6.3	       7.8
+ 540274 OXLEY CREEK MOUTH ALERT 				   2.5		     3.5	       5.5
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 5
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 540134 HOLLAND PARK WEST ALERT 				  17.5		    17.9	      18.3
+ 540132 EAST BRISBANE ALERT					   2.0		     2.8	       3.5
+ 540127 WISHART(GREENWOOD ST) AL				  22.0		    23.0	      24.0
+ 540126 MANSFIELD ALERT 					  10.2		    11.5	      12.5
+ 540128 CARINDALE ALERT 					   5.9		     6.8	       7.6
+ 540129 HEMMANT ALERT						   1.8		     2.2	       2.5
+ 540279 RANSOME ALERT						   2.8		     3.2	       3.5
+ 540477 WAKERLEY ALERT
+ 540278 WYNNUM(BYRNESIDE TCE) AL				   4.8		     6.0	       7.0
+ 540296 PULLEN PULLEN CREEK AL					   6.0		     7.5	       9.0
+ 540107 GOLD CK RESERVOIR ALERT 		      92.8   F
+ 540609 GOLD CK RESERVOIR HW TM 		      92.8   F
+ 540061 MISTY MORN ALERT					   8.9		    10.4	      12.3
+ 040813 UPPER BROOKFIELD TM					   2.0		     3.0	       4.0
+ 140004 ELEANOR SCHONELL BRIDGE (UQ)
+ 540119 ENOGGERA DAM ALERT			      74.4   F	  75.5		    77.0	      79.0
+ 540604 ENOGGERA DAM HW TM			      74.4   F	  75.5		    77.0	      79.0
+ 540118 KELVIN GROVE ALERT					   5.2		     5.9	       6.7
+ 540239 ALDERLEY ALERT
+ 540116 ITHACA ALERT						  15.0		    16.0	      17.0
+ 540500 ITHACA CREEK TM
+ 540130 BOWEN HILLS ALERT					   2.3		     2.7	       3.3
+ 540286 BREAKFAST CREEK MOUTH AL				   1.7		     2.0	       2.3
+
+PINE
+
+ 540111 MITCHELTON(OSBORNE RD)AL				  33.5		    35.0	      36.0
+ 540478 MCCORD ST ALERT
+ 540131 TOOMBUL(NUDGEE RD) ALERT				   2.3		     2.8	       3.2
+ 540548 TOOMBUL (NUDGEE RD) ALERT-B				   2.3		     2.8	       3.2
+ 540469 HENDRA ALERT
+ 540468 CANNERY CREEK ALERT
+ 540431 FRANK SLEEMAN PARK AL					   4.2		     4.7	       5.4
+ 540120 GEEBUNG ALERT						   7.1		     8.2	       9.2
+ 540636 EVERTON PARK (TROUTS RD) ALERT
+ 540121 EVERTON HILLS ALERT					  43.8		    44.0	      44.3
+ 540113 ASPLEY(STRINGYBARK DR)AL				  29.0		    29.5	      30.5
+ 540122 ZILLMERE(PINEAPPLE ST)AL				  12.0		    12.8	      13.5
+ 540124 DEAGON ALERT						   1.9		     2.5	       3.4
+ 540444 CEDAR CK RD ALERT
+ 540416 SAMFORD VILLAGE ALERT					   5.2		     6.5	       7.2
+ 540205 DRAPERS CROSSING ALERT			2.0		   7.0		     7.8	       9.1
+ 540398 DRAPERS CROSSING TM			2.0		   7.0		     7.8	       9.1
+ 540415 CASH'S CROSSING ALERT					   5.8		     7.0	       8.3
+ 540625 STRATHPINE (GYMPIE RD) ALERT
+ 540414 NORMANBY WAY ALERT					   4.7		     5.0	       5.5
+ 540189 BAXTERS CREEK ALERT
+ 540648 BAXTERS CREEK TM
+ 540628 DAYBORO (TERRORS CK) ALERT
+ 540484 DAYBORO WWTP ALERT
+ 540442 DAYBORO TM
+ 540483 KOBBLE CK AL
+ 540443 KOBBLE CK TM
+ 540202 NORTH PINE DAM ALERT			      39.6   F
+ 540277 NORTH PINE DAM ALERT-B			      39.6   F
+ 540204 LAKE KURWONGBAH ALERT			      20.4   S
+ 540605 LAKE KURWONGBAH HW TM			      20.4   S
+ 540412 YOUNGS CROSSING ALERT			3.5    2.7   C	   6.0		     7.6	       9.5
+ 540562 LAWNTON (TODDS RD) ALERT
+ 540439 LAWNTON ALERT
+ 540413 JOHN BRAY PARK ALERT					   3.4		     3.6	       3.9
+ 540417 MURRUMBA DOWNS ALERT					   2.5		     3.2	       3.7
+ 540445 LIPSCOMBE RD ALERT
+ 540659 ROTHWELL ALERT
+ 540658 KALLANGUR ALERT
+ 540508 NARANGBA (OAKEY FLAT RD) AL		      27.8   B
+ 540245 BURPENGARY(ROWLEY RD) AL				  18.5		    19.2	      20.2
+ 540619 BURPENGARY (MATHEW CR) ALERT
+ 540242 BURPENGARY (DALE ST) AL 				   9.0		    10.0	      10.4
+ 540623 DECEPTION BAY (CREEK RD) ALERT
+ 540357 UPPER CABOOLTURE ALERT					   8.5
+ 540208 UPPER CABOOLTURE TM					   8.5
+ 540244 WAMURAN ALERT				      30.6   B	  30.2		    30.6
+ 540557 MOODLU (WILLIAMS RD) ALERT
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 6
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 540542 SHEEP STATION CREEK ALERT
+ 540243 CABOOLTURE WTP ALERT					   7.2		     8.8	       9.7
+ 540561 CABOOLTURE (PUMICESTONE RD) AL
+ 540660 CABOOLTURE (SHORT ST) ALERT
+ 540624 CABOOLTURE (BRUCE HWAY) ALERT
+ 540627 CABOOLTURE (BRIBIE IS RD) AL
+ 540558 BEACHMERE (RIVERSLEIGH RD) AL
+ 540496 BEACHMERE ALERT
+ 540543 ROSE CREEK ROAD ALERT
+ 540635 TOORBUL (DONNYBROOK RD) ALERT
+
+MAROOCHY
+
+ 540345 MOOLOOLAH AL						   4.5		     5.0	       5.8
+ 540300 MOOLOOLAH TM						   4.5		     5.0	       5.8
+ 540346 EWEN MADDOCK DAM AL			      25.4   S	  26.0		    26.5	      27.0
+ 540603 EWEN MADDOCK DAM HW TM			      25.4   S	  26.0		    26.5	      27.0
+ 540344 JORDAN ST AL						   4.0		     5.1	       5.6
+ 540350 PALMVIEW AL						   4.7		     5.0	       5.5
+ 540351 MERIDAN WAY AL				       2.6   A	   2.8		     2.9	       3.5
+ 540348 PARREARRA WEIR U/S AL			       1.7   W	   1.7		     2.2	       2.6
+ 540421 TANAWHA ALERT				       1.4   X	   1.5		     2.0	       2.5
+ 540220 MOUNTAIN CREEK ALERT
+ 540347 MOOLOOLABA TIDE AL
+ 540037 MOOLOOLABA TIDE TM
+ 540448 GOLDEN BEACH ALERT
+ 540342 OLD GYMPIE RD AL			       3.8   B	   2.0		     3.0	       4.5
+ 540343 BEERWAH AL				       6.8   B	   4.5		     5.5	       6.5
+ 540536 GLASSHOUSE MOUNTAINS AL
+ 540533 MAWSONS RD AL
+ 540401 MAWSONS ROAD TM
+ 540093 EUMUNDI ALERT						   4.0		     5.0	       6.0
+ 540052 EUMUNDI TM						   4.0		     5.0	       6.0
+ 540461 POONA DAM ALERT 			     152.7   S
+ 540617 POONA DAM HW TM 			     152.7   S
+ 540089 KIAMBA ALERT						   3.0		     4.0	       5.0
+ 540263 KIAMBA TM						   3.0		     4.0	       5.0
+ 540613 MAROOCHY INTAKE WEIR TM
+ 540460 COOLOOLABIN DAM ALERT			     295.9   S
+ 540608 COOLOOLABIN DAM HW TM			     295.9   S
+ 540462 WAPPA DAM ALERT 			      44.8   F
+ 540616 WAPPA DAM HW TM 			      44.8   F
+ 540092 YANDINA ALERT						   2.0		     3.5	       5.0
+ 540265 YANDINA TM						   2.0		     3.5	       5.0
+ 540095 DUNETHIN ROCK ALERT					   2.3		     3.0	       4.0
+ 540223 YANDINA CREEK ALERT					   5.7		     5.9	       6.0
+ 540218 DOONAN CREEK ALERT			       3.8   A	   4.0		     4.2	       4.5
+ 540499 COOLUM WEST ALERT			       2.9   B	   2.9		     3.1	       3.3
+ 540424 STONEY WHARF ROAD ALERT
+ 540419 WEST WOOMBYE ALERT
+ 540088 WARANA BRIDGE ALERT					   6.0		     7.0	       8.0
+ 540266 WARANA BRIDGE TM					   6.0		     7.0	       8.0
+ 540506 BLI BLI ALERT						   2.1		     2.6	       3.3
+ 540420 PALMWOODS SPORTSGROUND ALERT				   3.5		     4.3	       5.0
+ 540083 DIDDILLIBAH ALERT					   2.5		     3.5	       4.5
+ 540222 EUDLO ALERT				       4.2   B	   5.0		     6.0	       7.0
+ 540087 KIELS MOUNTAIN ALERT					   3.0		     3.5	       4.0
+ 540289 KIELS MOUNTAIN TM					   3.0		     3.5	       4.0
+ 540094 PICNIC POINT ALERT					   1.5		     1.8	       2.0
+
+NOOSA
+
+ 540209 COOPS CORNER TM
+ 540532 COOPS CORNER AL
+ 540308 BOREEN POINT ALERT					   1.5		     2.0      2.7      2.5
+ 540639 KIN KIN ALERT
+ 040756 BOREEN POINT				1.0		   1.5		     2.0      2.0      2.5
+ 540309 LAKE COOROIBAH ALERT					   1.0		     1.5	       2.0
+ 540310 TEWANTIN ALERT				       0.9   R	   1.0		     1.3      1.8      1.8
+ 040772 TEWANTIN				0.9    0.9   R	   1.0		     1.3      1.8      1.8
+ 540311 NOOSA BAR ALERT
+
+
+
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 7
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+
+MARY
+
+ 540649 BAROON DAM HW ALERT-2			       0.0   S
+ 540647 BAROON POCKET DAM HW TM 		       0.0   S
+ 540427 BAROON DAM TW ALERT
+ 540620 CONONDALE ALERT 			       2.6   B	   2.5		     4.0	       6.0
+ 540332 BELLBIRD CREEK ALERT					   5.0		     6.0	       7.0
+ 040830 BELLBIRD CREEK TM					   5.0		     6.0	       7.0
+ 040386 KENILWORTH BRIDGE			3.0   11.2   B	   3.0	    3.0      5.0     10.0      8.0
+ 540331 KENILWORTH H/S ALERT					   4.0		     7.0	      10.0
+ 540330 MOY POCKET ALERT					   7.0		    12.0	      14.0
+ 040814 MOY POCKET TM						   7.0		    12.0	      14.0
+ 540575 BORUMBA DAM HW AL			       0.0   S	   2.0		     3.0	       4.0
+ 540264 BORUMBA DAM HW TM			       0.0   S	   2.0		     3.0	       4.0
+ 040481 BORUMBA DAM				0.7    0.0   S	   2.0		     3.0	       4.0
+ 540514 BORUMBA DAM TW TM
+ 040099 IMBIL POST OFFICE			3.0    6.1   B	   5.0	    5.0      6.5      9.5      8.0
+ 040777 IMBIL TM						   5.0	    5.0      6.5      8.5      8.0
+ 040780 HYGAIT TM						   5.0		     6.5	       8.0
+ 040778 ZACHARIAH TM						   6.0		     8.0	      10.0
+ 540569 DAGUN POCKET ALERT					   7.0		    13.0	      15.0
+ 040781 DAGUN POCKET TM 					   7.0		    13.0	      15.0
+ 540463 LAKE MACDONALD DAM ALERT		      95.3   S
+ 540327 LAKE MACDONALD DRIVE AL 		       5.0   B	   4.0		     5.0	       5.5
+ 040755 COORAN					3.0    7.2   B	   5.0	    6.0      7.0      9.1      9.0
+ 540326 COORAN ALERT						   6.5		     8.5	      11.0
+ 040782 COORAN TM						   6.5		     8.5	      11.0
+ 540476 CEDAR POCKET DAM ALERT			     100.9   S
+ 540572 CEDAR POCKET DAM TM			     100.9   S
+ 540618 CEDAR POCKET DAM TW TM
+ 540215 GYMPIE WEIR TM						   6.3		    12.3	      17.3
+ 040426 GYMPIE					4.0    9.9   B	   6.0	    6.0     12.0     12.1     17.0
+ 040993 GYMPIE ALERT				       9.9   B	   6.0	    6.0     12.0     12.1     17.0
+ 040824 FISHERMANS POCKET TM					   7.0		    13.0	      18.0
+ 540404 GLASTONBURY TM
+ 040811 KILKIVAN TM						   4.5		     5.5	       7.5
+ 040365 WOOLOOGA				2.0    2.4   B	   7.0	   10.0      8.0      9.0      9.0
+ 540043 BROOYAR TM						   7.5		     8.5	       9.5
+ 040688 MIVA					5.0   22.0   B	   7.5	    7.5      9.5	      15.5
+ 040826 MIVA TM 				      22.0   B	   7.5	    7.5      9.5	      15.5
+ 040825 MARODIAN TM						   8.0		     8.0	      12.0
+ 040833 HOME PARK TM						   7.0		     9.0	      13.0
+ 040203 TIARO					6.0    6.0   B	   6.0	    8.0      8.0     19.0     12.0
+ 540039 THE BARRAGE TM						   7.0		     8.0	       9.0
+ 540288 TAGIGAN ROAD TM 			       4.0   B	   4.0		     4.5	       5.0
+ 040679 BAUPLE EAST TM				       3.0   B	   9.0		    11.0	      12.0
+ 540251 TEDDINGTON WEIR HW			       8.7   W	  10.0		    10.5	      11.0
+ 040896 TEDDINGTON WEIR HW TM			       8.7   W	  10.0		    10.5	      11.0
+ 540027 TINANA BARRAGE HW TM			       2.5   W	   5.0		     8.0	       9.0
+ 040443 MARYBOROUGH				4.0    5.5   B	   5.0	    5.0      8.0      7.6      9.0
+ 540637 CHURCHILL STREET ALERT					   4.5		     7.5	       8.5
+ 040705 CHURCHILL STREET TM					   4.5		     7.5	       8.5
+ 540452 BOORAL ROAD ALERT			       0.0   R
+ 540450 BLACK SWAMP ALERT
+ 540036 URANGAN TIDE TM
+
+BURRUM
+
+ 040906 LENTHALLS DAM ALERT			      26.0   F
+ 540267 LENTHALLS DAM HW TM			      26.0   F
+ 040907 HOWARD ALERT				       4.9   W	   6.0		     8.0	      10.0
+ 540449 TORBANLEA ALERT 			       0.0   R
+ 040904 RAILWAY BRIDGE ALERT					   5.0		     7.0	       8.0
+ 040903 PACIFIC HAVEN ALERT					   2.5		     3.0	       3.5
+ 540076 BRUCE HIGHWAY TM			      14.5   B	   8.0		    10.0	      12.0
+ 539061 BURRUM HIGHWAY TM			      13.0   B	   8.0		     9.5	      11.0
+ 539103 LEESONS TM
+ 539059 ELLIOTT TM				       2.1   B	   3.0		     4.0	       5.0
+ 539060 DR MAYS CROSSING TM			       1.6   C	   1.5		     2.0	       2.5
+
+BURNETT
+
+ 539044 UPPER MONAL TM
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 8
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 539064 CANIA DAM				0.4    0.0   S	   0.6		     1.4	       3.0
+ 539092 CANIA DAM HW TM 			       0.0   S	   0.6		     1.4	       3.0
+ 539114 CANIA DAM TW TM
+ 039165 MONTO					4.0    7.4   B	   4.0	    6.0      5.0     10.7      6.0
+ 539040 MONTO TM
+ 539088 DAKIEL TM
+ 039319 ABERCORN TM						   5.0		     6.0	       8.0
+ 039000 ABERCORN				3.0    6.4   B	   5.0	    5.0      6.0	       8.0
+ 539039 YARROL TM						   5.0		     6.0	       7.0
+ 539052 LANDS END TM						   3.0		     4.5	       6.0
+ 539035 JOHN GOLEBY WEIR HW TM			       0.0   W	   2.5		     4.0	      10.0
+ 039318 CERATODUS TM						   5.5		     6.5	       8.5
+ 039236 WURUMA DAM				0.5    0.0   S	   0.5		     1.0	       1.5
+ 539051 WURUMA DAM HW TM			       0.0   S	   0.5		     1.0	       1.5
+ 539074 WURUMA DAM TW TM					   1.5		     2.0	       2.5
+ 039259 EIDSVOLD BRIDGE 			4.0    6.0   B	   6.0	    6.0      9.0	      12.0
+ 039321 EIDSVOLD TM						   4.0		     7.5	      10.0
+ 039324 MARRIAGES TM						   4.0		     7.0	      10.0
+ 042059 AUBURN					2.0    2.4   B	   5.0	    6.0      6.0	       7.0
+ 039177 GLENWOOD				4.0    4.0   B	   5.0	   12.0      8.0     16.0     12.0
+ 539037 DYKEHEAD TM						   4.0		     7.0	      10.0
+ 539042 BROVINIA TM						   5.0		     7.0	       9.0
+ 540056 CARTERS TM						   4.0		     5.0	       6.0
+ 540231 WEENS BRIDGE TM 			       5.0
+ 540055 PROSTON TM						   4.0		     5.5	       7.0
+ 540262 BOONDOOMA DAM HW TM			       0.0   S	   1.5		     2.1	       2.6
+ 040722 BOONDOOMA DAM				0.8    0.0   S	   1.5		     2.1	       2.6
+ 040455 DUNOLLIE				2.5    2.8   B	   2.5	    8.0      6.5	       8.0
+ 539069 COORANGA TM						   4.0		     6.0	       7.0
+ 539038 DERRA TM				       3.8   B	   2.5		     4.5	       5.0
+ 539066 MUNDUBBERA HW TM			       0.0   W	   1.5		     5.0	      11.0
+ 039320 MUNDUBBERA TW TM			      16.3   B	   6.3	   11.0     10.3     18.3     17.3
+ 039073 MUNDUBBERA				3.0   17.0   B	   7.0	   11.0     11.0     17.0     18.0
+ 539055 REID CREEK TM
+ 539049 WHARTON WEIR TM 					  96.5		    97.5	     102.0
+ 039323 GAYNDAH FLUME TM					   5.5		     8.5	      15.5
+ 039191 GAYNDAH 				4.0   18.1   B	   5.0	   15.0      8.0     16.3     15.0
+ 540041 BROOKLANDS TM						   6.0		     7.0	       8.0
+ 040500 EMBREYS BRIDGE				4.0    7.4   B	   4.0	    6.6      6.0	       7.0
+ 540042 GLENMORE TM						   2.8		     3.0	       3.5
+ 540025 WEST BARAMBAH TM
+ 540090 BJELKE-PETERSEN DAM			1.3    0.0   S	   1.7		     2.9	       3.5
+ 540053 BJELKE-PETERSEN DAM HW TM		       0.0   S	   1.7		     2.9	       3.5
+ 540531 BJELKE-PETERSEN DAM TW TM
+ 040834 LITZOWS TM						   8.0		     9.0	      10.0
+ 540362 JOE SIPPEL WEIR HW TM			       0.0   W	   2.0		     2.5	       3.0
+ 540361 JOE SIPPEL WEIR TW TM					   7.5		     8.5	       9.0
+ 540077 FICKS CROSSING TM			       7.5   B	   6.0		     8.0	       9.0
+ 539077 SILVERLEAF WEIR HW TM			       0.0   W	   2.5		     3.5	       4.5
+ 539073 SILVERLEAF WEIR TW TM					   7.5		     9.0	      10.0
+ 040837 STONELANDS TM						   8.5		    10.0	      11.5
+ 540075 ETTIEWYN TM						   7.0		     8.0	       9.0
+ 040827 BAN BAN TM						   6.5		     8.5	       9.5
+ 040428 BRIAN PASTURES				2.0    9.1   B	   6.0	    8.0      8.0	       9.0
+ 039193 MT LAWLESS TM				       6.1   B	   5.0	   18.0      6.0	       8.0
+ 539151 MT LAWLESS ALERT			       6.1   B	   5.0	   18.0      6.0	       8.0
+ 539150 MINGO CROSSING ALERT			       8.7   B
+ 539108 PARADISE DAM HW TM			       0.0   S	   1.5		     2.5	       3.5
+ 039184 PARADISE DAM			       68.1   67.6   S	  69.1		    70.1	      71.1
+ 539021 FIG TREE TM						   6.0		     8.0	      12.0
+ 539148 FIG TREE ALERT						   6.0		     8.0	      12.0
+ 539146 CORINGA ALERT						   5.0		     6.0	       7.0
+ 539045 CORINGA TM						   5.0		     6.0	       7.0
+ 539094 MT RAWDON TM
+ 539147 MT RAWDON ALERT 			       0.0   W
+ 039313 WALLA TM				       5.5   O	   6.0	   15.0      8.0	      12.0
+ 539154 WALLA ALERT				       5.5   B	   6.0	   15.0      8.0	      12.0
+ 039258 WALLA					3.0    5.5   O	   6.0	   15.0      8.0	      12.0
+ 539089 WALLA WEIR HW TM			      19.0   W	  20.5		    21.5	      23.0
+ 539096 WALLA WEIR TW TM
+ 539058 WOONGARRA P/S TM					  10.0		    12.5	      14.5
+ 039170 BUNDABERG				2.5   11.4   B	   3.5		     5.5      5.5      7.0
+ 039352 BUNDABERG ALERT 			      11.4   B	   3.5		     5.5      5.5      7.0
+ 539093 BUNDABERG PORT TIDE TM
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 9
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 539076 BURNETT HEADS TIDE TM
+ 039331 MINGO CROSSING
+
+KOLAN
+
+ 039137 MOLANGOOL				1.0    1.0   C	   6.0		     8.0	       9.0
+ 539048 SPRINGFIELD TM						   7.0		     9.0	      10.0
+ 539050 FRED HAIGH DAM HW TM			       0.0   S	   1.0		     1.5	       2.0
+ 539113 FRED HAIGH DAM TW TM
+ 039011 MONDURAN				3.0    3.4   B	   5.0	    5.0      8.0	       9.0
+ 539046 GIN GIN CREEK TM					   5.0		     7.0	       9.0
+ 539047 BUCCA WEIR HW TM			      16.2   W	  17.5		    18.5	      19.0
+ 539091 GOOBURRUM P/S TM					   4.5		     5.5	       6.0
+
+BAFFLE
+
+ 539132 MIMDALE ALERT						  10.0		    12.0	      14.0
+ 539085 MIMDALE TM						  10.0		    12.0	      14.0
+ 039267 ESSENDEAN BRIDGE			       5.9   B	   5.0		     8.0	      12.0
+ 539126 ESSENDEAN BRIDGE ALERT			       5.9   B	   5.0		     8.0	      12.0
+ 539118 RAPLEYS TM
+ 539135 HILLS ROAD ALERT			       3.2   B	   3.0		     4.0	       5.0
+ 039246 BARNETTS ROAD				3.0		   4.0		     5.0	       6.0
+ 539136 BARNETTS ROAD ALERT					   4.0		     5.0	       6.0
+
+BOYNE
+
+ 539129 NAGOORIN ALERT
+ 539036 NAGOORIN TM
+ 539140 MILTON ALERT
+ 539084 MILTON TM
+ 539087 MARLUA TM
+ 539130 MARLUA ALERT
+ 539131 AWOONGA DAM ALERT
+ 539086 AWOONGA DAM HW TM			      40.0   S	  40.3
+ 539125 BENARABY ALERT						   5.0		    10.0	      12.0
+ 539134 BOYNE ISLAND ALERT					   2.0		     3.0	       4.0
+ 539032 GLADSTONE TIDE TM
+ 539033 AUCKLAND POINT TIDE TM
+
+CALLIOPE
+
+ 539072 CASTLEHOPE TM
+
+FITZROY
+
+ 535032 UTOPIA DOWNS TM 					   5.0		     8.0	      13.0
+ 535111 EUROMBAH CREEK TM
+ 035271 TARANA CROSSING 			1.0    0.7   X	   6.0	    9.0      9.0	      12.0
+ 535013 WINDAMERE TM						   5.0		     7.0	       9.0
+ 035273 CHILGERRIE HILL 			3.0		   5.0		     7.0	       9.0
+ 035115 TAROOM					2.0    6.7   A	   4.5	    3.0      6.0      7.6      7.0
+ 035282 TAROOM TM				       6.7   A	   4.5	    3.0      6.0      7.6      7.0
+ 535055 BROADMERE TM
+ 535049 LA PALMA TM
+ 035096 THE GLEBE				1.0		   2.0	    2.0      3.0	       4.0
+ 535044 GLEBE WEIR HW TM			       0.0   W	   1.5		     2.5	       3.5
+ 535045 GLEBE WEIR TW TM					   8.5		    10.5	      12.0
+ 539070 GYRANDA WEIR TM 			       0.0   W	   1.5		     2.0	       3.0
+ 539065 ISLA-DELUSION XING TM					   7.0		     9.0	      10.0
+ 039315 THEODORE				7.0    5.9   W	   8.0	   10.0     11.0     12.2     12.0
+ 535110 THEODORE WEIR TM			       5.9   W	   8.0	   10.0     11.0     12.2     12.0
+ 539043 WOODLEIGH TM						   7.5		    13.0	      15.0
+ 539081 MOURA WEIR TM				       0.0   W	   1.0		     4.0	       5.5
+ 039296 MOURA					6.0   12.5   B	   6.0	   11.0     11.0	      12.0
+ 035083 WOORABINDA				1.0		   6.0	    8.0      7.0     10.1      8.0
+ 535021 REDCLIFFE TM						   4.0		     5.0	       6.0
+ 535124 KARAMEA ALERT				2.0    1.6   C	   7.0	    8.0      8.0	       9.0
+ 035227 KARAMEA 				2.0    1.6   C	   7.0	    8.0      8.0	       9.0
+ 535050 ROUNDSTONE CREEK TM
+ 539095 BINDAREE TM
+ 539080 BARALABA HW TM				       0.0   W	   0.8		     1.5	       2.0
+ 039143 BARALABA				3.0    8.8   B	   4.0		     7.5	       9.0
+ 539079 BARALABA TW TM				       9.0   B	   4.2		     7.7	       9.2
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 10
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 535015 BECKERS TM						   5.0		     8.5	      10.5
+ 539106 SOUTH KARIBOE CREEK TM
+ 539111 CALLIDE DAM INFLOW TM
+ 539071 CALLIDE DAM HW TM			       0.0   F
+ 539110 STEPANOFFS TM
+ 539112 KROOMBIT DAM HW TM			       0.0   F
+ 539083 KROOMBIT DAM TW TM
+ 539105 FOLDING HILLS TM
+ 539100 RED HILL TM
+ 539062 KINGSBOROUGH TM 					   5.0		     6.0	       7.0
+ 539107 CRAIGLANDS TM
+ 539068 GOOVIGEN TM						   6.5		     9.0	      10.5
+ 539104 NUMBER 7 DAM TM
+ 539102 DAIRY CK TM
+ 539056 KENBULA TM
+ 539016 WURA TM 						   4.0		     6.0	       8.0
+ 039308 RANNES					3.0    2.5   C	   6.0		     8.0     12.2     11.0
+ 539057 RANNES TM				       2.5   C	   6.0		     8.0     12.2     11.0
+ 035270 NEWLANDS				4.0    4.0   C	   4.0		    12.0	      15.0
+ 539090 KNEBWORTH TM						   5.0		    11.0	      14.0
+ 535054 REWAN TM
+ 535052 LAKE BROWN TM
+ 535108 THE CRESCENT ALERT
+ 535107 MT PANORAMA ALERT
+ 535109 ROLLESTON ALERT 			       5.3   B	   4.5	    5.0      5.0      7.0      5.5
+ 035145 ROLLESTON				2.0    5.3   B	   4.5	    5.0      5.0      7.0      5.5
+ 535090 THE LAKE ALERT						  10.0		    11.0	      12.0
+ 535010 THE LAKE TM						  10.0		    11.0	      12.0
+ 035276 SPRINGSURE CREEK JUNCTION AL
+ 535056 SPRINGSURE CREEK JUNCTION TM
+ 535094 COMET WEIR ALERT			      10.9   W	   6.5		     7.5	       8.0
+ 535025 COMET WEIR TM				      10.9   W	   6.5		     7.5	       8.0
+ 535125 PETRONA ALERT
+ 035150 RAYMOND 				3.0    2.9   B	   8.0	    8.0      9.5	      11.0
+ 535099 RAYMOND ALERT				       2.9   B	   8.0	    8.0      9.5	      11.0
+ 535106 VAN DYKE CREEK ALERT
+ 035251 CRAIGMORE AL						   9.0		    12.0	      14.0
+ 535029 CRAIGMORE TM						   9.0		    12.0	      14.0
+ 535101 FAIRBAIRN DAM AL			       0.0   S	   3.3		     3.8	       4.5
+ 035241 FAIRBAIRN DAM				0.0    0.0   S	   3.3		     3.8	       4.5
+ 535019 FAIRBAIRN DAM TM			       0.0   S	   3.3		     3.8	       4.5
+ 035260 EMERALD 				4.0   14.5   A	  14.0		    14.5	      15.0
+ 535076 EMERALD ALERT				      14.5   A	  14.0		    14.5	      15.0
+ 534025 WEST WOLFANG CREEK TM			       1.0   B
+ 535028 CLERMONT TM						   4.0		     5.0	       6.0
+ 535103 SANDY CREEK BRIDGE TM			       9.5   B
+ 035232 VALERIA 				3.0    4.0   B	   8.0		     8.5	       9.0
+ 035187 VALERIA AL				       4.0   B	   8.0		     8.5	       9.0
+ 535018 VALERIA TM				       4.0   B	   8.0		     8.5	       9.0
+ 535114 KEILAMBETE ALERT
+ 535112 KEILAMBETE TM
+ 535100 SAPPHIRE AL				       9.1   B	   9.0		     9.3      9.6      9.6
+ 535077 RUBYVALE ALERT
+ 535063 RUBYVALE TM
+ 535098 GREGORY HIGHWAY ALERT					   9.0		     9.5	      10.0
+ 535017 GREGORY HIGHWAY TM					   9.0		     9.5	      10.0
+ 535097 DUCKPONDS ALERT 					   9.0		    10.0	      11.0
+ 535020 DUCKPONDS TM						   9.0		    10.0	      11.0
+ 535095 RILEYS CROSSING ALERT
+ 535046 RILEY'S CROSSING TM
+ 035269 YAKCAM					5.0		  12.0		    17.0	      20.0
+ 535027 BEDFORD WEIR HW TM			       0.0   W
+ 535096 BEDFORD WEIR TW ALERT					   9.0		    12.0	      16.0
+ 535026 BEDFORD WEIR TW TM					   9.0		    12.0	      16.0
+ 535023 BINGEGANG HW TM 			       7.5   W	   9.5		    12.5	      15.5
+ 535022 BINGEGANG TW TM 					   8.0		    12.0	      16.0
+ 035295 BINGEGANG WEIR ALERT			       7.5   W	   9.5		    12.5	      15.5
+ 035266 BINGEGANG				2.0   14.6   B	   3.0	    7.0      7.0	      16.0
+ 535113 APIS CREEK ALERT			       1.7   X
+ 534006 GOONYELLA TM						   5.0		     6.0	       7.0
+ 534026 ISAAC RIVER BRIDGE TM			       8.9   B
+ 534003 DEVERILL TM						   7.0		     9.0	      11.0
+ 534028 FITZROY DEVELOPMENTAL RD BR TM		      10.3   B
+ 533126 UNDERCLIFF TM
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 11
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 533091 MT BRIDGET TM						   9.0		    10.5	      15.5
+ 033083 CARDOWAN				3.0    5.0   B	   9.0		    11.0	      15.0
+ 533113 PROSPECT CREEK TM			       7.1   B
+ 534005 FUNNEL CREEK TM 			       4.5   B	   7.0		     8.0	       9.0
+ 034083 WAITARA 				3.0    3.0   B	   6.0		     7.0	       9.0
+ 533030 BRAESIDE TM						   7.0		     9.0	      11.0
+ 533103 NEBO TM
+ 534027 BEE CREEK TM				      11.7   B
+ 533122 UPPER BEE CK TM 			       3.7   B
+ 034073 SALTBUSH PARK				1.0		   4.0	    6.0      5.0	       6.0
+ 534004 PINK LAGOON TM						   6.5		     9.0	      14.5
+ 534014 YATTON TM						   7.5		     9.5	      16.5
+ 534015 MAY DOWNS ROAD BRIDGE			1.5    1.5   B	   2.5	   10.5      4.3     22.5     14.5
+ 034082 TARTRUS 				7.0    5.7   W	  11.0		    13.0	      15.0
+ 034096 TARTRUS TM				       5.7   W	  11.0		    13.0	      15.0
+ 535024 COOLMARINGA TM						  15.0		    17.0	      19.0
+ 039044 RIVERSLEA TM				       3.4   B	  15.0	   15.0     21.0     24.4     24.0
+ 539041 RIVERSLEA TM-B				       3.4   B	  15.0	   15.0     21.0     24.4     24.0
+ 033285 THE GAP TM						  10.0		    14.0	      16.0
+ 533029 WATTLEBANK TM						  12.0		    16.0	      19.0
+ 033076 YAAMBA					3.0   18.5   A	   9.0		    12.0	      15.0
+ 533110 BYFIELD TM
+ 033310 SOUTH YAAMBA TM 					   7.0		    10.0	      15.0
+ 039347 LAUREL BANK TM						   4.0		     6.0	       8.0
+ 039264 ROCKHAMPTON				3.0		   7.0		     7.5	       8.5
+ 539101 RAGLAN CK TM
+ 539075 PORT ALMA TIDE TM
+ 533085 ROSSLYN BAY TIDE TM
+
+PLANE
+
+ 533014 CARMILA TM
+ 533097 MT CHRISTIAN TM
+ 533143 SUCROGEN WEIR ALERT
+ 533124 KINCHANT DAM TM 			       0.0   F
+
+PIONEER
+
+ 533064 TEEMBURRA DAM HW TM			       0.0   S
+ 533041 TEEMBURRA DAM ALERT			       0.0   S
+ 533089 TEEMBURRA DAM TW TM
+ 033301 WHITEFORD'S ALERT					   5.0		     6.5	       7.5
+ 533026 WHITEFORD'S TM						   5.0		     6.5	       7.5
+ 033299 SARICH'S ALERT						   6.5		     8.0	       9.5
+ 033282 SARICH'S TM						   6.5		     8.0	       9.5
+ 533111 FINCH HATTON CK DAM TM
+ 533059 FINCH HATTON ALERT			      10.0   B	   3.0	    4.0      4.0      4.6      5.0
+ 533092 FINCH HATTON TM 			      10.0   B	   3.0	    4.0      4.0      4.6      5.0
+ 033141 FINCH HATTON				1.5   10.0   B	   3.0	    4.0      4.0      4.6      5.0
+ 033304 GARGETT ALERT				      17.9   B	   5.5		     8.0	       9.0
+ 033281 GARGETT TM				      17.9   B	   5.5		     8.0	       9.0
+ 533069 MIRANI WEIR HW TM			      47.1   W	  49.5		    50.5	      51.0
+ 033302 MIRANI WEIR ALERT					   7.0		     9.0	      10.0
+ 033277 MIRANI WEIR TM						   7.0		     9.0	      10.0
+ 033152 MIRANI					3.0   15.8   B	   6.0	    6.0      8.0     18.0      9.0
+ 533145 MARIAN WEIR ALERT			       0.0   W
+ 533125 MARIAN WEIR TM				       0.0   W
+ 033300 DUMBLETON ROCKS ALERT			      16.0   F	  17.3		    20.0	      21.0
+ 033283 DUMBLETON ROCKS TM			      16.0   F	  17.3		    20.0	      21.0
+ 533105 DUMBLETON WEIR T/W TM
+ 533060 HOSPITAL BRIDGE ALERT			       6.6   O	   7.0		    10.5	      11.5
+ 033246 MACKAY					5.0    9.6   B	   7.0		     8.0      7.3      9.0
+ 033303 MACKAY ALERT				       9.6   B	   7.0		     8.0      7.3      9.0
+ 533061 GOOSEPONDS ALERT			       6.4   B	   6.2		     6.4	       7.0
+ 533144 MCCREADYS CREEK ALERT
+ 033305 OUTER HARBOUR TIDE ALERT
+ 533009 OUTER HARBOUR TIDE TM
+ 533142 WALKERSTON ALERT
+ 533063 BAKERS CREEK ALERT					   7.5		     8.5	      10.0
+ 533010 DALRYMPLE BAY TIDE TM
+ 533012 HAY POINT TIDE TM
+ 533031 HOMEBUSH TM
+
+
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 12
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+
+O'CONNELL
+
+ 533066 CALEN TM
+ 533104 FORBES ROAD TM
+ 533098 STAFFORD CROSSING TM
+ 533042 JOCHHEIMS TM
+
+PROSERPINE
+
+ 033273 PETER FAUST DAM 			0.0    0.0   S	   3.5		     6.0	       8.0
+ 533019 PETER FAUST DAM HW TM			       0.0   S	   3.5		     6.0	       8.0
+ 033274 PETER FAUST DAM TW TM					   5.5		     7.0	       8.0
+ 033254 CRYSTAL BROOK				3.0		   4.0		     5.0	       6.0
+ 533018 PROSERPINE TM						   7.0		     8.0	       9.0
+ 533020 LOWER GREGORY TM
+ 533086 LAGUNA QUAYS TIDE TM
+ 533008 SHUTE HARBOUR TIDE TM
+
+DON
+
+ 033265 IDA CREEK ALERT 					   2.5		     4.0	       5.5
+ 533028 IDA CREEK TM						   2.5		     4.0	       5.5
+ 033267 MT DANGAR ALERT 			       2.1   C	   2.5		     4.0	       5.5
+ 033268 REEVES ALERT						   3.0		     5.0	       7.0
+ 533013 REEVES TM						   3.0		     5.0	       7.0
+ 033264 BOWEN PUMP STATION ALERT		       2.0   B	   2.5		     4.0	       5.5
+ 533048 BOWEN TIDE TM
+ 533106 KOONANDAH TM
+ 533033 GUTHALUNGRA TM
+
+BURDEKIN
+
+ 532103 VALLEY OF LAGOONS TM
+ 032122 GREENVALE				6.0		   8.0	   17.0     12.0	      18.0
+ 032063 BLUE RANGE				7.0    3.2   B	   8.0	   20.0     12.0	      15.0
+ 532017 BLUE RANGE TM				       3.2   B	   8.0	   20.0     12.0	      15.0
+ 532016 MT FULLSTOP TM						   5.5		    11.5	      17.0
+ 532086 MT BRADLEY TM
+ 533107 LAROONA TM
+ 532063 PALUMA DAM ALERT
+ 530017 BLUFF DOWNS TM
+ 533096 GAINSFORD TM
+ 532085 KEELBOTTOM TM
+ 034085 SELLHEIM				2.0   13.5   B	  12.0	   14.0     14.0     18.0     15.0
+ 533075 SELLHEIM ALERT				      13.5   B	  12.0	   14.0     14.0     18.0     15.0
+ 533011 SELLHEIM TM				      13.5   B	  12.0	   14.0     14.0     18.0     15.0
+ 535296 RIVINGTON TM				       2.2   X	   3.5		     6.0      7.5      7.0
+ 035236 RIVINGTON				2.0    2.2   B	   3.5		     6.0      7.5      7.0
+ 035229 ALPHA					2.0   11.2   B	   7.0	    7.0      7.5      8.0      8.0
+ 535053 VIOLET GROVE TM
+ 535102 UPPER BELYANDO TM			       2.9   B
+ 036083 ALBRO					0.6    0.0   X	   4.0		     5.0	       6.0
+ 536008 TWIN HILLS TM
+ 536007 BELYANDO CROSSING TM			       7.9   B
+ 034022 MT DOUGLAS				4.0    9.2   B	   5.0	    6.0      8.0     10.0      9.0
+ 534016 EAGLEFIELD TM
+ 534024 LOGAN CREEK TM				       2.8   B
+ 534019 BOWEN DEVELOPMENT RD TM
+ 534012 ST ANNS ALERT						   4.0		     6.5	      10.0
+ 534008 ST ANNS TM						   4.0		     6.5	      10.0
+ 034087 SCARTWATER				1.0    1.2   B	   1.5		     3.5	       6.5
+ 530003 PENTLAND TM						   4.0		     5.0	       6.0
+ 530021 BETTS CREEK TM				       0.0   B
+ 534010 TAEMAS ALERT				       4.6   B	   5.0		     7.0	       8.0
+ 034094 TAEMAS					3.0    4.6   B	   5.0		     7.0	       8.0
+ 534017 TAEMAS TM				       4.6   B	   5.0		     7.0	       8.0
+ 034029 BURDEKIN DAM				0.0    0.0   S	   3.0		     5.5	       8.0
+ 034097 BURDEKIN DAM ALERT			       0.0   S	   3.0		     5.5	       8.0
+ 534001 BURDEKIN DAM TM 			       0.0   S	   3.0		     5.5	       8.0
+ 534013 HYDRO SITE TM						  11.0		    17.0	      21.0
+ 533032 OLD RACECOURSE TM
+ 533123 EUNGELLA DAM HW TM			       0.0   F
+ 533094 URANNAH TM
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 13
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 533015 JACKS CREEK ALERT					   9.0		    19.0	      21.0
+ 533102 JACKS CREEK TM						   9.0		    19.0	      21.0
+ 033292 MYUNA ALERT						   5.0		    13.0	      15.0
+ 533024 MYUNA TM						   5.0		    13.0	      15.0
+ 033291 DALBEG ALERT						  10.0	    5.0     15.0	      20.0
+ 033278 DALBEG TM						  10.0	    5.0     15.0	      20.0
+ 033205 DALBEG					5.0		  10.0	    5.0     15.0	      20.0
+ 033289 STRATHBOGIE ALERT					   8.5		    10.5	      11.5
+ 033287 MILLAROO ALERT						   9.0		    13.0	      17.0
+ 533090 CLARE HW TM				      20.5   S	  23.0		    27.0	      31.0
+ 033122 CLARE					5.0		   8.0		    13.0	      17.0
+ 033286 CLARE ALERT						   9.0		    13.0	      17.0
+ 033279 CLARE TM						   9.0		    13.0	      17.0
+ 533118 AYR ALERT				       1.8   X
+ 033204 INKERMAN BRIDGE 			3.0   18.3   B	   7.0	    9.0     10.0     12.1     12.0
+ 033288 INKERMAN BRIDGE ALERT			      18.3   B	   7.0	    9.0     10.0     12.1     12.0
+ 533117 BRANDON ALERT				       2.9   C
+ 533146 YELLOW GIN CREEK ALERT			       2.3   B
+ 533057 RITA ISLAND ALERT			       0.0   B	   1.0		     2.0	       3.0
+ 533049 GROPER CREEK ALERT					   3.0		     3.5	       4.0
+
+HAUGHTON
+
+ 033207 FLORA VALLEY				3.0   12.0   B	   5.0	    5.0      5.5      5.0      6.0
+ 533055 MT PICCANINNY ALERT					   3.0		     4.0	       5.0
+ 533027 MT PICCANINNY TM					   3.0		     4.0	       5.0
+ 533072 MAJOR CREEK ALERT					   7.0		     8.0	       9.5
+ 533016 MAJOR CREEK TM						   7.0		     8.0	       9.5
+ 533056 POWERLINE ALERT 					   5.0		     6.0	       8.0
+ 033280 POWERLINE TM						   5.0		     6.0	       8.0
+ 033249 HUSTONS FARM				3.0    6.1   B	   4.0	    4.0      5.0      4.6      6.7
+ 533150 REED BEDS ALERT 			       1.5   B
+ 533051 GIRU ALERT				       3.5   B	   1.8		     2.1      2.5      2.5
+ 033253 GIRU					1.0    3.5   B	   1.8		     2.1      2.5      2.5
+ 533130 CROMARTY TM				       0.0   B
+ 533093 NORTHCOTE TM
+ 533116 EAST BARRATTAS ALERT			       5.2   A
+
+ROSS
+
+ 532090 WHITES CREEK AL
+ 532034 ALLIGATOR CREEK ALERT					   5.0		     6.0	       7.0
+ 532051 ALLIGATOR CREEK TM					   5.0		     6.0	       7.0
+ 532005 CAPE FERGUSON TIDE TM
+ 532035 STUART CREEK ALERT			       6.9   B	   5.0		     5.9	       6.0
+ 532101 UPPER STUART CK ALERT
+ 532020 ROSS RIVER DAM ALERT			      38.6   F
+ 532030 BLACK WEIR (RIVERWAY) AL		       0.0   W	   2.0		     2.5	       3.5
+ 532029 APLIN WEIR ALERT			       0.0   W	   2.5		     3.5	       4.0
+ 532088 ROONEY'S BRIDGE ALERT
+ 532037 MYSTERTON ALERT 			       3.8   B	   3.5		     3.8	       4.0
+ 532032 LOUISA CREEK ALERT			       6.4   B	   5.0		     6.0	       6.4
+ 532044 LITTLE BOHLE RIVER ALERT				   3.0		     4.0	       5.0
+ 532043 BOHLE RIVER ALERT					   4.0		     5.5	       7.0
+ 532015 BOHLE RIVER TM						   4.0		     5.5	       7.0
+ 532089 DALRYMPLE ROAD ALERT			       5.9   B
+ 532053 MT BOHLE ALERT						   4.0		     5.5	       7.0
+ 532033 TOWNSVILLE TIDE ALERT
+ 532004 TOWNSVILLE TIDE TM
+
+BLACK
+
+ 532046 BLACK RIVER ALERT					   5.0		     6.0	       7.0
+ 532055 BLACK RIVER TM						   5.0		     6.0	       7.0
+ 532048 BLUEWATER ALERT 					   6.0		     7.0	       8.0
+ 532007 BLUEWATER TM						   6.0		     7.0	       8.0
+ 532091 ROLLINGSTONE AL
+
+HERBERT
+
+ 531015 SILVER VALLEY TM					   5.0		     6.0	       7.0
+ 531059 RAVENSHOE TM
+ 531021 ARCHERS CREEK TM					   6.0		     7.0	       8.0
+ 531060 WOOROORA TM
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 14
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 531081 GUNNAWARRA AL (RUDD CK)
+ 531079 GUNNAWARRA TM
+ 531078 CAMERON CREEK TM
+ 032018 GLENEAGLE				4.0		   4.5	    8.0      8.5	       9.0
+ 032169 GLENEAGLE ALERT 					   4.5		     7.5	       8.0
+ 532066 GLENEAGLE TM						   4.5		     7.5	       8.0
+ 532080 BLENCOE FALLS TM
+ 032170 NASH'S CROSSING ALERT					   4.5		     6.0	       7.5
+ 032184 ZATTAS ALERT						   3.5		     5.2	       7.5
+ 532010 GOWRIE CREEK TM 					   5.5		     6.5	       7.5
+ 032174 ABERGOWRIE ALERT					   5.5		     8.5	      12.5
+ 532006 ABERGOWRIE TM						   5.5		     8.5	      12.5
+ 032091 ELPHINSTONE PKT 			5.6   10.1   B	   6.0	    6.0     10.0     11.0     14.0
+ 532028 ABERGOWRIE BRIDGE ALERT 		      10.1   B	   6.0	    6.0     10.0     11.0     14.0
+ 532011 RUNNING CREEK TM					   5.0		     6.0	       7.0
+ 032149 PEACOCK SIDING				1.0    0.5   B	  10.0	   10.0     12.0     14.0     14.0
+ 032173 PEACOCK SIDING ALERT					  10.0	   10.0     12.0     14.0     14.0
+ 532067 TREBONNE AL						  10.0		    11.0	      12.0
+ 032171 INGHAM PUMP STATION AL					  10.0		    11.0     12.0     12.0
+ 532012 INGHAM PUMP STATION TM					  10.0		    11.0	      12.0
+ 032094 GAIRLOCH				4.0    4.1   B	   9.5	    6.0     10.5     11.5     11.5
+ 532027 GAIRLOCH ALERT				       4.1   B	   9.5	    6.0     10.5     11.5     11.5
+ 032156 HALIFAX 				2.0    6.5   A	   4.0		     4.5	       5.0
+ 032185 HALIFAX ALERT				       6.5   A	   4.0		     4.5	       5.0
+ 532019 LUCINDA OFFSHORE TIDE TM
+
+TULLY
+
+ 031085 KAREEYA 				2.0		   2.5		     3.0	       4.0
+ 531095 KOOLMOON CK TM
+ 531085 TULLY GORGE TM
+ 531057 BOLINDA ESTATE ALERT					   3.0		     5.0	       7.0
+ 532095 BANYAN CREEK TM 			       0.0   B
+ 032115 EURAMO					5.0    8.7   A	   6.0	    6.0      8.0      8.5      9.0
+ 532059 EURAMO ALERT				       8.7   A	   6.0	    6.0      8.0      8.5      9.0
+ 032167 EURAMO TM				       8.7   A	   6.0	    6.0      8.0      8.5      9.0
+ 532061 UPPER MURRAY ALERT					   6.0		     8.0	       9.0
+ 032109 UPPER MURRAY TM 					   6.0		     8.0	       9.0
+ 532060 MURRAY FLATS ALERT			       8.5   A	   7.0		     7.5	       8.0
+ 532065 MEUNGA CREEK ALERT
+ 532096 SING'S FARM TM
+ 532002 CLUMP POINT TIDE TM
+ 532003 CARDWELL TIDE TM
+
+JOHNSTONE
+
+ 531084 GLEN ALLYN TM
+ 532070 FISHER CK TM
+ 532092 RANKIN CREEK TM
+ 032165 NERADA ALERT						   6.0		     7.0	       8.0
+ 032166 TUNG OIL ALERT						   7.0		     8.0	       8.5
+ 032152 TUNG OIL TM						   7.0		     8.0	       8.5
+ 532023 MCAVOY BRIDGE ALERT			       7.1   B	   5.0		     6.0	       7.1
+ 532014 SALTWATER CREEK ALERT					   5.3		     5.8	       6.3
+ 032161 CORSIS ALERT						   5.0		     5.5	       6.0
+ 032160 CENTRAL MILL ALERT			       3.9   O	   7.5		     8.0	       8.5
+ 032155 CENTRAL MILL TM 			       3.9   O	   7.5		     8.0	       8.5
+ 532025 MOURILYAN MILL ALERT					   8.0		     9.0	      10.0
+ 532009 SWEENEY CREEK U/S ALERT 				   4.7		     5.2	       5.7
+ 532013 SWEENEY CREEK D/S ALERT 				   5.0		     5.5	       6.0
+ 032145 INNISFAIL WHARF 			3.5		   5.0		     5.5      6.0      6.0
+ 032163 INNISFAIL WHARF ALERT					   5.0		     5.5      6.0      6.0
+ 531026 JAPOONVALE TM
+ 532093 SILKWOOD TM
+ 532024 MOURILYAN HARBOUR ALERT
+ 532018 MOURILYAN TIDE TM
+
+MULGRAVE-RUSSELL
+
+ 531076 THE FISHERIES ALERT			       1.9   B	   2.5		     5.0	       7.0
+ 531046 THE FISHERIES TM			       1.9   B	   2.5		     5.0	       7.0
+ 531052 PEETS BRIDGE ALERT			       5.0   B	   5.0		     7.0	       8.0
+ 531023 PEETS BRIDGE TM 			       5.0   B	   5.0		     7.0	       8.0
+ 531051 GORDONVALE ALERT			      14.0   O	  12.0		    13.0	      14.0
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 15
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 531018 SIMMONDS CREEK TM
+ 531045 HILLS CREEK TM
+ 531024 BUCKLANDS TM						   6.0		     7.0	       8.0
+ 531022 THE BOULDERS TM 					   4.5		     5.0	       6.0
+ 531074 CLYDE RD ALERT				       0.0   B	   0.4		     1.0	       2.0
+ 531073 CLYDE RD TM				       0.0   B	   0.4		     1.0	       2.0
+
+BARRON
+
+ 531064 GOONARA CREEK TM
+ 531070 GWYNNE CREEK TM
+ 531028 LESLIE CK TM
+ 531066 PICNIC CROSSING TM
+ 531065 MAZLIN CREEK TM
+ 031075 TINAROO FALLS DAM			0.5    0.0   S	   1.0		     1.5      2.5      2.0
+ 531034 TINAROO DAM ALERT			       0.0   S	   1.0		     1.5      2.5      2.0
+ 531017 TINAROO DAM TM				       0.0   S	   1.0		     1.5      2.5      2.0
+ 531030 TINAROO DAM T/W TM					   3.0		     3.5	       4.0
+ 531033 MAREEBA ALERT				       4.8   B	   4.8		     8.0	       9.0
+ 031188 MAREEBA TM				       4.8   B	   4.8		     8.0	       9.0
+ 531036 BILWON ALERT						   6.0		     9.0	      10.0
+ 531019 BILWON TM						   6.0		     9.0	      10.0
+ 531037 BOLTON ROAD ALERT			       1.5   B	   1.5		     6.0	       8.0
+ 531039 FLAGGY CREEK ALERT					   4.5				       6.0
+ 531027 FLAGGY CREEK TM 					   4.5				       6.0
+ 531040 MYOLA ALERT				       5.0   B	   5.0		     8.5	      10.0
+ 031173 MYOLA TM				       5.0   B	   5.0		     8.5	      10.0
+ 031171 BARRON FALLS						   9.0		    10.0	      11.0
+ 531041 LAKE PLACID ALERT					  10.3		    11.2	      12.0
+ 031170 KAMERUNGA				4.0		   5.0	    6.0      6.5	       8.0
+ 531048 KAMERUNGA BR ALERT			      11.3   B	   5.0		     6.5	       8.0
+ 031205 COPPERLODE DAM ALERT			       0.0   S
+ 531072 REDLYNCH ALERT
+ 531061 REDLYNCH TM
+ 531049 CAIRNS AIRPORT ALERT					   2.5		     3.0	       3.5
+ 531050 CAIRNS HARBOUR TIDE AL
+ 531044 CAIRNS HARBOUR TIDE TM
+
+MOSSMAN
+
+ 531063 MOSSMAN TM
+ 531014 MOSSMAN TIDE TM
+ 531016 PORT DOUGLAS TIDE TM
+ 531089 PALM COVE TIDE TM
+
+DAINTREE
+
+ 531068 O'DONOGHUE RD TM
+ 531067 WHYANBEEL CK TM
+ 531029 BAIRDS TM						   8.0		    10.0	      12.0
+ 031127 DAINTREE VILLAGE			3.5    3.7   B	   4.0		     6.0      4.0      9.0
+ 531071 CHINA CAMP TM
+
+ENDEAVOUR
+
+ 531069 FLAGGY TM
+ 531062 BEESBIKE TM
+ 531013 COOKTOWN TIDE TM
+
+NORMANBY
+
+ 528004 LAURA RIVER TM				       3.5   B
+ 531091 EAST NORMANBY RIVER TM
+ 528002 BATTLE CAMP TM
+ 528005 KALPOWER CROSSING TM			       1.9   C
+ 528008 HANN RIVER TM
+
+STEWART
+
+ 528007 STEWART RIVER TM
+
+OLIVE-PASCOE
+
+ 527009 PASCOE RIVER TM
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 16
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 527011 GARRAWAY CK TM
+
+CONDAMINE-BALONNE
+
+ 041046 THE HEAD				2.0    2.0   C	   4.0	    4.0      4.5      4.3      5.0
+ 541039 BROSNANS BARN TM					   3.0		     4.0	       5.0
+ 041463 KILLARNEY				2.0    6.7   B	   4.0	    4.0      5.0      6.5      6.0
+ 041537 KILLARNEY ALERT 			       6.7   B	   4.0	    4.0      5.0	       6.0
+ 539063 KILLARNEY TM
+ 041535 ELBOW VALLEY ALERT					   2.0		     4.0	       6.0
+ 041494 ELBOW VALLEY TM 					   2.0		     4.0	       6.0
+ 041533 EMU VALE ALERT				       7.1   B	   5.0	    7.0      6.0	       7.0
+ 541035 EMU VALE TM				       7.1   B	   5.0	    7.0      6.0	       7.0
+ 041536 MURRAYS BRIDGE ALERT					   4.0	    6.5      5.0	       6.5
+ 541036 SWANFELS TM						   3.5		     4.0	       4.5
+ 041530 YANGAN ALERT				       6.1   B	   6.0	    6.0      9.0     12.2     12.0
+ 041343 YANGAN					2.0    6.1   B	   6.0	    6.0      9.0     12.2     12.0
+ 041477 CONNOLLY DAM				       0.0   S	   0.3		     0.4	       0.5
+ 041532 CONNOLLY DAM ALERT			       0.0   S	   0.3		     0.4	       0.5
+ 041503 WARWICK (SCOTS COLLEGE) TM				   4.0		     5.0	       6.0
+ 041357 WARWICK 				2.0    7.0   B	   5.0	    6.0      6.0      6.2      7.0
+ 041534 WARWICK ALERT				       7.0   B	   5.0	    6.0      6.0      6.2      7.0
+ 541103 CAMPBELLS GULLY ALERT
+ 041445 LESLIE DAM				1.5    0.0   S	   2.0		     2.5	       3.0
+ 541055 LESLIE DAM HW TM			       0.0   F	   2.0		     2.5	       3.0
+ 541037 LESLIE DAM TW TM					   2.5		     2.8	       3.0
+ 541098 ROCKY RIDGE TM
+ 041531 GLENGALLAN CREEK ALERT			       4.8   B	   3.0		     4.0	       5.0
+ 041473 PRATTEN 				3.0    4.3   B	   5.0	    5.0      6.0	       7.0
+ 041501 PRATTEN ALERT						   5.5		     6.3	       7.2
+ 541038 TALGAI WEIR TW TM					   4.5		     5.0	       6.0
+ 541101 GOOMBURRA ALERT
+ 041516 ALLORA TM						   3.0		     5.0	       5.5
+ 041345 ALLORA					2.0    7.9   B	   3.0	    5.0      5.0	       6.0
+ 541048 VICTORIA HILL ALERT			       3.9   B	   3.0		     4.0	       5.0
+ 041518 AIDES BRIDGE TM 			       6.6   B	   4.0	    5.0      4.5	       5.0
+ 041352 CLIFTON 				2.0    6.6   B	   4.0	    5.0      4.5	       5.0
+ 541050 MILLBROOK ALERT 			       5.2   B	   4.5		     5.5	       6.0
+ 041404 ELLANGOWAN				2.0    3.0   B	   3.9	    3.0      4.2	       4.5
+ 041405 FELTON					2.0    3.8   B	   3.0	    2.0      4.0	       5.0
+ 041515 FELTON TM						   2.0		     2.3	       2.5
+ 541104 TORRIDON ALERT
+ 041514 LEYBURN TM				       0.7   X	   3.0		     3.5	       4.0
+ 041060 LEYBURN 				2.0    2.1   B	   3.0	    4.0      3.5      4.6      4.0
+ 041342 TUMMAVILLE				2.0    4.3   B	   5.0	    8.0      8.0     10.4      9.0
+ 041499 TUMMAVILLE TM				       4.3   B	   5.0	    8.0      8.0     10.4      9.0
+ 541040 YARRAMALONG TM						   3.5		     5.5	       6.0
+ 041472 CENTENARY BRIDGE			4.0    6.8   A	   5.0	    6.0      6.0      7.3      7.0
+ 541096 LEMON TREE WEIR TM
+ 041410 CECIL PLAINS				4.5    6.9   B	   6.0	    7.0      7.0	       8.0
+ 041498 CECIL PLAINS TM 			       6.9   B	   6.0	    7.0      7.0	       8.0
+ 541047 PAMPAS BRIDGE TM					   2.5		     3.0	       3.5
+ 541056 LONE PINE TM						   3.5		     4.0	       5.0
+ 041358 TIPTON BRIDGE				3.0    8.4   B	   5.0	    5.0      6.0	       7.0
+ 541093 CRANLEY TM
+ 541058 OAKEY TM
+ 541097 JONDARYAN TM
+ 041008 BOWENVILLE				0.8    0.8   C	   2.0		     3.0	       3.5
+ 041479 FAIRVIEW TM				       6.0   B	   4.0	    5.0      5.0	       6.0
+ 541054 LOUDOUN BRIDGE TM			       1.8   W	   2.5		     3.5	       5.5
+ 041339 LOUDOUN BRIDGE				3.0    9.1   A	   5.0	    5.0      7.0	       9.0
+ 041466 CLYDESDALE				2.0		   2.0	    3.0      3.0      3.1      4.0
+ 541043 CLYDESDALE ALERT					   2.0	    3.0      3.0      3.1      4.0
+ 541042 MOFFATT ALERT				       2.0   X	   3.0		     4.0	       4.5
+ 041478 DALBY					1.5    1.9   B	   2.0		     3.0      3.5      3.5
+ 541041 DALBY ALERT				       1.9   B	   2.0		     3.0      3.5      3.5
+ 041346 RANGES BRIDGE				3.0    7.5   B	   6.0	    8.0      6.5	       7.0
+ 041486 WARRA-KOGAN RD BR			3.0    9.1   B	   7.0		     8.0	       9.0
+ 041490 BRIGALOW BRIDGE TM					   7.5		     9.0	      10.5
+ 541071 CHINCHILLA WEIR HW TM			       0.0   W
+ 041411 CHINCHILLA WEIR 			6.0   10.0   R	   6.0	    8.0      8.0	      10.0
+ 041517 CHINCHILLA WEIR TM			      10.0   R	   6.0	    8.0      8.0	      10.0
+ 041409 BERUNA					3.0    5.8   B	   4.0	    7.0      5.0	       7.0
+ 041020 SEVEN OAKS TM				       2.4   B	   4.0		     5.5	       6.5
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 17
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 041476 BURNCLUITH BRIDGE			1.0    3.7   B	   1.5		     3.0	       4.5
+ 041351 CHINCHILLA				2.0    5.2   B	   4.0	    6.0      5.0      6.6      6.0
+ 541074 CHINCHILLA TM				       5.0   W	   6.0		     7.0	       8.0
+ 542008 BEDARRA TM
+ 042048 CONDAMINE				3.0   10.1   B	   5.0	    7.0      7.0     10.5      8.0
+ 042110 LEICHHARDT HIGHWAY			0.5    1.1   B	   1.0		     1.2	       1.5
+ 042098 COTSWOLD TM				       4.3   W	   7.0		    10.0	      11.0
+ 042049 MILES					3.0   10.1   B	   8.0	   10.0     10.0     11.0     11.0
+ 042107 GILWEIR TM				       7.6   W	   9.5		    11.5	      12.2
+ 042113 PINE HILL CROSSING			2.0    2.4   B	   3.0		     5.0	       8.0
+ 043052 WARKON					3.0    3.2   B	   7.0	    9.0      8.0	       9.0
+ 543008 YULEBA FORESTRY TM					   4.0		     6.0	       8.0
+ 043063 SURAT					4.0   11.0   B	   5.0	    5.0      7.0     12.2      9.0
+ 543005 SURAT TM				      10.5   B	   4.5	    4.5      6.5     11.7      8.5
+ 043105 TABERS TM						   5.0		     6.0	       7.0
+ 043033 TINDARRA TM						   5.0		     6.0	       7.0
+ 043074 ROMA					3.0    6.3   B	   6.0	    6.0      6.5      6.3      7.0
+ 043077 GARRABARRA				3.5		   4.5		     6.0	       8.0
+ 043080 KAROOLA PARK				2.0    3.0   B	   5.0	    8.0      6.8	       7.5
+ 043101 WERIBONE TM						   5.8		     7.8	       9.8
+ 043107 WARROO					7.0    8.8   B	   9.0	   12.0     10.5     13.7     12.0
+ 043009 FOREST VALE				0.5    0.0   C	   5.0		     9.0	      10.0
+ 543007 FOREST VALE TM				       0.0   C
+ 043111 CURRAWONG				2.0		   2.0	    7.0      5.0      7.0      7.0
+ 043064 MITCHELL				1.0    8.0   B	   2.0	    5.0      3.0      7.6      5.0
+ 043102 MITCHELL TM				       1.0   C	   2.6		     3.6	       5.6
+ 043000 AMBY					3.0    6.9   B	   5.0	    3.0      6.0      7.0      7.0
+ 043099 SPRINGFIELD				1.5    0.9   C	   6.0	    6.5      7.0	       8.0
+ 044075 WOODLANDS				2.0		   5.0	    5.0      6.0	       7.0
+ 043100 OLD CASHMERE TM 					   4.8		     5.5	       6.8
+ 043103 BEARDMORE DAM TM			       0.0   F
+ 043090 BEARDMORE DAM {ST GEORGE}
+ 543004 JACK TAYLOR WEIR TM			       0.0   F
+ 043053 ST GEORGE				2.0   10.7   B	   4.0	   11.0      5.0     12.1      6.0
+ 043104 ST GEORGE TM						   4.0		     5.0	       6.0
+ 044154 WHYENBAH				3.0    5.3   B	   4.0		     6.0	       7.0
+ 544017 HASTINGS TM						   3.5		     5.0	       5.8
+ 544018 WHYENBAH TM						   3.5		     5.0	       5.8
+ 544023 WOOLERBILLA TM						   5.0		     5.5	       6.0
+ 044197 BRIARIE CREEK TM			       2.4   X	   2.5		     3.5	       5.0
+ 044117 DIRRANBANDI				3.0    5.2   B	   4.0	    4.0      4.3	       4.8
+ 544012 NARRAN RIVER TM 			       5.0   B	   3.5		     4.5	       4.8
+ 544013 BALLANDOOL RIVER TM					   3.0		     3.5	       4.0
+ 044155 HEBEL					1.0		   1.0		     1.5	       2.0
+ 544016 HEBEL TM						   1.0		     1.5	       2.0
+ 044144 HOMEBOIN				0.5    0.5   X	   2.0	    2.5      2.5      3.5      3.0
+ 544022 CARDIFF TM						   2.0		     2.5	       4.0
+ 044010 BOLLON					0.3    0.3   C	   0.5		     0.7      1.0      1.0
+ 044056 MUNGALLALA				2.0    4.2   B	   3.0		     4.0	       4.5
+ 044068 TOMOO					0.5		   2.0	    6.0      5.0      6.9      6.0
+ 044131 DEELAMON				0.3    0.2   X	   1.0	    2.0      2.0	       3.5
+ 044130 BENDENA 				0.5		   1.0	    2.0      2.0      3.0      3.0
+ 544025 ROSELEIGH CROSSING TM
+
+BORDER RIVERS
+
+ 556035 PARADISE STATION (PARADISE CK)
+ 556038 MIDDLE CK AT STANNIFER
+ 556011 ELSMORE BR (RIVER T/M)
+ 556039 MACINTYRE R AT RIVERSTONE
+ 556009 KIMBERLEY
+ 054147 WALLANGRA (MACINTYRE)
+ 554017 GLENORCHY (FRAZERS CK)
+ 556019 FLADBURY
+ 554001 PINDARI DAM LEVEL			     516.0   S
+ 554000 PINDARI DAM D/S
+ 054145 ASHFORD (SEVERN R)					   2.2		     4.0	       6.0
+ 554002 RIDGELANDS
+ 054035 YETMAN					2.4   14.0   B
+ 554014 YETMAN (BRIDGE GAUGE)			      14.0   B	   5.0		     7.6	       9.1
+ 054156 HOLDFAST
+ 042087 GOODAR STATION
+ 541083 STORM KING DAM INFLOW ALERT		       2.7   B	   2.0		     2.7	       3.2
+ 541082 MOUNTAIN STATION CREEK ALERT		       1.6   R	   1.6		     2.1	       2.6
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 18
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 541081 STORM KING DAM HEADWATER ALERT		       0.0   S	   0.1		     0.3	       0.5
+ 541085 DALCOUTH AL				       1.3   C	   1.4		     2.0	       2.5
+ 541084 KETTLE SWAMP CREEK AL			       1.3   R	   1.0		     1.5	       2.0
+ 541086 GRANITE STREET ALERT			       0.6   R	   0.6		     1.2	       2.0
+ 541087 STANTHORPE ALERT					   2.2		     3.5	       4.5
+ 541073 STANTHORPE TM						   2.2		     3.5	       4.5
+ 541090 ACCOMMODATION CREEK ALERT		       1.7   B	   1.7		     2.2	       2.7
+ 541076 ACCOMMODATION CREEK TM			       1.7   X	   1.7		     2.2	       2.7
+ 541089 BALLANDEAN ALERT			       1.9   A	   2.2		     3.0	       3.7
+ 541032 BALLANDEAN TM				       1.9   A	   2.2		     3.0	       3.7
+ 541053 FARNBRO TM						   2.5		     3.0	       4.0
+ 541088 BROADWATER CREEK ALERT					   2.0		     3.0	       4.5
+ 541028 BROADWATER CREEK TM					   2.0		     3.0	       4.5
+ 041430 GLENLYON DAM				0.0    0.0   S	   1.5		     1.8	       2.0
+ 541051 GLENLYON DAM HW TM			       0.0   S	   1.5		     1.8	       2.0
+ 541052 GLENLYON DAM TW TM					   2.5		     3.5	       4.0
+ 556002 DONALDSON
+ 041087 RIVERTON				2.0    2.8   B	   6.0	    8.0      7.0	       8.0
+ 056158 ROSENEATH						   5.3		     6.5	       7.5
+ 054146 HAYSTACK
+ 041540 BEARDY JUNCTION 			3.0		   4.5		     7.0	       8.0
+ 054155 BONSHAW (DUMARESQ R)
+ 041403 TEXAS					2.0    7.5   R	   6.0	    7.0      7.0      6.7      8.0
+ 041548 TEXAS TM				       7.5   R	   6.0	    7.0      7.0      6.7      8.0
+ 541065 OAKY CREEK TM						   3.5		     4.0	       5.0
+ 541066 BEEBO TM						   3.5		     4.0	       4.8
+ 541067 GLENARBON WEIR TM
+ 541110 ARTUNGA ALERT						   3.5		     4.5	       5.5
+ 041491 BARONGAROOK TM						   3.0		     4.5	       6.0
+ 541112 BARONGAROOK ALERT					   3.0		     4.5	       6.0
+ 541111 TERRAINE ALERT						   2.0		     3.5	       4.5
+ 041495 TERRAINE TM						   2.0		     3.5	       4.5
+ 541033 COOLMUNDA DAM HW TM			       0.0   F	   0.2		     0.3	       0.4
+ 541109 COOLMUNDA DAM TW ALERT			       0.5   C	   1.5		     4.5      5.5      5.0
+ 041137 COOLMUNDA DAM TW TM			       0.5   C	   1.5		     4.5      5.5      5.0
+ 041457 COOLMUNDA DAM				1.0    0.5   C	   1.5		     4.5      5.5      5.0
+ 041406 INGLEWOOD BRIDGE			3.0   10.4   B	   5.0	    9.0      9.0     10.1     10.0
+ 041123 INGLEWOOD BRIDGE TM			      10.4   B	   5.0		     9.0     10.1     10.0
+ 541107 INGLEWOOD BRIDGE ALERT			      10.4   B	   5.0		     9.0     10.1     10.0
+ 541108 WOODSPRING ALERT			       7.0   B	   3.5		     5.5	       7.0
+ 041133 WOODSPRING TM				       7.0   B	   3.5		     5.5	       7.0
+ 041391 WOODSPRING				3.0    7.0   B	   3.5		     5.5	       7.0
+ 041520 INGLEWOOD WEIR TM					   4.0		     8.0	       9.0
+ 541094 WHETSTONE WEIR TM			       0.0   W
+ 541095 BEN DOR WEIR TM
+ 041519 BOOBA SANDS TM						   4.0		     7.0	       8.0
+ 041506 BENGALLA TM						   4.0		     6.0	      10.0
+ 041360 BENGALLA				3.0		   4.0		     6.0	      10.0
+ 554015 COOLATAI
+ 041507 NEW KILDONAN TM 					   3.0	   12.5      5.0	      11.0
+ 053101 BOGGABILLA (MACINTYRE R)				   5.0		    11.5	      12.0
+ 553029 BOGGABILLA WEIR D/S
+ 041350 GOONDIWINDI				4.0   12.2   B	   4.0	    3.5      6.0     10.0      8.5
+ 041500 GOONDIWINDI TM				      12.2   B	   4.0	    3.5      6.0	       8.5
+ 541030 GOONDIWINDI WEIR TM			       1.5   W	   4.0		     6.0	       8.5
+ 541070 CARANA WEIR TM				       2.0   W	   3.3		     5.0	       5.7
+ 541072 OONAVALE TM
+ 053109 TERREWAH						   5.0		     6.0	       7.0
+ 042055 RIVERVIEW				2.0		   3.0		     4.0	       5.0
+ 052084 BOOMI WEIR
+ 553024 BOOMI OFFTAKE
+ 552012 KANOWNA (MACINTYRE)
+ 052068 MUNGINDI (BARWON R)					   6.1		     6.7	       7.2
+ 041508 O'CONNOR TM						   4.0	   12.0      6.0	       9.0
+ 041485 RETREAT BRIDGE TM			      12.5   B	   6.0		     8.0	      10.0
+ 041488 BALLYMENA TM				       3.0   B	   5.0		     8.0	       9.5
+ 542004 GUNN BRIDGE (DNRM) TM			       7.0   B	   5.0		     6.0	       7.0
+ 041124 KILBRONAE TM				       2.6   X	   1.0	    2.5      2.0	       2.5
+ 041489 MEDPARK BRIDGE TM			       4.6   B	   3.0		     4.0	       5.0
+ 041366 GIDDI GIDDI SOUTH			2.0    1.4   B	   4.0	    5.0      5.0	       6.0
+ 041112 GIDDI GIDDI SOUTH TM			       1.4   B	   4.0	    5.0      5.0	       6.0
+ 042097 HARTMANN BRIDGE TM			       5.7   B	   4.0	    5.5      5.0	       5.7
+ 042104 SURREY TM				       4.8   B	   3.5	    6.5      4.5	       5.5
+ 042066 TALWOOD 				2.0    3.7   B	   3.0	    3.2      3.5	       4.0
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 19
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 042108 TALWOOD TM				       4.4   B	   3.7	    3.9      4.2	       4.7
+ 542005 JERICHO TM				       1.0   X	   2.2		     2.8	       3.0
+ 542007 MASCOT TM						   2.0		     2.4	       3.2
+ 041364 RETREAT {WEIR RIVER}
+
+MOONIE
+
+ 041493 THE DEEP CROSSING			0.5    0.0   C	   2.5	    3.5      3.0      4.2      4.2
+ 041368 TARTHA					1.0    1.6   C	   2.5	    4.0      4.0      5.5      5.0
+ 042100 SOUTHWOOD				1.0    0.8   C	   3.5		     4.5	       5.5
+ 042111 KINKORA 				1.0    0.1   X	   2.0		     3.0	       4.0
+ 042053 FLINTON 				1.0    1.2   C	   3.0	    3.0      4.0      5.2      5.0
+ 542006 FLINTON TM
+ 043097 TEELBA					3.0    0.5   X	   5.0	    7.0      6.0	       7.0
+ 042103 MT DRIVEN				2.0    5.9   B	   3.0	    7.0      5.0      8.0      6.0
+ 044194 NINDIGULLY				2.0    3.5   A	   2.2	    2.8      3.0      4.5      4.0
+ 042105 NINDIGULLY TM						   2.2		     5.1	       5.8
+ 542009 THALLON BRIDGE				3.0    4.9   B	   4.0	    5.0      4.5      5.3      5.0
+ 042106 FENTON TM						   3.5		     4.3	       5.0
+
+WARREGO
+
+ 044190 LOCHINVAR				2.0		   3.0		     4.0	       5.5
+ 044199 WETLANDS				1.0		   1.0		     3.0	       4.0
+ 044118 AUGATHELLA				3.0    6.0   A	   4.0	    4.0      5.0      6.0      6.0
+ 544011 AUGATHELLA TM				       6.0   A	   4.0	    4.0      5.0      6.0      6.0
+ 035283 DRENSMAINE				2.0		   3.0		     5.0	       6.0
+ 044006 BIDDENHAM				1.3		   2.0	    4.0      4.0	       5.5
+ 044200 BIDDENHAM TM						   2.0	    4.0      4.0	       5.5
+ 044193 THE 27 MILE GARDEN			2.0    4.3   B	   2.0	    4.0      3.0      5.0      4.0
+ 044201 THE 27 MILE GARDEN TM			       4.3   B	   2.0	    4.0      3.0      5.0      4.0
+ 044232 THE 27 MILE GARDEN AL			       4.3   B	   2.0	    4.0      3.0      5.0      4.0
+ 544028 RACEVIEW ALERT						   1.5		     2.0	       2.5
+ 044213 RACEVIEW TM						   1.5		     2.0	       2.5
+ 544027 LOWER BRADLEYS ALERT					   1.5		     2.0	       2.5
+ 044156 CHARLEVILLE RV				2.5    4.4   O	   4.0	    4.0      5.0      5.5      6.0
+ 044229 CHARLEVILLE AL				       4.4   O	   4.0	    4.0      5.0      5.5      6.0
+ 044205 CHARLEVILLE TM				       4.4   O	   4.0	    4.0      5.0      5.5      6.0
+ 544020 CHARLEVILLE(BRADLEYS GLY)				   1.5		     2.0	       2.5
+ 044052 MT MORRIS					     C	   3.0	    4.0      4.0	       5.0
+ 044208 WARILDA 				2.0    3.4   B	   3.0	    4.0      4.0	       5.0
+ 044209 OAKPARK 				2.0    2.5   B	   2.0	    4.0      3.0      6.0      5.0
+ 044224 BINNOWEE				3.0    6.2   A	   4.0	    5.0      5.0      7.0      6.0
+ 044230 BINNOWEE AL				       6.2   A	   4.0		     5.0	       6.0
+ 544021 BINNOWEE TM				       6.2   A	   4.0		     5.0	       6.0
+ 044188 AUTHORINGA				1.5    1.5   C	   4.0		     6.0	       8.0
+ 044189 BAKERS BEND						   5.0		     7.0	       9.0
+ 044233 BAKERS BEND AL						   5.0		     7.0	       9.0
+ 044206 BAKERS BEND TM						   5.0		     7.0	       9.0
+ 044157 MURWEH					1.0    1.5   B	   5.0	    5.0      7.0	       9.0
+ 044158 WYANDRA 				3.0    7.6   A	   6.0	    8.0      8.0      8.7      9.0
+ 544014 WYANDRA TM				       7.6   B	   6.0	    8.0      8.0      8.7      9.0
+ 044174 WALLEN					1.3    1.4   X	   5.0	    8.0      6.5      9.5      8.0
+ 544024 WALLEN TM						   5.5	    8.5      7.0     10.0      8.5
+ 044116 CUNNAMULLA BRIDGE			6.0   10.1   B	   6.0	    5.0      7.0      9.0      8.0
+ 544019 CUNNAMULLA WEIR TM			       5.5   W	   6.0	    5.5      6.8	       7.5
+ 044210 ROCKY					1.0    1.0   X	   2.5	    4.0      4.0      5.3      5.0
+ 548003 BARRINGUN NO 2 (TM)
+
+PAROO
+
+ 044222 QUILPETA				0.5		   2.0		     3.0	       4.0
+ 044085 HUMEBURN				       4.5   B	   1.8		     2.8	       4.3
+ 044198 HUMEBURN TM				       4.5   C	   1.8		     2.8	       4.3
+ 044153 EULO					2.0    3.0   A	   2.0	    3.0      3.0	       4.0
+ 044191 ALLAMBIE				2.0		   3.0		     4.0	       4.5
+ 544015 CAIWARRO TM						   1.5		     2.5	       3.5
+ 044181 HUNGERFORD				0.5    0.9   X	   1.0	    1.0      1.5      2.5      2.0
+
+BULLOO
+
+ 045043 ADAVALE 				2.0    2.2   X	   2.6	    2.6      3.6      4.2      4.2
+ 045066 MILROY					3.0		   3.0	    3.5      4.0      5.0      5.0
+ 045044 QUILPIE 				2.0    4.6   B	   3.0	    4.0      4.0      5.9      5.0
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 20
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 545007 QUILPIE TM				       4.6   B	   3.0	    4.0      4.0      5.9      5.0
+ 045003 SOUTH COMONGIN				1.0    1.2   B	   3.1	    3.1      4.0	       5.0
+ 545001 AUTUMNVALE TM						   4.5		     5.5	       7.0
+ 045045 THARGOMINDAH				3.0    4.1   B	   4.0	    4.5      4.5      6.0      5.5
+
+COOPER CREEK
+
+ 536006 BOWEN DOWNS TM
+ 036037 MUTTABURRA				3.0    4.0   B	   3.0	    6.0      5.0      8.2      7.0
+ 036162 ARAMAC					1.3    1.7   B	   1.5	    1.7      2.0      5.4      5.0
+ 036013 CAMOOLA PARK				1.0    0.4   X	   2.0		     4.0      8.0      6.7
+ 036107 LONGREACH				2.3    3.5   O	   3.3	    4.3      4.3      6.7      5.3
+ 036161 LONGREACH TM				       3.5   O	   3.3	    4.3      4.3      6.7      5.3
+ 536005 DARR TM
+ 036116 BOGEWONG				0.3    3.1   B	   2.0	    3.0      4.0	       6.0
+ 537004 STONEHENGE TM				       3.1   B	   3.0		     4.0	       6.5
+ 037040 STONEHENGE				0.5    1.6   A	   2.0	    1.0      3.0     10.0      5.0
+ 038037 JUNDAH					1.0    3.4   A	   2.5	    5.0      4.0      4.6      5.0
+ 035284 TAMBO					2.5    2.8   A	   3.0	    5.1      5.1      5.9      5.9
+ 035049 GILLESPIE				3.5    6.4   B	   4.0	    6.5      7.0	       7.5
+ 535126 DUNEIRA ALERT
+ 035259 DUNEIRA 				1.0    1.4   B	   2.0		     3.0	       3.4
+ 536009 BLACKALL AL				       3.7   B	   2.9	    4.9      4.9      6.4      5.9
+ 536003 BLACKALL TM				       3.7   B	   2.9	    4.9      4.9      6.4      5.9
+ 036155 BLACKALL				1.0    3.5   B	   2.0	    4.0      4.0      5.5      5.0
+ 036169 COOLAGH 				2.0		   4.0	    4.0      5.0      8.0      6.0
+ 535104 GLENCOE TM				       1.0   X	   2.0		     2.5	       3.0
+ 035286 GLENCOE 				1.8    1.0   X	   2.0		     2.5	       3.0
+ 035285 JERICHO 				1.8    2.3   B	   2.0	    2.3      2.3      3.0      3.0
+ 036170 CAPRICORN HIGHWAY			2.0    4.4   B	   3.0		     4.0	       5.0
+ 036157 BARCALDINE				2.0    5.6   B	   3.0		     5.0	       6.0
+ 536002 BARCALDINE WEIR TM			       0.0   W	   1.5		     2.5	       3.0
+ 036026 ISISFORD				2.0    4.0   B	   4.0	    4.0      5.0	       6.0
+ 036104 OMA					3.0    1.5   B	   4.0		     5.0	       6.0
+ 036094 WAHROONGHA				0.5    0.6   X	   3.0		     4.0	       5.0
+ 038034 GLENLOCK				2.0    0.9   X	   4.0		     5.0	       6.0
+ 538001 RETREAT TM				       1.9   C	   3.5		     4.5	       5.5
+ 038018 RETREAT (BARCOO RIVER)			2.0    1.4   C	   3.0	    5.0      4.0	       5.0
+ 038038 WINDORAH				3.0    4.4   A	   3.0	    5.0      4.0	       5.0
+ 045005 DURHAM DOWNS				1.5    1.9   B	   2.0		     2.5	       3.0
+ 045057 NOCCUNDRA HOTEL 			1.3    1.3   X	   1.5		     2.5	       3.5
+ 545002 NAPPA MERRIE TM 			       7.2   B	   3.0	    4.0      6.0	       9.0
+ 045012 NAPPA MERRIE				1.5    7.2   B	   3.0	    4.0      6.0	       9.0
+
+DIAMANTINA
+
+ 037046 ELDERSLIE				1.5    1.6   C	   1.5	    2.5      2.5	       3.0
+ 037029 APSLEY					1.5		   2.0		     2.5	       3.0
+ 037026 ALDINGHAM				1.0		   1.5		     1.7	       2.0
+ 037082 OONDOOROO				1.0    0.6   C	   2.0		     3.0	       4.0
+ 537005 OONDOOROO TM				       2.8   C	   4.2		     5.2	       6.2
+ 037018 WINTON					1.3    1.3   B	   1.5		     2.0	       3.5
+ 037122 TULMUR					4.0		   5.0	    7.0      7.0      9.0      8.0
+ 538003 DIAMANTINA LAKES TM					   2.0		     4.0	       6.0
+ 038015 MONKIRA 				2.5    2.9   C	   2.9	    3.0      4.0	       4.5
+ 038031 DURRIE STATION				1.4		   1.5	    1.5      2.0	       2.4
+ 038020 ROSEBERTH STATION			4.0		   4.5	    4.0      4.9	       5.2
+ 038002 BIRDSVILLE				2.0    5.4   A	   4.0	    4.0      6.0      7.9      8.0
+ 538004 BIRDSVILLE TM
+
+GEORGINA
+
+ 037010 CAMOOWEAL				1.5    8.3   B	   2.0		     4.0	       6.0
+ 037043 URANDANGI				0.5    0.2   X	   1.0		     5.0      7.0      7.0
+ 537003 ROXBOROUGH DOWNS TM					   4.5		     6.0	       8.0
+ 038010 GLENORMISTON				3.0    2.6   B	   3.0	    3.0      4.0	       6.0
+ 538002 BOULIA TM				       4.9   B	   4.0	    4.0      5.0      6.1      6.0
+ 038055 BOULIA					3.0    4.9   B	   4.0	    4.0      5.0      6.1      6.0
+ 038014 MARION DOWNS				1.0    3.5   A	   3.0	    3.0      4.0	       5.0
+ 038000 BEDOURIE				3.0    4.4   B	   3.5		     4.0	       5.0
+ 038005 CLUNY					1.0    3.1   A	   2.0		     3.5	       4.5
+ 038009 GLENGYLE				1.0    3.3   B	   2.0		     3.0	       4.0
+
+
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 21
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+
+NICHOLSON
+
+ 029158 DOOMADGEE TOWNSHIP			0.5    0.5   X	   1.0		     4.0      8.0      6.0
+ 029031 LAWN HILL				1.0    0.1   X	   3.0		     4.0	       5.0
+ 029166 RIVERSLEIGH TM						   3.5		     5.0	       6.5
+ 529009 GREGORY DOWNS TM			       9.3   B	   4.0		     8.0	      10.0
+ 029159 ESCOTT STATION				5.0		   6.0	    8.0      8.0     10.0     10.0
+ 029157 BURKETOWN AIRSTRIP			4.5		   5.0	    4.5      5.5      6.5      6.0
+
+LEICHHARDT
+
+ 529014 DOUGHBOY CK TM						   6.0		     8.0	      10.0
+ 029171 LAKE JULIUS				0.0    0.0   S
+ 529019 JULIUS DAM TM				       0.0   S
+ 529021 MIRANDA CREEK TM
+ 029027 KAMILAROI				9.0		  10.0	   12.0     12.0     18.0     14.0
+ 529013 GUNPOWDER TM						   5.5		     6.5	       7.5
+ 029032 LORRAINE				8.0		  10.0	   15.0     13.0     17.5     15.0
+ 029001 AUGUSTUS DOWNS				8.0		   9.0	   10.0     10.0     13.0     11.0
+ 529008 THE 16M WATERHOLE TM					   3.0		     4.0	       5.0
+ 529010 FLORAVILLE TM				       1.5   C	   5.0		     6.5	       8.0
+
+FLINDERS
+
+ 530012 MT EMU PLAINS TM
+ 530023 GLENDOWER CROSSING TM
+ 530031 WHITES MOUNTAIN TM
+ 030024 HUGHENDEN				1.0    3.8   B	   2.0		     3.0      4.0      4.0
+ 030123 MARATHON				2.0		   6.0		     8.0	       9.0
+ 530030 PORCUPINE CREEK TM
+ 030045 RICHMOND				3.0    5.8   B	   5.0	    6.0      6.0	       8.0
+ 530009 RICHMOND TM				       6.4   B	   4.5		     6.0	       8.2
+ 530022 CHATFIELD CREEK TM			       0.0   B
+ 530164 MARATHON TM						   6.0		     8.0	       9.0
+ 529039 ALICK CREEK TM
+ 030159 HULBERTS BRIDGE 			2.0    3.9   B	   7.0	   10.0     10.0     12.2     12.0
+ 530163 HULBERTS BRIDGE TM			       3.9   B	   7.0	   10.0     10.0     12.2     12.0
+ 029161 BRIGHTLANDS STATION			1.0    1.0   C	   3.0		     4.0	       5.0
+ 029143 CLONCURRY				3.0   10.5   B	   3.0		     5.0      7.5      7.0
+ 529011 CLONCURRY TM				      10.5   B	   3.0		     5.0      7.5      7.0
+ 029075 FT CONSTANTINE				1.0    1.0   C	   4.0	    5.0      5.0     10.0      7.0
+ 529006 JULIA CREEK TM						   3.5		     4.0	       4.5
+ 529027 HOLY JOE CK TM				       0.0   B
+ 029105 CARSLAND				1.0		   2.0	    2.0      3.0	       5.0
+ 529015 DUGALD RIVER TM
+ 529022 LANDSBOROUGH HWY TM
+ 529018 ETTA PLAINS TM
+ 029007 CANOBIE 				3.0		   3.0		     4.0	       5.5
+ 529038 WARREN VALE			       10.0		  10.0	   11.0     11.0     13.0     12.0
+ 529017 CANOBIE TM
+ 029013 DONORS HILL STATION			4.0		   5.0	    6.5      6.0	       7.0
+ 029086 COWAN DOWNS				4.0    0.0   X	   4.0	    5.0      5.0      7.0      6.0
+ 029005 BUNDA BUNDA				0.5    0.6   X	   1.8	    3.5      3.0      7.0      4.0
+ 029147 WALKERS BEND				3.0    5.4   B	   5.0		     5.3	       5.6
+ 529007 WALKERS BEND TM 			       5.4   B	   5.0		     5.3	       5.6
+
+NORMAN
+
+ 530018 WOODSTOCK				1.0		   1.5	    2.0      2.0      3.0      2.7
+ 029023 IFFLEY STATION				2.0    0.0   X	   2.0	    2.0      2.5      3.5      3.0
+ 529026 MOMBA					1.0    0.0   X	   1.5	    2.0      2.0      2.8      2.7
+ 029154 YAPPAR RIVER				1.0    0.0   X	   1.6	    2.0      2.5      3.8      3.8
+ 529025 GUILDFORD				1.5    0.0   X	   1.5	    2.0      2.0	       2.1
+ 529012 GLENORE WEIR TM 			       9.6   B	   9.0		    12.0	      15.0
+ 029155 NORMANTON				2.0    2.8   A	   2.0	    3.5      4.0      6.0      6.0
+ 529003 KARUMBA TIDE TM
+
+GILBERT
+
+ 030019 GILBERTON				4.0    0.0   X	   5.0		     6.0	       8.0
+ 030112 NORTH HEAD				3.0		   5.0		     8.0	       9.0
+ 030147 COBBOLD GORGE				4.0    0.0   X	   4.0		     5.0	       6.0
+ 030158 GREEN HILLS				4.0    0.0   X	   4.0	   11.0      8.0     12.5     10.0
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway
+
+Date: 15/01/2014					SECTION 4 (B)				    Page: 22
+				     QUEENSLAND FLOOD WARNING RIVER HEIGHT STATIONS
+						   FLOOD CLASSIFICATIONS
+
+Station 				      First   Crossing	 Minor	  Crops   Moderate  Towns    Major
+  No.		Station Name		      Report  Ht  Type	 Fld Ht.  Grazg   Fld Ht.   Fld Ht.  Fld Ht.
+					       (m)    (m)	  (m)	   (m)	    (m)      (m)      (m)
+------------------------------------------------------------------------------------------------------------
+ 030157 RIVERVIEW (GILBERT RV)			1.0    0.0   X	   4.0	    7.0      6.5      8.5      8.5
+ 530019 MALACURA				3.0		   4.0		     5.0	       6.0
+ 533095 ROCKFIELDS TM				       6.0   B	   6.0	    7.5      7.5     10.5      9.5
+ 029054 INORUNIE STATION			3.0    0.0   X	   4.0	    5.5      5.5      7.5      6.5
+ 029045 STRATHMORE				3.0    0.3   X	   6.0	    7.0      7.0	       8.0
+ 030039 OAK PARK STATION			1.5    0.0   X	   2.5		     3.0	       4.0
+ 530015 SPANNER WATERHOLE TM
+ 530014 KIDSTON DAM HW TM			      36.0   S
+ 530013 KIDSTON DAM TW TM
+ 030030 LYNDHURST STATION			1.5		   2.5		     3.0      4.9      4.0
+ 530007 EINASLEIGH TM						   9.0		    13.0	      16.0
+ 030103 EVELEIGH				3.0    8.6   B	   3.0	    9.0      7.0	       9.0
+ 530008 MT SURPRISE TM
+ 030073 VAN LEE 				3.0    5.0   X	   5.0	    8.0      9.0     10.0     12.0
+ 030055 FORSAYTH				1.5    0.0   X	   2.0		     3.0	       4.0
+ 530011 ROUTH RIVER TM
+ 530010 ROSEGLEN TM
+ 030018 GEORGETOWN				4.0    4.2   B	   4.0	    6.0      5.0      6.5      6.5
+ 029037 MIRANDA DOWNS				3.0    1.0   X	   3.0	    4.5      4.0	       7.0
+
+STAATEN
+
+ 529023 DORUNDA TM
+
+MITCHELL
+
+ 531088 IBIS CREEK DAM HW TM			     825.5   S
+ 531090 IBIS CREEK DAM TW TM
+ 531025 FLATROCK TM
+ 528009 ROOKWOOD TM
+ 528003 TRIMBLES CROSSING TM			       1.2   C
+ 528001 GAMBOOLA TM
+ 531080 NULLINGA TM
+ 531086 FONTHILL TM
+ 531083 MCLEOD RIVER TM 			       4.5   A
+ 531087 COOKTOWN CROSSING TM
+ 528006 OK BRIDGE TM
+ 531031 PALMER RIVER TM
+ 527013 DRUMDUFF TM
+ 529024 KOOLATAH TM
+ 029038 KOWANYAMA AP				1.5    1.5   B	   2.0	    3.0      3.0      4.3      4.0
+
+ARCHER
+
+ 527003 TELEGRAPH CROSSING TM			       3.7   C
+ 527008 COEN RACECOURSE TM
+
+WATSON
+
+ 527010 WATSON RIVER TM
+
+EMBLEY
+
+ 527004 WEIPA TIDE TM
+
+WENLOCK
+
+ 527006 MORETON TM
+ 027015 MORETON 				       6.6   B
+
+DUCIE
+
+ 527012 DULHUNTY TM
+
+JARDINE
+
+ 527007 MONUMENT TM
+
+TORRES STRAIT ISLAND
+
+ 527005 THURSDAY ISLAND TIDE TM
+
+		      B: Bridge      C: Causeway   A: Approaches   X: Crossing	 R: Road
+		      O: Old Bridge  H: Highway    F: Full Supply  W: Weir	 S: Spillway

@@ -78,14 +78,26 @@ KEY_ORDER = {
                 'roles', 'radio_network_ids', 'catchment_ids', 'alert_ids',
                 'satcom', 'rm_system_id', 'enabled', 'notes', 'legacy_unit_id',
                 'repeater', 'site', 'sensors', 'lga', 'basin', 'hub_id',
-                'location_types', 'TBRGbucketSize', 'inspection_config_key'],
+                'location_types', 'TBRGbucketSize', 'inspection_config_key',
+                'flood_classes', 'crossings', 'gauge_survey'],
     'sensor':  ['alert_id', 'type', 'sensor_id', 'device_id'],
     'site':    ['db_id', 'number', 'name'],
     'satcom':  ['enabled', 'provider', 'terminal_id'],
     'repeater': ['acma_licence', 'rx_mhz', 'tx_mhz', 'delay_ms', 'pass_ranges',
                  'exclusions', 'notes'],
     'range':   ['low', 'high'],
+    # The three lists 0031 added, in the order their tables print the columns.
+    'flood_class': ['as_at', 'first_report_m', 'crossing_height_m', 'crossing_type',
+                    'minor_m', 'crops_grazing_m', 'moderate_m', 'towns_m', 'major_m',
+                    'note'],
+    'crossing':    ['as_at', 'stream', 'name', 'height_m', 'crossing_type', 'note'],
+    'gauge_survey': ['valid_from', 'valid_to', 'gauge_zero_m', 'datum', 'amtd_km',
+                     'catchment_area_km2', 'note'],
 }
+
+# Which shape each of a station's lists holds.
+STATION_LIST_SHAPE = {'flood_classes': 'flood_class', 'crossings': 'crossing',
+                      'gauge_survey': 'gauge_survey'}
 
 
 def ordered(obj, shape):
@@ -113,6 +125,8 @@ def ordered(obj, shape):
             out[k] = ordered(v, 'alert_ids')
         elif shape == 'station' and k == 'sensors':
             out[k] = [ordered(se, 'sensor') for se in v]
+        elif shape == 'station' and k in STATION_LIST_SHAPE:
+            out[k] = [ordered(r, STATION_LIST_SHAPE[k]) for r in v]
         elif shape == 'station' and k == 'site' and isinstance(v, dict):
             out[k] = ordered(v, 'site')
         elif shape == 'station' and k == 'satcom' and isinstance(v, dict):

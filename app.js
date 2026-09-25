@@ -6455,6 +6455,11 @@ function stnCardHtml(s) {
         `<span class="mn-pop-line mn-pop-indent">${esc(t.id)}${t.types.length ? ' — ' + esc(t.types.join(' / ')) : ''}</span>`).join('<br>')}</div>` : ''}
       ${acmaRepeaterPopupExtra(s)}
     </div>
+    <!-- The flood classes, crossing and gauge survey recorded on the station
+         (0031), from the Bureau's river height station lists and whatever an
+         editor has added since. Its own section, like the SLS below it, and
+         empty for a station none of those lists names. river-details.js. -->
+    ${RiverDetails.cardHtml(s)}
     <!-- What the Bureau's Service Level Specification says about this station
          (#180). Its own section rather than rows in the one above, because it
          is a different document talking: those rows are what MegaNet knows,

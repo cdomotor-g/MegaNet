@@ -757,6 +757,9 @@ Each entry in the `stations` array represents one node in the network. A node ca
 | `satcom.enabled` | `boolean` | Marks stations with satellite comms capability |
 | `catchment_ids` | `string[]` | References `catchments[].id`. **Not yet populated** — the Radio Path Maps tab derives a station's catchment at runtime from its coordinates (see feature 8). Populate this to make map suggestions exact. |
 | `TBRGbucketSize` | `number` | Millimetres per tip for this station's tipping-bucket rain gauge. **Absent, not `null`, when not recorded** — most stations today. Every consumer that converts a tip count to millimetres falls back to an assumed 0.2 mm/tip and says so (`bucketSizeMm()` in `app.js`) when this is missing. Named as the ticket that introduced it asked, so it doesn't match this schema's usual snake_case (`tbrg_bucket_size_mm`) — flag it if that should change before more call sites depend on the name. |
+| `flood_classes` | `object[]` | The station's flood classification levels, one per edition of the Bureau's river height station list: `as_at`, and any of `first_report_m`, `minor_m`, `crops_grazing_m`, `moderate_m`, `towns_m`, `major_m` (metres on the gauge), `crossing_height_m` and `crossing_type` (a code from the Bureau's legend — `B` Bridge … `S` Spillway, `T` Highest Astronomical Tide), `note`. **Absent when there are none**, and a row carries a key only for what it states. The newest `as_at` is what the station card shows. See `db/README.md`, *River height station details* |
+| `crossings` | `object[]` | The crossing the gauge is read against: `stream`, `name`, `height_m`, `crossing_type`, `as_at`, `note`. Absent when there are none |
+| `gauge_survey` | `object[]` | The gauge zero's history: `valid_from`, `valid_to` (absent while still in force), `gauge_zero_m`, `datum` (`AHD`, `ASSUM`, `STATE` or `UNKNOWN`), `amtd_km` (Adopted Middle Thread Distance — km along the middle of the stream from its mouth up to the gauge), `catchment_area_km2`, `note`. Absent when there are none |
 
 > **`site` / `sensors`** are the authoritative sensor records — the `alert_ids`
 > labels are kept for backward compatibility but can be mislabelled (an address
@@ -770,6 +773,14 @@ Each entry in the `stations` array represents one node in the network. A node ca
 > internal `db_id` / `device_id` are not in the workbooks, so they are looked up
 > in `archive/z_Sensors_with_Database_IDs_by_View_NATIONAL.csv` — the earlier
 > national export, kept for exactly that reason.
+
+> **`flood_classes` / `crossings` / `gauge_survey`** started as Sections 4, 4 (B),
+> 5 and 6 of the Bureau's *Queensland Flood Warning River Height Stations*
+> (`archive/river-height-stations/`, read by `tools/ingest/river_height_stations.py`
+> and attached by bureau number), and are the station's own rows from there on:
+> an editor adds the next edition, crossing or re-levelling in the station
+> editor's *River height station details* block, and the station card shows what
+> holds now with the rest under *Earlier*.
 
 ---
 
@@ -3783,6 +3794,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run maint` | the Council Maintenance Tasks form drawn against the workbook's own filled sheet, read out of the `.xlsx` in `archive/`. Every cell where that sheet differs from the blank template has to be either on screen or named as having no column |
 | `npm run history` | a saved record reading back as the sheet it was written on. The fixture is not a file: the check fills a sheet in, saves it, and serves that document back — so the round trip is what is tested, and the read-only view is compared against the *editable* form's own section list |
 | `npm run movepin` | a station's links and its move-pin mode. The five pills in the callout and in the editor card, the two document searches carrying the *reduced* station name rather than the raw one and asking for both spellings of the words that have two, and the mode armed, dragged **with a real pointer**, read back, cancelled and saved. Smoke sees none of it: a pill row missing two pills and a Save that writes null over a coordinate both open a tab with a clean console |
+| `npm run riverdetails` | the river height station details (0031) on the station card and in the editor: the card showing the newest flood classification and the gauge zero in force with the rest under *Earlier*; the editor's rows shut to one line, added on top, removed without dropping focus; and a save sending only the lists the form changed — an untouched list resent through the browser's parse would come back with 94.50 as 94.5, and nothing on screen would say so |
 | `npm run stncard` | the station card on the map and the callout it turned into a signpost (#175), at a desktop width and at a phone's. A real pin click paints the card without selecting; a filter change destroys the callout and leaves the card; *Station details ↓* selects and is the one thing that scrolls the details card into view; closing it holds until the next gesture; the three cards that share a rectangle close each other; and at 375 px the callout is two pills that fit inside the map with a finger-sized close button, and *Details* opens the card as a sheet with focus in it. Every one of those failures renders a page that looks right |
 | `npm run itm` | the Longley–Rice port drifting from its reference: 53 losses computed by NTIA's own compiled library — its five published vectors and 48 synthetic profiles across every regime, climate, polarisation and mode of variability — held to 10⁻⁶ dB, intermediates included. Node-only, seconds |
 | `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |

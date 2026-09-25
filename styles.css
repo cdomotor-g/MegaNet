@@ -2389,6 +2389,63 @@ h2.h-bad {
 
 .sensor-row .sensor-flip[disabled]:hover { text-decoration: none; }
 
+/* One row of the river height station lists in the editor (0031): a flood
+   classification, a crossing or a gauge survey. A disclosure, so a station's
+   rows read as one line each — what the row holds — until one is opened to be
+   edited. Open, it is up to ten boxes in a grid that fills the line and wraps:
+   two columns in the side panel, one line at the editor's full width. Each
+   box keeps its label over it, the way .form-grid does, because a row of bare
+   numbers is unreadable once it wraps. Free text takes a whole line — `1 / -1`
+   rather than a span, which on a narrow screen would add a column the grid
+   does not have and push the page sideways. */
+.rhs-row {
+  margin-bottom: var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.rhs-sum {
+  cursor: pointer;
+  padding: var(--sp-1) var(--sp-2);
+  overflow-wrap: anywhere;
+}
+.rhs-row[open] > .rhs-sum { border-bottom: 1px solid var(--border); }
+.rhs-fields {
+  display: grid;
+  /* 8rem, not less: a date box is ~8rem wide with its calendar button, and a
+     narrower column lets it spill across its neighbour. */
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: var(--sp-1) var(--sp-2);
+  align-items: end;
+  padding: var(--sp-2);
+}
+.rhs-fields label {
+  display: grid;
+  gap: .2rem;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  min-width: 0;
+}
+.rhs-fields .rhs-wide { grid-column: 1 / -1; }
+/* The app's field rule names its input types and date is not one of them, so a
+   date box here would sit a size smaller than the number box beside it. Matched
+   to its neighbours in this grid only; the other tabs' date inputs are theirs. */
+.rhs-fields input[type="date"] {
+  width: 100%;
+  min-width: 0;
+  padding: .55rem .65rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--text);
+}
+.rhs-fields .rhs-del {
+  justify-self: end;
+  grid-column: -2 / -1;
+  padding: .2rem .55rem;
+  line-height: 1;
+}
+.rhs-fields .rhs-flag { margin: 0; }
+
 /* The slots a relayed ALERT2 station has been heard on but nobody has named.
    A plain list inside the editor's own note text — it is a hint about live data,
    not a control surface, so it borrows the card's ground like everything else in
@@ -2601,6 +2658,7 @@ h2.h-bad {
      filled in on a phone at a station site is the case this is for. */
   .sensor-row .sensor-del,
   .sensor-row .sensor-flip,
+  .rhs-fields .rhs-del,
   .ef-carried-row,
   .ef-section-head button {
     min-height: 2.75rem;
@@ -2608,6 +2666,10 @@ h2.h-bad {
     align-items: center;
   }
   .ef-carried-row { justify-content: flex-start; }
+  /* A row's summary is what opens it, so it gets the floor too — as padding
+     rather than the flex the controls above take, which would drop the
+     disclosure triangle a summary draws as its list-item marker. */
+  .rhs-sum { padding-block: .7rem; }
 
   /* …and the same floor for this section's own controls. The parameter
      checkboxes are the case that matters: forty of them at .85rem is a target
@@ -2802,6 +2864,16 @@ hr {
 .stn-card-sls { border-top: 1px solid var(--border); padding-top: .5rem; }
 .stn-card-sls > .small { display: block; margin-bottom: .25rem; }
 .mn-sls-note { margin: .35rem 0 0; }
+
+/* The river height station details on the station card (0031): the same
+   label/value rows, a section of their own for the same reason the SLS has
+   one. What no longer holds — an earlier edition, a gauge zero since
+   re-levelled — is behind one disclosure at the foot, so the rows above it are
+   only ever what holds now. */
+.stn-card-rhs-head { display: block; margin-bottom: .25rem; }
+.stn-card-rhs-earlier { margin-top: .3rem; }
+.stn-card-rhs-earlier > summary { cursor: pointer; color: var(--muted); }
+.stn-card-rhs-earlier[open] > summary { margin-bottom: .2rem; }
 
 /* Manual, as a pill. The one fact in that block that changes what a person
    does: a gauge read by hand reports nothing over the radio, so silence from it

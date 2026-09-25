@@ -226,6 +226,10 @@ its cache at all (`PGRST002`).
 | `meganet.inspection_history_reconciliation` | View, one row: loaded, rejected, blocks, cells, what is still parked. #122's acceptance as a query. |
 | `meganet.link_fade_margin` | One row per radio link, holding the fade margin the Stations map colours it by — modelled in the browser (Longley–Rice over sampled terrain), saved here so it is computed once for the network rather than once per person per session. The pair is ordered and unique, `margin_db` is the worse of the two directions, and `good_db`/`ok_db` travel on the row so a colour carries the rule it was judged under. `signature` is every input the figure came from: the app paints a row only while that still matches the station list, so a moved pin retires the colour instead of aging it into a lie. Readable by `anon`, like the station document it is a property of. |
 | `meganet.save_link_fade(jsonb, numeric, numeric)` | The one writer, editors only. Upserts a chunk of margins with the thresholds they were judged against, and answers how many landed against how many were sent — a pair the station document does not have is skipped rather than raised, so one unknown station cannot lose the other 399 rows in the chunk. |
+| `meganet.station_flood_class` | A station's flood classification levels (`0031`), one row per edition dated by `as_at`: first report, minor, crops and grazing, moderate, towns and major, plus the height and type of the crossing the gauge is read against. From Sections 4 and 4 (B) of the Bureau's river height station lists — the 2014 edition kept beside the 2026 one — and whatever an editor adds since. The station's `flood_classes` list. |
+| `meganet.station_crossing` | The crossings a station's gauge is read against (`0031`, Section 5): stream, name, height, type. The station's `crossings` list. |
+| `meganet.station_gauge_survey` | The survey of a station's gauge (`0031`, Section 6): the height of its zero, the datum and the period it held — several rows for a gauge that has been re-levelled — with its AMTD (km along the middle of the stream from its mouth up to the gauge) and catchment area. The station's `gauge_survey` list. |
+| `meganet.crossing_type`, `meganet.gauge_datum` | The two vocabularies those three reference: the Bureau's crossing legend (B Bridge … S Spillway, T Highest Astronomical Tide) and the four datums a gauge zero is measured in (AHD, ASSUM, STATE, UNKNOWN). A new code is an insert. |
 
 Everything is readable by `anon` **except `meganet.reading_raw` and the whole
 inspection domain — bar the numbers, which `0023` publishes as views**. `reading_raw` holds whatever a device or an adapter actually
@@ -1126,6 +1130,72 @@ Then, after pushing:
 ```sql
 select meganet.load_sls_from_url();
 ```
+
+## River height station details
+
+`0031`. "Queensland Flood Warning River Height Stations" is a Bureau report in
+sections, every row keyed on the bureau number. Four of them are in
+`archive/river-height-stations/`: flood classifications as at 25/09/2026
+(Section 4) and 15/01/2014 (Section 4 (B)), the crossings (Section 5) and the
+survey details (Section 6). `tools/ingest/river_height_stations.py` reads them
+into `data/river-height-stations.json` — every row, including the ~half for
+stations MegaNet does not have.
+
+**Unlike the SLS, these are the station's own rows.** Three tables hang off
+`meganet.station` the way the sensors do, and three lists travel in its
+document — `flood_classes`, `crossings`, `gauge_survey`, each absent when empty
+— so the card reads them off the station it already holds, `save_station()`
+writes them with everything else in one transaction, and `stations.json`
+carries them. The Bureau's lists are where they started; an editor adds the
+next edition, crossing or re-levelling in the station editor.
+
+**`save_station()` leaves a list the document does not mention alone** — the one
+place it differs from the sensors. Every client older than `0031` builds its
+document without these keys, and reading their absence as "none" would have
+deleted them on the first save from a tab opened before the deploy. The editor
+uses the same rule the other way round: it sends only the lists the form
+changed, because the browser parses 94.50 as 94.5 and resending an untouched
+list would quietly shorten every figure in it. `load_stations_doc()` is a sync
+of a whole document, so there absent means none, as it always has.
+
+**Attaching the rows to stations** is not a migration — `0031` carries no
+station data, for `0029`'s reason. It is SQL the tool prints:
+
+```sh
+python3 tools/ingest/river_height_stations.py --check    # CI
+python3 tools/ingest/river_height_stations.py --report   # what came out, in prose
+python3 tools/ingest/river_height_stations.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+It attaches by `bureau_key()` to live stations only, and only where the station
+has none of its own yet — per edition (`as_at`) for flood classes and crossings,
+per station for the survey — so running it again after stations are added fills
+in the new ones and touches nothing an editor has changed. It moves each
+station's `updated_at`, so an editor holding one open is told to reload. Then
+refresh `stations.json` (`tools/snapshot_stations_json.py`), because the file is
+a copy.
+
+| As loaded | Rows | Stations |
+| --- | --- | --- |
+| flood classifications (2026 and 2014) | 1,073 | 642 |
+| crossings | 373 | 373 |
+| gauge survey | 736 | 623 |
+
+Two things are kept as printed rather than repaired. 366 flood classification
+rows name a station and print no figure; they carry no fact and are not stored.
+And one survey row, 535200 Arcadia Valley School, has its period backwards (from
+2021 to 2020): a check constraint would have refused the document, and then
+every save of that station, so the card and the editor say so instead.
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_river_height_details.sql
+```
+
+30 checks, in a transaction that rolls back: the tables, RLS and grants, the
+two vocabularies against the Bureau's legend, `save_station()`'s three cases
+(absent, empty, rows), its refusals, and the loader's sync and its
+`document_managed` guard.
 
 ## Checking it from outside
 

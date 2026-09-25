@@ -1,3 +1,8 @@
 # Certificates are byte-exact material: keep LF on every platform so a Windows
 # checkout does not hand CRLF to a firmware toolchain that will not take it.
 *.pem text eol=lf
+
+# The Bureau's river height station lists are read by column position
+# (tools/ingest/river_height_stations.py): a line ending rewritten on checkout
+# is a column moved.
+archive/river-height-stations/*.txt text eol=lf
