@@ -48,7 +48,10 @@ const LISTS     = ['bureau_listings', 'flood_classes', 'crossings', 'gauge_surve
 const FIELDS    = ['awrc_number', 'stream', 'urbs_label'];
 const TABLE     = { flood_classes: 'station_flood_class', crossings: 'station_crossing',
                     gauge_survey: 'station_gauge_survey', bureau_listings: 'station_bureau_listing',
-                    flood_effects: 'station_flood_effect' };
+                    flood_effects: 'station_flood_effect', aep_levels: 'station_aep_level' };
+// The sixth list the editor carries, the AEP flood levels, is 0033's.
+const MIGRATION_0033 = repo('db/migrations/0033_aep_levels_and_frequencies.sql');
+const EDITOR_LISTS = [...LISTS, 'aep_levels'];
 
 // The rows of one `insert into meganet.<table> … values (…), (…)` in the
 // migration, as arrays of their quoted text.
@@ -83,6 +86,7 @@ async function openStations(browser, server, errors, contextOpts) {
 
 async function main() {
   const sql = fs.readFileSync(MIGRATION, 'utf8') + '\n' + fs.readFileSync(MIGRATION_32, 'utf8');
+  const sql33 = fs.readFileSync(MIGRATION_0033, 'utf8');
 
   // Stations to look at, picked from the file rather than named, so the check
   // follows the data: one with every list, every field and more than one gauge
@@ -121,8 +125,8 @@ async function main() {
       sqlIndexes && JSON.stringify(sqlIndexes.map(r => [r[0], r[1]]))
         === JSON.stringify(js.indexes.map(i => [i.code, i.label])),
       JSON.stringify({ sql: sqlIndexes, js: js.indexes }));
-    check('the editor edits the five lists the document carries',
-      JSON.stringify(js.keys) === JSON.stringify(LISTS), JSON.stringify(js.keys));
+    check('the editor edits the six lists the document carries — the Bureau\'s five and the AEP levels',
+      JSON.stringify(js.keys) === JSON.stringify(EDITOR_LISTS), JSON.stringify(js.keys));
     const added = [...sql.matchAll(/alter table meganet\.station add column if not exists ([a-z_0-9]+) /g)].map(m => m[1]);
     check('…and the three fields, each a column 0032 adds to meganet.station',
       JSON.stringify(js.fields) === JSON.stringify(FIELDS) && FIELDS.every(f => added.includes(f)),
@@ -134,8 +138,16 @@ async function main() {
     await page.waitForSelector('#ef-rhs-flood_classes');
     const formKeys = await page.evaluate(lists => Object.fromEntries(lists.map(k =>
       [k, [...new Set([...document.querySelectorAll(`#ef-rhs-${k} [data-f]`)].map(e => e.dataset.f))]])), LISTS);
-    for (const k of LISTS) {
-      const cols = tableColumns(sql, TABLE[k]);
+    // The AEP list's boxes are the spec's, read off the module: `full` has no
+    // AEP row to draw them from.
+    formKeys.aep_levels = await page.evaluate(() => {
+      RiverDetails.addRow('aep_levels');
+      const keys = [...new Set([...document.querySelectorAll('#ef-rhs-aep_levels [data-f]')].map(e => e.dataset.f))];
+      document.querySelector('#ef-rhs-aep_levels .rhs-row .rhs-del').click();
+      return keys;
+    });
+    for (const k of EDITOR_LISTS) {
+      const cols = tableColumns(k === 'aep_levels' ? sql33 : sql, TABLE[k]);
       const stray = formKeys[k].filter(f => !cols.includes(f));
       check(`every ${k} box has a column in meganet.${TABLE[k]}`,
         formKeys[k].length && !stray.length, stray.length ? `no column for ${stray.join(', ')}` : '');
@@ -151,7 +163,14 @@ async function main() {
         [r.children[0].textContent.trim(), r.children[1].textContent.replace(/\s+/g, ' ').trim()]);
       const earlier = sect.querySelector('.stn-card-rhs-earlier');
       const effects = sect.querySelector('.stn-card-rhs-effects');
+      const block = sect.querySelector('.stn-card-rhs-classes');
+      const head = sect.querySelector('.stn-card-rhs-head');
+      const colour = sel => { const e = block && block.querySelector(sel); return e ? getComputedStyle(e).color : null; };
       return { rows, earlier: earlier ? earlier.querySelectorAll('.acma-row').length : 0,
+               afterHead: head && head.nextElementSibling ? head.nextElementSibling.textContent.trim() : '',
+               classesHead: block ? [...block.querySelectorAll(':scope > span')].slice(0, 2).map(e => e.textContent.trim()).join(' ') : '',
+               classLines: block ? [...block.querySelectorAll('.mn-pop-line')].map(e => e.textContent.trim()) : [],
+               colours: { minor: colour('.rhs-minor'), moderate: colour('.rhs-moderate'), major: colour('.rhs-major') },
                summary: earlier ? earlier.querySelector('summary').textContent.trim() : '',
                effects: effects ? [...effects.querySelectorAll('.acma-row')].map(r =>
                  [r.children[0].textContent.trim(), r.children[1].textContent.replace(/\s+/g, ' ').trim()]) : null,
@@ -159,6 +178,9 @@ async function main() {
                effectsOpen: effects ? effects.open : null };
     });
     check('a station the lists name has the section on its card', !!card, full.id);
+
+    check('"Hdb snapshot 26/9/26" is the line under the section\'s heading',
+      card && card.afterHead === 'Hdb snapshot 26/9/26', card && card.afterHead);
 
     const listed = card && card.rows.find(r => r[0] === 'Bureau lists');
     const labels = { 1: 'FloodWarn rainfall', 2: 'Daily rainfall', 3: 'River height' };
@@ -186,11 +208,30 @@ async function main() {
       JSON.stringify({ card: card && card.effects && card.effects.slice(0, 3), rows: effectsNow.slice(0, 3) }));
 
     const newest = [...full.flood_classes].sort((a, b) => (b.as_at || '').localeCompare(a.as_at || ''))[0];
-    const classes = card && card.rows.find(r => r[0] === 'Flood classes');
-    check('the flood classes are the newest edition\'s, dated',
-      classes && newest.minor_m != null && classes[1].includes(`minor ${newest.minor_m.toFixed(1)}`)
-        && classes[1].includes(`as at ${newest.as_at.slice(8, 10)}/${newest.as_at.slice(5, 7)}/${newest.as_at.slice(0, 4)}`),
-      JSON.stringify(classes));
+    const want = [['Minor', newest.minor_m], ['Moderate', newest.moderate_m], ['Major', newest.major_m]]
+      .filter(([, v]) => v != null).map(([k, v]) => `${k} ${v.toFixed(1)} m`);
+    check('the newest edition\'s minor, moderate and major are a line each, like the AlertIDs',
+      card && want.length && JSON.stringify(card.classLines) === JSON.stringify(want)
+        && !card.rows.some(r => r[0] === 'Flood classes'),
+      JSON.stringify({ got: card && card.classLines, want }));
+    check('…dated by the edition they came from',
+      card && card.classesHead.includes(`as at ${newest.as_at.slice(8, 10)}/${newest.as_at.slice(5, 7)}/${newest.as_at.slice(0, 4)}`),
+      card && card.classesHead);
+
+    // Green, yellow, red: read as hues off the computed colours, so a palette
+    // retuned for contrast still passes and a swapped pair does not.
+    const hue = rgb => {
+      const [r, g, b] = (rgb || '').match(/\d+/g).slice(0, 3).map(n => Number(n) / 255);
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+      if (!d) return null;
+      const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    const hues = card && Object.fromEntries(Object.entries(card.colours).map(([k, v]) => [k, v && hue(v)]));
+    check('…minor in green, moderate in yellow, major in red',
+      hues && hues.minor > 90 && hues.minor < 150 && hues.moderate > 40 && hues.moderate < 65
+        && (hues.major < 15 || hues.major > 345),
+      JSON.stringify({ colours: card && card.colours, hues }));
 
     const inForce = full.gauge_survey.filter(r => !r.valid_to)
       .sort((a, b) => (b.valid_from || '').localeCompare(a.valid_from || ''))[0];
@@ -234,11 +275,11 @@ async function main() {
       shape.every(x => x.rows === full[x.k].length && x.open === 0 && x.count.includes(String(x.rows))),
       JSON.stringify(shape));
 
-    check('an untouched form sends none of the five lists',
+    check('an untouched form sends none of the six lists',
       await page.evaluate(lists => {
         const d = editorReadForm();
         return lists.every(k => !(k in d));
-      }, LISTS));
+      }, EDITOR_LISTS));
     check('…and carries the three fields as they were',
       await page.evaluate(([fields, rec]) => {
         const d = editorReadForm();
@@ -307,7 +348,7 @@ async function main() {
     const sent = await page.evaluate(lists => {
       const d = editorReadForm();
       return { keys: lists.filter(k => k in d), fc: d.flood_classes };
-    }, LISTS);
+    }, EDITOR_LISTS);
     check('only the list that changed is sent',
       JSON.stringify(sent.keys) === '["flood_classes"]', JSON.stringify(sent.keys));
     check('…the new row first, keyed as the document keys it',

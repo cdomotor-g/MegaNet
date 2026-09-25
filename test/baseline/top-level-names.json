@@ -30,7 +30,9 @@
     "map-catchments.js",
     "map-hubs.js",
     "sls.js",
+    "flood-velocity.js",
     "river-details.js",
+    "frequencies.js",
     "map-survey.js",
     "map-contours.js",
     "map-elvis-coverage.js",
@@ -68,6 +70,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 772,
-  "distinct": 772
+  "total": 774,
+  "distinct": 774
 }

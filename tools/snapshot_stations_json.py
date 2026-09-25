@@ -80,7 +80,8 @@ KEY_ORDER = {
                 'repeater', 'site', 'sensors', 'lga', 'basin', 'hub_id',
                 'location_types', 'TBRGbucketSize', 'inspection_config_key',
                 'awrc_number', 'stream', 'urbs_label', 'bureau_listings',
-                'flood_classes', 'crossings', 'gauge_survey', 'flood_effects'],
+                'flood_classes', 'crossings', 'gauge_survey', 'flood_effects',
+                'aep_levels', 'frequencies'],
     'sensor':  ['alert_id', 'type', 'sensor_id', 'device_id'],
     'site':    ['db_id', 'number', 'name'],
     'satcom':  ['enabled', 'provider', 'terminal_id'],
@@ -97,12 +98,19 @@ KEY_ORDER = {
     # And the two 0032 added.
     'bureau_listing': ['section', 'as_at', 'note'],
     'flood_effect':   ['as_at', 'height_m', 'effect', 'detail', 'note'],
+    # …and the two 0033 added.
+    'aep_level':   ['as_at', 'source', 'point_lat', 'point_lon', 'ground_m', 'aep_1_m',
+                    'aep_0_5_m', 'aep_0_2_m', 'aep_0_066_m', 'data_quality',
+                    'level_difference', 'confidence', 'setting', 'slope', 'slope_basis',
+                    'manning_n', 'note'],
+    'frequency':   ['rx_mhz', 'tx_mhz', 'label', 'acma_licence'],
 }
 
 # Which shape each of a station's lists holds.
 STATION_LIST_SHAPE = {'flood_classes': 'flood_class', 'crossings': 'crossing',
                       'gauge_survey': 'gauge_survey', 'bureau_listings': 'bureau_listing',
-                      'flood_effects': 'flood_effect'}
+                      'flood_effects': 'flood_effect', 'aep_levels': 'aep_level',
+                      'frequencies': 'frequency'}
 
 
 def ordered(obj, shape):

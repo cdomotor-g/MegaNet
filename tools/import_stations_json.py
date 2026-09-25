@@ -22,10 +22,11 @@ That makes this the way to reload a snapshot into any empty database — includi
 the one inside the corporate network, which is the whole reason the schema is
 portable SQL in the first place.
 
-Requires the migrations through 0032_bureau_station_lists.sql to have been
-applied — the station's flood classes, crossings and gauge survey are synced
-into the tables 0031 creates, and its index listings, flood effects, AWRC
-number, stream and URBS label into 0032's. Standard library only.
+Requires the migrations through 0033_aep_levels_and_frequencies.sql to have
+been applied — the station's flood classes, crossings and gauge survey are synced
+into the tables 0031 creates, its index listings, flood effects, AWRC number,
+stream and URBS label into 0032's, and its AEP flood levels and frequencies into
+0033's. Standard library only.
 """
 
 from __future__ import annotations
@@ -165,9 +166,9 @@ def emit_sync(out, table, columns, key, rows, batch=500, prune_where=None):
 
 IMPORT_TAG = 'import_stations_json.py'
 
-# The station's own lists that 0031 and 0032 added: document key, table, and
-# the columns in the order a row carries them. The key and the column names are
-# the same words in the document and in the table.
+# The station's own lists that 0031, 0032 and 0033 added: document key, table,
+# and the columns in the order a row carries them. The key and the column names
+# are the same words in the document and in the table.
 STATION_LISTS = [
     ('flood_classes', 'station_flood_class',
      ['as_at', 'first_report_m', 'crossing_height_m', 'crossing_type', 'minor_m',
@@ -181,6 +182,14 @@ STATION_LISTS = [
      ['section', 'as_at', 'note']),
     ('flood_effects', 'station_flood_effect',
      ['as_at', 'height_m', 'effect', 'detail', 'note']),
+    # …and the two 0033 added: the AEP flood levels, and the frequencies beyond
+    # a repeater's own pair.
+    ('aep_levels', 'station_aep_level',
+     ['as_at', 'source', 'point_lat', 'point_lon', 'ground_m', 'aep_1_m', 'aep_0_5_m',
+      'aep_0_2_m', 'aep_0_066_m', 'data_quality', 'level_difference', 'confidence',
+      'setting', 'slope', 'slope_basis', 'manning_n', 'note']),
+    ('frequencies', 'station_frequency',
+     ['rx_mhz', 'tx_mhz', 'label', 'acma_licence']),
 ]
 
 
@@ -389,6 +398,8 @@ def build(data, out):
               ' · index listings %d · flood effects %d\n'
               % (details['flood_classes'], details['crossings'], details['gauge_survey'],
                  details['bureau_listings'], details['flood_effects']))
+    out.write('--   AEP level rows %d · frequencies %d\n'
+              % (details['aep_levels'], details['frequencies']))
 
     # A registry sync is the event that makes a previously unresolvable health
     # key resolvable, so it is where the fold runs (#162). Guarded, so this
@@ -409,6 +420,7 @@ def build(data, out):
         'gauge_survey': details['gauge_survey'],
         'bureau_listings': details['bureau_listings'],
         'flood_effects': details['flood_effects'],
+        'aep_levels': details['aep_levels'], 'frequencies': details['frequencies'],
         'radio_networks': len(data.get('radio_networks', [])),
         'catchments': len(data.get('catchments', [])),
         'rm_systems': len(data.get('rm_systems', [])),
@@ -437,6 +449,7 @@ def main():
 
     for k in ('stations', 'sensors', 'repeaters', 'ranges', 'flood_classes',
               'crossings', 'gauge_survey', 'bureau_listings', 'flood_effects',
+              'aep_levels', 'frequencies',
               'radio_networks', 'catchments', 'rm_systems'):
         print('%-16s %6d' % (k, stats[k]), file=sys.stderr)
     if args.out:

@@ -6557,8 +6557,16 @@ function stnCardHtml(s) {
       ${wind ? `<div class="acma-row"><span>Wind region</span><span><span id="${escAttr(windId)}"
           data-mn-wind="${escAttr(`${s.lat},${s.lon}`)}"
           title="${escAttr(wind.title)}">${esc(wind.text)}</span> <span class="mn-pop-note">indicative</span></span></div>` : ''}
+      <!-- The other load on a site's structures, beside the wind: the peak flood
+           velocity flood-velocity.js estimates from the station's AEP levels,
+           flagged indicative the same way. Its workings are in the Flood levels
+           section below. Empty for a station neither AEP sheet names. -->
+      ${RiverDetails.velocityRowHtml(s)}
       ${idTypes.length ? `<div class="stn-card-ids"><span class="small txt-muted">AlertID</span><br>${idTypes.map(t =>
         `<span class="mn-pop-line mn-pop-indent">${esc(t.id)}${t.types.length ? ' — ' + esc(t.types.join(' / ')) : ''}</span>`).join('<br>')}</div>` : ''}
+      <!-- Every RX/TX pair the station has, the repeater's own first, one to a
+           line like the addresses above (0033, frequencies.js). -->
+      ${Frequencies.cardHtml(s)}
       ${acmaRepeaterPopupExtra(s)}
     </div>
     <!-- The flood classes, crossing and gauge survey recorded on the station
@@ -6566,6 +6574,10 @@ function stnCardHtml(s) {
          editor has added since. Its own section, like the SLS below it, and
          empty for a station none of those lists names. river-details.js. -->
     ${RiverDetails.cardHtml(s)}
+    <!-- The modelled AEP flood levels at the station (0033), its own section
+         because a model is talking, not the Bureau's lists: indicative levels,
+         the sheet's own confidence, and the velocity's workings. -->
+    ${RiverDetails.aepCardHtml(s)}
     <!-- What the Bureau's Service Level Specification says about this station
          (#180). Its own section rather than rows in the one above, because it
          is a different document talking: those rows are what MegaNet knows,

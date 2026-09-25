@@ -28,8 +28,11 @@
 // station-inspections.js for StationInspections.sectionHtml, the Inspections
 // section under the ARRO block at the foot of the form; and to
 // river-details.js for RiverDetails — the Bureau's flood warning lists above
-// the ARRO block (0031, 0032), which editorReadForm() reads back and
-// editorSave() asks formProblem() about first.
+// the ARRO block (0031, 0032) and the AEP flood levels with them (0033), which
+// editorReadForm() reads back and editorSave() asks formProblem() about first;
+// and to frequencies.js for Frequencies — the RX/TX rows in the Repeater
+// Configuration and a base station's own section (0033), read back and asked
+// about the same way.
 //
 // This file is the form, not its host. The card is rendered by the Stations
 // tab, which is frozen in app.js for the whole of #129 — so a change to where
@@ -117,6 +120,7 @@ function repeaterCarriedStationsHtml(s) {
 
 function editorForm(s) {
   const hasRep  = s.roles.includes('repeater');
+  const hasBase = s.roles.includes('base');
   const sensors = stationSensors(s).slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0));
   const dbId    = arroSiteId(s);
   // The row of pills under the coordinate boxes. Read once rather than twice —
@@ -183,6 +187,13 @@ function editorForm(s) {
       <label>Wind region (AS/NZS 1170.2)
         <input type="text" id="ef-wind" readonly value="${escAttr(wind.text)}"
                data-mn-wind="${escAttr(`${s.lat},${s.lon}`)}" title="${escAttr(wind.title)}">
+      </label>
+      <!-- Beside the wind region for the same reason it is read-only: it is not
+           typed, it is worked out — from the AEP flood levels below and the
+           assumptions on their row (flood-velocity.js). -->
+      <label class="full">Flood velocity (indicative)
+        <input type="text" id="ef-flood-vel" readonly value="${escAttr(RiverDetails.velocitySummary(s))}"
+               title="Estimated peak flood velocity from the AEP flood levels, by Manning’s equation. The workings are on the station card; the setting, slope and Manning n are on the AEP row below.">
       </label>
       <label>RM System ID<input type="number" id="ef-rmsys" value="${s.rm_system_id || 1}"></label>
       <label>TBRG bucket size (mm/tip)
@@ -252,8 +263,6 @@ function editorForm(s) {
       <h4 class="ef-h">Repeater Configuration</h3>
       <div class="form-grid">
         <label>ACMA Licence<input type="text" id="ef-acma" value="${esc(s.repeater?.acma_licence || '')}"></label>
-        <label>RX (MHz)<input type="number" step="any" id="ef-rx" value="${s.repeater?.rx_mhz ?? ''}"></label>
-        <label>TX (MHz)<input type="number" step="any" id="ef-tx" value="${s.repeater?.tx_mhz ?? ''}"></label>
         <label>Repeater delay (ms)
           <input type="number" min="0" max="999" step="1" id="ef-delay"
                  value="${s.repeater?.delay_ms ?? ''}" placeholder="not set">
@@ -267,6 +276,9 @@ function editorForm(s) {
                distance whose windows share an address never hold the same delay.`;
           })()}
         </div>
+        <!-- The repeater's own RX/TX pair first (ef-rx, ef-tx — what every path
+             tool reads), then a row per other channel, with + Add (0033). -->
+        ${Frequencies.editorHtml(s, { primary: true })}
         ${repeaterPassingSummaryHtml(s)}
         ${repeaterCarriedStationsHtml(s)}
         <label class="full">Pass Ranges (one per line: <em>low-high</em>)
@@ -275,6 +287,14 @@ function editorForm(s) {
         <label class="full">Exclusions (one per line: <em>low-high</em>)
           <textarea id="ef-excl" rows="3">${(s.repeater?.exclusions || []).map(r => `${r.low}-${r.high}`).join('\n')}</textarea>
         </label>
+      </div>` : ''}
+    ${hasBase && !hasRep ? `
+      <hr>
+      <h4 class="ef-h">Base Station Radio</h4>
+      <!-- A base station has no repeater row, so every pair it uses is a row
+           here (0033). A base that is also a repeater keeps them above. -->
+      <div class="form-grid">
+        ${Frequencies.editorHtml(s)}
       </div>` : ''}
     ${RiverDetails.editorHtml(s)}
     ${editorArroSection(s, sensors)}
@@ -580,6 +600,9 @@ function editorReadForm() {
   for (const k of RiverDetails.LIST_KEYS) delete d[k];
   Object.assign(d, RiverDetails.readForm(state.editorDraft));
   RiverDetails.applyFields(d);
+  // The frequencies beyond a repeater's own pair (0033), on the same terms.
+  delete d.frequencies;
+  Object.assign(d, Frequencies.readForm(state.editorDraft));
 
   // Sensors — read the editable rows, preserving national-export metadata.
   //
@@ -656,7 +679,7 @@ async function editorSave() {
 
   // A figure the browser could not read reads back as empty, and would be
   // dropped from the save without a word; say which one instead.
-  const unreadable = RiverDetails.formProblem();
+  const unreadable = RiverDetails.formProblem() || Frequencies.formProblem();
   if (unreadable) {
     setEditorStatus({ kind: 'error', text: unreadable });
     return;

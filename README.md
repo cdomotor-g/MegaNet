@@ -765,6 +765,8 @@ Each entry in the `stations` array represents one node in the network. A node ca
 | `awrc_number` | `string` | The AWRC gauging station number (Section 3). Its first three digits are the basin. **Absent when not recorded** |
 | `stream` | `string` | The stream the gauge is on, as Section 3 prints it. Absent when not recorded |
 | `urbs_label` | `string` | The station's node in the Bureau's URBS runoff-routing model. Not unique — a TM and the ALERT gauge beside it read the same place. Absent when not recorded |
+| `aep_levels` | `object[]` | The modelled water level at the station in four floods — `aep_1_m`, `aep_0_5_m`, `aep_0_2_m`, `aep_0_066_m` (the 1%, 0.5%, 0.2% and 0.066% annual exceedance probability events, m AHD) — over `ground_m`, at the sheet's `point_lat`/`point_lon`, with the sheet's `data_quality` (1–3), `level_difference` (1–3) and `confidence` (1–9), its `source` and `as_at`; then the indicative flood velocity's assumptions, `setting` (`channel` or `floodplain`), `slope` (m/m) with `slope_basis`, and `manning_n`, and a `note`. One row per sheet. **Absent when there are none.** Indicative, not observed. See `db/README.md`, *AEP flood levels and frequencies* |
+| `frequencies` | `object[]` | RX/TX pairs beyond a repeater's own: `rx_mhz`, `tx_mhz`, `label` (what the channel is for), `acma_licence`. `repeater.rx_mhz`/`tx_mhz` stays the primary pair every path tool reads; a base station keeps all its pairs here. Absent when there are none |
 
 > **`site` / `sensors`** are the authoritative sensor records — the `alert_ids`
 > labels are kept for backward compatibility but can be mislabelled (an address
@@ -790,6 +792,19 @@ Each entry in the `stations` array represents one node in the network. A node ca
 > *Earlier*. The 1,697 stations Sections 1–3 list that MegaNet had none for were
 > created from those indexes on 25/09/2026 — a field station each, at the
 > Bureau's position, with no elevation yet.
+
+> **`aep_levels`** come from the QLD and NSW AEP flood level workbooks
+> (`archive/aep-levels/`, read by `tools/ingest/aep_levels.py` and attached by
+> bureau number, or by position for the eleven rows with none). The station card
+> shows them in a *Flood levels (AEP)* section flagged indicative, and
+> `flood-velocity.js` turns them into the **indicative flood velocity** on the
+> line beside the wind region: Manning's equation over the depth of each flood,
+> in the channel (over the gauge zero, n 0.040) and on the floodplain (over the
+> sheet's ground, n 0.060) until somebody records which the station is, with a
+> slope from the same sheets' water surface between same-stream neighbours or,
+> failing one, the median slope for stations at that ground height. The
+> workings are on the card, and the setting, slope and roughness are editable on
+> the AEP row.
 
 ---
 
@@ -3844,6 +3859,8 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run history` | a saved record reading back as the sheet it was written on. The fixture is not a file: the check fills a sheet in, saves it, and serves that document back — so the round trip is what is tested, and the read-only view is compared against the *editable* form's own section list |
 | `npm run movepin` | a station's links and its move-pin mode. The five pills in the callout and in the editor card, the two document searches carrying the *reduced* station name rather than the raw one and asking for both spellings of the words that have two, and the mode armed, dragged **with a real pointer**, read back, cancelled and saved. Smoke sees none of it: a pill row missing two pills and a Save that writes null over a coordinate both open a tab with a clean console |
 | `npm run riverdetails` | the Bureau's flood warning details (0031, 0032) on the station card and in the editor: the card naming the indexes that list the station, its AWRC number, stream and URBS label, the newest flood classification, the gauge zero in force and the flood effects, with the rest under *Earlier*; the editor's rows shut to one line, added on top, removed without dropping focus, its three fields sent trimmed or not at all; and a save sending only the lists the form changed — an untouched list resent through the browser's parse would come back with 94.50 as 94.5, and nothing on screen would say so |
+| `npm run floodlevels` | the AEP flood levels (0033) and the indicative flood velocity from them. The arithmetic off the page against figures worked by hand — Manning, the critical-flow cap, the channel bed (the gauge zero, but not a storage's, not an assumed datum's and not one 30 m down), the slope's sources and bounds, a recorded setting and an entered roughness — and `flood-velocity.js`'s default slopes against the ones the ingest wrote into `data/aep-levels.json`. Then the card: a *Flood levels (AEP)* section flagged indicative, the velocity line straight after the wind region with the module's own figures, the sheet's far-off point said out loud, nothing for a station neither sheet names; and the editor sending the AEP list, and only it, when a setting is picked |
+| `npm run frequencies` | a station's RX/TX pairs (0033): the repeater's own pair as the primary row under the ids every path tool's form reads, **+ Add frequency** at the foot with the cursor in it, an untouched form sending no list and a filled row sending exactly what was typed, a use with no frequency or a frequency that is not one stopping the save by name, a base station's section of its own and none for a field station, and the card listing every pair a line each |
 | `npm run stncard` | the station card on the map and the callout it turned into a signpost (#175), at a desktop width and at a phone's. A real pin click paints the card without selecting; a filter change destroys the callout and leaves the card; *Station details ↓* selects and is the one thing that scrolls the details card into view; closing it holds until the next gesture; the three cards that share a rectangle close each other; and at 375 px the callout is two pills that fit inside the map with a finger-sized close button, and *Details* opens the card as a sheet with focus in it. Every one of those failures renders a page that looks right |
 | `npm run itm` | the Longley–Rice port drifting from its reference: 53 losses computed by NTIA's own compiled library — its five published vectors and 48 synthetic profiles across every regime, climate, polarisation and mode of variability — held to 10⁻⁶ dB, intermediates included. Node-only, seconds |
 | `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |

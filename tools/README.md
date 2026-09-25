@@ -114,6 +114,44 @@ an existing one, for a person to decide. Safe to run again. `--sql` reads
 `stations.json` to know which stations exist, so snapshot it from the database
 first. `check_river_height_details.sql` and `check_bureau_station_lists.sql`
 prove the two migrations it writes into.
+
+## The AEP flood level sheets (0033)
+
+`ingest/aep_levels.py` reads the two workbooks in `archive/aep-levels/` —
+`QLD_AEP_Levels_1.xlsx` (sheet `FWIN_QLD_V9_2`) and `NSW_AEP_Levels_1.xlsx`,
+supplied 26/09/2026 — into `data/aep-levels.json`, and prints the SQL that
+attaches each row to the station it describes. Each row is a flood warning
+station's ground height and its modelled water level in the 1%, 0.5%, 0.2% and
+0.066% AEP floods (m AHD), with the sheet's three scores.
+
+```bash
+python3 tools/ingest/aep_levels.py            # rewrite the JSON
+python3 tools/ingest/aep_levels.py --report   # what came out, in prose
+python3 tools/ingest/aep_levels.py --check    # fail on drift (CI does this)
+python3 tools/ingest/aep_levels.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+Standard library only (`ingest/xlsx.py` reads the workbooks). The header row is
+checked word for word; a level that falls as the flood gets rarer, a level below
+its ground, a confidence score that is not quality × difference, or one number
+twice with different rows each raise. A cell's double is kept at the precision
+the sheet displays (17.510000000000002 is 17.51).
+
+It also works out the **water surface slope** that the flood velocity needs
+(`flood-velocity.js`): the fall of the modelled flood between this station and
+its nearest neighbours up- and downstream on the same stream in the same basin,
+2–60 km away along the stream (AMTD where both gauges have one, else the
+straight line × 1.3), structures excluded. 318 rows get one. The rest take a
+default — the median of those slopes among stations at a similar ground height
+— written into the JSON's `meta.default_slopes`, and `npm run floodlevels`
+holds `flood-velocity.js`'s copy to it.
+
+The SQL attaches by `bureau_key()`, or by position (within ~60 m) for the eleven
+QLD rows with no station number, only to live stations and only where the
+station has no row from that sheet yet — so it is safe to run again.
+`check_aep_levels_and_frequencies.sql` is the database's half.
+
 ## `ingest/` — the historical inspection workbook (#122)
 
 `ingest/xlsx.py` is a read-only .xlsx reader with nothing but the standard
@@ -414,6 +452,20 @@ loader's sync. CI runs it after the stations load.
 
 ```bash
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_bureau_station_lists.sql
+```
+
+## `check_aep_levels_and_frequencies.sql` — prove the AEP levels and the frequencies
+
+23 checks over `0033`, in a transaction that rolls back: both tables with RLS
+and grants, `save_station()` writing both lists — keeping the digits a figure
+was written with, leaving a list the document does not mention alone, clearing
+one it sends empty — its refusals of a setting that is neither channel nor
+floodplain, a score out of range, an implausible Manning n, a negative slope
+and a frequency of zero, and the loader's sync. CI runs it after the stations
+load.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_aep_levels_and_frequencies.sql
 ```
 
 ## `storage_bucket.sql` — create the `inspections` bucket and its policies

@@ -233,6 +233,8 @@ its cache at all (`PGRST002`).
 | `meganet.station_bureau_listing` | Which of the Bureau's Queensland station indexes list a station (`0032`): Section 1 FloodWarn rainfall, 2 daily rainfall, 3 river height, one row per index per edition, dated by `as_at`. The station's `bureau_listings` list; `section` is a foreign key into `meganet.bureau_index`, the three indexes by the section number the pages print. |
 | `meganet.station_flood_effect` | What each height on a station's gauge means on the ground (`0032`, Section 9): the height, the probable flood effect as the Bureau writes it, and the detail it prints in brackets under some of them. One row per height per edition, in the page's order. The station's `flood_effects` list. |
 | `meganet.station.awrc_number`, `.stream`, `.urbs_label` | Three fields `0032` adds to the station: the AWRC gauging station number and the stream the gauge is on (Section 3), and the station's node in the Bureau's URBS runoff-routing model. Optional keys in the document, absent when null. |
+| `meganet.station_aep_level` | The modelled water level at a station in the 1%, 0.5%, 0.2% and 0.066% AEP floods (`0033`), m AHD, with the ground height and the source sheet's own three scores — one row per sheet (the QLD and NSW AEP level workbooks, supplied 26/09/2026). Indicative, not observed. Its `setting`, `slope` and `manning_n` are the assumptions of the indicative flood velocity the card works out (`flood-velocity.js`); blank uses the defaults. The station's `aep_levels` list. |
+| `meganet.station_frequency` | A station's RX/TX frequency pairs beyond a repeater's own (`0033`): `rx_mhz`, `tx_mhz`, what the channel is for, its ACMA licence. `meganet.repeater.rx_mhz`/`tx_mhz` stays the primary pair — it is what every path tool reads — and a base station, which has no repeater row, keeps all its pairs here. The station's `frequencies` list. |
 
 Everything is readable by `anon` **except `meganet.reading_raw` and the whole
 inspection domain — bar the numbers, which `0023` publishes as views**. `reading_raw` holds whatever a device or an adapter actually
@@ -1243,6 +1245,65 @@ psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_bureau_station_lists.sq
 grants, the vocabularies against the Bureau's own, `save_station()`'s three
 cases (absent, empty, rows), its refusals, and the loader's sync and its
 `document_managed` guard.
+
+## AEP flood levels and frequencies
+
+`0033`. Two more lists on a station, on `0031`'s terms exactly: a table hanging
+off `meganet.station`, keyed `(station_id, ord)`, `numeric` for every figure, a
+list in the document absent when empty, and a `save_station()` that leaves a
+list the document does not mention alone.
+
+**`aep_levels`** comes from two workbooks in `archive/aep-levels/` —
+`QLD_AEP_Levels_1.xlsx` and `NSW_AEP_Levels_1.xlsx`, supplied 26/09/2026 — which
+give ~985 flood warning stations' ground heights and modelled water levels in
+the 1%, 0.5%, 0.2% and 0.066% AEP floods, with the sheets' own scores.
+`tools/ingest/aep_levels.py` reads them into `data/aep-levels.json` and works
+out a water surface slope between same-stream neighbours. They are a model's
+figures, and everything that shows them says *indicative*.
+
+The station card turns them into an **indicative peak flood velocity**
+(`flood-velocity.js`, Manning's equation with the depth as the hydraulic
+radius, held to critical flow): in the channel over the gauge zero and on the
+floodplain over the sheet's ground, both until somebody records which the
+station is. That `setting`, the `slope` and the roughness (`manning_n`) are
+columns of the AEP row because they are assumptions of this estimate; blank
+uses the defaults, and the card says which it used.
+
+```sh
+python3 tools/ingest/aep_levels.py --check    # CI
+python3 tools/ingest/aep_levels.py --report   # what came out, in prose
+python3 tools/ingest/aep_levels.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+It attaches by `bureau_key()`, or for the eleven QLD rows with no station number
+by position (the nearest live station within ~60 m, said so on the row), and
+only where the station has no row from that sheet yet. Then refresh
+`stations.json` (`tools/snapshot_stations_json.py`).
+
+| As loaded | Rows | Stations |
+| --- | --- | --- |
+| AEP rows — QLD sheet (every one of its 528 stations) | 528 | 528 |
+| AEP rows — NSW sheet (173 of its 457) | 173 | 173 |
+| …with at least one level (QLD 417, NSW 121) | 538 | 538 |
+| …with a same-stream slope (QLD 171, NSW 65) | 236 | 236 |
+
+Five of them are more than a kilometre from MegaNet's own position for the
+station, one (532150, which the sheet itself comments "Incorrect Coordinates")
+by 315 km; the levels are for the sheet's point, and the card says so.
+
+**`frequencies`** is every RX/TX pair a station uses beyond a repeater's own —
+`meganet.repeater.rx_mhz`/`tx_mhz` stays where it is, as the primary pair every
+path, fade, backbone and ACMA tool reads — and all of a base station's. Nothing
+is loaded: they arrive through the editor.
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_aep_levels_and_frequencies.sql
+```
+
+23 checks, in a transaction that rolls back: both tables, RLS and grants,
+`save_station()`'s three cases (absent, empty, rows) for both lists, its
+refusals, and the loader's sync.
 
 ## Checking it from outside
 

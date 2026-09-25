@@ -12,7 +12,7 @@
     "toplevel": "node toplevel.mjs",
     "registry": "node registry.mjs",
     "concat": "node concat-verify.mjs",
-    "all": "npm run check && npm run names && npm run toplevel && npm run steps && npm run hfem && npm run itm && npm run logger && npm run smoke && npm run registry && npm run nav && npm run shell && npm run tabs && npm run rivers && npm run roads && npm run survey && npm run mapctl && npm run elviscov && npm run elvis && npm run elvisprofile && npm run catchments && npm run sls && npm run riverdetails && npm run help && npm run insp && npm run maint && npm run history && npm run movepin && npm run stationscard && npm run stncard && npm run search && npm run linkbudget && npm run pathcover && npm run pathcursor && npm run claim && npm run fieldkind && npm run fieldprobe && npm run gate && npm run dbproxy && npm run mapfade && npm run maplinks && npm run dock && npm run drawkml && npm run terrain && npm run sites && npm run map3d && npm run adnav && npm run adqual",
+    "all": "npm run check && npm run names && npm run toplevel && npm run steps && npm run hfem && npm run itm && npm run logger && npm run smoke && npm run registry && npm run nav && npm run shell && npm run tabs && npm run rivers && npm run roads && npm run survey && npm run mapctl && npm run elviscov && npm run elvis && npm run elvisprofile && npm run catchments && npm run sls && npm run riverdetails && npm run floodlevels && npm run frequencies && npm run help && npm run insp && npm run maint && npm run history && npm run movepin && npm run stationscard && npm run stncard && npm run search && npm run linkbudget && npm run pathcover && npm run pathcursor && npm run claim && npm run fieldkind && npm run fieldprobe && npm run gate && npm run dbproxy && npm run mapfade && npm run maplinks && npm run dock && npm run drawkml && npm run terrain && npm run sites && npm run map3d && npm run adnav && npm run adqual",
     "rivers": "node rivers.mjs",
     "roads": "node roads.mjs",
     "survey": "node survey.mjs",
@@ -52,6 +52,8 @@
     "catchments": "node catchments.mjs",
     "sls": "node sls.mjs",
     "riverdetails": "node river-details.mjs",
+    "floodlevels": "node flood-levels.mjs",
+    "frequencies": "node frequencies.mjs",
     "elviscov": "node elviscov.mjs",
     "elvis": "node elvis.mjs",
     "elvisprofile": "node elvisprofile.mjs"

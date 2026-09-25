@@ -536,10 +536,26 @@ const HELP = {
       + '<abbr title="Adopted Middle Thread Distance">AMTD</abbr> — kilometres along the stream '
       + 'from its mouth up to the gauge — and the catchment area; and, under <em>Flood '
       + 'effects</em>, what each height on the gauge means on the ground. It shows what holds '
-      + 'now; earlier editions and earlier gauge levels are under <em>Earlier</em>. In the '
+      + 'now, dated by the <em>Hdb snapshot</em> line under its heading, with minor, moderate '
+      + 'and major a line each in green, yellow and red; earlier editions and earlier gauge '
+      + 'levels are under <em>Earlier</em>. In the '
       + 'details card the same fields and lists are editable — one line per row, opened to '
       + 'edit, <strong>+ Add</strong> for the next edition, crossing, re-levelling or effect — '
       + 'and saved with the station.',
+      'A station in the Queensland or New South Wales <strong>AEP flood level</strong> sheets has a '
+      + '<strong>Flood levels (AEP)</strong> section too: the modelled water level in the 1%, '
+      + '0.5%, 0.2% and 0.066% <abbr title="annual exceedance probability">AEP</abbr> floods '
+      + '(about 1 in 100 to 1 in 1,500 years), the ground they stand over and the sheet\'s own '
+      + 'confidence — all flagged <em>indicative</em>, because a model is talking. From them '
+      + 'comes the <strong>Flood velocity</strong> line beside the wind region: an estimate by '
+      + 'Manning\'s equation, in the channel and on the floodplain until somebody records which '
+      + 'the station is, with its slope, roughness and depths under <em>How the velocity is '
+      + 'worked out</em>. The setting, slope and roughness are editable on the AEP row in the '
+      + 'details card.',
+      'Repeaters and base stations carry <strong>Frequencies</strong>: the repeater\'s own RX/TX '
+      + 'pair is the primary — the one the path, fade and ACMA tools use — and <strong>+ Add '
+      + 'frequency</strong> in the details card adds a row for every other channel, with its use '
+      + 'and ACMA licence. The card lists them a line each.',
       'The 🗺️ <strong>Map display</strong> panel starts with the <strong>base maps</strong>: tick '
       + 'more than one and give each its own opacity to blend them — Satellite at 40% over '
       + 'OSM-Topo puts the contours on the real ground — and each is drawn over the ones listed '
@@ -1775,7 +1791,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 32;
+const DB_SCHEMA_VERSION = 33;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

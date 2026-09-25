@@ -105,6 +105,10 @@ const TEXT_PAIRS = [
   ['--warn', '--bg'], ['--warn', '--panel'],
   ['--role-field', '--panel'], ['--role-repeater', '--panel'],
   ['--role-base', '--panel'], ['--role-satcom', '--panel'],
+  // The flood classes on the station card, written in their colours on the
+  // card's own ground — green, yellow, red, and the yellow is the one that
+  // would fail if it were the yellow people picture.
+  ['--flood-minor', '--panel'], ['--flood-moderate', '--panel'], ['--flood-major', '--panel'],
   ['--hit-text', '--hit-bg'],
   ['--primary-text', '--primary'],
   // The river-note buttons (#150 A4): river-blue text on the panel they sit

@@ -4,13 +4,18 @@
 //                  about a station — which of its indexes list it, its AWRC
 //                  number, stream and URBS label, its flood classification
 //                  levels, the crossing its gauge is read against, the survey of
-//                  the gauge itself and what each height on it means — read-only
-//                  on the station card for anybody, and as three fields and five
-//                  editable lists in the station editor for an editor.
+//                  the gauge itself and what each height on it means — and the
+//                  modelled AEP flood levels at it (0033), with the indicative
+//                  flood velocity flood-velocity.js works out from them:
+//                  read-only on the station card for anybody, and as three
+//                  fields and six editable lists in the station editor for an
+//                  editor.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for esc and escAttr. Two files reach into this one:
-// app.js, whose stnCardHtml() places cardHtml(), and station-editor.js, whose
+// Reaches back to core.js for esc, escAttr and acmaHaversineKm, and across to
+// flood-velocity.js for FloodVelocity. Two files reach into this one: app.js,
+// whose stnCardHtml() places cardHtml(), aepCardHtml() and velocityRowHtml(),
+// and station-editor.js, whose
 // editorForm() places editorHtml() and whose editorReadForm()/editorSave() call
 // readForm() and formProblem(). The IIFE body declares and calls nothing, so
 // this file's position among the modules is free (`npm run toplevel`).
@@ -25,6 +30,11 @@
 // `flood_effects` — and three fields, `awrc_number`, `stream` and `urbs_label`,
 // so the card reads them off the record it already holds, and a station that is
 // in none of the Bureau's lists has none of the keys.
+//
+// The sixth list, `aep_levels`, is not the Bureau's: two workbooks of modelled
+// flood levels at flood warning stations in Queensland and New South Wales,
+// read by tools/ingest/aep_levels.py out of archive/aep-levels/ (0033). Its own
+// section on the card, flagged indicative, because it is a model talking.
 //
 // ── Which row is "the" answer ────────────────────────────────────────────────
 // Every list is a history. The 2014 flood classifications sit beside the 2026
@@ -166,8 +176,49 @@ const RiverDetails = (function () {
         { key: 'note',     label: 'Note',       kind: 'text', wide: true },
       ],
     },
+    // The AEP flood levels (0033). Setting, slope and Manning n are the
+    // velocity's assumptions (flood-velocity.js); `content` is what makes a row a
+    // row, the same list 0033's check constraint names — a row with only a
+    // source, a position or the sheet's scores is a blank line.
+    aep_levels: {
+      title: 'AEP flood levels',
+      one: 'AEP flood level row',
+      hint: 'The modelled water level at the station in four floods, in metres AHD — indicative, '
+          + 'not observed. 1% <abbr title="annual exceedance probability">AEP</abbr> is about a '
+          + '1-in-100 chance in any year; 0.066% about 1 in 1,500. <em>Setting</em>, <em>Manning n</em> '
+          + 'and <em>Slope</em> are what the flood velocity on the station card assumes: blank uses '
+          + 'its defaults, and the card says which it used.',
+      content: ['ground_m', 'aep_1_m', 'aep_0_5_m', 'aep_0_2_m', 'aep_0_066_m',
+                'setting', 'slope', 'manning_n', 'note'],
+      fields: [
+        { key: 'as_at',            label: 'As at',              kind: 'date' },
+        { key: 'source',           label: 'Source',             kind: 'text', wide: true },
+        { key: 'aep_1_m',          label: '1% AEP (m AHD)',     kind: 'num' },
+        { key: 'aep_0_5_m',        label: '0.5% AEP (m AHD)',   kind: 'num' },
+        { key: 'aep_0_2_m',        label: '0.2% AEP (m AHD)',   kind: 'num' },
+        { key: 'aep_0_066_m',      label: '0.066% AEP (m AHD)', kind: 'num' },
+        { key: 'ground_m',         label: 'Ground (m AHD)',     kind: 'num' },
+        { key: 'point_lat',        label: 'Latitude',           kind: 'num' },
+        { key: 'point_lon',        label: 'Longitude',          kind: 'num' },
+        { key: 'data_quality',     label: 'Data quality',       kind: 'score', max: 3 },
+        { key: 'level_difference', label: 'Level difference',   kind: 'score', max: 3 },
+        { key: 'confidence',       label: 'Confidence',         kind: 'score', max: 9 },
+        { key: 'setting',          label: 'Setting',            kind: 'setting' },
+        { key: 'manning_n',        label: 'Manning n',          kind: 'num' },
+        { key: 'slope',            label: 'Slope (m/m)',        kind: 'num' },
+        { key: 'slope_basis',      label: 'Slope from',         kind: 'text', wide: true },
+        { key: 'note',             label: 'Note',               kind: 'text', wide: true },
+      ],
+    },
   };
   const LIST_KEYS = Object.keys(LISTS);
+  // The kinds a row reads back as a number.
+  const NUMERIC = new Set(['num', 'score']);
+  const SETTING_OPTIONS = [
+    { code: 'channel',    label: 'in the channel' },
+    { code: 'floodplain', label: 'on the floodplain' },
+  ];
+
 
   // ── Reading a record ──────────────────────────────────────────────────────
 
@@ -247,6 +298,41 @@ const RiverDetails = (function () {
     return 'undated';
   }
 
+  // The three levels that decide a warning, in the order they are reached, and
+  // the colour each is written in on the card: green, yellow, red. The colours
+  // are tokens (--flood-minor/-moderate/-major, styles.css) so the dark theme
+  // can lift them, and the light theme's yellow is a dark one — pure yellow on
+  // a white card is 1.07:1 and cannot be read.
+  const CLASS_LEVELS = [
+    { key: 'minor_m',    label: 'Minor',    cls: 'rhs-minor' },
+    { key: 'moderate_m', label: 'Moderate', cls: 'rhs-moderate' },
+    { key: 'major_m',    label: 'Major',    cls: 'rhs-major' },
+  ];
+
+  // When the lists on the card were taken from the Bureau's hydrological
+  // database, as the operator dates it — said under the section's heading.
+  const SNAPSHOT = 'Hdb snapshot 26/9/26';
+
+  // The newest edition's three levels, one to a line and each in its colour,
+  // the way the AlertID block lists addresses — a level is looked for by name,
+  // and three on one line had to be read left to right to find the one wanted.
+  function classesBlock(r) {
+    const asAt = r.as_at ? ` <span class="mn-pop-note">as at ${esc(date(r.as_at))}</span>` : '';
+    const lines = CLASS_LEVELS.filter(c => r[c.key] != null).map(c =>
+      `<span class="mn-pop-line mn-pop-indent ${c.cls}">${c.label} ${esc(height(r[c.key], 1))}</span>`);
+    if (!lines.length && !asAt) return '';
+    return `<div class="stn-card-ids stn-card-rhs-classes"><span class="small txt-muted">Flood classes</span>${asAt}<br>${
+      lines.length ? lines.join('<br>') : '<span class="mn-pop-line mn-pop-indent mn-pop-note">none stated</span>'}</div>`;
+  }
+
+  // The same three inline, for an earlier edition's one line: coloured, but
+  // not given a line each — that would make "Earlier" longer than "now".
+  function classesInline(r) {
+    const parts = CLASS_LEVELS.filter(c => r[c.key] != null).map(c =>
+      `<span class="${c.cls}">${c.label.toLowerCase()} ${esc(fig(r[c.key], 1))}</span>`);
+    return parts.length ? `${parts.join(' · ')} m` : '';
+  }
+
   // "minor 2.4 · moderate 3.4 · major 4.1 m" — the three that decide a
   // warning, in the order they are reached.
   function classesText(r) {
@@ -272,9 +358,17 @@ const RiverDetails = (function () {
 
   // ── The card ──────────────────────────────────────────────────────────────
 
+  // The Bureau's lists — everything but the AEP levels, which are a model's
+  // and have a section of their own.
+  const BUREAU_KEYS = LIST_KEYS.filter(k => k !== 'aep_levels');
+
   function has(s) {
-    return !!s && (LIST_KEYS.some(k => Array.isArray(s[k]) && s[k].length)
+    return !!s && (BUREAU_KEYS.some(k => Array.isArray(s[k]) && s[k].length)
                    || FIELDS.some(f => s[f.key]));
+  }
+
+  function hasAep(s) {
+    return !!s && Array.isArray(s.aep_levels) && s.aep_levels.length > 0;
   }
 
   // "Bridge  Pacific Highway Bridge" — the effect, and under it in the page's
@@ -327,9 +421,7 @@ const RiverDetails = (function () {
       'The station’s node in the Bureau’s URBS runoff-routing model'));
 
     if (flood) {
-      const asAt = flood.as_at ? ` <span class="mn-pop-note">as at ${esc(date(flood.as_at))}</span>` : '';
-      const cls = classesText(flood);
-      rows.push(row('Flood classes', cls ? esc(cls) + asAt : asAt ? `<span class="mn-pop-note">none stated</span>${asAt}` : ''));
+      rows.push(classesBlock(flood));
       rows.push(row('First report', esc(height(flood.first_report_m, 1)),
         'The height at which the gauge is first reported to the Bureau'));
       rows.push(row('Crops & grazing', esc(height(flood.crops_grazing_m, 1))));
@@ -371,14 +463,15 @@ const RiverDetails = (function () {
         `listed${l.as_at ? ` <span class="mn-pop-note">as at ${esc(date(l.as_at))}</span>` : ''}`));
     }
     for (const f of floods.slice(1)) {
-      const bits = [classesText(f)];
+      const bits = [];
       if (f.first_report_m != null)  bits.push(`first report ${fig(f.first_report_m, 1)} m`);
       if (f.crops_grazing_m != null) bits.push(`crops & grazing ${fig(f.crops_grazing_m, 1)} m`);
       if (f.towns_m != null)         bits.push(`towns ${fig(f.towns_m, 1)} m`);
       if (f.crossing_height_m != null || f.crossing_type) {
         bits.push(`crossing ${crossingText({ height_m: f.crossing_height_m, crossing_type: f.crossing_type })}`);
       }
-      earlier.push(row(f.as_at ? date(f.as_at) : 'Undated', esc(bits.filter(Boolean).join('; ') || f.note || '—')));
+      const text = [classesInline(f), ...bits.map(esc)].filter(Boolean).join('; ');
+      earlier.push(row(f.as_at ? date(f.as_at) : 'Undated', text || esc(f.note || '—')));
     }
     for (const z of newestFirst(surveys.filter(r => r !== zero), 'valid_from')) {
       earlier.push(row('Gauge zero', `${zeroText(z) || '—'} <span class="mn-pop-note">${esc(periodText(z))}</span>`));
@@ -413,11 +506,166 @@ const RiverDetails = (function () {
       <div class="acma-sect stn-card-rhs">
         <span class="small txt-muted stn-card-rhs-head"
               title="Queensland Flood Warning River Height Stations (Bureau of Meteorology), Sections 1–6 and 9 and the URBS details, as recorded on this station">Bureau flood warning details</span>
+        <span class="stn-card-rhs-snap mn-pop-note">${esc(SNAPSHOT)}</span>
         ${rows.join('')}
         ${effectsHtml}
         ${earlier.length ? `<details class="stn-card-rhs-earlier">
           <summary class="small">Earlier — ${earlier.length} record${earlier.length === 1 ? '' : 's'}</summary>
           ${earlier.join('')}
+        </details>` : ''}
+      </div>`;
+  }
+
+  // ── The AEP flood levels and the flood velocity (0033) ────────────────────
+
+  const oneIn = n => `about a 1-in-${n.toLocaleString('en-AU')} chance in any year`;
+
+  // "≈ 2.4 m/s channel · 1.1 floodplain": one figure per setting worked out,
+  // each the fastest of its levels.
+  function velocityText(est) {
+    if (est.settings.every(t => !(t.max.v > 0))) return '';
+    if (est.settings.length === 1) return `≈ ${FloodVelocity.speed(est.settings[0].max.v)} m/s`;
+    return est.settings.map((t, i) => `${i ? '' : '≈ '}${FloodVelocity.speed(t.max.v)}${i ? '' : ' m/s'} ${t.short}`)
+      .join(' · ');
+  }
+
+  // The same figure as plain text, for the read-only box beside the wind region
+  // in the station editor.
+  function velocitySummary(s) {
+    const est = FloodVelocity.estimate(s);
+    if (!est) return hasAep(s) ? 'not estimated — no level over the ground' : 'not estimated — no AEP levels';
+    const text = velocityText(est) || 'none — no depth';
+    return `${text}${est.recorded ? ` (${est.recorded})` : ''} — indicative`;
+  }
+
+  // The flood velocity line for the top of the station card, beside the wind
+  // region: the other environmental load on a site's structures, and flagged
+  // the same way. Empty where there is nothing to work from.
+  function velocityRowHtml(s) {
+    const est = FloodVelocity.estimate(s);
+    if (!est) return '';
+    const text = velocityText(est);
+    const rarest = est.settings[0].max;
+    const title = text
+      ? `Estimated peak flood velocity at the station in the rarest flood the AEP sheet gives a level for `
+        + `(${rarest.label} AEP, ${oneIn(rarest.oneIn)}), by Manning’s equation. `
+        + (est.recorded ? `The station is recorded as ${est.recorded === 'channel' ? 'in the channel' : 'on the floodplain'}. `
+                        : 'Nobody has said whether the station is in the channel or on the floodplain, so both are given. ')
+        + 'The workings are under “Flood levels (AEP)” below.'
+      : 'Every AEP level the sheet gives is at or below the ground, so there is no flow to estimate.';
+    const note = est.recorded ? `${est.recorded} · indicative` : 'indicative';
+    const fast = est.settings.some(t => t.fast)
+      ? ` <span class="txt-warn" title="Above ${FloodVelocity.FAST} m/s — faster than most measured floods. Check the slope and the depth under “Flood levels (AEP)”.">⚠</span>` : '';
+    return `<div class="acma-row stn-card-vel"><span>Flood velocity</span><span title="${escAttr(title)}">${
+      text ? esc(text) : '<span class="mn-pop-note">none — no depth</span>'}${fast} <span class="mn-pop-note">${esc(note)}</span></span></div>`;
+  }
+
+  // A line per flood, the ones the sheet gives no level for included: that it
+  // gives none is itself something the sheet says.
+  function levelRows(a) {
+    const ground = a.ground_m != null ? Number(a.ground_m) : null;
+    return FloodVelocity.LEVELS.map(l => {
+      if (a[l.key] == null) {
+        return row(`${l.label} AEP`, '<span class="mn-pop-note">no level given</span>',
+          `${oneIn(l.oneIn)}. The sheet gives no level here — the modelled flood may not reach the point in this event, or the point may be outside the model.`);
+      }
+      const over = ground != null ? Number(a[l.key]) - ground : null;
+      return row(`${l.label} AEP`,
+        `${esc(`${fig(a[l.key], 2)} m AHD`)}${over != null
+          ? ` <span class="mn-pop-note">${esc(over.toFixed(1))} m over the ground</span>` : ''}`,
+        oneIn(l.oneIn));
+    }).join('');
+  }
+
+  // One line per setting worked out, the rarest flood's figure first and the
+  // 1% flood's after it when the two differ.
+  function velocityBlock(est) {
+    const lines = est.settings.map(t => {
+      const first = t.levels[0];
+      const tail = t.max !== first && first.v > 0
+        ? `, ${FloodVelocity.speed(first.v)} at ${first.label}` : '';
+      const fast = t.fast ? ' <span class="txt-warn">— above 5 m/s: check the slope and depth</span>' : '';
+      const name = t.key === 'channel' ? 'Channel' : 'Floodplain';
+      return `<span class="mn-pop-line mn-pop-indent">${name}${est.recorded ? ' (recorded)' : ''}: `
+        + `≈ ${esc(FloodVelocity.speed(t.max.v))} m/s at ${esc(t.max.label)} AEP${esc(tail)}${fast}</span>`;
+    });
+    return `<div class="stn-card-ids stn-card-aep-vel"><span class="small txt-muted">Flood velocity</span>`
+      + ` <span class="mn-pop-note">indicative</span><br>${lines.join('<br>')}</div>`;
+  }
+
+  // The workings, as sentences rather than label/value rows: they are read,
+  // not scanned, and a right-aligned paragraph is hard to read.
+  function workings(est) {
+    const sl = est.slope;
+    const bounded = sl.bounded
+      ? ` — read as ${FloodVelocity.slopeRatio(sl.used)}, the ${sl.used === FloodVelocity.SLOPE_MIN ? 'flattest' : 'steepest'} this uses`
+      : '';
+    const line = (label, html) => `<p class="stn-card-aep-line"><span class="txt-muted">${esc(label)}</span> ${html}</p>`;
+    const lines = [
+      line('Method', esc('Manning’s equation, V = (1/n)·R^⅔·S^½, with R taken as the depth (a flood wide against its depth), '
+        + 'and V held to critical flow.')),
+      line('Slope', `${esc(FloodVelocity.slopeRatio(sl.raw))}${sl.source === 'default' ? ' (assumed)' : ''} — ${esc(sl.basis + bounded)}.`),
+    ];
+    for (const t of est.settings) {
+      const ds = t.levels.map(l => Math.max(0, l.depth));
+      const lo = Math.min(...ds), hi = Math.max(...ds);
+      const depth = lo.toFixed(1) === hi.toFixed(1) ? `${hi.toFixed(1)} m` : `${lo.toFixed(1)}–${hi.toFixed(1)} m`;
+      lines.push(line(t.key === 'channel' ? 'Channel' : 'Floodplain',
+        esc(`n ${t.n.toFixed(3)}${t.nSource === 'entered' ? ' (entered)' : ''}; bed ${fig(t.bed, 2)} m AHD, `
+          + `${t.bedBasis}; ${depth} deep across the levels given.`)
+        + (t.levels.some(l => l.capped) ? ' Held to critical flow.' : '')));
+    }
+    if (est.storage) {
+      lines.push(line('Storage', 'A dam or headwater gauge: its gauge zero is not taken as a bed, and water a structure holds has little velocity to speak of.'));
+    }
+    if (!est.recorded) {
+      lines.push(line('Setting', 'Not recorded, so both are given. Set it on the AEP row in the station editor to keep one.'));
+    }
+    return `<details class="stn-card-rhs-earlier stn-card-aep-how">
+          <summary class="small">How the velocity is worked out</summary>
+          ${lines.join('')}
+        </details>`;
+  }
+
+  // The section on the station card: the newest AEP row's levels, the ground
+  // they are measured over, the sheet's own confidence, and the velocity with
+  // its workings behind a disclosure. Empty for a station neither sheet names.
+  function aepCardHtml(s) {
+    if (!hasAep(s)) return '';
+    const a = FloodVelocity.pickRow(s);
+    const est = FloodVelocity.estimate(s);
+    const rows = [levelRows(a)];
+    rows.push(row('Ground', a.ground_m != null
+      ? `${esc(`${fig(a.ground_m, 2)} m AHD`)} <span class="mn-pop-note">the sheet’s, at its point</span>` : '',
+      'Elevation (mAHD) as the sheet gives it: the ground the levels are measured over'));
+    if (a.confidence != null) {
+      const parts = [];
+      if (a.data_quality != null) parts.push(`data quality ${a.data_quality} of 3`);
+      if (a.level_difference != null) parts.push(`level difference ${a.level_difference} of 3`);
+      rows.push(row('Confidence', `${esc(`${a.confidence} of 9`)}${parts.length
+        ? ` <span class="mn-pop-note">${esc(parts.join(', '))}</span>` : ''}`,
+        'The sheet’s own 1% AEP confidence score: its data source quality times its water level difference score. Higher is better.'));
+    }
+    if (a.point_lat != null && a.point_lon != null && s.lat != null && s.lon != null) {
+      const km = acmaHaversineKm(Number(s.lat), Number(s.lon), Number(a.point_lat), Number(a.point_lon));
+      if (km > 0.25) {
+        rows.push(row('Position', `<span class="txt-warn">${esc(`The sheet places this station ${km < 10 ? km.toFixed(1) : Math.round(km)} km from its position here`)}</span>`
+          + ' <span class="mn-pop-note">— the levels are for the sheet’s point</span>'));
+      }
+    }
+    if (a.note) rows.push(row('Note', esc(a.note)));
+    const others = (s.aep_levels || []).filter(r => r !== a);
+    const src = [a.source, a.as_at ? `supplied ${date(a.as_at)}` : ''].filter(Boolean).join(', ');
+    return `
+      <div class="acma-sect stn-card-aep">
+        <span class="small txt-muted stn-card-rhs-head"
+              title="Modelled water levels at the station in the 1%, 0.5%, 0.2% and 0.066% annual exceedance probability floods, in metres AHD">Flood levels (AEP)</span>
+        <span class="stn-card-rhs-snap mn-pop-note">Modelled — indicative${src ? ` · ${esc(src)}` : ''}</span>
+        ${rows.join('')}
+        ${est ? velocityBlock(est) + workings(est) : ''}
+        ${others.length ? `<details class="stn-card-rhs-earlier">
+          <summary class="small">Other sheets — ${others.length}</summary>
+          ${others.map(r => row(r.as_at ? date(r.as_at) : 'Undated', esc(summaryText('aep_levels', r)))).join('')}
         </details>` : ''}
       </div>`;
   }
@@ -446,6 +694,13 @@ const RiverDetails = (function () {
     if (f.kind === 'index') {
       return `<select data-f="${f.key}">${options(BUREAU_INDEXES, val, '— pick one —')}</select>`;
     }
+    if (f.kind === 'setting') {
+      return `<select data-f="${f.key}">${options(SETTING_OPTIONS, val, '— not said: both —')}</select>`;
+    }
+    if (f.kind === 'score') {
+      const scores = Array.from({ length: f.max }, (_, i) => ({ code: String(i + 1), label: `of ${f.max}` }));
+      return `<select data-f="${f.key}">${options(scores, val, '— none —')}</select>`;
+    }
     if (f.kind === 'date') {
       return `<input type="date" data-f="${f.key}" value="${escAttr(val)}">`;
     }
@@ -468,6 +723,14 @@ const RiverDetails = (function () {
     }
     if (list === 'crossings') {
       return crossingText(r) || r.note || 'New crossing — nothing entered yet';
+    }
+    if (list === 'aep_levels') {
+      const lv = FloodVelocity.LEVELS.filter(l => r[l.key] != null);
+      const what = lv.length
+        ? `${lv.map(l => `${l.label} ${fig(r[l.key], 2)}`).join(' · ')} m AHD`
+        : (r.ground_m != null ? 'no level given' : '');
+      const bits = [what, r.setting ? `setting: ${r.setting}` : ''].filter(Boolean).join('; ');
+      return `${r.as_at ? date(r.as_at) : 'Undated'} — ${bits || r.note || 'nothing entered yet'}`;
     }
     if (list === 'bureau_listings') {
       if (!r.section && !r.as_at && !r.note) return 'New listing — nothing entered yet';
@@ -524,8 +787,9 @@ const RiverDetails = (function () {
       <hr>
       <h4 class="ef-h">Bureau flood warning details</h4>
       <p class="small ef-block">
-        What the Bureau’s Queensland flood warning station lists say about this station, and
-        anything added since. Blank means not recorded. Saved with the station.
+        What the Bureau’s Queensland flood warning station lists say about this station, the
+        modelled AEP flood levels at it, and anything added since. Blank means not recorded.
+        Saved with the station.
       </p>
       <div class="form-grid rhs-station-fields">
         ${[...FIELDS].sort((a, b) => (a.key === 'stream') - (b.key === 'stream')).map(f =>
@@ -584,7 +848,7 @@ const RiverDetails = (function () {
       const c = el.querySelector(`[data-f="${f.key}"]`);
       const raw = c ? String(c.value).trim() : '';
       if (raw === '') continue;
-      out[f.key] = f.kind === 'num' ? Number(raw) : raw;
+      out[f.key] = NUMERIC.has(f.kind) ? Number(raw) : raw;
     }
     return out;
   }
@@ -597,10 +861,12 @@ const RiverDetails = (function () {
       for (const f of LISTS[list].fields) {
         const v = r[f.key];
         if (v == null || String(v).trim() === '') continue;
-        out[f.key] = f.kind === 'num' ? Number(v) : String(v).trim();
+        out[f.key] = NUMERIC.has(f.kind) ? Number(v) : String(v).trim();
       }
       return out;
-    }).filter(r => Object.keys(r).some(k => !['as_at', 'valid_from', 'valid_to'].includes(k)));
+    }).filter(r => Object.keys(r).some(k => LISTS[list].content
+      ? LISTS[list].content.includes(k)
+      : !['as_at', 'valid_from', 'valid_to'].includes(k)));
   }
 
   // The lists the form has changed, keyed as the document keys them. A list
@@ -660,7 +926,11 @@ const RiverDetails = (function () {
     FIELD_KEYS: FIELDS.map(f => f.key),
     LIST_KEYS,
     has,
+    hasAep,
     cardHtml,
+    aepCardHtml,
+    velocityRowHtml,
+    velocitySummary,
     editorHtml,
     addRow,
     removeRow,

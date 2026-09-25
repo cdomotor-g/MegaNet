@@ -56,6 +56,10 @@ on:
       # derived-file rule, one document further on.
       - 'archive/river-height-stations/**'
       - 'data/river-height-stations.json'
+      # …and the AEP flood level sheets (0032), read by tools/ingest/
+      # aep_levels.py, whose slopes also read the file above.
+      - 'archive/aep-levels/**'
+      - 'data/aep-levels.json'
       # The base station program and the migration that gives its readings a
       # station are one contract across two files, and `npm run logger` is the
       # only thing holding them together — so a push touching either has to run
@@ -105,6 +109,10 @@ on:
       # derived-file rule, one document further on.
       - 'archive/river-height-stations/**'
       - 'data/river-height-stations.json'
+      # …and the AEP flood level sheets (0032), read by tools/ingest/
+      # aep_levels.py, whose slopes also read the file above.
+      - 'archive/aep-levels/**'
+      - 'data/aep-levels.json'
       # The base station program and the migration that gives its readings a
       # station are one contract across two files, and `npm run logger` is the
       # only thing holding them together — so a push touching either has to run
@@ -476,6 +484,21 @@ jobs:
         working-directory: test
         run: npm run riverdetails
 
+      # The AEP flood levels (0032) and the indicative flood velocity worked out
+      # from them. The arithmetic is checked against hand-worked figures off
+      # the page, and the card's velocity against the module's own — the two
+      # places a number could quietly be wrong without anything looking broken.
+      - name: AEP flood levels — indicative levels on the card, a velocity that is the arithmetic's
+        working-directory: test
+        run: npm run floodlevels
+
+      # A station's RX/TX pairs beyond a repeater's own (0032): the primary pair
+      # stays where every path tool reads it, and a save sends exactly the rows
+      # that were typed.
+      - name: Frequencies — rows on repeaters and base stations, a save sends what was typed
+        working-directory: test
+        run: npm run frequencies
+
       - name: Claim an address from the message that arrived on it
         working-directory: test
         run: npm run claim
@@ -685,6 +708,12 @@ jobs:
       - name: River height station lists — the extraction still matches the reports
         run: python3 tools/ingest/river_height_stations.py --check
 
+      # The AEP flood level sheets (0032), on the same footing: data/aep-levels
+      # .json is read out of two workbooks in archive/ and carries a slope
+      # worked out between stations, which is the part worth re-running.
+      - name: AEP flood levels — the extraction still matches the sheets
+        run: python3 tools/ingest/aep_levels.py --check
+
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —
 # as a per-push gate it would train everyone to re-record the baseline without
@@ -775,4 +804,12 @@ jobs:
       - name: The Bureau lists' SQL still fits the schema
         run: |
           { echo 'begin;'; python3 tools/ingest/river_height_stations.py --sql; echo 'rollback;'; } \
+            | psql -v ON_ERROR_STOP=1 -q
+      - name: check_aep_levels_and_frequencies.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_aep_levels_and_frequencies.sql
+      # …and the same for the AEP sheets' SQL (0033): it attaches rows by
+      # number and by position into columns only it and the editor write.
+      - name: The AEP levels' SQL still fits the schema
+        run: |
+          { echo 'begin;'; python3 tools/ingest/aep_levels.py --sql; echo 'rollback;'; } \
             | psql -v ON_ERROR_STOP=1 -q

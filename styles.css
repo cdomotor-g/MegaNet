@@ -158,6 +158,14 @@
      a warning line outside a panel actually sits. 4.82:1 on --bg now, 5.18:1
      on --panel. The other three status colours already cleared both. */
   --warn: #9e5e00;
+  /* The three flood classes on the station card (river-details.js): green,
+     yellow, red, as the classes are coloured on a flood warning. Tokens of
+     their own rather than --ok/--warn/--bad because they are a legend, not a
+     status — minor is not "fine". The yellow is a dark one on purpose: pure
+     yellow on a white card is 1.07:1, and this is 5.22:1 on --panel. */
+  --flood-minor:    #107c10;
+  --flood-moderate: #806b00;
+  --flood-major:    #b3261e;
   /* Side nav: expanded, and collapsed to an icon rail. The expanded width is
      set by the longest label, "Interference Workbench" — a nav that ellipsises
      its own tab names is worse than a wider one. */
@@ -503,6 +511,9 @@
   --ok:   #3ecf8e;
   --bad:  #ff6b6b;
   --warn: #ffb347;
+  --flood-minor:    #57d657;
+  --flood-moderate: #ffd84d;
+  --flood-major:    #ff6b6b;
   /* A pale wash disappears on a dark panel, so the hit goes the other way:
      deep amber block, light text, and the glow doing most of the work. */
   --hit-bg:   #7a5200;
@@ -2389,6 +2400,27 @@ h2.h-bad {
 
 .sensor-row .sensor-flip[disabled]:hover { text-decoration: none; }
 
+/* A frequency pair in the station editor (0033): the sensor row's grammar —
+   one wrapping line of boxes, the two frequencies short and fixed, the use
+   taking what is left — for the same reason it wraps: at 375 px the fixed half
+   alone is wider than the form. The primary row is the repeater's own pair and
+   says so where the use box would be. */
+.freq-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  align-items: flex-end;
+  margin-bottom: var(--sp-2);
+}
+.freq-row .freq-f { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.freq-row .freq-f > span { color: var(--muted); }
+.freq-row .freq-f > input { width: 100%; }
+.freq-row .freq-mhz { flex: 0 0 7.5rem; }
+.freq-row .freq-use { flex: 1 1 8rem; }
+.freq-row .freq-lic { flex: 0 1 8rem; }
+.freq-row .freq-del { flex: 0 0 auto; padding: .2rem .55rem; line-height: 1; margin-bottom: 2px; }
+.freq-row .freq-tag { flex: 1 1 8rem; color: var(--muted); align-self: center; }
+
 /* One row of the river height station lists in the editor (0031): a flood
    classification, a crossing or a gauge survey. A disclosure, so a station's
    rows read as one line each — what the row holds — until one is opened to be
@@ -2870,7 +2902,17 @@ hr {
    one. What no longer holds — an earlier edition, a gauge zero since
    re-levelled — is behind one disclosure at the foot, so the rows above it are
    only ever what holds now. */
-.stn-card-rhs-head { display: block; margin-bottom: .25rem; }
+.stn-card-rhs-head { display: block; }
+/* "Hdb snapshot …" — when the lists were taken, as a caveat under the heading
+   rather than a row: it dates every row below it. */
+.stn-card-rhs-snap { display: block; margin-bottom: .25rem; }
+.stn-card-rhs-classes { margin: .1rem 0 .2rem; }
+/* The velocity's workings under "Flood levels (AEP)" (0033): sentences, left
+   aligned, because they are read rather than scanned. */
+.stn-card-aep-line { margin: .15rem 0; font-size: .8rem; }
+.rhs-minor    { color: var(--flood-minor); }
+.rhs-moderate { color: var(--flood-moderate); }
+.rhs-major    { color: var(--flood-major); }
 .stn-card-rhs-earlier { margin-top: .3rem; }
 .stn-card-rhs-earlier > summary { cursor: pointer; color: var(--muted); }
 .stn-card-rhs-earlier[open] > summary { margin-bottom: .2rem; }
