@@ -118,26 +118,29 @@ try {
   // focus the button, then Enter.
   //
   // The extra step is #164: the note is inside the map-display panel, and that
-  // panel is an icon on the map rather than a block in the sidebar now. So the
-  // keyboard path this check exists to prove is one step longer than it was —
-  // reach the icon, open it, then the buttons are there — and proving the whole
-  // of it is the point. Enter on the icon rather than a class set by script:
-  // the disclosure has to actually work from the keyboard, or the note behind
-  // it is unreachable however real its buttons are.
+  // panel is not a block in the sidebar any more. At this width it is a pane of
+  // the side panel, opened from 🗺️ in the side panel's strip (on a phone, an
+  // icon on the map). So the keyboard path this check exists to prove is one
+  // step longer than it was — reach the button, open it, then the buttons are
+  // there — and proving the whole of it is the point. Enter on the button
+  // rather than a pane opened by script: the disclosure has to actually work
+  // from the keyboard, or the note behind it is unreachable however real its
+  // buttons are.
   await page.evaluate(() => {
-    document.querySelector('.mn-mapctl[data-panel="display"] .mn-mapctl-btn').focus();
+    document.querySelector('#help-panel .dock-tab[data-dock="map-display"]').focus();
   });
   await page.keyboard.press('Enter');
+  await page.waitForTimeout(250);
   const opened = await page.evaluate(() => {
     const wrap = document.querySelector('.mn-mapctl[data-panel="display"]');
-    const btn  = wrap.querySelector('.mn-mapctl-btn');
+    const btn  = document.querySelector('#help-panel .dock-tab[data-dock="map-display"]');
     const body = wrap.querySelector('.mn-mapctl-body');
     return {
       expanded: btn.getAttribute('aria-expanded'),
       visible: !!(body.offsetWidth || body.offsetHeight || body.getClientRects().length),
     };
   });
-  check('Enter on the map-display icon opens its panel and says so',
+  check('Enter on 🗺️ in the side panel\'s strip opens Map display and says so',
     opened.visible && opened.expanded === 'true', JSON.stringify(opened));
 
   await page.evaluate(() => {

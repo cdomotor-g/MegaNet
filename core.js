@@ -236,25 +236,26 @@ const HELP = {
            + 'link budget and the station details, one column that scrolls on its own. Press the '
            + 'button of the pane that is showing and the side panel shuts, giving the map the '
            + 'width; drag its left edge (or focus it and use the arrow keys) to make it wider or '
-           + 'narrower. Pin a map panel with its 📌 — Map display, Draw &amp; measure, the polar '
-           + 'plot, the site finder — and it moves off the map into the side panel with a button of '
-           + 'its own in that strip; unpin it there and it goes back to its icon on the map. ◫ in the '
-           + 'map\'s corner puts the cards back under the map instead, and below 1,100 px they are '
-           + 'under it whatever ◫ says. The <strong>Filters</strong> card drives the map and the list '
+           + 'narrower. The map\'s own controls are in that strip too, under 📋, in groups with a '
+           + 'hairline between them: what the map <em>shows</em> (🗺️ <strong>Map display</strong>, '
+           + 'base maps first, and 🔑 the legend), the tools you point at it (✏️ <strong>Draw &amp; '
+           + 'measure</strong>, 📡 <strong>Polar radio coverage</strong>, <strong>🗼 Repeater site '
+           + 'finder</strong>, <strong>ℹ️ What is here</strong>), the <strong>3-D view</strong> (⛰️, 🎚️ '
+           + 'its settings, and its camera), how much screen the map gets (⛶ and ◫), and the one '
+           + 'that resets it (↺). A panel among them opens as a pane of the side panel, the way 📋 '
+           + 'does; a button does its one thing, and the map\'s top-right corner is left empty. '
+           + '<strong>⛶ Full screen</strong> gives the map the whole window except the side panel, '
+           + 'which stays beside it with the tools in it; Escape brings the page back. ◫ puts the '
+           + 'cards back under the map instead, and below 1,100 px they are under it whatever ◫ '
+           + 'says. On a phone the side panel is only the help drawer, and the controls are on the '
+           + 'map in its top-right corner: a panel there opens when the pointer is on it or it is '
+           + 'tapped, and its 📌 keeps it open. The <strong>Filters</strong> card drives the map and the list '
            + 'at once, and is built from whatever <code>stations.json</code> holds — every option '
            + 'carries the number of stations behind it, and nothing is offered that no station uses. '
            + 'It collapses, and its summary line says what the filters are doing while it is shut. '
            + 'The <strong>Stations</strong> list under it collapses the same way — it is the tallest '
            + 'card there, and shutting it is how the path tools and the editor get onto one screen '
-           + 'together; its summary keeps the live row count and names the selected station. The '
-           + 'map carries its own controls in its top-right corner, in '
-           + 'groups with a hairline between them: what the map <em>shows</em> ('
-           + '🗺️ <strong>Map display</strong>, base maps first, and the legend), the tools you point at it '
-           + '(<strong>Draw &amp; measure</strong>, <strong>Polar radio coverage</strong>, '
-           + '<strong>🗼 Repeater site finder</strong>, '
-           + '<strong>ℹ️ What is here</strong>), the <strong>3-D view</strong> and its camera, '
-           + 'how much screen the map gets (⛶ and ◫), and the one that resets it (↺). The panels '
-           + 'among them open when the pointer is on them and can be pinned open. '
+           + 'together; its summary keeps the live row count and names the selected station. '
            + 'The elevation profile and link budget follow the list; the profile says how to '
            + 'draw a path until there is one. Selecting a '
            + 'station opens <strong>Repeaters listening</strong> between the list and the editor: '
@@ -279,7 +280,7 @@ const HELP = {
            + 'the address out of the box rather than off the saved record, so a row you have '
            + 'retyped sends you to the number on screen.',
     watch: [
-      '<strong>3-D view</strong> — ⛰️ in the map\'s corner, or the panel of the same name — '
+      '<strong>3-D view</strong> — ⛰️ in the side panel\'s strip, or the panel of the same name — '
       + 'tilts the map onto the ground it is drawn on: the base map you are already on (the most opaque one, if you have blended several), draped over '
       + '~30 m terrain, with the pins and links you are already looking at on it. Drag to pan, '
       + 'right-drag (or Ctrl-drag, or two fingers) to tilt and rotate. It is the same map and the '
@@ -290,9 +291,9 @@ const HELP = {
       + 'here</strong> picks the ground the <em>camera</em> is looking at rather than the point '
       + 'underneath it on the flat map — which on a tilted view are not the same place, and can '
       + 'be kilometres apart. The one thing the tilted map cannot draw is the callout balloon on '
-      + 'the pin itself. The ⛰️ button '
-      + 'and the panel are one split control in the corner — press the mountain to tilt, press the '
-      + 'caret under it for everything about the tilt — and two more buttons appear beside them '
+      + 'the pin itself. Press the mountain to tilt, and 🎚️ under it for everything about the '
+      + 'tilt (on a phone the two are one split control in the map\'s corner, the mountain and a '
+      + 'caret under it) — and two more buttons appear under them '
       + 'while it is on: a <strong>compass</strong> that shows which way north has gone and puts '
       + 'you back facing it, and a <strong>tilt</strong> button that shows how far the camera has '
       + 'dropped, flattens it to straight down on one press and returns it to 62° on the next. '
@@ -390,7 +391,7 @@ const HELP = {
       + 'with it, and the ground and the place names are not alternatives. The slider is what '
       + 'makes them one picture. Heights are above the EGM96 geoid at ~30 m sampling.',
       'The <strong>ℹ️ What is here</strong> button arms a pick: click anywhere on the map and a '
-      + 'card in the opposite corner says what the app knows about that point — ground height, '
+      + 'card in the map\'s bottom corner says what the app knows about that point — ground height, '
       + 'land cover, wind region, drainage basin, maintenance hub, and the nearest station, '
       + 'repeater and survey mark with the distance and bearing to each. Every one of those was '
       + 'already in the app and every one of them could only be asked about a <em>station</em>; '
@@ -555,10 +556,11 @@ const HELP = {
         <text x="228" y="44" font-size="9" text-anchor="middle" fill="var(--muted)">repeater</text>
       </svg>`,
       steps: [
-        'Open <strong>Draw &amp; measure</strong> from the pencil icon in the map\'s top-right '
-        + 'corner and pick <em>Line</em>. The cursor becomes a crosshair and clicks pass through '
-        + 'the pins to the map underneath. The panel closes again when the pointer leaves it — '
-        + 'the pin in its corner keeps it open while you work.',
+        'Open <strong>Draw &amp; measure</strong> from the ✏️ in the side panel\'s strip and pick '
+        + '<em>Line</em>. The cursor becomes a crosshair and clicks pass through the pins to the '
+        + 'map underneath, and the panel stays open beside the map while you work. (On a phone the '
+        + 'pencil is in the map\'s top-right corner, its panel closes again when you leave it, and '
+        + 'the pin in its corner keeps it open.)',
         'Click near one station, then near the other, and double-click (or <em>Finish</em>) to end '
         + 'the line. Within about 15 px of a pin the click <strong>snaps</strong> to that '
         + 'station\'s exact coordinates — the ring in the drawing is what says the next click will.',
@@ -2117,6 +2119,10 @@ const state = {
   // a pin is a standing preference about how this operator reads a map, not
   // something they are doing right now. Everything else about a panel — which
   // one is hovered, which one was clicked open — dies with the map it was on.
+  // It means something only where a panel is in a map's corner: the six maps
+  // that have no side panel beside them, and the Stations map on a phone. The
+  // Stations map's panels are panes of the side panel everywhere else, and a
+  // pane has no pin.
   mapPanelsPinned: new Set((localStorage.getItem('mn-map-panels') || '')
                              .split(',').map(s => s.trim()).filter(Boolean)),
   mapMatchLabels: new Set(),  // ids the current filter earned a label (see mapLabelIds)
@@ -2189,7 +2195,8 @@ const state = {
   navQuery:       '',
   // The side panel (#help-panel, the "dock"): a strip of tab buttons on the
   // right-hand edge, and — while it is open — one pane beside it, which is the
-  // help for this tab, the Stations cards, or a map panel pinned into it. Two
+  // help for this tab, the Stations cards, or one of the Stations map's panels
+  // (all of which live there above a phone's width). Two
   // questions kept apart on purpose, because they are answered at different
   // times: *whether* it is open, and *which* pane it would like to show.
   //
@@ -2208,10 +2215,10 @@ const state = {
   // fresh one, and the Stations tab opens with its cards beside the map.
   dockOpen:       localStorage.getItem('mn-dock-tab') == null
                   || (localStorage.getItem('mn-help') || 'expanded') === 'expanded',
-  // Which pane, remembered: 'help', 'stations', or 'map-<panel id>' for a map
-  // panel pinned into it. A pane that does not exist where you are — the
+  // Which pane, remembered: 'help', 'stations', or 'map-<panel id>' for one of
+  // the Stations map's panels. A pane that does not exist where you are — the
   // Stations cards on any other tab, a map panel on a tab with no Stations map
-  // — leaves the side panel shut *there* without this being touched, so
+  // or on a phone — leaves the side panel shut *there* without this being touched, so
   // coming back to the tab that has it opens it again. That is also what keeps
   // help from opening itself: on a fresh visit this says 'stations', and only
   // one tab has those.

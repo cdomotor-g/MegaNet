@@ -228,7 +228,8 @@ ok('and there is no canvas over the map', beforePress.host === false);
 
 // The button, and the panel beside it.
 const btn3d = page.locator('.mn-map-3d');
-ok('the map has a ⛰️ corner button', await btn3d.count() === 1);
+ok('the map has one ⛰️ button, in the side panel\'s strip', await btn3d.count() === 1
+   && await page.evaluate(() => !!document.querySelector('.mn-map-3d').closest('#help-panel .dock-strip')));
 ok('…which reports that the mode is off',
    await btn3d.getAttribute('aria-pressed') === 'false');
 
@@ -649,8 +650,13 @@ const reachable = await page.evaluate(() => {
     z: getComputedStyle(document.getElementById('map3d')).zIndex,
     popupPane: zOf('.leaflet-popup-pane'),
     corner:    zOf('.leaflet-top'),
-    probes: ['.mn-map-3d', '.mn-map-full', '.mn-mapctl[data-panel="display"] .mn-mapctl-btn',
-             '.mn-mapctl[data-panel="3d"] .mn-mapctl-btn'].map(probe),
+    // Where the map's controls stand at this width: the side panel's strip,
+    // beside the map rather than on it — ⛰️ and ⛶ as themselves, Map display
+    // and the 3-D settings as their panes' buttons. Off the map they are out of
+    // the canvas's reach whatever its z-index, and this still proves it: the
+    // thing under the pointer where each is drawn is that control.
+    probes: ['.mn-map-3d', '.mn-map-full', '#help-panel .dock-tab[data-dock="map-display"]',
+             '#help-panel .dock-tab[data-dock="map-3d"]'].map(probe),
   };
 });
 // The window, not a magic number: above the popup pane (700, the highest
@@ -668,7 +674,7 @@ for (const p of reachable.probes) {
      p.missing ? 'not in the DOM' : p.hidden ? 'has no box' : `got ${p.got}`);
 }
 
-// The panel's own switch and the corner button are the same mode.
+// The panel's own switch and the ⛰️ button in the strip are the same mode.
 ok('the ⛰️ button reports the mode is on',
    await btn3d.getAttribute('aria-pressed') === 'true');
 const panelBtn = await page.evaluate(() => {
@@ -763,8 +769,9 @@ if (pin) {
      card.topLeft.mine === true, `got ${card.topLeft.got}`);
   ok('…and at its own centre', card.centre.mine === true, `got ${card.centre.got}`);
   // The window, for the same reason the canvas's own is asserted above: over
-  // the canvas so it can be seen, under the control corners so the icon column
-  // it shares the map with stays reachable.
+  // the canvas so it can be seen, under the control corners so the controls it
+  // shares the map with stay reachable — Leaflet's zoom, and on a phone the
+  // whole icon column.
   ok('the card sits above the 3-D canvas and below the control corners',
      card.cardZ > card.canvasZ && card.cardZ < card.cornerZ,
      JSON.stringify({ card: card.cardZ, canvas: card.canvasZ, corner: card.cornerZ }));

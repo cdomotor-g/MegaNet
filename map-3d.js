@@ -1260,7 +1260,10 @@ const Map3D = (function () {
       // The effect is what matters: the 3-D view covers the 2-D map completely
       // while the on-map panels, the base-map picker and the corner buttons
       // stay where they are and keep working. That is what lets one set of
-      // controls drive both modes instead of two sets drifting apart.
+      // controls drive both modes instead of two sets drifting apart. (Above
+      // a phone's width the Stations map's controls are in the side panel's
+      // strip, off the map altogether, where no canvas can reach them; the
+      // window still matters for the phone, and for the zoom and the cards.)
       el.appendChild(h);
     }
     return h;
@@ -1286,7 +1289,9 @@ const Map3D = (function () {
   }
 
   // ── The camera buttons (#192) ──────────────────────────────────────────────
-  // 🧭 and the tilt quad, in the ⛰️ cluster in the map's corner. They exist
+  // 🧭 and the tilt quad, in the ⛰️ cluster — in the side panel's strip, or in
+  // the map's corner on a phone (MapChrome decides; nothing here needs to know
+  // which, because they are found by class wherever they stand). They exist
   // because the two things a right-drag does are the two things it is hardest
   // to undo: a map turned 37° is a map you have to turn 37° back by hand, and
   // a camera dropped to the horizon cannot be raised by any gesture a mouse
@@ -1356,7 +1361,7 @@ const Map3D = (function () {
   }
 
   // The tooltip and the accessible name are the same sentence, as they are on
-  // every other button in that corner (MapChrome).
+  // every other button MapChrome makes.
   function label(el, text) {
     el.title = text;
     el.setAttribute('aria-label', text);
@@ -1550,7 +1555,7 @@ const Map3D = (function () {
             </button>
             <button type="button" onclick="Map3D.levelCamera()" ${on ? '' : 'disabled'}
                     title="Point the camera straight down and north-up again — the 🧭 and tilt
-                           buttons in the corner do one each">Level the camera</button>
+                           buttons under ⛰️ do one each">Level the camera</button>
           </div>
           <label class="filter-check"
                  title="A surface between each hop's line of sight and the ground under it, shaded green where it clears the 60% Fresnel zone and red where the ground is above the line. Costs terrain tiles, so it is off until asked for.">

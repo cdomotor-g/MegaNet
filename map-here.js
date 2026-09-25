@@ -426,7 +426,8 @@ const MapHere = (function () {
       return true;
     },
 
-    // The corner button, and the card's own "pick another point" pill.
+    // The ℹ️ button (in the side panel's strip, or the map's corner on a
+    // phone), and the card's own "pick another point" pill.
     //
     // Arming takes the other click-takers off the map, exactly as MapMovePin
     // does on the way in: a draw tool and a link-budget end pick both answer

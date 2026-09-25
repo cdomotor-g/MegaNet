@@ -1407,7 +1407,9 @@ const PathProfile = (function () {
   // card nobody has seen is a feature nobody knows to ask for, and the way to
   // ask for this one — draw something, or click something — is on the map, not
   // on the card. So it is always there, and with nothing to draw it says how to
-  // get something drawn.
+  // get something drawn. It says where the line is drawn rather than where the
+  // ✏️ is, because the ✏️ is in two places: the side panel's strip, and the
+  // map's own corner on a phone.
   function emptyHtml() {
     return `
       <div class="path-empty-head">
@@ -1415,7 +1417,7 @@ const PathProfile = (function () {
         <span class="small">No path yet</span>
       </div>
       <p class="small path-empty">
-        Draw a <strong>Line</strong> with ✏️ <strong>Draw &amp; measure</strong> on the map, or click
+        Draw a <strong>Line</strong> on the map with ✏️ <strong>Draw &amp; measure</strong>, or click
         a radio path between two stations, and the ground between its two ends is drawn here — with
         the line of sight, the Fresnel zone over it and what stands in the way.
       </p>`;

@@ -41,13 +41,14 @@
 // keeps a picture of the drawing and nothing about the ground under it.
 //
 // Where the panel is drawn changed at #164 and nothing else did. It was a panel
-// in the Stations sidebar; it is a MapChrome flyout on the map itself now
-// (map-controls.js), opened from the ✏️ icon in the map's top-right corner and
-// pinnable open — which is the shape this tool always wanted, since every one
-// of its controls is about something you are doing on the map a few hundred
-// pixels away. panelHtml() still renders into #map-draw-panel and
-// rerenderPanel() still finds it there; the only edit to this file was dropping
-// the heading, because the flyout carries the title now.
+// in the Stations sidebar; it is a MapChrome panel now (map-controls.js),
+// opened from ✏️ — a pane of the side panel beside the map, from its strip,
+// and on a phone a flyout from the map's own corner, pinnable open — which is
+// the shape this tool always wanted, since every one of its controls is about
+// something you are doing on the map a few hundred pixels away. panelHtml()
+// still renders into #map-draw-panel and rerenderPanel() still finds it there
+// wherever it is standing; the only edit to this file was dropping the heading,
+// because the panel carries the title now.
 //
 // ── Keyboard parity, and where it stops (#136) ───────────────────────────────
 // Stated rather than left to be discovered, because the honest answer is not

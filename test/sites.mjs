@@ -137,8 +137,11 @@ await page.evaluate(() => {
   // charged P.2108's terminal clutter — which the screening pass never is —
   // without a 15 m canopy standing on every hilltop and cutting every path.
   LandCover.seed(lat => lat.map((_, i) => (i === 0 || i === lat.length - 1 ? 2 : 11)));
-  MapChrome.setPinned('sites', true);
 });
+await page.waitForTimeout(200);
+// The finder is a pane of the side panel at this width, opened from 🗼 in its
+// strip — with a real click, the way an operator opens it.
+await page.click('#help-panel .dock-tab[data-dock="map-sites"]');
 await page.waitForTimeout(400);
 
 const runSites = async () => {
@@ -156,28 +159,30 @@ console.log('\nThe panel');
 
 const panel = await page.evaluate(() => {
   const wrap = document.querySelector('.mn-mapctl[data-panel="sites"]');
-  const polar = document.querySelector('.mn-mapctl[data-panel="polar"]');
-  const here = document.querySelector('.mn-map-here');
-  const order = el => [...document.querySelectorAll('.leaflet-control-container .mn-mapctl, .leaflet-control-container .mn-map-here')].indexOf(el);
-  // Pinned, the panel is in the side panel beside the Stations map rather than
-  // in its corner (the dock), so its place in the corner is read with the pin
-  // off for a moment and put back straight after.
-  const docked = !!wrap && !!wrap.closest('#help-panel');
-  MapChrome.setPinned('sites', false);
-  const afterPolar = !!(wrap && polar) && order(wrap) > order(polar);
-  const beforeHere = !!(wrap && here) && order(wrap) < order(here);
-  MapChrome.setPinned('sites', true);
+  // Its place is read off the side panel's strip, which stands the map's
+  // controls in the order the corner did — the corner holds none of them at
+  // this width. The strip's own button for the pane, and ℹ️ itself.
+  const strip = [...document.querySelectorAll('#help-panel .dock-strip button')];
+  const at = sel => strip.findIndex(b => b.matches(sel));
+  const group = sel => strip.find(b => b.matches(sel))?.closest('.dock-group')?.dataset.group;
+  const body = wrap && wrap.querySelector('.mn-mapctl-body');
   return {
-    present: !!wrap, docked, title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
-    afterPolar, beforeHere,
+    present: !!wrap, docked: !!wrap && !!wrap.closest('#help-panel .dock-pane'),
+    shown: !!(body && body.getClientRects().length), showing: dockShowing(),
+    title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
+    label: strip.find(b => b.dataset.dock === 'map-sites')?.getAttribute('aria-label'),
+    group: group('[data-dock="map-sites"]'),
+    afterPolar: at('[data-dock="map-sites"]') === at('[data-dock="map-polar"]') + 1,
+    beforeHere: at('.mn-map-here') === at('[data-dock="map-sites"]') + 1,
     runDisabled: document.getElementById('sites-run')?.disabled,
     status: document.getElementById('sites-status')?.textContent || '',
   };
 });
-ok('a 🗼 Repeater site finder panel sits in the map corner, and pinned in the side panel',
-   panel.present && panel.docked && panel.title === 'Repeater site finder', JSON.stringify(panel));
-ok('…in the tools group, after the polar plot and before What is here',
-   panel.afterPolar && panel.beforeHere, JSON.stringify(panel));
+ok('a 🗼 Repeater site finder is a pane of the side panel, open from its button in the strip',
+   panel.present && panel.docked && panel.shown && panel.showing === 'map-sites'
+     && panel.title === 'Repeater site finder' && panel.label === 'Repeater site finder', JSON.stringify(panel));
+ok('…in the tools group, straight after the polar plot and straight before What is here',
+   panel.group === 'tools' && panel.afterPolar && panel.beforeHere, JSON.stringify(panel));
 ok('Find sites is disabled with nothing to serve, and the panel says what is missing',
    panel.runDisabled === true && /Add the sites/.test(panel.status), panel.status);
 
@@ -833,7 +838,7 @@ await page.evaluate(() => { toggleStationsSplit(true); setDockTab('map-sites'); 
 await page.waitForTimeout(300);
 const beforeProf = await page.evaluate(() => ({ showing: dockShowing(),
   cards: !!document.querySelector('#help-panel .dock-pane-stations #stations-cards') }));
-ok('with ◫ on the cards are in the side panel beside the pinned finder, and the finder is the pane on screen',
+ok('with ◫ on the cards are in the side panel beside the finder, and the finder is the pane on screen',
    beforeProf.showing === 'map-sites' && beforeProf.cards, JSON.stringify(beforeProf));
 await page.locator('.sites-panel button', { hasText: 'Profile the worst path' }).first().click();
 await page.waitForTimeout(400);

@@ -191,14 +191,19 @@ try {
     `${freq.checked} link(s) checked; ${JSON.stringify(freq.wrong)}`);
 
   // The legend has to say the same thing, or the colours are unreadable.
+  // Read off the legend's own pane, opened from 🔑 in the side panel's strip
+  // the way an operator opens it — it was pinned open in the map's corner for
+  // this until the map's controls moved into the side panel.
+  await page.click('#help-panel .dock-tab[data-dock="map-legend"]');
+  await page.waitForTimeout(200);
   const legend = await page.evaluate(() => {
-    MapChrome.setPinned('legend', true);
-    return document.getElementById('map-legend').textContent.replace(/\s+/g, ' ');
+    const el = document.getElementById('map-legend');
+    return el.getClientRects().length ? el.textContent.replace(/\s+/g, ' ') : '(the legend is not on screen)';
   });
   check('the legend names every channel with how many repeaters are on it',
     (await page.evaluate(() => MapFreq.rows())).every((r) =>
       legend.includes(r.label) && legend.includes(`${r.count} repeater`)), legend.slice(0, 160));
-  await page.evaluate(() => MapChrome.setPinned('legend', false));
+  await page.evaluate(() => setDockTab('stations', { instant: true }));
 
   // Plain and fade are the same one setting, so picking either has to move
   // both `mapLinkColour` and the flag MapFade has always been asked about.
@@ -364,7 +369,10 @@ try {
   // ── 8. Find a control, measured on screen ────────────────────────────────
   // getClientRects(), never el.hidden: see the header. A row with the
   // attribute set and `display: flex` still on it is a row that is on screen.
-  await page.evaluate(() => MapChrome.setPinned('display', true));
+  // Map display is a pane of the side panel at this width, opened from 🗺️ in
+  // its strip; it was pinned open in the map's corner for this section until
+  // the map's controls moved there.
+  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
   await page.waitForTimeout(300);
   const panel = () => page.evaluate(() => {
     const root = document.getElementById('map-display-block');
@@ -444,7 +452,7 @@ try {
   const restored = await panel();
   check('clearing the box gives the whole panel back',
     restored.rows === whole.rows && restored.acma === true, `${restored.rows} of ${whole.rows}`);
-  await page.evaluate(() => MapChrome.setPinned('display', false));
+  await page.evaluate(() => setDockTab('stations', { instant: true }));
 
   // ── 9. Side by side ──────────────────────────────────────────────────────
   // The default since the follow-up to #186 — the single column put the map's

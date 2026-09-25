@@ -42,13 +42,15 @@
   });
   // Crossing the phone breakpoint changes what the two rails *are* — columns or
   // drawers — and so what their toggles should say. Re-rendered on the crossing
-  // itself rather than on every resize event. It also changes where a pinned
-  // Stations map panel belongs — the side panel, or back in the map's corner,
-  // docked there the way pinning used to look — so MapChrome is asked again.
+  // itself rather than on every resize event. It also changes where the
+  // Stations map's controls belong — the side panel's strip, or the map's own
+  // corner — so MapChrome is asked again, and asked *before* the side panel is
+  // painted: a control moving takes focus with it (MapChrome's relocate), and
+  // it can only do that while the strip button it is leaving is still there.
   window.matchMedia(`(max-width: ${BREAKPOINTS.xs}px)`).addEventListener('change', () => {
     renderTabs();
-    renderHelp();
     if (state.map) MapChrome.redock(state.map);
+    renderHelp();
   });
   // Crossing `lg` folds the Stations cards back under the map and unfolds them
   // into the side panel again, without the setting moving either way — and the

@@ -164,12 +164,16 @@
   --mn-nav: 236px;
   --mn-nav-rail: 56px;
   /* The side panel opposite it (#help-panel). The rail is its strip: a column
-     of 44 px buttons and the 1 px border that separates it from the page. The
-     open pane's width is the operator's and is set by app.js as --mn-dock-w;
-     --mn-help is only the phone drawer's, where help is a drawer over the page
-     and the other panes are not there at all. */
+     of 44 px buttons and the 1 px border that separates it from the page —
+     and, since the Stations map's controls moved into that column, room for
+     the thin scrollbar a column of fifteen buttons needs on a laptop screen
+     (10 px in Chromium), so that the bar sits beside the buttons rather than
+     over them. The same width as the nav's rail, which the page's two edges
+     are the better for. The open pane's width is the operator's and is set by
+     app.js as --mn-dock-w; --mn-help is only the phone drawer's, where help is
+     a drawer over the page and the other panes are not there at all. */
   --mn-help: 260px;
-  --mn-help-rail: 45px;
+  --mn-help-rail: 56px;
   /* Search hits in the station table. Amber, to match the map's "matches
      filter" pin ring, so the same match reads the same way in both halves of
      the Stations tab. */
@@ -3050,10 +3054,12 @@ hr {
                          saying "I am working in this one", and a tool in use
                          should not be sharing pixels with the map under it.
                          Remembered between visits — see state.mapPanelsPinned.
-                         On the Stations map a pinned panel leaves the map
-                         altogether, for a pane of the side panel beside it
-                         (MapChrome.dockInto; the rules are with #help-panel's),
-                         and is docked here only in full screen and on a phone.
+
+   On the Stations map none of this is on the map above a phone's width: every
+   panel and every button leaves the corner for the side panel beside it, a
+   pane and a strip button each (MapChrome.dockInto; the rules are with
+   #help-panel's), and the corner holds nothing. On a phone they are back here,
+   and everything in this block is what they are.
 
    Neither state is a modal and neither traps focus: this is a disclosure, the
    button says so with aria-expanded, and Shift+Tab off the first control in
@@ -3115,12 +3121,16 @@ hr {
 }
 
 /* The hairline goes above every group that has another *non-empty* group
-   somewhere before it — not merely a group before it. On the Stations map a
-   pinned panel leaves the corner for the side panel, and a group whose every
-   panel has gone is an empty element still standing in the column: the plain
-   `+` sibling rule drew a separator under nothing at the top of the corner. The
-   empty group itself takes no room. */
-.mn-mapbar-group:empty {
+   somewhere before it — not merely a group before it. On the Stations map the
+   controls leave the corner for the side panel whenever the window is wider
+   than a phone's, and a group whose every control has gone is an empty element
+   still standing in the column: the plain `+` sibling rule drew a separator
+   under nothing at the top of the corner. The empty group itself takes no
+   room, and a bar with nothing left in it at all is not drawn either — it is
+   still a Leaflet control, with Leaflet's margin, and a corner that is meant
+   to hold nothing should not hold a 10 px box of it. */
+.mn-mapbar-group:empty,
+.mn-mapbar:not(:has(> .mn-mapbar-group:not(:empty))) {
   display: none;
 }
 
@@ -6761,11 +6771,13 @@ hr {
 /* ── The side panel (#help-panel) ───────────────────────────────────────────
    The right-hand counterpart to the nav rail: a strip of buttons on the outer
    edge and, open, one pane beside it — the help for this tab, the Stations
-   cards, or a map panel pinned into it (app.js, "The side panel", holds the
-   reasoning). It keeps the nav's interaction contract (collapse to a strip and
-   never to nothing; the state in localStorage; re-measure the maps once the
-   width has settled rather than during the slide) and differs where a panel of
-   tools has to:
+   cards, or one of the Stations map's panels — and, on that tab, every one of
+   the map's own controls standing in the strip too, where they used to stand
+   in the map's corner (app.js, "The side panel", holds the reasoning). It
+   keeps the nav's interaction contract (collapse to a strip and never to
+   nothing; the state in localStorage; re-measure the maps once the width has
+   settled rather than during the slide) and differs where a panel of tools
+   has to:
 
    * Its pane's width is the operator's — the handle on its inner edge drags
      and takes the arrow keys, and app.js writes the result as --mn-dock-w on
@@ -6779,13 +6791,13 @@ hr {
    strip alone, and app.js takes it off before .help-ready allows the slide. */
 #help-panel {
   flex: 0 0 auto;
-  width: var(--mn-help-rail, 45px);
+  width: var(--mn-help-rail, 56px);
   background: var(--panel);
   border-left: 1px solid var(--border);
 }
 
 #help-panel:not(.collapsed) {
-  width: calc(var(--mn-help-rail, 45px) + var(--mn-dock-w, 420px));
+  width: calc(var(--mn-help-rail, 56px) + var(--mn-dock-w, 420px));
 }
 
 #help-panel.help-ready {
@@ -6837,18 +6849,62 @@ hr {
 
 /* The strip. A column of 44 px square buttons (EPIC #107's floor) on a tint of
    its own, so the pane beside it reads as the thing that is open and the strip
-   as what opens it. It scrolls if it ever has more buttons than screen, which
-   at eight buttons it has not yet. */
+   as what opens it.
+
+   It scrolls, and on the Stations tab it has to: the map's thirteen controls and
+   the side panel's own two are ~700 px of column, and a laptop's window below
+   the banner is less than that. The scrollbar is the thin one and the rail is
+   wide enough to hold it beside the buttons (--mn-help-rail), so a bar that
+   appears pushes nothing under itself; `overflow-x: hidden` is what a browser
+   with only the wide bar gets instead of a sideways scroller of its own. */
 .dock-strip {
   flex: 0 0 auto;
   order: 2;                /* after the panes on screen, before them in the markup */
-  width: calc(var(--mn-help-rail, 45px) - 1px);
+  width: calc(var(--mn-help-rail, 56px) - 1px);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--sp-1);
   padding: var(--sp-2) 0;
   background: var(--panel-sub);
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* One group of buttons: the side panel's own pair, then one per group the map's
+   corner had (MapChrome, map-controls.js). The same spacing the corner used and
+   for the same reason — 3 px inside a group so a run reads as one, and a gap
+   with a short hairline between groups so the runs read as separate. The
+   hairline is drawn with the ring of --panel-sub the corner's had of --panel,
+   and at the same 18 px, centred under the column. */
+.dock-group {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.dock-group + .dock-group::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 1.125rem;
+  height: 2px;
+  margin: var(--sp-1) 0;
+  border-radius: 1px;
+  background: var(--muted);
+  box-shadow: 0 0 0 1px var(--panel-sub);
+}
+
+/* A button the map has not switched on yet — the camera pair while the map is
+   flat. The `!important` is the corner's, for the corner's reason:
+   `.mn-mapctl-btn` sets `display: flex`, which outranks the browser's own
+   `[hidden]` at the same specificity, and a set attribute on a button still on
+   screen is the failure a check reading `el.hidden` agrees with. */
+.dock-strip [hidden] {
+  display: none !important;
 }
 
 .dock-tab {
@@ -6878,6 +6934,52 @@ hr {
   background: var(--panel);
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* The map's own buttons, moved into the strip whole — ℹ️, ⛰️ and its camera
+   pair, ⛶, ◫, ↺ — dressed as the strip's own buttons rather than as the
+   shadowed chips they are on the map, where they have to stand out from the
+   tiles. Everything that is theirs stays theirs: the icon span, the class
+   their modules find them by, and the state those modules write on them. */
+.dock-strip .mn-mapctl-btn {
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.dock-strip .mn-mapctl-btn:hover {
+  background: var(--subtle);
+  border-color: var(--border);
+}
+
+/* A mode that is armed — What is here waiting for a click, the 3-D view on —
+   in the dress it has on the map: the accent ring for What is here, and the
+   accent fill for ⛰️. ⛶ and ◫ say pressed with aria-pressed and their labels
+   only, as they do on the map; ◫ is pressed by default, and a strip with a lit
+   button in it at rest would be a strip announcing a mode nobody chose. */
+.dock-strip .mn-mapctl-btn.is-on {
+  background: var(--subtle);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.dock-strip .mn-mapctl-btn.mn-map-3d.is-on {
+  background: var(--accent);
+}
+
+/* ↺ says what it is on hover, as it does on the map. */
+.dock-strip .mn-map-reset:hover,
+.dock-strip .mn-map-reset:focus-visible {
+  border-color: var(--bad);
+  color: var(--bad);
 }
 
 .dock-ico {
@@ -6944,12 +7046,15 @@ body.mn-dock-dragging {
   padding: .6rem .5rem 1rem;
 }
 
-/* ── A map panel, pinned into the side panel ──────────────────────────────
+/* ── A map panel in the side panel ────────────────────────────────────────
    The whole .mn-mapctl wrapper moves here — icon, heading, pin and body — and
    everything below undoes what the map's corner does to it: the body is no
    longer a flyout positioned off its icon, it is the pane's content, as wide as
    the pane, with no scroll cap of its own (the pane scrolls). The icon is
-   hidden, because the strip button is what it was.
+   hidden, because the strip button is what it was, and so is the pin: a pane is
+   a panel that stays open already, and a pin here would be a button that
+   changed nothing anyone could see. Both come back with the panel when it goes
+   back to the map's corner on a phone, where they mean what they always did.
 
    And the type. On the map a panel inherits Leaflet's container typography —
    `.leaflet-container` sets 12 px (0.75rem) at a line height of 1.5 in
@@ -6964,7 +7069,8 @@ body.mn-dock-dragging {
   line-height: 1.5;
 }
 
-.dock-pane > .mn-mapctl > .mn-mapctl-btn {
+.dock-pane > .mn-mapctl > .mn-mapctl-btn,
+.dock-pane > .mn-mapctl .mn-mapctl-pin {
   display: none;
 }
 
@@ -7242,10 +7348,15 @@ body.mn-dock-dragging {
    (1300), the drawers (1200) and the mem modal (1500) but below #app-modal
    (2000), so the bug reporter still opens on top of a full-screen map. The
    #leaflet-map selector carries the id so it outweighs the phone height
-   override, which is also id-only. */
+   override, which is also id-only.
+
+   It stops short of the window's right edge by the side panel's width, strip
+   and open pane (--mn-side-w, kept current by app.js), because the side panel
+   stays on screen beside it — the map's tools are in its strip. 0 on a phone,
+   where the side panel takes no width and the tools are on the map. */
 .map-panel.is-full {
   position: fixed;
-  inset: 0;
+  inset: 0 var(--mn-side-w, 0px) 0 0;
   z-index: 1900;
   margin: 0;
   border-radius: 0;
@@ -7267,6 +7378,45 @@ body.mn-dock-dragging {
   height: 100%;
   min-height: 0;
   border-radius: 0;
+}
+
+/* …and the side panel beside it, for as long as it lasts: fixed to the
+   window's right edge at the full-screen map's height, above the header the
+   map covers, with its column the whole window tall rather than the window
+   less the banner. At the map's own z-index and after it in the page, so it
+   paints over the header and the nav as the map does. No slide while it is
+   like this — the map's edge follows --mn-side-w in one step (app.js makes
+   every change instant and re-measures the map at once), and a panel sliding
+   beside it would open a gap or an overlap for the length of the slide. Keyed
+   off the full-screen class rather than a flag of its own, so it cannot
+   outlive the map it is beside. The phone block below puts all of this back. */
+body:has(.map-panel.is-full) #help-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1900;
+  transition: none;
+}
+
+body:has(.map-panel.is-full) .dock-inner {
+  height: 100dvh;
+}
+
+/* On a phone the side panel is a 0-wide box with a fixed edge tab and a drawer
+   in it, and the map's tools are on the map, so full screen is what it always
+   was there: the map over everything, the edge tab under it with the rest of
+   the page. Here rather than in the side panel's own phone block because these
+   have to come after the rules they undo. */
+@media (max-width: 560px) {
+  body:has(.map-panel.is-full) #help-panel {
+    position: static;
+    z-index: auto;
+  }
+
+  body:has(.map-panel.is-full) .dock-inner {
+    height: 0;
+  }
 }
 
 /* ── Stations tab: side by side (#186) ─────────────────────────────────────

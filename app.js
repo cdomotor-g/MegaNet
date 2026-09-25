@@ -7,8 +7,11 @@
 // What is left here, and why each of it is:
 //
 //   the theme and file-loading helpers, the side nav, the side panel (the
-//   help, the Stations cards and pinned map panels, in one tabbed column) and
-//   renderMain()   the app shell. #109 (U0) is the issue that owns it.
+//   help, the Stations cards and the Stations map's own controls, in one
+//   tabbed column) and renderMain()   the app shell. #109 (U0) is the issue
+//   that owns it. The side panel reaches across to map-controls.js only as
+//   MapChrome's host (stationsDockHost), and MapChrome only ever calls back
+//   through that.
 //
 //   the Stations map core, the station table and its repeater list, and the
 //   search machinery all three share   frozen for the whole of #129: 25 of its
@@ -1623,15 +1626,27 @@ function invalidateMapSizes(delay) {
 // right-hand columns side by side was one more than a page whose map is the
 // thing everyone came for could spare.
 //
-// The panes, in the order their buttons stand in the strip:
+// What stands in the strip, top to bottom:
 //
 //   ❔ Help        whatever HELP says about the open tab. Always there.
 //   📋 Stations    the Stations cards — filters, list, ground profile, link
 //                  budget, the editor — while that tab is open and they are
 //                  beside the map rather than under it (toggleStationsSplit).
-//   one per map panel pinned into it — Map display, Draw & measure, the polar
-//                  plot, the repeater site finder… — in the order their icons
-//                  stand in the map's corner (MapChrome, map-controls.js).
+//   the Stations map's own controls, all of them — everything MapChrome would
+//                  otherwise have put in the map's top-right corner, in the
+//                  same groups and the same order, a hairline between groups
+//                  as there was there. A *panel* (🗺️ Map display, 🔑 Legend,
+//                  ✏️ Draw & measure, 📡 the polar plot, 🗼 the site finder,
+//                  🎚️ the 3-D settings) is a pane of this panel with a button
+//                  here; a plain *button* (ℹ️ What is here, ⛰️ 3-D and its two
+//                  camera buttons, ⛶ full screen, ◫ the cards, ↺ reset) is
+//                  moved into the strip itself and does what it always did.
+//
+// Those controls were in the map's corner, and for one release a panel came
+// here only when its 📌 was pressed. That left the right-hand edge of the page
+// two places to look for the same kind of tool, with a pin deciding which one
+// a given tool was in that day — so now it is one place, and the map's corner
+// holds nothing. On a phone they go back to the corner (see below).
 //
 // It keeps the help rail's interaction contract (#47 / README §20) — it
 // collapses to its strip rather than to nothing, it remembers which it was, and
@@ -1647,12 +1662,16 @@ function invalidateMapSizes(delay) {
 //    that drags and takes the arrow keys, and the figure is kept in px.
 //  * Pressing the button of the pane that is showing shuts the panel and gives
 //    the map the width. Pressing any other opens the panel on that one.
+//  * It stays on screen in the map's full screen, beside the map rather than
+//    under it — the map's tools live here, and a full-screen map without them
+//    is a map that can only be looked at (toggleMapFullscreen).
 //  * Under 560 px it is still what the help rail was: the strip is the fixed
 //    tab on the screen edge and help is the drawer, mutually exclusive with the
 //    nav's. Nothing else becomes a pane there — the Stations cards stay under
-//    the map and a pinned panel stays docked in the map's corner — because a
-//    drawer over a 390 px map is a drawer over the thing it is about. How a
-//    phone should hold all this is a question for its own issue.
+//    the map, and the map's controls go back to its corner as flyouts, with
+//    pins that dock them there — because a drawer over a 390 px map is a drawer
+//    over the thing it is about. How a phone should hold all this is a
+//    question for its own issue.
 //
 // **Built once, and never rewritten wholesale.** renderHelp() used to write the
 // whole <aside> from a template on every call — every tab switch, every toggle,
@@ -1691,20 +1710,35 @@ function docUrl(path) {
 const DOCK_STEP = 20;
 const DOCK_PAGE_STEP = 100;
 
-// The map panels pinned into the side panel, by pane id ('map-display', …).
-// Held here rather than read back off the DOM, because a pane's place in the
-// strip is where its panel stood in the map's corner, and only MapChrome knew
-// that — it says so once, when it hands the panel over (dockAdoptPanel).
-const dockMapPanes = new Map();   // pane id → { id, pane, wrap, icon, title, rank, order }
+// The Stations map's controls, by key: 'map-<panel id>' for a panel, which is
+// also the name of its pane (state.dockTab), and 'btn-<class>' for a plain
+// button. Held here rather than read back off the DOM, because a control's
+// place in the strip is where it stood in the map's corner, and only MapChrome
+// knew that — it says so once, when it hands the control over (dockAdopt).
+//
+// An entry outlives the element in it. Every render of the Stations tab builds
+// a new map with new controls, and the entry is where they land: a panel's
+// pane and its strip button are the same two elements from one map to the
+// next, so nothing the operator is looking at is taken away and put back, a
+// strip button with focus keeps it, and the pane that was showing is still
+// showing when the new map arrives. `state` says what the entry is doing:
+//
+//   held   the element is here, in the strip or in the pane
+//   gap    its map has been taken down and the next has not built it yet — a
+//          panel's pane and button stay listed through it, empty for as long
+//          as a render takes, which is no frame at all
+//   away   MapChrome has it back, because the side panel stopped taking the
+//          map's controls (a phone), and it is in the map's corner
+const dockMapItems = new Map();   // key → { key, kind, state, el, pane, tab, icon, label, group, groupLabel, rank, order, scroll }
 
-// Which panel ids the Stations map built last time. See dockMapExpected().
-let dockStationsPanelIds = null;
+// Whether the Stations map has built its controls at least once this page load.
+// Until it has, a map pane remembered from the last visit is taken on trust
+// (dockHas); after, a pane no map builds any more is known to be gone.
+let dockMapBuilt = false;
 
-// Where the side panel was before a pin opened it on a map panel, most recent
-// last — so unpinning that panel puts the operator back on the pane they were
-// reading, or shuts the panel again if it was shut. Session-only: after a
-// reload an unpin falls back to the Stations cards, which is the default.
-const dockBack = [];
+// Focus that was inside one of the Stations map's controls when the map was
+// taken down to be built again, to be put back on the new one (dockSettle).
+let dockMapRefocus = null;   // { key, id } — id: the focused element's own id, if it had one
 
 // px the side panel was last laid out at, strip included, and the pane it was
 // showing. What renderDock() compares against to decide whether the maps need
@@ -1766,6 +1800,11 @@ function dockEl() {
 // emoji draws as a pale grey ornament whatever colour the button asks for —
 // about 1.8:1 on the strip's tint in the light theme — while text takes the
 // strip's own muted ink.
+//
+// The strip is a column of groups, the way the map's corner is (MapChrome): the
+// side panel's own two buttons first, then one group per corner group the map's
+// controls came from, each labelled as that group is. Only the first is here
+// from the start; syncDockStrip() makes the rest as their controls arrive.
 function dockSkeleton(panel) {
   panel.innerHTML = `
     <div class="dock-inner">
@@ -1774,9 +1813,11 @@ function dockSkeleton(panel) {
            title="Drag to make the side panel wider or narrower, or use the arrow keys"
            onpointerdown="dockResizeStart(event)" onkeydown="dockResizeKey(event)"></div>
       <div class="dock-strip" role="group" aria-label="Side panel" onkeydown="dockStripKey(event)">
-        <button type="button" class="dock-tab help-toggle" data-dock="help"
-                aria-controls="${dockPaneId('help')}" aria-expanded="false"
-                onclick="toggleHelp()"><span class="dock-ico" aria-hidden="true">?</span></button>
+        <div class="dock-group" data-group="side">
+          <button type="button" class="dock-tab help-toggle" data-dock="help"
+                  aria-controls="${dockPaneId('help')}" aria-expanded="false"
+                  onclick="toggleHelp()"><span class="dock-ico" aria-hidden="true">?</span></button>
+        </div>
       </div>
       <div class="dock-panes">
         <div class="help-inner dock-pane" id="${dockPaneId('help')}" data-dock="help" hidden>
@@ -1798,49 +1839,57 @@ function dockStationsHere() {
   return state.activeTab === 'stations' && !!state.data && stationsSplitActive();
 }
 
-// Whether map panels may be docked into the side panel at all right now. Not
-// in full screen — the full-screen map is fixed over the whole shell, this
-// panel included, so a panel docked here would be under it — and not on a
-// phone, where the side panel is a drawer over the map it would be describing.
-// MapChrome asks this of the Stations map's host (stationsDockHost) and puts a
-// pinned panel back in the corner, docked there the old way, whenever it says no.
+// Whether the Stations map's controls belong in the side panel right now —
+// every one of them, whatever its pin says. Not on a phone, where the side
+// panel is a drawer over the map it would be describing: there they are the
+// map's own again, flyouts in its corner. Full screen is no exception any more.
+// It keeps the side panel on screen beside the map (toggleMapFullscreen), so
+// the tools stay where the operator's hand has learnt they are. MapChrome asks
+// this of the Stations map's host (stationsDockHost) at every build and every
+// redock, and hands the controls back whenever it says no.
 function dockAcceptsPanels() {
-  return !state.mapFullscreen && !isPhoneNav();
+  return !isPhoneNav();
 }
 
-// A map panel's pane that is *about to* exist: pinned, on the Stations tab,
-// with the map it lives on still being built. Counted as there so that a tab
-// switch or a render of the Stations tab opens the side panel at its final
-// width *before* the map is built, rather than building the map, then opening
-// the panel under it and re-measuring it. Leaflet takes its size once, at
-// L.map(), and a fit made against a width the page is about to lose is a view
-// that is off by however much it lost.
+// Whether one of the Stations map's controls is in the strip: its element is
+// here, or — for a panel — its map is being built again and it is about to be.
+// Only on the Stations tab, which is the one tab whose map hands its controls
+// over; the entries outlive the tab (see dockMapItems), their buttons do not.
+function dockMapListed(e) {
+  if (state.activeTab !== 'stations') return false;
+  return e.state === 'held' || (e.state === 'gap' && e.kind === 'panel' && !!state.data);
+}
+
+// A map panel's pane counts as there while it is listed — including while its
+// map is being built again, so that a render of the Stations tab keeps the side
+// panel open on it at its final width *before* the map is built, rather than
+// shutting it, building the map, then opening it again under the map and
+// re-measuring it. Leaflet takes its size once, at L.map(), and a fit made
+// against a width the page is about to lose is a view off by what it lost.
 //
-// Only panels the Stations map is known to build, once it has been built once:
-// a pin stored under an id no map builds any more would otherwise hold the side
-// panel open on nothing for as long as it was remembered.
-function dockMapExpected(id) {
-  const pid = id.slice(4);
-  return id.startsWith('map-') && state.activeTab === 'stations' && !!state.data
-    && state.mapPanelsPinned.has(pid) && dockAcceptsPanels()
-    && (!dockStationsPanelIds || dockStationsPanelIds.has(pid));
-}
-
+// Before the Stations map has built its controls once this page load there are
+// no entries yet, and a pane remembered from the last visit is taken on trust
+// for the same reason: the first build then lands in a panel already open at
+// the width it will have.
 function dockHas(id) {
   if (id === 'help') return true;
   if (id === 'stations') return dockStationsHere();
-  return dockMapPanes.has(id) || dockMapExpected(id);
+  if (!id.startsWith('map-') || state.activeTab !== 'stations') return false;
+  const e = dockMapItems.get(id);
+  if (e) return dockMapListed(e);
+  return !dockMapBuilt && !!state.data && dockAcceptsPanels();
 }
 
 // The pane the side panel would like to show. What was stored, except for a map
-// panel whose pin has gone — unpinned from another map, where MapChrome's pin is
-// the same one (the pin set is per panel, not per map). A preference for a pane
-// that can no longer exist anywhere is not a preference, and read literally it
-// would leave the Stations tab opening with the side panel shut for no reason
-// anyone could see; it reads as the default instead.
+// pane that the Stations map, having been built, turns out not to make — an id
+// from an older version of the app, say. A preference for a pane that can no
+// longer exist anywhere is not a preference, and read literally it would leave
+// the Stations tab opening with the side panel shut for no reason anyone could
+// see; it reads as the default instead. A phone is not that case: there the
+// entries are 'away', not gone, and the preference is kept for the desktop.
 function dockPreferred() {
   const t = state.dockTab || 'stations';
-  return t.startsWith('map-') && !state.mapPanelsPinned.has(t.slice(4)) ? 'stations' : t;
+  return t.startsWith('map-') && dockMapBuilt && !dockMapItems.has(t) ? 'stations' : t;
 }
 
 // The pane on screen, or null for a shut panel. The preference is shown when it
@@ -1855,19 +1904,32 @@ function helpShowing() {
   return dockShowing() === 'help';
 }
 
-// Every pane there is right now, in strip order: help, the cards, then the map
-// panels by their corner group and their place in it — not by the order they
-// were pinned, and not by the order they were built, which for the polar plot
-// and the site finder is long after the rest.
-function dockTabs() {
-  const tabs = [{ id: 'help', icon: '?', label: 'Help' }];
+// Everything in the strip right now, as the groups it stands in: the side
+// panel's own (help, the cards), then the map's controls by their corner group
+// and their place in it — not by the order they were built, which for the
+// polar plot and the site finder is long after the rest. Each item is either a
+// pane's button ('tab', made and kept by syncDockStrip) or one of MapChrome's
+// own buttons ('action', the element itself). A button whose map is being
+// built again has no element to stand in the strip until the new one arrives,
+// so it is simply not there for that moment; a pane's button is.
+function dockStripGroups() {
+  const side = [{ key: 'help', kind: 'tab', icon: '?', label: 'Help' }];
   if (dockStationsHere()) {
-    tabs.push({ id: 'stations', icon: '📋',
+    side.push({ key: 'stations', kind: 'tab', icon: '📋',
                 label: 'Stations — filters, station list, ground profile, link budget and station details' });
   }
-  const maps = [...dockMapPanes.values()].sort((a, b) => a.rank - b.rank || a.order - b.order);
-  for (const m of maps) tabs.push({ id: m.id, icon: m.icon, label: m.title });
-  return tabs;
+  const groups = [{ name: 'side', label: '', items: side }];
+  const map = [...dockMapItems.values()]
+    .filter(e => dockMapListed(e) && (e.kind === 'panel' || e.el))
+    .sort((a, b) => a.rank - b.rank || a.order - b.order);
+  for (const e of map) {
+    let g = groups[groups.length - 1];
+    if (g.name !== e.group) groups.push(g = { name: e.group, label: `Map controls: ${e.groupLabel}`, items: [] });
+    g.items.push(e.kind === 'panel'
+      ? { key: e.key, kind: 'tab', icon: e.icon, label: e.label, entry: e }
+      : { key: e.key, kind: 'action', el: e.el });
+  }
+  return groups;
 }
 
 // ── How wide ─────────────────────────────────────────────────────────────────
@@ -1894,7 +1956,7 @@ function dockWidthRange() {
   const vw = document.documentElement.clientWidth || window.innerWidth || 0;
   const navW = isPhoneNav() ? 0
     : state.navCollapsed ? dockCssPx('--mn-nav-rail', 56) : dockCssPx('--mn-nav', 236);
-  const room = Math.max(0, vw - navW - dockCssPx('--mn-help-rail', 45));
+  const room = Math.max(0, vw - navW - dockCssPx('--mn-help-rail', 56));
   const max = Math.max(0, Math.round(Math.max(room - DOCK_MAIN_MIN, room * 0.55)));
   return { min: Math.min(DOCK_MIN_W, max), max };
 }
@@ -1910,12 +1972,19 @@ function dockWidth() {
 // it as --mn-dock-w (styles.css), set here as a custom property rather than as
 // a width so the phone breakpoint can go on ignoring it, and the separator
 // carries it in the same px the operator is moving it in.
+//
+// And the whole panel's width, strip included, as --mn-side-w on the root —
+// for the one thing outside the panel that has to meet its edge exactly: the
+// full-screen map, which stops where the side panel starts (styles.css,
+// .map-panel.is-full). Written on every call rather than only in full screen,
+// so the frame that enters full screen already has the right figure.
 function syncDockWidth() {
   const panel = document.getElementById('help-panel');
   if (!panel) return 0;
   const r = dockWidthRange();
   const w = dockWidth();
   panel.style.setProperty('--mn-dock-w', `${w}px`);
+  document.documentElement.style.setProperty('--mn-side-w', `${dockTakes(dockShowing(), w)}px`);
   const handle = panel.querySelector('.dock-resize');
   if (handle) {
     handle.setAttribute('aria-valuemin', String(r.min));
@@ -1930,7 +1999,7 @@ function syncDockWidth() {
 // where it is a drawer over the page and takes none.
 function dockTakes(showing, w) {
   if (isPhoneNav()) return 0;
-  const rail = dockCssPx('--mn-help-rail', 45);
+  const rail = dockCssPx('--mn-help-rail', 56);
   return showing ? rail + w : rail;
 }
 
@@ -1964,7 +2033,10 @@ function renderDock(opts = {}) {
   const w = dockWidth();
   const takes = dockTakes(showing, w);
   const moved = dockLastW !== null && takes !== dockLastW;
-  const instant = !!opts.instant && moved && panel.classList.contains('help-ready');
+  // Full screen is always instant: the map's edge there is the panel's edge,
+  // set from --mn-side-w in one step, and a panel sliding beside a map that has
+  // already moved is a gap or an overlap for as long as the slide lasts.
+  const instant = (!!opts.instant || mapFullOnScreen()) && moved && panel.classList.contains('help-ready');
   if (instant) panel.classList.add('dock-instant');
 
   panel.classList.toggle('collapsed', !showing);
@@ -2027,50 +2099,86 @@ function dockAfterSlide(panel) {
   dockSlideDone = finish;
 }
 
-// The strip, reconciled with the panes that exist: a button made for a new
-// pane, a button dropped with its pane, and the rest put in order. Buttons that
-// are already there are left where they are and only have their attributes
-// written — a button that is replaced is a button that loses focus, and the one
-// most likely to have it is the one that was just pressed.
+// The strip, reconciled with what is in it now: a group made for a new group, a
+// button made for a new pane, whatever has gone taken out, and the rest put in
+// order. Buttons that are already there are left where they are and only have
+// their attributes written — a button that is replaced is a button that loses
+// focus, and the one most likely to have it is the one that was just pressed.
+// A pane's button is kept on its entry for the same reason, so that a map built
+// again finds the button it had rather than a new one in its place.
+//
+// The map's own buttons are MapChrome's, and are only ever *moved* here: this
+// writes nothing on them. Their modules keep them in step (their labels, their
+// aria-pressed, the camera pair's `hidden`), wherever they are standing.
 function syncDockStrip(showing) {
   const strip = document.querySelector('#help-panel .dock-strip');
   if (!strip) return;
   const phone = isPhoneNav();
-  const want = dockTabs();
+  const groups = dockStripGroups();
   const had = document.activeElement;
-  for (const b of [...strip.querySelectorAll('.dock-tab')]) {
-    if (!want.some(t => t.id === b.dataset.dock)) b.remove();
+  const names = groups.map(g => g.name);
+  for (const box of [...strip.querySelectorAll(':scope > .dock-group')]) {
+    if (!names.includes(box.dataset.group)) box.remove();
   }
-  want.forEach((t, i) => {
-    let b = strip.querySelector(`.dock-tab[data-dock="${CSS.escape(t.id)}"]`);
-    if (!b) {
-      b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'dock-tab';
-      b.dataset.dock = t.id;
-      b.setAttribute('aria-controls', dockPaneId(t.id));
-      b.setAttribute('onclick', `toggleDockTab('${t.id}')`);
-      b.innerHTML = `<span class="dock-ico" aria-hidden="true">${t.icon}</span>`;
+  groups.forEach((g, gi) => {
+    let box = strip.querySelector(`:scope > .dock-group[data-group="${CSS.escape(g.name)}"]`);
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'dock-group';
+      box.dataset.group = g.name;
+      // The same labelled group the corner made of it (MapChrome), so that a
+      // screen reader is told "3-D view" where a sighted operator is shown a
+      // hairline. The side panel's own pair needs no name: the strip is it.
+      if (g.label) {
+        box.setAttribute('role', 'group');
+        box.setAttribute('aria-label', g.label);
+      }
     }
-    if (strip.children[i] !== b) strip.insertBefore(b, strip.children[i] || null);
-    const on = showing === t.id;
-    // On a phone the open help pane is a drawer and this button is the tab on
-    // its edge, so it is the drawer's close button and says so. Everywhere else
-    // the name stays the pane's name and aria-expanded carries the state; the
-    // tooltip says what a second press does, because "shut the whole panel"
-    // is not what a sighted user expects a tab to do until told.
-    const closing = on && phone && t.id === 'help';
-    const label = closing ? 'Close help' : t.label;
-    b.setAttribute('aria-label', label);
-    b.title = on && !phone ? `${label} — press again to hide the side panel` : label;
-    b.setAttribute('aria-expanded', String(on));
-    b.classList.toggle('is-on', on);
-    if (t.id === 'help') {
-      const ico = b.querySelector('.dock-ico');
-      if (ico) ico.textContent = closing ? '✕' : '?';
-    }
+    if (strip.children[gi] !== box) strip.insertBefore(box, strip.children[gi] || null);
+    const els = g.items.map(it => (it.kind === 'action' ? it.el : dockTabEl(strip, it)));
+    for (const c of [...box.children]) if (!els.includes(c)) c.remove();
+    els.forEach((el, i) => { if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null); });
+    g.items.forEach((it, i) => {
+      if (it.kind !== 'tab') return;
+      const b = els[i];
+      const on = showing === it.key;
+      // On a phone the open help pane is a drawer and this button is the tab on
+      // its edge, so it is the drawer's close button and says so. Everywhere
+      // else the name stays the pane's name and aria-expanded carries the
+      // state; the tooltip says what a second press does, because "shut the
+      // whole panel" is not what a sighted user expects a tab to do until told.
+      const closing = on && phone && it.key === 'help';
+      const label = closing ? 'Close help' : it.label;
+      b.setAttribute('aria-label', label);
+      b.title = on && !phone ? `${label} — press again to hide the side panel` : label;
+      b.setAttribute('aria-expanded', String(on));
+      b.classList.toggle('is-on', on);
+      if (it.key === 'help') {
+        const ico = b.querySelector('.dock-ico');
+        if (ico) ico.textContent = closing ? '✕' : '?';
+      }
+    });
   });
   if (had && had !== document.activeElement && strip.contains(had)) had.focus({ preventScroll: true });
+}
+
+// A pane's button: the one already in the strip, the one its map entry kept, or
+// a new one. Made here, never by MapChrome — the panel's own icon is a flyout's
+// disclosure and is hidden in the side panel, and this is the side panel's.
+function dockTabEl(strip, it) {
+  let b = it.entry ? it.entry.tab
+    : strip.querySelector(`.dock-tab[data-dock="${CSS.escape(it.key)}"]`);
+  if (!b) {
+    b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'dock-tab';
+    b.dataset.dock = it.key;
+    b.setAttribute('aria-controls', dockPaneId(it.key));
+    b.setAttribute('onclick', `toggleDockTab('${it.key}')`);
+    b.innerHTML = `<span class="dock-ico" aria-hidden="true">${it.icon}</span>`;
+    if (it.entry) it.entry.tab = b;
+  }
+  return b;
 }
 
 // ── Opening, shutting, switching ─────────────────────────────────────────────
@@ -2130,10 +2238,13 @@ function setHelpCollapsed(collapsed) {
 
 // Up and down walk the strip, Home and End go to either end — the strip reads
 // as one column of buttons, so it drives as one, the way navKey drives the nav.
+// Every button in it, the panes' and the map's alike, across the groups; not
+// the ones that are not on screen (the camera pair on a flat map).
 function dockStripKey(e) {
   const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
   if (!keys.includes(e.key)) return;
-  const items = [...document.querySelectorAll('#help-panel .dock-strip .dock-tab')];
+  const items = [...document.querySelectorAll('#help-panel .dock-strip button')]
+    .filter(b => !b.disabled && b.getClientRects().length > 0);
   const i = items.indexOf(document.activeElement);
   if (i < 0 || !items.length) return;
   const next = e.key === 'Home' ? items[0]
@@ -2252,96 +2363,177 @@ function dockResizeKey(e) {
   if (now !== w) invalidateMapSizes(0);
 }
 
-// ── Map panels in the side panel ─────────────────────────────────────────────
+// ── The Stations map's controls in the side panel ────────────────────────────
 // The other half of MapChrome.dockInto (map-controls.js). The Stations map is
-// the one map that hands its pinned panels over; the other six keep docking
-// theirs into their own corner, the way every map did before this, because
+// the one map that hands its corner over — every panel and every button in it —
+// and the other six keep theirs, the way every map did before this, because
 // none of them sits beside this panel.
 
-// What the Stations map hands MapChrome: the questions it asks, and the two
-// things it does with a panel.
+// What the Stations map hands MapChrome: the question it asks, and the two
+// things it does with a control.
 function stationsDockHost() {
   return {
     accepts: dockAcceptsPanels,
-    adopt: dockAdoptPanel,
-    release: dockReleasePanel,
+    adopt: dockAdopt,
+    release: dockRelease,
   };
 }
 
-// A panel arrives — its whole .mn-mapctl wrapper, icon, heading, pin and body,
-// moved rather than copied, so everything its module captured and every id in
-// it goes on working (map-controls.js says why the wrapper and nothing smaller).
-// `info.reason` says why:
+// The key a control is held under: its pane's name for a panel, and 'btn-' and
+// its class for a plain button.
+function dockMapKey(info) {
+  return `${info.kind === 'panel' ? 'map' : 'btn'}-${info.id}`;
+}
+
+// A control arrives — a panel's whole .mn-mapctl wrapper (icon, heading, pin and
+// body), or one of MapChrome's plain buttons — moved rather than copied, so
+// everything its module captured, every listener on it and every id in it goes
+// on working (map-controls.js says why the wrapper and nothing smaller). A panel
+// goes into a pane of its own and gets a button in the strip; a plain button
+// goes into the strip itself, where its class is still what its module finds it
+// by. At once, not at the next repaint: a module may look for its button by
+// class on the very next line (Map3D does, as the map is built).
 //
-//   pin     the operator has just pinned it, so the side panel opens on it —
-//           a pinned panel that is not on screen is a pin that did nothing.
-//   build   its map has just been built with it pinned (a tab switch, a
-//           reload). Whether it shows is the side panel's own preference.
-//   back    it is coming back from the map's corner (full screen has ended,
-//           the window is wider than a phone again). Same.
-function dockAdoptPanel(wrap, info) {
+// Nothing is opened by it. `info.reason` is 'build' — its map has just been
+// built, which happens on every render of the Stations tab — or 'back', from the
+// corner as the window grows past a phone's, and neither is the operator asking
+// to see it; which pane shows is the side panel's own preference.
+//
+// The one exception is focus, which has to land on something on screen
+// (relocate() in map-controls.js hands over what it was on):
+//
+//   the panel's icon     hidden here, so it goes to the panel's strip button
+//   inside the panel     somebody is typing in it as the window crosses a
+//                        phone's width: the side panel opens on it, or the field
+//                        they were in would be in a hidden pane and the refocus
+//                        would fail without a word
+//   a plain button       it is still that button
+function dockAdopt(el, info) {
   const panel = dockEl();
-  if (!panel) return;
-  const id = `map-${info.id}`;
-  const old = dockMapPanes.get(id);
-  if (old && old.wrap !== wrap) old.pane.remove();
-  const pane = (old && old.wrap === wrap) ? old.pane : document.createElement('div');
-  pane.className = 'dock-pane dock-pane-map';
-  pane.id = dockPaneId(id);
-  pane.dataset.dock = id;
-  pane.hidden = true;
-  if (wrap.parentNode !== pane) pane.appendChild(wrap);
-  if (pane.parentNode !== panel.querySelector('.dock-panes')) panel.querySelector('.dock-panes').appendChild(pane);
-  dockMapPanes.set(id, { id, pane, wrap, icon: info.icon, title: info.title,
-                         rank: info.rank, order: info.order });
-  if (info.reason === 'pin') {
-    if (dockShowing() !== id) dockBack.push({ tab: state.dockTab, open: state.dockOpen });
-    setDockTab(id);
-  } else if (info.focused) {
-    // Coming back from the corner with focus inside it (see relocate() in
-    // map-controls.js): shown at once, so the control that has focus is still
-    // on screen when it is focused again.
-    setDockTab(id, { instant: true });
-  } else {
-    renderDock({ instant: true });
+  if (!panel) return null;
+  const key = dockMapKey(info);
+  let e = dockMapItems.get(key);
+  if (!e) {
+    e = { key, kind: info.kind, state: 'gap', el: null, pane: null, tab: null, scroll: 0 };
+    dockMapItems.set(key, e);
   }
-}
-
-// …and leaves. `info.reason` is 'unpin' when the operator unpinned it, and
-// 'away' when it is going back to the corner for full screen or a phone and
-// will be back. Only an unpin changes what the side panel would like to show:
-// it goes back to where it was before the pin opened it.
-function dockReleasePanel(wrap, info) {
-  const id = `map-${info.id}`;
-  const entry = dockMapPanes.get(id);
-  if (!entry || entry.wrap !== wrap) return;
-  dockMapPanes.delete(id);
-  entry.pane.remove();
-  if (info.reason === 'unpin' && state.dockTab === id) {
-    let prev = null;
-    while (dockBack.length) {
-      const p = dockBack.pop();
-      if (p.tab !== id && dockHas(p.tab)) { prev = p; break; }
+  // A control from a map that was not taken down first. Never expected — but a
+  // second copy of every id on the page is the failure that says nothing, so it
+  // is taken out rather than left for getElementById to find first.
+  if (e.el && e.el !== el) e.el.remove();
+  Object.assign(e, { el, state: 'held', icon: info.icon, label: info.label, group: info.group,
+                     groupLabel: info.groupLabel, rank: info.rank, order: info.order });
+  if (e.kind === 'panel') {
+    if (!e.pane) {
+      e.pane = document.createElement('div');
+      e.pane.className = 'dock-pane dock-pane-map';
+      e.pane.id = dockPaneId(key);
+      e.pane.dataset.dock = key;
+      e.pane.hidden = true;
     }
-    state.dockTab = prev ? prev.tab : 'stations';
-    if (prev) state.dockOpen = prev.open;
-    dockPersist();
-    renderDock();
-  } else {
-    renderDock({ instant: info.reason !== 'unpin' });
+    const panes = panel.querySelector('.dock-panes');
+    if (e.pane.parentNode !== panes) panes.appendChild(e.pane);
+    if (el.parentNode !== e.pane) e.pane.appendChild(el);
+  }
+  renderDock({ instant: true });
+  const f = info.focused;
+  if (!f || e.kind !== 'panel') return null;
+  if (f.classList && f.classList.contains('mn-mapctl-btn')) return e.tab;
+  if (dockShowing() !== key) setDockTab(key, { instant: true });
+  return null;
+}
+
+// …and goes back to MapChrome, because the side panel has stopped taking the
+// map's controls (a phone). The entry keeps its pane and its button for when it
+// comes back, and the preference for its pane is left alone: a phone is not the
+// operator saying they are done with Draw & measure on their desktop.
+//
+// Returns whether the strip button for it had focus, so that MapChrome can put
+// focus on the control's icon in the corner instead of letting it fall to
+// <body> as the button leaves the strip.
+function dockRelease(el, info) {
+  const e = dockMapItems.get(dockMapKey(info));
+  if (!e || e.el !== el) return false;
+  const tabHad = !!e.tab && document.activeElement === e.tab;
+  e.el = null;
+  e.state = 'away';
+  renderDock({ instant: true });
+  return tabHad;
+}
+
+// Every one of the map's controls out of the side panel, at once and without
+// ceremony: their map is being taken down (stopStationsMap). Leaflet's own
+// teardown removes the controls it holds, and these are not in it — so without
+// this the old map's controls would outlive it here, and the next build would
+// put a second copy of every id on the page, where getElementById finds the
+// stale one first, and a second ⛰️ that Map3D would keep in step with nothing.
+//
+// The entries stay, as 'gap': the panes and their buttons are kept for the map
+// being built next (dockMapItems says why), and whatever had focus inside a
+// control, and the scroll of the pane on screen, are written down for
+// dockSettle() to give back. No repaint: whatever called this is about to build
+// the map again or leave the tab, and either repaints the panel itself.
+function dockDropMapItems() {
+  const a = document.activeElement;
+  const held = [...dockMapItems.values()].filter(e => e.state === 'held');
+  if (!held.length) return;
+  dockMapRefocus = null;
+  // Everything read before anything is taken out: a scroll offset read after
+  // the strip or a pane has lost its contents is an offset already clamped.
+  const strip = document.querySelector('#help-panel .dock-strip');
+  dockStripScroll = strip ? strip.scrollTop : 0;
+  for (const e of held) {
+    if (e.el && a && a !== document.body && e.el.contains(a)) dockMapRefocus = { key: e.key, id: a.id || null };
+    if (e.pane && !e.pane.hidden) e.scroll = e.pane.scrollTop;
+  }
+  for (const e of held) {
+    if (e.el) e.el.remove();
+    e.el = null;
+    e.state = 'gap';
   }
 }
 
-// Every map panel out of the side panel, at once and without ceremony: their
-// map is being taken down (stopStationsMap). Leaflet's own teardown removes the
-// controls it holds, and these are not in it any more — so without this the
-// old map's panels would outlive it here, and the next build would put a second
-// copy of every id on the page, where getElementById finds the stale one first.
-// No repaint: whatever called this is about to build the map again or leave the
-// tab, and either repaints the panel itself.
-function dockDropMapPanes() {
-  for (const entry of dockMapPanes.values()) entry.pane.remove();
-  dockMapPanes.clear();
+// How far down the strip was scrolled when the map's controls last left it for
+// a rebuild — the strip is taller than the window on a laptop, and a render of
+// the tab should not send it back to the top under the operator's pointer.
+let dockStripScroll = 0;
+
+// The Stations map has finished building, or has found it has nothing to build
+// (initMap). Whatever it did not hand back is gone for good — a panel this map
+// no longer makes — and is taken out with its pane and its button; the side
+// panel is painted once against what actually arrived; and what dockDropMapItems
+// wrote down is given back.
+//
+// Focus goes back on the same control of the new map: the same button, or the
+// element with the same id inside the same panel, or — for an element with no
+// id of its own — that panel's strip button, which is the nearest thing to it
+// that is still there. Only when nothing else has taken focus in the meantime.
+function dockSettle(built) {
+  if (built) dockMapBuilt = true;
+  for (const [key, e] of dockMapItems) {
+    if (e.state !== 'gap') continue;
+    if (e.pane) e.pane.remove();
+    if (e.tab) e.tab.remove();
+    dockMapItems.delete(key);
+  }
+  renderDock({ instant: true });
+  const r = dockMapRefocus;
+  dockMapRefocus = null;
+  const e = r && dockMapItems.get(r.key);
+  if (e && e.el && (!document.activeElement || document.activeElement === document.body)) {
+    const to = e.kind === 'button' ? e.el
+      : (r.id && e.el.querySelector(`#${CSS.escape(r.id)}`)) || e.tab;
+    if (to && document.contains(to)) to.focus({ preventScroll: true });
+  }
+  const showing = dockShowing();
+  const s = showing && dockMapItems.get(showing);
+  if (s && s.pane && s.scroll) {
+    s.pane.scrollTop = s.scroll;
+    s.scroll = 0;
+  }
+  const strip = document.querySelector('#help-panel .dock-strip');
+  if (strip && dockStripScroll) strip.scrollTop = dockStripScroll;
+  dockStripScroll = 0;
 }
 
 // ── Help: the prose ──────────────────────────────────────────────────────────
@@ -2893,7 +3085,26 @@ function refreshStationsListNote() {
 // state so renderStationsHtml() re-emits the class across in-tab re-renders
 // (which rebuild the map); the Escape listener is transient and dies with the
 // map in stopStationsMap(), then syncMapFullEsc() in initMap() re-arms it.
+//
+// **Everything except the side panel.** The map's tools live in the side
+// panel's strip above a phone's width, and a full-screen map that had covered
+// them would be a map that could only be looked at. So the side panel stays on
+// screen beside it, at the width it had, strip and open pane both: the map is
+// fixed to the window with its right edge at the side panel's (--mn-side-w,
+// which the side panel keeps current — syncDockWidth), and the side panel is
+// fixed to the window's right edge above the header for as long as full screen
+// lasts (styles.css). Its panes and its handle all go on working, and the map is
+// re-measured whenever the side panel changes width under it (renderDock, which
+// is instant for as long as this lasts). On a phone the side panel is a drawer
+// and the tools are on the map, so full screen there is what it always was.
 let mapFullEscListener = null;
+
+// Whether a full-screen map is on screen right now — asked of the class the
+// stylesheet keys off rather than of the flag, which can say full screen while
+// no map is drawn: a file not loaded yet, or a render of the tab half-way done.
+function mapFullOnScreen() {
+  return !!document.querySelector('.map-panel.is-full');
+}
 
 function toggleMapFullscreen(on) {
   state.mapFullscreen = on == null ? !state.mapFullscreen : !!on;
@@ -2903,16 +3114,14 @@ function toggleMapFullscreen(on) {
   const b = document.querySelector('.mn-map-full');
   if (b) syncMapFullBtn(b);
   syncMapFullEsc();
-  // The full-screen map is fixed over the whole shell, the side panel included,
-  // so a map panel pinned into the side panel would be under it for as long as
-  // full screen lasts. They go back to the map's corner — docked there, the way
-  // pinning looked before the side panel — and come back to it when full
-  // screen ends (dockAcceptsPanels is the rule, MapChrome.redock the asking).
-  if (state.map) MapChrome.redock(state.map);
+  // Written before the map is measured, so the edge the map is measured
+  // against is already the side panel's.
+  syncDockWidth();
   // No CSS transition on the class, so the container is already its new size.
   invalidateMapSizes(0);
   announce(state.mapFullscreen
-    ? 'Map is full screen. Press Escape to exit.'
+    ? (isPhoneNav() ? 'Map is full screen. Press Escape to exit.'
+                    : 'Map is full screen, with the side panel beside it. Press Escape to exit.')
     : 'Map back in the page.');
 }
 
@@ -3125,6 +3334,35 @@ function syncMapFullBtn(b) {
   b.setAttribute('aria-label', label);
 }
 
+// Everything Tab can stop on inside `roots`, in page order: on screen, not
+// disabled, not taken out of the order with tabindex="-1", and one stop per
+// radio group — the checked one, or the first when none is.
+function mapFullTabStops(roots) {
+  const sel = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), '
+            + 'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const radios = new Map();   // the form or root a radio group is in → the group names already stopped at
+  const out = [];
+  for (const root of roots) {
+    if (!root) continue;
+    for (const n of root.querySelectorAll(sel)) {
+      if (n.tabIndex < 0 || !n.getClientRects().length) continue;
+      if (getComputedStyle(n).visibility === 'hidden') continue;
+      if (n.type === 'radio' && n.name) {
+        const scope = n.form || root;
+        if (!radios.has(scope)) radios.set(scope, new Set());
+        const done = radios.get(scope);
+        if (done.has(n.name)) continue;
+        const group = [...scope.querySelectorAll(`input[type="radio"][name="${CSS.escape(n.name)}"]`)]
+          .filter(r => !r.disabled && r.getClientRects().length);
+        if ((group.find(r => r.checked) || group[0]) !== n) continue;
+        done.add(n.name);
+      }
+      out.push(n);
+    }
+  }
+  return out;
+}
+
 function syncMapFullEsc() {
   if (state.mapFullscreen && !mapFullEscListener) {
     mapFullEscListener = e => {
@@ -3135,21 +3373,36 @@ function syncMapFullEsc() {
       // phone drawers) claim the key the same way.
       if (e.defaultPrevented) return;
       if (e.key === 'Escape') { e.preventDefault(); toggleMapFullscreen(false); return; }
-      // Tab cycles within the panel while it owns the viewport — Modal's own
-      // walls, borrowed. Without this, Tab walks off into the station table,
-      // the nav and the mem-bar, all invisibly underneath the fixed panel
-      // (and the mem panel opens at z 1500, *below* it — a dialog a keyboard
-      // user could enter and never see).
+      // Tab cycles within what is on screen while the map owns the viewport —
+      // Modal's own walls, borrowed. Without this, Tab walks off into the
+      // station table, the nav and the mem-bar, all invisibly underneath the
+      // fixed panel (and the mem panel opens at z 1500, *below* it — a dialog a
+      // keyboard user could enter and never see).
+      //
+      // What is on screen is the map *and the side panel beside it*, which is
+      // where its tools are. Two places rather than one is why every Tab is
+      // placed here rather than only the ones at either end: the browser's own
+      // next stop after the map's last control is whatever follows it in the
+      // page — the cards under the map, when they are there, hidden under the
+      // map — and one Tab onto something nobody can see is the failure these
+      // walls exist to prevent. Radio buttons keep the browser's rule of one
+      // stop per group, at the one that is checked.
       if (e.key !== 'Tab') return;
       const panel = document.querySelector('.map-panel.is-full');
       if (!panel) return;
-      const items = [...panel.querySelectorAll(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])')]
-        .filter(n => n.offsetParent !== null);
+      // A dialog open over the map has walls of its own (Modal), and they only
+      // claim the key at their ends — so a Tab between two of its controls
+      // arrives here unclaimed, and placing it would throw focus out of the
+      // dialog onto the map behind it.
+      const active = document.activeElement;
+      if (active && active.closest && active.closest('#app-modal, [aria-modal="true"]')) return;
+      const side = isPhoneNav() ? null : document.getElementById('help-panel');
+      const items = mapFullTabStops([panel, side]);
       if (!items.length) return;
       const at = items.indexOf(document.activeElement);
-      if (e.shiftKey) { if (at <= 0) { e.preventDefault(); items[items.length - 1].focus(); } }
-      else if (at < 0 || at === items.length - 1) { e.preventDefault(); items[0].focus(); }
+      e.preventDefault();
+      const next = e.shiftKey ? items[(at <= 0 ? items.length : at) - 1] : items[(at + 1) % items.length];
+      next.focus();
     };
     document.addEventListener('keydown', mapFullEscListener);
   } else if (!state.mapFullscreen && mapFullEscListener) {
@@ -3178,6 +3431,14 @@ function syncMapFullEsc() {
 // corner, which is not the order they are added in: MapPolar.attach() runs long
 // after this function and drops 📡 into the middle of the tools group, where it
 // belongs, rather than at the bottom of the column where it landed before.
+//
+// **And the corner is not where they are, above a phone's width.** This map
+// hands every one of them to the side panel (MapChrome.dockInto, initMap), which
+// stands them in its strip in these same groups and this same order — a panel
+// as a pane with a button of its own, a button as itself. Everything said below
+// about "the corner" is what they are on a phone, and what the strip copies.
+// Nothing here needs to know which: each control is found again by its id or its
+// class, and neither changes with where it is standing.
 //
 // Rebuilt with the map, on every render of the tab: initMap() calls this after
 // addBaseLayers() and before the modules attach.
@@ -3261,8 +3522,13 @@ function stationsMapPanels(map) {
   // exaggeration slider, the line-of-sight sheet switch and the note that says
   // what the relief is made of and what it cannot be trusted to say. The button
   // above is the mode; this is everything about it (map-3d.js).
+  //
+  // In the side panel's strip there is no split button to be half of, so it is
+  // a button of its own under ⛰️, and wears 🎚️ — the slider and the switches it
+  // opens — rather than ⛰️ twice, which would be two buttons saying the same
+  // thing and doing different things.
   MapChrome.panel(map, {
-    id: '3d', icon: '▾', dockIcon: '⛰️', title: '3-D view',
+    id: '3d', icon: '▾', dockIcon: '🎚️', title: '3-D view',
     btnLabel: '3-D view settings — exaggeration, line-of-sight sheets, what the relief is',
     caret: true, pair: '3d',
     group: '3d', order: 20,
@@ -3299,8 +3565,9 @@ function stationsMapPanels(map) {
   // ── How much screen the map gets ───────────────────────────────────────────
   // Full screen and side by side are the same decision at two sizes, so they
   // are one group. Rebuilt with the map on every render; renderStationsHtml()
-  // emits the is-full class from state, so the buttons always sit inside a
-  // panel that already tells the truth.
+  // emits the is-full class from state, so the buttons are always built beside
+  // a map that already tells the truth — and in full screen the side panel they
+  // stand in is still on screen, so ⛶ is where it was when it was pressed.
   //
   // Both carry a pressed state and a label that changes with it, so both are
   // built bare and then handed to the same function that keeps them in step
@@ -4132,7 +4399,10 @@ function maybeShowMapLayersHint() {
     try { localStorage.setItem('mn-hint-display', '1'); } catch (_) { /* see above */ }
     mapLayersHintUntil = now + MAP_LAYERS_HINT_MS;
   }
-  mapNote('Tip: the 🗺️ button on the map mixes the base maps and has more layers — survey '
+  // Where the 🗺️ is depends on the width: in the side panel's strip, or — on a
+  // phone, where the map keeps its own controls — on the map.
+  const where = dockAcceptsPanels() ? '🗺️ in the side panel’s strip, on the right,' : 'the 🗺️ button on the map';
+  mapNote(`Tip: ${where} mixes the base maps and has more layers — survey `
     + 'marks, LiDAR contours, wind regions, ACMA licences, line of sight.', mapLayersHintUntil - now);
 }
 
@@ -4221,11 +4491,11 @@ function stopStationsMap() {
   // the generation, or four-at-a-time terrain fetches carry on for minutes
   // behind whatever tab replaced this one.
   MapLos.newGeneration();
-  // The map panels pinned into the side panel are this map's, and Leaflet's
-  // own teardown only reaches the controls still inside its container — which
+  // The map's controls in the side panel are this map's, and Leaflet's own
+  // teardown only reaches the controls still inside its container — which
   // these are not. Out before the map goes, and whether or not remove() below
   // manages to (removeMap swallows the throw a reused container makes).
-  dockDropMapPanes();
+  dockDropMapItems();
   state.map = removeMap(state.map);
   state.mapMarkers = [];
   state.mapLines   = [];
@@ -4251,6 +4521,12 @@ function initMap() {
   // goes with them in the repaint switchTab() makes straight after, which is
   // the first moment the side panel can know which tab it is on.
   registerTabTeardown('Stations cards', dropStationsCards);
+  // Full screen ends with the tab. It could not be left from inside before —
+  // the nav is under the map — but the side panel is beside a full-screen map
+  // now, and its help's "See also" buttons switch tabs. A flag left on would
+  // bring the next visit to the tab back up full screen, which nobody asked
+  // for; the class goes with the markup on its own.
+  registerTabTeardown('Stations full screen', () => { state.mapFullscreen = false; });
   // Belt and braces: a re-render *inside* the tab never goes through
   // switchTab(), so it never sees the teardown, and this map is rebuilt on
   // every one of them.
@@ -4260,7 +4536,8 @@ function initMap() {
   // re-measure the new map needs.
   lastSplitHeight = null;
   const el = document.getElementById('leaflet-map');
-  if (!el) return;
+  // No map to build: the side panel lets go of the panes the last one had.
+  if (!el) { dockSettle(false); return; }
   // preferCanvas: with ~3,174 station pins and ~3,141 pass-range link lines,
   // the default SVG renderer means ~6,300 SVG nodes rebuilt on every refresh.
   // A single canvas element instead. The renderer is created explicitly for
@@ -4270,9 +4547,10 @@ function initMap() {
   // The one map still declared in the file that re-measures them all. It says
   // so the same way the other four do, so that stays true if it ever moves.
   registerLiveMap('Stations', () => state.map);
-  // The one map whose pinned panels go into the side panel rather than into its
-  // own corner — it is the one map the side panel sits beside. Before any panel
-  // is built, so each one docks itself as it is made (MapChrome.dockInto).
+  // The one map whose corner goes into the side panel — every panel and every
+  // button in it — because it is the one map the side panel sits beside. Before
+  // any control is built, so each one goes there as it is made, without ever
+  // standing in the corner (MapChrome.dockInto).
   MapChrome.dockInto(state.map, stationsDockHost());
   // A view before anything is added to the map. Leaflet defers every layer add
   // until the map has one, and the deferred adds then run in an order nothing
@@ -4373,13 +4651,11 @@ function initMap() {
   // that is the map's own memory of what you were looking at must not.
   repaintStnCard();
   maybeShowMapLayersHint();
-  // Every panel this map has is built by now, polar plot and site finder
-  // included. Which ones is what dockMapExpected() needs to stop expecting a
-  // pinned panel this map does not make — and the side panel is settled once
-  // against what actually arrived. Nothing moves in the ordinary case: the
-  // panel was opened at this width before the map was built.
-  dockStationsPanelIds = new Set(MapChrome.panelIds(state.map));
-  renderDock({ instant: true });
+  // Every control this map has is built by now, polar plot and site finder
+  // included, and the side panel is settled once against what actually arrived
+  // (dockSettle). Nothing moves in the ordinary case: the panel was open at this
+  // width on this pane before the map was built, and still is.
+  dockSettle(true);
 }
 
 // Panels that depend on loaded ACMA data, refreshed without rebuilding the tab.
@@ -5882,16 +6158,18 @@ function closeStnCard(refocus = true) {
   const live = back && back !== document.body && document.contains(back)
     && typeof back.focus === 'function';
   // Tried in order until one takes: an opener can be on the page and still
-  // refuse focus, and a refusal is silent. In full screen only the panel
-  // counts — a row or a header button is underneath it, invisible, and the
-  // panel's own Tab walls exist to keep focus out of exactly there.
+  // refuse focus, and a refusal is silent. In full screen only what is on
+  // screen counts — the map and the side panel beside it; a row under the map
+  // or a header button is underneath it, invisible, and full screen's own Tab
+  // walls exist to keep focus out of exactly there.
   const full = state.mapFullscreen ? document.querySelector('.map-panel.is-full') : null;
+  const side = full && !isPhoneNav() ? document.getElementById('help-panel') : null;
   const row = id ? document.querySelector(`#stations-table-wrap tr[data-sid="${CSS.escape(id)}"] button`) : null;
   const candidates = [
     live ? back : null,
     row,
     document.getElementById('leaflet-map'),
-  ].filter(t => t && (!full || full.contains(t)));
+  ].filter(t => t && (!full || full.contains(t) || (side && side.contains(t))));
   for (const t of candidates) {
     // The row may be in the side panel's Stations pane with another pane on
     // screen, or with the panel shut. It is then skipped, not revealed:

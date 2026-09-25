@@ -117,19 +117,22 @@
     </main>
 
     <!-- The side panel (the "dock"): a strip of buttons on the outer edge — ❔
-         Help, 📋 the Stations cards on that tab, and one per map panel pinned
-         into it — and, open, one pane beside the strip, with a handle on its
-         inner edge that sets its width. The one complementary landmark on the
+         Help, 📋 the Stations cards on that tab, and on that tab every one of
+         the Stations map's own controls, which would otherwise stand in the
+         map's corner — and, open, one pane beside the strip, with a handle on
+         its inner edge that sets its width. The one complementary landmark on the
          page, and still #help-panel, the id the help rail it grew out of had:
          the print sheet, the reduced-motion rule and every check that finds
          the ❔ toggle reach it by that name.
 
          Its skeleton is built once, by the first renderHelp() (app.js,
-         dockSkeleton), and never rewritten wholesale after — the panes hold
-         live things, the Stations cards and pinned map panels, that a
-         template written over them would destroy. It starts collapsed in the
-         markup so the paint before app.js runs is the strip alone; the state
-         is applied before the width transition is allowed — see .help-ready.
+         dockSkeleton), and never rewritten wholesale after — the panes and the
+         strip hold live things, the Stations cards and the map's panels and
+         buttons, that a template written over them would destroy. It starts
+         collapsed in the markup so the paint before app.js runs is the strip
+         alone; the state is applied before the width transition is allowed —
+         see .help-ready. In the Stations map's full screen it stays on screen,
+         fixed beside the map (styles.css, .map-panel.is-full).
 
          No header button pairs with this the way ☰ pairs with the nav: the
          header had a slot on the left for ☰ and has none on the right, and a

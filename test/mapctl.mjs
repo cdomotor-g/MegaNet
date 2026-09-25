@@ -27,7 +27,13 @@
 //
 // Runs on the Stations map because it is the one carrying all four panels; the
 // primitive is shared, so what passes here is what the other six Leaflet maps
-// get.
+// get. **At a phone's width**, which is the one width the Stations map still
+// keeps its corner at: above it every one of its controls is in the side
+// panel's strip instead (MapChrome.dockInto; `npm run dock` holds that
+// contract, and §9b below checks the corner is empty there). The flyouts, their
+// pins and their corner are the same code on a phone and on the other six maps
+// at any width — §11 checks one of those still has its corner — so this is
+// where the contract is proved, with the same real pointer as before.
 //
 // ── And since #192, the corner they stand in ────────────────────────────────
 // The eleven icons were regrouped into one control holding five labelled
@@ -66,7 +72,10 @@ const server = await startServer();
 const browser = await launchBrowser();
 const errors = [];
 try {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 950 } });
+  // 560 is the widest a phone is (BREAKPOINTS.xs) and tall enough that the
+  // whole corner column stands on the map in one column, as it does on a wide
+  // screen's other maps.
+  const context = await browser.newContext({ viewport: { width: 560, height: 1000 } });
   const page = await context.newPage();
   await applyNetworkPolicy(page, server.origin);
   page.on('pageerror', (e) => errors.push(e.message));
@@ -100,9 +109,14 @@ try {
     };
   }, panel);
 
-  // Somewhere on the map with no control anywhere near it. Every "does it go
-  // away" assertion is this move followed by a look.
-  const leave = async () => { await page.mouse.move(200, 760); await page.waitForTimeout(200); };
+  // Somewhere on the map with no control anywhere near it — its bottom-left,
+  // opposite the corner and clear of the zoom. Every "does it go away"
+  // assertion is this move followed by a look.
+  const spot = await page.evaluate(() => {
+    const r = document.getElementById('leaflet-map').getBoundingClientRect();
+    return { x: Math.round(r.left + 40), y: Math.round(r.bottom - 40) };
+  });
+  const leave = async () => { await page.mouse.move(spot.x, spot.y); await page.waitForTimeout(200); };
 
   const hover = async (panel) => {
     const p = await look(panel);
@@ -177,6 +191,21 @@ try {
   await leave();
   check('and the panel is off the map, over the ground it was armed for',
     !(await look('draw')).shown, JSON.stringify(await look('draw')));
+  // …and the click that armed it did not also draw with it, under the flyout:
+  // no shape committed, and no pending first point for the pointer to trail a
+  // dashed preview from. The flyout is over the map, so this is where that
+  // leak can still happen (map-controls.js, the click stopper on the wrapper);
+  // `mapfade` asks the same of the pane in the side panel with two real clicks.
+  const drew = await page.evaluate(() => {
+    let ghosts = 0;
+    state.map.eachLayer((l) => {
+      if (l instanceof L.Polyline && !(l instanceof L.Polygon)
+          && l.options && l.options.dashArray === '5,5' && l.options.interactive === false) ghosts++;
+    });
+    return { shapes: state.draw.shapes.length, ghosts };
+  });
+  check('…having drawn nothing with the click that armed it', drew.shapes === 0 && drew.ghosts === 0,
+    JSON.stringify(drew));
   await page.evaluate(() => MapDraw.setTool(''));
   await leave();
 
@@ -393,6 +422,27 @@ try {
       JSON.stringify(b));
   }
 
+  // ── 9b. …and above a phone's width there is no corner at all ──────────────
+  // The Stations map hands every control to the side panel's strip there, so
+  // everything above is about a corner that is, on a wide screen, empty — and
+  // that is asserted rather than assumed, as geometry: nothing in the map's
+  // top-right corner has a box, and every one of those controls is in the strip.
+  await page.setViewportSize({ width: 1440, height: 950 });
+  await page.waitForTimeout(600);
+  const wide = await page.evaluate(() => {
+    const c = document.querySelector('#leaflet-map .leaflet-top.leaflet-right');
+    const drawn = [...c.querySelectorAll('*')].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+    const inStrip = sel => [...document.querySelectorAll(sel)].every(el => !!el.closest('#help-panel'));
+    return {
+      drawn: drawn.map(el => el.className),
+      panels: [...document.querySelectorAll('.mn-mapctl')].length,
+      panelsInSide: inStrip('.mn-mapctl'),
+      buttonsInStrip: inStrip('.mn-map-here, .mn-map-3d, .mn-map-north, .mn-map-tilt, .mn-map-full, .mn-map-split, .mn-map-reset'),
+    };
+  });
+  check('above a phone\'s width the Stations map\'s corner is empty, every control in the side panel',
+    wide.drawn.length === 0 && wide.panels === 6 && wide.panelsInSide && wide.buttonsInStrip, JSON.stringify(wide));
+
   // ── 10. The base maps are a blend, inside Map display ─────────────────────
   // They were a 🗺️ panel of their own holding four radios; they are the top
   // section of Map display now, which took the 🗺️ over from the 👁️, and every
@@ -410,7 +460,11 @@ try {
   check('Map display wears the map icon, not the eye', iconNow.icon === '🗺️', JSON.stringify(iconNow));
   check('and its first section is the base maps', /Base maps/.test(iconNow.first || ''), JSON.stringify(iconNow));
 
-  await page.evaluate(() => MapChrome.setPinned('display', true));
+  // In the side panel, opened from its button in the strip: this section is
+  // about what is in the panel, not about the corner it used to be pinned in,
+  // and a pane shows all of it.
+  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await page.waitForTimeout(300);
   // Put each switch where this section wants it, by clicking it.
   const setBase = async (n, on) => {
     const is = await page.evaluate((q) => document.querySelector(
@@ -528,11 +582,14 @@ try {
 
   // It comes back on the next visit, and the single-choice shape a saved value
   // might still be in reads as that base alone.
+  // The side panel remembers the pane it was showing, so Map display is on
+  // screen again without being asked for.
   const reopen = async () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
     await page.evaluate(() => switchTab('stations'));
     await page.waitForFunction(() => !!state.map && !!state.map.mnBases, null, { timeout: 30_000 });
+    await page.waitForFunction(() => dockShowing() === 'map-display', null, { timeout: 10_000 });
   };
   await reopen();
   mix = await readMix();
@@ -548,7 +605,49 @@ try {
   check('an old single saved choice becomes that base alone, at full strength',
     !!mix.out.Satellite && mix.out.Satellite.opacity === 1 && !mix.out['OSM-Topo'],
     JSON.stringify(mix.out));
-  await page.evaluate(() => { localStorage.removeItem('mn-base-maps'); MapChrome.setPinned('display', false); });
+  await page.evaluate(() => { localStorage.removeItem('mn-base-maps'); setDockTab('stations'); });
+
+  // ── 11. The other six maps keep their corner ──────────────────────────────
+  // Only the Stations map has the side panel beside it, and only it hands its
+  // controls over. The Map Generator's map, at the same width, still has its 🗺️
+  // Map display in its own top-right corner as a flyout that the pointer opens
+  // and puts away, and its pin still docks it *there* — nothing of it arrives
+  // in the side panel.
+  await page.evaluate(() => switchTab('mapgen'));
+  await page.waitForFunction(() => liveMaps().length > 0
+    && !!document.querySelector('#main-content .leaflet-control-container .mn-mapctl[data-panel="display"]'),
+    null, { timeout: 30_000 });
+  await page.waitForTimeout(400);
+  const other = await page.evaluate(() => {
+    const w = document.querySelector('#main-content .mn-mapctl[data-panel="display"]');
+    const b = w.querySelector('.mn-mapctl-btn').getBoundingClientRect();
+    return { x: b.left + b.width / 2, y: b.top + b.height / 2,
+             corner: !!w.closest('.leaflet-top.leaflet-right'),
+             strip: [...document.querySelectorAll('#help-panel .dock-strip button')].map(x => x.dataset.dock || x.className) };
+  });
+  check('the Map Generator\'s Map display is in its own map\'s top-right corner, and the strip holds only the side panel\'s own',
+    other.corner && JSON.stringify(other.strip) === '["help"]', JSON.stringify(other));
+  const otherShown = () => page.evaluate(() => {
+    const b = document.querySelector('#main-content .mn-mapctl[data-panel="display"] .mn-mapctl-body');
+    return !!(b.offsetWidth || b.offsetHeight);
+  });
+  await page.mouse.move(other.x, other.y);
+  await page.waitForTimeout(150);
+  const hovered = await otherShown();
+  await page.mouse.move(other.x - 400, other.y + 300);
+  await page.waitForTimeout(200);
+  check('…a flyout the pointer opens and puts away, there as here', hovered && !(await otherShown()));
+  await page.evaluate(() => MapChrome.setPinned('display', true));
+  await page.waitForTimeout(200);
+  const otherPinned = await page.evaluate(() => {
+    const w = document.querySelector('#main-content .mn-mapctl[data-panel="display"]');
+    return { corner: !!w.closest('.leaflet-top.leaflet-right'), pinned: w.classList.contains('is-pinned'),
+             shown: !!(w.querySelector('.mn-mapctl-body').offsetWidth),
+             side: document.querySelectorAll('#help-panel .mn-mapctl').length };
+  });
+  check('…and its pin docks it open in that corner, not in the side panel',
+    otherPinned.corner && otherPinned.pinned && otherPinned.shown && otherPinned.side === 0, JSON.stringify(otherPinned));
+  await page.evaluate(() => MapChrome.setPinned('display', false));
 
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {

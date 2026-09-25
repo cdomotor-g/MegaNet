@@ -141,30 +141,33 @@ await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0,
 await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: LOAD_TIMEOUT });
 
 // ── the pointer ──────────────────────────────────────────────────────────────
-// mapctl.mjs's helpers, because this file is asking mapctl.mjs's question at a
-// different control: what a *real* click leaves behind. The panel is measured
-// off the box the browser gave it rather than off a class, and every click
-// arrives along the panel — the flyout sits a gap away from its icon and the
-// pointer has to stay over the control the whole way (.mn-mapctl-body::after).
+// What a *real* click leaves behind, asked of the panels where they are on
+// this map at this width: panes of the side panel beside it, each opened from
+// its button in the side panel's strip (MapChrome.dockInto). They were flyouts
+// in the map's corner when this file was written, reached by hovering an icon
+// and moving along the panel; the corner and its flyouts are `mapctl`'s now,
+// on a phone. The panel is still measured off the box the browser gave it
+// rather than off a class, and every click is still a real one.
 
 const look = (panel) => page.evaluate((p) => {
   const wrap = document.querySelector(`.mn-mapctl[data-panel="${p}"]`);
   if (!wrap) return null;
-  const btn = wrap.querySelector('.mn-mapctl-btn');
   const body = wrap.querySelector('.mn-mapctl-body');
-  const r = btn.getBoundingClientRect();
   const br = body.getBoundingClientRect();
   return {
-    icon: { x: r.left + r.width / 2, y: r.top + r.height / 2 },
     body: { x: br.left + 20, y: br.top + 20 },
     shown: !!(body.offsetWidth || body.offsetHeight || body.getClientRects().length),
+    inSide: !!wrap.closest('#help-panel'),
   };
 }, panel);
 
-const hover = async (panel) => {
-  const p = await look(panel);
-  await page.mouse.move(p.icon.x, p.icon.y);
-  await page.waitForTimeout(150);
+// Open a panel's pane from its strip button, with the pointer — unless it is
+// the pane already showing, whose button would shut the side panel instead.
+const openPane = async (panel) => {
+  if (await page.evaluate((p) => dockShowing() !== `map-${p}`, panel)) {
+    await page.click(`#help-panel .dock-tab[data-dock="map-${panel}"]`);
+    await page.waitForTimeout(250);
+  }
   return look(panel);
 };
 
@@ -191,10 +194,9 @@ const settleScroll = async () => {
 };
 
 // One control inside an open panel, clicked for real. `text` picks between
-// several matches by their label; `.mn-mapctl-content` scrolls inside itself
-// (styles.css caps it at 42vh), so the control is brought into that box first —
-// scrolling the container only, which leaves the pointer where it is and the
-// flyout open under it.
+// several matches by their label; the pane scrolls, so the control is brought
+// into view in it first — scrolling the pane only, which leaves the pointer
+// where it is.
 const clickInside = async (panel, selector, text = null) => {
   const p = await look(panel);
   if (!p || !p.shown) return null;
@@ -204,7 +206,7 @@ const clickInside = async (panel, selector, text = null) => {
     const els = [...root.querySelectorAll(s)];
     const el = t ? els.find(e => (e.closest('label') || e).textContent.includes(t)) : els[0];
     if (!el) return null;
-    const box = el.closest('.mn-mapctl-content');
+    const box = el.closest('.dock-pane');
     if (box) {
       const cr = box.getBoundingClientRect(), er = el.getBoundingClientRect();
       box.scrollTop += (er.top - cr.top) - box.clientHeight / 2;
@@ -222,9 +224,11 @@ const clickInside = async (panel, selector, text = null) => {
 };
 
 // Where on the map it is safe to click: the visible slice of the container,
-// with the icon column top-right, the zoom control top-left, the note strip at
-// the top and the attribution at the foot all well clear of the fractions used
-// below.
+// with the zoom control top-left, the note strip at the top and the
+// attribution at the foot all well clear of the fractions used below. (The
+// icon column that used to be top-right is in the side panel's strip now, off
+// the map, and the side panel's width does not change between the panes this
+// file opens, so the slice measured here stays true.)
 const box = await page.evaluate(() => {
   const el = document.getElementById('leaflet-map');
   el.scrollIntoView({ block: 'center' });
@@ -273,8 +277,15 @@ const linkState = () => page.evaluate(() => ({
 // gesture. `MapDraw.setTool('line')` called from evaluate() cannot fail the way
 // the app did, because the bug is not in setTool — it is in the click that
 // reaches the map *after* setTool has replaced the button that was clicked.
+//
+// Draw & measure is a pane of the side panel now, beside the map rather than
+// over it, so the click that armed the tool has further to leak — but the same
+// wrapper, with the same stoppers on it, goes with it (map-controls.js), and the
+// question is the same one with the same proof: two clicks on the map after
+// arming are a two-point line, not three. On a phone the panel is a flyout on
+// the map again, and `mapctl` arms a tool from it with the same real pointer.
 
-console.log('\nArming a draw tool from the flyout');
+console.log('\nArming a draw tool from the Draw & measure pane in the side panel');
 
 await page.evaluate(() => {
   state.draw.shapes = [];
@@ -284,7 +295,8 @@ await page.evaluate(() => {
   MapDraw.rerenderPanel();
 });
 
-await hover('draw');
+const drawPane = await openPane('draw');
+ok('✏️ in the strip opens Draw & measure beside the map', drawPane.shown && drawPane.inSide, JSON.stringify(drawPane));
 const hitTool = await clickInside('draw', '.draw-tool', 'Line');
 ok('the Line tool was there to click', !!hitTool);
 let d = await drawState();
@@ -292,9 +304,9 @@ ok('clicking it arms the line tool', d.tool === 'line', d.tool);
 ok('…and commits nothing', d.shapes === 0, JSON.stringify(d.kinds));
 await leave();
 // The discriminating pair. With the click leaking through to the map there is
-// already a pending point under the flyout, and a pointer moving across the map
-// draws the ghost from it.
-ok('no ghost line follows the pointer — no first point was dropped under the flyout',
+// already a pending point where the button was, and a pointer moving across the
+// map draws the ghost from it.
+ok('no ghost line follows the pointer — no first point was dropped by the click that armed it',
    (await ghosts()) === 0);
 ok('…and Finish line is not on offer, because there is nothing to finish',
    (await drawState()).finishHidden === true);
@@ -321,7 +333,7 @@ ok('…still nothing committed until it is pressed', d.shapes === 0);
 // Finished through the panel's own button, which is the second place the same
 // missing stopPropagation would have dropped a point: finishLine() repaints the
 // panel out from under the click as well.
-await hover('draw');
+await openPane('draw');
 const hitFinish = await clickInside('draw', '#draw-finish');
 ok('the Finish line button was there to click', !!hitFinish);
 d = await drawState();
@@ -330,7 +342,7 @@ ok('exactly one shape is committed, and it is a line',
 // The number the bug is made of. Two clicks on the map after arming the tool is
 // a two-point line; the flyout's leaked click made it three, with the first
 // point sitting wherever the Line button happened to be.
-ok('…with exactly two points — three is the flyout’s own click, drawn',
+ok('…with exactly two points — three is the panel’s own click, drawn',
    d.pts[0] === 2, `${d.pts[0]} points`);
 await leave();
 ok('and pressing Finish did not drop a fresh point on the map either',
@@ -745,7 +757,7 @@ await page.waitForTimeout(300);
 // unchanged: the control is in the Map display panel, it is not the one selected
 // when the layer is off, clicking it turns the layer on, and the thresholds, the
 // Save button and the legend lines come with it.
-ok('the Map display flyout opens on hover', (await hover('display')).shown);
+ok('🗺️ in the strip opens the Map display pane', (await openPane('display')).shown);
 const before = await page.evaluate(() => {
   const l = [...document.querySelectorAll('.mn-mapctl[data-panel="display"] label')]
     .find(x => /By fade margin/.test(x.textContent));
@@ -965,7 +977,7 @@ await server.close();
 
 console.log(failures
   ? `\nFAIL — ${failures} of ${failures + passes} assertions about the armed tool and the cards that answer.`
-  : `\nPASS — ${passes} assertions: arming a tool from the flyout does not also draw with it,\n`
+  : `\nPASS — ${passes} assertions: arming a tool from its panel does not also draw with it,\n`
     + '       the budget puts the map down once it has both ends, Escape gets out of the pick,\n'
     + '       the margin is in the corner, the chart has a sky and an earth under it, built\n'
     + '       area is no longer red, the fade bands are set, banded and remembered, and the\n'

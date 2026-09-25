@@ -805,14 +805,15 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
 - **Repeater site finder** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve; fade everything else on the map to see them, see them on the terrain in 3-D, and take them to Google Earth as a KMZ with each candidate's paths in a folder of its own — see *Repeater site finder* under §17
-- Leaflet.js, with the map's own controls in its top-right corner, grouped by what they are for
-  and separated by a hairline: what the map **shows** (base map — OSM-Topo by default,
+- Leaflet.js, with the map's own controls in the side panel's strip beside it (§20), grouped by what they
+  are for and separated by a hairline: what the map **shows** (base map — OSM-Topo by default,
   OpenStreetMap, Satellite or Dark — **Map display**, the **legend**), the tools you point at it
-  (**Draw & measure**, **Polar radio coverage**, **Repeater site finder**, **What is here**), the **3-D view** and its
-  camera, how much screen the map gets (⛶ full screen, ◫ the cards beside the map or under it), and ↺ reset on its own at
-  the bottom. Each panel is an icon and nothing else until you point at it, click it or tab to it,
-  and each can be pinned open — which moves it off the map into the side panel (§20), and is a pin
-  that is remembered between visits
+  (**Draw & measure**, **Polar radio coverage**, **Repeater site finder**, **What is here**), the **3-D view**, its
+  settings (🎚️) and its camera, how much screen the map gets (⛶ full screen, ◫ the cards beside the map or under it),
+  and ↺ reset on its own at the bottom. A panel opens as a pane of the side panel from its button in the strip; a
+  button does its one thing; the map's top-right corner is left empty. On a phone they are on the map in its
+  top-right corner instead, where each panel is an icon and nothing else until you point at it, click it or tab
+  to it, and can be pinned open there — a pin that is remembered between visits
 
 **Reading the map.** Every pin carries a white ring so it separates from the
 base map and from its neighbours; ACMA transmitter squares carry the same ring.
@@ -826,7 +827,7 @@ which still keeps the repeater at the far end of any drawn signal link, since a
 TX path with its destination receiver hidden is the one station you most wanted
 to see.
 
-**The map in three dimensions.** Press ⛰️ in the map's corner and the same map
+**The map in three dimensions.** Press ⛰️ in the side panel's strip and the same map
 tilts: the ground gets its real relief, the base map you were already on is
 draped over it, and the pins and links you were already looking at come with
 them. Drag to pan, right-drag (or Ctrl-drag, or two fingers) to tilt and rotate,
@@ -895,8 +896,9 @@ context, and `.leaflet-container` is `position: relative` with `z-index: auto`,
 which is not one — so the canvas's 750 and the card's 690 were compared
 directly, and the canvas won. The card is lifted to 760 for exactly as long as
 the canvas is on screen: over the canvas so it can be read, under Leaflet's
-control corners at 1000 so the icon column it shares the map with stays
-reachable. `#here-card` rode on the same class and was lifted with it.
+control corners at 1000 so the controls it shares the map with stay
+reachable — Leaflet's zoom, and on a phone the whole icon column. `#here-card`
+rode on the same class and was lifted with it.
 
 The check that holds it asks `elementFromPoint` over the card's own rectangle —
 not *did a card open*, not *is it displayed*, but **is the card the thing
@@ -1005,7 +1007,9 @@ where a sighted operator is shown a hairline; a separator that existed only in
 the stylesheet would have made the corner prettier and no more navigable. And
 when the corner is taller than the map — a phone at 52 dvh with 44 px touch
 targets — the groups that do not fit wrap, whole, into a second column over the
-map rather than hanging off the bottom edge.
+map rather than hanging off the bottom edge. Above a phone's width the column is
+not on the map at all: it stands in the side panel's strip, in the same groups
+and the same order with the same hairlines and the same ARIA names (§20).
 
 **The 3-D pair is one split button, and it has a camera (#192).** The mountain
 and its panel share an edge now, the panel drawn as a thin caret under the
@@ -1020,7 +1024,10 @@ back that does not involve discovering the right-drag. Both are drawn from the
 camera rather than labelled once, which is half of what they are for: a needle
 at 37° is how you *find out* the map is not facing north. Neither is offered on
 the flat map — Leaflet has no pitch and no bearing, so there is no camera to
-reset, and a button that can do nothing is not shown.
+reset, and a button that can do nothing is not shown. In the side panel's
+strip, where there is no split button to be half of, the settings are a button
+of their own under ⛰️ and wear 🎚️ rather than a second mountain; the pair is
+one split control on a phone, in the map's corner.
 
 **The station card, and the callout as a signpost (#175).** Clicking a pin
 paints a card in the map's bottom-left corner — the station's number,
@@ -1113,10 +1120,17 @@ against the map's own height rather than against a share of the viewport, which
 is the only figure that is right in the page, on a phone, in full screen and in
 the side-by-side split at once.
 
-**Full screen.** The ⛶ button in the map's top-right corner, in the group about
-how much screen the map gets, fixes the map's panel to the viewport — the match note, the ACMA
-and path cards and the corner controls all ride along, because they are all
-positioned inside that panel. Press it again, or Escape, to put the page back;
+**Full screen.** The ⛶ button, in the group about how much screen the map gets,
+fixes the map's panel to the viewport — the match note and the ACMA, path and
+station cards all ride along, because they are all positioned inside that
+panel — **except the side panel**, which stays on screen beside it at the width
+it had, above the header, with its strip and its open pane: the map's tools
+live in that strip, and a full-screen map that had covered them could only be
+looked at. The map's edge follows the side panel's as a pane opens, the panel
+shuts or its handle is dragged, re-measured each time; Tab walks the map and the
+side panel and nothing under them; leaving the tab ends it. On a phone, where
+the tools are on the map, it covers the whole screen as it always did. Press ⛶
+again, or Escape, to put the page back;
 Escape defers to any dialog open over the map, and the bug reporter still
 opens on top. It is deliberately not a modal, though "a modal map" is how the
 ask arrives: the shared dialog shell wipes its content on every exit, which
@@ -1418,8 +1432,9 @@ sampling.
 > panel, and a second copy of the switch in the shared picker would be two
 > controls for one layer. Say so if you want it back on those maps.
 
-**What is here.** The **ℹ️** button in the map's corner column arms a pick: click
-anywhere and a card in the opposite corner says what the app already knows about
+**What is here.** The **ℹ️** button in the side panel's strip (in the map's corner
+column on a phone) arms a pick: click
+anywhere and a card in the map's bottom corner says what the app already knows about
 that point — ground height, land cover, wind region, drainage basin, maintenance
 hub, and the nearest station, repeater and survey mark with the distance and
 bearing to each, every one of them a button that takes you there.
@@ -1755,9 +1770,10 @@ one go comes back a third painted and two-thirds looking uncomputed. Where both 
 it is the one with a figure behind it, and it has already been charged for the
 obstruction.
 
-**Draw & measure.** A sketching layer over the network map, opened from the
-pencil icon in the map's top-right corner — and pinnable open, which is what you
-want while you are actually drawing. It is for the picture
+**Draw & measure.** A sketching layer over the network map, opened from ✏️ in
+the side panel's strip as a pane beside the map, which stays open while you are
+actually drawing — on a phone, from the pencil icon in the map's top-right
+corner, and pinnable open there. It is for the picture
 that goes into an email or an incident note: **pins**, **lines**, **circles**,
 **rectangles** and free **text annotations**. Every shape can be drawn by
 clicking on the map — click the circle's centre then its radius, click opposite
@@ -2736,7 +2752,7 @@ a good margin is permission to model the path properly, never a result.
 
 The tools above answer questions about a path somebody has already drawn. Siting
 a new repeater starts from the other end: *these* gauges have to be heard —
-where does the mast go? **🗼 Repeater site finder**, in the map's corner among the
+where does the mast go? **🗼 Repeater site finder**, in the side panel's strip among the
 tools you point at the map, answers it.
 
 **The sites to serve**, three ways, in any mixture and up to forty:
@@ -3256,11 +3272,12 @@ summary says so rather than inventing one.
 > Fields and elements with no such evidence behind them are marked *constant only*
 > in the tab's own reference rather than guessed at.
 
-### 20. Side Panel (Help, the Stations Cards, Pinned Map Panels)
+### 20. Side Panel (Help, the Stations Cards, the Stations Map's Controls)
 One column on the right of every tab, the *side panel* (`#help-panel`, called
 "the dock" in the code): a strip of buttons on the screen's edge and, open, one
 pane beside it. ❔ is the help described below; 📋, on the Stations tab, is the
-Stations cards; and every map panel pinned with its 📌 gets a button of its own.
+Stations cards; and under them, on that tab, every one of the Stations map's own
+controls — its panels as panes with a button each, its buttons as themselves.
 It is the help rail and the Stations tab's right-hand column of cards merged
 into one — see *The side panel as a dock* at the end of this section.
 
@@ -3344,10 +3361,17 @@ settled rather than during the slide. Where it differs:
   mutually exclusive with the nav's, opened from a tab fixed on the screen edge —
   the nav could move ☰ into the header because the header had a slot on the
   left, and there is none on the right. Only help is a pane there. The Stations
-  cards stay under the map and a pinned map panel stays docked in the map's
-  corner, because a drawer over a 390 px map is a drawer over the thing it is
-  describing. **A phone design for the side panel is out of scope for this
-  change** and left for its own issue.
+  cards stay under the map and the map's controls go back to its corner, as
+  flyouts with pins, because a drawer over a 390 px map is a drawer over the
+  thing it is describing. Crossing 560 px moves them either way without
+  rebuilding the map and without losing focus: a strip button's focus goes to
+  its panel's icon in the corner and back, a caret in a panel stays in it (the
+  flyout comes back open round it), and a button keeps its own. **A phone design
+  for the side panel is out of scope for this change** and left for its own
+  issue.
+- **It stays beside the map in full screen**, at its width, above the header,
+  and everything in it goes on working; the map stops at its edge and follows
+  it (see *Full screen* under the Stations tab).
 
 #### The side panel as a dock
 
@@ -3369,19 +3393,30 @@ to a card — *Show in the list*, *Station details*, the radio path card's links
 all. The elevation profile is always a card now, and with no line drawn it says
 how to get one.
 
-**Pinned map panels.** On the Stations map, pinning a panel (📌 in its heading,
-or `MapChrome.setPinned`) moves its whole `.mn-mapctl` wrapper — icon, heading,
-pin and body — into a pane of its own, with a button in the strip ordered the
-way the icons are ordered in the map's corner, and opens the side panel on it.
-Unpinning it there puts it back in the corner, shut, with focus on its icon, and
-the side panel goes back to the pane it showed before. The pin is still
-`mn-map-panels` and still survives a reload; the map is rebuilt on every visit
-to the tab and its panels dock themselves again as they are built. Full screen
-covers the side panel, so while it is on the pinned panels go back into the
-map's corner, docked there the old way, and return afterwards; a phone does the
-same. The other six Leaflet maps keep docking pinned panels into their own
-corners, because none of them sits beside the side panel (`MapChrome.dockInto`
-is per map). `npm run dock` holds all of this.
+**The Stations map's controls.** Everything MapChrome would put in the map's
+top-right corner lives in the strip instead, above a phone's width, and the
+corner holds nothing. Each panel — 🗺️ Map display, 🔑 Legend, ✏️ Draw & measure,
+📡 Polar radio coverage, 🗼 Repeater site finder, 🎚️ the 3-D settings — moves
+its whole `.mn-mapctl` wrapper (icon, heading, pin and body) into a pane of its
+own the moment it is built, with a button in the strip; its corner icon and its
+📌 are hidden there, because a pane already stays open. Each plain button — ℹ️,
+⛰️ and its two camera buttons (hidden until 3-D is on), ⛶, ◫, ↺ — is moved into
+the strip itself, keeping the class its module finds it by. They stand in the
+corner's groups and order (`MapChrome.groups()`), one labelled group each with a
+hairline between them, and the strip scrolls, with a thin bar beside the
+buttons rather than over them, when it is taller than the window. Building the
+map opens nothing: which pane shows is the side panel's own preference, and a
+fresh visit still opens on 📋. The map is rebuilt on every render of the tab,
+and its new controls land in the *same* panes and strip buttons, so the pane
+that was showing stays showing, a focused strip button keeps focus, focus on a
+control of the old map goes to the same control of the new one, and the pane's
+scroll comes back. The pin (`mn-map-panels`) means what it always did only where
+a panel is in a corner: on a phone, and on the other six Leaflet maps, which
+keep their corners because none of them sits beside the side panel
+(`MapChrome.dockInto` is per map). This used to be opt-in, a panel moving in
+only when its 📌 was pressed — which left the right-hand edge of the page two
+places to look for the same kind of tool — and it is not any more.
+`npm run dock` holds all of this.
 
 **The content has a check of its own**, `npm run help`, and it exists because
 every way this decays is silent. A doc link that 404s, a *see also* naming a tab

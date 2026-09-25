@@ -247,7 +247,7 @@ which is the only place the numbers are written down.
 | `lg` | 1100 | Side-by-side becomes stacked — `.layout`, `.map-layout`, Radio Path Maps, the Workbench, and the Stations cards leave the side panel for the page under the map |
 | `md` | 900 | **A tablet.** The nav auto-collapses to the icon rail, header buttons drop their labels, tables switch to automatic layout and scroll inside their wrapper |
 | `sm` | 700 | Two-column content folds to one — forms, pickers, optional table columns |
-| `xs` | 560 | **A phone.** The nav and the side panel stop being columns and become drawers over the page — the side panel's only pane there is help, and a pinned map panel stays in the map's corner |
+| `xs` | 560 | **A phone.** The nav and the side panel stop being columns and become drawers over the page — the side panel's only pane there is help, and the Stations map's controls leave its strip for the map's own corner, as flyouts with pins |
 | `xxs` | 380 | The smallest phone. The banner shrinks its title rather than pushing a button off the edge |
 
 They are in `core.js` and not in `styles.css` for two reasons. CSS custom
@@ -700,6 +700,20 @@ back into the corner's own column, so two pinned panels stack instead of
 overlapping, and the icon is dropped while it is docked. Pinning is remembered
 (`state.mapPanelsPinned`, one localStorage key); nothing else about a panel is.
 
+**A map with a side panel beside it hands the whole corner over.** One map does:
+the Stations map, above a phone's width (`MapChrome.dockInto(map, host)`, the
+host being the side panel). There every panel is moved, whole, into a pane of
+the side panel with a button in its strip, and every plain button is moved into
+the strip itself — in the corner's groups and order, a labelled group each with
+the corner's hairline between them — and the corner is left holding nothing. The
+corner icon and the 📌 are hidden in a pane: a pane already stays open, and a pin
+there would change nothing anyone could see. On a phone the controls come back
+to the corner and everything above is what they are again. It used to be the
+pin that moved a panel into the side panel, one at a time; that made the right
+edge of the page two places to look for the same kind of tool, and it was
+replaced by this. A new map that sits beside the side panel opts in the same
+way; every other map keeps its corner.
+
 Three things that are not optional:
 
 1. **The title is one string** — the button's `aria-label`, its tooltip and the
@@ -719,7 +733,7 @@ says so, and Shift+Tab off the first control lands back on the icon.
 ### Full screen — fix the anchor, never reparent
 
 *(Added by the Stations map's ⛶ button.)* When a surface needs to become the
-screen, put a `position: fixed; inset: 0` class on its own positioning anchor
+screen, put a `position: fixed` class on its own positioning anchor
 and take the class off to exit — never reparent it, and least of all into
 `Modal`, which wipes its `innerHTML` down all three of its exits and would
 destroy a live Leaflet map's DOM mid-flight. The Stations map's `.map-panel`
@@ -727,6 +741,18 @@ is already the containing block for everything that works over the map — the
 match note, the ACMA and path cards, the corner controls — so one class takes
 the whole working surface along and back with nothing moved or rebuilt; a
 Leaflet map needs one `invalidateSize()` after the toggle and nothing else.
+
+**The screen, less the side panel, when the surface's tools are in it.** The
+Stations map's controls live in the side panel's strip above a phone's width,
+so its full screen stops at the side panel's edge (`inset: 0 var(--mn-side-w) 0
+0`, the side panel writing its own width to the root) and the side panel is
+fixed to the right edge above the header for as long as it lasts — at the same
+z-index, after the map in the page — with no width transition, so the map's edge
+and the panel's move together and the map is re-measured at once. The Tab walls
+take both in, in page order, and place every Tab themselves: the browser's own
+next stop after the map's last control is whatever follows it in the page, which
+is under the map. Keyed off the full-screen class with `:has()`, so it cannot
+outlive the surface it is beside; leaving the tab ends full screen.
 
 **z-index 1900 is the slot**: above the header (1300), the drawers (1200) and
 the mem modal (1500), below `#app-modal` (2000), so a dialog opened over the
@@ -778,10 +804,13 @@ pointer or moved with the arrow keys, stored as `mn-dock-w` and clamped to the
 window when it is used (never below 300 px while there is room, never leaving
 the page less than 400 px — or, on a window too narrow for both, never more than
 55 % of the room). On the Stations tab it is also the tab's right-hand
-column: the station cards are one wrapper moved into its Stations pane, and a
-map panel pinned on the Stations map is moved into a pane of its own. Neither is
-ever re-rendered to get there, which is what lets the Leaflet map beside them
-keep its view.
+column: the station cards are one wrapper moved into its Stations pane, and
+every one of the Stations map's controls is moved into its strip — a panel into
+a pane of its own. None of them is ever re-rendered to get there, which is what
+lets the Leaflet map beside them keep its view. The strip scrolls when it is
+taller than the window, which with the map's controls in it it is on a laptop;
+its rail is as wide as the nav's (56 px) so that a thin scrollbar stands beside
+the 44 px buttons rather than over them.
 
 `npm run shell` holds it, as the claim an operator would make: every button in
 either rail can be brought on screen with that rail's own scrollbar, at the top
@@ -829,7 +858,8 @@ everything.
 | Nav collapse/expand | The toggle, through the re-render. On a phone collapse, the header's ☰ |
 | Help collapse/expand | The help toggle (❔), at every width |
 | A side-panel strip button | Stays on the button, which is never re-rendered — ↑ ↓ Home End walk the strip |
-| A map panel pinned into the side panel | Stays on its 📌, which moved with it. Unpinned there, it goes back to its icon in the map's corner |
+| One of the Stations map's controls crossing 560 px | Goes with it: a pane's strip button to that panel's icon in the map's corner and back, a control inside a panel stays focused (the flyout comes back open round it, the pane opens on it), a plain button keeps its own focus |
+| The Stations map rebuilt under a focused control | The same control of the new map — the same strip button (panes and their buttons outlive the map), the same button by its class, the element with the same id in the same panel |
 | A card brought into view (*Station details*, a row) | The code that brought it moves focus if it means to; opening the side panel on it moves none |
 | Modal open / close | The dialog card / whatever opened it. `Modal` already does this; `MemMeter` does now too |
 
