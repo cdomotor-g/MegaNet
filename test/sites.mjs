@@ -24,13 +24,35 @@
 //   The road      asked for the finalists only, only while its weight is above
 //                 nought, and a cadastre that fails is said to have failed
 //                 rather than read as "no road here".
+//   The pins      a candidate's pin is what a real pointer lands on — not the
+//                 network's canvas over it — and a click picks it.
+//   Google Earth  the KML parsed and walked: a folder per candidate holding
+//                 its pin (lon,lat, not lat,lon) and its paths, one per site
+//                 it can be drawn to, each in the band its own margin falls in
+//                 by an oracle written here; #1's paths on and everybody
+//                 else's off on the folder AND on every path; every styleUrl
+//                 resolving; the caveat in the file. Then the KMZ as the bytes
+//                 that were downloaded, unzipped by a reader in this file: a
+//                 stored zip, doc.kml first, every CRC right, the pins real
+//                 PNGs in the map's own blue — and doc.kml the plain KML but
+//                 for its icons.
+//   The dim       the "everything else" slider fades every pane from the
+//                 overlays up and nothing else — not the finder's, not the
+//                 popup, not the base map — reaches a pane made after it
+//                 moved, and applies nothing at all while the finder is empty,
+//                 however low it was left.
+//   3-D           the finder's own source and layers between the network's
+//                 links and pins, a DOM pin per candidate that a real click
+//                 selects without leaking to either map, the dim reaching the
+//                 network's paint, and nothing left behind on the way out.
 //   The circle    Draw & measure's own circle, armed from this panel with a
 //                 real pointer, lands its stations in the set and disarms.
-//   Reset         takes all of it off the map.
+//   Reset         takes all of it off the map, the dim included.
 //
 //   npm run sites          (or: node sites.mjs)
 //   npm run sites -- -v    also print what passed
 
+import zlib from 'node:zlib';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
@@ -326,6 +348,455 @@ const csv = await page.evaluate(() => MapSites.csvText());
 const csvRows = csv.trim().split('\n').filter(l => !l.startsWith('#'));
 ok('the CSV carries every result against every site', csvRows.length === 1 + 5 * 7 && /^rank,site_lat/.test(csvRows[0]),
    `${csvRows.length} row(s)`);
+const CSV_COLUMNS = csvRows[0].split(',');
+
+// ── 2a. a pin on the map takes a click ───────────────────────────────────────
+console.log('\nA pin on the map');
+
+// The pins used to sit in a pane under the network's canvas, where a real
+// pointer lands on the canvas and never on the pin — and the pin's handler
+// named a function nothing declared, so the one route that did reach it (the
+// keyboard) threw. Asked with the pointer, where the hit test says the pin is.
+await page.evaluate(r => state.map.setView([r.lat, r.lon], 13, { animate: false }), R[1]);
+await page.waitForTimeout(400);
+const pin2 = await page.evaluate(() => {
+  const el = [...document.querySelectorAll('.mn-site')].find(x => x.querySelector('.mn-site-mark')?.textContent === '2');
+  if (!el) return null;
+  const r = el.querySelector('.mn-site-mark').getBoundingClientRect();
+  const x = r.left + r.width / 2, y = r.top + r.height / 2;
+  const hit = document.elementFromPoint(x, y);
+  return { x, y, mine: !!(hit && el.contains(hit)), hit: hit ? `${hit.tagName}.${hit.className}` : null };
+});
+ok('candidate #2\'s pin is what the pointer lands on, not the network\'s canvas over it',
+   !!pin2 && pin2.mine, JSON.stringify(pin2));
+if (pin2) {
+  await page.mouse.click(pin2.x, pin2.y);
+  await page.waitForTimeout(300);
+}
+const picked2 = await page.evaluate(() => ({
+  rank: MapSites.selectedRank(),
+  popup: document.querySelector('.leaflet-popup .mn-site-pop h4')?.textContent || '',
+  row: document.querySelector('.sites-result.is-on .sites-rank')?.textContent || '',
+}));
+ok('…and a click on it picks it, opens its callout and its row',
+   picked2.rank === 2 && /^#2 repeater site/.test(picked2.popup) && picked2.row === '2', JSON.stringify(picked2));
+ok('…without throwing', errors.length === 0, errors.join('\n'));
+await page.evaluate(() => { state.map.closePopup(); MapSites.select(1); });
+
+// ── 2b. the Google Earth file ────────────────────────────────────────────────
+console.log('\nThe Google Earth file');
+
+// Parsed as a document and walked, for drawkml.mjs's reason: a wrong KML opens
+// perfectly. Every figure below is held against MapSites.results() — the
+// ranked answer the panel shows — and the bands against an oracle written
+// here from the map's own two thresholds, not against bandOf().
+const fade = await page.evaluate(() => ({ good: state.mapFadeGoodDb, ok: state.mapFadeOkDb }));
+const G = fade.good > 0 ? fade.good : 15, O = Number.isFinite(fade.ok) ? fade.ok : 6;
+const kmlIn = await page.evaluate(() => { const d = MapSites.exportSites(); return { d, text: sitesKml(d) }; });
+const K = await page.evaluate(parseKmlInPage, kmlIn.text);
+const T = run1.targets;
+ok('the file is well-formed KML 2.2, one Document',
+   !K.error && K.root === 'kml' && K.ns === 'http://www.opengis.net/kml/2.2' && K.docs === 1, String(K.error));
+ok('…named for what it holds', K.docName === `Repeater sites — ${T.length} sites, ${R.length} candidates`, K.docName);
+ok('…flying to the search area when it opens', K.lookAt);
+const tops = K.top || [];
+ok('the sites first, then one folder per candidate in rank order, then the search area',
+   tops.length === 1 + R.length + 1 && tops[0].tag === 'Folder' && tops[0].name === `Sites to serve (${T.length})`
+   && R.every((r, i) => tops[1 + i].tag === 'Folder' && tops[1 + i].name.startsWith(`#${r.rank} — `))
+   && tops[tops.length - 1].tag === 'Placemark' && tops[tops.length - 1].geom?.type === 'Polygon',
+   JSON.stringify(tops.map(t => `${t.tag}:${t.name}`)));
+ok('…each candidate folder saying height, score and how many sites it serves',
+   R.every((r, i) => tops[1 + i].name
+     === `#${r.rank} — ${Math.round(r.ground)} m · score ${Math.round(r.score)} · ${r.served} of ${T.length} at ≥${O} dB`),
+   tops.slice(1, 1 + R.length).map(t => t.name).join(' | '));
+ok('…and only #1\'s folder open', R.every((r, i) => tops[1 + i].open === (i === 0 ? '1' : '0')));
+
+const candFolders = tops.slice(1, 1 + R.length);
+const candPins = candFolders.map(f => f.placemarks[0]);
+ok('every candidate\'s pin is its own point, lon,lat in that order',
+   candPins.every((p, i) => p && p.geom?.type === 'Point'
+     && Math.abs(p.geom.coords[0][0] - R[i].lon) < 1e-9 && Math.abs(p.geom.coords[0][1] - R[i].lat) < 1e-9),
+   JSON.stringify(candPins.map(p => p && p.geom && p.geom.coords[0])));
+ok('…styled with its own numbered pin', candPins.every((p, i) => p && p.style === `#mnSite-${R[i].rank}`));
+ok('…with a balloon that is a plain table of every site — no scripts, no classes',
+   candPins.every(p => p && /<table/.test(p.desc) && (p.desc.match(/<tr>/g) || []).length === 1 + T.length
+     && !/<script|class=|style=/i.test(p.desc) && /Road reserve:/.test(p.desc)),
+   candPins[0] && candPins[0].desc.slice(0, 200));
+ok('…and the CSV\'s columns as its data', candPins.every((p, i) => p && p.data
+     && p.data.rank === String(R[i].rank) && p.data.site_lat === R[i].lat.toFixed(6)
+     && Object.keys(p.data).every(k => CSV_COLUMNS.includes(k))),
+   JSON.stringify(candPins[0] && candPins[0].data));
+
+const drawnOf = r => r.figs.filter(f => f && Object.keys(f).length && !f.colo && !f.failed);
+const linksOf = f => (f.folders.find(x => /^Links from #/.test(x.name)) || { placemarks: [] });
+ok('each candidate\'s paths are one per site, less any it stands on or could not compute',
+   R.every((r, i) => linksOf(candFolders[i]).placemarks.length === drawnOf(r).length
+     && linksOf(candFolders[i]).name === `Links from #${r.rank} (${drawnOf(r).length})`),
+   R.map((r, i) => `${linksOf(candFolders[i]).placemarks.length}/${drawnOf(r).length}`).join(' '));
+
+// The bands, from the figure's margin and the map's two thresholds.
+const oracleBand = f => (f.colo ? 'good' : f.margin == null ? (f.verdict === 'obstructed' ? 'bad' : 'none')
+  : f.margin >= G ? 'good' : f.margin >= O ? 'ok' : 'bad');
+const kOf = pm => T.findIndex(t => t.lat.toFixed(6) === pm.data?.target_lat && t.lon.toFixed(6) === pm.data?.target_lon);
+const bandMiss = [], seenBands = new Set();
+R.forEach((r, i) => linksOf(candFolders[i]).placemarks.forEach(pm => {
+  const k = kOf(pm), f = r.figs[k];
+  if (k < 0 || !f) { bandMiss.push(`#${r.rank}: no target for ${pm.name}`); return; }
+  const want = `#mnLink${f.verdict === 'obstructed' ? 'Obs' : ''}-${oracleBand(f)}`;
+  seenBands.add(want);
+  if (pm.style !== want) bandMiss.push(`#${r.rank} → ${T[k].name}: ${pm.style} ≠ ${want} (${f.margin})`);
+}));
+ok('every path is styled by the band its own margin falls in', bandMiss.length === 0,
+   bandMiss.slice(0, 4).join('; ') || [...seenBands].join(' '));
+const BAND_HEX = { good: '#00e676', ok: '#ffab00', bad: '#e53935', none: '#888888' };
+const kmlOf = (hex, a = 'ff') => `${a}${hex.slice(5, 7)}${hex.slice(3, 5)}${hex.slice(1, 3)}`;
+ok('…in the band\'s own colour, whatever the theme — obstructed paths thinner and translucent',
+   Object.entries(BAND_HEX).every(([b, h]) => K.styles[`mnLink-${b}`]?.line === kmlOf(h)
+     && K.styles[`mnLinkObs-${b}`]?.line === kmlOf(h, '99')
+     && +K.styles[`mnLinkObs-${b}`].width < +K.styles[`mnLink-${b}`].width),
+   JSON.stringify(K.styles['mnLink-good']));
+const allPms = [];
+const walk = f => { allPms.push(...f.placemarks); f.folders.forEach(walk); };
+tops.forEach(t => (t.tag === 'Folder' ? walk(t) : allPms.push(t)));
+ok('every styleUrl names a style that is in the file',
+   K.styleUrls.length > 0 && K.styleUrls.every(u => u.startsWith('#') && K.styles[u.slice(1)]),
+   K.styleUrls.filter(u => !K.styles[u.slice(1)]).join(' '));
+const allLinks = candFolders.flatMap(f => linksOf(f).placemarks);
+ok('every path is draped on the ground, not a chord through it',
+   allLinks.length > 0 && allLinks.every(p => p.geom?.type === 'LineString' && p.geom.tess === '1' && p.geom.alt === 'clampToGround'));
+ok('…from its candidate to its site, lon,lat',
+   R.every((r, i) => linksOf(candFolders[i]).placemarks.every(pm => {
+     const c = pm.geom.coords, t = T[kOf(pm)];
+     return c.length === 2 && Math.abs(c[0][0] - r.lon) < 1e-9 && Math.abs(c[0][1] - r.lat) < 1e-9
+       && !!t && Math.abs(c[1][0] - t.lon) < 1e-9 && Math.abs(c[1][1] - t.lat) < 1e-9;
+   })));
+
+// Visibility: #1's paths on, everybody else's off, on the folder AND on every
+// path in it — Earth on the web converts an import into project features and
+// may keep the placemark's flag and drop the folder's.
+const vis = candFolders.map(f => ({ folder: linksOf(f).visibility, each: linksOf(f).placemarks.map(p => p.visibility) }));
+ok('#1\'s paths are on — no visibility written on the folder or on any path',
+   vis[0].folder === null && vis[0].each.every(v => v === null), JSON.stringify(vis[0]));
+ok('every other candidate\'s paths are off, on the folder and on each path',
+   vis.slice(1).every(v => v.folder === '0' && v.each.length > 0 && v.each.every(x => x === '0')),
+   JSON.stringify(vis.slice(1).map(v => [v.folder, [...new Set(v.each)]])));
+ok('…while every candidate\'s pin, the sites and the search area stay on',
+   candPins.every(p => p.visibility === null) && tops[0].visibility === null
+   && tops[0].placemarks.every(p => p.visibility === null) && tops[tops.length - 1].visibility === null);
+
+const dataMiss = [];
+R.forEach((r, i) => linksOf(candFolders[i]).placemarks.forEach(pm => {
+  const f = r.figs[kOf(pm)];
+  const want = f && f.margin != null ? f.margin.toFixed(1) : '';
+  if (pm.data?.margin_db !== want) dataMiss.push(`${pm.name}: ${pm.data?.margin_db} ≠ ${want}`);
+  if (!Object.keys(pm.data || {}).every(k => CSV_COLUMNS.includes(k))) dataMiss.push(`${pm.name}: a column the CSV does not have`);
+}));
+ok('every path carries its margin to the tenth, under the CSV\'s own column names', dataMiss.length === 0,
+   dataMiss.slice(0, 3).join('; '));
+ok('…and says it in words too, both directions and where the figure came from',
+   allLinks.every(p => /Fade margin:/.test(p.desc) && /repeater to site/.test(p.desc) && /Figure:/.test(p.desc)));
+
+const chordFolders = candFolders.map(f => f.folders.find(x => x.name === 'Sight lines at antenna height (3-D)'));
+const rep = kmlIn.d.rep;
+ok('each candidate has its sight lines at antenna height, off, and said to be chords not clearance',
+   chordFolders.every((f, i) => f && f.visibility === '0' && f.placemarks.length === drawnOf(R[i]).length
+     && f.placemarks.every(p => p.visibility === '0' && /straight chord/.test(p.name) && /not the path's clearance/.test(p.desc))),
+   JSON.stringify(chordFolders.map(f => f && [f.visibility, f.placemarks.length])));
+ok('…straight lines from the mast top to the antenna top, relative to the ground',
+   chordFolders.every(f => f && f.placemarks.every(p => {
+     const t = T[T.findIndex(x => Math.abs(x.lon - p.geom.coords[1][0]) < 1e-9 && Math.abs(x.lat - p.geom.coords[1][1]) < 1e-9)];
+     const d = t && kmlIn.d.targets.find(x => x.key === t.key);
+     return p.geom.type === 'LineString' && p.geom.tess === '0' && p.geom.alt === 'relativeToGround'
+       && p.geom.coords[0][2] === rep.agl && !!d && p.geom.coords[1][2] === d.agl;
+   })), `mast ${rep.agl} m`);
+
+const siteFolder = tops[0];
+ok('the sites to serve are all there, stations as stations and the proposed one plainly',
+   siteFolder.placemarks.length === T.length
+   && siteFolder.placemarks.every((p, k) => p.name === T[k].name
+     && p.style === (T[k].kind === 'station' ? '#mnTarget' : '#mnTargetPt')
+     && Math.abs(p.geom.coords[0][0] - T[k].lon) < 1e-9 && Math.abs(p.geom.coords[0][1] - T[k].lat) < 1e-9),
+   siteFolder.placemarks.map(p => `${p.name}:${p.style}`).join(' | '));
+ok('…each saying which candidate serves it best',
+   siteFolder.placemarks.every(p => /Best served by(:<\/b>)? (#\d|no candidate)/.test(p.desc)), siteFolder.placemarks[0].desc);
+
+// The search area: a circle on the sphere, measured back with this file's
+// own haversine — drawkml.mjs's check, for its reason.
+const areaPm = tops[tops.length - 1];
+const ring = areaPm.geom.coords;
+const A = run1.area;
+ok('the search area is a closed ring, starting due north of the middle',
+   ring.length === 73 && ring[0][0] === ring[72][0] && ring[0][1] === ring[72][1]
+   && Math.abs(ring[0][0] - A.lon) < 1e-9 && ring[0][1] > A.lat, `${ring.length} points`);
+ok('…every vertex the search radius from the middle, on the sphere',
+   ring.every(([lon, lat]) => Math.abs(acmaDist(A, { lat, lon }) - A.rKm) / A.rKm < 0.005), `${A.rKm.toFixed(2)} km`);
+ok('…draped, and an outline', areaPm.geom.tess === '1' && areaPm.geom.alt === 'clampToGround'
+   && areaPm.style === '#mnArea');
+
+const PM_ORDER = ['name', 'visibility', 'open', 'description', 'LookAt', 'styleUrl', 'ExtendedData', 'Point', 'LineString', 'Polygon'];
+const badOrder = allPms.filter(p => !p.order.every((t, i) => PM_ORDER.includes(t)
+  && (i === 0 || PM_ORDER.indexOf(p.order[i - 1]) < PM_ORDER.indexOf(t))));
+ok('every placemark\'s children are in the KML 2.2 schema\'s order', badOrder.length === 0,
+   badOrder.slice(0, 2).map(p => `${p.name}: ${p.order.join(',')}`).join('; '));
+ok('the caveat travels with the file', K.docDesc.includes(kmlIn.d.caveat) && /Exported from MegaNet on /.test(K.docDesc));
+
+const nasty = 'Smith & Sons <b>"Hill"</b>';
+const Kn = await page.evaluate(parseKmlInPage, await page.evaluate(name => {
+  const d = MapSites.exportSites();
+  d.targets[0].name = name;
+  if (d.targets[0].station) d.targets[0].station.name = name;
+  return sitesKml(d);
+}, nasty));
+ok('a site named with & and < survives, as its own name',
+   !Kn.error && Kn.top[0].placemarks[0].name === nasty
+   && Kn.top.slice(1, -1).every(f => linksOf(f).placemarks.every(p => kOf(p) !== 0 || p.name.includes(nasty))),
+   String(Kn.error || Kn.top[0].placemarks[0].name));
+
+// ── 2c. the KMZ and the KML, downloaded ──────────────────────────────────────
+console.log('\nThe KMZ and the KML, downloaded');
+
+const base = await page.evaluate(() => `repeater-sites-${slug(MapSites.targets()[0].name) || 'sites'}-${MapSites.targets().length}`);
+const plain = await page.evaluate(() => sitesKml(MapSites.exportSites()));
+const btns = await page.evaluate(() => {
+  const z = document.getElementById('sites-kmz'), l = document.getElementById('sites-kml');
+  return { kmz: { on: !!z && !z.disabled, title: z ? z.title : '', text: z ? z.textContent.trim() : '' },
+           kml: { on: !!l && !l.disabled, title: l ? l.title : '' } };
+});
+ok('the panel offers the KMZ and a plain KML beside Save CSV, and says how to import them',
+   btns.kmz.on && btns.kml.on && /Google Earth \(KMZ\)/.test(btns.kmz.text)
+   && /Import file to project/.test(btns.kmz.title) && /Import file to project|Open local KML file/.test(btns.kml.title),
+   JSON.stringify(btns));
+
+const readDownload = async dl => {
+  const chunks = [];
+  for await (const c of await dl.createReadStream()) chunks.push(c);
+  return Buffer.concat(chunks);
+};
+const [dlz] = await Promise.all([page.waitForEvent('download'), page.locator('#sites-kmz').click()]);
+const kmz = await readDownload(dlz);
+ok('the KMZ is named for the sites, as the CSV is', dlz.suggestedFilename() === `${base}.kmz`, dlz.suggestedFilename());
+const Z = unzipStored(kmz);
+ok('it is a zip', kmz.subarray(0, 4).toString('latin1') === 'PK\x03\x04' && !!Z && !Z.error, Z && Z.error);
+const zNames = Z.entries.map(e => e.name);
+ok('…whose first entry is doc.kml, first in the file as well as in the directory',
+   zNames[0] === 'doc.kml' && Z.entries[0].offset === 0, zNames.join(' '));
+ok('…holding a numbered pin per candidate and the site mark',
+   zNames.length === 1 + R.length + 1 && R.every(r => zNames.includes(`files/site-${r.rank}.png`))
+   && zNames.includes('files/target.png'), zNames.join(' '));
+ok('…every entry stored, sizes agreeing, local header matching the directory',
+   Z.entries.every(e => e.method === 0 && e.lmethod === 0 && e.csize === e.usize && e.usize === e.data.length
+     && e.lname === e.name && e.lsize === e.csize && e.lcrc === e.crc && e.lsig === 0x04034b50),
+   JSON.stringify(Z.entries.map(e => [e.name, e.method, e.csize, e.usize])));
+ok('…and every CRC right, by a CRC written in this file',
+   Z.entries.every(e => crc32(e.data) === e.crc), JSON.stringify(Z.entries.map(e => [e.name, e.crc, crc32(e.data)])));
+ok('…the directory where the end record says it is', Z.cenOff + Z.cenSize === Z.eocd);
+
+const pngs = Z.entries.filter(e => e.name.endsWith('.png')).map(e => ({ name: e.name, px: pngPixels(e.data) }));
+ok('the pins are 64 px PNGs', pngs.every(p => p.px && p.px.w === 64 && p.px.h === 64),
+   JSON.stringify(pngs.map(p => [p.name, p.px && p.px.w, p.px && p.px.error])));
+// The map's own pin: a #0b5cab disc in a white ring, the rank in white. Read
+// off the decoded pixels, above the numeral and inside the ring.
+const near = (rgba, hex, tol = 24) => rgba && rgba[3] > 200 && [1, 3, 5].every((o, i) =>
+  Math.abs(rgba[i] - parseInt(hex.slice(o, o + 2), 16)) <= tol);
+const site1 = pngs.find(p => p.name === 'files/site-1.png')?.px;
+ok('…drawn as the map\'s pin: a blue disc in a white ring',
+   !!site1 && near(site1.at(32, 13), '#0b5cab') && near(site1.at(32, 6), '#ffffff') && site1.at(1, 1)[3] === 0,
+   site1 ? JSON.stringify([site1.at(32, 13), site1.at(32, 6), site1.at(1, 1)]) : 'no pixels');
+const tgt = pngs.find(p => p.name === 'files/target.png')?.px;
+ok('…and the site mark a ring round a dot', !!tgt && near(tgt.at(32, 32), '#0b5cab') && near(tgt.at(32, 12), '#0b5cab')
+   && tgt.at(32, 19)[3] < 60, tgt ? JSON.stringify([tgt.at(32, 32), tgt.at(32, 12), tgt.at(32, 19)]) : 'no pixels');
+
+const docKml = Z.entries[0].data.toString('utf8');
+const Kz = await page.evaluate(parseKmlInPage, docKml);
+const rel = Kz.hrefs.filter(h => !/^https?:/.test(h));
+ok('doc.kml parses, and every icon it names is in the zip',
+   !Kz.error && rel.length > 0 && rel.every(h => zNames.includes(h)), String(Kz.error || rel.join(' ')));
+ok('…and every picture in the zip is used', zNames.filter(n => n.endsWith('.png')).every(n => rel.includes(n)));
+const iconless = s => undated(s).replace(/<IconStyle>[\s\S]*?<\/IconStyle>/g, '<IconStyle/>');
+ok('doc.kml is the plain KML with its own icons — nothing else differs', iconless(docKml) === iconless(plain),
+   `${docKml.length} vs ${plain.length} bytes`);
+ok('…and the plain KML fetches Google\'s numbered pins instead',
+   R.every(r => K.styles[`mnSite-${r.rank}`]?.href === `https://maps.google.com/mapfiles/kml/paddle/${r.rank}.png`)
+   && /^https:\/\/maps\.google\.com\//.test(K.styles.mnTarget?.href || ''));
+const told = await page.evaluate(() => document.getElementById('app-status')?.textContent || '');
+ok('the download says what it wrote and where to take it',
+   new RegExp(`${base}\\.kmz — ${R.length} candidates, ${T.length} sites and \\d+ paths`).test(told)
+   && /earth\.google\.com/.test(told), told);
+
+const [dll] = await Promise.all([page.waitForEvent('download'), page.locator('#sites-kml').click()]);
+const kmlBody = (await readDownload(dll)).toString('utf8');
+ok('the KML button downloads the same file, as .kml', dll.suggestedFilename() === `${base}.kml`
+   && undated(kmlBody) === undated(plain), dll.suggestedFilename());
+
+// ── 2d. everything else, dimmed ──────────────────────────────────────────────
+console.log('\nEverything else, dimmed');
+
+const panes = () => page.evaluate(() => {
+  const out = {};
+  for (const [name, el] of Object.entries(state.map.getPanes())) {
+    out[name] = { z: parseInt(el.style.zIndex || getComputedStyle(el).zIndex, 10),
+                  op: getComputedStyle(el).opacity, inline: el.style.opacity };
+  }
+  return out;
+});
+const KEEP = ['mnSites', 'mnSitesLines', 'popupPane', 'mapPane'];
+const p100 = await panes();
+ok('at its default of 100 % the slider touches no pane',
+   Object.values(p100).every(p => p.op === '1' && p.inline === '')
+   && await page.evaluate(() => document.getElementById('sites-dim')?.value) === '100',
+   JSON.stringify(Object.entries(p100).filter(([, p]) => p.op !== '1')));
+await page.locator('#sites-dim').fill('20');
+const p20 = await panes();
+const dimmedNames = Object.keys(p20).filter(n => p20[n].op === '0.2');
+const shouldDim = Object.keys(p20).filter(n => !KEEP.includes(n) && p20[n].z >= 300);
+ok('at 20 % every pane from the overlays up is at 0.2 — the network\'s canvas, the pins\', the labels\' and every context layer\'s',
+   shouldDim.length >= 4 && ['overlayPane', 'markerPane', 'tooltipPane', 'shadowPane'].every(n => shouldDim.includes(n))
+   && shouldDim.every(n => p20[n].op === '0.2') && dimmedNames.length === shouldDim.length,
+   `dimmed: ${dimmedNames.join(' ')}`);
+ok('…while the finder\'s own panes and the popup stay whole',
+   KEEP.every(n => !p20[n] || p20[n].op === '1'), JSON.stringify(KEEP.map(n => p20[n] && p20[n].op)));
+ok('…and the base map, its labels and the elevation stay under their own sliders',
+   Object.entries(p20).filter(([n, p]) => p.z < 300 && n !== 'mapPane').every(([, p]) => p.op === '1')
+   && p20.tilePane.op === '1', Object.entries(p20).filter(([, p]) => p.z < 300).map(([n, p]) => `${n}:${p.op}`).join(' '));
+const dimSaid = await page.evaluate(() => ({
+  out: document.getElementById('sites-dim-out')?.textContent,
+  vt: document.getElementById('sites-dim')?.getAttribute('aria-valuetext'),
+  stored: JSON.parse(localStorage.getItem('mn-sites-v1') || '{}').dimPct,
+  k: MapSites.dimOthers(),
+  names: [...document.querySelectorAll('.mn-site-tname')].map(e => e.textContent),
+  dots: document.querySelectorAll('.mn-site-tdot').length,
+}));
+ok('the slider reads out its value, remembers it, and says it to a screen reader',
+   dimSaid.out === '20 %' && dimSaid.vt === '20 percent' && dimSaid.stored === 20 && dimSaid.k === 0.2,
+   JSON.stringify(dimSaid));
+ok('with the network faded, every site keeps a dot and gains its name',
+   dimSaid.dots === T.length && dimSaid.names.length === T.length && T.every(t => dimSaid.names.includes(t.name)),
+   JSON.stringify(dimSaid.names));
+const late = await page.evaluate(async () => {
+  state.map.createPane('mnLateHigh').style.zIndex = 360;
+  state.map.createPane('mnLateLow').style.zIndex = 240;
+  await new Promise(r => setTimeout(r, 0));
+  const out = { high: getComputedStyle(state.map.getPane('mnLateHigh')).opacity,
+                low: getComputedStyle(state.map.getPane('mnLateLow')).opacity };
+  for (const n of ['mnLateHigh', 'mnLateLow']) { state.map.getPane(n).remove(); delete state.map._panes[n]; }
+  return out;
+});
+ok('a layer\'s pane made after the slider moved is dimmed as it appears — and one under the overlays is not',
+   late.high === '0.2' && late.low === '1', JSON.stringify(late));
+
+// ── 2e. in 3-D ───────────────────────────────────────────────────────────────
+console.log('\nIn 3-D');
+
+const gl2 = await page.evaluate(() => {
+  try { return !!document.createElement('canvas').getContext('webgl2'); } catch (_) { return false; }
+});
+if (!gl2) {
+  console.log('  SKIP — this browser has no WebGL2, so the 3-D half cannot be checked here.');
+} else {
+  await page.evaluate(() => MapSites.select(1));
+  await page.locator('.mn-map-3d').click();
+  await page.waitForFunction(() => !!Map3D._map() && Map3D._map().isStyleLoaded() && !!Map3D._map().getTerrain(),
+    null, { timeout: RUN_TIMEOUT });
+  await page.waitForTimeout(500);
+  const look3 = () => page.evaluate(() => {
+    const m = Map3D._map(), s = Map3D._sites();
+    const ids = m.getStyle().layers.map(l => l.id);
+    const f = (s.drawn && s.drawn.features) || [];
+    const kinds = {};
+    for (const x of f) kinds[x.properties.kind] = (kinds[x.properties.kind] || 0) + 1;
+    return {
+      ids, source: s.source, kinds, pins: s.pins,
+      layers: ['mn-sites-fill', 'mn-sites-area', 'mn-sites-links', 'mn-sites-targets'].map(id => !!m.getLayer(id)),
+      links: f.filter(x => x.properties.kind === 'link').map(x => x.geometry.coordinates),
+      area: f.filter(x => x.properties.kind === 'area').map(x => x.geometry.coordinates[0]),
+      dom: document.querySelectorAll('#map3d .mn-site').length,
+      domOn: [...document.querySelectorAll('#map3d .mn-site.is-on .mn-site-mark')].map(e => e.textContent),
+      marks: document.querySelectorAll('#map3d .mn-site-t').length,
+      names: document.querySelectorAll('#map3d .mn-site-tname').length,
+      mirror: { st: Map3D._mirror().stations.features.length, markers: state.mapMarkers.length,
+                kinds: Map3D._mirror().links.features.filter(x => x.properties.kind != null).length },
+      paint: { links: m.getPaintProperty('mn-links', 'line-opacity'),
+               st: m.getPaintProperty('mn-stations', 'circle-opacity'),
+               stroke: m.getPaintProperty('mn-stations', 'circle-stroke-opacity'),
+               here: m.getPaintProperty('mn-here-dot', 'circle-opacity') },
+      dim: s.dim,
+      circle: { off: document.getElementById('sites-circle')?.disabled, title: document.getElementById('sites-circle')?.title || '' },
+      rank: MapSites.selectedRank(),
+    };
+  });
+  const s3 = await look3();
+  ok('the finder has its own source and four layers in 3-D', s3.source && s3.layers.every(Boolean), JSON.stringify(s3.layers));
+  ok('…between the network\'s links and its pins, as its panes sit in 2-D',
+     ['mn-sites-fill', 'mn-sites-area', 'mn-sites-links', 'mn-sites-targets']
+       .every(id => s3.ids.indexOf(id) > s3.ids.indexOf('mn-links') && s3.ids.indexOf(id) < s3.ids.indexOf('mn-stations')),
+     s3.ids.join(', '));
+  ok('…holding the search area, a ring per site and #1\'s paths',
+     s3.kinds.area === 1 && s3.kinds.target === T.length && s3.kinds.link === drawnOf(R[0]).length
+     && s3.area[0].length === 97 && s3.links.every(c => Math.abs(c[0][0] - R[0].lon) < 1e-9 && Math.abs(c[0][1] - R[0].lat) < 1e-9),
+     JSON.stringify(s3.kinds));
+  ok('one numbered pin per candidate, on the terrain, #1 picked',
+     s3.dom === R.length && s3.domOn.join() === '1' && s3.pins === R.length + T.length, JSON.stringify([s3.dom, s3.domOn, s3.pins]));
+  ok('…and every site\'s mark, named while the rest is dimmed', s3.marks === T.length && s3.names === T.length);
+  ok('none of it is in the network\'s own mirror', s3.mirror.st === s3.mirror.markers && s3.mirror.kinds === 0,
+     JSON.stringify(s3.mirror));
+  ok('the dim reaches the network in 3-D: links, pins and the What is here mark at 0.2',
+     s3.dim === 0.2 && JSON.stringify(s3.paint.links) === '["*",["get","op"],0.2]'
+     && JSON.stringify(s3.paint.st) === '["*",["get","op"],0.2]' && JSON.stringify(s3.paint.stroke) === '["*",["get","op"],0.2]'
+     && s3.paint.here === 0.2, JSON.stringify(s3.paint));
+  ok('Draw a circle is off in 3-D, and says why', s3.circle.off === true && /Leave 3-D/.test(s3.circle.title),
+     JSON.stringify(s3.circle));
+
+  // A real pointer on pin #3. The camera is put straight over it first, so the
+  // pin is where the hit test answers rather than where a projection guesses.
+  await page.evaluate(r => Map3D._map().jumpTo({ center: [r.lon, r.lat], zoom: 12, pitch: 0, bearing: 0 }), R[2]);
+  await page.waitForTimeout(900);
+  const pin3 = await page.evaluate(() => {
+    window.__lfClicks = 0; window.__mlClicks = 0;
+    state.map.on('click', () => window.__lfClicks++);
+    Map3D._map().on('click', () => window.__mlClicks++);
+    const el = [...document.querySelectorAll('#map3d .mn-site')].find(x => x.querySelector('.mn-site-mark')?.textContent === '3');
+    if (!el) return null;
+    const r = el.querySelector('.mn-site-mark').getBoundingClientRect();
+    const x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const hit = document.elementFromPoint(x, y);
+    return { x, y, mine: !!(hit && el.contains(hit)), hit: hit ? `${hit.tagName}.${hit.className}` : null };
+  });
+  ok('pin #3 is on screen where the pointer can reach it', !!pin3 && pin3.mine, JSON.stringify(pin3));
+  if (pin3) {
+    await page.mouse.click(pin3.x, pin3.y);
+    await page.waitForTimeout(400);
+  }
+  const s3b = await look3();
+  const leaked = await page.evaluate(() => ({ lf: window.__lfClicks, ml: window.__mlClicks, here: MapHere.point() }));
+  ok('clicking it picks candidate #3', s3b.rank === 3 && s3b.domOn.join() === '3', JSON.stringify([s3b.rank, s3b.domOn]));
+  ok('…and its paths replace #1\'s on the terrain',
+     s3b.kinds.link === drawnOf(R[2]).length
+     && s3b.links.every(c => Math.abs(c[0][0] - R[2].lon) < 1e-9 && Math.abs(c[0][1] - R[2].lat) < 1e-9),
+     JSON.stringify(s3b.kinds));
+  ok('…with the click answered by the pin alone — not the 3-D map, not the 2-D map under it',
+     leaked.lf === 0 && leaked.ml === 0 && leaked.here === null, JSON.stringify(leaked));
+
+  await page.locator('#sites-dim').fill('100');
+  const s3c = await look3();
+  ok('back at 100 % the network\'s opacities are its own again, and the names go',
+     s3c.dim === 1 && JSON.stringify(s3c.paint.links) === '["get","op"]' && JSON.stringify(s3c.paint.st) === '["get","op"]'
+     && s3c.paint.here === 1 && s3c.names === 0, JSON.stringify(s3c.paint));
+
+  await page.locator('.mn-map-3d').click();
+  await page.waitForFunction(() => !Map3D._map(), null, { timeout: RUN_TIMEOUT });
+  const gone3 = await page.evaluate(() => ({
+    host: !!document.getElementById('map3d'), markers: document.querySelectorAll('.maplibregl-marker').length,
+    pins: Map3D._sites().pins, flat: document.querySelectorAll('.mn-site').length,
+    circle: { off: document.getElementById('sites-circle')?.disabled, title: document.getElementById('sites-circle')?.title || '' },
+  }));
+  ok('leaving 3-D takes its pins and marks with it, and leaves 2-D\'s', !gone3.host && gone3.markers === 0 && gone3.pins === 0
+     && gone3.flat === R.length, JSON.stringify(gone3));
+  ok('…and Draw a circle comes back', gone3.circle.off === false && /middle of the area/.test(gone3.circle.title),
+     JSON.stringify(gone3.circle));
+}
+await page.evaluate(() => MapSites.select(1));
+// Left dimmed for the rest of the run, so ↺ has a dim to take away.
+await page.locator('#sites-dim').fill('20');
 
 // ── 3. the weights ───────────────────────────────────────────────────────────
 console.log('\nThe weights');
@@ -382,6 +853,21 @@ ok('with its weight at nought, the cadastre is not asked at all', roadAsked.leng
 await page.evaluate(() => MapSites.set('agl', 12));
 const gone = await page.evaluate(() => ({ n: MapSites.results().length, pins: document.querySelectorAll('.mn-site').length }));
 ok('changing the mast height takes the answer off the map', gone.n === 0 && gone.pins === 0, JSON.stringify(gone));
+// …and with no answer there is no file: both buttons off, and a call made
+// anyway (a stale render, the console) writes nothing and says why.
+const refused = await page.evaluate(() => {
+  let blobs = 0;
+  const real = URL.createObjectURL;
+  URL.createObjectURL = b => { blobs++; return real.call(URL, b); };
+  try { downloadSitesKmz(); downloadSitesKml(); } finally { URL.createObjectURL = real; }
+  return { blobs, off: ['sites-kmz', 'sites-kml'].every(id => document.getElementById(id)?.disabled === true) };
+});
+// announce() empties the live region and writes a frame later, so a reader
+// hears it as new — which is also when this can read it.
+await page.waitForFunction(() => !!document.getElementById('app-status')?.textContent, null, { timeout: 5000 }).catch(() => {});
+refused.said = await page.evaluate(() => document.getElementById('app-status')?.textContent || '');
+ok('with no answer the Google Earth buttons are off, and a download writes nothing and says why',
+   refused.blobs === 0 && refused.off && /no answer to export yet/.test(refused.said), JSON.stringify(refused));
 await page.evaluate(() => { MapSites.set('agl', ''); MapSites.set('wRoad', 1); MapSites.set('wElev', 2);
                             MapSites.set('wLos', 3); MapSites.set('wFade', 4); });
 
@@ -450,6 +936,29 @@ ok('↺ takes the sites, the answer and everything drawn for them away',
    after.targets === 0 && after.results === 0 && after.pins === 0 && after.ours === 0 && !after.legend,
    JSON.stringify(after));
 
+// The dim was left at 20 % through all of the above. ↺ empties the finder, and
+// an empty finder applies no dim whatever the slider remembers.
+const pReset = await panes();
+const dimAfter = await page.evaluate(() => ({ k: MapSites.dimOthers(),
+  stored: JSON.parse(localStorage.getItem('mn-sites-v1') || '{}').dimPct,
+  marks: document.querySelectorAll('.mn-site-t').length }));
+ok('…and puts every pane back, though the slider still remembers 20 %',
+   Object.values(pReset).every(p => p.op === '1' && p.inline === '') && dimAfter.k === 1 && dimAfter.stored === 20
+   && dimAfter.marks === 0, JSON.stringify(dimAfter));
+
+// A fresh visit with 20 % remembered: nothing is in the finder, so nothing is
+// dimmed — a low value left over from yesterday must not hide the network
+// with nothing on screen to say why.
+await page.reload({ waitUntil: 'load', timeout: LOAD_TIMEOUT });
+await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
+await page.evaluate(() => switchTab('stations'));
+await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0, null, { timeout: LOAD_TIMEOUT });
+const pFresh = await panes();
+const fresh = await page.evaluate(() => ({ k: MapSites.dimOthers(),
+  stored: JSON.parse(localStorage.getItem('mn-sites-v1') || '{}').dimPct }));
+ok('a fresh visit with 20 % remembered dims nothing until there are sites again',
+   fresh.stored === 20 && fresh.k === 1 && Object.values(pFresh).every(p => p.op === '1'), JSON.stringify(fresh));
+
 ok('no page errors', errors.length === 0, errors.join('\n'));
 
 await browser.close();
@@ -471,4 +980,136 @@ function dest(lat, lon, brg, km) {
   const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(b));
   const l2 = l1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(p1), Math.cos(d) - Math.sin(p1) * Math.sin(p2));
   return [p2 / rad, ((l2 / rad + 540) % 360) - 180];
+}
+
+// ── the file, read back ──────────────────────────────────────────────────────
+// Everything below is written here rather than borrowed from the app, for the
+// reason the haversine above is: a file checked with the code that wrote it is
+// checking nothing.
+
+// The KML, walked in the page's own DOMParser (the parser Earth's web client
+// is closest to) and handed back as plain facts: every Folder and Placemark
+// with its name, visibility, style, balloon, data, geometry and the order its
+// children came in.
+function parseKmlInPage(text) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  const bad = doc.querySelector('parsererror');
+  if (bad) return { error: bad.textContent.slice(0, 300) };
+  const kids = (el, tag) => [...el.children].filter(c => c.localName === tag);
+  const one = (el, tag) => kids(el, tag)[0] || null;
+  const txt = (el, tag) => { const c = one(el, tag); return c ? c.textContent : null; };
+  const geom = el => {
+    for (const tag of ['Point', 'LineString', 'Polygon']) {
+      const g = one(el, tag);
+      if (!g) continue;
+      const ce = tag === 'Polygon' ? g.querySelector('outerBoundaryIs > LinearRing > coordinates') : one(g, 'coordinates');
+      const coords = (ce ? ce.textContent : '').trim().split(/\s+/).filter(Boolean).map(s => s.split(',').map(Number));
+      return { type: tag, coords, tess: txt(g, 'tessellate'), alt: txt(g, 'altitudeMode') };
+    }
+    return null;
+  };
+  const placemark = el => {
+    const ed = one(el, 'ExtendedData');
+    const data = ed ? {} : null;
+    if (ed) for (const d of kids(ed, 'Data')) data[d.getAttribute('name')] = txt(d, 'value');
+    return { name: txt(el, 'name'), visibility: txt(el, 'visibility'), style: txt(el, 'styleUrl'),
+             desc: txt(el, 'description') || '', data, geom: geom(el), order: [...el.children].map(c => c.localName) };
+  };
+  const folder = el => ({ name: txt(el, 'name'), visibility: txt(el, 'visibility'), open: txt(el, 'open'),
+                          placemarks: kids(el, 'Placemark').map(placemark), folders: kids(el, 'Folder').map(folder) });
+  const root = doc.documentElement;
+  const D = one(root, 'Document');
+  const styles = {};
+  for (const s of kids(D, 'Style')) {
+    const q = sel => { const e = s.querySelector(sel); return e ? e.textContent : null; };
+    styles[s.getAttribute('id')] = { line: q('LineStyle > color'), width: q('LineStyle > width'), href: q('IconStyle > Icon > href') };
+  }
+  return {
+    error: null, root: root.localName, ns: root.namespaceURI, docs: kids(root, 'Document').length,
+    docName: txt(D, 'name'), docDesc: txt(D, 'description') || '', lookAt: !!one(D, 'LookAt'),
+    styles, styleUrls: [...doc.getElementsByTagName('styleUrl')].map(e => e.textContent),
+    hrefs: [...doc.getElementsByTagName('href')].map(e => e.textContent),
+    top: [...D.children].filter(c => c.localName === 'Folder' || c.localName === 'Placemark')
+      .map(c => (c.localName === 'Folder' ? { tag: 'Folder', ...folder(c) } : { tag: 'Placemark', ...placemark(c) })),
+  };
+}
+
+// drawkml.mjs's normaliser: the one line of a file that is the time it was written.
+function undated(s) {
+  return s.replace(/Exported from MegaNet[\s\S]*?\]\]><\/description>/, '');
+}
+
+// A store-only zip, read from the end record inwards: the central directory
+// says where each entry is, and each local header is read again at that offset
+// so the two can be held to agreeing. Anything but method 0 is reported rather
+// than inflated — the writer claims to store, so a deflated entry is a defect.
+function unzipStored(buf) {
+  let e = buf.length - 22;
+  while (e >= 0 && buf.readUInt32LE(e) !== 0x06054b50) e--;
+  if (e < 0) return { error: 'no end-of-central-directory record', entries: [] };
+  const count = buf.readUInt16LE(e + 10), cenSize = buf.readUInt32LE(e + 12), cenOff = buf.readUInt32LE(e + 16);
+  const entries = [];
+  let p = cenOff;
+  for (let i = 0; i < count; i++) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) return { error: `bad directory entry ${i}`, entries };
+    const nlen = buf.readUInt16LE(p + 28), xlen = buf.readUInt16LE(p + 30), clen = buf.readUInt16LE(p + 32);
+    const offset = buf.readUInt32LE(p + 42);
+    const ent = { name: buf.toString('utf8', p + 46, p + 46 + nlen), method: buf.readUInt16LE(p + 10),
+                  crc: buf.readUInt32LE(p + 16), csize: buf.readUInt32LE(p + 20), usize: buf.readUInt32LE(p + 24), offset };
+    const lnlen = buf.readUInt16LE(offset + 26), lxlen = buf.readUInt16LE(offset + 28);
+    Object.assign(ent, { lsig: buf.readUInt32LE(offset), lmethod: buf.readUInt16LE(offset + 8),
+                         lcrc: buf.readUInt32LE(offset + 14), lsize: buf.readUInt32LE(offset + 18),
+                         lname: buf.toString('utf8', offset + 30, offset + 30 + lnlen) });
+    const at = offset + 30 + lnlen + lxlen;
+    ent.data = buf.subarray(at, at + ent.csize);
+    entries.push(ent);
+    p += 46 + nlen + xlen + clen;
+  }
+  return { error: null, entries, cenOff, cenSize, eocd: e };
+}
+
+// CRC-32 the slow, obvious way — bit by bit, no table — so it shares nothing
+// with the writer's.
+function crc32(u8) {
+  let crc = 0xffffffff;
+  for (let n = 0; n < u8.length; n++) {
+    crc ^= u8[n];
+    for (let k = 0; k < 8; k++) crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+// An 8-bit RGBA or RGB PNG, decoded far enough to read a pixel: the IDAT
+// chunks inflated and each scanline's filter undone. That is every PNG a
+// canvas writes; anything else is reported, not guessed at.
+function pngPixels(buf) {
+  if (buf.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') return { error: 'not a PNG' };
+  let p = 8, w = 0, h = 0, bpp = 0;
+  const idat = [];
+  while (p < buf.length) {
+    const len = buf.readUInt32BE(p), type = buf.toString('latin1', p + 4, p + 8);
+    const body = buf.subarray(p + 8, p + 8 + len);
+    if (type === 'IHDR') {
+      w = body.readUInt32BE(0); h = body.readUInt32BE(4);
+      if (body[8] !== 8 || body[12] !== 0 || (body[9] !== 6 && body[9] !== 2)) return { error: 'not 8-bit RGB(A)', w, h };
+      bpp = body[9] === 6 ? 4 : 3;
+    } else if (type === 'IDAT') idat.push(body);
+    p += 12 + len;
+  }
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const px = Buffer.alloc(w * h * bpp), stride = w * bpp;
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x++) {
+      const v = raw[y * (stride + 1) + 1 + x];
+      const a = x >= bpp ? px[y * stride + x - bpp] : 0;
+      const b = y ? px[(y - 1) * stride + x] : 0;
+      const c = x >= bpp && y ? px[(y - 1) * stride + x - bpp] : 0;
+      const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+      const pred = f === 0 ? 0 : f === 1 ? a : f === 2 ? b : f === 3 ? (a + b) >> 1
+                 : (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
+      px[y * stride + x] = (v + pred) & 0xff;
+    }
+  }
+  return { w, h, at: (x, y) => { const o = (y * w + x) * bpp; return [px[o], px[o + 1], px[o + 2], bpp === 4 ? px[o + 3] : 255]; } };
 }

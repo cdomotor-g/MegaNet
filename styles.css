@@ -4125,6 +4125,64 @@ hr {
   font-size: .95rem;
 }
 
+/* The pin's wrapper is the thing that takes focus (Leaflet's marker in 2-D,
+   Map3D's DOM marker in 3-D), and it is zero-sized on purpose — its origin is
+   the coordinate — so the global ring would be drawn round nothing. The ring
+   goes on the mark instead, from the same tokens. */
+.mn-site-icon:focus-visible .mn-site-mark {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+  box-shadow: 0 0 0 calc(var(--focus-width) + var(--focus-offset)) var(--focus-halo);
+}
+
+/* A site to serve, in the finder's lines' pane under the network's canvas: a
+   dot inside its ring, so the site is still marked when the slider has faded
+   the station's own pin away, and its name beside it while the dim is on.
+   Takes no pointer — the station underneath is the thing to click. The white
+   ring and the dark hairline round it are literals for the pin's reason
+   (.mn-site-mark): they are read against a base map, which is not themed. */
+.mn-site-t {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.mn-site-tdot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .35);
+  transform: translate(-50%, -50%);
+}
+
+.mn-site-tname {
+  position: absolute;
+  left: 13px;                   /* clear of the 9 px ring round the point */
+  top: 0;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--card);
+  color: var(--text);
+  font-size: .7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+  transform: translateY(-50%);
+}
+
+/* The Google Earth pair under the panel's actions: the KMZ is the one to
+   press, so the plain KML beside it is the small one. */
+.sites-earth .sites-kml {
+  font-size: .75rem;
+}
+
 /* ── My location + heading (mobile only) ─────────────────────────────────── */
 
 .mn-locate a {

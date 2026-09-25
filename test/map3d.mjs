@@ -287,6 +287,26 @@ ok('the links are drawn as a layer',        cam.layers.includes('mn-links'), cam
 ok('the stations are drawn as a layer',     cam.layers.includes('mn-stations'));
 ok('the sheet layer is registered',         cam.sheetLayer === true);
 
+// The repeater site finder's own source and layers are always in the style
+// (sites.mjs drives them with an answer on the map) — and with the finder
+// idle they hold nothing and its "everything else" dim is exactly off: the
+// network's opacities are the plain per-feature values styleSpec wrote, not a
+// multiplication by one, and the drape's 0.35 further down is untouched.
+const idleSites = await page.evaluate(() => {
+  const m = Map3D._map(), s = Map3D._sites();
+  return {
+    layers: ['mn-sites-fill', 'mn-sites-area', 'mn-sites-links', 'mn-sites-targets'].every(id => !!m.getLayer(id)),
+    source: s.source, features: s.drawn ? s.drawn.features.length : -1, pins: s.pins, dim: s.dim,
+    links: m.getPaintProperty('mn-links', 'line-opacity'),
+    stations: m.getPaintProperty('mn-stations', 'circle-opacity'),
+  };
+});
+ok('the site finder has a source and layers of its own, empty while it is idle',
+   idleSites.layers && idleSites.source && idleSites.features === 0 && idleSites.pins === 0, JSON.stringify(idleSites));
+ok('…and its dim is exactly off: the network keeps the opacities it was given',
+   idleSites.dim === 1 && JSON.stringify(idleSites.links) === '["get","op"]'
+   && JSON.stringify(idleSites.stations) === '["get","op"]', JSON.stringify(idleSites));
+
 // ── 3. the mirror is the 2-D map's own answer ───────────────────────────────
 // Read against `state.mapLines` and `state.mapMarkers` rather than against a
 // literal, for `maplinks`' reason: a re-ordered palette still passes, and a

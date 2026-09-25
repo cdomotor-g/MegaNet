@@ -6,13 +6,14 @@
 //           drawn as a vertical sheet between the ray and the ground under it.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for `state`, cssVar, announce, esc and
+// Reaches back to core.js for `state`, cssVar, announce, esc, destPoint and
 // acmaHaversineKm; across to terrain.js for the ground profile, to
 // path-profile.js for the physics (pathAnalyse, earthBulge, rmSystemOf,
-// PATH_DEFAULT_*), to map-controls.js for the panel it is opened from, and to
-// app.js for showStationCard and the base-map choice. Every one of those is
-// called from inside this file's own functions, so its position among the
-// modules is free.
+// PATH_DEFAULT_*), to map-controls.js for the panel it is opened from, to
+// map-sites.js for what the repeater site finder drew (MapSites.drawn, select,
+// dimOthers, modeChanged), and to app.js for showStationCard and the base-map
+// choice. Every one of those is called from inside this file's own functions,
+// so its position among the modules is free.
 //
 // ── Why a second map rather than a 3-D Leaflet ───────────────────────────────
 // Leaflet draws into a 2-D canvas and has no camera: there is no pitch, no
@@ -41,6 +42,19 @@
 // second implementation of eleven modules' decisions, and the first time the
 // two disagreed the map would be lying in one of its two modes with nothing to
 // say which.
+//
+// The repeater site finder is mirrored the same way and kept apart from the
+// network. MapSites draws its search area, rings, paths and numbered pins on
+// Leaflet layers of its own and hands them over through `MapSites.drawn()`;
+// this file reads them into a source of its own (`mn-sites`) and DOM markers
+// of its own, and never into `mn-links` / `mn-stations`, which are the
+// network's and nothing else's — the check holds those two to exactly what
+// `state.mapLines` and `state.mapMarkers` hold. MapSites also owns one number
+// this view applies: how much of *everything else* to show while the finder
+// is in use (`dimOthers()`, 1 when it is idle), which fades the network's
+// links, pins, the What is here mark and the sheets — and not the base map or
+// the elevation drape, which are the ground the candidates stand on and have
+// sliders of their own, exactly as in 2-D.
 //
 // ── Why the library is fetched rather than listed in index.html ──────────────
 // MapLibre is ~1 MB of WebGL renderer. Leaflet is in index.html because half
@@ -145,6 +159,8 @@ const Map3D = (function () {
   let sheets   = { rows: [], pick: [], queue: [], running: 0, gen: 0,
                    done: 0, failed: 0, dropped: 0, inView: 0 };
   let buf      = null;   // { pos, clr, count } — the sheet geometry, in mercator
+  let sitePins = [];     // the site finder's pins and site marks, as ml.Markers
+  let dimK     = 1;      // MapSites.dimOthers(), as last applied — 1 when idle
 
   // ── base maps ────────────────────────────────────────────────────────────
   // The four the 2-D map already offers, as MapLibre raster sources. They are
@@ -392,6 +408,146 @@ const Map3D = (function () {
       });
     }
     return { type: 'FeatureCollection', features: out };
+  }
+
+  // ── the repeater site finder, mirrored ──────────────────────────────────
+  // What MapSites drew on the 2-D map, read off its own lines' layer group:
+  // each layer carries an `mn3d` tag saying what it is, so nothing here has to
+  // guess a search area from a radius or a path from a weight. Styles come off
+  // the layers as the network's do — a band colour the finder chose is the
+  // colour drawn here.
+  //
+  // The search area is an L.Circle, which MapLibre has no primitive for, so it
+  // becomes a polygon: bearings stepped through destPoint, which is the circle
+  // the finder actually searched (its test is acmaHaversineKm from the middle)
+  // rather than Leaflet's screen-space approximation of one.
+  const SITE_RING_SIDES = 96;
+
+  function siteFeatures() {
+    const out = [];
+    const d = typeof MapSites !== 'undefined' && MapSites.drawn ? MapSites.drawn() : null;
+    if (!d || !d.lines) return { type: 'FeatureCollection', features: out };
+    d.lines.eachLayer(l => {
+      const o = l.options || {};
+      const base = { colour: o.color || '#0b5cab', width: o.weight || 2,
+                     op: o.opacity == null ? 1 : o.opacity };
+      if (l.mn3d === 'area') {
+        const c = l.getLatLng(), km = l.getRadius() / 1000;
+        const ring = [];
+        for (let i = 0; i < SITE_RING_SIDES; i++) {
+          const p = destPoint(c.lat, c.lng, 360 * i / SITE_RING_SIDES, km);
+          ring.push([p[1], p[0]]);
+        }
+        ring.push(ring[0]);
+        out.push({ type: 'Feature',
+                   properties: { kind: 'area', ...base, fillOp: o.fillOpacity == null ? 0.2 : o.fillOpacity },
+                   geometry: { type: 'Polygon', coordinates: [ring] } });
+      } else if (l.mn3d === 'target') {
+        const ll = l.getLatLng();
+        out.push({ type: 'Feature', properties: { kind: 'target', ...base, r: o.radius || 9 },
+                   geometry: { type: 'Point', coordinates: [ll.lng, ll.lat] } });
+      } else if (l.mn3d === 'link') {
+        const pts = l.getLatLngs();
+        if (!pts || pts.length < 2) return;
+        out.push({ type: 'Feature', properties: { kind: 'link', ...base, dash: o.dashArray ? 1 : 0 },
+                   geometry: { type: 'LineString', coordinates: pts.map(p => [p.lng, p.lat]) } });
+      }
+    });
+    return { type: 'FeatureCollection', features: out };
+  }
+
+  // The numbered pins and the sites' own marks, as DOM markers carrying the
+  // 2-D markup verbatim — so the CSS that styles them on the flat map styles
+  // them here, and a pin is recognisably the same pin in both modes. DOM
+  // rather than a symbol layer on purpose: a symbol needs a `glyphs` URL,
+  // which is another off-origin host for a font this map otherwise never
+  // needs, and fails silently (the error listener below swallows it). The
+  // cost argument against DOM markers (stationFeatures' ~3,174) does not
+  // apply at five pins and forty marks. MapLibre stands them on the terrain
+  // and fades them where a hill is in front, which is the honest picture.
+  //
+  // A pin click is the finder's own select(), and stops here: the pin sits
+  // on MapLibre's canvas container inside the Leaflet container, and a click
+  // allowed to bubble would also reach MapLibre's click (a What is here pick)
+  // and Leaflet's (the focus clear). Enter and Space do the same, for the
+  // keyboard, and focus is put back on the rebuilt pin that replaced the one
+  // pressed — select() redraws, and a redraw that drops focus on the body
+  // loses a keyboard user's place.
+  function syncSitePins() {
+    const was = document.activeElement && document.activeElement.dataset
+      ? document.activeElement.dataset.mnSiteRank : null;
+    for (const p of sitePins) p.remove();
+    sitePins = [];
+    const d = typeof MapSites !== 'undefined' && MapSites.drawn ? MapSites.drawn() : null;
+    if (!map || !ml || !d) return;
+    let refocus = null;
+    // The sites' marks live in the lines' group (under the network in 2-D)
+    // and the pins in their own; here both are markers on the terrain, the
+    // marks first so a candidate standing on a site is drawn over its mark.
+    const each = fn => { if (d.lines) d.lines.eachLayer(fn); if (d.pins) d.pins.eachLayer(fn); };
+    each(l => {
+      if (l.mn3d !== 'site' && l.mn3d !== 'tmark') return;
+      const icon = l.options.icon && l.options.icon.options;
+      if (!icon || !icon.html) return;
+      const el = document.createElement('div');
+      el.className = 'mn-site-icon mn-site-3d';
+      el.innerHTML = icon.html;
+      if (l.mn3d === 'site') {
+        const rank = l.mnSiteRank;
+        const label = l.options.title || `Repeater site #${rank}`;
+        el.title = label;
+        el.setAttribute('aria-label', label);
+        el.setAttribute('role', 'button');
+        el.tabIndex = 0;
+        el.dataset.mnSiteRank = String(rank);
+        const pick = e => { e.stopPropagation(); e.preventDefault(); MapSites.select(rank); };
+        el.addEventListener('click', pick);
+        el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') pick(e); });
+        if (was === String(rank)) refocus = el;
+      } else {
+        // A site's mark is a picture of where it is, not a control: the ring
+        // is on the terrain already and the station itself is clickable.
+        el.setAttribute('role', 'presentation');
+        el.setAttribute('aria-hidden', 'true');
+        el.style.pointerEvents = 'none';
+      }
+      const ll = l.getLatLng();
+      sitePins.push(new ml.Marker({ element: el, anchor: 'center', opacityWhenCovered: 0.35 })
+        .setLngLat([ll.lng, ll.lat]).addTo(map));
+    });
+    if (refocus) refocus.focus({ preventScroll: true });
+  }
+
+  function syncSites() {
+    if (!map || !ready) return;
+    const s = map.getSource('mn-sites');
+    if (s) s.setData(siteFeatures());
+    syncSitePins();
+  }
+
+  // ── everything else, dimmed ─────────────────────────────────────────────
+  // The site finder's slider, applied to what this view draws of the network:
+  // the links, the pins, the What is here mark and the sheets. Not the base
+  // raster and not the elevation drape — in 2-D those are the tile, elevation
+  // and base-label panes the slider leaves alone, because they have sliders of
+  // their own and are the ground being judged — and not the finder's own
+  // layers, which are the point. Multiplied into the existing opacities rather
+  // than replacing them, so the focus dim and a colouring's own translucency
+  // survive; and restored to the plain `['get', 'op']` at 1, so an idle finder
+  // leaves the style exactly as styleSpec() wrote it.
+  function applyDim() {
+    if (!map || !ready) return;
+    const v = typeof MapSites !== 'undefined' && MapSites.dimOthers ? Number(MapSites.dimOthers()) : 1;
+    dimK = isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
+    const op = dimK === 1 ? ['get', 'op'] : ['*', ['get', 'op'], dimK];
+    const set = (id, prop, value) => { if (map.getLayer(id)) map.setPaintProperty(id, prop, value); };
+    set('mn-links', 'line-opacity', op);
+    set('mn-stations', 'circle-opacity', op);
+    set('mn-stations', 'circle-stroke-opacity', op);
+    set('mn-here-ring', 'circle-stroke-opacity', dimK);
+    set('mn-here-dot', 'circle-opacity', dimK);
+    set('mn-here-dot', 'circle-stroke-opacity', dimK);
+    map.triggerRepaint();              // the sheets read dimK in their own render
   }
 
   // ── the sheets ───────────────────────────────────────────────────────────
@@ -682,7 +838,9 @@ const Map3D = (function () {
       gl.uniform3fv(this.uBad,  rgb(cssVar('--map-line-blocked', '#d81b60')));
       gl.uniform3fv(this.uMid,  rgb(cssVar('--warn', '#f9a825')));
       gl.uniform3fv(this.uGood, rgb(cssVar('--ok', '#2e7d32')));
-      gl.uniform1f(this.uAlpha, 0.42);
+      // The site finder's dim reaches the sheets too: they are the network's
+      // hops, and a candidate's path is hard to read through a curtain.
+      gl.uniform1f(this.uAlpha, 0.42 * dimK);
       if (this.uploaded !== buf) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
         gl.bufferData(gl.ARRAY_BUFFER, buf.pos, gl.DYNAMIC_DRAW);
@@ -736,6 +894,7 @@ const Map3D = (function () {
         'mn-links':    { type: 'geojson', data: linkFeatures() },
         'mn-stations': { type: 'geojson', data: stationFeatures() },
         'mn-here':     { type: 'geojson', data: hereFeature() },
+        'mn-sites':    { type: 'geojson', data: siteFeatures() },
       },
       layers: [
         { id: 'mn-base', type: 'raster', source: 'mn-base' },
@@ -752,9 +911,42 @@ const Map3D = (function () {
             'line-color':   ['get', 'colour'],
             'line-width':   ['get', 'width'],
             'line-opacity': ['get', 'op'],
+            // No easing on the opacities the site finder's slider multiplies
+            // (applyDim): a drag has to move the picture with the thumb, and
+            // MapLibre's default 300 ms transition makes it trail behind.
+            'line-opacity-transition': { duration: 0, delay: 0 },
             'line-dasharray': ['case', ['==', ['get', 'dash'], 1],
                                ['literal', [2, 3]], ['literal', [1, 0]]],
           } },
+        // ── The repeater site finder (map-sites.js) ──────────────────────
+        // Its own source, between the network's links and its pins — the
+        // place its lines' pane takes in 2-D (342, under the station canvas
+        // at 400). Its numbered pins are DOM markers over all of it, as their
+        // pane is over that canvas in 2-D (syncSitePins). The fill and the
+        // lines are draped, and sit in one block with mn-links so the terrain
+        // renders them in the same pass; the rings stand on the ground like
+        // the pins. Dashes are the 2-D ones divided by the line width, which
+        // is MapLibre's unit for them: '6 6' at 1.5 for the search area,
+        // '7 6' at 3 for a cut path.
+        { id: 'mn-sites-fill', type: 'fill', source: 'mn-sites',
+          filter: ['==', ['get', 'kind'], 'area'],
+          paint: { 'fill-color': ['get', 'colour'], 'fill-opacity': ['get', 'fillOp'] } },
+        { id: 'mn-sites-area', type: 'line', source: 'mn-sites',
+          filter: ['==', ['get', 'kind'], 'area'],
+          paint: { 'line-color': ['get', 'colour'], 'line-width': ['get', 'width'],
+                   'line-opacity': ['get', 'op'], 'line-dasharray': ['literal', [4, 4]] } },
+        { id: 'mn-sites-links', type: 'line', source: 'mn-sites',
+          filter: ['==', ['get', 'kind'], 'link'],
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': ['get', 'colour'], 'line-width': ['get', 'width'],
+                   'line-opacity': ['get', 'op'],
+                   'line-dasharray': ['case', ['==', ['get', 'dash'], 1],
+                                      ['literal', [2.33, 2]], ['literal', [1, 0]]] } },
+        { id: 'mn-sites-targets', type: 'circle', source: 'mn-sites',
+          filter: ['==', ['get', 'kind'], 'target'],
+          paint: { 'circle-radius': ['get', 'r'], 'circle-color': 'rgba(0,0,0,0)',
+                   'circle-stroke-color': ['get', 'colour'], 'circle-stroke-width': ['get', 'width'],
+                   'circle-stroke-opacity': ['get', 'op'] } },
         { id: 'mn-stations', type: 'circle', source: 'mn-stations',
           paint: {
             'circle-color':        ['get', 'fill'],
@@ -763,6 +955,8 @@ const Map3D = (function () {
             'circle-stroke-width': ['get', 'w'],
             'circle-opacity':      ['get', 'op'],
             'circle-stroke-opacity': ['get', 'op'],
+            'circle-opacity-transition':        { duration: 0, delay: 0 },
+            'circle-stroke-opacity-transition': { duration: 0, delay: 0 },
             // Left billboarded (the default, `circle-pitch-alignment: viewport`)
             // rather than laid flat on the ground: at 70° of pitch a
             // map-aligned circle is a thin ellipse, and a station pin has to
@@ -786,10 +980,13 @@ const Map3D = (function () {
         // drawn over the pins because it is the thing just asked about.
         { id: 'mn-here-ring', type: 'circle', source: 'mn-here',
           paint: { 'circle-radius': 11, 'circle-color': 'rgba(0,0,0,0)',
-                   'circle-stroke-color': '#00e5ff', 'circle-stroke-width': 2 } },
+                   'circle-stroke-color': '#00e5ff', 'circle-stroke-width': 2,
+                   'circle-stroke-opacity-transition': { duration: 0, delay: 0 } } },
         { id: 'mn-here-dot', type: 'circle', source: 'mn-here',
           paint: { 'circle-radius': 3.5, 'circle-color': '#00e5ff',
-                   'circle-stroke-color': 'rgba(0,0,0,.5)', 'circle-stroke-width': 2 } },
+                   'circle-stroke-color': 'rgba(0,0,0,.5)', 'circle-stroke-width': 2,
+                   'circle-opacity-transition':        { duration: 0, delay: 0 },
+                   'circle-stroke-opacity-transition': { duration: 0, delay: 0 } } },
       ],
       sky: {
         'sky-color': cssVar('--map3d-sky', '#7fb3e8'),
@@ -891,6 +1088,11 @@ const Map3D = (function () {
       map.setTerrain({ source: 'mn-dem', exaggeration: state.map3dExag || 1 });
       map.addLayer(sheetLayer);
       syncElevation();
+      // The finder may have drawn before 3-D was opened, and its pins are DOM
+      // markers that the style cannot declare — so they are added here, and
+      // the slider's factor is read once the layers it applies to exist.
+      syncSites();
+      applyDim();
       queueSheets();
       setNote();
       syncCamera();
@@ -1271,6 +1473,20 @@ const Map3D = (function () {
       if (s) s.setData(hereFeature());
     },
 
+    // The site finder redrew (MapSites.draw — its one choke point): new sites,
+    // a new answer, another candidate picked, or all of it cleared. Its
+    // layers are re-read and its pins rebuilt, and the dim with them, because
+    // whether the dim applies at all depends on whether there is anything
+    // there. Two early returns while 3-D is shut, which is almost always.
+    sitesChanged() {
+      if (!map || !ready) return;
+      syncSites();
+      applyDim();
+    },
+
+    // The finder's slider moved without anything it drew changing.
+    dimChanged() { applyDim(); },
+
     // Put the camera back overhead without leaving 3-D — the gesture that gets
     // somebody un-lost after a rotate, and the one thing a tilted map makes
     // genuinely hard to do by hand. Both halves at once; the two corner buttons
@@ -1361,6 +1577,16 @@ const Map3D = (function () {
     // them in metres is what makes the assertions arithmetic rather than
     // "whatever the shader drew".
     _mirror() { return { links: linkFeatures(), stations: stationFeatures() }; },
+    // …and the site finder's mirror, kept out of _mirror() on purpose: that
+    // one is asserted to be exactly the network, and these are not it.
+    _sites() {
+      // `drawn` is what the renderer's source actually holds (serialize() is
+      // MapLibre's own public read-back), so a check can tell "the mirror
+      // would say" from "the map was told".
+      const src = map && map.getSource('mn-sites');
+      return { features: siteFeatures(), pins: sitePins.length, dim: dimK,
+               source: !!src, drawn: src ? src.serialize().data : null };
+    },
     _sheets() { return { rows: sheets.rows.length, done: sheets.done,
                          failed: sheets.failed, dropped: sheets.dropped,
                          inView: sheets.inView, verts: buf ? buf.count : 0,
@@ -1393,6 +1619,7 @@ const Map3D = (function () {
       host.classList.add('is-on');
       build();
       repaintPanel();
+      modeToSites();
       announce('3-D view on. Right-drag or Ctrl-drag to tilt and rotate.');
       return true;
     }).catch(() => {
@@ -1403,7 +1630,19 @@ const Map3D = (function () {
     });
   }
 
+  // The site finder's circle button is 2-D only (map-sites.js says why), so
+  // it is told whenever the mode changes. Asked for by `typeof` for symmetry
+  // with every other reach across from here, though map-sites.js loads first.
+  function modeToSites() {
+    if (typeof MapSites !== 'undefined' && MapSites.modeChanged) MapSites.modeChanged();
+  }
+
   function close() {
+    // The finder's pins are markers on this map; they would go with it, but
+    // each also holds listeners on it, so they are taken off first.
+    for (const p of sitePins) { try { p.remove(); } catch (_) {} }
+    sitePins = [];
+    dimK = 1;
     if (map) { try { map.remove(); } catch (_) {} }
     map = null;
     ready = false;
@@ -1419,6 +1658,7 @@ const Map3D = (function () {
     if (state.map3d) {
       state.map3d = false;
       repaintPanel();
+      modeToSites();
       announce('3-D view off');
     }
   }

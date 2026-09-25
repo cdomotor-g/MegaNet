@@ -804,7 +804,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Export the whole drawing to Google Earth as a KML — the shapes in their own colours, and the stations they enclose or run between
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
-- **Repeater site finder** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve — see *Repeater site finder* under §17
+- **Repeater site finder** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve; fade everything else on the map to see them, see them on the terrain in 3-D, and take them to Google Earth as a KMZ with each candidate's paths in a folder of its own — see *Repeater site finder* under §17
 - Leaflet.js, with the map's own controls in its top-right corner, grouped by what they are for
   and separated by a hairline: what the map **shows** (base map — OSM-Topo by default,
   OpenStreetMap, Satellite or Dark — **Map display**, the **legend**), the tools you point at it
@@ -2785,7 +2785,57 @@ a site with power, a track and a willing landholder is worth metres. **Save CSV*
 writes every result against every site. It is indicative in exactly the ways the
 rest of this section is — ~30 m terrain, omnidirectional antennas, representative
 cover heights, no buildings — a short list to take to a map and a landholder, not
-a site survey. `npm run sites` holds it to all of this on a synthetic hilly world.
+a site survey.
+
+**Everything else on the map** (under *On the map*) fades the rest of the map so
+the answer can be seen: 0–100 %, remembered, and applied to every Leaflet pane
+from the overlays up — the network's own canvas (links and pins), the marker,
+shadow and tooltip panes, and every context layer's pane (rivers, roads, wind,
+survey, contours, peaks, the polar plot, arrows, leader lines) — but never to the
+finder's own two panes or the popups. The base map, its labels and the elevation
+colours keep the sliders they already have in 🗺️ Map display. Because the
+stations' own pins fade with the rest, each site to serve carries a dot of the
+finder's own under its ring and, while the fade is on, its name. The fade applies
+only while the finder has sites or an answer, so a low value remembered from
+yesterday never opens today on a map with no network on it; **Clear** and ↺ put
+the map back.
+
+**🌏 Google Earth (KMZ)**, beside Save CSV, writes the answer for Google Earth —
+on the web, *New → Import file to project* (or *Open local KML file*), or Earth
+Pro's *File → Open*. The file is laid out to be compared one candidate at a time:
+
+- **Sites to serve** — every site, a station with its number, roles, ALERT ids
+  and position, and each saying which candidate serves it best.
+- **One folder per candidate** (`#1 — 612 m · score 83 · 7 of 7 at ≥6 dB`,
+  only #1's open) holding its numbered pin — whose balloon is the panel's summary,
+  the road reserve and a table of every site's distance, line of sight and margin —
+  and **Links from #n**: one path per site, draped on the ground and coloured by
+  its fade margin band exactly as on the map, a path the ground cuts thinner and
+  fainter since KML has no dashes; each carries the CSV's own column names as data.
+  **#1's paths are on and every other candidate's are off** — on the folder and on
+  each path, because Earth on the web converts an import into project features —
+  so ticking a folder puts one candidate and its paths on the terrain at a time.
+- **Sight lines at antenna height (3-D)**, per candidate and off by default:
+  straight chords from the mast top to each site's antenna top, relative to the
+  ground — "is anything solid in the way" over Earth's terrain, labelled as a
+  chord and *not* Fresnel clearance.
+- **The search area**, as an outline.
+
+The KMZ is a stored zip whose first entry is `doc.kml`, with the numbered pins
+drawn on a canvas in the map's own blue-disc style inside it; **KML** is the same
+document with Google's own numbered pins, for tools that will not open a zip. Both
+carry the caveat above. Heights are never absolute — the finder's ground is SRTM
+above the geoid and Earth's is its own.
+
+**In ⛰️ 3-D** the finder is on the terrain as well: the search area, the rings,
+the chosen candidate's paths (from its own MapLibre source, between the network's
+links and pins) and the numbered pins, which a click picks there just as on the
+flat map. The fade reaches the network's links, pins, the What-is-here mark and
+the line-of-sight sheets, and not the base map or the elevation drape. **Draw a
+circle** is off while 3-D is on and says why: Draw & measure places its clicks on
+the flat map under the 3-D view.
+
+`npm run sites` holds it to all of this on a synthetic hilly world.
 
 ---
 

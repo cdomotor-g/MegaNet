@@ -9,15 +9,20 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm, destPoint,
-// bearingDeg, acmaHaversineKm, cssVar, slug, dlText, stationLatLonText,
-// copyLatLonPillHtml and mapViewPills; across to terrain.js for Terrain.grid
-// and Terrain.profile, land-cover.js for LandCover.sample, path-profile.js for
-// pathAnalyse, rmSystemOf, wattsToDbm and the PATH_DEFAULT_* constants,
-// map-roads.js for MapRoads.near, map-draw.js for MapDraw, places.js for
-// Places.parse, map-controls.js for MapChrome.panel, and app.js for
+// bearingDeg, acmaHaversineKm, cssVar, slug, dlText, announce,
+// stationLatLonText, copyLatLonPillHtml and mapViewPills; across to terrain.js
+// for Terrain.grid and Terrain.profile, land-cover.js for LandCover.sample,
+// path-profile.js for pathAnalyse, rmSystemOf, wattsToDbm and the
+// PATH_DEFAULT_* constants, map-roads.js for MapRoads.near, map-draw.js for
+// MapDraw, places.js for Places.parse, map-controls.js for MapChrome.panel,
+// map-3d.js for Map3D.active (the circle is 2-D only), and app.js for
 // parseSearchTerms, parseIdRange, prepareSearch, stationMatchesSearch,
-// stationAlertIds, rerenderMapLegend and mapNote. All of it from inside its
-// own functions, so this file's position among the modules is free.
+// stationAlertIds, rerenderMapLegend and mapNote. Its two Google Earth
+// buttons call export.js's downloadSitesKmz and downloadSitesKml, which read
+// the answer back through exportSites(); and it tells map-3d.js's Map3D when
+// what it drew has changed (sitesChanged), asked for with a `typeof` because
+// that file loads after this one. All of it from inside its own functions, so
+// this file's position among the modules is free.
 //
 // ── The question this answers ────────────────────────────────────────────────
 // Highest ground in view (map-peaks.js) answers "what is high around here",
@@ -91,13 +96,50 @@
 // panel says so under every run, and every result carries a button that opens
 // its worst path in the elevation profile card, which is the authority for any
 // path anybody is about to build.
+//
+// ── Where the answer goes next ───────────────────────────────────────────────
+// Three ways out of this panel, each one the same answer seen somewhere else.
+//
+//   Google Earth   exportSites() hands export.js the answer as plain data — no
+//                  Leaflet, no XML, the band of every path already decided here
+//                  by bandOf() and coloured from BAND's literal hexes rather
+//                  than the theme's, so the file is the same file whichever
+//                  theme was on screen. export.js writes the KML; this file
+//                  never learns what a Placemark is. The draw-kml division of
+//                  labour (#183), for its reason: one side knows the sphere and
+//                  the ranking, the other knows the format.
+//
+//   3-D            Map3D mirrors what draw() put on the 2-D map — the search
+//                  area, the rings, the chosen candidate's paths and the pins —
+//                  read off the two layer groups drawn() hands it, the way it
+//                  mirrors the network off state.mapLines. draw() is the one
+//                  place anything here changes the map, so it is the one place
+//                  that says so.
+//
+//   The rest, dimmed   a slider for how much of *everything else* the map
+//                  shows while the finder is in use, because a candidate among
+//                  three thousand pins and a fan of network links is a
+//                  candidate nobody can see. It works on Leaflet's panes rather
+//                  than on anybody's layers — see applyDim() for why that is
+//                  the only way that stays true.
 const MapSites = (function () {
-  // Points over the peaks (348) and under the leader lines (350); lines over
-  // the watercourses (340) and under the survey marks (345) — the z-index
-  // budget map-survey.js documents. The lines take no pointer: the Stations
-  // map's shared canvas sits above them in the overlay pane, and the per-site
-  // table in the panel carries every figure a hover would have.
-  const PANE      = 'mnSites',      PANE_Z = 349;
+  // Lines over the watercourses (340) and under the survey marks (345) — the
+  // z-index budget map-survey.js documents. The lines take no pointer: the
+  // Stations map's shared canvas sits above them in the overlay pane (400),
+  // and the per-site table in the panel carries every figure a hover would
+  // have. The sites' own marks (a dot and, while the rest is dimmed, a name)
+  // are in the lines' pane too, under that canvas on purpose: at full
+  // strength the station's own pin covers its dot, and only when the dim has
+  // faded the pin does the dot show through.
+  //
+  // The numbered pins are over everything but a callout: above the canvas,
+  // the arrows (405) and the marker and station-label panes (600, 650), under
+  // the popup pane (700) so a pin's own callout opens over it. They were at
+  // 349 among the other points, which is under the canvas — and a full-map
+  // <canvas> takes every click that lands on it, so a pin under it could be
+  // seen and never pressed. Above the labels because five candidates are the
+  // answer being looked at, and a station's name drawn across one hides it.
+  const PANE      = 'mnSites',      PANE_Z = 660;
   const LINE_PANE = 'mnSitesLines', LINE_Z = 342;
 
   const MAX_TARGETS    = 40;    // sites served. Screening is candidates × sites
@@ -118,6 +160,20 @@ const MapSites = (function () {
   const COLO_KM        = 0.05;  // a candidate this close to a site is on it
   const MIN_COUNT = 3, MAX_COUNT = 5;
   const STORE          = 'mn-sites-v1';
+
+  // The dim's reach. Every pane from the overlay budget up — map-survey.js's
+  // z-index ledger starts the overlays at 300 — is "everything else": the
+  // network's own canvas in the overlay pane, the marker, shadow and tooltip
+  // panes, and every context layer's pane (rivers, roads, wind, survey,
+  // contours, peaks, the polar plot, the arrows, the leader lines). Below it
+  // are the base tiles (200), the elevation drape and Elvis coverage (245,
+  // 246) and the base-map labels (250), which already have a slider each in
+  // 🗺️ Map display and are the ground the candidates are being judged on.
+  // Kept out by name: this finder's own two panes, the popup a pin opens, and
+  // Leaflet's map pane — which is every other pane's parent, so dimming it
+  // would dim these too.
+  const DIM_FLOOR_Z = 300;
+  const DIM_KEEP    = [PANE, LINE_PANE, 'popupPane', 'mapPane'];
 
   const WEIGHTS = [
     ['wElev', 'Elevation',     'the height of the ground under the mast'],
@@ -140,6 +196,8 @@ const MapSites = (function () {
   let selected = null;     // the candidate whose links are drawn
   let rerankDue = false;   // a weight moved while a pass was in flight
   let status = { kind: 'idle', text: '' };
+  let dimWatch = null;     // MutationObserver on the map pane, while attached
+  const dimmed = new Set(); // pane elements this file has set an opacity on
 
   // ── Settings ────────────────────────────────────────────────────────────────
 
@@ -148,6 +206,10 @@ const MapSites = (function () {
       count: 5, marginKm: 5, spacingKm: null, existing: false,
       sysId: null, agl: null, freqMhz: null,
       wElev: 2, wLos: 3, wFade: 4, wRoad: 1,
+      // How much of everything else stays on the map, in percent. Remembered,
+      // because it is how this operator likes to look at a short list — but
+      // only ever *applied* while there is a short list to look at (dimFactor).
+      dimPct: 100,
     };
   }
 
@@ -746,7 +808,37 @@ const MapSites = (function () {
     });
   }
 
-  function draw() {
+  // A site to serve, as a mark of this file's own: a filled dot inside the
+  // ring, and its name beside it while everything else is dimmed. The ring
+  // alone was enough while the station's own pin sat inside it — but that pin
+  // is drawn on the network's canvas, which is exactly what the dim fades, so
+  // at nought the ring would be circling nothing. The name comes only with the
+  // dim for the same reason: at full strength the network's own labels are
+  // there, and two of them on one site is clutter. In the lines' pane, under
+  // the canvas (see LINE_Z), so at full strength the station's pin covers it.
+  function targetMark(t, named) {
+    return L.divIcon({
+      className: 'mn-site-icon',
+      html: `<span class="mn-site-t"><i class="mn-site-tdot" aria-hidden="true"></i>${
+        named ? `<b class="mn-site-tname">${esc(t.name)}</b>` : ''}</span>`,
+      iconSize: [0, 0], iconAnchor: [0, 0],
+    });
+  }
+
+  // Every layer is tagged with what it is (`mn3d`), the way app.js tags the
+  // network's polylines with the ids they join: Map3D reads these same layers
+  // back to draw them on the terrain, and a tag is the difference between it
+  // knowing a circle is the search area and guessing from its radius.
+  function drawLayers() {
+    // A pin pressed from the keyboard is redrawn by the select() it pressed,
+    // and a redraw that drops focus on the body loses the operator's place —
+    // so the rank that had focus gets it back on the pin that replaces it.
+    let hadFocus = null;
+    if (layer && document.activeElement) {
+      layer.eachLayer(l => {
+        if (l.mn3d === 'site' && l.getElement && l.getElement() === document.activeElement) hadFocus = l.mnSiteRank;
+      });
+    }
     clearLayers();
     // Nothing to serve and nothing found is nothing on the map — not two empty
     // layer groups in panes of their own.
@@ -754,37 +846,112 @@ const MapSites = (function () {
     lineLayer = L.layerGroup([], { pane: LINE_PANE }).addTo(map);
     layer = L.layerGroup([], { pane: PANE }).addTo(map);
     const accent = cssVar('--accent', '#0b5cab');
+    const named = dimFactor() < 1;
     const area = found ? found.area : areaOf(targets);
     if (area) {
-      L.circle([area.lat, area.lon], {
+      const c = L.circle([area.lat, area.lon], {
         pane: LINE_PANE, radius: area.rKm * 1000, color: accent, weight: 1.5, opacity: 0.8,
         dashArray: '6 6', fill: true, fillOpacity: 0.04, interactive: false,
-      }).addTo(lineLayer);
+      });
+      c.mn3d = 'area';
+      c.addTo(lineLayer);
     }
     for (const t of targets) {
-      L.circleMarker([t.lat, t.lon], {
+      const ring = L.circleMarker([t.lat, t.lon], {
         pane: LINE_PANE, radius: 9, color: accent, weight: 2.5, opacity: 0.95,
         fill: false, interactive: false,
-      }).addTo(lineLayer);
+      });
+      ring.mn3d = 'target';
+      ring.addTo(lineLayer);
+      const mark = L.marker([t.lat, t.lon], {
+        icon: targetMark(t, named), pane: LINE_PANE, interactive: false, keyboard: false,
+      });
+      mark.mn3d = 'tmark';
+      mark.addTo(lineLayer);
     }
     const sel = results.find(r => selected && r.c.id === selected.id);
     if (sel) {
       found.targets.forEach((t, k) => {
         const fig = figOf(sel.c, k, true);
         if (!fig || fig.failed || fig.colo) return;
-        L.polyline([[sel.c.lat, sel.c.lon], [t.lat, t.lon]], {
+        const line = L.polyline([[sel.c.lat, sel.c.lon], [t.lat, t.lon]], {
           pane: LINE_PANE, color: bandColour(bandOf(fig)), weight: 3, opacity: 0.9,
           dashArray: fig.verdict === 'obstructed' ? '7 6' : null, interactive: false,
-        }).addTo(lineLayer);
+        });
+        line.mn3d = 'link';
+        line.addTo(lineLayer);
       });
     }
     for (const r of results) {
-      L.marker([r.c.lat, r.c.lon], {
+      const pin = L.marker([r.c.lat, r.c.lon], {
         icon: icon(r), pane: PANE, riseOnHover: true,
         title: `Repeater site #${r.rank} — ${Math.round(r.c.ground)} m, score ${Math.round(r.s.score)}`,
       }).bindPopup(() => popupHtml(r), { maxWidth: 320 })
-        .on('click', () => select(r.rank, { keepPopup: true }))
-        .addTo(layer);
+        .on('click', () => select(r.rank, { keepPopup: true }));
+      pin.mn3d = 'site';
+      pin.mnSiteRank = r.rank;
+      pin.addTo(layer);
+      if (hadFocus === r.rank && pin.getElement()) pin.getElement().focus({ preventScroll: true });
+    }
+  }
+
+  // The one way anything here reaches the map, and so the one place that
+  // tells the two things watching it: the dim, which depends on whether there
+  // is anything here to look at, and the 3-D view, which is showing the same
+  // layers on terrain. Map3D is asked for by `typeof` because map-3d.js loads
+  // after this file — and it answers nothing while 3-D is shut.
+  function draw() {
+    drawLayers();
+    applyDim();
+    if (typeof Map3D !== 'undefined' && Map3D.sitesChanged) Map3D.sitesChanged();
+  }
+
+  // ── Everything else, dimmed ─────────────────────────────────────────────────
+  // The slider's factor, 0..1 — and 1, whatever the slider says, unless there
+  // are sites or an answer here. That condition is the safety catch: the value
+  // is remembered, so without it a session that ended at nought would open
+  // tomorrow on a map with no network on it and nothing on screen to say why.
+  // ↺ and Clear empty the sites, which is what puts everything back.
+  function dimPct() {
+    const v = cfg.dimPct;
+    if (v == null || v === '' || !isFinite(+v)) return 100;
+    return Math.max(0, Math.min(100, Math.round(+v)));
+  }
+
+  function dimFactor() {
+    return targets.length || results.length ? dimPct() / 100 : 1;
+  }
+
+  // CSS opacity on Leaflet's *panes*, never setStyle on anybody's layers. Three
+  // reasons, each enough on its own:
+  //   - a pane is where a module's drawing already lives, so one property
+  //     reaches the network's canvas, three thousand pins, their labels and a
+  //     dozen context layers without this file knowing any of them exist;
+  //   - setStyle is what refreshMapLayers, the focus dim (mnFocusDimmed),
+  //     MapFade and MapLos all write to, so a dim written there would be
+  //     overwritten by the next of them and would overwrite theirs;
+  //   - Map3D mirrors options.opacity off those layers, so a setStyle dim
+  //     would be applied twice in 3-D — once here and once by its own factor.
+  // The panes this has touched are remembered, so taking the dim away puts
+  // back exactly what it changed and nothing another module set.
+  function undim() {
+    for (const el of dimmed) el.style.opacity = '';
+    dimmed.clear();
+  }
+
+  function applyDim() {
+    const k = dimFactor();
+    if (!map || k >= 1) { undim(); return; }
+    const panes = map.getPanes();
+    for (const name of Object.keys(panes)) {
+      if (DIM_KEEP.includes(name)) continue;
+      const el = panes[name];
+      // The inline z-index where a module set one, the stylesheet's where
+      // Leaflet's own panes take theirs from `.leaflet-overlay-pane` and kin.
+      const z = parseInt(el.style.zIndex || getComputedStyle(el).zIndex, 10);
+      if (!(z >= DIM_FLOOR_Z)) continue;
+      el.style.opacity = String(k);
+      dimmed.add(el);
     }
   }
 
@@ -812,6 +979,24 @@ const MapSites = (function () {
     }
     return `<span class="txt-muted">No road parcel within ${ROAD_RADIUS_M} m${
       r.count === 0 ? ' — or this is outside Queensland, where the cadastre stops' : ''}.</span>`;
+  }
+
+  // The same sentence with the markup taken off, for a file that is not this
+  // page. Parsed rather than stripped by pattern, so an entity esc() wrote
+  // comes back as the character it stood for; DOMParser rather than a
+  // detached element's innerHTML, because a parsed document runs no handlers.
+  function plainText(html) {
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+    return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+
+  // The CSV's terser form of the same answer — one column, no sentence. The
+  // Google Earth file carries it too, under the same column name.
+  function roadCsv(c) {
+    const r = c.road;
+    return !r ? '' : !r.ok ? 'unchecked'
+         : r.inside ? `on: ${r.label}`
+         : r.distM != null ? `${Math.round(r.distM)} m: ${r.label}` : 'none';
   }
 
   function sourceText(s) {
@@ -908,6 +1093,8 @@ const MapSites = (function () {
       </label>`;
   }
 
+  function in3d() { return typeof Map3D !== 'undefined' && Map3D.active(); }
+
   // The drawn shapes that have an inside, each offering its stations. The
   // same "Select inside" answer Draw & measure gives — the stations the map is
   // showing inside it, so a filter that hides a site hides it here too.
@@ -916,11 +1103,20 @@ const MapSites = (function () {
     try { shapes = MapDraw.exportShapes().filter(s => s.kind === 'circle' || s.kind === 'rect'); }
     catch (_) { shapes = []; }
     const armed = !!awaitCircle;
+    // Not in 3-D. Draw & measure takes its clicks off the *Leaflet* map, which
+    // is underneath the 3-D canvas with a camera of its own — so a click on a
+    // hillside in 3-D is a vertex on whatever flat ground that pixel happens
+    // to be over in 2-D, which after a tilt is kilometres away. What is here
+    // had the same defect and was bridged (#194); a circle is two clicks with a
+    // drag between them and is not, so the button says why it is off instead.
+    const flatOnly = in3d();
     return `
       <div class="sites-row">
         <button type="button" id="sites-circle" class="${armed ? 'is-armed' : ''}"
-                onclick="MapSites.drawCircle()"
-                title="Click the middle of the area on the map, then click again at its edge — the stations inside it become the sites to serve"
+                onclick="MapSites.drawCircle()" ${flatOnly ? 'disabled' : ''}
+                title="${flatOnly
+                  ? 'Leave 3-D to draw a circle — its clicks are placed on the flat map under the 3-D view, so here they would land on the wrong ground'
+                  : 'Click the middle of the area on the map, then click again at its edge — the stations inside it become the sites to serve'}"
                 >◯ ${armed ? 'Drawing — click the map' : 'Draw a circle'}</button>
         <button type="button" onclick="MapSites.useSelection()"
                 ${state.mapSelection && state.mapSelection.size ? '' : 'disabled'}
@@ -1111,6 +1307,23 @@ const MapSites = (function () {
             and the list reorders at once.</p>
         </fieldset>
 
+        <fieldset class="sites-fs">
+          <legend>On the map</legend>
+          <label class="filter-range">
+            <span>Everything else on the map
+              <strong id="sites-dim-out" aria-hidden="true">${dimPct()} %</strong></span>
+            <input type="range" id="sites-dim" min="0" max="100" step="5" value="${dimPct()}"
+                   aria-label="Opacity of everything else on the map"
+                   aria-valuetext="${dimPct()} percent"
+                   title="Fade the network and every other layer so the candidates and the sites stand out"
+                   oninput="MapSites.setDim(this.value)">
+          </label>
+          <p class="small txt-muted">Fades the network, its labels and every other layer — nought
+            hides them — while the candidates, their paths and the sites stay at full strength. The
+            base map, its labels and the elevation colours keep their own sliders in 🗺️ Map display.
+            It applies only while there are sites or an answer here; Clear and ↺ put the map back.</p>
+        </fieldset>
+
         <div class="sites-actions">
           <button type="button" id="sites-run" class="primary" onclick="MapSites.run()"
                   ${readiness().ok && status.kind !== 'running' ? '' : 'disabled'}>Find sites</button>
@@ -1118,6 +1331,17 @@ const MapSites = (function () {
           <button type="button" onclick="MapSites.clear()" ${results.length || targets.length ? '' : 'disabled'}>Clear</button>
           <button type="button" onclick="MapSites.save()" ${results.length ? '' : 'disabled'}
                   title="Every result against every site, as rows">Save CSV</button>
+        </div>
+        <div class="sites-actions sites-earth">
+          <button type="button" id="sites-kmz" class="primary" onclick="downloadSitesKmz()"
+                  ${results.length ? '' : 'disabled'}
+                  title="Every candidate, the paths from each to every site, and the sites themselves, as one Google Earth file with numbered pins — #1's paths are on, tick another candidate's to compare. In earth.google.com: New → Import file to project (or Open local KML file)"
+                  >🌏 Google Earth (KMZ)</button>
+          <button type="button" id="sites-kml" class="sites-kml" onclick="downloadSitesKml()"
+                  ${results.length ? '' : 'disabled'}
+                  aria-label="Google Earth as plain KML"
+                  title="The same file as plain KML, with Google's own numbered pins instead of embedded ones — for tools that will not open a KMZ. Import it the same way: New → Import file to project, or Open local KML file"
+                  >KML</button>
         </div>
         <p class="filter-note" id="sites-status">${statusHtml()}</p>
         ${resultsHtml()}
@@ -1132,6 +1356,29 @@ const MapSites = (function () {
 
   function render() {
     if (body) body.innerHTML = panelHtml();
+  }
+
+  function selectedRank() {
+    const r = results.find(x => selected && x.c.id === selected.id);
+    return r ? r.rank : null;
+  }
+
+  // Pick a candidate: its paths go on the map and its table opens. A local
+  // function and not only a method, because the 2-D pin's click handler and
+  // the 3-D pin's both call it from inside this file — the pin's handler
+  // used to name a bare `select` that nothing here declared, which threw on
+  // the first click. `keepPopup` reopens the 2-D callout the redraw closed;
+  // the pin is found by its rank rather than by its coordinate, because an
+  // existing station scored as a candidate stands exactly on a site's mark.
+  function select(rank, opts) {
+    const r = results.find(x => x.rank === +rank);
+    if (!r) return;
+    selected = r.c;
+    draw();
+    render();
+    if (opts && opts.keepPopup && layer) {
+      layer.eachLayer(l => { if (l.mn3d === 'site' && l.mnSiteRank === r.rank) l.openPopup(); });
+    }
   }
 
   function addShape(id) {
@@ -1172,9 +1419,7 @@ const MapSites = (function () {
       'rank,site_lat,site_lon,ground_m,score,where,road_reserve,target,target_number,target_lat,target_lon,distance_km,los,margin_db,margin_down_db,margin_up_db,figure',
     ];
     for (const r of results) {
-      const road = !r.c.road ? '' : !r.c.road.ok ? 'unchecked'
-                 : r.c.road.inside ? `on: ${r.c.road.label}`
-                 : r.c.road.distM != null ? `${Math.round(r.c.road.distM)} m: ${r.c.road.label}` : 'none';
+      const road = roadCsv(r.c);
       found.targets.forEach((t, k) => {
         const fig = figOf(r.c, k, true) || {};
         rows.push([
@@ -1207,6 +1452,16 @@ const MapSites = (function () {
         html: () => panelHtml(),
         onMount(el) { body = el; },
       });
+      // Panes are made lazily — Map display's layers make theirs the first
+      // time they are switched on, which can be long after a dim was set — so
+      // a new pane is dimmed the moment it appears rather than at the next
+      // slider move. The map pane's own children are the panes and nothing
+      // else (layers live inside them), so this fires on a pane being made
+      // and on nothing a redraw does.
+      if (typeof MutationObserver !== 'undefined') {
+        dimWatch = new MutationObserver(() => { if (dimFactor() < 1) applyDim(); });
+        dimWatch.observe(m.getPane('mapPane'), { childList: true });
+      }
       // The sites and the answer are coordinates and figures, not a picture
       // pinned to a zoom, so they survive the map being rebuilt round them.
       draw();
@@ -1223,8 +1478,12 @@ const MapSites = (function () {
       }
       awaitCircle = null;
       clearLayers();
+      if (dimWatch) { dimWatch.disconnect(); dimWatch = null; }
+      undim();
       body = null;
       map = null;
+      // Harmless where it lands: attach() closes 3-D straight after this.
+      if (typeof Map3D !== 'undefined' && Map3D.sitesChanged) Map3D.sitesChanged();
     },
 
     active() { return results.length > 0; },
@@ -1293,6 +1552,9 @@ const MapSites = (function () {
         render();
         return;
       }
+      // The button is disabled in 3-D (shapesHtml says why); this is the same
+      // refusal for anybody calling it from the console.
+      if (in3d()) { announce('Leave 3-D to draw a circle — its clicks would land on the flat map underneath.'); return; }
       awaitCircle = new Set(state.draw.shapes.map(s => s.id));
       if (state.draw.tool !== 'circle') MapDraw.setTool('circle');
       if (map) mapNote('Click the middle of the area, then click again at its edge — the stations inside become the sites to serve. Esc stops.', 0);
@@ -1320,6 +1582,20 @@ const MapSites = (function () {
       if (el) el.innerHTML = shapesHtml();
     },
 
+    // Map3D's hook, on entering and on leaving 3-D: the circle button turns
+    // off and on with the mode, and a circle armed from here in 2-D is put
+    // down rather than left waiting for clicks that would land on the wrong
+    // ground. Only the button's row is redrawn — the rest of the panel may be
+    // under the pointer that pressed ⛰️'s own switch.
+    modeChanged() {
+      if (awaitCircle && in3d()) {
+        awaitCircle = null;
+        if (state.draw.tool === 'circle') MapDraw.setTool('');
+      }
+      const el = document.getElementById('sites-shapes');
+      if (el) el.innerHTML = shapesHtml();
+    },
+
     setPaste(v) { pasteText = String(v || ''); },
 
     addPaste() {
@@ -1339,19 +1615,7 @@ const MapSites = (function () {
       rerenderMapLegend();
     },
 
-    select(rank, opts) {
-      const r = results.find(x => x.rank === +rank);
-      if (!r) return;
-      selected = r.c;
-      draw();
-      render();
-      if (opts && opts.keepPopup && layer) {
-        layer.eachLayer(l => {
-          const ll = l.getLatLng && l.getLatLng();
-          if (ll && Math.abs(ll.lat - r.c.lat) < 1e-9 && Math.abs(ll.lng - r.c.lon) < 1e-9) l.openPopup();
-        });
-      }
-    },
+    select,
 
     flyTo(rank) {
       const r = results.find(x => x.rank === +rank);
@@ -1381,6 +1645,98 @@ const MapSites = (function () {
     },
 
     csvText,
+
+    // The answer as plain data, for export.js's Google Earth file: no Leaflet
+    // layer and no markup in it, and nothing the file would have to work out
+    // for itself. Each path's band is decided here, by the same bandOf() that
+    // colours it on the map, and its colour is BAND's literal hex rather than
+    // the theme's — a file written in the dark theme has to be the same file.
+    // Null until there is a finished answer: a file of sites with no
+    // candidates in it answers nothing Google Earth cannot already show.
+    exportSites() {
+      if (!found || !results.length) return null;
+      const w = weights();
+      const assumed = found.flds.find(x => x && x.assumed);
+      const band = fig => (fig && !fig.failed ? bandOf(fig) : 'none');
+      return {
+        area: { ...found.area },
+        marginKm: Math.max(0, +cfg.marginKm || 0),
+        rep: { sysName: found.rep.sysName, agl: found.rep.agl },
+        assumedRadio: assumed ? assumed.sysName : null,
+        f: found.f,
+        weights: { e: w.e, l: w.l, f: w.f, r: w.r },
+        goodDb: goodDb(), okDb: okDb(),
+        res: found.res, samples: FINE_SAMPLES, spacingKm: spacingKm(),
+        caveat: CAVEAT,
+        bands: Object.fromEntries(Object.keys(BAND).map(b => [b, BAND[b][1]])),
+        selectedRank: selectedRank(),
+        targets: found.targets.map((t, k) => {
+          const st = t.sid ? stationById(t.sid) : null;
+          return {
+            key: t.key, kind: t.kind, sid: t.sid, name: t.name, number: t.number,
+            lat: t.lat, lon: t.lon, elev: t.elev,
+            agl: found.flds[k] ? found.flds[k].agl : PATH_DEFAULT_AGL,
+            station: st ? { ...st } : null,
+          };
+        }),
+        results: results.map(r => ({
+          rank: r.rank, lat: r.c.lat, lon: r.c.lon, ground: r.c.ground, score: r.s.score,
+          src: r.c.src, name: r.c.name,
+          where: whereText(r.c), roadText: plainText(roadHtml(r.c)), roadCsv: roadCsv(r.c),
+          parts: { E: r.s.E, L: r.s.L, F: r.s.F, R: r.s.R },
+          counts: {
+            clear: r.s.clear, marginal: r.s.marginal, obstructed: r.s.obstructed,
+            failed: r.s.failed, served: r.s.served, colo: r.s.colo,
+            cover: r.s.cover, bare: r.s.bare, grid: r.s.grid,
+            min: r.s.min, median: r.s.median,
+          },
+          links: found.targets.map((t, k) => {
+            const fig = figOf(r.c, k, true);
+            const b = band(fig);
+            return {
+              k, dKm: fig && fig.dKm != null ? fig.dKm : acmaHaversineKm(r.c.lat, r.c.lon, t.lat, t.lon),
+              verdict: fig && !fig.failed ? fig.verdict || null : null,
+              ratio: fig && fig.ratio != null ? fig.ratio : null,
+              margin: fig && fig.margin != null ? fig.margin : null,
+              down: fig && fig.down != null ? fig.down : null,
+              up: fig && fig.up != null ? fig.up : null,
+              src: !fig || fig.failed ? 'failed' : fig.src,
+              colo: !!(fig && fig.colo), failed: !fig || !!fig.failed,
+              band: b, colour: BAND[b][1],
+            };
+          }),
+        })),
+      };
+    },
+
+    // What 2-D drew, for Map3D to draw again on terrain: the lines' group (the
+    // search area, the rings and the sites' marks under them, the chosen
+    // candidate's paths) and the pins' group (the numbered candidates), each
+    // layer tagged `mn3d`. Null when nothing is drawn.
+    drawn() { return lineLayer || layer ? { lines: lineLayer, pins: layer } : null; },
+
+    // The slider. Live on `input`, so a drag is a drag; it writes the readout
+    // in place rather than re-rendering the panel, which would take the thumb
+    // out from under the pointer mid-drag. The layers are only redrawn when
+    // the dim comes on or goes off — that is when the sites' names come or go.
+    setDim(value) {
+      const v = Number(value);
+      if (!isFinite(v)) return;
+      const was = dimFactor() < 1;
+      cfg.dimPct = Math.max(0, Math.min(100, Math.round(v)));
+      save();
+      const out = document.getElementById('sites-dim-out');
+      if (out) out.textContent = `${dimPct()} %`;
+      const inp = document.getElementById('sites-dim');
+      if (inp) inp.setAttribute('aria-valuetext', `${dimPct()} percent`);
+      if ((dimFactor() < 1) !== was) { draw(); return; }
+      applyDim();
+      if (typeof Map3D !== 'undefined' && Map3D.dimChanged) Map3D.dimChanged();
+    },
+
+    // The factor actually applied, 0..1 — 1 whenever the finder is idle.
+    // Map3D multiplies the network's opacities by it.
+    dimOthers() { return dimFactor(); },
 
     // One setter for every control on the panel, MapPolar's shape. An empty
     // box means "follow the default", not nought.
@@ -1429,7 +1785,7 @@ const MapSites = (function () {
     pool() { return found ? found.pool.map(c => ({ id: c.id, lat: c.lat, lon: c.lon, ground: c.ground, src: c.src })) : []; },
     area() { const a = found ? found.area : areaOf(targets); return a ? { ...a } : null; },
     status() { return { ...status }; },
-    selectedRank() { const r = results.find(x => selected && x.c.id === selected.id); return r ? r.rank : null; },
+    selectedRank,
   };
 })();
 if (typeof window !== 'undefined') window.MapSites = MapSites;
