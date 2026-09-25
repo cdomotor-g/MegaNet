@@ -1256,8 +1256,8 @@ The SLS catchment is the one column that is not in the stacked table at all: the
 drainage basin the Bureau's Service Level Specification files the station under,
 which is the fact the map beside it cannot draw. It is the same answer the
 station card's **SLS catchment** row gives, read from the same
-`data/sls-locations.json`, and the 720 KB of schedule behind it is fetched once,
-after the first paint, the first time the narrow table asks for it. The 2,028
+`data/sls-locations.json`, and the 710 KB of schedule behind it is fetched once,
+after the first paint, the first time the narrow table asks for it. The 2,188
 stations the document does not carry show an em dash, as the ARRO column already
 does for a station with no site id.
 

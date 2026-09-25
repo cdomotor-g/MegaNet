@@ -253,7 +253,7 @@ function editorForm(s) {
         <input type="checkbox" id="ef-enabled" ${s.enabled ? 'checked' : ''}> Enabled
       </label>
       <!-- Who owns the station, recorded on it (0030). Blank means not recorded,
-           and the card then shows only what the 2018 SLS says, if anything. -->
+           and the card then shows only what the SLS says, if anything. -->
       <label class="full">Owner<input type="text" id="ef-owner" value="${escAttr(s.owner || '')}"
              placeholder="e.g. Toowoomba Regional Council"></label>
       <label class="full">Notes<textarea id="ef-notes">${esc(s.notes || '')}</textarea></label>

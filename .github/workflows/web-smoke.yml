@@ -60,6 +60,13 @@ on:
       # aep_levels.py, whose slopes also read the file above.
       - 'archive/aep-levels/**'
       - 'data/aep-levels.json'
+      # The Service Level Specification and what tools/ingest/sls.py reads out
+      # of it (0028, 0034), and the check holding the database's merge of it to
+      # the app's. Neither the PDF nor the two files were listed, so a push
+      # carrying a new edition alone would have run nothing.
+      - 'archive/QLD_SLS_*.pdf'
+      - 'data/sls-*.json'
+      - 'tools/check_sls_merge.py'
       # The base station program and the migration that gives its readings a
       # station are one contract across two files, and `npm run logger` is the
       # only thing holding them together — so a push touching either has to run
@@ -113,6 +120,13 @@ on:
       # aep_levels.py, whose slopes also read the file above.
       - 'archive/aep-levels/**'
       - 'data/aep-levels.json'
+      # The Service Level Specification and what tools/ingest/sls.py reads out
+      # of it (0028, 0034), and the check holding the database's merge of it to
+      # the app's. Neither the PDF nor the two files were listed, so a push
+      # carrying a new edition alone would have run nothing.
+      - 'archive/QLD_SLS_*.pdf'
+      - 'data/sls-*.json'
+      - 'tools/check_sls_merge.py'
       # The base station program and the migration that gives its readings a
       # station are one contract across two files, and `npm run logger` is the
       # only thing holding them together — so a push touching either has to run
@@ -813,3 +827,11 @@ jobs:
         run: |
           { echo 'begin;'; python3 tools/ingest/aep_levels.py --sql; echo 'rollback;'; } \
             | psql -v ON_ERROR_STOP=1 -q
+      # The SLS's merge rule is written twice — in tools/ingest/sls.py for the
+      # file the app reads off disk, and in meganet.sls_location for anything
+      # that asks the database — and this is what holds the two to one rule:
+      # data/sls-qld.json loaded in a transaction that rolls back, the view
+      # read, and every location compared with data/sls-locations.json, field
+      # by field. It also proves a new edition's rows load into the schema.
+      - name: The SLS loads, and the database merges it as the app's file does
+        run: python3 tools/check_sls_merge.py

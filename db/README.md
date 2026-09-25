@@ -1066,23 +1066,30 @@ database has it.
 
 ## What the SLS says
 
-`0028`. `archive/QLD_SLS_current.pdf` is the Bureau's "Service Level
-Specification for Flood Forecasting and Warning Services for Queensland",
-version 3.1, September 2018. Six of its eleven schedules are tables of stations
-keyed on the **bureau number** — the same number `station.station_number`
-carries — which makes it the answer to questions this database could not
-previously ask about a station: its flood class levels, whether anybody
-forecasts for it, who owns it, whether a person reads it, and how much it
-matters when it stops.
+`0028`, and `0034` for the edition. `archive/QLD_SLS_current.pdf` is the
+Bureau's "Service Level Specification for Flood Forecasting and Warning
+Services for Queensland", version 3.7, December 2025 — the file the Bureau
+publishes at <https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf>,
+which the heading of the station card's SLS section links to. Version 3.1
+(September 2018), which `0028` was written against, is kept beside it as
+`archive/QLD_SLS_v3.1_2018-09.pdf`. Six of the ten schedules are tables of
+stations keyed on the **bureau number** — the same number
+`station.station_number` carries — which makes it the answer to questions this
+database could not previously ask about a station: its flood class levels,
+whether anybody forecasts for it, who owns it, whether a person reads it, and
+how much it matters when it stops.
 
 `tools/ingest/sls.py` reads schedules 2, 3, 4, 7, 8 and 9 into
-`data/sls-qld.json` (3,588 rows) and the merged half into
-`data/sls-locations.json` (2,783 locations, what the app fetches).
+`data/sls-qld.json` (3,392 rows) and the merged half into
+`data/sls-locations.json` (2,766 locations, what the app fetches).
+`meganet.sls_doc` says which edition the rows in `meganet.sls_row` came from;
+a new edition is new data, not a migration — `0034` only took the edition out
+of two comments that had named it.
 
 **The document as written, and the reading of it — kept apart**, the same split
-`0014` made for the inspection workbook. 764 bureau numbers appear in more than
-one schedule and they disagree: on priority for 42 of them, the name for 39, the
-owner for 23, the basin for 11, the gauge type for 1. `meganet.sls_row` keeps
+`0014` made for the inspection workbook. 591 bureau numbers appear in more than
+one schedule and they disagree: on priority for 55 of them, the owner for 41,
+the name for 31, the gauge type for 4, the basin for 1. `meganet.sls_row` keeps
 every version; `meganet.sls_location` states its rule.
 
 **The rule.** The lowest-numbered schedule that states a field wins, because the
@@ -1096,38 +1103,62 @@ a `High` in the forecast schedule is the one direction that field must not move.
 
 That rule is implemented twice — in Python for the file the app reads, and in
 SQL for `sls_location` — because the app is a field tool that has to work from
-`file://` with no database behind it. The two are held together by an md5 over
-all 2,783 locations and thirteen fields, not by hope.
+`file://` with no database behind it. The two are held together by
+`tools/check_sls_merge.py`, not by hope: it loads `data/sls-qld.json` in a
+transaction it rolls back and compares the view with `data/sls-locations.json`
+— all 2,766 locations, 23 fields each, and an md5 of each side — and CI runs it
+on every push that touches either.
 
 **The join needs `bureau_key()`.** The document pads to six digits (`040846`);
-`station_number` does not — 2,167 stations carry six digits, 902 five and 87
-four. Matching the strings as they stand finds 884 stations; matching them with
-the leading zeros stripped finds **1,146**, and nothing collides either way.
+`station_number` does not — 2,877 stations carry six digits, 1,891 five and 87
+four. Matching the strings as they stand finds 1,509 stations; matching them
+with the leading zeros stripped finds **2,685**, and nothing collides either
+way.
 
 | | |
 | --- | --- |
-| SLS locations | 2,783 |
-| …that are MegaNet stations | 1,146 |
-| …automatic | 1,874, of which 1,092 are MegaNet stations |
-| …manual, read by a person | 909, of which **54** are MegaNet stations |
-| …with flood class levels | 1,042 |
+| SLS locations | 2,766 |
+| …that are MegaNet stations | 2,685 |
+| …automatic | 1,901, of which 1,889 are MegaNet stations |
+| …manual, read by a person | 865, of which **796** are MegaNet stations |
+| …with flood class levels | 1,069 |
 
-**The 1,637 that are not MegaNet stations are kept anyway**, with a null
-`station_id`, and that is a decision rather than an oversight. 855 are manual
-gauges (801 the Bureau's own) that telemeter nothing; 782 are automatic gauges
-belonging to DNRME, Sunwater, Seqwater, QLD Rail and NSW Office of Water. None
-of them go into `stations.json` — they are not MegaNet stations and inventing
-rows for them would corrupt every count in the app.
+**The 81 that are not MegaNet stations are kept anyway**, with a null
+`station_id`, and that is a decision rather than an oversight. 69 are manual
+gauges (68 the Bureau's own) that telemeter nothing; 12 are automatic. None of
+them go into `stations.json` — the Bureau's own station indexes do not list
+them, and inventing rows for them would corrupt every count in the app. (Under
+3.1 it was 1,637, until `0032` added the stations those indexes list.)
 
-Two rows record a contradiction rather than repairing one: `031170` KAMERUNGA,
-whose priority column reads `River`, and `035283` YAKCAM, whose data type reads
-`River/River`. Both are in `source_note`, and both are what the page says.
+**Where the page is irregular, the row says so** (`source_note`) rather than
+guessing, and the card shows the note under the section:
+
+- `540149` GLENORE GROVE is a forecast location whose priority, like its
+  prediction type, lead time, trigger and accuracy, reads `TBC`.
+- `540071` CORINDA HIGH's minor level reads `3. 5`, and five Schedule 3 rows
+  print `N/A` for a moderate or major level (UPPER CABOOLTURE twice, WAMURAN,
+  AWOONGA DAM and AWOONGA DAM HW). Neither is a height, so neither is stored as
+  one.
+- Five numbers are printed without their leading zero (`27015` and four more);
+  they are padded back, and noted.
+- Three stations are listed twice in one schedule with different values —
+  `044209` as OAKPARK and OAK PARK in Schedule 7, `040940` YARRAHAPPINI and
+  `032169` GLENEAGLE in Schedule 8. The first row is kept as printed and the
+  second's differences are noted on it.
+
+**A forecast location can have two targets.** PALMVIEW (`540350`) and both
+EMERALD gauges (`035260`, `535076`) are printed as two lines of one row: PALMVIEW
+is forecast 6 hours ahead of a peak over 4.5 m to ±0.1 m, and 18 hours ahead of
+the river passing 4.5 m to ±0.3 m. Their lead time, trigger and accuracy hold
+both values in order, separated by ` / ` (`6 hours / 18 hours`), and the card
+shows one line per target.
 
 ```sh
 pip install pdfplumber
 python3 tools/ingest/sls.py            # rewrite both JSON files
 python3 tools/ingest/sls.py --report   # what came out, in prose
 python3 tools/ingest/sls.py --check    # CI
+python3 tools/check_sls_merge.py       # the view against the file (CI; PG* variables)
 ```
 
 Then, after pushing:

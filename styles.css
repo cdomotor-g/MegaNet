@@ -2896,6 +2896,11 @@ hr {
 .stn-card-sls { border-top: 1px solid var(--border); padding-top: .5rem; }
 .stn-card-sls > .small { display: block; margin-bottom: .25rem; }
 .mn-sls-note { margin: .35rem 0 0; }
+/* One line per forecast target (sls.js serviceLines): a station the schedule
+   gives two targets reads as two, with air between them, even once each has
+   wrapped in a narrow card. */
+.mn-sls-target { display: block; }
+.mn-sls-target + .mn-sls-target { margin-top: .2rem; }
 
 /* The river height station details on the station card (0031): the same
    label/value rows, a section of their own for the same reason the SLS has

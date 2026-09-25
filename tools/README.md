@@ -54,25 +54,48 @@ assignment still uses.
 
 ## The Service Level Specification (#180)
 
-`ingest/sls.py` reads six of the eleven schedules out of
+`ingest/sls.py` reads six of the ten schedules out of
 `archive/QLD_SLS_current.pdf` — the Bureau's Queensland flood-warning SLS,
-version 3.1 — into `data/sls-qld.json` and `data/sls-locations.json`.
+version 3.7 (December 2025), the file the Bureau publishes at
+<https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf> — into
+`data/sls-qld.json` and `data/sls-locations.json`. Version 3.1 (September
+2018), which it read before, is `archive/QLD_SLS_v3.1_2018-09.pdf`, and still
+reads through `--pdf` for a comparison.
 
 ```bash
 pip install pdfplumber                     # the only dependency in this directory
 python3 tools/ingest/sls.py                # rewrite both files
 python3 tools/ingest/sls.py --report       # what came out, in prose
 python3 tools/ingest/sls.py --check        # fail on drift (CI does this)
+python3 tools/ingest/sls.py --pdf archive/QLD_SLS_v3.1_2018-09.pdf \
+  --out /tmp/sls-3.1.json --out-locations /tmp/sls-3.1-locations.json
+python3 tools/check_sls_merge.py           # meganet.sls_location against the file (CI does this)
 ```
 
-The tables are ruled, so the cell grid recovers exactly — but the header cells
-are merged, which leaves 21 columns of which 12 carry anything. Dropping the
-empty ones and reading what is left is the obvious repair and it is wrong: a
-station with no Moderate level shifts every field after it by one. So the column
-indices are fixed per schedule and the header is checked on every page, which is
-what caught Schedules 4 and 7 changing column count mid-schedule. Those three
-are read by value instead, which is only safe because their fields are closed
-vocabularies.
+`check_sls_merge.py` is the other half: the merge rule is in `sls.py` for the
+file the app reads and in the view `meganet.sls_location` for the database, and
+it loads `data/sls-qld.json` into the database the PG* variables name — in a
+transaction it rolls back, so it is safe against the live one — and compares
+the view with `data/sls-locations.json` location by location. Standard library
+and `psql`.
+
+The tables are ruled, so the cell grid recovers exactly — but the grid is not
+the same from one page to the next. 3.7's Schedule 2 comes out 17, 18 or 20
+columns wide and Schedule 8 15 or 18, because a rule that stops short on one
+page is a column boundary on another, so a fixed column index (how 3.1 was
+read) files a Major level as a Moderate one on the first page that moves. The
+columns are read off each table's own header instead: a heading with headings
+under it is a group, one with nothing under it is a column, and every cell is
+filed under the column it sits beneath. Each page's columns are checked
+against what its schedule must have before a row on it is read.
+
+Read this way, 3.1 comes out as the old reader had it, field for field, except
+where the old reader lost something: the peak accuracy of all 219 Schedule 2
+rows, nine rows printed without a leading zero, and two Noosa rows filed under
+Maroochy because their heading is misprinted "40 – Noosa". What the page prints
+that is not a value of its column — `TBC`, `N/A`, `3. 5` — is left out of the
+field and written into the row's `source_note`, and three Schedule 2 rows that
+give a station two targets keep both, in order, joined by ` / `.
 
 ## The Bureau's flood warning station lists (0031, 0032)
 

@@ -4,10 +4,10 @@
 //
 //   * The join. The document pads bureau numbers to six digits and
 //     station_number does not, so `40939` and `040939` are the same station and
-//     string equality says they are not. 262 of the 1,146 matches depend on
+//     string equality says they are not. 1,176 of the 2,685 matches depend on
 //     that, and BEAUDESERT is one of them — a station whose number is five
 //     digits in MegaNet and six in the SLS.
-//   * Nothing is invented for a station the document does not carry. 2,030 of
+//   * Nothing is invented for a station the document does not carry. 2,188 of
 //     MegaNet's stations are not in the SLS and their cards must look exactly
 //     as they did before this existed.
 //   * Manual is visible. It is the one fact in the block that changes what a
@@ -16,7 +16,11 @@
 //     and not only a colour.
 //   * The numbers on screen are the numbers in the file. A flood class level is
 //     read off a gauge board by somebody standing in a river; a transcription
-//     error here is not cosmetic.
+//     error here is not cosmetic. A station with two targets gets a line for
+//     each, so neither lead time is read against the other's trigger.
+//   * The document is one click away. The section's heading links to the copy
+//     the Bureau publishes, says so to someone who cannot see the ↗, and names
+//     the edition the figures are from — the link always opens the newest.
 //
 // Run:  npm run sls
 //       npm run sls -- -v    also print what passed
@@ -139,6 +143,75 @@ try {
     card.text.slice(0, 200));
   check('an automatic gauge gets no manual pill', card.manualPills === 0);
 
+  // ── The heading is the way to the document ───────────────────────────────
+  const head = await page.evaluate(() => {
+    const a = document.querySelector('#mn-sls-card-beaudesert_al .stn-card-sls a.mn-sls-doc');
+    return a && { href: a.getAttribute('href'), target: a.target, rel: a.rel,
+                  text: a.textContent.replace(/\s+/g, ' ').trim(),
+                  name: a.getAttribute('aria-label') || '', title: a.title || '',
+                  heading: a.closest('.stn-card-sls').firstElementChild.contains(a),
+                  docUrl: SLS.DOC_URL };
+  });
+  const edition = `Flood warning service (SLS v${doc.meta.version})`;
+  check('the SLS heading links to the document as the Bureau publishes it',
+    !!head && head.href === 'https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf'
+      && head.href === head.docUrl, JSON.stringify(head));
+  check('…in a new tab, without handing it this window',
+    !!head && head.target === '_blank' && /\bnoopener\b/.test(head.rel), JSON.stringify(head));
+  check('…from the heading itself, which names the edition the card quotes',
+    !!head && head.heading && head.text.startsWith(edition), head && head.text);
+  check('…its accessible name starting with the words on screen and saying where it goes',
+    !!head && head.name.startsWith(edition) && /PDF/.test(head.name) && /new tab/.test(head.name),
+    head && head.name);
+  check('…and its tooltip naming the edition and its date, with no stray escape in "Bureau\'s"',
+    !!head && head.title.includes(`version ${doc.meta.version}`)
+      && (!doc.meta.published || head.title.includes(doc.meta.published))
+      && head.title.includes('Bureau of Meteorology\'s') && !head.title.includes('\\'),
+    head && head.title);
+
+  // ── Two targets are two lines, each lead time beside its own trigger ──────
+  // PALMVIEW is warned 6 hours ahead of a peak over 4.5 m and 18 hours ahead of
+  // the river passing it. The file keeps the pair apart with " / ".
+  const PALMVIEW = byKey.get('540350');
+  const parts = (v) => String(v).split(' / ');
+  const predictionLines = (id) => page.evaluate((id) => {
+    const rows = [...document.querySelectorAll(`#mn-sls-card-${id} .acma-row`)];
+    const r = rows.find((x) => x.firstElementChild.textContent.trim() === 'Prediction');
+    // Each target is its own line; within one, the card keeps phrases together
+    // with no-break spaces, which are still spaces to a reader.
+    return r ? r.lastElementChild.innerText.split('\n')
+      .map((t) => t.replace(/\s+/g, ' ').trim()).filter(Boolean) : null;
+  }, id);
+  const openCard = async (id) => {
+    await page.evaluate((id) => showStationCard(id), id);
+    await page.waitForFunction((id) => { const el = document.getElementById(`mn-sls-card-${id}`);
+      return el && el.textContent.trim().length > 0; }, id, { timeout: 20_000 });
+  };
+  await openCard('palmview_al');
+  const palm = await predictionLines('palmview_al');
+  const palmWant = parts(PALMVIEW.lead_time).map((lead, i) =>
+    `${PALMVIEW.prediction_type} · ${lead} lead · from ${parts(PALMVIEW.trigger)[i]} · `
+    + parts(PALMVIEW.peak_accuracy)[i]);
+  check('the file gives PALMVIEW two targets', palmWant.length === 2, PALMVIEW.lead_time);
+  check('a station with two targets gets a line for each, its lead time beside its own trigger',
+    JSON.stringify(palm) === JSON.stringify(palmWant),
+    `${JSON.stringify(palm)} vs ${JSON.stringify(palmWant)}`);
+
+  // ── What the Bureau has not settled reads as such ────────────────────────
+  const GLENORE = byKey.get('540149');
+  await openCard('glenore_grove_alert');
+  const glen = await page.evaluate(() => {
+    const el = document.getElementById('mn-sls-card-glenore_grove_alert');
+    const note = el.querySelector('.mn-sls-note');
+    return { note: note ? note.textContent.replace(/\s+/g, ' ').trim() : '' };
+  });
+  const glenLines = await predictionLines('glenore_grove_alert');
+  check('a service printed as TBC in every column reads "To be confirmed", once',
+    GLENORE.prediction_type === 'TBC' && JSON.stringify(glenLines) === '["To be confirmed"]',
+    JSON.stringify(glenLines));
+  check('the note under it says what the page printed where a priority was expected',
+    !!GLENORE.source_note && glen.note.includes(GLENORE.source_note), glen.note);
+
   // ── A manual gauge says so, in a word and not only a colour ───────────────
   await page.evaluate(() => showStationCard('alpha'));
   await page.waitForTimeout(200);
@@ -189,11 +262,13 @@ try {
   });
   // 1,146 and 54 until 0032 added the 1,697 stations the Bureau's flood
   // warning indexes list and MegaNet did not have — most of the SLS's manual
-  // gauges among them, which are the daily read stations of Section 2.
-  check('2,566 of the 2,783 SLS locations are MegaNet stations',
-    counts.all === 2783 && counts.matched === 2566, JSON.stringify(counts));
-  check('789 of MegaNet’s stations are gauges a person reads',
-    counts.manual === 909 && counts.manualMatched === 789, JSON.stringify(counts));
+  // gauges among them, which are the daily read stations of Section 2 — and
+  // then 2,566 of 2,783 and 789 of 909 until the SLS went from version 3.1 to
+  // 3.7.
+  check('2,685 of the 2,766 SLS locations are MegaNet stations',
+    counts.all === 2766 && counts.matched === 2685, JSON.stringify(counts));
+  check('796 of MegaNet’s stations are gauges a person reads',
+    counts.manual === 865 && counts.manualMatched === 796, JSON.stringify(counts));
 
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {

@@ -5998,7 +5998,7 @@ function stationWideCellsHtml(s) {
 // `SLS.forStation` answers null for two different things and they must not read
 // the same. The document carries 2,566 of the 4,873 stations; the others
 // are genuinely not in it and get the em dash the ARRO column already uses for
-// "no record". A table painted before the 720 KB schedule has landed knows
+// "no record". A table painted before the 710 KB schedule has landed knows
 // nothing about any of them yet, and leaves the cell empty rather than claiming
 // the em dash's answer — askStationsSls() has the repaint on order.
 function slsCatchmentCell(s) {
@@ -6036,7 +6036,7 @@ let stationsSlsFailed = false;
 // The column's half of sls.js's lazy fetch. The station card does this one card
 // at a time with SLS.ask(); a whole column of it is the same bargain made once
 // — ask on the first narrow paint, repaint when the answer arrives. It does put
-// the 720 KB behind opening the Stations tab, which sls.js deliberately kept
+// the 710 KB behind opening the Stations tab, which sls.js deliberately kept
 // out of opening the app: it is after the first paint, off the critical path,
 // and once per session, which is the price of the column being useful at all.
 function askStationsSls() {
@@ -6367,7 +6367,7 @@ function repaintStnCard() {
   // writes (map-wind.js), and a repaint reproduces both.
   if (s.lat != null && s.lon != null) MapWind.askRegion(`mn-wind-card-${s.id}`, s.lat, s.lon);
   // And the SLS section, on the same terms and for the same reason: the first
-  // card that asks pays for the 720 KB, every one after is free, and a station
+  // card that asks pays for the 710 KB, every one after is free, and a station
   // the document does not carry fills with nothing.
   SLS.ask(`mn-sls-card-${s.id}`, s);
   elvisCardAsk(`mn-elvis-card-${s.id}`, s);
@@ -6525,7 +6525,7 @@ function stnCardHtml(s) {
       ${acmaCardRow('Stn #', s.station_number ? esc(s.station_number) : null)}
       ${acmaCardRow('Networks', nets ? esc(nets) : null)}
       <!-- The owner as recorded on the station (0030). The SLS section below has
-           its own "Station owner" row, which is what the 2018 document says —
+           its own "Station owner" row, which is what the SLS says —
            a different source, and the only one for most stations. -->
       ${acmaCardRow('Owner', s.owner ? esc(s.owner) : null)}
       ${acmaCardRow('Position', located ? esc(stationLatLonText(s)) : null)}
@@ -6583,7 +6583,7 @@ function stnCardHtml(s) {
          is a different document talking: those rows are what MegaNet knows,
          these are what the SLS says, and a flood class level is not the same
          kind of fact as an antenna height. Empty for a station the SLS does
-         not carry, which is 2,030 of them. Filled after the fetch by SLS.ask,
+         not carry, which is 2,188 of them. Filled after the fetch by SLS.ask,
          the way the wind region line is. -->
     <div class="acma-sect" id="${escAttr(slsId)}"
          data-mn-sls="${escAttr(s.station_number || '')}">${sls.html}</div>
