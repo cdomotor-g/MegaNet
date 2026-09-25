@@ -2032,6 +2032,10 @@ const state = {
   // which is the moment "whose road reserve is this?" is worth answering, and
   // the moment a checkbox stands between the operator and the answer.
   mapRoads:       localStorage.getItem('mn-roads') !== 'off',
+  // Property / lot boundaries from the same Queensland cadastre (see MapLots).
+  // Off by default and remembered: context somebody goes looking for, and its
+  // scale gate means a cold load with it on still makes no request.
+  mapLots:        localStorage.getItem('mn-lots') === 'on',
   // The 77 Queensland drainage basins (see MapCatchments). Off by default and
   // remembered, on MapContours' terms rather than MapWind's: nothing else in
   // the app asks data/qld-basins.geojson for anything, so unlike the wind

@@ -126,6 +126,17 @@ const MapFreq = (function () {
   }
 
   return {
+    // The channel a drawn path is on, for the radio-path card and popup to
+    // quote: the same pick the link colouring makes, so the row and the line's
+    // colour never disagree. `far` is the other end's channel only when it
+    // differs; null throughout for a path with no frequency on either end.
+    pathChannel(a, b) {
+      const f = pairMhz(a, b);
+      if (f == null) return null;
+      const fa = endMhz(a), fb = endMhz(b);
+      return { mhz: f, label: fmt(f), far: fa != null && fb != null && fa !== fb ? fmt(fb) : null };
+    },
+
     // Which colouring the operator has chosen. Both this and MapFade.active()
     // read the same one setting, so they can never both be true.
     active() { return state.mapLinkColour === 'freq'; },

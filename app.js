@@ -3996,6 +3996,13 @@ function mapDisplayControlsHtml() {
       Road parcels (Qld cadastre)
     </label>
     <p class="filter-note" id="map-roads-note">${MapRoads.noteHtml()}</p>
+    <label class="filter-check"
+           title="Every lot in the Queensland cadastre (DCDB) — the land parcels Queensland Globe draws — with its lot/plan written in once you are close enough to read it.">
+      <input type="checkbox" ${state.mapLots ? 'checked' : ''}
+             onchange="MapLots.setEnabled(this.checked);rerenderMapLegend()">
+      Property boundaries (Qld)
+    </label>
+    <p class="filter-note" id="map-lots-note">${MapLots.noteHtml()}</p>
     <!-- Wind and LOS repaint the legend from here (#175): rivers, survey
          marks and contours each repaint it from inside their own module, and
          these two never did, so the legend's entry for either — and its line
@@ -4211,6 +4218,7 @@ function mapLegendOffLayersHtml() {
     !state.mapContours        && 'LiDAR contours',
     !state.mapPeaks           && 'Highest ground in view',
     !state.mapRoads           && 'Road parcels',
+    !state.mapLots            && 'Property boundaries',
     !state.mapWind            && 'Wind regions',
     !state.mapCatchments      && 'River catchments',
     !state.mapHubs            && 'Maintenance hubs',
@@ -4393,6 +4401,11 @@ function mapLegendHtml() {
         MapPeaks.peaks().length === 1 ? '' : 's'}, ranked. Ground height off ~30 m terrain,
         nothing standing on it</span>
     </span>` : ''}
+    ${MapLots.active() ? `
+    <span class="legend-item">
+      <span class="legend-line legend-line-lot"></span>
+      <span class="small">Property boundary — lot/plan when zoomed in (Qld cadastre)</span>
+    </span>` : ''}
     ${MapRoads.active() ? `
     <span class="legend-item">
       <span class="legend-sq" style="--dot:${MapRoads.legendColour()}"></span>
@@ -4558,6 +4571,7 @@ function stopStationsMap() {
   MapSites.detach();
   Places.detach();
   MapRoads.detach();
+  MapLots.detach();
   MapWind.detach();
   // Not a detach — MapLos holds no layer — but the same duty: the queue is
   // for lines on the map this function is destroying, so clear it and bump
@@ -4705,6 +4719,7 @@ function initMap() {
   // dropping a pin on before anybody asks it to.
   Places.attach(state.map);
   MapRoads.attach(state.map);
+  MapLots.attach(state.map);
   MapWind.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
   // show on the map that has just been rebuilt.

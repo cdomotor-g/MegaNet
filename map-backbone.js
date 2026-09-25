@@ -302,6 +302,15 @@ const MapBackbone = (function () {
         r.fsplOnly ? ' · free-space only' : ''}</span>`;
   }
 
+  // The channel the path is on — MapFreq's pick, the one the link colouring
+  // uses. A path with no recorded frequency says so rather than quoting the
+  // default the free-space margin falls back to.
+  function freqHtml(a, b) {
+    const ch = typeof MapFreq !== 'undefined' ? MapFreq.pathChannel(a, b) : null;
+    if (!ch) return '<span class="small">not recorded — no RX frequency on file for the repeater</span>';
+    return esc(ch.label) + (ch.far ? `<br><span class="small">far end ${esc(ch.far)}</span>` : '');
+  }
+
   function stationLink(s) {
     return `<a href="#" onclick="zoomToStation('${escAttr(s.id)}');return false"
       title="Zoom the map to this station">${esc(s.name)}</a>`;
@@ -378,6 +387,7 @@ const MapBackbone = (function () {
       </div>
       <div class="acma-sect">
         ${backbone ? backboneRows(a, b) : fieldRows(a, b)}
+        ${row('Frequency', freqHtml(a, b))}
         ${row('Distance', fmtKm(km))}
         ${row('Fade margin', marginHtml(r))}
       </div>
@@ -472,13 +482,14 @@ const MapBackbone = (function () {
       const r = freeSpaceMargin(a, b);
       const km = acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
       const m = r.margin != null ? lbMarginClass(r.margin) : null;
+      const ch = typeof MapFreq !== 'undefined' ? MapFreq.pathChannel(a, b) : null;
       return `
         <strong>${backbone ? backboneTitle(a, b) : 'Radio path'}</strong><br>
         <span class="mn-pop-line">${esc(a.name)} ⇄ ${esc(b.name)}</span><br>
         ${backbone && p ? `<span class="mn-pop-line">${p.overlap
           ? `${p.shared.length} shared ALERT ID${p.shared.length === 1 ? '' : 's'} in use · windows overlap on ${p.overlap}`
           : 'no pass-range window at the base end — matched on distance alone'}</span><br>` : ''}
-        <span class="mn-pop-line">${fmtKm(km)} · ${r.margin == null ? 'no margin figure'
+        <span class="mn-pop-line">${ch ? esc(ch.label) + (ch.far ? ` (far end ${esc(ch.far)})` : '') + ' · ' : ''}${fmtKm(km)} · ${r.margin == null ? 'no margin figure'
           : `${(r.margin > 0 ? '+' : '') + r.margin.toFixed(1)} dB ${m.label.toLowerCase()} (free-space)`}</span>
         <!-- The same row of pills a station callout carries (#170), and the
              same reason its two in-page actions became buttons: this one is

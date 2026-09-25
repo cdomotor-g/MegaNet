@@ -34,6 +34,7 @@
     "map-contours.js",
     "map-elvis-coverage.js",
     "map-roads.js",
+    "map-lots.js",
     "map-wind.js",
     "map-spider.js",
     "map-backbone.js",
@@ -66,6 +67,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 764,
-  "distinct": 764
+  "total": 765,
+  "distinct": 765
 }

@@ -2715,6 +2715,8 @@ hr {
    purpose: the swatch matches the server-rendered image (MapContours draws the
    MapServer's own symbology), which no theme token can restyle. */
 .legend-line-contour { border-top-color: rgb(214, 104, 26); }
+/* The lot line is white over a dark casing, as MapLots draws it. */
+.legend-line-lot { border-top-color: #fff; box-shadow: 0 0 0 1px rgba(20, 20, 20, .6); }
 /* The line-of-sight verdict in the legend (#175): the obstructed-link colour,
    through the same token the drawn links take, so the two agree in both
    themes. */
