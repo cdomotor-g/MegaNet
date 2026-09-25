@@ -1,7 +1,282 @@
 {
   "_": "Workbook stations that match more than one MegaNet station. Listed rather than resolved arbitrarily — picking one would be a coin toss recorded as a fact. Written by tools/ingest/crosswalk.py; do not edit by hand.",
-  "count": 4,
+  "count": 14,
   "entries": [
+    {
+      "key": "c:44206",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "bakersbend",
+      "candidates": [
+        "bakers_bend",
+        "bakers_bend_al"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "044206"
+        ],
+        "cbm_numbers": [
+          "44206"
+        ],
+        "names_raw": [
+          "BAKERS BEND TM"
+        ],
+        "alert_ids": [
+          "7283",
+          "7282",
+          "7787"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 27,
+      "first_visit": "2002-03-12",
+      "last_visit": "2019-05-23",
+      "sheets": [
+        "Warrego!"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Warrego!:881"
+      ],
+      "candidate_names": [
+        "Bakers Bend",
+        "Bakers Bend AL"
+      ]
+    },
+    {
+      "key": "c:44205",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "charleville",
+      "candidates": [
+        "charleville",
+        "charleville_al"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "044205"
+        ],
+        "cbm_numbers": [
+          "44205"
+        ],
+        "names_raw": [
+          "CHARLEVILLE TM"
+        ],
+        "alert_ids": [
+          "7281",
+          "7280",
+          "7792"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 24,
+      "first_visit": "2002-06-13",
+      "last_visit": "2015-07-03",
+      "sheets": [
+        "Closed stations"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Closed stations:781"
+      ],
+      "candidate_names": [
+        "Charleville",
+        "Charleville AL"
+      ]
+    },
+    {
+      "key": "c:41123",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "inglewoodbridge",
+      "candidates": [
+        "inglewood_br_ale",
+        "inglewood_bridge"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "041123"
+        ],
+        "cbm_numbers": [
+          "41123"
+        ],
+        "names_raw": [
+          "Inglewood Bridge TM"
+        ],
+        "alert_ids": [
+          "7754",
+          "7755"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 21,
+      "first_visit": "2001-02-06",
+      "last_visit": "2018-08-20",
+      "sheets": [
+        "Closed stations"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Closed stations:1011"
+      ],
+      "candidate_names": [
+        "Inglewood Bridge AL",
+        "Inglewood Bridge"
+      ]
+    },
+    {
+      "key": "c:44201",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "the27milegarden",
+      "candidates": [
+        "the_27_mile_garden",
+        "the_27_mile_garden_a"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "044201"
+        ],
+        "cbm_numbers": [
+          "44201"
+        ],
+        "names_raw": [
+          "THE 27 MILE GARDEN TM"
+        ],
+        "alert_ids": [
+          "7150",
+          "7151",
+          "7790"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 19,
+      "first_visit": "2002-06-14",
+      "last_visit": "2015-07-06",
+      "sheets": [
+        "Closed stations"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Closed stations:848"
+      ],
+      "candidate_names": [
+        "The 27 Mile Garden",
+        "The 27 Mile Garden AL"
+      ]
+    },
+    {
+      "key": "c:40877",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "tarome",
+      "candidates": [
+        "tarome",
+        "tarome_al_p"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "40877"
+        ],
+        "cbm_numbers": [
+          "40877"
+        ],
+        "names_raw": [
+          "TAROME ALERT"
+        ],
+        "alert_ids": [
+          "2196"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 14,
+      "first_visit": "1992-12-12",
+      "last_visit": "1999-08-03",
+      "sheets": [
+        "Brisbane!"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Brisbane!:2"
+      ],
+      "candidate_names": [
+        "Tarome",
+        "Tarome AL-P"
+      ]
+    },
+    {
+      "key": "c:41133",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "woodspring",
+      "candidates": [
+        "woodspring",
+        "woodspring_al"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "041133"
+        ],
+        "cbm_numbers": [
+          "41133"
+        ],
+        "names_raw": [
+          "Woodspring TM"
+        ],
+        "alert_ids": [],
+        "notes": []
+      },
+      "inspection_rows": 12,
+      "first_visit": "2008-02-18",
+      "last_visit": "2018-08-22",
+      "sheets": [
+        "Closed stations"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Closed stations:990"
+      ],
+      "candidate_names": [
+        "Woodspring",
+        "Woodspring AL"
+      ]
+    },
+    {
+      "key": "n:coolmundadamtw",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "coolmundadamtw",
+      "candidates": [
+        "coolmunda_dam_tw_al",
+        "coolmunda_dam_tw_tm"
+      ],
+      "workbook": {
+        "cbm_raw": [],
+        "cbm_numbers": [],
+        "names_raw": [
+          "Coolmunda Dam TW"
+        ],
+        "alert_ids": [
+          "4517",
+          "4518"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 10,
+      "first_visit": "2013-07-08",
+      "last_visit": "2023-08-10",
+      "sheets": [
+        "Border!"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Border!:86"
+      ],
+      "candidate_names": [
+        "Coolmunda Dam TW AL",
+        "Coolmunda Dam TW TM"
+      ]
+    },
     {
       "key": "c:541155",
       "tier": "number_ambiguous",
@@ -41,6 +316,46 @@
       "candidate_names": [
         "Loudoun Br AL",
         "Loudoun Br AL"
+      ]
+    },
+    {
+      "key": "c:40859",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "palencreek",
+      "candidates": [
+        "palen_ck_al",
+        "palen_creek"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "040859"
+        ],
+        "cbm_numbers": [
+          "40859"
+        ],
+        "names_raw": [
+          "PALEN CREEK TM"
+        ],
+        "alert_ids": [
+          "7239",
+          "7910"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 8,
+      "first_visit": "2005-05-05",
+      "last_visit": "2008-12-01",
+      "sheets": [
+        "Closed stations"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Closed stations:130"
+      ],
+      "candidate_names": [
+        "Palen Creek AL",
+        "Palen Creek"
       ]
     },
     {
@@ -84,6 +399,86 @@
       ]
     },
     {
+      "key": "c:535043",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "tambo",
+      "candidates": [
+        "tambo",
+        "tambo_2",
+        "tambo_al"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "535043"
+        ],
+        "cbm_numbers": [
+          "535043"
+        ],
+        "names_raw": [
+          "Tambo TM"
+        ],
+        "alert_ids": [],
+        "notes": []
+      },
+      "inspection_rows": 7,
+      "first_visit": "2004-03-19",
+      "last_visit": "2015-07-07",
+      "sheets": [
+        "Closed stations"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Closed stations:875"
+      ],
+      "candidate_names": [
+        "Tambo",
+        "Tambo",
+        "Tambo AL"
+      ]
+    },
+    {
+      "key": "c:541456",
+      "tier": "name_ambiguous",
+      "station_id": null,
+      "station_name": null,
+      "matched_on": "brigalowbridge",
+      "candidates": [
+        "brigalow_br_aler",
+        "brigalow_bridge_tm"
+      ],
+      "workbook": {
+        "cbm_raw": [
+          "541456"
+        ],
+        "cbm_numbers": [
+          "541456"
+        ],
+        "names_raw": [
+          "Brigalow Bridge"
+        ],
+        "alert_ids": [
+          "6111",
+          "6112",
+          "6113"
+        ],
+        "notes": []
+      },
+      "inspection_rows": 7,
+      "first_visit": "2015-09-23",
+      "last_visit": "2023-06-12",
+      "sheets": [
+        "Condamine!"
+      ],
+      "blocks": [
+        "qld-all-site-inspections:Condamine!:1205"
+      ],
+      "candidate_names": [
+        "Brigalow Br AL",
+        "Brigalow Bridge TM"
+      ]
+    },
+    {
       "key": "c:40858",
       "tier": "name_ambiguous",
       "station_id": null,
@@ -91,6 +486,7 @@
       "matched_on": "boonah",
       "candidates": [
         "boonah",
+        "boonah_2",
         "boonah_al"
       ],
       "workbook": {
@@ -120,47 +516,49 @@
       ],
       "candidate_names": [
         "Boonah",
+        "Boonah",
         "Boonah AL"
       ]
     },
     {
-      "key": "c:44158",
+      "key": "c:44198",
       "tier": "name_ambiguous",
       "station_id": null,
       "station_name": null,
-      "matched_on": "dunvegan",
+      "matched_on": "humeburn",
       "candidates": [
-        "dunvegan_al",
-        "dunvegan_tm"
+        "humeburn",
+        "humeburn_al"
       ],
       "workbook": {
         "cbm_raw": [
-          "44158"
+          "044198"
         ],
         "cbm_numbers": [
-          "44158"
+          "44198"
         ],
         "names_raw": [
-          "Dunvegan"
+          "HUMEBURN TM"
         ],
         "alert_ids": [
-          "4248",
-          "4249"
+          "7143",
+          "7142",
+          "7786"
         ],
         "notes": []
       },
-      "inspection_rows": 2,
-      "first_visit": "2017-07-12",
-      "last_visit": "2018-03-21",
+      "inspection_rows": 5,
+      "first_visit": "2002-03-13",
+      "last_visit": "2008-04-01",
       "sheets": [
-        "Warrego!"
+        "Closed stations"
       ],
       "blocks": [
-        "qld-all-site-inspections:Warrego!:461"
+        "qld-all-site-inspections:Closed stations:767"
       ],
       "candidate_names": [
-        "Dunvegan AL",
-        "Dunvegan TM"
+        "Humeburn",
+        "Humeburn AL"
       ]
     }
   ]

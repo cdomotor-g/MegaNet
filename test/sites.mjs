@@ -190,12 +190,23 @@ ok('Find sites is disabled with nothing to serve, and the panel says what is mis
 console.log('\nThe paste');
 
 // A cluster of real stations: the first in file order with five neighbours
-// inside 10 km, each with a station number and a position.
+// inside 10 km, each with a station number and a position — and each one the
+// only station answering to what the paste below calls it by. The file does
+// not promise that on its own: ALERT addresses repeat between networks (5732
+// is Ballandean AL in Queensland and Angas Creek in South Australia), names
+// repeat between a gauge and its rain gauge, and a few four-digit station
+// numbers are somebody's ALERT address. A cluster that pasted one of those
+// would be testing the data, not the paste.
 const cluster = await page.evaluate(() => {
-  const st = state.data.stations.filter(s => s.lat != null && s.lon != null && s.station_number);
+  const all = state.data.stations;
+  const tally = (keys) => keys.reduce((m, k) => m.set(k, (m.get(k) || 0) + 1), new Map());
+  const alerts = tally(all.flatMap(s => stationAlertIds(s).map(String)));
+  const names  = tally(all.map(s => s.name.toLowerCase()));
+  const unique = s => names.get(s.name.toLowerCase()) === 1 && !alerts.has(String(s.station_number));
+  const st = all.filter(s => s.lat != null && s.lon != null && s.station_number && unique(s));
   for (const s0 of st) {
     const near = st.filter(s => s !== s0 && acmaHaversineKm(s0.lat, s0.lon, s.lat, s.lon) < 10);
-    const ids = near.filter(s => stationAlertIds(s).length);
+    const ids = near.filter(s => stationAlertIds(s).length && alerts.get(String(stationAlertIds(s)[0])) === 1);
     if (near.length >= 5 && ids.length) {
       const pick = [s0, ...near.filter(s => s !== ids[0]).slice(0, 4), ids[0]];
       const lat = pick.reduce((a, s) => a + s.lat, 0) / pick.length;

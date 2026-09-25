@@ -1,39 +1,7 @@
 {
   "_": "Every workbook station with no confident match, most inspections first — a station with 60 visits and no match matters more than one with 1. `proposed` is a near name for a person to accept or reject; it is not applied. Written by tools/ingest/crosswalk.py; do not edit by hand.",
-  "count": 78,
+  "count": 68,
   "entries": [
-    {
-      "key": "c:540174",
-      "tier": "unmatched",
-      "station_id": null,
-      "station_name": null,
-      "matched_on": "",
-      "candidates": [],
-      "workbook": {
-        "cbm_raw": [
-          "540174"
-        ],
-        "cbm_numbers": [
-          "540174"
-        ],
-        "names_raw": [
-          "LYONS BRIDGE ALERT- P"
-        ],
-        "alert_ids": [
-          "6634"
-        ],
-        "notes": []
-      },
-      "inspection_rows": 23,
-      "first_visit": "2000-03-01",
-      "last_visit": "2013-11-14",
-      "sheets": [
-        "Brisbane!"
-      ],
-      "blocks": [
-        "qld-all-site-inspections:Brisbane!:526"
-      ]
-    },
     {
       "key": "c:41555",
       "tier": "unmatched",
@@ -155,69 +123,6 @@
       ]
     },
     {
-      "key": "c:41137",
-      "tier": "unmatched",
-      "station_id": null,
-      "station_name": null,
-      "matched_on": "",
-      "candidates": [],
-      "workbook": {
-        "cbm_raw": [
-          "041137"
-        ],
-        "cbm_numbers": [
-          "41137"
-        ],
-        "names_raw": [
-          "COOLMUNDA DAM TAILWATER TM"
-        ],
-        "alert_ids": [
-          "7744",
-          "7742"
-        ],
-        "notes": []
-      },
-      "inspection_rows": 18,
-      "first_visit": "2001-02-07",
-      "last_visit": "2014-06-25",
-      "sheets": [
-        "Closed stations"
-      ],
-      "blocks": [
-        "qld-all-site-inspections:Closed stations:962"
-      ]
-    },
-    {
-      "key": "c:41359",
-      "tier": "unmatched",
-      "station_id": null,
-      "station_name": null,
-      "matched_on": "",
-      "candidates": [],
-      "workbook": {
-        "cbm_raw": [
-          "41359"
-        ],
-        "cbm_numbers": [
-          "41359"
-        ],
-        "names_raw": [
-          "OAKEY BASE STATION ALERT"
-        ],
-        "alert_ids": [],
-        "notes": []
-      },
-      "inspection_rows": 18,
-      "first_visit": "2002-11-26",
-      "last_visit": "2023-07-07",
-      "sheets": [
-        "Condamine!"
-      ],
-      "blocks": [
-        "qld-all-site-inspections:Condamine!:439"
-      ]
-    },
-    {
       "key": "c:40795",
       "tier": "unmatched",
       "station_id": null,
@@ -310,6 +215,14 @@
       ],
       "blocks": [
         "qld-all-site-inspections:Closed stations:186"
+      ],
+      "proposed": [
+        {
+          "station_id": "woongarra_p_s_tm",
+          "station_name": "Woongarra P/S TM",
+          "matched_on": "woongarraps",
+          "score": 0.9
+        }
       ]
     },
     {
@@ -491,36 +404,6 @@
       ]
     },
     {
-      "key": "c:33119",
-      "tier": "unmatched",
-      "station_id": null,
-      "station_name": null,
-      "matched_on": "",
-      "candidates": [],
-      "workbook": {
-        "cbm_raw": [
-          "33119"
-        ],
-        "cbm_numbers": [
-          "33119"
-        ],
-        "names_raw": [
-          "Mt. Bassett Base Station (Mackay M.O.)"
-        ],
-        "alert_ids": [],
-        "notes": []
-      },
-      "inspection_rows": 11,
-      "first_visit": "2004-10-16",
-      "last_visit": "2015-09-07",
-      "sheets": [
-        "Pioneer!"
-      ],
-      "blocks": [
-        "qld-all-site-inspections:Pioneer!:911"
-      ]
-    },
-    {
       "key": "c:40974",
       "tier": "unmatched",
       "station_id": null,
@@ -678,36 +561,6 @@
       ]
     },
     {
-      "key": "n:stokescrossing",
-      "tier": "unmatched",
-      "station_id": null,
-      "station_name": null,
-      "matched_on": "",
-      "candidates": [],
-      "workbook": {
-        "cbm_raw": [],
-        "cbm_numbers": [],
-        "names_raw": [
-          "Stokes Crossing"
-        ],
-        "alert_ids": [
-          "2074",
-          "2075",
-          "2076"
-        ],
-        "notes": []
-      },
-      "inspection_rows": 10,
-      "first_visit": "2002-02-08",
-      "last_visit": "2010-05-10",
-      "sheets": [
-        "Closed stations"
-      ],
-      "blocks": [
-        "qld-all-site-inspections:Closed stations:891"
-      ]
-    },
-    {
       "key": "c:260165",
       "tier": "unmatched",
       "station_id": null,
@@ -808,39 +661,6 @@
       ]
     },
     {
-      "key": "c:531020",
-      "tier": "unmatched",
-      "station_id": null,
-      "station_name": null,
-      "matched_on": "",
-      "candidates": [],
-      "workbook": {
-        "cbm_raw": [
-          "531020"
-        ],
-        "cbm_numbers": [
-          "531020"
-        ],
-        "names_raw": [
-          "Gunnawarra Alert"
-        ],
-        "alert_ids": [
-          "6058",
-          "6059"
-        ],
-        "notes": []
-      },
-      "inspection_rows": 9,
-      "first_visit": "2000-09-30",
-      "last_visit": "2008-10-21",
-      "sheets": [
-        "Herbert!"
-      ],
-      "blocks": [
-        "qld-all-site-inspections:Herbert!:935"
-      ]
-    },
-    {
       "key": "c:533021",
       "tier": "unmatched",
       "station_id": null,
@@ -932,36 +752,6 @@
       ]
     },
     {
-      "key": "c:44021",
-      "tier": "unmatched",
-      "station_id": null,
-      "station_name": null,
-      "matched_on": "",
-      "candidates": [],
-      "workbook": {
-        "cbm_raw": [
-          "44021"
-        ],
-        "cbm_numbers": [
-          "44021"
-        ],
-        "names_raw": [
-          "Charleville Met Office Base Station"
-        ],
-        "alert_ids": [],
-        "notes": []
-      },
-      "inspection_rows": 7,
-      "first_visit": "2013-07-01",
-      "last_visit": "2024-05-01",
-      "sheets": [
-        "Warrego!"
-      ],
-      "blocks": [
-        "qld-all-site-inspections:Warrego!:417"
-      ]
-    },
-    {
       "key": "c:535033",
       "tier": "unmatched",
       "station_id": null,
@@ -989,44 +779,6 @@
       ],
       "blocks": [
         "qld-all-site-inspections:Closed stations:470"
-      ]
-    },
-    {
-      "key": "c:535037",
-      "tier": "unmatched",
-      "station_id": null,
-      "station_name": null,
-      "matched_on": "",
-      "candidates": [],
-      "workbook": {
-        "cbm_raw": [
-          "535037"
-        ],
-        "cbm_numbers": [
-          "535037"
-        ],
-        "names_raw": [
-          "Mantuan Downs"
-        ],
-        "alert_ids": [],
-        "notes": []
-      },
-      "inspection_rows": 7,
-      "first_visit": "2011-07-26",
-      "last_visit": "2018-10-16",
-      "sheets": [
-        "Fitzroy!"
-      ],
-      "blocks": [
-        "qld-all-site-inspections:Fitzroy!:2547"
-      ],
-      "proposed": [
-        {
-          "station_id": "mantuan_downs_west_al",
-          "station_name": "Mantuan Downs (West) AL",
-          "matched_on": "mantuandownswest",
-          "score": 0.857
-        }
       ]
     },
     {
@@ -1451,32 +1203,6 @@
       ]
     },
     {
-      "key": "n:kareeya",
-      "tier": "unmatched",
-      "station_id": null,
-      "station_name": null,
-      "matched_on": "",
-      "candidates": [],
-      "workbook": {
-        "cbm_raw": [],
-        "cbm_numbers": [],
-        "names_raw": [
-          "Kareeya"
-        ],
-        "alert_ids": [],
-        "notes": []
-      },
-      "inspection_rows": 4,
-      "first_visit": "2006-10-24",
-      "last_visit": "2009-10-21",
-      "sheets": [
-        "Closed stations"
-      ],
-      "blocks": [
-        "qld-all-site-inspections:Closed stations:499"
-      ]
-    },
-    {
       "key": "n:saddlemountreceiving",
       "tier": "unmatched",
       "station_id": null,
@@ -1563,44 +1289,6 @@
       ],
       "blocks": [
         "qld-all-site-inspections:Mooloolah!:433"
-      ]
-    },
-    {
-      "key": "c:39123",
-      "tier": "unmatched",
-      "station_id": null,
-      "station_name": null,
-      "matched_on": "",
-      "candidates": [],
-      "workbook": {
-        "cbm_raw": [
-          "39123"
-        ],
-        "cbm_numbers": [
-          "39123"
-        ],
-        "names_raw": [
-          "Gladstone Radar Base Station"
-        ],
-        "alert_ids": [],
-        "notes": []
-      },
-      "inspection_rows": 3,
-      "first_visit": "2021-08-03",
-      "last_visit": "2023-09-23",
-      "sheets": [
-        "Burnett&Kolan!"
-      ],
-      "blocks": [
-        "qld-all-site-inspections:Burnett&Kolan!:972"
-      ],
-      "proposed": [
-        {
-          "station_id": "gladstone_radar_al",
-          "station_name": "Gladstone Radar AL",
-          "matched_on": "gladstoneradar",
-          "score": 0.875
-        }
       ]
     },
     {

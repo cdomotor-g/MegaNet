@@ -230,6 +230,9 @@ its cache at all (`PGRST002`).
 | `meganet.station_crossing` | The crossings a station's gauge is read against (`0031`, Section 5): stream, name, height, type. The station's `crossings` list. |
 | `meganet.station_gauge_survey` | The survey of a station's gauge (`0031`, Section 6): the height of its zero, the datum and the period it held — several rows for a gauge that has been re-levelled — with its AMTD (km along the middle of the stream from its mouth up to the gauge) and catchment area. The station's `gauge_survey` list. |
 | `meganet.crossing_type`, `meganet.gauge_datum` | The two vocabularies those three reference: the Bureau's crossing legend (B Bridge … S Spillway, T Highest Astronomical Tide) and the four datums a gauge zero is measured in (AHD, ASSUM, STATE, UNKNOWN). A new code is an insert. |
+| `meganet.station_bureau_listing` | Which of the Bureau's Queensland station indexes list a station (`0032`): Section 1 FloodWarn rainfall, 2 daily rainfall, 3 river height, one row per index per edition, dated by `as_at`. The station's `bureau_listings` list; `section` is a foreign key into `meganet.bureau_index`, the three indexes by the section number the pages print. |
+| `meganet.station_flood_effect` | What each height on a station's gauge means on the ground (`0032`, Section 9): the height, the probable flood effect as the Bureau writes it, and the detail it prints in brackets under some of them. One row per height per edition, in the page's order. The station's `flood_effects` list. |
+| `meganet.station.awrc_number`, `.stream`, `.urbs_label` | Three fields `0032` adds to the station: the AWRC gauging station number and the stream the gauge is on (Section 3), and the station's node in the Bureau's URBS runoff-routing model. Optional keys in the document, absent when null. |
 
 Everything is readable by `anon` **except `meganet.reading_raw` and the whole
 inspection domain — bar the numbers, which `0023` publishes as views**. `reading_raw` holds whatever a device or an adapter actually
@@ -1131,23 +1134,38 @@ Then, after pushing:
 select meganet.load_sls_from_url();
 ```
 
-## River height station details
+## The Bureau's flood warning station lists
 
-`0031`. "Queensland Flood Warning River Height Stations" is a Bureau report in
-sections, every row keyed on the bureau number. Four of them are in
-`archive/river-height-stations/`: flood classifications as at 25/09/2026
-(Section 4) and 15/01/2014 (Section 4 (B)), the crossings (Section 5) and the
-survey details (Section 6). `tools/ingest/river_height_stations.py` reads them
-into `data/river-height-stations.json` — every row, including the ~half for
-stations MegaNet does not have.
+`0031` and `0032`. The Bureau prints its Queensland flood warning network as
+numbered sections, every row keyed on the bureau number. Nine documents are in
+`archive/river-height-stations/`:
 
-**Unlike the SLS, these are the station's own rows.** Three tables hang off
-`meganet.station` the way the sensors do, and three lists travel in its
-document — `flood_classes`, `crossings`, `gauge_survey`, each absent when empty
-— so the card reads them off the station it already holds, `save_station()`
-writes them with everything else in one transaction, and `stations.json`
-carries them. The Bureau's lists are where they started; an editor adds the
-next edition, crossing or re-levelling in the station editor.
+| Section | Dated | What it is | Where it goes |
+| --- | --- | --- | --- |
+| 1 | 25/09/2026 | index of FloodWarn rainfall stations — number, name, basin, position | new stations; `bureau_listings` |
+| 2 | 26/09/2026 | index of daily reporting rainfall stations (those used for flood warning) | new stations; `bureau_listings` |
+| 3 | 26/09/2026 | index of river height stations — plus AWRC number and stream | new stations; `bureau_listings`; `awrc_number`, `stream` |
+| 4 | 25/09/2026 | flood classifications | `flood_classes` |
+| 4 (B) | 15/01/2014 | flood classifications, the edition before | `flood_classes` |
+| 5 | 25/09/2026 | details of crossings | `crossings` |
+| 6 | 25/09/2026 | survey details — gauge zero, datum, AMTD, catchment area | `gauge_survey` |
+| 9 | 26/09/2026 | flood effects — what each height on the gauge means | `flood_effects` |
+| URBS | 26/09/2026 | each river height station's URBS model label | `urbs_label` |
+
+`tools/ingest/river_height_stations.py` reads them into
+`data/river-height-stations.json` — every row, whether or not MegaNet has the
+station. The URBS details also print minor, moderate and major levels; they
+equal Section 4's on all 921 rows that print them, so they are not stored twice.
+
+**Unlike the SLS, these are the station's own rows.** Five tables hang off
+`meganet.station` the way the sensors do, and five lists travel in its
+document — `bureau_listings`, `flood_classes`, `crossings`, `gauge_survey`,
+`flood_effects`, each absent when empty — with three optional fields beside
+them, `awrc_number`, `stream`, `urbs_label`. So the card reads them off the
+station it already holds, `save_station()` writes them with everything else in
+one transaction, and `stations.json` carries them. The Bureau's lists are where
+they started; an editor adds the next edition, crossing, re-levelling or effect
+in the station editor.
 
 **`save_station()` leaves a list the document does not mention alone** — the one
 place it differs from the sensors. Every client older than `0031` builds its
@@ -1155,11 +1173,13 @@ document without these keys, and reading their absence as "none" would have
 deleted them on the first save from a tab opened before the deploy. The editor
 uses the same rule the other way round: it sends only the lists the form
 changed, because the browser parses 94.50 as 94.5 and resending an untouched
-list would quietly shorten every figure in it. `load_stations_doc()` is a sync
-of a whole document, so there absent means none, as it always has.
+list would quietly shorten every figure in it. The three fields are ordinary
+optional keys, like `owner`: the editor starts from the record it loaded, so a
+key it does not show is carried through. `load_stations_doc()` is a sync of a
+whole document, so there absent means none, as it always has.
 
-**Attaching the rows to stations** is not a migration — `0031` carries no
-station data, for `0029`'s reason. It is SQL the tool prints:
+**Writing them in** is not a migration — neither file carries station data, for
+`0029`'s reason. It is SQL the tool prints:
 
 ```sh
 python3 tools/ingest/river_height_stations.py --check    # CI
@@ -1168,33 +1188,60 @@ python3 tools/ingest/river_height_stations.py --sql \
   | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
 ```
 
-It attaches by `bureau_key()` to live stations only, and only where the station
-has none of its own yet — per edition (`as_at`) for flood classes and crossings,
-per station for the survey — so running it again after stations are added fills
-in the new ones and touches nothing an editor has changed. It moves each
-station's `updated_at`, so an editor holding one open is told to reload. Then
-refresh `stations.json` (`tools/snapshot_stations_json.py`), because the file is
-a copy.
+It is additive by construction, in four steps in one transaction:
 
-| As loaded | Rows | Stations |
+1. **The stations Sections 1–3 list that MegaNet has none for** are created —
+   matched by `bureau_key()` against every station, live or deleted, so a
+   station somebody deleted stays deleted. A field station each, as the
+   editor's "+ New" makes one: the Bureau's name in MegaNet's style ("ALERT" as
+   "AL", title case), the number without its leading zeros, the Bureau's
+   position (ddmmss to five decimal places, which loses nothing), the catchment
+   and hub the position falls in, and no elevation.
+2. **Every list** is attached by `bureau_key()` to live stations, and only where
+   the station has none of its own yet — per edition (`as_at`) for flood
+   classes, crossings and flood effects, per section and edition for index
+   listings, per station for the survey.
+3. **The three fields** are set where the station has none.
+4. **A check** that every station Sections 1–3 list now exists fails the whole
+   transaction if one could not be created.
+
+A station's existing position, name and elevation are never written over.
+`--report` lists where the Bureau's position and MegaNet's disagree by a
+kilometre or more, and the new stations that sit within 300 m of an existing
+one under the same name, for a person to look at. Running it again touches
+nothing; it moves each station's `updated_at` it writes to, so an editor
+holding one open is told to reload. Then refresh `stations.json`
+(`tools/snapshot_stations_json.py`), because the file is a copy.
+
+| As loaded, 25/09/2026 | Rows | Stations |
 | --- | --- | --- |
-| flood classifications (2026 and 2014) | 1,073 | 642 |
-| crossings | 373 | 373 |
-| gauge survey | 736 | 623 |
+| stations created from Sections 1–3 | 1,697 | 1,697 (4 with no readable position) |
+| index listings (Sections 1, 2, 3) | 4,860 | 3,349 |
+| flood classifications (2026 and 2014) | 2,345 | 1,317 |
+| crossings | 825 | 825 |
+| gauge survey | 1,435 | 1,254 |
+| flood effects | 5,848 | 1,287 |
+| AWRC number · stream · URBS label | 1,549 · 1,715 · 1,053 | |
 
-Two things are kept as printed rather than repaired. 366 flood classification
+Some things are kept as printed rather than repaired. 366 flood classification
 rows name a station and print no figure; they carry no fact and are not stored.
-And one survey row, 535200 Arcadia Valley School, has its period backwards (from
+One survey row, 535200 Arcadia Valley School, has its period backwards (from
 2021 to 2020): a check constraint would have refused the document, and then
-every save of that station, so the card and the editor say so instead.
+every save of that station, so the card and the editor say so instead. Four
+Torres Strait tide gauges (527018, 527019, 527020, 527022) have a latitude
+printed as `9.437S` — a digit of the minutes gone — so they were created with no
+position and a note saying why. 48 stations are only in the 2014 edition and in
+none of the indexes, so there is nothing to place them with; their rows stay in
+the JSON.
 
 ```sh
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_river_height_details.sql
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_bureau_station_lists.sql
 ```
 
-30 checks, in a transaction that rolls back: the tables, RLS and grants, the
-two vocabularies against the Bureau's legend, `save_station()`'s three cases
-(absent, empty, rows), its refusals, and the loader's sync and its
+30 and 20 checks, each in a transaction that rolls back: the tables, RLS and
+grants, the vocabularies against the Bureau's own, `save_station()`'s three
+cases (absent, empty, rows), its refusals, and the loader's sync and its
 `document_managed` guard.
 
 ## Checking it from outside

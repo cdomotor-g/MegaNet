@@ -1,9 +1,11 @@
 // MegaNet — river-details.js
 //
-//   RiverDetails   what the Bureau's river height station lists say about a
-//                  station — its flood classification levels, the crossing its
-//                  gauge is read against, and the survey of the gauge itself —
-//                  read-only on the station card for anybody, and as three
+//   RiverDetails   what the Bureau's Queensland flood warning station lists say
+//                  about a station — which of its indexes list it, its AWRC
+//                  number, stream and URBS label, its flood classification
+//                  levels, the crossing its gauge is read against, the survey of
+//                  the gauge itself and what each height on it means — read-only
+//                  on the station card for anybody, and as three fields and five
 //                  editable lists in the station editor for an editor.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
@@ -14,13 +16,15 @@
 // this file's position among the modules is free (`npm run toplevel`).
 //
 // ── Where the rows come from ─────────────────────────────────────────────────
-// "Queensland Flood Warning River Height Stations", Sections 4, 4 (B), 5 and 6,
-// read by tools/ingest/river_height_stations.py out of
+// "Queensland Flood Warning River Height Stations", Sections 1–6 and 9 and the
+// URBS details, read by tools/ingest/river_height_stations.py out of
 // archive/river-height-stations/ and attached by bureau number to the stations
-// they describe (db/migrations/0031_river_height_details.sql). They are three
-// lists on the station itself — `flood_classes`, `crossings`, `gauge_survey` —
+// they describe (db/migrations/0031_river_height_details.sql and
+// 0032_bureau_station_lists.sql). They are five lists on the station itself —
+// `bureau_listings`, `flood_classes`, `crossings`, `gauge_survey`,
+// `flood_effects` — and three fields, `awrc_number`, `stream` and `urbs_label`,
 // so the card reads them off the record it already holds, and a station that is
-// in none of the Bureau's lists (most of them) has none of the three keys.
+// in none of the Bureau's lists has none of the keys.
 //
 // ── Which row is "the" answer ────────────────────────────────────────────────
 // Every list is a history. The 2014 flood classifications sit beside the 2026
@@ -63,11 +67,40 @@ const RiverDetails = (function () {
     { code: 'STATE',   label: 'State datum' },
     { code: 'UNKNOWN', label: 'Datum unknown' },
   ];
+  // meganet.bureau_index, as 0032 inserts it: the Bureau's indexes by the
+  // section number its pages print.
+  const BUREAU_INDEXES = [
+    { code: '1', label: 'FloodWarn rainfall' },
+    { code: '2', label: 'Daily rainfall' },
+    { code: '3', label: 'River height' },
+  ];
+
+  // The station's own three fields (0032), edited as plain boxes above the
+  // lists. Blank is absent, the shape station_json emits.
+  const FIELDS = [
+    { key: 'awrc_number', id: 'ef-awrc',   label: 'AWRC number',
+      hint: 'The national gauging station number; its first three digits are the basin.' },
+    { key: 'stream',      id: 'ef-stream', label: 'Stream' },
+    { key: 'urbs_label',  id: 'ef-urbs',   label: 'URBS label',
+      hint: 'The station’s node in the Bureau’s URBS runoff-routing model.' },
+  ];
 
   // The three lists, and the boxes each row is edited in. `kind` decides the
   // control and how its value is read back; `wide` takes a whole line of the
   // row, for the free text. The order is the order a person reads the page in.
   const LISTS = {
+    bureau_listings: {
+      title: 'Bureau indexes',
+      one: 'Bureau index listing',
+      hint: 'Which of the Bureau’s Queensland station indexes list this station — Section 1 '
+          + '(FloodWarn rainfall), 2 (daily rainfall) or 3 (river height) — one row per index '
+          + 'per edition, dated by <em>As at</em>.',
+      fields: [
+        { key: 'section', label: 'Index',  kind: 'index' },
+        { key: 'as_at',   label: 'As at',  kind: 'date' },
+        { key: 'note',    label: 'Note',   kind: 'text', wide: true },
+      ],
+    },
     flood_classes: {
       title: 'Flood classifications',
       one: 'flood classification',
@@ -119,6 +152,20 @@ const RiverDetails = (function () {
         { key: 'note',               label: 'Note',                  kind: 'text', wide: true },
       ],
     },
+    flood_effects: {
+      title: 'Flood effects',
+      one: 'flood effect',
+      hint: 'What each height on the gauge means on the ground, as the Bureau writes it: the '
+          + 'height in metres, the effect, and the detail it prints in brackets under some of '
+          + 'them — which bridge, which spillway.',
+      fields: [
+        { key: 'height_m', label: 'Height (m)', kind: 'num' },
+        { key: 'as_at',    label: 'As at',      kind: 'date' },
+        { key: 'effect',   label: 'Effect',     kind: 'text', wide: true },
+        { key: 'detail',   label: 'Detail',     kind: 'text', wide: true },
+        { key: 'note',     label: 'Note',       kind: 'text', wide: true },
+      ],
+    },
   };
   const LIST_KEYS = Object.keys(LISTS);
 
@@ -126,6 +173,8 @@ const RiverDetails = (function () {
 
   const crossingLabel = code => (CROSSING_TYPES.find(t => t.code === code) || {}).label || code;
   const datumLabel    = code => (DATUMS.find(d => d.code === code) || {}).label || code;
+  const indexLabel    = code => (BUREAU_INDEXES.find(i => i.code === code) || {}).label
+                               || (code ? `Section ${code}` : '');
 
   // Newest first by one date field, undated last, and otherwise the stored
   // order. A copy — the record's own order is what the editor writes back.
@@ -224,11 +273,34 @@ const RiverDetails = (function () {
   // ── The card ──────────────────────────────────────────────────────────────
 
   function has(s) {
-    return !!s && LIST_KEYS.some(k => Array.isArray(s[k]) && s[k].length);
+    return !!s && (LIST_KEYS.some(k => Array.isArray(s[k]) && s[k].length)
+                   || FIELDS.some(f => s[f.key]));
+  }
+
+  // "Bridge  Pacific Highway Bridge" — the effect, and under it in the page's
+  // brackets the detail, which the card sets in the quieter note style.
+  function effectHtml(e) {
+    const bits = [];
+    if (e.effect) bits.push(esc(e.effect));
+    if (e.detail) bits.push(`<span class="mn-pop-note">${esc(e.detail)}</span>`);
+    if (e.note)   bits.push(`<span class="mn-pop-note">${esc(e.note)}</span>`);
+    return bits.join(' ') || '—';
+  }
+
+  // The indexes that list the station, the newest edition of each, in the
+  // Bureau's section order. One date at the end when they share it.
+  function listingsHtml(newest) {
+    const dates = new Set(newest.map(l => l.as_at || ''));
+    const one = dates.size === 1;
+    const parts = newest.map(l => esc(indexLabel(l.section))
+      + (!one && l.as_at ? ` <span class="mn-pop-note">${esc(date(l.as_at))}</span>` : '')
+      + (l.note ? ` <span class="mn-pop-note">${esc(l.note)}</span>` : ''));
+    const asAt = one && newest[0].as_at ? ` <span class="mn-pop-note">as at ${esc(date(newest[0].as_at))}</span>` : '';
+    return parts.join(' · ') + asAt;
   }
 
   // The section on the station card. Empty for a station that is in none of
-  // the Bureau's lists, which is most of them.
+  // the Bureau's lists.
   function cardHtml(s) {
     if (!has(s)) return '';
     const floods    = newestFirst(s.flood_classes || [], 'as_at');
@@ -237,6 +309,22 @@ const RiverDetails = (function () {
     const flood     = floods[0] || null;
     const zero      = currentSurvey(surveys);
     const rows      = [];
+
+    // Which of the Bureau's indexes list it: the newest listing per section.
+    const newest = [], older = [];
+    for (const l of newestFirst(s.bureau_listings || [], 'as_at')) {
+      (newest.some(n => n.section === l.section) ? older : newest).push(l);
+    }
+    newest.sort((a, b) => String(a.section).localeCompare(String(b.section)));
+    if (newest.length) {
+      rows.push(row('Bureau lists', listingsHtml(newest),
+        'Which of the Bureau’s Queensland flood warning station indexes list this station — Section 1 FloodWarn rainfall, 2 daily rainfall, 3 river height'));
+    }
+    rows.push(row('AWRC number', esc(s.awrc_number || ''),
+      'The national (Australian Water Resources Council) gauging station number — its first three digits are the basin'));
+    rows.push(row('Stream', esc(s.stream || '')));
+    rows.push(row('URBS label', esc(s.urbs_label || ''),
+      'The station’s node in the Bureau’s URBS runoff-routing model'));
 
     if (flood) {
       const asAt = flood.as_at ? ` <span class="mn-pop-note">as at ${esc(date(flood.as_at))}</span>` : '';
@@ -278,6 +366,10 @@ const RiverDetails = (function () {
 
     // Everything that no longer holds, newest first, behind one disclosure.
     const earlier = [];
+    for (const l of older) {
+      earlier.push(row(indexLabel(l.section),
+        `listed${l.as_at ? ` <span class="mn-pop-note">as at ${esc(date(l.as_at))}</span>` : ''}`));
+    }
     for (const f of floods.slice(1)) {
       const bits = [classesText(f)];
       if (f.first_report_m != null)  bits.push(`first report ${fig(f.first_report_m, 1)} m`);
@@ -292,11 +384,37 @@ const RiverDetails = (function () {
       earlier.push(row('Gauge zero', `${zeroText(z) || '—'} <span class="mn-pop-note">${esc(periodText(z))}</span>`));
     }
 
+    // What each height means, behind its own disclosure: up to thirty-odd
+    // lines for a big gauge. The newest edition first, each in the page's
+    // order, an older edition under its own date.
+    const effects = s.flood_effects || [];
+    let effectsHtml = '';
+    if (effects.length) {
+      const editions = new Map();
+      for (const e of newestFirst(effects, 'as_at')) {
+        const k = e.as_at || '';
+        if (!editions.has(k)) editions.set(k, []);
+        editions.get(k).push(e);
+      }
+      const blocks = [...editions.entries()].map(([asAt, list], i) => {
+        const head = (editions.size > 1 || asAt)
+          ? `<div class="small txt-muted stn-card-rhs-asat">${i ? 'Earlier — ' : ''}${asAt ? `as at ${esc(date(asAt))}` : 'undated'}</div>`
+          : '';
+        return head + list.map(e => row(e.height_m != null ? height(e.height_m, 2) : '—', effectHtml(e))).join('');
+      });
+      const n = editions.values().next().value.length;
+      effectsHtml = `<details class="stn-card-rhs-effects">
+          <summary class="small">Flood effects — ${n} height${n === 1 ? '' : 's'}</summary>
+          ${blocks.join('')}
+        </details>`;
+    }
+
     return `
       <div class="acma-sect stn-card-rhs">
         <span class="small txt-muted stn-card-rhs-head"
-              title="Queensland Flood Warning River Height Stations (Bureau of Meteorology), Sections 4–6, as recorded on this station">River height station details</span>
+              title="Queensland Flood Warning River Height Stations (Bureau of Meteorology), Sections 1–6 and 9 and the URBS details, as recorded on this station">Bureau flood warning details</span>
         ${rows.join('')}
+        ${effectsHtml}
         ${earlier.length ? `<details class="stn-card-rhs-earlier">
           <summary class="small">Earlier — ${earlier.length} record${earlier.length === 1 ? '' : 's'}</summary>
           ${earlier.join('')}
@@ -325,6 +443,9 @@ const RiverDetails = (function () {
     if (f.kind === 'datum') {
       return `<select data-f="${f.key}">${options(DATUMS, val, '— none —')}</select>`;
     }
+    if (f.kind === 'index') {
+      return `<select data-f="${f.key}">${options(BUREAU_INDEXES, val, '— pick one —')}</select>`;
+    }
     if (f.kind === 'date') {
       return `<input type="date" data-f="${f.key}" value="${escAttr(val)}">`;
     }
@@ -347,6 +468,16 @@ const RiverDetails = (function () {
     }
     if (list === 'crossings') {
       return crossingText(r) || r.note || 'New crossing — nothing entered yet';
+    }
+    if (list === 'bureau_listings') {
+      if (!r.section && !r.as_at && !r.note) return 'New listing — nothing entered yet';
+      return `${r.section ? `Section ${r.section}, ${indexLabel(r.section)}` : 'No index picked'}`
+           + ` — ${r.as_at ? `as at ${date(r.as_at)}` : 'undated'}`;
+    }
+    if (list === 'flood_effects') {
+      const what = [r.effect, r.detail ? `(${r.detail})` : ''].filter(Boolean).join(' ') || r.note || '';
+      if (r.height_m == null && !what) return 'New flood effect — nothing entered yet';
+      return `${r.height_m != null ? `${fig(r.height_m, 2)} m` : 'No height'} — ${what || 'no effect written'}`;
     }
     const zero = r.gauge_zero_m != null
       ? `${fig(r.gauge_zero_m, 2)} m${r.datum ? ` ${r.datum === 'AHD' ? 'AHD' : datumLabel(r.datum).toLowerCase()}` : ''}`
@@ -385,16 +516,21 @@ const RiverDetails = (function () {
     return n ? ` <span class="small ef-plain">— ${n}</span>` : '';
   }
 
-  // The block at the foot of the editor form, above ARRO: one section per
-  // list, each with its rows and an add button, the way the sensors are done.
+  // The block at the foot of the editor form, above ARRO: the three fields,
+  // then one section per list, each with its rows and an add button, the way
+  // the sensors are done.
   function editorHtml(s) {
     return `
       <hr>
-      <h4 class="ef-h">River height station details</h4>
+      <h4 class="ef-h">Bureau flood warning details</h4>
       <p class="small ef-block">
-        What the Bureau’s Queensland flood warning river height station lists say about this
-        station, and anything added since. Blank means not recorded. Saved with the station.
+        What the Bureau’s Queensland flood warning station lists say about this station, and
+        anything added since. Blank means not recorded. Saved with the station.
       </p>
+      <div class="form-grid rhs-station-fields">
+        ${[...FIELDS].sort((a, b) => (a.key === 'stream') - (b.key === 'stream')).map(f =>
+          `<label${f.key === 'stream' ? ' class="full"' : ''}${f.hint ? ` title="${escAttr(f.hint)}"` : ''}>${esc(f.label)}<input type="text" id="${f.id}" value="${escAttr((s && s[f.key]) || '')}"></label>`).join('')}
+      </div>
       ${LIST_KEYS.map(list => {
         const spec = LISTS[list];
         const rows = (s && s[list]) || [];
@@ -482,6 +618,19 @@ const RiverDetails = (function () {
     return out;
   }
 
+  // The three fields onto the document the save sends: set where the box says
+  // something, gone where it is blank — the shape station_json emits, so a save
+  // that set nothing round-trips without gaining a key.
+  function applyFields(d) {
+    for (const f of FIELDS) {
+      const el = document.getElementById(f.id);
+      if (!el) continue;
+      const v = String(el.value).trim();
+      if (v) d[f.key] = v; else delete d[f.key];
+    }
+    return d;
+  }
+
   // A box the browser could not read — "3,5" in a number field, half a date —
   // reads back as empty, and saving would quietly drop the figure. Named here,
   // before the save, rather than lost.
@@ -507,6 +656,8 @@ const RiverDetails = (function () {
   return {
     CROSSING_TYPES,
     DATUMS,
+    BUREAU_INDEXES,
+    FIELD_KEYS: FIELDS.map(f => f.key),
     LIST_KEYS,
     has,
     cardHtml,
@@ -515,6 +666,7 @@ const RiverDetails = (function () {
     removeRow,
     resummarise,
     readForm,
+    applyFields,
     formProblem,
     currentSurvey,
     newestFirst,

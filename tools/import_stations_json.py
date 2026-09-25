@@ -22,9 +22,10 @@ That makes this the way to reload a snapshot into any empty database — includi
 the one inside the corporate network, which is the whole reason the schema is
 portable SQL in the first place.
 
-Requires the migrations through 0031_river_height_details.sql to have been
+Requires the migrations through 0032_bureau_station_lists.sql to have been
 applied — the station's flood classes, crossings and gauge survey are synced
-into the tables that file creates. Standard library only.
+into the tables 0031 creates, and its index listings, flood effects, AWRC
+number, stream and URBS label into 0032's. Standard library only.
 """
 
 from __future__ import annotations
@@ -164,9 +165,9 @@ def emit_sync(out, table, columns, key, rows, batch=500, prune_where=None):
 
 IMPORT_TAG = 'import_stations_json.py'
 
-# The station's own lists that 0031 added: document key, table, and the columns
-# in the order a row carries them. The key and the column names are the same
-# words in the document and in the table.
+# The station's own lists that 0031 and 0032 added: document key, table, and
+# the columns in the order a row carries them. The key and the column names are
+# the same words in the document and in the table.
 STATION_LISTS = [
     ('flood_classes', 'station_flood_class',
      ['as_at', 'first_report_m', 'crossing_height_m', 'crossing_type', 'minor_m',
@@ -176,6 +177,10 @@ STATION_LISTS = [
     ('gauge_survey', 'station_gauge_survey',
      ['valid_from', 'valid_to', 'gauge_zero_m', 'datum', 'amtd_km',
       'catchment_area_km2', 'note']),
+    ('bureau_listings', 'station_bureau_listing',
+     ['section', 'as_at', 'note']),
+    ('flood_effects', 'station_flood_effect',
+     ['as_at', 'height_m', 'effect', 'detail', 'note']),
 ]
 
 
@@ -309,7 +314,7 @@ def build(data, out):
                'elevation_source', 'owner',
                'roles', 'radio_network_ids', 'catchment_ids', 'alert_ids', 'satcom',
                'rm_system_id', 'enabled', 'notes', 'legacy_unit_id', 'site', 'lga',
-               'basin', 'location_types'],
+               'basin', 'location_types', 'awrc_number', 'stream', 'urbs_label'],
               ['id'],
               [[q(s['id']), q(i), q(s.get('name', '')), q(s.get('station_number', '')),
                 q(s.get('lat')), q(s.get('lon')), q(s.get('elevation_ahd')),
@@ -323,7 +328,11 @@ def build(data, out):
                 qjson(s.get('satcom') or {}), q(s.get('rm_system_id')),
                 q(bool(s.get('enabled'))), q(s.get('notes', '')),
                 q(s.get('legacy_unit_id')), qjson(s.get('site')), q(s.get('lga')),
-                q(s.get('basin')), qarray(s.get('location_types'))]
+                q(s.get('basin')), qarray(s.get('location_types')),
+                # 0032's three: absent where not recorded, like `owner`.
+                q((s.get('awrc_number') or '').strip() or None),
+                q((s.get('stream') or '').strip() or None),
+                q((s.get('urbs_label') or '').strip() or None)]
                for i, s in enumerate(stations)],
               prune_where='t.document_managed')
 
@@ -358,8 +367,9 @@ def build(data, out):
               ['repeater_id', 'kind', 'lo', 'hi'], ranges,
               prune_where=owned_by_document('repeater_id'))
 
-    # The three lists 0031 hangs off a station: the Bureau's flood
-    # classifications, crossings and gauge survey. Keyed by (station, position),
+    # The lists 0031 and 0032 hang off a station: the Bureau's flood
+    # classifications, crossings and gauge survey, its index listings and flood
+    # effects. Keyed by (station, position),
     # like load_stations_doc() keys them, and a key absent from a row is a null
     # column — the view strips nulls back out, so the round trip is clean.
     details = {}
@@ -375,8 +385,10 @@ def build(data, out):
     out.write('\n-- Row counts after this file, for the record:\n')
     out.write('--   stations %d · sensors %d · repeaters %d · pass ranges %d\n'
               % (len(stations), len(sensors), len(repeaters), len(ranges)))
-    out.write('--   flood classes %d · crossings %d · gauge surveys %d\n'
-              % (details['flood_classes'], details['crossings'], details['gauge_survey']))
+    out.write('--   flood classes %d · crossings %d · gauge surveys %d'
+              ' · index listings %d · flood effects %d\n'
+              % (details['flood_classes'], details['crossings'], details['gauge_survey'],
+                 details['bureau_listings'], details['flood_effects']))
 
     # A registry sync is the event that makes a previously unresolvable health
     # key resolvable, so it is where the fold runs (#162). Guarded, so this
@@ -395,6 +407,8 @@ def build(data, out):
         'repeaters': len(repeaters), 'ranges': len(ranges),
         'flood_classes': details['flood_classes'], 'crossings': details['crossings'],
         'gauge_survey': details['gauge_survey'],
+        'bureau_listings': details['bureau_listings'],
+        'flood_effects': details['flood_effects'],
         'radio_networks': len(data.get('radio_networks', [])),
         'catchments': len(data.get('catchments', [])),
         'rm_systems': len(data.get('rm_systems', [])),
@@ -422,7 +436,8 @@ def main():
             handle.close()
 
     for k in ('stations', 'sensors', 'repeaters', 'ranges', 'flood_classes',
-              'crossings', 'gauge_survey', 'radio_networks', 'catchments', 'rm_systems'):
+              'crossings', 'gauge_survey', 'bureau_listings', 'flood_effects',
+              'radio_networks', 'catchments', 'rm_systems'):
         print('%-16s %6d' % (k, stats[k]), file=sys.stderr)
     if args.out:
         print('wrote %s' % args.out, file=sys.stderr)

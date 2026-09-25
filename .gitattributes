@@ -4,5 +4,6 @@
 
 # The Bureau's river height station lists are read by column position
 # (tools/ingest/river_height_stations.py): a line ending rewritten on checkout
-# is a column moved.
+# is a column moved. Section 9 is an HTML page of <pre> blocks, read the same way.
 archive/river-height-stations/*.txt text eol=lf
+archive/river-height-stations/*.html text eol=lf

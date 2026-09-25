@@ -1,16 +1,18 @@
-// The river height station details (0031): a station's flood classifications,
-// crossings and gauge survey, on the station card and in the station editor,
+// The Bureau's flood warning details (0031, 0032): a station's index listings,
+// AWRC number, stream and URBS label, flood classifications, crossings, gauge
+// survey and flood effects, on the station card and in the station editor,
 // driven in a real browser against the committed stations.json.
 //
-//   1. **The copies agree.** river-details.js carries the crossing-type legend
-//      and the datums because the card has to name a code when the datastore
-//      is not there to ask; 0031 inserts the same two lists. Held together
-//      here, along with the field keys the editor reads and the columns the
-//      tables have — a key the form sends that no column holds is a figure
-//      save_station() silently drops.
-//   2. **The card** says what holds now — the newest flood classification, the
-//      gauge zero in force — and puts everything else under Earlier. Nothing
-//      for a station the Bureau's lists do not name.
+//   1. **The copies agree.** river-details.js carries the crossing-type legend,
+//      the datums and the Bureau's indexes because the card has to name a code
+//      when the datastore is not there to ask; 0031 and 0032 insert the same
+//      lists. Held together here, along with the field keys the editor reads
+//      and the columns the tables have — a key the form sends that no column
+//      holds is a figure save_station() silently drops.
+//   2. **The card** says what holds now — the indexes that list the station,
+//      the newest flood classification, the gauge zero in force, the flood
+//      effects of the newest edition — and puts everything else under Earlier.
+//      Nothing for a station the Bureau's lists do not name.
 //   3. **The editor** shows every row as a line, opens one to edit, adds a row
 //      on top with the cursor in it, removes one without dropping focus on
 //      <body>, and — the one that is invisible when it breaks — sends only the
@@ -40,10 +42,13 @@ function check(label, ok, detail = '') {
 }
 
 const MIGRATION = repo('db/migrations/0031_river_height_details.sql');
+const MIGRATION_32 = repo('db/migrations/0032_bureau_station_lists.sql');
 const STATIONS  = JSON.parse(fs.readFileSync(repo('stations.json'), 'utf8')).stations;
-const LISTS     = ['flood_classes', 'crossings', 'gauge_survey'];
+const LISTS     = ['bureau_listings', 'flood_classes', 'crossings', 'gauge_survey', 'flood_effects'];
+const FIELDS    = ['awrc_number', 'stream', 'urbs_label'];
 const TABLE     = { flood_classes: 'station_flood_class', crossings: 'station_crossing',
-                    gauge_survey: 'station_gauge_survey' };
+                    gauge_survey: 'station_gauge_survey', bureau_listings: 'station_bureau_listing',
+                    flood_effects: 'station_flood_effect' };
 
 // The rows of one `insert into meganet.<table> … values (…), (…)` in the
 // migration, as arrays of their quoted text.
@@ -77,14 +82,16 @@ async function openStations(browser, server, errors, contextOpts) {
 }
 
 async function main() {
-  const sql = fs.readFileSync(MIGRATION, 'utf8');
+  const sql = fs.readFileSync(MIGRATION, 'utf8') + '\n' + fs.readFileSync(MIGRATION_32, 'utf8');
 
   // Stations to look at, picked from the file rather than named, so the check
-  // follows the data: one with every list and more than one gauge zero, one
-  // with none, one whose gauge zero history the Bureau printed backwards.
+  // follows the data: one with every list, every field and more than one gauge
+  // zero, one with none, one whose gauge zero history the Bureau printed
+  // backwards.
   const full = STATIONS.find(s => LISTS.every(k => (s[k] || []).length)
+    && FIELDS.every(k => s[k])
     && s.gauge_survey.length > 1 && s.flood_classes.length > 1 && s.lat != null);
-  const none = STATIONS.find(s => !LISTS.some(k => s[k]) && s.lat != null);
+  const none = STATIONS.find(s => !LISTS.some(k => s[k]) && !FIELDS.some(k => s[k]) && s.lat != null);
   const backwards = STATIONS.find(s => (s.gauge_survey || []).some(r =>
     r.valid_from && r.valid_to && r.valid_to < r.valid_from));
 
@@ -98,6 +105,7 @@ async function main() {
 
     const js = await page.evaluate(() => ({
       types: RiverDetails.CROSSING_TYPES, datums: RiverDetails.DATUMS, keys: RiverDetails.LIST_KEYS,
+      indexes: RiverDetails.BUREAU_INDEXES, fields: RiverDetails.FIELD_KEYS,
     }));
     const sqlTypes = insertedRows(sql, 'crossing_type');
     check('the crossing types are 0031\'s, code and label, in its order',
@@ -108,8 +116,17 @@ async function main() {
     check('the datums are 0031\'s, code and label, in its order',
       sqlDatums && JSON.stringify(sqlDatums.map(r => [r[0], r[1]]))
         === JSON.stringify(js.datums.map(d => [d.code, d.label])));
-    check('the editor edits the three lists the document carries',
+    const sqlIndexes = insertedRows(sql, 'bureau_index');
+    check('the Bureau\'s indexes are 0032\'s, code and label, in its order',
+      sqlIndexes && JSON.stringify(sqlIndexes.map(r => [r[0], r[1]]))
+        === JSON.stringify(js.indexes.map(i => [i.code, i.label])),
+      JSON.stringify({ sql: sqlIndexes, js: js.indexes }));
+    check('the editor edits the five lists the document carries',
       JSON.stringify(js.keys) === JSON.stringify(LISTS), JSON.stringify(js.keys));
+    const added = [...sql.matchAll(/alter table meganet\.station add column if not exists ([a-z_0-9]+) /g)].map(m => m[1]);
+    check('…and the three fields, each a column 0032 adds to meganet.station',
+      JSON.stringify(js.fields) === JSON.stringify(FIELDS) && FIELDS.every(f => added.includes(f)),
+      JSON.stringify({ js: js.fields, added }));
 
     // Every box the form reads has a column to land in — by reading the form's
     // own markup, which is what the save is built from.
@@ -133,10 +150,40 @@ async function main() {
       const rows = [...sect.querySelectorAll(':scope > .acma-row')].map(r =>
         [r.children[0].textContent.trim(), r.children[1].textContent.replace(/\s+/g, ' ').trim()]);
       const earlier = sect.querySelector('.stn-card-rhs-earlier');
+      const effects = sect.querySelector('.stn-card-rhs-effects');
       return { rows, earlier: earlier ? earlier.querySelectorAll('.acma-row').length : 0,
-               summary: earlier ? earlier.querySelector('summary').textContent.trim() : '' };
+               summary: earlier ? earlier.querySelector('summary').textContent.trim() : '',
+               effects: effects ? [...effects.querySelectorAll('.acma-row')].map(r =>
+                 [r.children[0].textContent.trim(), r.children[1].textContent.replace(/\s+/g, ' ').trim()]) : null,
+               effectsSummary: effects ? effects.querySelector('summary').textContent.trim() : '',
+               effectsOpen: effects ? effects.open : null };
     });
     check('a station the lists name has the section on its card', !!card, full.id);
+
+    const listed = card && card.rows.find(r => r[0] === 'Bureau lists');
+    const labels = { 1: 'FloodWarn rainfall', 2: 'Daily rainfall', 3: 'River height' };
+    check('the indexes that list it are named, in section order',
+      listed && [...new Set(full.bureau_listings.map(l => l.section))].sort()
+        .map(k => labels[k]).join(' · ')
+        === listed[1].replace(/ as at .*$/, '').replace(/ \d{2}\/\d{2}\/\d{4}/g, ''),
+      JSON.stringify({ listed, rows: full.bureau_listings }));
+    check('its AWRC number, stream and URBS label are on the card, as recorded',
+      card && FIELDS.every((k, i) => {
+        const r = card.rows.find(x => x[0] === ['AWRC number', 'Stream', 'URBS label'][i]);
+        return r && r[1] === full[k];
+      }), JSON.stringify(card && card.rows.slice(0, 5)));
+
+    const editionOf = rows => rows.filter(e => e.as_at === [...rows].map(r => r.as_at || '').sort().reverse()[0]);
+    const effectsNow = editionOf(full.flood_effects);
+    check('the flood effects are shut behind their own line, which counts them',
+      card && card.effects && card.effectsOpen === false
+        && card.effectsSummary.includes(`${effectsNow.length} height`),
+      JSON.stringify({ summary: card && card.effectsSummary, n: effectsNow.length }));
+    check('…each a height to the centimetre against what it means, in the page\'s order',
+      card && card.effects && effectsNow.every((e, i) => card.effects[i]
+        && card.effects[i][0] === `${Number(e.height_m).toFixed(2)} m`
+        && card.effects[i][1].startsWith(e.effect || e.detail || '')),
+      JSON.stringify({ card: card && card.effects && card.effects.slice(0, 3), rows: effectsNow.slice(0, 3) }));
 
     const newest = [...full.flood_classes].sort((a, b) => (b.as_at || '').localeCompare(a.as_at || ''))[0];
     const classes = card && card.rows.find(r => r[0] === 'Flood classes');
@@ -187,11 +234,54 @@ async function main() {
       shape.every(x => x.rows === full[x.k].length && x.open === 0 && x.count.includes(String(x.rows))),
       JSON.stringify(shape));
 
-    check('an untouched form sends none of the three lists',
-      await page.evaluate(() => {
+    check('an untouched form sends none of the five lists',
+      await page.evaluate(lists => {
         const d = editorReadForm();
-        return !('flood_classes' in d) && !('crossings' in d) && !('gauge_survey' in d);
-      }));
+        return lists.every(k => !(k in d));
+      }, LISTS));
+    check('…and carries the three fields as they were',
+      await page.evaluate(([fields, rec]) => {
+        const d = editorReadForm();
+        return fields.every(k => d[k] === rec[k]);
+      }, [FIELDS, { awrc_number: full.awrc_number, stream: full.stream, urbs_label: full.urbs_label }]));
+
+    // The fields: a blank box is no key, a changed one is the new value.
+    await page.fill('#ef-urbs', '  NEW_LBL ');
+    await page.fill('#ef-awrc', '');
+    const fieldsSent = await page.evaluate(() => {
+      const d = editorReadForm();
+      return { urbs: d.urbs_label, awrc: 'awrc_number' in d, stream: d.stream };
+    });
+    check('a field typed into is sent trimmed, one emptied is no key at all',
+      fieldsSent.urbs === 'NEW_LBL' && fieldsSent.awrc === false && fieldsSent.stream === full.stream,
+      JSON.stringify(fieldsSent));
+    await page.fill('#ef-urbs', full.urbs_label);
+    await page.fill('#ef-awrc', full.awrc_number);
+
+    // A flood effect, added.
+    await page.click('#ef-rhs-flood_effects .ef-section-head button');
+    await page.fill('#ef-rhs-flood_effects .rhs-row [data-f="height_m"]', '12.50');
+    await page.fill('#ef-rhs-flood_effects .rhs-row [data-f="effect"]', 'Bridge');
+    await page.fill('#ef-rhs-flood_effects .rhs-row [data-f="detail"]', 'Test Road Bridge');
+    const eff = await page.evaluate(() => ({
+      sum: document.querySelector('#ef-rhs-flood_effects .rhs-sum').textContent,
+      sent: RiverDetails.readForm(state.editorDraft),
+    }));
+    check('a flood effect added reads as its height and effect, and only its list is sent',
+      eff.sum === '12.50 m — Bridge (Test Road Bridge)'
+        && JSON.stringify(Object.keys(eff.sent)) === '["flood_effects"]'
+        && JSON.stringify(eff.sent.flood_effects[0]) === JSON.stringify({ height_m: 12.5, effect: 'Bridge', detail: 'Test Road Bridge' })
+        && eff.sent.flood_effects.length === full.flood_effects.length + 1,
+      JSON.stringify({ sum: eff.sum, first: eff.sent.flood_effects && eff.sent.flood_effects[0] }));
+    await page.click('#ef-rhs-flood_effects .rhs-row .rhs-del');
+
+    // A listing: the index is a pick-list of the Bureau's three.
+    await page.click('#ef-rhs-bureau_listings .ef-section-head button');
+    const pick = await page.evaluate(() => [...document.querySelectorAll(
+      '#ef-rhs-bureau_listings .rhs-row:first-child [data-f="section"] option')].map(o => o.value));
+    check('a new listing picks its index from the Bureau\'s three',
+      JSON.stringify(pick) === '["","1","2","3"]', JSON.stringify(pick));
+    await page.click('#ef-rhs-bureau_listings .rhs-row .rhs-del');
 
     // Add a flood classification.
     await page.click('#ef-rhs-flood_classes .ef-section-head button');
@@ -214,10 +304,10 @@ async function main() {
       summary.startsWith('01/03/2027') && summary.includes('minor 3.25') && summary.includes('major 8.0'),
       summary);
 
-    const sent = await page.evaluate(() => {
+    const sent = await page.evaluate(lists => {
       const d = editorReadForm();
-      return { keys: ['flood_classes', 'crossings', 'gauge_survey'].filter(k => k in d), fc: d.flood_classes };
-    });
+      return { keys: lists.filter(k => k in d), fc: d.flood_classes };
+    }, LISTS);
     check('only the list that changed is sent',
       JSON.stringify(sent.keys) === '["flood_classes"]', JSON.stringify(sent.keys));
     check('…the new row first, keyed as the document keys it',
@@ -273,7 +363,7 @@ async function main() {
     const phone = await openStations(browser, server, errors, { viewport: { width: 375, height: 800 } });
     await phone.page.evaluate(id => { if (state.selectedId !== id) selectStation(id); showStationCard(id); }, full.id);
     await phone.page.evaluate(() => {
-      for (const d of document.querySelectorAll('.rhs-row, .stn-card-rhs-earlier')) d.open = true;
+      for (const d of document.querySelectorAll('.rhs-row, .stn-card-rhs-earlier, .stn-card-rhs-effects')) d.open = true;
     });
     const w = await phone.page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
     check('at 375 px, every row open, the page does not scroll sideways', w[0] <= w[1], JSON.stringify(w));
@@ -299,8 +389,8 @@ async function main() {
     log(`FAIL — ${failed.length} of them.`);
     process.exit(1);
   }
-  log('PASS — the card says what holds now, the editor edits every row, and a save');
-  log('       sends only what changed.');
+  log('PASS — the card says what holds now, the editor edits every row and field,');
+  log('       and a save sends only what changed.');
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

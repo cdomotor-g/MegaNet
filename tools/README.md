@@ -74,32 +74,46 @@ what caught Schedules 4 and 7 changing column count mid-schedule. Those three
 are read by value instead, which is only safe because their fields are closed
 vocabularies.
 
-## The river height station lists (0031)
+## The Bureau's flood warning station lists (0031, 0032)
 
-`ingest/river_height_stations.py` reads four sections of the Bureau's
-*Queensland Flood Warning River Height Stations* out of
-`archive/river-height-stations/` — flood classifications as at 2026 and 2014,
-the crossings, and the survey details — into `data/river-height-stations.json`,
-and prints the SQL that attaches each row to the station it describes.
+`ingest/river_height_stations.py` reads nine documents of the Bureau's
+Queensland flood warning station lists out of `archive/river-height-stations/`
+— the three station indexes (Sections 1–3: FloodWarn rainfall, daily rainfall,
+river height), flood classifications as at 2026 and 2014 (4, 4 (B)), the
+crossings (5), the survey details (6), the flood effects (9) and the URBS
+details — into `data/river-height-stations.json`, and prints the SQL that
+writes them into the database.
 
 ```bash
 python3 tools/ingest/river_height_stations.py            # rewrite the JSON
 python3 tools/ingest/river_height_stations.py --report   # what came out, in prose
 python3 tools/ingest/river_height_stations.py --check    # fail on drift (CI does this)
+python3 tools/ingest/river_height_stations.py --plan     # the stations --sql would create
 python3 tools/ingest/river_height_stations.py --sql \
   | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
 ```
 
-Three of the four are fixed-width, and the column rule under each page's
-headings is read as the layout rather than written down here. The trap is the
-wrapping: a name too long for its column carries on underneath, on a line with
-no station number — sometimes after a page break — and the station name wraps
-at a word while the stream is cut mid-word, so the two join differently. The
-2014 edition prints the same names unwrapped, and every joined name agrees with
-it. The SQL attaches only to live stations and only where the station has none
-of its own rows yet, so it is safe to run again; `check_river_height_details.sql`
-is the database's half.
+Sections 1–6 are fixed-width, and the column rule under each page's headings is
+read as the layout rather than written down here. The trap is the wrapping: a
+name too long for its column carries on underneath, on a line with no station
+number — sometimes after a page break — and the station name wraps at a word
+while the stream is cut mid-word, so the two join differently. The 2014
+edition prints the same names unwrapped, and Section 3 prints them in a wider
+column; every joined name agrees with both. Section 4 (B) and the URBS details
+are tab-aligned and read by the column each figure ends on; Section 9 is an
+HTML page of `<pre>` blocks, read the same way.
 
+The SQL is additive: it creates the stations Sections 1–3 list that no station,
+live or deleted, carries the number of — named, placed and given a catchment
+and hub from the Bureau's own row — then attaches every list only where the
+station has none of its own for that edition, and sets the AWRC number, stream
+and URBS label only where they are empty. It never writes over a station's
+position, name or elevation; `--report` lists where the Bureau puts a station a
+kilometre or more from where MegaNet does, and which new stations sit on top of
+an existing one, for a person to decide. Safe to run again. `--sql` reads
+`stations.json` to know which stations exist, so snapshot it from the database
+first. `check_river_height_details.sql` and `check_bureau_station_lists.sql`
+prove the two migrations it writes into.
 ## `ingest/` — the historical inspection workbook (#122)
 
 `ingest/xlsx.py` is a read-only .xlsx reader with nothing but the standard
@@ -387,6 +401,19 @@ sync and its `document_managed` guard. CI runs it after the stations load.
 
 ```bash
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_river_height_details.sql
+```
+
+## `check_bureau_station_lists.sql` — prove the Bureau's index listings and flood effects
+
+20 checks over `0032`, in the same shape: the three tables, their RLS and
+grants, the three indexes against the Bureau's section numbers, the station's
+three new fields, `save_station()` writing the two lists — blank rows dropped,
+a list the document does not mention left alone, one it sends empty cleared —
+its refusals of an index nobody prints and of a listing with no index, and the
+loader's sync. CI runs it after the stations load.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_bureau_station_lists.sql
 ```
 
 ## `storage_bucket.sql` — create the `inspections` bucket and its policies

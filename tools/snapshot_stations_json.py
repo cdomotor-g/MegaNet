@@ -79,7 +79,8 @@ KEY_ORDER = {
                 'satcom', 'rm_system_id', 'enabled', 'notes', 'legacy_unit_id',
                 'repeater', 'site', 'sensors', 'lga', 'basin', 'hub_id',
                 'location_types', 'TBRGbucketSize', 'inspection_config_key',
-                'flood_classes', 'crossings', 'gauge_survey'],
+                'awrc_number', 'stream', 'urbs_label', 'bureau_listings',
+                'flood_classes', 'crossings', 'gauge_survey', 'flood_effects'],
     'sensor':  ['alert_id', 'type', 'sensor_id', 'device_id'],
     'site':    ['db_id', 'number', 'name'],
     'satcom':  ['enabled', 'provider', 'terminal_id'],
@@ -93,11 +94,15 @@ KEY_ORDER = {
     'crossing':    ['as_at', 'stream', 'name', 'height_m', 'crossing_type', 'note'],
     'gauge_survey': ['valid_from', 'valid_to', 'gauge_zero_m', 'datum', 'amtd_km',
                      'catchment_area_km2', 'note'],
+    # And the two 0032 added.
+    'bureau_listing': ['section', 'as_at', 'note'],
+    'flood_effect':   ['as_at', 'height_m', 'effect', 'detail', 'note'],
 }
 
 # Which shape each of a station's lists holds.
 STATION_LIST_SHAPE = {'flood_classes': 'flood_class', 'crossings': 'crossing',
-                      'gauge_survey': 'gauge_survey'}
+                      'gauge_survey': 'gauge_survey', 'bureau_listings': 'bureau_listing',
+                      'flood_effects': 'flood_effect'}
 
 
 def ordered(obj, shape):

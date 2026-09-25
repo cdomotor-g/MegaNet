@@ -187,10 +187,13 @@ try {
     }
     return { all: all.length, matched, manual, manualMatched };
   });
-  check('1,146 of the 2,783 SLS locations are MegaNet stations',
-    counts.all === 2783 && counts.matched === 1146, JSON.stringify(counts));
-  check('54 of MegaNet’s stations are gauges a person reads',
-    counts.manual === 909 && counts.manualMatched === 54, JSON.stringify(counts));
+  // 1,146 and 54 until 0032 added the 1,697 stations the Bureau's flood
+  // warning indexes list and MegaNet did not have — most of the SLS's manual
+  // gauges among them, which are the daily read stations of Section 2.
+  check('2,566 of the 2,783 SLS locations are MegaNet stations',
+    counts.all === 2783 && counts.matched === 2566, JSON.stringify(counts));
+  check('789 of MegaNet’s stations are gauges a person reads',
+    counts.manual === 909 && counts.manualMatched === 789, JSON.stringify(counts));
 
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {

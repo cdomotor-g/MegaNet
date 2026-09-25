@@ -51,9 +51,9 @@ on:
       - 'tools/ingest/**'
       - 'data/inspections/**'
       - 'archive/QLD All Site Inspections.xlsx'
-      # The Bureau's river height station lists and what tools/ingest/
-      # river_height_stations.py reads out of them (0031): the same derived-file
-      # rule, one document further on.
+      # The Bureau's flood warning station lists and what tools/ingest/
+      # river_height_stations.py reads out of them (0031, 0032): the same
+      # derived-file rule, one document further on.
       - 'archive/river-height-stations/**'
       - 'data/river-height-stations.json'
       # The base station program and the migration that gives its readings a
@@ -100,9 +100,9 @@ on:
       - 'tools/ingest/**'
       - 'data/inspections/**'
       - 'archive/QLD All Site Inspections.xlsx'
-      # The Bureau's river height station lists and what tools/ingest/
-      # river_height_stations.py reads out of them (0031): the same derived-file
-      # rule, one document further on.
+      # The Bureau's flood warning station lists and what tools/ingest/
+      # river_height_stations.py reads out of them (0031, 0032): the same
+      # derived-file rule, one document further on.
       - 'archive/river-height-stations/**'
       - 'data/river-height-stations.json'
       # The base station program and the migration that gives its readings a
@@ -677,10 +677,11 @@ jobs:
       - name: Service Level Specification — the extraction still matches the document
         run: python3 tools/ingest/sls.py --check
 
-      # The river height station lists, on the same footing: data/river-height-
-      # stations.json is derived from four fixed-width reports in archive/ whose
-      # long names carry on onto the next line, and the reader that joins them
-      # back is the part worth re-running. Standard library only.
+      # The Bureau's flood warning station lists, on the same footing: data/
+      # river-height-stations.json is derived from nine documents in archive/ —
+      # fixed-width reports whose long names carry on onto the next line, two
+      # tab-aligned ones and an HTML page — and the readers that put them back
+      # together are the part worth re-running. Standard library only.
       - name: River height station lists — the extraction still matches the reports
         run: python3 tools/ingest/river_height_stations.py --check
 
@@ -764,3 +765,14 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspection_history.sql
       - name: check_river_height_details.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_river_height_details.sql
+      - name: check_bureau_station_lists.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_bureau_station_lists.sql
+      # The SQL river_height_stations.py prints is what writes the Bureau's lists
+      # into the live database, and nothing else ever runs it — so a migration
+      # that renames a column it writes would be found the next time somebody
+      # fed it a new edition. Run here against the database stations.json just
+      # built, in a transaction that rolls back.
+      - name: The Bureau lists' SQL still fits the schema
+        run: |
+          { echo 'begin;'; python3 tools/ingest/river_height_stations.py --sql; echo 'rollback;'; } \
+            | psql -v ON_ERROR_STOP=1 -q

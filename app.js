@@ -5996,7 +5996,7 @@ function stationWideCellsHtml(s) {
 // not already on the map beside it.
 //
 // `SLS.forStation` answers null for two different things and they must not read
-// the same. The document carries 1,146 of the 3,174 stations; the other 2,028
+// the same. The document carries 2,566 of the 4,873 stations; the others
 // are genuinely not in it and get the em dash the ARRO column already uses for
 // "no record". A table painted before the 720 KB schedule has landed knows
 // nothing about any of them yet, and leaves the cell empty rather than claiming
@@ -6011,7 +6011,7 @@ function slsCatchmentCell(s) {
   }
   const loc = SLS.forStation(s);
   if (!loc || !loc.catchment_name) {
-    return '<span class="txt-muted" title="Not one of the 1,146 stations the Service Level '
+    return '<span class="txt-muted" title="Not a station the Service Level '
          + 'Specification carries">—</span>';
   }
   // The gloss in brackets comes off the cell and stays in the tooltip. Three of

@@ -757,9 +757,14 @@ Each entry in the `stations` array represents one node in the network. A node ca
 | `satcom.enabled` | `boolean` | Marks stations with satellite comms capability |
 | `catchment_ids` | `string[]` | References `catchments[].id`. **Not yet populated** — the Radio Path Maps tab derives a station's catchment at runtime from its coordinates (see feature 8). Populate this to make map suggestions exact. |
 | `TBRGbucketSize` | `number` | Millimetres per tip for this station's tipping-bucket rain gauge. **Absent, not `null`, when not recorded** — most stations today. Every consumer that converts a tip count to millimetres falls back to an assumed 0.2 mm/tip and says so (`bucketSizeMm()` in `app.js`) when this is missing. Named as the ticket that introduced it asked, so it doesn't match this schema's usual snake_case (`tbrg_bucket_size_mm`) — flag it if that should change before more call sites depend on the name. |
-| `flood_classes` | `object[]` | The station's flood classification levels, one per edition of the Bureau's river height station list: `as_at`, and any of `first_report_m`, `minor_m`, `crops_grazing_m`, `moderate_m`, `towns_m`, `major_m` (metres on the gauge), `crossing_height_m` and `crossing_type` (a code from the Bureau's legend — `B` Bridge … `S` Spillway, `T` Highest Astronomical Tide), `note`. **Absent when there are none**, and a row carries a key only for what it states. The newest `as_at` is what the station card shows. See `db/README.md`, *River height station details* |
+| `flood_classes` | `object[]` | The station's flood classification levels, one per edition of the Bureau's river height station list: `as_at`, and any of `first_report_m`, `minor_m`, `crops_grazing_m`, `moderate_m`, `towns_m`, `major_m` (metres on the gauge), `crossing_height_m` and `crossing_type` (a code from the Bureau's legend — `B` Bridge … `S` Spillway, `T` Highest Astronomical Tide), `note`. **Absent when there are none**, and a row carries a key only for what it states. The newest `as_at` is what the station card shows. See `db/README.md`, *The Bureau's flood warning station lists* |
 | `crossings` | `object[]` | The crossing the gauge is read against: `stream`, `name`, `height_m`, `crossing_type`, `as_at`, `note`. Absent when there are none |
 | `gauge_survey` | `object[]` | The gauge zero's history: `valid_from`, `valid_to` (absent while still in force), `gauge_zero_m`, `datum` (`AHD`, `ASSUM`, `STATE` or `UNKNOWN`), `amtd_km` (Adopted Middle Thread Distance — km along the middle of the stream from its mouth up to the gauge), `catchment_area_km2`, `note`. Absent when there are none |
+| `bureau_listings` | `object[]` | Which of the Bureau's Queensland station indexes list the station: `section` (`"1"` FloodWarn rainfall, `"2"` daily rainfall, `"3"` river height), `as_at`, `note`. Absent when there are none |
+| `flood_effects` | `object[]` | What each height on the gauge means on the ground: `height_m`, `effect` (as the Bureau writes it — "Minor Flood Level", "Bridge", "Low lying roads at …"), `detail` (the line the page prints under it in brackets, without them), `as_at`, `note`. In the page's order. Absent when there are none |
+| `awrc_number` | `string` | The AWRC gauging station number (Section 3). Its first three digits are the basin. **Absent when not recorded** |
+| `stream` | `string` | The stream the gauge is on, as Section 3 prints it. Absent when not recorded |
+| `urbs_label` | `string` | The station's node in the Bureau's URBS runoff-routing model. Not unique — a TM and the ALERT gauge beside it read the same place. Absent when not recorded |
 
 > **`site` / `sensors`** are the authoritative sensor records — the `alert_ids`
 > labels are kept for backward compatibility but can be mislabelled (an address
@@ -774,13 +779,17 @@ Each entry in the `stations` array represents one node in the network. A node ca
 > in `archive/z_Sensors_with_Database_IDs_by_View_NATIONAL.csv` — the earlier
 > national export, kept for exactly that reason.
 
-> **`flood_classes` / `crossings` / `gauge_survey`** started as Sections 4, 4 (B),
-> 5 and 6 of the Bureau's *Queensland Flood Warning River Height Stations*
-> (`archive/river-height-stations/`, read by `tools/ingest/river_height_stations.py`
-> and attached by bureau number), and are the station's own rows from there on:
-> an editor adds the next edition, crossing or re-levelling in the station
-> editor's *River height station details* block, and the station card shows what
-> holds now with the rest under *Earlier*.
+> **`bureau_listings` / `flood_classes` / `crossings` / `gauge_survey` /
+> `flood_effects`, and `awrc_number` / `stream` / `urbs_label`,** started as
+> Sections 1–6 and 9 and the URBS details of the Bureau's Queensland flood
+> warning station lists (`archive/river-height-stations/`, read by
+> `tools/ingest/river_height_stations.py` and attached by bureau number), and are
+> the station's own rows from there on: an editor adds the next edition,
+> crossing, re-levelling or effect in the station editor's *Bureau flood warning
+> details* block, and the station card shows what holds now with the rest under
+> *Earlier*. The 1,697 stations Sections 1–3 list that MegaNet had none for were
+> created from those indexes on 25/09/2026 — a field station each, at the
+> Bureau's position, with no elevation yet.
 
 ---
 
@@ -3819,7 +3828,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run maint` | the Council Maintenance Tasks form drawn against the workbook's own filled sheet, read out of the `.xlsx` in `archive/`. Every cell where that sheet differs from the blank template has to be either on screen or named as having no column |
 | `npm run history` | a saved record reading back as the sheet it was written on. The fixture is not a file: the check fills a sheet in, saves it, and serves that document back — so the round trip is what is tested, and the read-only view is compared against the *editable* form's own section list |
 | `npm run movepin` | a station's links and its move-pin mode. The five pills in the callout and in the editor card, the two document searches carrying the *reduced* station name rather than the raw one and asking for both spellings of the words that have two, and the mode armed, dragged **with a real pointer**, read back, cancelled and saved. Smoke sees none of it: a pill row missing two pills and a Save that writes null over a coordinate both open a tab with a clean console |
-| `npm run riverdetails` | the river height station details (0031) on the station card and in the editor: the card showing the newest flood classification and the gauge zero in force with the rest under *Earlier*; the editor's rows shut to one line, added on top, removed without dropping focus; and a save sending only the lists the form changed — an untouched list resent through the browser's parse would come back with 94.50 as 94.5, and nothing on screen would say so |
+| `npm run riverdetails` | the Bureau's flood warning details (0031, 0032) on the station card and in the editor: the card naming the indexes that list the station, its AWRC number, stream and URBS label, the newest flood classification, the gauge zero in force and the flood effects, with the rest under *Earlier*; the editor's rows shut to one line, added on top, removed without dropping focus, its three fields sent trimmed or not at all; and a save sending only the lists the form changed — an untouched list resent through the browser's parse would come back with 94.50 as 94.5, and nothing on screen would say so |
 | `npm run stncard` | the station card on the map and the callout it turned into a signpost (#175), at a desktop width and at a phone's. A real pin click paints the card without selecting; a filter change destroys the callout and leaves the card; *Station details ↓* selects and is the one thing that scrolls the details card into view; closing it holds until the next gesture; the three cards that share a rectangle close each other; and at 375 px the callout is two pills that fit inside the map with a finger-sized close button, and *Details* opens the card as a sheet with focus in it. Every one of those failures renders a page that looks right |
 | `npm run itm` | the Longley–Rice port drifting from its reference: 53 losses computed by NTIA's own compiled library — its five published vectors and 48 synthetic profiles across every regime, climate, polarisation and mode of variability — held to 10⁻⁶ dB, intermediates included. Node-only, seconds |
 | `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |

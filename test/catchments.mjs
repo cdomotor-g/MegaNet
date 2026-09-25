@@ -171,13 +171,22 @@ try {
     stationsFilterChanged();
   });
   await page.waitForTimeout(400);
-  const moved = await page.evaluate(() => {
+  // Read once the map has finished moving, not straight after the call: a
+  // change of four zoom levels or fewer is animated, and Leaflet only commits
+  // the new centre when the animation ends. Whether this one is depends on
+  // where the search left the map — which stations happen to be called
+  // Fitzroy — so waiting is the only reading that does not depend on the data.
+  const moved = await page.evaluate(() => new Promise((resolve) => {
     const before = state.map.getCenter();
+    const done = () => {
+      const after = state.map.getCenter();
+      resolve({ moved: before.lat !== after.lat || before.lng !== after.lng,
+                lat: after.lat, lon: after.lng });
+    };
+    state.map.once('moveend', done);
     MapCatchments.zoomTo('fitzroy');
-    const after = state.map.getCenter();
-    return { moved: before.lat !== after.lat || before.lng !== after.lng,
-             lat: after.lat, lon: after.lng };
-  });
+    setTimeout(done, 5000);
+  }));
   check('the note button takes the map to its basin',
     moved.moved && moved.lat < -21 && moved.lat > -26 && moved.lon > 146 && moved.lon < 152,
     JSON.stringify(moved));

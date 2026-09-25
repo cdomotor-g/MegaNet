@@ -27,8 +27,8 @@
 // renders its form from, rather than keeping a second copy; to
 // station-inspections.js for StationInspections.sectionHtml, the Inspections
 // section under the ARRO block at the foot of the form; and to
-// river-details.js for RiverDetails — the flood classes, crossings and gauge
-// survey above the ARRO block (0031), which editorReadForm() reads back and
+// river-details.js for RiverDetails — the Bureau's flood warning lists above
+// the ARRO block (0031, 0032), which editorReadForm() reads back and
 // editorSave() asks formProblem() about first.
 //
 // This file is the form, not its host. The card is rendered by the Stations
@@ -572,12 +572,14 @@ function editorReadForm() {
   const a2stn = pInt(document.getElementById('ef-a2stn')?.value);
   if (a2stn != null) d.alert2_station_id = a2stn; else delete d.alert2_station_id;
 
-  // The river height station lists (0031): only the ones this form changed go
-  // in the document. A list left out is one save_station() leaves as it is —
-  // which is what keeps an untouched 94.50 from coming back as 94.5 (see the
-  // head of river-details.js).
+  // The Bureau's flood warning lists (0031, 0032): only the lists this form
+  // changed go in the document. A list left out is one save_station() leaves as
+  // it is — which is what keeps an untouched 94.50 from coming back as 94.5 (see
+  // the head of river-details.js). The three fields beside them are ordinary
+  // optional keys, absent when blank, like the owner above.
   for (const k of RiverDetails.LIST_KEYS) delete d[k];
   Object.assign(d, RiverDetails.readForm(state.editorDraft));
+  RiverDetails.applyFields(d);
 
   // Sensors — read the editable rows, preserving national-export metadata.
   //

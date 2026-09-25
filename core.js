@@ -527,16 +527,19 @@ const HELP = {
       + 'the side panel, or under the map when the cards are there. On a phone the callout '
       + 'carries only <em>Details &amp; actions</em> and <em>Copy lat, lon</em>, and the card '
       + 'opens as a sheet across the bottom of the map.',
-      'A station the Bureau\'s <em>Queensland Flood Warning River Height Stations</em> lists name '
-      + 'has a <strong>River height station details</strong> section on its card: the flood '
-      + 'classes (minor, moderate, major, and the first-report, crops-and-grazing and towns '
-      + 'heights where there are any), the crossing the gauge is read against, and the gauge '
-      + 'zero with its datum, its <abbr title="Adopted Middle Thread Distance">AMTD</abbr> — '
-      + 'kilometres along the stream from its mouth up to the gauge — and the catchment area. '
-      + 'It shows what holds now; earlier editions and earlier gauge levels are under '
-      + '<em>Earlier</em>. In the details card the same three lists are editable — one line per '
-      + 'row, opened to edit, <strong>+ Add</strong> for the next edition, crossing or '
-      + 're-levelling — and saved with the station.',
+      'A station the Bureau\'s Queensland flood warning station lists name has a <strong>Bureau '
+      + 'flood warning details</strong> section on its card: which of the Bureau\'s indexes list '
+      + 'it (FloodWarn rainfall, daily rainfall, river height), its AWRC number, the stream it '
+      + 'is on and its URBS model label; the flood classes (minor, moderate, major, and the '
+      + 'first-report, crops-and-grazing and towns heights where there are any), the crossing '
+      + 'the gauge is read against, and the gauge zero with its datum, its '
+      + '<abbr title="Adopted Middle Thread Distance">AMTD</abbr> — kilometres along the stream '
+      + 'from its mouth up to the gauge — and the catchment area; and, under <em>Flood '
+      + 'effects</em>, what each height on the gauge means on the ground. It shows what holds '
+      + 'now; earlier editions and earlier gauge levels are under <em>Earlier</em>. In the '
+      + 'details card the same fields and lists are editable — one line per row, opened to '
+      + 'edit, <strong>+ Add</strong> for the next edition, crossing, re-levelling or effect — '
+      + 'and saved with the station.',
       'The 🗺️ <strong>Map display</strong> panel starts with the <strong>base maps</strong>: tick '
       + 'more than one and give each its own opacity to blend them — Satellite at 40% over '
       + 'OSM-Topo puts the contours on the real ground — and each is drawn over the ones listed '
@@ -1772,7 +1775,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 31;
+const DB_SCHEMA_VERSION = 32;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

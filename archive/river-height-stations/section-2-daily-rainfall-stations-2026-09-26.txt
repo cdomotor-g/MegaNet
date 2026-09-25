@@ -1,0 +1,1065 @@
+
+Date: 26/09/2026                    SECTION 2                         Page:    1
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 039000 ABERCORN                  BURNETT              250760S    1510745E      
+ 030000 ABINGDON DOWNS            GILBERT              173630S    1431045E      
+ 045043 ADAVALE                   BULLOO               255434S    1443556E      
+ 036083 ALBRO                     BURDEKIN             224216S    1463410E      
+ 040224 ALDERLEY                  PINE                 272509S    1530009E      
+ 037109 ALDERLEY STATION          GEORGINA             222937S    1393941E      
+        {DAJARRA}                                                               
+                                                                                
+ 015088 ALEXANDRIA DNS            GEORGINA             190328S    1364223E      
+ 044191 ALLAMBIE                  PAROO                265607S    1452627E      
+ 032117 ALLINGHAM  FORREST DRIVE  HERBERT              184112S    1461749E      
+ 029000 ALMORA STATION            NICHOLSON            181743S    1391658E      
+ 037000 ALNI                      DIAMANTINA           220915S    1422924E      
+ 035229 ALPHA                     BURDEKIN             233900S    1463842E      
+ 035000 ALPHA POST OFFICE         BURDEKIN             233900S    1463826E      
+ 033295 ALVA BEACH                BURDEKIN             192725S    1472860E      
+ 040004 AMBERLEY                  BRISBANE             273747S    1524240E      
+ 043000 AMBY                      CONDAMINE-BALONNE    263252S    1481106E      
+ 035001 ANAKIE                    FITZROY              233308S    1474446E      
+ 044001 ANGELLALA DOWNS HOMESTEAD WARREGO              260104S    1470148E      
+ 015587 ANNITOWA                  GEORGINA             211237S    1362830E      
+ 041175 APPLETHORPE               BORDER RIVERS        283718S    1515712E      
+ 036004 ARAMAC                    COOPER CREEK         225818S    1451442E      
+ 027063 ARCHER RIVER              ARCHER               132617S    1425630E      
+ 040211 ARCHERFIELD               BRISBANE             273417S    1530026E      
+ 035002 ARCTURUS DOWNS            FITZROY              240204S    1482423E      
+ 035003 ARDURAD                   FITZROY              235257S    1485751E      
+ 015584 ARGADARGADA               GEORGINA             214027S    1363955E      
+ 029083 ARMRAYNALD STATION        LEICHHARDT           173934S    1394523E      
+ 044127 ASHLING                   CONDAMINE-BALONNE    272316S    1471709E      
+ 031217 ATHERTON SOLAR CRESCENT   BARRON               171530S    1452826E      
+ 042059 AUBURN                    BURNETT              255709S    1503651E      
+ 044002 AUGATHELLA                WARREGO              254744S    1463509E      
+ 029001 AUGUSTUS DOWNS            LEICHHARDT           183241S    1395214E      
+ 015004 AUSTRAL DOWNS             GEORGINA             203007S    1374628E      
+ 044188 AUTHORINGA                WARREGO              263957S    1463630E      
+ 015005 AVON DOWNS                GEORGINA             200147S    1372927E      
+ 033001 AYR                       BURDEKIN             193440S    1472423E      
+ 033002 AYR DPI                   BURDEKIN             193701S    1472233E      
+                                                                                
+ 031004 BABINDA                   MULGRAVE-RUSSELL     172037S    1455518E      
+ 039002 BAJOOL POST OFFICE        FITZROY              233910S    1503843E      
+ 044189 BAKERS BEND               WARREGO              264215S    1460634E      
+ 041338 BALLANDEAN                BORDER RIVERS        284804S    1515032E      
+ 045009 BALLERA GAS FIELD         COOPER CREEK         272403S    1414841E      
+ 044228 BALMACARRA                WARREGO              252841S    1460301E      
+ 027031 BAMAGA                    JARDINE              105349S    1422304E      
+ 032001 BAMBAROO                  HERBERT              185258S    1461012E      
+ 036084 BANCHORY                  BURDEKIN             224826S    1470754E      
+ 039143 BARALABA                  FITZROY              241054S    1494836E      
+ 036007 BARCALDINE                COOPER CREEK         233316S    1451718E      
+ 036102 BARCALDINE DNS            COOPER CREEK         234258S    1450749E      
+ 039135 BARGARA POST OFFICE       BURNETT              244813S    1522712E      
+ 037003 BARKLY DOWNS              GEORGINA             202758S    1382806E      
+ 040850 BAROON PCKT DAM           MARY                 264254S    1525219E      
+ 039345 BARWOOD                   BURNETT              251932S    1503023E      
+ 027034 BATAVIA DOWNS             WENLOCK              123942S    1424015E      
+ 035007 BAUHINIA DNS              FITZROY              243415S    1491731E      
+ 042075 BAWNDUGGIE                BURNETT              260935S    1505020E      
+ 044168 BAYRICK                   WARREGO              252749S    1460138E      
+ 029170 BEAMESBROOK               NICHOLSON            175360S    1391930E      
+ 043090 BEARDMORE DAM {ST GEORGE} CONDAMINE-BALONNE    275424S    1483905E      
+ 041540 BEARDY JUNCTION           BORDER RIVERS        291010S    1512029E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:    2
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 040983 BEAUDESERT DRUMLEY STREET LOGAN-ALBERT         275815S    1525923E      
+ 038000 BEDOURIE                  GEORGINA             242135S    1392817E      
+ 040686 BEENHAM VALLEY RD         MARY                 261103S    1524915E      
+ 040284 BEERBURRUM                PINE                 265731S    1525743E      
+ 041005 BELL                      CONDAMINE-BALONNE    265604S    1512706E      
+ 031140 BELLENDEN KER BOTTOM STN  MULGRAVE-RUSSELL     171613S    1455400E      
+ 031141 BELLENDEN KER TOP STN     MULGRAVE-RUSSELL     171550S    1455113E      
+ 037105 BELMONT                   DIAMANTINA           220445S    1433040E      
+ 039201 BELVEDERE                 FITZROY              241940S    1495120E      
+ 044130 BENDENA                   CONDAMINE-BALONNE    275101S    1465244E      
+ 041360 BENGALLA                  BORDER RIVERS        283918S    1504000E      
+ 014720 BENMARA                   NICHOLSON            175505S    1365420E      
+ 041409 BERUNA                    CONDAMINE-BALONNE    263837S    1505117E      
+ 044006 BIDDENHAM                 WARREGO              254811S    1462530E      
+ 039290 BILOELA TOWNSITE          FITZROY              242447S    1503115E      
+ 032009 BINGIL BAY                JOHNSTONE            175006S    1460555E      
+ 038002 BIRDSVILLE                DIAMANTINA           255401S    1392057E      
+ 038026 BIRDSVILLE AP             DIAMANTINA           255351S    1392050E      
+ 036003 BIRRICANNIA               COOPER CREEK         215432S    1444010E      
+ 540090 BJELKE-PETERSEN DAM       BURNETT              261819S    1515841E      
+ 036143 BLACKALL                  COOPER CREEK         242517S    1452802E      
+ 036034 BLACKALL AP               COOPER CREEK         242549S    1452550E      
+ 040020 BLACKBUTT STATE SCHOOL    BRISBANE             265323S    1520613E      
+ 034043 BLACKJACK MINE            BURDEKIN             200850S    1461342E      
+ 035134 BLACKWATER AIRPORT        FITZROY              233605S    1484827E      
+ 037006 BLADENSBURG               DIAMANTINA           223054S    1430219E      
+ 033284 BLOOMSBURY                O'CONNELL            204457S    1483460E      
+ 032063 BLUE RANGE                BURDEKIN             190953S    1452512E      
+ 044133 BOGARELLA                 WARREGO              252230S    1470626E      
+ 044010 BOLLON MARY ST            CONDAMINE-BALONNE    280202S    1472842E      
+ 029152 BOODJAMULLA - LAWN HILL   NICHOLSON            184210S    1382907E      
+        NP                                                                      
+                                                                                
+ 040722 BOONDOOMA DAM             BURNETT              260539S    1512630E      
+ 035109 BOOROONDARRA              FITZROY              224905S    1482924E      
+ 044013 BOOTHULLA                 PAROO                262260S    1451300E      
+ 038003 BOULIA                    GEORGINA             225442S    1395414E      
+ 033327 BOWEN AIRPORT             DON                  200055S    1481250E      
+ 041008 BOWENVILLE                CONDAMINE-BALONNE    271812S    1512935E      
+ 029164 BOWTHORN STATION          NICHOLSON            180555S    1381813E      
+ 027072 BRAMWELL R'DHOUSE         DUCIE                120536S    1423332E      
+ 040428 BRIAN PASTURES            BURNETT              253918S    1514442E      
+ 041007 BRIGALOW POST OFFICE      CONDAMINE-BALONNE    265037S    1504721E      
+ 029161 BRIGHTLANDS STATION       FLINDERS             210424S    1401653E      
+ 029092 BRINARD STATION           FLINDERS             195021S    1405601E      
+ 040913 BRISBANE                  BRISBANE             272851S    1530220E      
+ 040842 BRISBANE AP               PINE                 272330S    1530745E      
+ 039242 BROADMEADOWS              FITZROY              232403S    1503726E      
+        {ROCKHAMPTON}                                                           
+                                                                                
+ 040028 BROOWEENA                 MARY                 253602S    1521542E      
+ 034044 BRUSLEE                   BURDEKIN             210436S    1463048E      
+ 036010 BULLIWALLAH               BURDEKIN             213652S    1463804E      
+ 045002 BULLOO DOWNS              BULLOO               283136S    1425741E      
+ 029005 BUNDA BUNDA               FLINDERS             200428S    1421232E      
+ 039128 BUNDABERG                 BURNETT              245425S    1521923E      
+ 035206 BUNGAWARRA                FITZROY              242718S    1485735E      
+ 034029 BURDEKIN DAM              BURDEKIN             203760S    1470760E      
+ 029077 BURKETOWN AP              NICHOLSON            174454S    1393208E      
+ 029004 BURKETOWN POST OFFICE     NICHOLSON            174433S    1393251E      
+ 037057 BUSHY PARK                GEORGINA             211544S    1394329E      
+ 031009 BUTCHERS HILL             NORMANBY             155050S    1445231E      
+ 033008 BYFIELD                   FITZROY              225046S    1503851E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:    3
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+                                                                                
+ 031166 CAIRNS                    BARRON               165542S    1454553E      
+ 031011 CAIRNS AP                 BARRON               165225S    1454445E      
+ 031222 CAIRNS RACECOURSE         BARRON               165647S    1454451E      
+ 042118 CAITHNESS - WESTMAR       MOONIE               274842S    1493913E      
+ 035142 CALDERVALE                WARREGO              250604S    1464952E      
+ 040998 CALOUNDRA AIRPORT         MAROOCHY             264752S    1530621E      
+ 040320 CALTEX LYTTON             BRISBANE             272446S    1530902E      
+ 014705 CALVERT HILLS             NICHOLSON            171353S    1371951E      
+ 039022 CAMBOON                   FITZROY              250149S    1502603E      
+ 041011 CAMBOOYA                  CONDAMINE-BALONNE    274226S    1515154E      
+ 045063 CAMERON CORNER            COOPER CREEK         285948S    1410000E      
+ 036013 CAMOOLA PARK              COOPER CREEK         230222S    1443110E      
+ 037010 CAMOOWEAL                 GEORGINA             195521S    1380717E      
+ 539064 CANIA DAM                 BURNETT              243916S    1505860E      
+ 039222 CANIA GORGE PARK          BURNETT              243943S    1505748E      
+ 033323 CANNONVALE WTP            PROSERPINE           201657S    1484058E      
+ 029007 CANOBIE                   FLINDERS             192835S    1405554E      
+ 040042 CANUNGRA FINCH ROAD       LOGAN-ALBERT         280051S    1530959E      
+ 040458 CAPALABA WATER TREAT      BRISBANE             273153S    1531057E      
+ 031213 CAPE FLATTERY             JEANNIE              145802S    1451838E      
+ 040043 CAPE MORETON              STRADBROKE ISLANDS   270153S    1532758E      
+ 031012 CAPE TRIBULATION          DAINTREE             160549S    1452727E      
+ 035016 CAPELLA                   FITZROY              230508S    1480125E      
+ 037011 CARANDOTTA STATION        GEORGINA             215817S    1383642E      
+ 035225 CARDBEIGN                 FITZROY              241723S    1480619E      
+ 033083 CARDOWAN                  FITZROY              220713S    1490353E      
+ 032004 CARDWELL                  TULLY                181516S    1460109E      
+ 032192 CARDWELL RANGE            HERBERT              183249S    1461041E      
+ 034016 CARFAX                    FITZROY              222726S    1484055E      
+ 030009 CARGOON                   BURDEKIN             200028S    1445357E      
+ 033186 CARMILA                   PLANE                215512S    1492619E      
+ 035018 CARNARVON STN             WARREGO              244832S    1474509E      
+ 040490 CARNEYS CREEK             LOGAN-ALBERT         281231S    1523220E      
+ 029105 CARSLAND                  FLINDERS             203008S    1401859E      
+ 037053 CARTERS BORE              GEORGINA             205609S    1391747E      
+ 041472 CENTENARY BRIDGE          CONDAMINE-BALONNE    274835S    1512143E      
+ 040413 CENTRAL KERRY             LOGAN-ALBERT         280920S    1530224E      
+ 029167 CENTURY MINE              NICHOLSON            184525S    1384220E      
+ 044021 CHARLEVILLE               WARREGO              262450S    1461521E      
+ 034084 CHARTERS TOWERS           BURDEKIN             200234S    1461618E      
+ 039303 CHILDERS SOUTH            BURRUM               251521S    1521655E      
+ 035273 CHILGERRIE HILL           FITZROY              255116S    1494731E      
+ 041017 CHINCHILLA                CONDAMINE-BALONNE    264438S    1503609E      
+ 032104 CHRISTMAS CREEK STATION   BURDEKIN             190541S    1452114E      
+ 033122 CLARE                     BURDEKIN             194739S    1471403E      
+ 030145 CLARKE HILLS STATION      BURDEKIN             194512S    1443105E      
+ 035124 CLERMONT AIRPORT          FITZROY              224632S    1473718E      
+ 041018 CLIFTON                   CONDAMINE-BALONNE    275554S    1515421E      
+ 029089 CLONAGH STATION           FLINDERS             200828S    1404051E      
+ 029141 CLONCURRY AP              FLINDERS             203959S    1403018E      
+ 029008 CLONCURRY TOWN            FLINDERS             204231S    1403106E      
+ 040965 CLONTARF                  PINE                 271439S    1530512E      
+ 035110 CLOYNE                    BURDEKIN             235437S    1470927E      
+ 038005 CLUNY                     GEORGINA             243029S    1393517E      
+ 041466 CLYDESDALE                CONDAMINE-BALONNE    271142S    1512906E      
+ 030147 COBBOLD GORGE             GILBERT              184743S    1432523E      
+ 027054 COCONUT ISLAND            TORRES STRAIT ISLAND 100304S    1430407E      
+ 027073 COEN AP                   ARCHER               134538S    1430706E      
+ 033012 COLLAROY                  FITZROY              220158S    1491106E      
+ 033013 COLLINSVILLE              BURDEKIN             203312S    1475047E      
+ 039204 COLODAN                   BURNETT              245655S    1504103E      
+ 035021 COMET                     FITZROY              233617S    1483241E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:    4
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 042048 CONDAMINE                 CONDAMINE-BALONNE    265537S    1500831E      
+ 030061 CONJUBOY STATION          BURDEKIN             184101S    1444441E      
+ 041477 CONNOLLY DAM              CONDAMINE-BALONNE    282122S    1515949E      
+ 035189 CONSUELO                  FITZROY              243919S    1482734E      
+ 041512 COOBY CREEK DAM           CONDAMINE-BALONNE    272257S    1515528E      
+ 031209 COOKTOWN AP               ENDEAVOUR            152646S    1451110E      
+ 040717 COOLANGATTA               SOUTH COAST          281005S    1533019E      
+ 041457 COOLMUNDA DAM             BORDER RIVERS        282521S    1511247E      
+ 040516 COOMERA                   SOUTH COAST          275034S    1532101E      
+ 040056 COOMINYA POST OFFICE      BRISBANE             272329S    1523005E      
+ 038006 COORABULKA                GEORGINA             234351S    1401827E      
+ 040755 COORAN                    MARY                 263327S    1524617E      
+ 041131 COORANGA NORTH            CONDAMINE-BALONNE    264624S    1512255E      
+ 040759 CORBOULD PK RACECOURSE    MAROOCHY             264706S    1530407E      
+ 037061 COTSWOLD HILLS            DIAMANTINA           223242S    1424006E      
+ 029078 COTSWOLD STN              FLINDERS             201503S    1403918E      
+ 029086 COWAN DOWNS               FLINDERS             185740S    1403219E      
+ 032194 COWLEY BEACH              JOHNSTONE            174126S    1460645E      
+ 032082 CRAIGS POCKET STATION     BURDEKIN             183348S    1445921E      
+ 140000 CROWS NEST                BRISBANE             271555S    1520323E      
+ 029012 CROYDON                   NORMAN               181216S    1421441E      
+ 033254 CRYSTAL BROOK             PROSERPINE           202037S    1483000E      
+ 044026 CUNNAMULLA                WARREGO              280408S    1454056E      
+ 041456 CUNNINGHAMS GAP NATIONAL  CONDAMINE-BALONNE    280344S    1522203E      
+        PARK                                                                    
+                                                                                
+                                                                                
+ 031219 DAINTREE ICE CREAM        DAINTREE             161244S    1452415E      
+ 031102 DAINTREE TEA              DAINTREE             161138S    1452422E      
+ 033205 DALBEG                    BURDEKIN             201608S    1471756E      
+ 041522 DALBY                     CONDAMINE-BALONNE    270938S    1511548E      
+ 043112 DALMALLY                  CONDAMINE-BALONNE    264759S    1483556E      
+ 041022 DALVEEN                   CONDAMINE-BALONNE    282946S    1515823E      
+ 039344 DARTS CREEK               FITZROY              234439S    1505612E      
+ 038030 DAVENPORT DOWNS           DIAMANTINA           240918S    1410554E      
+ 033017 DAYDREAM ISLAND RESORT    WHITSUNDAY ISLAND    201527S    1484850E      
+ 044131 DEELAMON                  CONDAMINE-BALONNE    273234S    1471813E      
+ 056008 DEEPWATER                 BORDER RIVERS        292632S    1515054E      
+ 037101 DENTON                    COOPER CREEK         225712S    1433319E      
+ 044223 DERBYSHIRE DOWNS          WARREGO              252713S    1471811E      
+ 029129 DEVONCOURT                FLINDERS             211254S    1401360E      
+ 044029 DILLALAH                  WARREGO              265130S    1460140E      
+ 039256 DINGLE DELL               BURNETT              250842S    1513738E      
+ 044152 DINGWALL                  CONDAMINE-BALONNE    272748S    1465107E      
+ 044117 DIRRANBANDI               CONDAMINE-BALONNE    283508S    1481342E      
+ 029013 DONORS HILL STATION       FLINDERS             184250S    1403250E      
+ 034049 DOONGARA                  BURDEKIN             203330S    1462852E      
+ 040068 DOUBLE IS PT              NOOSA                255555S    1531126E      
+ 035283 DRENSMAINE                WARREGO              251242S    1462854E      
+ 035026 DUARINGA                  FITZROY              234250S    1494021E      
+ 037019 DUCHESS                   GEORGINA             212123S    1395155E      
+ 035259 DUNEIRA                   COOPER CREEK         243227S    1453409E      
+ 041025 DUNMORE                   CONDAMINE-BALONNE    273433S    1510448E      
+ 040455 DUNOLLIE                  BURNETT              255100S    1512200E      
+ 040537 DUNWICH                   STRADBROKE ISLANDS   273010S    1532449E      
+ 045005 DURHAM DOWNS              COOPER CREEK         270447S    1415428E      
+ 035165 DURRANDELLA               BURDEKIN             240416S    1463646E      
+ 038031 DURRIE STATION            DIAMANTINA           254117S    1401342E      
+ 044031 DYNEVOR DOWNS             PAROO                280528S    1442131E      
+                                                                                
+ 040212 EAGLE FARM RACECOURSE     PINE                 272544S    1530409E      
+ 036076 EASTMERE                  COOPER CREEK         223006S    1455506E      
+ 040962 EBBW VALE                 BRISBANE             273619S    1524928E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:    5
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 041291 EHLMA PARK                CONDAMINE-BALONNE    265225S    1505208E      
+ 039036 EIDSVOLD                  BURNETT              252214S    1510720E      
+ 039259 EIDSVOLD BRIDGE           BURNETT              252238S    1510455E      
+ 037046 ELDERSLIE                 DIAMANTINA           221725S    1422823E      
+ 041404 ELLANGOWAN                CONDAMINE-BALONNE    275730S    1513949E      
+ 032091 ELPHINSTONE PKT           HERBERT              182958S    1460016E      
+ 040500 EMBREYS BRIDGE            BURNETT              263825S    1515635E      
+ 035264 EMERALD AP                FITZROY              233410S    1481032E      
+ 045006 EROMANGA                  COOPER CREEK         264010S    1431612E      
+ 029159 ESCOTT STATION            NICHOLSON            174760S    1392138E      
+ 040075 ESK POST OFFICE           BRISBANE             271423S    1522519E      
+ 029016 ESMERALDA                 NORMAN               185109S    1423427E      
+ 034027 ESSEX                     FITZROY              224628S    1484836E      
+ 033134 ETON STATE WATER DEPOT    PLANE                211605S    1485812E      
+ 033175 ETON VALE                 BURDEKIN             201252S    1474634E      
+ 044153 EULO                      PAROO                280937S    1450247E      
+ 040078 EUMUNDI                   MAROOCHY             262837S    1525642E      
+ 030103 EVELEIGH                  GILBERT              181321S    1435811E      
+ 036006 EVERSLEIGH                COOPER CREEK         214242S    1442334E      
+ 036022 EVESHAM                   COOPER CREEK         230152S    1434242E      
+ 036054 EVORA STATION             COOPER CREEK         240457S    1453033E      
+                                                                                
+ 035241 FAIRBAIRN DAM             FITZROY              233909S    1480428E      
+ 028010 FAIRVIEW                  NORMANBY             152957S    1441654E      
+ 039037 FAIRYMEAD SUGAR MILL      BURNETT              244728S    1522131E      
+ 033023 FARLEIGH CO-OP SUGAR MILL PIONEER              210604S    1490608E      
+ 041405 FELTON                    CONDAMINE-BALONNE    274743S    1514419E      
+ 039252 FERNDALE                  BAFFLE               241244S    1512519E      
+ 039197 FIG TREE                  CALLIOPE             240153S    1504424E      
+ 033207 FLORA VALLEY              HAUGHTON             194529S    1465020E      
+ 043009 FOREST VALE               CONDAMINE-BALONNE    255541S    1475218E      
+ 030055 FORSAYTH                  GILBERT              183518S    1433606E      
+ 036160 FRANKFIELD                BURDEKIN             221618S    1470525E      
+ 029075 FT CONSTANTINE            FLINDERS             202828S    1403457E      
+                                                                                
+ 032094 GAIRLOCH                  HERBERT              183654S    1461052E      
+ 014713 GALLIPOLI                 NICHOLSON            190819S    1375224E      
+ 044151 GAMARREN                  CONDAMINE-BALONNE    281935S    1463040E      
+ 028022 GAMBOOLA STATION          MITCHELL             163231S    1434010E      
+ 043077 GARRABARRA                CONDAMINE-BALONNE    265650S    1490049E      
+ 040083 GATTON                    BRISBANE             273234S    1521654E      
+ 040082 GATTON UQ                 BRISBANE             273237S    1522015E      
+ 033176 GATTON VALE               BURDEKIN             204641S    1475655E      
+ 039191 GAYNDAH                   BURNETT              253742S    1513648E      
+ 039066 GAYNDAH AP                BURNETT              253700S    1513656E      
+ 030124 GEORGETOWN AIRPORT        GILBERT              181814S    1433150E      
+ 029131 GERETA STATION            LEICHHARDT           200112S    1395036E      
+ 041366 GIDDI GIDDI SOUTH         BORDER RIVERS        282413S    1500254E      
+ 030019 GILBERTON                 GILBERT              191540S    1434110E      
+ 035049 GILLESPIE                 COOPER CREEK         243339S    1454713E      
+ 039040 GIN GIN                   KOLAN                245936S    1515738E      
+ 041454 GIRRAWEEN NAT PARK        BORDER RIVERS        285001S    1515615E      
+ 039326 GLADSTONE AIRPORT         BOYNE                235211S    1511317E      
+ 039123 GLADSTONE RADAR           BOYNE                235119S    1511546E      
+ 031178 GLEN ALLYN                JOHNSTONE            172354S    1453957E      
+ 031158 GLEN HARDING              BURDEKIN             181511S    1450737E      
+ 056243 GLEN INNES AWS            BORDER RIVERS        294041S    1514138E      
+ 035286 GLENCOE                   COOPER CREEK         234244S    1461003E      
+ 032018 GLENEAGLE HOMESTEAD       HERBERT              181003S    1452017E      
+ 041034 GLENELG                   BORDER RIVERS        282414S    1512813E      
+ 038009 GLENGYLE                  GEORGINA             244708S    1393531E      
+ 039043 GLENLANDS                 FITZROY              233132S    1503028E      
+ 038034 GLENLOCK                  COOPER CREEK         245560S    1434430E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:    6
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 037063 GLENLYON                  FLINDERS             212024S    1425543E      
+ 041430 GLENLYON DAM              BORDER RIVERS        285755S    1512812E      
+ 044038 GLENORIE                  CONDAMINE-BALONNE    270112S    1470913E      
+ 038010 GLENORMISTON              GEORGINA             225458S    1384815E      
+ 039177 GLENWOOD                  BURNETT              254147S    1505753E      
+ 040969 GODWIN BEACH              PINE                 270418S    1530621E      
+ 040764 GOLD CST SEAWAY           SOUTH COAST          275620S    1532542E      
+ 045007 GOOMBIE                   BULLOO               260648S    1440760E      
+ 040089 GOOMBOORIAN               MARY                 260323S    1524720E      
+ 041037 GOOMBUNGEE POST OFFICE    CONDAMINE-BALONNE    271826S    1515102E      
+ 039010 GOONDICUM                 BURNETT              245125S    1512636E      
+ 041560 GOONDIWINDI AIRPORT       BORDER RIVERS        283121S    1501920E      
+ 032105 GOSHEN STATION            HERBERT              180847S    1452619E      
+ 039049 GRACEMERE                 FITZROY              232732S    1502721E      
+ 556025 GRED (KINGS CK)           BORDER RIVERS        294829S    1512507E      
+ 030158 GREEN HILLS               GILBERT              182723S    1431755E      
+ 040659 GREENBANK                 BRISBANE             274144S    1525627E      
+ 031168 GREENHAVEN                JOHNSTONE            173515S    1453600E      
+ 034078 GREENMANTLE STATION       BURDEKIN             223127S    1474124E      
+ 041040 GREENMOUNT                CONDAMINE-BALONNE    274713S    1515418E      
+ 032122 GREENVALE                 BURDEKIN             185835S    1450645E      
+ 030160 GREENVALE TOWN            BURDEKIN             190000S    1445837E      
+ 029100 GREGORY DOWNS OUTSTATION  NICHOLSON            183831S    1391506E      
+ 029081 GREGORY DOWNS STATION     NICHOLSON            183011S    1391725E      
+ 030082 GREGORY SPRINGS           BURDEKIN             194213S    1442239E      
+ 036172 GUE                       COOPER CREEK         215800S    1441960E      
+ 040093 GYMPIE                    MARY                 261059S    1523829E      
+                                                                                
+ 041042 HADEN                     CONDAMINE-BALONNE    271327S    1515260E      
+ 032023 HALIFAX MACROSSAN ST      HERBERT              183455S    1461702E      
+ 033106 HAMILTON IS               WHITSUNDAY ISLAND    202157S    1485713E      
+ 042016 HANNAFORD                 CONDAMINE-BALONNE    272028S    1500344E      
+ 040094 HARRISVILLE               BRISBANE             274831S    1524003E      
+ 043060 HAVELOCK                  CONDAMINE-BALONNE    260432S    1475416E      
+ 032191 HAWKINS CREEK             HERBERT              183509S    1460423E      
+ 039334 HAZELDEAN                 CALLIOPE             240117S    1505737E      
+ 031129 HAZELMERE                 ENDEAVOUR            152319S    1450210E      
+ 037024 HEADINGLY STATION         GEORGINA             211921S    1381726E      
+ 044143 HEATHER  STATION          CONDAMINE-BALONNE    280441S    1472353E      
+ 027050 HEATHLANDS NATIONAL PARK  DUCIE                114503S    1423456E      
+ 044042 HEBEL                     CONDAMINE-BALONNE    285820S    1474746E      
+ 029061 HERBERT VALE              NICHOLSON            185707S    1380311E      
+ 040405 HERVEY BAY                BURRUM               251919S    1525254E      
+ 027038 HIGHBURY STN              MITCHELL             162523S    1430844E      
+ 040693 HIGHVALE                  PINE                 272243S    1524859E      
+ 030137 HILLGROVE                 BURDEKIN             193805S    1454719E      
+ 036023 HOLMLEIGH                 COOPER CREEK         213043S    1443802E      
+ 033032 HOME HILL                 BURDEKIN             193960S    1472454E      
+ 044144 HOMEBOIN                  CONDAMINE-BALONNE    273736S    1472643E      
+ 040493 HOMELEIGH                 BRISBANE             274648S    1523205E      
+ 030023 HOMESTEAD POST OFFICE     BURDEKIN             202142S    1453919E      
+ 027058 HORN IS                   TORRES STRAIT ISLAND 103504S    1421724E      
+ 035135 HORNET BANK HOMESTEAD     FITZROY              254223S    1492428E      
+ 030024 HUGHENDEN                 FLINDERS             205041S    1441155E      
+ 030022 HUGHENDEN AP              FLINDERS             204909S    1441360E      
+ 030159 HULBERTS BRIDGE           FLINDERS             203836S    1423724E      
+ 044181 HUNGERFORD                PAROO                285950S    1442434E      
+ 033249 HUSTONS FARM              HAUGHTON             193709S    1470708E      
+                                                                                
+ 029023 IFFLEY STATION            NORMAN               185213S    1411227E      
+ 034100 IFFLEY {MORANBAH}         FITZROY              221428S    1482548E      
+ 040099 IMBIL POST OFFICE         MARY                 262733S    1524035E      
+ 032078 INGHAM                    HERBERT              183848S    1461022E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:    7
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 032200 INGHAM AP                 HERBERT              183954S    1460848E      
+ 041047 INGLEWOOD                 BORDER RIVERS        282453S    1510458E      
+ 043015 INJUNE                    FITZROY              255034S    1483401E      
+ 032025 INNISFAIL                 JOHNSTONE            173130S    1460204E      
+ 032197 INNISFAIL AERODROME       JOHNSTONE            173329S    1460043E      
+ 031069 INNOT HOT SPRINGS         HERBERT              174011S    1451429E      
+        TOWNSHIP                                                                
+                                                                                
+ 029054 INORUNIE STATION          GILBERT              181233S    1423927E      
+ 056242 INVERELL                  BORDER RIVERS        294647S    1510644E      
+ 056018 INVERELL SCS              BORDER RIVERS        294631S    1510455E      
+ 030091 IRONHURST STATION         GILBERT              180451S    1432744E      
+ 036025 ISIS DOWNS                COOPER CREEK         241318S    1443757E      
+ 036026 ISISFORD                  COOPER CREEK         241533S    1442626E      
+ 035275 ISLAY PLAINS              BURDEKIN             231237S    1465241E      
+ 044044 IVANHOE DOWNS             WARREGO              262043S    1470733E      
+                                                                                
+ 039054 JAMBIN                    FITZROY              241148S    1502217E      
+ 041050 JANDOWAE                  CONDAMINE-BALONNE    264647S    1510640E      
+ 037118 JARVISFIELD               DIAMANTINA           223024S    1423515E      
+ 040708 JIMEAL MONOGORILBY        BURNETT              260201S    1510337E      
+ 041052 JINGI JINGI               CONDAMINE-BALONNE    264134S    1510547E      
+ 036074 JOCHMUS                   COOPER CREEK         221808S    1455924E      
+ 041053 JONDARYAN                 CONDAMINE-BALONNE    272203S    1513524E      
+ 035274 JUANITA                   FITZROY              235048S    1480630E      
+ 029058 JULIA CREEK AP            FLINDERS             204002S    1414317E      
+ 029181 JULIUS DAM                LEICHHARDT           200700S    1394332E      
+ 038012 JUNDAH POST OFFICE        COOPER CREEK         244949S    1430331E      
+ 034061 JUNEE STATION             FITZROY              225614S    1490819E      
+                                                                                
+ 044150 KAHMOO                    PAROO                280547S    1453027E      
+ 033035 KALAMIA ESTATE            BURDEKIN             193128S    1472458E      
+ 029027 KAMILAROI                 LEICHHARDT           192136S    1400229E      
+ 032027 KANGAROO HILLS STATION    BURDEKIN             185559S    1454011E      
+ 040928 KARALEE                   BRISBANE             273350S    1524915E      
+ 041344 KARARA                    CONDAMINE-BALONNE    281227S    1513339E      
+ 031085 KAREEYA                   TULLY                174600S    1453440E      
+ 043080 KAROOLA PARK              CONDAMINE-BALONNE    271338S    1484427E      
+ 037025 KATANDRA {CORFIELD}       COOPER CREEK         213300S    1434811E      
+ 033127 KELSEY CREEK DITTMER RD   PROSERPINE           202539S    1482651E      
+ 044045 KENILWORTH                CONDAMINE-BALONNE    272448S    1472553E      
+ 040106 KENILWORTH                MARY                 263543S    1524340E      
+ 015150 KIANA                     NICHOLSON            171433S    1361056E      
+ 040110 KILCOY                    BRISBANE             265633S    1523353E      
+ 040111 KILKIVAN                  MARY                 260509S    1521417E      
+ 040671 KILLARA {PROSTON}         BURNETT              261702S    1511123E      
+ 041056 KILLARNEY                 CONDAMINE-BALONNE    282004S    1521743E      
+ 028027 KIMBA {LAURA}             MITCHELL             153643S    1432843E      
+ 040922 KINGAROY                  BURNETT              263425S    1515023E      
+ 029163 KINGFISHER CAMP           NICHOLSON            175206S    1381708E      
+ 042111 KINKORA                   MOONIE               275004S    1494103E      
+ 035182 KINNOUL                   FITZROY              254031S    1493759E      
+ 028012 KOOLBURRA                 NORMANBY             151900S    1435721E      
+ 033038 KOUMALA HATFIELDS ROAD    PLANE                213732S    1491412E      
+ 029038 KOWANYAMA AP              MITCHELL             152854S    1414454E      
+ 039240 KROOMBIT                  FITZROY              242650S    1504753E      
+ 040113 KUMBIA POST OFFICE        BURNETT              264122S    1513918E      
+ 031036 KURANDA RAILWAY STATION   BARRON               164904S    1453818E      
+                                                                                
+ 035117 LA PALMA                  FITZROY              252311S    1494703E      
+ 029172 LADY ANNIE COPPER MINE    LEICHHARDT           195413S    1390630E      
+ 039059 LADY ELLIOT IS            BAFFLE               240642S    1524258E      
+ 041062 LAGUNA                    CONDAMINE-BALONNE    274830S    1511936E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:    8
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 040716 LAIDLEY                   BRISBANE             273905S    1522251E      
+ 040115 LAKE MANCHESTER           BRISBANE             272929S    1524507E      
+ 015019 LAKE NASH                 GEORGINA             205752S    1375517E      
+ 028023 LAKEFIELD                 NORMANBY             145533S    1441158E      
+ 040071 LANARK                    CONDAMINE-BALONNE    262258S    1511132E      
+ 029030 LANDS END STN             FLINDERS             202529S    1412417E      
+ 036056 LANDSBOROUGH DOWNS        COOPER CREEK         213041S    1442356E      
+ 033226 LANSDOWN                  HAUGHTON             193928S    1465004E      
+ 032089 LAROONA STATION           BURDEKIN             192054S    1455852E      
+ 028000 LAURA QLD                 NORMANBY             153329S    1442643E      
+ 041091 LAURIEDALE                CONDAMINE-BALONNE    264831S    1510450E      
+ 029031 LAWN HILL                 NICHOLSON            183450S    1383452E      
+ 042110 LEICHHARDT HIGHWAY        CONDAMINE-BALONNE    270830S    1500845E      
+ 036028 LERIDA QLD                COOPER CREEK         221034S    1440257E      
+ 041445 LESLIE DAM                CONDAMINE-BALONNE    281252S    1515510E      
+ 041063 LEYBURN                   CONDAMINE-BALONNE    280038S    1513508E      
+ 040247 LINDFIELD                 BRISBANE             265032S    1523449E      
+ 040387 LINVILLE                  BRISBANE             264927S    1521627E      
+ 036137 LISTOWEL DOWNS            BULLOO               251204S    1451337E      
+ 040524 LITTLE NERANG DAM         SOUTH COAST          280840S    1531709E      
+ 039332 LLOYONA                   FITZROY              242436S    1495008E      
+ 035139 LOCHINGTON                FITZROY              235633S    1473130E      
+ 044190 LOCHINVAR                 WARREGO              252811S    1465035E      
+ 036036 LOCHNAGAR                 COOPER CREEK         233724S    1454211E      
+ 028008 LOCKHART RIVER            LOCKHART             124706S    1431817E      
+ 040854 LOGAN CITY                LOGAN-ALBERT         274103S    1531153E      
+ 029173 LONGFORD                  FLINDERS             205138S    1410354E      
+ 036031 LONGREACH                 COOPER CREEK         232623S    1441658E      
+ 029032 LORRAINE                  LEICHHARDT           190024S    1395346E      
+ 028035 LOTUS BIRD LODGE          NORMANBY             144242S    1434349E      
+ 041339 LOUDOUN BRIDGE            CONDAMINE-BALONNE    271249S    1511109E      
+ 039175 LOVANDEE                  BOYNE                242500S    1511243E      
+ 030072 LOW HOLM STATION          BURDEKIN             200549S    1445915E      
+ 031037 LOW ISLES                 DAINTREE             162303S    1453333E      
+ 032141 LUCINDA                   HERBERT              183113S    1462310E      
+ 030115 LUCKY SPRINGS             BURDEKIN             190318S    1445734E      
+ 015604 LUCY CREEK                GEORGINA             222629S    1361732E      
+ 030030 LYNDHURST STATION         GILBERT              191214S    1442212E      
+                                                                                
+ 041469 MACALISTER                CONDAMINE-BALONNE    270144S    1510541E      
+ 556037 MACINTYRE RIVER AT        BORDER RIVERS        295547S    1512619E      
+        WYOMING                                                                 
+                                                                                
+ 033119 MACKAY                    PIONEER              210702S    1491301E      
+ 033045 MACKAY AP                 PIONEER              211014S    1491046E      
+ 032032 MACKNADE SUGAR MILL       HERBERT              183512S    1461517E      
+ 037009 MACKUNDA DOWNS            DIAMANTINA           222225S    1411707E      
+ 040542 MACLEAN BRIDGE            LOGAN-ALBERT         274712S    1530055E      
+ 032193 MAGNETIC ISLAND - NELLY   ROSS                 190914S    1465058E      
+        BAY                                                                     
+                                                                                
+ 037056 MAHRIGONG                 DIAMANTINA           221547S    1434443E      
+ 031220 MALANDA                   JOHNSTONE            172105S    1453545E      
+ 037030 MALBOONA                  DIAMANTINA           215319S    1433607E      
+ 029150 MALVIE DOWNS STATION      FLINDERS             205032S    1412545E      
+ 041323 MANDALA FARM              CONDAMINE-BALONNE    280107S    1521710E      
+ 040231 MANLY                     BRISBANE             272723S    1531048E      
+ 015560 MANNERS CREEK             GEORGINA             220631S    1375855E      
+ 035042 MANTUAN DOWNS             FITZROY              242445S    1471447E      
+ 040123 MAPLETON                  MAROOCHY             263721S    1525156E      
+ 031210 MAREEBA AP                BARRON               170413S    1452545E      
+ 036011 MARENGO                   COOPER CREEK         221224S    1450030E      
+ 038014 MARION DOWNS              GEORGINA             232154S    1393920E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:    9
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 041145 MARNHULL                  CONDAMINE-BALONNE    265023S    1510954E      
+ 040677 MAROON DAM                LOGAN-ALBERT         281031S    1523921E      
+ 015559 MARQUA                    GEORGINA             224809S    1371743E      
+ 040126 MARYBOROUGH               MARY                 253048S    1524255E      
+ 041229 MARYVALE                  CONDAMINE-BALONNE    280439S    1521545E      
+ 030032 MARYVALE STATION          BURDEKIN             193245S    1451512E      
+ 037059 MAY DOWNS                 GEORGINA             203524S    1392028E      
+ 029148 MCALLISTER STATION        FLINDERS             181435S    1403142E      
+ 031175 MEADOWBANK                BURDEKIN             181430S    1445918E      
+ 042022 MEANDARRA POST OFFICE     CONDAMINE-BALONNE    271925S    1495258E      
+ 035172 MELMOTH                   FITZROY              232715S    1491539E      
+ 039035 MELROSE                   FITZROY              230815S    1495821E      
+ 031040 MERINGA                   MULGRAVE-RUSSELL     170409S    1454627E      
+ 027044 MERLUNA                   WATSON               130348S    1422653E      
+ 040417 MIAMI                     SOUTH COAST          280407S    1532527E      
+ 200001 MIDDLE PERCY IS           SHOALWATER           213946S    1501616E      
+ 042112 MILES                     CONDAMINE-BALONNE    263925S    1501055E      
+ 042023 MILES POST OFFICE         CONDAMINE-BALONNE    263929S    1501104E      
+ 041069 MILLMERRAN                CONDAMINE-BALONNE    275227S    1511618E      
+ 029036 MILLUNGERA STATION        FLINDERS             195129S    1413324E      
+ 045066 MILROY                    BULLOO               260248S    1442050E      
+ 029130 MIM RIFLE CREEK           LEICHHARDT           205715S    1393510E      
+ 033051 MINGELA                   HAUGHTON             195245S    1463756E      
+ 035190 MINNIE DOWNS              WARREGO              250152S    1455159E      
+ 029037 MIRANDA DOWNS             GILBERT              171947S    1415247E      
+ 033068 MIRANI                    PIONEER              210947S    1485212E      
+ 043020 MITCHELL                  CONDAMINE-BALONNE    262920S    1475840E      
+ 015125 MITTIEBAH                 GEORGINA             184819S    1370516E      
+ 040688 MIVA                      MARY                 255727S    1522931E      
+ 529026 MOMBA                     NORMAN               185343S    1420416E      
+ 039011 MONDURAN                  KOLAN                245316S    1515436E      
+ 038015 MONKIRA                   DIAMANTINA           244918S    1403321E      
+ 035164 MONKLANDS                 BURDEKIN             232428S    1462749E      
+ 039104 MONTO TOWNSHIP            BURNETT              245151S    1510729E      
+ 040135 MOOGERAH DAM              BRISBANE             280149S    1523310E      
+ 034035 MORANBAH AIRPORT          FITZROY              220352S    1480433E      
+ 027015 MORETON                   WENLOCK              122713S    1423820E      
+ 038073 MORNEY PLAINS             DIAMANTINA           252217S    1412813E      
+ 029182 MORNINGTON ISLAND AIRPORT MORNINGTON ISLAND    163943S    1390956E      
+ 029040 MORSTONE                  NICHOLSON            193134S    1382159E      
+ 044050 MORVEN                    WARREGO              262456S    1470647E      
+ 040138 MOUNEFONTEIN              BURNETT              263028S    1513051E      
+ 031180 MOUNT CARBINE TOWNSHIP    MITCHELL             163155S    1450757E      
+ 029127 MOUNT ISA                 LEICHHARDT           204040S    1392915E      
+ 029126 MOUNT ISA MINE            LEICHHARDT           204410S    1392854E      
+ 039106 MOUNT KROOMBIT            FITZROY              242442S    1504342E      
+ 038017 MOUNT LEONARD STATION     DIAMANTINA           254118S    1404513E      
+ 045011 MOUNT MARGARET            COOPER CREEK         265356S    1432017E      
+ 038066 MOUNT MARLOW              COOPER CREEK         245643S    1434520E      
+ 039296 MOURA                     FITZROY              243530S    1495406E      
+ 039071 MOURA POST OFFICE         FITZROY              243420S    1495816E      
+ 040139 MT ALFORD                 LOGAN-ALBERT         280415S    1523643E      
+ 040310 MT BERRYMAN               BRISBANE             274326S    1521839E      
+ 040886 MT BINGA                  BRISBANE             270033S    1515905E      
+ 033080 MT CHARLTON               O'CONNELL            210001S    1484415E      
+ 040976 MT COO'THA GRDNS          BRISBANE             272831S    1525831E      
+ 040142 MT CROSBY                 BRISBANE             273211S    1524757E      
+ 034022 MT DOUGLAS                BURDEKIN             213107S    1465223E      
+ 031046 MT GARNET                 HERBERT              174037S    1450654E      
+ 045010 MT HOWITT                 COOPER CREEK         263044S    1421623E      
+ 040144 MT JOSEPH                 MARY                 254428S    1521411E      
+ 033320 MT JUKES                  O'CONNELL            210030S    1485451E      
+ 041096 MT KYNOCH                 CONDAMINE-BALONNE    273034S    1515717E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:   10
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 039068 MT LARCOM                 FITZROY              234837S    1505842E      
+ 034007 MT MCCONNEL               BURDEKIN             204207S    1470103E      
+ 035093 MT MOFFATT                CONDAMINE-BALONNE    250115S    1475704E      
+ 044052 MT MORRIS                 WARREGO              254846S    1453423E      
+ 039070 MT PERRY THE PINES        BURNETT              251010S    1513815E      
+ 035289 MT PLAYFAIR               FITZROY              245150S    1465652E      
+ 030155 MT PLEASANT               FLINDERS             201816S    1441443E      
+ 031104 MT SOPHIA                 MULGRAVE-RUSSELL     170952S    1455242E      
+ 030036 MT SURPRISE               GILBERT              180850S    1441906E      
+ 040197 MT TAMBORINE              SOUTH COAST          275810S    1531143E      
+ 040914 MT TARAMPA                BRISBANE             272939S    1522950E      
+ 044054 MULGA DOWNS               CONDAMINE-BALONNE    284820S    1470712E      
+ 031049 MULGRAVE MILL             MULGRAVE-RUSSELL     170534S    1454726E      
+ 039073 MUNDUBBERA                BURNETT              253527S    1511755E      
+ 037052 MUNDURIN STATION          DIAMANTINA           225245S    1415011E      
+ 044056 MUNGALLALA                CONDAMINE-BALONNE    262645S    1473243E      
+ 040026 MUNGAR GAYNDAH ST         MARY                 253602S    1523534E      
+ 052020 MUNGINDI                  BORDER RIVERS        285843S    1485924E      
+ 043075 MUNNAWEENA                CONDAMINE-BALONNE    254800S    1475700E      
+ 044157 MURWEH                    WARREGO              270010S    1455636E      
+ 058158 MURWILLUMBAH              SOUTH COAST          282022S    1532251E      
+ 032101 MUTARNEE STORE            BLACK                185721S    1461719E      
+ 036037 MUTTABURRA                COOPER CREEK         223542S    1443249E      
+ 033170 MYSTERY PARK              STYX                 222141S    1492229E      
+                                                                                
+ 043095 NAMARAH                   CONDAMINE-BALONNE    272312S    1492316E      
+ 040157 NAMBOUR BOWLING CLUB      MAROOCHY             263715S    1525800E      
+ 040988 NAMBOUR DAFF - HILLSIDE   MAROOCHY             263839S    1525618E      
+ 045012 NAPPA MERRIE              COOPER CREEK         273547S    1410625E      
+ 029065 NARDOO                    LEICHHARDT           184717S    1394243E      
+ 038004 NAVARRA                   COOPER CREEK         245108S    1434002E      
+ 033054 NEBO                      FITZROY              214120S    1484117E      
+ 556036 NEWSTEAD NORTH (KINGS CK) BORDER RIVERS        294948S    1512049E      
+ 044194 NINDIGULLY                MOONIE               282115S    1484920E      
+ 044057 NIVE DOWNS                WARREGO              252957S    1463239E      
+ 041075 NOBBY                     CONDAMINE-BALONNE    275111S    1515408E      
+ 045057 NOCCUNDRA HOTEL           COOPER CREEK         274905S    1423524E      
+ 045024 NOCKATUNGA                COOPER CREEK         274318S    1424247E      
+ 029080 NORFOLK STATION           NICHOLSON            191851S    1381956E      
+ 043026 NORMANDY                  CONDAMINE-BALONNE    264610S    1482121E      
+ 029063 NORMANTON AP              NORMAN               174114S    1410424E      
+ 030112 NORTH HEAD                GILBERT              184927S    1431511E      
+ 029137 NUMIL DOWNS STATION       NORMAN               193958S    1412346E      
+                                                                                
+ 030039 OAK PARK STATION          GILBERT              191516S    1440913E      
+ 041359 OAKEY                     CONDAMINE-BALONNE    272412S    1514429E      
+ 041464 OAKINGTON                 CONDAMINE-BALONNE    280914S    1521952E      
+ 044209 OAKPARK                   WARREGO              260329S    1460751E      
+ 015534 OORATIPPRA                GEORGINA             215415S    1360427E      
+ 045029 ORIENTOS                  COOPER CREEK         280420S    1413154E      
+ 033095 ORKABIE WEST HILL         PLANE                214811S    1492125E      
+ 040770 ORMISTON                  BRISBANE             273055S    1531457E      
+                                                                                
+ 033077 PACIFIC HEIGHTS           FITZROY              230547S    1504403E      
+ 040167 PALEN CREEK               LOGAN-ALBERT         281934S    1524611E      
+ 042119 PALMERSTON                MOONIE               273207S    1492432E      
+ 028004 PALMERVILLE               MITCHELL             155960S    1440431E      
+ 040695 PALMWOODS                 MAROOCHY             264235S    1525539E      
+ 032064 PALUMA                    BURDEKIN             190027S    1461225E      
+ 041250 PAMPAS                    CONDAMINE-BALONNE    274722S    1512448E      
+ 031218 PARRAMATTA PARK           BARRON               165451S    1454540E      
+ 040169 PEACHESTER                BRISBANE             265033S    1525255E      
+ 035053 PEAKVALE                  FITZROY              231111S    1472114E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:   11
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 040170 PECHEY                    CONDAMINE-BALONNE    271815S    1520315E      
+ 036119 PEMBERLEY                 COOPER CREEK         243129S    1440534E      
+ 033273 PETER FAUST DAM           PROSERPINE           202206S    1482316E      
+ 037106 PHOSPHATE HILL            GEORGINA             215259S    1395822E      
+ 027064 PICCANINNY PLNS           ARCHER               130757S    1424714E      
+ 042113 PINE HILL CROSSING        CONDAMINE-BALONNE    265435S    1495741E      
+ 028025 PINNACLE                  MITCHELL             154112S    1433348E      
+ 041082 PITTSWORTH                CONDAMINE-BALONNE    274322S    1513810E      
+ 030144 PLAINBY STATION           FLINDERS             212405S    1423700E      
+ 045032 PLEVNA DOWNS              COOPER CREEK         264050S    1423539E      
+ 033060 PLEYSTOWE SUGAR MILL      PIONEER              210830S    1490216E      
+ 040209 POINT LOOKOUT             STRADBROKE ISLANDS   272610S    1533244E      
+ 031052 PORT DOUGLAS WARNER ST    MOSSMAN              162860S    1452750E      
+ 042004 POSSUM PARK               CONDAMINE-BALONNE    263017S    1500557E      
+ 041083 PRATTEN                   CONDAMINE-BALONNE    280410S    1514647E      
+ 041473 PRATTEN CONDAMINE RIVER   CONDAMINE-BALONNE    280608S    1514843E      
+ 033247 PROSERPINE AP             PROSERPINE           202933S    1483318E      
+ 040177 PROSTON                   BURNETT              260950S    1513605E      
+                                                                                
+ 043041 QLD COTTON                CONDAMINE-BALONNE    280836S    1484233E      
+ 041085 QUEEN MARY FALLS          CONDAMINE-BALONNE    281931S    1522339E      
+ 044222 QUILPETA                  PAROO                270747S    1450426E      
+ 045015 QUILPIE                   BULLOO               263645S    1441528E      
+                                                                                
+ 040856 RAINBOW BEACH             NOOSA                255403S    1530521E      
+ 039308 RANNES                    FITZROY              240607S    1500635E      
+ 033062 RAVENSWOOD                BURDEKIN             200559S    1465321E      
+ 035150 RAYMOND                   FITZROY              241354S    1473842E      
+ 014718 REDBANK MINE              NICHOLSON            171130S    1374434E      
+ 140007 REDLAND (ALEXANDRA HILLS) BRISBANE             273236S    1531422E      
+ 031204 REEF PARK                 MOSSMAN              163134S    1452746E      
+ 040964 REGENTS PARK              LOGAN-ALBERT         274011S    1530239E      
+ 042050 REMILTON                  MOONIE               280352S    1493917E      
+ 038018 RETREAT (BARCOO RIVER)    COOPER CREEK         251146S    1431632E      
+ 035090 REWAN                     FITZROY              245731S    1482228E      
+ 030045 RICHMOND                  FLINDERS             204344S    1430833E      
+ 030161 RICHMOND AP               FLINDERS             204200S    1430649E      
+ 040982 RIVERHEADS                MARY                 252348S    1525450E      
+ 029066 RIVERSLEIGH               NICHOLSON            190142S    1384424E      
+ 041087 RIVERTON                  BORDER RIVERS        290153S    1512923E      
+ 042055 RIVERVIEW                 BORDER RIVERS        283636S    1494927E      
+ 035236 RIVINGTON                 BURDEKIN             235739S    1463339E      
+ 030107 ROBIN HOOD STATION        GILBERT              185018S    1434231E      
+ 039083 ROCKHAMPTON               FITZROY              232231S    1502839E      
+ 037115 ROCKLANDS                 GEORGINA             195139S    1380606E      
+ 044210 ROCKY                     WARREGO              282535S    1454406E      
+ 040319 ROCKY POINT SUGAR MILL    SOUTH COAST          274406S    1531938E      
+ 039167 ROCKYBAR                  BURNETT              252726S    1502741E      
+ 035145 ROLLESTON                 FITZROY              242800S    1483710E      
+ 035129 ROLLESTON AIRPORT         FITZROY              242742S    1483735E      
+ 032098 ROLLINGSTONE              BLACK                190238S    1462433E      
+ 043091 ROMA                      CONDAMINE-BALONNE    263252S    1484616E      
+ 038020 ROSEBERTH STATION         DIAMANTINA           254724S    1393508E      
+ 039084 ROSEDALE                  BAFFLE               243746S    1515457E      
+ 044137 ROSEHILL AVIARY           CONDAMINE-BALONNE    275218S    1480204E      
+ 030046 ROSELLA PLAINS            GILBERT              182520S    1442745E      
+ 036123 ROTHERFIELD               COOPER CREEK         233623S    1442833E      
+ 038032 ROXBOROUGH DOWNS          GEORGINA             223111S    1385005E      
+ 032033 RUSSELL RIVER             MULGRAVE-RUSSELL     172739S    1455256E      
+ 029110 RUTLAND PLAINS STATION    MITCHELL             153819S    1414922E      
+                                                                                
+ 034073 SALTBUSH PARK             FITZROY              220812S    1485449E      
+ 033308 SAMUEL HILL               SHOALWATER           224436S    1503928E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:   12
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 038025 SANDRINGHAM               GEORGINA             240306S    1390350E      
+ 039085 SANDY CAPE LIGHTHOUSE     FRASER ISLAND        244348S    1531232E      
+ 033059 SARINA                    PLANE                212537S    1491258E      
+ 031221 SCARDONS HILL             MITCHELL             171842S    1444101E      
+ 034087 SCARTWATER                BURDEKIN             210533S    1465204E      
+ 027075 SCHERGER RAAF             EMBLEY               123700S    1420513E      
+ 034085 SELLHEIM                  BURDEKIN             200030S    1462606E      
+ 041438 SILVERWOOD DAM            CONDAMINE-BALONNE    282110S    1520000E      
+ 040188 SIM JUE CREEK             BRISBANE             271600S    1523738E      
+ 030075 SOLWAY DOWNS STATION      FLINDERS             200542S    1424135E      
+ 035063 SOMERBY                   FITZROY              241240S    1484425E      
+ 040189 SOMERSET DAM              BRISBANE             270653S    1523318E      
+ 015040 SOUDAN                    GEORGINA             200307S    1370108E      
+ 045003 SOUTH COMONGIN            BULLOO               265404S    1442019E      
+ 038056 SOUTH GALWAY              COOPER CREEK         253955S    1420631E      
+ 032037 SOUTH JOHNSTONE           JOHNSTONE            173619S    1455950E      
+ 044123 SOUTH PLAINS              CONDAMINE-BALONNE    282304S    1464454E      
+ 027061 SOUTHWELL STN             COLEMAN              143105S    1420220E      
+ 042100 SOUTHWOOD                 MOONIE               274557S    1500406E      
+ 035064 SPRING CK STATION         FITZROY              242653S    1475355E      
+        {SPRINGSURE)                                                            
+                                                                                
+ 040607 SPRINGBROOK               SOUTH COAST          281212S    1531620E      
+ 043099 SPRINGFIELD               CONDAMINE-BALONNE    255112S    1494738E      
+ 036040 SPRINGLEIGH               COOPER CREEK         243342S    1444306E      
+ 039255 SPRINGS                   BAFFLE               240959S    1513046E      
+ 035065 SPRINGSURE                FITZROY              240723S    1480508E      
+ 043053 ST GEORGE                 CONDAMINE-BALONNE    280312S    1483348E      
+ 043109 ST GEORGE AP              CONDAMINE-BALONNE    280252S    1483545E      
+ 033210 ST LAWRENCE               STYX                 222050S    1493127E      
+ 033065 ST LAWRENCE POST OFFICE   STYX                 222045S    1493208E      
+ 041095 STANTHORPE                BORDER RIVERS        283948S    1515544E      
+ 039328 STANWELL POWER            FITZROY              233026S    1501916E      
+ 040702 STOKES CROSSING           BRISBANE             274551S    1523215E      
+ 037040 STONEHENGE                COOPER CREEK         242105S    1431717E      
+ 037041 STRADBROKE STATION        GEORGINA             213353S    1394323E      
+ 029045 STRATHMORE                GILBERT              175143S    1423337E      
+ 033082 STRATHMORE {COLLINSVILLE} BURDEKIN             202957S    1473740E      
+ 030138 STRATHTAY                 FLINDERS             201238S    1444038E      
+ 036127 SUNBURY {YARAKA}          COOPER CREEK         243606S    1434953E      
+ 040861 SUNSHINE COAST AIRPORT    MAROOCHY             263556S    1530528E      
+ 043035 SURAT                     CONDAMINE-BALONNE    270933S    1490413E      
+ 036139 SURBITON STATION          BURDEKIN             225908S    1463708E      
+ 029139 SWEERS IS                 MORNINGTON ISLAND    170651S    1393553E      
+                                                                                
+ 034094 TAEMAS                    BURDEKIN             205958S    1462538E      
+ 035131 TALAGAI                   FITZROY              230759S    1483136E      
+ 042027 TALWOOD                   BORDER RIVERS        282914S    1492812E      
+ 035069 TAMBO                     COOPER CREEK         245255S    1461523E      
+ 038023 TANBAR                    COOPER CREEK         255030S    1415508E      
+ 035271 TARANA CROSSING           FITZROY              254748S    1493245E      
+ 015620 TARLTON DOWNS             GEORGINA             223928S    1364759E      
+ 040198 TAROME                    BRISBANE             275857S    1522959E      
+ 035070 TAROOM                    FITZROY              253827S    1494745E      
+ 035115 TAROOM                    FITZROY              253816S    1494722E      
+ 041368 TARTHA                    MOONIE               274258S    1501328E      
+ 034082 TARTRUS                   FITZROY              225717S    1492524E      
+ 040390 TEDDINGTON WATERWORKS     MARY                 253901S    1523953E      
+ 056032 TENTERFIELD               BORDER RIVERS        290252S    1520102E      
+ 036144 TERRICK TERRICK           COOPER CREEK         244410S    1450423E      
+ 040908 TEWANTIN                  NOOSA                262328S    1530225E      
+ 041100 TEXAS                     BORDER RIVERS        285116S    1511005E      
+ 039089 THANGOOL AP               FITZROY              242937S    1503415E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:   13
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 045025 THARGOMINDAH AP           BULLOO               275912S    1434854E      
+ 041493 THE DEEP CROSSING         MOONIE               272935S    1502719E      
+ 035096 THE GLEBE                 FITZROY              252915S    1500023E      
+ 030106 THE LYND STATION          GILBERT              185614S    1442926E      
+ 037107 THE MONUMENT              GEORGINA             214549S    1395454E      
+ 037034 THE MONUMENT AP           GEORGINA             214845S    1395536E      
+ 035015 THE SANDSTONE             FITZROY              252409S    1490616E      
+ 033071 THE VALLEY                PLANE                215548S    1492151E      
+ 039158 THEODORE                  FITZROY              245650S    1500444E      
+ 037119 THORNER STATION           GEORGINA             214227S    1382860E      
+ 040751 THORNTON                  BRISBANE             274744S    1522231E      
+ 045018 THYLUNGRA                 COOPER CREEK         260507S    1432654E      
+ 033129 TILPAL STATION            SHOALWATER           224754S    1500817E      
+ 031075 TINAROO FALLS DAM         BARRON               171010S    1453253E      
+ 041198 TINGHA {DALBY}            CONDAMINE-BALONNE    270847S    1511812E      
+ 041358 TIPTON BRIDGE             CONDAMINE-BALONNE    272630S    1511524E      
+ 036046 TIREE                     COOPER CREEK         213745S    1450660E      
+ 015618 TOBERMOREY                GEORGINA             221627S    1375823E      
+ 035073 TOLINESS                  WARREGO              251900S    1460110E      
+ 044068 TOMOO                     CONDAMINE-BALONNE    270534S    1472158E      
+ 040205 TOOGOOLAWAH               BRISBANE             270516S    1522232E      
+ 040412 TOOGOOM                   BURRUM               251454S    1523949E      
+ 030083 TOOMBA                    BURDEKIN             195816S    1453506E      
+ 040237 TOOMBUL                   PINE                 272328S    1530346E      
+ 041529 TOOWOOMBA AP              CONDAMINE-BALONNE    273233S    1515448E      
+ 031167 TOPAZ                     JOHNSTONE            172810S    1454352E      
+ 039314 TOWN OF 1770              BAFFLE               240924S    1515320E      
+ 032040 TOWNSVILLE                ROSS                 191454S    1464558E      
+ 034010 TRAFALGAR STATION         BURDEKIN             202558S    1460047E      
+ 041509 TRAIGHLI                  MOONIE               274029S    1502109E      
+ 037079 TRANBY                    DIAMANTINA           223940S    1422334E      
+ 040206 TRAVESTON                 MARY                 261930S    1524713E      
+ 037036 TREPELL AP                GEORGINA             215024S    1405333E      
+ 038035 TRINIDAD                  COOPER CREEK         253525S    1435330E      
+ 032042 TULLY SUGAR MILL          TULLY                175611S    1455531E      
+ 037122 TULMUR                    DIAMANTINA           223838S    1421504E      
+ 041110 TURALLIN                  CONDAMINE-BALONNE    274953S    1511147E      
+ 033169 TURRAWALLA STN            BURDEKIN             211000S    1481439E      
+                                                                                
+ 036050 ULCANBAH                  BURDEKIN             220123S    1455859E      
+ 029047 UNDILLA STATION           NICHOLSON            193727S    1383819E      
+ 032043 UPPER STONE               HERBERT              184318S    1455526E      
+ 039351 UPPER ULAM ROAD           FITZROY              233717S    1503227E      
+ 037043 URANDANGI                 GEORGINA             213643S    1381849E      
+ 037058 URANDANGI AERODROME       GEORGINA             213552S    1382159E      
+                                                                                
+ 035121 VALENCIA                  FITZROY              225743S    1474813E      
+ 035232 VALERIA                   FITZROY              231109S    1475350E      
+ 030073 VAN LEE                   GILBERT              175100S    1434210E      
+ 029048 VANROOK                   STAATEN              165806S    1415717E      
+ 044070 VICTORIA DOWNS            WARREGO              262230S    1470222E      
+ 032045 VICTORIA SUGAR MILL       HERBERT              183903S    1461217E      
+ 041191 VICTORY DOWNS {DALBY}     CONDAMINE-BALONNE    271546S    1512229E      
+ 029160 VIOLA STN                 FLINDERS             201406S    1411736E      
+                                                                                
+ 036094 WAHROONGHA                COOPER CREEK         242647S    1440634E      
+ 034083 WAITARA                   FITZROY              215041S    1485225E      
+ 031108 WALKAMIN DPI              BARRON               170805S    1452541E      
+ 041116 WALLANGARRA               BORDER RIVERS        285525S    1515552E      
+ 044174 WALLEN                    WARREGO              273712S    1454941E      
+ 040732 WALLEN WALLEN             STRADBROKE ISLANDS   273148S    1532510E      
+ 043038 WALLUMBILLA               CONDAMINE-BALONNE    263506S    1491111E      
+ 040343 WAMURAN POST OFFICE       PINE                 270223S    1525204E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:   14
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 030052 WANDO VALE                BURDEKIN             194024S    1445324E      
+ 035014 WANDOAN                   FITZROY              260714S    1495741E      
+ 044111 WANSEY DOWNS              WARREGO              255106S    1461122E      
+ 033147 WARDEN BEND               DON                  201112S    1480842E      
+ 044138 WARIDA                    CONDAMINE-BALONNE    262124S    1472418E      
+ 044208 WARILDA                   WARREGO              260822S    1453950E      
+ 043052 WARKON                    CONDAMINE-BALONNE    270002S    1492949E      
+ 041486 WARRA-KOGAN RD BR         CONDAMINE-BALONNE    265727S    1505148E      
+ 040246 WARRAGAI                  BURNETT              263314S    1512456E      
+ 043045 WARRIE STATION            MOONIE               280542S    1485825E      
+ 037049 WARRNAMBOOL DOWNS         COOPER CREEK         224847S    1424957E      
+ 043107 WARROO                    CONDAMINE-BALONNE    273842S    1484428E      
+ 041376 WARROO STATION            BORDER RIVERS        283220S    1512053E      
+ 041525 WARWICK                   CONDAMINE-BALONNE    281222S    1520601E      
+ 027045 WEIPA AP                  EMBLEY               124040S    1415515E      
+ 027042 WEIPA TOWN                EMBLEY               123736S    1415301E      
+ 541150 WELLCAMP AIRPORT          CONDAMINE-BALONNE    273306S    1514704E      
+ 034015 WENTWORTH {MORANBAH}      BURDEKIN             220356S    1474319E      
+ 037104 WEONA {WINTON}            COOPER CREEK         230345S    1424912E      
+ 029049 WERRINA STATION           FLINDERS             202637S    1412719E      
+ 030088 WERRINGTON STATION WRC    GILBERT              192237S    1440656E      
+ 037073 WESTERTON                 COOPER CREEK         240233S    1424952E      
+ 029069 WESTMORELAND STATION      NICHOLSON            172018S    1381503E      
+ 044199 WETLANDS                  WARREGO              253543S    1470706E      
+ 035079 WHARTON CREEK             FITZROY              243718S    1472423E      
+ 031189 WHITE CLIFF POINT         MOSSMAN              163929S    1453403E      
+ 031062 WHYANBEEL VALLEY          DAINTREE             162326S    1452104E      
+ 044154 WHYENBAH                  CONDAMINE-BALONNE    282315S    1481840E      
+ 045022 WHYNOT STATION            COOPER CREEK         264128S    1435417E      
+ 033195 WILLIAMSON RAAF           SHOALWATER           222813S    1501043E      
+ 200283 WILLIS IS                 JOHNSTONE            161716S    1495755E      
+ 035170 WILPEENA                  FITZROY              230605S    1485523E      
+ 038024 WINDORAH                  COOPER CREEK         252511S    1423934E      
+ 038038 WINDORAH (LONG CROSSING)  COOPER CREEK         252206S    1424418E      
+ 037039 WINTON AP                 DIAMANTINA           222142S    1430501E      
+ 035094 WINVIC                    BURDEKIN             222859S    1473102E      
+ 040763 WIVENHOE DAM              BRISBANE             272342S    1523635E      
+ 035081 WOLEEBEE                  FITZROY              261707S    1494942E      
+ 014707 WOLLOGORANG               NICHOLSON            171244S    1375646E      
+ 040251 WONDAI                    BURNETT              261902S    1515232E      
+ 041128 WONDALLI                  BORDER RIVERS        283001S    1503512E      
+ 029050 WONDOOLA STATION          FLINDERS             183425S    1405350E      
+ 030127 WOODBINE                  COOPER CREEK         205939S    1443836E      
+ 040924 WOODFORD STANMORE         BRISBANE             265410S    1524559E      
+ 033073 WOODHOUSE                 BURDEKIN             194953S    1470752E      
+ 044075 WOODLANDS                 CONDAMINE-BALONNE    271554S    1480453E      
+ 041391 WOODSPRING                BORDER RIVERS        282140S    1510847E      
+ 037116 WOODSTOCK STATION         DIAMANTINA           221530S    1415647E      
+ 040365 WOOLOOGA                  MARY                 260310S    1522331E      
+ 033307 WOOLSHED                  BLACK                192500S    1463210E      
+ 045026 WOOMANOOKA                COOPER CREEK         271502S    1420745E      
+ 035083 WOORABINDA                FITZROY              240748S    1492724E      
+ 035205 WOORARRA                  FITZROY              240129S    1475515E      
+ 039102 WOWAN                     FITZROY              235428S    1501143E      
+ 028015 WROTHAM PARK              MITCHELL             163944S    1435949E      
+ 039236 WURUMA DAM                BURNETT              251143S    1505925E      
+ 037120 WYORA                     DIAMANTINA           215345S    1430548E      
+                                                                                
+ 033076 YAAMBA                    FITZROY              230760S    1502201E      
+ 032050 YABULU QLD NICKEL         BLACK                191212S    1463647E      
+ 035269 YAKCAM                    FITZROY              232812S    1483936E      
+ 041120 YANGAN                    CONDAMINE-BALONNE    281144S    1521232E      
+ 029154 YAPPAR RIVER              NORMAN               182550S    1411607E      
+(Note: Only includes stations used for flood warning.)                          
+
+Date: 26/09/2026                    SECTION 2                         Page:   15
+                                                                                
+              INDEX OF QUEENSLAND DAILY REPORTING RAINFALL STATIONS             
+Station                                                Latitude   Longitude     
+   No   Station Name              Basin Name           (ddmmss)   (dddmmss)     
+------- ------------------------- -------------------- ---------- ----------    
+ 030154 YARAMULLA                 GILBERT              181335S    1444016E      
+ 040258 YARRAMAN POST OFFICE      BRISBANE             265028S    1515850E      
+ 033294 YEPPOON                   FITZROY              230811S    1504502E      
+ 054035 YETMAN                    BORDER RIVERS        285350S    1504620E      
+ 043043 YULEBA                    CONDAMINE-BALONNE    263648S    1492316E      
+                                                                                
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(Note: Only includes stations used for flood warning.)                          

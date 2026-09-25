@@ -2874,6 +2874,14 @@ hr {
 .stn-card-rhs-earlier { margin-top: .3rem; }
 .stn-card-rhs-earlier > summary { cursor: pointer; color: var(--muted); }
 .stn-card-rhs-earlier[open] > summary { margin-bottom: .2rem; }
+/* The flood effects (0032) are their own disclosure, above Earlier: thirty-odd
+   heights on a big gauge would otherwise push everything under them off the
+   card. Same rows inside, a height against what it means; an older edition is
+   headed by its date. */
+.stn-card-rhs-effects { margin-top: .3rem; }
+.stn-card-rhs-effects > summary { cursor: pointer; color: var(--muted); }
+.stn-card-rhs-effects[open] > summary { margin-bottom: .2rem; }
+.stn-card-rhs-asat { margin: .25rem 0 .1rem; }
 
 /* Manual, as a pill. The one fact in that block that changes what a person
    does: a gauge read by hand reports nothing over the radio, so silence from it
