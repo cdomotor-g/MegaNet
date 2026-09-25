@@ -27,11 +27,12 @@
 //
 // Runs on the Stations map because it is the one carrying all four panels; the
 // primitive is shared, so what passes here is what the other six Leaflet maps
-// get. **With its side panel told to decline them.** The Stations map keeps no
-// corner at any width now: every one of its controls is in the side panel's
-// strip — a rail beside the map on a phone — and `npm run dock` holds that
-// contract, while §9b below checks the corner is empty, at a phone's width and
-// a wide one. What puts a control in the corner or in the strip is one
+// get. **With its side panel told to decline them.** The Stations map keeps
+// only ↺ in its corner now, at any width: every other one of its controls is
+// in the side panel's strip — a rail beside the map on a phone — and `npm run
+// dock` holds that contract, while §9b below checks the corner holds ↺ alone,
+// at a phone's width and a wide one. What puts a control in the corner or in
+// the strip is one
 // question, asked of the host the map was handed (MapChrome.dockInto,
 // host.accepts, which is app.js's dockAcceptsPanels), and while the host says
 // no, every control is this file's again: a flyout in the corner with a pin
@@ -436,36 +437,50 @@ try {
       JSON.stringify(b));
   }
 
-  // ── 9b. …and with its own host's answer, there is no corner at all ────────
-  // The side panel takes every one of the Stations map's controls at every
-  // width, so everything above is about a corner that is, in the app, empty —
-  // on this phone's width as on a wide screen, where the strip is a rail
-  // beside the map and a column beside its cards. That is asserted rather than
-  // assumed, as geometry: nothing in the map's top-right corner has a box, and
-  // every one of those controls is in the side panel. The host is given its
-  // own answer back and the map built again, since what MapChrome asks is the
-  // host it was handed when the map was built.
+  // ── 9b. …and with its own host's answer, a corner holding ↺ alone ─────────
+  // The side panel takes every one of the Stations map's controls but ↺ at
+  // every width, so everything above is about a corner that in the app holds
+  // one button — on this phone's width as on a wide screen, where the strip is
+  // a rail beside the map and a column beside its cards. That is asserted
+  // rather than assumed, as geometry: the only control in the map's top-right
+  // corner with a box is ↺, at the corner's top right, with no hairline beside
+  // it; and every other one of those controls is in the side panel. The host
+  // is given its own answer back and the map built again, since what MapChrome
+  // asks is the host it was handed when the map was built. (↺ never asks it:
+  // it is built to stay, with `corner`.)
   await page.evaluate(() => { window.dockAcceptsPanels = window.__accepts; renderMain(); });
   await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
-  const emptyCorner = () => page.evaluate(() => {
+  const cornerNow = () => page.evaluate(() => {
     const c = document.querySelector('#leaflet-map .leaflet-top.leaflet-right');
-    const drawn = [...c.querySelectorAll('*')].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
-    const inStrip = sel => [...document.querySelectorAll(sel)].every(el => !!el.closest('#help-panel'));
+    const shown = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const inSide = sel => [...document.querySelectorAll(sel)].every(el => !!el.closest('#help-panel'));
+    const m = document.getElementById('leaflet-map').getBoundingClientRect();
+    const b = c.querySelector('.mn-map-reset');
+    const r = b && shown(b) ? b.getBoundingClientRect() : null;
     return {
-      drawn: drawn.map(el => el.className),
-      panels: [...document.querySelectorAll('.mn-mapctl')].length,
-      panelsInSide: inStrip('.mn-mapctl'),
-      buttonsInStrip: inStrip('.mn-map-here, .mn-map-3d, .mn-map-north, .mn-map-tilt, .mn-map-full, .mn-map-split, .mn-map-reset'),
+      items: [...c.querySelectorAll('.mn-mapbar-group > *')].filter(shown)
+        .map(el => (el.dataset.panel ? `map-${el.dataset.panel}` : [...el.classList].find(k => k.startsWith('mn-map-')) || el.className)),
+      hairlines: [...c.querySelectorAll('.mn-mapbar-group')].filter(g => {
+        const cs = getComputedStyle(g, '::before');
+        return cs.content && cs.content !== 'none' && cs.display !== 'none' && g.getClientRects().length;
+      }).length,
+      at: r ? { dx: Math.round(m.right - r.right), dy: Math.round(r.top - m.top) } : null,
+      panels: document.querySelectorAll('.mn-mapctl').length,
+      panelsInSide: inSide('.mn-mapctl'),
+      buttonsInSide: inSide('.mn-map-here, .mn-map-3d, .mn-map-north, .mn-map-tilt, .mn-map-full, .mn-map-split'),
     };
   });
-  const narrow = await emptyCorner();
-  check('at a phone\'s width the Stations map\'s corner is empty, every control in the side panel\'s rail',
-    narrow.drawn.length === 0 && narrow.panels === 6 && narrow.panelsInSide && narrow.buttonsInStrip, JSON.stringify(narrow));
+  const alone = k => JSON.stringify(k.items) === '["mn-map-reset"]' && k.hairlines === 0 && !!k.at
+    && k.at.dx >= 0 && k.at.dx <= 12 && k.at.dy >= 0 && k.at.dy <= 12
+    && k.panels === 6 && k.panelsInSide && k.buttonsInSide;
+  const narrow = await cornerNow();
+  check('at a phone\'s width the Stations map\'s corner holds ↺ alone, at its top right, every other control in the side panel\'s rail',
+    alone(narrow), JSON.stringify(narrow));
   await page.setViewportSize({ width: 1440, height: 950 });
   await page.waitForTimeout(600);
-  const wide = await emptyCorner();
-  check('…and above it, every control in the side panel\'s strip',
-    wide.drawn.length === 0 && wide.panels === 6 && wide.panelsInSide && wide.buttonsInStrip, JSON.stringify(wide));
+  const wide = await cornerNow();
+  check('…and above it too, every other control in the side panel\'s strip',
+    alone(wide), JSON.stringify(wide));
 
   // ── 10. The base maps are a blend, inside Map display ─────────────────────
   // They were a 🗺️ panel of their own holding four radios; they are the top

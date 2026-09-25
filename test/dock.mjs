@@ -14,12 +14,12 @@
 //   1. **Where a fresh visit lands.** On the Stations tab at 1440 the cards are
 //      in the side panel and showing, and ❔ says Help is not; on any other tab
 //      the panel is shut, because the pane it prefers is not there.
-//   2. **The map's controls are all in the strip, from the first render.**
-//      Every panel MapChrome builds for the Stations map is a pane with a
-//      button of its own, every plain button is in the strip itself, in the
-//      corner's groups and order with a gap between groups, the camera pair is
-//      hidden, no pin is on screen — and the map's top-right corner holds
-//      nothing at all. Building the map opened nothing.
+//   2. **The map's controls are in the strip, from the first render — all but
+//      ↺.** Every panel MapChrome builds for the Stations map is a pane with a
+//      button of its own, every other plain button is in the strip itself, in
+//      the corner's groups and order with a gap between groups, the camera pair
+//      is hidden, no pin is on screen — and the map's top-right corner holds ↺
+//      and nothing else, at its top right. Building the map opened nothing.
 //   3. **Panes and buttons.** Help and back, the map's panes opened from their
 //      buttons and working to a real pointer, and the showing pane's own button
 //      shutting the panel — measured as the map getting the width, and as
@@ -94,15 +94,18 @@ const PANEL_IDS = ['map-display-block', 'map-legend', 'map-draw-panel', 'map-3d-
 
 // The strip, top to bottom, as the corner orders it: the side panel's own
 // three (❔, 📋 the cards, 〽️ the path tools), then the map's groups — show,
-// tools, 3d, screen, reset — and within each by its declared order. Panes are
-// 'map-<id>', plain buttons their class.
+// tools, 3d, screen — and within each by its declared order. Panes are
+// 'map-<id>', plain buttons their class. Not ↺ (the reset group's one button):
+// it is built to stay in the map's corner (`corner`), and is asserted there.
 const STRIP = ['help', 'stations', 'paths',
                'map-display', 'map-legend',
                'map-draw', 'map-polar', 'map-sites', 'mn-map-here',
                'mn-map-3d', 'map-3d', 'mn-map-north', 'mn-map-tilt',
-               'mn-map-full', 'mn-map-split',
-               'mn-map-reset'];
+               'mn-map-full', 'mn-map-split'];
 const BUTTONS = STRIP.filter(k => k.startsWith('mn-map-'));
+// The groups of the map's own that stand in the strip: every one MapChrome
+// declares but `reset`, whose one button stays on the map.
+const STRIP_GROUPS = ['show', 'tools', '3d', 'screen'];
 
 const server = await startServer();
 const browser = await launchBrowser();
@@ -186,20 +189,40 @@ try {
     };
   }, id);
 
-  // What is drawn in the map's top-right corner, as boxes the browser gave it.
-  // Nothing, at any width: a phone's too.
+  // What is drawn in the map's top-right corner, as boxes the browser gave it:
+  // ↺ and nothing else, at any width — a phone's too. `items` are the controls
+  // standing in it (a panel as 'map-<id>', a button by its class), `pseudo`
+  // the hairlines drawn between groups, and `reset` where ↺ is: how far in
+  // from the map's right edge and down from its top (Leaflet's 10 px corner
+  // margin), whether it is the thing under the pointer where it is drawn, and
+  // what it says it is.
   const cornerNow = () => page.evaluate(() => {
     const c = document.querySelector('#leaflet-map .leaflet-top.leaflet-right');
-    if (!c) return { missing: true, drawn: [] };
-    const drawn = [...c.querySelectorAll('*')]
-      .filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; })
-      .map(el => el.className || el.tagName);
+    if (!c) return { missing: true, items: [] };
+    const shown = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const items = [...c.querySelectorAll('.mn-mapbar-group > *')].filter(shown)
+      .map(el => (el.dataset.panel ? `map-${el.dataset.panel}` : [...el.classList].find(k => k.startsWith('mn-map-')) || el.className));
     const pseudo = [...c.querySelectorAll('*')].filter(el => {
       const cs = getComputedStyle(el, '::before');
       return cs.content && cs.content !== 'none' && cs.display !== 'none' && el.getClientRects().length;
     }).length;
-    return { drawn, pseudo };
+    const b = c.querySelector('.mn-map-reset');
+    const m = document.getElementById('leaflet-map').getBoundingClientRect();
+    let reset = null;
+    if (b && shown(b)) {
+      const r = b.getBoundingClientRect();
+      const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      reset = { dx: Math.round(m.right - r.right), dy: Math.round(r.top - m.top),
+                hit: !!t && (t === b || b.contains(t)), label: b.getAttribute('aria-label'),
+                pressed: b.getAttribute('aria-pressed') };
+    }
+    return { items, pseudo, reset };
   });
+  // …and the answer every width is held to: ↺ alone, at the map's top right,
+  // under the pointer, named, and a one-shot button rather than a mode.
+  const resetAlone = (k) => !k.missing && JSON.stringify(k.items) === '["mn-map-reset"]' && k.pseudo === 0
+    && !!k.reset && k.reset.dx >= 0 && k.reset.dx <= 12 && k.reset.dy >= 0 && k.reset.dy <= 12
+    && k.reset.hit && /reset/i.test(k.reset.label || '') && k.reset.pressed === null;
 
   // ── 1. A fresh visit ─────────────────────────────────────────────────────
   let s = await look();
@@ -235,8 +258,8 @@ try {
   check('…and the Stations pane has the h2 its cards\' h3s step from', shape.stationsH2);
   check('…and so does the path tools\' pane', shape.pathsH2);
 
-  // ── 2. The map's controls, all in the strip ──────────────────────────────
-  check('the strip holds every one of the map\'s controls, in the corner\'s order, from the first render',
+  // ── 2. The map's controls, in the strip — all but ↺ ────────────────────────
+  check('the strip holds every one of the map\'s controls but ↺, in the corner\'s order, from the first render',
     JSON.stringify(s.strip) === JSON.stringify(STRIP), JSON.stringify(s.strip));
   const panels = {};
   for (const id of ['display', 'legend', 'draw', 'polar', 'sites', '3d']) panels[id] = await wrapAt(id);
@@ -260,7 +283,7 @@ try {
       && buttons.filter(b => !/north|tilt/.test(b.c)).every(b => b.shown), JSON.stringify(buttons));
   check('…the toggles say whether they are on, the one-shot buttons do not',
     ['mn-map-here', 'mn-map-3d', 'mn-map-full', 'mn-map-split'].every(c => ['true', 'false'].includes(buttons.find(b => b.c === c).pressed))
-      && ['mn-map-reset', 'mn-map-north', 'mn-map-tilt'].every(c => buttons.find(b => b.c === c).pressed === null),
+      && ['mn-map-north', 'mn-map-tilt'].every(c => buttons.find(b => b.c === c).pressed === null),
     JSON.stringify(buttons.map(b => [b.c, b.pressed])));
   const groups = await page.evaluate(() => {
     const strip = document.querySelector('#help-panel .dock-strip');
@@ -270,10 +293,14 @@ try {
         .map(b => { const r = b.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }),
     }));
   });
+  // MapChrome's own order, less the one group that stays on the map: read off
+  // MapChrome rather than copied, so a group added there is in this check.
   const known = await page.evaluate(() => Object.keys(MapChrome.groups()));
+  const inStrip = known.filter(g => g !== 'reset');
   const mapGroups = groups.filter(g => g.name !== 'side');
-  check('the map\'s groups stand in the order MapChrome declares, each a labelled group',
-    JSON.stringify(mapGroups.map(g => g.name)) === JSON.stringify(known)
+  check('the map\'s groups stand in the order MapChrome declares, each a labelled group — all but reset\'s',
+    JSON.stringify(mapGroups.map(g => g.name)) === JSON.stringify(inStrip)
+      && JSON.stringify(inStrip) === JSON.stringify(STRIP_GROUPS)
       && mapGroups.every(g => g.role === 'group' && /\S/.test(g.label || '')),
     JSON.stringify(groups.map(g => [g.name, g.role, g.label])));
   const inside = [], between = [];
@@ -281,14 +308,29 @@ try {
   for (const g of vis) for (let i = 1; i < g.items.length; i++) inside.push(g.items[i].top - g.items[i - 1].bottom);
   for (let i = 1; i < vis.length; i++) between.push(vis[i].items[0].top - vis[i - 1].items[vis[i - 1].items.length - 1].bottom);
   check('…with every gap between two groups wider than every gap inside one',
-    between.length === known.length && Math.min(...between) > Math.max(...inside) + 6,
+    between.length === inStrip.length && Math.min(...between) > Math.max(...inside) + 6,
     JSON.stringify({ inside, between }));
   const corner = await cornerNow();
-  check('the map\'s top-right corner holds nothing — no icon, no empty bar, no hairline',
-    !corner.missing && corner.drawn.length === 0 && corner.pseudo === 0, JSON.stringify(corner));
+  check('the map\'s top-right corner holds ↺ and nothing else, at its top right, under the pointer — no other icon, no hairline',
+    resetAlone(corner), JSON.stringify(corner));
   const zoom = await page.evaluate(() => !!document.querySelector('#leaflet-map .leaflet-top.leaflet-left .leaflet-control-zoom')
     && document.querySelector('#leaflet-map .leaflet-control-zoom').getClientRects().length > 0);
   check('…while Leaflet\'s zoom stays on the map, top-left', zoom);
+  // ↺ is a working button where it stands, to a real pointer: a selection
+  // made, ↺ clicked where it is drawn, and the selection gone — the click
+  // stopped at the button rather than reaching the map under it.
+  const picked = await page.evaluate(() => {
+    const st = state.data.stations.find(x => x.lat != null && x.lon != null);
+    selectStation(st.id);
+    return state.selectedId;
+  });
+  await page.waitForTimeout(300);
+  const rb = await page.locator('#leaflet-map .leaflet-top.leaflet-right .mn-map-reset').boundingBox();
+  await page.mouse.click(rb.x + rb.width / 2, rb.y + rb.height / 2);
+  await page.waitForTimeout(400);
+  const afterReset = await page.evaluate(() => ({ sel: state.selectedId, showing: dockShowing() }));
+  check('…and a real click on ↺ there resets the map — the selection made a moment ago gone, the side panel as it was',
+    !!picked && afterReset.sel === null && afterReset.showing === 'stations', JSON.stringify({ picked, afterReset }));
 
   // Pinning from code, on this map, above a phone: nothing moves, nothing shows.
   await page.evaluate(() => MapChrome.setPinned('legend', true));
@@ -320,7 +362,7 @@ try {
     JSON.stringify(walked.slice(0, onScreen.length - 1)) === JSON.stringify(onScreen.slice(2).concat('help')),
     JSON.stringify(walked));
   await page.keyboard.press('End');
-  check('End goes to the last of them', (await look()).active === 'mn-map-reset', (await look()).active);
+  check('End goes to the last of them — ◫, now that ↺ is on the map', (await look()).active === 'mn-map-split', (await look()).active);
   await page.keyboard.press('Home');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
@@ -569,16 +611,28 @@ try {
     found.find === 'contour' && found.rows > 0 && found.rows < 12, JSON.stringify(found));
   await page.fill('#map-display-find', '');
   // Focus on one of the map's own buttons across the same rebuild: a new
-  // element, focused in place of the old one.
-  await page.focus('#help-panel .dock-strip .mn-map-reset');
+  // element, focused in place of the old one — in the strip (⛶), and in the
+  // map's corner (↺), which goes with the map itself rather than through the
+  // side panel, and was the one a keyboard user would otherwise have lost.
+  await page.focus('#help-panel .dock-strip .mn-map-full');
+  await page.evaluate(() => { document.querySelector('.mn-map-full').__probe = 'old'; renderMain(); });
+  await page.waitForTimeout(500);
+  const fullFocus = await page.evaluate(() => {
+    const a = document.activeElement;
+    return { cls: a && a.className, fresh: !!a && a.__probe !== 'old', inStrip: !!(a && a.closest('#help-panel .dock-strip')) };
+  });
+  check('…and focus on one of the map\'s own buttons in the strip lands on the new one',
+    /mn-map-full/.test(fullFocus.cls || '') && fullFocus.fresh && fullFocus.inStrip, JSON.stringify(fullFocus));
+  await page.focus('#leaflet-map .mn-map-reset');
   await page.evaluate(() => { document.querySelector('.mn-map-reset').__probe = 'old'; renderMain(); });
   await page.waitForTimeout(500);
   const resetFocus = await page.evaluate(() => {
     const a = document.activeElement;
-    return { cls: a && a.className, fresh: !!a && a.__probe !== 'old', inStrip: !!(a && a.closest('#help-panel .dock-strip')) };
+    return { cls: a && a.className, fresh: !!a && a.__probe !== 'old',
+             inCorner: !!(a && a.closest('#leaflet-map .leaflet-top.leaflet-right')) };
   });
-  check('…and focus on one of the map\'s own buttons lands on the new one',
-    /mn-map-reset/.test(resetFocus.cls || '') && resetFocus.fresh && resetFocus.inStrip, JSON.stringify(resetFocus));
+  check('…and focus on ↺, in the map\'s corner, lands on the new map\'s ↺',
+    /mn-map-reset/.test(resetFocus.cls || '') && resetFocus.fresh && resetFocus.inCorner, JSON.stringify(resetFocus));
   // The pane last open is the pane that opens when the tab comes back.
   await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
   await page.waitForTimeout(250);
@@ -629,6 +683,9 @@ try {
     f.sideTop === 0 && f.sideH === f.winH && f.stripH === f.winH && f.showing === 'stations'
       && f.topRight === 'side' && f.topLeft === 'map' && f.midSide === 'side', JSON.stringify(f));
   check('…and the map re-measured to its new size', f.leafletW === f.mapClientW, JSON.stringify(f));
+  const fullCorner = await cornerNow();
+  check('…with ↺ still alone at the top right of the full-screen map, under the pointer',
+    resetAlone(fullCorner), JSON.stringify(fullCorner));
   // The walls place every Tab themselves, so they have to stop wherever the
   // browser would — a <summary> included, or no card beside a full-screen map
   // could be opened or shut from the keyboard. From the filter box, the next
@@ -932,7 +989,8 @@ try {
       && (await wrapAt('display')).where === 'dock', JSON.stringify(s));
   check('…without forgetting where the cards were wanted', s.pref === 'stations'
     && await page.evaluate(() => state.mapSplit === true), JSON.stringify(s));
-  check('…and still nothing in the map\'s corner', (await cornerNow()).drawn.length === 0);
+  const foldCorner = await cornerNow();
+  check('…and still ↺ alone in the map\'s corner, at its top right', resetAlone(foldCorner), JSON.stringify(foldCorner));
 
   // ── 7b. A phone ──────────────────────────────────────────────────────────
   // On the Stations tab a phone's strip is a rail down the right-hand edge,
@@ -1002,8 +1060,9 @@ try {
     JSON.stringify(phone.strip) === JSON.stringify(PHONE_STRIP) && phone.square.every(([w, h]) => w === 44 && h === 44)
       && phone.panels.length === 6 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
     JSON.stringify(phone));
-  check('…the map ending where the rail begins, measured to it, and nothing standing in its corner',
-    p.map.r <= p.panel.l && p.leafletW === p.mapClientW && (await cornerNow()).drawn.length === 0, JSON.stringify(p));
+  const phoneCorner = await cornerNow();
+  check('…the map ending where the rail begins, measured to it, and only ↺ standing on it, at its top right',
+    p.map.r <= p.panel.l && p.leafletW === p.mapClientW && resetAlone(phoneCorner), JSON.stringify({ p, phoneCorner }));
   check('…the cards under the map, and nothing scrolling sideways', phone.cards && !phone.sideways, JSON.stringify(phone));
 
   // A panel from the rail, by the keyboard: a drawer beside the rail, over the
@@ -1108,19 +1167,30 @@ try {
     typingBack.focus === 'map-display-find' && typingBack.inSide && typingBack.showing === 'map-display' && !typingBack.backdrop,
     JSON.stringify(typingBack));
   await page.fill('#map-display-find', '');
-  // One of the map's own buttons: the same element, wherever it stands.
-  await page.focus('#help-panel .dock-strip .mn-map-reset');
+  // One of the map's own buttons: the same element, wherever it stands — ⛶ in
+  // the strip, and ↺ in the map's corner, which the crossing does not move.
+  const onBtn = (cls) => page.evaluate((c) => ({ on: !!document.activeElement?.classList.contains(c),
+    strip: !!document.activeElement?.closest('#help-panel .dock-strip'),
+    corner: !!document.activeElement?.closest('#leaflet-map .leaflet-top.leaflet-right'),
+    leafletW: state.map.getSize().x, mapClientW: document.getElementById('leaflet-map').clientWidth }), cls);
+  await page.focus('#help-panel .dock-strip .mn-map-full');
   await page.setViewportSize({ width: 375, height: 700 });
   await page.waitForTimeout(600);
-  const btnPhone = await page.evaluate(() => ({ reset: !!document.activeElement?.classList.contains('mn-map-reset'),
-    strip: !!document.activeElement?.closest('#help-panel .dock-strip') }));
+  const fullPhone = await onBtn('mn-map-full');
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.waitForTimeout(600);
-  const btnDesk = await page.evaluate(() => ({ reset: !!document.activeElement?.classList.contains('mn-map-reset'),
-    strip: !!document.activeElement?.closest('#help-panel .dock-strip'),
-    leafletW: state.map.getSize().x, mapClientW: document.getElementById('leaflet-map').clientWidth }));
-  check('focus on ↺ stays on ↺ in the strip across a phone\'s width, both ways',
-    btnPhone.reset && btnPhone.strip && btnDesk.reset && btnDesk.strip, JSON.stringify({ btnPhone, btnDesk }));
+  const fullDesk = await onBtn('mn-map-full');
+  check('focus on ⛶ stays on ⛶ in the strip across a phone\'s width, both ways',
+    fullPhone.on && fullPhone.strip && fullDesk.on && fullDesk.strip, JSON.stringify({ fullPhone, fullDesk }));
+  await page.focus('#leaflet-map .mn-map-reset');
+  await page.setViewportSize({ width: 375, height: 700 });
+  await page.waitForTimeout(600);
+  const btnPhone = await onBtn('mn-map-reset');
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.waitForTimeout(600);
+  const btnDesk = await onBtn('mn-map-reset');
+  check('…and focus on ↺ stays on ↺ in the map\'s corner, both ways',
+    btnPhone.on && btnPhone.corner && btnDesk.on && btnDesk.corner, JSON.stringify({ btnPhone, btnDesk }));
   // Coming up out of a phone's width the nav's rail goes back into the row
   // beside the map, and Leaflet — which measured itself on the resize, before
   // the rail had its width back — has to have been told.
@@ -1141,10 +1211,10 @@ try {
   const lastUp = await page.evaluate(() => {
     const a = document.activeElement, r = a.getBoundingClientRect();
     const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return { reset: a.classList.contains('mn-map-reset'), bottom: Math.round(r.bottom), winH: innerHeight, hit: !!t && (t === a || a.contains(t)) };
+    return { last: a.classList.contains('mn-map-split'), bottom: Math.round(r.bottom), winH: innerHeight, hit: !!t && (t === a || a.contains(t)) };
   });
-  check('at the top of a short phone\'s page, End in the rail brings ↺ up above the fold, under a finger',
-    lastUp.reset && lastUp.bottom <= lastUp.winH && lastUp.hit, JSON.stringify(lastUp));
+  check('at the top of a short phone\'s page, End in the rail brings its last button (◫) up above the fold, under a finger',
+    lastUp.last && lastUp.bottom <= lastUp.winH && lastUp.hit, JSON.stringify(lastUp));
   await page.evaluate(() => scrollTo(0, 1200));
   await page.waitForTimeout(200);
   await page.evaluate(() => setDockTab('map-legend', { instant: true }));
@@ -1289,9 +1359,9 @@ try {
   const end = await page.evaluate(() => {
     const strip = document.querySelector('#help-panel .dock-strip');
     const a = document.activeElement, r = a.getBoundingClientRect(), sr = strip.getBoundingClientRect();
-    return { reset: a.classList.contains('mn-map-reset'), inView: r.bottom <= sr.bottom + 0.5 && r.top >= sr.top - 0.5 };
+    return { last: a.classList.contains('mn-map-split'), inView: r.bottom <= sr.bottom + 0.5 && r.top >= sr.top - 0.5 };
   });
-  check('…and End reaches the last of them and scrolls it into view', end.reset && end.inView, JSON.stringify(end));
+  check('…and End reaches the last of them (◫) and scrolls it into view', end.last && end.inView, JSON.stringify(end));
   check('no pageerror with real scrollbars', errors.length === 0, errors.join(' | '));
 } finally {
   await classic.close();
@@ -1307,5 +1377,5 @@ if (failed.length) {
   for (const f of failed) console.log(`  ✗ ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
   process.exit(1);
 }
-console.log('PASS — one side panel: the cards, the help and every one of the map\'s controls, tabbed,');
-console.log('       resizable, beside the map in full screen, and nothing left behind or in the corner.');
+console.log('PASS — one side panel: the cards, the help and every one of the map\'s controls but ↺, tabbed,');
+console.log('       resizable, beside the map in full screen, nothing left behind, and ↺ alone in the corner.');

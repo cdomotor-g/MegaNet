@@ -705,7 +705,9 @@ the Stations map, at every width (`MapChrome.dockInto(map, host)`, the host
 being the side panel). There every panel is moved, whole, into a pane of the
 side panel with a button in its strip, and every plain button is moved into the
 strip itself — in the corner's groups and order, a labelled group each with the
-corner's hairline between them — and the corner is left holding nothing. The
+corner's hairline between them — and the corner is left holding one button: ↺
+reset, built with `corner: true` so the side panel is never offered it, because
+a control about the map as a whole is looked for on the map. The
 corner icon and the 📌 are hidden in a pane: a pane already stays open, and a pin
 there would change nothing anyone could see. On a phone the strip is a rail
 beside the map and a pane is a drawer from it. The controls used to come back
@@ -810,7 +812,7 @@ the page less than 400 px — or, on a window too narrow for both, never more th
 55 % of the room). On the Stations tab it is also the tab's right-hand
 column: the station cards are one wrapper moved into its Stations pane (📋),
 the path tools (the elevation profile and the link budget) a second wrapper
-moved into a pane of their own (〽️), and every one of the Stations map's controls is moved into its strip — a panel into
+moved into a pane of their own (〽️), and every one of the Stations map's controls but ↺ (which stays in the map's top-right corner) is moved into its strip — a panel into
 a pane of its own. None of them is ever re-rendered to get there, which is what
 lets the Leaflet map beside them keep its view. The strip scrolls when it is
 taller than the window, which with the map's controls in it it is on a laptop;

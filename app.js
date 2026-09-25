@@ -1644,21 +1644,23 @@ function invalidateMapSizes(delay) {
 //                  asked of the map rather than of the list, and they are the
 //                  cards the map itself sends people to (a drawn line, a
 //                  clicked radio path, the site finder's worst path).
-//   the Stations map's own controls, all of them — everything MapChrome would
-//                  otherwise have put in the map's top-right corner, in the
-//                  same groups and the same order, a hairline between groups
-//                  as there was there. A *panel* (🗺️ Map display, 🔑 Legend,
-//                  ✏️ Draw & measure, 📡 the polar plot, 🗼 the site finder,
-//                  🎚️ the 3-D settings) is a pane of this panel with a button
-//                  here; a plain *button* (ℹ️ What is here, ⛰️ 3-D and its two
-//                  camera buttons, ⛶ full screen, ◫ the cards, ↺ reset) is
+//   the Stations map's own controls, all of them but ↺ — everything MapChrome
+//                  would otherwise have put in the map's top-right corner, in
+//                  the same groups and the same order, a hairline between
+//                  groups as there was there. A *panel* (🗺️ Map display, 🔑
+//                  Legend, ✏️ Draw & measure, 📡 the polar plot, 🗼 the site
+//                  finder, 🎚️ the 3-D settings) is a pane of this panel with a
+//                  button here; a plain *button* (ℹ️ What is here, ⛰️ 3-D and
+//                  its two camera buttons, ⛶ full screen, ◫ the cards) is
 //                  moved into the strip itself and does what it always did.
 //
 // Those controls were in the map's corner, and for one release a panel came
 // here only when its 📌 was pressed. That left the right-hand edge of the page
 // two places to look for the same kind of tool, with a pin deciding which one
 // a given tool was in that day — so now it is one place, and the map's corner
-// holds nothing. At every width: a phone's too (see below).
+// holds only ↺, reset, which is about the map as a whole rather than one of
+// its tools and is looked for on it (stationsMapPanels). At every width: a
+// phone's too (see below).
 //
 // It keeps the help rail's interaction contract (#47 / README §20) — it
 // collapses to its strip rather than to nothing, it remembers which it was, and
@@ -1761,6 +1763,21 @@ let dockMapBuilt = false;
 // Focus that was inside one of the Stations map's controls when the map was
 // taken down to be built again, to be put back on the new one (dockSettle).
 let dockMapRefocus = null;   // { key, id } — id: the focused element's own id, if it had one
+
+// …and focus that was on ↺, the one control that stays in the map's corner, by
+// the class its module finds it by. Noted by renderMain() before it writes the
+// Stations tab over itself, because that takes the map's container — and ↺ in
+// it — off the page before the map is taken down: by the time the side panel
+// lets go of the old map's controls (dockDropMapItems), focus is already on
+// <body>. Strip buttons are outside <main> and survive to that point; ↺ does
+// not. dockSettle() gives it back.
+let mapCornerRefocus = null;
+
+function noteMapCornerFocus() {
+  const a = document.activeElement;
+  const inCorner = a && a !== document.body && a.closest && a.closest('#leaflet-map .leaflet-control-container');
+  mapCornerRefocus = inCorner ? [...a.classList].find(c => c.startsWith('mn-map-')) || null : null;
+}
 
 // px the side panel was last laid out at, strip included, and the pane it was
 // showing. What renderDock() compares against to decide whether the maps need
@@ -1884,19 +1901,19 @@ function dockStationsHere() {
 }
 
 // Whether the Stations map's controls belong in the side panel right now —
-// every one of them, whatever its pin says. Always, now. A phone used to be
-// the exception, where the side panel was only a drawer over the map it would
-// be describing and the controls went back to its corner as flyouts; but at
-// 44 px a finger's buttons are a column taller than a phone's map, which
-// wrapped into two, and two columns over a 390 px map are a quarter of it that
-// cannot be seen. So a phone
-// gives them a rail of their own beside the map (renderDock, has-map-tools)
-// and opens their panels as drawers from it. Full screen is no exception
-// either: it keeps the side panel on screen beside the map
-// (toggleMapFullscreen), so the tools stay where the operator's hand has learnt
-// they are. MapChrome asks this of the Stations map's host (stationsDockHost)
-// at every build and every redock, and would hand the controls back to the
-// corner if it ever said no.
+// every one of them, whatever its pin says, but ↺, which is built to stay on
+// the map and is never offered (MapChrome.button's `corner`). Always, now. A
+// phone used to be the exception, where the side panel was only a drawer over
+// the map it would be describing and the controls went back to its corner as
+// flyouts; but at 44 px a finger's buttons are a column taller than a phone's
+// map, which wrapped into two, and two columns over a 390 px map are a
+// quarter of it that cannot be seen. So a phone gives them a rail of their
+// own beside the map (renderDock, has-map-tools) and opens their panels as
+// drawers from it. Full screen is no exception either: it keeps the side
+// panel on screen beside the map (toggleMapFullscreen), so the tools stay
+// where the operator's hand has learnt they are. MapChrome asks this of the
+// Stations map's host (stationsDockHost) at every build and every redock, and
+// would hand the controls back to the corner if it ever said no.
 function dockAcceptsPanels() {
   return true;
 }
@@ -2609,6 +2626,7 @@ function dockDropMapItems() {
 
 function dockForgetRebuild() {
   dockMapRefocus = null;
+  mapCornerRefocus = null;
   dockStripScroll = 0;
 }
 
@@ -2643,11 +2661,19 @@ function dockSettle(built) {
   renderDock({ instant: true });
   const r = dockMapRefocus;
   dockMapRefocus = null;
+  const free = !document.activeElement || document.activeElement === document.body;
   const e = r && dockMapItems.get(r.key);
-  if (e && e.el && (!document.activeElement || document.activeElement === document.body)) {
+  if (e && e.el && free) {
     const to = e.kind === 'button' ? e.el
       : (r.id && e.el.querySelector(`#${CSS.escape(r.id)}`)) || e.tab;
     if (to && document.contains(to)) to.focus({ preventScroll: true });
+  }
+  // …or the new map's own ↺, in its corner (noteMapCornerFocus).
+  const corner = mapCornerRefocus;
+  mapCornerRefocus = null;
+  if (corner && free) {
+    const to = document.querySelector(`#leaflet-map .leaflet-control-container .${CSS.escape(corner)}`);
+    if (to) to.focus({ preventScroll: true });
   }
   const showing = dockShowing();
   const s = showing && dockMapItems.get(showing);
@@ -2791,8 +2817,11 @@ function renderMain() {
     // The cards go to wherever they belong before anything paints into them or
     // measures them, and before the map is built — so the side panel is at its
     // final width when Leaflet takes the map's size, and has nothing to
-    // re-measure afterwards.
-    case 'stations':   el.innerHTML = renderStationsHtml();
+    // re-measure afterwards. And ↺, on the map, goes with the markup this
+    // writes over, before the map it stands on is taken down — so focus on it
+    // is noted first (noteMapCornerFocus).
+    case 'stations':   noteMapCornerFocus();
+                       el.innerHTML = renderStationsHtml();
                        syncStationsCardsHome({ instant: true, remeasure: false });
                        initStationFilters(); initMap(); break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
@@ -3773,12 +3802,20 @@ function stationsMapPanels(map) {
 
   // ── And the one that takes something away ──────────────────────────────────
   // Reset (#191) — the one button that puts the map back the way it was found.
-  // A group of its own, at the bottom, for the reason it was last in the column
-  // before there were any groups: it is the destructive one, and a button that
-  // throws work away should not sit where a hand reaching for full screen can
-  // find it first. The hairline above it is that sentence, drawn.
+  // A group of its own, for the reason it was last in the column before there
+  // were any groups: it is the destructive one, and a button that throws work
+  // away should not sit where a hand reaching for full screen can find it
+  // first.
+  //
+  // **And the one control that stays on the map** (`corner`), alone in its
+  // top-right corner while everything else is in the side panel's strip, at
+  // every width. It is about the map as a whole rather than one of its tools —
+  // it is what somebody looking at a map in a state they want out of reaches
+  // for, and they are looking at the map when they do — so it is on the map,
+  // where the column of controls used to begin. It keeps its distance from
+  // full screen there for free: that is a strip away.
   MapChrome.button(map, {
-    className: 'mn-map-reset', icon: '↺', group: 'reset', order: 10,
+    className: 'mn-map-reset', icon: '↺', group: 'reset', order: 10, corner: true,
     title: 'Reset the map — clears the filters, the selection, every drawing and every card',
     ariaLabel: 'Reset the map',
     onClick: () => resetStationsMap(),

@@ -654,9 +654,13 @@ const reachable = await page.evaluate(() => {
     // beside the map rather than on it — ⛰️ and ⛶ as themselves, Map display
     // and the 3-D settings as their panes' buttons. Off the map they are out of
     // the canvas's reach whatever its z-index, and this still proves it: the
-    // thing under the pointer where each is drawn is that control.
+    // thing under the pointer where each is drawn is that control. And ↺, the
+    // one control still *on* the map, in its top-right corner: the one the
+    // canvas's z-index is actually standing between, and so the one that says
+    // the window below the corners is right.
     probes: ['.mn-map-3d', '.mn-map-full', '#help-panel .dock-tab[data-dock="map-display"]',
-             '#help-panel .dock-tab[data-dock="map-3d"]'].map(probe),
+             '#help-panel .dock-tab[data-dock="map-3d"]',
+             '#leaflet-map .leaflet-top.leaflet-right .mn-map-reset'].map(probe),
   };
 });
 // The window, not a magic number: above the popup pane (700, the highest

@@ -9,9 +9,10 @@
 //                   when it is clicked, tapped or opened with Enter, and that
 //                   can be pinned open, which docks it into the corner for
 //                   good — or a plain button that does one thing. A map that
-//                   has a side panel beside it hands the whole column to that
+//                   has a side panel beside it hands the column to that
 //                   instead, panels and buttons alike, whenever the side panel
-//                   will take them (dockInto).
+//                   will take them (dockInto) — all but a button built to stay
+//                   on the map (`corner`: the Stations map's ↺).
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc and escAttr, and across to
@@ -52,11 +53,14 @@
 // an operator who pins the legend means it.
 //
 // ── …and a map that has somewhere better to put all of it (the side panel) ──
-// On the Stations map nothing stays in the corner at all. That map has the
-// app's side panel beside it (#help-panel, app.js), and the whole column goes
-// there instead: every panel is moved into a pane of its own with a button in
-// the side panel's strip, and every plain button is moved into that strip
-// itself, in the same groups and the same order it would have had here.
+// On the Stations map one button stays in the corner, and nothing else does.
+// That map has the app's side panel beside it (#help-panel, app.js), and the
+// column goes there instead: every panel is moved into a pane of its own with a
+// button in the side panel's strip, and every plain button is moved into that
+// strip itself, in the same groups and the same order it would have had here.
+// The one that stays is ↺, built with `corner` (see button()): it resets the
+// map, and a control about the map as a whole is looked for on the map — so it
+// is the whole of the top-right corner, where the column used to begin.
 //
 // It went there in two steps, and the first one is worth remembering because
 // it is the one that was wrong. The side panel first took a panel only when
@@ -727,7 +731,9 @@ const MapChrome = (function () {
     const home = homes.get(el);
     if (!home) return null;
     const host = hostOf(el);
-    const want = !!(host && host.accepts());
+    // A control built to stay on the map (opts.corner) is never offered: it
+    // is in the corner whatever the host would take.
+    const want = !!(host && !home.opts.corner && host.accepts());
     const docked = el.classList.contains('is-docked');
     if (!want && !docked && !el.parentNode) { place(home.map, el, home.opts); return null; }
     if (want === docked) return null;
@@ -835,7 +841,8 @@ const MapChrome = (function () {
     },
 
     // Hand this map's whole corner to a side panel: every panel and every plain
-    // button built on it from now on, whenever the host will take them.
+    // button built on it from now on, whenever the host will take them — all
+    // but a button built to stay (`corner`), which the host is never offered.
     // `host` answers three things (app.js, stationsDockHost):
     //
     //   accepts()          will it take this map's controls right now? Asked on
@@ -901,6 +908,11 @@ const MapChrome = (function () {
     //   group / order / pair   where it goes — see place() above
     //   id        optional: what a host keys it by, when its first class is
     //             not a name of its own
+    //   corner    stays in the map's corner even on a map that hands its
+    //             corner to a side panel (dockInto): a control that is about
+    //             the map as a whole, and is looked for on it. The Stations
+    //             map's ↺ is the one — alone in the top-right corner, with
+    //             every other control of that map in the side panel
     //
     // Returns the button, for a caller that wants to go on syncing it. It is
     // already in the document — in the corner, or in the host's strip — so a

@@ -3129,12 +3129,13 @@ hr {
                          should not be sharing pixels with the map under it.
                          Remembered between visits — see state.mapPanelsPinned.
 
-   On the Stations map none of this is on the map, at any width: every panel
-   and every button leaves the corner for the side panel beside it, a pane and
-   a strip button each (MapChrome.dockInto; the rules are with #help-panel's),
-   and the corner holds nothing — a phone's included, where the strip is a
-   rail beside the map and a pane is a drawer from it. Everything in this block
-   is what the six other maps' corners are, at every width.
+   On the Stations map none of the panels is on the map, at any width: every
+   panel and every button but one leaves the corner for the side panel beside
+   it, a pane and a strip button each (MapChrome.dockInto; the rules are with
+   #help-panel's) — a phone's included, where the strip is a rail beside the
+   map and a pane is a drawer from it. The one that stays is ↺, alone in the
+   top-right corner and drawn as the buttons below are drawn. Everything else
+   in this block is what the six other maps' corners are, at every width.
 
    Neither state is a modal and neither traps focus: this is a disclosure, the
    button says so with aria-expanded, and Shift+Tab off the first control in
@@ -7071,7 +7072,7 @@ hr {
 }
 
 /* The map's own buttons, moved into the strip whole — ℹ️, ⛰️ and its camera
-   pair, ⛶, ◫, ↺ — dressed as the strip's own buttons rather than as the
+   pair, ⛶, ◫ (↺ stays on the map) — dressed as the strip's own buttons rather than as the
    shadowed chips they are on the map, where they have to stand out from the
    tiles. Everything that is theirs stays theirs: the icon span, the class
    their modules find them by, and the state those modules write on them. */
@@ -7107,13 +7108,6 @@ hr {
 
 .dock-strip .mn-mapctl-btn.mn-map-3d.is-on {
   background: var(--accent);
-}
-
-/* ↺ says what it is on hover, as it does on the map. */
-.dock-strip .mn-map-reset:hover,
-.dock-strip .mn-map-reset:focus-visible {
-  border-color: var(--bad);
-  color: var(--bad);
 }
 
 .dock-ico {
@@ -7388,10 +7382,11 @@ body.mn-dock-dragging {
    was taller than the map, covering a quarter of the thing the phone was
    opened to look at. So they keep the rail they have on a desktop — the strip
    down the right-hand edge, sticky under the banner, taking its width from the
-   page so the map ends where the rail begins and nothing stands on it — and a
-   pane opens as a drawer beside the rail rather than beside the page. The rail
-   stays lit over the backdrop with it, so its buttons go on switching panes and
-   the lit one puts its drawer away again. */
+   page so the map ends where the rail begins and only ↺ stands on it, alone in
+   its top-right corner as at every width — and a pane opens as a drawer beside
+   the rail rather than beside the page. The rail stays lit over the backdrop
+   with it, so its buttons go on switching panes and the lit one puts its
+   drawer away again. */
 @media (max-width: 560px) {
   /* 44 px buttons and a hair either side of them. The desktop rail keeps room
      for a scrollbar beside its buttons; a phone's scrollbar floats over what it

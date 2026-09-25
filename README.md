@@ -820,10 +820,11 @@ Each entry in the `stations` array represents one node in the network. A node ca
   are for and separated by a hairline: what the map **shows** (base map — OSM-Topo by default,
   OpenStreetMap, Satellite or Dark — **Map display**, the **legend**), the tools you point at it
   (**Draw & measure**, **Polar radio coverage**, **Repeater site finder**, **What is here**), the **3-D view**, its
-  settings (🎚️) and its camera, how much screen the map gets (⛶ full screen, ◫ the cards beside the map or under it),
-  and ↺ reset on its own at the bottom. A panel opens as a pane of the side panel from its button in the strip; a
-  button does its one thing; the map's top-right corner is left empty. On a phone the strip is a rail down the
-  right-hand edge, beside the map rather than on it, and a panel opens from it as a drawer over the page
+  settings (🎚️) and its camera, and how much screen the map gets (⛶ full screen, ◫ the cards beside the map or
+  under it). A panel opens as a pane of the side panel from its button in the strip; a button does its one thing.
+  The one control left on the map is ↺ reset, alone in its top-right corner at every width. On a phone the strip
+  is a rail down the right-hand edge, beside the map rather than on it, and a panel opens from it as a drawer over
+  the page
 
 **Reading the map.** Every pin carries a white ring so it separates from the
 base map and from its neighbours; ACMA transmitter squares carry the same ring.
@@ -1017,12 +1018,14 @@ where a sighted operator is shown a hairline; a separator that existed only in
 the stylesheet would have made the corner prettier and no more navigable. And
 when a corner is taller than its map, the groups that do not fit wrap, whole,
 into a second column over the map rather than hanging off the bottom edge. The
-Stations map's column is not on the map at all, at any width: it stands in the
-side panel's strip, in the same groups and the same order with the same
-hairlines and the same ARIA names (§20) — on a phone, a rail beside the map.
-That is where it went last, and the phone is why. Below 560 px it used to come
-back to the corner, where at 52 dvh with 44 px touch targets it was two columns
-of buttons over a quarter of a map the width of the screen.
+Stations map's column is not on the map, at any width: it stands in the side
+panel's strip, in the same groups and the same order with the same hairlines
+and the same ARIA names (§20) — on a phone, a rail beside the map. That is
+where it went last, and the phone is why. Below 560 px it used to come back to
+the corner, where at 52 dvh with 44 px touch targets it was two columns of
+buttons over a quarter of a map the width of the screen. The one button left
+in the corner is ↺ reset, alone at the top right: it is about the map as a
+whole rather than one of its tools, and it is looked for on the map.
 
 **The 3-D pair is one split button, and it has a camera (#192).** The mountain
 and its panel share an edge now, the panel drawn as a thin caret under the
@@ -3377,9 +3380,10 @@ settled rather than during the slide. Where it differs:
   Escape. What it opens from depends on the tab:
   - **On the Stations tab the strip is still a rail** down the right-hand edge,
     48 px wide, sticky under the banner and taking its width from the page — so
-    the map ends where the rail begins and nothing stands on it. It holds ❔ and
-    every one of the map's controls, in the same groups and order as on a
-    desktop; a panel's drawer opens on the rail's inner edge, and the rail stays
+    the map ends where the rail begins and only ↺, in its top-right corner,
+    stands on it. It holds ❔ and every other one of the map's controls, in the
+    same groups and order as on a desktop; a panel's drawer opens on the rail's
+    inner edge, and the rail stays
     lit above the backdrop, so its buttons go on switching panes and the lit one
     puts its drawer away. The rail and its drawer run to the foot of the screen
     once the banner has scrolled away, and the last button can be scrolled up
@@ -3447,13 +3451,15 @@ those two are open on this exact path.
 
 **The Stations map's controls.** Everything MapChrome would put in the map's
 top-right corner lives in the strip instead, at every width — a phone's rail
-included, where a pane is a drawer — and the corner holds nothing. Each panel — 🗺️ Map display, 🔑 Legend, ✏️ Draw & measure,
+included, where a pane is a drawer — except ↺ reset, which is built to stay
+(`corner: true` on `MapChrome.button`, so the side panel is never offered it)
+and is the one thing in that corner. Each panel — 🗺️ Map display, 🔑 Legend, ✏️ Draw & measure,
 📡 Polar radio coverage, 🗼 Repeater site finder, 🎚️ the 3-D settings — moves
 its whole `.mn-mapctl` wrapper (icon, heading, pin and body) into a pane of its
 own the moment it is built, with a button in the strip; its corner icon and its
-📌 are hidden there, because a pane already stays open. Each plain button — ℹ️,
-⛰️ and its two camera buttons (hidden until 3-D is on), ⛶, ◫, ↺ — is moved into
-the strip itself, keeping the class its module finds it by. They stand in the
+📌 are hidden there, because a pane already stays open. Each other plain button
+— ℹ️, ⛰️ and its two camera buttons (hidden until 3-D is on), ⛶, ◫ — is moved
+into the strip itself, keeping the class its module finds it by. They stand in the
 corner's groups and order (`MapChrome.groups()`), one labelled group each with a
 hairline between them, and the strip scrolls, with a thin bar beside the
 buttons rather than over them, when it is taller than the window. Building the
@@ -3461,8 +3467,8 @@ map opens nothing: which pane shows is the side panel's own preference, and a
 fresh visit still opens on 📋. The map is rebuilt on every render of the tab,
 and its new controls land in the *same* panes and strip buttons, so the pane
 that was showing stays showing, a focused strip button keeps focus, focus on a
-control of the old map goes to the same control of the new one, and the pane's
-scroll comes back. The pin (`mn-map-panels`) means what it always did only where
+control of the old map goes to the same control of the new one — ↺ in the
+corner included — and the pane's scroll comes back. The pin (`mn-map-panels`) means what it always did only where
 a panel is in a corner: on the other six Leaflet maps, which keep their corners
 because none of them sits beside the side panel (`MapChrome.dockInto` is per
 map). This used to be opt-in, a panel moving in
