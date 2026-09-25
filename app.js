@@ -1857,7 +1857,14 @@ function dockAcceptsPanels() {
 // over; the entries outlive the tab (see dockMapItems), their buttons do not.
 function dockMapListed(e) {
   if (state.activeTab !== 'stations') return false;
-  return e.state === 'held' || (e.state === 'gap' && e.kind === 'panel' && !!state.data);
+  // 'away' counts too once the host would take it back: a panel that went to
+  // a phone's corner and is coming back to a desktop build is about to be a
+  // pane again, and the side panel has to be open at its final width before
+  // L.map() takes its size (dockHas says why) — or the first fit is made
+  // against a map ~420 px wider than it ends up, and the view comes up off
+  // centre.
+  if (e.kind !== 'panel' || !state.data) return e.state === 'held';
+  return e.state === 'held' || e.state === 'gap' || (e.state === 'away' && dockAcceptsPanels());
 }
 
 // A map panel's pane counts as there while it is listed — including while its
@@ -2265,7 +2272,19 @@ function dockStripKey(e) {
 function dockReveal(el) {
   const pane = el && el.closest ? el.closest('#help-panel .dock-pane') : null;
   if (!pane) return false;
+  const was = document.activeElement;
   if (dockShowing() !== pane.dataset.dock) setDockTab(pane.dataset.dock, { instant: true });
+  // The press that asked for the card is often in the pane that has just
+  // gone — the site finder's "Profile the worst path", Draw & measure's
+  // "Finish line" — and a focused element that loses its box leaves focus on
+  // <body>, with the next Tab starting from the top of the page. So focus
+  // follows the reveal to the card it was for: its summary if it has one, else
+  // its first control.
+  if (was && was !== document.body && !was.getClientRects().length) {
+    const to = el.querySelector('summary, button:not([disabled]), a[href], input:not([disabled]), '
+                              + 'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    if (to && to.getClientRects().length) to.focus({ preventScroll: true });
+  }
   return true;
 }
 
@@ -2438,7 +2457,11 @@ function dockAdopt(el, info) {
   renderDock({ instant: true });
   const f = info.focused;
   if (!f || e.kind !== 'panel') return null;
-  if (f.classList && f.classList.contains('mn-mapctl-btn')) return e.tab;
+  // The side panel hides a panel's corner icon and its 📌 (it has a button of
+  // its own for the panel, and a pin there would change nothing anyone could
+  // see), and focus left on a hidden element is focus on <body>. Either goes
+  // to the panel's strip button instead.
+  if (f.matches && f.matches('.mn-mapctl-btn, .mn-mapctl-pin')) return e.tab;
   if (dockShowing() !== key) setDockTab(key, { instant: true });
   return null;
 }
@@ -2493,6 +2516,11 @@ function dockDropMapItems() {
   }
 }
 
+function dockForgetRebuild() {
+  dockMapRefocus = null;
+  dockStripScroll = 0;
+}
+
 // How far down the strip was scrolled when the map's controls last left it for
 // a rebuild — the strip is taller than the window on a laptop, and a render of
 // the tab should not send it back to the top under the operator's pointer.
@@ -2509,7 +2537,12 @@ let dockStripScroll = 0;
 // id of its own — that panel's strip button, which is the nearest thing to it
 // that is still there. Only when nothing else has taken focus in the meantime.
 function dockSettle(built) {
-  if (built) dockMapBuilt = true;
+  // Only a build that handed its controls to the side panel says which panes
+  // exist. A phone build hands none over, and counting it would make a pane
+  // remembered from the desktop look gone the next time the window is wide —
+  // shutting the side panel under the build and fitting the map to a width it
+  // then loses.
+  if (built && dockAcceptsPanels()) dockMapBuilt = true;
   for (const [key, e] of dockMapItems) {
     if (e.state !== 'gap') continue;
     if (e.pane) e.pane.remove();
@@ -3249,7 +3282,19 @@ function dropStationsCards() {
 // the map's height — which is the window's beside the cards and the page's
 // under them.
 function stationsLayoutChanged() {
+  // Full screen and the fold together: the cards leave the side panel for
+  // their place under the map — which the full-screen map covers — and focus
+  // carried with them (syncStationsCardsHome) would be typing into a search
+  // box nobody can see. So it goes to ◫, the control that says where the
+  // cards went, and failing that to the map.
+  const cards = document.getElementById('stations-cards');
+  const hidFocus = state.mapFullscreen && cards && cards.contains(document.activeElement);
   if (state.activeTab === 'stations') syncStationsCardsHome({ instant: true });
+  if (hidFocus && cards.closest('#stations-main')) {
+    const to = [document.querySelector('#help-panel .mn-map-split'), document.getElementById('leaflet-map')]
+      .find(n => n && n.getClientRects().length);
+    if (to) to.focus({ preventScroll: true });
+  }
   // ◫ describes where the cards are, and crossing the fold has just moved them.
   syncMapSplitBtn(document.querySelector('.mn-map-split'));
   syncStationsTableCols();
@@ -3338,8 +3383,16 @@ function syncMapFullBtn(b) {
 // disabled, not taken out of the order with tabindex="-1", and one stop per
 // radio group — the checked one, or the first when none is.
 function mapFullTabStops(roots) {
+  // Everything the browser itself would stop on. `summary` is the one that is
+  // easy to forget and costly to: it is the only way to open a <details>, and
+  // without it no disclosure beside a full-screen map — the Stations list
+  // card, the link budget, Place by numbers, the ACMA options — could be
+  // opened from the keyboard at all. Only a details' own first summary counts,
+  // and only when it is drawn (the rect check below drops one inside a shut
+  // details, whose contents have no box).
   const sel = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), '
-            + 'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+            + 'textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), '
+            + 'details > summary:first-of-type, [contenteditable]:not([contenteditable="false"])';
   const radios = new Map();   // the form or root a radio group is in → the group names already stopped at
   const out = [];
   for (const root of roots) {
@@ -3396,12 +3449,32 @@ function syncMapFullEsc() {
       // dialog onto the map behind it.
       const active = document.activeElement;
       if (active && active.closest && active.closest('#app-modal, [aria-modal="true"]')) return;
-      const side = isPhoneNav() ? null : document.getElementById('help-panel');
+      // A phone keeps the old walls exactly: one place on screen, so the
+      // browser moves focus itself and only the two ends wrap round.
+      if (isPhoneNav()) {
+        const items = mapFullTabStops([panel]);
+        if (!items.length) return;
+        const at = items.indexOf(active);
+        if (e.shiftKey) { if (at <= 0) { e.preventDefault(); items[items.length - 1].focus(); } }
+        else if (at < 0 || at === items.length - 1) { e.preventDefault(); items[0].focus(); }
+        return;
+      }
+      const side = document.getElementById('help-panel');
       const items = mapFullTabStops([panel, side]);
       if (!items.length) return;
-      const at = items.indexOf(document.activeElement);
+      let at = items.indexOf(active);
+      // Focus can be somewhere that is not a stop of its own — a click on a
+      // card's body, a control that has just gone to tabindex -1. Inside one of
+      // the two places, the next stop is the one after it in the page, not the
+      // first stop on the map.
+      if (at < 0 && active && (panel.contains(active) || (side && side.contains(active)))) {
+        const after = items.findIndex(n => active.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING);
+        at = after < 0 ? items.length - 0.5 : after - 0.5;
+      }
       e.preventDefault();
-      const next = e.shiftKey ? items[(at <= 0 ? items.length : at) - 1] : items[(at + 1) % items.length];
+      const i = at === -1 ? (e.shiftKey ? items.length - 1 : 0)
+              : e.shiftKey ? Math.ceil(at) - 1 : Math.floor(at) + 1;
+      const next = items[((i % items.length) + items.length) % items.length];
       next.focus();
     };
     document.addEventListener('keydown', mapFullEscListener);
@@ -4515,7 +4588,12 @@ function initMap() {
   // Before the early return below, so a render that finds no container still
   // leaves a teardown registered for the render that built one. Keyed by name
   // and safe to repeat — this runs on every render of the tab (#142).
-  registerTabTeardown('Stations', stopStationsMap);
+  // A teardown for leaving the tab is not a rebuild: whatever
+  // dockDropMapItems wrote down to give back to the next map (the focus that
+  // was inside a pane, the strip's scroll) belongs to a map that is not
+  // coming back until somebody returns — and then focus would be thrown onto a
+  // strip button nobody pressed. So leaving forgets it.
+  registerTabTeardown('Stations', () => { stopStationsMap(); dockForgetRebuild(); });
   // The cards, when they are in the side panel: leaving the tab has to take
   // them out of it, for the reasons at dropStationsCards(). The pane's button
   // goes with them in the repaint switchTab() makes straight after, which is

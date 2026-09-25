@@ -589,6 +589,21 @@ try {
     f.sideTop === 0 && f.sideH === f.winH && f.stripH === f.winH && f.showing === 'stations'
       && f.topRight === 'side' && f.topLeft === 'map' && f.midSide === 'side', JSON.stringify(f));
   check('…and the map re-measured to its new size', f.leafletW === f.mapClientW, JSON.stringify(f));
+  // The walls place every Tab themselves, so they have to stop wherever the
+  // browser would — a <summary> included, or no card beside a full-screen map
+  // could be opened or shut from the keyboard. From the filter box, the next
+  // disclosure down is the Stations list's own summary.
+  await page.focus('#station-search-quick');
+  let sumAt = null;
+  for (let i = 0; i < 40 && !sumAt; i++) {
+    await page.keyboard.press('Tab');
+    sumAt = await page.evaluate(() => {
+      const a = document.activeElement;
+      return a && a.tagName === 'SUMMARY' ? (a.closest('.panel') || {}).id || 'summary' : null;
+    });
+  }
+  check('in full screen Tab stops on a card\'s <summary> — the Stations list\'s, after the filter box',
+    sumAt === 'stations-list-card', String(sumAt));
   // The side panel works in full screen: a pane changes, the panel shuts and
   // opens, the handle moves — and the map's edge follows each, re-measured.
   await page.click('#help-panel .dock-tab[data-dock="map-display"]');
@@ -735,6 +750,32 @@ try {
   check('<main>\'s own heading says it holds the map alone while the cards are beside it',
     await page.evaluate(() => document.getElementById('stations-main-h')?.textContent === 'Stations — map'));
 
+  // A line drawn from the ✏️ pane is drawn to see the ground under it, and the
+  // card that shows that is in the Stations pane — which the ✏️ pane hides.
+  // Finishing the line brings the card up, and focus, which was on Finish
+  // line in the pane that just went, goes with it rather than to <body>.
+  await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
+  await page.waitForTimeout(250);
+  await page.locator('#map-draw-panel .draw-tool', { hasText: 'Line' }).click();
+  const mb = await page.evaluate(() => { const r = document.getElementById('leaflet-map').getBoundingClientRect();
+    return { x: r.left + r.width * 0.35, y: r.top + r.height * 0.5, w: r.width }; });
+  await page.mouse.click(mb.x, mb.y);
+  await page.waitForTimeout(150);
+  await page.mouse.click(mb.x + mb.w * 0.2, mb.y + 40);
+  await page.waitForTimeout(150);
+  await page.click('#draw-finish');
+  await page.waitForTimeout(400);
+  const drew = await page.evaluate(() => {
+    const el = document.getElementById('path-profile-panel');
+    const a = document.activeElement;
+    return { showing: dockShowing(), visible: !!el && el.checkVisibility(), lines: state.draw.shapes.filter(x => x.kind === 'line').length,
+             focus: a ? a.tagName : null, focusSeen: !!(a && a !== document.body && a.getClientRects().length) };
+  });
+  check('finishing a line from the ✏️ pane brings its elevation profile up, with focus on something that is on screen',
+    drew.lines === 1 && drew.showing === 'stations' && drew.visible && drew.focusSeen, JSON.stringify(drew));
+  await page.evaluate(() => { MapDraw.setTool(''); state.draw.shapes = []; state.draw.selectedId = null; MapDraw.render(); MapDraw.rerenderPanel(); });
+  await page.waitForTimeout(200);
+
   // ── 7. ◫, the fold, a phone ──────────────────────────────────────────────
   await page.evaluate(() => { state.map.__probe = 'same'; });
   await page.click('#help-panel .dock-strip .mn-map-split');
@@ -865,6 +906,21 @@ try {
     typingBack.focus === 'map-display-find' && typingBack.inSide && typingBack.showing === 'map-display',
     JSON.stringify(typingBack));
   await page.fill('#map-display-find', '');
+  // A pane somebody typed in and then left — focus back on the map — goes to
+  // a phone's corner shut, like every other panel nobody is in. The focusin
+  // promotion used to mark it open while it was a pane, and it came back as a
+  // flyout over the map that nobody had asked for.
+  await page.focus('#map-display-find');
+  await page.keyboard.type('x');
+  await page.fill('#map-display-find', '');
+  await page.evaluate(() => document.getElementById('leaflet-map').focus());
+  await page.setViewportSize({ width: 375, height: 700 });
+  await page.waitForTimeout(600);
+  const leftShut = await wrapAt('display');
+  check('a pane that was typed in, then left, comes back to a phone\'s corner shut',
+    leftShut.where === 'corner' && !leftShut.shown && !leftShut.pinned, JSON.stringify(leftShut));
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.waitForTimeout(600);
   // One of the map's own buttons: the same element, wherever it stands.
   await page.focus('#help-panel .dock-strip .mn-map-reset');
   await page.setViewportSize({ width: 375, height: 700 });

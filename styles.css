@@ -6987,6 +6987,22 @@ hr {
   transform: translateY(.5px);
 }
 
+/* The strip scrolls when it is taller than the window, and a scroller clips
+   what is drawn outside its content box — which is where a focus ring normally
+   sits. With a classic scrollbar there is half a pixel either side of a 44 px
+   button, and the ring lost both its sides. Drawn inside the button instead,
+   the way #main-content draws its own, it is whole at every width. */
+.dock-strip :focus-visible {
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
+/* …and its halo, which is a spread shadow outside the button, is clipped with
+   it — so it goes, except on the button that is on, whose inset accent ring is
+   that button's own state and has to stay while it has focus. */
+.dock-strip :focus-visible:not(.is-on) {
+  box-shadow: none;
+}
+
 /* The help button's "?" is text, so it is set as text: heavier and a touch
    larger than the emoji beside it, so the two read as the same size of mark. */
 .dock-tab.help-toggle .dock-ico {
@@ -11788,6 +11804,13 @@ code {
     color: #000;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 8pt;
+  }
+
+  /* A map printed while it is full screen: the side panel it leaves room for
+     on screen is hidden below, so the room goes too, or the sheet carries a
+     blank band the width of a panel nobody can see. */
+  .map-panel.is-full {
+    inset: 0;
   }
 
   /* The shell. None of it is part of a form. */

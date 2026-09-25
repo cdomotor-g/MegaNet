@@ -742,6 +742,13 @@ const MapChrome = (function () {
       return to || had;
     }
     el.classList.remove('is-docked');
+    // Coming back shut is the rule both ways, and it has to be written on the
+    // way back too: a pane that was clicked or tabbed into picked up is-open
+    // from the focusin promotion (now skipped while docked, below, but a panel
+    // docked before that guard existed could still carry it), and it would
+    // otherwise come back to a phone as an open flyout over the map that
+    // nobody asked for. `had` puts is-open back for the one case that wants it.
+    if (panel) el.classList.remove('is-open', 'is-shut');
     const tabHad = !!host.release(el, info);
     place(home.map, el, home.opts);
     if (!panel) return had;
@@ -1037,6 +1044,10 @@ const MapChrome = (function () {
       // toggle close what the click was opening.
       L.DomEvent.on(wrap, 'focusin', e => {
         if (e.target === btn) return;
+        // A pane in the side panel is already open, and is-open means nothing
+        // there — except that it would come back with the panel to a phone's
+        // corner as a flyout left open over the map.
+        if (wrap.classList.contains('is-docked')) return;
         if (wrap.classList.contains('is-open') || state.mapPanelsPinned.has(id)) return;
         if (!(e.target.matches && e.target.matches(':focus-visible'))) return;
         wrap.classList.add('is-open');

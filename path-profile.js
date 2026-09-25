@@ -1433,7 +1433,17 @@ const PathProfile = (function () {
     hoverGeom = null;
     MapDraw.clearProfilePoint();
     el.hidden = false;
+    // Focus in the card goes with the markup it was on, and the card is
+    // redrawn whenever the ground or the cover arrives — so a keyboard user
+    // who opened it, or was sent to it, would find themselves on the page.
+    // It goes back to the same control, or failing that to the card's header.
+    const f = document.activeElement;
+    const back = f && f !== el && el.contains(f) ? (f.id || 'summary') : '';
     el.innerHTML = sh ? panelHtml() : emptyHtml();
+    if (back) {
+      const to = (back !== 'summary' && document.getElementById(back)) || el.querySelector('summary');
+      if (to) to.focus({ preventScroll: true });
+    }
     // A flip re-walks the terrain, so the button that was pressed is replaced
     // twice — by the "Sampling…" line and then by the new chart's own button.
     // Focus goes back to it once it exists again, so a keyboard user can flip

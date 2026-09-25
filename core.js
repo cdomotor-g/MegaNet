@@ -236,7 +236,7 @@ const HELP = {
            + 'link budget and the station details, one column that scrolls on its own. Press the '
            + 'button of the pane that is showing and the side panel shuts, giving the map the '
            + 'width; drag its left edge (or focus it and use the arrow keys) to make it wider or '
-           + 'narrower. The map\'s own controls are in that strip too, under 📋, in groups with a '
+           + 'narrower. The map\'s own controls are in that strip too, below the side panel\'s own buttons, in groups with a '
            + 'hairline between them: what the map <em>shows</em> (🗺️ <strong>Map display</strong>, '
            + 'base maps first, and 🔑 the legend), the tools you point at it (✏️ <strong>Draw &amp; '
            + 'measure</strong>, 📡 <strong>Polar radio coverage</strong>, <strong>🗼 Repeater site '
@@ -362,7 +362,7 @@ const HELP = {
       '<strong>Limit link length</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
       + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 100 km; '
-      + 'the <strong>Map display</strong> panel on the map says how many links were drawn and how '
+      + '🗺️ <strong>Map display</strong> (in the side panel\'s strip; on a phone, on the map) says how many links were drawn and how '
       + 'many were culled, so check that before concluding the path isn\'t there.',
       'The strip belongs to the box the caret is in and goes when focus leaves it — the results '
       + 'are kept, so clicking back into the box brings the same strip back without a second '
@@ -411,8 +411,8 @@ const HELP = {
       'The 🗺️ <strong>Map display</strong> panel has a <strong>Find a control</strong> box at the '
       + 'top of it. Type into it and the panel filters down to the rows that match — against the '
       + 'label, its note and its tooltip, so "wind", "dB", "contour" and "licence" all land '
-      + 'somewhere. It filters what is drawn and switches nothing off, and the panel opens as '
-      + 'tall as the map so there is something for it to filter.',
+      + 'somewhere. It filters what is drawn and switches nothing off; in the side panel the '
+      + 'pane is the full height of the window, so there is plenty for it to filter.',
       'The ◫ button beside ⛶ chooses where the station cards go: in the <strong>side '
       + 'panel</strong> beside the map (📋), the map filling the height of the window and the '
       + 'cards scrolling on their own, or back under the map in one long page. Beside it is how '
