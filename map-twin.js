@@ -164,22 +164,29 @@ const MapTwin = (function () {
     // buttons top-left, ↺ top-right — stand above this overlay on purpose
     // (the same window the 3-D canvas works in), and a bar under them would
     // put its first and last buttons behind them.
+    // One row, whatever the width: the words on the buttons go below `sm`
+    // the way the banner's do (.hdr-label), the title truncates, and the
+    // status and the credit line are each one line with the whole text as
+    // their tooltip — the tab has them in full. A map on a phone is 340 px
+    // tall, and a head that wrapped to five rows left the stage no height at
+    // all and its own text spilling over the credit line.
     return `
       <div class="map-twin-head">
         <div class="map-twin-bar">
           <button type="button" class="map-twin-back" onclick="MapTwin.leave()"
                   title="Back to the map, one zoom level out">← Map</button>
-          <span class="map-twin-title"><strong>${esc(st.name)}</strong>
-            <span class="small">digital twin${st.station_number ? ` · ${esc(st.station_number)}` : ''}</span></span>
-          <span class="button-group">
+          <span class="map-twin-title" title="${escAttr(st.name)}${st.station_number ? ` · ${escAttr(st.station_number)}` : ''}"><strong>${esc(st.name)}</strong>
+            <span class="small map-twin-label">digital twin${st.station_number ? ` · ${esc(st.station_number)}` : ''}</span></span>
+          <span class="button-group map-twin-actions">
             <button type="button" id="twin-walk" aria-pressed="false" onclick="DigitalTwin.toggleWalk()"
-                    title="Stand on the ground at eye height and walk with the keys">🚶 Walk</button>
-            <button type="button" onclick="DigitalTwin.resetView()" title="Back to the opening view of the pole">↺ View</button>
+                    title="Stand on the ground at eye height and walk with the keys"><span aria-hidden="true">🚶</span><span class="map-twin-label"> Walk</span><span class="sr-only">Walk</span></button>
+            <button type="button" onclick="DigitalTwin.resetView()" title="Back to the opening view of the pole"><span aria-hidden="true">↺</span><span class="map-twin-label"> View</span><span class="sr-only">Reset the view</span></button>
             <button type="button" onclick="MapTwin.openTab()"
-                    title="The Digital Twin tab: the settings, the ground truth, the .glb for Blender">Open the tab →</button>
+                    title="The Digital Twin tab: the settings, the ground truth, the .glb for Blender"><span aria-hidden="true">🧊</span><span class="map-twin-label"> Open the tab →</span><span class="sr-only">Open the Digital Twin tab</span></button>
           </span>
         </div>
         <p class="twin-status map-twin-status" id="twin-status" role="status">Building…</p>
+        <p class="small twin-paths map-twin-paths" id="twin-paths" hidden></p>
         <ul class="twin-notes" id="twin-notes" hidden></ul>
       </div>
       ${DigitalTwin.stageHtml()}

@@ -695,6 +695,55 @@ try {
       && p.agl0 > 0),
     JSON.stringify(P.list.map(p => p.end)));
 
+  // Every far station is named under the stage, and its name is the way
+  // there: pressing it moves the map to the far station and the hand-over
+  // follows, at this zoom, without rebuilding the tab.
+  const line = await page.evaluate(() => {
+    const el = document.getElementById('twin-paths');
+    return { hidden: el.hidden, text: el.textContent, buttons: [...el.querySelectorAll('button.twin-path')].map(b => b.textContent.trim()) };
+  });
+  const farNames = await page.evaluate(ids => ids.map(id => state.data.stations.find(s => s.id === id).name), linked.far);
+  ok('the paths are listed under the stage by the far station\'s name, distance and bearing',
+    !line.hidden && farNames.every(n => line.buttons.includes(n)) && /km at \d+°/.test(line.text) && /^Radio path/.test(line.text.trim()),
+    line.text.replace(/\s+/g, ' ').slice(0, 200));
+  const followed = await page.evaluate(() => {
+    const b = document.querySelector('#twin-paths button.twin-path');
+    b.click();
+    return true;
+  });
+  const farId = linked.far[0];
+  await page.waitForFunction(id => MapTwin.active() && MapTwin.station() === id && DigitalTwin.debug().built, farId, { timeout: BUILD_TIMEOUT });
+  await settled();
+  const arrived = await page.evaluate(() => ({ station: MapTwin.station(), zoom: state.map.getZoom(), card: state.stnCard.id, tab: state.activeTab }));
+  ok('pressing a far station\'s name goes to it: the map moves at this zoom and hands over to its twin',
+    followed && arrived.station === farId && arrived.zoom === 17 && arrived.card === farId && arrived.tab === 'stations', JSON.stringify(arrived));
+  // Back to the station under test for what follows.
+  await page.evaluate(([id, lat, lon]) => { showStationCard(id); state.map.setView([lat, lon], 17, { animate: false }); }, [linked.id, linked.lat, linked.lon]);
+  await page.waitForFunction(id => MapTwin.active() && MapTwin.station() === id && DigitalTwin.debug().built, linked.id, { timeout: BUILD_TIMEOUT });
+  await settled();
+
+  // A phone: the overlay's head is one row that never shrinks, the stage keeps
+  // a picture's worth of height, and nothing spills past the map or sideways.
+  await page.setViewportSize({ width: 375, height: 800 });
+  await sleep(500);
+  const phone = await page.evaluate(() => {
+    const r = sel => { const el = document.querySelector(sel); return el ? el.getBoundingClientRect() : null; };
+    const head = r('#map-twin .map-twin-head'), stage = r('#twin-stage'), attrib = r('#map-twin .map-twin-attrib'),
+          host = r('#map-twin'), map = r('#leaflet-map'), bar = r('#map-twin .map-twin-bar');
+    return { active: MapTwin.active(), head, stage, attrib, host, map, bar,
+             scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth,
+             labelsHidden: [...document.querySelectorAll('#map-twin .map-twin-label')].every(el => getComputedStyle(el).display === 'none') };
+  });
+  ok('on a phone the twin is still up, the head is one row above a stage of at least 160 px, and the credit line is inside the map',
+    phone.active && phone.bar.height < 60 && phone.head.bottom <= phone.stage.top + 1 && phone.stage.height >= 160
+      && phone.attrib.bottom <= phone.map.bottom + 1 && phone.host.width <= phone.map.width + 1 && phone.labelsHidden,
+    JSON.stringify({ bar: phone.bar && phone.bar.height, head: phone.head && phone.head.bottom, stageTop: phone.stage && phone.stage.top,
+                     stageH: phone.stage && phone.stage.height, attribBottom: phone.attrib && phone.attrib.bottom, mapBottom: phone.map && phone.map.bottom, labels: phone.labelsHidden }));
+  ok('and the page does not scroll sideways', phone.scroll <= phone.client + 1, `${phone.scroll} in ${phone.client}`);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await sleep(500);
+  await page.waitForFunction(id => MapTwin.active() && MapTwin.station() === id, linked.id, { timeout: BUILD_TIMEOUT });
+
   // Out again by the wheel: past the widest orbit, the map takes over one
   // level out.
   const wheeled = await page.evaluate(async () => {

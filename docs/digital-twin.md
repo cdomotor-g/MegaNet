@@ -213,7 +213,12 @@ that already says which question is being asked, so zoom is the hand-over.
 The overlay is a child of the Leaflet container, above the 3-D canvas and
 below the control corners (`#map-twin`, one step above `#map3d`'s window in
 `styles.css`); Leaflet's own drag and wheel are held off under it, for
-`map-3d.js`'s reason, and the station card stays above both. The twin's scene,
+`map-3d.js`'s reason, and the station card stays above both. Its head is one
+row that never shrinks — the words come off its buttons below `sm`, as they
+do off the banner's — and the status, the paths and the credit line are one
+line each with the whole text as their tooltip, so a map 340 px tall on a
+phone still gives the stage a picture's worth of height and nothing spills
+over the credit line under the map. The twin's scene,
 controls and teardown are `digital-twin.js`'s; `map-twin.js` decides *when*
 and gives it a host. **Open the tab →** on the overlay opens the Digital Twin
 tab on the same station, for the settings, the Ground truth panel and the
@@ -222,8 +227,14 @@ tab on the same station, for the settings, the Ground truth panel and the
 ## The radio paths
 
 What joins the station to the rest of the network is drawn from its antenna
-as rays, each named at its end with the far station, the distance and the
-bearing. Two sources, and the first is the one that matters:
+as rays, each named twice with the far station, the distance and the bearing
+— on the ray beside the pole, where the opening view is looking, and again
+at the ray's end, scaled with its distance — and listed under the stage as
+words: **Radio paths:** the far station's name, in the ray's colour, then its
+distance and bearing. The name is a button that goes there: inside the
+Stations map the map moves to the far station at this zoom and the hand-over
+follows; on the tab the twin is rebuilt for it. Two sources, and the first is
+the one that matters:
 
 - **Inside the Stations map**, the map's own lines — the seam `map-3d.js`
   reads (`state.mapLines`): the same filters, the same colouring (channel,

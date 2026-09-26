@@ -12229,41 +12229,96 @@ code {
   padding: var(--sp-2);
   background: var(--panel);
   border-radius: inherit;
+  /* Nothing of the overlay may spill past the map: a map on a phone is
+     340 px tall, and what does not fit is cut, never laid over the credit
+     line under the map. */
+  overflow: hidden;
 }
 
 #map-twin.is-on { display: flex; }
 
+/* The stage takes whatever the head and the credit line leave, and never
+   less than a picture's worth: the head and the credit line are each one
+   row and never shrink. */
 #map-twin .twin-stage {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 160px;
   height: auto;
   margin: 0;
 }
 
-#map-twin .twin-notes { margin: 0; }
+#map-twin .twin-notes { margin: 0; flex: 0 0 auto; }
 #map-twin .map-twin-status { margin: 0; }
-#map-twin .map-twin-attrib { margin: 0; }
+#map-twin .map-twin-paths { margin: 0; }
+
+/* One line each, the whole text as the tooltip (the tab has it in full). */
+#map-twin .map-twin-status,
+#map-twin .map-twin-paths,
+#map-twin .map-twin-attrib {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+#map-twin .map-twin-attrib {
+  margin: 0;
+  flex: 0 0 auto;
+}
 
 /* Inset from both edges by a corner control's width and margin: the zoom
-   buttons top-left and ↺ top-right are above this overlay on purpose. */
+   buttons top-left and ↺ top-right are above this overlay on purpose — and
+   under a coarse pointer they are the 44 px the design system gives every
+   control there, so the inset is set for that case. */
 .map-twin-head {
   display: grid;
   gap: var(--sp-1);
-  padding-inline: 3.25rem;
-  min-height: 4.5rem;
+  padding-inline: 4.25rem;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .map-twin-bar {
   display: flex;
   gap: var(--sp-2);
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
+
+.map-twin-bar .map-twin-actions { flex-wrap: nowrap; }
 
 .map-twin-title {
   flex: 1 1 auto;
   min-width: 0;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Below `sm` the words come off the action buttons, as they do off the
+   banner's (.hdr-label): three icons fit beside a name, three phrases do
+   not. */
+@media (max-width: 700px) {
+  .map-twin-label { display: none; }
+  .map-twin-head { padding-inline: 4rem; }
+}
+
+/* The radio paths as words: the far station, a button in the ray's colour,
+   then its distance and bearing. On the tab as under the map. */
+.twin-paths { margin: var(--sp-1) 0 0; }
+.twin-paths-lead { color: var(--muted); }
+.twin-path { font-weight: 600; }
+.twin-path-fact { color: var(--muted); }
+
+.twin-path-dot {
+  display: inline-block;
+  width: .6rem;
+  height: .6rem;
+  margin-right: .3rem;
+  border-radius: 50%;
+  background: var(--dot, var(--map-line));
+  vertical-align: middle;
 }
 
 /* The station card and the What-is-here card stay above the twin as they do

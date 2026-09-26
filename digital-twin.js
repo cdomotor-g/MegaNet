@@ -1163,9 +1163,16 @@ const DigitalTwin = (function () {
       tube.name = `path to ${p.far.name || p.far.id}`;
       tube.userData.path = p.far.id;
       grp.add(tube);
-      // The far end named at the ray's end, scaled with its distance so it
-      // reads from the opening view: a 3 m sign 200 m off is a speck.
-      const sign = makeSign(p.far.name || p.far.id, `${(D / 1000).toFixed(D < 10000 ? 1 : 0)} km · ${Math.round(brg)}°${p.kind === 'backbone' ? ' · backbone' : ''}`, { bar: p.colour });
+      // The far end named twice: on the ray beside the pole, where the
+      // opening view is looking, and again at the ray's end, scaled with its
+      // distance so it reads from wherever the camera has gone — a 3 m sign
+      // 200 m off is a speck.
+      const words = `${(D / 1000).toFixed(D < 10000 ? 1 : 0)} km · ${Math.round(brg)}°${p.kind === 'backbone' ? ' · backbone' : ''}`;
+      const dNear = Math.min(dE * 0.45, 9 + list.length * 3);
+      const near = makeSign(`→ ${p.far.name || p.far.id}`, words, { bar: p.colour });
+      near.position.set(ux * dNear, agl0 + slope * dNear * exag + 0.9, uz * dNear);
+      grp.add(near);
+      const sign = makeSign(p.far.name || p.far.id, words, { bar: p.colour });
       const k = Math.max(1, dE / 40);
       sign.scale.multiplyScalar(k);
       sign.position.copy(b).add(new THREE.Vector3(0, 0.5 * k, 0));
@@ -1177,6 +1184,7 @@ const DigitalTwin = (function () {
     sc.paths = grp;
     sc.scene.add(grp);
     tw.paths = { count: list.length, source, list, pending: missing.length };
+    refreshPathsLine();
     requestFrame();
     // The tiles for the far ends nobody surveyed, then the rays again with
     // the ground they stand on — once, all together.
@@ -1497,7 +1505,7 @@ const DigitalTwin = (function () {
   function setStatus(text) {
     tw.status = text;
     const el = document.getElementById('twin-status');
-    if (el) el.textContent = text;
+    if (el) { el.textContent = text; el.title = text; }
   }
 
   function setNotes(notes) {
@@ -1530,7 +1538,7 @@ const DigitalTwin = (function () {
       requestFrame();
       setStatus(status);
       showPlaceholder(placeholder);
-      refreshTruth(); refreshTable(); syncCanvasName(); syncExportButton(); refreshAttrib();
+      refreshTruth(); refreshTable(); syncCanvasName(); syncExportButton(); refreshAttrib(); refreshPathsLine();
       const pk = document.getElementById('twin-pick');
       if (pk) pk.textContent = '';
     };
@@ -1577,6 +1585,7 @@ const DigitalTwin = (function () {
       refreshTable();
       syncCanvasName();
       syncExportButton();
+      refreshPathsLine();
       imageP.catch(() => {});
       return;
     }
@@ -1733,6 +1742,31 @@ const DigitalTwin = (function () {
       </div>`;
   }
 
+  // The radio paths as a line of words under the stage — every far station
+  // named, with its distance and bearing, each a button that goes there:
+  // in the Stations map the map moves to it and the hand-over follows, on
+  // the tab the twin is rebuilt for it. What the rays say, for whoever is
+  // not looking at the picture, and the answer to "where does this link go"
+  // without finding the sign on the ray.
+  function pathsLineHtml() {
+    const P = tw.paths;
+    if (!P || !P.count) return '';
+    const items = P.list.map(p =>
+      `<button type="button" class="link-btn twin-path" onclick="DigitalTwin.followPath('${escAttr(p.farId)}')"
+               title="${escAttr(p.kind === 'backbone' ? 'Backbone path' : 'Radio path')} to ${escAttr(p.far)} — go there">`
+      + `<i class="twin-path-dot" style="--dot:${escAttr(p.colour)}"></i>${esc(p.far)}</button> `
+      + `<span class="twin-path-fact">${p.km.toFixed(p.km < 10 ? 1 : 0)} km at ${Math.round(p.bearing)}°</span>`);
+    return `<span class="twin-paths-lead">Radio path${P.count === 1 ? '' : 's'}${P.source === 'map' ? '' : ' (as recorded)'}:</span> ${items.join(' · ')}`;
+  }
+
+  function refreshPathsLine() {
+    const el = document.getElementById('twin-paths');
+    if (!el) return;
+    const html = pathsLineHtml();
+    el.innerHTML = html;
+    el.hidden = !html;
+  }
+
   function refreshTable() {
     const el = document.getElementById('twin-table');
     if (el) el.innerHTML = tableHtml();
@@ -1848,6 +1882,7 @@ const DigitalTwin = (function () {
           </div>
         </div>
         <p class="twin-status" id="twin-status" role="status">${esc(tw.status || 'Building…')}</p>
+        <p class="small twin-paths" id="twin-paths" hidden></p>
         <ul class="twin-notes" id="twin-notes" ${tw.notes.length ? '' : 'hidden'}>${tw.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
         ${stageHtml()}
         <p class="small twin-pick" id="twin-pick"></p>
@@ -1885,7 +1920,7 @@ const DigitalTwin = (function () {
 
   function refreshAttrib() {
     const el = document.getElementById('twin-attrib');
-    if (el) el.innerHTML = attribHtml();
+    if (el) { el.innerHTML = attribHtml(); el.title = el.textContent; }
   }
 
   // ── lifecycle ──────────────────────────────────────────────────────────────
@@ -2160,6 +2195,30 @@ const DigitalTwin = (function () {
     },
 
     exportGlb, buildGlb,
+
+    // Go to the far end of a radio path. Inside the Stations map, the map
+    // moves there and, at this zoom, hands over to that station's twin
+    // (map-twin.js); on the tab, the twin is rebuilt for it.
+    followPath(id) {
+      const s = stationById(id);
+      if (!s || !located(s)) return;
+      if (tw.hooks) {
+        // The card is the map's memory of what you are looking at and the
+        // twin's first choice of station (map-twin.js), so the far station
+        // goes on it and the map moves there at this zoom: the move's end is
+        // the hand-over to its twin. Not goToStation(), which rebuilds the
+        // tab and the map and lands at zoom 11.
+        if (typeof showStationCard === 'function') showStationCard(s.id);
+        if (typeof state !== 'undefined' && state.map) {
+          const z = Math.max(state.map.getZoom(), typeof MapTwin !== 'undefined' ? MapTwin.zoom : 17);
+          state.map.setView([s.lat, s.lon], z, { animate: false });
+        }
+        return;
+      }
+      tw.stationId = s.id;
+      rerenderStationBits();
+      init();
+    },
 
     // The memory strip's holder (mem-meter.js): what the caches hold, and
     // the Release button's call.

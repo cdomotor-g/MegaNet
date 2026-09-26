@@ -3587,7 +3587,9 @@ other; zoom is what says which question is being asked, so zoom is the
 hand-over (`map-twin.js`).
 
 **The radio paths are drawn from the antenna** as rays to the edge of the
-patch along the line of sight to the far station, each named at its end.
+patch along the line of sight to the far station, each named beside the pole
+and again at its end, and listed under the stage — the far station's name is
+a button that goes there.
 Inside the Stations map they are the map's own lines — the same filters, the
 same colouring, the same culled set, read off `state.mapLines` the way the
 3-D view reads them, so the twin cannot disagree with the map it was opened
