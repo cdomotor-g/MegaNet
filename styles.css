@@ -138,11 +138,16 @@
   --map-survey: #00695c;
   --map-repeater: #0b5cab;
   --map-field: #107c10;
-  /* The Digital Twin's sky — the WebGL clear colour and the fog it fades into,
-     read by digital-twin.js with cssVar() because a renderer cannot take
-     var(). A pale daylight blue here; a night blue in the dark theme, so the
-     scene sits in its panel rather than glowing out of it. */
+  /* The Digital Twin's sky, read by digital-twin.js with cssVar() because a
+     renderer cannot take var(): the colour at the horizon (also the stage's
+     own background and the haze the far ground fades into), the colour
+     overhead, and the colour of the air below the horizon that shows past
+     the far ground from a high camera. A day here; a dusk in the dark theme,
+     so the scene sits in its panel rather than glowing out of it, with the
+     horizon still a line. */
   --twin-sky: #cfe3f5;
+  --twin-zenith: #5f9bd6;
+  --twin-haze: #b8c3cc;
   /* Station-role colours (mirror ROLE_COLOR in app.js and the map markers). */
   --role-field: #107c10;
   --role-repeater: #0b5cab;
@@ -507,7 +512,9 @@
   --map-survey: #4dd0c8;
   --map-repeater: #6bb6ff;
   --map-field: #57d657;
-  --twin-sky: #101a26;
+  --twin-sky: #3f5168;
+  --twin-zenith: #0c1524;
+  --twin-haze: #26303c;
   /* Lighter role tints so coloured station names stay legible on dark panels. */
   --role-field: #57d657;
   --role-repeater: #6bb6ff;

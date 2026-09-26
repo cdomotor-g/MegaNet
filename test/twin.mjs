@@ -51,7 +51,7 @@ import zlib from 'node:zlib';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
-import { hillyTerrariumPng } from './lib/terrarium.mjs';
+import { hillyTerrariumPng, hillyHeightAtWorld } from './lib/terrarium.mjs';
 import { TEST_DIR } from './lib/paths.mjs';
 
 // The three.js the harness vendors — the version the module has to ask for,
@@ -313,7 +313,11 @@ try {
   ok('a frame has been drawn', d.frames > 0, `${d.frames}`);
   ok('no warnings on a world that answered', d.notes.length === 0, d.notes.join(' | '));
 
-  const req = seen.dem[seen.dem.length - 1];
+  // The patch's own raster request — the horizon asks the same service for
+  // an 8 km sheet once the patch is standing, and that is not this.
+  const mLat = 110.574e3, mLon = 111.320e3 * Math.cos(st.lat * Math.PI / 180);
+  const patchDem = () => seen.dem.filter(r => (r.bbox[2] - r.bbox[0]) * mLon < 3000);
+  const req = patchDem()[patchDem().length - 1];
   ok('one raster request, as 32-bit floats, in degrees, 201 × 201, with the aspect snap switched off',
     !!req && req.W === 201 && req.H === 201 && req.pixelType === 'F32' && req.format === 'tiff'
       && req.imageSR === '4326' && req.bboxSR === '4326' && req.adjust === 'false', JSON.stringify(req));
@@ -324,7 +328,6 @@ try {
     await page.evaluate(() => DigitalTwin._libUrl()));
   // The box is the patch plus one sample — half on each side — so pixel
   // centres are the vertices.
-  const mLat = 110.574e3, mLon = 111.320e3 * Math.cos(st.lat * Math.PI / 180);
   const reqW = (req.bbox[2] - req.bbox[0]) * mLon, reqH = (req.bbox[3] - req.bbox[1]) * mLat;
   ok('the request box is the patch grown by half a sample on every side',
     near(reqW, 402, 0.05) && near(reqH, 402, 0.05), `${reqW.toFixed(3)} × ${reqH.toFixed(3)} m`);
@@ -429,6 +432,190 @@ try {
   ok('and the figure followed the ground under it, 2.5× its relief', near(ex.figure.baseY, figGround25, 1e-3), `${ex.figure.baseY} vs ${figGround25}`);
   await page.evaluate(() => DigitalTwin.setExag(1));
 
+  // ── 2b. The horizon ───────────────────────────────────────────────────────
+  // The far ground past the patch: three sheets, one mesh of concentric
+  // squares standing on the patch's own edge, the Earth's curve, a sky and
+  // haze. The oracles are the fixtures' own worlds read the way the app
+  // reads them — the State's closed-form surface at the inner sheet's nodes,
+  // the hilly tile world at the outer sheets' — never the app's own sampler.
+  console.log('\nThe horizon\n');
+  const hzd = (await dbg()).horizon;
+  ok('the horizon is up: three shells of far ground to 60 km round the patch, under a sky, in haze',
+    hzd.on && hzd.up && !hzd.pending && hzd.km === 60 && hzd.meshes.length === 3 && hzd.sky
+      && hzd.fog && hzd.fog.exp2 && near(hzd.fog.density, 2.9e-5, 1e-9) && hzd.far >= 200000,
+    JSON.stringify({ on: hzd.on, up: hzd.up, meshes: hzd.meshes.length, sky: hzd.sky, fog: hzd.fog, far: hzd.far }));
+  ok('the inner sheet is the State\'s raster at 40 m over ±4 km, the outer two the tiles over ±20 and ±60 km',
+    hzd.shells && hzd.shells[0] && hzd.shells[0].source === 'qld' && hzd.shells[0].half === 4000 && near(hzd.shells[0].resolution_m, 40, 1e-6)
+      && hzd.shells[1] && hzd.shells[1].source === 'srtm' && hzd.shells[1].half === 20000
+      && hzd.shells[2] && hzd.shells[2].source === 'srtm' && hzd.shells[2].half === 60000,
+    JSON.stringify(hzd.shells && hzd.shells.map(s => s && { source: s.source, half: s.half, zoom: s.zoom, res: s.resolution_m })));
+  const sheetReq = seen.dem.find(r => near((r.bbox[2] - r.bbox[0]) * mLon, 8040, 1));
+  ok('the State was asked once for the 8 km sheet — 201 × 201 floats, the same request shape as the patch\'s',
+    !!sheetReq && sheetReq.W === 201 && sheetReq.pixelType === 'F32' && sheetReq.adjust === 'false', JSON.stringify(sheetReq));
+  ok('the tiles were asked for the outer two, at a coarser zoom for the wider — a handful, not a hundred',
+    seen.srtm > 0 && seen.srtm <= 20 && hzd.shells[1].zoom > hzd.shells[2].zoom,
+    `${seen.srtm} tiles, zooms ${hzd.shells[1].zoom} and ${hzd.shells[2].zoom}`);
+  ok('every sheet is draped with its own imagery', hzd.images && hzd.images.every(s => s === 'qld') && hzd.meshes.every(m => m.textured),
+    JSON.stringify(hzd.images));
+  ok('the far shell is drawn first, and within a shell the outermost squares first',
+    hzd.meshes[2].renderOrder < hzd.meshes[1].renderOrder && hzd.meshes[1].renderOrder < hzd.meshes[0].renderOrder
+      && [0, 1, 2].every(k => hzd.meshes[k].renderOrder >= 1),
+    hzd.meshes.map(m => m.renderOrder).join(','));
+  const orders = await page.evaluate(() => [0, 1, 2].map(k => DigitalTwin.debug().horizon.order(k)));
+  ok('…measured: each shell\'s first triangle is on its outer edge and its last on its inner',
+    orders.every((o, k) => o.first > o.last && near(o.first, hzd.meshes[k].outerHalf, 1) && near(o.last, hzd.meshes[k].innerHalf, 1)),
+    JSON.stringify(orders));
+  ok('no vertex of the far ground is inside the patch, and the mesh faces up',
+    near(orders[0].minHq, 200, 1e-3) && orders.every(o => o.meanNormalY > 0.9), JSON.stringify(orders.map(o => [o.minHq, o.meanNormalY])));
+
+  // The seam: the innermost square's 800 vertices are the patch's own edge
+  // vertices — same place, same height — so there is no crack to see through.
+  const edgeIJ = t => (t < 200 ? [t, 0] : t < 400 ? [200, t - 200] : t < 600 ? [600 - t, 200] : [0, 800 - t]);
+  const seamT = [0, 1, 57, 199, 200, 333, 400, 401, 599, 600, 777, 799];
+  const seam = await page.evaluate(ts => {
+    const d = DigitalTwin.debug();
+    return ts.map(t => ({ v: d.horizon.vertex(0, t) }));
+  }, seamT);
+  const seamGot = await page.evaluate(ts => {
+    const d = DigitalTwin.debug();
+    return ts.map(([i, j]) => ({ x: d.vertexX(j * d.N + i), y: d.vertexY(j * d.N + i), z: d.vertexZ(j * d.N + i) }));
+  }, seamT.map(edgeIJ));
+  ok('the horizon\'s innermost square is the patch\'s edge, vertex for vertex — same x, z and height',
+    seam.every((s, k) => s.v && s.v.inner && s.v.t === seamT[k] && near(s.v.h, 200, 1e-9)
+      && near(s.v.x, seamGot[k].x, 1e-4) && near(s.v.z, seamGot[k].z, 1e-4) && near(s.v.y, seamGot[k].y, 1e-4)),
+    seam.map((s, k) => `${seamT[k]}: ${s.v && [s.v.x.toFixed(1), s.v.y.toFixed(3), s.v.z.toFixed(1)]} vs ${[seamGot[k].x.toFixed(1), seamGot[k].y.toFixed(3), seamGot[k].z.toFixed(1)]}`).join('; '));
+
+  // The sheets, read as the app reads them. The State's: a node (i, j) of the
+  // ±4 km sheet is a pixel centre of the grown request, which the route
+  // filled with the surface at that latitude and longitude. The tiles': a
+  // node is terrain.js's nearest pixel of the hilly world at the zoom it
+  // fetched, on a lattice even in Mercator y.
+  const R_EYE = 7320000;
+  const drop = (x, z) => Math.max(0, x * x + z * z - 2 * HALF * HALF) / (2 * R_EYE);
+  const mercY = lat => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2; };
+  const tileXf = (lon, z) => (lon + 180) / 360 * 2 ** z;
+  const nodeQld = (g, i, j) => groundAt(g.box.north - (g.box.north - g.box.south) * j / (g.n - 1),
+                                        g.box.west + (g.box.east - g.box.west) * i / (g.n - 1));
+  const nodeTile = (g, i, j) => {
+    const lon = g.box.west + (g.box.east - g.box.west) * i / (g.n - 1);
+    const my = mercY(g.box.north) + (mercY(g.box.south) - mercY(g.box.north)) * j / (g.n - 1);
+    const side = 256 * 2 ** g.zoom;
+    return hillyHeightAtWorld(Math.floor(tileXf(lon, g.zoom) * 256) / side, Math.floor(my * 2 ** g.zoom * 256) / side);
+  };
+  const sheetAt = (g, x, z) => {
+    const lat = st.lat - z / mLat, lon = st.lon + x / mLon;
+    const fx = (lon - g.box.west) / (g.box.east - g.box.west) * (g.n - 1);
+    const fy = (g.rows === 'merc' ? (mercY(lat) - mercY(g.box.north)) / (mercY(g.box.south) - mercY(g.box.north))
+                                  : (g.box.north - lat) / (g.box.north - g.box.south)) * (g.n - 1);
+    const node = g.rows === 'merc' ? nodeTile : nodeQld;
+    const i = Math.min(g.n - 2, Math.floor(fx)), j = Math.min(g.n - 2, Math.floor(fy)), tx = fx - i, ty = fy - j;
+    return node(g, i, j) * (1 - tx) * (1 - ty) + node(g, i + 1, j) * tx * (1 - ty) + node(g, i, j + 1) * (1 - tx) * ty + node(g, i + 1, j + 1) * tx * ty;
+  };
+  // Where a point stands round its square, as an index into the patch's 800
+  // edge vertices — the app's own rule, restated.
+  const perimT = (x, z) => {
+    const hq = Math.max(Math.abs(x), Math.abs(z));
+    if (-z >= Math.abs(x)) return (0 + (x + hq) / (2 * hq)) * 200;
+    if (x >= Math.abs(z))  return (1 + (z + hq) / (2 * hq)) * 200;
+    if (z >= Math.abs(x))  return (2 + (hq - x) / (2 * hq)) * 200;
+    return (3 + (hq - z) / (2 * hq)) * 200;
+  };
+  const edgeLift = t => {   // the LiDAR edge less the State's sheet under it, at edge vertex t
+    const [i, j] = edgeIJ(t % 800);
+    return at(i, j) - sheetAt(hzd.shells[0], -HALF + 2 * i, -HALF + 2 * j);
+  };
+  const liftAt = (x, z) => { const t = perimT(x, z), i = Math.floor(t), w = t - i; return edgeLift(i) * (1 - w) + edgeLift((i + 1) % 800) * w; };
+  // Probes: the vertex nearest each place, in the shell that holds it.
+  const far = [[0, 0, -240], [0, 130, 250], [0, 0, -1000], [0, 2500, -900], [1, 10000, 3000], [1, -6000, -14000], [2, 0, -40000], [2, 33000, 25000]];
+  const farGot = await page.evaluate(far => far.map(([k, x, z]) => {
+    const d = DigitalTwin.debug().horizon;
+    const i = d.nearest(k, x, z);
+    return { k, i, v: d.vertex(k, i) };
+  }), far);
+  const expectFar = (k, v, exag) => {
+    const hq = Math.max(Math.abs(v.x), Math.abs(v.z));
+    const w = Math.min(1, Math.max(0, (hq / HALF - 1) / 2));
+    const H = sheetAt(hzd.shells[k], v.x, v.z) + (1 - w) * liftAt(v.x, v.z);
+    return (H - h0) * exag - drop(v.x, v.z);
+  };
+  const farOk = farGot.map(({ k, v }) => v && !v.inner && !v.seam && near(v.y, expectFar(k, v, 1), 0.02));
+  ok('just outside the patch, the State\'s sheet is lifted to meet the LiDAR edge, the lift fading by three patch-halves out',
+    farOk[0] && farOk[1], farGot.slice(0, 2).map(({ k, v }) => v && `(${v.x.toFixed(0)},${v.z.toFixed(0)}) h${v.h.toFixed(0)} y ${v.y.toFixed(3)} vs ${expectFar(k, v, 1).toFixed(3)} seam:${v.seam}`).join('; '));
+  ok('beyond that, each vertex stands on its sheet\'s own height at its own latitude and longitude, less the Earth\'s curve',
+    farOk.slice(2).every(Boolean), farGot.slice(2).map(({ k, v }) => v && `${k}:(${v.x.toFixed(0)},${v.z.toFixed(0)}) y ${v.y.toFixed(3)} vs ${expectFar(k, v, 1).toFixed(3)} drop ${drop(v.x, v.z).toFixed(3)} seam:${v.seam}`).join('; '));
+  const v40 = farGot[6].v;
+  ok('…and at 40 km that curve is 109 m, on an Earth the light bends round (R = 7,320 km)',
+    v40 && near(drop(v40.x, v40.z), 109, 2) && hzd.earthR === 7320000, v40 && `${drop(v40.x, v40.z).toFixed(1)} m at ${Math.hypot(v40.x, v40.z).toFixed(0)} m`);
+
+  // Exaggeration stretches the far relief with the patch's, and not the curve.
+  const ex25 = await page.evaluate(({ far, ts }) => {
+    DigitalTwin.setExag(2.5);
+    const d = DigitalTwin.debug();
+    return { far: far.map(([k, x, z]) => { const i = d.horizon.nearest(k, x, z); return { k, v: d.horizon.vertex(k, i) }; }),
+             seam: ts.map(t => d.horizon.vertex(0, t)),
+             edge: ts.map(t => { const [i, j] = t < 200 ? [t, 0] : t < 400 ? [200, t - 200] : t < 600 ? [600 - t, 200] : [0, 800 - t]; return d.vertexY(j * d.N + i); }) };
+  }, { far, ts: seamT });
+  ok('at 2.5× the far ground is 2.5 × its relief less the same curve, and the seam still meets the patch',
+    ex25.far.every(({ k, v }) => v && near(v.y, expectFar(k, v, 2.5), 0.02)) && ex25.seam.every((v, k) => near(v.y, ex25.edge[k], 1e-4)),
+    ex25.far.map(({ k, v }) => `${k}: ${v.y.toFixed(3)} vs ${expectFar(k, v, 2.5).toFixed(3)}`).join('; '));
+  await page.evaluate(() => DigitalTwin.setExag(1));
+
+  // The orbit camera is kept above the far ground too, not only the patch's.
+  const cam = await page.evaluate(() => {
+    const c = DigitalTwin._orbit({ radius: 880, theta: 0.3, phi: 1.53 });
+    const d = DigitalTwin.debug();
+    return { c, ground: d.horizon.ringSurface(c.x, c.z), mode: d.mode };
+  });
+  ok('the orbit camera, out over the far ground, stays above it',
+    cam.mode === 'orbit' && Math.max(Math.abs(cam.c.x), Math.abs(cam.c.z)) > 200 && cam.c.y >= cam.ground + 0.9 - 1e-6,
+    `camera ${cam.c.x.toFixed(0)},${cam.c.y.toFixed(1)},${cam.c.z.toFixed(0)}; ground there ${cam.ground.toFixed(1)}`);
+  await page.evaluate(() => DigitalTwin.resetView());
+
+  // The switch, and its cost.
+  const srtmAtToggle = seen.srtm;
+  await page.evaluate(() => DigitalTwin.setHorizon(false));
+  d = await dbg();
+  ok('switched off: the far ground and the haze go, the patch stays, and the setting is kept',
+    !d.horizon.up && !d.horizon.on && d.built && d.horizon.fog && !d.horizon.fog.exp2
+      && await page.evaluate(() => JSON.parse(localStorage.getItem('mn-twin')).horizon === false),
+    JSON.stringify({ up: d.horizon.up, built: d.built, fog: d.horizon.fog }));
+  await page.evaluate(() => DigitalTwin.setHorizon(true));
+  await settled();
+  d = await dbg();
+  ok('and back on from memory: three shells, no new tile requests', d.horizon.up && d.horizon.meshes.length === 3 && seen.srtm === srtmAtToggle,
+    `${d.horizon.meshes.length} shells, ${seen.srtm - srtmAtToggle} new tile request(s)`);
+  await page.evaluate(() => DigitalTwin.setHorizon(false));
+  const bare = { srtm: seen.srtm, dem: seen.dem.length, img: seen.img.length };
+  await page.evaluate(() => DigitalTwin.rebuild());
+  await settled();
+  d = await dbg();
+  ok('off from the start, a rebuild asks for the patch alone: one raster, one image, no tiles',
+    !d.horizon.up && d.built && seen.srtm === bare.srtm && seen.dem.length === bare.dem + 1 && seen.img.length === bare.img + 1,
+    `+${seen.srtm - bare.srtm} tiles, +${seen.dem.length - bare.dem} rasters, +${seen.img.length - bare.img} images`);
+  await page.evaluate(() => DigitalTwin.setHorizon(true));
+  await settled();
+  d = await dbg();
+  // (The State's sheet is asked for again; the tiles are terrain.js's to
+  // remember, and it still has them.)
+  ok('switched on again, the sheets are fetched then', d.horizon.up && d.horizon.meshes.length === 3 && seen.dem.length === bare.dem + 2 && d.notes.length === 0,
+    `+${seen.dem.length - bare.dem} rasters; ${d.notes.join(' | ')}`);
+
+  // The tiles gone: the State's sheet still stands, the two beyond it are
+  // not drawn — never flat — and the notes say so.
+  world.srtm = 'abort';
+  await page.evaluate(() => { Terrain.clear(); DigitalTwin.rebuild(); });
+  await settled();
+  d = await dbg();
+  ok('tiles gone → the inner sheet from the State stands alone, the outer two are not drawn, and a note says so',
+    d.built && d.source === 'qld' && d.horizon.up && d.horizon.meshes.length === 1 && d.horizon.shells[0] && !d.horizon.shells[1] && !d.horizon.shells[2]
+      && d.notes.some(n => /2 of the horizon's 3 sheets/.test(n)),
+    `${d.horizon.meshes.length} shell(s); ${d.notes.join(' | ')}`);
+  world.srtm = 'ok';
+  await page.evaluate(() => { Terrain.clear(); DigitalTwin.rebuild(); });
+  await settled();
+  d = await dbg();
+  ok('and back', d.horizon.up && d.horizon.meshes.length === 3 && d.notes.length === 0, d.notes.join(' | '));
+
   // ── 3. The .glb ───────────────────────────────────────────────────────────
   console.log('\nThe .glb\n');
   const glb = await page.evaluate(async () => {
@@ -471,6 +658,7 @@ try {
   ok('the ground, the pole and the figure are in it, one node each',
     glb.meshes.includes('ground') && glb.meshes.includes('station pole') && glb.meshes.includes('torso') && glb.meshes.includes('head')
       && glb.nodes === glb.meshes.length && glb.sceneNodes === glb.nodes, glb.meshes.join(', '));
+  ok('and the horizon and the sky are not — Blender gets the site', !glb.meshes.some(m => /^horizon|^sky/.test(m)), glb.meshes.join(', '));
   ok('the ground has N × N float positions with normals, UVs and an index',
     glb.accCount === glb.N * glb.N && glb.accType === 5126 && glb.hasNormal && glb.hasUv && glb.indices === (glb.N - 1) * (glb.N - 1) * 6,
     `${glb.accCount} positions, ${glb.indices} indices`);
@@ -502,14 +690,14 @@ try {
   // nothing for, and the note has to say which — one means the data is not
   // there, the other means press Rebuild. Two attempts are made before
   // giving up, so the route sees the request twice.
-  const demBefore = seen.dem.length;
+  const demBefore = patchDem().length;
   world.dem = 'abort';
   await page.evaluate(() => DigitalTwin.rebuild());
   await settled();
   d = await dbg();
   ok('a raster request that fails → the tiles, and a note that says to try again, after one retry',
-    d.source === 'srtm' && d.qld === 'failed' && seen.dem.length === demBefore + 2 && d.notes.some(n => /could not be reached/.test(n) && /Rebuild/.test(n)),
-    `${d.source} ${d.qld} requests:${seen.dem.length - demBefore} ${d.notes.join(' | ')}`);
+    d.source === 'srtm' && d.qld === 'failed' && patchDem().length === demBefore + 2 && d.notes.some(n => /could not be reached/.test(n) && /Rebuild/.test(n)),
+    `${d.source} ${d.qld} requests:${patchDem().length - demBefore} ${d.notes.join(' | ')}`);
 
   // A service that snaps the box anyway — the default it had before the
   // parameter, or a future that drops it — is caught from the GeoTIFF's own
@@ -540,8 +728,10 @@ try {
     !d.built && /No ground could be read/.test(d.status) && d.notes.some(n => /Nothing is drawn/.test(n)) && empty.placeholder && !empty.exportOn,
     `${d.status} | ${empty.text}`);
 
+  // (terrain.js remembers a failed tile for a minute; the horizon's sheets
+  // would be missing until then, so the memory is cleared with the world.)
   world.dem = 'ok'; world.srtm = 'ok'; world.img = 'abort';
-  await page.evaluate(() => DigitalTwin.rebuild());
+  await page.evaluate(() => { Terrain.clear(); DigitalTwin.rebuild(); });
   await settled();
   d = await dbg();
   ok('imagery aborted → Esri\'s tiles, and a note that says to try again',

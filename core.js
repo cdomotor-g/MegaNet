@@ -1166,6 +1166,10 @@ const HELP = {
       + 'they are the map\'s own lines — the same filters, the same colouring (channel, fade margin or '
       + 'line of sight), the same culled set. On this tab there is no map to mirror, so they are the '
       + 'pass-range and backbone relations as recorded, in the plain colours.',
+      '<strong>The country runs to a horizon 60 km off</strong> — far ground round the patch from the '
+      + 'State\'s raster at 40 m and the ~30 m tiles beyond, under a sky, with haze — but it is scenery: '
+      + 'coarse on purpose, dropped for the Earth\'s curve, not in the .glb and not clickable. The '
+      + 'patch is the survey. It is a few more requests, so the Scene panel can switch it off.',
       '<strong>The ground is a model, not a survey.</strong> Queensland\'s service is bare-earth LiDAR '
       + 'in AHD at 0.5–1 m where the State has flown it and SRTM where it has not, and it does not say '
       + 'which per pixel — a patch that looks smooth may be the 30 m data. Outside Queensland the '

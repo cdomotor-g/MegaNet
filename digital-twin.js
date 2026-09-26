@@ -88,6 +88,51 @@
 //
 // Vertical exaggeration scales the relief only. The pole is 2.000 m tall and
 // 0.300 m across at every setting, and the figure 1.75 m — they are the ruler.
+//
+// ── The horizon ──────────────────────────────────────────────────────────────
+//
+// A patch of ground floating in a flat colour reads as a model on a table; the
+// same patch with the country running off to a horizon reads as a place. So
+// past the patch's edge there is far ground to 60 km, a sky, and haze:
+//
+// * **Three sheets of heights**, each 201 × 201 like the patch: ±4 km, ±20 km
+//   and ±60 km about the station. The inner one is the State's raster
+//   resampled to 40 m (one request, AHD like the patch) where its box is
+//   inside the service's extent; the outer two are the ~30 m tiles at the
+//   zoom terrain.js picks for 200 m and 600 m samples — four to nine tiles
+//   and one to four. Nothing here is fetched until the patch is standing.
+// * **One mesh of concentric squares**, not a second grid: the innermost square
+//   *is* the patch's 800 edge vertices, and each square out is a few percent
+//   wider than the last, so the sampling is fine where the eye is close and
+//   coarse at 60 km, in ~50,000 vertices. Every side keeps 200 segments to
+//   1.5 patch-halves, 100 to 4, then 50; where a square is finer than the
+//   one outside it, its odd vertices are put on the straight line between
+//   their neighbours, so there is no crack. The seam with the patch is exact
+//   — same vertices, same heights — and the tiles' heights just outside it
+//   are lifted by however much they differ from the LiDAR at the edge, a
+//   lift that fades to nothing by three patch-halves out. The eye sees a
+//   continuous ground, and the notes still say which is which.
+// * **The Earth's curve**: every far vertex is dropped by d²/2R with R the
+//   Earth's radius over (1 − 0.13), the light's own refraction — 27 m at
+//   20 km, 245 m at 60 km — which is what puts a horizon where one belongs
+//   and hides the far side of a plain below it, as the depth buffer then
+//   does on its own. The drop starts at the patch's circumscribed circle so
+//   the seam is untouched; the 9 cm that costs at 60 km is not a number.
+// * **A sky**: a dome that rides with the camera, shaded from zenith to horizon
+//   to the haze below it, and exponential fog in the horizon's colour so the
+//   far ground fades into the sky rather than ending at an edge — the
+//   colours are tokens, so the dark theme is a dusk and the light a day.
+// * **The depth buffer**: 24 bits with a near plane of 0.2 m (the walker can
+//   stand against the pole) cannot tell 40 km from 40.5. Rather than a
+//   logarithmic depth — which writes gl_FragDepth, and so loses the polygon
+//   offset the wireframe rides on — the far mesh's triangles are simply put
+//   in the index outermost first, shell by shell, so where the buffer cannot
+//   decide, the later-drawn nearer ridge wins, as a painter would have it.
+//   The camera is never more than a few kilometres from the station, so the
+//   station's order is the camera's to within the resolution in question.
+// * **It is scenery**: not in the `.glb` (Blender wants the site, and 12 MB of
+//   satellite sheet is not the site), not clickable, and switchable off in
+//   the Scene panel — it is a few more requests, and the setting is kept.
 const DigitalTwin = (function () {
   // ── the renderer ──
   // r185.1 is the last release that ships a minified ESM build (0.186 dropped
@@ -127,6 +172,20 @@ const DigitalTwin = (function () {
   const CACHE_MAX  = 6;       // ground grids kept decoded — 162 KB each
   const IMAGE_CACHE_BYTES = 40 * 1024 * 1024;   // decoded imagery kept — one wide patch and a few narrow ones
 
+  // The horizon (see the header): the three sheets' half-widths, the texels
+  // each is draped with (8, 39 and 117 m/px), how far out the tiles are
+  // lifted to meet the LiDAR edge (in patch-halves), the Earth the eye sees
+  // (its radius over 1 − 0.13, the standard optical refraction), the haze's
+  // density (95 % at 60 km, 3 % at 5 km) and the sky dome's radius.
+  const SHELL_HALF   = [4000, 20000, 60000];
+  const HORIZON_M    = SHELL_HALF[SHELL_HALF.length - 1];
+  const SHELL_PX     = 1024;
+  const BLEND_OUT    = 3;
+  const EARTH_R_EYE  = 7320000;
+  const HAZE_DENSITY = 2.9e-5;
+  const SKY_R        = 100000;
+  const CAMERA_FAR   = 250000;
+
   // ── module state ──
   // `tw.s` is the remembered settings (localStorage); the rest is the live scene
   // and is thrown away on teardown. THREE is the imported module namespace,
@@ -150,6 +209,12 @@ const DigitalTwin = (function () {
     picked: null,      // the last ground point clicked: { x, z, h }
     paths: null,       // the radio paths drawn: { count, source, list }
     hooks: null,       // set when embedded in the Stations map (map-twin.js): { leave }
+    horizon: null,     // the far field's sheets: { lat, lon, grids: [ { elev, n, rows, source, zoom, box, … } | null ] }
+    horizonImages: null,   // the sheets' imagery, one per shell, as they land
+    horizonOffsets: null,  // the lift the tiles need to meet the LiDAR at each of the patch's edge vertices
+    horizonUnfilled: 0,    // edge vertices no sheet had a height under
+    horizonPending: false, // a fetch is in flight
+    statusBase: '',        // the status line without the horizon's clause
   };
 
   // Ground under a far station that has no recorded height, read off the
@@ -162,6 +227,7 @@ const DigitalTwin = (function () {
     renderer: null, scene: null, camera: null, canvas: null, stage: null,
     terrain: null, wire: null, pole: null, band: null, figure: null, label: null, paths: null,
     sun: null, hemi: null, texture: null, raf: 0, ro: null, dirty: false,
+    horizon: null, shells: null, sky: null,   // the far field's group, its shells' bookkeeping, the dome
     off: [],          // listener removers
   };
 
@@ -180,7 +246,7 @@ const DigitalTwin = (function () {
 
   // ── settings ───────────────────────────────────────────────────────────────
 
-  const DEFAULTS = { size: 400, exag: 1, imagery: true, figure: true, label: true, wire: false };
+  const DEFAULTS = { size: 400, exag: 1, imagery: true, figure: true, label: true, wire: false, horizon: true };
 
   function loadSettings() {
     let s = {};
@@ -189,7 +255,7 @@ const DigitalTwin = (function () {
     if (SIZES.includes(Number(s.size))) out.size = Number(s.size);
     const ex = Number(s.exag);
     if (isFinite(ex) && ex >= 1 && ex <= 3) out.exag = ex;
-    for (const k of ['imagery', 'figure', 'label', 'wire']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon']) if (typeof s[k] === 'boolean') out[k] = s[k];
     return out;
   }
 
@@ -270,6 +336,17 @@ const DigitalTwin = (function () {
     const g = tw.ground;
     if (!g) return 0;
     return (heightAt(x, z) - g.h0) * S().exag;
+  }
+
+  // The ground as drawn, wherever the camera is: the patch on it, the horizon
+  // off it (when there is one), the station's own level where neither knows.
+  function surfaceY(x, z) {
+    const g = tw.ground;
+    if (g && sc.horizon && Math.max(Math.abs(x), Math.abs(z)) > g.half) {
+      const r = ringSurface(x, z);
+      if (isFinite(r)) return r;
+    }
+    return yAt(x, z);
   }
 
   // ── the GeoTIFF the State answers with ─────────────────────────────────────
@@ -710,10 +787,11 @@ const DigitalTwin = (function () {
     });
   }
 
-  function imageryFor(box) {
-    const key = `${box.south.toFixed(6)},${box.west.toFixed(6)}|${box.size}`;
+  function boxKey(box) { return `${box.south.toFixed(6)},${box.west.toFixed(6)}|${box.size}`; }
+
+  function imageryFor(box, px = texturePx(box.size)) {
+    const key = boxKey(box);
     if (imageCache.has(key)) return Promise.resolve(imageCache.get(key));
-    const px = texturePx(box.size);
     return qldImagery(box, px)
       .then(q => {
         if (q.kind === 'ok') return q;
@@ -747,9 +825,10 @@ const DigitalTwin = (function () {
     let b = 0;
     for (const v of imageCache.values()) b += v.bytes || 0;
     for (const g of groundCache.values()) b += g.elev ? g.elev.byteLength : 0;
+    for (const hz of horizonCache.values()) for (const g of hz.grids) b += g && g.elev ? g.elev.byteLength : 0;
     return b;
   }
-  function clearCaches() { imageCache.clear(); groundCache.clear(); }
+  function clearCaches() { imageCache.clear(); groundCache.clear(); horizonCache.clear(); }
 
   // ── the renderer ───────────────────────────────────────────────────────────
   // A module that failed to fetch is remembered as failed by the browser's
@@ -796,7 +875,8 @@ const DigitalTwin = (function () {
 
   function clearScene() {
     if (!sc.scene) return;
-    for (const k of ['terrain', 'wire', 'pole', 'band', 'figure', 'label', 'paths']) {
+    removeHorizon();
+    for (const k of ['terrain', 'wire', 'pole', 'band', 'figure', 'label', 'paths', 'sky']) {
       if (sc[k]) { sc.scene.remove(sc[k]); disposeObject(sc[k]); sc[k] = null; }
     }
     if (sc.texture) { sc.texture.dispose(); sc.texture = null; }
@@ -826,7 +906,9 @@ const DigitalTwin = (function () {
     sc.canvas = canvas;
     sc.stage = stage;
     sc.scene = new THREE.Scene();
-    sc.camera = new THREE.PerspectiveCamera(50, 1, 0.2, 60000);
+    // The far plane holds the sky dome and the horizon's corners (85 km);
+    // it is the near plane, not this, that sets the depth buffer's grain.
+    sc.camera = new THREE.PerspectiveCamera(50, 1, 0.2, CAMERA_FAR);
     rig.target = new THREE.Vector3(0, 1, 0);
 
     sc.hemi = new THREE.HemisphereLight(0xdfeeff, 0x6b5a3a, 1.1);
@@ -864,6 +946,24 @@ const DigitalTwin = (function () {
     sc.camera.updateProjectionMatrix();
   }
 
+  // The height ramp, for when there is no imagery: dark green in the low
+  // ground through olive and tan to a pale crest, over [lo, hi]. Linear-space
+  // colours, as three wants vertex colours. The patch alone is coloured over
+  // its own range; with the horizon standing, both are coloured over the two
+  // ranges together, so the seam is one colour and a far hill is a hill.
+  function rampColour(c, h, lo, hi) {
+    const t = Math.min(1, Math.max(0, (h - lo) / Math.max(1, hi - lo)));
+    c.setHSL(0.30 - 0.22 * t, 0.42 - 0.18 * t, 0.22 + 0.42 * t);
+    return c;
+  }
+  function paintPatchRamp(lo, hi) {
+    const g = tw.ground;
+    if (!g || !sc.terrain) return;
+    const col = sc.terrain.geometry.attributes.color, c = new THREE.Color();
+    for (let i = 0; i < col.count; i++) { rampColour(c, g.elev[i], lo, hi); col.setXYZ(i, c.r, c.g, c.b); }
+    col.needsUpdate = true;
+  }
+
   // The ground: one plane, N × N, its vertices lifted to the grid. Row 0 of the
   // raster is north; PlaneGeometry's first row is its top, which rotateX(−90°)
   // sends to −z — north. So the raster indexes the vertices directly, and the
@@ -875,16 +975,11 @@ const DigitalTwin = (function () {
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
     const col = new Float32Array(pos.count * 3);
-    const span = Math.max(1, g.max - g.min);
     const c = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const h = g.elev[i];
       pos.setY(i, (h - g.h0) * exag);
-      // The height ramp, for when there is no imagery: dark green in the low
-      // ground through olive and tan to a pale crest. Linear-space colours,
-      // as three wants vertex colours.
-      const t = (h - g.min) / span;
-      c.setHSL(0.30 - 0.22 * t, 0.42 - 0.18 * t, 0.22 + 0.42 * t);
+      rampColour(c, h, g.min, g.max);
       col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -933,6 +1028,443 @@ const DigitalTwin = (function () {
     mat.vertexColors = !want;
     mat.needsUpdate = true;
     requestFrame();
+  }
+
+  // ── the horizon ────────────────────────────────────────────────────────────
+  // Everything past the patch's edge — the header has the shape of it. Three
+  // sheets of heights about the station, one mesh of concentric squares that
+  // starts on the patch's own edge, a dome for the sky and haze to fade into
+  // it. Fetched only once the patch is standing, cached by station, and
+  // drawn from the cache when the station comes round again.
+  const horizonCache = new Map();   // `${lat},${lon}` → { lat, lon, grids }
+
+  function shellBox(lat, lon, half) { return patchBox(lat, lon, half * 2); }
+
+  // One sheet's heights, N × N over its box, or null. The inner sheet is the
+  // State's raster where the box is inside its extent — the LiDAR resampled
+  // to 40 m, in AHD like the patch, one request — and the tiles where it is
+  // not or where the State holds holes; the outer two are the tiles at the
+  // zoom terrain.js picks for the spacing. A grid from the tiles has its
+  // rows even in Mercator y (terrain.js's lattice), the State's in latitude;
+  // both have their columns even in longitude, and `rows` says which.
+  function shellGrid(box, k) {
+    const tiles = () => {
+      if (typeof Terrain === 'undefined') return Promise.resolve(null);
+      return Terrain.grid({ west: box.west, east: box.east, south: box.south, north: box.north }, N, N)
+        .then(r => (r && r.ok
+          ? { elev: r.elev, n: N, rows: 'merc', source: 'srtm', zoom: r.zoom, resolution_m: r.resolution_m,
+              missing: r.missing, attribution: r.attribution, box }
+          : null))
+        .catch(() => null);
+    };
+    if (k !== 0) return tiles();
+    return qldGround(box).then(q => (q.kind === 'ok' && q.holes === 0
+      ? { elev: q.elev, n: N, rows: 'lat', source: 'qld', zoom: null, resolution_m: box.size / (N - 1),
+          missing: 0, attribution: ATTR_QLD_DEM, box }
+      : tiles()), () => tiles());
+  }
+
+  function horizonKey(st) { return `${st.lat.toFixed(6)},${st.lon.toFixed(6)}`; }
+
+  // The three sheets, in parallel; resolves — never rejects — to what came,
+  // with a null for a sheet that did not. Cached while at least one did.
+  function horizonFor(st) {
+    const key = horizonKey(st);
+    if (horizonCache.has(key)) return Promise.resolve(horizonCache.get(key));
+    return Promise.all(SHELL_HALF.map((h, k) => shellGrid(shellBox(st.lat, st.lon, h), k))).then(grids => {
+      const hz = { key, lat: st.lat, lon: st.lon, grids };
+      if (grids.some(Boolean)) {
+        horizonCache.set(key, hz);
+        while (horizonCache.size > CACHE_MAX) horizonCache.delete(horizonCache.keys().next().value);
+      }
+      return hz;
+    });
+  }
+
+  function mercY(lat) {
+    const r = lat * Math.PI / 180;
+    return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2;
+  }
+
+  // A sheet's height at a scene point, bilinear between its nodes; NaN off
+  // the sheet or on a tile that did not arrive.
+  function gridAt(g, x, z, lat0, lon0) {
+    const b = g.box, n = g.n;
+    const lat = lat0 - z / metresPerDegLat(), lon = lon0 + x / metresPerDegLon(lat0);
+    let fx = (lon - b.west) / (b.east - b.west) * (n - 1);
+    let fy = (g.rows === 'merc'
+      ? (mercY(lat) - mercY(b.north)) / (mercY(b.south) - mercY(b.north))
+      : (b.north - lat) / (b.north - b.south)) * (n - 1);
+    const eps = 1e-6;
+    if (!(fx >= -eps && fx <= n - 1 + eps && fy >= -eps && fy <= n - 1 + eps)) return NaN;
+    fx = Math.min(n - 1, Math.max(0, fx)); fy = Math.min(n - 1, Math.max(0, fy));
+    const ix = Math.min(n - 2, Math.floor(fx)), iy = Math.min(n - 2, Math.floor(fy));
+    const tx = fx - ix, ty = fy - iy, e = g.elev;
+    const a = e[iy * n + ix], bb = e[iy * n + ix + 1], c = e[(iy + 1) * n + ix], d = e[(iy + 1) * n + ix + 1];
+    return a * (1 - tx) * (1 - ty) + bb * tx * (1 - ty) + c * (1 - tx) * ty + d * tx * ty;
+  }
+
+  // The far ground's own height (AHD or EGM96, as the sheet has it) at a scene
+  // point: the finest sheet that holds it. NaN where none does.
+  function ringHeight(x, z) {
+    const hz = tw.horizon;
+    if (!hz) return NaN;
+    for (const g of hz.grids) {
+      if (!g) continue;
+      const v = gridAt(g, x, z, hz.lat, hz.lon);
+      if (isFinite(v)) return v;
+    }
+    return NaN;
+  }
+
+  // The squares. Vertex t of a square of half-width h with M segments a side
+  // goes clockwise seen from above: the north edge west → east, the east
+  // north → south, the south east → west, the west south → north. The
+  // innermost square has M0 = N − 1 segments, so its vertices are the
+  // patch's own edge vertices.
+  const M0 = N - 1;
+  function squareXZ(h, M, t) {
+    const side = Math.floor(t / M), u = (t % M) / M;
+    switch (side) {
+      case 0:  return { x: -h + 2 * h * u, z: -h };
+      case 1:  return { x: h, z: -h + 2 * h * u };
+      case 2:  return { x: h - 2 * h * u, z: h };
+      default: return { x: -h, z: h - 2 * h * u };
+    }
+  }
+
+  // The inverse: where a point stands round its own square, as a (fractional)
+  // index into the innermost square's 4·M0 vertices — which is what the lift
+  // at the patch's edge is stored by.
+  function perimeterT(x, z) {
+    const hq = Math.max(Math.abs(x), Math.abs(z));
+    if (hq === 0) return 0;
+    let side, u;
+    if (-z >= Math.abs(x))     { side = 0; u = (x + hq) / (2 * hq); }
+    else if (x >= Math.abs(z)) { side = 1; u = (z + hq) / (2 * hq); }
+    else if (z >= Math.abs(x)) { side = 2; u = (hq - x) / (2 * hq); }
+    else                       { side = 3; u = (hq - z) / (2 * hq); }
+    return (side + u) * M0;
+  }
+
+  // The squares from the patch's edge to the horizon: 200 segments a side to
+  // 1.5 patch-halves, 100 to 4, then 50 all the way; each a few percent wider
+  // than the last, a run of them ending exactly on each sheet's edge so a
+  // shell's mesh starts and stops on a square.
+  function squareList(half) {
+    const segs = [[half, 1.5 * half, M0], [1.5 * half, 4 * half, M0 / 2], [4 * half, SHELL_HALF[0], M0 / 4]];
+    for (let k = 1; k < SHELL_HALF.length; k++) segs.push([SHELL_HALF[k - 1], SHELL_HALF[k], M0 / 4]);
+    const out = [{ h: half, M: M0 }];
+    for (const [a, b, M] of segs) {
+      if (!(b > a)) continue;
+      const n = Math.max(1, Math.ceil(Math.log(b / a) / Math.log(1 + 3 / M)));
+      const q = Math.pow(b / a, 1 / n);
+      for (let i = 1; i <= n; i++) out.push({ h: i === n ? b : a * Math.pow(q, i), M });
+    }
+    return out;
+  }
+
+  // The lift at the patch's edge, linear between the edge vertices, wrapping.
+  function offsetAt(t) {
+    const o = tw.horizonOffsets;
+    if (!o) return 0;
+    const L = o.length, f = ((t % L) + L) % L;
+    const i = Math.floor(f), w = f - i;
+    return o[i] * (1 - w) + o[(i + 1) % L] * w;
+  }
+
+  // The Earth's curve, from the patch's circumscribed circle out.
+  function earthDrop(d, half) { return Math.max(0, d * d - 2 * half * half) / (2 * EARTH_R_EYE); }
+
+  // The far ground as drawn, at any point outside the patch: the sheet's
+  // height, lifted to meet the LiDAR edge where that is near, exaggerated
+  // like the patch, and dropped by the Earth's curve. NaN inside the patch,
+  // and the station's own level where no sheet has a height.
+  function ringSurface(x, z) {
+    const g = tw.ground;
+    if (!g || !tw.horizon) return NaN;
+    const hq = Math.max(Math.abs(x), Math.abs(z));
+    if (hq < g.half) return NaN;
+    const w = Math.min(1, Math.max(0, (hq / g.half - 1) / (BLEND_OUT - 1)));
+    const r = ringHeight(x, z);
+    const H = (isFinite(r) ? r : g.h0) + (1 - w) * offsetAt(perimeterT(x, z));
+    return (H - g.h0) * S().exag - earthDrop(Math.hypot(x, z), g.half);
+  }
+
+  function removeHorizon() {
+    if (sc.shells) for (const sh of sc.shells) if (sh.tex) { sh.tex.dispose(); sh.tex = null; }
+    if (sc.horizon && sc.scene) { sc.scene.remove(sc.horizon); disposeObject(sc.horizon); }
+    const had = !!sc.horizon;
+    sc.horizon = null; sc.shells = null;
+    setFog(false);
+    if (had && tw.ground) paintPatchRamp(tw.ground.min, tw.ground.max);
+  }
+
+  // Haze: the near fog fades the patch's own edges when there is nothing past
+  // them; the far one is the air between here and 60 km.
+  function setFog(far) {
+    if (!sc.scene || !tw.ground) return;
+    const c = skyColour();
+    sc.scene.fog = far ? new THREE.FogExp2(c, HAZE_DENSITY) : new THREE.Fog(c, tw.ground.size * 1.1, tw.ground.size * 4);
+  }
+
+  // The mesh: one BufferGeometry per sheet, its squares' vertices in order,
+  // its triangles outermost square first (the header says why), a shell's
+  // own texture coordinates over its sheet's box, and a colour ramp on the
+  // patch's own scale for when there is no imagery. Heights are set by
+  // liftHorizon(), which the exaggeration slider calls again.
+  function buildHorizon() {
+    removeHorizon();
+    const g = tw.ground, hz = tw.horizon;
+    if (!g || !hz || !hz.grids.some(Boolean) || !sc.scene) return;
+    const off = new Float32Array(4 * M0);
+    let unfilled = 0;
+    for (let t = 0; t < 4 * M0; t++) {
+      const p = squareXZ(g.half, M0, t);
+      const r = ringHeight(p.x, p.z);
+      if (!isFinite(r)) unfilled++;
+      off[t] = heightAt(p.x, p.z) - (isFinite(r) ? r : g.h0);
+    }
+    tw.horizonOffsets = off;
+    tw.horizonUnfilled = unfilled;
+    const squares = squareList(g.half);
+    const group = new THREE.Group();
+    group.name = 'horizon';
+    const shells = [];
+    for (let k = 0; k < SHELL_HALF.length; k++) {
+      // A sheet that did not arrive is a shell not drawn — a ring of nothing,
+      // rather than a ring of flat ground at the station's level.
+      if (!hz.grids[k]) continue;
+      const outerH = SHELL_HALF[k], innerH = k === 0 ? g.half : SHELL_HALF[k - 1];
+      const mine = squares.filter(s => s.h >= innerH - 1e-6 && s.h <= outerH + 1e-6);
+      if (mine.length < 2) continue;
+      const base = [];
+      let count = 0;
+      for (const s of mine) { base.push(count); count += 4 * s.M; }
+      const pos = new Float32Array(count * 3), uv = new Float32Array(count * 2), col = new Float32Array(count * 3);
+      const isInner = new Uint8Array(count), meta = new Int32Array(count * 2);
+      for (let qi = 0; qi < mine.length; qi++) {
+        const s = mine[qi];
+        for (let t = 0; t < 4 * s.M; t++) {
+          const i = base[qi] + t, p = squareXZ(s.h, s.M, t);
+          pos[i * 3] = p.x; pos[i * 3 + 2] = p.z;
+          uv[i * 2] = (p.x + outerH) / (2 * outerH); uv[i * 2 + 1] = (outerH - p.z) / (2 * outerH);
+          isInner[i] = s.h === g.half ? 1 : 0;
+          meta[i * 2] = qi; meta[i * 2 + 1] = t;
+        }
+      }
+      // Outermost pair of squares first. Between a square and a coarser one
+      // outside it, every second vertex of the finer is used; its odd ones
+      // are the seam list, put on the line between their neighbours.
+      const idx = [], seams = [];
+      for (let qi = mine.length - 2; qi >= 0; qi--) {
+        const A = mine[qi], B = mine[qi + 1], r = A.M / B.M, nA = 4 * A.M, nB = 4 * B.M;
+        for (let t = 0; t < nB; t++) {
+          const a = base[qi] + (t * r) % nA, b = base[qi] + ((t + 1) * r) % nA;
+          const c = base[qi + 1] + (t + 1) % nB, d = base[qi + 1] + t;
+          idx.push(a, b, c, a, c, d);
+          if (r === 2) seams.push(base[qi] + (t * r + 1) % nA, a, b);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      geo.setIndex(idx);
+      const mat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, vertexColors: true });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = `horizon ${k}`;
+      mesh.renderOrder = SHELL_HALF.length - k;    // the far shell first
+      mesh.userData.export = false;
+      group.add(mesh);
+      shells.push({ k, mesh, half: outerH, squares: mine, base, isInner, meta, tex: null,
+                    seams: Int32Array.from(seams), seamSet: new Set(seams.filter((_, i) => i % 3 === 0)) });
+    }
+    if (!shells.length) return;
+    sc.horizon = group; sc.shells = shells;
+    sc.scene.add(group);
+    liftHorizon();
+    setFog(true);
+    applyHorizonImagery();
+  }
+
+  function liftHorizon() {
+    const g = tw.ground;
+    if (!g || !sc.shells) return;
+    const c = new THREE.Color(), exag = S().exag;
+    let lo = g.min, hi = g.max;
+    const heights = [];
+    for (const sh of sc.shells) {
+      const pos = sh.mesh.geometry.attributes.position;
+      const H = new Float32Array(pos.count);
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), z = pos.getZ(i);
+        const y = sh.isInner[i] ? yAt(x, z) : ringSurface(x, z);
+        pos.setY(i, isFinite(y) ? y : 0);
+        H[i] = (pos.getY(i) + earthDrop(Math.hypot(x, z), g.half)) / exag + g.h0;
+        if (H[i] < lo) lo = H[i];
+        if (H[i] > hi) hi = H[i];
+      }
+      const s = sh.seams;
+      for (let j = 0; j < s.length; j += 3) pos.setY(s[j], (pos.getY(s[j + 1]) + pos.getY(s[j + 2])) / 2);
+      pos.needsUpdate = true;
+      sh.mesh.geometry.computeVertexNormals();
+      sh.mesh.geometry.computeBoundingSphere();
+      heights.push(H);
+    }
+    // One ramp over the patch and the far ground together.
+    sc.shells.forEach((sh, k) => {
+      const col = sh.mesh.geometry.attributes.color, H = heights[k];
+      for (let i = 0; i < col.count; i++) { rampColour(c, H[i], lo, hi); col.setXYZ(i, c.r, c.g, c.b); }
+      col.needsUpdate = true;
+    });
+    paintPatchRamp(lo, hi);
+    requestFrame();
+  }
+
+  function applyHorizonImagery() {
+    if (!sc.shells || !sc.renderer) return;
+    const ims = tw.horizonImages || [];
+    for (const sh of sc.shells) {
+      const im = ims[sh.k];
+      const want = !!S().imagery && !!im;
+      if (want && !sh.tex) {
+        const tex = new THREE.CanvasTexture(im.canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = Math.min(8, sc.renderer.capabilities.getMaxAnisotropy() || 1);
+        tex.generateMipmaps = true;
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        sh.tex = tex;
+      }
+      const mat = sh.mesh.material;
+      mat.map = want ? sh.tex : null;
+      mat.vertexColors = !want;
+      mat.needsUpdate = true;
+    }
+    requestFrame();
+  }
+
+  // ── the sky ────────────────────────────────────────────────────────────────
+  // A dome round the camera, shaded by the direction seen: the zenith colour
+  // overhead, the horizon's at the horizon, the haze's below it (which is
+  // what shows past the far ground's edge from a high camera). Its depth is
+  // neither written nor tested, and it is drawn first, so everything else is
+  // in front of it whatever the distance.
+  const SKY_VERT = `varying vec3 vDir;
+void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  const SKY_FRAG = `uniform vec3 zenith; uniform vec3 horizon; uniform vec3 haze; varying vec3 vDir;
+void main() {
+  float h = normalize(vDir).y;
+  vec3 c = h >= 0.0 ? mix(horizon, zenith, pow(h, 0.5)) : mix(horizon, haze, pow(-h, 0.35));
+  gl_FragColor = vec4(c, 1.0);
+  #include <colorspace_fragment>
+}`;
+
+  function skyTones() {
+    const dark = typeof state !== 'undefined' && state.theme === 'dark';
+    return {
+      horizon: cssVar('--twin-sky',    dark ? '#3f5168' : '#cfe3f5'),
+      zenith:  cssVar('--twin-zenith', dark ? '#0c1524' : '#5f9bd6'),
+      haze:    cssVar('--twin-haze',   dark ? '#26303c' : '#b8c3cc'),
+    };
+  }
+
+  function buildSky() {
+    if (sc.sky || !sc.scene) return;
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() }, haze: { value: new THREE.Color() } },
+      vertexShader: SKY_VERT, fragmentShader: SKY_FRAG,
+      side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
+    });
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(SKY_R, 48, 24), mat);
+    mesh.renderOrder = -10;
+    mesh.frustumCulled = false;
+    mesh.name = 'sky';
+    mesh.userData.export = false;
+    sc.sky = mesh;
+    sc.scene.add(mesh);
+    skyKey = '';
+    syncSky();
+  }
+
+  let skyKey = '';
+  function syncSky() {
+    if (!sc.sky) return;
+    const t = skyTones(), key = t.horizon + t.zenith + t.haze;
+    if (key !== skyKey) {
+      skyKey = key;
+      const u = sc.sky.material.uniforms;
+      u.horizon.value.set(t.horizon); u.zenith.value.set(t.zenith); u.haze.value.set(t.haze);
+    }
+    if (sc.camera) sc.sky.position.copy(sc.camera.position);
+  }
+
+  // The far field, once the patch is standing: the sheets, the mesh, then the
+  // imagery a shell at a time. Every await checks the build sequence, as
+  // build() does, and the status line's last clause is the horizon's.
+  function horizonWords(hz) {
+    const srcs = hz.grids.filter(Boolean).map(g => g.source);
+    const qld = srcs.includes('qld'), srtm = srcs.includes('srtm');
+    return `horizon to ${HORIZON_M / 1000} km from ${qld && srtm ? 'the State\'s raster and the ~30 m tiles' : qld ? 'the State\'s raster' : 'the ~30 m tiles'}`;
+  }
+
+  function horizonNotes(notes) { return notes.filter(n => !/horizon/i.test(n)); }
+
+  async function fetchHorizon(st, seq, notes) {
+    tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false;
+    if (!S().horizon || !sc.terrain) { setStatus(`${tw.statusBase}.`); return; }
+    tw.horizonPending = true;
+    setStatus(`${tw.statusBase}; fetching the horizon…`);
+    const hz = await horizonFor(st);
+    // Moved on, or switched off while it was coming: nothing to draw.
+    if (seq !== tw.seq || !S().horizon) return;
+    tw.horizon = hz;
+    const have = hz.grids.filter(Boolean).length;
+    if (!have) {
+      tw.horizonPending = false;
+      notes.push('The horizon could not be fetched — the terrain tiles did not answer — so the patch stands alone against the sky. Press Rebuild to try again.');
+      setNotes(notes);
+      setStatus(`${tw.statusBase}; no horizon.`);
+      return;
+    }
+    buildHorizon();
+    if (have < SHELL_HALF.length) {
+      notes.push(`${SHELL_HALF.length - have} of the horizon's ${SHELL_HALF.length} sheets could not be fetched; the far ground is drawn where it was read.`);
+    }
+    const missing = hz.grids.reduce((s, g) => s + (g && g.missing ? g.missing : 0), 0);
+    if (missing) {
+      notes.push(`${missing} of the horizon's terrain tiles did not arrive; the ground under them is the next sheet out where there is one, and the station's own level where there is not.`);
+    }
+    setNotes(notes);
+    refreshAttrib();
+    syncCanvasName();
+    if (S().imagery) await drapeHorizon(st, seq, notes);
+    else { tw.horizonPending = false; setStatus(`${tw.statusBase}; ${horizonWords(hz)}.`); }
+  }
+
+  async function drapeHorizon(st, seq, notes) {
+    if (!tw.horizon || !sc.shells) return;
+    tw.horizonPending = true;
+    const words = horizonWords(tw.horizon);
+    setStatus(`${tw.statusBase}; ${words}, draping it…`);
+    const ims = tw.horizonImages || (tw.horizonImages = []);
+    for (let k = 0; k < SHELL_HALF.length; k++) {
+      if (ims[k]) continue;
+      const im = await imageryFor(shellBox(st.lat, st.lon, SHELL_HALF[k]), SHELL_PX).catch(() => null);
+      if (seq !== tw.seq || !S().horizon || !sc.shells) return;
+      ims[k] = im;
+      applyHorizonImagery();
+    }
+    tw.horizonPending = false;
+    const missing = ims.filter(im => !im).length;
+    if (missing) {
+      notes.push(missing === SHELL_HALF.length
+        ? 'No imagery could be fetched for the horizon; it is coloured by height.'
+        : `Imagery for ${missing} of the horizon's ${SHELL_HALF.length} sheets could not be fetched; those are coloured by height.`);
+    }
+    setNotes(notes);
+    setStatus(`${tw.statusBase}; ${words}.`);
+    refreshAttrib();
   }
 
   // The station: a 2.000 m × Ø0.300 m galvanised pole, its foot on the ground
@@ -1255,7 +1787,8 @@ const DigitalTwin = (function () {
       let y = rig.target.y + rig.radius * Math.cos(rig.phi);
       // Never under the hill between the camera and the pole: a camera inside
       // the ground shows the underside of the world, which reads as nothing.
-      y = Math.max(y, yAt(x, z) + 0.9);
+      // Past the patch's edge that hill is the horizon's.
+      y = Math.max(y, surfaceY(x, z) + 0.9);
       cam.position.set(x, y, z);
       cam.lookAt(rig.target);
     }
@@ -1493,6 +2026,7 @@ const DigitalTwin = (function () {
     placeCamera();
     sc.scene.background = skyColour();
     if (sc.scene.fog) sc.scene.fog.color.copy(sc.scene.background);
+    syncSky();
     sc.renderer.render(sc.scene, sc.camera);
     tw.frames++;
   }
@@ -1534,6 +2068,7 @@ const DigitalTwin = (function () {
     // in for this one's, so they go, and every panel says so.
     const nothing = (status, placeholder) => {
       tw.ground = null; tw.image = null; tw.elvis = null; tw.picked = null;
+      tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = '';
       clearScene();
       requestFrame();
       setStatus(status);
@@ -1572,6 +2107,7 @@ const DigitalTwin = (function () {
     tw.ground = ground;
     tw.image = null;
     tw.elvis = null;
+    tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = '';
 
     if (!ground) {
       // The last station's scene must not stand in for this one's: cleared,
@@ -1600,12 +2136,13 @@ const DigitalTwin = (function () {
 
     if (lib && ensureRenderer()) {
       clearScene();
+      buildSky();
       buildTerrain();
       buildPole(st);
       buildFigure();
       buildLabel(st);
       buildPaths(st);
-      sc.scene.fog = new THREE.Fog(skyColour(), ground.size * 1.1, ground.size * 4);
+      setFog(false);
       resetOrbit();
       showPlaceholder('');
       startLoop();
@@ -1644,11 +2181,23 @@ const DigitalTwin = (function () {
     }
     if (image && image.partial) notes.push('Some imagery tiles did not arrive; the gaps in the drape are white.');
     if (sc.terrain) applyImagery();
-    setStatus(`${groundLine}, ${image ? (image.source === 'qld' ? 'Queensland aerial imagery' : 'Esri imagery') + ` at ${image.mpp.toFixed(2)} m/px` : 'no imagery'}.`);
+    tw.statusBase = `${groundLine}, ${image ? (image.source === 'qld' ? 'Queensland aerial imagery' : 'Esri imagery') + ` at ${image.mpp.toFixed(2)} m/px` : 'no imagery'}`;
+    setStatus(`${tw.statusBase}.`);
     setNotes(notes);
     refreshTruth();
     refreshAttrib();
     syncCanvasName();
+
+    // The horizon last, and only round a patch that is drawn: it is scenery,
+    // and the numbers above never wait on it — nor does the patch fall with it.
+    try {
+      await fetchHorizon(st, seq, notes);
+    } catch (err) {
+      if (seq !== tw.seq) return;
+      notes.push(`The horizon could not be drawn: ${(err && err.message) || err}. The patch stands alone against the sky.`);
+      setNotes(notes);
+      setStatus(`${tw.statusBase}; no horizon.`);
+    }
   }
 
   // The canvas is the control (the thing that takes focus and is operated) and
@@ -1662,7 +2211,8 @@ const DigitalTwin = (function () {
     let name = 'Three-dimensional view. No station is built yet.';
     if (st && g) {
       name = `Three-dimensional view of ${st.name}: ${g.size} m of ground at ${g.sample_m.toFixed(1)} m, `
-           + `${(g.max - g.min).toFixed(1)} m of relief, a 2 m pole at the station and a 1.75 m figure beside it. `
+           + `${(g.max - g.min).toFixed(1)} m of relief, a 2 m pole at the station and a 1.75 m figure beside it`
+           + (sc.horizon ? `, the country round it to ${HORIZON_M / 1000} km under a sky. ` : '. ')
            + (rig.mode === 'walk' ? 'Walking: W A S D move, drag looks, Escape stops.'
                                   : 'Drag to orbit, arrow keys turn, plus and minus zoom, F walks, T looks down, R resets.');
     }
@@ -1833,6 +2383,7 @@ const DigitalTwin = (function () {
                  oninput="DigitalTwin.setExag(this.value)">
         </label>
         <label class="check-label"><input type="checkbox" ${s.imagery ? 'checked' : ''} onchange="DigitalTwin.setImagery(this.checked)"><span>Drape the aerial imagery</span></label>
+        <label class="check-label"><input type="checkbox" ${s.horizon ? 'checked' : ''} onchange="DigitalTwin.setHorizon(this.checked)"><span>The horizon: far ground to ${HORIZON_M / 1000} km, a sky and haze (a few more requests)</span></label>
         <label class="check-label"><input type="checkbox" ${s.wire ? 'checked' : ''} onchange="DigitalTwin.setWire(this.checked)"><span>Show the mesh</span></label>
         <label class="check-label"><input type="checkbox" ${s.figure ? 'checked' : ''} onchange="DigitalTwin.setFigure(this.checked)"><span>Figure beside the pole (1.75 m)</span></label>
         <label class="check-label"><input type="checkbox" ${s.label ? 'checked' : ''} onchange="DigitalTwin.setLabel(this.checked)"><span>Name over the pole</span></label>
@@ -1914,8 +2465,11 @@ const DigitalTwin = (function () {
     const parts = [];
     if (tw.ground) parts.push(tw.ground.attribution);
     if (tw.image) parts.push(tw.image.attribution);
+    // The horizon's sources, where they are not the patch's already.
+    if (tw.horizon) for (const g of tw.horizon.grids) if (g) parts.push(g.attribution);
+    if (tw.horizonImages) for (const im of tw.horizonImages) if (im) parts.push(im.attribution);
     if (typeof Elvis !== 'undefined') parts.push(Elvis.attribution);
-    return parts.filter(Boolean).map(esc).join(' · ');
+    return [...new Set(parts.filter(Boolean))].map(esc).join(' · ');
   }
 
   function refreshAttrib() {
@@ -1940,6 +2494,7 @@ const DigitalTwin = (function () {
     sc.sun = null; sc.hemi = null;
     tw.hooks = null;
     tw.paths = null;
+    tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false;
   }
 
   function init() {
@@ -2172,10 +2727,36 @@ const DigitalTwin = (function () {
         if (sc.wire) { sc.wire.geometry.dispose(); sc.wire.geometry = new THREE.WireframeGeometry(sc.terrain.geometry); }
         if (sc.figure) sc.figure.position.y = yAt(sc.figure.position.x, sc.figure.position.z);
         if (sc.paths) buildPaths(currentStation());
+        liftHorizon();
         requestFrame();
       }
     },
-    setImagery(on) { S().imagery = !!on; saveSettings(); applyImagery(); },
+    setImagery(on) {
+      S().imagery = !!on; saveSettings();
+      applyImagery();
+      applyHorizonImagery();
+      // Switched on with the horizon standing bare: its sheets are fetched now.
+      const st = currentStation();
+      if (on && sc.shells && st && located(st) && !(tw.horizonImages && tw.horizonImages.every(Boolean))) {
+        drapeHorizon(st, tw.seq, horizonNotes(tw.notes)).catch(() => {});
+      }
+    },
+    setHorizon(on) {
+      S().horizon = !!on; saveSettings();
+      const st = currentStation();
+      if (!on) {
+        // A fetch in flight sees the setting when it lands and stands down.
+        removeHorizon();
+        tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false;
+        setNotes(horizonNotes(tw.notes));
+        if (tw.statusBase) setStatus(`${tw.statusBase}.`);
+        refreshAttrib(); syncCanvasName(); requestFrame();
+        return;
+      }
+      if (st && located(st) && sc.terrain && !sc.shells) {
+        fetchHorizon(st, tw.seq, horizonNotes(tw.notes)).catch(() => {});
+      }
+    },
     setWire(on)    { S().wire = !!on; saveSettings(); if (sc.wire) { sc.wire.visible = !!on; requestFrame(); } },
     setFigure(on)  { S().figure = !!on; saveSettings(); if (sc.figure) { sc.figure.visible = !!on; requestFrame(); } },
     setLabel(on)   { S().label = !!on; saveSettings(); if (sc.label) { sc.label.visible = !!on; requestFrame(); } },
@@ -2187,9 +2768,10 @@ const DigitalTwin = (function () {
     rebuild() {
       const st = currentStation();
       if (st && located(st)) {
-        const box = patchBox(st.lat, st.lon, S().size);
-        const key = `${box.south.toFixed(6)},${box.west.toFixed(6)}|${box.size}`;
+        const key = boxKey(patchBox(st.lat, st.lon, S().size));
         groundCache.delete(key); imageCache.delete(key);
+        horizonCache.delete(horizonKey(st));
+        for (const h of SHELL_HALF) imageCache.delete(boxKey(shellBox(st.lat, st.lon, h)));
       }
       init();
     },
@@ -2271,6 +2853,60 @@ const DigitalTwin = (function () {
         camera: sc.camera ? { x: sc.camera.position.x, y: sc.camera.position.y, z: sc.camera.position.z } : null,
         paths: tw.paths ? { count: tw.paths.count, source: tw.paths.source, pending: tw.paths.pending, list: tw.paths.list.slice() } : null,
         embedded: !!tw.hooks,
+        horizon: {
+          on: !!S().horizon, up: !!sc.horizon, pending: tw.horizonPending, km: HORIZON_M / 1000,
+          earthR: EARTH_R_EYE, blendOut: BLEND_OUT, skyR: SKY_R, far: sc.camera ? sc.camera.far : null, sky: !!sc.sky,
+          fog: sc.scene && sc.scene.fog
+            ? { exp2: !!sc.scene.fog.isFogExp2, density: sc.scene.fog.density, near: sc.scene.fog.near, far: sc.scene.fog.far }
+            : null,
+          shells: tw.horizon
+            ? tw.horizon.grids.map((g, k) => (g ? { half: SHELL_HALF[k], source: g.source, zoom: g.zoom, rows: g.rows, n: g.n,
+                                                    missing: g.missing, resolution_m: g.resolution_m,
+                                                    box: { west: g.box.west, east: g.box.east, south: g.box.south, north: g.box.north } }
+                                                : null))
+            : null,
+          images: tw.horizonImages ? tw.horizonImages.map(im => (im ? im.source : null)) : null,
+          meshes: sc.shells
+            ? sc.shells.map(sh => ({ name: sh.mesh.name, half: sh.half, vertices: sh.mesh.geometry.attributes.position.count,
+                                     triangles: sh.mesh.geometry.index.count / 3, textured: !!sh.mesh.material.map,
+                                     renderOrder: sh.mesh.renderOrder, squares: sh.squares.length,
+                                     innerHalf: sh.squares[0].h, outerHalf: sh.squares[sh.squares.length - 1].h }))
+            : [],
+          unfilled: tw.horizonUnfilled,
+          ringHeight, ringSurface, perimeterT,
+          // A shell's vertex: where it is, which square and which vertex of it, whether it is on the patch's edge or a seam.
+          vertex: (k, i) => {
+            const sh = sc.shells && sc.shells[k];
+            if (!sh) return null;
+            const p = sh.mesh.geometry.attributes.position, q = sh.meta[i * 2];
+            return { x: p.getX(i), y: p.getY(i), z: p.getZ(i), inner: !!sh.isInner[i], square: q, t: sh.meta[i * 2 + 1],
+                     h: sh.squares[q].h, M: sh.squares[q].M, seam: sh.seamSet.has(i) };
+          },
+          // The index of a shell's vertex nearest a point.
+          nearest: (k, x, z) => {
+            const sh = sc.shells && sc.shells[k];
+            if (!sh) return -1;
+            const p = sh.mesh.geometry.attributes.position;
+            let best = -1, bd = Infinity;
+            for (let i = 0; i < p.count; i++) {
+              const d = (p.getX(i) - x) ** 2 + (p.getZ(i) - z) ** 2;
+              if (d < bd) { bd = d; best = i; }
+            }
+            return best;
+          },
+          // How far out the first triangle reaches and how far in the last one
+          // does, the smallest square any vertex stands on, the mean normal's lift.
+          order: k => {
+            const sh = sc.shells && sc.shells[k];
+            if (!sh) return null;
+            const idx = sh.mesh.geometry.index, p = sh.mesh.geometry.attributes.position, nrm = sh.mesh.geometry.attributes.normal;
+            const hq = i => Math.max(Math.abs(p.getX(i)), Math.abs(p.getZ(i)));
+            let minHq = Infinity, ny = 0;
+            for (let i = 0; i < p.count; i++) { minHq = Math.min(minHq, hq(i)); ny += nrm.getY(i); }
+            const tri = j => [idx.getX(j), idx.getX(j + 1), idx.getX(j + 2)].map(hq);
+            return { first: Math.max(...tri(0)), last: Math.min(...tri(idx.count - 3)), minHq, meanNormalY: ny / p.count };
+          },
+        },
         heightAt, yAt,
         vertexY: i => (sc.terrain ? sc.terrain.geometry.attributes.position.getY(i) : NaN),
         vertexX: i => (sc.terrain ? sc.terrain.geometry.attributes.position.getX(i) : NaN),
@@ -2285,6 +2921,18 @@ const DigitalTwin = (function () {
     _upsample: upsample,
     _sizes: () => SIZES.slice(),
     _libUrl: () => LIB_URL,
+    // Put the orbit camera somewhere and say where it ended up — the check's
+    // way of standing it over the far ground.
+    _orbit({ radius, theta, phi }) {
+      rig.mode = 'orbit';
+      if (rig.target) rig.target.set(0, 1, 0);
+      if (isFinite(radius)) rig.radius = radius;
+      if (isFinite(theta)) rig.theta = theta;
+      if (isFinite(phi)) rig.phi = phi;
+      placeCamera();
+      requestFrame();
+      return sc.camera ? { x: sc.camera.position.x, y: sc.camera.position.y, z: sc.camera.position.z } : null;
+    },
     // Forget the station, so a check can measure the tab with nothing chosen.
     _clear() {
       tw.stationId = null; tw.ground = null; tw.image = null; tw.elvis = null;

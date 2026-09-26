@@ -3586,6 +3586,16 @@ scales — the network on its terrain, and the site — and neither replaces the
 other; zoom is what says which question is being asked, so zoom is the
 hand-over (`map-twin.js`).
 
+**Past the patch the country runs to a horizon 60 km off**, under a sky, in
+haze: three sheets of far ground — the State's raster at 40 m to 4 km, the
+~30 m tiles to 20 and 60 km — on one mesh of concentric squares that starts
+on the patch's own edge vertices and widens by a few percent a square, every
+far vertex dropped for the Earth's curve (27 m at 20 km, 245 m at 60) so the
+horizon is where one belongs, each sheet draped with its own imagery. It is
+scenery, not survey — coarse on purpose, not in the `.glb`, not clickable —
+fetched only once the patch is standing, and the Scene panel can switch it
+off; it is a few more requests.
+
 **The radio paths are drawn from the antenna** as rays to the edge of the
 patch along the line of sight to the far station, each named beside the pole
 and again at its end, and listed under the stage — the far station's name is
@@ -3945,7 +3955,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run itm` | the Longley–Rice port drifting from its reference: 53 losses computed by NTIA's own compiled library — its five published vectors and 48 synthetic profiles across every regime, climate, polarisation and mode of variability — held to 10⁻⁶ dB, intermediates included. Node-only, seconds |
 | `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |
 | `npm run linkbudget` | the link budget card's two ends. Each is found by name, station number, ALERT address or address window — asserted against what the *Stations filter itself* returns for the same term, so the claim is that the card runs the shared matcher rather than a second copy of the rules. Then: the box keeping its caret through a paste, an end armed and filled from a pin click and from a row of the Stations list in its filtered state without selecting it, the three Clear buttons, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute — the same station at both ends, a zero-length path, a term nobody supplied, and a frequency box that cannot say whether it holds an override. Every one of those is a clean console |
-| `npm run twin` | the Digital Twin tab against a world the check makes — the State's elevation service answered with a tiled float GeoTIFF of a closed-form surface, so every mesh vertex is arithmetic: the request box grown by half a sample with the aspect snap switched off, each vertex at the surface's height at its own latitude and longitude, the 2 m × Ø300 mm pole with its foot at the origin, the 1.75 m figure with its feet on the ground where it stands, exaggeration scaling the relief alone, the `.glb` read back out of the binary, each fallback by breaking one host, walk mode at eye height, and the renderer torn down with the tab |
+| `npm run twin` | the Digital Twin tab against a world the check makes — the State's elevation service answered with a tiled float GeoTIFF of a closed-form surface, so every mesh vertex is arithmetic: the request box grown by half a sample with the aspect snap switched off, each vertex at the surface's height at its own latitude and longitude, the 2 m × Ø300 mm pole with its foot at the origin, the 1.75 m figure with its feet on the ground where it stands, exaggeration scaling the relief alone, the horizon (its innermost square the patch's edge vertex for vertex, each far vertex on its sheet's height at its own place less the Earth's curve, the far shell drawn first, the switch, the tiles gone), the `.glb` read back out of the binary with the horizon left out, each fallback by breaking one host, walk mode at eye height, and the renderer torn down with the tab |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and

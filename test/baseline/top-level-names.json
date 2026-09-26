@@ -59,6 +59,7 @@
     "map-sites.js",
     "map-3d.js",
     "digital-twin.js",
+    "map-twin.js",
     "modal.js",
     "packets.js",
     "alert2.js",
@@ -71,6 +72,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 776,
-  "distinct": 776
+  "total": 777,
+  "distinct": 777
 }

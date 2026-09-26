@@ -162,9 +162,57 @@ on the ground *there* — not at the pole's height.
 **Vertical exaggeration** (1–3×) scales the relief and nothing else. The pole
 and the figure are the ruler at every setting.
 
-**Light.** A sun from the north, high, casting a short shadow the eye reads
-as "standing on the ground". The sky is `--twin-sky`, a token, so the scene
-sits in its panel in either theme.
+**Light, sky and haze.** A sun from the north, high, casting a short shadow
+the eye reads as "standing on the ground". The sky is a dome that rides with
+the camera, shaded from `--twin-zenith` overhead through `--twin-sky` at the
+horizon to `--twin-haze` below it — tokens, so the light theme is a day and
+the dark one a dusk with the horizon still a line — and the air is
+exponential fog in the horizon's colour (95 % at 60 km, 3 % at 5 km, nothing
+on the patch) so the far ground fades into the sky rather than ending at an
+edge.
+
+**The horizon.** Past the patch's edge the country runs to 60 km, so the site
+reads as a place rather than a model on a table:
+
+- *Three sheets of heights*, each 201 × 201 like the patch, about the
+  station: ±4 km, ±20 km and ±60 km. The inner one is the State's raster
+  resampled to 40 m (one request, AHD like the patch) where its box is inside
+  the service's extent, the tiles otherwise; the outer two are the ~30 m
+  tiles at the zoom `terrain.js` picks for 200 m and 600 m samples — four to
+  nine tiles and one to four, most of them already in its cache from the
+  Stations map. Nothing is fetched until the patch is standing, and the
+  numbers on the panels never wait on it.
+- *One mesh of concentric squares.* The innermost square **is** the patch's
+  800 edge vertices — same place, same height, so there is no crack — and
+  each square out is ~3 % wider than the last: 200 segments a side to
+  1.5 patch-halves, 100 to 4, then 50 to the edge, ~50,000 vertices in all.
+  Where a square is finer than the one outside it, its odd vertices are put
+  on the line between their neighbours. The tiles' heights just outside the
+  patch are lifted by however much they differ from the LiDAR at the edge,
+  a lift that fades to nothing by three patch-halves out; the eye sees one
+  ground, and the notes still say which is which.
+- *The Earth's curve.* Every far vertex is dropped by d²/2R, with R the
+  Earth's radius over (1 − 0.13) — the light's own refraction, 7,320 km —
+  27 m at 20 km and 245 m at 60 km. That is what puts a horizon where one
+  belongs and hides the far side of a plain below it; the depth buffer does
+  the rest. The drop starts at the patch's circumscribed circle, so the seam
+  is untouched.
+- *Drawn outermost first.* A 24-bit depth buffer with a 0.2 m near plane
+  cannot tell 40 km from 40.5. Rather than a logarithmic depth (which writes
+  `gl_FragDepth` and so loses the polygon offset the wireframe rides on),
+  each shell's triangles go in the index outermost square first and the far
+  shell is drawn before the near, so where the buffer cannot decide the
+  nearer ridge wins. The camera is never more than a few kilometres from the
+  station, so its order is the station's.
+- *Imagery per sheet* — the State's program, then Esri — at 1024 px: 8, 39
+  and 117 m/px, draped as each sheet lands, coloured by height on the
+  patch's own scale where none can be had.
+- *Scenery, not survey.* Not in the `.glb`, not clickable, coarse on purpose;
+  the exaggeration slider stretches it with the patch. It costs one raster,
+  five to thirteen tiles and three images (about 2 MB); the Scene panel's
+  switch turns it off, and the setting is kept. A sheet that does not arrive
+  is a ring not drawn — never flat ground at the station's level — and the
+  notes say so.
 
 **The camera.**
 
@@ -329,9 +377,9 @@ three.js was, and belongs to that issue.
 
 | Host | For | Notes |
 |---|---|---|
-| `spatial-img.information.qld.gov.au` | the ground and the imagery | ArcGIS ImageServers, CORS reflected; a new host for this app — `spatial-gis.information.qld.gov.au` (cadastre, contours, survey marks) is the one already allowed |
+| `spatial-img.information.qld.gov.au` | the ground, the imagery, the horizon's inner sheet and its imagery | ArcGIS ImageServers, CORS reflected; a new host for this app — `spatial-gis.information.qld.gov.au` (cadastre, contours, survey marks) is the one already allowed |
 | `unpkg.com` | three.js, once a session | already allowed for Leaflet and MapLibre |
-| `s3.amazonaws.com` | the ~30 m tiles, as a fallback | already allowed for every profile |
+| `s3.amazonaws.com` | the ~30 m tiles, as a fallback and for the horizon's outer sheets | already allowed for every profile |
 | `server.arcgisonline.com` | Esri imagery, as a fallback | already allowed for the Satellite base |
 | `api-elevation.fsdf.org.au` | the height at the pin | already allowed for the station card |
 
@@ -345,7 +393,12 @@ a tiled 32-bit-float GeoTIFF of a closed-form surface in the exact layout the
 real one uses, so every vertex of the mesh is arithmetic — the half-sample
 request box, the heights at the pixel centres, the pole's foot at the origin,
 the figure's feet on the ground where it stands, the exaggeration scaling the
-relief and nothing else, the `.glb`'s chunks and positions read back out of
-the binary, each fallback by breaking one host, walk mode at eye height, and
-the renderer going with the tab. It needs WebGL2, which Playwright's Chromium
+relief and nothing else, the horizon (its innermost square the patch's edge
+vertex for vertex, each far vertex on its sheet's height at its own latitude
+and longitude read off the fixture the way `terrain.js` reads a tile, less
+the Earth's curve, the lift at the edge fading out, the far shell drawn
+first, the switch and what it saves, the tiles gone leaving the State's
+sheet alone and a note), the `.glb`'s chunks and positions read back out of
+the binary with the horizon left out, each fallback by breaking one host,
+walk mode at eye height, and the renderer going with the tab. It needs WebGL2, which Playwright's Chromium
 has through SwiftShader, and skips rather than fails without it.
