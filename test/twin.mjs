@@ -33,7 +33,10 @@
 //   The fallbacks    an empty raster → the ~30 m tiles, and a note that says
 //                    so; imagery aborted or blank → Esri; nothing at all → a
 //                    stage that says so and an empty scene. Never flat ground.
-//   Walking          eye 1.70 m above the ground under the camera; W moves;
+//   The station      the Type 3 pole or the tower, from the record; the kit
+//                    inside by telemetry; doors that open on approach; the
+//                    ladder up the tower and the deck at the top
+//   POV              eye 1.70 m above the ground under the camera; W moves;
 //                    Escape returns to orbit.
 //   The teardown     the frame loop stops and the renderer goes with the tab,
 //                    and the tab rebuilds on return.
@@ -292,10 +295,16 @@ try {
 
   // A station with a position inside Queensland's service box, and a recorded
   // height, so the Ground truth panel has a comparison to make.
+  // A station with a position inside Queensland's service box, a recorded
+  // height, and no water-level sensor in its record — a Type 3 pole, whose
+  // 2.000 m × Ø0.300 m is what the first sections measure. The tower has its
+  // own section.
   const st = await page.evaluate(() => {
     const s = state.data.stations.find(x => isFinite(x.lat) && isFinite(x.lon)
-      && x.lat < -10 && x.lat > -28.5 && x.lon > 140 && x.lon < 153.5 && x.elevation_ahd != null);
-    return { id: s.id, name: s.name, lat: s.lat, lon: s.lon, elev: s.elevation_ahd };
+      && x.lat < -10 && x.lat > -28.5 && x.lon > 140 && x.lon < 153.5 && x.elevation_ahd != null
+      && DigitalTwin._kind(x).structure === 'pole' && DigitalTwin._kind(x).telemetryKnown && x.station_number);
+    return { id: s.id, name: s.name, lat: s.lat, lon: s.lon, elev: s.elevation_ahd, number: String(s.station_number),
+             kind: DigitalTwin._kind(s) };
   });
 
   // ── 1. The scene, built ───────────────────────────────────────────────────
@@ -659,6 +668,10 @@ try {
     glb.meshes.includes('ground') && glb.meshes.includes('station pole') && glb.meshes.includes('torso') && glb.meshes.includes('head')
       && glb.nodes === glb.meshes.length && glb.sceneNodes === glb.nodes, glb.meshes.join(', '));
   ok('and the horizon and the sky are not — Blender gets the site', !glb.meshes.some(m => /^horizon|^sky/.test(m)), glb.meshes.join(', '));
+  ok('the station as built is in it: the gauge, the enclosure and its door, the kit inside',
+    ['rain gauge', 'gauge ring', 'enclosure door', 'concrete pad', 'solar panel', 'whip antenna', 'name plate'].every(n => glb.meshes.includes(n))
+      && (st.kind.telemetry === 'alert' ? glb.meshes.includes('ERT-A2') : glb.meshes.includes('CR300') && glb.meshes.includes('Beam SBD modem')),
+    glb.meshes.filter(n => !/^(leg|boot|arm)$/.test(n)).join(', '));
   ok('the ground has N × N float positions with normals, UVs and an index',
     glb.accCount === glb.N * glb.N && glb.accType === 5126 && glb.hasNormal && glb.hasUv && glb.indices === (glb.N - 1) * (glb.N - 1) * 6,
     `${glb.accCount} positions, ${glb.indices} indices`);
@@ -783,9 +796,10 @@ try {
   // The eye, against the fixture's ground under the camera (at 1×).
   const eye0 = walk.cam0.y - (atBilinear(walk.cam0.x, walk.cam0.z) - h0);
   const eye1 = walk.cam1.y - (atBilinear(walk.cam1.x, walk.cam1.z) - h0);
-  ok('walk mode puts the eye 1.70 m above the ground under the camera', walk.mode0 === 'walk' && near(eye0, 1.7, 0.01), `${eye0}`);
-  ok('W walks forward, and the eye stays 1.70 m up', walk.moved > 0.05 && walk.moved < 6 && near(eye1, 1.7, 0.01), `${walk.moved.toFixed(2)} m, eye ${eye1}`);
-  ok('the button reads as pressed and the canvas name says how to walk', walk.pressed === 'true' && /Walking/.test(walk.name), walk.name);
+  ok('POV puts the eye 1.70 m above the ground under the camera', walk.mode0 === 'walk' && near(eye0, 1.7, 0.01), `${eye0}`);
+  // 3.2 m/s for 0.6 s is about two metres; the old 1.6 m/s would be one.
+  ok('W walks forward at 3.2 m/s, and the eye stays 1.70 m up', walk.moved > 1.0 && walk.moved < 3.5 && near(eye1, 1.7, 0.01), `${walk.moved.toFixed(2)} m, eye ${eye1}`);
+  ok('the button reads as pressed and the canvas name says how to move about', walk.pressed === 'true' && /POV/.test(walk.name), walk.name);
   ok('Escape returns to orbit', walk.modeAfter === 'orbit' && walk.pressedAfter === 'false');
 
   const box = await page.locator('#twin-canvas').boundingBox();
@@ -793,6 +807,151 @@ try {
   await sleep(300);
   const picked = await page.evaluate(() => document.getElementById('twin-pick').textContent);
   ok('a click on the ground is answered with where it is and how high', /ground \d+\.\d\d m/.test(picked) && /of the pole/.test(picked), picked);
+
+  // ── 5b. The station as built: the Type 3 pole ─────────────────────────────
+  // What stands at the origin is read from the record. This station has no
+  // water-level sensor in its record, so it is the Type 3 pole: the gauge on
+  // top, the enclosure on the south face with the kit its telemetry calls
+  // for, the plate with its name and number. Its door opens when the POV eye
+  // comes close, and closes when it leaves.
+  console.log('\nThe station as built\n');
+  const kinds = await page.evaluate(() => {
+    const K = DigitalTwin._kind;
+    return {
+      rainAl:   K({ name: 'Somewhere Ck AL', sensors: [{ alert_id: 1, type: 'Rainfall' }, { alert_id: 2, type: 'Battery' }] }),
+      riverAl:  K({ name: 'Somewhere Ck AL', sensors: [{ alert_id: 1, type: 'Rainfall' }, { alert_id: 3, type: 'Water Level' }] }),
+      riverTm:  K({ name: 'Somewhere Ck TM', location_types: ['Rain Gauge', 'Water Level'] }),
+      bubbler:  K({ name: 'Somewhere Ck TM', sensors: [{ type: 'Gas Pressure' }] }),
+      legacy:   K({ name: 'Somewhere Ck', alert_ids: { rainfall: 100, water_level: 101 } }),
+      repeater: K({ name: 'Mt Somewhere AL', roles: ['field', 'repeater'], sensors: [{ alert_id: 4, type: 'Rainfall' }] }),
+      unknown:  K({ name: 'Somewhere Ck', roles: ['field'] }),
+      satcom:   K({ name: 'Somewhere Ck', satcom: { enabled: true } }),
+      awrcOnly: K({ name: 'Somewhere Ck', awrc_number: '422988', stream: 'SOMEWHERE CREEK' }),
+    };
+  });
+  ok('a rainfall-only AL station is a pole with an ALERT radio',
+    kinds.rainAl.structure === 'pole' && kinds.rainAl.telemetry === 'alert' && kinds.rainAl.telemetryKnown, JSON.stringify(kinds.rainAl));
+  ok('a Water Level sensor, a Water Level listing, a Gas Pressure sensor or a legacy water_level address makes it a tower',
+    ['riverAl', 'riverTm', 'bubbler', 'legacy'].every(k => kinds[k].structure === 'tower' && kinds[k].water),
+    JSON.stringify([kinds.riverAl.structure, kinds.riverTm.structure, kinds.bubbler.structure, kinds.legacy.structure]));
+  ok('TM in the name, or satcom, is TM telemetry; AL and ALERT addresses are ALERT',
+    kinds.riverTm.telemetry === 'tm' && kinds.satcom.telemetry === 'tm' && kinds.legacy.telemetry === 'alert' && kinds.riverAl.telemetry === 'alert');
+  ok('a rain-and-repeater is a pole', kinds.repeater.structure === 'pole' && kinds.repeater.repeater);
+  ok('a station the record cannot place is a pole drawn as TM, and says it is a guess',
+    kinds.unknown.structure === 'pole' && kinds.unknown.telemetry === 'tm' && !kinds.unknown.telemetryKnown
+      && kinds.awrcOnly.structure === 'pole' && !kinds.awrcOnly.telemetryKnown, JSON.stringify(kinds.unknown));
+
+  d = await dbg();
+  const model = d.model;
+  ok('the twin\'s station is the pole its record says, with the right kit inside',
+    model && model.structure === 'pole' && model.telemetry === st.kind.telemetry && model.plate.name === st.name && model.plate.number === st.number
+      && model.parts.includes('rain gauge') && model.parts.includes('gauge ring') && model.parts.includes('concrete pad')
+      && model.parts.includes('solar panel') && model.parts.includes('whip antenna') && model.parts.includes('enclosure door')
+      && model.parts.includes('name plate') && model.parts.includes('DIN rail') && model.parts.includes('cable gland')
+      && (st.kind.telemetry === 'alert' ? model.parts.includes('ERT-A2') && !model.parts.includes('CR300')
+                                        : model.parts.includes('CR300') && model.parts.includes('Beam SBD modem') && !model.parts.includes('ERT-A2')),
+    JSON.stringify({ structure: model && model.structure, telemetry: model && model.telemetry, plate: model && model.plate, parts: model && model.parts.length }));
+  ok('the pole is still 2.000 m × Ø0.300 m with its foot at the origin, and the label sits over the gauge',
+    near(d.pole.h, 2, 1e-9) && near(d.pole.r, 0.15, 1e-9) && near(d.pole.baseY, 0, 1e-6) && near(model.top, 2.35, 1e-6) && model.ladder === null);
+  // The door: shut in orbit, shut when the visitor is far, open when they
+  // come up to it, shut again when they leave.
+  const frames = n => page.evaluate(n => new Promise(r => { let k = 0; const f = () => (++k >= n ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);
+  const doorFar = await page.evaluate(() => { DigitalTwin._pov({ px: 0, pz: 8, yaw: 0, pitch: 0 }); return DigitalTwin.debug().model.doors; });
+  await frames(30);
+  const doorFar2 = await page.evaluate(() => DigitalTwin.debug().model.doors);
+  ok('eight metres off, the enclosure door is shut',
+    doorFar.length === 1 && doorFar[0].name === 'enclosure door' && !doorFar2[0].wanted && near(doorFar2[0].angle, 0, 1e-6), JSON.stringify(doorFar2));
+  await page.evaluate(() => DigitalTwin._pov({ px: 0.4, pz: 1.4, yaw: 0, pitch: -0.15 }));
+  await page.waitForFunction(() => { const d = DigitalTwin.debug().model.doors[0]; return Math.abs(d.angle - d.open) < 1e-6; }, null, { timeout: 10_000 }).catch(() => {});
+  const doorNear = await page.evaluate(() => DigitalTwin.debug().model.doors[0]);
+  ok('walked up to it, the door swings open and the kit inside is on view',
+    doorNear.wanted && near(doorNear.angle, doorNear.open, 1e-6) && doorNear.open < -1.5, JSON.stringify(doorNear));
+  await page.evaluate(() => document.getElementById('twin-canvas').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  await page.waitForFunction(() => Math.abs(DigitalTwin.debug().model.doors[0].angle) < 1e-6, null, { timeout: 10_000 }).catch(() => {});
+  const doorAfter = await page.evaluate(() => ({ door: DigitalTwin.debug().model.doors[0], mode: DigitalTwin.debug().mode }));
+  ok('and shuts again when the visitor leaves', doorAfter.mode === 'orbit' && near(doorAfter.door.angle, 0, 1e-6), JSON.stringify(doorAfter));
+
+  // ── 5c. The station as built: the river-gauge tower ───────────────────────
+  // A station whose record has a water-level sensor gets the tower: the mast,
+  // the platform 4 m up with its rails, the cabinet with the Kisters HS40
+  // above and the power and telemetry below, the ladder up the south side.
+  // The visitor walks into the ladder, climbs it, steps onto the deck where
+  // the door opens on its own, and climbs down again.
+  console.log('\nThe tower\n');
+  const tst = await page.evaluate(() => {
+    const s = state.data.stations.find(x => isFinite(x.lat) && isFinite(x.lon)
+      && x.lat < -10 && x.lat > -28.5 && x.lon > 140 && x.lon < 153.5 && x.elevation_ahd != null
+      && DigitalTwin._kind(x).structure === 'tower' && x.station_number);
+    return s ? { id: s.id, name: s.name, number: String(s.station_number), kind: DigitalTwin._kind(s) } : null;
+  });
+  ok('the records hold a station with a water-level sensor inside Queensland', !!tst, tst && tst.name);
+  if (tst) {
+    await page.evaluate(id => DigitalTwin.openStation(id), tst.id);
+    await page.waitForFunction(id => DigitalTwin.debug().built && DigitalTwin.debug().stationId === id, tst.id, { timeout: BUILD_TIMEOUT });
+    await settled();
+    d = await dbg();
+    const tm = d.model;
+    ok('the twin\'s station is the tower, its mast 4 m and Ø0.300 m with its foot at the origin',
+      tm && tm.structure === 'tower' && near(d.pole.h, 4, 1e-9) && near(d.pole.r, 0.15, 1e-9) && near(d.pole.baseY, 0, 1e-6), JSON.stringify({ structure: tm && tm.structure, pole: d.pole }));
+    const rungs = tm ? tm.parts.filter(n => n === 'ladder rung').length : 0;
+    ok('the platform, its rails, the ladder up the south side with rungs every 300 mm, the gauge and the antenna mast are there',
+      tm && tm.deck && near(tm.deck.top, 4.05, 1e-9) && near(tm.deck.half, 0.9, 1e-9) && tm.ladder && near(tm.ladder.z, 0.98, 1e-9)
+        && rungs === 13 && tm.parts.includes('platform grating') && tm.parts.filter(n => n === 'handrail').length === 10
+        && tm.parts.includes('ladder stile') && tm.parts.includes('rain gauge') && tm.parts.includes('antenna mast') && tm.parts.includes('solar panel'),
+      JSON.stringify({ deck: tm && tm.deck, ladder: tm && tm.ladder, rungs, rails: tm && tm.parts.filter(n => n === 'handrail').length }));
+    ok('the cabinet holds the Kisters HS40 bubbler above and the Victron, the telemetry, the terminals and the battery below, and the plate names the station',
+      tm && ['Kisters HS40 panel', 'HS40 desiccant tube', 'HS40 pressure gauge', 'Kisters HS40 display', 'HS40 valve', 'HS40 compressor control', 'HS40 compressor',
+             'Victron charge controller', 'DIN rail', 'battery', 'name plate', 'cabinet door'].every(n => tm.parts.includes(n))
+        && (tst.kind.telemetry === 'alert' ? tm.parts.includes('ERT-A2') : tm.parts.includes('CR300') && tm.parts.includes('Beam SBD modem'))
+        && tm.plate.name === tst.name && tm.plate.number === tst.number && tm.telemetry === tst.kind.telemetry,
+      JSON.stringify({ telemetry: tm && tm.telemetry, plate: tm && tm.plate, missing: tm && ['Kisters HS40 panel', 'Victron charge controller', 'battery', 'cabinet door'].filter(n => !tm.parts.includes(n)) }));
+    ok('the note says when the telemetry is a guess',
+      tst.kind.telemetryKnown ? !d.notes.some(n => /telemetry/i.test(n)) : d.notes.some(n => /telemetry/i.test(n) && /TM/.test(n)), d.notes.join(' | '));
+
+    // Up the ladder. The visitor stands a metre and a half south of it,
+    // facing north, and holds W with Shift.
+    const hold = async (keys, ms) => {
+      await page.evaluate(keys => { const cv = document.getElementById('twin-canvas'); cv.focus(); for (const k of keys) cv.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })); }, keys);
+      await sleep(ms);
+      await page.evaluate(keys => { const cv = document.getElementById('twin-canvas'); for (const k of keys) cv.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true })); }, keys);
+      await frames(3);
+    };
+    const groundEye = await page.evaluate(() => { const c = DigitalTwin._pov({ px: 0, pz: 2.5, yaw: 0, pitch: 0 }); const d = DigitalTwin.debug(); return { c, level: d.model.level, ground: d.yAt(0, 2.5) }; });
+    ok('on the ground south of the ladder, facing it', groundEye.level === 'ground' && near(groundEye.c.y - groundEye.ground, 1.7, 0.01), JSON.stringify(groundEye));
+    await hold(['w'], 500);
+    const onLadder = await page.evaluate(() => { const d = DigitalTwin.debug(); return { level: d.model.level, climb: d.model.climb, walker: d.model.walker, cam: d.camera, footY: d.model.ladder.footY }; });
+    ok('walking into the foot of the ladder takes hold of it, and W climbs',
+      onLadder.level === 'ladder' && onLadder.climb > 0.05 && near(onLadder.walker.x, 0, 1e-6) && near(onLadder.walker.z, 1.2, 1e-6)
+        && near(onLadder.cam.y - onLadder.footY - onLadder.climb, 1.7, 0.01), JSON.stringify(onLadder));
+    await hold(['w', 'Shift'], 2400);
+    const onDeck = await page.evaluate(() => { const d = DigitalTwin.debug(); return { level: d.model.level, walker: d.model.walker, cam: d.camera, door: d.model.doors[0] }; });
+    ok('at the top the visitor steps onto the platform, eye 1.70 m over the grating, facing the cabinet',
+      onDeck.level === 'deck' && near(onDeck.cam.y, 4.05 + 1.7, 0.01) && Math.abs(onDeck.walker.x) < 0.9 && Math.abs(onDeck.walker.z) < 0.9 && near(onDeck.walker.yaw, 0, 1e-6),
+      JSON.stringify({ level: onDeck.level, cam: onDeck.cam, walker: onDeck.walker }));
+    await page.waitForFunction(() => { const d = DigitalTwin.debug().model.doors[0]; return Math.abs(d.angle - d.open) < 1e-6; }, null, { timeout: 10_000 }).catch(() => {});
+    const deckDoor = await page.evaluate(() => DigitalTwin.debug().model.doors[0]);
+    ok('and the cabinet door opens on its own', deckDoor.name === 'cabinet door' && deckDoor.when === 'deck' && deckDoor.wanted && near(deckDoor.angle, deckDoor.open, 1e-6), JSON.stringify(deckDoor));
+    // The toe boards hold: walking north runs into the cabinet, not off the edge.
+    await hold(['w'], 700);
+    const held = await page.evaluate(() => DigitalTwin.debug().model);
+    ok('the deck holds the visitor: walking on runs up to the cabinet, never off the platform',
+      held.level === 'deck' && held.walker.z >= held.deck.front - 1e-6 && Math.abs(held.walker.x) <= 0.9, JSON.stringify(held.walker));
+    // Down: turn about, walk out through the hatch onto the ladder, and S down.
+    await page.evaluate(() => DigitalTwin._turn({ yaw: Math.PI }));
+    await hold(['w'], 900);
+    const back = await page.evaluate(() => DigitalTwin.debug().model);
+    ok('walking out through the hatch, facing it, is back onto the ladder at the top', back.level === 'ladder' && near(back.climb, back.ladder.height, 0.3), JSON.stringify({ level: back.level, climb: back.climb, h: back.ladder.height }));
+    await hold(['s', 'Shift'], 2400);
+    const down = await page.evaluate(() => ({ level: DigitalTwin.debug().model.level, door: DigitalTwin.debug().model.doors[0] }));
+    ok('S climbs down to the ground, and the door has shut behind', down.level === 'ground' && !down.door.wanted, JSON.stringify(down));
+    await page.evaluate(() => document.getElementById('twin-canvas').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    await frames(3);
+    ok('Escape leaves the POV', (await dbg()).mode === 'orbit');
+    // Back to the pole station for what follows.
+    await page.evaluate(id => DigitalTwin.openStation(id), st.id);
+    await page.waitForFunction(id => DigitalTwin.debug().built && DigitalTwin.debug().stationId === id, st.id, { timeout: BUILD_TIMEOUT });
+    await settled();
+  }
 
   // ── 6. The teardown, and the return ───────────────────────────────────────
   console.log('\nThe teardown\n');

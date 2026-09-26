@@ -179,7 +179,7 @@ const MapTwin = (function () {
             <span class="small map-twin-label">digital twin${st.station_number ? ` · ${esc(st.station_number)}` : ''}</span></span>
           <span class="button-group map-twin-actions">
             <button type="button" id="twin-walk" aria-pressed="false" onclick="DigitalTwin.toggleWalk()"
-                    title="Stand on the ground at eye height and walk with the keys"><span aria-hidden="true">🚶</span><span class="map-twin-label"> Walk</span><span class="sr-only">Walk</span></button>
+                    title="Point of view: stand on the ground at eye height, walk with the keys, climb the ladder"><span aria-hidden="true">👁</span><span class="map-twin-label"> POV</span><span class="sr-only">Point of view</span></button>
             <button type="button" onclick="DigitalTwin.resetView()" title="Back to the opening view of the pole"><span aria-hidden="true">↺</span><span class="map-twin-label"> View</span><span class="sr-only">Reset the view</span></button>
             <button type="button" onclick="MapTwin.openTab()"
                     title="The Digital Twin tab: the settings, the ground truth, the .glb for Blender"><span aria-hidden="true">🧊</span><span class="map-twin-label"> Open the tab →</span><span class="sr-only">Open the Digital Twin tab</span></button>

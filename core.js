@@ -1152,9 +1152,11 @@ const HELP = {
   twin: {
     summary: 'One station\'s patch of ground in three dimensions — the real relief under it from the '
            + 'best public elevation model there is (Queensland\'s 0.5–1 m LiDAR where it exists, the '
-           + '~30 m SRTM elsewhere), the aerial imagery draped over it, a <strong>2 m × 300 mm pole</strong> '
-           + 'where the station stands and a 1.75 m figure beside it for scale. Orbit it, look straight '
-           + 'down on it, or walk about in it at eye height; click the ground for its height; and '
+           + '~30 m SRTM elsewhere), the aerial imagery draped over it, <strong>the station as built</strong> '
+           + 'where it stands — the Type 3 rainfall pole, or the river-gauge tower with its platform and '
+           + 'ladder — with the kit inside its enclosure, and a 1.75 m figure beside it for scale. Orbit it, '
+           + 'look straight down on it, or take the POV and walk about in it at eye height (and up the '
+           + 'ladder); click the ground for its height; and '
            + 'download the whole scene as a <code>.glb</code> that Blender opens in one step.',
     watch: [
       '<strong>The same twin is inside the Stations map.</strong> From zoom 17 with a station under '
@@ -1179,8 +1181,15 @@ const HELP = {
       + 'gauge down in the channel and the mark is the hut on the bank</strong> — a flag on the '
       + 'position, not a correction to the height. The Ground truth panel puts the two side by side, '
       + 'with what Elvis says at the point and which dataset it read.',
-      'Vertical exaggeration stretches the relief and nothing else: the pole is 2.000 m tall and '
-      + '300 mm across and the figure 1.75 m at every setting. They are the ruler.',
+      '<strong>The station is read from its record.</strong> A water-level sensor in the record — a '
+      + 'Water Level or Gas Pressure sensor, a water_level ALERT address, a Bureau listing typed Water '
+      + 'Level — makes it the tower; anything else, rainfall-only and rain-and-repeater included, is the '
+      + 'Type 3 pole. AL or ALERT in the name (or ALERT addresses) puts an ELPRO ERT-A2 in the '
+      + 'enclosure; TM in the name (or satcom) a Campbell CR300 and a Beam SBD modem; every tower '
+      + 'cabinet carries a Kisters HS40 bubbler. A station the record cannot place is drawn as TM, and '
+      + 'the notes say so. The doors open when you come up to them in the POV.',
+      'Vertical exaggeration stretches the relief and nothing else: the station is its true size and '
+      + 'the figure 1.75 m at every setting. They are the ruler.',
       'Everything arrives over the network — the renderer on the first visit (~750 KB), then one '
       + 'raster and one image per patch. Whatever fails, the tab says which and draws what it did get; '
       + 'a ground that could not be read is never drawn flat.',

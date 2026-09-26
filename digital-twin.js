@@ -86,8 +86,11 @@
 // tiles — the same metre-or-so apart terrain.js's header describes — and the
 // panel names which one the ground is standing on.
 //
-// Vertical exaggeration scales the relief only. The pole is 2.000 m tall and
-// 0.300 m across at every setting, and the figure 1.75 m — they are the ruler.
+// Vertical exaggeration scales the relief only. The station is built at its
+// true size at every setting, and the figure is 1.75 m — they are the ruler.
+// What the station is — a Type 3 rainfall pole or a river-gauge tower, and
+// what is inside its enclosure — is read from the record; "the station as
+// built" below has the rules.
 //
 // ── The horizon ──────────────────────────────────────────────────────────────
 //
@@ -209,6 +212,7 @@ const DigitalTwin = (function () {
     picked: null,      // the last ground point clicked: { x, z, h }
     paths: null,       // the radio paths drawn: { count, source, list }
     hooks: null,       // set when embedded in the Stations map (map-twin.js): { leave }
+    model: null,       // the station as built: { structure, telemetry, telemetryKnown, top, poleTop, ladder, deck, plate }
     horizon: null,     // the far field's sheets: { lat, lon, grids: [ { elev, n, rows, source, zoom, box, … } | null ] }
     horizonImages: null,   // the sheets' imagery, one per shell, as they land
     horizonOffsets: null,  // the lift the tiles need to meet the LiDAR at each of the patch's edge vertices
@@ -226,6 +230,7 @@ const DigitalTwin = (function () {
   const sc = {
     renderer: null, scene: null, camera: null, canvas: null, stage: null,
     terrain: null, wire: null, pole: null, band: null, figure: null, label: null, paths: null,
+    station: null, doors: [],   // the station as built, and its doors
     sun: null, hemi: null, texture: null, raf: 0, ro: null, dirty: false,
     horizon: null, shells: null, sky: null,   // the far field's group, its shells' bookkeeping, the dome
     off: [],          // listener removers
@@ -235,7 +240,8 @@ const DigitalTwin = (function () {
   const rig = {
     mode: 'orbit',
     target: null, radius: 26, theta: 0.65, phi: 1.05,   // orbit: spherical about target
-    px: 3, pz: 6, yaw: -0.45, pitch: -0.08,             // walk: feet position and look
+    px: 3, pz: 6, yaw: -0.45, pitch: -0.08,             // POV: feet position and look
+    level: 'ground', climb: 0, climbLatch: false,       // POV: on the ground, on the ladder (climb metres up it), or on the deck
     keys: new Set(),
     pointers: new Map(),
     pinch: null,
@@ -876,7 +882,8 @@ const DigitalTwin = (function () {
   function clearScene() {
     if (!sc.scene) return;
     removeHorizon();
-    for (const k of ['terrain', 'wire', 'pole', 'band', 'figure', 'label', 'paths', 'sky']) {
+    sc.pole = null; sc.band = null; sc.doors = [];
+    for (const k of ['terrain', 'wire', 'station', 'figure', 'label', 'paths', 'sky']) {
       if (sc[k]) { sc.scene.remove(sc[k]); disposeObject(sc[k]); sc[k] = null; }
     }
     if (sc.texture) { sc.texture.dispose(); sc.texture = null; }
@@ -1467,28 +1474,451 @@ void main() {
     refreshAttrib();
   }
 
-  // The station: a 2.000 m × Ø0.300 m galvanised pole, its foot on the ground
-  // at the origin, and a band in the station's role colour near the top so
-  // the thing on the ground reads as the pin on the map.
-  function buildPole(station) {
-    const shaft = new THREE.Mesh(
-      new THREE.CylinderGeometry(POLE_R, POLE_R, POLE_H, 40, 1, false),
-      new THREE.MeshStandardMaterial({ color: 0x9aa4ae, metalness: 0.65, roughness: 0.38 }));
-    shaft.position.y = POLE_H / 2;
-    shaft.castShadow = true;
-    shaft.name = 'station pole';
-    sc.pole = shaft;
-    sc.scene.add(shaft);
+  // ── the station as built ───────────────────────────────────────────────────
+  // What stands at the origin is the station the network actually puts there,
+  // in two shapes, chosen from the record:
+  //
+  //   * A **Type 3 rainfall station** — the Bureau's green pole with the
+  //     tipping-bucket gauge and its ring on top, a small enclosure on the
+  //     south face, a solar panel on a bracket to the north, a whip antenna
+  //     up the east side, on a concrete pad — for a station that reports
+  //     rainfall only, for a rain-and-repeater, and for any station the
+  //     record does not say has a water-level sensor. Its pole is still
+  //     2.000 m × Ø0.300 m: the brief's ruler, now with the right things on it.
+  //   * A **river-gauge tower** — a 4 m galvanised mast on a flange, a 1.8 m
+  //     grating platform with handrails, the cabinet on the platform, the
+  //     gauge and the antenna mast with its solar panel, and a ladder up the
+  //     south side — for a station the record says has a water-level sensor
+  //     (a 'Water Level…' or 'Gas Pressure' sensor, a water_level ALERT
+  //     address, or a Bureau listing typed Water Level). The foundation is
+  //     below the ground and so not drawn.
+  //
+  // Inside each enclosure is the electronics the network fits, by telemetry:
+  // an ELPRO ERRTS ERT-A2 radio for an ALERT station (a name ending AL or
+  // ALERT, or ALERT addresses in the record), a Campbell Scientific CR300
+  // logger and a Beam Iridium SBD modem for a TM station (a name ending TM,
+  // or satcom on). A station the record cannot place is drawn as TM and the
+  // notes say so. Every tower cabinet carries a Kisters HS40 compressor
+  // bubbler in its upper compartment, and a Victron charge controller, the
+  // telemetry, the terminals and the battery below. A plate inside names the
+  // station and its number. The doors open on their own: a pole's when the
+  // POV eye comes within DOOR_NEAR of it, the tower's when the visitor is up
+  // on the platform — and close again when they leave.
+  const TOWER_H   = 4.0;     // the mast, ground to the platform's underside
+  const DECK_TOP  = 4.05;    // the grating's walking surface
+  const DECK_HALF = 0.9;     // the platform is 1.8 m square
+  const RAIL_H    = 1.1;     // handrail over the deck
+  const LADDER_Z  = 0.98;    // the ladder's stiles, just south of the deck's edge
+  const LADDER_HW = 0.2;     // half the ladder's width
+  const CLIMB_MPS = 1.2;     // up the ladder (Shift doubles it)
+  const DOOR_NEAR = 2.2;     // a pole enclosure opens when the eye is this close
+  const DOOR_RATE = 2.6;     // radians per second
 
-    const role = typeof primaryRole === 'function' ? primaryRole(station) : 'field';
+  // What the record says a station is: its structure and its telemetry.
+  function stationKind(st) {
+    const name = String((st && st.name) || '').trim();
+    const m = /\s(AL|ALERT|TM)$/i.exec(name);
+    const suffix = m ? m[1].toUpperCase() : null;
+    const sensors = st && typeof stationSensors === 'function' ? stationSensors(st) : ((st && st.sensors) || []);
+    const types = sensors.map(s => String((s && s.type) || ''));
+    const aids = (st && st.alert_ids) || {};
+    const water = types.some(t => /^Water Level|^Gas Pressure/i.test(t))
+      || aids.water_level != null
+      || (Array.isArray(st && st.location_types) && st.location_types.includes('Water Level'));
+    const rain = types.some(t => /^Rainfall/i.test(t)) || aids.rainfall != null
+      || (Array.isArray(st && st.location_types) && st.location_types.includes('Rain Gauge'));
+    const alertEvidence = sensors.some(s => s && s.alert_id != null) || Object.keys(aids).length > 0;
+    const satcom = !!(st && st.satcom && st.satcom.enabled);
+    let telemetry = suffix === 'TM' ? 'tm' : suffix ? 'alert' : alertEvidence ? 'alert' : satcom ? 'tm' : null;
+    const known = telemetry != null;
+    if (!known) telemetry = 'tm';
+    return { structure: water ? 'tower' : 'pole', telemetry, telemetryKnown: known, water, rain,
+             repeater: Array.isArray(st && st.roles) && st.roles.includes('repeater'), suffix };
+  }
+
+  // The kit of parts: materials made once per build, and three shapes placed
+  // by their centre — a box, a cylinder, and a bar from one point to another.
+  function kitMaterials() {
+    const M = (color, roughness, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
+    return {
+      galv:     M(0x9aa4ae, 0.38, 0.65),
+      steel:    M(0xc9ced3, 0.30, 0.80),
+      green:    M(0x4a5d33, 0.70, 0.10),
+      concrete: M(0x9c9b95, 0.95),
+      cream:    M(0xd9d3b0, 0.60, 0.20),
+      copper:   M(0x8a5a2b, 0.45, 0.60),
+      black:    M(0x161819, 0.60),
+      white:    M(0xe9ebe8, 0.55),
+      light:    M(0xd6d9d6, 0.60),
+      dark:     M(0x3a3f44, 0.60),
+      blue:     M(0x1e6fd1, 0.50),
+      stripe:   M(0x2f80d6, 0.50),
+      orange:   M(0xff7a1a, 0.55),
+      panel:    M(0x14213d, 0.25, 0.30),
+      terminal: M(0x2fa84f, 0.60),
+      led:      new THREE.MeshStandardMaterial({ color: 0x35d06a, emissive: 0x35d06a, emissiveIntensity: 0.8, roughness: 0.5 }),
+      ledBlue:  new THREE.MeshStandardMaterial({ color: 0x4aa3ff, emissive: 0x4aa3ff, emissiveIntensity: 0.8, roughness: 0.5 }),
+      tube:     M(0xf2f2f2, 0.40),
+      tubeBlue: M(0x4aa3ff, 0.40),
+    };
+  }
+  function box(parent, mat, w, h, d, x, y, z, name) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z); m.castShadow = true; m.name = name;
+    parent.add(m);
+    return m;
+  }
+  function cyl(parent, mat, rTop, rBot, h, x, y, z, name, seg = 24) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, seg), mat);
+    m.position.set(x, y, z); m.castShadow = true; m.name = name;
+    parent.add(m);
+    return m;
+  }
+  function bar(parent, mat, r, ax, ay, az, bx, by, bz, name) {
+    const dx = bx - ax, dy = by - ay, dz = bz - az, len = Math.hypot(dx, dy, dz);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 10), mat);
+    m.position.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx, dy, dz).normalize());
+    m.castShadow = true; m.name = name;
+    parent.add(m);
+    return m;
+  }
+  // A plate with words on it: the station's name and number inside the
+  // enclosure, and the makers' names on the kit. Metres wide and high.
+  function makePlate(title, sub, w, h, name = 'name plate') {
+    const cv = document.createElement('canvas');
+    cv.width = 512; cv.height = 192;
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#e8e8e4'; cx.fillRect(0, 0, 512, 192);
+    cx.strokeStyle = '#555'; cx.lineWidth = 8; cx.strokeRect(6, 6, 500, 180);
+    cx.fillStyle = '#111'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.font = '700 60px system-ui, sans-serif';
+    let t = String(title || '');
+    while (t.length > 3 && cx.measureText(t).width > 470) t = t.slice(0, -2) + '…';
+    cx.fillText(t, 256, sub ? 70 : 96);
+    if (sub) { cx.font = '500 50px system-ui, sans-serif'; cx.fillText(String(sub), 256, 138); }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));
+    m.name = name;
+    return m;
+  }
+  function plateAt(parent, title, sub, w, h, x, y, z, name) {
+    const p = makePlate(title, sub, w, h, name);
+    p.position.set(x, y, z);
+    parent.add(p);
+    return p;
+  }
+  // Steel grating: bars with dark gaps between, repeated over the deck.
+  function gratingMaterial() {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 128;
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#2b2f33'; cx.fillRect(0, 0, 128, 128);
+    cx.fillStyle = '#8b9399';
+    for (let x = 0; x < 128; x += 8) cx.fillRect(x, 0, 3, 128);
+    for (let y = 0; y < 128; y += 32) cx.fillRect(0, y, 128, 3);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(7, 7);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshStandardMaterial({ map: tex, color: 0xffffff, roughness: 0.6, metalness: 0.5 });
+  }
+
+  // A door: a panel on a pivot group at its hinge. `open` is the angle it
+  // swings to; `when` says what opens it — 'near' the POV eye, or 'deck'.
+  function addDoor(parent, mat, hx, hy, hz, w, h, d, sign, open, when, name) {
+    const pivot = new THREE.Group();
+    pivot.position.set(hx, hy, hz);
+    pivot.name = `${name} hinge`;
+    parent.add(pivot);
+    // The panel hangs from the hinge to one side of it (sign: +1 east, −1 west).
+    const panel = box(pivot, mat, w, h, d, sign * w / 2, 0, 0, name);
+    const handle = box(pivot, kitMaterials().steel, 0.02, 0.06, 0.02, sign * (w - 0.05), 0, d / 2 + 0.01, `${name} handle`);
+    handle.castShadow = false;
+    const door = { pivot, panel, open, when, angle: 0, name };
+    sc.doors.push(door);
+    return door;
+  }
+
+  // The telemetry inside an enclosure, on a backplate whose centre is (x, y)
+  // and whose face is at z (the kit sits proud of it). The same kit in a
+  // pole's enclosure and in a tower's cabinet, at the same size.
+  function addTelemetry(parent, k, kind, x, y, z) {
+    if (kind.telemetry === 'alert') {
+      const r = box(parent, k.light, 0.17, 0.22, 0.06, x, y, z + 0.03, 'ERT-A2');
+      box(parent, k.stripe, 0.022, 0.20, 0.004, x + 0.04, y, z + 0.062, 'ERT-A2 stripe');
+      for (let i = 0; i < 4; i++) {
+        const led = new THREE.Mesh(new THREE.SphereGeometry(0.004, 8, 6), k.led);
+        led.position.set(x - 0.06, y + 0.07 - i * 0.02, z + 0.061);
+        led.name = 'ERT-A2 LED';
+        parent.add(led);
+      }
+      plateAt(parent, 'ELPRO ERRTS', 'ERT-A2', 0.07, 0.024, x - 0.03, y + 0.085, z + 0.061, 'label');
+      // The coax up to the antenna, out of the top of the radio.
+      cyl(parent, k.black, 0.004, 0.004, 0.10, x - 0.05, y + 0.16, z + 0.03, 'coax');
+      return r;
+    }
+    const logger = box(parent, k.dark, 0.14, 0.09, 0.05, x, y + 0.06, z + 0.025, 'CR300');
+    box(parent, k.terminal, 0.13, 0.014, 0.012, x, y + 0.02, z + 0.052, 'CR300 terminals');
+    plateAt(parent, 'CAMPBELL SCIENTIFIC', 'CR300', 0.09, 0.028, x, y + 0.075, z + 0.051, 'label');
+    const modem = box(parent, k.black, 0.10, 0.05, 0.03, x, y - 0.045, z + 0.015, 'Beam SBD modem');
+    const led = new THREE.Mesh(new THREE.SphereGeometry(0.004, 8, 6), k.ledBlue);
+    led.position.set(x + 0.035, y - 0.03, z + 0.031);
+    led.name = 'modem LED';
+    parent.add(led);
+    plateAt(parent, 'BEAM', 'IRIDIUM SBD', 0.06, 0.022, x - 0.01, y - 0.045, z + 0.031, 'label');
+    cyl(parent, k.black, 0.004, 0.004, 0.08, x - 0.05, y + 0.14, z + 0.02, 'coax');
+    return logger;
+  }
+
+  // A DIN rail with terminals and a coax connector, at (x, y) on a face at z.
+  function addTerminals(parent, k, x, y, z, n = 8) {
+    box(parent, k.galv, 0.05 + n * 0.014, 0.035, 0.008, x, y, z + 0.004, 'DIN rail');
+    const tops = [k.black, k.orange, k.terminal, k.light, k.light, k.black, k.orange, k.light, k.light, k.black];
+    for (let i = 0; i < n; i++) {
+      const tx = x - (n - 1) * 0.007 + i * 0.014;
+      box(parent, k.light, 0.012, 0.045, 0.03, tx, y, z + 0.02, 'terminal');
+      box(parent, tops[i % tops.length], 0.012, 0.008, 0.03, tx, y + 0.026, z + 0.02, 'terminal tag');
+    }
+    cyl(parent, k.steel, 0.008, 0.008, 0.05, x - n * 0.007 - 0.035, y, z + 0.02, 'coax connector', 12);
+  }
+  function addGlands(parent, k, x, y, z, n = 3, vertical = false) {
+    for (let i = 0; i < n; i++) {
+      const g = cyl(parent, k.black, 0.012, 0.012, 0.024, vertical ? x + i * 0.05 : x, vertical ? y : y - i * 0.045, z, 'cable gland', 12);
+      if (!vertical) g.rotation.x = Math.PI / 2;
+      g.castShadow = false;
+    }
+  }
+
+  // The Type 3 rainfall station.
+  function buildPoleStation(st, kind, k) {
+    const g = new THREE.Group();
+    g.name = 'station';
+    box(g, k.concrete, 1.2, 0.12, 1.2, 0, 0, 0, 'concrete pad');
+    const shaft = cyl(g, k.green, POLE_R, POLE_R, POLE_H, 0, POLE_H / 2, 0, 'station pole', 40);
+    sc.pole = shaft;
+    // The tipping-bucket gauge on the pole's top, its funnel, and the ring on
+    // three arms round it.
+    cyl(g, k.steel, 0.10, 0.10, 0.32, 0, POLE_H + 0.16, 0, 'rain gauge', 32);
+    cyl(g, k.copper, 0.095, 0.06, 0.03, 0, POLE_H + 0.335, 0, 'gauge funnel', 32);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.008, 8, 48), k.steel);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = POLE_H + 0.30;
+    ring.name = 'gauge ring';
+    ring.castShadow = true;
+    g.add(ring);
+    for (let i = 0; i < 3; i++) {
+      const a = i * Math.PI * 2 / 3;
+      const arm = box(g, k.steel, 0.12, 0.008, 0.008, Math.cos(a) * 0.16, POLE_H + 0.30, Math.sin(a) * 0.16, 'ring arm');
+      arm.rotation.y = -a;
+      arm.castShadow = false;
+    }
+    // The role band, as before, below the enclosure's top.
+    const role = typeof primaryRole === 'function' ? primaryRole(st) : 'field';
     const colour = (typeof ROLE_COLOR !== 'undefined' && ROLE_COLOR[role]) || '#107c10';
     const band = new THREE.Mesh(
       new THREE.CylinderGeometry(POLE_R + 0.008, POLE_R + 0.008, 0.12, 40, 1, true),
       new THREE.MeshStandardMaterial({ color: new THREE.Color(colour), metalness: 0.1, roughness: 0.6 }));
-    band.position.y = POLE_H - 0.18;
+    band.position.y = POLE_H - 0.25;
     band.name = 'role band';
     sc.band = band;
-    sc.scene.add(band);
+    g.add(band);
+    // The enclosure on the south face: five faces, the door the sixth.
+    const encl = new THREE.Group();
+    encl.name = 'enclosure';
+    encl.position.set(0, 1.25, POLE_R + 0.09);
+    g.add(encl);
+    const W = 0.30, H = 0.40, D = 0.18, t = 0.01;
+    box(encl, k.green, W, H, t, 0, 0, -D / 2 + t / 2, 'enclosure back');
+    box(encl, k.green, W, t, D, 0, H / 2 - t / 2, 0, 'enclosure top');
+    box(encl, k.green, W, t, D, 0, -H / 2 + t / 2, 0, 'enclosure bottom');
+    box(encl, k.green, t, H, D, -W / 2 + t / 2, 0, 0, 'enclosure side');
+    box(encl, k.green, t, H, D, W / 2 - t / 2, 0, 0, 'enclosure side');
+    const face = -D / 2 + t + 0.004;
+    box(encl, k.light, W - 0.02, H - 0.02, 0.004, 0, 0, face - 0.002, 'backplate');
+    addTelemetry(encl, k, kind, -0.03, 0.06, face);
+    plateAt(encl, st.name || st.id, st.station_number ? String(st.station_number) : '', 0.10, 0.036, 0.085, 0.10, face + 0.002, 'name plate');
+    addTerminals(encl, k, 0.0, -0.06, face, 8);
+    addGlands(encl, k, 0.105, -0.05, face + 0.012, 3, false);
+    cyl(encl, k.light, 0.003, 0.003, 0.09, -0.05, -0.01, face + 0.03, 'wire', 6);
+    cyl(encl, k.black, 0.003, 0.003, 0.09, -0.01, -0.01, face + 0.03, 'wire', 6);
+    addDoor(encl, k.green, -W / 2, 0, D / 2 - t / 2, W, H, t, +1, -1.9, 'near', 'enclosure door');
+    // The solar panel on a bracket to the north, tilted to face north and up.
+    box(g, k.galv, 0.04, 0.50, 0.04, 0, 1.55, -POLE_R - 0.04, 'solar bracket');
+    box(g, k.galv, 0.04, 0.04, 0.24, 0, 1.78, -POLE_R - 0.16, 'solar arm');
+    const sp = new THREE.Group();
+    sp.position.set(0, 1.78, -POLE_R - 0.30);
+    sp.rotation.x = 0.52;
+    g.add(sp);
+    box(sp, k.galv, 0.38, 0.28, 0.02, 0, 0, 0, 'solar frame');
+    box(sp, k.panel, 0.35, 0.25, 0.006, 0, 0, -0.012, 'solar panel');
+    // The whip antenna up the east side, on two brackets.
+    box(g, k.galv, 0.10, 0.03, 0.03, POLE_R + 0.03, 1.30, 0, 'antenna bracket');
+    box(g, k.galv, 0.10, 0.03, 0.03, POLE_R + 0.03, 1.80, 0, 'antenna bracket');
+    cyl(g, k.white, 0.006, 0.006, 3.0, POLE_R + 0.07, 1.6 + 1.5, 0, 'whip antenna', 8);
+    return { group: g, top: POLE_H + 0.35, poleTop: POLE_H, ladder: null, deck: null };
+  }
+
+  // The river-gauge tower.
+  function buildTower(st, kind, k) {
+    const g = new THREE.Group();
+    g.name = 'station';
+    cyl(g, k.cream, 0.28, 0.28, 0.03, 0, 0.015, 0, 'base flange', 32);
+    const mast = cyl(g, k.galv, POLE_R, POLE_R, TOWER_H, 0, TOWER_H / 2, 0, 'station pole', 40);
+    sc.pole = mast;
+    const role = typeof primaryRole === 'function' ? primaryRole(st) : 'field';
+    const colour = (typeof ROLE_COLOR !== 'undefined' && ROLE_COLOR[role]) || '#107c10';
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(POLE_R + 0.008, POLE_R + 0.008, 0.12, 40, 1, true),
+      new THREE.MeshStandardMaterial({ color: new THREE.Color(colour), metalness: 0.1, roughness: 0.6 }));
+    band.position.y = 1.6;
+    band.name = 'role band';
+    sc.band = band;
+    g.add(band);
+    // The platform: struts from the mast, the grating, toe boards, handrails
+    // with a gap at the south for the ladder.
+    const H = DECK_HALF;
+    for (const [x, z] of [[H - 0.05, 0], [-H + 0.05, 0], [0, H - 0.05], [0, -H + 0.05]]) {
+      bar(g, k.galv, 0.025, 0, TOWER_H - 0.8, 0, x, TOWER_H - 0.03, z, 'strut');
+    }
+    box(g, k.galv, 2 * H, 0.06, 0.06, 0, TOWER_H - 0.03, 0, 'bearer');
+    box(g, k.galv, 0.06, 0.06, 2 * H, 0, TOWER_H - 0.03, 0, 'bearer');
+    box(g, gratingMaterial(), 2 * H, 0.05, 2 * H, 0, TOWER_H + 0.025, 0, 'platform grating');
+    box(g, k.galv, 2 * H, 0.10, 0.02, 0, DECK_TOP + 0.05, -H + 0.01, 'toe board');
+    box(g, k.galv, 0.02, 0.10, 2 * H, H - 0.01, DECK_TOP + 0.05, 0, 'toe board');
+    box(g, k.galv, 0.02, 0.10, 2 * H, -H + 0.01, DECK_TOP + 0.05, 0, 'toe board');
+    box(g, k.galv, H - LADDER_HW - 0.1, 0.10, 0.02, -(H + LADDER_HW + 0.1) / 2, DECK_TOP + 0.05, H - 0.01, 'toe board');
+    box(g, k.galv, H - LADDER_HW - 0.1, 0.10, 0.02, (H + LADDER_HW + 0.1) / 2, DECK_TOP + 0.05, H - 0.01, 'toe board');
+    const p = H - 0.02, top = DECK_TOP + RAIL_H, mid = DECK_TOP + RAIL_H / 2, hw = LADDER_HW + 0.1;
+    for (const [x, z] of [[p, p], [-p, p], [p, -p], [-p, -p], [p, 0], [-p, 0], [0, -p], [hw, p], [-hw, p]]) {
+      cyl(g, k.galv, 0.018, 0.018, RAIL_H, x, DECK_TOP + RAIL_H / 2, z, 'handrail post', 10);
+    }
+    for (const y of [top, mid]) {
+      bar(g, k.galv, 0.016, -p, y, -p, p, y, -p, 'handrail');
+      bar(g, k.galv, 0.016, p, y, -p, p, y, p, 'handrail');
+      bar(g, k.galv, 0.016, -p, y, -p, -p, y, p, 'handrail');
+      bar(g, k.galv, 0.016, -p, y, p, -hw, y, p, 'handrail');
+      bar(g, k.galv, 0.016, hw, y, p, p, y, p, 'handrail');
+    }
+    // The ladder up the south side: stiles that run on past the deck as
+    // handholds, rungs every 300 mm, two brackets back to the mast.
+    for (const sx of [-LADDER_HW, LADDER_HW]) {
+      cyl(g, k.galv, 0.016, 0.016, DECK_TOP + RAIL_H - 0.25, sx, (DECK_TOP + RAIL_H + 0.25) / 2, LADDER_Z, 'ladder stile', 10);
+      for (const y of [1.5, 3.0]) bar(g, k.galv, 0.012, sx, y, LADDER_Z, sx * 0.6, y, POLE_R + 0.02, 'ladder bracket');
+    }
+    for (let y = 0.4; y <= TOWER_H + 0.01; y += 0.3) bar(g, k.galv, 0.013, -LADDER_HW, y, LADDER_Z, LADDER_HW, y, LADDER_Z, 'ladder rung');
+    // The cabinet on the north of the platform, its door to the south, facing
+    // whoever comes up the ladder. Two compartments: the bubbler above, the
+    // power and the telemetry below.
+    const cab = new THREE.Group();
+    cab.name = 'cabinet';
+    const CW = 0.60, CH = 1.20, CD = 0.45, t = 0.012;
+    cab.position.set(0, DECK_TOP + CH / 2, -H + CD / 2 + 0.08);
+    g.add(cab);
+    box(cab, k.green, CW, CH, t, 0, 0, -CD / 2 + t / 2, 'cabinet back');
+    box(cab, k.green, CW, t, CD, 0, CH / 2 - t / 2, 0, 'cabinet top');
+    box(cab, k.green, CW, t, CD, 0, -CH / 2 + t / 2, 0, 'cabinet bottom');
+    box(cab, k.green, t, CH, CD, -CW / 2 + t / 2, 0, 0, 'cabinet side');
+    box(cab, k.green, t, CH, CD, CW / 2 - t / 2, 0, 0, 'cabinet side');
+    box(cab, k.light, CW - 0.04, 0.02, CD - 0.06, 0, 0.02, 0, 'cabinet shelf');
+    const face = -CD / 2 + t + 0.004;
+    // Upper: the Kisters HS40 compressor bubbler — the panel, the desiccant
+    // tube, the pressure gauge, the display, three valves, the compressor
+    // control and the compressor, and the tubing between them.
+    box(cab, k.white, 0.52, 0.52, 0.006, 0, 0.31, face, 'Kisters HS40 panel');
+    plateAt(cab, 'KISTERS', 'HS40 COMPRESSOR BUBBLER', 0.13, 0.036, -0.16, 0.54, face + 0.004, 'label');
+    cyl(cab, k.steel, 0.026, 0.026, 0.34, -0.20, 0.30, face + 0.03, 'HS40 desiccant tube', 20);
+    const gauge = cyl(cab, k.black, 0.036, 0.036, 0.022, -0.09, 0.47, face + 0.012, 'HS40 pressure gauge', 24);
+    gauge.rotation.x = Math.PI / 2;
+    const gface = cyl(cab, k.white, 0.030, 0.030, 0.004, -0.09, 0.47, face + 0.025, 'gauge face', 24);
+    gface.rotation.x = Math.PI / 2;
+    box(cab, k.black, 0.13, 0.07, 0.03, 0.08, 0.47, face + 0.015, 'Kisters HS40 display');
+    plateAt(cab, 'KISTERS', 'HS40', 0.07, 0.024, 0.08, 0.47, face + 0.031, 'label');
+    for (const y of [0.38, 0.30, 0.22]) {
+      const knob = cyl(cab, k.black, 0.022, 0.022, 0.03, -0.03, y, face + 0.016, 'HS40 valve', 16);
+      knob.rotation.x = Math.PI / 2;
+    }
+    box(cab, k.black, 0.10, 0.09, 0.03, -0.17, 0.12, face + 0.015, 'HS40 compressor control');
+    plateAt(cab, 'COMPRESSOR', 'CONTROL', 0.07, 0.024, -0.17, 0.13, face + 0.031, 'label');
+    box(cab, k.galv, 0.16, 0.10, 0.10, 0.10, 0.12, face + 0.05, 'HS40 compressor');
+    cyl(cab, k.tubeBlue, 0.004, 0.004, 0.26, -0.06, 0.30, face + 0.03, 'tubing', 6);
+    bar(cab, k.tube, 0.004, -0.03, 0.40, face + 0.03, -0.09, 0.45, face + 0.03, 'tubing');
+    bar(cab, k.tube, 0.004, -0.20, 0.47, face + 0.03, -0.12, 0.47, face + 0.03, 'tubing');
+    bar(cab, k.tubeBlue, 0.004, -0.03, 0.20, face + 0.03, 0.06, 0.16, face + 0.03, 'tubing');
+    // Lower: the backplate, the Victron charge controller, the telemetry,
+    // the terminals, the battery.
+    box(cab, k.light, 0.54, 0.54, 0.004, 0, -0.30, face - 0.002, 'backplate');
+    box(cab, k.blue, 0.13, 0.19, 0.05, -0.17, -0.12, face + 0.025, 'Victron charge controller');
+    plateAt(cab, 'VICTRON', 'ENERGY', 0.08, 0.026, -0.17, -0.07, face + 0.051, 'label');
+    addTelemetry(cab, k, kind, 0.13, -0.13, face);
+    addTerminals(cab, k, 0.02, -0.30, face, 10);
+    plateAt(cab, st.name || st.id, st.station_number ? String(st.station_number) : '', 0.12, 0.042, 0.17, -0.30, face + 0.002, 'name plate');
+    box(cab, k.black, 0.30, 0.19, 0.17, 0, -0.485, face + 0.085, 'battery');
+    box(cab, k.blue, 0.28, 0.06, 0.004, 0, -0.47, face + 0.172, 'battery label');
+    plateAt(cab, 'INVICTA', '', 0.09, 0.026, 0, -0.47, face + 0.175, 'label');
+    addGlands(cab, k, -0.08, -CH / 2 + t + 0.012, 0.05, 3, true);
+    addDoor(cab, k.green, CW / 2, 0, CD / 2 - t / 2, CW, CH, t, -1, 1.9, 'deck', 'cabinet door');
+    // The gauge on the platform's west, and the antenna mast at the north-
+    // east corner with its solar panel and the whip.
+    cyl(g, k.galv, 0.025, 0.025, 0.55, -0.62, DECK_TOP + 0.275, 0.25, 'gauge post', 12);
+    cyl(g, k.steel, 0.10, 0.10, 0.30, -0.62, DECK_TOP + 0.70, 0.25, 'rain gauge', 32);
+    cyl(g, k.orange, 0.10, 0.07, 0.04, -0.62, DECK_TOP + 0.87, 0.25, 'gauge funnel', 32);
+    cyl(g, k.galv, 0.025, 0.025, 3.5, 0.75, DECK_TOP + 1.75, -0.75, 'antenna mast', 12);
+    cyl(g, k.white, 0.006, 0.006, 3.0, 0.75, DECK_TOP + 3.5 + 1.5, -0.75, 'whip antenna', 8);
+    const sp = new THREE.Group();
+    sp.position.set(0.75, DECK_TOP + 1.7, -0.75 - 0.05);
+    sp.rotation.x = 0.52;
+    g.add(sp);
+    box(sp, k.galv, 0.58, 0.43, 0.02, 0, 0, 0, 'solar frame');
+    box(sp, k.panel, 0.55, 0.40, 0.006, 0, 0, -0.012, 'solar panel');
+    return { group: g, top: DECK_TOP + RAIL_H, poleTop: TOWER_H,
+             ladder: { x: 0, z: LADDER_Z, stand: LADDER_Z + 0.22, halfW: LADDER_HW },
+             deck: { top: DECK_TOP, half: DECK_HALF, front: -H + CD + 0.12 } };
+  }
+
+  // The station at the origin: which of the two, built, and remembered.
+  function buildStation(st) {
+    const kind = stationKind(st);
+    const k = kitMaterials();
+    sc.doors = [];
+    const built = kind.structure === 'tower' ? buildTower(st, kind, k) : buildPoleStation(st, kind, k);
+    built.group.position.y = 0;
+    sc.station = built.group;
+    sc.scene.add(built.group);
+    tw.model = { ...kind, top: built.top, poleTop: built.poleTop, ladder: built.ladder, deck: built.deck,
+                 plate: { name: st.name || st.id, number: st.station_number ? String(st.station_number) : '' } };
+  }
+
+  // The ladder's foot, and its height, live: the ground under it moves with
+  // the exaggeration, the deck does not.
+  function ladderFootY() {
+    const m = tw.model;
+    return m && m.ladder ? yAt(m.ladder.x, m.ladder.stand) : 0;
+  }
+  function ladderHeight() {
+    const m = tw.model;
+    return m && m.ladder ? m.deck.top - ladderFootY() : 0;
+  }
+
+  // The doors: a frame at a time toward open or closed, as the visitor comes
+  // and goes. Returns whether any moved.
+  const _doorPos = () => new THREE.Vector3();
+  function doorWanted(d) {
+    if (rig.mode !== 'walk' || !sc.camera) return false;
+    if (d.when === 'deck') return rig.level === 'deck';
+    return d.pivot.getWorldPosition(_doorPos()).distanceTo(sc.camera.position) < DOOR_NEAR;
+  }
+  function animateDoors(dt) {
+    if (!sc.doors || !sc.doors.length) return false;
+    let moving = false;
+    for (const d of sc.doors) {
+      const want = doorWanted(d) ? d.open : 0;
+      const step = DOOR_RATE * dt;
+      const next = Math.abs(want - d.angle) <= step ? want : d.angle + Math.sign(want - d.angle) * step;
+      if (next !== d.angle) { d.angle = next; d.pivot.rotation.y = next; moving = true; }
+    }
+    return moving;
   }
 
   // A person, 1.75 m, in hi-vis, a metre east of the pole with their feet on
@@ -1569,7 +1999,7 @@ void main() {
   // The station's name over the pole.
   function buildLabel(station) {
     const sp = makeSign(station.name || station.id, station.station_number ? String(station.station_number) : null);
-    sp.position.set(0, POLE_H + 0.75, 0);
+    sp.position.set(0, (tw.model ? tw.model.top : POLE_H) + 0.75, 0);
     sp.visible = !!S().label;
     sp.name = 'label';
     sc.label = sp;
@@ -1665,10 +2095,11 @@ void main() {
     const exag = S().exag;
     // A mast from the pole's top to the antenna, where the antenna is higher
     // than the pole — the ray has to leave from somewhere the eye can see.
-    if (agl0 > POLE_H + 0.05) {
-      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, agl0 - POLE_H, 12),
+    const poleTop = tw.model ? tw.model.poleTop : POLE_H;
+    if (agl0 > poleTop + 0.05) {
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, agl0 - poleTop, 12),
                                   new THREE.MeshStandardMaterial({ color: 0x8d97a1, metalness: 0.6, roughness: 0.4 }));
-      mast.position.y = POLE_H + (agl0 - POLE_H) / 2;
+      mast.position.y = poleTop + (agl0 - poleTop) / 2;
       mast.castShadow = true;
       mast.name = 'mast';
       grp.add(mast);
@@ -1756,6 +2187,7 @@ void main() {
       rig.px = 3; rig.pz = 6; rig.yaw = Math.atan2(-3, 6);
     }
     rig.pitch = -0.06;
+    rig.level = 'ground'; rig.climb = 0;
     rig.mode = 'walk';
     syncModeUi();
     if (sc.canvas) sc.canvas.focus({ preventScroll: true });
@@ -1763,7 +2195,9 @@ void main() {
 
   function leaveWalk() {
     if (rig.mode !== 'walk') return;
-    // Orbit again, from about where the walker stood, looking at the pole.
+    // Orbit again, from about where the visitor stood, looking at the station.
+    // Off the ladder or the deck, back on the ground.
+    if (rig.level !== 'ground') { rig.level = 'ground'; rig.climb = 0; rig.pz = Math.max(rig.pz, LADDER_Z + 1.2); }
     rig.mode = 'orbit';
     if (rig.target) rig.target.set(0, 1, 0);
     rig.radius = Math.max(4, Math.hypot(rig.px, rig.pz));
@@ -1776,7 +2210,12 @@ void main() {
     const cam = sc.camera;
     if (!cam) return;
     if (rig.mode === 'walk') {
-      const y = yAt(rig.px, rig.pz) + EYE_H;
+      // Feet on the ground, or on a rung, or on the grating.
+      const m = tw.model;
+      let feet = yAt(rig.px, rig.pz);
+      if (m && m.deck && rig.level === 'deck') feet = m.deck.top;
+      else if (m && m.ladder && rig.level === 'ladder') feet = ladderFootY() + rig.climb;
+      const y = feet + EYE_H;
       cam.position.set(rig.px, y, rig.pz);
       const cp = Math.cos(rig.pitch);
       cam.lookAt(rig.px + Math.sin(rig.yaw) * cp, y + Math.sin(rig.pitch), rig.pz - Math.cos(rig.yaw) * cp);
@@ -1812,11 +2251,19 @@ void main() {
     const btn = document.getElementById('twin-walk');
     if (btn) {
       btn.setAttribute('aria-pressed', rig.mode === 'walk' ? 'true' : 'false');
-      btn.textContent = rig.mode === 'walk' ? '🚶 Stop walking' : '🚶 Walk';
+      // The map's overlay button is an icon, a word that hides on a phone,
+      // and a name for a reader; the tab's is plain text.
+      const label = btn.querySelector('.map-twin-label'), sr = btn.querySelector('.sr-only');
+      if (label) {
+        label.textContent = rig.mode === 'walk' ? ' Leave POV' : ' POV';
+        if (sr) sr.textContent = rig.mode === 'walk' ? 'Leave the point of view' : 'Point of view';
+      } else {
+        btn.textContent = rig.mode === 'walk' ? '👁 Leave POV' : '👁 POV';
+      }
     }
     const hud = document.getElementById('twin-hud');
     if (hud) hud.textContent = rig.mode === 'walk'
-      ? 'Walking at 1.7 m: W A S D or the arrow keys move, drag to look, Shift to hurry, Esc to stop.'
+      ? `POV at eye height: W A S D or the arrow keys move, drag to look, Shift to hurry, Esc to leave.${tw.model && tw.model.ladder ? ' Walk into the ladder to climb it.' : ''}`
       : (tw.hooks ? 'Drag to orbit, wheel to zoom, right-drag to pan; click the ground for its height. Wheel out past the edge, or Esc, for the map.'
                   : 'Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.');
     syncCanvasName();
@@ -1926,13 +2373,13 @@ void main() {
         case 'd': pan(-24, 0); break;
         case 'r': resetOrbit(); break;
         case 't': lookDown(); break;
-        case 'f': enterWalk(); break;
+        case 'f': case 'p': enterWalk(); break;
         default: return;
       }
       e.preventDefault();
       requestFrame();
     });
-    on(cv, 'keyup', e => rig.keys.delete(keyName(e.key)));
+    on(cv, 'keyup', e => { rig.keys.delete(keyName(e.key)); if (!rig.keys.has('w') && !rig.keys.has('ArrowUp')) rig.climbLatch = false; });
     on(cv, 'blur', () => rig.keys.clear());
   }
 
@@ -1960,30 +2407,92 @@ void main() {
     rig.target.y = yAt(rig.target.x, rig.target.z) + 1;
   }
 
-  // One step of walking: `f` metres forward, `r` metres right, on the ground.
+  // One step of walking: `f` metres forward, `r` metres right. On the ground
+  // it is the patch that holds the visitor in; on the deck, the toe boards
+  // and the cabinet. Walking into the foot of the ladder, facing it, is how
+  // the ladder is taken; walking out through the hatch on the deck, facing
+  // it, is how it is taken down. Forward is (sin yaw, −cos yaw): yaw 0 is
+  // north, which is the way the ladder faces.
   function walkStep(f, r) {
     const sy = Math.sin(rig.yaw), cy = Math.cos(rig.yaw);
-    rig.px += f * sy + r * cy;
-    rig.pz += -f * cy + r * sy;
+    const nx = rig.px + f * sy + r * cy, nz = rig.pz - f * cy + r * sy;
+    const m = tw.model;
+    if (m && m.deck && rig.level === 'deck') {
+      if (rig.climbLatch && f > 0) return;   // just arrived: W has to be pressed again
+      const lim = m.deck.half - 0.14;
+      if (nz > lim && Math.abs(nx) < m.ladder.halfW && f > 0 && cy < -0.5) {
+        rig.level = 'ladder'; rig.climb = ladderHeight();
+        rig.px = m.ladder.x; rig.pz = m.ladder.stand; rig.pitch = -0.35;
+        // W is still held from the walk out: it must not put the visitor
+        // straight back on the deck. Released and pressed again, it does.
+        rig.climbLatch = true;
+        return;
+      }
+      rig.px = Math.max(-lim, Math.min(lim, nx));
+      rig.pz = Math.max(m.deck.front, Math.min(lim, nz));
+      return;
+    }
+    const oz = rig.pz;
+    rig.px = nx; rig.pz = nz;
     const lim = (tw.ground ? tw.ground.half : 100) - 1;
     rig.px = Math.max(-lim, Math.min(lim, rig.px));
     rig.pz = Math.max(-lim, Math.min(lim, rig.pz));
+    if (m && m.ladder && rig.level === 'ground' && f > 0 && cy > 0.5) {
+      // The foot of the ladder is a gate 0.9 m south of the rungs: a step
+      // that lands inside it, or one long enough to cross it, takes hold.
+      const L = m.ladder, gate = L.z + 0.9;
+      const inLine = Math.abs(rig.px - L.x) < L.halfW + 0.15;
+      if (inLine && rig.pz < gate && (rig.pz > L.z || oz >= gate)) {
+        rig.level = 'ladder'; rig.climb = 0;
+        rig.px = L.x; rig.pz = L.stand; rig.yaw = 0; rig.pitch = 0.35;
+      }
+    }
   }
 
-  // Held keys, applied per frame at a walking pace.
+  // A step up or down the ladder; at the top the deck, at the bottom the ground.
+  function climbStep(dy) {
+    const m = tw.model;
+    if (!m || !m.ladder) { rig.level = 'ground'; rig.climb = 0; return; }
+    rig.climb += dy;
+    const h = ladderHeight();
+    if (rig.climb >= h) {
+      if (rig.climbLatch) { rig.climb = h; return; }
+      // On the grating at the hatch, facing the cabinet — which is 1.2 m
+      // tall and a metre off, so the eye is tilted down into it — and held
+      // there until W is pressed afresh, so the climb does not run on into
+      // the cabinet.
+      rig.level = 'deck'; rig.climb = 0; rig.climbLatch = true;
+      rig.px = 0; rig.pz = m.deck.half - 0.3; rig.yaw = 0; rig.pitch = -0.55;
+    } else if (rig.climb <= 0) {
+      rig.level = 'ground'; rig.climb = 0;
+      rig.pz = m.ladder.z + 0.6; rig.pitch = -0.06;
+    }
+  }
+
+  // Held keys, applied per frame: a brisk walk, a run with Shift, a climb on
+  // the ladder. The step is the wall time since the last frame, capped so a
+  // tab that was asleep does not lurch — but capped high, because a phone
+  // that draws this scene at four frames a second still has to walk at
+  // 3.2 m/s and not at a fifth of it.
+  const WALK_MPS = 3.2, HURRY_MPS = 9.0;
+  const MAX_DT = 0.5;
   let lastTick = 0;
+  function frameDt(now) { return Math.min(MAX_DT, (now - lastTick) / 1000 || 0.016); }
   function walkKeys(now) {
     if (rig.mode !== 'walk' || !rig.keys.size) return false;
-    const dt = Math.min(0.05, (now - lastTick) / 1000 || 0.016);
-    const speed = (rig.keys.has('Shift') ? 4.5 : 1.6) * dt;
+    const dt = frameDt(now);
+    const hurry = rig.keys.has('Shift');
+    const speed = (hurry ? HURRY_MPS : WALK_MPS) * dt;
     let f = 0, r = 0;
-    if (rig.keys.has('w') || rig.keys.has('ArrowUp'))    f += speed;
-    if (rig.keys.has('s') || rig.keys.has('ArrowDown'))  f -= speed;
-    if (rig.keys.has('d') || rig.keys.has('ArrowRight')) r += speed;
-    if (rig.keys.has('a') || rig.keys.has('ArrowLeft'))  r -= speed;
+    if (rig.keys.has('w') || rig.keys.has('ArrowUp'))    f += 1;
+    if (rig.keys.has('s') || rig.keys.has('ArrowDown'))  f -= 1;
+    if (rig.keys.has('d') || rig.keys.has('ArrowRight')) r += 1;
+    if (rig.keys.has('a') || rig.keys.has('ArrowLeft'))  r -= 1;
     if (rig.keys.has('q')) rig.yaw -= 1.4 * dt;
     if (rig.keys.has('e')) rig.yaw += 1.4 * dt;
-    if (f || r) walkStep(f, r);
+    if (f <= 0) rig.climbLatch = false;
+    if (rig.level === 'ladder') { if (f) climbStep(f * CLIMB_MPS * (hurry ? 2 : 1) * dt); }
+    else if (f || r) walkStep(f * speed, r * speed);
     return true;
   }
 
@@ -2019,6 +2528,7 @@ void main() {
     if (!tw.live) { sc.raf = 0; return; }
     sc.raf = requestAnimationFrame(tick);
     if (walkKeys(now)) sc.dirty = true;
+    if (animateDoors(frameDt(now))) sc.dirty = true;
     lastTick = now;
     if (!sc.dirty) return;
     sc.dirty = false;
@@ -2068,7 +2578,7 @@ void main() {
     // in for this one's, so they go, and every panel says so.
     const nothing = (status, placeholder) => {
       tw.ground = null; tw.image = null; tw.elvis = null; tw.picked = null;
-      tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = '';
+      tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = ''; tw.model = null;
       clearScene();
       requestFrame();
       setStatus(status);
@@ -2107,7 +2617,7 @@ void main() {
     tw.ground = ground;
     tw.image = null;
     tw.elvis = null;
-    tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = '';
+    tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = ''; tw.model = null;
 
     if (!ground) {
       // The last station's scene must not stand in for this one's: cleared,
@@ -2138,7 +2648,10 @@ void main() {
       clearScene();
       buildSky();
       buildTerrain();
-      buildPole(st);
+      buildStation(st);
+      if (tw.model && !tw.model.telemetryKnown) {
+        notes.push('This station\'s telemetry is not in its record — no AL or TM in the name, no ALERT addresses, no satcom — so its enclosure is drawn as a TM station\'s: a CR300 logger and a Beam SBD modem.');
+      }
       buildFigure();
       buildLabel(st);
       buildPaths(st);
@@ -2211,9 +2724,9 @@ void main() {
     let name = 'Three-dimensional view. No station is built yet.';
     if (st && g) {
       name = `Three-dimensional view of ${st.name}: ${g.size} m of ground at ${g.sample_m.toFixed(1)} m, `
-           + `${(g.max - g.min).toFixed(1)} m of relief, a 2 m pole at the station and a 1.75 m figure beside it`
+           + `${(g.max - g.min).toFixed(1)} m of relief, ${tw.model && tw.model.structure === 'tower' ? 'a river-gauge tower with its platform 4 m up' : 'a Type 3 rainfall pole 2 m tall'} at the station and a 1.75 m figure beside it`
            + (sc.horizon ? `, the country round it to ${HORIZON_M / 1000} km under a sky. ` : '. ')
-           + (rig.mode === 'walk' ? 'Walking: W A S D move, drag looks, Escape stops.'
+           + (rig.mode === 'walk' ? 'POV: W A S D move, drag looks, Escape leaves.'
                                   : 'Drag to orbit, arrow keys turn, plus and minus zoom, F walks, T looks down, R resets.');
     }
     cv.setAttribute('aria-label', name);
@@ -2428,7 +2941,7 @@ void main() {
           <div class="button-group">
             <button type="button" onclick="DigitalTwin.resetView()" title="Back to the opening view of the pole">↺ Reset view</button>
             <button type="button" onclick="DigitalTwin.topView()" title="Straight down on the patch">⬇ Top-down</button>
-            <button type="button" id="twin-walk" aria-pressed="false" onclick="DigitalTwin.toggleWalk()" title="Stand on the ground at eye height and walk with the keys">🚶 Walk</button>
+            <button type="button" id="twin-walk" aria-pressed="false" onclick="DigitalTwin.toggleWalk()" title="Point of view: stand on the ground at eye height, walk with the keys, climb the ladder">👁 POV</button>
             <button type="button" onclick="DigitalTwin.rebuild()" title="Fetch the ground and the imagery again">⟳ Rebuild</button>
           </div>
         </div>
@@ -2495,6 +3008,7 @@ void main() {
     tw.hooks = null;
     tw.paths = null;
     tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false;
+    tw.model = null;
   }
 
   function init() {
@@ -2551,7 +3065,8 @@ void main() {
           ground: { source: g.source, sample_m: g.sample_m, size_m: g.size, exaggeration: S().exag,
                     attribution: g.attribution },
           imagery: tw.image && S().imagery ? { source: tw.image.source, attribution: tw.image.attribution } : null,
-          pole: { height_m: POLE_H, diameter_m: POLE_R * 2 },
+          pole: { height_m: tw.model ? tw.model.poleTop : POLE_H, diameter_m: POLE_R * 2 },
+          station: tw.model ? { structure: tw.model.structure, telemetry: tw.model.telemetry, telemetry_known: tw.model.telemetryKnown } : null,
           figure: { height_m: FIGURE_H },
           generated: new Date().toISOString(),
         },
@@ -2845,7 +3360,15 @@ void main() {
         h0: g ? g.h0 : null, min: g ? g.min : null, max: g ? g.max : null,
         imagery: tw.image ? tw.image.source : null, mpp: tw.image ? tw.image.mpp : null,
         exag: S().exag, status: tw.status, notes: tw.notes.slice(),
-        pole: sc.pole ? { h: POLE_H, r: POLE_R, baseY: sc.pole.position.y - POLE_H / 2, x: sc.pole.position.x, z: sc.pole.position.z } : null,
+        pole: sc.pole ? { h: tw.model ? tw.model.poleTop : POLE_H, r: POLE_R, baseY: sc.pole.position.y - (tw.model ? tw.model.poleTop : POLE_H) / 2, x: sc.pole.position.x, z: sc.pole.position.z } : null,
+        model: tw.model ? {
+          structure: tw.model.structure, telemetry: tw.model.telemetry, telemetryKnown: tw.model.telemetryKnown,
+          water: tw.model.water, rain: tw.model.rain, repeater: tw.model.repeater, top: tw.model.top, poleTop: tw.model.poleTop,
+          plate: tw.model.plate, ladder: tw.model.ladder ? { ...tw.model.ladder, footY: ladderFootY(), height: ladderHeight() } : null,
+          deck: tw.model.deck, level: rig.level, climb: rig.climb, walker: { x: rig.px, z: rig.pz, yaw: rig.yaw },
+          doors: sc.doors.map(d => ({ name: d.name, angle: d.angle, open: d.open, when: d.when, wanted: doorWanted(d) })),
+          parts: (() => { const n = []; if (sc.station) sc.station.traverse(o => { if (o.isMesh) n.push(o.name); }); return n; })(),
+        } : null,
         figure: sc.figure ? { h: FIGURE_H, x: sc.figure.position.x, z: sc.figure.position.z, baseY: sc.figure.position.y, visible: sc.figure.visible } : null,
         vertices: sc.terrain ? sc.terrain.geometry.attributes.position.count : 0,
         textured: !!(sc.terrain && sc.terrain.material.map),
@@ -2921,6 +3444,27 @@ void main() {
     _upsample: upsample,
     _sizes: () => SIZES.slice(),
     _libUrl: () => LIB_URL,
+    // What the record says a station is — the check's way of choosing one.
+    _kind: stationKind,
+    // Put the POV visitor somewhere on the ground, facing a way.
+    _pov({ px, pz, yaw, pitch }) {
+      if (rig.mode !== 'walk') enterWalk();
+      rig.level = 'ground'; rig.climb = 0;
+      if (isFinite(px)) rig.px = px;
+      if (isFinite(pz)) rig.pz = pz;
+      if (isFinite(yaw)) rig.yaw = yaw;
+      if (isFinite(pitch)) rig.pitch = pitch;
+      placeCamera();
+      requestFrame();
+      return sc.camera ? { x: sc.camera.position.x, y: sc.camera.position.y, z: sc.camera.position.z } : null;
+    },
+    // Turn the POV visitor where they stand.
+    _turn({ yaw, pitch }) {
+      if (isFinite(yaw)) rig.yaw = yaw;
+      if (isFinite(pitch)) rig.pitch = pitch;
+      placeCamera();
+      requestFrame();
+    },
     // Put the orbit camera somewhere and say where it ended up — the check's
     // way of standing it over the far ground.
     _orbit({ radius, theta, phi }) {

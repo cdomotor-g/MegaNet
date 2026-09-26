@@ -150,17 +150,49 @@ samples — 1, 2, 4 or 8 m apart. 200 m at 1 m is the State's LiDAR at
 something close to its own resolution; 1600 m is the setting for a site on a
 ridge whose relief is what matters.
 
-**The pole.** A cylinder 2.000 m tall and 0.300 m across, galvanised grey,
-with a band in the station's role colour near the top so the thing on the
-ground reads as the pin on the map. Its foot is on the ground at the origin.
+**The station as built.** What stands at the origin is the station the
+network puts there, read from the record:
+
+- A **Type 3 rainfall station** — the green pole, 2.000 m × Ø0.300 m, the
+  tipping-bucket gauge and its ring on top, the enclosure on the south face,
+  the solar panel on its bracket to the north, the whip antenna up the east
+  side, on a concrete pad — for a station that reports rainfall only, for a
+  rain-and-repeater, and for any station whose record does not say it has
+  a water-level sensor. A band in the station's role colour rides the pole.
+- A **river-gauge tower** — a 4 m galvanised mast on its flange, a 1.8 m
+  grating platform with handrails and toe boards 4 m up, the cabinet on the
+  platform's north side, the gauge on its west, the antenna mast with the
+  solar panel and the whip at its north-east corner, and a ladder up the
+  south side with rungs every 300 mm — for a station whose record has a
+  water-level sensor: a sensor typed `Water Level…` or `Gas Pressure`, a
+  legacy `water_level` ALERT address, or a Bureau listing typed Water Level.
+  The foundation is below the ground and is not drawn.
+
+Inside each enclosure is the kit the network fits, by telemetry: an **ELPRO
+ERRTS ERT-A2** radio for an ALERT station (a name ending AL or ALERT, or
+ALERT addresses in the record), a **Campbell Scientific CR300** logger and a
+**Beam Iridium SBD modem** for a TM station (a name ending TM, or satcom
+on). A station the record cannot place is drawn as TM, and the notes say
+so. Every tower cabinet carries a **Kisters HS40 compressor bubbler** in its
+upper compartment — panel, desiccant tube, pressure gauge, display, valves,
+compressor control and compressor — and a **Victron** charge controller,
+the telemetry, the terminals and the battery below. A plate inside names
+the station and gives its number. Everything is primitives, not fetched
+models, at true size.
+
+**The doors** open on their own: the pole's enclosure when the POV eye comes
+within 2.2 m of it, the tower's cabinet when the visitor is up on the
+platform — and close again when they leave, or when the view goes back to
+orbit.
 
 **The figure.** 1.75 m, hi-vis and a hard hat, built from primitives (a model
 is a file to fetch and a licence to carry; a capsule in orange gives a sense
 of scale as well as a mesh of a face), a metre east of the pole with its feet
 on the ground *there* — not at the pole's height.
 
-**Vertical exaggeration** (1–3×) scales the relief and nothing else. The pole
-and the figure are the ruler at every setting.
+**Vertical exaggeration** (1–3×) scales the relief and nothing else. The
+station and the figure are their true size at every setting: they are the
+ruler.
 
 **Light, sky and haze.** A sun from the north, high, casting a short shadow
 the eye reads as "standing on the ground". The sky is a dome that rides with
@@ -218,11 +250,16 @@ reads as a place rather than a model on a table:
 
 | Mode | Pointer | Keys |
 |---|---|---|
-| Orbit (default) | drag to orbit; wheel to zoom; right-drag, Shift-drag or two fingers to pan; pinch to zoom | arrows orbit; `+`/`−` zoom; `W A S D` pan; `R` reset; `T` top-down; `F` walk; inside the Stations map, a wheel out past the edge or `Esc` hands back to the map |
-| Walk | drag to look; wheel to step | `W A S D` / arrows move at 1.6 m/s, Shift hurries; `Q`/`E` turn; `Esc` back to orbit |
+| Orbit (default) | drag to orbit; wheel to zoom; right-drag, Shift-drag or two fingers to pan; pinch to zoom | arrows orbit; `+`/`−` zoom; `W A S D` pan; `R` reset; `T` top-down; `F` or `P` for the POV; inside the Stations map, a wheel out past the edge or `Esc` hands back to the map |
+| POV | drag to look; wheel to step | `W A S D` / arrows move at 3.2 m/s, Shift runs at 9; `Q`/`E` turn; `Esc` back to orbit |
 
-The walker's eye is 1.70 m above the ground under it, and the orbit camera
-is never let under the hill between it and the pole. A compass rose over the
+The POV eye is 1.70 m above whatever is under it — the ground, a rung, the
+grating — and the orbit camera is never let under the hill between it and
+the station. At a tower, walking into the foot of the ladder while facing it
+takes hold of it: `W` climbs (1.2 m/s, Shift doubles it), `S` climbs down,
+and at the top the visitor steps onto the platform, where the toe boards
+and the cabinet hold them in and the cabinet door swings open. Walking out
+through the hatch, facing it, is back onto the ladder. A compass rose over the
 stage turns so its N points where north is on screen. A click on the ground
 answers with where it is from the pole and how high it is — the twin's "what
 is here".
@@ -393,7 +430,12 @@ a tiled 32-bit-float GeoTIFF of a closed-form surface in the exact layout the
 real one uses, so every vertex of the mesh is arithmetic — the half-sample
 request box, the heights at the pixel centres, the pole's foot at the origin,
 the figure's feet on the ground where it stands, the exaggeration scaling the
-relief and nothing else, the horizon (its innermost square the patch's edge
+relief and nothing else, the station as built (which of the two the record
+picks and why, the kit inside by telemetry, the plate, the pole's door
+opening on approach and shutting on leaving; the tower's mast, rails, rungs
+and cabinet, the ladder taken by walking into it, the deck at the top with
+the door opening on its own, the toe boards holding, and the way down), the
+horizon (its innermost square the patch's edge
 vertex for vertex, each far vertex on its sheet's height at its own latitude
 and longitude read off the fixture the way `terrain.js` reads a tile, less
 the Earth's curve, the lift at the edge fading out, the far shell drawn

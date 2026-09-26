@@ -3525,11 +3525,11 @@ the tab is fine. See **Testing** below.
 
 ### 21. Digital Twin (One Station's Ground in Three Dimensions)
 One station's patch of ground — 200 to 1600 m square — with the real relief
-under it, the aerial imagery draped over it, a **2 m × 300 mm pole** where the
-station stands and a **1.75 m figure** beside it for scale. Orbit it, look
-straight down on it, or walk about in it at eye height with the keys; click
-the ground for its height; and download the whole scene as a `.glb` that
-Blender opens with one import. It is `digital-twin.js`, the **Digital Twin**
+under it, the aerial imagery draped over it, **the station as built** where
+it stands and a **1.75 m figure** beside it for scale. Orbit it, look
+straight down on it, or take the POV and walk about in it at eye height with
+the keys — up the ladder of a tower, too; click the ground for its height;
+and download the whole scene as a `.glb` that Blender opens with one import. It is `digital-twin.js`, the **Digital Twin**
 tab under *Stations & networks*, and a 🧊 pill on the card of every station with a
 position.
 
@@ -3554,6 +3554,24 @@ height ramp.** One JPEG of the patch from `LatestStateProgram_AllUsers`
 photography told apart from a real one by its variance; Esri World Imagery
 stitched on a canvas where that fails; and the ground coloured by height
 where nothing can be had.
+
+**The station is read from the record.** A station whose record has a
+water-level sensor (a `Water Level…` or `Gas Pressure` sensor, a legacy
+`water_level` address, a Bureau listing typed Water Level) is the
+river-gauge tower — 4 m mast, grating platform with handrails, the cabinet
+with a Kisters HS40 compressor bubbler above and the Victron, the telemetry,
+the terminals and the battery below, the gauge, the antenna mast with its
+solar panel, and a ladder up the south side. Every other station — rainfall
+only, rain-and-repeater, or one the record does not place — is the Type 3
+rainfall pole: 2.000 m × Ø0.300 m, green, with the tipping-bucket gauge and
+its ring on top, the enclosure on the south face, the solar panel and the
+whip. Inside is the kit the telemetry calls for: an ELPRO ERRTS ERT-A2 for
+an ALERT station (AL/ALERT in the name, or ALERT addresses), a Campbell
+CR300 and a Beam Iridium SBD modem for a TM station (TM in the name, or
+satcom), a plate with the station's name and number either way; a station
+the record cannot place is drawn as TM and the notes say so. The doors open
+on their own — the pole's when the POV eye comes close, the tower's when
+the visitor is up on the platform — and shut again when they leave.
 
 **The request box is the patch grown by half a sample**, so the 201 pixel
 centres the service returns are the 201 mesh vertices and the middle one is
@@ -3955,7 +3973,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run itm` | the Longley–Rice port drifting from its reference: 53 losses computed by NTIA's own compiled library — its five published vectors and 48 synthetic profiles across every regime, climate, polarisation and mode of variability — held to 10⁻⁶ dB, intermediates included. Node-only, seconds |
 | `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |
 | `npm run linkbudget` | the link budget card's two ends. Each is found by name, station number, ALERT address or address window — asserted against what the *Stations filter itself* returns for the same term, so the claim is that the card runs the shared matcher rather than a second copy of the rules. Then: the box keeping its caret through a paste, an end armed and filled from a pin click and from a row of the Stations list in its filtered state without selecting it, the three Clear buttons, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute — the same station at both ends, a zero-length path, a term nobody supplied, and a frequency box that cannot say whether it holds an override. Every one of those is a clean console |
-| `npm run twin` | the Digital Twin tab against a world the check makes — the State's elevation service answered with a tiled float GeoTIFF of a closed-form surface, so every mesh vertex is arithmetic: the request box grown by half a sample with the aspect snap switched off, each vertex at the surface's height at its own latitude and longitude, the 2 m × Ø300 mm pole with its foot at the origin, the 1.75 m figure with its feet on the ground where it stands, exaggeration scaling the relief alone, the horizon (its innermost square the patch's edge vertex for vertex, each far vertex on its sheet's height at its own place less the Earth's curve, the far shell drawn first, the switch, the tiles gone), the `.glb` read back out of the binary with the horizon left out, each fallback by breaking one host, walk mode at eye height, and the renderer torn down with the tab |
+| `npm run twin` | the Digital Twin tab against a world the check makes — the State's elevation service answered with a tiled float GeoTIFF of a closed-form surface, so every mesh vertex is arithmetic: the request box grown by half a sample with the aspect snap switched off, each vertex at the surface's height at its own latitude and longitude, the Type 3 pole with its foot at the origin, the 1.75 m figure with its feet on the ground where it stands, exaggeration scaling the relief alone, the station as built (pole or tower from the record, the kit inside by telemetry, the door on approach, the ladder climbed and the deck at the top), the horizon (its innermost square the patch's edge vertex for vertex, each far vertex on its sheet's height at its own place less the Earth's curve, the far shell drawn first, the switch, the tiles gone), the `.glb` read back out of the binary with the horizon left out, each fallback by breaking one host, walk mode at eye height, and the renderer torn down with the tab |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and
