@@ -38,6 +38,7 @@
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 
@@ -59,8 +60,17 @@ function maplibreDist() {
 // absent from every check that does not go there. `three`'s package `main` is
 // build/three.cjs, so resolving the bare name lands in build/, where the ESM
 // build and the core it imports by a relative path both live.
+//
+// Served for the pinned version only. A module asking for any other version
+// is aborted like everything else off-origin, so a pin that drifts from the
+// package the harness vendors fails the twin check rather than being quietly
+// answered with a different three.
 function threeDist() {
   return path.dirname(require.resolve('three'));
+}
+function threeVersion() {
+  const pkg = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
+  return pkg.devDependencies.three;
 }
 
 const CONTENT_TYPE = {
@@ -121,7 +131,7 @@ export async function applyNetworkPolicy(page, origin) {
     // `build/` — three.module.min.js and the three.core.min.js it imports.
     // Served from the `three` devDependency, pinned to the same 0.185.1 the
     // module asks for. Real three, real WebGL, no network.
-    const three = url.match(/unpkg\.com\/three@[\d.]+\/build\/([^?#]+)/);
+    const three = url.match(new RegExp(`unpkg\\.com/three@${threeVersion().replace(/\./g, '\\.')}/build/([^?#]+)`));
     if (three) {
       let dist3 = null;
       try { dist3 = threeDist(); } catch (_) { dist3 = null; }

@@ -170,7 +170,7 @@ MegaNet/
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
 ├── test/                   ← the web app's safety net (see test/README.md, and Testing below)
-│   ├── smoke.mjs            (headless Chromium: load, open all 19 tabs, clean console)
+│   ├── smoke.mjs            (headless Chromium: load, open all 22 tabs, clean console)
 │   ├── dup-names.mjs        (no duplicate top-level names across the loaded scripts)
 │   ├── inspections.mjs      (the six sheets, against the migration's own seed data)
 │   ├── maintenance.mjs      (the Council sheet, against the workbook's filled example)
@@ -3530,7 +3530,8 @@ station stands and a **1.75 m figure** beside it for scale. Orbit it, look
 straight down on it, or walk about in it at eye height with the keys; click
 the ground for its height; and download the whole scene as a `.glb` that
 Blender opens with one import. It is `digital-twin.js`, the **Digital Twin**
-tab under *Stations & networks*, and a 🧊 pill on every station card.
+tab under *Stations & networks*, and a 🧊 pill on the card of every station with a
+position.
 
 **The ground is the State's, then the tiles'.** Queensland's own elevation
 service (`Elevation/QldDem` on `spatial-img.information.qld.gov.au`) holds
@@ -3573,9 +3574,30 @@ header; the imagery embedded) and `tools/blender/import_twin.py` sets the
 scene up in Blender — units, a sun from the north, a camera on the pole.
 Point clouds, when they are ingested, will land in this same frame.
 
+**The same twin is inside the Stations map, and that is the usual way in.**
+From zoom 17 with a station under the view — the one on the card, the
+selected one, or the nearest to the centre — the map's rectangle hands over
+to that station's twin, whichever view was showing (the 2-D map or ⛰️ 3-D,
+whose camera follows the 2-D map's zoom), and hands back one level out when
+you wheel past the edge, press Escape or press ← Map. From zoom 14 the
+station's patch is fetched ahead, so the hand-over is a build from memory.
+The switch is in 🗺️ Map display. ⛰️ 3-D and the twin are one idea at two
+scales — the network on its terrain, and the site — and neither replaces the
+other; zoom is what says which question is being asked, so zoom is the
+hand-over (`map-twin.js`).
+
+**The radio paths are drawn from the antenna** as rays to the edge of the
+patch along the line of sight to the far station, each named at its end.
+Inside the Stations map they are the map's own lines — the same filters, the
+same colouring, the same culled set, read off `state.mapLines` the way the
+3-D view reads them, so the twin cannot disagree with the map it was opened
+from. On the tab, with no map to mirror, they are the pass-range and backbone
+relations as recorded, in the plain colours, and the notes say which.
+
 `docs/digital-twin.md` has the measurements behind every claim above, the
 controls, the hosts a network has to allow, and the Blender workflow.
-`npm run twin` holds the geometry — see **Testing** below.
+`npm run twin` holds the geometry, the hand-over and the mirror — see
+**Testing** below.
 
 ---
 
@@ -3899,7 +3921,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Twenty-five checks. The fourteen below are the ones a change to the front end
+Fifty checks. The eighteen below are the ones a change to the front end
 meets first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |
@@ -3907,7 +3929,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run check` | a broken brace, in under a second, before a browser is launched |
 | `npm run names` | a second `function esc()` in another file silently overwriting the first |
 | `npm run toplevel` | a statement that executes at load in a file that should only declare — the property the load order in `index.html` rests on |
-| `npm run smoke` | the page loading and all 19 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
+| `npm run smoke` | the page loading and all 22 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
 | `npm run registry` | a Leaflet map or a tab teardown no file registered — and, at runtime, one that was registered and does not fire |
 | `npm run help` | a help entry that decayed: a doc link pointing at a file that is no longer there, a *see also* naming a tab that was renamed, a placeholder that shipped, a walkthrough with no `<title>` or with a width of its own. Every one of those renders a panel that looks right, which is why smoke cannot see any of them |
 | `npm run insp` | the Inspections form drawn against the schema's own seed data, on all six sheets. Smoke cannot see this one: it blocks the datastore, and this tab renders from it |
@@ -3921,6 +3943,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run itm` | the Longley–Rice port drifting from its reference: 53 losses computed by NTIA's own compiled library — its five published vectors and 48 synthetic profiles across every regime, climate, polarisation and mode of variability — held to 10⁻⁶ dB, intermediates included. Node-only, seconds |
 | `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |
 | `npm run linkbudget` | the link budget card's two ends. Each is found by name, station number, ALERT address or address window — asserted against what the *Stations filter itself* returns for the same term, so the claim is that the card runs the shared matcher rather than a second copy of the rules. Then: the box keeping its caret through a paste, an end armed and filled from a pin click and from a row of the Stations list in its filtered state without selecting it, the three Clear buttons, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute — the same station at both ends, a zero-length path, a term nobody supplied, and a frequency box that cannot say whether it holds an override. Every one of those is a clean console |
+| `npm run twin` | the Digital Twin tab against a world the check makes — the State's elevation service answered with a tiled float GeoTIFF of a closed-form surface, so every mesh vertex is arithmetic: the request box grown by half a sample with the aspect snap switched off, each vertex at the surface's height at its own latitude and longitude, the 2 m × Ø300 mm pole with its foot at the origin, the 1.75 m figure with its feet on the ground where it stands, exaggeration scaling the relief alone, the `.glb` read back out of the binary, each fallback by breaking one host, walk mode at eye height, and the renderer torn down with the tab |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and
@@ -3938,7 +3961,7 @@ then clicks its way through the RF Changes and Interference Workbench controls,
 keyed by the handler each one names rather than by its label. See
 `test/lib/controls.mjs`.
 
-CI runs all twenty-three on any push touching a root `*.js`, `index.html`, `styles.css`,
+CI runs all fifty on any push touching a root `*.js`, `index.html`, `styles.css`,
 `stations.json`, `db/migrations/`, `test/` or the inspection workbook in
 `archive/`. The filter is a glob rather than a list of filenames
 because the app's script list grew with every milestone of the split — a named

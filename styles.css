@@ -12211,6 +12211,67 @@ code {
   .twin-kv { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* ── The twin inside the Stations map (map-twin.js) ─────────────────────────
+   A child of the Leaflet container, over the whole map: above the 3-D canvas
+   (#map3d, 750 — the window's reasoning is beside that rule) and below the
+   control corners at 1000, so the map's corner controls and the station card
+   keep working over it. A column: the bar, the status, the stage taking what
+   is left, the credit line. display rather than opacity while it is down, for
+   #map3d's reason — a div with no dimensions still covers the controls it is
+   behind. */
+#map-twin {
+  position: absolute;
+  inset: 0;
+  z-index: 755;
+  display: none;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-2);
+  background: var(--panel);
+  border-radius: inherit;
+}
+
+#map-twin.is-on { display: flex; }
+
+#map-twin .twin-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+}
+
+#map-twin .twin-notes { margin: 0; }
+#map-twin .map-twin-status { margin: 0; }
+#map-twin .map-twin-attrib { margin: 0; }
+
+/* Inset from both edges by a corner control's width and margin: the zoom
+   buttons top-left and ↺ top-right are above this overlay on purpose. */
+.map-twin-head {
+  display: grid;
+  gap: var(--sp-1);
+  padding-inline: 3.25rem;
+  min-height: 4.5rem;
+}
+
+.map-twin-bar {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.map-twin-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The station card and the What-is-here card stay above the twin as they do
+   above the 3-D canvas — the same lift, keyed off the same kind of class. */
+.mn-map-stage:has(#map-twin.is-on) .stn-card {
+  z-index: 760;
+}
+
 /* ── Print (#118) ────────────────────────────────────────────────────────────
    The workbook's own print setup is A4 portrait, one page per station visit,
    Arial with 8pt labels and 10pt bold banner headings, and an explicit print

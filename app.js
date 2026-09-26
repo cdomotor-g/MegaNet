@@ -4126,6 +4126,18 @@ function mapDisplayControlsHtml() {
     </label>
     ${ElvisCoverage.rampHtml()}` : ''}
     <p class="filter-note" id="map-elvis-cov-note">${ElvisCoverage.noteHtml()}</p>
+    <!-- The Digital Twin at close zoom (map-twin.js): the map hands its
+         rectangle to the site twin from zoom 17 with a station under the
+         view, and takes it back on the way out. Beside the elevation layers
+         because it is the same ground, at the scale where 1 m LiDAR is the
+         difference between a bank and a gauge in a channel. -->
+    <label class="filter-check"
+           title="From zoom 17 in, with a station under the view, the map hands over to that station's digital twin: the site's ground in 3-D, the imagery, a 2 m pole and the radio paths. Wheel out, Escape or ← Map to come back.">
+      <input type="checkbox" ${state.mapTwinAuto ? 'checked' : ''}
+             onchange="MapTwin.setEnabled(this.checked)">
+      Digital twin at close zoom (${MapTwin.zoom}+)
+    </label>
+    <p class="filter-note" id="map-twin-note">${MapTwin.noteHtml()}</p>
     <!-- The highest ground in view (#184). It sits with the contours because
          it is the same question asked the other way round — those draw the
          shape of the ground, this names the top of it — and because both are
@@ -4706,6 +4718,9 @@ function anySearchText() {
 // map.off(), MapDraw clears a ghost layer, MapMovePin removes its own control),
 // and each is self-contained, so they may run in any order and twice over.
 function stopStationsMap() {
+  // First, and before the container it drew into goes: a twin up in the map
+  // is a WebGL context that must not outlive the map (map-twin.js).
+  MapTwin.detach();
   MapSpider.detach();
   MapLocate.detach();
   MapMovePin.detach();
@@ -4836,6 +4851,12 @@ function initMap() {
   // check exists to catch.
   Map3D.attach(state.map);
   registerTabTeardown('Stations 3-D', () => Map3D.stop());
+  // The site-scale view, one step up from ⛰️: from zoom 17 the map hands its
+  // rectangle to the station's digital twin (map-twin.js). After Map3D, so
+  // its overlay is the later child of the container and paints above the
+  // 3-D canvas. Its own teardown is digital-twin.js's, registered when a twin
+  // is built; stopStationsMap() detaches this the way it does every layer.
+  MapTwin.attach(state.map);
   // Before MapDraw, for MapMovePin's reason: the tools that take a map click
   // have to know which map before anybody arms one.
   MapHere.attach(state.map);
@@ -6185,6 +6206,10 @@ function scrollStationRowIntoView(id) {
 function selectStationState(s) {
   state.selectedId  = s.id;
   state.editorId    = s.id;
+  // The selection is the twin's second choice of station after the card
+  // (map-twin.js): at close zoom, selecting the station under the view is a
+  // hand-over, and at any zoom it is a reason to fetch its patch ahead.
+  if (typeof MapTwin !== 'undefined') MapTwin.sync();
   // Same deep copy as selectStation: fields the form doesn't expose survive a save.
   state.editorDraft = JSON.parse(JSON.stringify(s));
   state.editorMsg   = null;
@@ -6342,6 +6367,10 @@ function showStationCard(id, { takeFocus = false, opener = document.activeElemen
     const el = document.getElementById('stn-card');
     if (el) el.focus();
   }
+  // The card is the map's memory of what you are looking at, and the twin's
+  // first choice of station (map-twin.js): a card opened at close zoom is a
+  // hand-over without a move.
+  if (typeof MapTwin !== 'undefined') MapTwin.sync();
 }
 
 // Paint only — never moves focus *into* the card, and never touches the

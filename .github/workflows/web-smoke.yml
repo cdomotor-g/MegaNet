@@ -626,8 +626,11 @@ jobs:
       # with each pixel centre on its vertex, the 2 m × 300 mm pole standing
       # on the ground at the origin and the 1.75 m figure on the ground
       # beside it, the imagery draped, the .glb round-tripping, the fallbacks
-      # (empty raster → the tiles, blank imagery → Esri, nothing → said so),
-      # walk mode at eye height, and the renderer going with the tab. Needs
+      # (empty raster → the tiles, blank imagery → Esri, a raster that came
+      # back a different shape → refused), walk mode at eye height, the
+      # renderer going with the tab, and then the twin inside the Stations
+      # map — the hand-over at zoom 17, the map's own link lines mirrored as
+      # rays in the map's colours, the wheel-out back to the map. Needs
       # WebGL2 through SwiftShader, like map3d; skips rather than fails
       # without it.
       - name: The Digital Twin — the ground, the pole and the figure on it, the .glb, the teardown

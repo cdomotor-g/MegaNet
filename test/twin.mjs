@@ -45,11 +45,18 @@
 //   node --run twin        (or: npm run twin)
 //       npm run twin -- -v    also print what passed
 
+import fs from 'node:fs';
+import path from 'node:path';
 import zlib from 'node:zlib';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { hillyTerrariumPng } from './lib/terrarium.mjs';
+import { TEST_DIR } from './lib/paths.mjs';
+
+// The three.js the harness vendors — the version the module has to ask for,
+// or every real visitor gets a 404 the check would not see.
+const THREE_VER = JSON.parse(fs.readFileSync(path.join(TEST_DIR, 'package.json'), 'utf8')).devDependencies.three;
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT  = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -74,41 +81,49 @@ function groundAt(lat, lon) {
 
 // A GeoTIFF exactly as ArcGIS's exportImage writes one for pixelType=F32: one
 // band of little-endian floats, no compression, 128 × 128 tiles padded to the
-// full tile, the GDAL NoData tag. `empty` is the other shape the real service
+// full tile, the GDAL NoData tag, and the two GeoTIFF tags that say where the
+// pixels are — ModelPixelScale (33550) and ModelTiepoint (33922) — which the
+// app checks against its request. `empty` is the other shape the real service
 // has: a patch it holds nothing for comes back with every tile's byte count
-// at zero.
-function tiffF32(W, H, valueAt, { empty = false } = {}) {
+// at zero. `extent` is [west, south, east, north] of what the raster covers.
+function tiffF32(W, H, extent, valueAt, { empty = false } = {}) {
   const TW = 128, TH = 128;
   const ntx = Math.ceil(W / TW), nty = Math.ceil(H / TH), nt = ntx * nty;
   const tileBytes = TW * TH * 4;
+  const pw = (extent[2] - extent[0]) / W, ph = (extent[3] - extent[1]) / H;
+  const bytesFor = (type, val) => {
+    if (type === 2) return val;
+    const size = type === 3 ? 2 : type === 4 ? 4 : 8;
+    const b = Buffer.alloc(val.length * size);
+    val.forEach((v, i) => (type === 3 ? b.writeUInt16LE(v, i * size)
+                         : type === 4 ? b.writeUInt32LE(v, i * size) : b.writeDoubleLE(v, i * size)));
+    return b;
+  };
+  // Tags ascending, as TIFF requires. The tile offsets are filled in once the
+  // data's position is known; their size is known now.
   const entries = [
     [256, 3, [W]], [257, 3, [H]], [258, 3, [32]], [259, 3, [1]], [262, 3, [1]],
     [277, 3, [1]], [284, 3, [1]], [322, 3, [TW]], [323, 3, [TH]],
-    [324, 4, null], [325, 4, null], [339, 3, [3]], [42113, 2, Buffer.from('-9999\0', 'latin1')],
+    [324, 4, new Array(nt).fill(0)], [325, 4, new Array(nt).fill(0)], [339, 3, [3]],
+    [33550, 12, [pw, ph, 0]], [33922, 12, [0, 0, 0, extent[0], extent[3], 0]],
+    [42113, 2, Buffer.from('-9999\0', 'latin1')],
   ];
   const ifdSize = 2 + entries.length * 12 + 4;
   const extAt = 8 + ifdSize;
-  const extSize = (nt > 1 ? 2 * 4 * nt : 0) + 6;
+  let extSize = 0;
+  for (const [, type, val] of entries) { const n = bytesFor(type, val).length; if (n > 4) extSize += n; }
   const dataAt = extAt + extSize;
-  const offsets = [], counts = [];
   for (let t = 0; t < nt; t++) {
-    offsets.push(empty ? 0 : dataAt + t * tileBytes);
-    counts.push(empty ? 0 : tileBytes);
+    entries[9][2][t]  = empty ? 0 : dataAt + t * tileBytes;
+    entries[10][2][t] = empty ? 0 : tileBytes;
   }
-  entries[9][2] = offsets;
-  entries[10][2] = counts;
   const buf = Buffer.alloc(dataAt + (empty ? 0 : nt * tileBytes));
   buf.write('II', 0, 'latin1'); buf.writeUInt16LE(42, 2); buf.writeUInt32LE(8, 4);
   let p = 8;
   buf.writeUInt16LE(entries.length, p); p += 2;
   let ext = extAt;
   for (const [tag, type, val] of entries) {
-    let bytes;
-    if (type === 2) bytes = val;
-    else {
-      bytes = Buffer.alloc(val.length * (type === 3 ? 2 : 4));
-      val.forEach((v, i) => (type === 3 ? bytes.writeUInt16LE(v, i * 2) : bytes.writeUInt32LE(v, i * 4)));
-    }
+    const bytes = bytesFor(type, val);
     buf.writeUInt16LE(tag, p); buf.writeUInt16LE(type, p + 2); buf.writeUInt32LE(val.length, p + 4);
     if (bytes.length <= 4) bytes.copy(buf, p + 8);
     else { buf.writeUInt32LE(ext, p + 8); bytes.copy(buf, ext); ext += bytes.length; }
@@ -128,6 +143,21 @@ function tiffF32(W, H, valueAt, { empty = false } = {}) {
     }
   }
   return buf;
+}
+
+// What an ArcGIS ImageServer does to a request box unless told not to
+// (`adjustAspectRatio=false`): it keeps the centre and makes the pixels square
+// in the image's own units, widening whichever axis is the shorter per pixel.
+// Measured live on the State's service: a 402 m box at Brisbane, square in
+// metres and so 1/cos(lat) narrower in degrees of longitude, came back 450 m
+// north to south. A request box that is square in metres is *not* square in
+// degrees, so the snap is the trap the app has to step round, and the fake
+// service sets it exactly as the real one does.
+function snapExtent(bbox, W, H, adjust) {
+  if (adjust === 'false') return bbox.slice();
+  const pix = Math.max((bbox[2] - bbox[0]) / W, (bbox[3] - bbox[1]) / H);
+  const cx = (bbox[0] + bbox[2]) / 2, cy = (bbox[1] + bbox[3]) / 2;
+  return [cx - pix * W / 2, cy - pix * H / 2, cx + pix * W / 2, cy + pix * H / 2];
 }
 
 // PNGs: a gradient for the imagery (so the blank-sheet test has variance to
@@ -178,26 +208,33 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 900 
 const page    = await context.newPage();
 await applyNetworkPolicy(page, server.origin);
 
-// What each host does right now — flipped by the fallback phase.
+// What each host does right now — flipped by the fallback phase. `snap` on
+// the DEM is a service that ignores adjustAspectRatio=false and snaps anyway,
+// which the app has to notice from the GeoTIFF's own tags.
 const world = { dem: 'ok', img: 'ok', esri: 'ok', srtm: 'ok' };
-const seen  = { dem: [], img: 0, esri: 0, srtm: 0, three: 0 };
+const seen  = { dem: [], img: [], esri: 0, srtm: 0, three: 0 };
 
 // Registered after the policy so they are consulted first.
 await page.route(/QldDem\/ImageServer\/exportImage/, route => {
   const u = new URL(route.request().url());
   const bbox = (u.searchParams.get('bbox') || '').split(',').map(Number);
   const [W, H] = (u.searchParams.get('size') || '0,0').split(',').map(Number);
-  seen.dem.push({ bbox, W, H, format: u.searchParams.get('format'), pixelType: u.searchParams.get('pixelType'),
+  const adjust = u.searchParams.get('adjustAspectRatio');
+  seen.dem.push({ bbox, W, H, adjust, format: u.searchParams.get('format'), pixelType: u.searchParams.get('pixelType'),
                   imageSR: u.searchParams.get('imageSR'), bboxSR: u.searchParams.get('bboxSR') });
   if (world.dem === 'abort') return route.abort('blockedbyclient');
-  const pw = (bbox[2] - bbox[0]) / W, ph = (bbox[3] - bbox[1]) / H;
-  const body = tiffF32(W, H, (x, y) => groundAt(bbox[3] - (y + 0.5) * ph, bbox[0] + (x + 0.5) * pw),
+  // The raster covers what ArcGIS would return for this request — the box as
+  // asked only when the parameter is there — and its tags say so.
+  const extent = snapExtent(bbox, W, H, world.dem === 'snap' ? null : adjust);
+  const pw = (extent[2] - extent[0]) / W, ph = (extent[3] - extent[1]) / H;
+  const body = tiffF32(W, H, extent, (x, y) => groundAt(extent[3] - (y + 0.5) * ph, extent[0] + (x + 0.5) * pw),
                        { empty: world.dem === 'empty' });
   return route.fulfill({ status: 200, contentType: 'image/tiff', body,
                          headers: { 'Access-Control-Allow-Origin': '*' } });
 });
 await page.route(/LatestStateProgram_AllUsers\/ImageServer\/exportImage/, route => {
-  seen.img++;
+  const u = new URL(route.request().url());
+  seen.img.push({ adjust: u.searchParams.get('adjustAspectRatio'), size: u.searchParams.get('size') });
   if (world.img === 'abort') return route.abort('blockedbyclient');
   return route.fulfill({ status: 200, contentType: 'image/png', body: world.img === 'blank' ? GREY : GRADIENT,
                          headers: { 'Access-Control-Allow-Origin': '*' } });
@@ -277,9 +314,14 @@ try {
   ok('no warnings on a world that answered', d.notes.length === 0, d.notes.join(' | '));
 
   const req = seen.dem[seen.dem.length - 1];
-  ok('one raster request, as 32-bit floats, in degrees, 201 × 201',
+  ok('one raster request, as 32-bit floats, in degrees, 201 × 201, with the aspect snap switched off',
     !!req && req.W === 201 && req.H === 201 && req.pixelType === 'F32' && req.format === 'tiff'
-      && req.imageSR === '4326' && req.bboxSR === '4326', JSON.stringify(req));
+      && req.imageSR === '4326' && req.bboxSR === '4326' && req.adjust === 'false', JSON.stringify(req));
+  ok('and the imagery request has it switched off too',
+    seen.img.length > 0 && seen.img[seen.img.length - 1].adjust === 'false', JSON.stringify(seen.img));
+  ok('and the renderer asked for is the version the harness vendors',
+    (await page.evaluate(() => DigitalTwin._libUrl())) === `https://unpkg.com/three@${THREE_VER}/build/three.module.min.js`,
+    await page.evaluate(() => DigitalTwin._libUrl()));
   // The box is the patch plus one sample — half on each side — so pixel
   // centres are the vertices.
   const mLat = 110.574e3, mLon = 111.320e3 * Math.cos(st.lat * Math.PI / 180);
@@ -289,32 +331,51 @@ try {
   ok('and centred on the station',
     near((req.bbox[0] + req.bbox[2]) / 2, st.lon, 1e-7) && near((req.bbox[1] + req.bbox[3]) / 2, st.lat, 1e-7));
 
-  // Heights: the surface at each pixel centre, on its vertex.
-  const pw = (req.bbox[2] - req.bbox[0]) / 201, ph = (req.bbox[3] - req.bbox[1]) / 201;
-  const at = (i, j) => groundAt(req.bbox[3] - (j + 0.5) * ph, req.bbox[0] + (i + 0.5) * pw);
-  const probes = [[0, 0], [100, 100], [200, 200], [37, 150], [150, 37], [0, 200], [200, 0], [101, 100], [100, 99]];
+  // Heights: the surface at the *vertex's own place on the ground*, from the
+  // station's coordinates and the scene's metres — not from the request, and
+  // not from what came back. That is the oracle that goes red when the rows
+  // land 12% too far apart, which one derived from the returned raster
+  // cannot: the raster's row j always holds the raster's row j.
+  const STEP = 2, HALF = 200;
+  const atXZ = (x, z) => groundAt(st.lat - z / mLat, st.lon + x / mLon);
+  const at = (i, j) => atXZ(-HALF + i * STEP, -HALF + j * STEP);
+  // Bilinear over the four vertices around a point, as the app reads the
+  // grid between samples — the fixture's own heights at those vertices, so
+  // the comparison is exact rather than a smooth surface against a facet.
+  const atBilinear = (x, z) => {
+    const fx = (x + HALF) / STEP, fz = (z + HALF) / STEP;
+    const i = Math.min(199, Math.floor(fx)), j = Math.min(199, Math.floor(fz)), tx = fx - i, tz = fz - j;
+    return at(i, j) * (1 - tx) * (1 - tz) + at(i + 1, j) * tx * (1 - tz) + at(i, j + 1) * (1 - tx) * tz + at(i + 1, j + 1) * tx * tz;
+  };
+  const probes = [[0, 0], [100, 100], [200, 200], [37, 150], [150, 37], [0, 200], [200, 0], [101, 100], [100, 99], [100, 50], [50, 100]];
   const got = await page.evaluate(probes => {
     const d = DigitalTwin.debug();
     const step = d.size / (d.N - 1), half = d.size / 2;
-    return probes.map(([i, j]) => ({ h: d.heightAt(-half + i * step, -half + j * step), y: d.vertexY(j * d.N + i) }));
+    return probes.map(([i, j]) => ({ h: d.heightAt(-half + i * step, -half + j * step), y: d.vertexY(j * d.N + i),
+                                     x: d.vertexX(j * d.N + i), z: d.vertexZ(j * d.N + i) }));
   }, probes);
   const h0 = at(100, 100);
   ok('the station\'s own height is the centre pixel', near(d.h0, h0, 1e-3), `${d.h0} vs ${h0}`);
   const heightsRight = probes.every(([i, j], k) => near(got[k].h, at(i, j), 1e-3));
-  ok('every probed vertex has the surface\'s height at its pixel centre', heightsRight,
+  ok('every probed vertex has the surface\'s height at its own latitude and longitude — 100 m north included', heightsRight,
     probes.map(([i, j], k) => `(${i},${j}) ${got[k].h.toFixed(3)} vs ${at(i, j).toFixed(3)}`).join(', '));
   ok('and its mesh y is that height less the station\'s, at 1×',
     probes.every(([i, j], k) => near(got[k].y, at(i, j) - h0, 1e-3)));
+  ok('and every vertex stands where its row and column say: column 0 west, row 0 north',
+    probes.every(([i, j], k) => near(got[k].x, -HALF + i * STEP, 1e-3) && near(got[k].z, -HALF + j * STEP, 1e-3)),
+    probes.map(([i, j], k) => `(${i},${j}) → ${got[k].x.toFixed(1)},${got[k].z.toFixed(1)}`).join(' '));
   ok('the pole is 2.000 m tall and 0.300 m across',
     d.pole && near(d.pole.h, 2, 1e-9) && near(d.pole.r, 0.15, 1e-9), JSON.stringify(d.pole));
   ok('and its foot is on the ground at the origin',
     d.pole && near(d.pole.baseY, 0, 1e-6) && near(d.pole.x, 0, 1e-9) && near(d.pole.z, 0, 1e-9), JSON.stringify(d.pole));
-  const figGround = await page.evaluate(() => { const d = DigitalTwin.debug(); return d.yAt(d.figure.x, d.figure.z); });
+  // The figure's feet, against the fixture's own ground where it stands —
+  // not against the app's yAt(), which is what places it.
+  const figGround = d.figure ? atBilinear(d.figure.x, d.figure.z) - h0 : NaN;
   ok('the figure is 1.75 m and stands with its feet on the ground beside the pole',
-    d.figure && near(d.figure.h, 1.75, 1e-9) && near(d.figure.baseY, figGround, 1e-6)
+    d.figure && near(d.figure.h, 1.75, 1e-9) && near(d.figure.baseY, figGround, 1e-3)
       && Math.hypot(d.figure.x, d.figure.z) > 0.6 && Math.hypot(d.figure.x, d.figure.z) < 2 && d.figure.visible,
     JSON.stringify(d.figure) + ` ground there ${figGround}`);
-  ok('the imagery is the State\'s, draped', d.imagery === 'qld' && d.textured && seen.img >= 1, `${d.imagery} textured:${d.textured}`);
+  ok('the imagery is the State\'s, draped', d.imagery === 'qld' && d.textured && seen.img.length >= 1, `${d.imagery} textured:${d.textured}`);
 
   // The panels around the scene.
   const dom = await page.evaluate(() => {
@@ -347,7 +408,8 @@ try {
   await page.waitForFunction(() => /301\.50/.test(document.getElementById('twin-truth').textContent), null, { timeout: 15_000 }).catch(() => {});
   const truth = await page.evaluate(() => document.getElementById('twin-truth').textContent);
   ok('the Ground truth list quotes the ground at the pin, the recorded height and Elvis\'s answer',
-    /Ground at the pin/.test(truth) && /301\.50/.test(truth) && /Check_2026_1m\.tif/.test(truth) && new RegExp(String(st.elev)).test(truth),
+    /Ground at the pin/.test(truth) && /301\.50/.test(truth) && /Check_2026_1m\.tif/.test(truth)
+      && truth.includes(`${Number(st.elev).toFixed(1)} m AHD`),
     truth.replace(/\s+/g, ' ').slice(0, 300));
 
   // ── 2. Exaggeration scales the relief and nothing else ────────────────────
@@ -356,14 +418,15 @@ try {
     DigitalTwin.setExag(2.5);
     const d = DigitalTwin.debug();
     const step = d.size / (d.N - 1), half = d.size / 2;
-    return { exag: d.exag, pole: d.pole, figure: d.figure, figGround: d.yAt(d.figure.x, d.figure.z),
+    return { exag: d.exag, pole: d.pole, figure: d.figure,
              ys: probes.map(([i, j]) => d.vertexY(j * d.N + i)),
              hs: probes.map(([i, j]) => d.heightAt(-half + i * step, -half + j * step)) };
   }, probes);
-  ok('at 2.5× every vertex y is 2.5 × its relief', ex.exag === 2.5 && probes.every((p, k) => near(ex.ys[k], (ex.hs[k] - h0) * 2.5, 1e-3)));
+  ok('at 2.5× every vertex y is 2.5 × its relief', ex.exag === 2.5 && probes.every(([i, j], k) => near(ex.ys[k], (at(i, j) - h0) * 2.5, 1e-3)));
   ok('the heights themselves did not move', probes.every(([i, j], k) => near(ex.hs[k], at(i, j), 1e-3)));
   ok('the pole is still 2 m with its foot at the origin', near(ex.pole.h, 2, 1e-9) && near(ex.pole.baseY, 0, 1e-6));
-  ok('and the figure followed the ground under it', near(ex.figure.baseY, ex.figGround, 1e-6), `${ex.figure.baseY} vs ${ex.figGround}`);
+  const figGround25 = (atBilinear(ex.figure.x, ex.figure.z) - h0) * 2.5;
+  ok('and the figure followed the ground under it, 2.5× its relief', near(ex.figure.baseY, figGround25, 1e-3), `${ex.figure.baseY} vs ${figGround25}`);
   await page.evaluate(() => DigitalTwin.setExag(1));
 
   // ── 3. The .glb ───────────────────────────────────────────────────────────
@@ -413,8 +476,9 @@ try {
     `${glb.accCount} positions, ${glb.indices} indices`);
   ok('its bounds are the patch', near(glb.accMin[0], -200, 1e-3) && near(glb.accMax[0], 200, 1e-3) && near(glb.accMin[2], -200, 1e-3) && near(glb.accMax[2], 200, 1e-3),
     `${glb.accMin} … ${glb.accMax}`);
-  ok('positions read back out of the binary are the scene\'s', glb.back.every(b => near(b.y, b.want, 1e-5))
-      && near(glb.back[1].x, 0, 1e-5) && near(glb.back[1].z, 0, 1e-5), JSON.stringify(glb.back));
+  ok('positions read back out of the binary are the scene\'s, each where its row and column put it',
+    glb.back.every(b => near(b.y, b.want, 1e-5) && near(b.x, -200 + 2 * b.i, 1e-4) && near(b.z, -200 + 2 * b.j, 1e-4)),
+    JSON.stringify(glb.back));
   ok('the imagery is embedded as a JPEG and the ground\'s material wears it',
     glb.jpeg && glb.jpeg[0] === 0xFF && glb.jpeg[1] === 0xD8 && glb.mime === 'image/jpeg' && glb.texOnGround, `${glb.jpeg} ${glb.mime}`);
   const x = glb.asset.extras || {};
@@ -446,6 +510,17 @@ try {
   ok('a raster request that fails → the tiles, and a note that says to try again, after one retry',
     d.source === 'srtm' && d.qld === 'failed' && seen.dem.length === demBefore + 2 && d.notes.some(n => /could not be reached/.test(n) && /Rebuild/.test(n)),
     `${d.source} ${d.qld} requests:${seen.dem.length - demBefore} ${d.notes.join(' | ')}`);
+
+  // A service that snaps the box anyway — the default it had before the
+  // parameter, or a future that drops it — is caught from the GeoTIFF's own
+  // pixel scale, and is a failed request, not a ground 12% out.
+  world.dem = 'snap';
+  await page.evaluate(() => DigitalTwin.rebuild());
+  await settled();
+  d = await dbg();
+  ok('a raster that came back a different shape from the one asked for is refused, and the note says so',
+    d.source === 'srtm' && d.qld === 'failed' && d.notes.some(n => /different extent/.test(n)),
+    `${d.source} ${d.qld} ${d.notes.join(' | ')}`);
   world.dem = 'ok';
 
   // terrain.js keeps the tiles it decoded, so blocking their host after the
@@ -500,7 +575,6 @@ try {
     DigitalTwin.toggleWalk();
     await frame();
     const d0 = DigitalTwin.debug();
-    const eye0 = d0.camera.y - d0.yAt(d0.camera.x, d0.camera.z);
     const cv = document.getElementById('twin-canvas');
     cv.focus();
     cv.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true }));
@@ -508,17 +582,19 @@ try {
     cv.dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true }));
     await frame();
     const d1 = DigitalTwin.debug();
-    const eye1 = d1.camera.y - d1.yAt(d1.camera.x, d1.camera.z);
     const moved = Math.hypot(d1.camera.x - d0.camera.x, d1.camera.z - d0.camera.z);
     const pressed = document.getElementById('twin-walk').getAttribute('aria-pressed');
     const name = cv.getAttribute('aria-label');
     cv.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await frame();
-    return { mode0: d0.mode, eye0, eye1, moved, pressed, name, modeAfter: DigitalTwin.debug().mode,
+    return { mode0: d0.mode, cam0: d0.camera, cam1: d1.camera, moved, pressed, name, modeAfter: DigitalTwin.debug().mode,
              pressedAfter: document.getElementById('twin-walk').getAttribute('aria-pressed') };
   });
-  ok('walk mode puts the eye 1.70 m above the ground under the camera', walk.mode0 === 'walk' && near(walk.eye0, 1.7, 0.01), `${walk.eye0}`);
-  ok('W walks forward, and the eye stays 1.70 m up', walk.moved > 0.05 && walk.moved < 6 && near(walk.eye1, 1.7, 0.01), `${walk.moved.toFixed(2)} m, eye ${walk.eye1}`);
+  // The eye, against the fixture's ground under the camera (at 1×).
+  const eye0 = walk.cam0.y - (atBilinear(walk.cam0.x, walk.cam0.z) - h0);
+  const eye1 = walk.cam1.y - (atBilinear(walk.cam1.x, walk.cam1.z) - h0);
+  ok('walk mode puts the eye 1.70 m above the ground under the camera', walk.mode0 === 'walk' && near(eye0, 1.7, 0.01), `${eye0}`);
+  ok('W walks forward, and the eye stays 1.70 m up', walk.moved > 0.05 && walk.moved < 6 && near(eye1, 1.7, 0.01), `${walk.moved.toFixed(2)} m, eye ${eye1}`);
   ok('the button reads as pressed and the canvas name says how to walk', walk.pressed === 'true' && /Walking/.test(walk.name), walk.name);
   ok('Escape returns to orbit', walk.modeAfter === 'orbit' && walk.pressedAfter === 'false');
 
@@ -553,8 +629,138 @@ try {
     pill.present && pill.tab === 'twin' && pill.station === st.id && /^🧊/.test(pill.text), JSON.stringify(pill));
   await page.waitForFunction(() => DigitalTwin.debug().built, null, { timeout: BUILD_TIMEOUT });
   await settled();
+  // …and drawing again: the frame count has to move past where the teardown
+  // left it, or a loop that never restarted passes on the first build's frames.
+  await page.waitForFunction(f => DigitalTwin.debug().frames > f, f2, { timeout: 10_000 }).catch(() => {});
   d = await dbg();
-  ok('and the twin is rebuilt on return', d.built && d.live && d.source === 'qld' && d.frames > 0);
+  ok('and the twin is rebuilt on return, and drawing', d.built && d.live && d.source === 'qld' && d.frames > f2, `frames ${f2} → ${d.frames}`);
+
+  // ── 7. The radio paths, and the twin inside the Stations map ──────────────
+  console.log('\nThe radio paths, in the map and on the tab\n');
+  await page.evaluate(() => switchTab('stations'));
+  await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0 && state.mapLines.length > 0,
+    null, { timeout: LOAD_TIMEOUT });
+  // A station the map has drawn a link for, and every line touching it as the
+  // twin will read them: the far end and the colour the 2-D map gave each.
+  const linked = await page.evaluate(() => {
+    const ends = l => [l.mnLinkStationId, l.mnLinkRepeaterId, l.mnLinkRepeaterId2].filter(v => v != null);
+    const core = state.mapLines.find(l => l.mnLinkRole === 'core' && l.mnLinkStationId);
+    const s = state.data.stations.find(x => x.id === core.mnLinkStationId);
+    const touching = state.mapLines.filter(l => (l.mnLinkRole === 'core' || l.mnLinkRole === 'backbone') && ends(l).includes(s.id));
+    const colours = {};
+    for (const l of touching) colours[ends(l).find(v => v !== s.id)] = l.options.color;
+    return { id: s.id, name: s.name, lat: s.lat, lon: s.lon, far: Object.keys(colours), colours };
+  });
+  await page.evaluate(() => DigitalTwin.clearCaches());
+
+  // Zoom 15 with the station on the card: fetched ahead, nothing handed over.
+  const demBeforePrefetch = seen.dem.length;
+  await page.evaluate(([id, lat, lon]) => { showStationCard(id); state.map.setView([lat, lon], 15, { animate: false }); },
+    [linked.id, linked.lat, linked.lon]);
+  await sleep(1500);
+  const pre = await page.evaluate(() => ({ active: MapTwin.active(), built: DigitalTwin.debug().built, zoom: state.map.getZoom() }));
+  ok('at zoom 15 the station\'s patch is fetched ahead, and the map is still the map',
+    seen.dem.length > demBeforePrefetch && !pre.active && !pre.built && pre.zoom === 15,
+    `requests +${seen.dem.length - demBeforePrefetch}, active:${pre.active} built:${pre.built} zoom:${pre.zoom}`);
+
+  // Zoom 17: the hand-over.
+  await page.evaluate(([lat, lon]) => state.map.setView([lat, lon], 17, { animate: false }), [linked.lat, linked.lon]);
+  await page.waitForFunction(() => MapTwin.active() && DigitalTwin.debug().built, null, { timeout: BUILD_TIMEOUT });
+  await settled();
+  const inMap = await page.evaluate(() => {
+    const d = DigitalTwin.debug();
+    const host = document.getElementById('map-twin');
+    const cv = document.getElementById('twin-canvas');
+    return { active: MapTwin.active(), station: MapTwin.station(), embedded: d.embedded, built: d.built, live: d.live,
+             hostOn: !!(host && host.classList.contains('is-on')), inMap: !!(cv && cv.closest('#leaflet-map')),
+             paths: d.paths, size: d.size, zoom: state.map.getZoom(),
+             dragging: state.map.dragging.enabled(), wheel: state.map.scrollWheelZoom.enabled(),
+             back: !!document.querySelector('#map-twin .map-twin-back'), status: d.status,
+             cardAbove: (() => { const c = document.getElementById('stn-card'); return c ? getComputedStyle(c).zIndex : null; })() };
+  });
+  ok('at zoom 17 with the station on the card, the map hands over to its twin',
+    inMap.active && inMap.station === linked.id && inMap.embedded && inMap.built && inMap.live && inMap.hostOn && inMap.inMap && inMap.back,
+    JSON.stringify({ ...inMap, paths: undefined }));
+  ok('and Leaflet\'s own drag and wheel are held off under it', !inMap.dragging && !inMap.wheel);
+  ok('the station card stays above the twin', inMap.cardAbove === '760', String(inMap.cardAbove));
+  const half = inMap.size / 2;
+  const P = inMap.paths || { list: [], count: 0 };
+  ok('the radio paths are the map\'s own lines: one ray per far end, in the colour the map gave it',
+    P.source === 'map' && P.count === linked.far.length && linked.far.length > 0
+      && P.list.every(p => linked.colours[p.farId] && p.colour.toLowerCase() === linked.colours[p.farId].toLowerCase()),
+    `${P.source} ${P.count} vs ${linked.far.length}: ${JSON.stringify(P.list.map(p => [p.farId, p.colour]))} vs ${JSON.stringify(linked.colours)}`);
+  ok('each ray leaves the antenna and ends at the patch\'s edge, or at the far station inside it',
+    P.list.every(p => (Math.abs(p.end.x) <= half + 1e-6 && Math.abs(p.end.z) <= half + 1e-6)
+      && (near(Math.max(Math.abs(p.end.x), Math.abs(p.end.z)), half, 1e-6) || p.km * 1000 < half + 1)
+      && p.agl0 > 0),
+    JSON.stringify(P.list.map(p => p.end)));
+
+  // Out again by the wheel: past the widest orbit, the map takes over one
+  // level out.
+  const wheeled = await page.evaluate(async () => {
+    const cv = document.getElementById('twin-canvas');
+    let n = 0;
+    while (MapTwin.active() && n < 80) {
+      cv.dispatchEvent(new WheelEvent('wheel', { deltaY: 400, bubbles: true, cancelable: true }));
+      await new Promise(r => requestAnimationFrame(r));
+      n++;
+    }
+    return { n, active: MapTwin.active(), zoom: state.map.getZoom(), live: DigitalTwin.debug().live,
+             hostOn: document.getElementById('map-twin').classList.contains('is-on'),
+             dragging: state.map.dragging.enabled() };
+  });
+  ok('wheeling out past the edge hands back to the map, one zoom level out, and the renderer goes',
+    !wheeled.active && wheeled.zoom === 16 && !wheeled.live && !wheeled.hostOn && wheeled.dragging, JSON.stringify(wheeled));
+
+  // The switch in Map display. Zoom 17 rather than deeper: the topo base the
+  // harness's map opens on stops at 17, and Leaflet clamps the map to its
+  // layers. (A zoom animation the map may have in flight is waited out
+  // first, as map3d does — a view set during one is overruled when it ends.)
+  await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: 10_000 });
+  await page.evaluate(([lat, lon]) => { MapTwin.setEnabled(false); state.map.setView([lat, lon], 17, { animate: false }); }, [linked.lat, linked.lon]);
+  await sleep(600);
+  const off = await page.evaluate(() => ({ active: MapTwin.active(), zoom: state.map.getZoom(), auto: state.mapTwinAuto }));
+  ok('switched off, zoom 17 is a map', !off.active && off.zoom === 17 && off.auto === false, JSON.stringify(off));
+  await page.evaluate(() => MapTwin.setEnabled(true));
+  await page.waitForFunction(() => MapTwin.active() && DigitalTwin.debug().built, null, { timeout: BUILD_TIMEOUT });
+  await settled();
+  ok('switched on again, the same view hands over', await page.evaluate(() => MapTwin.active()));
+  // ← Map: one level out from the hand-over.
+  await page.evaluate(() => MapTwin.leave());
+  await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: 10_000 });
+  await sleep(300);
+  const left = await page.evaluate(() => ({ active: MapTwin.active(), zoom: state.map.getZoom() }));
+  ok('← Map leaves, to the last zoom before the hand-over', !left.active && left.zoom === 16, JSON.stringify(left));
+
+  // Zooming the map out with the twin up — the map's own move — takes the
+  // twin down without touching the zoom asked for.
+  await page.evaluate(([lat, lon]) => state.map.setView([lat, lon], 17, { animate: false }), [linked.lat, linked.lon]);
+  await page.waitForFunction(() => MapTwin.active(), null, { timeout: BUILD_TIMEOUT });
+  await page.evaluate(() => state.map.setZoom(12, { animate: false }));
+  await page.waitForFunction(() => !MapTwin.active() && !state.map._animatingZoom, null, { timeout: 10_000 });
+  ok('zooming the map out takes the twin down at the zoom asked for', (await page.evaluate(() => state.map.getZoom())) === 12);
+
+  // From the overlay to the tab: the same station, no longer embedded, and
+  // the paths now read from the relations rather than the map's lines.
+  await page.evaluate(([lat, lon]) => state.map.setView([lat, lon], 17, { animate: false }), [linked.lat, linked.lon]);
+  await page.waitForFunction(() => MapTwin.active() && DigitalTwin.debug().built, null, { timeout: BUILD_TIMEOUT });
+  await page.evaluate(() => MapTwin.openTab());
+  await page.waitForFunction(() => state.activeTab === 'twin' && DigitalTwin.debug().built && !DigitalTwin.debug().embedded, null, { timeout: BUILD_TIMEOUT });
+  await settled();
+  const onTab = await page.evaluate(async () => {
+    const d = DigitalTwin.debug();
+    const buf = await DigitalTwin.buildGlb();
+    const dv = new DataView(buf);
+    const jsonLen = dv.getUint32(12, true);
+    const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen)));
+    return { station: d.stationId, embedded: d.embedded, paths: d.paths, mapUp: !!state.map,
+             pathMeshes: json.meshes.filter(m => /^path to /.test(m.name)).length };
+  });
+  ok('the tab opens on the station from the overlay, with the paths read from the relations',
+    onTab.station === linked.id && !onTab.embedded && !onTab.mapUp && onTab.paths && onTab.paths.source === 'data'
+      && onTab.paths.count >= linked.far.length && linked.far.every(id => onTab.paths.list.some(p => p.farId === id)),
+    JSON.stringify({ ...onTab, paths: onTab.paths && { source: onTab.paths.source, count: onTab.paths.count, far: onTab.paths.list.map(p => p.farId) } }));
+  ok('and the .glb carries one mesh per path', onTab.pathMeshes === onTab.paths.count, `${onTab.pathMeshes} vs ${onTab.paths.count}`);
 
   ok('no uncaught page errors', errors.length === 0, errors.join(' | '));
 } catch (err) {

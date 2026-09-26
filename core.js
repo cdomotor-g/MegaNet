@@ -288,6 +288,12 @@ const HELP = {
            + 'the address out of the box rather than off the saved record, so a row you have '
            + 'retyped sends you to the number on screen.',
     watch: [
+      '<strong>From zoom 17 the map becomes the station\'s digital twin</strong> — the ground to '
+      + '1 m where the State holds LiDAR, the aerial imagery, a 2 m pole and the radio paths as this '
+      + 'map colours them — whenever a station is under the view: the one on the card, the selected '
+      + 'one, or the nearest to the centre. Wheel out past the edge, press Escape or ← Map to come '
+      + 'back; the switch is in 🗺️ Map display. ⛰️ 3-D is the same idea at network scale, and hands '
+      + 'over at the same zoom.',
       '<strong>3-D view</strong> — ⛰️ in the side panel\'s strip, or the panel of the same name — '
       + 'tilts the map onto the ground it is drawn on: the base map you are already on (the most opaque one, if you have blended several), draped over '
       + '~30 m terrain, with the pins and links you are already looking at on it. Drag to pan, '
@@ -1151,6 +1157,15 @@ const HELP = {
            + 'down on it, or walk about in it at eye height; click the ground for its height; and '
            + 'download the whole scene as a <code>.glb</code> that Blender opens in one step.',
     watch: [
+      '<strong>The same twin is inside the Stations map.</strong> From zoom 17 with a station under '
+      + 'the view the map hands its rectangle to the twin and takes it back when you wheel out, press '
+      + 'Escape or ← Map — so the usual way in is to zoom to a pin, not to come here. This tab is the '
+      + 'full version: the settings, the Ground truth panel and the .glb.',
+      '<strong>The radio paths are drawn from the antenna</strong> as rays to the edge of the patch, '
+      + 'along the line of sight to the far station, each named at its end. Inside the Stations map '
+      + 'they are the map\'s own lines — the same filters, the same colouring (channel, fade margin or '
+      + 'line of sight), the same culled set. On this tab there is no map to mirror, so they are the '
+      + 'pass-range and backbone relations as recorded, in the plain colours.',
       '<strong>The ground is a model, not a survey.</strong> Queensland\'s service is bare-earth LiDAR '
       + 'in AHD at 0.5–1 m where the State has flown it and SRTM where it has not, and it does not say '
       + 'which per pixel — a patch that looks smooth may be the 30 m data. Outside Queensland the '
@@ -2082,6 +2097,10 @@ const state = {
   // requests for a view nobody asked a question about, so "no extra requests
   // fire with the layer off" has to stay true of a cold page load. The
   // opacity is a preference rather than a cost, so that one is remembered.
+  // The Digital Twin taking the map over at close zoom (map-twin.js). On by
+  // default and remembered, for mapRivers' reason: it is how an operator
+  // reads the map, and a switch they turned off should stay off.
+  mapTwinAuto:        localStorage.getItem('mn-map-twin') !== 'off',
   mapElvisCov:        false,
   mapElvisCovOpacity: Math.max(0.1, Math.min(1,
                         Number(localStorage.getItem('mn-elvis-cov-op')) || 0.6)),

@@ -124,7 +124,8 @@ const DigitalTwin = (function () {
   const SIZES      = [200, 400, 800, 1600];   // patch widths offered, metres
   const N          = 201;     // samples per side; odd, so the centre sample IS the station
   const FETCH_MS   = 45000;   // a raster that has not arrived by now has failed
-  const CACHE_MAX  = 6;       // patches kept decoded — ~700 KB each with the imagery
+  const CACHE_MAX  = 6;       // ground grids kept decoded — 162 KB each
+  const IMAGE_CACHE_BYTES = 40 * 1024 * 1024;   // decoded imagery kept — one wide patch and a few narrow ones
 
   // ── module state ──
   // `tw.s` is the remembered settings (localStorage); the rest is the live scene
@@ -147,12 +148,19 @@ const DigitalTwin = (function () {
     live: false,       // a renderer exists
     frames: 0,         // frames actually drawn (the check reads it to see the loop stop)
     picked: null,      // the last ground point clicked: { x, z, h }
+    paths: null,       // the radio paths drawn: { count, source, list }
+    hooks: null,       // set when embedded in the Stations map (map-twin.js): { leave }
   };
+
+  // Ground under a far station that has no recorded height, read off the
+  // tiles once and kept for the session — a path's far end is the same place
+  // every time it is drawn.
+  const farHeightCache = new Map();
 
   // The live scene — everything the teardown has to dispose of.
   const sc = {
     renderer: null, scene: null, camera: null, canvas: null, stage: null,
-    terrain: null, wire: null, pole: null, band: null, figure: null, label: null,
+    terrain: null, wire: null, pole: null, band: null, figure: null, label: null, paths: null,
     sun: null, hemi: null, texture: null, raf: 0, ro: null, dirty: false,
     off: [],          // listener removers
   };
@@ -320,6 +328,13 @@ const DigitalTwin = (function () {
       if (isFinite(v)) nodata = v;
     }
     const isHole = v => !isFinite(v) || v <= nodata + 1e-3 || v < -9000;
+    // GeoTIFF's own statement of where the pixels are: ModelPixelScale
+    // (33550, the size of a pixel in degrees, x then y) and ModelTiepoint
+    // (33922, raster (0,0,0) → model (lon, lat, 0) of the top-left corner).
+    // Read so the caller can check the service put the pixels where they
+    // were asked for — see qldGround.
+    const pixelScale = tags[33550] && tags[33550].length >= 2 ? [tags[33550][0], tags[33550][1]] : null;
+    const tiepoint   = tags[33922] && tags[33922].length >= 6 ? [tags[33922][3], tags[33922][4]] : null;
     const out = new Float32Array(W * H).fill(NaN);
     if (tags[324]) {                                    // tiled
       const tw_ = tags[322][0], th = tags[323][0];
@@ -359,7 +374,7 @@ const DigitalTwin = (function () {
     } else {
       throw new Error('TIFF has neither tiles nor strips');
     }
-    return { W, H, data: out };
+    return { W, H, data: out, pixelScale, tiepoint };
   }
 
   // ── fetching, bounded ──────────────────────────────────────────────────────
@@ -375,8 +390,26 @@ const DigitalTwin = (function () {
   // link drops a request now and then, and the difference between "the State
   // has no data here" and "one packet went missing" is worth one retry — not
   // a loop, which on a host that is genuinely down would only hold the tab.
+  // A request that ran the full FETCH_MS and was cut off is not retried:
+  // that host is answering slowly or not at all, and a second wait would
+  // only double the time the stage says "Reading…" for.
+  function timedOut(err) {
+    return !!err && (err.name === 'AbortError' || err.timeout === true);
+  }
   function once(fn) {
-    return fn().catch(err => new Promise(res => setTimeout(res, 800)).then(fn).catch(() => { throw err; }));
+    return fn().catch(err => {
+      if (timedOut(err)) throw err;
+      return new Promise(res => setTimeout(res, 800)).then(fn).catch(() => { throw err; });
+    });
+  }
+
+  // What a failed request is called in the notes, from the error it threw.
+  function failureWord(err) {
+    if (timedOut(err)) return 'it timed out';
+    const m = (err && err.message) || '';
+    if (/^HTTP \d+/.test(m)) return `it answered ${m}`;
+    if (/extent|answered/.test(m)) return m;
+    return 'it could not be reached';
   }
 
   // One <img>, decoded, with CORS asked for — the pixels are read back out of a
@@ -387,7 +420,7 @@ const DigitalTwin = (function () {
       const img = new Image();
       let done = false;
       const finish = (ok, v) => { if (done) return; done = true; clearTimeout(timer); ok ? resolve(v) : reject(v); };
-      const timer = setTimeout(() => finish(false, new Error('image timed out')), FETCH_MS);
+      const timer = setTimeout(() => finish(false, Object.assign(new Error('image timed out'), { timeout: true })), FETCH_MS);
       img.crossOrigin = 'anonymous';
       img.onload  = () => finish(true, img);
       img.onerror = () => finish(false, new Error('image unavailable'));
@@ -401,18 +434,35 @@ const DigitalTwin = (function () {
   // vertices — the middle one on the station itself — rather than half a
   // sample off. (An ImageServer samples a pixel at its centre, and `size`
   // pixels over a bbox have their centres at bbox.min + (i + ½) · pixel.)
-  function qldDemUrl(box) {
+  //
+  // `adjustAspectRatio=false`, and it is load-bearing. A patch that is square
+  // in metres is not square in degrees — a degree of longitude is cos(lat) of
+  // a degree of latitude — and the ImageServer's default (`true`) quietly
+  // widens the shorter axis so the pixels come out square in the image's own
+  // units: measured live, a 402 m box at Brisbane came back 450 m north to
+  // south, every row 2.24 m apart on the ground where the mesh had them at
+  // 2.00 m, the centre pixel still on the station and nothing to see. With
+  // the parameter off the service honours the box as asked; qldGround checks
+  // the GeoTIFF's own pixel scale against the request rather than trusting
+  // that, and a raster that came back a different shape is a failure, not a
+  // ground.
+  function demBox(box) {
     const step = box.size / (N - 1);
     const hLat = step / 2 / metresPerDegLat();
     const hLon = step / 2 / metresPerDegLon((box.south + box.north) / 2);
-    const bb = [box.west - hLon, box.south - hLat, box.east + hLon, box.north + hLat].map(v => v.toFixed(8)).join(',');
-    return `${QLD_DEM}?bbox=${bb}&bboxSR=4326&imageSR=4326&size=${N},${N}`
+    return { west: box.west - hLon, south: box.south - hLat, east: box.east + hLon, north: box.north + hLat };
+  }
+
+  function qldDemUrl(box) {
+    const b = demBox(box);
+    const bb = [b.west, b.south, b.east, b.north].map(v => v.toFixed(8)).join(',');
+    return `${QLD_DEM}?bbox=${bb}&bboxSR=4326&imageSR=4326&size=${N},${N}&adjustAspectRatio=false`
          + '&format=tiff&pixelType=F32&noData=-9999&interpolation=RSP_BilinearInterpolation&f=image';
   }
 
   function qldImgUrl(box, px) {
     const bb = [box.west, box.south, box.east, box.north].map(v => v.toFixed(8)).join(',');
-    return `${QLD_IMG}?bbox=${bb}&bboxSR=4326&imageSR=4326&size=${px},${px}&format=jpg&f=image`;
+    return `${QLD_IMG}?bbox=${bb}&bboxSR=4326&imageSR=4326&size=${px},${px}&adjustAspectRatio=false&format=jpg&f=image`;
   }
 
   // The State's raster, as an N × N grid, or the reason there is none — and
@@ -427,12 +477,24 @@ const DigitalTwin = (function () {
     if (typeof fetch !== 'function') return Promise.resolve({ kind: 'failed', error: 'no fetch' });
     return once(() => fetchBytes(qldDemUrl(box))).then(buf => {
       const t = readTiffF32(buf);
-      if (t.W !== N || t.H !== N) throw new Error(`service answered ${t.W} × ${t.H}, asked for ${N} × ${N}`);
+      if (t.W !== N || t.H !== N) throw new Error(`it answered ${t.W} × ${t.H} pixels, not ${N} × ${N}`);
+      // The pixels have to be where they were asked for, on both axes, or
+      // the rows land on the wrong vertices — see qldDemUrl. Half a percent is
+      // rounding; the aspect snap this guards against is 4–15%.
+      const b = demBox(box);
+      const wantX = (b.east - b.west) / N, wantY = (b.north - b.south) / N;
+      if (t.pixelScale && (Math.abs(t.pixelScale[0] - wantX) > wantX * 0.005
+                        || Math.abs(t.pixelScale[1] - wantY) > wantY * 0.005)) {
+        throw new Error('it answered a different extent from the one asked for');
+      }
+      if (t.tiepoint && (Math.abs(t.tiepoint[0] - b.west) > wantX || Math.abs(t.tiepoint[1] - b.north) > wantY)) {
+        throw new Error('it answered a different extent from the one asked for');
+      }
       let holes = 0;
       for (let i = 0; i < t.data.length; i++) if (!isFinite(t.data[i])) holes++;
       if (holes === t.data.length) return { kind: 'empty' };
       return { kind: 'ok', elev: t.data, holes };
-    }).catch(err => ({ kind: 'failed', error: (err && err.message) || String(err) }));
+    }).catch(err => ({ kind: 'failed', error: err }));
   }
 
   // ── the ground, from the tiles ─────────────────────────────────────────────
@@ -484,7 +546,7 @@ const DigitalTwin = (function () {
     const key = `${box.south.toFixed(6)},${box.west.toFixed(6)}|${box.size}`;
     if (groundCache.has(key)) return Promise.resolve(groundCache.get(key));
     return qldGround(box).then(q => {
-      if (q.kind === 'ok' && q.holes === 0) return finishGround(box, q.elev, 'qld', 0, 0, null, q.kind);
+      if (q.kind === 'ok' && q.holes === 0) return finishGround(box, q.elev, 'qld', 0, 0, null, q);
       // Holes, or nothing: the tiles fill what the State does not hold.
       return tileGround(box).then(t => {
         if (q.kind === 'ok') {
@@ -494,10 +556,10 @@ const DigitalTwin = (function () {
               if (!isFinite(q.elev[i]) && isFinite(t.elev[i])) { q.elev[i] = t.elev[i]; filled++; }
             }
           }
-          return finishGround(box, q.elev, 'qld', q.holes, filled, t, q.kind);
+          return finishGround(box, q.elev, 'qld', q.holes, filled, t, q);
         }
         if (!t) return null;
-        return finishGround(box, t.elev, 'srtm', 0, 0, t, q.kind);
+        return finishGround(box, t.elev, 'srtm', 0, 0, t, q);
       });
     }).then(g => {
       if (g) {
@@ -508,7 +570,7 @@ const DigitalTwin = (function () {
     });
   }
 
-  function finishGround(box, elev, source, holes, filled, tiles, qldKind) {
+  function finishGround(box, elev, source, holes, filled, tiles, q) {
     const c = elev[Math.floor(N / 2) * N + Math.floor(N / 2)];
     let min = Infinity, max = -Infinity, nan = 0;
     for (let i = 0; i < elev.length; i++) {
@@ -527,8 +589,10 @@ const DigitalTwin = (function () {
     return {
       elev, size: box.size, half: box.half, source, h0, min, max, holes, filled, unfilled: nan,
       // Why the State's raster is not the whole answer, when it is not:
-      // 'outside' | 'empty' | 'failed' (or 'ok').
-      qld: qldKind || 'ok',
+      // 'outside' | 'empty' | 'failed' (or 'ok'), and for a failure, what
+      // went wrong in the notes' own words.
+      qld: (q && q.kind) || 'ok',
+      qldError: q && q.kind === 'failed' ? failureWord(q.error) : null,
       sample_m: step,
       // What the surface can honestly claim: the State's LiDAR is 0.5–1 m
       // (and SRTM where it holds none — the service does not say which per
@@ -549,17 +613,23 @@ const DigitalTwin = (function () {
   function texturePx(size) { return size > 400 ? 2048 : 1024; }
 
   // The State answers a patch it has no photography for with a plain grey
-  // sheet rather than an error. Sixteen pixels of it tell the two apart: real
-  // ground has variance, a "no data" fill has none.
+  // sheet rather than an error. Sixty-four pixels on an 8 × 8 lattice across
+  // the sheet tell the two apart: real ground has variance, a "no data" fill
+  // has none. A lattice, not a stride through the buffer — a stride that is
+  // a multiple of the width walks down one column, and a sheet whose west
+  // edge is sea or the grey pad beyond the data reads as blank.
   function isBlank(canvas) {
     const cx = canvas.getContext('2d', { willReadFrequently: true });
-    const d = cx.getImageData(0, 0, canvas.width, canvas.height).data;
-    const step = Math.max(1, Math.floor(d.length / 4 / 64)) * 4;
+    const w = canvas.width, h = canvas.height;
     let min = 255, max = 0;
-    for (let i = 0; i < d.length; i += step) {
-      const v = (d[i] + d[i + 1] + d[i + 2]) / 3;
-      if (v < min) min = v;
-      if (v > max) max = v;
+    for (let j = 0; j < 8; j++) {
+      for (let i = 0; i < 8; i++) {
+        const x = Math.floor((i + 0.5) * w / 8), y = Math.floor((j + 0.5) * h / 8);
+        const d = cx.getImageData(x, y, 1, 1).data;
+        const v = (d[0] + d[1] + d[2]) / 3;
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
     }
     return max - min < 6;
   }
@@ -624,6 +694,11 @@ const DigitalTwin = (function () {
       const cv = document.createElement('canvas');
       cv.width = cv.height = px;
       const cx = cv.getContext('2d');
+      // White under the tiles, so a tile that did not arrive is a white gap
+      // — as the note says — rather than the black a transparent texel
+      // renders as on an opaque material, and composites to in the JPEG.
+      cx.fillStyle = '#ffffff';
+      cx.fillRect(0, 0, px, px);
       const sx = px / (x1 - x0), sy = px / (y1 - y0);            // texels per tile unit
       for (const t of got) {
         cx.drawImage(t.img, (t.tx - x0) * sx, (t.ty - y0) * sy, sx + 0.5, sy + 0.5);
@@ -647,18 +722,47 @@ const DigitalTwin = (function () {
       .catch(() => null)
       .then(im => {
         if (im) {
+          im.bytes = im.canvas.width * im.canvas.height * 4;
           imageCache.set(key, im);
-          while (imageCache.size > CACHE_MAX) imageCache.delete(imageCache.keys().next().value);
+          // Bounded by bytes, not entries: a decoded canvas is width × height
+          // × 4 — 4 MB at 1024, 16 MB at 2048 — and six of the wide ones
+          // would be 100 MB of bitmaps no browser cache can evict. The bound
+          // holds one wide patch and a few narrow ones; the ground grids
+          // beside them are 162 KB each and are not what the budget is for.
+          let total = 0;
+          for (const v of imageCache.values()) total += v.bytes;
+          while (total > IMAGE_CACHE_BYTES && imageCache.size > 1) {
+            const k = imageCache.keys().next().value;
+            total -= imageCache.get(k).bytes;
+            imageCache.delete(k);
+          }
         }
         return im;
       });
   }
 
+  // What the two caches are holding, for the memory strip — and one call to
+  // give it back (MemMeter's Release), the way Terrain.clear() does.
+  function cacheBytes() {
+    let b = 0;
+    for (const v of imageCache.values()) b += v.bytes || 0;
+    for (const g of groundCache.values()) b += g.elev ? g.elev.byteLength : 0;
+    return b;
+  }
+  function clearCaches() { imageCache.clear(); groundCache.clear(); }
+
   // ── the renderer ───────────────────────────────────────────────────────────
+  // A module that failed to fetch is remembered as failed by the browser's
+  // module map: import() of the same URL again rejects at once without a
+  // request leaving the page. So each try after a failure keys the URL with a
+  // query — a different specifier, a fresh fetch — which unpkg ignores, and
+  // which the module's own relative import of its core does not inherit.
+  let libTry = 0;
   function loadLib() {
     if (THREE) return Promise.resolve(THREE);
     if (libP) return libP;
-    libP = import(LIB_URL).then(m => {
+    const url = libTry ? `${LIB_URL}?r=${libTry}` : LIB_URL;
+    libP = import(url).then(m => {
       if (!m || !m.WebGLRenderer) throw new Error('the 3-D renderer loaded but defined nothing');
       THREE = m;
       libErr = null;
@@ -667,6 +771,7 @@ const DigitalTwin = (function () {
       // Remembered as a failure, not as an answer: the next build tries again.
       libErr = (err && err.message) || String(err);
       libP = null;
+      libTry++;
       throw err;
     });
     return libP;
@@ -691,7 +796,7 @@ const DigitalTwin = (function () {
 
   function clearScene() {
     if (!sc.scene) return;
-    for (const k of ['terrain', 'wire', 'pole', 'band', 'figure', 'label']) {
+    for (const k of ['terrain', 'wire', 'pole', 'band', 'figure', 'label', 'paths']) {
       if (sc[k]) { sc.scene.remove(sc[k]); disposeObject(sc[k]); sc[k] = null; }
     }
     if (sc.texture) { sc.texture.dispose(); sc.texture = null; }
@@ -787,18 +892,23 @@ const DigitalTwin = (function () {
     geo.computeVertexNormals();
     geo.computeBoundingSphere();
 
-    const mat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, vertexColors: true });
+    // polygonOffset pushes the ground back a hair in the depth buffer, so the
+    // wireframe drawn on the very same vertices wins every fragment. Lifting
+    // the wire a few centimetres instead loses it to the ground wherever the
+    // depth buffer's resolution runs out — a sixth of it from the top-down
+    // view of a wide patch.
+    const mat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, vertexColors: true,
+                                                 polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     mesh.name = 'ground';
     sc.terrain = mesh;
     sc.scene.add(mesh);
 
-    // The wireframe rides the same geometry a hair above it, so the mesh's
-    // sample spacing can be seen against the imagery.
+    // The wireframe rides the same geometry, so the mesh's sample spacing can
+    // be seen against the imagery.
     const wire = new THREE.LineSegments(new THREE.WireframeGeometry(geo),
       new THREE.LineBasicMaterial({ color: 0x1b2a3a, transparent: true, opacity: 0.35 }));
-    wire.position.y = 0.03;
     wire.visible = !!S().wire;
     wire.name = 'wireframe';
     wire.userData.export = false;
@@ -889,13 +999,13 @@ const DigitalTwin = (function () {
     sc.scene.add(grp);
   }
 
-  // The station's name over the pole, on a sprite so it always faces the
-  // camera. Text is rasterised at 2× for the retina case and the sprite is
-  // sized in metres, so it stays readable from across the patch and does not
-  // swamp the pole up close.
-  function buildLabel(station) {
+  // A sign on a sprite — a title and, under it, a second line — sized in
+  // metres and always facing the camera. Rasterised at 2× for the retina
+  // case. The station's name over the pole is one; the far end of every
+  // radio path is another.
+  function makeSign(title, sub, { bar = null } = {}) {
     const cv = document.createElement('canvas');
-    const W = 640, H = 160;
+    const W = 640, H = sub ? 160 : 112;
     cv.width = W; cv.height = H;
     const cx = cv.getContext('2d');
     cx.fillStyle = 'rgba(16, 32, 42, 0.82)';
@@ -903,28 +1013,177 @@ const DigitalTwin = (function () {
     if (typeof cx.roundRect === 'function') cx.roundRect(4, 4, W - 8, H - 8, 28);
     else cx.rect(4, 4, W - 8, H - 8);
     cx.fill();
+    if (bar) { cx.fillStyle = bar; cx.fillRect(4, 4, 22, H - 8); }
     cx.fillStyle = '#ffffff';
     cx.textAlign = 'center';
     cx.textBaseline = 'middle';
     cx.font = '600 58px system-ui, sans-serif';
-    let name = station.name || station.id;
-    while (name.length > 3 && cx.measureText(name).width > W - 60) name = name.slice(0, -2) + '…';
-    cx.fillText(name, W / 2, station.station_number ? 60 : H / 2);
-    if (station.station_number) {
+    let t = String(title || '');
+    while (t.length > 3 && cx.measureText(t).width > W - 70) t = t.slice(0, -2) + '…';
+    cx.fillText(t, W / 2, sub ? 60 : H / 2);
+    if (sub) {
       cx.font = '400 40px system-ui, sans-serif';
       cx.fillStyle = '#cfe3f5';
-      cx.fillText(String(station.station_number), W / 2, 114);
+      cx.fillText(String(sub), W / 2, 114);
     }
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-    sp.scale.set(3.2, 0.8, 1);
+    sp.scale.set(3.2, 3.2 * H / W, 1);
+    sp.userData.export = false;
+    return sp;
+  }
+
+  // The station's name over the pole.
+  function buildLabel(station) {
+    const sp = makeSign(station.name || station.id, station.station_number ? String(station.station_number) : null);
     sp.position.set(0, POLE_H + 0.75, 0);
     sp.visible = !!S().label;
     sp.name = 'label';
-    sp.userData.export = false;
     sc.label = sp;
     sc.scene.add(sp);
+  }
+
+  // ── the radio paths ────────────────────────────────────────────────────────
+  // What joins this station to the rest of the network, as rays from its
+  // antenna. Two sources, and the first is the one that matters:
+  //
+  //   * The Stations map's own lines, where that map is up — the seam
+  //     map-3d.js reads (`state.mapLines`): the same filters, the same
+  //     colouring (channel, fade margin or line of sight, whichever is on),
+  //     the same hidden and culled sets. Nothing is re-derived, so this view
+  //     cannot disagree with the map it was opened from.
+  //   * On the Digital Twin tab there is no map to mirror (leaving the
+  //     Stations tab takes its lines with it), so the relations themselves are
+  //     asked — the pass-range and backbone indexes app.js draws the lines
+  //     from, through its own functions — in the plain colours. The notes say
+  //     which, because "as the map colours them" and "as recorded" are
+  //     different claims.
+  //
+  // A path's far end is beyond the patch almost always, so the ray is drawn
+  // from the antenna to the patch's edge, along the line of sight to the far
+  // antenna: over a hop this short the earth's bulge is millimetres and is
+  // left out. Vertical exaggeration scales the ray's relief with the
+  // ground's — its rise from the antenna is (far altitude − near altitude) ×
+  // d/D × exaggeration — so the clearance it shows over the ground is the
+  // true clearance at 1× and stretches with the ground above that; the
+  // antenna height itself, like the pole, is never scaled.
+  function antennaAgl(st) {
+    const sys = typeof rmSystemOf === 'function' ? rmSystemOf(st) : null;
+    if (sys && isFinite(sys.antenna_height_m)) return Number(sys.antenna_height_m);
+    return typeof PATH_DEFAULT_AGL === 'number' ? PATH_DEFAULT_AGL : 4;
+  }
+
+  function pathsFor(station) {
+    const out = new Map();
+    const add = (far, colour, opacity, kind) => {
+      if (!far || far.id === station.id || !located(far) || out.has(far.id)) return;
+      out.set(far.id, { far, colour, opacity, kind });
+    };
+    const lines = (typeof state !== 'undefined' && state.map && state.mapLines) || [];
+    if (lines.length) {
+      for (const l of lines) {
+        const role = l.mnLinkRole;
+        if (role !== 'core' && role !== 'backbone') continue;
+        const ids = [l.mnLinkStationId, l.mnLinkRepeaterId, l.mnLinkRepeaterId2].filter(x => x != null);
+        if (!ids.includes(station.id)) continue;
+        const farId = ids.find(x => x !== station.id);
+        add(stationById(farId), (l.options && l.options.color) || '#ff6f00',
+            l.options && l.options.opacity != null ? l.options.opacity : 1,
+            role === 'backbone' ? 'backbone' : 'field');
+      }
+      return { paths: [...out.values()], source: 'map' };
+    }
+    const lineC = cssVar('--map-line', '#ff6f00'), bbC = cssVar('--map-backbone', '#000000');
+    const roles = station.roles || [];
+    if (typeof passRangeLinks === 'function' && roles.includes('field')) {
+      for (const p of passRangeLinks([station])) add(p.r, lineC, 1, 'field');
+    }
+    if (typeof findStationMatches === 'function' && roles.includes('repeater')) {
+      for (const f of findStationMatches(station)) add(f, lineC, 1, 'field');
+    }
+    if (typeof backboneLinks === 'function') {
+      const maxKm = typeof state !== 'undefined' && state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : Infinity;
+      for (const p of backboneLinks(maxKm)) {
+        if (p.a.id === station.id) add(p.b, bbC, 1, 'backbone');
+        else if (p.b.id === station.id) add(p.a, bbC, 1, 'backbone');
+      }
+    }
+    return { paths: [...out.values()], source: 'data' };
+  }
+
+  // The ground under a far station: its recorded height, else what the tiles
+  // say (fetched once), else — until the tiles answer — the near station's
+  // own, which draws the ray level and is corrected the moment they do.
+  function farGround(far) {
+    if (far.elevation_ahd != null && isFinite(far.elevation_ahd)) return Number(far.elevation_ahd);
+    if (farHeightCache.has(far.id)) return farHeightCache.get(far.id);
+    return null;
+  }
+
+  function buildPaths(station) {
+    if (sc.paths) { sc.scene.remove(sc.paths); disposeObject(sc.paths); sc.paths = null; }
+    const g = tw.ground;
+    if (!g || !THREE || !sc.scene || !station) { tw.paths = null; return; }
+    const seq = tw.seq;
+    const { paths, source } = pathsFor(station);
+    const grp = new THREE.Group();
+    grp.name = 'radio paths';
+    const agl0 = antennaAgl(station);
+    const exag = S().exag;
+    // A mast from the pole's top to the antenna, where the antenna is higher
+    // than the pole — the ray has to leave from somewhere the eye can see.
+    if (agl0 > POLE_H + 0.05) {
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, agl0 - POLE_H, 12),
+                                  new THREE.MeshStandardMaterial({ color: 0x8d97a1, metalness: 0.6, roughness: 0.4 }));
+      mast.position.y = POLE_H + (agl0 - POLE_H) / 2;
+      mast.castShadow = true;
+      mast.name = 'mast';
+      grp.add(mast);
+    }
+    const list = [];
+    const missing = [];
+    for (const p of paths) {
+      const D = acmaHaversineKm(station.lat, station.lon, p.far.lat, p.far.lon) * 1000;
+      if (!(D > 0.5)) continue;
+      const brg = bearingDeg(station.lat, station.lon, p.far.lat, p.far.lon);
+      const rad = brg * Math.PI / 180;
+      const ux = Math.sin(rad), uz = -Math.cos(rad);
+      const edge = g.half / Math.max(Math.abs(ux), Math.abs(uz), 1e-9);
+      const dE = Math.min(D, edge);
+      let hF = farGround(p.far);
+      if (hF == null) { missing.push(p.far); hF = g.h0; }
+      const aglF = antennaAgl(p.far);
+      const slope = ((hF + aglF) - (g.h0 + agl0)) / D;
+      const yEnd = agl0 + slope * dE * exag;
+      const a = new THREE.Vector3(0, agl0, 0), b = new THREE.Vector3(ux * dE, yEnd, uz * dE);
+      const tube = new THREE.Mesh(
+        new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, 0.12, 8, false),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(p.colour), transparent: p.opacity < 1, opacity: p.opacity }));
+      tube.name = `path to ${p.far.name || p.far.id}`;
+      tube.userData.path = p.far.id;
+      grp.add(tube);
+      // The far end named at the ray's end, scaled with its distance so it
+      // reads from the opening view: a 3 m sign 200 m off is a speck.
+      const sign = makeSign(p.far.name || p.far.id, `${(D / 1000).toFixed(D < 10000 ? 1 : 0)} km · ${Math.round(brg)}°${p.kind === 'backbone' ? ' · backbone' : ''}`, { bar: p.colour });
+      const k = Math.max(1, dE / 40);
+      sign.scale.multiplyScalar(k);
+      sign.position.copy(b).add(new THREE.Vector3(0, 0.5 * k, 0));
+      grp.add(sign);
+      list.push({ farId: p.far.id, far: p.far.name, colour: p.colour, opacity: p.opacity, kind: p.kind,
+                  km: D / 1000, bearing: brg, agl0, aglF, hF, farKnown: farGround(p.far) != null,
+                  end: { x: b.x, y: b.y, z: b.z } });
+    }
+    sc.paths = grp;
+    sc.scene.add(grp);
+    tw.paths = { count: list.length, source, list, pending: missing.length };
+    requestFrame();
+    // The tiles for the far ends nobody surveyed, then the rays again with
+    // the ground they stand on — once, all together.
+    if (missing.length && typeof Terrain !== 'undefined') {
+      Promise.all(missing.map(f => Terrain.sample(f.lat, f.lon).then(h => { if (isFinite(h)) farHeightCache.set(f.id, h); }, () => {})))
+        .then(() => { if (seq === tw.seq && sc.scene && tw.ground) buildPaths(station); });
+    }
   }
 
   // ── the camera ─────────────────────────────────────────────────────────────
@@ -1017,7 +1276,8 @@ const DigitalTwin = (function () {
     const hud = document.getElementById('twin-hud');
     if (hud) hud.textContent = rig.mode === 'walk'
       ? 'Walking at 1.7 m: W A S D or the arrow keys move, drag to look, Shift to hurry, Esc to stop.'
-      : 'Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.';
+      : (tw.hooks ? 'Drag to orbit, wheel to zoom, right-drag to pan; click the ground for its height. Wheel out past the edge, or Esc, for the map.'
+                  : 'Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.');
     syncCanvasName();
     requestFrame();
   }
@@ -1085,7 +1345,14 @@ const DigitalTwin = (function () {
     on(cv, 'wheel', e => {
       e.preventDefault();
       if (rig.mode === 'walk') walkStep(-e.deltaY * 0.01, 0);
-      else dolly(e.deltaY * 0.0015);
+      else {
+        // Embedded in the Stations map, a wheel-out past the widest the
+        // orbit goes is the gesture that brought the twin up run backwards:
+        // the map takes over again, one zoom level out (map-twin.js).
+        const atLimit = rig.radius >= maxRadius() - 1e-6;
+        dolly(e.deltaY * 0.0015);
+        if (atLimit && e.deltaY > 0 && tw.hooks && tw.hooks.leave) { tw.hooks.leave(); return; }
+      }
       requestFrame();
     }, { passive: false });
 
@@ -1103,6 +1370,7 @@ const DigitalTwin = (function () {
         if (WALK_KEYS.includes(k)) { e.preventDefault(); rig.keys.add(k); requestFrame(); }
         return;
       }
+      if (k === 'Escape' && tw.hooks && tw.hooks.leave) { e.preventDefault(); tw.hooks.leave(); return; }
       const step = 0.08;
       switch (k) {
         case 'ArrowLeft':  rig.theta += step; break;
@@ -1127,9 +1395,9 @@ const DigitalTwin = (function () {
     on(cv, 'blur', () => rig.keys.clear());
   }
 
+  function maxRadius() { return tw.ground ? tw.ground.size * 2.2 : 400; }
   function dolly(amount) {
-    const max = tw.ground ? tw.ground.size * 2.2 : 400;
-    rig.radius = Math.min(max, Math.max(1.5, rig.radius * Math.exp(amount)));
+    rig.radius = Math.min(maxRadius(), Math.max(1.5, rig.radius * Math.exp(amount)));
   }
 
   // Pan the orbit target across the ground, screen-relative: the ground follows
@@ -1268,23 +1536,33 @@ const DigitalTwin = (function () {
     };
     if (!st) { nothing('Pick a station to build its twin.', '<p>No station chosen. Find one on the left, or select one on the Stations tab and come back.</p>'); return; }
     if (!located(st)) { nothing(`${st.name} has no position, so there is no ground to stand it on.`, `<p><strong>${esc(st.name)}</strong> has no coordinates. Give it a position in the station editor and the twin can be built.</p>`); return; }
-    if (!webglOk()) { setStatus('This browser has no WebGL, so nothing three-dimensional can be drawn here.'); showPlaceholder('<p>WebGL is not available in this browser — the twin needs it. The ground table below still fills in.</p>'); }
-
+    const gl = webglOk();
     const box = patchBox(st.lat, st.lon, S().size);
     const notes = [];
 
-    setStatus('Fetching the 3-D renderer…');
-    showPlaceholder('<p>Loading…</p>');
+    // The renderer, only where it can draw: without WebGL there is no point
+    // fetching three quarters of a megabyte to be told so.
     let lib = null;
-    try { lib = await loadLib(); } catch (_) { lib = null; }
-    if (seq !== tw.seq) return;
-    if (!lib) notes.push(`The 3-D renderer could not be fetched (${libErr || 'offline, or blocked'}). The ground is still read and tabled below; press Rebuild to try again.`);
+    if (gl) {
+      setStatus('Fetching the 3-D renderer…');
+      showPlaceholder('<p>Loading…</p>');
+      try { lib = await loadLib(); } catch (_) { lib = null; }
+      if (seq !== tw.seq) return;
+      if (!lib) notes.push(`The 3-D renderer could not be fetched (${libErr || 'offline, or blocked'}). The ground is still read and tabled below; press Rebuild to try again.`);
+    } else {
+      notes.push('WebGL is not available in this browser, so nothing three-dimensional can be drawn here; the ground is still read and tabled below.');
+      showPlaceholder('<p>WebGL is not available in this browser — the twin needs it. The ground has been read and is tabled below.</p>');
+    }
 
+    // The ground first, drawn the moment it lands; the imagery follows and is
+    // draped when it arrives. Waiting for both held a ground that took
+    // seconds behind an imagery host that took a minute to say no.
     setStatus('Reading the ground…');
-    const [ground, image] = await Promise.all([groundFor(box), imageryFor(box)]);
+    const imageP = imageryFor(box);
+    const ground = await groundFor(box);
     if (seq !== tw.seq) return;
     tw.ground = ground;
-    tw.image = image;
+    tw.image = null;
     tw.elvis = null;
 
     if (!ground) {
@@ -1299,23 +1577,17 @@ const DigitalTwin = (function () {
       refreshTable();
       syncCanvasName();
       syncExportButton();
+      imageP.catch(() => {});
       return;
     }
     if (ground.source === 'srtm') {
       notes.push(ground.qld === 'failed'
-        ? 'Queensland\'s elevation service could not be reached (offline, blocked, or it timed out), so the ground is the ~30 m SRTM every profile in this app reads — the relief is smoothed and a channel narrower than a pixel is not there. Press Rebuild to ask it again.'
+        ? `Queensland's elevation service did not answer — ${ground.qldError || 'it could not be reached'} — so the ground is the ~30 m SRTM every profile in this app reads: the relief is smoothed and a channel narrower than a pixel is not there. Press Rebuild to ask it again.`
         : 'Queensland\'s elevation service holds nothing here, so the ground is the ~30 m SRTM every profile in this app reads — the relief is smoothed and a channel narrower than a pixel is not there. Elvis lists finer LiDAR for much of NSW; it is not yet a source this tab can read.');
     } else if (ground.filled) {
       notes.push(`${ground.filled.toLocaleString()} of ${(N * N).toLocaleString()} samples were outside the State's data and were filled from ~30 m terrain tiles.`);
     }
     if (ground.unfilled) notes.push(`${ground.unfilled.toLocaleString()} samples could not be read from any source and are drawn at the station's own height.`);
-    if (!image) notes.push('No imagery could be fetched — the ground is coloured by height instead.');
-    else if (image.source === 'esri') {
-      notes.push(image.qld === 'failed'
-        ? 'Queensland\'s aerial imagery could not be fetched, so Esri World Imagery is draped instead. Press Rebuild to ask for it again.'
-        : 'Queensland\'s aerial imagery holds nothing here, so Esri World Imagery is draped instead.');
-    }
-    if (image && image.partial) notes.push('Some imagery tiles did not arrive; the gaps in the drape are white.');
 
     if (lib && ensureRenderer()) {
       clearScene();
@@ -1323,6 +1595,7 @@ const DigitalTwin = (function () {
       buildPole(st);
       buildFigure();
       buildLabel(st);
+      buildPaths(st);
       sc.scene.fog = new THREE.Fog(skyColour(), ground.size * 1.1, ground.size * 4);
       resetOrbit();
       showPlaceholder('');
@@ -1331,14 +1604,14 @@ const DigitalTwin = (function () {
     } else if (lib) {
       notes.push('A WebGL context could not be created on this canvas, so nothing is drawn; the numbers below are still the ground.');
       showPlaceholder('<p>WebGL is not available here. The ground has been read and is tabled below.</p>');
-    } else {
+    } else if (gl) {
       showPlaceholder('<p>The 3-D renderer could not be fetched. The ground has been read and is tabled below; press <strong>Rebuild</strong> to try the renderer again.</p>');
     }
     syncExportButton();
-    setStatus(`${st.name}: ${ground.size} m of ground at ${ground.sample_m.toFixed(1)} m samples `
-            + `(${ground.source === 'qld' ? 'Queensland LiDAR/SRTM DTM' : 'SRTM ~30 m'}), `
-            + `${(ground.max - ground.min).toFixed(1)} m of relief, `
-            + `${image ? (image.source === 'qld' ? 'Queensland aerial imagery' : 'Esri imagery') + ` at ${image.mpp.toFixed(2)} m/px` : 'no imagery'}.`);
+    const groundLine = `${st.name}: ${ground.size} m of ground at ${ground.sample_m.toFixed(1)} m samples `
+                     + `(${ground.source === 'qld' ? 'Queensland LiDAR/SRTM DTM' : 'SRTM ~30 m'}), `
+                     + `${(ground.max - ground.min).toFixed(1)} m of relief`;
+    setStatus(`${groundLine}; fetching the imagery…`);
     setNotes(notes);
     refreshTruth();
     refreshTable();
@@ -1350,6 +1623,23 @@ const DigitalTwin = (function () {
         refreshTruth();
       }, () => {});
     }
+
+    const image = await imageP;
+    if (seq !== tw.seq) return;
+    tw.image = image;
+    if (!image) notes.push('No imagery could be fetched — the ground is coloured by height instead.');
+    else if (image.source === 'esri') {
+      notes.push(image.qld === 'failed'
+        ? 'Queensland\'s aerial imagery could not be fetched, so Esri World Imagery is draped instead. Press Rebuild to ask for it again.'
+        : 'Queensland\'s aerial imagery holds nothing here, so Esri World Imagery is draped instead.');
+    }
+    if (image && image.partial) notes.push('Some imagery tiles did not arrive; the gaps in the drape are white.');
+    if (sc.terrain) applyImagery();
+    setStatus(`${groundLine}, ${image ? (image.source === 'qld' ? 'Queensland aerial imagery' : 'Esri imagery') + ` at ${image.mpp.toFixed(2)} m/px` : 'no imagery'}.`);
+    setNotes(notes);
+    refreshTruth();
+    refreshAttrib();
+    syncCanvasName();
   }
 
   // The canvas is the control (the thing that takes focus and is operated) and
@@ -1526,7 +1816,7 @@ const DigitalTwin = (function () {
         <div class="panel-header"><h2>Station</h2></div>
         <div id="twin-station-line">${stationLineHtml()}</div>
         <label class="twin-field">Find a station
-          <input type="search" id="twin-find" value="${escAttr(tw.query)}" autocomplete="off" spellcheck="false"
+          <input type="search" id="twin-find" value="${esc(tw.query)}" autocomplete="off" spellcheck="false"
                  placeholder="name, station number or ALERT address"
                  oninput="DigitalTwin.setQuery(this.value)">
         </label>
@@ -1559,12 +1849,7 @@ const DigitalTwin = (function () {
         </div>
         <p class="twin-status" id="twin-status" role="status">${esc(tw.status || 'Building…')}</p>
         <ul class="twin-notes" id="twin-notes" ${tw.notes.length ? '' : 'hidden'}>${tw.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
-        <div class="twin-stage" id="twin-stage">
-          <canvas id="twin-canvas" tabindex="0" aria-label="Three-dimensional view. Nothing is built yet."></canvas>
-          <div class="twin-compass" id="twin-compass" aria-hidden="true" style="--twin-heading:0deg">N</div>
-          <p class="twin-hud" id="twin-hud">Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.</p>
-          <div class="twin-placeholder" id="twin-placeholder" hidden></div>
-        </div>
+        ${stageHtml()}
         <p class="small twin-pick" id="twin-pick"></p>
         <details class="twin-details">
           <summary>The ground under the station, as numbers</summary>
@@ -1574,6 +1859,20 @@ const DigitalTwin = (function () {
       </div>
     </div>
   </div>`;
+  }
+
+  // The stage — the canvas and what stands over it — for the tab and for the
+  // Stations map alike (map-twin.js puts this in its overlay). The ids are the
+  // ones every refresh here writes to, and the two hosts are never on screen
+  // together: the overlay lives in the Stations tab's map, the panel in this
+  // tab's page.
+  function stageHtml() {
+    return `<div class="twin-stage" id="twin-stage">
+          <canvas id="twin-canvas" tabindex="0" aria-label="Three-dimensional view. Nothing is built yet."></canvas>
+          <div class="twin-compass" id="twin-compass" aria-hidden="true" style="--twin-heading:0deg">N</div>
+          <p class="twin-hud" id="twin-hud">Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.</p>
+          <div class="twin-placeholder" id="twin-placeholder" hidden></div>
+        </div>`;
   }
 
   function attribHtml() {
@@ -1604,6 +1903,8 @@ const DigitalTwin = (function () {
     }
     sc.renderer = null; sc.scene = null; sc.camera = null; sc.canvas = null; sc.stage = null;
     sc.sun = null; sc.hemi = null;
+    tw.hooks = null;
+    tw.paths = null;
   }
 
   function init() {
@@ -1714,7 +2015,10 @@ const DigitalTwin = (function () {
 
     sc.scene.updateMatrixWorld(true);
     const meshes = [];
-    sc.scene.traverse(o => { if (o.isMesh && o.visible && o.userData.export !== false && o.geometry && o.geometry.attributes.position) meshes.push(o); });
+    // traverseVisible, not traverse: a figure switched off is a hidden
+    // *group*, and its parts keep visible = true of their own. What is not in
+    // the frame is not in the file.
+    sc.scene.traverseVisible(o => { if (o.isMesh && o.userData.export !== false && o.geometry && o.geometry.attributes.position) meshes.push(o); });
     for (const mesh of meshes) {
       let geo = mesh.geometry.index ? mesh.geometry : mesh.geometry;   // both fine; index optional
       geo = geo.clone().applyMatrix4(mesh.matrixWorld);
@@ -1832,6 +2136,7 @@ const DigitalTwin = (function () {
         sc.terrain.geometry.computeBoundingSphere();
         if (sc.wire) { sc.wire.geometry.dispose(); sc.wire.geometry = new THREE.WireframeGeometry(sc.terrain.geometry); }
         if (sc.figure) sc.figure.position.y = yAt(sc.figure.position.x, sc.figure.position.z);
+        if (sc.paths) buildPaths(currentStation());
         requestFrame();
       }
     },
@@ -1856,6 +2161,37 @@ const DigitalTwin = (function () {
 
     exportGlb, buildGlb,
 
+    // The memory strip's holder (mem-meter.js): what the caches hold, and
+    // the Release button's call.
+    cacheBytes, clearCaches,
+
+    // ── Embedded in the Stations map (map-twin.js) ──
+    // The stage markup for a host of its own, the build into it, and what the
+    // host wants to be told. `hooks.leave` is called when the operator wheels
+    // out past the widest orbit or presses Escape — the map's cue to take
+    // over again. stop() is the way out, as it is for the tab.
+    stageHtml,
+    mountAt(id, hooks) {
+      const s = stationById(id);
+      if (!s) return false;
+      tw.stationId = s.id;
+      tw.hooks = hooks || null;
+      init();
+      return true;
+    },
+    // Fetch a station's ground and imagery into the caches ahead of a
+    // hand-over that has not happened yet — a station selected on the map
+    // at any zoom is a station about to be looked at closely.
+    prefetch(id) {
+      const s = stationById(id);
+      if (!located(s) || typeof fetch !== 'function') return;
+      const box = patchBox(s.lat, s.lon, S().size);
+      groundFor(box).catch(() => {});
+      imageryFor(box).catch(() => {});
+    },
+    patchSize() { return S().size; },
+    embedded() { return !!tw.hooks; },
+
     // Read by the check and by nothing else: what the scene is standing on.
     libLoaded() { return !!THREE; },
     debug() {
@@ -1874,8 +2210,12 @@ const DigitalTwin = (function () {
         textured: !!(sc.terrain && sc.terrain.material.map),
         contextLost: sc.renderer ? sc.renderer.getContext().isContextLost() : null,
         camera: sc.camera ? { x: sc.camera.position.x, y: sc.camera.position.y, z: sc.camera.position.z } : null,
+        paths: tw.paths ? { count: tw.paths.count, source: tw.paths.source, pending: tw.paths.pending, list: tw.paths.list.slice() } : null,
+        embedded: !!tw.hooks,
         heightAt, yAt,
         vertexY: i => (sc.terrain ? sc.terrain.geometry.attributes.position.getY(i) : NaN),
+        vertexX: i => (sc.terrain ? sc.terrain.geometry.attributes.position.getX(i) : NaN),
+        vertexZ: i => (sc.terrain ? sc.terrain.geometry.attributes.position.getZ(i) : NaN),
       };
     },
     // Seams for the check: the raster reader and the geometry, so the arithmetic
@@ -1889,7 +2229,7 @@ const DigitalTwin = (function () {
     // Forget the station, so a check can measure the tab with nothing chosen.
     _clear() {
       tw.stationId = null; tw.ground = null; tw.image = null; tw.elvis = null;
-      tw.status = ''; tw.notes = []; tw.picked = null;
+      tw.status = ''; tw.notes = []; tw.picked = null; tw.paths = null;
     },
   };
 })();

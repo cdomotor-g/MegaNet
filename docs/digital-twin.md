@@ -8,7 +8,7 @@ at eye height; click the ground for its height; and download the whole scene
 as a `.glb` that Blender opens in one step.
 
 It is `digital-twin.js`, the **Digital Twin** tab under *Stations & networks*,
-and a 🧊 pill on every station card. `npm run twin` holds it (see the end).
+and a 🧊 pill on the card of every station with a position. `npm run twin` holds it (see the end).
 
 ---
 
@@ -56,7 +56,20 @@ their centres at `bbox.min + (i + ½) · pixel`. Asked for the patch itself,
 every height would land half a sample off and the middle one a metre off the
 station, and nothing would look wrong. Grown by half a sample, the 201 pixel
 centres are the 201 mesh vertices and the middle one *is* the station.
-`npm run twin` asserts this from the URL the tab sends.
+
+**And `adjustAspectRatio=false`, which is load-bearing.** A patch that is
+square in metres is not square in degrees — a degree of longitude is cos(lat)
+of a degree of latitude — and the ImageServer's default (`true`) quietly
+widens the shorter axis so the pixels come out square in the image's own
+units. Measured live: a 402 m box at Brisbane came back 450 m north to south,
+every row 2.24 m apart on the ground where the mesh had them at 2.00 m, the
+centre pixel still on the station and nothing to see. With the parameter off
+the service honours the box as asked, and the module checks the GeoTIFF's own
+`ModelPixelScale` and `ModelTiepoint` against the request rather than trusting
+it: a raster that came back a different shape is a failed request, not a
+ground. `npm run twin` asserts the URL the tab sends, and its fake service
+snaps the extent exactly as the real one does unless the parameter is there,
+so the regression is one the check can see.
 
 ### Why not Elvis's API for this
 
@@ -110,8 +123,8 @@ The same shape as the ground:
    nothing was flown. One `exportImage` JPEG of the patch: 1024 px for a
    patch up to 400 m (0.4 m/px), 2048 for the two wide ones. The service
    answers a patch it has no photography for with a plain grey sheet rather
-   than an error; sixteen pixels of variance tell the two apart
-   (`isBlank`).
+   than an error; sixty-four pixels on an 8 × 8 lattice tell the two apart by their
+   variance (`isBlank`).
 2. **Esri World Imagery** tiles, stitched onto one canvas the patch's size,
    where the State's sheet is blank or unreachable — the same host and
    terms as the Stations map's Satellite base.
@@ -157,7 +170,7 @@ sits in its panel in either theme.
 
 | Mode | Pointer | Keys |
 |---|---|---|
-| Orbit (default) | drag to orbit; wheel to zoom; right-drag, Shift-drag or two fingers to pan; pinch to zoom | arrows orbit; `+`/`−` zoom; `W A S D` pan; `R` reset; `T` top-down; `F` walk |
+| Orbit (default) | drag to orbit; wheel to zoom; right-drag, Shift-drag or two fingers to pan; pinch to zoom | arrows orbit; `+`/`−` zoom; `W A S D` pan; `R` reset; `T` top-down; `F` walk; inside the Stations map, a wheel out past the edge or `Esc` hands back to the map |
 | Walk | drag to look; wheel to step | `W A S D` / arrows move at 1.6 m/s, Shift hurries; `Q`/`E` turn; `Esc` back to orbit |
 
 The walker's eye is 1.70 m above the ground under it, and the orbit camera
@@ -170,6 +183,71 @@ is here".
 two lines through the pole (west → east, south → north) at offsets that fit
 the patch — part 3 of the design system's chart pattern, so the numbers are
 there for whoever cannot see the picture.
+
+## In the Stations map
+
+The same twin is inside the Stations map (`map-twin.js`), and that is the
+usual way in. **From zoom 17** — about a kilometre across on a laptop's map,
+the moment a pin has become a place — with a station under the view, the
+map's rectangle hands over to that station's twin, whichever view was
+showing: the 2-D map or ⛰️ 3-D (whose camera follows the 2-D map's zoom, so
+both paths arrive the same way). Wheeling out past the twin's widest orbit,
+pressing Escape, or **← Map** on the overlay hands back, with the map set one
+level out — where the operator was heading.
+
+"A station under the view" is, in order: the station on the card (the map's
+memory of what you were looking at), the selected station, or the nearest
+station to the map's centre — each only if it is within half a patch of the
+centre, so a twin is never built for a pin off the edge of the screen. From
+zoom 14 a station under the view has its ground and imagery fetched ahead
+into the same bounded caches the tab uses, so the hand-over at 17 is a build
+from memory rather than a wait. The switch is in 🗺️ Map display, on by
+default and remembered.
+
+⛰️ 3-D and the twin are one idea at two scales, and neither replaces the
+other: a map camera cannot be put at eye height, and a site twin cannot show
+a 60 km hop. The 3-D view is the network on its terrain — every pin and link,
+the line-of-sight sheets — and the twin is the site. Zoom is the one thing
+that already says which question is being asked, so zoom is the hand-over.
+
+The overlay is a child of the Leaflet container, above the 3-D canvas and
+below the control corners (`#map-twin`, one step above `#map3d`'s window in
+`styles.css`); Leaflet's own drag and wheel are held off under it, for
+`map-3d.js`'s reason, and the station card stays above both. The twin's scene,
+controls and teardown are `digital-twin.js`'s; `map-twin.js` decides *when*
+and gives it a host. **Open the tab →** on the overlay opens the Digital Twin
+tab on the same station, for the settings, the Ground truth panel and the
+`.glb`.
+
+## The radio paths
+
+What joins the station to the rest of the network is drawn from its antenna
+as rays, each named at its end with the far station, the distance and the
+bearing. Two sources, and the first is the one that matters:
+
+- **Inside the Stations map**, the map's own lines — the seam `map-3d.js`
+  reads (`state.mapLines`): the same filters, the same colouring (channel,
+  fade margin or line of sight, whichever is on), the same hidden and culled
+  sets. Nothing is re-derived, so the twin cannot disagree with the map it
+  was opened from. `npm run twin` holds the mirror: one ray per far end, in
+  the colour the map gave the line.
+- **On the Digital Twin tab** there is no map to mirror (leaving the Stations
+  tab takes its lines with it), so the relations themselves are asked — the
+  pass-range and backbone indexes `app.js` draws the lines from, through its
+  own functions — in the plain colours. The notes say which, because "as the
+  map colours them" and "as recorded" are different claims.
+
+A path's far end is beyond the patch almost always, so the ray runs from the
+antenna to the patch's edge along the line of sight to the far antenna (the
+station's `rm_system` antenna height, or the 4 m default, at both ends; the
+far ground from its recorded height or the terrain tiles). Over a hop this
+short the earth's bulge is millimetres and is left out. Vertical exaggeration
+scales the ray's rise with the ground's relief — the clearance it shows over
+the ground is the true clearance at 1× and stretches with the ground above
+that — and the antenna height itself, like the pole, is never scaled. Where
+the antenna is higher than the 2 m pole a thin mast joins them, so the ray
+leaves from somewhere the eye can see. The rays go into the `.glb` as meshes
+named `path to …`.
 
 ## The Ground truth panel
 

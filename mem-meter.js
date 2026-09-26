@@ -51,6 +51,10 @@ const MemMeter = (function () {
     { key: 'maps',      label: 'Leaflet map layers',      color: '--map-line',      releasable: false },
     { key: 'acma',      label: 'ACMA / RF Changes data',  color: '--role-satcom',   releasable: true  },
     { key: 'terrain',   label: 'Terrain tile cache',      color: '--role-base',     releasable: true  },
+    // The Digital Twin's decoded patches — a ground grid and an imagery canvas
+    // each, the canvas 4–16 MB — kept so a station looked at twice costs no
+    // second fetch. Releasable for terrain's reason: the next twin re-fetches.
+    { key: 'twin',      label: 'Digital twin patches',    color: '--accent',        releasable: true  },
     { key: 'arro',      label: 'ARRO Data series',        color: '--role-field',    releasable: true  },
     { key: 'a2',        label: 'ALERT2 capture',          color: '--draw',         releasable: false },
     { key: 'storage',   label: 'localStorage',            color: '--muted',        releasable: false },
@@ -177,6 +181,7 @@ const MemMeter = (function () {
       maps:     maps.bytes,
       acma:     acmaFileBytes(),
       terrain:  Terrain.cached() * TERRAIN_TILE_BYTES,
+      twin:     typeof DigitalTwin !== 'undefined' ? DigitalTwin.cacheBytes() : 0,
       arro:     arroBytes(),
       a2:       (state.a2.text || '').length * 2,
       storage:  localStorageBytes(),
@@ -375,6 +380,7 @@ const MemMeter = (function () {
   function release(key) {
     if (key === 'acma') releaseAcma();
     else if (key === 'terrain') releaseTerrain();
+    else if (key === 'twin' && typeof DigitalTwin !== 'undefined') DigitalTwin.clearCaches();
     else if (key === 'arro') releaseArro();
     render();
     renderPanel();
