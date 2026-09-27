@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-27** (revision 102 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-27** (revision 103 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -498,11 +498,13 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Five AI rows, and six `[Human]` issues.
 >
+> **Revision 103 opens and closes nothing** — it is revision 100's first unfiled step done: `0035` and the `field-photos` bucket are on the live project, applied from an agent session over the Supabase connection at the owner's request and verified there (see the entry at the bottom of the file). The allocation below is unchanged. Of the two person-steps revision 100 left, **one remains — linking a Dropbox folder** — still unfiled.
+>
 > **Revision 102 closes #200 and #202, and opens nothing** — the field photos' pins in the 3-D view and HEIC in the browsers that cannot draw one, picked up together from a session request. The Sonnet5 Med row goes from six to four. #201 is the one of revision 100's three still open, and nothing it shares a file with is in flight any more (sequencing item 10e).
 >
 > **Revision 101 opened #203, and closes nothing** — `[Sonnet5/Med]`, the historical flood peaks into the station record, out of the Digital Twin's flood water shipping from a session request. The twin reads the peaks already; the database has none, because **the HDB extract that would carry them is failing**. So #203 is the first agent row on the board that is *blocked* rather than merely unpicked: nothing in it can start until an extract file exists. The Sonnet5 Med row goes from five to six. The extract itself is not filed — it needs HDB access, and whether to file it as `[Human]` is with the owner.
 >
-> **Revision 100 opened #200, #201 and #202, and closes none of them** — three `[Sonnet5/Med]` follow-ups out of the field photos shipping from a session request: the photo pins in the 3-D view (#200, under EPIC #186), placing a photo by clicking the map (#201) and HEIC in the browsers that cannot draw one (#202). The Sonnet5 Med row goes from two to five. Two steps for a person came out of it as well — apply `0035` and the second bucket to the live project, and link a Dropbox folder — and are **not filed yet**: whether to file them as `[Human]` issues is with the owner, and the first may be done from an agent session over the Supabase connection, as #149 did for `0010`.
+> **Revision 100 opened #200, #201 and #202, and closes none of them** — three `[Sonnet5/Med]` follow-ups out of the field photos shipping from a session request: the photo pins in the 3-D view (#200, under EPIC #186), placing a photo by clicking the map (#201) and HEIC in the browsers that cannot draw one (#202). The Sonnet5 Med row goes from two to five. Two steps for a person came out of it as well — ~~apply `0035` and the second bucket to the live project~~ (**done at revision 103, from an agent session over the Supabase connection, as #149 did for `0010`**) and link a Dropbox folder — and are **not filed yet**: whether to file the second as `[Human]` is with the owner.
 
 > **Revision 99 opened and closed nothing** — it is #198's backfill landing in the data: 2,330 stations gained a modelled AHD height and a new `elevation_source` column saying where it came from, in the file and in the database. The allocation below is unchanged. It leaves one thing for somebody to decide rather than filing it: `station_json` filters on `deleted_at` alone, so `stations_doc()` hands out the two rows the document does not own (`bateson_test`, `elpro_test`). 0022 gave the *importer* a `document_managed` guard and never gave the *view* one. The file now carries them, which is a decision taken here and reversible; teaching the view to filter would stop the app seeing rows 0026's rig work may expect.
 
@@ -641,6 +643,55 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 103 — 2026-09-27: `0035` and the field photos' bucket are live
+
+At the owner's request (asked as "apply migration 0034", which the live
+project already had: schema version 34, and all three of its comments
+matching the file word for word), `0035` and the `field-photos` bucket were
+applied to the live project from an agent session over the Supabase
+connection, the way #149 applied `0010`. Nothing is filed or closed by it.
+
+**How, and why that way.** This container holds no database URL, so `psql -f`
+was not an option and the SQL went through the connector as text. 0035 went
+in as three named parts — the tables (with RLS switched on in the same
+transaction rather than the third, so nothing was readable in the gap), the
+four functions, then the policies, the grants and the version — which is the
+precedent the live history already set (0033 is five parts there). The
+bucket script's own header says it is *not* a migration, so it went as plain
+SQL and is not in the migration history: only its `field-photos` half,
+because the live `inspections` bucket already matched the script exactly —
+private, 25 MB, no MIME list, its four policies — and its closing verdict,
+which checks both buckets and raises on any fault.
+
+**What was checked, rather than assumed.** Before: everything 0035 builds on
+was present live (the attachment vocabulary with JPEG, HEIC, PNG and WebP,
+`station`, `is_editor()`, `actor()`, `touch_updated_at()`, the storage
+schema). After:
+- **the four function bodies are the file's, byte for byte** — the md5 of
+  each live `prosrc` against the same span cut from
+  `db/migrations/0035_field_photos.sql`;
+- schema version 35, which the app has expected since `a1d7cff`;
+- five tables, all with RLS, and exactly the four policies designed —
+  none on the sync cursor, which the security advisor notes as it does
+  `editor_allow` and `ingest_token`, and which is the point;
+- `field_photo` with its 35 columns, 17 checks and 8 indexes;
+- the vocabularies at 2 and 5 rows, and no photos;
+- what each role can do, PUBLIC grants included:
+  - anon: the vocabulary and nothing else;
+  - authenticated: read, narrowed to editors by RLS, and the three doors,
+    which check `is_editor()`; no direct writes and no cursor;
+  - `service_role`: all of it;
+- the bucket private at 25 MB with its four policies;
+- `field_photo_station_for()` filing the two Solocator photos' position under
+  `gatton`, which is where they were taken.
+
+The security advisor raised nothing new. Its two warnings predate this and
+were not touched: `public.rls_auto_enable()` executable over RPC, and
+leaked-password protection off.
+
+**What is left of revision 100's two person-steps: linking a Dropbox folder**
+(`docs/field-photos.md` has every click), still unfiled pending the owner.
 
 ### Revision 102 — 2026-09-27: the photo pins stand on the terrain, and an iPhone's HEIC reads in Chrome
 
