@@ -48,6 +48,15 @@
 //   • Tiles outside the cached footprint 403 the same way. errorTileUrl turns
 //     those into a transparent pixel, so an ocean tile is blank rather than a
 //     broken image.
+//
+// One more measured fact, and the reason there is no `crossOrigin` on the
+// tile layer below even though several other layers in this app set it: this
+// bucket answers plainly, with none of the `Access-Control-Allow-Origin`
+// headers `crossOrigin: 'anonymous'` requires. Nothing here ever reads the
+// tiles' pixels back through a canvas — unlike terrain.js or map-elevation.js,
+// which do and need that header — so the attribute would only ask the browser
+// for a guarantee this bucket never gives, and every tile would fail as a
+// CORS error and render as the blank fallback instead of the coverage it is.
 const ElvisCoverage = (function () {
   // Geoscience Australia / ICSM, via the Elvis front end's own layer config.
   const TILE_URL = 'https://s3-ap-southeast-2.amazonaws.com/fsdf-elevation-tile-cache/DEM/{z}/{x}/{y}.png';
@@ -106,7 +115,6 @@ const ElvisCoverage = (function () {
         maxNativeZoom: MAX_NATIVE_Z,
         errorTileUrl: BLANK,
         attribution: ATTRIBUTION,
-        crossOrigin: 'anonymous',
       }).addTo(map);
       return;
     }
