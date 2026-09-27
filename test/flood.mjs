@@ -403,8 +403,13 @@ async function browserHalf(FS) {
       && up[0].band === null && up[up.length - 1].band === 'aep_0_066_m', J(up.map(x => x.band)));
     ok('the line says what it is doing', /Pause the rise/.test(await text('#twin-flood .twin-flood-play')));
 
-    // Paused: still water, and a still scene draws nothing.
+    // Paused: still water, and a still scene draws nothing. The pause settles
+    // the water and asks for one last frame, which is right; what must not
+    // follow is another. Three animation frames let that one land first (under
+    // SwiftShader it can take longer than the click's own round trip), as
+    // twin.mjs waits before it counts.
     await page.click('#twin-flood .twin-flood-play');
+    await page.evaluate(() => new Promise(r => { let k = 0; const f = () => (++k >= 3 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); }));
     const a = await fl();
     const framesA = await page.evaluate(() => DigitalTwin.debug().frames);
     await page.waitForTimeout(600);
