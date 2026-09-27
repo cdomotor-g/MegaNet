@@ -11,9 +11,10 @@
 // path-profile.js for the physics (pathAnalyse, earthBulge, rmSystemOf,
 // PATH_DEFAULT_*), to map-controls.js for the panel it is opened from, to
 // map-sites.js for what the repeater site finder drew (MapSites.drawn, select,
-// dimOthers, modeChanged), and to app.js for showStationCard and the base-map
-// choice. Every one of those is called from inside this file's own functions,
-// so its position among the modules is free.
+// dimOthers, modeChanged), to map-photos.js for the field photos' pins
+// (MapPhotos.drawn, badgeHtml, conePath, open), and to app.js for
+// showStationCard and the base-map choice. Every one of those is called from
+// inside this file's own functions, so its position among the modules is free.
 //
 // ── Why a second map rather than a 3-D Leaflet ───────────────────────────────
 // Leaflet draws into a 2-D canvas and has no camera: there is no pitch, no
@@ -55,6 +56,14 @@
 // links, pins, the What is here mark and the sheets — and not the base map or
 // the elevation drape, which are the ground the candidates stand on and have
 // sliders of their own, exactly as in 2-D.
+//
+// The field photos' pins are the third thing mirrored, and on the same terms
+// (#200): `MapPhotos.drawn()` is the pins that module put on the 2-D map —
+// after its one query, FieldPhotos.spots() and its merge — and this file reads
+// them into a source (`mn-photos`) and DOM markers of its own. It never asks
+// for a photo. "Photos around here" is the 2-D map's question, and the 2-D map
+// under the canvas follows the camera (see "One view"), so it is asked about
+// the ground the camera is looking at.
 //
 // ── Why the library is fetched rather than listed in index.html ──────────────
 // MapLibre is ~1 MB of WebGL renderer. Leaflet is in index.html because half
@@ -160,6 +169,8 @@ const Map3D = (function () {
                    done: 0, failed: 0, dropped: 0, inView: 0 };
   let buf      = null;   // { pos, clr, count } — the sheet geometry, in mercator
   let sitePins = [];     // the site finder's pins and site marks, as ml.Markers
+  let photoPins = [];    // the field photos' badges: [{ marker, pin }] (syncPhotos)
+  let photoKey  = null;  // what they were last built from, so a pan that finds the same photos rebuilds nothing
   let dimK     = 1;      // MapSites.dimOthers(), as last applied — 1 when idle
   let lfHeld   = [];     // Leaflet's own handlers this file switched off (holdLeaflet)
   let lfMoving = false;  // the 2-D map was moved, and the camera has not followed yet
@@ -528,6 +539,7 @@ const Map3D = (function () {
         .setLngLat([ll.lng, ll.lat]).addTo(map));
     });
     if (refocus) refocus.focus({ preventScroll: true });
+    standOnGround();
   }
 
   function syncSites() {
@@ -535,6 +547,148 @@ const Map3D = (function () {
     const s = map.getSource('mn-sites');
     if (s) s.setData(siteFeatures());
     syncSitePins();
+  }
+
+  // ── The field photos, mirrored (#200) ───────────────────────────────────
+  // A 📷 per spot from zoom 12, signed in, with a cone each way the cameras
+  // faced — whatever MapPhotos drew, where it drew it, and nothing when it drew
+  // nothing. Its three reasons for nothing (signed out, zoomed out, switched
+  // off) are that file's, and so is the note under its switch that says which.
+  //
+  // One 2-D pin is three things here, because the 2-D pin's parts sit in two
+  // different places in the stacking and a DOM marker is above every WebGL
+  // layer whatever it is — the site marks' problem (syncSitePins), met here
+  // by splitting the pin rather than by hiding part of it:
+  //
+  //   * the **dot** on the point, a circle in `mn-photos` under the station
+  //     pins. In 2-D the photos' pane is under the markers' so that a photo
+  //     taken beside a station never covers it, and a photo taken *at* one —
+  //     most of them — has its dot exactly on the station's middle.
+  //   * the **cones**, a symbol per heading in the same source and also under
+  //     the pins, drawn from 2-D's own outline (MapPhotos.conePath) and
+  //     laid in the ground's plane — `icon-rotation-alignment` and
+  //     `icon-pitch-alignment: map` turn each with the bearing and tip it with
+  //     the camera, so it points where that camera pointed from any angle.
+  //     Not draped: a cone is a direction, not an area (#200 asks no more).
+  //   * the **badge** with the count, a DOM marker carrying 2-D's markup
+  //     verbatim, standing up off the point at any pitch so the count reads.
+  //     It stands up and to the right of the point, as in 2-D, so it clears a
+  //     station's pin there. It is the button — a click, Enter or Space opens
+  //     the carousel the 2-D pin opens (MapPhotos.open) and stops there,
+  //     since a click let through would also be MapLibre's (a What is here
+  //     pick) and Leaflet's (the focus clear). A DOM node rather than a
+  //     symbol because it has to be pressed and reached by the keyboard, and a
+  //     symbol is neither: a feature the renderer has to be asked about is
+  //     the pin 2-D had while its photos were under the network's canvas,
+  //     seen and never pressed. It fades where a hill is in front of the spot,
+  //     as the finder's pins do.
+  //
+  // Rebuilt only when what MapPhotos drew changed. It draws again after every
+  // pan that settles, and most of those find the same photos — rebuilding
+  // then would drop the keyboard focus from a badge for no change at all, and
+  // the viewer hands the focus back to the badge that opened it.
+  const PHOTO_CONE = 'mn-photo-cone';
+  const PHOTO_COVERED = 0.35;
+
+  function photoFeatures(pins) {
+    const out = [];
+    for (const g of pins) {
+      out.push({ type: 'Feature', properties: { kind: 'dot', n: g.n },
+                 geometry: { type: 'Point', coordinates: [g.lon, g.lat] } });
+      for (const h of g.cones) {
+        out.push({ type: 'Feature', properties: { kind: 'cone', heading: h },
+                   geometry: { type: 'Point', coordinates: [g.lon, g.lat] } });
+      }
+    }
+    return { type: 'FeatureCollection', features: out };
+  }
+
+  // The cone as an image, once per map: 2-D's own outline and 2-D's own
+  // colours, at the size 2-D draws it (a 40 px box, the point at its middle,
+  // opening north), at twice the pixels so it is not soft on a phone.
+  function addConeImage() {
+    if (!map || map.hasImage(PHOTO_CONE) || typeof MapPhotos === 'undefined' || !MapPhotos.conePath) return;
+    const PX = 2, BOX = 40;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = BOX * PX;
+    const cx = cv.getContext('2d');
+    const path = new Path2D(MapPhotos.conePath);
+    cx.setTransform(PX, 0, 0, PX, BOX * PX / 2, BOX * PX / 2);
+    cx.fillStyle = cssVar('--photo', '#ffc400');
+    cx.globalAlpha = 0.45;
+    cx.fill(path);
+    cx.globalAlpha = 1;
+    cx.strokeStyle = cssVar('--photo-ink', '#3a2a00');
+    cx.lineWidth = 1;
+    cx.stroke(path);
+    map.addImage(PHOTO_CONE, cx.getImageData(0, 0, cv.width, cv.height), { pixelRatio: PX });
+  }
+
+  function syncPhotos() {
+    if (!map || !ready) return;
+    const pins = typeof MapPhotos !== 'undefined' && MapPhotos.drawn ? MapPhotos.drawn() : [];
+    const key = JSON.stringify(pins);
+    if (key === photoKey) return;
+    photoKey = key;
+    const s = map.getSource('mn-photos');
+    if (s) s.setData(photoFeatures(pins));
+    syncPhotoPins(pins);
+  }
+
+  function syncPhotoPins(pins) {
+    const was = document.activeElement && document.activeElement.dataset
+      ? document.activeElement.dataset.mnPhotoId : null;
+    for (const p of photoPins) p.marker.remove();
+    photoPins = [];
+    if (!map || !ml) return;
+    let refocus = null;
+    for (const pin of pins) {
+      const el = document.createElement('div');
+      el.className = 'mn-photo-icon mn-photo-3d';
+      el.innerHTML = `<span class="mn-photo-pin">${MapPhotos.badgeHtml(pin)}</span>`;
+      el.title = pin.title;
+      el.setAttribute('aria-label', pin.title);
+      el.setAttribute('role', 'button');
+      el.tabIndex = 0;
+      el.dataset.mnPhotoId = pin.ids[0];
+      const press = e => { e.stopPropagation(); e.preventDefault(); MapPhotos.open(pin); };
+      el.addEventListener('click', press);
+      el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') press(e); });
+      if (was && was === pin.ids[0]) refocus = el;
+      const marker = new ml.Marker({ element: el, anchor: 'center',
+                                     opacity: String(dimK), opacityWhenCovered: String(PHOTO_COVERED * dimK) })
+        .setLngLat([pin.lon, pin.lat]).addTo(map);
+      if (dimK === 0) el.style.pointerEvents = 'none';
+      photoPins.push({ marker, pin });
+    }
+    if (refocus) refocus.focus({ preventScroll: true });
+    standOnGround();
+  }
+
+  // ── Standing the DOM markers on the ground ──────────────────────────────
+  // A marker is placed on the ground as far as the terrain has loaded when it
+  // is added, and MapLibre places its markers again as tiles land only for the
+  // ones that were there when the terrain was set — its 'terrain' event is
+  // what starts that. Every marker this file makes is added after (style.load
+  // sets the terrain first, and the finder and the photos build theirs again
+  // as they change), so each stood where it was put: at sea level wherever the
+  // tile under it was still on its way — on a hillside, tens of pixels below
+  // its own point — until the camera next moved. Measured on the photos'
+  // badges (npm run photos), and the finder's pins are made the same way. So
+  // both are placed again after each frame until the map has loaded, the
+  // condition MapLibre's own markers wait for, one chain of it at a time.
+  let standing = false;
+  function standOnGround() {
+    if (standing || !map) return;
+    standing = true;
+    const again = () => {
+      if (!map) { standing = false; return; }
+      for (const m of sitePins) m.setLngLat(m.getLngLat());
+      for (const p of photoPins) p.marker.setLngLat(p.marker.getLngLat());
+      if (map.loaded() && !map.isMoving()) { standing = false; return; }
+      map.once('render', again);
+    };
+    again();
   }
 
   // ── everything else, dimmed ─────────────────────────────────────────────
@@ -559,6 +713,17 @@ const Map3D = (function () {
     set('mn-here-ring', 'circle-stroke-opacity', dimK);
     set('mn-here-dot', 'circle-opacity', dimK);
     set('mn-here-dot', 'circle-stroke-opacity', dimK);
+    // The field photos, which in 2-D are a pane of their own above the
+    // slider's floor and so are "everything else" too. At nought a badge is
+    // out of reach as well as out of sight, as the panes are (a transparent
+    // node still takes the click that lands on it).
+    set('mn-photos-dot', 'circle-opacity', dimK);
+    set('mn-photos-dot', 'circle-stroke-opacity', dimK);
+    set('mn-photos-cones', 'icon-opacity', dimK);
+    for (const p of photoPins) {
+      p.marker.setOpacity(String(dimK), String(PHOTO_COVERED * dimK));
+      p.marker.getElement().style.pointerEvents = dimK === 0 ? 'none' : '';
+    }
     map.triggerRepaint();              // the sheets read dimK in their own render
   }
 
@@ -907,6 +1072,10 @@ const Map3D = (function () {
         'mn-stations': { type: 'geojson', data: stationFeatures() },
         'mn-here':     { type: 'geojson', data: hereFeature() },
         'mn-sites':    { type: 'geojson', data: siteFeatures() },
+        // Filled by syncPhotos() once the style has loaded, after the cone's
+        // image is added — a symbol laid out before its image exists is a
+        // console warning and a missing cone.
+        'mn-photos':   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
       },
       layers: [
         { id: 'mn-base', type: 'raster', source: 'mn-base' },
@@ -959,6 +1128,25 @@ const Map3D = (function () {
           paint: { 'circle-radius': ['get', 'r'], 'circle-color': 'rgba(0,0,0,0)',
                    'circle-stroke-color': ['get', 'colour'], 'circle-stroke-width': ['get', 'width'],
                    'circle-stroke-opacity': ['get', 'op'] } },
+        // ── The field photos (#200, syncPhotos) ──────────────────────────
+        // Over the links and under the station pins — 2-D's photo pane sits
+        // at 420, over the network's canvas and under the markers at 600 —
+        // the cones first and the dot on them, as 2-D's markup has it. The
+        // badges are DOM markers over all of it.
+        { id: 'mn-photos-cones', type: 'symbol', source: 'mn-photos',
+          filter: ['==', ['get', 'kind'], 'cone'],
+          layout: { 'icon-image': PHOTO_CONE, 'icon-rotate': ['get', 'heading'],
+                    'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',
+                    'icon-allow-overlap': true, 'icon-ignore-placement': true },
+          paint: { 'icon-opacity-transition': { duration: 0, delay: 0 } } },
+        { id: 'mn-photos-dot', type: 'circle', source: 'mn-photos',
+          filter: ['==', ['get', 'kind'], 'dot'],
+          // 2-D's dot: 8 px across with its 1.5 px ring. MapLibre strokes
+          // outside the radius, so the radius is what is left inside.
+          paint: { 'circle-radius': 2.5, 'circle-color': cssVar('--photo', '#ffc400'),
+                   'circle-stroke-color': cssVar('--photo-ink', '#3a2a00'), 'circle-stroke-width': 1.5,
+                   'circle-opacity-transition':        { duration: 0, delay: 0 },
+                   'circle-stroke-opacity-transition': { duration: 0, delay: 0 } } },
         { id: 'mn-stations', type: 'circle', source: 'mn-stations',
           paint: {
             'circle-color':        ['get', 'fill'],
@@ -1238,6 +1426,10 @@ const Map3D = (function () {
       // markers that the style cannot declare — so they are added here, and
       // the slider's factor is read once the layers it applies to exist.
       syncSites();
+      // The field photos likewise — the 2-D pins are usually there already —
+      // with the cone's image first, since the symbols need it to lay out.
+      addConeImage();
+      syncPhotos();
       applyDim();
       queueSheets();
       setNote();
@@ -1647,6 +1839,12 @@ const Map3D = (function () {
     // The finder's slider moved without anything it drew changing.
     dimChanged() { applyDim(); },
 
+    // MapPhotos drew its pins again, or took them all down (#200): a pan that
+    // settled, a zoom past 12, the switch, signing in or out, a photo added,
+    // moved or removed. Two early returns while 3-D is shut, and nothing
+    // rebuilt when what it drew is what it drew last time.
+    photosChanged() { syncPhotos(); },
+
     // Put the camera back overhead without leaving 3-D — the gesture that gets
     // somebody un-lost after a rotate, and the one thing a tilted map makes
     // genuinely hard to do by hand. Both halves at once; the two corner buttons
@@ -1717,7 +1915,10 @@ const Map3D = (function () {
           <p class="filter-note">The base map is the one 🗺️ Map display has on — the most
             opaque of them, if several are blended — and the
             pins and links are the ones the 2-D map has drawn — the same filters, the same
-            colouring, the same hidden and culled sets.</p>
+            colouring, the same hidden and culled sets. So are the field photos’ 📷 — the
+            ones around the middle of the view, which is where the 2-D map is: it follows
+            the camera, and a photo out towards the horizon is drawn once the camera goes
+            to it.</p>
           <p class="filter-note" id="map-3d-note">${noteHtml()}</p>
         </div>`;
     },
@@ -1746,6 +1947,20 @@ const Map3D = (function () {
       const src = map && map.getSource('mn-sites');
       return { features: siteFeatures(), pins: sitePins.length, dim: dimK,
                source: !!src, drawn: src ? src.serialize().data : null };
+    },
+    // …and the field photos': the badges as the markers stand (where MapLibre
+    // was told each is, and what it opens), and what the dot-and-cone source
+    // holds. Kept out of _mirror() for _sites()' reason.
+    _photos() {
+      const src = map && map.getSource('mn-photos');
+      return {
+        pins: photoPins.map(({ marker, pin }) => {
+          const ll = marker.getLngLat();
+          return { lat: ll.lat, lon: ll.lng, ids: pin.ids.slice(), n: pin.n, cones: pin.cones.slice(),
+                   label: marker.getElement().getAttribute('aria-label') };
+        }),
+        source: !!src, drawn: src ? src.serialize().data : null, image: !!(map && map.hasImage(PHOTO_CONE)),
+      };
     },
     _sheets() { return { rows: sheets.rows.length, done: sheets.done,
                          failed: sheets.failed, dropped: sheets.dropped,
@@ -1806,6 +2021,12 @@ const Map3D = (function () {
     // each also holds listeners on it, so they are taken off first.
     for (const p of sitePins) { try { p.remove(); } catch (_) {} }
     sitePins = [];
+    // The photos' badges likewise; and what they were built from, so the next
+    // map builds its own rather than deciding it has them already.
+    for (const p of photoPins) { try { p.marker.remove(); } catch (_) {} }
+    photoPins = [];
+    photoKey = null;
+    standing = false;   // a chain waiting on this map's next frame waits for ever
     dimK = 1;
     if (map) { try { map.remove(); } catch (_) {} }
     map = null;

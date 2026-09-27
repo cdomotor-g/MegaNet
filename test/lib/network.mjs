@@ -21,6 +21,11 @@
 // Served from the `maplibre-gl` devDependency, pinned to the same 5.24.0
 // map-3d.js asks for. Real MapLibre, real WebGL, no network.
 //
+// three.js (the Digital Twin), Tesseract.js (the field photos' OCR) and
+// libheif-js (their HEIC decoder) are served the same way, each fetched by the
+// app only when it is needed and each from the version the harness vendors —
+// see beside each below.
+//
 // Everything else off-origin is aborted: the Supabase datastore, GitHub raw,
 // Overpass, the basemap tile servers. Three consequences worth stating, because
 // they are the test's behaviour and not accidents:
@@ -88,6 +93,15 @@ function tesseractDirs() {
     core: path.dirname(require.resolve('tesseract.js-core/package.json')),
     lang: path.dirname(require.resolve('@tesseract.js-data/eng/package.json')),
   };
+}
+// And for the field photos' HEIC decoder, libheif-js, on the same terms once
+// more: fetched by field-photos.js on the first HEIC the browser cannot draw
+// (Chromium draws none), from inside a worker it builds from a Blob — the glue
+// by importScripts and the WebAssembly by fetch, which is cross-origin from
+// there and so is answered with CORS as the OCR engine's files are. Only
+// `libheif-wasm/`, the build the app asks for, and only at the version pinned.
+function heifDir() {
+  return path.dirname(require.resolve('libheif-js/package.json'));
 }
 function testPkgVersion(name) {
   const pkg = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
@@ -182,6 +196,23 @@ export async function applyNetworkPolicy(page, origin) {
       const rel = pkg === 'tesseract.js' ? rest.replace(/^dist\//, '') : rest;
       const file = root && path.join(root, path.normalize(rel));
       if (ver === pinned && file && file.startsWith(root + path.sep) && fs.existsSync(file)) {
+        return route.fulfill({
+          status: 200,
+          contentType: CONTENT_TYPE[path.extname(file)] || 'application/octet-stream',
+          headers: { 'Access-Control-Allow-Origin': '*' },
+          body: fs.readFileSync(file),
+        });
+      }
+    }
+
+    // The HEIC decoder: `libheif-wasm/libheif.js` and the `.wasm` beside it.
+    const heif = url.match(/unpkg\.com\/libheif-js@([\d.]+)\/(libheif-wasm\/[^?#]+)/);
+    if (heif) {
+      let root = null;
+      try { root = heifDir(); } catch (_) { root = null; }
+      const [, ver, rest] = heif;
+      const file = root && path.join(root, path.normalize(rest));
+      if (ver === testPkgVersion('libheif-js') && file && file.startsWith(root + path.sep) && fs.existsSync(file)) {
         return route.fulfill({
           status: 200,
           contentType: CONTENT_TYPE[path.extname(file)] || 'application/octet-stream',

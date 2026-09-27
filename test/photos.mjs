@@ -30,22 +30,28 @@
 //   2. The app in Chromium, against a fake project: the Data API answered
 //      from rows this file keeps (the attachment vocabulary parsed out of
 //      0010, as the form checks do), Storage from lib/storage.mjs, and the
-//      OCR engine served off disk by the network policy — real Tesseract, a
-//      real read of the two Solocator photos. Signed out, then in; eight
-//      files dropped in one go (the two photos, one with GPS in its EXIF, the
-//      same photo twice, a HEIC this browser cannot draw, two photos with no
-//      position anywhere, and a text file); the queue checked and a photo
-//      placed by hand; the upload's order, paths and records; the same photo
-//      again, refused before a byte moves — and again in a race, and again
-//      refused by the database, each taking its bytes back down; the library,
-//      its filters and one batch of signed thumbnails; the carousel by
-//      keyboard and by click, a caption, a placing, a removal; linking
-//      Dropbox, PKCE end to end. Then the map: a pin per spot with a cone per
-//      way the camera faced, merged as they would overlap, opening the
-//      carousel. Then the twin (skipped without WebGL): a marker standing on
+//      OCR engine and the HEIC decoder served off disk by the network policy
+//      — real Tesseract, a real read of the two Solocator photos, and real
+//      libheif. Signed out, then in; eight files dropped in one go (the two
+//      photos, one with GPS in its EXIF, the same photo twice, a HEIC with no
+//      picture in it, two photos with no position anywhere, and a text file);
+//      the queue checked and a photo placed by hand; the upload's order,
+//      paths and records; the same photo again, refused before a byte moves —
+//      and again in a race, and again refused by the database, each taking
+//      its bytes back down; the library, its filters and one batch of signed
+//      thumbnails; the carousel by keyboard and by click, a caption, a
+//      placing, a removal; linking Dropbox, PKCE end to end. Then the map: a
+//      pin per spot with a cone per way the camera faced, merged as they
+//      would overlap, opening the carousel — and the same pins tilted into
+//      3-D, standing on the terrain, pressed with a pointer and a key, and
+//      gone for each of the three reasons they go in 2-D (skipped without
+//      WebGL2). Then the twin (skipped without WebGL): a marker standing on
 //      the ground where each spot is, a wedge per view, "In the twin" standing
 //      the camera behind the photographer, the badge clicked, the POV walked
-//      up to it and Enter pressed — and none of it in the .glb.
+//      up to it and Enter pressed — and none of it in the .glb. Last, a real
+//      HEIC, which Chromium cannot draw: decoded by libheif, fetched for it
+//      and for nothing before it, placed from its EXIF and uploaded as a JPEG
+//      whose pixels are the picture, the right way up.
 //
 // What is *not* here: 0035's rules. tools/check_field_photos.sql holds them
 // against a real Postgres, and a JavaScript copy in this fake would be a
@@ -405,9 +411,30 @@ const GPS_JPG = jpegWith(NE, { tiff: tiff({
   exif: [[0x9003, 2, '2026:06:25 09:15:00'], [0x9011, 2, '+10:00'], [0xa405, 3, [26]]],
   gps: gpsEntries({ ...GPS_AT, alt: 96.5, heading: 118.25, accuracy: 3.5, date: '2026:06:24', time: [23, 15, 0] }),
 }) });
-// An iPhone's HEIC, as far as its metadata goes — no picture a browser could
-// draw, which is the point: Chromium draws no HEIC at all.
+// An iPhone's HEIC, as far as its metadata goes — no picture in it at all, so
+// that the decoder Chromium needs is fetched, finds nothing, and says so.
 const HEIC = heicWith({ tiff: exifTiff(), width: 4032, height: 3024 });
+
+// And a real one (#202): 160 × 120, four colours — red, green over blue,
+// yellow — so a picture decoded upside down or mirrored reads as one, with an
+// iPhone's EXIF (big-endian, as Apple writes it) 60 m east of the Gatton
+// gauge, facing 205.5° true, taken at 10:02 AEST. 1.4 kB. Made with
+// pillow-heif 1.8.0 (libheif 1.23.4, x265), the EXIF from lib/exif.mjs:
+//
+//   tiff({ le: false,
+//     ifd0: [[0x010f, 2, 'Apple'], [0x0110, 2, 'iPhone 15'], [0x0112, 3, [1]]],
+//     exif: [[0x9003, 2, '2026:06:25 10:02:00'], [0x9011, 2, '+10:00'], [0xa405, 3, [26]]],
+//     gps: gpsEntries({ lat: -27.5551, lon: 152.2756, alt: 97.5, heading: 205.5,
+//                       accuracy: 4.5, date: '2026:06:25', time: [0, 2, 0] }) })
+//
+//   img = Image.new('RGB', (160, 120)); d = ImageDraw.Draw(img)
+//   d.rectangle([0, 0, 79, 59], fill=(220, 40, 40));   d.rectangle([80, 0, 159, 59], fill=(40, 180, 60))
+//   d.rectangle([0, 60, 79, 119], fill=(40, 80, 220)); d.rectangle([80, 60, 159, 119], fill=(240, 210, 40))
+//   pillow_heif.from_pillow(img).save('IMG_2041.HEIC', quality=80, exif=b'Exif\x00\x00' + tiff)
+const HEIC_REAL = fs.readFileSync(`${FIX}/IMG_2041.HEIC`);
+const HEIC_AT = { lat: -27.5551, lon: 152.2756 };
+const HEIC_QUADS = [['top left', 40, 30, [220, 40, 40]], ['top right', 120, 30, [40, 180, 60]],
+                    ['bottom left', 40, 90, [40, 80, 220]], ['bottom right', 120, 90, [240, 210, 40]]];
 
 const STATIONS = JSON.parse(fs.readFileSync(repo('stations.json'), 'utf8')).stations
   .filter(s => s.lat != null && s.lon != null);
@@ -598,6 +625,11 @@ async function browserHalf() {
 
     const tessRequests = [];
     page.on('request', r => { if (/unpkg\.com\/tesseract\.js@/.test(r.url())) tessRequests.push(r.url()); });
+    // The HEIC decoder is fetched from inside a worker, so it is counted where
+    // the route sees it — registered after the policy, so it is asked first —
+    // and handed on to the policy to be answered.
+    const heifRequests = [];
+    await page.route(/unpkg\.com\/libheif-js@/, route => { heifRequests.push(route.request().url()); return route.fallback(); });
     page.on('pageerror', e => errors.push(e.stack || e.message));
     page.on('console', m => {
       if (m.type() !== 'error') return;
@@ -627,6 +659,7 @@ async function browserHalf() {
       /private to signed-in editors/.test(await text('#fp-add-panel')) && !(await page.$('#fp-files')), await text('#fp-add-panel'));
     ok('…and asks the project for nothing', db.selects.length === 0 && store.uploads.length === 0, `${db.selects.length} select(s)`);
     ok('the OCR engine is not fetched until a photo needs it', tessRequests.length === 0 && !(await page.evaluate(() => !!window.Tesseract)));
+    ok('…nor the HEIC decoder until a HEIC does', heifRequests.length === 0 && !(await page.evaluate(() => !!window.libheif)));
     let audit = await auditHandlers(page);
     ok(`signed out: all ${audit.checked} handler(s) resolve`, audit.unresolved.length === 0, audit.unresolved.map(u => u.path).join(', '));
 
@@ -711,8 +744,8 @@ async function browserHalf() {
         && gps.station && gps.station.id === 'gatton', J(gps));
     ok('the same photo twice in one drop is refused as the same photo, before it is read any further',
       dup && dup.status === 'refused' && /same photo is already in this list/.test(dup.note), dup && dup.note);
-    ok('a HEIC this browser cannot draw is refused, and told how to get a JPEG instead',
-      heic && heic.status === 'refused' && /cannot read HEIC/.test(heic.note) && /Most Compatible/.test(heic.note), heic && heic.note);
+    ok('a HEIC with no picture in it goes to the decoder Chromium needs, which finds none — refused, and said to be damaged',
+      heic && heic.status === 'refused' && /the HEIC could not be decoded — no picture in it could be read; it may be damaged/.test(heic.note), heic && heic.note);
     ok('two photos with nothing in them: the OCR looked, found nothing, and placed neither',
       [p1, p2].every(p => p && p.status === 'ready' && !p.pos && p.ocr && p.ocr.passes >= 1 && /Nothing in the file or on the picture/.test(p.note)),
       J([p1, p2].map(p => p && { s: p.status, pos: p.pos, ocr: p.ocr, note: p.note })));
@@ -724,6 +757,9 @@ async function browserHalf() {
         && /Upload 5 photos/.test(await text('#fp-upload')) && (await page.$$eval('.fp-chip-ocr', e => e.length)) === 2, await text('#fp-upload'));
     ok('the OCR engine arrived only now, every part of it from the version pinned',
       tessRequests.length > 0 && !net.blocked.some(u => /tesseract/.test(u)), `${tessRequests.length} request(s); blocked: ${net.blocked.filter(u => /tesseract/.test(u)).join(', ')}`);
+    ok('…and so did the HEIC decoder — its glue and its WebAssembly, at the version pinned, into a worker and not the page',
+      J(heifRequests) === J(['https://unpkg.com/libheif-js@1.23.2/libheif-wasm/libheif.js', 'https://unpkg.com/libheif-js@1.23.2/libheif-wasm/libheif.wasm'])
+        && !net.blocked.some(u => /libheif/.test(u)) && !(await page.evaluate(() => !!window.libheif)), J(heifRequests));
 
     // ── Placing one by hand ──────────────────────────────────────────────────
     section('Placing one by hand');
@@ -977,11 +1013,11 @@ async function browserHalf() {
     await page.evaluate(id => FieldPhotos.openOne(id), R.sw.id);
     await page.click('#fp-v-details button:has-text("On the map")');
     await page.waitForFunction(() => state.activeTab === 'stations' && !!state.map && typeof MapPhotos !== 'undefined'
-      && MapPhotos._note().kind === 'ok' && MapPhotos._drawn().length === 3, null, { timeout: LOAD_TIMEOUT });
+      && MapPhotos._note().kind === 'ok' && MapPhotos.drawn().length === 3, null, { timeout: LOAD_TIMEOUT });
     const centre = await page.evaluate(() => { const c = state.map.getCenter(); return { lat: c.lat, lon: c.lng, z: state.map.getZoom() }; });
     ok('"On the map" closes the viewer and shows the Stations map on the spot, at zoom 16',
       !(await viewer()) && near(centre.lat, R.sw.lat, 1e-5) && near(centre.lon, R.sw.lon, 1e-5) && centre.z === 16, J(centre));
-    const drawn = await page.evaluate(() => MapPhotos._drawn());
+    const drawn = await page.evaluate(() => MapPhotos.drawn());
     const pair = drawn.find(d => d.n === 2), exifPin = drawn.find(d => d.ids.includes(R.gps.id)), p2pin = drawn.find(d => d.ids.includes(R.p2.id));
     ok('three pins for four photos: the SW and NE photos are one spot', drawn.length === 3 && !!pair && !!exifPin && !!p2pin,
       J(drawn.map(d => ({ n: d.n, cones: d.cones }))));
@@ -1006,13 +1042,22 @@ async function browserHalf() {
     ok('zoomed out past 12 there are no pins, and the note says to zoom in', (await page.$$('.mn-photo-icon')).length === 0
       && /Zoom in/.test(await text('#map-photos-note')));
     await page.evaluate(() => state.map.setZoom(16, { animate: false }));
-    await page.waitForFunction(() => MapPhotos._note().kind === 'ok' && MapPhotos._drawn().length === 3, null, { timeout: LOAD_TIMEOUT });
+    await page.waitForFunction(() => MapPhotos._note().kind === 'ok' && MapPhotos.drawn().length === 3, null, { timeout: LOAD_TIMEOUT });
     await page.evaluate(() => MapPhotos.setEnabled(false));
     ok('switched off: nothing drawn, and remembered', (await page.$$('.mn-photo-icon')).length === 0
       && await page.evaluate(() => localStorage.getItem('mn-field-photos') === 'off' && !document.querySelector('#map-legend .legend-photo')));
     await page.evaluate(() => MapPhotos.setEnabled(true));
-    await page.waitForFunction(() => MapPhotos._drawn().length === 3, null, { timeout: LOAD_TIMEOUT });
+    await page.waitForFunction(() => MapPhotos.drawn().length === 3, null, { timeout: LOAD_TIMEOUT });
     ok('…and back on', true);
+
+    // ── The map, tilted ──────────────────────────────────────────────────────
+    section('The Stations map in 3-D');
+    const gl2 = await page.evaluate(() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch (_) { return false; } });
+    if (!gl2) {
+      console.log('  SKIP — this Chromium has no WebGL2; the 3-D view\'s pins cannot be exercised here.');
+    } else {
+      await tiltedHalf(page, R, db, viewer, text);
+    }
 
     // ── The twin ─────────────────────────────────────────────────────────────
     section('The Digital Twin');
@@ -1037,6 +1082,12 @@ async function browserHalf() {
     await page.waitForFunction(() => MapPhotos._note().kind === 'signed-out', null, { timeout: LOAD_TIMEOUT });
     ok('the map draws no pins for a session that is not signed in', (await page.$$('.mn-photo-icon')).length === 0);
 
+    // ── A real HEIC ──────────────────────────────────────────────────────────
+    // Last, and signed in again, so that the photo it adds is in none of the
+    // counts above.
+    section('A real HEIC, in a browser that cannot draw one');
+    await heicHalf(page, db, store, queue, settledQueue, net);
+
     ok('nothing threw and the console stayed clean', errors.length === 0, errors.slice(0, 4).join(' | '));
     await context.close();
   } finally {
@@ -1047,6 +1098,203 @@ async function browserHalf() {
 
 // A position within `tol` degrees (2e-7 is 2 cm).
 function at2(p, lat, lon, tol = 2e-7) { return !!p && near(p.lat, lat, tol) && near(p.lon, lon, tol); }
+
+// A HEIC as an iPhone makes one, dropped on Chromium, which draws none
+// (#202). Everything after the pixels is the path a HEIC Safari drew takes —
+// so what is asserted is that the pixels are the picture (sampled out of the
+// JPEG that went up, the four colours in their four corners) and that
+// everything the file says still reaches the record: the position and
+// heading from its EXIF, its hash as it arrived, what it was converted from.
+async function heicHalf(page, db, store, queue, settledQueue, net) {
+  await page.evaluate(() => { dbSetAccessToken('test-token'); FieldPhotos.authChanged(); switchTab('photos'); });
+  await page.waitForFunction(() => !!document.getElementById('fp-files'), null, { timeout: LOAD_TIMEOUT });
+  await page.evaluate(() => FieldPhotos.clearFinished());
+  const uploads0 = store.uploads.length;
+  await page.setInputFiles('#fp-files', [{ name: 'IMG_2041.HEIC', mimeType: 'image/heic', buffer: HEIC_REAL }]);
+  await settledQueue();
+  let one = (await queue()).find(i => i.name === 'IMG_2041.HEIC');
+  ok('read: decoded by libheif, the picture\'s own 160 × 120, and a thumbnail made from it',
+    one && one.status === 'ready' && one.decoder === 'libheif' && one.width === 160 && one.height === 120 && one.thumb, J(one));
+  const station = nearestStation(HEIC_AT);
+  ok('…placed from its EXIF, 205.5° true, 10:02 AEST — the OCR not asked — and filed under the nearest station',
+    one && one.pos && one.pos.placement === 'exif' && at2(one.pos, HEIC_AT.lat, HEIC_AT.lon, 1e-7) && one.pos.accuracy === 4.5
+      && one.heading && one.heading.deg === 205.5 && one.taken && one.taken.iso === '2026-06-25T00:02:00.000Z' && !one.ocr
+      && one.station && station && one.station.id === station.id, J(one && { pos: one.pos, h: one.heading, t: one.taken, st: one.station }));
+  ok('…its hash the HEIC\'s, as it arrived; to be stored as a JPEG', one && one.sha === sha256(HEIC_REAL) && one.converted
+    && one.contentType === 'image/jpeg' && one.ext === 'jpg', J(one && { sha: one.sha, c: one.converted, t: one.contentType }));
+
+  await page.click('#fp-upload');
+  await settledQueue();
+  one = (await queue()).find(i => i.name === 'IMG_2041.HEIC');
+  const add = db.calls.filter(c => c.fn === 'add_field_photo').pop();
+  const p = add && add.body.p_photo;
+  const up = store.uploads.slice(uploads0);
+  const obj = p && up.find(u => u.path === p.storage_path);
+  ok('uploaded: a .jpg object that is a JPEG, image/jpeg, and its thumbnail beside it',
+    one && one.status === 'done' && p && /\.jpg$/.test(p.storage_path) && p.content_type === 'image/jpeg' && obj
+      && obj.contentType === 'image/jpeg' && obj.data.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))
+      && p.byte_size === obj.bytes && up.some(u => u.path === p.thumb_path), J({ one: one && one.status, p: p && { path: p.storage_path, type: p.content_type }, up: up.map(u => u.path) }));
+  ok('…the record: the HEIC\'s hash, where and which way, 160 × 120, and what it was converted from',
+    p && p.sha256 === sha256(HEIC_REAL) && p.placement === 'exif' && p.lat === HEIC_AT.lat && p.lon === HEIC_AT.lon && p.heading_deg === 205.5
+      && p.width === 160 && p.height === 120 && p.meta.converted && p.meta.converted.from === 'image/heic'
+      && p.meta.converted.bytes === HEIC_REAL.length && p.meta.file.format === 'heic' && p.meta.camera.make === 'Apple', J(p));
+  const px = obj ? await page.evaluate(async ({ b64, quads }) => {
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/jpeg' }));
+    const c = document.createElement('canvas');
+    c.width = bmp.width; c.height = bmp.height;
+    const x = c.getContext('2d');
+    x.drawImage(bmp, 0, 0);
+    return { w: bmp.width, h: bmp.height, at: quads.map(([, qx, qy]) => Array.from(x.getImageData(qx, qy, 1, 1).data.slice(0, 3))) };
+  }, { b64: obj.data.toString('base64'), quads: HEIC_QUADS }) : null;
+  const off = px ? HEIC_QUADS.map(([name, , , want], i) => ({ name, want, got: px.at[i] }))
+    .filter(q => q.got.some((v, k) => Math.abs(v - q.want[k]) > 24)) : null;
+  ok('the JPEG is the picture, the right way up: red and green over blue and yellow, to a JPEG\'s rounding',
+    px && px.w === 160 && px.h === 120 && off.length === 0, J(px && { w: px.w, h: px.h, off }));
+  ok('nothing from the decoder\'s host was refused, then or since', !net.blocked.some(u => /libheif/.test(u)),
+    net.blocked.filter(u => /libheif/.test(u)).join(', '));
+}
+
+// The same pins with the map tilted (#200). What is under test is the seam
+// the 3-D view is built on — it draws what MapPhotos drew and asks for
+// nothing — and the one thing the 2-D pins had to learn the hard way: a pin
+// that is on screen can be pressed. So the badges are found where MapLibre
+// puts them, clicked with a real pointer and pressed with a real key, and the
+// three reasons for no pins are each met with the map tilted.
+async function tiltedHalf(page, R, db, viewer, text) {
+  const photos3 = () => page.evaluate(() => Map3D._photos());
+  const idle = () => page.waitForFunction(() => { const m = Map3D._map(); return !!m && !m.isMoving() && m.areTilesLoaded(); },
+    null, { timeout: BUILD_TIMEOUT }).catch(() => {});
+  const byFirst = list => Object.fromEntries(list.map(p => [p.ids[0], p]));
+
+  const selects0 = db.selects.length;
+  await page.locator('.mn-map-3d').click();
+  await page.waitForFunction(() => typeof Map3D !== 'undefined' && !!Map3D._map() && Map3D._map().isStyleLoaded()
+    && !!Map3D._map().getTerrain() && Map3D._photos().pins.length === 3, null, { timeout: BUILD_TIMEOUT });
+  await page.waitForTimeout(600);
+  await idle();
+
+  let P = await photos3();
+  const flat = await page.evaluate(() => MapPhotos.drawn());
+  const want = byFirst(flat), got = byFirst(P.pins);
+  const same = flat.every(d => { const g = got[d.ids[0]]; return g && g.lat === d.lat && g.lon === d.lon && J(g.ids) === J(d.ids) && g.n === d.n && J(g.cones) === J(d.cones); });
+  ok('tilted, a badge for each of the three pins 2-D drew — at the same point, opening the same photos, facing the same ways',
+    P.pins.length === 3 && same, J(P.pins.map(p => ({ n: p.n, lat: p.lat, lon: p.lon }))));
+  const pair3 = P.pins.find(p => p.n === 2), exif3 = P.pins.find(p => p.ids.includes(R.gps.id)), p2_3 = P.pins.find(p => p.ids.includes(R.p2.id));
+  ok('…the SW/NE spot where the first of them was taken, the EXIF photo where its GPS put it, the one placed by hand where it was placed',
+    pair3 && at2(pair3, R.ne.lat, R.ne.lon, 1e-9) && exif3 && at2(exif3, R.gps.lat, R.gps.lon, 1e-9) && p2_3 && at2(p2_3, R.p2.lat, R.p2.lon, 1e-9),
+    J({ pair3, exif3, p2_3 }));
+  ok('…named as the 2-D pins are', pair3 && pair3.label === '2 field photos taken here, facing 46° and 242° — open them'
+    && Object.values(want).every(d => got[d.ids[0]] && got[d.ids[0]].label === d.title), pair3 && pair3.label);
+  ok('entering 3-D asked the project for nothing — the pins are read off the 2-D layer, not fetched again',
+    db.selects.length === selects0, `${db.selects.length - selects0} more select(s)`);
+
+  const feats = (P.drawn && P.drawn.features) || [];
+  const dots = feats.filter(f => f.properties.kind === 'dot'), cones = feats.filter(f => f.properties.kind === 'cone');
+  const at = (f, p) => f.geometry.coordinates[0] === p.lon && f.geometry.coordinates[1] === p.lat;
+  ok('a dot on each point, in the renderer\'s own source', P.source && dots.length === 3 && flat.every(d => dots.some(f => at(f, d))),
+    J(dots.map(f => f.geometry.coordinates)));
+  const conesAt = p => cones.filter(f => at(f, p)).map(f => f.properties.heading).sort((a, b) => a - b);
+  ok('…and a cone each way a camera faced — 46° and 242° at the pair, 118.25° at the EXIF photo, none at the one placed by hand',
+    J(conesAt(pair3)) === J([46, 242]) && J(conesAt(exif3)) === J([118.25]) && conesAt(p2_3).length === 0 && cones.length === 3 && P.image,
+    J(cones.map(f => [f.geometry.coordinates, f.properties.heading])));
+  const style = await page.evaluate(() => {
+    const m = Map3D._map(), ids = m.getStyle().layers.map(l => l.id);
+    return { ids, rot: m.getLayoutProperty('mn-photos-cones', 'icon-rotation-alignment'),
+             pitch: m.getLayoutProperty('mn-photos-cones', 'icon-pitch-alignment'),
+             rotate: m.getLayoutProperty('mn-photos-cones', 'icon-rotate') };
+  });
+  const ix = id => style.ids.indexOf(id);
+  ok('the dots and cones are over the links and under the station pins, as 2-D\'s photo pane is',
+    ix('mn-photos-cones') > ix('mn-links') && ix('mn-photos-dot') > ix('mn-photos-cones') && ix('mn-photos-dot') < ix('mn-stations'),
+    style.ids.join(', '));
+  ok('…the cones laid in the ground\'s plane, turned by heading from north',
+    style.rot === 'map' && style.pitch === 'map' && J(style.rotate) === J(['get', 'heading']), J(style));
+
+  // Where the badge is on screen, against where MapLibre puts its point: the
+  // badge stands up and to the right of it, 4 px each way, as in 2-D.
+  const seen = await page.evaluate(() => {
+    const m = Map3D._map(), c = m.getCanvas().getBoundingClientRect();
+    return [...document.querySelectorAll('#map3d .mn-photo-3d')].map(el => {
+      const pin = Map3D._photos().pins.find(p => p.ids[0] === el.dataset.mnPhotoId);
+      const b = el.querySelector('.mn-photo-badge').getBoundingClientRect();
+      const pt = m.project([pin.lon, pin.lat]);
+      const x = b.left + b.width / 2, y = b.top + b.height / 2;
+      const hit = document.elementFromPoint(x, y);
+      return { id: el.dataset.mnPhotoId, dx: b.left - (c.left + pt.x), dy: (c.top + pt.y) - b.bottom,
+               x, y, mine: !!(hit && el.contains(hit)), n: el.querySelector('.mn-photo-badge b').textContent,
+               role: el.getAttribute('role'), tab: el.tabIndex };
+    });
+  });
+  ok('each badge stands just up and right of its point on the terrain, as MapLibre projects it',
+    seen.length === 3 && seen.every(s => near(s.dx, 4, 1.5) && near(s.dy, 4, 1.5)), J(seen.map(s => ({ dx: s.dx, dy: s.dy }))));
+  ok('…carries the count, is a button in the tab order, and is what is under the pointer at its own middle',
+    seen.every(s => s.role === 'button' && s.tab === 0 && s.mine) && seen.map(s => s.n).sort().join() === '1,1,2', J(seen));
+
+  // A real pointer on the pair's badge.
+  const pairSeen = seen.find(s => s.id === pair3.ids[0]);
+  await page.evaluate(() => {
+    window.__lfClicks = 0; window.__mlClicks = 0;
+    state.map.on('click', () => window.__lfClicks++);
+    Map3D._map().on('click', () => window.__mlClicks++);
+  });
+  await page.mouse.click(pairSeen.x, pairSeen.y);
+  let v = await viewer();
+  const leaked = await page.evaluate(() => ({ lf: window.__lfClicks, ml: window.__mlClicks, here: MapHere.point() }));
+  ok('a click on the pair\'s badge opens the carousel over the two photos taken there, as the 2-D pin does',
+    v && v.ids.length === 2 && v.ids.includes(R.sw.id) && v.ids.includes(R.ne.id) && /2 photos taken here — photo 1 of 2/.test(await text('#fp-v-title')),
+    `${J(v)} ${await text('#fp-v-title')}`);
+  ok('…answered by the badge alone — not the 3-D map, not the 2-D map under it', leaked.lf === 0 && leaked.ml === 0 && leaked.here === null, J(leaked));
+  await page.keyboard.press('Escape');
+
+  // And the keyboard: Enter on the badge, then Escape back to it.
+  await page.evaluate(id => document.querySelector(`#map3d .mn-photo-3d[data-mn-photo-id="${id}"]`).focus(), exif3.ids[0]);
+  await page.keyboard.press('Enter');
+  v = await viewer();
+  ok('Enter on a focused badge opens its photos', v && v.ids.length === 1 && v.ids[0] === R.gps.id, J(v));
+  await page.keyboard.press('Escape');
+  ok('…and Escape hands the focus back to that badge', await page.evaluate(id => document.activeElement
+    && document.activeElement.dataset.mnPhotoId === id, exif3.ids[0]));
+
+  // The three reasons for no pins, each met tilted: zoomed out, switched off,
+  // signed out — and the note under 🗺️ Map display's switch saying which.
+  const none3 = async () => {
+    const p = await photos3();
+    return p.pins.length === 0 && p.drawn && p.drawn.features.length === 0
+      && (await page.$$('#map3d .mn-photo-3d')).length === 0;
+  };
+  const back3 = () => page.waitForFunction(() => MapPhotos._note().kind === 'ok' && Map3D._photos().pins.length === 3,
+    null, { timeout: BUILD_TIMEOUT });
+  const zoom0 = await page.evaluate(() => Map3D._map().getZoom());
+  await page.evaluate(() => Map3D._map().jumpTo({ zoom: 10 }));
+  await page.waitForFunction(() => MapPhotos._note().kind === 'zoom', null, { timeout: LOAD_TIMEOUT });
+  ok('the camera pulled back past 12 (the 2-D map under it at 11): no pins, and the note says to zoom in',
+    await none3() && /Zoom in/.test(await text('#map-photos-note')), await text('#map-photos-note'));
+  await page.evaluate(z => Map3D._map().jumpTo({ zoom: z }), zoom0);
+  await back3();
+  ok('…brought back in, they are back', true);
+
+  await page.evaluate(() => MapPhotos.setEnabled(false));
+  ok('switched off: none tilted either, and the note is the switch\'s own', await none3()
+    && /A 📷 where each field photo was taken/.test(await text('#map-photos-note')), await text('#map-photos-note'));
+  await page.evaluate(() => MapPhotos.setEnabled(true));
+  await back3();
+
+  await page.evaluate(() => { dbSetAccessToken(null); FieldPhotos.authChanged(); });
+  await page.waitForFunction(() => MapPhotos._note().kind === 'signed-out', null, { timeout: LOAD_TIMEOUT });
+  ok('signed out: no pins in 3-D, and the note says to sign in', await none3() && /sign in/.test(await text('#map-photos-note')),
+    await text('#map-photos-note'));
+  await page.evaluate(() => { dbSetAccessToken('test-token'); FieldPhotos.authChanged(); });
+  await back3();
+  ok('…signed back in, they come back', true);
+
+  await page.locator('.mn-map-3d').click();
+  await page.waitForFunction(() => !Map3D._map(), null, { timeout: BUILD_TIMEOUT });
+  const gone = await page.evaluate(() => ({ markers: document.querySelectorAll('.maplibregl-marker').length,
+                                           pins: Map3D._photos().pins.length, flat: document.querySelectorAll('.mn-photo-icon').length }));
+  ok('leaving 3-D takes its badges with it, and leaves the 2-D pins', gone.markers === 0 && gone.pins === 0 && gone.flat === 3, J(gone));
+}
+
 
 async function twinHalf(page, R, db, viewer, text) {
   const settled = () => page.waitForFunction(() => DigitalTwin.debug().built && !DigitalTwin.debug().status.endsWith('…')

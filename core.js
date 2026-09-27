@@ -1325,7 +1325,8 @@ const HELP = {
            + 'Each is filed under the nearest station within a kilometre. Then they are wherever that '
            + 'ground is drawn: a 📷 marker in the <strong>Digital Twin</strong> where the photo was '
            + 'taken, pointing the way the camera faced — click it, or walk up to it in the POV and '
-           + 'press Enter — and a pin on the Stations map. Every door opens the same viewer: ← → '
+           + 'press Enter — and a pin on the Stations map, standing on the terrain when the map is '
+           + 'tilted into 3-D. Every door opens the same viewer: ← → '
            + 'through the photos taken at that spot, with when, where, which way and how each was known.',
     watch: [
       '<strong>Nothing is uploaded until you press Upload.</strong> A position read off a picture is '
@@ -1338,6 +1339,10 @@ const HELP = {
       'The OCR engine (~7 MB, Tesseract) is fetched only for a photo with no GPS in it, once a '
       + 'session. A photo sent through Messages, a chat app or an email has usually lost its GPS and '
       + 'kept the overlay, which is exactly the case it is for.',
+      '<strong>HEIC</strong>, an iPhone\'s own format, is stored as a JPEG, so every browser can show '
+      + 'it. Safari converts it itself; Chrome and Firefox cannot draw one, so for the first HEIC of a '
+      + 'session a decoder (~0.5 MB, libheif) is fetched to do it instead. Nothing else changes — the '
+      + 'position, time and heading still come from the file.',
       '<strong>Editors only</strong>: the pictures, and where they were taken, are in a private '
       + 'bucket and shown through links that expire. A site photo shows its access, its padlock and '
       + 'often a colleague, and its coordinates are as much a disclosure as its pixels.',

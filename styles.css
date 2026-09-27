@@ -12810,7 +12810,12 @@ code {
   pointer-events: none;
 }
 .mn-photo-cone path { fill: var(--photo); fill-opacity: .45; stroke: var(--photo-ink); stroke-width: 1; }
-.leaflet-marker-icon.mn-photo-icon:focus-visible .mn-photo-badge {
+/* The pin's wrapper takes the focus — Leaflet's marker in 2-D, Map3D's DOM
+   marker in 3-D (#200), where the badge is the whole of the button and the dot
+   and cones are drawn by the renderer under the station pins — and it is zero
+   sized on purpose, its origin being the coordinate. So the ring goes on the
+   badge, as .mn-site-icon's goes on its mark. */
+.mn-photo-icon:focus-visible .mn-photo-badge {
   outline: var(--focus-width) solid var(--focus);
   outline-offset: var(--focus-offset);
 }

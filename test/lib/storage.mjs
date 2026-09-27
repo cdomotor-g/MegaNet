@@ -24,7 +24,7 @@
 /** A fresh recorder. Pass the same one to installStorage() and attachmentRpc(). */
 export function storageStore() {
   return {
-    uploads: [],   // { path, contentType, bytes } in the order they were sent
+    uploads: [],   // { path, bucket, contentType, bytes, data } in the order they were sent
     signed: [],    // paths a signed URL was asked for
     removed: [],   // paths deleted from the bucket
     rows: [],      // the index, as meganet.attachment rows
@@ -76,11 +76,15 @@ export function installStorage(page, store) {
     // POST /object/<bucket>/<path> — the bytes.
     if (req.method() === 'POST' && after.startsWith('object/')) {
       const path = after.replace(/^object\/[^/]+\//, '');
+      // The bytes themselves as well as how many — a check converting a photo
+      // on the way up (a HEIC to a JPEG) asks what the object actually is.
+      const data = req.postDataBuffer() || Buffer.alloc(0);
       store.uploads.push({
         path,
         bucket: after.split('/')[1],
         contentType: req.headers()['content-type'] || '',
-        bytes: (req.postDataBuffer() || Buffer.alloc(0)).length,
+        bytes: data.length,
+        data,
       });
       return json(200, { Key: after });
     }

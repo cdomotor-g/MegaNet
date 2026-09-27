@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-27** (revision 101 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-27** (revision 102 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -233,11 +233,13 @@ Six per-tab issues are about to restyle nineteen tabs in parallel. The decisions
 The 3-D view shipped at `d7509fc` mirrors exactly two things off the Stations map — `state.mapLines` and `state.mapMarkers` — which is precisely what was asked for and deliberately the whole of what it does. Everything else the map can draw is **absent when it is tilted**, and a layer that is on in 2-D and silently gone in 3-D is what this epic closes.
 - **#187** `[Sub-issue of #186]` `[Sonnet5/Med]` — **OPEN** — ACMA transmitters (drawn into `state.acma.*`, which the mirror does not see) and the Draw & measure shapes. The trap is the circle, and #183 already paid for it once: **a circle is round on the sphere, not on the screen**, so a MapLibre `circle` layer draws a 25 km ring of the wrong ground radius almost everywhere. Emit the KML exporter's own 72-vertex `destPoint` walk.
 - **#188** `[Sub-issue of #186]` `[Opus5/High]` — **OPEN** — polar radio coverage draped on the relief, which is the payoff layer of the epic: coverage running up a valley and stopping at a ridge, with the ridge visible. Must keep `npm run terrain`'s re-banding property — a new threshold re-colours the computed plot **without fetching a single extra terrain tile**.
-- **#200** `[Sub-issue of #186]` `[Sonnet5/Med]` — **OPEN, opened revision 100** — the Stations map's field photo pins (`map-photos.js`: a 📷 per spot from zoom 12, a cone per way the camera faced, editors only), which vanish when the map is tilted. Out of the field photos shipping at revision 100. **The epic's rule applies unchanged**: the spots are what the 2-D layer already fetched and grouped (`MapPhotos` holds them; `FieldPhotos.spots()` is the one grouping rule) — no second query, no second grouping. And a lesson the 2-D pins paid for first: they were drawn under the network's full-map canvas and could be seen and never pressed, so whatever draws them in 3-D has to be asserted with a real click.
+- ~~**#200**~~ `[Sub-issue of #186]` `[Sonnet5/Med]` — **CLOSED at revision 102** — the Stations map's field photo pins, standing on the terrain when the map is tilted. **The epic's rule held without exception**: `MapPhotos.drawn()` (the `_drawn()` seam, promoted and documented) is the only thing the 3-D view reads — no second query, no second grouping, and the three reasons for no pins (signed out, below 12, switched off) are the 2-D module's, with its note saying which. One 2-D pin became three things in 3-D, because a DOM marker is above every WebGL layer: the dot and the cones in a `mn-photos` source **under `mn-stations`** (so a photo taken at a station still never covers it — the 2-D pane order's promise), the cones laid in the ground's plane by `icon-rotation-alignment`/`icon-pitch-alignment: map`, and the count as a **DOM badge** — the button, reached by Tab and pressed by Enter, asserted with a real pointer. It found a bug worth knowing before #187 and #188 add markers of their own: see the note below.
 
 > **The rule every child inherits, and the reason the parent is worth having at all.** The 3-D view is correct because it does not re-derive: it reads the lines and pins the 2-D map has already drawn, so the filters, the hidden and culled sets, the colouring and the focus dim are whatever `refreshMapLayers()` just decided. **The first child that computes its own answer is the first place the two modes can disagree with nothing to say which is right.** Where a 2-D module holds its geometry privately, have that module expose it rather than writing a second copy here — the same move #118 made when a reader tab asked another tab for a model instead of reaching into its renderers.
 
-> **Sequencing.** All three are independent of each other and depend on nothing but the shipped view. They do collide in one file (`map-3d.js`), so they are constraint 2 work: **one at a time**, not in parallel. **#200 (revision 100) joins them on the same terms**: independent of the other two, the same file, so one at a time.
+> **Sequencing.** All three are independent of each other and depend on nothing but the shipped view. They do collide in one file (`map-3d.js`), so they are constraint 2 work: **one at a time**, not in parallel. ~~**#200 (revision 100) joins them on the same terms**~~ — **done at revision 102**, so #187 and #188 are the two left, still one at a time.
+
+> **What #200 changed in `map-3d.js` that #187 and #188 should read first.** (1) **A MapLibre marker added after `setTerrain()` stands at sea level until the camera next moves** — MapLibre re-seats markers as DEM tiles land only for the ones that existed when its `'terrain'` event fired, and `style.load` sets the terrain before anything adds a marker. Measured, not supposed: two of three photo badges were 6 and 56 px below their points on a hillside. `standOnGround()` now re-places every DOM marker this file makes (the photos' badges, **and the site finder's pins, which are added the same way and so stood on the same sea level — `npm run sites` clicks each pin wherever it is drawn, so nothing could see it**) after each frame until the map has loaded. Any child adding DOM markers calls it. (2) `applyDim()` now reaches the photo layers and badges too — a child adding layers of "everything else" adds them there. (3) The click chain is untouched: the badges are DOM and stop their own click, so the order stays pins → links → What is here.
 
 > **`map-3d.js` moved under both children at revision 98.** #196 made the radio paths clickable there — `linkFeatures()` now carries the pair each line joins, and the click handler hit-tests `mn-links` with a 5 px box between the pins and the What-is-here pick. Two things in it are worth reading before either child is picked up rather than rediscovering. **A point query does not hit a line:** measured at the middle of a field link at 60° of pitch, `queryRenderedFeatures([x, y])` returns 0 features and the same call with a 5 px box returns 1, so any new clickable *line* layer needs `LINK_HIT_PX`, and #187's Draw & measure shapes are exactly that. And **the handler's order is now load-bearing** — pins, then links, then the pick — so a child adding a third clickable layer is choosing where it sits in that chain, not just adding a listener.
 
@@ -394,7 +396,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## Standalone issues
 - **#203** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 101, blocked** — historical flood peaks into the station record. The twin's flood water (revision 101) already reads them as `flood_peaks` on the station — `[{ date, height_m }]` on the gauge through an AHD zero, or `[{ date, level_m_ahd }]` — a ring on the staff each, the rise up to the highest, never colouring the water, and `npm run flood` holds that contract. What is missing is the data: a table, an importer in `tools/ingest/` and `stations_doc()` emitting the field, `0033` being the pattern for all three. **Blocked on the HDB extract that carries the peaks, which is failing** — the owner's, since it needs HDB access. Writing `stations.json` alone is undone within a week (revision 99); the field has to come out of the database.
-- **#202** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 100** — HEIC photos in Chrome and Firefox. iPhones save HEIC; Safari converts on upload and the Dropbox sync decodes it in Node, but the Field Photos tab in any other browser cannot draw one and refuses it with how to get a JPEG instead. A WebAssembly decoder loaded only for a HEIC, pinned and served from the harness at that version exactly as the OCR engine is.
+- ~~**#202**~~ `[Standalone]` `[Sonnet5/Med]` — **CLOSED at revision 102** — HEIC photos in Chrome and Firefox. `libheif-js` **1.23.2** — the version the Dropbox sync's `heic-decode` already resolves to, so both doors decode with the same libheif — as its WebAssembly build (29 kB of glue + 469 kB gzipped, against 698 kB for the base64 bundle; LGPL-3.0, loaded separately and unmodified), fetched from unpkg on the first HEIC the browser cannot draw and **run in a worker let go after a quiet minute**, the OCR engine's terms. A worker rather than the page because a phone photo's decode is a heap of a couple of hundred MB that WebAssembly never hands back. The check drops a real 1.4 kB HEIC (made with pillow-heif; the recipe is in the check) and decodes the JPEG that went up to find the picture's four colours in its four corners.
 - **#201** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 100** — place a field photo by clicking the map: *Pick on the map* from the place editor, and a photo's own pin dragged to move it, the way a station's is. The database needs nothing — `update_field_photo()` already takes a move and re-files an unplaced photo by distance.
 - **#190** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 93** — MapLibre 5.24.0 is the last UMD build, and the 3-D view pins it. **6.x ships ESM only**, so a plain `<script src>` cannot load it and the app is on a branch that stops getting fixes at a moment nobody picks. High not for the diff but for the decision: this is the first real pressure on the classic-script contract #129 argued for at length. Four options are on the issue; `await import(url)` inside a classic script looks right — it needs no bundler and `map-3d.js` already loads the library lazily from its own function, which is exactly where it would go — and it wants checking rather than assuming, in particular what `file://` does with a module script. **Gates nothing; gated by nothing.**
 - **#189** `[Standalone]` `[Haiku4.5/Low]` — **OPEN, opened revision 93** — the 2-D OpenStreetMap base asks for `{s}.tile.openstreetmap.org`, and the OSMF tile policy asks for exactly `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, adding that other hostnames "may be slower or withdrawn without notice". Works today; documented as something that may stop working, which on a base map means tiles that quietly stop arriving. The 3-D view already uses the bare host and says in a comment that the 2-D layer was left alone rather than changed in passing — this is that change. `OSM-Topo` is **not** in scope: OpenTopoMap publishes the `{a,b,c}` form itself.
@@ -496,6 +498,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Five AI rows, and six `[Human]` issues.
 >
+> **Revision 102 closes #200 and #202, and opens nothing** — the field photos' pins in the 3-D view and HEIC in the browsers that cannot draw one, picked up together from a session request. The Sonnet5 Med row goes from six to four. #201 is the one of revision 100's three still open, and nothing it shares a file with is in flight any more (sequencing item 10e).
+>
 > **Revision 101 opened #203, and closes nothing** — `[Sonnet5/Med]`, the historical flood peaks into the station record, out of the Digital Twin's flood water shipping from a session request. The twin reads the peaks already; the database has none, because **the HDB extract that would carry them is failing**. So #203 is the first agent row on the board that is *blocked* rather than merely unpicked: nothing in it can start until an extract file exists. The Sonnet5 Med row goes from five to six. The extract itself is not filed — it needs HDB access, and whether to file it as `[Human]` is with the owner.
 >
 > **Revision 100 opened #200, #201 and #202, and closes none of them** — three `[Sonnet5/Med]` follow-ups out of the field photos shipping from a session request: the photo pins in the 3-D view (#200, under EPIC #186), placing a photo by clicking the map (#201) and HEIC in the browsers that cannot draw one (#202). The Sonnet5 Med row goes from two to five. Two steps for a person came out of it as well — apply `0035` and the second bucket to the live project, and link a Dropbox folder — and are **not filed yet**: whether to file them as `[Human]` issues is with the owner, and the first may be done from an agent session over the Supabase connection, as #149 did for `0010`.
@@ -533,7 +537,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Sonnet5
 | Effort | Issues |
 |---|---|
-| Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters and drawings in 3-D) · **#200** (field photo pins in 3-D) · **#201** (place a field photo on the map) · **#202** (HEIC in Chrome and Firefox) · **#203** (historical flood peaks into the station record — *blocked on the HDB extract*) |
+| Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters and drawings in 3-D) · **#201** (place a field photo on the map) · **#203** (historical flood peaks into the station record — *blocked on the HDB extract*) |
 
 ### AI agent — Haiku4.5
 | Effort | Issues |
@@ -600,7 +604,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 10. ~~#99 (doc bug fix) has no blockers — ready to pick up now.~~ — **done at `30cf03b`.** It gated nothing on the board, so nothing else moved.
 10. #66 (CORS check) has no blockers — ready now; gates only future/unfiled ARRO API work.
 10d. **#186's children (#187, #188), #189 and #190 have no blockers and gate nothing** — all four fell out of the 3-D view shipping at `d7509fc` and none of them is in front of anything. The one real sequencing note is negative and is constraint 2's: **#187 and #188 both edit `map-3d.js`, so they run one at a time.** #189 is a one-line change in `map-controls.js` and collides with neither. #190 is a decision rather than a change and should be made *before* either child grows the file further, because the answer could move which build the module loads.
-10e. **#200, #201 and #202 have no blockers and gate nothing** — all three fell out of the field photos shipping at revision 100. Constraint 2 decides the order and nothing else does: **#200 edits `map-3d.js`, so it queues behind or ahead of #187 and #188, one at a time**; #201 and #202 both edit `field-photos.js` (and #201 `map-photos.js`, which #200 also touches for its accessor), so each of those pairs is one at a time too. #202 is the only one of the three with a third-party choice in it — which decoder, at what size and under what licence — and is the natural one to pick up first.
+10e. ~~**#200, #201 and #202 have no blockers and gate nothing**~~ — **#200 and #202 are done at revision 102, taken together in one session and one at a time within it, as constraint 2 asked.** #201 is what is left, and it has the files it shares to itself now: `field-photos.js` (which #202 grew a HEIC decoder in, beside the queue — nowhere near the place editor) and `map-photos.js` (where #200 promoted `drawn()` and exposed the pin's parts as `badgeHtml()`, `conePath` and `open()` — **#201's second half, a photo's pin dragged to move it, is a 2-D drag; once the move lands the 3-D badge follows by itself**, since it is rebuilt from `drawn()` whenever that changes).
 10f. **#203 is blocked, and not by anything on this board**: it waits on the HDB extract of historical flood peaks, which is failing and needs a person with HDB access. It gates nothing — the twin's flood water ships without peaks and draws them the day the field arrives. When the extract works, #203 is a migration (`0036` or whatever is next), so it takes the next number at the time it is picked up, and it touches `stations_doc()`, which every station migration restates — one at a time with any other migration in flight.
 10c. #145 (apply `0009`, create the bucket) has no blockers — ready now. **It gates nothing on this board**, which is worth stating plainly so it is not mistaken for a blocker on #116/#117/#123/#126: those four were unblocked by the *migration being written*, not by it being applied, and all four are code and schema-design work that can proceed against the file. What is actually waiting on it is the Export tab reading green, `tools/check_inspections.sql` being runnable against the real database, and — for Part B only — #116 being able to upload a photo at the end of a form.
 10. ~~**#115 (inspection schema) is the widest gate in the repo**~~ — **done at `68baffc`.** It was the widest gate and it is discharged: #116, #117, #123 and #126 are unblocked in one go, which makes four of the board's five next-pickable items come out of one epic. What it leaves behind is a constraint rather than a dependency — the record tables are editors-only, so #118 and #128 render behind sign-in.
@@ -628,15 +632,80 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## Priority (as stated on each epic/issue, where given)
 - **P2:** ~~#100 (epic) → #102/#103~~ — **the whole epic is closed**; ~~#152 (epic) → #153/#154/#155~~ — **that epic is closed too, at revision 55**; ~~#78 (epic) → #115/#116/#117/#149/#146/#148/#118~~ — **EPIC #78 is closed out; every child of it is shut**; ~~#122 (epic) → #123/#124/#125/#126/#159/#128/#127~~ — **the whole epic is closed**; ~~#129 (epic) → #130/#132/#133/#134/#135~~ — **all closed**
-- **P3:** ~~#118~~ — **closed**; ~~#119 (epic) → #120/#121~~ — **all closed**; ~~#150~~, ~~#162~~, ~~#163~~, ~~#151~~, ~~#159~~, ~~#161~~, ~~#128~~, ~~#127~~ — **all closed**; #200, as a child of EPIC #186 (P3)
+- **P3:** ~~#118~~ — **closed**; ~~#119 (epic) → #120/#121~~ — **all closed**; ~~#150~~, ~~#162~~, ~~#163~~, ~~#151~~, ~~#159~~, ~~#161~~, ~~#128~~, ~~#127~~ — **all closed**; ~~#200~~, as a child of EPIC #186 (P3) — **closed at revision 102**
 - **Unrated:** ~~#160~~ — **closed at revision 47** (sequencing item 23).
 - **P4:** #66
-- Unprioritised until reviewed: #203 (the flood peaks — blocked on the HDB extract, so its priority is the extract's); #201 and #202 (the field photos' two follow-ups — the feature works without either, and each closes a way in that today ends in "type the coordinates" or "use Safari"); #166 (the ELPRO trial — ~~#167~~ closed, so what is left is a credential, a card and a phone call; worth doing before it is worth a P-number, because the whole 115E-2 question stays theoretical until one unit publishes); #156 (a decision menu, not work — it gates nothing); #158 (three dashboard settings — it gates nothing either, but it is the only thing standing between a non-`@bom.gov.au` address and a working sign-in, so it is worth doing before it is worth prioritising)
+- Unprioritised until reviewed: #203 (the flood peaks — blocked on the HDB extract, so its priority is the extract's); #201 (the field photos' follow-up — the feature works without it, and it closes a way in that today ends in "type the coordinates"; ~~#202~~, the other, which ended in "use Safari", **closed at revision 102**); #166 (the ELPRO trial — ~~#167~~ closed, so what is left is a credential, a card and a phone call; worth doing before it is worth a P-number, because the whole 115E-2 question stays theoretical until one unit publishes); #156 (a decision menu, not work — it gates nothing); #158 (three dashboard settings — it gates nothing either, but it is the only thing standing between a non-`@bom.gov.au` address and a working sign-in, so it is worth doing before it is worth prioritising)
 - Unstated on ~~#101~~ (**closed**) /#107 and their children — ~~#108~~, ~~#109~~, ~~#137~~, ~~#141~~ and ~~#138~~ **closed** — and on ~~#99~~ (**closed**) — treat as normal priority, sequenced by the dependency chain above. The near-term-regardless-of-P-number pairing (#130 and #131, two live crashes) is now **both closed**.
 
 ---
 
 ## What changed
+
+### Revision 102 — 2026-09-27: the photo pins stand on the terrain, and an iPhone's HEIC reads in Chrome
+
+From a session request: pick up #200 and #202. Both closed in one push; they
+share `map-photos.js` and `field-photos.js` with nothing else in flight, and
+were done one after the other.
+
+**#200 — the pins in the 3-D view.** The epic's rule, to the letter: the 3-D
+view reads `MapPhotos.drawn()` — the `_drawn()` seam, promoted and documented —
+and asks for no photo of its own, so the query, `FieldPhotos.spots()` and the
+merge happen once, and the three reasons for no pins (signed out, below 12,
+switched off) are the 2-D module's, with its note saying which. The 2-D map
+under the canvas follows the camera, so "zoomed out" means the camera. What
+did take a decision is that **one 2-D pin is three things in 3-D**: a DOM
+marker is above every WebGL layer whatever it is, and a photo taken at a
+station — most of them — has its dot on the station's middle. So the dot and
+the cones are a `mn-photos` source *under* `mn-stations` (the 2-D pane
+order's promise that a photo never covers a station, kept), the cones drawn
+from 2-D's own outline and laid in the ground's plane, and only the count is
+a DOM badge — the button, because it has to be pressed and reached by Tab, and
+a symbol is neither.
+
+**It found a bug the 3-D view has had since its pins were DOM markers.** A
+MapLibre marker added after `setTerrain()` stands at sea level until the
+camera next moves: MapLibre re-seats markers as terrain tiles land only for
+the ones that existed when its `'terrain'` event fired, and `style.load` sets
+the terrain before anything adds a marker. The new check measured two of the
+three photo badges 6 and 56 px below their points on the fixture's hills. The
+site finder's pins are added the same way, so they stood on the same sea level
+— which `npm run sites` could not see, since it clicks each pin wherever it is
+drawn. `standOnGround()` re-places both after each frame until the map has
+loaded.
+
+**#202 — HEIC in Chrome and Firefox.** `libheif-js` 1.23.2, the version the
+Dropbox sync's `heic-decode` already resolves to, so a HEIC is decoded by the
+same libheif whichever door it comes in by. Its WebAssembly build rather than
+the bundle (29 kB of glue and 469 kB gzipped, against 698 kB with the same
+WebAssembly as base64), LGPL-3.0 and loaded separately and unmodified. On the
+OCR engine's terms — fetched on the first HEIC the browser cannot draw, never
+for a session without one, pinned, from unpkg — and, like the OCR engine, **in
+a worker let go after a quiet minute**: a phone photo's decode is a second or
+two and a heap of a couple of hundred MB that WebAssembly never hands back.
+That build compiles its WebAssembly synchronously and cannot find it from a
+Blob worker (it looks beside the script, a `blob:` URL), so the worker fetches
+it and hands it over. It draws the primary image, turned and mirrored as the
+container says, and from there it is a HEIC Safari drew. A decoder that cannot
+be fetched and a file with no picture in it are refused in different words.
+
+The checks: `npm run photos` goes from 189 to 218 assertions. The 3-D half
+presses the pair's badge with a real pointer and asserts the click went no
+further, presses another with Enter and gets the focus back from Escape, and
+meets each reason for no pins tilted. The HEIC half: the metadata-only HEIC
+the first drop always carried now goes to the decoder and is refused as
+damaged, the decoder is asserted absent until then, and a real 1.4 kB HEIC
+(`test/fixtures/photos/IMG_2041.HEIC`, made with pillow-heif, the recipe
+beside it in the check) is read, placed from its EXIF and uploaded as a JPEG
+that is decoded again and found to be the picture — four colours in their
+four corners, the right way up. Six deliberate breaks each went red on the
+assertion meant for it: the badges left where they were put (the bug above,
+before its fix), a badge click let through, a switch that did not tell 3-D,
+the decoder fetched at load, the picture handed back upside down, and a
+version the harness does not serve. `test/lib/storage.mjs` keeps the bytes of
+what went up now, not only their count.
+
+**Closed: #200 and #202. Opened: nothing.** EPIC #186 is down to #187 and #188.
 
 ### Revision 101 — 2026-09-27: the twin floods — a station's levels as water over its ground, rising, in the colours of the levels it passes
 

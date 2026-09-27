@@ -57,13 +57,20 @@ database by hash first and sends nothing: *Already in MegaNet — added by …
 on …*, with *Show it*. If two people race, the database's own unique index
 refuses the second and the objects it sent are taken down again.
 
-**HEIC.** Safari draws HEIC and converts it to a JPEG before it goes up — a
-photo stored as something Chrome cannot show is a photo half the crew cannot
-see. Chrome and Firefox cannot draw one at all, and say so with the fix: on an
-iPhone, *Settings → Camera → Formats → Most Compatible* saves JPEGs; or use
-Safari; or put the HEICs in the Dropbox folder, where the sync converts them.
-The hash is always of the file as it arrived, so the same HEIC dropped twice
-is still one photo.
+**HEIC.** A HEIC is converted to a JPEG before it goes up — a photo stored as
+something Chrome cannot show is a photo half the crew cannot see. Safari draws
+HEIC and converts it itself. Chrome and Firefox cannot draw one at all, so for
+the first HEIC of a session the tab fetches a decoder — libheif built to
+WebAssembly (`libheif-js` 1.23.2 from unpkg, about half a megabyte, LGPL-3.0),
+run in a worker and let go after a quiet minute — and from the picture on it is
+the same as in Safari: the thumbnail, the OCR if the file has no position, the
+JPEG. It draws the file's primary image, turned and mirrored as the HEIC says,
+which is how every HEIC reader goes. A session with no HEIC never fetches it.
+If it cannot be fetched (offline, or a network that blocks unpkg) the photo is
+refused with that reason and the other ways round it: on an iPhone,
+*Settings → Camera → Formats → Most Compatible* saves JPEGs; or put the HEICs in
+the Dropbox folder, where the sync converts them. The hash is always of the file
+as it arrived, so the same HEIC dropped twice is still one photo.
 
 ### From Dropbox, on their own
 
@@ -227,6 +234,16 @@ The pins sit over the network's canvas and under the station pins: over the
 canvas because a full-map `<canvas>` takes every click that lands on it, under
 the pins because a photo taken beside a station must never cover the station.
 
+**Tilted (⛰️), the same pins stand on the terrain** — the dot on the point and
+the cones laid flat on the ground, both still under the station pins, and the
+badge standing up off the point so the count reads at any angle. Click the
+badge, or Tab to it and press Enter, for the same carousel. The 3-D view draws
+what this layer drew and asks for no photo of its own, so the same three things
+leave it empty — signed out, zoomed out past 12, the switch off — and the same
+note says which. They are the photos around the middle of the view: the flat
+map under the 3-D one follows the camera, so a photo out towards the horizon is
+drawn once the camera goes to it.
+
 ### In the Digital Twin
 
 Where somebody stood with a camera, drawn where they stood: a post at chest
@@ -370,8 +387,9 @@ Each run (`tools/field-photos/sync.mjs`, one Node process on a GitHub runner):
    imported photo is not imported twice, and **a photo removed from MegaNet is
    never brought back** (its tombstone keeps the Dropbox file id).
 4. **Each photo left**: downloaded; read by `photo-meta.js` exactly as the tab
-   reads one (a HEIC decoded and converted to JPEG here, which the browser
-   cannot do); skipped if the same bytes are already in MegaNet (somebody
+   reads one (a HEIC decoded and converted to JPEG here, by the same libheif
+   the tab fetches in a browser that cannot draw one); skipped if the same
+   bytes are already in MegaNet (somebody
    dropped it in by hand); the photo and a thumbnail uploaded; indexed through
    `meganet.add_field_photo()`, which files it under the nearest station and
    refuses what it must — a refused photo's objects are taken down again.
@@ -417,7 +435,7 @@ the migration, like 0010's.
 
 | Host | For | Notes |
 |---|---|---|
-| `unpkg.com` | the OCR engine, once a session, only for a photo with no GPS | already allowed for Leaflet, MapLibre and three.js |
+| `unpkg.com` | the OCR engine, once a session, only for a photo with no GPS; the HEIC decoder, once a session, only for a HEIC the browser cannot draw | already allowed for Leaflet, MapLibre and three.js |
 | `*.supabase.co` (or the `/api/db` proxy) | the rows, the bucket, the signed links | already allowed |
 | `www.dropbox.com`, `api.dropboxapi.com` | linking Dropbox, once, from the tab | only for whoever sets it up; the sync itself runs on GitHub |
 
@@ -425,11 +443,14 @@ the migration, like 0010's.
 
 - **`npm run photos`** (test/) — `photo-meta.js` under Node against photos
   built byte by byte and the overlay formats above, then the app in Chromium
-  against a fake project with the real OCR engine: eight files dropped at once
-  and read, one placed by hand, the upload's order and records, the same photo
-  refused three ways with its bytes taken back down, the library, the
-  carousel by keyboard, Dropbox's PKCE link end to end, the map's pins and
-  cones, and the twin's markers on the ground, clicked and walked up to.
+  against a fake project with the real OCR engine and the real HEIC decoder:
+  eight files dropped at once and read, one placed by hand, the upload's order
+  and records, the same photo refused three ways with its bytes taken back
+  down, the library, the carousel by keyboard, Dropbox's PKCE link end to end,
+  the map's pins and cones, the same pins tilted into 3-D and pressed there,
+  the twin's markers on the ground, clicked and walked up to — and a real HEIC,
+  which Chromium cannot draw, decoded, placed from its EXIF and uploaded as a
+  JPEG whose pixels are the picture.
 - **`tools/check_field_photos.sql`** — 0035's own rules against a real
   Postgres: the path and type rules, one live photo per hash, one row per
   Dropbox file, the nearest station and when it is picked again, who may read

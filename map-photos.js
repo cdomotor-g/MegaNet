@@ -6,9 +6,11 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state` and esc; across to field-photos.js for
-// FieldPhotos (the photos, the spots they fall into, and the viewer), and to
-// app.js for rerenderMapLegend. All of it from inside its own functions, so
-// this file's position among the modules is free.
+// FieldPhotos (the photos, the spots they fall into, and the viewer), to
+// app.js for rerenderMapLegend, and to map-3d.js for Map3D, which draws these
+// pins again on the terrain and is told when they change (photosChanged). All
+// of it from inside its own functions, so this file's position among the
+// modules is free.
 //
 // ── Why the map as well as the twin ──────────────────────────────────────────
 // The twin is one station's patch — 200 m to 1.6 km — and a photo taken
@@ -34,6 +36,15 @@
 // beside a station does not hide under the station's pin or hide it. A cone
 // for every way the cameras faced from there — two photos taken a few seconds
 // apart, up the reach and down it, are one pin with two cones — up to six.
+//
+// ── In 3-D (#200) ────────────────────────────────────────────────────────────
+// The tilted map draws these same pins and asks for nothing itself: drawn()
+// is what this file put on the map, after the query, FieldPhotos.spots() and
+// the merge, and map-3d.js stands that on the terrain — #186's rule, that the
+// first thing to work its own answer out is the first place the two modes can
+// disagree. So the three reasons for no pins (signed out, zoomed out, switched
+// off) are this file's in both modes, and so is the note that says which: the
+// 2-D map under the canvas follows the camera, so its zoom is the camera's.
 const MapPhotos = (function () {
   // Its own pane, over the network's canvas (the overlay pane, 400) and the
   // arrows (405), under the station pins (markerPane, 600). Over the canvas
@@ -50,16 +61,25 @@ const MapPhotos = (function () {
   const CONE_DEG    = 12;      // headings closer than this are one cone
 
   let map = null, layer = null, timer = null, seq = 0;
-  let drawn = [];              // [{ lat, lon, ids, n, heading }]
+  let drawn = [];              // [{ lat, lon, ids, n, cones, title }]
   let note = { kind: 'off', n: 0, spots: 0, error: '' };
 
   function signedIn() { return typeof FieldPhotos !== 'undefined' && FieldPhotos.signedIn(); }
   // `isFinite(null)` is true; a photo with no heading has no cone, not a north one.
   function known(v) { return v !== null && v !== undefined && v !== '' && isFinite(v); }
 
+  // Whatever is drawn changed, so the 3-D view draws it again. Asked for by
+  // `typeof` because map-3d.js loads after this file; two early returns there
+  // while 3-D is shut, which is almost always.
+  function tell3d() {
+    if (typeof Map3D !== 'undefined' && Map3D.photosChanged) Map3D.photosChanged();
+  }
+
   function clear() {
     if (layer) { layer.remove(); layer = null; }
+    const had = drawn.length > 0;
     drawn = [];
+    if (had) tell3d();
   }
 
   function setNote(kind, extra = {}) {
@@ -94,16 +114,27 @@ const MapPhotos = (function () {
     return out;
   }
 
+  // The pin's markup, in its parts: a cone per heading, the dot on the point
+  // and the badge with the count. One pin here; the 3-D view lays the cones on
+  // the ground, puts the dot under the station pins and stands the badge up
+  // (map-3d.js says why they are apart there), and they are these same parts.
+  //
+  // Each cone's turn is a custom property rather than an inline transform —
+  // the design system's rule (#109): a token reaching the element, not a
+  // decision no stylesheet can see.
+  const CONE_PATH = 'M0 0 L-9 -18 A20 20 0 0 1 9 -18 Z';
+  const DOT_HTML  = '<i class="mn-photo-dot" aria-hidden="true"></i>';
+  function coneHtml(h) {
+    return `<svg class="mn-photo-cone" style="--rot:${h.toFixed(1)}deg" viewBox="-20 -20 40 40" aria-hidden="true"><path d="${CONE_PATH}"/></svg>`;
+  }
+  function badgeHtml(g) {
+    return `<span class="mn-photo-badge"><span aria-hidden="true">📷</span><b>${g.n}</b></span>`;
+  }
+
   function icon(g) {
-    // Each cone's turn is a custom property rather than an inline transform —
-    // the design system's rule (#109): a token reaching the element, not a
-    // decision no stylesheet can see.
-    const cone = g.cones.map(h =>
-      `<svg class="mn-photo-cone" style="--rot:${h.toFixed(1)}deg" viewBox="-20 -20 40 40" aria-hidden="true"><path d="M0 0 L-9 -18 A20 20 0 0 1 9 -18 Z"/></svg>`).join('');
     return L.divIcon({
       className: 'mn-photo-icon',
-      html: `<span class="mn-photo-pin">${cone}<i class="mn-photo-dot" aria-hidden="true"></i>`
-          + `<span class="mn-photo-badge"><span aria-hidden="true">📷</span><b>${g.n}</b></span></span>`,
+      html: `<span class="mn-photo-pin">${g.cones.map(coneHtml).join('')}${DOT_HTML}${badgeHtml(g)}</span>`,
       iconSize: [0, 0],
       iconAnchor: [0, 0],
     });
@@ -114,21 +145,26 @@ const MapPhotos = (function () {
     return `${g.n} field photo${g.n === 1 ? '' : 's'} taken here${facing} — open ${g.n === 1 ? 'it' : 'them'}`;
   }
 
+  // What pressing a pin does, in either mode: the carousel over the photos
+  // taken there, from the first.
+  function open(g) {
+    if (typeof FieldPhotos === 'undefined' || !g || !g.ids || !g.ids.length) return;
+    FieldPhotos.openSpot(g.ids, g.ids[0], `${g.n} photo${g.n === 1 ? '' : 's'} taken here`);
+  }
+
   function draw(groups) {
     if (layer) layer.remove();
     layer = L.layerGroup([], { pane: PANE });
     for (const g of groups) {
       L.marker([g.lat, g.lon], { icon: icon(g), pane: PANE, keyboard: true, riseOnHover: true,
                                  title: titleOf(g), alt: titleOf(g), bubblingMouseEvents: false })
-        .on('click', () => {
-          if (typeof FieldPhotos !== 'undefined') {
-            FieldPhotos.openSpot(g.ids, g.ids[0], `${g.n} photo${g.n === 1 ? '' : 's'} taken here`);
-          }
-        })
+        .on('click', () => open(g))
         .addTo(layer);
     }
     layer.addTo(map);
-    drawn = groups.map(g => ({ lat: g.lat, lon: g.lon, ids: g.ids.slice(), n: g.n, cones: g.cones.slice() }));
+    drawn = groups.map(g => ({ lat: g.lat, lon: g.lon, ids: g.ids.slice(), n: g.n, cones: g.cones.slice(),
+                               title: titleOf(g) }));
+    tell3d();
   }
 
   function run() {
@@ -216,8 +252,25 @@ const MapPhotos = (function () {
       if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
     },
 
+    // What is drawn: a pin each, after the merge — where it stands, the
+    // photos it opens, how many, each way the cameras faced from there (at
+    // most six, to CONE_DEG), and its name. Copies, so nothing reading them
+    // can move a pin. Empty whenever there are no pins: signed out, below
+    // MIN_ZOOM, switched off, a query that failed.
+    //
+    // The 3-D view's source for the photos (#200) — and deliberately its only
+    // one: it reads these rather than asking FieldPhotos for the rows again or
+    // grouping them itself, so there is one query, one grouping rule
+    // (FieldPhotos.spots) and one merge, and the tilted map shows what this
+    // file decided. photosChanged() tells it when to read them again.
+    drawn: () => drawn.map(d => ({ ...d, ids: d.ids.slice(), cones: d.cones.slice() })),
+    // The parts of a pin the 3-D view draws the same pin from: the badge, and
+    // the cone's outline (a path in the SVG's 40-unit box, the point at its
+    // middle, opening north).
+    badgeHtml,
+    conePath: CONE_PATH,
+    open,
     // Read by the check and by nothing else.
-    _drawn: () => drawn.map(d => ({ ...d, ids: d.ids.slice() })),
     _note: () => ({ ...note }),
   };
 })();

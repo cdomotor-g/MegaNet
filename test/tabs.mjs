@@ -464,7 +464,7 @@ const SEED_PHOTOS = `async () => {
       heading: { deg: 242, ref: 'T' }, taken: { local: '2026-06-24T12:26:08', zone: 'printed' },
       station: { id: 'gatton', auto: true, m: 117 }, editing: true },
     { key: 't2', name: 'IMG_1188.HEIC', size: 2400000, status: 'refused',
-      note: 'Refused — this browser cannot read HEIC photos.' },
+      note: 'Refused — the HEIC could not be decoded — no picture in it could be read; it may be damaged or cut short.' },
   ];
   FieldPhotos.authChanged();
   await new Promise(res => {

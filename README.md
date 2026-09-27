@@ -3689,7 +3689,8 @@ a 📷 marker standing on the ground in the **Digital Twin** where the
 photographer stood — a post at chest height, the camera turned the way it
 faced, a wedge for each way a photo from there looked — clicked, or walked up
 to in the POV and opened with Enter; a pin with a cone per direction on the
-**Stations map**; and the **Field Photos** tab under *Site visits*, where they
+**Stations map**, flat or tilted into 3-D, where it stands on the terrain; and
+the **Field Photos** tab under *Site visits*, where they
 come in. Every one of those opens one viewer: a carousel over the photos taken
 at that spot, ← → through them, with when, where, which way and how each was
 known.
@@ -3705,7 +3706,9 @@ a photo that has been through Messages or a chat app still has when its EXIF
 has gone. Readings are voted: a position is *high* confidence only when two
 readings agree. The nearest station within a kilometre is picked, a 480 px
 thumbnail made, and nothing goes up until somebody has looked at the list and
-pressed Upload; a photo nothing could place still goes, into *Unplaced*.
+pressed Upload; a photo nothing could place still goes, into *Unplaced*. A HEIC
+goes up as a JPEG: Safari converts it, and Chrome and Firefox, which cannot
+draw one, fetch a WebAssembly libheif for the first HEIC of a session to do it.
 
 **Or on their own, from Dropbox**: a scheduled workflow
 (`.github/workflows/field-photos-dropbox.yml`) reads the linked folder every
@@ -3722,7 +3725,8 @@ removed here is never brought back by the sync.
 
 `docs/field-photos.md` has the order a position is looked for in, the formats
 the overlay parser reads, the time zones, the setup, and how the sync runs.
-`npm run photos` holds the reader, the tab, the map and the twin;
+`npm run photos` holds the reader, the tab, the map (flat and tilted), the
+twin and the HEIC decoder;
 `tools/check_field_photos.sql` holds 0035.
 
 ---
@@ -4070,7 +4074,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |
 | `npm run linkbudget` | the link budget card's two ends. Each is found by name, station number, ALERT address or address window — asserted against what the *Stations filter itself* returns for the same term, so the claim is that the card runs the shared matcher rather than a second copy of the rules. Then: the box keeping its caret through a paste, an end armed and filled from a pin click and from a row of the Stations list in its filtered state without selecting it, the three Clear buttons, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute — the same station at both ends, a zero-length path, a term nobody supplied, and a frequency box that cannot say whether it holds an override. Every one of those is a clean console |
 | `npm run twin` | the Digital Twin tab against a world the check makes — the State's elevation service answered with a tiled float GeoTIFF of a closed-form surface, so every mesh vertex is arithmetic: the request box grown by half a sample with the aspect snap switched off, each vertex at the surface's height at its own latitude and longitude, the Type 3 pole with its foot at the origin, the 1.75 m figure with its feet on the ground where it stands, exaggeration scaling the relief alone, the station as built (pole or tower from the record, the kit inside by telemetry, the door on approach, the ladder climbed and the deck at the top), the room (what the twin sends, a visitor played in through a fake Realtime server and drawn, walked, pointing, gone; the pointer's laser), the notes folded on a phone, the horizon (its innermost square the patch's edge vertex for vertex, each far vertex on its sheet's height at its own place less the Earth's curve, the far shell drawn first, the switch, the tiles gone), the `.glb` read back out of the binary with the horizon left out, each fallback by breaking one host, walk mode at eye height, and the renderer torn down with the tab |
-| `npm run photos` | a field photo read, placed, uploaded and shown — the reader against photos built byte by byte and the overlay parser against what field camera apps print and what OCR makes of it, then the app signed in against a fake project with the real OCR engine: eight files dropped at once, the upload's order and records, the same photo refused three ways with its bytes taken back down, the carousel by keyboard, Dropbox's PKCE link, the map's pins clicked with a real pointer and the twin's markers on the ground. Smoke sees a tab that says "sign in" |
+| `npm run photos` | a field photo read, placed, uploaded and shown — the reader against photos built byte by byte and the overlay parser against what field camera apps print and what OCR makes of it, then the app signed in against a fake project with the real OCR engine and the real HEIC decoder: eight files dropped at once, the upload's order and records, the same photo refused three ways with its bytes taken back down, the carousel by keyboard, Dropbox's PKCE link, the map's pins clicked with a real pointer — flat, and tilted into 3-D — the twin's markers on the ground, and a real HEIC, which Chromium cannot draw, decoded and uploaded as a JPEG that is the picture. Smoke sees a tab that says "sign in" |
 | `npm run flood` | the twin's flood water where the river would put it, in the colours of the levels it passes — the ladder, colours and cycle under Node against real station records (a class on an assumed-datum zero named and not drawn, a colour that never goes back from magenta to red past a major class set above the 1% AEP), then Gatton's levels stood on a valley the check makes: the channel wet at moderate, the floodplain at major, the hollow behind a bank dry until its crest is overtopped; every level passed in order in its colour; each frame of the rise where the cycle says for the moment it was drawn; the pause from the line and the pill, hiding it, the Stations map's line and on a phone its pill, reduced motion, and nothing of it in the `.glb` |
 
 The smoke test serves the repo on loopback, blocks every off-origin request

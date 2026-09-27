@@ -42,10 +42,12 @@
 // hand, by coordinates or at a station.
 //
 // Bytes first, then the row, and a refused row takes its bytes down again —
-// attachments.js's order and its reason. A HEIC is converted to JPEG where the
-// browser can draw it (Safari), because a photo stored as something Chrome
-// cannot show is a photo half the crew cannot see; the hash is of the file as it
-// arrived, so dropping the same HEIC again is still the same photo.
+// attachments.js's order and its reason. A HEIC is converted to JPEG, because a
+// photo stored as something Chrome cannot show is a photo half the crew cannot
+// see: drawn by the browser where the browser can (Safari), and by libheif,
+// fetched for the purpose, where it cannot (Chrome, Firefox — see "A HEIC the
+// browser cannot draw"). The hash is of the file as it arrived, so dropping the
+// same HEIC again is still the same photo.
 //
 // ── Who may see them ─────────────────────────────────────────────────────────
 //
@@ -265,6 +267,143 @@ const FieldPhotos = (function () {
   }
   function isHeic(file, format) {
     return format === 'heic' || /image\/hei[cf]/i.test(file.type || '') || /^(heic|heif)$/.test(extensionOf(file.name));
+  }
+
+  // ── A HEIC the browser cannot draw (#202) ──────────────────────────────────
+  // iPhones save HEIC. Safari draws one and so goes the ordinary way; Chrome
+  // and Firefox draw none, on any platform — and photos copied off an iPhone
+  // onto a Windows PC and dropped into Chrome is exactly how a crew meets one.
+  // Its position was never the problem (PhotoMeta.read needs no pixels); the
+  // thumbnail, the OCR and the JPEG it is stored as all need the picture.
+  //
+  // So the picture comes from libheif — the decoder the Dropbox sync's
+  // heic-decode wraps, as WebAssembly — on the OCR engine's terms: fetched on
+  // the first HEIC the browser cannot draw and never for a session without
+  // one, from unpkg (the host the Bureau's filter allows for Leaflet), pinned,
+  // and run in a worker that is let go after a quiet minute. A worker because
+  // a phone photo's decode is a second or two of work and a heap of a couple
+  // of hundred MB that WebAssembly never hands back; in a worker the tab stays
+  // live while it runs and the memory goes when the worker does.
+  //
+  // The build is libheif-js's WebAssembly one: 29 kB of glue and 469 kB of
+  // WebAssembly, gzipped, against 698 kB for the bundle that carries the same
+  // WebAssembly as base64 — and the pure-JavaScript build is slower still.
+  // LGPL-3.0, which is fine for a library loaded separately and unmodified.
+  // That build compiles its WebAssembly synchronously and cannot fetch it
+  // for itself from a Blob worker (it looks beside the script, which is a
+  // blob: URL), so the worker fetches it and hands it over as `wasmBinary`.
+  //
+  // It decodes the primary image — the one Safari would draw — with the
+  // container's rotation and mirroring applied, to RGBA; the worker sends the
+  // pixels back and they become an ImageBitmap, and from there it is a HEIC
+  // Safari drew. The version is the one tools/field-photos' lockfile resolves
+  // heic-decode's libheif-js to, so a HEIC dropped here and one the Dropbox
+  // sync imports are decoded by the same libheif. The check serves exactly
+  // this version (test/lib/network.mjs) and aborts any other.
+  const HEIF_VER  = '1.23.2';
+  const HEIF_LIB  = `https://unpkg.com/libheif-js@${HEIF_VER}/libheif-wasm/libheif.js`;
+  const HEIF_WASM = `https://unpkg.com/libheif-js@${HEIF_VER}/libheif-wasm/libheif.wasm`;
+  const HEIF_IDLE_MS = 60000;
+
+  // The worker's whole program, which is why it is a string: a classic worker
+  // made from a Blob may importScripts from another origin, and the library's
+  // `libheif` factory is defined there and nowhere in the page. A failure says
+  // which stage it was in, because "the decoder could not be had" and "this
+  // file has no picture in it" are different advice.
+  const HEIF_WORKER = `
+    let lib = null;
+    self.onmessage = async (e) => {
+      const { id, src, wasm, buf } = e.data;
+      let stage = 'load';
+      try {
+        if (!lib) {
+          importScripts(src);
+          const res = await fetch(wasm);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          lib = self.libheif({ wasmBinary: await res.arrayBuffer() });
+        }
+        stage = 'decode';
+        const dec = new lib.HeifDecoder();
+        let imgs = [];
+        try {
+          imgs = dec.decode(new Uint8Array(buf));
+          const img = imgs.find(i => i.is_primary()) || imgs[0];
+          if (!img) throw new Error('no picture in it could be read');
+          const width = img.get_width(), height = img.get_height();
+          const out = { data: new Uint8ClampedArray(width * height * 4), width, height };
+          if (!(await new Promise(done => img.display(out, done)))) throw new Error('its picture could not be decoded');
+          self.postMessage({ id, ok: true, width, height, data: out.data.buffer }, [out.data.buffer]);
+        } finally {
+          for (const i of imgs) { try { i.free(); } catch (_) {} }
+          try { if (dec.decoder) lib.heif_context_free(dec.decoder); } catch (_) {}
+        }
+      } catch (err) {
+        self.postMessage({ id, ok: false, stage, error: (err && err.message) || String(err) });
+      }
+    };`;
+
+  let heif = null;          // { worker, url, waiting: Map(id → {resolve, reject}) } while there is one
+  let heifSeq = 0, heifIdle = 0;
+
+  function heifWorker() {
+    if (heif) return heif;
+    const url = URL.createObjectURL(new Blob([HEIF_WORKER], { type: 'text/javascript' }));
+    const h = { worker: new Worker(url), url, waiting: new Map() };
+    h.worker.onmessage = e => {
+      const m = e.data || {};
+      const w = h.waiting.get(m.id);
+      if (!w) return;
+      h.waiting.delete(m.id);
+      if (m.ok) w.resolve(m); else w.reject(m);
+    };
+    // The worker itself died — it could not be made, or threw outside a
+    // message. Everything waiting is told, and the next HEIC starts afresh.
+    h.worker.onerror = e => {
+      if (e && e.preventDefault) e.preventDefault();
+      for (const w of h.waiting.values()) w.reject({ stage: 'load', error: (e && e.message) || 'the decoder stopped' });
+      h.waiting.clear();
+      releaseHeif(true);
+    };
+    heif = h;
+    return h;
+  }
+
+  function releaseHeif(now) {
+    const h = heif;
+    if (!h || (!now && h.waiting.size)) return;
+    heif = null;
+    for (const w of h.waiting.values()) w.reject({ stage: 'load', error: 'the decoder was stopped' });
+    h.waiting.clear();
+    try { h.worker.terminate(); } catch (_) { /* already gone */ }
+    URL.revokeObjectURL(h.url);
+  }
+
+  // The picture of a HEIC, as ImageData, or an Error saying what went wrong in
+  // words the queue can show.
+  async function decodeHeic(buf) {
+    clearTimeout(heifIdle);
+    const h = heifWorker();
+    const id = ++heifSeq;
+    try {
+      const m = await new Promise((resolve, reject) => {
+        h.waiting.set(id, { resolve, reject });
+        h.worker.postMessage({ id, src: HEIF_LIB, wasm: HEIF_WASM, buf }, [buf]);
+      });
+      return new ImageData(new Uint8ClampedArray(m.data), m.width, m.height);
+    } catch (m) {
+      if (m instanceof Error) throw m;
+      if (m.stage === 'load') {
+        // Remembered as a failure, not as an answer: offline for a moment is
+        // the common case, so the next HEIC asks again.
+        releaseHeif(true);
+        throw new Error(`this browser cannot draw HEIC photos, and the decoder that reads them could not be fetched (${m.error}). `
+          + 'Try again when online — or on an iPhone, Settings → Camera → Formats → Most Compatible saves JPEGs');
+      }
+      throw new Error(`the HEIC could not be decoded — ${m.error}; it may be damaged or cut short`);
+    } finally {
+      clearTimeout(heifIdle);
+      heifIdle = setTimeout(() => releaseHeif(false), HEIF_IDLE_MS);
+    }
   }
   function looksLikeImage(file) {
     return /^image\//.test(file.type || '') || /^(jpe?g|png|webp|heic|heif)$/.test(extensionOf(file.name));
@@ -490,10 +629,19 @@ const FieldPhotos = (function () {
     let bmp = null;
     try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
     catch (_) { try { bmp = await createImageBitmap(file); } catch (__) { bmp = null; } }
-    if (!bmp) {
-      if (heic) throw new Error('this browser cannot read HEIC photos. On an iPhone, Settings → Camera → Formats → Most Compatible saves JPEGs; or open this tab in Safari, which converts them');
-      throw new Error('the photo could not be decoded — it may be damaged or cut short');
+    item.decoder = bmp ? 'browser' : null;
+    // A HEIC this browser cannot draw is drawn by libheif instead, upright by
+    // the container's own rotation (which is what a HEIC's reader goes by, not
+    // the EXIF's), and from here on it is a HEIC Safari drew: the same
+    // thumbnail, the same OCR, the same JPEG. A fresh copy of the bytes goes to
+    // the worker, since the first is the one the hash and the reading came from.
+    if (!bmp && heic) {
+      item.note = 'Decoding the HEIC — this browser cannot draw one…';
+      repaintQueueRow(item);
+      bmp = await createImageBitmap(await decodeHeic(await file.arrayBuffer()));
+      item.decoder = 'libheif';
     }
+    if (!bmp) throw new Error('the photo could not be decoded — it may be damaged or cut short');
     try {
       item.width = bmp.width; item.height = bmp.height;
 
@@ -1605,6 +1753,7 @@ const FieldPhotos = (function () {
       altitude: i.altitude ? { ...i.altitude } : null, taken: i.taken ? { ...i.taken } : null,
       station: i.station ? { ...i.station } : null, ocr: i.ocr ? { confidence: i.ocr.confidence, votes: i.ocr.votes, passes: i.ocr.passes } : null,
       width: i.width, height: i.height, contentType: i.contentType, ext: i.ext, converted: !!i.converted,
+      decoder: i.decoder || null,
       thumb: !!i.thumbBlob, row: i.row ? { id: i.row.id } : null, existingId: i.existingId || null,
     })),
     _record: key => { const i = S().queue.find(x => x.key === key); return i && i.uploadBlob ? photoRecord(i, 'photo/x.jpg', 'photo/x.thumb.jpg') : null; },
