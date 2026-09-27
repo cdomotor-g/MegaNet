@@ -202,6 +202,14 @@
   /* Draw & measure overlay — magenta, which is not a station role, not an ACMA
      mechanism and not the orange of a pass-range link. */
   --draw: #c2185b;
+  /* Field photos (map-photos.js, digital-twin.js, 0035) — the 📷 pin on the Stations map and the
+     camera marker in the Digital Twin. Camera yellow with a dark ink, which is
+     no station role, no link colouring and not the draw magenta, and which
+     reads on the satellite base and on the twin's grass and bare earth alike.
+     Never text on a page background, so outside the contrast contract; the
+     ink is what sits on it. */
+  --photo: #ffc400;
+  --photo-ink: #3a2a00;
 
   /* ── Radio Path Maps: the eight region fills (#137) ────────────────────────
      A categorical palette, and the one kind of colour set that does not reduce
@@ -534,6 +542,8 @@
   --hit-ring: #ffc400;
   --hit-glow: rgba(255, 196, 0, .55);
   --draw: #ff6fb0;
+  --photo: #ffd23f;
+  --photo-ink: #2b1f00;
 
   /* The eight region fills, lifted for a dark page. Same eight hues, raised in
      lightness and dropped in saturation so a 0.32-opacity fill over #111923 is
@@ -12258,6 +12268,7 @@ code {
 
 #map-twin .map-twin-status { margin: 0; }
 #map-twin .map-twin-paths { margin: 0; }
+#map-twin .map-twin-photos { margin: 0; }
 #map-twin .map-twin-peers { margin: 0; }
 
 /* The notes, folded: a one-line count in the warning colour that opens as a
@@ -12299,6 +12310,7 @@ code {
 /* One line each, the whole text as the tooltip (the tab has it in full). */
 #map-twin .map-twin-status,
 #map-twin .map-twin-paths,
+#map-twin .map-twin-photos,
 #map-twin .map-twin-peers,
 #map-twin .map-twin-attrib {
   white-space: nowrap;
@@ -12367,6 +12379,34 @@ code {
 .twin-path { font-weight: 600; }
 .twin-path-fact { color: var(--muted); }
 
+/* The field photos as words: each spot a button — how many, how far and
+   which way from the pole. On the tab as under the map. */
+.twin-photos { margin: var(--sp-1) 0 0; }
+.twin-photos-lead { color: var(--muted); }
+.twin-photo { font-weight: 600; }
+
+/* Standing at a photo spot in the POV: what Enter opens, over the stage above
+   the HUD. A real button, so a pointer and a keyboard get there too. */
+.twin-photo-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 2.6rem;
+  transform: translateX(-50%);
+  max-width: calc(100% - 2rem);
+  padding: .35rem .8rem;
+  border: 1px solid var(--photo-ink);
+  border-radius: var(--r-pill);
+  background: var(--photo);
+  color: var(--photo-ink);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: var(--shadow-2);
+}
+.twin-photo-prompt[hidden] { display: none; }
+.twin-stage canvas.is-over-photo { cursor: pointer; }
+
 .twin-path-dot {
   display: inline-block;
   width: .6rem;
@@ -12382,6 +12422,319 @@ code {
 .mn-map-stage:has(#map-twin.is-on) .stn-card {
   z-index: 760;
 }
+
+/* ── Field Photos tab (field-photos.js, 0035) ────────────────────────────────
+   Photos in by the handful or the folderful, each placed where it was taken,
+   and the viewer every other part of the app opens a photo in. */
+
+.fp-drop {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 2px dashed var(--ctl-border);
+  border-radius: var(--r-lg);
+  background: var(--subtle);
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
+}
+.fp-drop.is-over {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--subtle));
+}
+.fp-drop-lead { margin: 0; }
+
+/* A label that reads as a button, with its file input inside it: the input is
+   the control a keyboard reaches and a screen reader names (by this label),
+   kept on the page at 1 px rather than display:none, which would take it out
+   of the tab order. The ring goes on the label while the input has focus. */
+.fp-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: .35rem .8rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  cursor: pointer;
+}
+.fp-pick:hover { border-color: var(--accent); }
+.fp-pick input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.fp-pick:focus-within {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+@media (pointer: coarse) {
+  .fp-pick { min-height: 2.75rem; }
+}
+
+.fp-msg { min-height: 1.2em; margin: var(--sp-2) 0; }
+.fp-queue-actions { margin-bottom: var(--sp-2); align-items: center; }
+
+.fp-queue-table td { vertical-align: top; }
+.fp-q-photo { min-width: 12rem; }
+.fp-q-thumb {
+  display: inline-block;
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: var(--sp-2);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--subtle);
+}
+.fp-q-name { overflow-wrap: anywhere; font-weight: 600; }
+.fp-coord { font-family: var(--font-mono); font-size: var(--fs-sm); }
+.fp-heading, .fp-note { display: block; }
+.fp-note { color: var(--muted); }
+.fp-status { font-weight: 600; }
+.fp-row-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-1); }
+.fp-q-refused .fp-status,
+.fp-q-failed .fp-status { color: var(--bad); }
+.fp-q-done .fp-status { color: var(--ok); }
+.fp-q-already .fp-status { color: var(--warn); }
+.fp-q-edit td { background: var(--subtle); }
+
+.fp-chip {
+  display: inline-block;
+  margin: .1rem .25rem 0 0;
+  padding: 0 .45rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.fp-chip-exif, .fp-chip-xmp { border-color: var(--ok); color: var(--ok); }
+.fp-chip-ocr { border-color: var(--accent); color: var(--accent); }
+.fp-chip-warn { border-color: var(--warn); color: var(--warn); }
+
+.fp-place { display: grid; gap: var(--sp-2); max-width: 44rem; }
+.fp-place-field { display: grid; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--muted); }
+.fp-place-row { display: flex; gap: var(--sp-2); }
+.fp-place-row input { flex: 1 1 auto; min-width: 0; }
+.fp-hits { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.fp-hit { padding: .25rem .55rem; text-align: left; }
+
+.fp-filter.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  font-weight: 600;
+}
+
+.fp-grid {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--sp-3);
+}
+.fp-card {
+  display: grid;
+  gap: .15rem;
+  width: 100%;
+  height: 100%;
+  padding: var(--sp-1);
+  text-align: left;
+  align-content: start;
+}
+/* A fixed box, for .att-thumb's reason: the grid must not reflow as each
+   signed URL arrives. */
+.fp-card-img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  background: var(--subtle);
+}
+.fp-card-where { font-weight: 600; overflow-wrap: anywhere; }
+.fp-card-when { color: var(--muted); }
+.fp-thumb-missing { background: repeating-linear-gradient(45deg, var(--subtle), var(--subtle) 6px, var(--border) 6px, var(--border) 7px); }
+
+/* Linking a Dropbox folder: three numbered steps, each field on its own row. */
+.fp-connect { margin-top: var(--sp-3); }
+.fp-connect > summary { cursor: pointer; font-weight: 600; }
+.fp-connect-steps { display: grid; gap: var(--sp-2); padding-left: 1.4rem; margin: var(--sp-2) 0; }
+.fp-connect-steps .fp-place-row { margin-top: var(--sp-1); max-width: 34rem; }
+
+/* ── The viewer ── */
+.fp-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 2050;                 /* over the modal shell (2000): it can be opened from one */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2vh 1rem;
+  background: rgba(8, 15, 24, .78);
+}
+/* An author display beats the browser's own [hidden] — the trap map-controls
+   fell into (#186) — so hidden is said again here. */
+.fp-viewer[hidden] { display: none; }
+
+.fp-v-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+  width: min(1280px, 100%);
+  height: min(96vh, 900px);
+  padding: var(--sp-3);
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-2);
+}
+.fp-v-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.fp-v-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.fp-v-head h2 { margin: 0; font-size: var(--fs-lg); overflow-wrap: anywhere; }
+.fp-v-count { color: var(--muted); font-weight: 400; }
+
+.fp-v-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--sp-3);
+  min-height: 0;
+}
+.fp-v-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  background: #0b1016;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  touch-action: pan-y;
+}
+.fp-v-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.fp-v-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.75rem;
+  height: 3.5rem;
+  border: 0;
+  border-radius: var(--r-md);
+  background: rgba(0, 0, 0, .45);
+  color: #fff;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.fp-v-nav:hover { background: rgba(0, 0, 0, .65); }
+.fp-v-prev { left: var(--sp-2); }
+.fp-v-next { right: var(--sp-2); }
+
+.fp-v-side { min-height: 0; overflow: auto; font-size: var(--fs-sm); }
+.fp-v-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: .3rem var(--sp-3);
+  margin: 0 0 var(--sp-3);
+}
+.fp-v-facts dt { color: var(--muted); }
+.fp-v-facts dd { margin: 0; overflow-wrap: anywhere; }
+.fp-v-caption { display: grid; gap: var(--sp-1); color: var(--muted); }
+.fp-v-caption textarea { color: var(--text); }
+.fp-v-msg { min-height: 1.2em; }
+.fp-v-actions { margin-bottom: var(--sp-2); }
+
+.fp-v-strip {
+  display: flex;
+  gap: var(--sp-1);
+  overflow-x: auto;
+  padding-bottom: var(--sp-1);
+}
+.fp-v-thumb {
+  flex: 0 0 auto;
+  padding: 2px;
+  border: 2px solid transparent;
+  border-radius: var(--r-sm);
+  background: none;
+}
+.fp-v-thumb img {
+  display: block;
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 2px;
+  background: var(--subtle);
+}
+.fp-v-thumb.is-here { border-color: var(--accent); }
+
+@media (max-width: 900px) {
+  .fp-v-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .fp-viewer { padding: 0; }
+  .fp-v-card { height: 100%; border-radius: 0; padding: var(--sp-2); }
+  .fp-q-photo { min-width: 9rem; }
+}
+
+/* ── Field photos on the Stations map (map-photos.js) ── */
+.mn-photo-icon { background: none; border: 0; }
+/* The dot sits on the point; the badge stands up and to the right of it, so a
+   photo beside a station neither hides under its pin nor hides it. */
+.mn-photo-pin { position: relative; display: block; width: 0; height: 0; }
+.mn-photo-dot {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--photo);
+  border: 1.5px solid var(--photo-ink);
+}
+.mn-photo-badge {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px 1px 4px;
+  border-radius: var(--r-pill);
+  background: var(--photo);
+  border: 1px solid var(--photo-ink);
+  color: var(--photo-ink);
+  font-size: .72rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  cursor: pointer;
+}
+.mn-photo-badge b { font-weight: 700; }
+.mn-photo-cone {
+  position: absolute;
+  left: -20px;
+  top: -20px;
+  width: 40px;
+  height: 40px;
+  overflow: visible;
+  transform: rotate(var(--rot, 0deg));
+  pointer-events: none;
+}
+.mn-photo-cone path { fill: var(--photo); fill-opacity: .45; stroke: var(--photo-ink); stroke-width: 1; }
+.leaflet-marker-icon.mn-photo-icon:focus-visible .mn-photo-badge {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+.legend-photo { display: inline-block; width: 1.2rem; text-align: center; }
 
 /* ── Print (#118) ────────────────────────────────────────────────────────────
    The workbook's own print setup is A4 portrait, one page per station visit,

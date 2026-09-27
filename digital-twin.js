@@ -11,10 +11,11 @@
 // the reasons. Reaches back to core.js for state, esc, escAttr, announce,
 // cssVar, registerTabTeardown, KM_PER_DEG_LAT and kmPerDegLon; across to
 // terrain.js for the ~30 m fallback ground, to elvis.js for the AHD height at
-// the pin, and to app.js for switchTab, goToStation and primaryRole (from
-// inline handlers). Every one of those is a runtime call from inside this
-// file's own functions, so its position among the modules is free. Nothing
-// executes at load (`npm run toplevel`).
+// the pin, to field-photos.js for the field photos taken in the patch (and the
+// viewer they open in), and to app.js for switchTab, goToStation and
+// primaryRole (from inline handlers). Every one of those is a runtime call from
+// inside this file's own functions, so its position among the modules is free.
+// Nothing executes at load (`npm run toplevel`).
 //
 // ── Why a tab of its own, and not a mode on the Stations map ─────────────────
 //
@@ -219,6 +220,9 @@ const DigitalTwin = (function () {
     horizonUnfilled: 0,    // edge vertices no sheet had a height under
     horizonPending: false, // a fetch is in flight
     statusBase: '',        // the status line without the horizon's clause
+    photos: null,          // the field photos in the patch: { status, spots: [{ x, z, ids, rows, heading, fov, pitch }], count, error }
+    photoNear: -1,         // the spot the POV visitor is standing at, or −1
+    focusPhotoId: null,    // a photo to stand the camera behind once the markers are up (the viewer's "In the twin")
   };
 
   // Ground under a far station that has no recorded height, read off the
@@ -234,6 +238,7 @@ const DigitalTwin = (function () {
     avatars: null, laser: null, dot: null,   // the other visitors, and the visitor's own pointer
     sun: null, hemi: null, texture: null, raf: 0, ro: null, dirty: false,
     horizon: null, shells: null, sky: null,   // the far field's group, its shells' bookkeeping, the dome
+    photos: null,     // the field photo markers
     off: [],          // listener removers
   };
 
@@ -295,7 +300,10 @@ const DigitalTwin = (function () {
     return null;
   }
 
-  function located(s) { return !!s && isFinite(s.lat) && isFinite(s.lon); }
+  // A number that is there: `isFinite(null)` is true, and a station, or a
+  // photo's heading, that is null is not known — never at 0°, 0° or facing north.
+  function known(v) { return v !== null && v !== undefined && v !== '' && isFinite(v); }
+  function located(s) { return !!s && known(s.lat) && known(s.lon); }
 
   // ── geometry on the ground ─────────────────────────────────────────────────
   // Metres east and south of the station, equirectangular: exact to centimetres
@@ -884,6 +892,8 @@ const DigitalTwin = (function () {
   function clearScene() {
     if (!sc.scene) return;
     removeHorizon();
+    removePhotoMarkers();
+    tw.photoNear = -1;
     sc.pole = null; sc.band = null; sc.doors = [];
     remoteClear();
     for (const k of ['terrain', 'wire', 'station', 'figure', 'label', 'paths', 'sky', 'avatars', 'laser', 'dot']) {
@@ -2367,6 +2377,347 @@ void main() {
     }
   }
 
+  // ── the field photos ───────────────────────────────────────────────────────
+  // Where somebody stood with a camera, drawn where they stood: a post at a
+  // photographer's chest height with a camera on it, turned the way the camera
+  // faced and tilted as it was, a pale wedge the width of its view on the
+  // ground ahead of it, and a badge over it saying how many photos were taken
+  // there. Photos within a few metres of each other are one spot — one marker,
+  // one carousel (field-photos.js decides which, for the twin and the map
+  // alike). Click it; or walk up to it in the POV, and Enter opens them.
+  //
+  // Asked of the database for the patch's box, and only for a signed-in
+  // session: field photos are editors-only (0035). The line under the stage
+  // lists every spot as a button — the same numbers for whoever cannot see the
+  // picture, and the keyboard's way to them. Not in the .glb: the scene there
+  // is the site, and a photo's position is not something to hand to a file.
+  const PHOTO_POST_H = 1.45;     // metres — where a camera is held
+  const PHOTO_NEAR   = 2.5;      // metres — the POV's prompt comes up this close
+  const PHOTO_WEDGE  = 2.6;      // metres — how far ahead the view wedge reaches
+  const PHOTO_LINE_CAP = 12;     // spots listed by name under the stage
+
+  function photoColours() {
+    return { fill: cssVar('--photo', '#ffc400'), ink: cssVar('--photo-ink', '#3a2a00') };
+  }
+  function compassWord(deg) {
+    return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((deg % 360) + 360) % 360 / 45) % 8];
+  }
+  function spotWhere(sp) {
+    const d = Math.hypot(sp.x, sp.z);
+    if (d < 1.5) return 'at the station';
+    const brg = (Math.atan2(sp.x, -sp.z) * 180 / Math.PI + 360) % 360;
+    return `${d < 100 ? d.toFixed(0) : Math.round(d / 10) * 10} m ${compassWord(brg)}`;
+  }
+
+  // The badge: a camera and the count, on a sprite that always faces the eye.
+  function makePhotoBadge(n) {
+    const { fill, ink } = photoColours();
+    const cv = document.createElement('canvas');
+    const W = 320, H = 128;
+    cv.width = W; cv.height = H;
+    const cx = cv.getContext('2d');
+    const rr = (x, y, w, h, r) => {
+      cx.beginPath();
+      if (typeof cx.roundRect === 'function') cx.roundRect(x, y, w, h, r); else cx.rect(x, y, w, h);
+    };
+    cx.fillStyle = 'rgba(16, 32, 42, 0.86)';
+    rr(4, 4, W - 8, H - 8, 32); cx.fill();
+    cx.fillStyle = fill;
+    rr(28, 40, 96, 60, 12); cx.fill();
+    cx.fillRect(52, 28, 32, 16);
+    cx.fillStyle = ink;
+    cx.beginPath(); cx.arc(76, 70, 22, 0, Math.PI * 2); cx.fill();
+    cx.fillStyle = fill;
+    cx.beginPath(); cx.arc(76, 70, 12, 0, Math.PI * 2); cx.fill();
+    cx.fillStyle = '#ffffff';
+    cx.font = '700 66px system-ui, sans-serif';
+    cx.textAlign = 'left';
+    cx.textBaseline = 'middle';
+    cx.fillText(String(n), 146, H / 2 + 3);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+    sp.renderOrder = 10;
+    sp.name = 'badge';
+    sp.userData.base = { w: 0.8, h: 0.32 };
+    sp.scale.set(0.8, 0.32, 1);
+    return sp;
+  }
+
+  // The view, as a flat fan ahead of the lens: `fov` degrees wide, PHOTO_WEDGE
+  // long, in the camera head's own frame (forward is −z) so it turns and tilts
+  // with it.
+  function makeWedge(fovDeg, mat) {
+    const half = Math.min(80, Math.max(10, (known(fovDeg) ? fovDeg : 60) / 2)) * Math.PI / 180;
+    const n = 12, pos = [0, 0, 0], idx = [];
+    for (let i = 0; i <= n; i++) {
+      const a = -half + 2 * half * i / n;
+      pos.push(Math.sin(a) * PHOTO_WEDGE, 0, -Math.cos(a) * PHOTO_WEDGE);
+    }
+    for (let i = 1; i <= n; i++) idx.push(0, i, i + 1);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    const w = new THREE.Mesh(geo, mat);
+    w.name = 'view';
+    w.position.z = -0.12;
+    return w;
+  }
+
+  function removePhotoMarkers() {
+    if (sc.photos && sc.scene) { sc.scene.remove(sc.photos); disposeObject(sc.photos); }
+    sc.photos = null;
+  }
+
+  function buildPhotoMarkers() {
+    removePhotoMarkers();
+    const P = tw.photos;
+    if (!P || !P.spots.length || !sc.scene || !THREE) return;
+    const { fill, ink } = photoColours();
+    const g = new THREE.Group();
+    g.name = 'field photos';
+    const postMat  = new THREE.MeshStandardMaterial({ color: ink, roughness: 0.7 });
+    const bodyMat  = new THREE.MeshStandardMaterial({ color: fill, roughness: 0.45, metalness: 0.05 });
+    const lensMat  = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3 });
+    const wedgeMat = new THREE.MeshBasicMaterial({ color: fill, transparent: true, opacity: 0.3,
+                                                   side: THREE.DoubleSide, depthWrite: false });
+    P.spots.forEach((sp, k) => {
+      const m = new THREE.Group();
+      m.name = `photo spot ${k + 1}`;
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, PHOTO_POST_H, 10), postMat);
+      post.name = 'post';
+      post.position.y = PHOTO_POST_H / 2;
+      m.add(post);
+      const head = new THREE.Group();
+      head.name = 'camera';
+      head.rotation.order = 'YXZ';
+      head.position.y = PHOTO_POST_H + 0.08;
+      // Forward is −z; a heading h clockwise from north is (sin h, 0, −cos h)
+      // in this scene's x-east, z-south frame, which a turn of −h about y gives.
+      if (known(sp.heading)) head.rotation.y = -sp.heading * Math.PI / 180;
+      if (known(sp.pitch)) head.rotation.x = Math.max(-85, Math.min(85, sp.pitch)) * Math.PI / 180;
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.15, 0.1), bodyMat);
+      body.name = 'body';
+      head.add(body);
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.07, 16), lensMat);
+      lens.name = 'lens';
+      lens.rotation.x = Math.PI / 2;
+      lens.position.z = -0.085;
+      head.add(lens);
+      m.add(head);
+      // A wedge for every way the camera faced from here, each at the camera's
+      // height and turned and tilted as that photo was — the head itself faces
+      // the first.
+      for (const view of (sp.views && sp.views.length ? sp.views : [])) {
+        const w = new THREE.Group();
+        w.name = 'view';
+        w.rotation.order = 'YXZ';
+        w.position.y = PHOTO_POST_H + 0.08;
+        w.rotation.y = -view.heading * Math.PI / 180;
+        if (known(view.pitch)) w.rotation.x = Math.max(-85, Math.min(85, view.pitch)) * Math.PI / 180;
+        w.add(makeWedge(view.fov, wedgeMat));
+        m.add(w);
+      }
+      const badge = makePhotoBadge(sp.rows.length);
+      badge.position.y = PHOTO_POST_H + 0.6;
+      m.add(badge);
+      m.userData.badge = badge;
+      m.traverse(o => { o.userData.photoSpot = k; o.userData.export = false; });
+      g.add(m);
+    });
+    sc.photos = g;
+    sc.scene.add(g);
+    placePhotoMarkers();
+  }
+
+  // Feet on the ground where each spot is — the ground as drawn, so the
+  // exaggeration slider moves them with it.
+  function placePhotoMarkers() {
+    const P = tw.photos;
+    if (!sc.photos || !P) return;
+    sc.photos.children.forEach((m, k) => {
+      const sp = P.spots[k];
+      if (sp) m.position.set(sp.x, yAt(sp.x, sp.z), sp.z);
+    });
+    requestFrame();
+  }
+
+  // A badge a few pixels across from the far side of a 1.6 km patch is a
+  // badge nobody finds, so past fourteen metres it grows with the distance
+  // and stays about one size on screen.
+  function scalePhotoBadges() {
+    if (!sc.photos || !sc.camera) return;
+    const p = new THREE.Vector3();
+    for (const m of sc.photos.children) {
+      const b = m.userData.badge;
+      if (!b) continue;
+      b.getWorldPosition(p);
+      const s = Math.max(1, sc.camera.position.distanceTo(p) / 14);
+      b.scale.set(b.userData.base.w * s, b.userData.base.h * s, 1);
+    }
+  }
+
+  function loadPhotos(st, seq) {
+    if (typeof FieldPhotos === 'undefined' || !st || !tw.ground) return;
+    tw.photoNear = -1;
+    if (!FieldPhotos.signedIn()) {
+      tw.photos = { status: 'signed-out', spots: [], count: 0 };
+      removePhotoMarkers();
+      refreshPhotosLine();
+      syncPhotoPrompt();
+      return;
+    }
+    tw.photos = Object.assign({ spots: [], count: 0 }, tw.photos && tw.photos.status === 'ok' ? tw.photos : {}, { status: 'loading' });
+    refreshPhotosLine();
+    const g = tw.ground;
+    FieldPhotos.inBox(patchBox(st.lat, st.lon, g.size)).then(rows => {
+      if (seq !== tw.seq || !tw.ground) return;
+      const half = tw.ground.half;
+      const spots = FieldPhotos.spots(rows)
+        .map(sp => Object.assign(sp, localXZ(sp.lat, sp.lon, st.lat, st.lon)))
+        .filter(sp => Math.abs(sp.x) <= half - 0.3 && Math.abs(sp.z) <= half - 0.3);
+      tw.photos = { status: 'ok', spots, count: spots.reduce((n, sp) => n + sp.rows.length, 0) };
+      buildPhotoMarkers();
+      refreshPhotosLine();
+      applyPhotoFocus();
+      tw.photoNear = -2;           // re-measured on the next frame
+      requestFrame();
+    }, err => {
+      if (seq !== tw.seq) return;
+      const msg = (err && err.message) || String(err);
+      tw.photos = { status: 'error', spots: [], count: 0,
+                    error: /field_photo/.test(msg) && /(does not exist|schema cache|not find)/i.test(msg)
+                      ? 'this database has no field photos table yet (0035 is not applied)' : msg };
+      removePhotoMarkers();
+      refreshPhotosLine();
+    });
+  }
+
+  function photosLineHtml() {
+    if (typeof FieldPhotos === 'undefined' || !tw.ground) return '';
+    const P = tw.photos;
+    const lead = n => `<span class="twin-photos-lead"><span aria-hidden="true">📷</span> Field photos${n ? ` (${n})` : ''}:</span>`;
+    if (!P) return '';
+    // Inside the Stations map the overlay is a phone's 340 px of map, and a
+    // line that only says there is nothing here — or to sign in — is a line
+    // of stage given up for no photo. There it is shown when there are photos
+    // to list; the tab says the rest.
+    if (tw.hooks && !(P.spots && P.spots.length)) return '';
+    if (P.status === 'signed-out') return `${lead()} <button type="button" class="link-btn" onclick="Auth.open()">sign in</button> to see the photos taken here.`;
+    if (P.status === 'loading' && !P.spots.length) return `${lead()} looking…`;
+    if (P.status === 'error') return `${lead()} could not be read — ${esc(P.error)}.`;
+    if (!P.spots.length) return `${lead()} none taken in this patch yet. <button type="button" class="link-btn" onclick="switchTab('photos')">Add some →</button>`;
+    const shown = P.spots.slice(0, PHOTO_LINE_CAP).map((sp, k) =>
+      `<button type="button" class="link-btn twin-photo" onclick="DigitalTwin.openPhotoSpot(${k})"
+               title="Open the photos taken here">${sp.rows.length} ${spotWhere(sp)}</button>`);
+    const more = P.spots.length > PHOTO_LINE_CAP ? ` · and ${P.spots.length - PHOTO_LINE_CAP} more spots` : '';
+    const all = P.spots.length > 1 ? ` · <button type="button" class="link-btn" onclick="DigitalTwin.openAllPhotos()">all ${P.count}</button>` : '';
+    return `${lead(P.count)} ${shown.join(' · ')}${more}${all}`;
+  }
+
+  function refreshPhotosLine() {
+    const el = document.getElementById('twin-photos');
+    if (!el) return;
+    const html = photosLineHtml();
+    el.innerHTML = html;
+    el.hidden = !html;
+    el.title = el.textContent.replace(/\s+/g, ' ').trim();
+  }
+
+  // Which spot the POV visitor is standing at, if any — the prompt over the
+  // stage, and what Enter opens. True when it changed.
+  function updatePhotoNear() {
+    const P = tw.photos;
+    let near = -1;
+    if (rig.mode === 'walk' && rig.level === 'ground' && P && P.spots.length) {
+      let bd = PHOTO_NEAR;
+      P.spots.forEach((sp, k) => {
+        const d = Math.hypot(sp.x - rig.px, sp.z - rig.pz);
+        if (d < bd) { bd = d; near = k; }
+      });
+    }
+    if (near === tw.photoNear) return false;
+    tw.photoNear = near;
+    syncPhotoPrompt();
+    return true;
+  }
+  function syncPhotoPrompt() {
+    const el = document.getElementById('twin-photo-prompt');
+    if (!el) return;
+    const sp = tw.photos && tw.photoNear >= 0 ? tw.photos.spots[tw.photoNear] : null;
+    el.hidden = !sp;
+    if (sp) {
+      const n = sp.rows.length;
+      el.textContent = `📷 ${n} photo${n === 1 ? '' : 's'} taken here — Enter to look`;
+    }
+  }
+
+  // The spot under the pointer: a badge wherever it is (it is drawn over the
+  // hills, so it is clicked over them), a post or a camera only where the
+  // ground is not in front of it. Never the wedge — it covers ground people
+  // click for its height.
+  function photoAt(clientX, clientY) {
+    if (!sc.photos || !sc.camera || !sc.canvas) return -1;
+    const r = sc.canvas.getBoundingClientRect();
+    const nd = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    const rc = new THREE.Raycaster();
+    rc.setFromCamera(nd, sc.camera);
+    const ground = sc.terrain ? rc.intersectObject(sc.terrain, false)[0] : null;
+    const hits = rc.intersectObject(sc.photos, true)
+      .filter(h => h.object.userData.photoSpot != null && h.object.name !== 'view'
+                && (h.object.isSprite || !ground || h.distance <= ground.distance + 0.05));
+    return hits.length ? hits[0].object.userData.photoSpot : -1;
+  }
+
+  function pickPhoto(e) {
+    const k = photoAt(e.clientX, e.clientY);
+    if (k < 0) return false;
+    openPhotoSpot(k);
+    return true;
+  }
+
+  function openPhotoSpot(k) {
+    const P = tw.photos;
+    const sp = P && P.spots[k];
+    if (!sp || typeof FieldPhotos === 'undefined') return;
+    const st = currentStation();
+    const where = spotWhere(sp);
+    FieldPhotos.openSpot(sp.ids, sp.ids[0],
+      `Photos taken ${where === 'at the station' ? 'at ' : `${where} of `}${st ? st.name : 'the station'}`);
+  }
+
+  function openAllPhotos() {
+    const P = tw.photos;
+    if (!P || !P.spots.length || typeof FieldPhotos === 'undefined') return;
+    const st = currentStation();
+    const ids = P.spots.flatMap(sp => sp.ids);
+    FieldPhotos.openSpot(ids, ids[0], `Photos around ${st ? st.name : 'the station'}`);
+  }
+
+  // From the viewer's "In the twin": once the markers are up, stand the orbit
+  // camera behind that photo's camera, looking the way it looked.
+  function applyPhotoFocus() {
+    const id = tw.focusPhotoId;
+    const P = tw.photos;
+    if (!id || !P || !rig.target) return;
+    const k = P.spots.findIndex(sp => sp.ids.includes(id));
+    if (k < 0) return;
+    tw.focusPhotoId = null;
+    const sp = P.spots[k];
+    // That photo's own heading, not the spot's first: two taken from here up
+    // the reach and down it are one spot, and "In the twin" on the second
+    // has to look down it.
+    const row = sp.rows.find(r => r.id === id);
+    const h = row && known(row.heading_deg) ? +row.heading_deg : sp.heading;
+    rig.mode = 'orbit';
+    rig.target.set(sp.x, yAt(sp.x, sp.z) + PHOTO_POST_H, sp.z);
+    rig.radius = 7;
+    rig.phi = 1.2;
+    rig.theta = known(h) ? -h * Math.PI / 180 : rig.theta;
+    syncModeUi();
+    requestFrame();
+  }
+
   // ── the camera ─────────────────────────────────────────────────────────────
   function resetOrbit() {
     rig.mode = 'orbit';
@@ -2475,9 +2826,9 @@ void main() {
     syncPointUi();
     const hud = document.getElementById('twin-hud');
     if (hud) hud.textContent = rig.mode === 'walk'
-      ? `POV at eye height: W A S D or the arrow keys move, drag to look, Shift to hurry, Space points, Esc to leave.${tw.model && tw.model.ladder ? ' Walk into the ladder to climb it.' : ''}`
-      : (tw.hooks ? 'Drag to orbit, wheel to zoom, right-drag to pan; click the ground for its height. Wheel out past the edge, or Esc, for the map.'
-                  : 'Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.');
+      ? `POV at eye height: W A S D or the arrow keys move, drag to look, Shift to hurry, Space points, Esc to leave.${tw.model && tw.model.ladder ? ' Walk into the ladder to climb it.' : ''}${tw.photos && tw.photos.spots && tw.photos.spots.length ? ' Walk up to a 📷 and press Enter for its photos.' : ''}`
+      : (tw.hooks ? 'Drag to orbit, wheel to zoom, right-drag to pan; click the ground for its height, a 📷 for its photos. Wheel out past the edge, or Esc, for the map.'
+                  : 'Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height, a 📷 for the photos taken there.');
     syncCanvasName();
     requestFrame();
   }
@@ -2537,10 +2888,24 @@ void main() {
       rig.pointers.delete(e.pointerId);
       if (rig.pointers.size < 2) rig.pinch = null;
       try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
-      if (p && !p.moved && p.b === 0 && e.type === 'pointerup') pickGround(e);
+      // A field photo's marker first: it stands on the ground, and a click on
+      // it is about the photos, not the height under them.
+      if (p && !p.moved && p.b === 0 && e.type === 'pointerup' && !pickPhoto(e)) pickGround(e);
     };
     on(cv, 'pointerup', up);
     on(cv, 'pointercancel', up);
+
+    // Over a photo marker the pointer says it is something to click. A class
+    // rather than an inline style, for the design system's rule (#109).
+    let hoverAt = 0;
+    on(cv, 'pointermove', e => {
+      if (rig.pointers.size || !sc.photos) return;
+      const now = performance.now();
+      if (now - hoverAt < 60) return;
+      hoverAt = now;
+      cv.classList.toggle('is-over-photo', photoAt(e.clientX, e.clientY) >= 0);
+    });
+    on(cv, 'pointerleave', () => cv.classList.remove('is-over-photo'));
 
     on(cv, 'wheel', e => {
       e.preventDefault();
@@ -2567,6 +2932,8 @@ void main() {
       const k = keyName(e.key);
       if (rig.mode === 'walk') {
         if (k === 'Escape') { e.preventDefault(); leaveWalk(); return; }
+        // Standing at a field photo's marker, Enter looks at what was taken there.
+        if (k === 'Enter' && tw.photoNear >= 0) { e.preventDefault(); rig.keys.clear(); openPhotoSpot(tw.photoNear); return; }
         if (WALK_KEYS.includes(k)) { e.preventDefault(); rig.keys.add(k); requestFrame(); }
         return;
       }
@@ -2744,6 +3111,7 @@ void main() {
     if (pointing !== rig.pointing) { rig.pointing = pointing; sc.dirty = true; }
     if (animateDoors(frameDt(now))) sc.dirty = true;
     if (animateAvatars(now)) sc.dirty = true;
+    if (updatePhotoNear()) sc.dirty = true;
     lastTick = now;
     // The visitor's own pose, every frame; what leaves the room is gated there.
     if (typeof TwinPresence !== 'undefined' && sc.terrain) TwinPresence.publish(localPose());
@@ -2752,6 +3120,7 @@ void main() {
     if (!sc.renderer || !sc.scene) return;
     placeCamera();
     updateLocalLaser();
+    scalePhotoBadges();
     sc.scene.background = skyColour();
     if (sc.scene.fog) sc.scene.fog.color.copy(sc.scene.background);
     syncSky();
@@ -2803,12 +3172,14 @@ void main() {
     const nothing = (status, placeholder) => {
       tw.ground = null; tw.image = null; tw.elvis = null; tw.picked = null;
       tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = ''; tw.model = null;
+      tw.photos = null;
       if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
       clearScene();
       requestFrame();
       setStatus(status);
       showPlaceholder(placeholder);
       refreshTruth(); refreshTable(); syncCanvasName(); syncExportButton(); refreshAttrib(); refreshPathsLine(); refreshPeersLine();
+      refreshPhotosLine(); syncPhotoPrompt();
       const pk = document.getElementById('twin-pick');
       if (pk) pk.textContent = '';
     };
@@ -2848,8 +3219,10 @@ void main() {
       // The last station's scene must not stand in for this one's: cleared,
       // its room left, and the stage says why it is empty.
       if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
+      tw.photos = null;
       clearScene();
       requestFrame();
+      refreshPhotosLine(); syncPhotoPrompt();
       setStatus('No ground could be read for this patch — offline, or every elevation service is blocked.');
       setNotes([...notes, 'Neither Queensland\'s elevation service nor the terrain tiles answered. Nothing is drawn: a flat patch would read as flat ground, and that is the one wrong answer worth refusing.']);
       showPlaceholder('<p>No ground could be read. Check the network, then press <strong>Rebuild</strong>.</p>');
@@ -2884,6 +3257,7 @@ void main() {
       setFog(false);
       resetOrbit();
       presenceJoin(st);
+      loadPhotos(st, seq);
       showPlaceholder('');
       startLoop();
       requestFrame();
@@ -3191,6 +3565,7 @@ void main() {
         </div>
         <p class="twin-status" id="twin-status" role="status">${esc(tw.status || 'Building…')}</p>
         <p class="small twin-paths" id="twin-paths" hidden></p>
+        <p class="small twin-photos" id="twin-photos" hidden></p>
         <p class="small twin-peers" id="twin-peers" hidden></p>
         <ul class="twin-notes" id="twin-notes" ${tw.notes.length ? '' : 'hidden'}>${tw.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
         ${stageHtml()}
@@ -3215,6 +3590,7 @@ void main() {
           <canvas id="twin-canvas" tabindex="0" aria-label="Three-dimensional view. Nothing is built yet."></canvas>
           <div class="twin-compass" id="twin-compass" aria-hidden="true" style="--twin-heading:0deg">N</div>
           <p class="twin-hud" id="twin-hud">Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.</p>
+          <button type="button" class="twin-photo-prompt" id="twin-photo-prompt" hidden onclick="DigitalTwin.openNearPhotos()"></button>
           <div class="twin-placeholder" id="twin-placeholder" hidden></div>
         </div>`;
   }
@@ -3254,6 +3630,7 @@ void main() {
     tw.paths = null;
     tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false;
     tw.model = null;
+    tw.photos = null; tw.photoNear = -1;
     rig.pointLatch = false; rig.pointing = false;
     if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
   }
@@ -3489,6 +3866,7 @@ void main() {
         if (sc.wire) { sc.wire.geometry.dispose(); sc.wire.geometry = new THREE.WireframeGeometry(sc.terrain.geometry); }
         if (sc.figure) sc.figure.position.y = yAt(sc.figure.position.x, sc.figure.position.z);
         if (sc.paths) buildPaths(currentStation());
+        placePhotoMarkers();
         liftHorizon();
         requestFrame();
       }
@@ -3634,6 +4012,23 @@ void main() {
           laser: a.laser.visible ? { len: a.laser.scale.y, dot: { x: a.dot.position.x, y: a.dot.position.y, z: a.dot.position.z } } : null,
         })),
         presence: typeof TwinPresence !== 'undefined' ? TwinPresence.debug() : null,
+        photos: tw.photos ? {
+          status: tw.photos.status, count: tw.photos.count, error: tw.photos.error || null, near: tw.photoNear,
+          prompt: (() => { const el = document.getElementById('twin-photo-prompt'); return el && !el.hidden ? el.textContent : null; })(),
+          spots: tw.photos.spots.map((sp, k) => {
+            const m = sc.photos && sc.photos.children[k];
+            const head = m && m.getObjectByName('camera');
+            const badge = m && m.userData.badge;
+            return {
+              x: sp.x, z: sp.z, n: sp.rows.length, ids: sp.ids.slice(), heading: sp.heading, fov: sp.fov,
+              y: m ? m.position.y : null, groundY: yAt(sp.x, sp.z),
+              yaw: head ? -head.rotation.y * 180 / Math.PI : null, pitch: head ? head.rotation.x * 180 / Math.PI : null,
+              wedges: m ? m.children.filter(c => c.name === 'view').map(c => ((-c.rotation.y * 180 / Math.PI) % 360 + 360) % 360) : [],
+              badgeScale: badge ? badge.scale.x / badge.userData.base.w : null,
+              exported: m ? (() => { let any = false; m.traverse(o => { if (o.userData.export !== false) any = true; }); return any; })() : null,
+            };
+          }),
+        } : null,
         horizon: {
           on: !!S().horizon, up: !!sc.horizon, pending: tw.horizonPending, km: HORIZON_M / 1000,
           earthR: EARTH_R_EYE, blendOut: BLEND_OUT, skyR: SKY_R, far: sc.camera ? sc.camera.far : null, sky: !!sc.sky,
@@ -3702,6 +4097,17 @@ void main() {
     _upsample: upsample,
     _sizes: () => SIZES.slice(),
     _libUrl: () => LIB_URL,
+    // The field photos (field-photos.js holds them; this draws them).
+    photosChanged() {
+      const st = currentStation();
+      if (tw.live && sc.terrain && st && located(st)) loadPhotos(st, tw.seq);
+    },
+    openPhotoSpot, openAllPhotos,
+    openNearPhotos() { if (tw.photoNear >= 0) openPhotoSpot(tw.photoNear); },
+    // Stand the orbit camera behind a photo's camera, once its marker is up —
+    // now if it already is, after the next build otherwise.
+    focusPhoto(id) { tw.focusPhotoId = id || null; applyPhotoFocus(); },
+    _photoAt: (x, y) => photoAt(x, y),
     // The others in the room, driven by twin-presence.js.
     remote: { set: remoteSet, pose: remotePose, remove: remoteRemove, clear: remoteClear },
     presenceChanged() { refreshPeersLine(); },

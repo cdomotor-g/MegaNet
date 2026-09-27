@@ -1,0 +1,22 @@
+{
+  "name": "meganet-field-photos",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dropbox → MegaNet field photo sync: lists a Dropbox folder, reads each new photo with the app's own photo-meta.js (EXIF, then the printed overlay by OCR), and files it in the field-photos bucket and meganet.field_photo.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "sync": "node sync.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
+    "heic-decode": "2.1.0",
+    "jpeg-js": "0.4.4",
+    "pngjs": "7.0.0",
+    "tesseract.js": "7.0.0"
+  }
+}

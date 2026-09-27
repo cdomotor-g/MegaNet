@@ -73,11 +73,37 @@ function threeVersion() {
   return pkg.devDependencies.three;
 }
 
+// And for the field photos' OCR engine, Tesseract.js, on the same terms again:
+// fetched by photo-meta.js on the first photo with no GPS in it, and absent
+// from every check that does not read one. Three packages — the library and
+// its worker, the WebAssembly core (it picks its own build: SIMD, relaxed SIMD
+// or neither), and the English model — each served for the version the harness
+// vendors and no other, so a pin that drifts fails `npm run photos` rather than
+// being answered with a different engine. The worker's own fetches (its core,
+// the model) are routed like the page's: Playwright intercepts a dedicated
+// worker's requests too, which the photos check relies on and says so.
+function tesseractDirs() {
+  return {
+    lib:  path.join(path.dirname(require.resolve('tesseract.js/package.json')), 'dist'),
+    core: path.dirname(require.resolve('tesseract.js-core/package.json')),
+    lang: path.dirname(require.resolve('@tesseract.js-data/eng/package.json')),
+  };
+}
+function testPkgVersion(name) {
+  const pkg = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
+  return pkg.devDependencies[name];
+}
+function installedVersion(name) {
+  return JSON.parse(fs.readFileSync(require.resolve(`${name}/package.json`), 'utf8')).version;
+}
+
 const CONTENT_TYPE = {
   '.js':  'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
+  '.wasm': 'application/wasm',
+  '.gz':  'application/gzip',
 };
 
 /**
@@ -140,6 +166,26 @@ export async function applyNetworkPolicy(page, origin) {
         return route.fulfill({
           status: 200,
           contentType: CONTENT_TYPE[path.extname(file)] || 'application/octet-stream',
+          body: fs.readFileSync(file),
+        });
+      }
+    }
+
+    // The OCR engine: `dist/` of the library, the core's files, the model.
+    const tess = url.match(/unpkg\.com\/(tesseract\.js|tesseract\.js-core|@tesseract\.js-data\/eng)@([\d.]+)\/([^?#]+)/);
+    if (tess) {
+      let dirs = null;
+      try { dirs = tesseractDirs(); } catch (_) { dirs = null; }
+      const [, pkg, ver, rest] = tess;
+      const pinned = pkg === 'tesseract.js-core' ? installedVersion('tesseract.js-core') : testPkgVersion(pkg);
+      const root = dirs && (pkg === 'tesseract.js' ? dirs.lib : pkg === 'tesseract.js-core' ? dirs.core : dirs.lang);
+      const rel = pkg === 'tesseract.js' ? rest.replace(/^dist\//, '') : rest;
+      const file = root && path.join(root, path.normalize(rel));
+      if (ver === pinned && file && file.startsWith(root + path.sep) && fs.existsSync(file)) {
+        return route.fulfill({
+          status: 200,
+          contentType: CONTENT_TYPE[path.extname(file)] || 'application/octet-stream',
+          headers: { 'Access-Control-Allow-Origin': '*' },
           body: fs.readFileSync(file),
         });
       }

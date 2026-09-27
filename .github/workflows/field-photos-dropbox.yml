@@ -1,0 +1,89 @@
+# Field photos from Dropbox (0035): every fifteen minutes, the photos saved
+# into the linked Dropbox folder since the last run are read, placed where they
+# were taken and filed in MegaNet — the same way the Field Photos tab files a
+# photo dropped on it, by the same photo-meta.js. tools/field-photos/sync.mjs is
+# the run; docs/field-photos.md is how to link a folder, click by click.
+#
+# Why a scheduled workflow and not something always running. The job is
+# "look at a folder now and then", and GitHub already runs things now and then
+# for this repository: no process to host, nothing to keep alive, a log of
+# every run, and "Run workflow" for an import right now. A photo waits at most
+# a quarter of an hour, which is less than the drive back from a site. Dropbox
+# can call a webhook the moment a file lands, and a Worker route could start
+# this workflow from it — that is a later refinement, noted in the doc, not a
+# reason to have a server.
+#
+# Until the secrets exist it does nothing and says so: a notice, not a red
+# run every fifteen minutes. What it needs (Settings → Secrets and variables →
+# Actions → Repository secrets):
+#
+#   DROPBOX_APP_KEY        the Dropbox app's key
+#   DROPBOX_REFRESH_TOKEN  from the Field Photos tab's "Link a Dropbox folder"
+#   SUPABASE_SECRET_KEY    the project's secret key (Supabase → Project Settings → API Keys)
+#   DROPBOX_APP_SECRET     only for a token made with the app's secret instead
+#
+# and, optionally, a repository variable DROPBOX_FOLDER naming the folder to
+# read — one inside the app folder, or anywhere for an app made with Full
+# Dropbox access (the whole app folder otherwise).
+#
+# The secret key can write where only editors may, which is why nothing else in
+# this repository holds it and why this workflow runs nothing but the sync: every
+# photo still goes through meganet.add_field_photo(), which enforces the same
+# path, type, size and duplicate rules it enforces for a person.
+
+name: Field photos from Dropbox
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time, and a run is never cancelled for the next: a sync stopped
+# mid-upload leaves an object nothing points at. The next one waits.
+concurrency:
+  group: field-photos-dropbox
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DROPBOX_APP_KEY:       ${{ secrets.DROPBOX_APP_KEY }}
+      DROPBOX_APP_SECRET:    ${{ secrets.DROPBOX_APP_SECRET }}
+      DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+      SUPABASE_SECRET_KEY:   ${{ secrets.SUPABASE_SECRET_KEY }}
+      DROPBOX_FOLDER:        ${{ vars.DROPBOX_FOLDER }}
+    steps:
+      - name: Is Dropbox linked?
+        id: linked
+        run: |
+          if [ -z "$DROPBOX_APP_KEY" ] || [ -z "$DROPBOX_REFRESH_TOKEN" ] || [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "::notice::Dropbox is not linked yet — nothing to sync. docs/field-photos.md ('Linking a Dropbox folder') has the steps."
+            echo "linked=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "linked=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.linked.outputs.linked == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.linked.outputs.linked == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/field-photos/package-lock.json
+
+      - name: Install the sync
+        if: steps.linked.outputs.linked == 'true'
+        working-directory: tools/field-photos
+        run: npm ci --omit=dev
+
+      - name: Sync
+        if: steps.linked.outputs.linked == 'true'
+        working-directory: tools/field-photos
+        run: node sync.mjs

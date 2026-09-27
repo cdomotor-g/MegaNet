@@ -235,9 +235,17 @@ its cache at all (`PGRST002`).
 | `meganet.station.awrc_number`, `.stream`, `.urbs_label` | Three fields `0032` adds to the station: the AWRC gauging station number and the stream the gauge is on (Section 3), and the station's node in the Bureau's URBS runoff-routing model. Optional keys in the document, absent when null. |
 | `meganet.station_aep_level` | The modelled water level at a station in the 1%, 0.5%, 0.2% and 0.066% AEP floods (`0033`), m AHD, with the ground height and the source sheet's own three scores — one row per sheet (the QLD and NSW AEP level workbooks, supplied 26/09/2026). Indicative, not observed. Its `setting`, `slope` and `manning_n` are the assumptions of the indicative flood velocity the card works out (`flood-velocity.js`); blank uses the defaults. The station's `aep_levels` list. |
 | `meganet.station_frequency` | A station's RX/TX frequency pairs beyond a repeater's own (`0033`): `rx_mhz`, `tx_mhz`, what the channel is for, its ACMA licence. `meganet.repeater.rx_mhz`/`tx_mhz` stays the primary pair — it is what every path tool reads — and a base station, which has no repeater row, keeps all its pairs here. The station's `frequencies` list. |
+| `meganet.field_photo` | One row per field photo (`0035`): the object and its thumbnail in the `field-photos` bucket, the file (type against `attachment_type`, size, **SHA-256** — one live photo per hash), when it was taken (as the camera's clock read it and as an instant, and from what), **where** (lat/lon, how placed — `exif`, `xmp`, `ocr`, `manual`, `station` — and the GPS's accuracy), altitude and its datum, heading (true or magnetic), pitch and field of view, the station it is filed under and whether by distance, `meta` (the camera, every OCR reading's text, the Dropbox file), where it came from (`upload`, `dropbox`, with the Dropbox file id — one row per file, tombstones included, so a removed photo is never re-imported), and who. Soft-deleted. **Editors only**: no grant to `anon`, and the policy hides tombstones. A null in any of the measured columns means the photo did not say — never nought. |
+| `meganet.field_photo_origin`, `meganet.field_photo_placement` | The two vocabularies: where a photo came in, and how its position was known. |
+| `meganet.field_photo_sync` | The Dropbox sync's report, one row per source: when it last ran and last ran clean, whose Dropbox, how many photos it saw, imported, could not place, skipped and failed, and the last error. Readable by editors; written by the sync with the secret key. |
+| `meganet.field_photo_sync_cursor` | Where the sync got to in the folder — a Dropbox cursor. RLS on, no policy: the secret key only. |
+| `meganet.add_field_photo(jsonb)`, `meganet.update_field_photo(uuid, jsonb)`, `meganet.remove_field_photo(uuid)` | The field photo write path (`0035`), three functions for `0010`'s three reasons: the object path has to be `photo/<uuid>.<ext>` agreeing with the type, the thumbnail's has to be its twin, and `uploaded_by` has to be the caller (the secret key may name the sync). `add` refuses a live duplicate hash or a Dropbox file already imported with `23505` and the existing photo's id as the detail, and files the photo under the nearest station within a kilometre when none is sent; `update` takes a patch, and a move re-files a photo whose station was only ever picked by distance — or that had no place until now; `remove` soft-deletes and hands back the two object paths for the caller to delete. |
+| `meganet.field_photo_station_for(numeric, numeric, numeric)` | The nearest live station within a distance (1 km by default) — the rule `add_field_photo()` files by, and the one the tab restates to show it before the upload. |
 
-Everything is readable by `anon` **except `meganet.reading_raw` and the whole
-inspection domain — bar the numbers, which `0023` publishes as views**. `reading_raw` holds whatever a device or an adapter actually
+Everything is readable by `anon` **except `meganet.reading_raw`, the whole
+inspection domain — bar the numbers, which `0023` publishes as views — and the
+field photos (`0035`)**, whose pictures and positions show a site's access, its
+locks and often a colleague. `reading_raw` holds whatever a device or an adapter actually
 sent, unread — a debugging artefact rather than a publication, and the day an
 adapter puts a header or a device key in its payload is the day the difference
 matters. The inspection tables are withheld for a different reason: the Council
@@ -261,13 +269,14 @@ that its object *name* is one the app generated rather than one a phone supplied
 and that `uploaded_by` is the caller — are facts about the request rather than
 about the row, and a grant hands all three to the client.
 
-**One thing this schema needs is not in this directory: the storage bucket.**
+**One thing this schema needs is not in this directory: the storage buckets.**
 `meganet.attachment` indexes objects in a Supabase Storage bucket called
-`inspections`, and `storage.buckets` is Supabase's table rather than ours — so it
-is not a migration, for the same reason nothing else here reaches outside
-`meganet`. It is `tools/storage_bucket.sql`: idempotent, safe to re-run, and it
-asserts at the foot that the bucket exists, that it is **private**, and that its
-four policies are there. Run it once per project after `0010`. It is a file rather
+`inspections`, `meganet.field_photo` in one called `field-photos` (`0035`), and
+`storage.buckets` is Supabase's table rather than ours — so neither is a
+migration, for the same reason nothing else here reaches outside `meganet`. Both
+are `tools/storage_bucket.sql`: idempotent, safe to re-run, and it asserts at the
+foot that each bucket exists, that it is **private**, and that its four policies
+are there. Run it once per project after `0010`, and again after `0035`. It is a file rather
 than a page of dashboard instructions because the page of dashboard instructions
 was tried first (#145) and got half done in silence.
 

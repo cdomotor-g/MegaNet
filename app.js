@@ -2806,7 +2806,10 @@ function renderMain() {
   // The Map Generator joins them too: contours, rivers and the graticule need
   // no station file at all — only the pins and their names do, and the sheet
   // simply generates without them until one loads.
-  const noDataTabs = ['packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen'];
+  // Field Photos joins them too: its library and its uploads are the
+  // datastore's, and the station list only names the station a photo is of —
+  // a photo read before it loads is still placed, and filed by the database.
+  const noDataTabs = ['packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -2845,6 +2848,7 @@ function renderMain() {
     case 'inspections': el.innerHTML = Inspections.render();  Inspections.init(); break;
     case 'maintenance': el.innerHTML = Maintenance.render();  Maintenance.init(); break;
     case 'history':    el.innerHTML = History.render();       History.init();      break;
+    case 'photos':     el.innerHTML = FieldPhotos.render();   FieldPhotos.init();  break;
     case 'export':     el.innerHTML = renderExportHtml();     initExport();     break;
     default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }
@@ -4083,6 +4087,17 @@ function mapDisplayControlsHtml() {
       Digital twin at close zoom (${MapTwin.zoom}+)
     </label>
     <p class="filter-note" id="map-twin-note">${MapTwin.noteHtml()}</p>
+    <!-- The field photos (map-photos.js, 0035): a 📷 where each was taken,
+         a cone the way the camera faced. Beside the twin because they are the
+         same ground at the same scale — from zoom 17 they are markers in the
+         twin, and short of that they are pins here. -->
+    <label class="filter-check"
+           title="A 📷 pin where each field photo was taken, with a cone the way the camera faced. Click one for the photos taken there. Signed-in editors only, from zoom 12 in.">
+      <input type="checkbox" ${state.mapPhotos ? 'checked' : ''}
+             onchange="MapPhotos.setEnabled(this.checked)">
+      Field photos (📷)
+    </label>
+    <p class="filter-note" id="map-photos-note">${MapPhotos.noteHtml()}</p>
     <!-- The highest ground in view (#184). It sits with the contours because
          it is the same question asked the other way round — those draw the
          shape of the ground, this names the top of it — and because both are
@@ -4331,6 +4346,7 @@ function mapLegendOffLayersHtml() {
     !state.mapPeaks           && 'Highest ground in view',
     !state.mapRoads           && 'Road parcels',
     !state.mapLots            && 'Property boundaries',
+    !state.mapPhotos          && 'Field photos',
     !state.mapWind            && 'Wind regions',
     !state.mapCatchments      && 'River catchments',
     !state.mapHubs            && 'Maintenance hubs',
@@ -4518,6 +4534,12 @@ function mapLegendHtml() {
       <span class="legend-line legend-line-lot"></span>
       <span class="small">Property boundary — lot/plan when zoomed in (Qld cadastre)</span>
     </span>` : ''}
+    ${MapPhotos.active() ? `
+    <span class="legend-item">
+      <span class="legend-photo" aria-hidden="true">📷</span>
+      <span class="small">Field photos — where each was taken, a cone the way the camera faced.
+        Click one for the photos taken there</span>
+    </span>` : ''}
     ${MapRoads.active() ? `
     <span class="legend-item">
       <span class="legend-sq" style="--dot:${MapRoads.legendColour()}"></span>
@@ -4686,6 +4708,7 @@ function stopStationsMap() {
   Places.detach();
   MapRoads.detach();
   MapLots.detach();
+  MapPhotos.detach();
   MapWind.detach();
   // Not a detach — MapLos holds no layer — but the same duty: the queue is
   // for lines on the map this function is destroying, so clear it and bump
@@ -4840,6 +4863,7 @@ function initMap() {
   Places.attach(state.map);
   MapRoads.attach(state.map);
   MapLots.attach(state.map);
+  MapPhotos.attach(state.map);
   MapWind.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
   // show on the map that has just been rebuilt.
@@ -5421,6 +5445,7 @@ function stationActionGroups(s, { edit = false } = {}) {
            title="Zoom the map to the ~50 km area around this station">🔍 Zoom to station</button>`,
       fieldDataPillHtml(s),
       twinPillHtml(s),
+      fieldPhotosPillHtml(s),
       MapBlast.popupLinkHtml(s),
     ] },
     { label: 'Position', pills: [
@@ -5455,10 +5480,19 @@ function stationActionGroups(s, { edit = false } = {}) {
 // is loaded, for fieldDataPillHtml's reason below.
 function twinPillHtml(s) {
   if (typeof DigitalTwin === 'undefined' || !DigitalTwin.openStation) return '';
-  if (!isFinite(s.lat) || !isFinite(s.lon)) return '';
+  if (s.lat == null || s.lon == null || !isFinite(s.lat) || !isFinite(s.lon)) return '';
   return `<button type="button" class="pill mn-twin" onclick="DigitalTwin.openStation('${escAttr(s.id)}')"
            title="Open the Digital Twin tab on this station: its ground in 3-D, a 2 m pole where it stands"
            >🧊 Digital twin →</button>`;
+}
+
+// "Field photos →": the photos filed under this station, on the Field Photos
+// tab. Only for a signed-in session — the photos are editors-only (0035), and a
+// pill onto a tab that can only say "sign in" is a pill that wastes a click —
+// and only when the module is loaded, for fieldDataPillHtml's reason below.
+function fieldPhotosPillHtml(s) {
+  if (typeof FieldPhotos === 'undefined' || !FieldPhotos.pillHtml) return '';
+  return FieldPhotos.pillHtml(s);
 }
 
 // "Field data →": the station's readings, on the tab that draws them. The

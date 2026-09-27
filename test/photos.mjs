@@ -1,0 +1,1145 @@
+// Field photos: a photo in, placed where it was taken, and shown there — on
+// the Field Photos tab, on the Stations map and in the Digital Twin
+// (photo-meta.js, field-photos.js, map-photos.js, digital-twin.js).
+//
+// Why this is a check of its own. `smoke` opens the tab signed out, where it
+// says "sign in" and nothing else, and passes. Everything this feature is
+// for happens past that sentence: a photo read, its position taken out of
+// its EXIF or read off the picture by OCR, a station matched, bytes and a row
+// sent in the right order, and the same photo drawn as a pin on the map and
+// a marker in the twin, each opening one carousel. None of it is visible to
+// a check that does not sign in, drop files and look.
+//
+// Two halves.
+//
+//   1. photo-meta.js on its own, under Node — the file the Dropbox sync
+//      require()s, so both doors read a photo alike. The reader against
+//      photos built byte by byte (lib/exif.mjs): EXIF in a JPEG either byte
+//      order, in a HEIC (in mdat and in idat), a PNG and a WebP; XMP, a DJI
+//      drone's own tags; a file that is not a photo, cut short, or holding
+//      a (0, 0) fix. The overlay parser against the text field camera apps
+//      print — Solocator's (the two photos the issue came with), GPS Map
+//      Camera's, Timestamp Camera's DMS, NoteCam's, an MGA grid reference —
+//      and against what OCR makes of them: a (T) read as (1), ± as +, a
+//      digit wrong in one reading of three, a decimal point lost. The
+//      compass word that has to agree with a heading; a date written day
+//      first; the zone a time was in, where only the place says. Then
+//      reconcile() and record(): the file's facts before the overlay's, and
+//      no field the photo did not say (null is not nought).
+//
+//   2. The app in Chromium, against a fake project: the Data API answered
+//      from rows this file keeps (the attachment vocabulary parsed out of
+//      0010, as the form checks do), Storage from lib/storage.mjs, and the
+//      OCR engine served off disk by the network policy — real Tesseract, a
+//      real read of the two Solocator photos. Signed out, then in; eight
+//      files dropped in one go (the two photos, one with GPS in its EXIF, the
+//      same photo twice, a HEIC this browser cannot draw, two photos with no
+//      position anywhere, and a text file); the queue checked and a photo
+//      placed by hand; the upload's order, paths and records; the same photo
+//      again, refused before a byte moves — and again in a race, and again
+//      refused by the database, each taking its bytes back down; the library,
+//      its filters and one batch of signed thumbnails; the carousel by
+//      keyboard and by click, a caption, a placing, a removal; linking
+//      Dropbox, PKCE end to end. Then the map: a pin per spot with a cone per
+//      way the camera faced, merged as they would overlap, opening the
+//      carousel. Then the twin (skipped without WebGL): a marker standing on
+//      the ground where each spot is, a wedge per view, "In the twin" standing
+//      the camera behind the photographer, the badge clicked, the POV walked
+//      up to it and Enter pressed — and none of it in the .glb.
+//
+// What is *not* here: 0035's rules. tools/check_field_photos.sql holds them
+// against a real Postgres, and a JavaScript copy in this fake would be a
+// fixture testing itself. The fake does only what the pages downstream of it
+// need to draw — an id, a station by distance, a live row per hash — and
+// records what the browser sent, which is the thing under test.
+//
+// Run:  npm run photos
+//       npm run photos -- -v    also print what passed
+
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
+import { startServer } from './lib/server.mjs';
+import { launchBrowser } from './lib/browser.mjs';
+import { applyNetworkPolicy } from './lib/network.mjs';
+import { auditHandlers } from './lib/controls.mjs';
+import { storageStore, installStorage, fileOf } from './lib/storage.mjs';
+import { seedRows, attachmentsSql } from './lib/migration.mjs';
+import { hillyTerrariumPng } from './lib/terrarium.mjs';
+import { repo } from './lib/paths.mjs';
+import { tiff, gpsEntries, jpegWith, jpegShell, heicWith, pngWith, webpWith, xmpPacket } from './lib/exif.mjs';
+
+const require = createRequire(import.meta.url);
+const PhotoMeta = require(repo('photo-meta.js'));
+
+const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
+const LOAD_TIMEOUT  = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
+const OCR_TIMEOUT   = Number(process.env.PHOTOS_OCR_TIMEOUT || 300_000);
+const BUILD_TIMEOUT = Number(process.env.TWIN_TIMEOUT || 90_000);
+
+let failures = 0, passes = 0;
+const ok = (name, cond, detail = '') => {
+  if (cond) { passes++; if (VERBOSE) console.log(`  ok   ${name}${detail ? ` — ${detail}` : ''}`); return; }
+  failures++;
+  console.log(`  FAIL ${name}${detail ? `\n         ${detail}` : ''}`);
+};
+const near = (a, b, tol) => a != null && b != null && isFinite(a) && isFinite(b) && Math.abs(a - b) <= tol;
+const section = t => console.log(`\n${t}\n`);
+const sha256 = buf => crypto.createHash('sha256').update(buf).digest('hex');
+const b64url = buf => Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const J = v => JSON.stringify(v);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 1. photo-meta.js, under Node
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Where the two Solocator photos were taken, as their overlay prints it.
+const G = { lat: -27.554294, lon: 152.274116 };
+
+// A phone's EXIF: the camera, the shutter in local time and its zone, a 26 mm
+// equivalent lens, and a GPS block with everything a GPS block can hold.
+function exifTiff({ le = true, orientation = 1, local = '2026:06:24 12:26:08', offset = '+10:00', f35 = 26, gps = {} } = {}) {
+  const exif = [];
+  if (local) exif.push([0x9003, 2, local]);
+  if (offset) exif.push([0x9011, 2, offset]);
+  if (f35) exif.push([0xa405, 3, [f35]]);
+  return tiff({
+    le,
+    ifd0: [[0x010f, 2, 'Apple'], [0x0110, 2, 'iPhone 15'], [0x0112, 3, [orientation]]],
+    exif,
+    gps: gps === null ? [] : gpsEntries({ lat: G.lat, lon: G.lon, alt: 134, heading: 242, accuracy: 4,
+                                          date: '2026:06:24', time: [2, 26, 8], datum: 'WGS-84', ...gps }),
+  });
+}
+
+// The horizontal field of view of a 26 mm equivalent lens, across a frame
+// `w` wide and `h` high: the 35 mm diagonal (43.27 mm) shared out by aspect.
+const fov26 = (w, h) => 2 * Math.atan((43.27 * w / Math.hypot(w, h)) / 52) * 180 / Math.PI;
+
+function fullRead(r, what, { make = true } = {}) {
+  ok(`${what}: the position, to a centimetre`,
+    r.gps && near(r.gps.lat, G.lat, 1e-7) && near(r.gps.lon, G.lon, 1e-7) && r.gps.source === 'exif', J(r.gps));
+  ok(`${what}: altitude, heading (true), accuracy, datum and the GPS clock`,
+    r.gps && r.gps.alt === 134 && r.gps.altRef === 'MSL' && r.gps.heading === 242 && r.gps.headingRef === 'T'
+      && r.gps.accuracy === 4 && r.gps.datum === 'WGS-84' && r.gps.utc === '2026-06-24T02:26:08.000Z', J(r.gps));
+  ok(`${what}: the time, in the zone the camera wrote`,
+    r.taken && r.taken.local === '2026-06-24T12:26:08' && r.taken.offset === '+10:00'
+      && r.taken.iso === '2026-06-24T02:26:08.000Z' && r.taken.zoneSource === 'exif' && r.taken.source === 'exif', J(r.taken));
+  if (make) ok(`${what}: the camera`, r.make === 'Apple' && r.model === 'iPhone 15' && r.hasExif, `${r.make} ${r.model}`);
+}
+
+function nodeHalf() {
+  const read = PhotoMeta.read;
+
+  section('Reading a file — EXIF in four containers, XMP, and what is not a photo');
+
+  const le = read(jpegWith(jpegShell(4032, 3024), { tiff: exifTiff({ orientation: 6 }) }));
+  ok('a JPEG with little-endian EXIF is a JPEG, 4032 × 3024', le.format === 'jpeg' && le.width === 4032 && le.height === 3024, `${le.format} ${le.width}×${le.height}`);
+  fullRead(le, 'little-endian JPEG');
+  ok('orientation 6 stands it up: 3024 wide, 4032 high', le.orientation === 6 && le.uprightWidth === 3024 && le.uprightHeight === 4032,
+    `${le.orientation} ${le.uprightWidth}×${le.uprightHeight}`);
+  ok('and the field of view is across the upright width — 26 mm on a portrait frame', near(le.fov, fov26(3024, 4032), 1e-9) && near(le.fov, 53.1, 0.1),
+    `${le.fov}`);
+
+  fullRead(read(jpegWith(jpegShell(4032, 3024), { tiff: exifTiff({ le: false }) })), 'big-endian JPEG');
+
+  for (const inIdat of [false, true]) {
+    const h = read(heicWith({ tiff: exifTiff({ le: false }), width: 4032, height: 3024, inIdat }));
+    ok(`a HEIC with its Exif item in ${inIdat ? 'idat' : 'mdat'}: a HEIC, its size from ispe`,
+      h.format === 'heic' && h.width === 4032 && h.height === 3024, `${h.format} ${h.width}×${h.height}`);
+    fullRead(h, `HEIC, Exif in ${inIdat ? 'idat' : 'mdat'}`);
+  }
+
+  const png = read(pngWith({ tiff: exifTiff(), width: 8, height: 6 }));
+  ok('a PNG with eXIf after its pixels: the size from IHDR', png.format === 'png' && png.width === 8 && png.height === 6, `${png.width}×${png.height}`);
+  fullRead(png, 'PNG eXIf');
+
+  const webp = read(webpWith({ tiff: exifTiff(), width: 1600, height: 1200 }));
+  ok('a WebP with VP8X and EXIF: the size from VP8X', webp.format === 'webp' && webp.width === 1600 && webp.height === 1200, `${webp.width}×${webp.height}`);
+  fullRead(webp, 'WebP EXIF');
+
+  // XMP alone, the way a photo that has been through an editor carries it.
+  const x = read(jpegWith(jpegShell(4000, 3000), { xmp: xmpPacket({
+    'exif:GPSLatitude': '27,33.25764S', 'exif:GPSLongitude': '152,16.44696E', 'exif:GPSAltitude': '1342/10',
+    'exif:GPSImgDirection': '242/1', 'exif:GPSImgDirectionRef': 'M', 'exif:DateTimeOriginal': '2026-06-24T12:26:08+10:00',
+  }) }));
+  ok('XMP only: the position in degrees and decimal minutes, from the XMP',
+    x.gps && x.gps.source === 'xmp' && near(x.gps.lat, G.lat, 1e-7) && near(x.gps.lon, G.lon, 1e-7) && !x.hasExif && x.hasXmp, J(x.gps));
+  ok('XMP only: altitude as a rational, a magnetic heading, and the time with its offset',
+    x.gps && near(x.gps.alt, 134.2, 1e-9) && x.gps.heading === 242 && x.gps.headingRef === 'M'
+      && x.taken && x.taken.local === '2026-06-24T12:26:08' && x.taken.offset === '+10:00' && x.taken.source === 'xmp', J({ g: x.gps, t: x.taken }));
+
+  // A DJI drone: its own tags, longitude spelt as some firmware spells it, and
+  // the gimbal — where the camera points — rather than the aircraft's heading.
+  const dji = read(jpegWith(jpegShell(5280, 3956), { xmp: xmpPacket({
+    'drone-dji:GpsLatitude': '-27.5543', 'drone-dji:GpsLongtitude': '152.274115', 'drone-dji:AbsoluteAltitude': '+180.50',
+    'drone-dji:GimbalYawDegree': '-118.0', 'drone-dji:GimbalPitchDegree': '-30.5',
+  }) }));
+  ok('a DJI photo: its own position tags, "Longtitude" and all',
+    dji.gps && dji.gps.source === 'xmp-dji' && dji.gps.lat === -27.5543 && dji.gps.lon === 152.274115 && dji.gps.alt === 180.5, J(dji.gps));
+  ok('…the gimbal\'s yaw as the heading (−118° is 242°) and its pitch as the tilt', dji.gps && dji.gps.heading === 242 && dji.pitch === -30.5,
+    `${dji.gps && dji.gps.heading} ${dji.pitch}`);
+  const djiRec = PhotoMeta.record({ name: 'DJI_0042.JPG', meta: dji, ...PhotoMeta.reconcile(dji, null) });
+  ok('…placed from the XMP, facing 242°, pitched −30.5°',
+    djiRec.placement === 'xmp' && djiRec.heading_deg === 242 && djiRec.pitch_deg === -30.5 && djiRec.altitude_m === 180.5, J(djiRec));
+
+  // What is not a photo, or not all of one: never a throw, never a position.
+  let threw = null, placed = 0;
+  let seed = 42;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const shapes = [];
+  for (let i = 0; i < 60; i++) shapes.push(Buffer.from(Array.from({ length: 64 + Math.floor(rnd() * 4000) }, () => Math.floor(rnd() * 256))));
+  const whole = jpegWith(jpegShell(4032, 3024), { tiff: exifTiff() });
+  for (let n = 0; n < whole.length; n += 3) shapes.push(whole.subarray(0, n));
+  const heic = heicWith({ tiff: exifTiff(), inIdat: true });
+  for (let n = 0; n < heic.length; n += 7) shapes.push(heic.subarray(0, n));
+  // A JPEG whose APP1 claims more than it has, and one full of 0xff.
+  shapes.push(Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe1, 0xff, 0xff]), Buffer.from('Exif\0\0II*\0', 'latin1')]));
+  shapes.push(Buffer.alloc(512, 0xff));
+  for (const b of shapes) {
+    try { const r = read(b); if (r.gps && !(near(r.gps.lat, G.lat, 1e-6) && near(r.gps.lon, G.lon, 1e-6))) placed++; }
+    catch (e) { threw = threw || e; }
+  }
+  ok(`${shapes.length} random, truncated and malformed files: read() never throws, and places none anywhere else`,
+    !threw && placed === 0, threw ? threw.stack : `${placed} placed wrongly`);
+  const junk = read(Buffer.from('this is a text file, not a photo'));
+  ok('a text file reads as no known format, with no position and no time', junk.format === 'unknown' && !junk.gps && !junk.taken, J(junk));
+
+  const zero = read(jpegWith(jpegShell(640, 480), { tiff: exifTiff({ gps: { lat: 0, lon: 0 } }) }));
+  ok('a GPS fix of (0, 0) is no fix, not a photo in the Gulf of Guinea', !zero.gps, J(zero.gps));
+  const half = read(jpegWith(jpegShell(640, 480), { tiff: tiff({ gps: gpsEntries({ lat: G.lat }) }) }));
+  ok('a latitude with no longitude is no position', !half.gps, J(half.gps));
+
+  section('The zone a time was taken in, where the file does not say');
+
+  const clock = read(jpegWith(jpegShell(4032, 3024), { tiff: exifTiff({ offset: null }) }));
+  ok('no offset written, a GPS clock: the zone is the difference between the two, to the quarter hour',
+    clock.taken.offset === '+10:00' && clock.taken.zoneSource === 'gps-clock' && clock.taken.iso === '2026-06-24T02:26:08.000Z', J(clock.taken));
+  const qld = read(jpegWith(jpegShell(4032, 3024), { tiff: exifTiff({ offset: null, gps: { time: undefined, date: undefined } }) }));
+  ok('no offset and no GPS clock at Gatton: AEST, and it says it was assumed',
+    qld.taken.offset === '+10:00' && qld.taken.zoneSource === 'assumed' && qld.taken.iso === '2026-06-24T02:26:08.000Z', J(qld.taken));
+  const syd = read(jpegWith(jpegShell(4032, 3024), { tiff: exifTiff({ local: '2026:01:15 09:00:00', offset: null,
+    gps: { lat: -33.87, lon: 151.21, time: undefined, date: undefined } }) }));
+  ok('…and in Sydney in January, daylight saving', syd.taken.offset === '+11:00' && syd.taken.iso === '2026-01-14T22:00:00.000Z', J(syd.taken));
+
+  const zone = (lat, lon, local) => { const z = PhotoMeta.auZone(lat, lon, local); return z ? z.offset : null; };
+  const zones = [
+    ['Brisbane in January (Queensland keeps no summer time)', -27.47, 153.03, '2026-01-15T12:00:00', '+10:00'],
+    ['Sydney in January', -33.87, 151.21, '2026-01-15T12:00:00', '+11:00'],
+    ['Sydney in July', -33.87, 151.21, '2026-07-15T12:00:00', '+10:00'],
+    ['Melbourne in January', -37.81, 144.96, '2026-01-15T12:00:00', '+11:00'],
+    ['Hobart in January', -42.88, 147.33, '2026-01-15T12:00:00', '+11:00'],
+    ['Adelaide in January', -34.93, 138.60, '2026-01-15T12:00:00', '+10:30'],
+    ['Adelaide in July', -34.93, 138.60, '2026-07-15T12:00:00', '+09:30'],
+    ['Darwin in January', -12.46, 130.84, '2026-01-15T12:00:00', '+09:30'],
+    ['Perth in January', -31.95, 115.86, '2026-01-15T12:00:00', '+08:00'],
+    ['the Gold Coast in January — north of the border', -28.0, 153.43, '2026-01-15T12:00:00', '+10:00'],
+    ['Byron Bay in January — south of it', -28.64, 153.61, '2026-01-15T12:00:00', '+11:00'],
+    ['Sydney on the first Sunday in October 2026', -33.87, 151.21, '2026-10-04T12:00:00', '+11:00'],
+    ['Sydney the day before', -33.87, 151.21, '2026-10-03T12:00:00', '+10:00'],
+    ['Sydney the day before the first Sunday in April 2026', -33.87, 151.21, '2026-04-04T12:00:00', '+11:00'],
+    ['Sydney on it', -33.87, 151.21, '2026-04-05T12:00:00', '+10:00'],
+    ['London (not guessed at)', 51.5, -0.12, '2026-01-15T12:00:00', null],
+    ['nowhere (a null latitude is not 0°)', null, 152.27, '2026-01-15T12:00:00', null],
+  ];
+  const wrongZones = zones.filter(([, la, lo, t, want]) => zone(la, lo, t) !== want);
+  ok(`the zone by place and date, ${zones.length} ways`, wrongZones.length === 0,
+    wrongZones.map(([n, la, lo, t, want]) => `${n}: ${zone(la, lo, t)} not ${want}`).join('; '));
+
+  section('The overlay, as text — what field camera apps print, and what OCR makes of it');
+
+  const vote = (texts, opts) => PhotoMeta.vote(Array.isArray(texts) ? texts : [texts], opts);
+  const at = (c, lat, lon, tol = 2e-7) => c && near(c.lat, lat, tol) && near(c.lon, lon, tol);
+
+  const SOLO = '242°SW (T) -27.554294°, 152.274116° ±4m ▲ 134m (HAE)\nBoM-FWIN\nGatton\n2026-06-24, 12:26:08 AEST';
+  const s = vote(SOLO);
+  ok('Solocator: the position, one reading, medium confidence', at(s.coords, G.lat, G.lon) && s.coords.votes === 1 && s.coords.confidence === 'medium',
+    J(s.coords));
+  ok('Solocator: 242° true, ±4 m, 134 m above the ellipsoid',
+    s.heading && s.heading.heading === 242 && s.heading.ref === 'T' && s.accuracy && s.accuracy.accuracy === 4
+      && s.altitude && s.altitude.altitude === 134 && s.altitude.ref === 'HAE', J({ h: s.heading, a: s.accuracy, z: s.altitude }));
+  ok('Solocator: the time, and AEST is +10:00', s.time && s.time.local === '2026-06-24T12:26:08' && s.time.offset === '+10:00', J(s.time));
+
+  // Three readings of one overlay, as OCR returns them: the (T) read as (1),
+  // the ± as a +, the ▲ as an A — and in the third a 9 read as a 0 and the
+  // degree sign as a nought.
+  const noisy = vote([
+    '242°SW (T) -27.554294°, 152.274116° ±4m ▲ 134m (HAE)',
+    '242°SW (1) -27.554294°, 152.274116° +4m A 134m (HAE)',
+    '2420SW (T) -27.554204°, 152.274116° ±4m',
+  ]);
+  ok('three readings, one misread: the two that agree win, with high confidence, and the misreading is kept as the rival',
+    at(noisy.coords, G.lat, G.lon) && noisy.coords.votes === 2 && noisy.coords.confidence === 'high'
+      && noisy.coords.rivals.some(r => near(r.lat, -27.554204, 1e-7)), J(noisy.coords));
+  ok('…the heading from the two readings that have one, (1) read as (T)', noisy.heading && noisy.heading.heading === 242 && noisy.heading.ref === 'T' && noisy.heading.votes === 2,
+    J(noisy.heading));
+  ok('…±4 m in all three, the + after a coordinate included', noisy.accuracy && noisy.accuracy.accuracy === 4 && noisy.accuracy.votes === 3, J(noisy.accuracy));
+
+  const gpsmap = vote('Gatton, Queensland, Australia\n23 Railway St, Gatton QLD 4343, Australia\nLat -27.554294° Long 152.274116°\nWednesday, 24/06/2026 12:26 PM GMT +10:00');
+  ok('GPS Map Camera: labelled, and a day-first date with GMT +10:00',
+    at(gpsmap.coords, G.lat, G.lon) && gpsmap.coords.kind === 'labelled' && gpsmap.time && gpsmap.time.local === '2026-06-24T12:26:00'
+      && gpsmap.time.offset === '+10:00' && !gpsmap.time.ambiguous, J({ c: gpsmap.coords, t: gpsmap.time }));
+
+  const dms = vote('27°33\'15.46"S 152°16\'26.82"E\nJun 24, 2026 12:26:08 PM');
+  ok('Timestamp Camera: degrees, minutes and seconds', at(dms.coords, -(27 + 33 / 60 + 15.46 / 3600), 152 + 16 / 60 + 26.82 / 3600, 1e-9) && dms.coords.kind === 'dms',
+    J(dms.coords));
+  ok('…and "Jun 24, 2026 12:26:08 PM", with no zone', dms.time && dms.time.local === '2026-06-24T12:26:08' && dms.time.offset === null, J(dms.time));
+
+  const notecam = vote('S 27.554294 E 152.274116\nAltitude: 134.2m\nAccuracy: 5m\n24 June 2026 12:26:08');
+  ok('NoteCam: the hemisphere first, a labelled altitude and accuracy, "24 June 2026"',
+    at(notecam.coords, G.lat, G.lon) && notecam.coords.kind === 'hemisphere' && notecam.altitude && notecam.altitude.altitude === 134.2
+      && notecam.accuracy && notecam.accuracy.accuracy === 5 && notecam.time && notecam.time.local === '2026-06-24T12:26:08', J(notecam));
+
+  // Flinders Peak, the textbook's worked example (GDA94 / MGA zone 55).
+  const FP = { lat: -(37 + 57 / 60 + 3.72030 / 3600), lon: 144 + 25 / 60 + 29.52440 / 3600 };
+  const mga = vote('MGA55 E 273741.297 N 5796489.777');
+  ok('an MGA grid reference: Flinders Peak, to a centimetre', at(mga.coords, FP.lat, FP.lon, 1e-7) && mga.coords.kind === 'grid' && mga.coords.grid.zone === 55,
+    J(mga.coords));
+  const utm = vote('55H 273741 5796490');
+  ok('…and as UTM with a band letter, to the metre it was written to', at(utm.coords, FP.lat, FP.lon, 1e-5), J(utm.coords));
+  const fp = PhotoMeta.utmToLatLon(55, 273741.297, 5796489.777, true);
+  ok('utmToLatLon: Krüger\'s series lands on the published coordinates', near(fp.lat, FP.lat, 1e-8) && near(fp.lon, FP.lon, 1e-8), J(fp));
+
+  const guessed = vote('27.554294, 152.274116', { home: { lat: -27.5, lon: 152.9 } });
+  ok('a bare pair with no sign: south of the equator, where the network is — and it says it guessed, at low confidence',
+    at(guessed.coords, G.lat, G.lon) && guessed.coords.signGuessed && guessed.coords.confidence === 'low', J(guessed.coords));
+  const repaired = vote('46°NE (T) -27554300°,152.274115° ±4m');
+  ok('a latitude that lost its decimal point is put back, at low confidence', at(repaired.coords, -27.5543, 152.274115)
+    && repaired.coords.kind === 'repaired' && repaired.coords.confidence === 'low', J(repaired.coords));
+  const lopsided = vote('-27.5543°, 152.274116°');
+  ok('a pair whose halves disagree in precision, read once, is low confidence', lopsided.coords && lopsided.coords.confidence === 'low', J(lopsided.coords));
+
+  const heads = t => PhotoMeta.parseOverlay(t).headings.map(h => `${h.heading}${h.ref || ''}`);
+  const headingCases = [
+    ['"242°SW (T)"', '242°SW (T)', ['242T']],
+    ['"46°NE", no reference', '46°NE', ['46']],
+    ['"242°SW (M)"', '242°SW (M)', ['242M']],
+    ['"353° N (T)" — within a point of north', '353° N (T)', ['353T']],
+    ['"Heading: 118°"', 'Heading: 118°', ['118']],
+    ['a latitude followed by S is not a heading', 'Lat 27.5° S', []],
+    ['"90° N" — the word disagrees', '90° N', []],
+    ['a compass ribbon\'s bare numbers', '300 NW 330 N 30 NE 60', []],
+  ];
+  const wrongHeads = headingCases.filter(([, t, want]) => J(heads(t)) !== J(want));
+  ok('headings: five read, and the three lookalikes that are not', wrongHeads.length === 0,
+    wrongHeads.map(([n, t]) => `${n}: ${J(heads(t))}`).join('; '));
+
+  const times = t => PhotoMeta.parseOverlay(t).times.map(x => `${x.local}${x.offset || ''}${x.ambiguous ? '?' : ''}`);
+  const timeCases = [
+    ['06/05/2026 09:15 — both ways round, read day first and flagged', '06/05/2026 09:15', ['2026-05-06T09:15:00?']],
+    ['05/13/2026 09:15 — the month cannot be 13, so it is not', '05/13/2026 09:15', ['2026-05-13T09:15:00']],
+    ['13 Jan 2026 18:05:00 AEDT', '13 Jan 2026 18:05:00 AEDT', ['2026-01-13T18:05:00+11:00']],
+    ['Jun 24, 2026 12:26:08 AM — twelve in the morning is nought', 'Jun 24, 2026 12:26:08 AM', ['2026-06-24T00:26:08']],
+    ['2026-06-24 12:26:08 +09:30', '2026-06-24 12:26:08 +09:30', ['2026-06-24T12:26:08+09:30']],
+    ['2026-13-40 25:61 — nothing', '2026-13-40 25:61', []],
+  ];
+  const wrongTimes = timeCases.filter(([, t, want]) => J(times(t)) !== J(want));
+  ok(`times, ${timeCases.length} ways`, wrongTimes.length === 0, wrongTimes.map(([n, t]) => `${n}: ${J(times(t))}`).join('; '));
+
+  const alts = t => PhotoMeta.parseOverlay(t).altitudes.map(a => `${+a.altitude.toFixed(3)}${a.ref || ''}`);
+  const accs = t => PhotoMeta.parseOverlay(t).accuracies.map(a => a.accuracy);
+  ok('altitudes: "▲ 134m (HAE)", "Alt: 440 ft" in metres, "Elevation 98.5 m AHD"',
+    J(alts('▲ 134m (HAE)')) === J(['134HAE', '134HAE']) && J(alts('Alt: 440 ft')) === J(['134.112'])
+      && alts('Elevation 98.5 m AHD').every(a => a === '98.5AHD'),
+    `${J(alts('▲ 134m (HAE)'))} ${J(alts('Alt: 440 ft'))} ${J(alts('Elevation 98.5 m AHD'))}`);
+  ok('accuracies: "±4m", "Accuracy: 5 m", "HAcc 3.2m"',
+    J(accs('±4m')) === '[4]' && J(accs('Accuracy: 5 m')) === '[5]' && J(accs('HAcc 3.2m')) === '[3.2]',
+    `${J(accs('±4m'))} ${J(accs('Accuracy: 5 m'))} ${J(accs('HAcc 3.2m'))}`);
+
+  ok('compass points: 242° is WSW, 46° NE, 359° N', PhotoMeta.compassPoint(242) === 'WSW' && PhotoMeta.compassPoint(46) === 'NE' && PhotoMeta.compassPoint(359) === 'N'
+    && PhotoMeta.compassPoint(null) === '', `${PhotoMeta.compassPoint(242)} ${PhotoMeta.compassPoint(46)}`);
+
+  section('Reconciled and recorded — the file before the overlay, and nothing the photo did not say');
+
+  const need = PhotoMeta.needsOcr;
+  ok('the overlay is read only where the file lacks a position or a time',
+    need(le) === false && need(read(jpegWith(jpegShell(640, 480), { tiff: exifTiff({ gps: null }) }))) === true
+      && need(read(jpegWith(jpegShell(640, 480), { tiff: exifTiff({ local: null, offset: null }) }))) === true && need(null) === true);
+
+  const ocrOf = text => Object.assign(PhotoMeta.vote([text, text]), { passes: 2, texts: [{ band: 'bottom', variant: 'grey', psm: '6', text }, { band: 'bottom', variant: 'key', psm: '7', text }] });
+  const ocr = ocrOf('46°NE (T) -27.554300°, 152.274115° ±4m ▲ 134m (HAE)\n2026-06-24, 12:26:02 AEST');
+  const both = PhotoMeta.reconcile(le, ocr);
+  ok('GPS in the file and a position on the picture: the file\'s wins, heading and all, and the reading is kept',
+    both.pos.placement === 'exif' && at(both.pos, G.lat, G.lon) && both.heading.deg === 242 && both.ocr && both.ocr.confidence === 'high', J(both));
+  const onlyOcr = PhotoMeta.reconcile(read(Buffer.from([0xff, 0xd8, 0xff, 0xd9])), ocr);
+  ok('nothing in the file: the overlay places it — position, accuracy, heading, altitude and a printed zone',
+    onlyOcr.pos.placement === 'ocr' && at(onlyOcr.pos, -27.5543, 152.274115) && onlyOcr.pos.accuracy === 4 && onlyOcr.pos.confidence === 'high'
+      && onlyOcr.heading.deg === 46 && onlyOcr.altitude.m === 134 && onlyOcr.altitude.ref === 'HAE'
+      && onlyOcr.taken.local === '2026-06-24T12:26:02' && onlyOcr.taken.zone === 'printed' && onlyOcr.taken.iso === '2026-06-24T02:26:02.000Z', J(onlyOcr));
+  const noZone = PhotoMeta.reconcile(read(Buffer.from([0xff, 0xd8, 0xff, 0xd9])), ocrOf('-27.554300°, 152.274115°\n24/06/2026 12:26'));
+  ok('an overlay time with no zone takes the zone of where it was taken, and says so',
+    noZone.taken.zone === 'assumed' && noZone.taken.iso === '2026-06-24T02:26:00.000Z', J(noZone.taken));
+
+  const rec = PhotoMeta.record({ name: 'IMG_0042.jpg', size: 2163393, type: 'image/jpeg', width: 4032, height: 3024, meta: le, ...PhotoMeta.reconcile(le, null) });
+  ok('record(): the position to seven places, the GPS\'s accuracy, heading, altitude and the time twice over',
+    rec.lat === -27.554294 && rec.lon === 152.274116 && rec.placement === 'exif' && rec.accuracy_m === 4
+      && rec.heading_deg === 242 && rec.heading_ref === 'T' && rec.altitude_m === 134 && rec.altitude_ref === 'MSL'
+      && rec.taken_local === '2026-06-24T12:26:08' && rec.taken_at === '2026-06-24T02:26:08.000Z' && rec.taken_source === 'exif', J(rec));
+  ok('record(): the lens\'s field of view to a tenth, the camera and the datum in meta',
+    rec.fov_deg === +fov26(3024, 4032).toFixed(1) && rec.meta.camera.make === 'Apple' && rec.meta.gps.datum === 'WGS-84'
+      && rec.meta.taken.zone_source === 'exif' && rec.title === 'IMG_0042.jpg', J(rec.meta));
+  const bare = PhotoMeta.record({ name: 'x.jpg', ...PhotoMeta.reconcile({ gps: { lat: -27.5, lon: 152.2, source: 'exif' }, pitch: null, fov: null, taken: null }, null) });
+  ok('record(): a photo that says no pitch, no field of view and no accuracy sends none — null is not nought',
+    !('pitch_deg' in bare) && !('fov_deg' in bare) && !('accuracy_m' in bare) && !('heading_deg' in bare) && bare.placement === 'exif', J(bare));
+  const none = PhotoMeta.record({ name: 'blank.jpg', ...PhotoMeta.reconcile({ gps: null, taken: null }, null) });
+  ok('record(): a photo with no position sends no position at all', !('lat' in none) && !('lon' in none) && !('placement' in none) && !('taken_at' in none), J(none));
+  const edge = PhotoMeta.record({ name: 'x.jpg', heading: { deg: 359.999, ref: 'T' }, pitch: -120, fov: 250 });
+  ok('record(): a heading that rounds to 360 is 0, and pitch and field of view are kept in range',
+    edge.heading_deg === 0 && edge.pitch_deg === -90 && edge.fov_deg === 180, J(edge));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 2. The app, in Chromium, against a fake project
+// ═════════════════════════════════════════════════════════════════════════════
+
+const FIX = repo('test', 'fixtures', 'photos');
+const SW = fs.readFileSync(`${FIX}/solocator-gatton-sw.jpg`);
+const NE = fs.readFileSync(`${FIX}/solocator-gatton-ne.jpg`);
+
+// A phone photo with its GPS in the EXIF — 25 m north-east of the Gatton
+// gauge — taken the next morning. The picture is the NE photo, overlay and
+// all: the file's own position has to win without the OCR being asked.
+const GPS_AT = { lat: -27.55484, lon: 152.27518 };
+const GPS_JPG = jpegWith(NE, { tiff: tiff({
+  ifd0: [[0x010f, 2, 'Apple'], [0x0110, 2, 'iPhone 15'], [0x0112, 3, [1]]],
+  exif: [[0x9003, 2, '2026:06:25 09:15:00'], [0x9011, 2, '+10:00'], [0xa405, 3, [26]]],
+  gps: gpsEntries({ ...GPS_AT, alt: 96.5, heading: 118.25, accuracy: 3.5, date: '2026:06:24', time: [23, 15, 0] }),
+}) });
+// An iPhone's HEIC, as far as its metadata goes — no picture a browser could
+// draw, which is the point: Chromium draws no HEIC at all.
+const HEIC = heicWith({ tiff: exifTiff(), width: 4032, height: 3024 });
+
+const STATIONS = JSON.parse(fs.readFileSync(repo('stations.json'), 'utf8')).stations
+  .filter(s => s.lat != null && s.lon != null);
+const GATTON = STATIONS.find(s => s.id === 'gatton');
+const metres = (a, b) => Math.hypot((b.lat - a.lat) * 110574, (b.lon - a.lon) * 111320 * Math.cos(a.lat * Math.PI / 180));
+function nearestStation(p, within = 1000) {
+  let best = null, bd = Infinity;
+  for (const s of STATIONS) {
+    if (Math.abs(s.lat - p.lat) > 0.05 || Math.abs(s.lon - p.lon) > 0.06) continue;
+    const d = metres(p, s);
+    if (d <= within && d < bd) { best = s; bd = d; }
+  }
+  return best;
+}
+
+// ── The fake project's Data API ──────────────────────────────────────────────
+// PostgREST as far as these pages use it: a select list with aliases into the
+// JSON meta, eq / gte / lte / is.null, an order with nulls placement, a limit.
+// Rows live here; deleted ones are tombstones, invisible as they are to an
+// editor under 0035's policy.
+
+function project(row, select) {
+  if (!select || select === '*') return { ...row };
+  const out = {};
+  for (const part of select.split(',')) {
+    const [alias, expr] = part.includes(':') ? part.split(':') : [null, part];
+    const pathOf = expr.split(/->>|->/);
+    let v = row[pathOf[0]];
+    for (const k of pathOf.slice(1)) v = v && typeof v === 'object' ? v[k] : undefined;
+    if (v === undefined) v = null;
+    if (expr.includes('->>') && v !== null && typeof v !== 'string') v = typeof v === 'object' ? J(v) : String(v);
+    out[alias || pathOf[pathOf.length - 1]] = v;
+  }
+  return out;
+}
+function matches(row, key, cond) {
+  const v = row[key];
+  if (cond === 'is.null') return v === null || v === undefined;
+  const dot = cond.indexOf('.');
+  const op = cond.slice(0, dot), arg = cond.slice(dot + 1);
+  if (op === 'eq') return v != null && String(v) === arg;
+  if (op === 'gte') return v != null && +v >= +arg;
+  if (op === 'lte') return v != null && +v <= +arg;
+  throw new Error(`the photo fixture does not do ${op}`);
+}
+function ordered(rows, order) {
+  const keys = (order || '').split(',').filter(Boolean).map(k => {
+    const [col, ...mods] = k.split('.');
+    const desc = mods.includes('desc');
+    return { col, desc, nullsLast: mods.includes('nullslast') ? true : mods.includes('nullsfirst') ? false : !desc };
+  });
+  return rows.slice().sort((a, b) => {
+    for (const k of keys) {
+      const x = a[k.col], y = b[k.col];
+      if (x == null && y == null) continue;
+      if (x == null) return k.nullsLast ? 1 : -1;
+      if (y == null) return k.nullsLast ? -1 : 1;
+      if (x < y) return k.desc ? 1 : -1;
+      if (x > y) return k.desc ? -1 : 1;
+    }
+    return 0;
+  });
+}
+
+function photoProject() {
+  return {
+    rows: [],            // meganet.field_photo, tombstones included
+    calls: [],           // { fn, body, uploadsBefore } for every RPC, in order
+    selects: [],         // every field_photo query string
+    sync: [],            // meganet.field_photo_sync
+    hideSha: false,      // answer the next hash look-up with nothing — a race lost
+    refuseNext: null,    // { status, body } for the next add_field_photo
+    seq: 0,
+  };
+}
+
+function installProject(page, db, store, types) {
+  return page.route('**://*.supabase.co/rest/v1/**', async route => {
+    const req = route.request();
+    const url = new URL(req.url());
+    const name = url.pathname.replace(/^.*\/rest\/v1\//, '');
+    const json = (status, body) => route.fulfill({ status, contentType: 'application/json', body: J(body) });
+    const live = id => db.rows.find(r => r.id === id && !r.deleted_at);
+
+    if (req.method() === 'POST' && name.startsWith('rpc/')) {
+      const fn = name.slice(4);
+      const body = JSON.parse(req.postData() || '{}');
+      if (!/^(add|update|remove)_field_photo$/.test(fn)) return route.fallback();
+      db.calls.push({ fn, body, uploadsBefore: store.uploads.map(u => u.path) });
+
+      if (fn === 'add_field_photo') {
+        const p = body.p_photo;
+        if (db.refuseNext) { const r = db.refuseNext; db.refuseNext = null; return json(r.status, r.body); }
+        const dup = db.rows.find(r => !r.deleted_at && r.sha256 === p.sha256);
+        if (dup) return json(409, { code: '23505', message: 'this photo is already in MegaNet', details: dup.id, hint: null });
+        const n = ++db.seq;
+        const at = new Date(Date.UTC(2026, 5, 24, 5, 0, 0) + n * 1000).toISOString();
+        let station_id = null, station_auto = false;
+        if ('station_id' in p) station_id = p.station_id;
+        else if (p.lat != null) { const s = nearestStation(p); if (s) { station_id = s.id; station_auto = true; } }
+        const row = {
+          id: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+          storage_bucket: 'field-photos', storage_path: p.storage_path, thumb_path: p.thumb_path ?? null,
+          content_type: p.content_type, byte_size: p.byte_size, sha256: p.sha256, width: p.width ?? null, height: p.height ?? null,
+          title: p.title ?? '', caption: p.caption ?? '',
+          taken_at: p.taken_at ?? null, taken_local: p.taken_local ?? null, taken_source: p.taken_source ?? null,
+          lat: p.lat ?? null, lon: p.lon ?? null, placement: p.placement ?? null, accuracy_m: p.accuracy_m ?? null,
+          altitude_m: p.altitude_m ?? null, altitude_ref: p.altitude_ref ?? null,
+          heading_deg: p.heading_deg ?? null, heading_ref: p.heading_ref ?? null, pitch_deg: p.pitch_deg ?? null, fov_deg: p.fov_deg ?? null,
+          station_id, station_auto, meta: p.meta ?? {}, origin: 'upload', origin_ref: null,
+          uploaded_by: 'fixture@example.test', created_at: at, updated_at: at, updated_by: null, deleted_at: null, deleted_by: null,
+        };
+        db.rows.push(row);
+        return json(200, row);
+      }
+      const row = live(body.p_id);
+      if (!row) return json(400, { code: 'P0002', message: `no such field photo: ${body.p_id}` });
+      if (fn === 'update_field_photo') {
+        const p = body.p_patch;
+        if ('lat' in p || 'lon' in p) {
+          const rematch = !('station_id' in p) && (row.station_auto || (row.lat == null && row.station_id == null));
+          row.lat = p.lat; row.lon = p.lon;
+          row.placement = p.lat == null ? null : (p.placement || 'manual');
+          row.accuracy_m = 'accuracy_m' in p ? p.accuracy_m : null;
+          if (rematch) { const s = row.lat == null ? null : nearestStation(row); row.station_id = s ? s.id : null; row.station_auto = !!s; }
+        }
+        if ('station_id' in p) { row.station_id = p.station_id; row.station_auto = false; }
+        for (const k of ['title', 'caption', 'heading_deg', 'heading_ref', 'pitch_deg']) if (k in p) row[k] = p[k];
+        if ('taken_at' in p) { row.taken_at = p.taken_at; row.taken_source = p.taken_at ? (p.taken_source || 'manual') : null; }
+        row.updated_by = 'fixture@example.test';
+        return json(200, row);
+      }
+      row.deleted_at = '2026-06-25T00:00:00Z';
+      row.deleted_by = 'fixture@example.test';
+      return json(200, { removed: true, storage_bucket: row.storage_bucket, storage_path: row.storage_path, thumb_path: row.thumb_path });
+    }
+
+    if (req.method() !== 'GET') return route.fallback();
+    if (name === 'attachment_type') return json(200, types);
+    if (name === 'field_photo_sync') return json(200, db.sync);
+    if (name !== 'field_photo') return route.fallback();
+
+    db.selects.push(url.search);
+    const q = url.searchParams;
+    let rows = db.rows.filter(r => !r.deleted_at);
+    for (const [k, v] of q) {
+      if (['select', 'order', 'limit'].includes(k)) continue;
+      if (k === 'sha256' && db.hideSha) { db.hideSha = false; rows = []; continue; }
+      rows = rows.filter(r => matches(r, k, v));
+    }
+    rows = ordered(rows, q.get('order'));
+    if (q.get('limit')) rows = rows.slice(0, +q.get('limit'));
+    return json(200, rows.map(r => project(r, q.get('select'))));
+  });
+}
+
+// ── The browser half ─────────────────────────────────────────────────────────
+
+async function browserHalf() {
+  const server = await startServer();
+  const browser = await launchBrowser();
+  const errors = [];
+  const store = storageStore();
+  const db = photoProject();
+  const types = seedRows(attachmentsSql(), 'attachment_type');
+  const dropbox = { posts: [] };
+
+  try {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+    const page = await context.newPage();
+    const net = await applyNetworkPolicy(page, server.origin);
+    await installProject(page, db, store, types);
+    await installStorage(page, store);
+    await page.route(/elevation-tiles-prod\/terrarium\/(\d+)\/(\d+)\/(\d+)\.png/, route => {
+      const m = /terrarium\/(\d+)\/(\d+)\/(\d+)\.png/.exec(route.request().url());
+      return route.fulfill({ status: 200, contentType: 'image/png', body: hillyTerrariumPng(+m[1], +m[2], +m[3]),
+                             headers: { 'Access-Control-Allow-Origin': '*' } });
+    });
+    await page.route('https://api.dropboxapi.com/oauth2/token', route => {
+      const req = route.request();
+      if (req.method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'POST' } });
+      }
+      dropbox.posts.push(Object.fromEntries(new URLSearchParams(req.postData() || '')));
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' },
+        body: J({ access_token: 'sl.fixture', token_type: 'bearer', expires_in: 14400, refresh_token: 'rt-fixture-5b1d9e', account_id: 'dbid:fixture' }) });
+    });
+
+    const tessRequests = [];
+    page.on('request', r => { if (/unpkg\.com\/tesseract\.js@/.test(r.url())) tessRequests.push(r.url()); });
+    page.on('pageerror', e => errors.push(e.stack || e.message));
+    page.on('console', m => {
+      if (m.type() !== 'error') return;
+      const t = m.text();
+      if (/^Failed to load resource|ERR_BLOCKED_BY_CLIENT|ERR_FAILED|WebGL|GL_|GPU stall/i.test(t)) return;
+      errors.push(t);
+    });
+    const dialogs = [];
+    page.on('dialog', d => { dialogs.push(d.message()); d.accept(); });
+
+    await page.goto(server.origin + '/index.html', { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+    await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations),
+      null, { timeout: LOAD_TIMEOUT });
+    await page.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(String(u)); return null; }; });
+
+    const queue = () => page.evaluate(() => FieldPhotos._queue());
+    const text = sel => page.evaluate(s => { const el = document.querySelector(s); return el ? el.textContent.replace(/\s+/g, ' ').trim() : null; }, sel);
+    const viewer = () => page.evaluate(() => FieldPhotos._viewer());
+    const settledQueue = () => page.waitForFunction(() => !state.photos.reading && !state.photos.uploading
+      && state.photos.queue.every(i => !['waiting', 'reading', 'ocr', 'queued', 'uploading'].includes(i.status)), null, { timeout: OCR_TIMEOUT });
+
+    // ── Signed out ───────────────────────────────────────────────────────────
+    section('Signed out');
+    await page.evaluate(() => switchTab('photos'));
+    await page.waitForTimeout(200);
+    ok('signed out, the tab says the photos are for signed-in editors, and offers no way to add any',
+      /private to signed-in editors/.test(await text('#fp-add-panel')) && !(await page.$('#fp-files')), await text('#fp-add-panel'));
+    ok('…and asks the project for nothing', db.selects.length === 0 && store.uploads.length === 0, `${db.selects.length} select(s)`);
+    ok('the OCR engine is not fetched until a photo needs it', tessRequests.length === 0 && !(await page.evaluate(() => !!window.Tesseract)));
+    let audit = await auditHandlers(page);
+    ok(`signed out: all ${audit.checked} handler(s) resolve`, audit.unresolved.length === 0, audit.unresolved.map(u => u.path).join(', '));
+
+    // ── Signed in ────────────────────────────────────────────────────────────
+    section('Signed in, and eight files dropped at once');
+    await page.evaluate(() => { dbSetAccessToken('test-token'); FieldPhotos.authChanged(); });
+    await page.waitForFunction(() => !!document.getElementById('fp-files') && state.photos.lib !== null && state.photos.sync !== null,
+      null, { timeout: LOAD_TIMEOUT });
+    ok('signed in: the drop zone, a file picker and a folder picker',
+      !!(await page.$('#fp-drop')) && !!(await page.$('#fp-files[multiple]')) && !!(await page.$('#fp-folder[webkitdirectory]')));
+    ok('the library is empty and says so', /No field photos yet/.test(await text('#fp-lib')), await text('#fp-lib'));
+    ok('the sync panel says nothing has reported from Dropbox', /Not set up yet/.test(await text('#fp-sync')), await text('#fp-sync'));
+
+    // Two photos with nothing in them — a paddock and some sky, drawn here,
+    // no overlay and no EXIF — so the OCR has to look and find nothing.
+    const blanks = (await page.evaluate(async () => {
+      const make = async (seed) => {
+        const c = document.createElement('canvas');
+        c.width = 1200; c.height = 900;
+        const x = c.getContext('2d');
+        const sky = x.createLinearGradient(0, 0, 0, 520);
+        sky.addColorStop(0, '#6fa3d8'); sky.addColorStop(1, '#dfeaf4');
+        x.fillStyle = sky; x.fillRect(0, 0, 1200, 520);
+        x.fillStyle = '#6b7f3a'; x.fillRect(0, 520, 1200, 380);
+        let s = seed;
+        const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+        for (let i = 0; i < 500; i++) {
+          x.fillStyle = `rgba(${40 + rnd() * 40 | 0},${60 + rnd() * 50 | 0},20,${0.25 + 0.5 * rnd()})`;
+          x.fillRect(rnd() * 1200, 520 + rnd() * 380, 3 + rnd() * 14, 2 + rnd() * 6);
+        }
+        const b = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+        const bytes = new Uint8Array(await b.arrayBuffer());
+        let bin = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        return btoa(bin);
+      };
+      return [await make(7), await make(11)];
+    })).map(b => Buffer.from(b, 'base64'));
+
+    const files = [
+      { name: 'solocator-gatton-sw.jpg', mimeType: 'image/jpeg', buffer: SW },
+      { name: 'solocator-gatton-ne.jpg', mimeType: 'image/jpeg', buffer: NE },
+      { name: 'IMG_1187.jpg', mimeType: 'image/jpeg', buffer: GPS_JPG },
+      { name: 'copy of solocator-gatton-sw.jpg', mimeType: 'image/jpeg', buffer: SW },
+      { name: 'IMG_1188.HEIC', mimeType: 'image/heic', buffer: HEIC },
+      { name: 'paddock-1.jpg', mimeType: 'image/jpeg', buffer: blanks[0] },
+      { name: 'paddock-2.jpg', mimeType: 'image/jpeg', buffer: blanks[1] },
+      fileOf('notes.txt', 'text/plain', 300),
+    ];
+    const t0 = Date.now();
+    await page.setInputFiles('#fp-files', files);
+    const added = await page.evaluate(() => state.photos.msg && state.photos.msg.text);
+    ok('eight files in: seven photos queued, the text file left out and said to be',
+      /^7 photos added — 1 file was not a photo and was left out/.test(added || ''), added);
+    await settledQueue();
+    const readS = ((Date.now() - t0) / 1000).toFixed(1);
+    let q = await queue();
+    const byName = n => q.find(i => i.name === n);
+    const sw = byName('solocator-gatton-sw.jpg'), ne = byName('solocator-gatton-ne.jpg'), gps = byName('IMG_1187.jpg');
+    const dup = byName('copy of solocator-gatton-sw.jpg'), heic = byName('IMG_1188.HEIC');
+    const p1 = byName('paddock-1.jpg'), p2 = byName('paddock-2.jpg');
+    ok(`seven in the queue, read in ${readS} s`, q.length === 7, q.map(i => `${i.name}:${i.status}`).join(', '));
+
+    ok('the SW photo, read off its overlay: the position Solocator printed, at high confidence',
+      sw && sw.status === 'ready' && sw.pos && sw.pos.placement === 'ocr' && at2(sw.pos, G.lat, G.lon) && sw.pos.confidence === 'high' && sw.pos.accuracy === 4,
+      J(sw && { pos: sw.pos, ocr: sw.ocr }));
+    ok('…facing 242° true, 134 m above the ellipsoid, at 12:26:08 AEST as printed',
+      sw && sw.heading && sw.heading.deg === 242 && sw.heading.ref === 'T' && sw.altitude && sw.altitude.m === 134 && sw.altitude.ref === 'HAE'
+        && sw.taken && sw.taken.local === '2026-06-24T12:26:08' && sw.taken.iso === '2026-06-24T02:26:08.000Z' && sw.taken.zone === 'printed',
+      J(sw && { h: sw.heading, a: sw.altitude, t: sw.taken }));
+    ok('…and filed under Gatton, the nearest station, 117 m away',
+      sw && sw.station && sw.station.id === 'gatton' && sw.station.auto && near(sw.station.m, metres(G, GATTON), 1.5), J(sw && sw.station));
+    ok('…its hash the file\'s own, its size the picture\'s, a thumbnail made',
+      sw && sw.sha === sha256(SW) && sw.width === 1545 && sw.height === 1159 && sw.thumb && sw.contentType === 'image/jpeg' && sw.ext === 'jpg',
+      J(sw && { sha: sw.sha, w: sw.width, h: sw.height }));
+    ok('the NE photo, six seconds earlier from the same spot, facing 46°',
+      ne && ne.status === 'ready' && ne.pos && ne.pos.placement === 'ocr' && at2(ne.pos, -27.5543, 152.274115) && ne.pos.confidence === 'high'
+        && ne.heading && ne.heading.deg === 46 && ne.taken && ne.taken.local === '2026-06-24T12:26:02', J(ne && { p: ne.pos, h: ne.heading, t: ne.taken }));
+    ok('the photo with GPS in its EXIF is placed from that — the OCR never asked, though it has the same overlay',
+      gps && gps.status === 'ready' && gps.pos && gps.pos.placement === 'exif' && at2(gps.pos, GPS_AT.lat, GPS_AT.lon, 1e-7) && !gps.ocr
+        && gps.heading.deg === 118.25 && gps.pos.accuracy === 3.5 && gps.altitude.m === 96.5 && gps.taken.zone === 'exif'
+        && gps.station && gps.station.id === 'gatton', J(gps));
+    ok('the same photo twice in one drop is refused as the same photo, before it is read any further',
+      dup && dup.status === 'refused' && /same photo is already in this list/.test(dup.note), dup && dup.note);
+    ok('a HEIC this browser cannot draw is refused, and told how to get a JPEG instead',
+      heic && heic.status === 'refused' && /cannot read HEIC/.test(heic.note) && /Most Compatible/.test(heic.note), heic && heic.note);
+    ok('two photos with nothing in them: the OCR looked, found nothing, and placed neither',
+      [p1, p2].every(p => p && p.status === 'ready' && !p.pos && p.ocr && p.ocr.passes >= 1 && /Nothing in the file or on the picture/.test(p.note)),
+      J([p1, p2].map(p => p && { s: p.status, pos: p.pos, ocr: p.ocr, note: p.note })));
+    const msg = await page.evaluate(() => state.photos.msg && state.photos.msg.text);
+    ok('the summary line counts each outcome',
+      /^7 photos read: 1 placed from the camera's GPS; 2 placed from the position printed on the photo; 2 not placed .*; 2 refused\. Check the positions, then press Upload\.$/.test(msg || ''), msg);
+    ok('the table has a row each, and the button offers the five that can go',
+      (await page.$$eval('.fp-queue-table tbody tr[id^="fp-row-"]', rs => rs.length)) === 7
+        && /Upload 5 photos/.test(await text('#fp-upload')) && (await page.$$eval('.fp-chip-ocr', e => e.length)) === 2, await text('#fp-upload'));
+    ok('the OCR engine arrived only now, every part of it from the version pinned',
+      tessRequests.length > 0 && !net.blocked.some(u => /tesseract/.test(u)), `${tessRequests.length} request(s); blocked: ${net.blocked.filter(u => /tesseract/.test(u)).join(', ')}`);
+
+    // ── Placing one by hand ──────────────────────────────────────────────────
+    section('Placing one by hand');
+    await page.click(`#fp-row-${p1.key} button[aria-controls="fp-edit-${p1.key}"]`);
+    const focused = await page.evaluate(() => document.activeElement && document.activeElement.id);
+    ok('"Place it…" opens the editor under the row, with the coordinates box focused', focused === `fp-place-${p1.key}`, focused);
+    await page.fill(`#fp-place-${p1.key}`, 'beside the gauge');
+    await page.press(`#fp-place-${p1.key}`, 'Enter');
+    ok('words that are not a coordinate are refused, with an example', /is not a coordinate this can read/.test(await text(`#fp-edit-${p1.key}`)),
+      await text(`#fp-edit-${p1.key}`));
+    await page.fill(`#fp-place-${p1.key}`, '-27.5561, 152.2731');
+    await page.press(`#fp-place-${p1.key}`, 'Enter');
+    q = await queue();
+    let it = q.find(i => i.key === p1.key);
+    ok('a coordinate places it by hand, and the nearest station comes with it (Gatton AL, 32 m)',
+      it.pos && it.pos.placement === 'manual' && it.pos.lat === -27.5561 && it.pos.lon === 152.2731 && it.station && it.station.id === 'gatton_al' && it.station.auto,
+      J(it));
+    let rec = await page.evaluate(k => FieldPhotos._record(k), p1.key);
+    ok('…and the record leaves the station to the database, which picks the same way', !('station_id' in rec) && rec.placement === 'manual', J(rec));
+    await page.evaluate(k => FieldPhotos.queueEdit(k, true), p1.key);
+    await page.click(`#fp-edit-${p1.key} button:has-text("No station")`);
+    rec = await page.evaluate(k => FieldPhotos._record(k), p1.key);
+    ok('"No station" is sent as a null — said, not left to the distance rule', 'station_id' in rec && rec.station_id === null, J(rec.station_id));
+    await page.evaluate(k => FieldPhotos.queueEdit(k, true), p1.key);
+    await page.fill(`#fp-edit-${p1.key} input[type="search"]`, '40444');
+    await page.click(`#fp-hits-${p1.key} .fp-hit:has-text("Gatton")`);
+    q = await queue();
+    it = q.find(i => i.key === p1.key);
+    rec = await page.evaluate(k => FieldPhotos._record(k), p1.key);
+    ok('a station found by its number is chosen, and sent as chosen — the position stays the one typed',
+      it.station && it.station.id === 'gatton' && !it.station.auto && rec.station_id === 'gatton' && it.pos.placement === 'manual' && it.pos.lat === -27.5561, J({ st: it.station, rec: rec.station_id }));
+    audit = await auditHandlers(page);
+    ok(`the queue: all ${audit.checked} handler(s) resolve`, audit.unresolved.length === 0, audit.unresolved.map(u => u.path).join(', '));
+
+    // ── Uploading ────────────────────────────────────────────────────────────
+    section('Uploading');
+    await page.click('#fp-upload');
+    await settledQueue();
+    q = await queue();
+    const done = q.filter(i => i.status === 'done');
+    ok('five uploaded; the two refused stay refused', done.length === 5 && q.filter(i => i.status === 'refused').length === 2,
+      q.map(i => `${i.name}:${i.status}`).join(', '));
+    ok('the line says so', /^5 uploaded\.$/.test(await page.evaluate(() => state.photos.msg && state.photos.msg.text)), await page.evaluate(() => state.photos.msg && state.photos.msg.text));
+    const adds = db.calls.filter(c => c.fn === 'add_field_photo');
+    const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+    ok('ten objects, all in the field-photos bucket: each photo and its thumbnail, named by a fresh uuid',
+      store.uploads.length === 10 && store.uploads.every(u => u.bucket === 'field-photos')
+        && adds.every(c => new RegExp(`^photo/${UUID}\\.jpg$`).test(c.body.p_photo.storage_path)
+                        && c.body.p_photo.thumb_path === c.body.p_photo.storage_path.replace(/\.jpg$/, '.thumb.jpg')),
+      store.uploads.map(u => `${u.bucket}/${u.path}`).join(', '));
+    ok('the bytes go up before the row that points at them — both objects, every photo',
+      adds.length === 5 && adds.every(c => c.uploadsBefore.includes(c.body.p_photo.storage_path) && c.uploadsBefore.includes(c.body.p_photo.thumb_path)));
+    ok('no object is named after the file', store.uploads.every(u => !/solocator|IMG_|paddock/i.test(u.path)));
+    const sent = n => (adds.find(c => c.body.p_photo.title === n) || {}).body?.p_photo;
+    const pSW = sent('solocator-gatton-sw.jpg'), pGPS = sent('IMG_1187.jpg'), pP1 = sent('paddock-1.jpg'), pP2 = sent('paddock-2.jpg');
+    ok('the SW record: where, which way, how high, when — and that it was read off the picture',
+      pSW && pSW.lat === -27.554294 && pSW.lon === 152.274116 && pSW.placement === 'ocr' && pSW.accuracy_m === 4
+        && pSW.heading_deg === 242 && pSW.heading_ref === 'T' && pSW.altitude_m === 134 && pSW.altitude_ref === 'HAE'
+        && pSW.taken_local === '2026-06-24T12:26:08' && pSW.taken_at === '2026-06-24T02:26:08.000Z' && pSW.taken_source === 'ocr', J(pSW));
+    ok('…the file: its hash, its size, its type, its name as the title — and no station, for the database to match',
+      pSW && pSW.sha256 === sha256(SW) && pSW.byte_size === SW.length && pSW.content_type === 'image/jpeg' && pSW.width === 1545 && pSW.height === 1159
+        && !('station_id' in pSW), J(pSW && { sha: pSW.sha256, n: pSW.byte_size }));
+    ok('…and in meta, what the OCR saw: its confidence, its passes and every reading\'s text',
+      pSW && pSW.meta.ocr && pSW.meta.ocr.confidence === 'high' && pSW.meta.ocr.passes >= 2 && pSW.meta.ocr.texts.length === pSW.meta.ocr.passes
+        && pSW.meta.ocr.texts.some(t => /27\.55429/.test(t.text)) && pSW.meta.taken.zone_source === 'printed', J(pSW && pSW.meta.ocr && { c: pSW.meta.ocr.confidence, p: pSW.meta.ocr.passes }));
+    ok('the EXIF record: the camera\'s own facts, the lens\'s field of view, and no OCR at all',
+      pGPS && pGPS.placement === 'exif' && pGPS.heading_deg === 118.25 && pGPS.accuracy_m === 3.5 && pGPS.altitude_m === 96.5 && pGPS.altitude_ref === 'MSL'
+        && pGPS.taken_at === '2026-06-24T23:15:00.000Z' && pGPS.taken_source === 'exif' && pGPS.meta.taken.zone_source === 'exif'
+        && pGPS.fov_deg === +fov26(1545, 1159).toFixed(1) && pGPS.meta.camera.make === 'Apple' && !pGPS.meta.ocr && !('pitch_deg' in pGPS), J(pGPS));
+    ok('the hand-placed record: manual, and the station chosen', pP1 && pP1.placement === 'manual' && pP1.lat === -27.5561 && pP1.station_id === 'gatton', J(pP1));
+    ok('the unplaced record: no position, no placement, no time — nothing it did not know',
+      pP2 && !('lat' in pP2) && !('placement' in pP2) && !('taken_at' in pP2) && !('heading_deg' in pP2) && !('fov_deg' in pP2) && pP2.meta.ocr, J(pP2));
+    const rowOf = n => db.rows.find(r => r.title === n && !r.deleted_at);
+    const R = { sw: rowOf('solocator-gatton-sw.jpg'), ne: rowOf('solocator-gatton-ne.jpg'), gps: rowOf('IMG_1187.jpg'),
+                p1: rowOf('paddock-1.jpg'), p2: rowOf('paddock-2.jpg') };
+    ok('each uploaded row offers "Show it"', (await page.$$eval('.fp-q-done button', bs => bs.filter(b => b.textContent === 'Show it').length)) === 5);
+
+    // ── The same photo again ─────────────────────────────────────────────────
+    section('The same photo again — asked first, raced, and refused');
+    await page.click('button:has-text("Clear finished")');
+    ok('"Clear finished" empties the list', (await queue()).length === 0);
+    const again = async () => {
+      await page.setInputFiles('#fp-files', [{ name: 'IMG_1187.jpg', mimeType: 'image/jpeg', buffer: GPS_JPG }]);
+      await settledQueue();
+      await page.click('#fp-upload');
+      await settledQueue();
+      return (await queue())[0];
+    };
+    let n0 = store.uploads.length, c0 = adds.length;
+    let one = await again();
+    ok('asked before a byte moves: "Already in MegaNet — added by … on …", and nothing sent',
+      one.status === 'already' && /^Already in MegaNet — added by fixture@example\.test on 2026-06-24\.$/.test(one.note)
+        && one.existingId === R.gps.id && store.uploads.length === n0 && db.calls.filter(c => c.fn === 'add_field_photo').length === c0, J(one));
+    ok('…with a way to it', /Show it/.test(await text(`#fp-row-${one.key}`)));
+
+    await page.click('button:has-text("Clear finished")');
+    db.hideSha = true;
+    n0 = store.uploads.length;
+    const r0 = store.removed.length;
+    one = await again();
+    const raced = store.uploads.slice(n0).map(u => u.path);
+    ok('a race lost — the check said no, the database said yes: the two objects sent are taken down again',
+      one.status === 'already' && one.existingId === R.gps.id && raced.length === 2 && raced.every(p => store.removed.slice(r0).includes(p)), J({ one, raced, removed: store.removed.slice(r0) }));
+
+    await page.click('button:has-text("Clear finished")');
+    db.hideSha = true;
+    db.refuseNext = { status: 400, body: { code: '22023', message: 'the fixture refuses this photo', hint: null } };
+    n0 = store.uploads.length;
+    const r1 = store.removed.length;
+    one = await again();
+    const refusedUp = store.uploads.slice(n0).map(u => u.path);
+    ok('a row the database refuses fails the photo with the database\'s words, and takes both objects down',
+      one.status === 'failed' && /the fixture refuses this photo/.test(one.note) && refusedUp.length === 2
+        && refusedUp.every(p => store.removed.slice(r1).includes(p)), J({ one, refusedUp }));
+    ok('…and a failed photo can be sent again', /Upload 1 photo/.test(await text('#fp-upload')));
+    await page.click('#fp-upload');
+    await settledQueue();
+    one = (await queue())[0];
+    ok('…which finds it already there', one.status === 'already', J(one));
+    await page.click('button:has-text("Clear finished")');
+
+    // ── The library ──────────────────────────────────────────────────────────
+    section('The library');
+    await page.waitForFunction(() => document.querySelectorAll('#fp-lib .fp-card').length === 5, null, { timeout: LOAD_TIMEOUT });
+    const cards = await page.$$eval('#fp-lib .fp-card', bs => bs.map(b => b.getAttribute('aria-label')));
+    ok('five photos, newest first — the EXIF one taken the next morning, then SW, then NE; the unplaced last',
+      /^IMG_1187\.jpg — Gatton, 25 Jun 2026, 09:15:00 UTC\+10$/.test(cards[0]) && /^solocator-gatton-sw\.jpg — Gatton/.test(cards[1])
+        && /^solocator-gatton-ne\.jpg/.test(cards[2]) && cards.slice(3).some(c => /Unplaced/.test(c)), cards.join(' | '));
+    await page.waitForFunction(() => [...document.querySelectorAll('#fp-lib img[data-fp-src]')].every(i => i.src), null, { timeout: LOAD_TIMEOUT });
+    ok('every thumbnail signed — in one request, not five', (store.batches || 0) >= 1
+      && [R.sw, R.ne, R.gps, R.p1, R.p2].every(r => store.signed.includes(r.thumb_path)), `${store.batches} batch(es)`);
+    await page.waitForFunction(() => /Unplaced \(\d+\)/.test(document.getElementById('fp-filter').textContent), null, { timeout: LOAD_TIMEOUT });
+    ok('the Unplaced chip counts one', /Unplaced \(1\)/.test(await text('#fp-filter')), await text('#fp-filter'));
+
+    await page.click('#fp-filter button:has-text("Unplaced")');
+    await page.waitForFunction(() => document.querySelectorAll('#fp-lib .fp-card').length === 1, null, { timeout: LOAD_TIMEOUT });
+    ok('Unplaced shows the one with no position', /with no position/.test(await text('#fp-lib-lead'))
+      && db.selects.some(s => /lat=is\.null/.test(s)), await text('#fp-lib-lead'));
+    await page.click('#fp-lib .fp-card');
+    let v = await viewer();
+    ok('opening it: "Unplaced photos — photo 1 of 1", saying it is not placed',
+      v && v.title === 'Unplaced photos' && /Not placed/.test(await text('#fp-v-details')) && /photo 1 of 1/.test(await text('#fp-v-title')), J(v));
+    await page.click('#fp-v-details button:has-text("Place it…")');
+    ok('"Place it…" opens the coordinates box, focused', (await page.evaluate(() => document.activeElement && document.activeElement.id)) === 'fp-v-coord');
+    await page.fill('#fp-v-coord', '-27.554, 152.279');
+    await page.press('#fp-v-coord', 'Enter');
+    await page.waitForFunction(() => /Moved\./.test((document.getElementById('fp-v-msg') || {}).textContent || ''), null, { timeout: LOAD_TIMEOUT });
+    const moved = db.calls.filter(c => c.fn === 'update_field_photo').pop();
+    ok('placed from the viewer: a patch of the position, by hand', moved && moved.body.p_id === R.p2.id
+      && J(moved.body.p_patch) === J({ lat: -27.554, lon: 152.279, placement: 'manual' }), J(moved && moved.body));
+    ok('…and it is filed under the nearest station, as if it had come in with the position',
+      R.p2.station_id === 'gatton' && R.p2.station_auto && /Gatton/.test(await text('#fp-v-details')), await text('#fp-v-details'));
+    await page.keyboard.press('Escape');
+    ok('Escape closes the viewer', !(await viewer()) && await page.evaluate(() => document.getElementById('fp-viewer').hidden));
+    await page.waitForFunction(() => /Every photo has a place/.test(document.getElementById('fp-lib').textContent), null, { timeout: LOAD_TIMEOUT });
+    ok('…and Unplaced is empty now', true);
+    await page.click('#fp-filter button:has-text("All")');
+    await page.waitForFunction(() => document.querySelectorAll('#fp-lib .fp-card').length === 5, null, { timeout: LOAD_TIMEOUT });
+
+    // ── The carousel ─────────────────────────────────────────────────────────
+    section('The carousel');
+    await page.click('#fp-lib .fp-card >> nth=0');
+    v = await viewer();
+    ok('a card opens the viewer on it, over all five', v && v.ids.length === 5 && v.i === 0 && v.ids[0] === R.gps.id
+      && /Field photos — photo 1 of 5/.test(await text('#fp-v-title')), J(v));
+    ok('it is a dialog, labelled by its title, with the focus in it',
+      await page.evaluate(() => { const c = document.querySelector('#fp-viewer .fp-v-card'); return !!c && c.getAttribute('role') === 'dialog' && c.getAttribute('aria-modal') === 'true' && c.contains(document.activeElement); }));
+    await page.waitForFunction(id => { const i = document.getElementById('fp-v-img'); return i && i.src && /photo\//.test(i.src); }, null, { timeout: LOAD_TIMEOUT });
+    ok('the full-size picture through a signed URL', store.signed.includes(R.gps.storage_path));
+    ok('the details: taken, where, facing, altitude, station, file, added',
+      /Taken\s*25 Jun 2026, 09:15:00 UTC\+10/.test(await text('#fp-v-details')) && /Where\s*-27\.554840, 152\.275180 ±4 m/.test(await text('#fp-v-details'))
+        && /Facing\s*118° ESE \(true\)/.test(await text('#fp-v-details')) && /Altitude\s*97 m MSL/.test(await text('#fp-v-details'))
+        && /Station\s*Gatton — 25 m NE of the station, the nearest/.test(await text('#fp-v-details')), await text('#fp-v-details'));
+    await page.keyboard.press('ArrowRight');
+    ok('→ is the next photo', (await viewer()).i === 1 && /photo 2 of 5/.test(await text('#fp-v-title')));
+    await page.keyboard.press('ArrowLeft');
+    ok('← the one before', (await viewer()).i === 0);
+    await page.keyboard.press('End');
+    ok('End the last', (await viewer()).i === 4 && /photo 5 of 5/.test(await text('#fp-v-title')));
+    await page.keyboard.press('Home');
+    ok('Home the first', (await viewer()).i === 0);
+    await page.keyboard.press('ArrowLeft');
+    ok('← from the first wraps to the last', (await viewer()).i === 4);
+    await page.click('.fp-v-thumb >> nth=1');
+    ok('a thumbnail in the strip goes straight to it, and says it is the current one',
+      (await viewer()).i === 1 && await page.evaluate(() => document.querySelectorAll('.fp-v-thumb')[1].getAttribute('aria-current') === 'true'));
+    await page.click('.fp-v-next');
+    ok('› is the next photo too', (await viewer()).i === 2);
+    await page.evaluate(() => document.querySelector('#fp-viewer .fp-v-thumb:last-child').focus());
+    await page.keyboard.press('Tab');
+    ok('Tab from the last control goes round to the first — the focus stays in the dialog',
+      await page.evaluate(() => document.activeElement && document.activeElement.classList.contains('modal-x')));
+    ok('the metadata is fetched whole for the photo on screen', db.selects.some(s => /select=\*&id=eq\./.test(s)));
+
+    // A caption, typed and left.
+    await page.keyboard.press('Home');
+    await page.fill('#fp-v-details textarea', 'The staff gauge from the bridge, looking downstream');
+    await page.click('#fp-v-title');
+    await page.waitForFunction(() => /Caption saved/.test((document.getElementById('fp-v-msg') || {}).textContent || ''), null, { timeout: LOAD_TIMEOUT });
+    const cap = db.calls.filter(c => c.fn === 'update_field_photo').pop();
+    ok('a caption is saved as a patch of the caption and nothing else',
+      cap && cap.body.p_id === R.gps.id && J(cap.body.p_patch) === J({ caption: 'The staff gauge from the bridge, looking downstream' }), J(cap && cap.body));
+    await page.click('#fp-v-details button:has-text("Open the original")');
+    const opened = await page.evaluate(() => window.__opened.slice());
+    ok('"Open the original" opens the signed full-size picture, inside the click', opened.some(u => u.includes(`/object/sign/field-photos/${R.gps.storage_path}`)), opened.join(', '));
+    audit = await auditHandlers(page);
+    ok(`the viewer: all ${audit.checked} handler(s) resolve`, audit.unresolved.length === 0, audit.unresolved.map(u => u.path).join(', '));
+    await page.keyboard.press('Escape');
+    ok('Escape closes it and hands the focus back to the card that opened it',
+      !(await viewer()) && await page.evaluate(() => document.activeElement && document.activeElement.classList.contains('fp-card')));
+
+    // Removing.
+    await page.evaluate(id => FieldPhotos.openOne(id), R.p1.id);
+    await page.click('#fp-v-details button:has-text("Remove")');
+    await page.waitForFunction(id => !FieldPhotos.row(id), R.p1.id, { timeout: LOAD_TIMEOUT });
+    ok('Remove asks first, and says the picture is deleted, not hidden', dialogs.some(d => /is deleted, not just hidden/.test(d)), dialogs.join(' | '));
+    ok('…takes the row, then both objects', R.p1.deleted_at && store.removed.includes(R.p1.storage_path) && store.removed.includes(R.p1.thumb_path));
+    ok('…and a viewer of one photo closes', !(await viewer()));
+    await page.waitForFunction(() => document.querySelectorAll('#fp-lib .fp-card').length === 4, null, { timeout: LOAD_TIMEOUT });
+
+    // ── The sync's report, and linking Dropbox ───────────────────────────────
+    section('Dropbox');
+    db.sync = [{ source: 'dropbox', folder: '/Field photos', account: 'Flood Crew', last_run_at: new Date(Date.now() - 5 * 60000).toISOString(),
+                 last_ok_at: new Date(Date.now() - 5 * 60000).toISOString(), last_error: null, runs: 12, seen: 3, imported: 2, unplaced: 1, skipped: 0, failed: 0 }];
+    await page.evaluate(() => FieldPhotos.retry());
+    await page.waitForFunction(() => /Working/.test(document.getElementById('fp-sync').textContent), null, { timeout: LOAD_TIMEOUT });
+    ok('the sync\'s last run, as the tab reads it', /Working — last ran 5 min ago, reading Flood Crew's Dropbox \(\/Field photos\)\./.test(await text('#fp-sync'))
+      && /3 new files seen, 2 imported \(1 could not be placed/.test(await text('#fp-sync')), await text('#fp-sync'));
+    await page.click('#fp-connect summary');
+    await page.fill('#fp-dbx-key', 'k3y4ppabc123');
+    await page.press('#fp-dbx-key', 'Tab');
+    await page.click('#fp-connect button:has-text("Open Dropbox to allow access")');
+    const auth = (await page.evaluate(() => window.__opened.slice())).find(u => u.startsWith('https://www.dropbox.com/oauth2/authorize'));
+    const aq = auth ? new URL(auth).searchParams : new URLSearchParams();
+    ok('Dropbox is opened on its authorize page with the app key, for a code and an offline token, PKCE S256',
+      aq.get('client_id') === 'k3y4ppabc123' && aq.get('response_type') === 'code' && aq.get('token_access_type') === 'offline'
+        && aq.get('code_challenge_method') === 'S256' && /^[A-Za-z0-9_-]{43}$/.test(aq.get('code_challenge') || ''), auth);
+    await page.fill('#fp-dbx-code', 'the-code-dropbox-showed');
+    await page.click('#fp-connect button:has-text("Get the token")');
+    await page.waitForFunction(() => !!document.getElementById('fp-dbx-token'), null, { timeout: LOAD_TIMEOUT });
+    const post = dropbox.posts[0] || {};
+    ok('the code is traded with the verifier the challenge was made from, and no secret',
+      post.code === 'the-code-dropbox-showed' && post.grant_type === 'authorization_code' && post.client_id === 'k3y4ppabc123'
+        && !('client_secret' in post) && b64url(crypto.createHash('sha256').update(post.code_verifier || '').digest()) === aq.get('code_challenge'), J(post));
+    ok('the refresh token is shown once, to be pasted into GitHub', (await page.inputValue('#fp-dbx-token')) === 'rt-fixture-5b1d9e'
+      && /DROPBOX_REFRESH_TOKEN/.test(await text('#fp-connect')));
+    ok('…and kept nowhere in this browser', await page.evaluate(() => ![...Object.values(localStorage), ...Object.values(sessionStorage)].some(v => String(v).includes('rt-fixture'))));
+
+    // ── The map ──────────────────────────────────────────────────────────────
+    section('The Stations map');
+    await page.evaluate(id => FieldPhotos.openOne(id), R.sw.id);
+    await page.click('#fp-v-details button:has-text("On the map")');
+    await page.waitForFunction(() => state.activeTab === 'stations' && !!state.map && typeof MapPhotos !== 'undefined'
+      && MapPhotos._note().kind === 'ok' && MapPhotos._drawn().length === 3, null, { timeout: LOAD_TIMEOUT });
+    const centre = await page.evaluate(() => { const c = state.map.getCenter(); return { lat: c.lat, lon: c.lng, z: state.map.getZoom() }; });
+    ok('"On the map" closes the viewer and shows the Stations map on the spot, at zoom 16',
+      !(await viewer()) && near(centre.lat, R.sw.lat, 1e-5) && near(centre.lon, R.sw.lon, 1e-5) && centre.z === 16, J(centre));
+    const drawn = await page.evaluate(() => MapPhotos._drawn());
+    const pair = drawn.find(d => d.n === 2), exifPin = drawn.find(d => d.ids.includes(R.gps.id)), p2pin = drawn.find(d => d.ids.includes(R.p2.id));
+    ok('three pins for four photos: the SW and NE photos are one spot', drawn.length === 3 && !!pair && !!exifPin && !!p2pin,
+      J(drawn.map(d => ({ n: d.n, cones: d.cones }))));
+    ok('…at the first photo taken there, with a cone each way the camera faced — 46° and 242°',
+      pair && near(pair.lat, R.ne.lat, 1e-9) && near(pair.lon, R.ne.lon, 1e-9) && J(pair.cones.slice().sort((a, b) => a - b)) === J([46, 242]), J(pair));
+    ok('the EXIF photo\'s pin faces 118.25°, and the one placed by hand has no cone',
+      exifPin && J(exifPin.cones) === J([118.25]) && p2pin && p2pin.cones.length === 0, J({ exifPin, p2pin }));
+    const cones = await page.$$eval('.mn-photo-cone', cs => cs.map(c => c.style.getPropertyValue('--rot')));
+    ok('each cone is turned by a custom property, not an inline transform', cones.length === 3 && cones.every(c => /^\d+(\.\d)?deg$/.test(c)), cones.join(', '));
+    ok('the note under the switch counts them', /4 field photos in and around this view, at 3 spots/.test(await text('#map-photos-note')), await text('#map-photos-note'));
+    ok('the legend explains the 📷', !!(await page.$('#map-legend .legend-photo')));
+    ok('asked for the view\'s box, not for every photo', db.selects.some(s => /lat=gte\..*lat=lte\..*lon=gte\..*lon=lte\./.test(s)));
+    const pairTitle = await page.evaluate(() => { const m = [...document.querySelectorAll('.mn-photo-icon')].find(e => /^2 field photos/.test(e.title)); return m ? m.title : null; });
+    ok('its name says what it is', pairTitle === '2 field photos taken here, facing 46° and 242° — open them', pairTitle);
+    await page.click('.mn-photo-icon[title^="2 field photos"] .mn-photo-badge');
+    v = await viewer();
+    ok('a click on the pin opens the carousel over the photos taken there', v && v.ids.length === 2 && v.ids.includes(R.sw.id) && v.ids.includes(R.ne.id)
+      && /2 photos taken here — photo 1 of 2/.test(await text('#fp-v-title')), J(v));
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => state.map.setZoom(11, { animate: false }));
+    await page.waitForFunction(() => MapPhotos._note().kind === 'zoom', null, { timeout: LOAD_TIMEOUT });
+    ok('zoomed out past 12 there are no pins, and the note says to zoom in', (await page.$$('.mn-photo-icon')).length === 0
+      && /Zoom in/.test(await text('#map-photos-note')));
+    await page.evaluate(() => state.map.setZoom(16, { animate: false }));
+    await page.waitForFunction(() => MapPhotos._note().kind === 'ok' && MapPhotos._drawn().length === 3, null, { timeout: LOAD_TIMEOUT });
+    await page.evaluate(() => MapPhotos.setEnabled(false));
+    ok('switched off: nothing drawn, and remembered', (await page.$$('.mn-photo-icon')).length === 0
+      && await page.evaluate(() => localStorage.getItem('mn-field-photos') === 'off' && !document.querySelector('#map-legend .legend-photo')));
+    await page.evaluate(() => MapPhotos.setEnabled(true));
+    await page.waitForFunction(() => MapPhotos._drawn().length === 3, null, { timeout: LOAD_TIMEOUT });
+    ok('…and back on', true);
+
+    // ── The twin ─────────────────────────────────────────────────────────────
+    section('The Digital Twin');
+    const gl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); });
+    if (!gl) {
+      console.log('  SKIP — this Chromium has no WebGL; the twin\'s markers cannot be exercised here.');
+    } else {
+      await twinHalf(page, R, db, viewer, text);
+    }
+
+    // ── Signing out ──────────────────────────────────────────────────────────
+    section('Signing out');
+    await page.evaluate(() => { dbSetAccessToken(null); FieldPhotos.authChanged(); });
+    await page.waitForTimeout(400);
+    if (gl) {
+      const d = await page.evaluate(() => DigitalTwin.debug().photos);
+      ok('the twin takes its markers down and says to sign in', d && d.status === 'signed-out' && d.spots.length === 0
+        && /sign in/.test(await text('#twin-photos')), J(d));
+    }
+    ok('the viewer\'s rows are forgotten', await page.evaluate(id => !FieldPhotos.row(id), R.sw.id));
+    await page.evaluate(() => switchTab('stations'));
+    await page.waitForFunction(() => MapPhotos._note().kind === 'signed-out', null, { timeout: LOAD_TIMEOUT });
+    ok('the map draws no pins for a session that is not signed in', (await page.$$('.mn-photo-icon')).length === 0);
+
+    ok('nothing threw and the console stayed clean', errors.length === 0, errors.slice(0, 4).join(' | '));
+    await context.close();
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+}
+
+// A position within `tol` degrees (2e-7 is 2 cm).
+function at2(p, lat, lon, tol = 2e-7) { return !!p && near(p.lat, lat, tol) && near(p.lon, lon, tol); }
+
+async function twinHalf(page, R, db, viewer, text) {
+  const settled = () => page.waitForFunction(() => DigitalTwin.debug().built && !DigitalTwin.debug().status.endsWith('…')
+    && DigitalTwin.debug().photos && DigitalTwin.debug().photos.status === 'ok', null, { timeout: BUILD_TIMEOUT });
+  const photos = () => page.evaluate(() => DigitalTwin.debug().photos);
+  const frame = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+
+  // "In the twin", from the viewer, on the SW photo.
+  await page.evaluate(id => FieldPhotos.openOne(id), R.sw.id);
+  await page.click('#fp-v-details button:has-text("In the twin")');
+  await page.waitForFunction(() => state.activeTab === 'twin', null, { timeout: LOAD_TIMEOUT });
+  await settled();
+  await frame();
+  let P = await photos();
+  const st = { lat: -27.555, lon: 152.275 };
+  const xz = (lat, lon) => ({ x: (lon - st.lon) * 111320 * Math.cos(st.lat * Math.PI / 180), z: -(lat - st.lat) * 110574 });
+  const pairAt = xz(R.ne.lat, R.ne.lon), exifAt = xz(R.gps.lat, R.gps.lon);
+  ok('"In the twin" opens the twin on the photo\'s station, with the photos in its patch loaded',
+    (await page.evaluate(() => DigitalTwin.debug().stationId)) === 'gatton' && P.status === 'ok' && P.count === 3, J({ status: P.status, count: P.count }));
+  ok('two spots in the patch — the photo placed 400 m east is outside it', P.spots.length === 2, J(P.spots.map(s => ({ n: s.n, x: s.x, z: s.z }))));
+  const [a, b] = P.spots;
+  ok('the SW/NE spot stands 87 m west and 77 m north of the gauge, to 5 cm', a && a.n === 2 && near(a.x, pairAt.x, 0.05) && near(a.z, pairAt.z, 0.05),
+    `${a && a.x.toFixed(2)}, ${a && a.z.toFixed(2)} vs ${pairAt.x.toFixed(2)}, ${pairAt.z.toFixed(2)}`);
+  ok('…on the ground there', a && near(a.y, a.groundY, 1e-6), `${a && a.y} vs ${a && a.groundY}`);
+  ok('…with a wedge each way the camera faced — 46° and 242° — and the camera turned to the first',
+    a && J(a.wedges.map(w => +w.toFixed(3)).sort((p, q) => p - q)) === J([46, 242]) && near(a.yaw, 46, 1e-6), J(a && { w: a.wedges, yaw: a.yaw }));
+  ok('the EXIF photo\'s spot, 25 m north-east, faces 118.25° and holds one', b && b.n === 1 && near(b.x, exifAt.x, 0.05) && near(b.z, exifAt.z, 0.05)
+    && J(b.wedges.map(w => +w.toFixed(3))) === J([118.25]) && near(b.yaw, 118.25, 1e-6) && near(b.y, b.groundY, 1e-6), J(b));
+  ok('no marker goes into the .glb', P.spots.every(s => s.exported === false));
+  const cam = await page.evaluate(() => DigitalTwin.debug().camera);
+  const look = (Math.atan2(a.x - cam.x, -(a.z - cam.z)) * 180 / Math.PI + 360) % 360;
+  ok('the camera stands behind the SW photo\'s camera, looking the way it looked — 242°, not the spot\'s first 46°',
+    near(look, 242, 1.5), `looking ${look.toFixed(1)}°`);
+  ok('the line under the stage lists both spots — where from the gauge, to ten metres past a hundred — and all three photos',
+    /Field photos \(3\): 2 120 m NW · 1 25 m NE · all 3/.test(await text('#twin-photos')), await text('#twin-photos'));
+
+  // The badge, clicked where it is drawn.
+  const hit = await page.evaluate(() => {
+    const r = document.getElementById('twin-canvas').getBoundingClientRect();
+    for (let dy = 0; dy <= 0.5; dy += 0.01) {
+      for (const sy of [-1, 1]) {
+        for (let dx = -0.2; dx <= 0.2; dx += 0.01) {
+          const x = r.left + r.width * (0.5 + dx), y = r.top + r.height * (0.5 + sy * dy);
+          if (DigitalTwin._photoAt(x, y) === 0) return { x, y };
+        }
+      }
+    }
+    return null;
+  });
+  ok('the marker is under the pointer somewhere near the middle of the stage', !!hit, J(hit));
+  if (hit) {
+    await page.mouse.click(hit.x, hit.y);
+    const v = await viewer();
+    ok('a click on it opens the carousel over its two photos, titled by where they were taken',
+      v && v.ids.length === 2 && /Photos taken 120 m NW of Gatton — photo 1 of 2/.test(await text('#fp-v-title')), `${J(v)} ${await text('#fp-v-title')}`);
+    await page.keyboard.press('Escape');
+  }
+  await page.click('#twin-photos .twin-photo >> nth=1');
+  let v = await viewer();
+  ok('a spot on the line under the stage opens it too', v && v.ids.length === 1 && v.ids[0] === R.gps.id, J(v));
+  await page.keyboard.press('Escape');
+
+  // Walked up to, in the POV.
+  await page.evaluate(sp => DigitalTwin._pov({ px: sp.x + 1.2, pz: sp.z, yaw: -Math.PI / 2, pitch: 0 }), a);
+  await frame();
+  P = await photos();
+  ok('standing 1.2 m from the spot in the POV: "📷 2 photos taken here — Enter to look"',
+    P.near === 0 && P.prompt === '📷 2 photos taken here — Enter to look', J({ near: P.near, prompt: P.prompt }));
+  await page.focus('#twin-canvas');
+  await page.keyboard.press('Enter');
+  v = await viewer();
+  ok('Enter opens them', v && v.ids.length === 2, J(v));
+  await page.keyboard.press('Escape');
+  ok('Escape closes the viewer and leaves the visitor in the POV', !(await viewer()) && (await page.evaluate(() => DigitalTwin.debug().mode)) === 'walk');
+  await page.evaluate(() => DigitalTwin._pov({ px: 40, pz: 40 }));
+  await frame();
+  P = await photos();
+  ok('walked away, the prompt goes', P.near === -1 && P.prompt === null, J({ near: P.near, prompt: P.prompt }));
+  await page.evaluate(() => DigitalTwin.toggleWalk());
+}
+
+// ── Run ──────────────────────────────────────────────────────────────────────
+try {
+  nodeHalf();
+  await browserHalf();
+} catch (err) {
+  failures++;
+  console.log(`\nThe photos check could not finish:\n${err.stack || err}`);
+}
+console.log(`\n  ${passes + failures} assertion(s).`);
+if (failures) {
+  console.log(`\nFAIL — ${failures} of ${passes + failures}.`);
+  process.exitCode = 1;
+} else {
+  console.log('\nPASS — a photo in, placed where it was taken, and shown there: on the tab, the map and the twin.');
+}

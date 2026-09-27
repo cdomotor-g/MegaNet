@@ -342,6 +342,11 @@ async function dbRpc(fn, args) {
     err.status   = res.status;
     err.conflict = res.status === 409;
     err.denied   = res.status === 401 || res.status === 403 || res.status === 404;
+    // The SQLSTATE and the detail line, for a caller that has to tell two
+    // refusals with one status apart — a field photo's "already here" carries
+    // the id of the photo that is.
+    err.code     = (body && body.code) || null;
+    err.details  = (body && body.details) || null;
     throw err;
   }
   return body;
@@ -412,7 +417,7 @@ async function dbUploadObject(bucket, path, file) {
     },
     body: file,
   });
-  if (!res.ok) throw await storageError(res);
+  if (!res.ok) throw await storageError(res, bucket);
   return { bucket, path };
 }
 
@@ -432,12 +437,41 @@ async function dbSignedUrl(bucket, path, seconds) {
     body: JSON.stringify({ expiresIn: seconds || 3600 }),
     cache: 'no-store',
   });
-  if (!res.ok) throw await storageError(res);
+  if (!res.ok) throw await storageError(res, bucket);
   const body = await res.json();
   // Storage answers with a path relative to /storage/v1, leading slash included.
   const signed = body && (body.signedURL || body.signedUrl);
   if (!signed) throw new Error('Storage returned no signed URL');
   return `${STORAGE_URL}${signed.startsWith('/') ? '' : '/'}${signed}`;
+}
+
+// The same for many objects in one request — a page of field photo thumbnails
+// is sixty of them, and sixty round trips over a paddock's signal is a grid that
+// fills in over a minute. Storage's batch form takes the paths in the body and
+// answers one entry per path, each with its own error where it has one; a path
+// it could not sign comes back without a URL rather than failing the rest.
+async function dbSignedUrls(bucket, paths, seconds) {
+  const list = [...new Set((paths || []).filter(Boolean))];
+  if (!list.length) return {};
+  const res = await fetch(`${STORAGE_URL}/object/sign/${bucket}`, {
+    method: 'POST',
+    headers: {
+      apikey: DB_ANON_KEY,
+      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ expiresIn: seconds || 3600, paths: list }),
+    cache: 'no-store',
+  });
+  if (!res.ok) throw await storageError(res, bucket);
+  const body = await res.json();
+  const out = {};
+  for (const e of Array.isArray(body) ? body : []) {
+    const signed = e && (e.signedURL || e.signedUrl);
+    if (e && e.path && signed) out[e.path] = `${STORAGE_URL}${signed.startsWith('/') ? '' : '/'}${signed}`;
+  }
+  return out;
 }
 
 // Remove the bytes. Called after meganet.detach_file() has dropped the index
@@ -452,21 +486,22 @@ async function dbRemoveObject(bucket, path) {
       Accept: 'application/json',
     },
   });
-  if (!res.ok) throw await storageError(res);
+  if (!res.ok) throw await storageError(res, bucket);
   return true;
 }
 
 // Storage speaks its own error shape — {statusCode, error, message} — rather
 // than PostgREST's, and its 400 for "Bucket not found" is the single most likely
 // thing to go wrong on a project where tools/storage_bucket.sql has not been
-// run. So that one is named rather than passed through as a status code.
-async function storageError(res) {
+// run. So that one is named rather than passed through as a status code — with
+// the bucket's own name, now that there are two (0010's and 0035's).
+async function storageError(res, bucket = 'inspections') {
   let body = null;
   try { body = await res.json(); } catch (_) { /* not JSON; the status stands */ }
   const raw = (body && (body.message || body.error)) || `HTTP ${res.status}`;
   const missing = /bucket not found/i.test(raw);
   const err = new Error(missing
-    ? 'the `inspections` storage bucket does not exist on this project — run tools/storage_bucket.sql'
+    ? `the \`${bucket}\` storage bucket does not exist on this project — run tools/storage_bucket.sql`
     : raw);
   err.status = res.status;
   err.bucketMissing = missing;

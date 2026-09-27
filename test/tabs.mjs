@@ -443,6 +443,62 @@ const SEED_TWIN = `async () => {
   for (const d of document.querySelectorAll('#main-content details')) d.open = true;
 }`;
 
+// The Field Photos tab, born converted. Signed out it is a sentence and a
+// button; signed in it is the drop zone, a queue table, the library's grid and
+// the sync's report — none of which exists until the datastore answers, which
+// under this harness it never does. So its three tables, and only those, are
+// answered by a route below (PHOTO_FIXTURE), and the queue is set as state: a
+// photo read off its overlay with the place editor open under it, and one
+// refused. Reading a photo is `npm run photos`'s to prove; this measures what
+// the tab draws once one has been read.
+const SEED_PHOTOS_OUT = `() => {
+  dbSetAccessToken(null);
+  FieldPhotos.authChanged();
+}`;
+
+const SEED_PHOTOS = `async () => {
+  dbSetAccessToken('tabs-check');
+  state.photos.queue = [
+    { key: 't1', name: 'solocator-gatton-sw.jpg', size: 208184, status: 'ready', note: 'Ready.',
+      pos: { lat: -27.554294, lon: 152.274116, placement: 'ocr', accuracy: 4, confidence: 'high' },
+      heading: { deg: 242, ref: 'T' }, taken: { local: '2026-06-24T12:26:08', zone: 'printed' },
+      station: { id: 'gatton', auto: true, m: 117 }, editing: true },
+    { key: 't2', name: 'IMG_1188.HEIC', size: 2400000, status: 'refused',
+      note: 'Refused — this browser cannot read HEIC photos.' },
+  ];
+  FieldPhotos.authChanged();
+  await new Promise(res => {
+    const t0 = Date.now();
+    const tick = () => (state.photos.lib && state.photos.sync && state.photos.types) || Date.now() - t0 > 5000
+      ? res() : setTimeout(tick, 50);
+    tick();
+  });
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
+const PHOTO_FIXTURE = {
+  attachment_type: [{ content_type: 'image/jpeg', ord: 1, label: 'JPEG photo', extensions: ['jpg', 'jpeg'], max_bytes: 25165824 }],
+  field_photo: [
+    { id: '00000000-0000-4000-8000-00000000f001', storage_path: 'photo/00000000-0000-4000-8000-00000000f001.jpg',
+      thumb_path: 'photo/00000000-0000-4000-8000-00000000f001.thumb.jpg', content_type: 'image/jpeg', byte_size: 208184,
+      width: 1545, height: 1159, title: 'solocator-gatton-sw.jpg', caption: 'The staff gauge from the bridge',
+      taken_at: '2026-06-24T02:26:08Z', taken_local: '2026-06-24T12:26:08', taken_source: 'ocr',
+      lat: -27.554294, lon: 152.274116, placement: 'ocr', accuracy_m: 4, altitude_m: 134, altitude_ref: 'HAE',
+      heading_deg: 242, heading_ref: 'T', pitch_deg: null, fov_deg: null, station_id: 'gatton', station_auto: true,
+      origin: 'upload', uploaded_by: 'tabs@example.test', created_at: '2026-06-24T05:00:00Z', updated_at: '2026-06-24T05:00:00Z',
+      ocr_confidence: 'high', zone_source: 'printed' },
+    { id: '00000000-0000-4000-8000-00000000f002', storage_path: 'photo/00000000-0000-4000-8000-00000000f002.jpg',
+      thumb_path: 'photo/00000000-0000-4000-8000-00000000f002.thumb.jpg', content_type: 'image/jpeg', byte_size: 32669,
+      width: 1200, height: 900, title: 'paddock-2.jpg', caption: '', taken_at: null, taken_local: null, taken_source: null,
+      lat: null, lon: null, placement: null, accuracy_m: null, altitude_m: null, altitude_ref: null,
+      heading_deg: null, heading_ref: null, pitch_deg: null, fov_deg: null, station_id: null, station_auto: false,
+      origin: 'dropbox', uploaded_by: 'Dropbox — Flood Crew', created_at: '2026-06-24T05:01:00Z', updated_at: '2026-06-24T05:01:00Z',
+      ocr_confidence: null, zone_source: null },
+  ],
+  field_photo_sync: [{ source: 'dropbox', folder: '/Field photos', account: 'Flood Crew', last_run_at: '2026-06-24T05:01:00Z',
+    last_ok_at: '2026-06-24T05:01:00Z', last_error: null, runs: 12, seen: 3, imported: 2, unplaced: 1, skipped: 0, failed: 0 }],
+};
+
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
@@ -473,6 +529,8 @@ const CONVERTED = [
   { id: 'hfem',       label: 'HFEM Messages — the spec\'s ten examples decoded', issue: 'born converted at #154', seed: SEED_HFEM },
   { id: 'twin',       label: 'Digital Twin — no station chosen', issue: 'born converted', seed: SEED_TWIN_NONE },
   { id: 'twin',       label: 'Digital Twin — a station, its ground unreachable', issue: 'born converted', seed: SEED_TWIN },
+  { id: 'photos',     label: 'Field Photos — signed out', issue: 'born converted', seed: SEED_PHOTOS_OUT },
+  { id: 'photos',     label: 'Field Photos — a queue, the place editor, the library and the sync', issue: 'born converted', seed: SEED_PHOTOS },
 ];
 
 
@@ -517,6 +575,15 @@ try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await applyNetworkPolicy(page, server.origin);
+  // The Field Photos tab's three tables, answered from PHOTO_FIXTURE (see
+  // SEED_PHOTOS); every other request to the project falls through to the
+  // policy and is aborted as before.
+  await page.route('**://*.supabase.co/rest/v1/**', route => {
+    const table = new URL(route.request().url()).pathname.replace(/^.*\/rest\/v1\//, '');
+    const rows = PHOTO_FIXTURE[table];
+    if (route.request().method() !== 'GET' || !rows) return route.fallback();
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
+  });
   page.on('pageerror', e => errors.push(e.message));
 
   await page.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });

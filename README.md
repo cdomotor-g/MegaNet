@@ -89,6 +89,14 @@ MegaNet/
 ├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
 ├── digital-twin.js         ← DigitalTwin — Digital Twin tab: one station's ground in
 │                             3-D, a 2 m pole and a figure on it, a .glb for Blender
+├── photo-meta.js           ← PhotoMeta — what a photo says about where it was taken:
+│                             EXIF/XMP in four containers, and the overlay a field
+│                             camera app printed on it, read by OCR (also the
+│                             Dropbox sync's, under Node)
+├── field-photos.js         ← FieldPhotos — Field Photos tab (bulk upload, placing,
+│                             the library) and the carousel every door opens
+├── map-photos.js           ← MapPhotos — the Stations map's 📷 pins, a cone each
+│                             way the camera faced
 ├── modal.js                ← Modal     — the shared dialog shell
 ├── packets.js              ← Packets   — ALERT / ERTS codec, and its tab
 ├── alert2.js               ← Alert2    — ALERT2 / ERT-A2 tab
@@ -170,12 +178,14 @@ MegaNet/
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
 ├── test/                   ← the web app's safety net (see test/README.md, and Testing below)
-│   ├── smoke.mjs            (headless Chromium: load, open all 22 tabs, clean console)
+│   ├── smoke.mjs            (headless Chromium: load, open all 23 tabs, clean console)
 │   ├── dup-names.mjs        (no duplicate top-level names across the loaded scripts)
 │   ├── inspections.mjs      (the six sheets, against the migration's own seed data)
 │   ├── maintenance.mjs      (the Council sheet, against the workbook's filled example)
 │   ├── history.mjs          (a saved record read back, against the form that wrote it)
 │   ├── help.mjs             (every tab's help entry: real content, links that land)
+│   ├── photos.mjs           (field photos: the reader, the OCR, the tab, the map, the twin)
+│   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
 │   ├── syntax-check.mjs     (node --check over every script index.html loads)
 │   └── package.json         (down here on purpose — the app itself still has no build step)
@@ -184,6 +194,8 @@ MegaNet/
 │   ├── check_ingest.sql     (psql: prove the telemetry contract — 48 checks, rolls back)
 │   ├── check_mqtt.sql       (psql: prove the MQTT bridge's database half — 39 checks)
 │   ├── check_inspections.sql (psql: prove the inspection schema — 90 checks, rolls back)
+│   ├── check_field_photos.sql (psql: prove the field photo doors (0035) — 83 checks, rolls back)
+│   ├── field-photos/        (the Dropbox → MegaNet photo sync, run by field-photos-dropbox.yml)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
 │   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
@@ -2329,7 +2341,7 @@ on a narrow window.
 | **Interference** | RF Environment · RF Changes · Interference Workbench |
 | **ALERT** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · HFEM Messages · Serial Monitor |
 | **Data** | ARRO Launcher · ARRO Data · Field Data · Message Log |
-| **Site visits** | Inspections · Site Maintenance · Inspection History |
+| **Site visits** | Inspections · Site Maintenance · Inspection History · Field Photos |
 
 #### Where the grouping comes from
 Three groups held these tabs until #108, and one of the three held eight of the
@@ -3648,6 +3660,49 @@ controls, the hosts a network has to allow, and the Blender workflow.
 `npm run twin` holds the geometry, the hand-over and the mirror — see
 **Testing** below.
 
+### 22. Field Photos (Where Each Photo Was Taken, Shown There)
+
+Photos from the field, filed by where they were taken and then drawn there:
+a 📷 marker standing on the ground in the **Digital Twin** where the
+photographer stood — a post at chest height, the camera turned the way it
+faced, a wedge for each way a photo from there looked — clicked, or walked up
+to in the POV and opened with Enter; a pin with a cone per direction on the
+**Stations map**; and the **Field Photos** tab under *Site visits*, where they
+come in. Every one of those opens one viewer: a carousel over the photos taken
+at that spot, ← → through them, with when, where, which way and how each was
+known.
+
+**In, by the handful or the folderful** — dropped on the tab, chosen, or a
+whole folder — each read in the browser before anything is sent: its SHA-256
+(the same photo twice is one photo, asked of the database before a byte
+moves), its EXIF or XMP (`photo-meta.js`: a JPEG, a HEIC, a PNG or a WebP, a
+DJI drone's gimbal), and where the file holds no position, **the overlay a
+field camera app printed on the picture, read by OCR** — Solocator's, GPS Map
+Camera's, Timestamp Camera's, NoteCam's, an MGA grid reference — which is what
+a photo that has been through Messages or a chat app still has when its EXIF
+has gone. Readings are voted: a position is *high* confidence only when two
+readings agree. The nearest station within a kilometre is picked, a 480 px
+thumbnail made, and nothing goes up until somebody has looked at the list and
+pressed Upload; a photo nothing could place still goes, into *Unplaced*.
+
+**Or on their own, from Dropbox**: a scheduled workflow
+(`.github/workflows/field-photos-dropbox.yml`) reads the linked folder every
+fifteen minutes with the same `photo-meta.js` and files what is new. Linking
+is a Dropbox app and a refresh token got from the tab itself (PKCE — no app
+secret anywhere), then three repository secrets; `docs/field-photos.md` has
+every click.
+
+**Editors only.** The pictures and their positions are in a private bucket,
+shown through links that expire, written through three `security definer`
+functions (`db/migrations/0035_field_photos.sql`) that enforce the path, the
+type and size, one live photo per hash and one row per Dropbox file — a photo
+removed here is never brought back by the sync.
+
+`docs/field-photos.md` has the order a position is looked for in, the formats
+the overlay parser reads, the time zones, the setup, and how the sync runs.
+`npm run photos` holds the reader, the tab, the map and the twin;
+`tools/check_field_photos.sql` holds 0035.
+
 ---
 
 ## Deployment Plan
@@ -3970,7 +4025,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Fifty checks. The eighteen below are the ones a change to the front end
+Fifty-one checks. The nineteen below are the ones a change to the front end
 meets first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |
@@ -3978,7 +4033,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run check` | a broken brace, in under a second, before a browser is launched |
 | `npm run names` | a second `function esc()` in another file silently overwriting the first |
 | `npm run toplevel` | a statement that executes at load in a file that should only declare — the property the load order in `index.html` rests on |
-| `npm run smoke` | the page loading and all 22 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
+| `npm run smoke` | the page loading and all 23 tabs opening with nothing on the console, every rendered `on*=` handler resolving to a real function, and 25 of the RF Changes / Workbench controls actually doing something when pressed |
 | `npm run registry` | a Leaflet map or a tab teardown no file registered — and, at runtime, one that was registered and does not fire |
 | `npm run help` | a help entry that decayed: a doc link pointing at a file that is no longer there, a *see also* naming a tab that was renamed, a placeholder that shipped, a walkthrough with no `<title>` or with a width of its own. Every one of those renders a panel that looks right, which is why smoke cannot see any of them |
 | `npm run insp` | the Inspections form drawn against the schema's own seed data, on all six sheets. Smoke cannot see this one: it blocks the datastore, and this tab renders from it |
@@ -3993,6 +4048,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |
 | `npm run linkbudget` | the link budget card's two ends. Each is found by name, station number, ALERT address or address window — asserted against what the *Stations filter itself* returns for the same term, so the claim is that the card runs the shared matcher rather than a second copy of the rules. Then: the box keeping its caret through a paste, an end armed and filled from a pin click and from a row of the Stations list in its filtered state without selecting it, the three Clear buttons, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute — the same station at both ends, a zero-length path, a term nobody supplied, and a frequency box that cannot say whether it holds an override. Every one of those is a clean console |
 | `npm run twin` | the Digital Twin tab against a world the check makes — the State's elevation service answered with a tiled float GeoTIFF of a closed-form surface, so every mesh vertex is arithmetic: the request box grown by half a sample with the aspect snap switched off, each vertex at the surface's height at its own latitude and longitude, the Type 3 pole with its foot at the origin, the 1.75 m figure with its feet on the ground where it stands, exaggeration scaling the relief alone, the station as built (pole or tower from the record, the kit inside by telemetry, the door on approach, the ladder climbed and the deck at the top), the room (what the twin sends, a visitor played in through a fake Realtime server and drawn, walked, pointing, gone; the pointer's laser), the notes folded on a phone, the horizon (its innermost square the patch's edge vertex for vertex, each far vertex on its sheet's height at its own place less the Earth's curve, the far shell drawn first, the switch, the tiles gone), the `.glb` read back out of the binary with the horizon left out, each fallback by breaking one host, walk mode at eye height, and the renderer torn down with the tab |
+| `npm run photos` | a field photo read, placed, uploaded and shown — the reader against photos built byte by byte and the overlay parser against what field camera apps print and what OCR makes of it, then the app signed in against a fake project with the real OCR engine: eight files dropped at once, the upload's order and records, the same photo refused three ways with its bytes taken back down, the carousel by keyboard, Dropbox's PKCE link, the map's pins clicked with a real pointer and the twin's markers on the ground. Smoke sees a tab that says "sign in" |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and
@@ -4010,7 +4066,7 @@ then clicks its way through the RF Changes and Interference Workbench controls,
 keyed by the handler each one names rather than by its label. See
 `test/lib/controls.mjs`.
 
-CI runs all fifty on any push touching a root `*.js`, `index.html`, `styles.css`,
+CI runs all fifty-one on any push touching a root `*.js`, `index.html`, `styles.css`,
 `stations.json`, `db/migrations/`, `test/` or the inspection workbook in
 `archive/`. The filter is a glob rather than a list of filenames
 because the app's script list grew with every milestone of the split — a named

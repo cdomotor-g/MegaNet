@@ -23,6 +23,8 @@
     "station-editor.js",
     "station-inspections.js",
     "attachments.js",
+    "photo-meta.js",
+    "field-photos.js",
     "inspections.js",
     "maintenance.js",
     "history.js",
@@ -38,6 +40,7 @@
     "map-elvis-coverage.js",
     "map-roads.js",
     "map-lots.js",
+    "map-photos.js",
     "map-wind.js",
     "map-spider.js",
     "map-backbone.js",
@@ -73,6 +76,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 776,
-  "distinct": 776
+  "total": 781,
+  "distinct": 781
 }

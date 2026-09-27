@@ -80,7 +80,9 @@ const MapTwin = (function () {
     return (state.data && state.data.stations || []).find(s => s.id === id) || null;
   }
 
-  function located(s) { return !!s && isFinite(s.lat) && isFinite(s.lon); }
+  // `isFinite(null)` is true, and seven stations in stations.json have no
+  // position: null is not the Gulf of Guinea.
+  function located(s) { return !!s && s.lat != null && s.lon != null && isFinite(s.lat) && isFinite(s.lon); }
 
   // Half the patch, in metres: how far from the map's centre a station may be
   // and still be the one this view is about.
@@ -168,7 +170,8 @@ const MapTwin = (function () {
     // One row, whatever the width: the words on the buttons go below `sm`
     // the way the banner's do (.hdr-label), the title truncates, and the
     // status, the paths, the company and the credit line are each one line
-    // with the whole text as their tooltip — the tab has them in full. The
+    // with the whole text as their tooltip — the tab has them in full (the
+    // field photos' line among them: one line, its spots as buttons). The
     // notes are folded under a one-line count that opens over the stage
     // rather than in front of it: a map on a phone is 340 px tall, and three
     // notes of four lines each once left the stage no height at all.
@@ -191,6 +194,7 @@ const MapTwin = (function () {
         </div>
         <p class="twin-status map-twin-status" id="twin-status" role="status">Building…</p>
         <p class="small twin-paths map-twin-paths" id="twin-paths" hidden></p>
+        <p class="small twin-photos map-twin-photos" id="twin-photos" hidden></p>
         <p class="small twin-peers map-twin-peers" id="twin-peers" hidden></p>
         <details class="map-twin-notes" id="twin-notes-fold" hidden>
           <summary class="map-twin-notes-sum"><span aria-hidden="true">⚠</span> <span id="twin-notes-count">0 notes</span></summary>

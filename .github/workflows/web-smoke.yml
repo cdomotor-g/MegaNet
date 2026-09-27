@@ -79,6 +79,9 @@ on:
       - 'tools/check_*.sql'
       - 'tools/ci/**'
       - 'tools/import_stations_json.py'
+      # The Dropbox photo sync and the bucket script CI now runs (0035).
+      - 'tools/field-photos/**'
+      - 'tools/storage_bucket.sql'
       - '.github/workflows/web-smoke.yml'
   pull_request:
     paths:
@@ -139,6 +142,9 @@ on:
       - 'tools/check_*.sql'
       - 'tools/ci/**'
       - 'tools/import_stations_json.py'
+      # The Dropbox photo sync and the bucket script CI now runs (0035).
+      - 'tools/field-photos/**'
+      - 'tools/storage_bucket.sql'
       - '.github/workflows/web-smoke.yml'
   workflow_dispatch:
 
@@ -637,6 +643,23 @@ jobs:
         working-directory: test
         run: npm run twin
 
+      # Field photos (photo-meta.js, field-photos.js, map-photos.js and the
+      # twin's markers). `smoke` opens the tab signed out, where it says "sign
+      # in" and nothing else. This signs in against a fake project and drops
+      # eight files: the two Solocator photos read by the real OCR engine
+      # (served from the harness, like three.js), one placed from its EXIF,
+      # a duplicate, a HEIC, two with no position anywhere and a text file —
+      # then the upload's order and records, the same photo refused three
+      # ways with its bytes taken back down, the library, the carousel by
+      # keyboard, Dropbox's PKCE link end to end, the map's pins and cones,
+      # and the twin's markers on the ground, clicked and walked up to. The
+      # reader and the overlay parser are held first, under Node, against
+      # files built byte by byte. The twin half needs WebGL2 and skips
+      # without it; tools/check_field_photos.sql holds 0035's own rules.
+      - name: Field photos — read, placed, uploaded, and shown on the tab, the map and the twin
+        working-directory: test
+        run: npm run photos
+
       # The two navigators under and beside the Arrow chart. Their edge handles
       # were ungrabbable for a reason no check here could see: the drawing and
       # the hit-test each converted client coordinates to viewBox coordinates
@@ -772,6 +795,30 @@ jobs:
         working-directory: bridge
         run: npm test
 
+  # ── The Dropbox photo sync's tests (0035) ─────────────────────────────────
+  # The sync runs on a schedule with a secret key that can write where only
+  # editors may, and everything it does wrong is silent: a photo filed in the
+  # wrong place, the same one twice, a removed one brought back, a cursor that
+  # skips a folder's worth. So it is run here against a fake Dropbox and a fake
+  # project, with the real photo-meta.js and the real OCR engine reading the
+  # two Solocator fixtures — offline, as the bridge's are.
+  field-photos-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/field-photos/package-lock.json
+      - name: Install the sync
+        working-directory: tools/field-photos
+        run: npm ci
+      - name: The sync, against a fake Dropbox and a fake project
+        working-directory: tools/field-photos
+        run: npm test
+
   # ── The database checks, against a real Postgres (#102) ──────────────────
   # tools/check_*.sql were built to run in a workflow — a row per check,
   # non-zero on failure — and nothing ran them: they need a database, and no
@@ -814,6 +861,15 @@ jobs:
             echo "== $f"
             psql -v ON_ERROR_STOP=1 --single-transaction -q -f "$f"
           done
+      # The two private buckets and their eight policies (0010, 0035). Not a
+      # migration — storage is Supabase's schema — and until the scaffold grew
+      # the buckets table's limit columns this file had only ever been run by
+      # hand, so the verdict at its foot (the half #145 got wrong) was checked
+      # nowhere. Twice, because it claims to be safe to re-run.
+      - name: The storage buckets — private, four policies each, and re-runnable
+        run: |
+          psql -v ON_ERROR_STOP=1 -q -f tools/storage_bucket.sql
+          psql -v ON_ERROR_STOP=1 -q -f tools/storage_bucket.sql
       - name: Load stations.json
         run: python3 tools/import_stations_json.py | psql -v ON_ERROR_STOP=1 --single-transaction -q
       - name: check_ingest.sql
@@ -839,6 +895,13 @@ jobs:
             | psql -v ON_ERROR_STOP=1 -q
       - name: check_aep_levels_and_frequencies.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_aep_levels_and_frequencies.sql
+      # The field photo door (0035): the path and type rules a private bucket's
+      # privacy rests on, one live photo per SHA-256, one row per Dropbox file
+      # (tombstones included, so a removed photo stays removed), the nearest
+      # station within a kilometre, and who may read what — signed in as an
+      # editor, as a stranger, as anon and as the sync's service_role.
+      - name: check_field_photos.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_field_photos.sql
       # …and the same for the AEP sheets' SQL (0033): it attaches rows by
       # number and by position into columns only it and the editor write.
       - name: The AEP levels' SQL still fits the schema

@@ -408,6 +408,26 @@ twin open is drawn in it (`twin-presence.js`):
   pointing, leaving — and measures the figure drawn for them. Every other
   check closes off-origin sockets at once, so no run reaches the project.
 
+## Field photos
+
+Where somebody stood with a camera is drawn where they stood
+(`docs/field-photos.md` has the rest of it): for every spot in the patch with
+field photos — photos within 3 m of each other are one spot — a post at chest
+height (1.45 m) on the ground as drawn (the exaggeration slider moves it with
+the ground), a camera on it turned the way the first photo there faced and
+tilted as it was, a pale wedge the width of the lens's view ahead of it **for
+each way a photo from there looked**, and a badge with the count that stays
+about one size on screen from across the patch. A click on the badge, the
+post or the camera opens the photos taken there; the wedge takes no click,
+because it lies on ground people click for its height. The line under the
+stage lists every spot by distance and direction from the station, and in the
+POV, within 2.5 m of one, *📷 n photos taken here — Enter to look*.
+
+*In the twin* on a photo stands the orbit camera 7 m behind that photo's
+camera, looking the way it looked. The photos are asked for by the patch's
+box, only for a signed-in editor; signed out, the line says to sign in and
+nothing is drawn. None of it goes in the `.glb`.
+
 ## The Ground truth panel
 
 Side by side: the station's recorded height (surveyed, or modelled with its

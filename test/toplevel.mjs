@@ -91,6 +91,16 @@ const ACCEPTED = {
          + 'undefined, never runs it. Constrains nothing below it.',
     },
   ],
+  'photo-meta.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = PhotoMeta;",
+      why: 'The field photo reader\'s CommonJS registration: the Dropbox sync '
+         + '(tools/field-photos/sync.mjs) and test/photos.mjs require this same '
+         + 'file, so a photo is placed by one set of rules whichever door it '
+         + 'comes in by. Guarded so the browser, where `module` is undefined, '
+         + 'never runs it. Constrains nothing below it.',
+    },
+  ],
   'core.js': [
     {
       match: "if (typeof window !== 'undefined') {",

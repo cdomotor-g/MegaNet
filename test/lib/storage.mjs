@@ -45,11 +45,22 @@ export function installStorage(page, store) {
     const json = (status, body) =>
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
+    // POST /object/sign/<bucket> — the batch form (a page of field photo
+    // thumbnails in one request): the paths in the body, one entry back each.
+    if (req.method() === 'POST' && /^object\/sign\/[^/]+$/.test(after)) {
+      const bucket = after.split('/')[2];
+      const paths = (JSON.parse(req.postData() || '{}').paths) || [];
+      store.batches = (store.batches || 0) + 1;
+      for (const p of paths) store.signed.push(p);
+      return json(200, paths.map(p => ({ path: p, signedURL: `/object/sign/${bucket}/${p}?token=fixture`, error: null })));
+    }
+
     // POST /object/sign/<bucket>/<path>
     if (req.method() === 'POST' && after.startsWith('object/sign/')) {
+      const bucket = after.split('/')[2];
       const path = after.replace(/^object\/sign\/[^/]+\//, '');
       store.signed.push(path);
-      return json(200, { signedURL: `/object/sign/inspections/${path}?token=fixture` });
+      return json(200, { signedURL: `/object/sign/${bucket}/${path}?token=fixture` });
     }
 
     // GET of a signed URL — an <img> resolving. One transparent GIF, because a
@@ -67,6 +78,7 @@ export function installStorage(page, store) {
       const path = after.replace(/^object\/[^/]+\//, '');
       store.uploads.push({
         path,
+        bucket: after.split('/')[1],
         contentType: req.headers()['content-type'] || '',
         bytes: (req.postDataBuffer() || Buffer.alloc(0)).length,
       });
@@ -75,6 +87,7 @@ export function installStorage(page, store) {
 
     // DELETE /object/<bucket>/<path>
     if (req.method() === 'DELETE' && after.startsWith('object/')) {
+      if (store.failRemove) return json(500, { message: 'the fixture refuses this delete' });
       store.removed.push(after.replace(/^object\/[^/]+\//, ''));
       return json(200, { message: 'Successfully deleted' });
     }

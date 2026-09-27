@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-21** (revision 97 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-27** (revision 100 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -233,10 +233,11 @@ Six per-tab issues are about to restyle nineteen tabs in parallel. The decisions
 The 3-D view shipped at `d7509fc` mirrors exactly two things off the Stations map — `state.mapLines` and `state.mapMarkers` — which is precisely what was asked for and deliberately the whole of what it does. Everything else the map can draw is **absent when it is tilted**, and a layer that is on in 2-D and silently gone in 3-D is what this epic closes.
 - **#187** `[Sub-issue of #186]` `[Sonnet5/Med]` — **OPEN** — ACMA transmitters (drawn into `state.acma.*`, which the mirror does not see) and the Draw & measure shapes. The trap is the circle, and #183 already paid for it once: **a circle is round on the sphere, not on the screen**, so a MapLibre `circle` layer draws a 25 km ring of the wrong ground radius almost everywhere. Emit the KML exporter's own 72-vertex `destPoint` walk.
 - **#188** `[Sub-issue of #186]` `[Opus5/High]` — **OPEN** — polar radio coverage draped on the relief, which is the payoff layer of the epic: coverage running up a valley and stopping at a ridge, with the ridge visible. Must keep `npm run terrain`'s re-banding property — a new threshold re-colours the computed plot **without fetching a single extra terrain tile**.
+- **#200** `[Sub-issue of #186]` `[Sonnet5/Med]` — **OPEN, opened revision 100** — the Stations map's field photo pins (`map-photos.js`: a 📷 per spot from zoom 12, a cone per way the camera faced, editors only), which vanish when the map is tilted. Out of the field photos shipping at revision 100. **The epic's rule applies unchanged**: the spots are what the 2-D layer already fetched and grouped (`MapPhotos` holds them; `FieldPhotos.spots()` is the one grouping rule) — no second query, no second grouping. And a lesson the 2-D pins paid for first: they were drawn under the network's full-map canvas and could be seen and never pressed, so whatever draws them in 3-D has to be asserted with a real click.
 
 > **The rule every child inherits, and the reason the parent is worth having at all.** The 3-D view is correct because it does not re-derive: it reads the lines and pins the 2-D map has already drawn, so the filters, the hidden and culled sets, the colouring and the focus dim are whatever `refreshMapLayers()` just decided. **The first child that computes its own answer is the first place the two modes can disagree with nothing to say which is right.** Where a 2-D module holds its geometry privately, have that module expose it rather than writing a second copy here — the same move #118 made when a reader tab asked another tab for a model instead of reaching into its renderers.
 
-> **Sequencing.** All three are independent of each other and depend on nothing but the shipped view. They do collide in one file (`map-3d.js`), so they are constraint 2 work: **one at a time**, not in parallel.
+> **Sequencing.** All three are independent of each other and depend on nothing but the shipped view. They do collide in one file (`map-3d.js`), so they are constraint 2 work: **one at a time**, not in parallel. **#200 (revision 100) joins them on the same terms**: independent of the other two, the same file, so one at a time.
 
 > **`map-3d.js` moved under both children at revision 98.** #196 made the radio paths clickable there — `linkFeatures()` now carries the pair each line joins, and the click handler hit-tests `mn-links` with a 5 px box between the pins and the What-is-here pick. Two things in it are worth reading before either child is picked up rather than rediscovering. **A point query does not hit a line:** measured at the middle of a field link at 60° of pitch, `queryRenderedFeatures([x, y])` returns 0 features and the same call with a 5 px box returns 1, so any new clickable *line* layer needs `LINK_HIT_PX`, and #187's Draw & measure shapes are exactly that. And **the handler's order is now load-bearing** — pins, then links, then the pick — so a child adding a third clickable layer is choosing where it sits in that chain, not just adding a listener.
 
@@ -392,6 +393,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
+- **#202** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 100** — HEIC photos in Chrome and Firefox. iPhones save HEIC; Safari converts on upload and the Dropbox sync decodes it in Node, but the Field Photos tab in any other browser cannot draw one and refuses it with how to get a JPEG instead. A WebAssembly decoder loaded only for a HEIC, pinned and served from the harness at that version exactly as the OCR engine is.
+- **#201** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 100** — place a field photo by clicking the map: *Pick on the map* from the place editor, and a photo's own pin dragged to move it, the way a station's is. The database needs nothing — `update_field_photo()` already takes a move and re-files an unplaced photo by distance.
 - **#190** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 93** — MapLibre 5.24.0 is the last UMD build, and the 3-D view pins it. **6.x ships ESM only**, so a plain `<script src>` cannot load it and the app is on a branch that stops getting fixes at a moment nobody picks. High not for the diff but for the decision: this is the first real pressure on the classic-script contract #129 argued for at length. Four options are on the issue; `await import(url)` inside a classic script looks right — it needs no bundler and `map-3d.js` already loads the library lazily from its own function, which is exactly where it would go — and it wants checking rather than assuming, in particular what `file://` does with a module script. **Gates nothing; gated by nothing.**
 - **#189** `[Standalone]` `[Haiku4.5/Low]` — **OPEN, opened revision 93** — the 2-D OpenStreetMap base asks for `{s}.tile.openstreetmap.org`, and the OSMF tile policy asks for exactly `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, adding that other hostnames "may be slower or withdrawn without notice". Works today; documented as something that may stop working, which on a base map means tiles that quietly stop arriving. The 3-D view already uses the bare host and says in a comment that the 2-D layer was left alone rather than changed in passing — this is that change. `OSM-Topo` is **not** in scope: OpenTopoMap publishes the `{a,b,c}` form itself.
 - **#185** `[Standalone]` `[Human]` — **OPEN** — spot-check the three things #184 could not check from an agent session. Not a credentials problem; **toolchain**, the second of the four categories below: the environment cannot reach `nominatim.openstreetmap.org`, cannot run Radio Mobile, and cannot form an opinion about whether a colour ramp looks right. Three parts, ~15 minutes, each with click-by-click steps on the issue:
@@ -492,6 +495,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Five AI rows, and six `[Human]` issues.
 >
+> **Revision 100 opened #200, #201 and #202, and closes none of them** — three `[Sonnet5/Med]` follow-ups out of the field photos shipping from a session request: the photo pins in the 3-D view (#200, under EPIC #186), placing a photo by clicking the map (#201) and HEIC in the browsers that cannot draw one (#202). The Sonnet5 Med row goes from two to five. Two steps for a person came out of it as well — apply `0035` and the second bucket to the live project, and link a Dropbox folder — and are **not filed yet**: whether to file them as `[Human]` issues is with the owner, and the first may be done from an agent session over the Supabase connection, as #149 did for `0010`.
+
 > **Revision 99 opened and closed nothing** — it is #198's backfill landing in the data: 2,330 stations gained a modelled AHD height and a new `elevation_source` column saying where it came from, in the file and in the database. The allocation below is unchanged. It leaves one thing for somebody to decide rather than filing it: `station_json` filters on `deleted_at` alone, so `stations_doc()` hands out the two rows the document does not own (`bateson_test`, `elpro_test`). 0022 gave the *importer* a `document_managed` guard and never gave the *view* one. The file now carries them, which is a decision taken here and reversible; teaching the view to filter would stop the app seeing rows 0026's rig work may expect.
 
 > **Revision 98 opened and closed #196, #197, #198 and #199 in the same push, and opened nothing that stays open** — paths made clickable in the 3-D view, and three pieces of Elvis (Geoscience Australia / ICSM) elevation work out of a session asking what that platform could give this app. The allocation below is unchanged. One human step falls out of it and is **not** filed: a check that `api-elevation.fsdf.org.au` and `s3-ap-southeast-2.amazonaws.com` load from a Bureau machine, since `docs/floodwarning-net.md` records that the filter default-denies hostnames it has never categorised. Nothing shipped depends on it — every Elvis feature is off by default or asked for — so it is a "confirm before relying on it", not a blocker.
@@ -525,7 +530,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Sonnet5
 | Effort | Issues |
 |---|---|
-| Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters and drawings in 3-D) |
+| Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters and drawings in 3-D) · **#200** (field photo pins in 3-D) · **#201** (place a field photo on the map) · **#202** (HEIC in Chrome and Firefox) |
 
 ### AI agent — Haiku4.5
 | Effort | Issues |
@@ -592,6 +597,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 10. ~~#99 (doc bug fix) has no blockers — ready to pick up now.~~ — **done at `30cf03b`.** It gated nothing on the board, so nothing else moved.
 10. #66 (CORS check) has no blockers — ready now; gates only future/unfiled ARRO API work.
 10d. **#186's children (#187, #188), #189 and #190 have no blockers and gate nothing** — all four fell out of the 3-D view shipping at `d7509fc` and none of them is in front of anything. The one real sequencing note is negative and is constraint 2's: **#187 and #188 both edit `map-3d.js`, so they run one at a time.** #189 is a one-line change in `map-controls.js` and collides with neither. #190 is a decision rather than a change and should be made *before* either child grows the file further, because the answer could move which build the module loads.
+10e. **#200, #201 and #202 have no blockers and gate nothing** — all three fell out of the field photos shipping at revision 100. Constraint 2 decides the order and nothing else does: **#200 edits `map-3d.js`, so it queues behind or ahead of #187 and #188, one at a time**; #201 and #202 both edit `field-photos.js` (and #201 `map-photos.js`, which #200 also touches for its accessor), so each of those pairs is one at a time too. #202 is the only one of the three with a third-party choice in it — which decoder, at what size and under what licence — and is the natural one to pick up first.
 10c. #145 (apply `0009`, create the bucket) has no blockers — ready now. **It gates nothing on this board**, which is worth stating plainly so it is not mistaken for a blocker on #116/#117/#123/#126: those four were unblocked by the *migration being written*, not by it being applied, and all four are code and schema-design work that can proceed against the file. What is actually waiting on it is the Export tab reading green, `tools/check_inspections.sql` being runnable against the real database, and — for Part B only — #116 being able to upload a photo at the end of a form.
 10. ~~**#115 (inspection schema) is the widest gate in the repo**~~ — **done at `68baffc`.** It was the widest gate and it is discharged: #116, #117, #123 and #126 are unblocked in one go, which makes four of the board's five next-pickable items come out of one epic. What it leaves behind is a constraint rather than a dependency — the record tables are editors-only, so #118 and #128 render behind sign-in.
 11. ~~#116 and #117 can run in parallel now~~ — **both are closed, and the parallelism claim was never tested.** It would have held: different form families, different tables, different save functions, shared lookup tables neither writes. What actually happened was better for #117 than the parallel would have been — the tab, the CSS section, the three-state pick-list, the draft path, the 409 contract and the section-pruning rule all existed to copy, and the fixture reader in `test/` did too. **Two tabs, two issues, four shared edits each** (`TABS`, `HELP`, a `state` block, one `renderMain()` line) — see constraint 3, which now states that as a shape rather than a single data point.
@@ -618,15 +624,81 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## Priority (as stated on each epic/issue, where given)
 - **P2:** ~~#100 (epic) → #102/#103~~ — **the whole epic is closed**; ~~#152 (epic) → #153/#154/#155~~ — **that epic is closed too, at revision 55**; ~~#78 (epic) → #115/#116/#117/#149/#146/#148/#118~~ — **EPIC #78 is closed out; every child of it is shut**; ~~#122 (epic) → #123/#124/#125/#126/#159/#128/#127~~ — **the whole epic is closed**; ~~#129 (epic) → #130/#132/#133/#134/#135~~ — **all closed**
-- **P3:** ~~#118~~ — **closed**; ~~#119 (epic) → #120/#121~~ — **all closed**; ~~#150~~, ~~#162~~, ~~#163~~, ~~#151~~, ~~#159~~, ~~#161~~, ~~#128~~, ~~#127~~ — **all closed**
+- **P3:** ~~#118~~ — **closed**; ~~#119 (epic) → #120/#121~~ — **all closed**; ~~#150~~, ~~#162~~, ~~#163~~, ~~#151~~, ~~#159~~, ~~#161~~, ~~#128~~, ~~#127~~ — **all closed**; #200, as a child of EPIC #186 (P3)
 - **Unrated:** ~~#160~~ — **closed at revision 47** (sequencing item 23).
 - **P4:** #66
-- Unprioritised until reviewed: #166 (the ELPRO trial — ~~#167~~ closed, so what is left is a credential, a card and a phone call; worth doing before it is worth a P-number, because the whole 115E-2 question stays theoretical until one unit publishes); #156 (a decision menu, not work — it gates nothing); #158 (three dashboard settings — it gates nothing either, but it is the only thing standing between a non-`@bom.gov.au` address and a working sign-in, so it is worth doing before it is worth prioritising)
+- Unprioritised until reviewed: #201 and #202 (the field photos' two follow-ups — the feature works without either, and each closes a way in that today ends in "type the coordinates" or "use Safari"); #166 (the ELPRO trial — ~~#167~~ closed, so what is left is a credential, a card and a phone call; worth doing before it is worth a P-number, because the whole 115E-2 question stays theoretical until one unit publishes); #156 (a decision menu, not work — it gates nothing); #158 (three dashboard settings — it gates nothing either, but it is the only thing standing between a non-`@bom.gov.au` address and a working sign-in, so it is worth doing before it is worth prioritising)
 - Unstated on ~~#101~~ (**closed**) /#107 and their children — ~~#108~~, ~~#109~~, ~~#137~~, ~~#141~~ and ~~#138~~ **closed** — and on ~~#99~~ (**closed**) — treat as normal priority, sequenced by the dependency chain above. The near-term-regardless-of-P-number pairing (#130 and #131, two live crashes) is now **both closed**.
 
 ---
 
 ## What changed
+
+### Revision 100 — 2026-09-27: a photo taken in the field lands where it was taken — on the map, in the twin, and in a tab of its own
+
+Not from an issue: a session request, with two photos from the app the crews
+use attached — Solocator, which burns its own panel into the picture:
+`242°SW (T) -27.554294°, 152.274116° ±4m ▲ 134m (HAE)` over `BoM-FWIN · Gatton
+· 2026-06-24, 12:26:08 AEST`. The ask was field photos in MegaNet, drawn where
+they were taken in the twin and reachable there with a carousel; the position
+read from the file or, failing that, off the picture; a bulk upload; and if
+possible a Dropbox folder that feeds itself. All of it shipped in one push.
+
+**The two photos had no EXIF at all** — which is the ordinary case for a photo
+that has been through Messages, WhatsApp or an email, and the reason the
+overlay matters more than the metadata. So `photo-meta.js` reads a photo two
+ways, in one file the browser and the Dropbox sync both load: the EXIF/XMP in
+any of four containers (JPEG, HEIC with its `iloc`, PNG `eXIf`, WebP), and the
+overlay by OCR (Tesseract.js, fetched only when a photo needs it). OCR alone
+was garbage on these photos; what made it read them was **reading only the
+bands an overlay lives in, keyed to the panel's own colour, and voting**: a
+position is high confidence only when two readings agree, a heading only
+counts when its compass word agrees with its degrees, and a second reading of
+just the line the first one found is what turns "read" into "read right". Both
+photos: four passes, two agreeing readings, every field — including that they
+were taken from **one spot six seconds apart, facing 242° and 46°**, which is
+why a spot draws a wedge (twin) and a cone (map) for each way it looked.
+
+**Three things were wrong in ways no screen would show, and each has a check
+now.** `isFinite(null)` is `true`: a photo with no pitch was being recorded as
+held level and one with no lens as 1° wide, a library card with no position
+said *0.000000, 0.000000*, and a photo with no heading would have faced north
+— "null is not nought" is now a helper in all three modules. The same
+predicate was offering a Digital Twin for the seven stations with no position
+(`located()` in `digital-twin.js` and `map-twin.js`, and the twin pill) —
+pre-existing, and fixed while there. And the map's pins sat at z-index 352,
+**under the network's full-map canvas**, where they could be seen and never
+pressed — the exact lesson `map-sites.js` wrote down for its candidates; they
+are at 420 now, over the canvas and under the station pins, and the check
+clicks one with a real pointer.
+
+**The Dropbox sync had a backlog that could never drain.** It capped a run at
+150 photos and counted the ones it *skipped as already imported* against the
+cap — so any folder with more than 150 photos would re-skip its oldest 150
+every fifteen minutes, forever. What came in before is now looked up a hundred
+at a time before the run starts and never counted; a test drives a backlog
+through three runs to the cursor moving on.
+
+**`0035` is new and not yet applied to the live project.** `meganet.field_photo`
+keyed by SHA-256 (the same photo twice is one photo) and, for Dropbox, by the
+file's id including tombstones (a photo removed here is never re-imported);
+three `security definer` doors; editors-only reads; a second private bucket in
+`tools/storage_bucket.sql`. `check_field_photos.sql` holds it at 83 checks —
+one added when the build found that a photo placed by hand after arriving
+unplaced was never filed under a station (nobody could have filed it; it is now
+filed by distance).
+
+The checks: `npm run photos` is new (189 assertions — the reader and parser
+under Node, then the whole path in Chromium with the real OCR engine, the map
+and the twin; 51 checks in `npm run all` and in CI now), `npm run tabs` measures
+the tab in two states, and the sync's own tests are ten.
+
+**Opened: #200** (the pins in the 3-D view, under EPIC #186), **#201** (place a
+photo by clicking the map) and **#202** (HEIC in Chrome and Firefox), all
+`[Sonnet5/Med]`. **Not filed, pending the owner:** applying `0035` and the
+bucket to the live project (possible from an agent session over the Supabase
+connection, as #149 did), and linking the Dropbox folder — `docs/field-photos.md`
+has every click of the second.
 
 ### Revision 99 — 2026-09-23: 2,330 stations learn how high they are, and that it was modelled
 

@@ -61,6 +61,14 @@ create table if not exists storage.buckets (
   updated_at timestamptz default now()
 );
 
+-- The two limit columns Supabase's own buckets table carries, which
+-- tools/storage_bucket.sql sets. Without them that file could not run here,
+-- and it had only ever been run by hand — so its verdict block, the half #145
+-- got wrong, was the one database claim CI never checked (0035 added a second
+-- bucket to it, which is when that stopped being acceptable).
+alter table storage.buckets add column if not exists file_size_limit bigint;
+alter table storage.buckets add column if not exists allowed_mime_types text[];
+
 create table if not exists storage.objects (
   id uuid primary key default gen_random_uuid(),
   bucket_id text references storage.buckets (id),

@@ -6,7 +6,9 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for AUTH_URL, DB_URL, DB_ANON_KEY, DB_SCHEMA and esc;
-// across to app.js for setHeaderLabel and rerenderStationEditorCard; and to
+// across to app.js for setHeaderLabel and rerenderStationEditorCard; to
+// field-photos.js for FieldPhotos.authChanged, because every photo it holds was
+// fetched for one session (0035 makes them editors-only); and to
 // datastore.js for dbSetAccessToken. datastore.js and station-editor.js call
 // back into Auth, so this is a cycle — which is fine in one shared global scope
 // and would not be under ESM, one of the four reasons #129 gives for classic
@@ -335,6 +337,7 @@ const Auth = (function () {
     // The editor's status line says "not signed in" until something tells it
     // otherwise, and it is on screen behind this panel.
     if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
+    photosAuthChanged();
   }
 
   // GoTrue does not pass a trigger's message through, so a refused signup
@@ -373,6 +376,7 @@ const Auth = (function () {
     syncHeader();
     if (announce && document.getElementById('auth-modal')?.style.display === 'flex') render();
     if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
+    photosAuthChanged();
   }
 
   // ── the magic link landing ──
@@ -425,6 +429,14 @@ const Auth = (function () {
       ? `Signed in${email ? ` as ${email}` : ''}${who && who.may_write === false ? ' — read only' : ''}`
       : 'Sign in to edit stations';
     btn.classList.toggle('is-in', !!session);
+  }
+
+  // Field photos are editors-only (0035): whatever the tab, the twin and the
+  // map were holding was fetched for the session that just ended or began.
+  function photosAuthChanged() {
+    if (typeof FieldPhotos !== 'undefined' && FieldPhotos.authChanged) {
+      try { FieldPhotos.authChanged(); } catch (_) { /* its own problem, not the sign-in's */ }
+    }
   }
 
   // ── panel ──
@@ -586,6 +598,7 @@ const Auth = (function () {
       syncHeader();
       render();
       if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
+      photosAuthChanged();
     })();
   }
 

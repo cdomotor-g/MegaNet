@@ -158,6 +158,8 @@ const TABS = [
       find: 'council tasks form condition owner contact vegetation access' },
     { id: 'history',    label: 'Inspection History',     icon: '📋',
       find: 'past records read back print a4 csv timeline previous visits' },
+    { id: 'photos',     label: 'Field Photos',           icon: '📷',
+      find: 'pictures camera gps exif ocr overlay solocator geotag position heading upload bulk folder dropbox carousel unplaced' },
   ] },
 ];
 
@@ -1201,11 +1203,16 @@ const HELP = {
       'Everything arrives over the network — the renderer on the first visit (~750 KB), then one '
       + 'raster and one image per patch. Whatever fails, the tab says which and draws what it did get; '
       + 'a ground that could not be read is never drawn flat.',
+      '<strong>A 📷 on the ground is where somebody stood with a camera</strong> — a post at chest '
+      + 'height, the camera turned the way it faced and a pale wedge for each way a photo from there '
+      + 'looked. Click it, pick it from the line under the stage, or walk up to it in the POV and '
+      + 'press Enter, and the photos taken there open one after another. Editors only, like the '
+      + 'photos themselves; the markers are not in the .glb.',
       'The <code>.glb</code> is in metres, y up, with its origin on the ground at the pole and the '
       + 'station\'s coordinates and datum in its header. Blender: <em>File → Import → glTF 2.0</em>, '
       + 'and it lands z-up. Point cloud data, when it is ingested, will sit in this same scene.',
     ],
-    related: ['stations', 'mapgen', 'maps'],
+    related: ['stations', 'photos', 'mapgen', 'maps'],
     links: [
       { label: 'Digital twin — where the ground and the imagery come from, and the Blender workflow',
         href: 'docs/digital-twin.md' },
@@ -1298,6 +1305,44 @@ const HELP = {
       + 'view that will show it.',
     ],
     related: ['inspections', 'maintenance', 'stations'],
+  },
+
+  photos: {
+    summary: 'Photos from the field, <strong>filed by where they were taken</strong> — drop in a '
+           + 'handful or a whole folder, and each one is placed on the ground it shows: from the '
+           + 'camera\'s own GPS where the file has it, and otherwise from the position a field camera '
+           + 'app printed on the picture (Solocator, GPS Map Camera and the like), read off it by OCR. '
+           + 'Each is filed under the nearest station within a kilometre. Then they are wherever that '
+           + 'ground is drawn: a 📷 marker in the <strong>Digital Twin</strong> where the photo was '
+           + 'taken, pointing the way the camera faced — click it, or walk up to it in the POV and '
+           + 'press Enter — and a pin on the Stations map. Every door opens the same viewer: ← → '
+           + 'through the photos taken at that spot, with when, where, which way and how each was known.',
+    watch: [
+      '<strong>Nothing is uploaded until you press Upload.</strong> A position read off a picture is '
+      + 'a reading: the list says where each one came from, and flags one the OCR only read once. '
+      + 'Check it, change it (paste coordinates, or pick a station), then upload.',
+      '<strong>The same photo twice is one photo.</strong> Each file\'s SHA-256 is checked before a '
+      + 'byte is sent, so dropping last week\'s folder in again costs a query a photo, not the upload.',
+      'A photo that <strong>nothing can place</strong> still uploads, into <em>Unplaced</em> — open '
+      + 'it there and give it coordinates or a station. It is drawn nowhere until it has a place.',
+      'The OCR engine (~7 MB, Tesseract) is fetched only for a photo with no GPS in it, once a '
+      + 'session. A photo sent through Messages, a chat app or an email has usually lost its GPS and '
+      + 'kept the overlay, which is exactly the case it is for.',
+      '<strong>Editors only</strong>: the pictures, and where they were taken, are in a private '
+      + 'bucket and shown through links that expire. A site photo shows its access, its padlock and '
+      + 'often a colleague, and its coordinates are as much a disclosure as its pixels.',
+      '<strong>From Dropbox</strong>: photos saved into the linked Dropbox folder are imported by a '
+      + 'scheduled job about every fifteen minutes, read the same way, and reported in the panel at '
+      + 'the foot of the tab. A photo removed here stays removed — the sync will not bring it back.',
+      'The altitude a photo carries is shown, never used: phones and apps disagree about its datum '
+      + '(Solocator prints height above the ellipsoid, some 40 m off AHD here). The marker in the twin '
+      + 'stands on the twin\'s own ground.',
+    ],
+    related: ['twin', 'stations', 'inspections', 'history'],
+    links: [
+      { label: 'Field photos — how a position is read, the Dropbox sync, and setting it up',
+        href: 'docs/field-photos.md' },
+    ],
   },
 
   export: {
@@ -1870,7 +1915,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 34;
+const DB_SCHEMA_VERSION = 35;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
@@ -2668,6 +2713,36 @@ const state = {
     msg: null,           // { role, kind, text } — rendered on the panel that asked
     urls: {},            // storage_path → signed URL, for this session only
   },
+  // Field photos (field-photos.js, 0035). The queue is state, not DOM, so it
+  // carries on reading and uploading behind another tab and is all still there
+  // when this one comes back; byId is every photo this session has seen,
+  // whichever door it came in by, so the viewer never asks twice.
+  photos: {
+    types: null,         // the image rows of meganet.attachment_type
+    typesLoading: false,
+    typesP: null,
+    typesError: null,
+    queue: [],           // files being read and uploaded — see FieldPhotos._queue for the shape
+    reading: false,
+    uploading: false,
+    msg: null,           // { text, kind } — the line under the drop zone
+    lib: null,           // the library's rows, for the filter below
+    libKey: '',
+    libLimit: 60,
+    libLoading: false,
+    libError: null,
+    unplacedCount: null,
+    filter: { show: 'all', station: '' },   // all | unplaced | dropbox | station
+    sync: null,          // meganet.field_photo_sync rows
+    syncError: null,
+    byId: {},            // id → row
+    near: {},            // box key → { at, p } — the twin's and the map's queries, a minute each
+    urls: {},            // object path → { url, at } signed for this session
+  },
+  // The Stations map's 📷 layer (map-photos.js). On unless switched off: it
+  // draws nothing for a session that is not signed in, and a photo somebody
+  // took is the first thing they will look for.
+  mapPhotos:     localStorage.getItem('mn-field-photos') !== 'off',
   theme: localStorage.getItem('mn-theme') || 'light',
 };
 

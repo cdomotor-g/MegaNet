@@ -1,10 +1,13 @@
--- storage_bucket.sql — The `inspections` bucket and the four policies on it.
+-- storage_bucket.sql — The two private buckets and the four policies on each:
+-- `inspections` (0010: a form's photos and pasted screenshots) and
+-- `field-photos` (0035: pictures filed by where they were taken).
 --
 --   psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/storage_bucket.sql
 --
 -- Unlike every other file under tools/ this one **writes**, and it does not roll
--- back. It is idempotent and safe to re-run: the bucket is an upsert and each
--- policy is dropped before it is created.
+-- back. It is idempotent and safe to re-run: each bucket is an upsert and each
+-- policy is dropped before it is created. Running it again after 0035 is how a
+-- project that already had the first bucket gets the second.
 --
 -- ── Why this is not a migration ──────────────────────────────────────────────
 --
@@ -89,31 +92,77 @@ create policy inspections_delete_editors on storage.objects
   for delete to authenticated
   using (bucket_id = 'inspections' and meganet.is_editor());
 
+-- ── The field photos (0035) ──────────────────────────────────────────────────
+-- The same four policies on the same list of people, for the same reason: a
+-- field photo shows a site's access, a landowner's shed and often a colleague,
+-- and its coordinates are as much a disclosure as its pixels. Private, read
+-- through signed URLs, 25 MB an object like the other. The Dropbox sync writes
+-- here as service_role, which Storage lets past these policies.
+--
+-- A second bucket rather than a prefix in the first: the two hold different
+-- things under different rules — an attachment's path is filed under the
+-- record it belongs to, a field photo's is not — and a bucket is the unit
+-- Storage's own limits and listings work in.
+
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('field-photos', 'field-photos', false, 26214400)
+on conflict (id) do update set
+  public          = false,
+  file_size_limit = excluded.file_size_limit;
+
+drop policy if exists field_photos_read_editors   on storage.objects;
+drop policy if exists field_photos_insert_editors on storage.objects;
+drop policy if exists field_photos_update_editors on storage.objects;
+drop policy if exists field_photos_delete_editors on storage.objects;
+
+create policy field_photos_read_editors on storage.objects
+  for select to authenticated
+  using (bucket_id = 'field-photos' and meganet.is_editor());
+
+create policy field_photos_insert_editors on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'field-photos' and meganet.is_editor());
+
+create policy field_photos_update_editors on storage.objects
+  for update to authenticated
+  using (bucket_id = 'field-photos' and meganet.is_editor())
+  with check (bucket_id = 'field-photos' and meganet.is_editor());
+
+create policy field_photos_delete_editors on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'field-photos' and meganet.is_editor());
+
 -- ── The verdict ──────────────────────────────────────────────────────────────
 -- The three things #145's Part B could get wrong, asserted rather than eyeballed
--- in a dashboard: the bucket exists, it is private, and all four policies are
--- there. Raises rather than printing a row, so a scripted run fails loudly.
+-- in a dashboard, for both buckets: it exists, it is private, and all four of
+-- its policies are there. Raises rather than printing a row, so a scripted run
+-- fails loudly.
 
 do $$
 declare
+  v_bucket   text;
+  v_prefix   text;
   v_public   boolean;
   v_policies integer;
 begin
-  select public into v_public from storage.buckets where id = 'inspections';
-  if v_public is null then
-    raise exception 'the inspections bucket was not created';
-  end if;
-  if v_public then
-    raise exception 'the inspections bucket is PUBLIC — every photo in it is served to anyone with the URL';
-  end if;
+  foreach v_bucket in array array['inspections', 'field-photos'] loop
+    v_prefix := pg_catalog.replace(v_bucket, '-', '_');
+    select public into v_public from storage.buckets where id = v_bucket;
+    if v_public is null then
+      raise exception 'the % bucket was not created', v_bucket;
+    end if;
+    if v_public then
+      raise exception 'the % bucket is PUBLIC — every photo in it is served to anyone with the URL', v_bucket;
+    end if;
 
-  select count(*) into v_policies from pg_catalog.pg_policies
-   where schemaname = 'storage' and tablename = 'objects'
-     and policyname like 'inspections\_%';
-  if v_policies <> 4 then
-    raise exception 'expected 4 inspections_* policies on storage.objects, found %', v_policies;
-  end if;
+    select count(*) into v_policies from pg_catalog.pg_policies
+     where schemaname = 'storage' and tablename = 'objects'
+       and policyname like v_prefix || '\_%';
+    if v_policies <> 4 then
+      raise exception 'expected 4 %_* policies on storage.objects, found %', v_prefix, v_policies;
+    end if;
 
-  raise notice 'the inspections bucket exists, is private, and has all 4 policies';
+    raise notice 'the % bucket exists, is private, and has all 4 policies', v_bucket;
+  end loop;
 end
 $$;
