@@ -14,7 +14,7 @@
 //
 // Run:  npm run dbproxy
 
-import { dbProxyTarget, dbProxyRequestHeaders } from '../worker/index.js';
+import { dbProxyTarget, dbProxyRequestHeaders, dbProxyIsUpgrade } from '../worker/index.js';
 
 const UPSTREAM = 'https://jjprlritvhdqpvphfrnu.supabase.co';
 const results = [];
@@ -45,6 +45,9 @@ carries('a Storage upload', '/api/db/storage/v1/object/attachments/x.jpg', '',
         `${UPSTREAM}/storage/v1/object/attachments/x.jpg`);
 carries('a service root with no path under it', '/api/db/rest/v1', '',
         `${UPSTREAM}/rest/v1`);
+// The digital twin's room: a WebSocket to Realtime, the fourth service.
+carries('the Realtime socket', '/api/db/realtime/v1/websocket', '?apikey=k&vsn=1.0.0',
+        `${UPSTREAM}/realtime/v1/websocket?apikey=k&vsn=1.0.0`);
 
 // ── Paths that are not its business ──────────────────────────────────────────
 refuses('the gate route', '/api/session');
@@ -101,6 +104,28 @@ header('the real caller is passed on for rate limiting',
 const noIp = dbProxyRequestHeaders(new Headers({ apikey: 'k' }));
 header('no forwarded address is invented when there is none',
        noIp.get('x-forwarded-for') === null, String(noIp.get('x-forwarded-for')));
+
+// ── The socket's handshake ───────────────────────────────────────────────────
+// The upgrade headers go through on an upgrade and on nothing else: a plain
+// request that carries them is not upgrading anything, and a socket without
+// them never opens.
+const wsHeaders = new Headers({
+  apikey: 'k', Upgrade: 'websocket', Connection: 'Upgrade',
+  'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==', 'Sec-WebSocket-Version': '13',
+  Cookie: 'CF_Authorization=an-access-session',
+});
+header('a WebSocket upgrade is recognised', dbProxyIsUpgrade(wsHeaders) === true, String(dbProxyIsUpgrade(wsHeaders)));
+header('a plain request is not', dbProxyIsUpgrade(new Headers({ apikey: 'k' })) === false, 'false');
+const up = dbProxyRequestHeaders(wsHeaders, true);
+header('on an upgrade the handshake headers are forwarded',
+       up.get('upgrade') === 'websocket' && up.get('connection') === 'Upgrade'
+         && up.get('sec-websocket-key') === 'dGhlIHNhbXBsZSBub25jZQ==' && up.get('sec-websocket-version') === '13',
+       `${up.get('upgrade')} ${up.get('connection')} ${up.get('sec-websocket-version')}`);
+header('and the Access cookie still is not', up.get('cookie') === null, String(up.get('cookie')));
+const plain = dbProxyRequestHeaders(wsHeaders);
+header('on a plain request the handshake headers are stripped',
+       plain.get('upgrade') === null && plain.get('connection') === null && plain.get('sec-websocket-key') === null,
+       String(plain.get('upgrade')));
 
 console.log('');
 for (const r of results) console.log(`  ${r.ok ? '✓' : '✗'} ${r.what} — ${r.detail}`);

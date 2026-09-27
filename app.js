@@ -1634,8 +1634,8 @@ function invalidateMapSizes(delay) {
 //
 //   ❔ Help        whatever HELP says about the open tab. Always there.
 //   📋 Stations    the Stations cards — filters, list, the editor — while
-//                  that tab is open and they are beside the map rather than
-//                  under it (toggleStationsSplit).
+//                  that tab is open and the window is wide enough for them to
+//                  be beside the map rather than under it (stationsSplitActive).
 //   〽️ Path tools  the radio path card (while a path is open), the elevation
 //                  profile and the link budget (its fade margin), under the
 //                  same condition. A pane of their own
@@ -1651,7 +1651,7 @@ function invalidateMapSizes(delay) {
 //                  Legend, ✏️ Draw & measure, 📡 the polar plot, 🗼 the site
 //                  finder, 🎚️ the 3-D settings) is a pane of this panel with a
 //                  button here; a plain *button* (ℹ️ What is here, ⛰️ 3-D and
-//                  its two camera buttons, ⛶ full screen, ◫ the cards) is
+//                  its two camera buttons, ⛶ full screen) is
 //                  moved into the strip itself and does what it always did.
 //
 // Those controls were in the map's corner, and for one release a panel came
@@ -3112,9 +3112,9 @@ function syncStationsSplitHeight() {
   // page is deliberately one long scroller. Measuring against that page and
   // writing the answer down anyway is how the floor below used to get stored:
   // the figure meant nothing at the width it was taken, and it was still there
-  // at the width that reads it. stationsSplitActive() is the same pair of
-  // conditions the table's own column set follows, which is the point of it
-  // being a function rather than two tests written out twice.
+  // at the width that reads it. stationsSplitActive() is the same width test
+  // the table's own column set follows, which is the point of it being a
+  // function rather than the media query written out twice.
   if (!stationsSplitActive()) {
     main.style.removeProperty('--mn-split-h');
     // …and forget what was last applied, so the next measurement counts as a
@@ -3294,9 +3294,15 @@ function toggleMapFullscreen(on) {
 // ── Side by side ─────────────────────────────────────────────────────────────
 // The map filling the page on the left, and everything that is normally under
 // it — the filters, the station list, the path tools, the editor — in the side
-// panel beside it (#186, and the dock since). The ◫ corner button chooses
-// between that and the cards under the map, and nothing else about the tab
-// changes with it.
+// panel beside it (#186, and the dock since). Which of the two shapes the tab
+// takes is decided by the width of the window and by nothing else: above the
+// `lg` breakpoint the cards are beside the map, at or below it they are under
+// it in one long page. There is no switch. There was one — a ◫ button beside
+// ⛶, remembered as a preference — and it went, because it was a mode laid over
+// a decision the width already made: below `lg` the cards folded under the map
+// whatever it said, so on every phone it was a button that did nothing, and
+// above `lg` "off" was the stacked page at a width with room for both halves,
+// which nobody asked for once the side panel held the cards.
 //
 // This tab was two columns once and stopped being them at #165, and this is not
 // that split coming back: what went away was a *filter rail* beside the map,
@@ -3304,8 +3310,7 @@ function toggleMapFullscreen(on) {
 // What this puts beside the map is the map's own answer — the list of what
 // matched, the card of what is selected, the profile of the path just clicked —
 // so the two halves are one question and its answer rather than a tool and its
-// settings. It is on by default and remembered, because which of those two
-// readings a person wants is a preference and not a mode.
+// settings.
 //
 // It was a grid of three columns inside <main> until the side panel took the
 // right-hand one: the map, a divider that dragged, and a column of cards with a
@@ -3314,13 +3319,12 @@ function toggleMapFullscreen(on) {
 // the side panel now, the divider is the panel's own width handle, and the
 // width it sets is the panel's rather than a percentage of <main>.
 //
-// The map still fills the height of the window rather than the page scrolling
-// past it — which is the whole point of having the cards beside it: the map
-// stays in view while the list beside it is read. That is also why the cards
-// are *not* put beside the map below the `lg` breakpoint — a 400 px map beside
-// a 400 px pane is two things too narrow to read rather than two things in view
-// — and they fold back under it there without the setting moving, so a laptop
-// docked to a wide screen finds them beside the map again.
+// The map fills the height of the window rather than the page scrolling past
+// it — which is the whole point of having the cards beside it: the map stays in
+// view while the list beside it is read. That is also why the cards are *not*
+// put beside the map at or below `lg` — a 400 px map beside a 400 px pane is
+// two things too narrow to read rather than two things in view — and the
+// column there is the page's own scroller, the shape the tab was designed in.
 //
 // What is left under the map: the page's own bottom padding. Small, and a
 // figure rather than a measurement because there is nothing below the map to
@@ -3332,23 +3336,23 @@ const STATIONS_SPLIT_FOOT = 12;
 // measurement after.
 const STATIONS_SPLIT_FLOOR = 360;
 
-// Whether the cards are beside the map, which is not the same question as
-// whether ◫ is on: below `lg` they fold back under it and the *setting* is
-// deliberately left alone, so a laptop docked to a wide screen finds them
-// beside it again. Anything that changes with the layout — the station table's
-// columns, the map's height, whether the side panel has a Stations pane — has
-// to ask this rather than state.mapSplit. Named off BREAKPOINTS for the same
-// reason isPhoneNav() is: the media query here and the fold are the same
-// breakpoint, and `npm run shell` holds the stylesheet to that list.
+// Whether the cards are beside the map: the one question every part of the
+// layout asks, and a width test and nothing more. Anything that changes with
+// the layout — the station table's columns, the map's height, whether the side
+// panel has a Stations pane, which way the station card's pointer to the cards
+// faces — asks this rather than reading the media query for itself. Named off
+// BREAKPOINTS for the same reason isPhoneNav() is: the media query here and
+// the fold init.js listens for are the same breakpoint, and `npm run shell`
+// holds the stylesheet to that list.
 function stationsSplitActive() {
-  return state.mapSplit && !window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).matches;
+  return !window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).matches;
 }
 
 // Repaint the station table if — and only if — the column set it is holding is
-// no longer the one stationsSplitActive() asks for. Called from both things
-// that can change that answer: the toggle, and the fold at `lg` (init.js). The
-// check is what stops a toggle below the fold, where the table is already the
-// wide one, from throwing away 500 rows and the keyboard's place in them.
+// no longer the one stationsSplitActive() asks for. Called from the one thing
+// that can change that answer, the fold at `lg` (init.js). The check is what
+// stops a crossing the table already matches — one rendered on the far side
+// of it — from throwing away 500 rows and the keyboard's place in them.
 function syncStationsTableCols() {
   if (!document.getElementById('stations-table-wrap')) return;
   if (stationsColsNarrow === stationsSplitActive()) return;
@@ -3363,8 +3367,8 @@ function syncStationsTableCols() {
 // Leaflet map beside it is not rebuilt.
 //
 // `opts` goes to renderDock(). A render of the tab passes instant and no
-// re-measure, because its map is built after this; the toggle and the fold
-// leave the side panel to slide and re-measure the map for itself.
+// re-measure, because its map is built after this; the fold leaves the side
+// panel to slide and re-measure the map for itself.
 //
 // The path tools (#stations-path-cards) go with the cards but not *in* them:
 // beside the map they are the side panel's 〽️ pane, and under it they go back
@@ -3436,19 +3440,18 @@ function stationsLayoutChanged() {
   // Full screen and the fold together: the cards leave the side panel for
   // their place under the map — which the full-screen map covers — and focus
   // carried with them (syncStationsCardsHome) would be typing into a search
-  // box nobody can see. So it goes to ◫, the control that says where the
-  // cards went, and failing that to the map.
+  // box nobody can see. So it goes to ⛶ in the strip — the control that says
+  // the map is covering them, and the one that gives them back — and failing
+  // that to the map.
   const cards = document.getElementById('stations-cards');
   const held = [cards, document.getElementById('stations-path-cards')];
   const hidFocus = state.mapFullscreen && held.some(c => c && c.contains(document.activeElement));
   if (state.activeTab === 'stations') syncStationsCardsHome({ instant: true });
   if (hidFocus && cards && cards.closest('#stations-main')) {
-    const to = [document.querySelector('#help-panel .mn-map-split'), document.getElementById('leaflet-map')]
+    const to = [document.querySelector('#help-panel .mn-map-full'), document.getElementById('leaflet-map')]
       .find(n => n && n.getClientRects().length);
     if (to) to.focus({ preventScroll: true });
   }
-  // ◫ describes where the cards are, and crossing the fold has just moved them.
-  syncMapSplitBtn(document.querySelector('.mn-map-split'));
   syncStationsTableCols();
   syncStationsSplitHeight();
   // The station card on the map points at the cards — "shown in the side
@@ -3456,67 +3459,9 @@ function stationsLayoutChanged() {
   repaintStnCard();
 }
 
-function toggleStationsSplit(on) {
-  state.mapSplit = on == null ? !state.mapSplit : !!on;
-  try { localStorage.setItem('mn-map-split', state.mapSplit ? 'on' : 'off'); } catch (_) {}
-  // Switched on where the cards fit beside the map, it is asking to see them
-  // there — so the side panel opens on them, whatever it was showing. Off, the
-  // cards go under the map and the side panel loses its Stations and path
-  // tools panes; if one of those was on screen the panel shuts and the map has
-  // the width, and the preference is kept for the next time they are beside it.
-  if (state.mapSplit && stationsSplitActive()) {
-    state.dockTab = 'stations';
-    state.dockOpen = true;
-    dockPersist();
-  }
-  // A move, not a re-render (see syncStationsCardsHome): the Leaflet map keeps
-  // its view, its layers and its in-flight requests. Same reasoning as
-  // toggleMapFullscreen above.
-  syncStationsCardsHome();
-  const b = document.querySelector('.mn-map-split');
-  if (b) syncMapSplitBtn(b);
-  // The height is measured off where the map starts and what is under it, so
-  // it has to be taken after the cards have moved — and taken away again when
-  // they come back under it.
-  syncStationsSplitHeight();
-  // The list beside the map is a narrower list, and carries a narrower set of
-  // columns for it (see stationsTable). Unlike the height this is a re-render,
-  // because the columns are markup — but only of the table, and only when the
-  // set it is holding is the wrong one.
-  syncStationsTableCols();
-  // …and the station card's pointer to them (stationsLayoutChanged says why).
-  repaintStnCard();
-  // The height changed with no transition; the side panel's width, which
-  // slides, is re-measured by renderDock() once the slide is done.
-  invalidateMapSizes(0);
-  announce(!stationsSplitActive() && state.mapSplit
-    ? 'Station cards go in the side panel on wider windows; at this width they stay under the map.'
-    : state.mapSplit
-    ? 'Station cards in the side panel, beside the map. Its edge can be dragged, or moved with the arrow keys.'
-    : 'Station cards back under the map.');
-}
-
-// The ◫ button, told which of the two it is doing. The label says where the
-// cards are and what pressing it does, because an icon of two panes cannot say
-// which of them the cards are in.
-function syncMapSplitBtn(b) {
-  if (!b) return;
-  const on = state.mapSplit;
-  b.setAttribute('aria-pressed', String(on));
-  // Below the fold the setting is kept but cannot be honoured — the cards are
-  // under the map whatever it says — so the label says that, rather than
-  // claiming a side panel that is not holding them.
-  const label = !stationsSplitActive() && on
-    ? 'Station cards go in the side panel on wider windows — at this width they are under the map'
-    : on
-    ? 'Station cards are in the side panel — put them under the map'
-    : 'Station cards are under the map — put them in the side panel beside it';
-  b.title = label;
-  b.setAttribute('aria-label', label);
-}
-
-// The corner button, told what it is currently doing. Called on build and
-// again on every change of the flag, from here and from toggleMapFullscreen().
+// The corner button, told what it is currently doing. Called on build (the
+// 'screen' group, below) and again on every change of the flag, from
+// toggleMapFullscreen().
 //
 // It writes the label and leaves the icon alone, which it did not before #192:
 // it set `textContent`, which replaced the `.mn-mapctl-ico` span MapChrome
@@ -3782,23 +3727,23 @@ function stationsMapPanels(map) {
   });
 
   // ── How much screen the map gets ───────────────────────────────────────────
-  // Full screen and side by side are the same decision at two sizes, so they
-  // are one group. Rebuilt with the map on every render; renderStationsHtml()
-  // emits the is-full class from state, so the buttons are always built beside
-  // a map that already tells the truth — and in full screen the side panel they
-  // stand in is still on screen, so ⛶ is where it was when it was pressed.
+  // Full screen, in a group of its own. It shared the group with ◫ — the cards
+  // beside the map or under it — until that became the width's decision alone
+  // (stationsSplitActive); the group stays, because what matters is its place
+  // in the strip (after the tools, and last — ↺ is on the map), and a second
+  // button about the screen would belong here. Rebuilt with the map on every
+  // render; renderStationsHtml() emits the is-full class from state, so the
+  // button is always built beside a map that already tells the truth — and in
+  // full screen the side panel it stands in is still on screen, so ⛶ is where
+  // it was when it was pressed.
   //
-  // Both carry a pressed state and a label that changes with it, so both are
-  // built bare and then handed to the same function that keeps them in step
-  // from everywhere else — the label on the button and the state it reports
-  // are written in one place or they drift.
+  // It carries a pressed state and a label that changes with it, so it is
+  // built bare and then handed to the function that keeps it in step from
+  // everywhere else — the label on the button and the state it reports are
+  // written in one place or they drift.
   syncMapFullBtn(MapChrome.button(map, {
     className: 'mn-map-full', icon: '⛶', group: 'screen', order: 10,
     onClick: () => toggleMapFullscreen(),
-  }));
-  syncMapSplitBtn(MapChrome.button(map, {
-    className: 'mn-map-split', icon: '◫', group: 'screen', order: 20,
-    onClick: () => toggleStationsSplit(),
   }));
 
   // ── And the one that takes something away ──────────────────────────────────
@@ -4860,9 +4805,9 @@ function initMap() {
   // Before MapDraw, for MapMovePin's reason: the tools that take a map click
   // have to know which map before anybody arms one.
   MapHere.attach(state.map);
-  // Side by side is remembered and on by default, so the tab can render
-  // straight into it — and the height the map needs cannot be known until the
-  // markup is in the document and the cards have gone to the side panel.
+  // Above `lg` the tab renders straight into side by side — and the height the
+  // map needs cannot be known until the markup is in the document and the
+  // cards have gone to the side panel.
   //
   // It re-measures the map when it changes that height, which matters here more
   // than anywhere: Leaflet caches the container's size at L.map() time, which

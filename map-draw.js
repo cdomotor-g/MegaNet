@@ -579,8 +579,8 @@ const MapDraw = (function () {
       // beside the map, which this pane (Draw & measure) is hiding. So the
       // pane that has the profile comes up, the way the link budget's and the
       // site finder's profile buttons bring it up; the tool stays armed, so
-      // the next line needs no trip back here. Under the map (◫ off, or a
-      // narrow window) the card is already on the page and nothing moves.
+      // the next line needs no trip back here. Under the map (a window at or
+      // below `lg`) the card is already on the page and nothing moves.
       const card = document.getElementById('path-profile-panel');
       if (card && typeof dockReveal === 'function') dockReveal(card);
       // Finish was pressed in this pane, whose list add() has just redrawn

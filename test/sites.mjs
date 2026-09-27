@@ -132,7 +132,6 @@ await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0,
   null, { timeout: LOAD_TIMEOUT });
 await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: LOAD_TIMEOUT });
 await page.evaluate(() => {
-  toggleStationsSplit(false);
   // Trees round both ends and open rangeland between, so a refined figure is
   // charged P.2108's terminal clutter — which the screening pass never is —
   // without a 15 m canopy standing on every hilltop and cutting every path.
@@ -837,19 +836,19 @@ await page.evaluate(() => MapSites.select(1));
 // Left dimmed for the rest of the run, so ↺ has a dim to take away.
 await page.locator('#sites-dim').fill('20');
 
-// ── 2f. in the default layout, with the cards in the side panel ─────────────
-// Everything above runs with ◫ off, so the Stations cards are under the map and
-// the finder is the side panel's only pane. That is not how anybody meets it:
-// by default the cards are in the side panel too, the profile card in the path
-// tools' pane (〽️), and "Profile the worst path" draws into it there. It used
-// to leave the card hidden there and say it was "under the map".
-console.log('\nIn the default layout');
+// ── 2f. the profile card, in the side panel beside the finder ───────────────
+// At this width the Stations cards are in the side panel too — 📋, and the
+// profile card in the path tools' pane (〽️) — and "Profile the worst path"
+// draws into it there. It used to leave the card hidden there and say it was
+// "under the map". (The run used to put the cards under the map first, with a
+// ◫ toggle that has gone: the width decides now, and 1440 is beside the map.)
+console.log('\nThe profile card, beside the finder');
 
-await page.evaluate(() => { toggleStationsSplit(true); setDockTab('map-sites'); });
+await page.evaluate(() => setDockTab('map-sites'));
 await page.waitForTimeout(300);
 const beforeProf = await page.evaluate(() => ({ showing: dockShowing(),
   cards: !!document.querySelector('#help-panel .dock-pane-stations #stations-cards') }));
-ok('with ◫ on the cards are in the side panel beside the finder, and the finder is the pane on screen',
+ok('the cards are in the side panel beside the finder, and the finder is the pane on screen',
    beforeProf.showing === 'map-sites' && beforeProf.cards, JSON.stringify(beforeProf));
 await page.locator('.sites-panel button', { hasText: 'Profile the worst path' }).first().click();
 await page.waitForTimeout(400);
@@ -863,8 +862,8 @@ ok('Profile the worst path brings the profile card up in the side panel, open',
    afterProf.showing === 'paths' && afterProf.visible && afterProf.open === true, JSON.stringify(afterProf));
 ok('…and the note says where the card is', /side panel/.test(afterProf.note) && !/under the map/.test(afterProf.note),
    afterProf.note);
-// Back to the layout the rest of the run was written for.
-await page.evaluate(() => { toggleStationsSplit(false); setDockTab('map-sites'); });
+// Back on the finder for the rest of the run.
+await page.evaluate(() => setDockTab('map-sites'));
 await page.waitForTimeout(300);
 
 // ── 3. the weights ───────────────────────────────────────────────────────────

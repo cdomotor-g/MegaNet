@@ -245,14 +245,14 @@ const HELP = {
            + 'base maps first, and 🔑 the legend), the tools you point at it (✏️ <strong>Draw &amp; '
            + 'measure</strong>, 📡 <strong>Polar radio coverage</strong>, <strong>🗼 Repeater site '
            + 'finder</strong>, <strong>ℹ️ What is here</strong>), the <strong>3-D view</strong> (⛰️, 🎚️ '
-           + 'its settings, and its camera), and how much screen the map gets (⛶ and ◫). A panel '
+           + 'its settings, and its camera), and how much screen the map gets (⛶ full screen). A panel '
            + 'among them opens as a pane of the side panel, the way 📋 does; a button does its one '
            + 'thing. The one control left on the map is <strong>↺ Reset</strong>, alone in its '
            + 'top-right corner: it clears the filters, the selection, every drawing and every card. '
            + '<strong>⛶ Full screen</strong> gives the map the whole window except the side panel, '
-           + 'which stays beside it with the tools in it; Escape brings the page back. ◫ puts the '
-           + 'cards back under the map instead, and below 1,100 px they are under it whatever ◫ '
-           + 'says. On a phone the strip is a rail down the right-hand edge, beside the map rather '
+           + 'which stays beside it with the tools in it; Escape brings the page back. At or below '
+           + '1,100 px the cards are under the map in one long page and the side panel keeps the '
+           + 'tools. On a phone the strip is a rail down the right-hand edge, beside the map rather '
            + 'than on it, with ❔ and the map\'s controls in it and the cards under the map; a panel '
            + 'opens as a drawer beside the rail, and pressing its button again, tapping the dimmed '
            + 'page or pressing Escape puts it away. The <strong>Filters</strong> card drives the map and the list '
@@ -427,18 +427,18 @@ const HELP = {
       + 'label, its note and its tooltip, so "wind", "dB", "contour" and "licence" all land '
       + 'somewhere. It filters what is drawn and switches nothing off; in the side panel the '
       + 'pane is the full height of the window, so there is plenty for it to filter.',
-      'The ◫ button beside ⛶ chooses where the station cards go: in the <strong>side '
-      + 'panel</strong> beside the map (📋, and 〽️ for the path tools), the map filling the height of the window and the '
-      + 'cards scrolling on their own, or back under the map in one long page. Beside it is how '
-      + 'the tab opens — the single column put the map\'s own answer below the fold, so reading '
-      + 'it cost you the map. The side panel\'s width is yours: drag its left edge, or focus it '
-      + 'and use the arrow keys, and it is remembered. Below 1,100 px the cards fold back under '
-      + 'the map without the setting forgetting where you wanted them. The station list in the '
-      + 'side panel carries five columns rather than ten — name, station number, roles, AlertID '
-      + 'and <strong>SLS catchment</strong> — because ten of them in a 420 px pane is ten columns '
-      + 'nothing fits in. The network, position, elevation, the enabled tick and the ARRO link '
-      + 'are all on the station\'s card, which a click on any row opens; put the cards under the '
-      + 'map and the table has them back.',
+      'Where the station cards go follows the width of the window. Above 1,100 px they are in '
+      + 'the <strong>side panel</strong> beside the map (📋, and 〽️ for the path tools), the map '
+      + 'filling the height of the window and the cards scrolling on their own — the single '
+      + 'column put the map\'s own answer below the fold, so reading it cost you the map. At or '
+      + 'below 1,100 px they are under the map in one long page, because two 400 px columns are '
+      + 'two things too narrow to read rather than two things in view. The side panel\'s width is '
+      + 'yours: drag its left edge, or focus it and use the arrow keys, and it is remembered. The '
+      + 'station list in the side panel carries five columns rather than ten — name, station '
+      + 'number, roles, AlertID and <strong>SLS catchment</strong> — because ten of them in a '
+      + '420 px pane is ten columns nothing fits in. The network, position, elevation, the enabled '
+      + 'tick and the ARRO link are all on the station\'s card, which a click on any row opens; '
+      + 'under the map the table has them back.',
       '<strong>Clear filters</strong> also clears the repeater focus — the dim that a click on a '
       + 'repeater pin puts over everything not on its own paths. Both are ways of saying "back to '
       + 'the whole network", so both buttons do both, and both are enabled by a focus even with no '
@@ -1188,6 +1188,14 @@ const HELP = {
       + 'enclosure; TM in the name (or satcom) a Campbell CR300 and a Beam SBD modem; every tower '
       + 'cabinet carries a Kisters HS40 bubbler. A station the record cannot place is drawn as TM, and '
       + 'the notes say so. The doors open when you come up to them in the POV.',
+      '<strong>You are not necessarily alone.</strong> With <em>Explore together</em> on (the Scene '
+      + 'panel), the twin joins a room for its station and whoever else has that station open is '
+      + 'drawn where they stand, in the hat, shirt and trouser colours they chose, with their name over '
+      + 'their head — and you are drawn for them. Hold Space in the POV, or press Point, and your arm '
+      + 'goes out with a laser to whatever you are looking at. The room sees a chosen name (a signed-in '
+      + 'address\'s local part, or a visitor number), three colours and metres from the station; never '
+      + 'the address, never a coordinate on the Earth. Past four others the twin listens without '
+      + 'publishing, to keep the project\'s message budget for the readings it also serves.',
       'Vertical exaggeration stretches the relief and nothing else: the station is its true size and '
       + 'the figure 1.75 m at every setting. They are the ruler.',
       'Everything arrives over the network — the renderer on the first visit (~750 KB), then one '
@@ -2179,8 +2187,8 @@ const state = {
   // and the same cost — one terrain profile per hop on enable.
   map3dSheets:    false,
   // Vertical exaggeration of the relief, 1–3×. Remembered, unlike the two
-  // above, and for mapSplit's reason: it is not something an operator is doing
-  // right now, it is how they read a landscape. 1× is the default because it is
+  // above, because it is not something an operator is doing right now, it is
+  // how they read a landscape. 1× is the default because it is
   // the truthful one — the slider says what it is doing, and anything above 1
   // is a taller picture of the same ground, not more of it.
   map3dExag:      Math.max(1, Math.min(3,
@@ -2221,22 +2229,6 @@ const state = {
   // right now, not a standing preference — and a page that *opens* with a
   // full-screen map has hidden its own navigation.
   mapFullscreen:  false,
-  // The Stations tab side by side: the map filling the page on the left, and
-  // the station cards — the filters, the list, the path tools, the editor — in
-  // the side panel beside it (#186, and the dock since; see
-  // toggleStationsSplit, app.js). Remembered, unlike full screen, and for the
-  // opposite reason: this is not something an operator is doing right now, it
-  // is which of two readings of the tab they prefer, and a preference that has
-  // to be re-made on every visit is not one. Off puts the cards back under the
-  // map, in the page, the way the tab was designed.
-  //
-  // **On by default**, by request. The single column was the shape the tab was
-  // designed in and it is the shape that puts the map's own answer — what
-  // matched, what is selected, the path just clicked — below the fold, so
-  // reading it costs the map. Below `lg` the layout folds back to one column
-  // whatever this says, so the default is only ever the default on a screen
-  // wide enough to hold both halves.
-  mapSplit:       localStorage.getItem('mn-map-split') !== 'off',
   // Which on-map control panels (see MapChrome, map-controls.js) the operator
   // has pinned open. Persisted, and the one thing about those panels that is:
   // a pin is a standing preference about how this operator reads a map, not
@@ -2271,19 +2263,20 @@ const state = {
   // and what the default decides is only whether the eight blocks of grouped
   // filters underneath it are, which on arrival they need not be.
   //
-  // **Side by side ignores what was stored, on arrival only (#191.)** The split
-  // gives the whole right-hand column to the map, and the filter card is the
-  // first thing under the divider on the left — so a stored "open" lands on a
-  // page whose visible half is eight blocks of tick boxes and whose map is a
-  // strip. That is not what the split is for. So the landing state there is
-  // shut, whatever was remembered; pressing Filters still opens it, and still
-  // writes the preference, which is then honoured the moment the split is off.
+  // **Beside the map it lands shut, whatever was stored (#191).** Above `lg`
+  // the cards are in the side panel beside the map (stationsSplitActive,
+  // app.js), and the filter card is the first thing in that pane — so a stored
+  // "open" would land on a pane whose whole height is eight blocks of tick
+  // boxes, with the list they filter below the fold. That is not what the pane
+  // is for. So the landing state there is shut; pressing Filters still opens
+  // it, and still writes the preference, which is honoured on every visit at
+  // or below `lg`, where the cards are under the map in one long page.
   // Deliberately not a write: this reads the stored value and overrides it for
-  // one page load, so nobody's setting is destroyed by having opened the tab in
-  // the wrong layout once.
+  // one page load, so nobody's setting is destroyed by having opened the tab
+  // on a wide screen once. The media query is stationsSplitActive()'s, written
+  // out here because app.js has not loaded yet.
   filtersOpen:    (localStorage.getItem('mn-filters') || 'closed') === 'open'
-                  && !(localStorage.getItem('mn-map-split') !== 'off'
-                       && typeof window !== 'undefined' && window.matchMedia
+                  && !(typeof window !== 'undefined' && window.matchMedia
                        && !window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).matches),
   // The station list card on the same tab, and remembered for the same reason.
   // It is the tallest card on the page — a scroller capped at most of the

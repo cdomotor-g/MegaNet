@@ -260,6 +260,35 @@ await page.route(/api-elevation\.fsdf\.org\.au/, route =>
                   body: JSON.stringify({ SOURCE: 'QLD Government - https://www.qld.gov.au/', DATASET: 'Check_2026_1m.tif',
                                          'DEM RESOLUTION': '1m', 'HEIGHT AT LOCATION': '301.50m', 'METADATA URL': '' }),
                   headers: { 'Access-Control-Allow-Origin': '*' } }));
+// A Realtime room, faked: Playwright's WebSocket routing stands in for the
+// project. It answers the protocol the way the real server does (verified
+// live before the module was written) — a join, a heartbeat, a presence track
+// echoed back as a diff, a leave — keeps every frame the twin sent, and lets
+// the check play another visitor in by sending server frames.
+const room = { sockets: [], frames: [], state: {} };
+const roomSend = obj => { const c = room.sockets.filter(c => c.open).pop(); if (c) c.ws.send(JSON.stringify(obj)); return !!c; };
+await page.routeWebSocket(/realtime\/v1\/websocket/, ws => {
+  const conn = { ws, url: ws.url(), frames: [], topic: null, joinRef: null, key: null, open: true };
+  room.sockets.push(conn);
+  ws.onMessage(raw => {
+    let m; try { m = JSON.parse(String(raw)); } catch (_) { return; }
+    conn.frames.push(m); room.frames.push(m);
+    const reply = (status, response = {}) => ws.send(JSON.stringify({ topic: m.topic, event: 'phx_reply', payload: { status, response }, ref: m.ref, join_ref: m.join_ref || null }));
+    if (m.event === 'phx_join') {
+      conn.topic = m.topic; conn.joinRef = m.ref; conn.key = m.payload && m.payload.config && m.payload.config.presence && m.payload.config.presence.key;
+      reply('ok', { postgres_changes: [] });
+      ws.send(JSON.stringify({ topic: m.topic, event: 'presence_state', payload: room.state, ref: null }));
+    } else if (m.event === 'heartbeat') reply('ok');
+    else if (m.event === 'presence') {
+      reply('ok');
+      ws.send(JSON.stringify({ topic: m.topic, event: 'presence_diff', payload: { joins: { [conn.key]: { metas: [{ phx_ref: 'own', ...(m.payload && m.payload.payload) }] } }, leaves: {} }, ref: null }));
+    } else if (m.event === 'phx_leave') {
+      reply('ok');
+      ws.send(JSON.stringify({ topic: m.topic, event: 'phx_close', payload: {}, ref: null }));
+    }
+  });
+  ws.onClose(() => { conn.open = false; });
+});
 page.on('request', r => { if (/unpkg\.com\/three@/.test(r.url())) seen.three++; });
 page.on('pageerror', e => errors.push(String(e)));
 
@@ -918,7 +947,12 @@ try {
     };
     const groundEye = await page.evaluate(() => { const c = DigitalTwin._pov({ px: 0, pz: 2.5, yaw: 0, pitch: 0 }); const d = DigitalTwin.debug(); return { c, level: d.model.level, ground: d.yAt(0, 2.5) }; });
     ok('on the ground south of the ladder, facing it', groundEye.level === 'ground' && near(groundEye.c.y - groundEye.ground, 1.7, 0.01), JSON.stringify(groundEye));
-    await hold(['w'], 500);
+    // W held until the ladder is taken and climbed a little — however fast
+    // this machine draws frames.
+    await page.evaluate(() => { const cv = document.getElementById('twin-canvas'); cv.focus(); cv.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true })); });
+    await page.waitForFunction(() => { const m = DigitalTwin.debug().model; return m.level === 'ladder' && m.climb > 0.05; }, null, { timeout: 6000 }).catch(() => {});
+    await page.evaluate(() => document.getElementById('twin-canvas').dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true })));
+    await frames(3);
     const onLadder = await page.evaluate(() => { const d = DigitalTwin.debug(); return { level: d.model.level, climb: d.model.climb, walker: d.model.walker, cam: d.camera, footY: d.model.ladder.footY }; });
     ok('walking into the foot of the ladder takes hold of it, and W climbs',
       onLadder.level === 'ladder' && onLadder.climb > 0.05 && near(onLadder.walker.x, 0, 1e-6) && near(onLadder.walker.z, 1.2, 1e-6)
@@ -953,6 +987,195 @@ try {
     await settled();
   }
 
+  // ── 5d. The room: exploring together ──────────────────────────────────────
+  // The twin joined the station's room when its scene stood (the fake above
+  // answered). What went out, and then a visitor played in from the server
+  // side: joining, walking, pointing, leaving — measured as the figure drawn.
+  console.log('\nThe room\n');
+  const conn = room.sockets[room.sockets.length - 1];
+  const join = conn && conn.frames.find(f => f.event === 'phx_join');
+  const trackF = conn && conn.frames.find(f => f.event === 'presence');
+  const pres = (await dbg()).presence;
+  ok('the twin joined a public room named for the station, with presence and a per-tab key, publishable key as the token',
+    !!join && join.topic === `realtime:twin:${st.id}` && join.payload.config.broadcast.self === false && join.payload.config.presence.enabled === true
+      && typeof join.payload.config.presence.key === 'string' && join.payload.config.presence.key.length >= 8 && join.payload.config.private === false
+      && join.payload.access_token === 'sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY' && pres && pres.status === 'joined' && pres.key === join.payload.config.presence.key,
+    JSON.stringify({ topic: join && join.topic, config: join && join.payload.config, status: pres && pres.status }));
+  ok('the socket dialled the project directly, in protocol 1.0.0 — this origin has no Worker in front of it',
+    !!conn && /^wss:\/\/jjprlritvhdqpvphfrnu\.supabase\.co\/realtime\/v1\/websocket\?apikey=.*&vsn=1\.0\.0$/.test(conn.url), conn && conn.url);
+  const tp = trackF && trackF.payload && trackF.payload.payload;
+  ok('it tracked a name and three colours — no address, no id that outlives the tab',
+    !!tp && trackF.payload.type === 'presence' && trackF.payload.event === 'track' && /^Visitor \d{3}$/.test(tp.name)
+      && [tp.hat, tp.shirt, tp.pants].every(c => /^#[0-9a-f]{6}$/.test(c)) && !('uid' in tp)
+      && !JSON.stringify(tp).includes('@') && trackF.join_ref === join.ref,
+    JSON.stringify(tp));
+  ok('the line under the stage says only you are here, and what the others would see you as',
+    /Only you here.*would see you as Visitor \d{3}/.test(await page.evaluate(() => document.getElementById('twin-peers').textContent)));
+
+  // A visitor who changes a colour is a leave and a join of one key in one
+  // diff — the same person, still there, in the new colour, where they were.
+  const RETRACK = 'peer-retrack';
+  roomSend({ topic: `realtime:twin:${st.id}`, event: 'presence_diff', ref: null,
+             payload: { joins: { [RETRACK]: { metas: [{ phx_ref: 'r1', name: 'kim', hat: '#ffffff', shirt: '#00aa00', pants: '#0000ff' }] } }, leaves: {} } });
+  await page.waitForFunction(() => DigitalTwin.debug().presence.peers.length === 1, null, { timeout: 5000 }).catch(() => {});
+  roomSend({ topic: `realtime:twin:${st.id}`, event: 'broadcast', ref: null,
+             payload: { type: 'broadcast', event: 'pose', payload: { key: RETRACK, mode: 'walk', x: -3, z: 2, yaw: 1, pitch: 0, level: 'ground', climb: 0, point: false } } });
+  await page.waitForFunction(() => { const a = DigitalTwin.debug().avatars[0]; return a && a.visible; }, null, { timeout: 5000 }).catch(() => {});
+  roomSend({ topic: `realtime:twin:${st.id}`, event: 'presence_diff', ref: null,
+             payload: { joins: { [RETRACK]: { metas: [{ phx_ref: 'r2', name: 'kim', hat: '#e03030', shirt: '#00aa00', pants: '#0000ff' }] } },
+                        leaves: { [RETRACK]: { metas: [{ phx_ref: 'r1', name: 'kim', hat: '#ffffff', shirt: '#00aa00', pants: '#0000ff' }] } } } });
+  await page.waitForFunction(() => { const a = DigitalTwin.debug().avatars[0]; return a && a.hat === '#e03030' && a.visible; }, null, { timeout: 5000 }).catch(() => {});
+  const retracked = await dbg();
+  ok('a visitor who changes their hat is still there, in the new hat, where they stood',
+    retracked.presence.peers.length === 1 && retracked.avatars.length === 1 && retracked.avatars[0].hat === '#e03030' && retracked.avatars[0].hatDrawn === '#e03030'
+      && retracked.avatars[0].visible && near(retracked.avatars[0].x, -3, 1e-6) && near(retracked.avatars[0].z, 2, 1e-6),
+    JSON.stringify(retracked.avatars));
+  roomSend({ topic: `realtime:twin:${st.id}`, event: 'presence_diff', ref: null, payload: { joins: {}, leaves: { [RETRACK]: { metas: [{ phx_ref: 'r2' }] } } } });
+  await page.waitForFunction(() => DigitalTwin.debug().avatars.length === 0, null, { timeout: 5000 }).catch(() => {});
+
+  // A room flooded with keys: figures for eight, a count for the rest, and
+  // the twin listening rather than publishing.
+  const flood = {};
+  for (let i = 0; i < 12; i++) flood[`flood-${i}`] = { metas: [{ phx_ref: `f${i}`, name: `<b>f${i}</b>`, hat: '#ffd400', shirt: '#ff6a00', pants: '#1f2a44' }] };
+  roomSend({ topic: `realtime:twin:${st.id}`, event: 'presence_diff', ref: null, payload: { joins: flood, leaves: {} } });
+  await page.waitForFunction(() => DigitalTwin.debug().presence.peers.length === 12, null, { timeout: 5000 }).catch(() => {});
+  const flooded = await page.evaluate(() => { const d = DigitalTwin.debug(); const el = document.getElementById('twin-peers'); return { peers: d.presence.peers.length, drawn: d.presence.peers.filter(p => p.drawn).length, avatars: d.avatars.length, spectating: d.presence.spectating, text: el.textContent, html: el.innerHTML }; });
+  ok('twelve keys at once: eight figures, "and 4 more", the names escaped, and the twin listening only',
+    flooded.peers === 12 && flooded.drawn === 8 && flooded.avatars === 8 && /and 4 more/.test(flooded.text) && /listening only/.test(flooded.text)
+      && !/<b>/.test(flooded.html) && /&lt;b&gt;/.test(flooded.html),
+    JSON.stringify({ peers: flooded.peers, drawn: flooded.drawn, avatars: flooded.avatars, text: flooded.text.slice(0, 120) }));
+  const floodLeaves = {};
+  for (let i = 0; i < 12; i++) floodLeaves[`flood-${i}`] = { metas: [{ phx_ref: `f${i}` }] };
+  roomSend({ topic: `realtime:twin:${st.id}`, event: 'presence_diff', ref: null, payload: { joins: {}, leaves: floodLeaves } });
+  await page.waitForFunction(() => DigitalTwin.debug().presence.peers.length === 0, null, { timeout: 5000 }).catch(() => {});
+
+  // A visitor arrives.
+  const PEER = 'peer-abc123';
+  const groundAt0 = (x, z) => atBilinear(x, z) - h0;
+  await page.evaluate(() => {});
+  roomSend({ topic: `realtime:twin:${st.id}`, event: 'presence_diff', ref: null,
+             payload: { joins: { [PEER]: { metas: [{ phx_ref: 'p1', name: 'bao', hat: '#ff0000', shirt: '#00aa00', pants: '#0000ff', uid: 'u-2', since: 'now' }] } }, leaves: {} } });
+  await page.waitForFunction(() => DigitalTwin.debug().presence.peers.length === 1, null, { timeout: 5000 }).catch(() => {});
+  let rd = await dbg();
+  ok('a visitor who joins is listed by name, and has a figure waiting for a pose',
+    rd.presence.peers.length === 1 && rd.presence.peers[0].name === 'bao' && rd.avatars.length === 1 && !rd.avatars[0].visible
+      && rd.avatars[0].hat === '#ff0000' && rd.avatars[0].hatDrawn === '#ff0000'
+      && /With you:.*bao/.test(await page.evaluate(() => document.getElementById('twin-peers').textContent)),
+    JSON.stringify({ peers: rd.presence.peers.map(p => p.name), avatars: rd.avatars }));
+  // …and walks: a first pose, then a second, walked to over the time between.
+  const pose = (x, z, extra = {}) => ({ topic: `realtime:twin:${st.id}`, event: 'broadcast', ref: null,
+    payload: { type: 'broadcast', event: 'pose', payload: { key: PEER, mode: 'walk', x, z, yaw: 0.5, pitch: 0, level: 'ground', climb: 0, point: false, ...extra } } });
+  roomSend(pose(4, 6));
+  await page.waitForFunction(() => { const a = DigitalTwin.debug().avatars[0]; return a && a.visible; }, null, { timeout: 5000 }).catch(() => {});
+  rd = await dbg();
+  const av = rd.avatars[0];
+  ok('the first pose puts the figure on the ground where it says, turned the way it looks',
+    av && av.visible && near(av.x, 4, 1e-6) && near(av.z, 6, 1e-6) && near(av.y, groundAt0(4, 6), 1e-3) && near(av.yaw, 0.5, 1e-6),
+    JSON.stringify({ av, ground: groundAt0(4, 6) }));
+  await sleep(250);
+  const framesBefore = (await dbg()).frames;
+  roomSend(pose(6, 6));
+  // The first frame that shows it moved — part way on any machine that draws
+  // faster than the walk, at the end on one that does not.
+  await page.waitForFunction(() => { const a = DigitalTwin.debug().avatars[0]; return a && a.x > 4; }, null, { timeout: 5000 }).catch(() => {});
+  const mid = (await dbg()).avatars[0];
+  await page.waitForFunction(() => { const a = DigitalTwin.debug().avatars[0]; return a && a.settled; }, null, { timeout: 5000 }).catch(() => {});
+  rd = await dbg();
+  const end = rd.avatars[0];
+  ok('the second pose is walked to — on the way when first seen, there by the end — and the loop drew the walk',
+    mid && mid.x > 4 && mid.x <= 6.001 && end && near(end.x, 6, 1e-6) && end.settled && rd.frames > framesBefore,
+    JSON.stringify({ mid: mid && mid.x, end: end && end.x, settled: end && end.settled, frames: [framesBefore, rd.frames] }));
+  // …and points: the arm goes up, the laser lands on the ground.
+  roomSend(pose(6, 6, { yaw: 0.5, pitch: -0.35, point: true }));
+  await page.waitForFunction(() => { const a = DigitalTwin.debug().avatars[0]; return a && a.pointing && a.laser && a.settled; }, null, { timeout: 5000 }).catch(() => {});
+  rd = await dbg();
+  const pt = rd.avatars[0];
+  ok('pointing raises the arm and lays a laser from the hand to the ground, its dot on the terrain',
+    pt && pt.pointing && pt.armRaised && pt.laser && pt.laser.len > 1 && pt.laser.len < 60
+      && near(pt.laser.dot.y, groundAt0(pt.laser.dot.x, pt.laser.dot.z), 0.15),
+    JSON.stringify({ arm: pt && pt.armRaised, laser: pt && pt.laser, ground: pt && pt.laser && groundAt0(pt.laser.dot.x, pt.laser.dot.z) }));
+  ok('a figure in orbit is named but not drawn', await (async () => {
+    roomSend(pose(6, 6, { mode: 'orbit' }));
+    await page.waitForFunction(() => { const a = DigitalTwin.debug().avatars[0]; return a && !a.visible; }, null, { timeout: 5000 }).catch(() => {});
+    const t = await page.evaluate(() => document.getElementById('twin-peers').textContent);
+    const a = (await dbg()).avatars[0];
+    return a && !a.visible && /bao/.test(t) && /looking on/.test(t);
+  })());
+
+  // The visitor's own pointer: Space held in the POV, and the latch.
+  const own = await page.evaluate(async () => {
+    const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    DigitalTwin._pov({ px: 2, pz: 3, yaw: 0.3, pitch: -0.4 });
+    const cv = document.getElementById('twin-canvas'); cv.focus();
+    cv.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    await frame(); await frame();
+    const held = DigitalTwin.debug();
+    cv.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
+    await frame(); await frame();
+    const released = DigitalTwin.debug();
+    DigitalTwin.togglePoint();
+    await frame(); await frame();
+    const latched = { pointing: DigitalTwin.debug().pointing, pressed: document.getElementById('twin-point').getAttribute('aria-pressed'), laser: DigitalTwin.debug().laser };
+    cv.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await frame();
+    const left = { pointing: DigitalTwin.debug().pointing, pressed: document.getElementById('twin-point').getAttribute('aria-pressed'), mode: DigitalTwin.debug().mode };
+    return { held: { pointing: held.pointing, laser: held.laser, cam: held.camera }, released: { pointing: released.pointing, laser: released.laser }, latched, left };
+  });
+  ok('Space held in the POV points: a laser from beside the eye with its dot on the ground; released, it goes',
+    own.held.pointing && own.held.laser && own.held.laser.len > 0.5 && near(own.held.laser.dot.y, groundAt0(own.held.laser.dot.x, own.held.laser.dot.z), 0.15)
+      && !own.released.pointing && !own.released.laser,
+    JSON.stringify(own.held) + ' → ' + JSON.stringify(own.released));
+  ok('the Point button latches it, reads as pressed, and leaving the POV releases it',
+    own.latched.pointing && own.latched.pressed === 'true' && !!own.latched.laser && !own.left.pointing && own.left.pressed === 'false' && own.left.mode === 'orbit',
+    JSON.stringify({ latched: own.latched, left: own.left }));
+
+  // What goes out: poses on change, four a second at most, with the tab's own key.
+  const sentBefore = conn.frames.filter(f => f.event === 'broadcast').length;
+  await page.evaluate(() => DigitalTwin._pov({ px: 0, pz: 8, yaw: 0, pitch: 0 }));
+  await page.evaluate(() => { const cv = document.getElementById('twin-canvas'); cv.focus(); cv.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true })); });
+  await sleep(1000);
+  await page.evaluate(() => document.getElementById('twin-canvas').dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true })));
+  await sleep(400);
+  const walked = conn.frames.filter(f => f.event === 'broadcast').slice(sentBefore);
+  await sleep(1000);
+  const idle = conn.frames.filter(f => f.event === 'broadcast').length - sentBefore - walked.length;
+  ok('walking for a second sent a few poses — never more than four a second — each with this tab\'s key and metres from the station',
+    walked.length >= 2 && walked.length <= 7 && walked.every(f => f.payload.type === 'broadcast' && f.payload.event === 'pose' && f.payload.payload.key === pres.key
+      && f.payload.payload.mode === 'walk' && isFinite(f.payload.payload.x) && isFinite(f.payload.payload.z)) && idle <= 1,
+    `${walked.length} while walking, ${idle} while still; last ${JSON.stringify(walked[walked.length - 1] && walked[walked.length - 1].payload.payload)}`);
+  await page.evaluate(() => document.getElementById('twin-canvas').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+
+  // Nothing of the room in the .glb.
+  roomSend(pose(5, 5));
+  await page.waitForFunction(() => { const a = DigitalTwin.debug().avatars[0]; return a && a.visible; }, null, { timeout: 5000 }).catch(() => {});
+  const glbNames = await page.evaluate(async () => {
+    const buf = await DigitalTwin.buildGlb();
+    const dv = new DataView(buf);
+    const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, dv.getUint32(12, true))));
+    return json.meshes.map(m => m.name);
+  });
+  ok('the visitor, their laser and the pointer are not in the .glb', !glbNames.some(n => /visitor|laser/.test(n)) && glbNames.includes('torso'), glbNames.filter(n => /visitor|laser/.test(n)).join(', ') || 'none');
+
+  // The visitor leaves.
+  roomSend({ topic: `realtime:twin:${st.id}`, event: 'presence_diff', ref: null, payload: { joins: {}, leaves: { [PEER]: { metas: [{ phx_ref: 'p1' }] } } } });
+  await page.waitForFunction(() => DigitalTwin.debug().avatars.length === 0, null, { timeout: 5000 }).catch(() => {});
+  rd = await dbg();
+  ok('a visitor who leaves is gone from the scene and the line', rd.avatars.length === 0 && rd.presence.peers.length === 0
+    && /Only you here/.test(await page.evaluate(() => document.getElementById('twin-peers').textContent)), JSON.stringify(rd.presence.peers));
+
+  // Off: no socket for a rebuild; on again: a fresh room.
+  const socketsBefore = room.sockets.length;
+  await page.evaluate(() => TwinPresence.setEnabled(false));
+  await page.evaluate(() => DigitalTwin.rebuild());
+  await settled();
+  const roomOff = await dbg();
+  ok('switched off, a rebuild opens no socket and the line is gone',
+    room.sockets.length === socketsBefore && roomOff.presence.status === 'off' && await page.evaluate(() => document.getElementById('twin-peers').hidden),
+    `${room.sockets.length - socketsBefore} new socket(s), status ${roomOff.presence.status}`);
+  await page.evaluate(() => TwinPresence.setEnabled(true));
+  await page.waitForFunction(() => DigitalTwin.debug().presence.status === 'joined', null, { timeout: 5000 }).catch(() => {});
+  ok('switched on, it joins again', (await dbg()).presence.status === 'joined' && room.sockets.length === socketsBefore + 1, `${room.sockets.length - socketsBefore} new socket(s)`);
+
   // ── 6. The teardown, and the return ───────────────────────────────────────
   console.log('\nThe teardown\n');
   const before = (await dbg()).frames;
@@ -963,6 +1186,10 @@ try {
   await sleep(400);
   const f2 = (await dbg()).frames;
   ok('leaving the tab takes the renderer and the scene with it', !gone.live && !gone.built && !gone.canvas && gone.contextLost === null);
+  const lastConn = room.sockets[room.sockets.length - 1];
+  ok('and the room is left: a phx_leave went out and the socket closed',
+    !!lastConn && lastConn.frames.some(f => f.event === 'phx_leave') && !lastConn.open && gone.presence && gone.presence.status === 'off',
+    JSON.stringify({ frames: lastConn && lastConn.frames.map(f => f.event).slice(-3), open: lastConn && lastConn.open, status: gone.presence && gone.presence.status }));
   ok('and the frame loop has stopped', f1 === f2 && f1 >= before, `${before} → ${f1} → ${f2}`);
 
   // The station card offers the twin, and opens the tab on that station.
@@ -1089,6 +1316,49 @@ try {
     JSON.stringify({ bar: phone.bar && phone.bar.height, head: phone.head && phone.head.bottom, stageTop: phone.stage && phone.stage.top,
                      stageH: phone.stage && phone.stage.height, attribBottom: phone.attrib && phone.attrib.bottom, mapBottom: phone.map && phone.map.bottom, labels: phone.labelsHidden }));
   ok('and the page does not scroll sideways', phone.scroll <= phone.client + 1, `${phone.scroll} in ${phone.client}`);
+
+  // With notes — three long ones, as a fallback afternoon produces — the head
+  // still holds one folded line, the stage keeps most of the map, the fold
+  // opens over the stage without moving it, and the map's zoom corner has
+  // stood down while ↺ still answers.
+  const noted = await page.evaluate(() => {
+    // The nav is a drawer at this width, and a drawer left open lays its
+    // backdrop over the map: shut, as a phone has it.
+    if (typeof setNavCollapsed === 'function') setNavCollapsed(true);
+    DigitalTwin._setNotes([
+      'This station\'s telemetry is not in its record — no AL or TM in the name, no ALERT addresses, no satcom — so its enclosure is drawn as a TM station\'s: a CR300 logger and a Beam SBD modem.',
+      'Queensland\'s aerial imagery could not be fetched, so Esri World Imagery is draped instead. Press Rebuild to ask for it again.',
+      '2 of the horizon\'s 3 sheets could not be fetched; the far ground is drawn where it was read.',
+    ]);
+    const r = el => { const b = el && el.getBoundingClientRect(); return b ? { top: b.top, bottom: b.bottom, height: b.height, width: b.width, left: b.left } : null; };
+    const fold = document.getElementById('twin-notes-fold'), sum = fold && fold.querySelector('summary'), list = document.getElementById('twin-notes');
+    const stage = document.getElementById('twin-stage'), map = document.getElementById('leaflet-map');
+    const zoom = document.querySelector('#leaflet-map .leaflet-top.leaflet-left');
+    const reset = document.querySelector('#leaflet-map .mn-map-reset');
+    const before = r(stage);
+    // The page may be scrolled past the map's top on a phone: a point off the
+    // screen hits nothing, so ↺ is brought into view for its probe.
+    let hitWhat = null;
+    const hitReset = (() => { if (!reset) return null; reset.scrollIntoView({ block: 'center' }); const b = reset.getBoundingClientRect(); const e = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); hitWhat = e ? `${e.tagName}#${e.id}.${String(e.className).slice(0, 60)} at ${Math.round(b.left)},${Math.round(b.top)} ${Math.round(b.width)}×${Math.round(b.height)} display:${getComputedStyle(reset).display} vis:${getComputedStyle(reset).visibility}` : `nothing at ${Math.round(b.left)},${Math.round(b.top)} ${Math.round(b.width)}×${Math.round(b.height)}`; return !!e && (e === reset || reset.contains(e)); })();
+    fold.open = true;
+    const after = r(stage), listBox = r(list);
+    fold.open = false;
+    return { hidden: fold.hidden, open: fold.open, count: (document.getElementById('twin-notes-count') || {}).textContent,
+             sum: r(sum), stage: before, stageAfter: after, list: listBox, map: r(map),
+             zoomShown: !!zoom && getComputedStyle(zoom).display !== 'none', hitReset, hitWhat,
+             attrib: r(document.getElementById('twin-attrib')) };
+  });
+  ok('three long notes fold to one line that says how many, the stage keeps at least half the map, and the credit line stays inside it',
+    !noted.hidden && !noted.open && /^3 notes$/.test(noted.count) && noted.sum.height <= 32 && noted.stage.height >= noted.map.height / 2
+      && noted.attrib.bottom <= noted.map.bottom + 1,
+    JSON.stringify({ count: noted.count, sum: noted.sum && noted.sum.height, stage: noted.stage && noted.stage.height, map: noted.map && noted.map.height }));
+  ok('opening the fold lays the list over the stage — the stage does not move, the list fits inside the map',
+    noted.stageAfter.top === noted.stage.top && noted.stageAfter.height === noted.stage.height
+      && noted.list.top >= noted.sum.bottom - 1 && noted.list.bottom <= noted.map.bottom + 1 && noted.list.height > 40,
+    JSON.stringify({ stage: noted.stage, after: noted.stageAfter, list: noted.list }));
+  ok('the map\'s zoom corner has stood down while the twin is up, and ↺ still answers a tap',
+    !noted.zoomShown && noted.hitReset === true, JSON.stringify({ zoom: noted.zoomShown, hitReset: noted.hitReset, hitWhat: noted.hitWhat }));
+  await page.evaluate(() => DigitalTwin._setNotes([]));
   await page.setViewportSize({ width: 1440, height: 900 });
   await sleep(500);
   await page.waitForFunction(id => MapTwin.active() && MapTwin.station() === id, linked.id, { timeout: BUILD_TIMEOUT });

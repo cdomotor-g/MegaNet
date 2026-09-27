@@ -879,9 +879,9 @@ const MapChrome = (function () {
     },
 
     // ── A plain corner button ────────────────────────────────────────────────
-    // One press, one thing, nothing disclosed: full screen, side by side,
-    // reset, What is here, the ⛰️ mode and the two camera buttons are all this
-    // shape. They were five hand-rolled `L.control` blocks in app.js until the
+    // One press, one thing, nothing disclosed: full screen, reset, What is
+    // here, the ⛰️ mode and the two camera buttons are all this shape. They
+    // were five hand-rolled `L.control` blocks in app.js until the
     // corner became a bar — the same six lines of Leaflet plumbing five times,
     // none of which could say which group it belonged to, and each of which
     // built its icon slightly differently from the panels beside it.

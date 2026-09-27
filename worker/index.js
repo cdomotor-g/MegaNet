@@ -245,7 +245,9 @@ const DB_PROXY_PREFIX = '/api/db/';
 
 // `db/` at the repo root is a real directory of migrations and is served as
 // static assets, which is why this sits under `/api/` rather than `/db/`.
-const DB_PROXY_SERVICES = ['rest/v1', 'auth/v1', 'storage/v1'];
+// `realtime/v1` is the fourth: the digital twin's room (twin-presence.js), a
+// WebSocket, carried the same way for the same reason.
+const DB_PROXY_SERVICES = ['rest/v1', 'auth/v1', 'storage/v1', 'realtime/v1'];
 
 // An allow-list rather than "forward what the browser sent", because what the
 // browser sent includes the Access cookie and the Cloudflare identity headers,
@@ -255,6 +257,13 @@ const DB_PROXY_SERVICES = ['rest/v1', 'auth/v1', 'storage/v1'];
 const DB_PROXY_REQUEST_HEADERS = [
   'accept', 'accept-profile', 'apikey', 'authorization',
   'content-profile', 'content-type', 'prefer', 'range', 'x-upsert',
+];
+
+// The handshake headers a WebSocket upgrade needs, forwarded only on one —
+// a plain request that carries them is not upgrading anything.
+const DB_PROXY_UPGRADE_HEADERS = [
+  'upgrade', 'connection', 'sec-websocket-key', 'sec-websocket-version',
+  'sec-websocket-protocol', 'sec-websocket-extensions',
 ];
 
 const DB_PROXY_RESPONSE_HEADERS = [
@@ -289,11 +298,17 @@ export function dbProxyTarget(pathname, search = '') {
 
 // Exported for the same reason: what is *not* forwarded is the security property,
 // and it is invisible from the outside.
-export function dbProxyRequestHeaders(headers) {
+export function dbProxyRequestHeaders(headers, upgrade = false) {
   const out = new Headers();
   for (const name of DB_PROXY_REQUEST_HEADERS) {
     const value = headers.get(name);
     if (value !== null) out.set(name, value);
+  }
+  if (upgrade) {
+    for (const name of DB_PROXY_UPGRADE_HEADERS) {
+      const value = headers.get(name);
+      if (value !== null) out.set(name, value);
+    }
   }
   // Supabase rate-limits some auth endpoints per caller. Every request now
   // arrives from this Worker, so without this one person's retries would spend
@@ -304,7 +319,25 @@ export function dbProxyRequestHeaders(headers) {
   return out;
 }
 
+// Whether a request is a WebSocket upgrade — the Realtime socket is the one
+// caller. Exported for the check.
+export function dbProxyIsUpgrade(headers) {
+  return (headers.get('upgrade') || '').toLowerCase() === 'websocket';
+}
+
 async function dbProxy(request, target) {
+  // A socket: fetch() completes the upgrade upstream, and the response it
+  // hands back — status 101, the socket on it — is returned as it stands,
+  // which is how a Worker pairs the browser's socket with the project's.
+  // Nothing else of this function applies: there is no body to stream and
+  // no headers to pick over on a 101.
+  if (dbProxyIsUpgrade(request.headers)) {
+    try {
+      return await fetch(target, { headers: dbProxyRequestHeaders(request.headers, true) });
+    } catch (err) {
+      return json({ error: `datastore unreachable: ${err.message}` }, 502);
+    }
+  }
   const init = {
     method: request.method,
     headers: dbProxyRequestHeaders(request.headers),

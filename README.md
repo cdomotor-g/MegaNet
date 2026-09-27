@@ -831,7 +831,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Limit link/path length*)
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
-- Map and station cards side by side by default — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape has room for
+- Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape, which every narrower window gets, has room for
 - **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub and nearest station, repeater and survey mark
 - **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
 - Elevation shading over any base map, with an opacity slider
@@ -846,8 +846,8 @@ Each entry in the `stations` array represents one node in the network. A node ca
   are for and separated by a hairline: what the map **shows** (base map — OSM-Topo by default,
   OpenStreetMap, Satellite or Dark — **Map display**, the **legend**), the tools you point at it
   (**Draw & measure**, **Polar radio coverage**, **Repeater site finder**, **What is here**), the **3-D view**, its
-  settings (🎚️) and its camera, and how much screen the map gets (⛶ full screen, ◫ the cards beside the map or
-  under it). A panel opens as a pane of the side panel from its button in the strip; a button does its one thing.
+  settings (🎚️) and its camera, and how much screen the map gets (⛶ full screen). A panel opens as a pane of
+  the side panel from its button in the strip; a button does its one thing.
   The one control left on the map is ↺ reset, alone in its top-right corner at every width. On a phone the strip
   is a rail down the right-hand edge, beside the map rather than on it, and a panel opens from it as a drawer over
   the page
@@ -1129,14 +1129,15 @@ viewport, the card collapses, and its summary line carries the live match count
 — so what the filters are doing is readable without opening them, and reading it
 costs you nothing of the map.
 
-**Side by side lands with the card shut (#191)**, whatever was remembered. The
-split gives the whole right-hand column to the map, and the filter card is the
-first thing under the divider on the left — so a stored "open" lands on a page
-whose visible half is eight blocks of tick boxes and whose map is a strip, which
-is not what the split is for. Pressing **Filters** still opens it and still
-writes the preference, which is honoured the moment the split is off; the
-override is read-only and lasts one page load, so nobody's setting is destroyed
-by having opened the tab in the wrong layout once.
+**Beside the map it lands with the card shut (#191)**, whatever was remembered.
+Above 1,100 px the cards are in the side panel, and the filter card is the first
+thing in that pane — so a stored "open" would land on a pane whose whole height
+is eight blocks of tick boxes, with the list they filter below the fold, which
+is not what the pane is for. Pressing **Filters** still opens it and still
+writes the preference, which is honoured on every visit at or below 1,100 px,
+where the cards are under the map in one long page; the override is read-only
+and lasts one page load, so nobody's setting is destroyed by having opened the
+tab on a wide screen once.
 
 Inside the card the search box leads and spans, and the six filter groups flow
 into as many columns as the window allows — four on a wide screen, two at 768 px,
@@ -1183,12 +1184,14 @@ panel and removing it later never moves or rebuilds the map at all. Full
 screen is something an operator is doing, not a preference, so it lasts the
 session and is not remembered.
 
-**Side by side, and it is how the tab opens.** The map filling the page on the
-left, and everything normally under it — the filters, the station list, the path
-tools, the details card — in the side panel on the right (§20), the map at the
-height of the viewport and the cards a pane that scrolls on its own. That is the
-whole point of it: the map stays in view while the list beside it is read. ◫
-beside ⛶ puts the cards back under the map. Until the side panel it was three
+**Side by side, and it is how the tab opens on any window wider than 1,100 px.**
+The map filling the page on the left, and everything normally under it — the
+filters, the station list, the path tools, the details card — in the side panel
+on the right (§20), the map at the height of the viewport and the cards a pane
+that scrolls on its own. That is the whole point of it: the map stays in view
+while the list beside it is read. At or below 1,100 px the same tab is one long
+page with the cards under the map, and the width is the only thing that chooses
+between the two. Until the side panel it was three
 columns inside `<main>` — the map, a divider that dragged and a column of cards —
 beside a help rail that was a second right-hand column; the divider is the side
 panel's own width handle now (a real ARIA separator with a value in px, dragged
@@ -1226,19 +1229,22 @@ too. Under 1100 px the stack is `height: auto` and the page is one long scroller
 on purpose, so `--mn-split-h` is not read there at all — and a figure taken
 against that page is a measurement of a layout that is not on screen. It was
 stored anyway, as the floor, and it survived the fold because the variable does.
-The sync now asks `stationsSplitActive()` — the same pair of conditions the
-table's own column set follows — and writes nothing while the answer is no.
+The sync now asks `stationsSplitActive()` — the same width test the table's
+own column set follows — and writes nothing while the answer is no.
 
 This is not #165's filter rail coming back. What sat beside the map then was the
 map's *settings*, which had to be scrolled past to reach the map; what sits
 beside it now is the map's *answer* — the list of what matched, the card of what
-is selected, the profile of the path just clicked. It is on by default,
-remembered once changed, and folds back to the single column below 1100 px
-without touching the setting: two 400 px columns are two things too narrow to read
-rather than two things in view, and a laptop docked to a wide screen finds its
-split again where it left it.
+is selected, the profile of the path just clicked. It folds back to the single
+column at 1100 px and below: two 400 px columns are two things too narrow to
+read rather than two things in view, and a laptop docked to a wide screen finds
+the cards beside its map again. There is no switch — there was a ◫ button
+beside ⛶, remembered as a preference, and it went because it was a mode laid
+over a decision the width already made: on every phone it did nothing, and on
+a wide screen "off" was the stacked page nobody asked for once the side panel
+held the cards.
 
-Like full screen, switching between the two readings never rebuilds the map:
+Like full screen, crossing between the two readings never rebuilds the map:
 the cards are one wrapper, *moved* between the side panel and the page, and the
 Leaflet map keeps its view, its layers and its in-flight requests.
 
@@ -3453,7 +3459,7 @@ settled rather than during the slide. Where it differs:
 the elevation profile, the link budget, *Repeaters listening*, the blast radius
 and the station editor are one wrapper (`#stations-cards`), emitted under the
 map by the tab's render and *moved* — never re-rendered — into the side panel's
-Stations pane while ◫ is on and the window is wider than 1,100 px. The radio
+Stations pane while the window is wider than 1,100 px. The radio
 path card, the elevation profile and the link budget are a wrapper of their own
 inside it (`#stations-path-cards`), and
 beside the map that goes to a pane of its own, 〽️ *Path tools*, under 📋: they
@@ -3461,9 +3467,9 @@ answer a question asked of the map rather than of the list, and they are the
 cards the map sends people to. Under the map it goes back into the column
 between the list and *Repeaters listening*, where the render emitted it. `#stations-main.is-split` then
 means "the cards are beside the map", and the map fills the height of the window
-on its own. ◫ moves them back under the map without rebuilding the Leaflet map;
-below 1,100 px they fold under it whatever ◫ says, and come back beside it when
-the window is wide again. Every card is re-rendered in place by its own id, so
+on its own. At or below 1,100 px they fold under it without the Leaflet map
+being rebuilt, and come back beside it when the window is wide again — the
+width is the one thing that decides. Every card is re-rendered in place by its own id, so
 none of them knows it has moved; leaving the tab takes the wrapper out of the
 side panel (a registered tab teardown), because a great deal of the app reads
 "no `#stations-table-wrap`" as "not on the Stations tab". Everything that jumps
@@ -3499,7 +3505,7 @@ and is the one thing in that corner. Each panel — 🗺️ Map display, 🔑 Le
 its whole `.mn-mapctl` wrapper (icon, heading, pin and body) into a pane of its
 own the moment it is built, with a button in the strip; its corner icon and its
 📌 are hidden there, because a pane already stays open. Each other plain button
-— ℹ️, ⛰️ and its two camera buttons (hidden until 3-D is on), ⛶, ◫ — is moved
+— ℹ️, ⛰️ and its two camera buttons (hidden until 3-D is on), ⛶ — is moved
 into the strip itself, keeping the class its module finds it by. They stand in the
 corner's groups and order (`MapChrome.groups()`), one labelled group each with a
 hairline between them, and the strip scrolls, with a thin bar beside the
@@ -3613,6 +3619,19 @@ horizon is where one belongs, each sheet draped with its own imagery. It is
 scenery, not survey — coarse on purpose, not in the `.glb`, not clickable —
 fetched only once the patch is standing, and the Scene panel can switch it
 off; it is a few more requests.
+
+**Nobody explores alone unless they choose to.** With *Explore together* on,
+the twin joins a room for its station on Supabase Realtime (the project the
+readings already live in — no server of ours) and whoever else has that
+station open is drawn where they stand, in the hat, shirt and trouser colours
+they chose, their name over their head; hold Space in the POV, or press
+Point, and your arm goes out with a laser to whatever you are looking at.
+The room sees a chosen name, three colours and metres from the station,
+never an address or a coordinate on the Earth; poses go out four times a
+second at most and only on change, and past four others a visitor listens
+without publishing, so a busy day cannot silence the readings the same
+project serves. The socket goes through the site's Worker where there is
+one, like every database call (`twin-presence.js`).
 
 **The radio paths are drawn from the antenna** as rays to the edge of the
 patch along the line of sight to the far station, each named beside the pole
@@ -3973,7 +3992,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run itm` | the Longley–Rice port drifting from its reference: 53 losses computed by NTIA's own compiled library — its five published vectors and 48 synthetic profiles across every regime, climate, polarisation and mode of variability — held to 10⁻⁶ dB, intermediates included. Node-only, seconds |
 | `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |
 | `npm run linkbudget` | the link budget card's two ends. Each is found by name, station number, ALERT address or address window — asserted against what the *Stations filter itself* returns for the same term, so the claim is that the card runs the shared matcher rather than a second copy of the rules. Then: the box keeping its caret through a paste, an end armed and filled from a pin click and from a row of the Stations list in its filtered state without selecting it, the three Clear buttons, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute — the same station at both ends, a zero-length path, a term nobody supplied, and a frequency box that cannot say whether it holds an override. Every one of those is a clean console |
-| `npm run twin` | the Digital Twin tab against a world the check makes — the State's elevation service answered with a tiled float GeoTIFF of a closed-form surface, so every mesh vertex is arithmetic: the request box grown by half a sample with the aspect snap switched off, each vertex at the surface's height at its own latitude and longitude, the Type 3 pole with its foot at the origin, the 1.75 m figure with its feet on the ground where it stands, exaggeration scaling the relief alone, the station as built (pole or tower from the record, the kit inside by telemetry, the door on approach, the ladder climbed and the deck at the top), the horizon (its innermost square the patch's edge vertex for vertex, each far vertex on its sheet's height at its own place less the Earth's curve, the far shell drawn first, the switch, the tiles gone), the `.glb` read back out of the binary with the horizon left out, each fallback by breaking one host, walk mode at eye height, and the renderer torn down with the tab |
+| `npm run twin` | the Digital Twin tab against a world the check makes — the State's elevation service answered with a tiled float GeoTIFF of a closed-form surface, so every mesh vertex is arithmetic: the request box grown by half a sample with the aspect snap switched off, each vertex at the surface's height at its own latitude and longitude, the Type 3 pole with its foot at the origin, the 1.75 m figure with its feet on the ground where it stands, exaggeration scaling the relief alone, the station as built (pole or tower from the record, the kit inside by telemetry, the door on approach, the ladder climbed and the deck at the top), the room (what the twin sends, a visitor played in through a fake Realtime server and drawn, walked, pointing, gone; the pointer's laser), the notes folded on a phone, the horizon (its innermost square the patch's edge vertex for vertex, each far vertex on its sheet's height at its own place less the Earth's curve, the far shell drawn first, the switch, the tiles gone), the `.glb` read back out of the binary with the horizon left out, each fallback by breaking one host, walk mode at eye height, and the renderer torn down with the tab |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and

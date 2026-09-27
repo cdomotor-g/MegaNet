@@ -39,8 +39,8 @@
 //      with its panes, its handle and its buttons working; the map's edge
 //      follows the side panel's, re-measured each time; Tab stays inside the
 //      two of them and Escape from the side panel ends it.
-//   7. **◫, the lg fold and a phone**: the cards under the map and back with
-//      the same Leaflet map; below 1,100 px the cards fold under the map and
+//   7. **The lg fold and a phone**: below 1,100 px the cards fold under the
+//      map and come back beside it with the same Leaflet map, focus kept, and
 //      the strip keeps Help and the map's controls; at 375 px the Stations
 //      tab's strip is a rail beside the map, the map ending where it begins
 //      and nothing left in the map's corner — every control in the rail, a
@@ -101,7 +101,7 @@ const STRIP = ['help', 'stations', 'paths',
                'map-display', 'map-legend',
                'map-draw', 'map-polar', 'map-sites', 'mn-map-here',
                'mn-map-3d', 'map-3d', 'mn-map-north', 'mn-map-tilt',
-               'mn-map-full', 'mn-map-split'];
+               'mn-map-full'];
 const BUTTONS = STRIP.filter(k => k.startsWith('mn-map-'));
 // The groups of the map's own that stand in the strip: every one MapChrome
 // declares but `reset`, whose one button stays on the map.
@@ -282,7 +282,7 @@ try {
     buttons.filter(b => /north|tilt/.test(b.c)).every(b => !b.shown)
       && buttons.filter(b => !/north|tilt/.test(b.c)).every(b => b.shown), JSON.stringify(buttons));
   check('…the toggles say whether they are on, the one-shot buttons do not',
-    ['mn-map-here', 'mn-map-3d', 'mn-map-full', 'mn-map-split'].every(c => ['true', 'false'].includes(buttons.find(b => b.c === c).pressed))
+    ['mn-map-here', 'mn-map-3d', 'mn-map-full'].every(c => ['true', 'false'].includes(buttons.find(b => b.c === c).pressed))
       && ['mn-map-north', 'mn-map-tilt'].every(c => buttons.find(b => b.c === c).pressed === null),
     JSON.stringify(buttons.map(b => [b.c, b.pressed])));
   const groups = await page.evaluate(() => {
@@ -362,7 +362,7 @@ try {
     JSON.stringify(walked.slice(0, onScreen.length - 1)) === JSON.stringify(onScreen.slice(2).concat('help')),
     JSON.stringify(walked));
   await page.keyboard.press('End');
-  check('End goes to the last of them — ◫, now that ↺ is on the map', (await look()).active === 'mn-map-split', (await look()).active);
+  check('End goes to the last of them — ⛶, now that ↺ is on the map and ◫ has gone', (await look()).active === 'mn-map-full', (await look()).active);
   await page.keyboard.press('Home');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
@@ -758,23 +758,28 @@ try {
   check('…and round from the side panel\'s last stop to the map\'s first, both ways',
     round[0] === 'side' && wrapped === 'leaflet-map' && sideTail.every(t => t === 'side'),
     JSON.stringify({ round, wrapped, sideTail }));
-  // The seam that has teeth: with the cards under the map, the page's own next
-  // stop after the map's last is the Filters card — under the full-screen map,
-  // where nobody can see what has focus. The side panel is shut then (its
+  // The seam that has teeth: with the cards under the map — which is where
+  // the fold at `lg` puts them, and the one thing that does — the page's own
+  // next stop after the map's last is the Filters card, under the full-screen
+  // map, where nobody can see what has focus. The side panel is shut then (its
   // Stations pane has gone under the map), so its first stop is ❔, the handle
-  // being hidden with the pane it sizes.
-  await page.evaluate(() => toggleStationsSplit(false));
-  await page.waitForTimeout(300);
+  // being hidden with the pane it sizes. Full screen is kept across the fold:
+  // it is the width that changes, not the mode.
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.waitForTimeout(600);
   await page.focus('#help-panel .help-toggle');
   await page.keyboard.press('Shift+Tab');
   const offSide = await where();
   await page.keyboard.press('Tab');
   const underMap = await page.evaluate(() => ({ help: !!document.activeElement?.classList.contains('help-toggle'),
-    cards: !!document.activeElement?.closest('#stations-cards'), shut: dockShowing() === null }));
-  check('…with the cards under the map, Tab off the map goes to the side panel, not to a card under it',
-    underMap.shut && offSide === 'map' && underMap.help && !underMap.cards, JSON.stringify({ offSide, underMap }));
-  await page.evaluate(() => toggleStationsSplit(true));
-  await page.waitForTimeout(300);
+    cards: !!document.activeElement?.closest('#stations-cards'), shut: dockShowing() === null,
+    under: !!document.querySelector('#stations-main > #stations-cards'),
+    full: state.mapFullscreen && !!document.querySelector('.map-panel.is-full') }));
+  check('…folded under the full-screen map, Tab off the map goes to the side panel, not to a card under it',
+    underMap.full && underMap.under && underMap.shut && offSide === 'map' && underMap.help && !underMap.cards,
+    JSON.stringify({ offSide, underMap }));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(600);
   // …and a dialog opened over the full-screen map keeps its own walls: a Tab
   // between two of its controls stays in it, rather than being placed on the
   // map behind it.
@@ -947,25 +952,18 @@ try {
     await page.waitForTimeout(200);
   }
 
-  // ── 7. ◫, the fold, a phone ──────────────────────────────────────────────
-  await page.evaluate(() => { state.map.__probe = 'same'; });
-  await page.click('#help-panel .dock-strip .mn-map-split');
-  await page.waitForTimeout(500);
-  s = await look();
-  check('◫ in the strip puts the cards under the map and takes the Stations button away',
-    s.cardsIn === 'main' && !s.strip.includes('stations') && s.strip.includes('mn-map-split'), JSON.stringify(s));
-  check('…and the path tools go back among the cards, after the list and before Repeaters listening, 〽️ with them',
-    s.pathsIn === 'cards' && !s.strip.includes('paths') && [...CARD_IDS, ...PANEL_IDS].every(id => s.counts[id] === 1),
-    JSON.stringify({ pathsIn: s.pathsIn, strip: s.strip, counts: s.counts }));
-  await page.click('#help-panel .dock-strip .mn-map-split');
-  await page.waitForTimeout(500);
-  s = await look();
-  check('◫ again puts them back in the side panel, open on them, with the same Leaflet map',
-    s.cardsIn === 'dock' && s.showing === 'stations' && await page.evaluate(() => state.map.__probe === 'same'),
-    JSON.stringify(s));
-  check('…and the path tools back in their own pane', s.pathsIn === 'paths' && s.strip.includes('paths'),
-    JSON.stringify({ pathsIn: s.pathsIn, strip: s.strip }));
-
+  // ── 7. The fold, a phone ──────────────────────────────────────────────────
+  // Where the cards are is the width's decision alone — beside the map above
+  // 1,100 px, under it at or below — so the fold is driven by resizing the
+  // window, and what is asserted is what ◫ used to be asserted for as well as
+  // what the fold always was: the cards moving with the same Leaflet map, the
+  // path tools going back among them and coming out again, every card still
+  // on the page once, and focus surviving the move.
+  // Entered from the cards — the pane a fresh visit opens on, and the one the
+  // section above left for the path tools'. (◫ used to put the side panel
+  // back on them; the pane is chosen here instead.)
+  await page.evaluate(() => { state.map.__probe = 'same'; setDockTab('stations', { instant: true }); });
+  await page.waitForTimeout(200);
   // Focus is carried across the fold: moving the cards with a row button
   // focused used to drop the keyboard user back on <body>.
   await page.focus('#stations-table-wrap tr[data-sid] button');
@@ -977,20 +975,34 @@ try {
   });
   check('crossing the 1100 px fold with a row focused keeps focus on that row', foldFocus.row, JSON.stringify(foldFocus));
   const folded = await page.evaluate(() => ({
-    split: document.querySelector('.mn-map-split')?.getAttribute('aria-label') || '',
     h: document.getElementById('stations-main-h')?.textContent || '',
   }));
-  check('…and below it ◫ says the side panel is for wider windows, and <main>\'s heading names the cards again',
-    /wider windows/.test(folded.split) && /filters and station list/.test(folded.h), JSON.stringify(folded));
+  check('…and below it <main>\'s heading names the cards again',
+    /filters and station list/.test(folded.h), JSON.stringify(folded));
   s = await look();
   check('at 1000 px the cards fold under the map, and the strip keeps Help and every map control',
     s.cardsIn === 'main' && s.pathsIn === 'cards'
       && JSON.stringify(s.strip) === JSON.stringify(STRIP.filter(k => k !== 'stations' && k !== 'paths'))
       && (await wrapAt('display')).where === 'dock', JSON.stringify(s));
-  check('…without forgetting where the cards were wanted', s.pref === 'stations'
-    && await page.evaluate(() => state.mapSplit === true), JSON.stringify(s));
+  check('…the path tools back among the cards, after the list and before Repeaters listening, 〽️ gone with 📋, and every card on the page once',
+    !s.strip.includes('paths') && [...CARD_IDS, ...PANEL_IDS].every(id => s.counts[id] === 1),
+    JSON.stringify({ pathsIn: s.pathsIn, strip: s.strip, counts: s.counts }));
+  check('…without forgetting which pane was open', s.pref === 'stations', JSON.stringify(s));
   const foldCorner = await cornerNow();
   check('…and still ↺ alone in the map\'s corner, at its top right', resetAlone(foldCorner), JSON.stringify(foldCorner));
+  // Back above it: the same map, the side panel open on the cards again, the
+  // path tools in their own pane.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(600);
+  s = await look();
+  check('back above the fold the cards are in the side panel again, open on them, with the same Leaflet map',
+    s.cardsIn === 'dock' && s.showing === 'stations' && await page.evaluate(() => state.map.__probe === 'same'),
+    JSON.stringify(s));
+  check('…and the path tools back in their own pane', s.pathsIn === 'paths' && s.strip.includes('paths'),
+    JSON.stringify({ pathsIn: s.pathsIn, strip: s.strip }));
+  // …and folded again, which is where the phone below is entered from.
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.waitForTimeout(600);
 
   // ── 7b. A phone ──────────────────────────────────────────────────────────
   // On the Stations tab a phone's strip is a rail down the right-hand edge,
@@ -1211,9 +1223,9 @@ try {
   const lastUp = await page.evaluate(() => {
     const a = document.activeElement, r = a.getBoundingClientRect();
     const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return { last: a.classList.contains('mn-map-split'), bottom: Math.round(r.bottom), winH: innerHeight, hit: !!t && (t === a || a.contains(t)) };
+    return { last: a.classList.contains('mn-map-full'), bottom: Math.round(r.bottom), winH: innerHeight, hit: !!t && (t === a || a.contains(t)) };
   });
-  check('at the top of a short phone\'s page, End in the rail brings its last button (◫) up above the fold, under a finger',
+  check('at the top of a short phone\'s page, End in the rail brings its last button (⛶) up above the fold, under a finger',
     lastUp.last && lastUp.bottom <= lastUp.winH && lastUp.hit, JSON.stringify(lastUp));
   await page.evaluate(() => scrollTo(0, 1200));
   await page.waitForTimeout(200);
@@ -1359,9 +1371,9 @@ try {
   const end = await page.evaluate(() => {
     const strip = document.querySelector('#help-panel .dock-strip');
     const a = document.activeElement, r = a.getBoundingClientRect(), sr = strip.getBoundingClientRect();
-    return { last: a.classList.contains('mn-map-split'), inView: r.bottom <= sr.bottom + 0.5 && r.top >= sr.top - 0.5 };
+    return { last: a.classList.contains('mn-map-full'), inView: r.bottom <= sr.bottom + 0.5 && r.top >= sr.top - 0.5 };
   });
-  check('…and End reaches the last of them (◫) and scrolls it into view', end.last && end.inView, JSON.stringify(end));
+  check('…and End reaches the last of them (⛶) and scrolls it into view', end.last && end.inView, JSON.stringify(end));
   check('no pageerror with real scrollbars', errors.length === 0, errors.join(' | '));
 } finally {
   await classic.close();

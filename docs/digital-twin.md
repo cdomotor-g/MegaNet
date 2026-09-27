@@ -185,6 +185,14 @@ within 2.2 m of it, the tower's cabinet when the visitor is up on the
 platform — and close again when they leave, or when the view goes back to
 orbit.
 
+**The notes, inside the map.** On the tab the notes are a list under the
+status. Inside the Stations map they are folded under a one-line count
+("⚠ 2 notes") that opens as a flyout over the stage — the stage never moves
+for it — because a map on a phone is 340 px tall and three notes of four
+lines each once left it no height at all. The map's zoom corner stands down
+while the twin is up (← Map, Escape or a wheel out is the way back), which
+gives a phone's bar the room its buttons need.
+
 **The figure.** 1.75 m, hi-vis and a hard hat, built from primitives (a model
 is a file to fetch and a licence to carry; a capsule in orange gives a sense
 of scale as well as a mesh of a face), a metre east of the pole with its feet
@@ -251,7 +259,7 @@ reads as a place rather than a model on a table:
 | Mode | Pointer | Keys |
 |---|---|---|
 | Orbit (default) | drag to orbit; wheel to zoom; right-drag, Shift-drag or two fingers to pan; pinch to zoom | arrows orbit; `+`/`−` zoom; `W A S D` pan; `R` reset; `T` top-down; `F` or `P` for the POV; inside the Stations map, a wheel out past the edge or `Esc` hands back to the map |
-| POV | drag to look; wheel to step | `W A S D` / arrows move at 3.2 m/s, Shift runs at 9; `Q`/`E` turn; `Esc` back to orbit |
+| POV | drag to look; wheel to step; Point (a latch) to point | `W A S D` / arrows move at 3.2 m/s, Shift runs at 9; `Q`/`E` turn; Space held points; `Esc` back to orbit |
 
 The POV eye is 1.70 m above whatever is under it — the ground, a rung, the
 grating — and the orbit camera is never let under the hill between it and
@@ -345,6 +353,61 @@ the antenna is higher than the 2 m pole a thin mast joins them, so the ray
 leaves from somewhere the eye can see. The rays go into the `.glb` as meshes
 named `path to …`.
 
+## Exploring together
+
+With **Explore together** on (the Scene panel; the setting is kept), the twin
+joins a room for its station on Supabase Realtime — the project the readings
+already live in, so no server of ours — and whoever else has that station's
+twin open is drawn in it (`twin-presence.js`):
+
+- **Who.** Each visitor is a figure in the hat, shirt and trouser colours they
+  chose (three swatches in the Scene panel, remembered per browser; the
+  defaults come from a per-browser id, so a person is the same figure every
+  visit), with their name over their head: the local part of a signed-in
+  address — the header's own rule — or "Visitor 417" for a stranger. What the
+  room carries is that name, the three colours and metres from the station,
+  and nothing else: never the address, never the session token, never a
+  coordinate on the Earth. It is a public channel, joined with the project's
+  publishable key, and that is the rule that keeps it so.
+- **Where.** A pose — metres east and south of the station, the look's yaw
+  and pitch, the ground/ladder/deck level and the climb, whether they are
+  pointing — goes out at most four times a second and only when it changed
+  (a keep-alive every five seconds otherwise), and each viewer walks the
+  figure from its last pose to the next over the time between. The figure's
+  height is worked out where it is drawn, from the level and the ground
+  there, because each viewer's ground is exaggerated by their own setting. A
+  visitor in orbit rather than the POV is named but not drawn; one who has
+  wandered off this viewer's patch is not drawn either.
+- **Pointing.** Hold Space in the POV, or press **Point** (a latch), and your
+  right arm goes out along your look with a laser to whatever it lands on —
+  the ground, the station, the far ground — and a dot there; the others see
+  the arm and the laser from your hand, you see the laser from beside your
+  eye. Space releases it; Point pressed again does; leaving the POV does.
+- **The line under the stage** says who is here ("With you: bao · Visitor
+  417"), that you are alone, or why the room could not be reached.
+- **The budget.** The project's plan allows a hundred messages a second
+  across everything it serves, and a pose to a room of N is N − 1 messages.
+  Four a second, only on change, and past four others in the room a visitor
+  listens without publishing (the line says so) — five people walking at once
+  are eighty messages a second, inside the budget; figures are still drawn
+  for up to eight, so a visitor who is listening sees who is there.
+- **The wire.** The socket goes the way every database call goes: through
+  the site's own Worker where there is one (`/api/db/realtime/v1`, which
+  `worker/index.js` carries with the WebSocket upgrade — the fourth service
+  on its list), and to the project directly everywhere else. On a network
+  that filters by hostname the Worker's route is what makes the room
+  reachable at all, and it is the one part of this that a check here cannot
+  prove: it wants a socket from a browser on that network.
+- **The protocol** is Phoenix's, a hundred lines of JSON written in the
+  module rather than fetched as a library — join, heartbeat, presence track,
+  presence state and diff, broadcast — every message of which was verified
+  against the project before it was written down.
+- **The check** stands up a fake room with Playwright's WebSocket routing: it
+  reads what the twin sends (the join's config, a track with no address in
+  it, poses gated to the rate) and plays a visitor in — joining, walking,
+  pointing, leaving — and measures the figure drawn for them. Every other
+  check closes off-origin sockets at once, so no run reaches the project.
+
 ## The Ground truth panel
 
 Side by side: the station's recorded height (surveyed, or modelled with its
@@ -435,7 +498,9 @@ picks and why, the kit inside by telemetry, the plate, the pole's door
 opening on approach and shutting on leaving; the tower's mast, rails, rungs
 and cabinet, the ladder taken by walking into it, the deck at the top with
 the door opening on its own, the toe boards holding, and the way down), the
-horizon (its innermost square the patch's edge
+room (what the twin sends, a visitor played in and drawn, walked, pointing,
+gone; the pointer's own laser on the ground; the notes folded on a phone with
+the stage keeping the room), the horizon (its innermost square the patch's edge
 vertex for vertex, each far vertex on its sheet's height at its own latitude
 and longitude read off the fixture the way `terrain.js` reads a tile, less
 the Earth's curve, the lift at the edge fading out, the far shell drawn

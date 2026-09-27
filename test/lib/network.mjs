@@ -149,5 +149,18 @@ export async function applyNetworkPolicy(page, origin) {
     return route.abort('blockedbyclient');
   });
 
+  // WebSockets do not pass through page.route: a socket to any other host —
+  // the digital twin's room on Supabase Realtime, say — would leave the
+  // machine unseen. So every off-origin socket is closed at once, and counted
+  // with the rest; a check that wants a room stands up its own fake with
+  // page.routeWebSocket after this policy, which then takes precedence.
+  await page.routeWebSocket(/.*/, ws => {
+    const url = ws.url();
+    const wsOrigin = origin.replace(/^http/, 'ws');
+    if (url.startsWith(wsOrigin)) { ws.connectToServer(); return; }
+    blocked.push(url);
+    ws.close({ code: 1008, reason: 'off-origin' });
+  });
+
   return { blocked };
 }

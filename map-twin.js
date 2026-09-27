@@ -160,16 +160,18 @@ const MapTwin = (function () {
   }
 
   function overlayHtml(st) {
-    // The head is inset from both edges: the map's corner controls — the zoom
-    // buttons top-left, ↺ top-right — stand above this overlay on purpose
-    // (the same window the 3-D canvas works in), and a bar under them would
-    // put its first and last buttons behind them.
+    // The head is inset from the right edge only: ↺ (the map's own reset)
+    // stands above this overlay top-right on purpose, and the zoom buttons
+    // top-left stand down while the twin is up (the stylesheet hides them:
+    // there is no map to zoom, and ← Map is the way out), which gives a
+    // phone's bar the room its third button needs.
     // One row, whatever the width: the words on the buttons go below `sm`
     // the way the banner's do (.hdr-label), the title truncates, and the
-    // status and the credit line are each one line with the whole text as
-    // their tooltip — the tab has them in full. A map on a phone is 340 px
-    // tall, and a head that wrapped to five rows left the stage no height at
-    // all and its own text spilling over the credit line.
+    // status, the paths, the company and the credit line are each one line
+    // with the whole text as their tooltip — the tab has them in full. The
+    // notes are folded under a one-line count that opens over the stage
+    // rather than in front of it: a map on a phone is 340 px tall, and three
+    // notes of four lines each once left the stage no height at all.
     return `
       <div class="map-twin-head">
         <div class="map-twin-bar">
@@ -180,6 +182,8 @@ const MapTwin = (function () {
           <span class="button-group map-twin-actions">
             <button type="button" id="twin-walk" aria-pressed="false" onclick="DigitalTwin.toggleWalk()"
                     title="Point of view: stand on the ground at eye height, walk with the keys, climb the ladder"><span aria-hidden="true">👁</span><span class="map-twin-label"> POV</span><span class="sr-only">Point of view</span></button>
+            <button type="button" id="twin-point" aria-pressed="false" onclick="DigitalTwin.togglePoint()"
+                    title="Point where you are looking, for whoever is here with you — Space held in the POV does the same"><span aria-hidden="true">☝</span><span class="map-twin-label"> Point</span><span class="sr-only">Point</span></button>
             <button type="button" onclick="DigitalTwin.resetView()" title="Back to the opening view of the pole"><span aria-hidden="true">↺</span><span class="map-twin-label"> View</span><span class="sr-only">Reset the view</span></button>
             <button type="button" onclick="MapTwin.openTab()"
                     title="The Digital Twin tab: the settings, the ground truth, the .glb for Blender"><span aria-hidden="true">🧊</span><span class="map-twin-label"> Open the tab →</span><span class="sr-only">Open the Digital Twin tab</span></button>
@@ -187,7 +191,11 @@ const MapTwin = (function () {
         </div>
         <p class="twin-status map-twin-status" id="twin-status" role="status">Building…</p>
         <p class="small twin-paths map-twin-paths" id="twin-paths" hidden></p>
-        <ul class="twin-notes" id="twin-notes" hidden></ul>
+        <p class="small twin-peers map-twin-peers" id="twin-peers" hidden></p>
+        <details class="map-twin-notes" id="twin-notes-fold" hidden>
+          <summary class="map-twin-notes-sum"><span aria-hidden="true">⚠</span> <span id="twin-notes-count">0 notes</span></summary>
+          <ul class="twin-notes" id="twin-notes"></ul>
+        </details>
       </div>
       ${DigitalTwin.stageHtml()}
       <p class="small map-twin-attrib" id="twin-attrib"></p>`;

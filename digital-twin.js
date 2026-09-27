@@ -231,6 +231,7 @@ const DigitalTwin = (function () {
     renderer: null, scene: null, camera: null, canvas: null, stage: null,
     terrain: null, wire: null, pole: null, band: null, figure: null, label: null, paths: null,
     station: null, doors: [],   // the station as built, and its doors
+    avatars: null, laser: null, dot: null,   // the other visitors, and the visitor's own pointer
     sun: null, hemi: null, texture: null, raf: 0, ro: null, dirty: false,
     horizon: null, shells: null, sky: null,   // the far field's group, its shells' bookkeeping, the dome
     off: [],          // listener removers
@@ -242,6 +243,7 @@ const DigitalTwin = (function () {
     target: null, radius: 26, theta: 0.65, phi: 1.05,   // orbit: spherical about target
     px: 3, pz: 6, yaw: -0.45, pitch: -0.08,             // POV: feet position and look
     level: 'ground', climb: 0, climbLatch: false,       // POV: on the ground, on the ladder (climb metres up it), or on the deck
+    pointing: false, pointLatch: false,                 // POV: Space held, or the Point button latched
     keys: new Set(),
     pointers: new Map(),
     pinch: null,
@@ -883,7 +885,8 @@ const DigitalTwin = (function () {
     if (!sc.scene) return;
     removeHorizon();
     sc.pole = null; sc.band = null; sc.doors = [];
-    for (const k of ['terrain', 'wire', 'station', 'figure', 'label', 'paths', 'sky']) {
+    remoteClear();
+    for (const k of ['terrain', 'wire', 'station', 'figure', 'label', 'paths', 'sky', 'avatars', 'laser', 'dot']) {
       if (sc[k]) { sc.scene.remove(sc[k]); disposeObject(sc[k]); sc[k] = null; }
     }
     if (sc.texture) { sc.texture.dispose(); sc.texture = null; }
@@ -1921,37 +1924,51 @@ void main() {
     return moving;
   }
 
-  // A person, 1.75 m, in hi-vis, a metre east of the pole with their feet on
-  // the ground there. Primitives rather than a model: a model is a file to
-  // fetch and a licence to carry, and what this figure is for is a sense of
-  // scale, which a capsule in orange gives as well as a mesh of a face.
-  function buildFigure() {
+  // A person, 1.75 m — boots, legs, a torso, two arms, a head, a hard hat — in
+  // the colours asked for (CSS colours: the hat, the shirt, the trousers).
+  // Primitives rather than a model: a model is a file to fetch and a licence
+  // to carry, and what this figure is for is a sense of scale, which a capsule
+  // in orange gives as well as a mesh of a face. The right arm hangs from a
+  // shoulder pivot so it can be raised to point. Local −z is the front, so a
+  // group turned by −yaw faces the way its owner is looking (the camera's own
+  // convention: forward is (sin yaw, ·, −cos yaw)).
+  function makeFigure({ hat = '#ffd400', shirt = '#ff6a00', pants = '#1f2a44' } = {}) {
     const grp = new THREE.Group();
-    const hiVis = new THREE.MeshStandardMaterial({ color: 0xff6a00, roughness: 0.8 });
-    const navy  = new THREE.MeshStandardMaterial({ color: 0x1f2a44, roughness: 0.9 });
-    const skin  = new THREE.MeshStandardMaterial({ color: 0xc9a07a, roughness: 0.7 });
-    const hat   = new THREE.MeshStandardMaterial({ color: 0xffd400, roughness: 0.5 });
-    const boot  = new THREE.MeshStandardMaterial({ color: 0x3a2d22, roughness: 0.9 });
-    const add = (geo, mat, x, y, z, name) => {
+    const M = (color, roughness) => new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness });
+    const shirtM = M(shirt, 0.8), pantsM = M(pants, 0.9), skin = M('#c9a07a', 0.7), hatM = M(hat, 0.5), boot = M('#3a2d22', 0.9);
+    const add = (parent, geo, mat, x, y, z, name) => {
       const m = new THREE.Mesh(geo, mat);
       m.position.set(x, y, z);
       m.castShadow = true;
       m.name = name;
-      grp.add(m);
+      parent.add(m);
       return m;
     };
     // Boots 0–0.12, legs to 0.82, torso to 1.46, head to 1.72, hat crown 1.75.
-    add(new THREE.CylinderGeometry(0.075, 0.085, 0.12, 12), boot, -0.11, 0.06, 0.02, 'boot');
-    add(new THREE.CylinderGeometry(0.075, 0.085, 0.12, 12), boot,  0.11, 0.06, 0.02, 'boot');
-    add(new THREE.CylinderGeometry(0.068, 0.078, 0.70, 14), navy, -0.11, 0.47, 0, 'leg');
-    add(new THREE.CylinderGeometry(0.068, 0.078, 0.70, 14), navy,  0.11, 0.47, 0, 'leg');
-    add(new THREE.CapsuleGeometry(0.175, 0.30, 6, 16), hiVis, 0, 1.13, 0, 'torso');
-    const la = add(new THREE.CapsuleGeometry(0.052, 0.52, 4, 12), hiVis, -0.27, 1.12, 0, 'arm');
-    const ra = add(new THREE.CapsuleGeometry(0.052, 0.52, 4, 12), hiVis,  0.27, 1.12, 0, 'arm');
-    la.rotation.z =  0.12; ra.rotation.z = -0.12;
-    add(new THREE.SphereGeometry(0.105, 20, 14), skin, 0, 1.60, 0, 'head');
-    add(new THREE.SphereGeometry(0.125, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), hat, 0, 1.625, 0, 'hard hat');
-    add(new THREE.CylinderGeometry(0.165, 0.165, 0.012, 24), hat, 0, 1.627, 0, 'hat brim');
+    add(grp, new THREE.CylinderGeometry(0.075, 0.085, 0.12, 12), boot, -0.11, 0.06, 0.02, 'boot');
+    add(grp, new THREE.CylinderGeometry(0.075, 0.085, 0.12, 12), boot,  0.11, 0.06, 0.02, 'boot');
+    add(grp, new THREE.CylinderGeometry(0.068, 0.078, 0.70, 14), pantsM, -0.11, 0.47, 0, 'leg');
+    add(grp, new THREE.CylinderGeometry(0.068, 0.078, 0.70, 14), pantsM,  0.11, 0.47, 0, 'leg');
+    add(grp, new THREE.CapsuleGeometry(0.175, 0.30, 6, 16), shirtM, 0, 1.13, 0, 'torso');
+    const la = add(grp, new THREE.CapsuleGeometry(0.052, 0.52, 4, 12), shirtM, -0.27, 1.12, 0, 'arm');
+    la.rotation.z = 0.12;
+    const shoulder = new THREE.Group();
+    shoulder.position.set(0.27, 1.43, 0);
+    shoulder.rotation.z = -0.12;
+    shoulder.name = 'shoulder';
+    grp.add(shoulder);
+    add(shoulder, new THREE.CapsuleGeometry(0.052, 0.52, 4, 12), shirtM, 0, -0.312, 0, 'arm');
+    add(grp, new THREE.SphereGeometry(0.105, 20, 14), skin, 0, 1.60, 0, 'head');
+    add(grp, new THREE.SphereGeometry(0.125, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), hatM, 0, 1.625, 0, 'hard hat');
+    add(grp, new THREE.CylinderGeometry(0.165, 0.165, 0.012, 24), hatM, 0, 1.627, 0, 'hat brim');
+    grp.userData.shoulder = shoulder;
+    return grp;
+  }
+
+  // The scale figure: a metre east of the station with its feet on the ground
+  // there — not at the pole's height.
+  function buildFigure() {
+    const grp = makeFigure();
     const fx = 1.0, fz = 0.25;
     grp.position.set(fx, yAt(fx, fz), fz);
     grp.rotation.y = Math.atan2(-fx, -fz) + Math.PI;   // facing away from the pole, as if looking at it over a shoulder
@@ -1959,6 +1976,199 @@ void main() {
     grp.name = 'figure';
     sc.figure = grp;
     sc.scene.add(grp);
+  }
+
+  // ── other visitors ─────────────────────────────────────────────────────────
+  // The people in this station's room (twin-presence.js): a figure each in
+  // the colours they chose, their name over their head, placed where their
+  // last pose said and walked to the next one over the time between — and,
+  // when they point, the right arm raised along their look and a laser from
+  // the hand to whatever it lands on. The visitor's own pointer is the same
+  // laser, from beside the eye. Nothing here goes in the .glb.
+  const avatars = new Map();   // presence key → { group, sprite, shoulder, laser, dot, info, pose, shown, from, to, t0, dur, laserLen }
+  const LASER_MAX = 60;
+  const LASER_COLOUR = 0xff2a2a;
+
+  function noExport(o) { o.traverse(x => { x.userData.export = false; }); return o; }
+  function avatarsGroup() {
+    if (!sc.avatars && sc.scene) { sc.avatars = new THREE.Group(); sc.avatars.name = 'visitors'; sc.scene.add(sc.avatars); }
+    return sc.avatars;
+  }
+  function lookVec(yaw, pitch) {
+    const cp = Math.cos(pitch);
+    return new THREE.Vector3(Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp);
+  }
+  // How far a ray from `origin` along `dir` goes before it lands on the
+  // ground, the station or the far ground — LASER_MAX if nothing.
+  function laserHit(origin, dir) {
+    const rc = new THREE.Raycaster(origin, dir, 0.05, LASER_MAX);
+    const hit = rc.intersectObjects([sc.terrain, sc.station, sc.horizon].filter(Boolean), true)[0];
+    return hit ? hit.distance : LASER_MAX;
+  }
+  function makeLaser(parent, name) {
+    const laser = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 1, 6, 1, true),
+      new THREE.MeshBasicMaterial({ color: LASER_COLOUR, transparent: true, opacity: 0.85, depthWrite: false, fog: false }));
+    laser.visible = false; laser.name = name; laser.userData.export = false; laser.frustumCulled = false;
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), new THREE.MeshBasicMaterial({ color: LASER_COLOUR, fog: false }));
+    dot.visible = false; dot.name = `${name} dot`; dot.userData.export = false;
+    parent.add(laser); parent.add(dot);
+    return { laser, dot };
+  }
+  function aimLaser(laser, dot, origin, dir, len) {
+    laser.visible = true;
+    laser.scale.set(1, len, 1);
+    laser.position.copy(origin).addScaledVector(dir, len / 2);
+    laser.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    dot.visible = true;
+    dot.position.copy(origin).addScaledVector(dir, len);
+  }
+
+  function remoteSet(key, info) {
+    if (!sc.scene || !THREE) return;
+    const a0 = avatars.get(key);
+    let keep = null;
+    if (a0 && (a0.info.hat !== info.hat || a0.info.shirt !== info.shirt || a0.info.pants !== info.pants || a0.info.name !== info.name)) {
+      keep = a0.pose;   // a new colour is the same person in the same place
+      remoteRemove(key);
+    }
+    if (avatars.has(key)) return;
+    if (avatars.size >= 8) return;   // the presence module caps the figures; this is the belt to its braces
+    const group = noExport(makeFigure(info));
+    group.name = `visitor ${info.name || ''}`.trim();
+    const sprite = makeSign(info.name || 'Visitor', null);
+    sprite.scale.multiplyScalar(0.36);
+    sprite.position.set(0, 2.05, 0);
+    group.add(sprite);
+    group.visible = false;   // until a pose lands
+    avatarsGroup().add(group);
+    const { laser, dot } = makeLaser(avatarsGroup(), 'visitor laser');
+    avatars.set(key, { key, group, sprite, shoulder: group.userData.shoulder, laser, dot, info: { ...info },
+                       pose: null, shown: null, from: null, to: null, t0: 0, dur: 0, laserLen: 0 });
+    if (keep) remotePose(key, keep);
+    requestFrame();
+  }
+  function remoteRemove(key) {
+    const a = avatars.get(key);
+    if (!a) return;
+    avatars.delete(key);
+    if (sc.avatars) { sc.avatars.remove(a.group); sc.avatars.remove(a.laser); sc.avatars.remove(a.dot); }
+    disposeObject(a.group); disposeObject(a.laser); disposeObject(a.dot);
+    requestFrame();
+  }
+  function remoteClear() { for (const key of [...avatars.keys()]) remoteRemove(key); }
+
+  // Where a visitor's feet are: on the ground, on the grating, on a rung —
+  // from their level and climb, never from a published height, because each
+  // viewer's ground is exaggerated by their own setting.
+  function feetY(pose, x, z) {
+    const m = tw.model;
+    if (m && m.deck && pose.level === 'deck') return m.deck.top;
+    if (m && m.ladder && pose.level === 'ladder') return ladderFootY() + (pose.climb || 0);
+    return yAt(x, z);
+  }
+  function remotePose(key, p) {
+    const a = avatars.get(key);
+    if (!a || !tw.ground) return;
+    const now = performance.now();
+    a.pose = p;
+    const onPatch = p.mode === 'walk' && Math.abs(p.x) <= tw.ground.half && Math.abs(p.z) <= tw.ground.half;
+    if (!onPatch) { a.group.visible = false; a.laser.visible = false; a.dot.visible = false; a.to = null; requestFrame(); return; }
+    const target = { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch };
+    a.from = a.group.visible && a.shown ? { ...a.shown } : { ...target };
+    a.dur = a.group.visible ? Math.min(400, Math.max(60, now - a.t0)) : 0;
+    a.t0 = now;
+    a.to = target;
+    a.group.visible = true;
+    // The laser's length is measured once per pose, from where the hand will be.
+    if (p.point) {
+      const dir = lookVec(p.yaw, p.pitch);
+      const hand = new THREE.Vector3(p.x, feetY(p, p.x, p.z) + 1.43, p.z)
+        .addScaledVector(new THREE.Vector3(Math.cos(p.yaw), 0, Math.sin(p.yaw)), 0.27)
+        .addScaledVector(dir, 0.6);
+      a.laserLen = laserHit(hand, dir);
+    }
+    placeAvatar(a, a.from);
+    requestFrame();
+  }
+  function placeAvatar(a, s) {
+    const p = a.pose;
+    a.group.position.set(s.x, feetY(p, s.x, s.z), s.z);
+    a.group.rotation.y = -s.yaw;
+    a.shown = { ...s };
+    if (p.point) {
+      a.shoulder.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, Math.sin(s.pitch), -Math.cos(s.pitch)).normalize());
+      a.group.updateMatrixWorld(true);
+      const dir = lookVec(s.yaw, s.pitch);
+      const hand = new THREE.Vector3();
+      a.shoulder.getWorldPosition(hand);
+      hand.addScaledVector(dir, 0.6);
+      aimLaser(a.laser, a.dot, hand, dir, a.laserLen || LASER_MAX);
+    } else {
+      a.shoulder.rotation.set(0, 0, -0.12);
+      a.laser.visible = false;
+      a.dot.visible = false;
+    }
+  }
+  // A frame of walking each visitor toward their latest pose; true while any
+  // of them is still on the way, which is what keeps the loop drawing.
+  function animateAvatars(now) {
+    let moving = false;
+    for (const a of avatars.values()) {
+      if (!a.to || !a.group.visible) continue;
+      const t = a.dur ? Math.min(1, (now - a.t0) / a.dur) : 1;
+      const s = a.shown;
+      if (t >= 1 && s && s.x === a.to.x && s.z === a.to.z && s.yaw === a.to.yaw && s.pitch === a.to.pitch) continue;
+      const dy = Math.atan2(Math.sin(a.to.yaw - a.from.yaw), Math.cos(a.to.yaw - a.from.yaw));
+      placeAvatar(a, t >= 1 ? { ...a.to } : {
+        x: a.from.x + (a.to.x - a.from.x) * t, z: a.from.z + (a.to.z - a.from.z) * t,
+        yaw: a.from.yaw + dy * t, pitch: a.from.pitch + (a.to.pitch - a.from.pitch) * t });
+      moving = true;
+    }
+    return moving;
+  }
+
+  // The visitor's own pointer: a laser from beside the eye along the look,
+  // while Space is held or the Point button is latched, in the POV.
+  function ensureLocalLaser() {
+    if (sc.laser || !sc.scene) return;
+    const { laser, dot } = makeLaser(sc.scene, 'laser');
+    sc.laser = laser; sc.dot = dot;
+  }
+  function updateLocalLaser() {
+    const on = rig.mode === 'walk' && rig.pointing && sc.camera;
+    if (!on) { if (sc.laser) { sc.laser.visible = false; sc.dot.visible = false; } return; }
+    ensureLocalLaser();
+    const dir = lookVec(rig.yaw, rig.pitch);
+    const right = new THREE.Vector3(Math.cos(rig.yaw), 0, Math.sin(rig.yaw));
+    const origin = sc.camera.position.clone().addScaledVector(right, 0.22).add(new THREE.Vector3(0, -0.18, 0)).addScaledVector(dir, 0.35);
+    aimLaser(sc.laser, sc.dot, origin, dir, laserHit(origin, dir));
+  }
+  function syncPointUi() {
+    for (const btn of document.querySelectorAll('#twin-point')) btn.setAttribute('aria-pressed', rig.pointLatch ? 'true' : 'false');
+  }
+  function setPointing(on) {
+    rig.pointLatch = !!on;
+    if (on && rig.mode !== 'walk') enterWalk();
+    syncPointUi();
+    requestFrame();
+  }
+  function localPose() {
+    return { mode: rig.mode, x: rig.px, z: rig.pz, yaw: rig.yaw, pitch: rig.pitch, level: rig.level, climb: rig.climb, point: !!rig.pointing };
+  }
+
+  // ── the room ───────────────────────────────────────────────────────────────
+  function presenceJoin(st) {
+    if (typeof TwinPresence === 'undefined' || !st) return;
+    try { TwinPresence.join(st.id); } catch (_) {}
+    refreshPeersLine();
+  }
+  function refreshPeersLine() {
+    const el = document.getElementById('twin-peers');
+    if (!el) return;
+    const html = typeof TwinPresence !== 'undefined' && tw.live && sc.terrain ? TwinPresence.lineHtml() : '';
+    el.innerHTML = html;
+    el.hidden = !html;
+    el.title = el.textContent;
   }
 
   // A sign on a sprite — a title and, under it, a second line — sized in
@@ -2198,6 +2408,7 @@ void main() {
     // Orbit again, from about where the visitor stood, looking at the station.
     // Off the ladder or the deck, back on the ground.
     if (rig.level !== 'ground') { rig.level = 'ground'; rig.climb = 0; rig.pz = Math.max(rig.pz, LADDER_Z + 1.2); }
+    rig.pointLatch = false; rig.pointing = false;
     rig.mode = 'orbit';
     if (rig.target) rig.target.set(0, 1, 0);
     rig.radius = Math.max(4, Math.hypot(rig.px, rig.pz));
@@ -2261,9 +2472,10 @@ void main() {
         btn.textContent = rig.mode === 'walk' ? '👁 Leave POV' : '👁 POV';
       }
     }
+    syncPointUi();
     const hud = document.getElementById('twin-hud');
     if (hud) hud.textContent = rig.mode === 'walk'
-      ? `POV at eye height: W A S D or the arrow keys move, drag to look, Shift to hurry, Esc to leave.${tw.model && tw.model.ladder ? ' Walk into the ladder to climb it.' : ''}`
+      ? `POV at eye height: W A S D or the arrow keys move, drag to look, Shift to hurry, Space points, Esc to leave.${tw.model && tw.model.ladder ? ' Walk into the ladder to climb it.' : ''}`
       : (tw.hooks ? 'Drag to orbit, wheel to zoom, right-drag to pan; click the ground for its height. Wheel out past the edge, or Esc, for the map.'
                   : 'Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.');
     syncCanvasName();
@@ -2348,7 +2560,7 @@ void main() {
     // reaches them by tabbing to it and nothing on the page loses a key it
     // was using. Escape in walk mode is claimed (preventDefault), which is
     // what stands the phone drawer's own Escape down (init.js).
-    const WALK_KEYS = ['w', 'a', 's', 'd', 'q', 'e', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift'];
+    const WALK_KEYS = ['w', 'a', 's', 'd', 'q', 'e', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' '];
     const keyName = k => (k.length === 1 ? k.toLowerCase() : k);
     on(cv, 'keydown', e => {
       if (e.altKey || e.metaKey || e.ctrlKey) return;
@@ -2528,12 +2740,18 @@ void main() {
     if (!tw.live) { sc.raf = 0; return; }
     sc.raf = requestAnimationFrame(tick);
     if (walkKeys(now)) sc.dirty = true;
+    const pointing = rig.mode === 'walk' && (rig.keys.has(' ') || rig.pointLatch);
+    if (pointing !== rig.pointing) { rig.pointing = pointing; sc.dirty = true; }
     if (animateDoors(frameDt(now))) sc.dirty = true;
+    if (animateAvatars(now)) sc.dirty = true;
     lastTick = now;
+    // The visitor's own pose, every frame; what leaves the room is gated there.
+    if (typeof TwinPresence !== 'undefined' && sc.terrain) TwinPresence.publish(localPose());
     if (!sc.dirty) return;
     sc.dirty = false;
     if (!sc.renderer || !sc.scene) return;
     placeCamera();
+    updateLocalLaser();
     sc.scene.background = skyColour();
     if (sc.scene.fog) sc.scene.fog.color.copy(sc.scene.background);
     syncSky();
@@ -2557,7 +2775,13 @@ void main() {
     const el = document.getElementById('twin-notes');
     if (!el) return;
     el.innerHTML = notes.map(n => `<li>${esc(n)}</li>`).join('');
-    el.hidden = !notes.length;
+    // Inside the map the list is folded under a one-line summary (map-twin.js)
+    // that says how many there are; on the tab it is the list itself.
+    const fold = el.closest('.map-twin-notes');
+    (fold || el).hidden = !notes.length;
+    if (fold) el.hidden = false;
+    const count = document.getElementById('twin-notes-count');
+    if (count) count.textContent = `${notes.length} note${notes.length === 1 ? '' : 's'}`;
   }
 
   function showPlaceholder(html) {
@@ -2579,11 +2803,12 @@ void main() {
     const nothing = (status, placeholder) => {
       tw.ground = null; tw.image = null; tw.elvis = null; tw.picked = null;
       tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = ''; tw.model = null;
+      if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
       clearScene();
       requestFrame();
       setStatus(status);
       showPlaceholder(placeholder);
-      refreshTruth(); refreshTable(); syncCanvasName(); syncExportButton(); refreshAttrib(); refreshPathsLine();
+      refreshTruth(); refreshTable(); syncCanvasName(); syncExportButton(); refreshAttrib(); refreshPathsLine(); refreshPeersLine();
       const pk = document.getElementById('twin-pick');
       if (pk) pk.textContent = '';
     };
@@ -2621,7 +2846,8 @@ void main() {
 
     if (!ground) {
       // The last station's scene must not stand in for this one's: cleared,
-      // and the stage says why it is empty.
+      // its room left, and the stage says why it is empty.
+      if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
       clearScene();
       requestFrame();
       setStatus('No ground could be read for this patch — offline, or every elevation service is blocked.');
@@ -2657,6 +2883,7 @@ void main() {
       buildPaths(st);
       setFog(false);
       resetOrbit();
+      presenceJoin(st);
       showPlaceholder('');
       startLoop();
       requestFrame();
@@ -2881,6 +3108,21 @@ void main() {
       </p>`;
   }
 
+  // Exploring together: the switch, the three colours a visitor is seen in,
+  // and the name they are seen as (twin-presence.js).
+  function avatarPanelHtml() {
+    if (typeof TwinPresence === 'undefined') return '';
+    const a = TwinPresence.avatar();
+    return `
+        <label class="check-label"><input type="checkbox" ${TwinPresence.enabled() ? 'checked' : ''} onchange="TwinPresence.setEnabled(this.checked)"><span>Explore together: see who else is at this station, and be seen by them</span></label>
+        <div class="twin-avatar-fields">
+          <label class="twin-field twin-colour">Hat <input type="color" value="${escAttr(a.hat)}" onchange="TwinPresence.setAvatar({ hat: this.value })"></label>
+          <label class="twin-field twin-colour">Shirt <input type="color" value="${escAttr(a.shirt)}" onchange="TwinPresence.setAvatar({ shirt: this.value })"></label>
+          <label class="twin-field twin-colour">Pants <input type="color" value="${escAttr(a.pants)}" onchange="TwinPresence.setAvatar({ pants: this.value })"></label>
+        </div>
+        <p class="small">You appear to the others as <strong>${esc(a.name)}</strong>${a.signedIn ? '' : ' — sign in to appear by name'}. Hold Space in the POV, or press Point, to point where you are looking.</p>`;
+  }
+
   function scenePanelHtml() {
     const s = S();
     return `
@@ -2897,6 +3139,7 @@ void main() {
         </label>
         <label class="check-label"><input type="checkbox" ${s.imagery ? 'checked' : ''} onchange="DigitalTwin.setImagery(this.checked)"><span>Drape the aerial imagery</span></label>
         <label class="check-label"><input type="checkbox" ${s.horizon ? 'checked' : ''} onchange="DigitalTwin.setHorizon(this.checked)"><span>The horizon: far ground to ${HORIZON_M / 1000} km, a sky and haze (a few more requests)</span></label>
+        ${avatarPanelHtml()}
         <label class="check-label"><input type="checkbox" ${s.wire ? 'checked' : ''} onchange="DigitalTwin.setWire(this.checked)"><span>Show the mesh</span></label>
         <label class="check-label"><input type="checkbox" ${s.figure ? 'checked' : ''} onchange="DigitalTwin.setFigure(this.checked)"><span>Figure beside the pole (1.75 m)</span></label>
         <label class="check-label"><input type="checkbox" ${s.label ? 'checked' : ''} onchange="DigitalTwin.setLabel(this.checked)"><span>Name over the pole</span></label>
@@ -2942,11 +3185,13 @@ void main() {
             <button type="button" onclick="DigitalTwin.resetView()" title="Back to the opening view of the pole">↺ Reset view</button>
             <button type="button" onclick="DigitalTwin.topView()" title="Straight down on the patch">⬇ Top-down</button>
             <button type="button" id="twin-walk" aria-pressed="false" onclick="DigitalTwin.toggleWalk()" title="Point of view: stand on the ground at eye height, walk with the keys, climb the ladder">👁 POV</button>
+            <button type="button" id="twin-point" aria-pressed="false" onclick="DigitalTwin.togglePoint()" title="Point where you are looking: the arm goes out and a laser lands on it, for whoever is here with you — Space held in the POV does the same">☝ Point</button>
             <button type="button" onclick="DigitalTwin.rebuild()" title="Fetch the ground and the imagery again">⟳ Rebuild</button>
           </div>
         </div>
         <p class="twin-status" id="twin-status" role="status">${esc(tw.status || 'Building…')}</p>
         <p class="small twin-paths" id="twin-paths" hidden></p>
+        <p class="small twin-peers" id="twin-peers" hidden></p>
         <ul class="twin-notes" id="twin-notes" ${tw.notes.length ? '' : 'hidden'}>${tw.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
         ${stageHtml()}
         <p class="small twin-pick" id="twin-pick"></p>
@@ -3009,6 +3254,8 @@ void main() {
     tw.paths = null;
     tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false;
     tw.model = null;
+    rig.pointLatch = false; rig.pointing = false;
+    if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
   }
 
   function init() {
@@ -3376,6 +3623,17 @@ void main() {
         camera: sc.camera ? { x: sc.camera.position.x, y: sc.camera.position.y, z: sc.camera.position.z } : null,
         paths: tw.paths ? { count: tw.paths.count, source: tw.paths.source, pending: tw.paths.pending, list: tw.paths.list.slice() } : null,
         embedded: !!tw.hooks,
+        pointing: !!rig.pointing, pointLatch: !!rig.pointLatch,
+        laser: sc.laser && sc.laser.visible ? { len: sc.laser.scale.y, dot: { x: sc.dot.position.x, y: sc.dot.position.y, z: sc.dot.position.z } } : null,
+        avatars: [...avatars.values()].map(a => ({
+          key: a.key, name: a.info.name, hat: a.info.hat, shirt: a.info.shirt, pants: a.info.pants,
+          hatDrawn: `#${a.group.getObjectByName('hard hat').material.color.getHexString()}`,
+          visible: a.group.visible, x: a.group.position.x, y: a.group.position.y, z: a.group.position.z, yaw: -a.group.rotation.y,
+          pointing: !!(a.pose && a.pose.point), armRaised: Math.abs(a.shoulder.quaternion.x) > 0.01,
+          settled: !!(a.shown && a.to && a.shown.x === a.to.x && a.shown.z === a.to.z && a.shown.yaw === a.to.yaw && a.shown.pitch === a.to.pitch),
+          laser: a.laser.visible ? { len: a.laser.scale.y, dot: { x: a.dot.position.x, y: a.dot.position.y, z: a.dot.position.z } } : null,
+        })),
+        presence: typeof TwinPresence !== 'undefined' ? TwinPresence.debug() : null,
         horizon: {
           on: !!S().horizon, up: !!sc.horizon, pending: tw.horizonPending, km: HORIZON_M / 1000,
           earthR: EARTH_R_EYE, blendOut: BLEND_OUT, skyR: SKY_R, far: sc.camera ? sc.camera.far : null, sky: !!sc.sky,
@@ -3444,6 +3702,14 @@ void main() {
     _upsample: upsample,
     _sizes: () => SIZES.slice(),
     _libUrl: () => LIB_URL,
+    // The others in the room, driven by twin-presence.js.
+    remote: { set: remoteSet, pose: remotePose, remove: remoteRemove, clear: remoteClear },
+    presenceChanged() { refreshPeersLine(); },
+    togglePoint() { setPointing(!rig.pointLatch); },
+    setPointing,
+    // The check's seams: the visitor's own pose as published, and notes to fold.
+    _pose: localPose,
+    _setNotes(list) { setNotes(Array.isArray(list) ? list.map(String) : []); },
     // What the record says a station is — the check's way of choosing one.
     _kind: stationKind,
     // Put the POV visitor somewhere on the ground, facing a way.

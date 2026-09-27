@@ -63,11 +63,11 @@
     invalidateMapSizes(NAV_TRANSITION_MS + 40);
   });
   // Crossing `lg` folds the Stations cards back under the map and unfolds them
-  // into the side panel again, without the setting moving either way — and the
-  // station table's columns follow the *layout*, not the setting: five of them
-  // in the side panel, ten of them across the page. Same reasoning as the rail
-  // above, and the same shape: the crossing moves the cards and repaints the
-  // table, the 300 resize events between two crossings do not.
+  // into the side panel again — the width is the one thing that decides which
+  // (stationsSplitActive, app.js) — and the station table's columns follow it:
+  // five of them in the side panel, ten of them across the page. Same reasoning
+  // as the rail above, and the same shape: the crossing moves the cards and
+  // repaints the table, the 300 resize events between two crossings do not.
   window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).addEventListener('change', stationsLayoutChanged);
   // On a phone both rails are drawers laid over the page, and a drawer that
   // only closes by picking a tab is a trap — Escape backs out of either: the

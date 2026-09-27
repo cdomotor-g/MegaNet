@@ -179,7 +179,8 @@ somebody who has bypassed Cloudflare entirely by using the github.io URL.
 ### Reached through this origin
 
 The browser does not name the Supabase project any more. `worker/index.js`
-forwards `/api/db/rest/v1/*`, `/api/db/auth/v1/*` and `/api/db/storage/v1/*` to
+forwards `/api/db/rest/v1/*`, `/api/db/auth/v1/*`, `/api/db/storage/v1/*` and
+`/api/db/realtime/v1/*` (the digital twin's room, a WebSocket) to
 it, and `core.js` points `DB_URL` at that path on the origins that Worker serves
 — `AUTH_URL` and `STORAGE_URL` derive from `DB_URL`, so the sign-in and the
 attachment bucket came along without being named twice.

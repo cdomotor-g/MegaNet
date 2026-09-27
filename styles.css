@@ -7140,7 +7140,7 @@ hr {
 }
 
 /* The map's own buttons, moved into the strip whole — ℹ️, ⛰️ and its camera
-   pair, ⛶, ◫ (↺ stays on the map) — dressed as the strip's own buttons rather than as the
+   pair, ⛶ (↺ stays on the map) — dressed as the strip's own buttons rather than as the
    shadowed chips they are on the map, where they have to stand out from the
    tiles. Everything that is theirs stays theirs: the icon span, the class
    their modules find them by, and the state those modules write on them. */
@@ -7165,9 +7165,9 @@ hr {
 
 /* A mode that is armed — What is here waiting for a click, the 3-D view on —
    in the dress it has on the map: the accent ring for What is here, and the
-   accent fill for ⛰️. ⛶ and ◫ say pressed with aria-pressed and their labels
-   only, as they do on the map; ◫ is pressed by default, and a strip with a lit
-   button in it at rest would be a strip announcing a mode nobody chose. */
+   accent fill for ⛰️. ⛶ says pressed with aria-pressed and its label only, as
+   it does on the map: a map that has just filled the window is its own
+   announcement, and a lit button beside it would be saying what is plain. */
 .dock-strip .mn-mapctl-btn.is-on {
   background: var(--subtle);
   border-color: var(--accent);
@@ -7726,7 +7726,9 @@ body:has(.map-panel.is-full) .dock-inner {
    it was designed as; beside it, app.js moves the wrapper into the side panel
    whole and puts is-split on #stations-main, and the map takes the height of
    the window. Nothing is re-rendered either way, so the Leaflet map is never
-   rebuilt — the reasoning is at toggleStationsSplit().
+   rebuilt — the reasoning is at syncStationsCardsHome(). Which of the two it
+   is follows the width alone (stationsSplitActive): beside the map above `lg`,
+   under it at or below.
 
    The cards are a grid of their own wherever they are, with the same 1rem gap
    as the stack, so they are spaced identically under the map and beside it.
@@ -12254,13 +12256,50 @@ code {
   margin: 0;
 }
 
-#map-twin .twin-notes { margin: 0; flex: 0 0 auto; }
 #map-twin .map-twin-status { margin: 0; }
 #map-twin .map-twin-paths { margin: 0; }
+#map-twin .map-twin-peers { margin: 0; }
+
+/* The notes, folded: a one-line count in the warning colour that opens as a
+   flyout over the stage — the stage never moves for it. Closed on every
+   entry and at every width: one behaviour, one check. */
+.map-twin-notes { position: relative; min-width: 0; }
+.map-twin-notes[hidden] { display: none; }
+.map-twin-notes-sum {
+  font-size: var(--fs-sm);
+  color: var(--warn);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 24px;
+  line-height: 24px;
+}
+#map-twin .map-twin-notes .twin-notes {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 1;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) 1.6rem;
+  max-height: 12rem;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+}
+
+/* The map's zoom corner stands down while the twin is up: there is no map
+   under the pointer to zoom, ← Map (and Escape, and a wheel out) is the way
+   back, and a phone's bar needs the room. ↺ top-right stays. */
+.mn-map-stage:has(#map-twin.is-on) .leaflet-top.leaflet-left { display: none; }
 
 /* One line each, the whole text as the tooltip (the tab has it in full). */
 #map-twin .map-twin-status,
 #map-twin .map-twin-paths,
+#map-twin .map-twin-peers,
 #map-twin .map-twin-attrib {
   white-space: nowrap;
   overflow: hidden;
@@ -12273,14 +12312,14 @@ code {
   flex: 0 0 auto;
 }
 
-/* Inset from both edges by a corner control's width and margin: the zoom
-   buttons top-left and ↺ top-right are above this overlay on purpose — and
-   under a coarse pointer they are the 44 px the design system gives every
-   control there, so the inset is set for that case. */
+/* Inset from the right edge by a corner control's width and margin: ↺
+   top-right is above this overlay on purpose — and under a coarse pointer it
+   is the 44 px the design system gives every control there, so the inset is
+   set for that case. The left corner is hidden while the twin is up. */
 .map-twin-head {
   display: grid;
   gap: var(--sp-1);
-  padding-inline: 4.25rem;
+  padding-inline: 0 4.25rem;
   flex: 0 0 auto;
   min-width: 0;
 }
@@ -12308,8 +12347,18 @@ code {
    not. */
 @media (max-width: 700px) {
   .map-twin-label { display: none; }
-  .map-twin-head { padding-inline: 4rem; }
+  .map-twin-head { padding-inline: 0 4rem; }
 }
+
+/* Who else is here (twin-presence.js), on the tab as under the map. */
+.twin-peers { margin: var(--sp-1) 0 0; color: var(--muted); }
+.twin-peers-lead { color: var(--muted); }
+.twin-peers-fact { color: var(--muted); font-weight: 400; }
+
+/* The visitor's own colours: three small swatches in a row. */
+.twin-avatar-fields { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+.twin-avatar-fields .twin-colour { display: flex; align-items: center; gap: var(--sp-1); }
+.twin-avatar-fields input[type="color"] { width: 2.75rem; height: 2rem; padding: 0 2px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--panel); }
 
 /* The radio paths as words: the far station, a button in the ray's colour,
    then its distance and bearing. On the tab as under the map. */

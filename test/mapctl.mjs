@@ -467,7 +467,7 @@ try {
       at: r ? { dx: Math.round(m.right - r.right), dy: Math.round(r.top - m.top) } : null,
       panels: document.querySelectorAll('.mn-mapctl').length,
       panelsInSide: inSide('.mn-mapctl'),
-      buttonsInSide: inSide('.mn-map-here, .mn-map-3d, .mn-map-north, .mn-map-tilt, .mn-map-full, .mn-map-split'),
+      buttonsInSide: inSide('.mn-map-here, .mn-map-3d, .mn-map-north, .mn-map-tilt, .mn-map-full'),
     };
   });
   const alone = k => JSON.stringify(k.items) === '["mn-map-reset"]' && k.hairlines === 0 && !!k.at
