@@ -195,6 +195,7 @@ const MapTwin = (function () {
         <p class="twin-status map-twin-status" id="twin-status" role="status">Building…</p>
         <p class="small twin-paths map-twin-paths" id="twin-paths" hidden></p>
         <p class="small twin-photos map-twin-photos" id="twin-photos" hidden></p>
+        <p class="small twin-flood map-twin-flood" id="twin-flood" hidden></p>
         <p class="small twin-peers map-twin-peers" id="twin-peers" hidden></p>
         <details class="map-twin-notes" id="twin-notes-fold" hidden>
           <summary class="map-twin-notes-sum"><span aria-hidden="true">⚠</span> <span id="twin-notes-count">0 notes</span></summary>

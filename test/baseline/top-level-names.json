@@ -33,6 +33,7 @@
     "map-hubs.js",
     "sls.js",
     "flood-velocity.js",
+    "flood-stages.js",
     "river-details.js",
     "frequencies.js",
     "map-survey.js",
@@ -76,6 +77,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 781,
-  "distinct": 781
+  "total": 782,
+  "distinct": 782
 }

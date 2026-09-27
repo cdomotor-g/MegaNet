@@ -223,6 +223,7 @@ const DigitalTwin = (function () {
     photos: null,          // the field photos in the patch: { status, spots: [{ x, z, ids, rows, heading, fov, pitch }], count, error }
     photoNear: -1,         // the spot the POV visitor is standing at, or −1
     focusPhotoId: null,    // a photo to stand the camera behind once the markers are up (the viewer's "In the twin")
+    flood: null,           // the flood water: { lad, start, top, seed, fill, level, band, … } — see buildFlood
   };
 
   // Ground under a far station that has no recorded height, read off the
@@ -239,6 +240,7 @@ const DigitalTwin = (function () {
     sun: null, hemi: null, texture: null, raf: 0, ro: null, dirty: false,
     horizon: null, shells: null, sky: null,   // the far field's group, its shells' bookkeeping, the dome
     photos: null,     // the field photo markers
+    flood: null,      // the flood water and its staff: { water, staff, tex, data, mat, palette }
     off: [],          // listener removers
   };
 
@@ -259,7 +261,11 @@ const DigitalTwin = (function () {
 
   // ── settings ───────────────────────────────────────────────────────────────
 
-  const DEFAULTS = { size: 400, exag: 1, imagery: true, figure: true, label: true, wire: false, horizon: true };
+  // `floodAnim` null is "as the browser prefers": animated, unless it asks for
+  // reduced motion. `floodHold` is where still water stands — a level's key,
+  // or a fraction of the way from 0 m to the top.
+  const DEFAULTS = { size: 400, exag: 1, imagery: true, figure: true, label: true, wire: false, horizon: true,
+                     flood: true, floodAnim: null, floodHold: null };
 
   function loadSettings() {
     let s = {};
@@ -268,7 +274,9 @@ const DigitalTwin = (function () {
     if (SIZES.includes(Number(s.size))) out.size = Number(s.size);
     const ex = Number(s.exag);
     if (isFinite(ex) && ex >= 1 && ex <= 3) out.exag = ex;
-    for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon', 'flood']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    if (typeof s.floodAnim === 'boolean') out.floodAnim = s.floodAnim;
+    if ((typeof s.floodHold === 'number' && s.floodHold >= 0 && s.floodHold <= 1) || (typeof s.floodHold === 'string' && s.floodHold)) out.floodHold = s.floodHold;
     return out;
   }
 
@@ -893,6 +901,7 @@ const DigitalTwin = (function () {
     if (!sc.scene) return;
     removeHorizon();
     removePhotoMarkers();
+    removeFlood();
     tw.photoNear = -1;
     sc.pole = null; sc.band = null; sc.doors = [];
     remoteClear();
@@ -2718,6 +2727,447 @@ void main() {
     requestFrame();
   }
 
+  // ── the flood water ────────────────────────────────────────────────────────
+  // The river at the heights it is known to reach — the Bureau's flood classes,
+  // the modelled AEP levels, the peaks it has reached where there are any
+  // (flood-stages.js puts them on one ladder in m AHD) — drawn as water over
+  // the patch: rising from 0 m on the gauge to the highest level, held there,
+  // let out, and round again, coloured by the furthest level it has passed.
+  //
+  // Water where the river would be, not everywhere low. Every sample carries
+  // the lowest level at which it joins the channel by the gauge — the least,
+  // over every path from the channel to it, of the highest ground on the path
+  // (a priority flood: Dijkstra with max for plus, once per ground). At level L
+  // a sample is under water when that is below L, so a hollow behind a bank
+  // stays dry until the bank is overtopped, and a dam in the next gully is not
+  // flooded by a river it is not joined to. The water itself is one level
+  // plane over the patch, masked to those samples and cut by the ground in the
+  // depth buffer, so its edge is the true contour wherever the ground makes it.
+  // It is only as good as the samples, though: a bank narrower than a few of
+  // them (2 m apart at 400 m, 8 m at 1600 m) is crossed on a diagonal beside
+  // its crest, and leaks. docs/digital-twin.md says so where a user reads it.
+  //
+  // A level surface through the whole patch is the model's one simplification
+  // worth saying out loud: a real flood slopes downstream (the AEP sheets give
+  // the slope — a metre in 600 at Gatton), so across a 1.6 km patch the far
+  // edges are a guide, not a map. Not in the .glb: it is a simulation, not the
+  // site. Editors and visitors alike see it — the levels are the station
+  // card's, and those are public.
+  const FLOOD_SEED_M  = 60;    // the channel is looked for this far round the gauge
+  const FLOOD_FPS     = 30;    // the rise is redrawn at most this often
+  const FLOOD_LINE_HZ = 8;     // the reading under the stage, at most this often
+  const FLOOD_ALPHA   = { below: 0.45, level: 0.62 };
+
+  let floodClock = null;       // the check's seam: a shorter cycle
+
+  function reducedMotion() {
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; }
+  }
+  function floodAnimating() {
+    const s = S();
+    return !!s.flood && (s.floodAnim == null ? !reducedMotion() : s.floodAnim);
+  }
+  function floodPalette() {
+    const out = {};
+    for (const [k, v] of Object.entries(FloodStages.COLOURS)) out[k] = cssVar(v.token, v.hex) || v.hex;
+    return out;
+  }
+  function floodY(ahd) { const g = tw.ground; return g ? (ahd - g.h0) * S().exag : 0; }
+
+  // The channel by the gauge: the lowest sample within FLOOD_SEED_M of it.
+  function floodSeed(g) {
+    const step = g.size / (N - 1), c = (N - 1) / 2, r = Math.ceil(FLOOD_SEED_M / step);
+    let best = null;
+    for (let j = Math.max(0, c - r); j <= Math.min(N - 1, c + r); j++) {
+      for (let i = Math.max(0, c - r); i <= Math.min(N - 1, c + r); i++) {
+        const x = -g.half + i * step, z = -g.half + j * step;
+        if (Math.hypot(x, z) > FLOOD_SEED_M) continue;
+        const e = g.elev[j * N + i];
+        if (!isFinite(e)) continue;
+        if (!best || e < best.elev) best = { idx: j * N + i, i, j, x, z, elev: e };
+      }
+    }
+    return best;
+  }
+
+  // For every sample, the level at which it joins the channel (see above).
+  // Doubles, whatever the ground came as: a level stored rounded would compare
+  // unequal to the one queued, and the sample it was queued for never expand.
+  function fillLevels(elev, seed) {
+    const n = N * N;
+    const fill = new Float64Array(n).fill(Infinity);
+    const hk = [], hi = [];
+    const push = (k, i) => {
+      let c = hk.length; hk.push(k); hi.push(i);
+      while (c > 0) { const p = (c - 1) >> 1; if (hk[p] <= k) break; hk[c] = hk[p]; hi[c] = hi[p]; c = p; }
+      hk[c] = k; hi[c] = i;
+    };
+    const pop = () => {
+      const k0 = hk[0], i0 = hi[0];
+      const k = hk.pop(), i = hi.pop();
+      const len = hk.length;
+      if (len) {
+        let c = 0;
+        for (;;) {
+          let l = 2 * c + 1;
+          if (l >= len) break;
+          if (l + 1 < len && hk[l + 1] < hk[l]) l++;
+          if (hk[l] >= k) break;
+          hk[c] = hk[l]; hi[c] = hi[l]; c = l;
+        }
+        hk[c] = k; hi[c] = i;
+      }
+      popped[0] = k0; popped[1] = i0;
+    };
+    const popped = [0, 0];
+    fill[seed] = elev[seed];
+    push(fill[seed], seed);
+    while (hk.length) {
+      pop();
+      const f = popped[0], cell = popped[1];
+      if (f > fill[cell]) continue;
+      const cx = cell % N, cy = (cell - cx) / N;
+      for (let dy = -1; dy <= 1; dy++) {
+        const y = cy + dy;
+        if (y < 0 || y >= N) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const x = cx + dx;
+          if ((!dx && !dy) || x < 0 || x >= N) continue;
+          const nb = y * N + x;
+          const e = elev[nb];
+          const nf = isFinite(e) ? Math.max(f, e) : Infinity;
+          if (nf < fill[nb]) { fill[nb] = nf; push(nf, nb); }
+        }
+      }
+    }
+    return fill;
+  }
+
+  function removeFlood() {
+    if (sc.flood && sc.scene) {
+      sc.scene.remove(sc.flood.water); sc.scene.remove(sc.flood.staff);
+      disposeObject(sc.flood.water); disposeObject(sc.flood.staff);
+      if (sc.flood.tex) sc.flood.tex.dispose();
+    }
+    sc.flood = null;
+  }
+
+  // The ladder, the channel and the fill levels for the station on screen, and
+  // the water and its staff if there is a scene to put them in. Returns the
+  // notes the build should show.
+  function buildFlood(st) {
+    removeFlood();
+    tw.flood = null;
+    const g = tw.ground;
+    if (!g || !st || typeof FloodStages === 'undefined') { refreshFloodLine(); return []; }
+    const lad = FloodStages.ladder(st);
+    const notes = lad.notes.slice();
+    if (!lad.levels.length || lad.top == null) {
+      tw.flood = { lad, none: true, notes };
+      refreshFloodLine();
+      return notes;
+    }
+    const seed = floodSeed(g);
+    const start = FloodStages.start(lad, seed ? seed.elev : null);
+    const fill = seed ? fillLevels(g.elev, seed.idx) : null;
+    if (seed && seed.elev >= lad.top) {
+      notes.push(`Every flood level recorded here is below the lowest ground by the gauge in this patch (${seed.elev.toFixed(2)} m AHD against ${lad.top.toFixed(2)} m), so the water has nothing to cover.`);
+    }
+    tw.flood = { lad, none: false, notes, seed, fill, start: start.m, startBasis: start.basis, top: lad.top,
+                 level: null, band: null, bandKey: undefined, maskLevel: null, flooded: 0,
+                 t0: performance.now(), clock: null, lastDraw: 0, lastLine: 0 };
+    if (sc.scene && THREE) makeFlood();
+    settleFlood();
+    refreshFloodLine();
+    return notes;
+  }
+
+  function makeFlood() {
+    const F = tw.flood, g = tw.ground;
+    const pal = floodPalette();
+    // The mask: one texel per sample, in the ground's own order (row 0 north),
+    // and the plane's corners sampling the corner texels' centres.
+    const data = new Uint8Array(N * N * 4);
+    const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+    tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+    tex.needsUpdate = true;
+    const geo = new THREE.PlaneGeometry(g.size, g.size, 1, 1);
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) {
+      uv.setXY(i, (uv.getX(i) * (N - 1) + 0.5) / N, ((1 - uv.getY(i)) * (N - 1) + 0.5) / N);
+    }
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshStandardMaterial({ color: pal.below, transparent: true, opacity: FLOOD_ALPHA.below,
+                                                 alphaMap: tex, depthWrite: false, side: THREE.DoubleSide,
+                                                 roughness: 0.2, metalness: 0 });
+    const water = new THREE.Mesh(geo, mat);
+    water.name = 'flood water';
+    water.renderOrder = 2;
+    water.userData.export = false;
+
+    // The staff: a white post in the channel from 0 m to the top, a ring at
+    // every level in its colour — the gauge board the water is read against.
+    const staff = new THREE.Group();
+    staff.name = 'flood staff';
+    const postMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.6 });
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1, 8), postMat);
+    post.name = 'staff post';
+    staff.add(post);
+    for (const l of F.lad.levels) {
+      const col = FloodStages.colourOf(l, pal);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(l.kind === 'peak' ? 0.11 : 0.14, 0.03, 8, 24),
+        new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.35, roughness: 0.5 }));
+      ring.rotation.x = Math.PI / 2;
+      ring.name = `level ${l.label}`;
+      ring.userData.level = l.key;
+      staff.add(ring);
+    }
+    const at = F.seed || { x: 0, z: 0 };
+    staff.position.set(at.x, 0, at.z);
+    staff.traverse(o => { o.userData.export = false; });
+    sc.flood = { water, staff, tex, data, mat, palette: pal };
+    sc.scene.add(water);
+    sc.scene.add(staff);
+    placeFlood();
+  }
+
+  // Heights follow the ground: the exaggeration slider moves them with it.
+  function placeFlood() {
+    const F = tw.flood;
+    if (!F || F.none || !sc.flood) return;
+    const y0 = floodY(F.start), y1 = floodY(F.top) + 0.4;
+    const post = sc.flood.staff.getObjectByName('staff post');
+    post.scale.y = Math.max(0.01, y1 - y0);
+    post.position.y = (y0 + y1) / 2;
+    for (const ring of sc.flood.staff.children) {
+      if (!ring.userData.level) continue;
+      const l = F.lad.levels.find(x => x.key === ring.userData.level);
+      if (l) ring.position.y = floodY(l.ahd);
+    }
+    if (F.level != null) sc.flood.water.position.y = floodY(F.level);
+    const on = !!S().flood;
+    sc.flood.water.visible = on;
+    sc.flood.staff.visible = on;
+    requestFrame();
+  }
+
+  // Put the water at a level (m AHD, kept between 0 m and the top). True when
+  // it moved.
+  function setFloodLevel(ahd) {
+    const F = tw.flood;
+    if (!F || F.none) return false;
+    const L = Math.max(F.start, Math.min(F.top, ahd));
+    if (F.level != null && Math.abs(L - F.level) < 1e-4) return false;
+    F.level = L;
+    const band = FloodStages.passed(F.lad, L);
+    const key = band ? band.key : 'below';
+    if (sc.flood) {
+      sc.flood.water.position.y = floodY(L);
+      if (F.maskLevel == null || Math.abs(L - F.maskLevel) >= 0.01 || key !== F.bandKey) floodMask(L);
+      if (key !== F.bandKey) {
+        sc.flood.mat.color.set(FloodStages.colourOf(band, sc.flood.palette));
+        sc.flood.mat.opacity = band ? FLOOD_ALPHA.level : FLOOD_ALPHA.below;
+      }
+    } else if (F.fill) {
+      let n = 0;
+      for (let i = 0; i < F.fill.length; i++) if (F.fill[i] < L) n++;
+      F.flooded = n;
+    }
+    F.band = band;
+    F.bandKey = key;
+    return true;
+  }
+
+  function floodMask(L) {
+    const F = tw.flood, d = sc.flood.data, fill = F.fill;
+    let n = 0;
+    for (let i = 0, o = 0; i < N * N; i++, o += 4) {
+      const v = fill && fill[i] < L ? 255 : 0;
+      if (v) n++;
+      d[o] = d[o + 1] = d[o + 2] = d[o + 3] = v;
+    }
+    sc.flood.tex.needsUpdate = true;
+    F.maskLevel = L;
+    F.flooded = n;
+  }
+
+  // Where still water stands: the level chosen, else the top.
+  function floodHoldLevel() {
+    const F = tw.flood, h = S().floodHold;
+    if (typeof h === 'number' && isFinite(h)) return F.start + Math.max(0, Math.min(1, h)) * (F.top - F.start);
+    if (typeof h === 'string') { const l = F.lad.levels.find(x => x.key === h); if (l) return l.ahd; }
+    return F.top;
+  }
+
+  // The settings, applied: shown or not, rising or held.
+  function settleFlood() {
+    const F = tw.flood;
+    if (!F || F.none) { refreshFloodLine(); return; }
+    if (floodAnimating()) {
+      // Carried on from where the water is, not from the bottom.
+      const f = F.level == null || F.top <= F.start ? 0 : Math.max(0, Math.min(1, (F.level - F.start) / (F.top - F.start)));
+      F.t0 = performance.now() - f * floodClockOpts().rise * 1000;
+      F.clock = f * floodClockOpts().rise;
+      F.lastDraw = 0;
+      if (F.level == null) setFloodLevel(F.start);
+    } else {
+      setFloodLevel(floodHoldLevel());
+    }
+    placeFlood();
+    syncFloodReading();
+    syncFloodControls();
+    syncCanvasName();
+    requestFrame();
+  }
+
+  function floodClockOpts() {
+    return floodClock || { rise: FloodStages.RISE_S, hold: FloodStages.HOLD_S, drain: FloodStages.DRAIN_S };
+  }
+
+  // One frame of the rise. True when the scene needs drawing.
+  function floodTick(now) {
+    const F = tw.flood;
+    if (!F || F.none || !floodAnimating()) return false;
+    if (now - F.lastDraw < 1000 / FLOOD_FPS) return false;
+    F.lastDraw = now;
+    // A frame's time can be a moment before the clock was set (it is when the
+    // frame began); that is the start, not the end of the last cycle.
+    F.clock = Math.max(0, (now - F.t0) / 1000);
+    const moved = setFloodLevel(F.start + FloodStages.cycle(F.clock, floodClockOpts()) * (F.top - F.start));
+    if (now - F.lastLine >= 1000 / FLOOD_LINE_HZ) { F.lastLine = now; syncFloodReading(); }
+    return moved;
+  }
+
+  // ── the flood line, under the stage, and the pill on it ──
+  // "moderate", "the 1% AEP": a level as the reading names it.
+  function floodLevelName(l) { return l.kind === 'aep' ? `the ${l.label}` : l.label.toLowerCase(); }
+  // Below the first level the water is named by the level it has yet to reach.
+  function floodFirst(F) { return F.lad.levels.find(l => l.rank != null) || null; }
+
+  function floodNowText() {
+    const F = tw.flood;
+    if (!F || F.none || F.level == null) return '';
+    const g = F.lad.ahdZero != null ? `${(F.level - F.lad.ahdZero).toFixed(1)} m on the gauge, ` : '';
+    const first = floodFirst(F);
+    const where = F.band ? `past ${floodLevelName(F.band)}` : first ? `below ${floodLevelName(first)}` : 'below the first level';
+    return `water ${g}${F.level.toFixed(2)} m AHD — ${where}`;
+  }
+
+  // The pill's few words: how high, and the band — "10.0 m · moderate".
+  function floodBrief() {
+    const F = tw.flood;
+    if (!F || F.none || F.level == null) return '';
+    const h = F.lad.ahdZero != null ? `${(F.level - F.lad.ahdZero).toFixed(1)} m` : `${F.level.toFixed(2)} m AHD`;
+    const first = floodFirst(F);
+    const band = F.band ? (F.band.kind === 'aep' ? F.band.label : F.band.label.toLowerCase())
+                        : first ? `below ${first.kind === 'aep' ? first.label : first.label.toLowerCase()}` : 'below';
+    return `${h} · ${band}`;
+  }
+
+  // The water's own control on the stage: its colour, ⏸ or ▶, how high. The
+  // off switch within reach wherever the twin is — and on a phone's map the
+  // only one, the line there having no row to spare. Built once and written
+  // in place after: a press that lands between two readings still lands on
+  // the button it began on.
+  function syncFloodPill() {
+    const el = document.getElementById('twin-flood-pill');
+    if (!el) return;
+    const F = tw.flood;
+    const show = !!(F && !F.none && F.level != null && S().flood && sc.flood);
+    if (el.hidden !== !show) el.hidden = !show;
+    if (!show) return;
+    if (el.children.length !== 4) {
+      el.innerHTML = '<span class="twin-flood-sw" aria-hidden="true"></span><span class="twin-flood-pill-icon" aria-hidden="true"></span><span class="sr-only"></span><span class="twin-flood-pill-text"></span>';
+    }
+    const anim = floodAnimating();
+    const verb = anim ? 'Pause the rise' : 'Play the rise';
+    const [sw, icon, sr, txt] = el.children;
+    sw.style.setProperty('--sw', FloodStages.colourOf(F.band, sc.flood.palette));
+    icon.textContent = anim ? '⏸' : '▶';
+    sr.textContent = `${verb}: `;
+    txt.textContent = floodBrief();
+    el.title = `${verb} — ${floodNowText()}`;
+  }
+
+  function floodLineHtml() {
+    const F = tw.flood;
+    if (typeof FloodStages === 'undefined' || !tw.ground || !F || F.none) return '';
+    const on = !!S().flood, anim = floodAnimating();
+    const pal = (sc.flood && sc.flood.palette) || floodPalette();
+    const lead = `<span class="twin-flood-lead"><span aria-hidden="true">🌊</span> Flood levels:</span>`;
+    if (!on) return `${lead} the water is hidden. <button type="button" class="link-btn" data-flood="show" onclick="DigitalTwin.setFlood(true)">Show it</button>`;
+    const levels = F.lad.levels.map(l => `<button type="button" class="link-btn twin-flood-level" data-flood="${escAttr(l.key)}" onclick="DigitalTwin.floodAt('${escAttr(l.key)}')"
+                 title="Hold the water at ${escAttr(FloodStages.levelText(l))}${l.kind !== 'aep' && l.gauge != null ? ` (${escAttr(FloodStages.ahdText(l.ahd))})` : ''}"><span class="twin-flood-sw" style="--sw:${escAttr(FloodStages.colourOf(l, pal))}" aria-hidden="true"></span>${esc(FloodStages.levelText(l))}</button>`);
+    return `${lead} <button type="button" class="link-btn twin-flood-play" data-flood="play" onclick="DigitalTwin.toggleFloodAnim()">${anim ? '⏸ Pause the rise' : '▶ Play the rise'}</button>
+      <span class="twin-flood-now" id="twin-flood-now">${esc(floodNowText())}</span> · ${levels.join(' · ')}
+      · <button type="button" class="link-btn" data-flood="hide" onclick="DigitalTwin.setFlood(false)">Hide the water</button>`;
+  }
+
+  // The line is drawn again whenever a setting changes — which is what a press
+  // on it does — so the focus is put back on the control that was pressed, or
+  // on the one that took its place (Hide the water becomes Show it).
+  function refreshFloodLine() {
+    const el = document.getElementById('twin-flood');
+    if (el) {
+      const had = el.contains(document.activeElement) && document.activeElement.dataset ? document.activeElement.dataset.flood : null;
+      const html = floodLineHtml();
+      el.innerHTML = html;
+      el.hidden = !html;
+      // The whole line as its tooltip (the Stations map cuts it to one), less
+      // the reading, which moves on while the tooltip would stand still.
+      const F = tw.flood;
+      el.title = html ? (S().flood
+        ? `Flood levels: ${F.lad.levels.map(l => FloodStages.levelText(l)).join(' · ')}. A level surface through the patch: a real flood slopes downstream, so the far edges of a wide patch are a guide, not a map.`
+        : 'Flood levels: the water is hidden.') : '';
+      if (had) {
+        const back = el.querySelector(`[data-flood="${CSS.escape(had)}"]`) || el.querySelector('button');
+        if (back) back.focus();
+      }
+    }
+    syncFloodPill();
+  }
+
+  function syncFloodReading() {
+    const el = document.getElementById('twin-flood-now');
+    if (el) el.textContent = floodNowText();
+    const F = tw.flood;
+    const slider = document.getElementById('twin-flood-level');
+    if (slider && F && !F.none && F.level != null && document.activeElement !== slider) {
+      slider.value = String(Math.round(F.top > F.start ? 1000 * (F.level - F.start) / (F.top - F.start) : 0));
+    }
+    const out = document.getElementById('twin-flood-out');
+    if (out) out.textContent = F && !F.none && F.level != null ? `${F.level.toFixed(2)} m AHD` : '';
+    syncFloodPill();
+  }
+
+  // The panel's controls, where the setting changed somewhere else (the line).
+  function syncFloodControls() {
+    const s = S();
+    const on = document.getElementById('twin-flood-on');
+    if (on) on.checked = !!s.flood;
+    const anim = document.getElementById('twin-flood-anim');
+    if (anim) { anim.checked = floodAnimating(); anim.disabled = !s.flood; }
+    const slider = document.getElementById('twin-flood-level');
+    if (slider) slider.disabled = !s.flood || !(tw.flood && !tw.flood.none);
+    refreshFloodLine();
+  }
+
+  function floodPanelHtml() {
+    const s = S();
+    const F = tw.flood;
+    const none = !F || F.none;
+    return `
+        <fieldset class="twin-flood-set">
+          <legend>Flood water</legend>
+          <label class="check-label"><input type="checkbox" id="twin-flood-on" ${s.flood ? 'checked' : ''} onchange="DigitalTwin.setFlood(this.checked)"><span>Water at the station's flood levels — minor, moderate and major, the AEP floods, the peaks it has reached</span></label>
+          <label class="check-label"><input type="checkbox" id="twin-flood-anim" ${floodAnimating() ? 'checked' : ''} ${s.flood ? '' : 'disabled'} onchange="DigitalTwin.setFloodAnim(this.checked)"><span>Animate it: rising from 0 m on the gauge to the highest level, and again</span></label>
+          <label class="twin-field">Water level <span class="small" id="twin-flood-out"></span>
+            <input type="range" id="twin-flood-level" min="0" max="1000" step="1" value="1000" ${s.flood && !none ? '' : 'disabled'}
+                   oninput="DigitalTwin.setFloodFraction(this.value / 1000)">
+          </label>
+        </fieldset>`;
+  }
+
   // ── the camera ─────────────────────────────────────────────────────────────
   function resetOrbit() {
     rig.mode = 'orbit';
@@ -3112,6 +3562,7 @@ void main() {
     if (animateDoors(frameDt(now))) sc.dirty = true;
     if (animateAvatars(now)) sc.dirty = true;
     if (updatePhotoNear()) sc.dirty = true;
+    if (floodTick(now)) sc.dirty = true;
     lastTick = now;
     // The visitor's own pose, every frame; what leaves the room is gated there.
     if (typeof TwinPresence !== 'undefined' && sc.terrain) TwinPresence.publish(localPose());
@@ -3173,13 +3624,14 @@ void main() {
       tw.ground = null; tw.image = null; tw.elvis = null; tw.picked = null;
       tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = ''; tw.model = null;
       tw.photos = null;
+      tw.flood = null;
       if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
       clearScene();
       requestFrame();
       setStatus(status);
       showPlaceholder(placeholder);
       refreshTruth(); refreshTable(); syncCanvasName(); syncExportButton(); refreshAttrib(); refreshPathsLine(); refreshPeersLine();
-      refreshPhotosLine(); syncPhotoPrompt();
+      refreshPhotosLine(); syncPhotoPrompt(); refreshFloodLine();
       const pk = document.getElementById('twin-pick');
       if (pk) pk.textContent = '';
     };
@@ -3220,9 +3672,10 @@ void main() {
       // its room left, and the stage says why it is empty.
       if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
       tw.photos = null;
+      tw.flood = null;
       clearScene();
       requestFrame();
-      refreshPhotosLine(); syncPhotoPrompt();
+      refreshPhotosLine(); syncPhotoPrompt(); refreshFloodLine();
       setStatus('No ground could be read for this patch — offline, or every elevation service is blocked.');
       setNotes([...notes, 'Neither Queensland\'s elevation service nor the terrain tiles answered. Nothing is drawn: a flat patch would read as flat ground, and that is the one wrong answer worth refusing.']);
       showPlaceholder('<p>No ground could be read. Check the network, then press <strong>Rebuild</strong>.</p>');
@@ -3258,10 +3711,12 @@ void main() {
       resetOrbit();
       presenceJoin(st);
       loadPhotos(st, seq);
+      notes.push(...buildFlood(st));
       showPlaceholder('');
       startLoop();
       requestFrame();
     } else if (lib) {
+      buildFlood(st);
       notes.push('A WebGL context could not be created on this canvas, so nothing is drawn; the numbers below are still the ground.');
       showPlaceholder('<p>WebGL is not available here. The ground has been read and is tabled below.</p>');
     } else if (gl) {
@@ -3326,7 +3781,8 @@ void main() {
     if (st && g) {
       name = `Three-dimensional view of ${st.name}: ${g.size} m of ground at ${g.sample_m.toFixed(1)} m, `
            + `${(g.max - g.min).toFixed(1)} m of relief, ${tw.model && tw.model.structure === 'tower' ? 'a river-gauge tower with its platform 4 m up' : 'a Type 3 rainfall pole 2 m tall'} at the station and a 1.75 m figure beside it`
-           + (sc.horizon ? `, the country round it to ${HORIZON_M / 1000} km under a sky. ` : '. ')
+           + (sc.horizon ? `, the country round it to ${HORIZON_M / 1000} km under a sky` : '')
+           + (tw.flood && !tw.flood.none && sc.flood && S().flood ? `, and water at its flood levels, up to ${FloodStages.ahdText(tw.flood.top)}. ` : '. ')
            + (rig.mode === 'walk' ? 'POV: W A S D move, drag looks, Escape leaves.'
                                   : 'Drag to orbit, arrow keys turn, plus and minus zoom, F walks, T looks down, R resets.');
     }
@@ -3513,6 +3969,7 @@ void main() {
         </label>
         <label class="check-label"><input type="checkbox" ${s.imagery ? 'checked' : ''} onchange="DigitalTwin.setImagery(this.checked)"><span>Drape the aerial imagery</span></label>
         <label class="check-label"><input type="checkbox" ${s.horizon ? 'checked' : ''} onchange="DigitalTwin.setHorizon(this.checked)"><span>The horizon: far ground to ${HORIZON_M / 1000} km, a sky and haze (a few more requests)</span></label>
+        ${floodPanelHtml()}
         ${avatarPanelHtml()}
         <label class="check-label"><input type="checkbox" ${s.wire ? 'checked' : ''} onchange="DigitalTwin.setWire(this.checked)"><span>Show the mesh</span></label>
         <label class="check-label"><input type="checkbox" ${s.figure ? 'checked' : ''} onchange="DigitalTwin.setFigure(this.checked)"><span>Figure beside the pole (1.75 m)</span></label>
@@ -3566,6 +4023,7 @@ void main() {
         <p class="twin-status" id="twin-status" role="status">${esc(tw.status || 'Building…')}</p>
         <p class="small twin-paths" id="twin-paths" hidden></p>
         <p class="small twin-photos" id="twin-photos" hidden></p>
+        <p class="small twin-flood" id="twin-flood" hidden></p>
         <p class="small twin-peers" id="twin-peers" hidden></p>
         <ul class="twin-notes" id="twin-notes" ${tw.notes.length ? '' : 'hidden'}>${tw.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
         ${stageHtml()}
@@ -3589,6 +4047,7 @@ void main() {
     return `<div class="twin-stage" id="twin-stage">
           <canvas id="twin-canvas" tabindex="0" aria-label="Three-dimensional view. Nothing is built yet."></canvas>
           <div class="twin-compass" id="twin-compass" aria-hidden="true" style="--twin-heading:0deg">N</div>
+          <button type="button" class="twin-flood-pill" id="twin-flood-pill" hidden onclick="DigitalTwin.toggleFloodAnim()"></button>
           <p class="twin-hud" id="twin-hud">Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.</p>
           <button type="button" class="twin-photo-prompt" id="twin-photo-prompt" hidden onclick="DigitalTwin.openNearPhotos()"></button>
           <div class="twin-placeholder" id="twin-placeholder" hidden></div>
@@ -3631,6 +4090,7 @@ void main() {
     tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false;
     tw.model = null;
     tw.photos = null; tw.photoNear = -1;
+    tw.flood = null;
     rig.pointLatch = false; rig.pointing = false;
     if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
   }
@@ -3867,6 +4327,7 @@ void main() {
         if (sc.figure) sc.figure.position.y = yAt(sc.figure.position.x, sc.figure.position.z);
         if (sc.paths) buildPaths(currentStation());
         placePhotoMarkers();
+        placeFlood();
         liftHorizon();
         requestFrame();
       }
@@ -4012,6 +4473,28 @@ void main() {
           laser: a.laser.visible ? { len: a.laser.scale.y, dot: { x: a.dot.position.x, y: a.dot.position.y, z: a.dot.position.z } } : null,
         })),
         presence: typeof TwinPresence !== 'undefined' ? TwinPresence.debug() : null,
+        flood: tw.flood ? (() => {
+          const F = tw.flood;
+          if (F.none) return { none: true, notes: F.notes.slice(), levels: [] };
+          const pal = (sc.flood && sc.flood.palette) || null;
+          return {
+            none: false, on: !!S().flood, animating: floodAnimating(), level: F.level, top: F.top, start: F.start, startBasis: F.startBasis,
+            clock: floodAnimating() && F.clock != null ? F.clock : null,
+            zero: F.lad.ahdZero, band: F.band ? F.band.key : null, flooded: F.flooded,
+            colour: sc.flood ? `#${sc.flood.mat.color.getHexString()}` : null, opacity: sc.flood ? sc.flood.mat.opacity : null,
+            y: sc.flood ? sc.flood.water.position.y : null, visible: sc.flood ? sc.flood.water.visible : null,
+            seed: F.seed ? { x: F.seed.x, z: F.seed.z, elev: F.seed.elev } : null,
+            levels: F.lad.levels.map(l => ({ key: l.key, kind: l.kind, label: l.label, ahd: l.ahd, gauge: l.gauge, rank: l.rank,
+                                            colour: FloodStages.colourOf(l, pal) })),
+            staff: sc.flood ? {
+              x: sc.flood.staff.position.x, z: sc.flood.staff.position.z, visible: sc.flood.staff.visible,
+              rings: sc.flood.staff.children.filter(c => c.userData.level).map(c => ({ key: c.userData.level, y: c.position.y, colour: `#${c.material.color.getHexString()}` })),
+              post: (() => { const p = sc.flood.staff.getObjectByName('staff post'); return { bottom: p.position.y - p.scale.y / 2, top: p.position.y + p.scale.y / 2 }; })(),
+            } : null,
+            exported: sc.flood ? (() => { let any = false; for (const o of [sc.flood.water, sc.flood.staff]) o.traverse(x => { if (x.userData.export !== false) any = true; }); return any; })() : null,
+            notes: F.notes.slice(),
+          };
+        })() : null,
         photos: tw.photos ? {
           status: tw.photos.status, count: tw.photos.count, error: tw.photos.error || null, near: tw.photoNear,
           prompt: (() => { const el = document.getElementById('twin-photo-prompt'); return el && !el.hidden ? el.textContent : null; })(),
@@ -4108,6 +4591,83 @@ void main() {
     // now if it already is, after the next build otherwise.
     focusPhoto(id) { tw.focusPhotoId = id || null; applyPhotoFocus(); },
     _photoAt: (x, y) => photoAt(x, y),
+    // The flood water: shown or hidden, rising or held — each remembered.
+    setFlood(on) {
+      S().flood = !!on; saveSettings();
+      if (tw.flood && !tw.flood.none && sc.flood && on && tw.flood.level == null) setFloodLevel(tw.flood.start);
+      settleFlood();
+    },
+    setFloodAnim(on) {
+      S().floodAnim = !!on; saveSettings();
+      settleFlood();
+    },
+    toggleFloodAnim() {
+      S().floodAnim = !floodAnimating();
+      // Paused, the water stays where it was caught.
+      const F = tw.flood;
+      if (!S().floodAnim && F && !F.none && F.level != null && F.top > F.start) S().floodHold = (F.level - F.start) / (F.top - F.start);
+      saveSettings();
+      settleFlood();
+    },
+    // Hold the water at one level (its key), or a fraction of the way from 0 m
+    // to the top — either stops the rise.
+    floodAt(key) {
+      S().flood = true; S().floodAnim = false; S().floodHold = String(key); saveSettings();
+      settleFlood();
+    },
+    setFloodFraction(v) {
+      const f = Math.max(0, Math.min(1, Number(v)));
+      if (!isFinite(f)) return;
+      S().flood = true; S().floodAnim = false; S().floodHold = f; saveSettings();
+      settleFlood();
+    },
+    // The check's seams: a shorter cycle, and whether a scene point is wet.
+    _floodClock(rise, hold, drain) {
+      floodClock = rise ? { rise: Number(rise), hold: Number(hold) || 0, drain: Number(drain) || 0.001 } : null;
+      const F = tw.flood;
+      if (F && !F.none) {
+        // From the bottom, now: the water is put at 0 m before the next frame.
+        F.t0 = performance.now(); F.lastDraw = 0; F.clock = 0;
+        if (floodAnimating()) setFloodLevel(F.start);
+        requestFrame();
+      }
+    },
+    _floodWet(x, z) {
+      const F = tw.flood, g = tw.ground;
+      if (!F || F.none || !F.fill || !g || F.level == null) return false;
+      const step = g.size / (N - 1);
+      const i = Math.round((x + g.half) / step), j = Math.round((z + g.half) / step);
+      if (i < 0 || j < 0 || i >= N || j >= N) return false;
+      return F.fill[j * N + i] < F.level;
+    },
+    _floodFill(x, z) {
+      const F = tw.flood, g = tw.ground;
+      if (!F || F.none || !F.fill || !g) return null;
+      const step = g.size / (N - 1);
+      const i = Math.round((x + g.half) / step), j = Math.round((z + g.half) / step);
+      return (i < 0 || j < 0 || i >= N || j >= N) ? null : F.fill[j * N + i];
+    },
+    // Whether the water as drawn covers a scene point: the texel of the mask
+    // the plane samples there, found through the plane's own positions and
+    // UVs rather than the arithmetic that set them — so a mask drawn turned
+    // or flipped against the ground is told apart from one that is not.
+    _floodMaskAt(x, z) {
+      if (!sc.flood) return null;
+      const geo = sc.flood.water.geometry, pos = geo.attributes.position, uv = geo.attributes.uv;
+      // A rectangle on the ground: u runs with x alone, v with z alone.
+      let bx = -1, bz = -1;
+      for (let k = 1; k < pos.count; k++) {
+        if (bx < 0 && pos.getX(k) !== pos.getX(0)) bx = k;
+        if (bz < 0 && pos.getZ(k) !== pos.getZ(0)) bz = k;
+      }
+      if (bx < 0 || bz < 0) return null;
+      const u = uv.getX(0) + (x - pos.getX(0)) / (pos.getX(bx) - pos.getX(0)) * (uv.getX(bx) - uv.getX(0));
+      const v = uv.getY(0) + (z - pos.getZ(0)) / (pos.getZ(bz) - pos.getZ(0)) * (uv.getY(bz) - uv.getY(0));
+      const ti = Math.floor(u * N), tj = Math.floor(v * N);
+      if (ti < 0 || tj < 0 || ti >= N || tj >= N) return null;
+      // three reads an alpha map's green channel.
+      return sc.flood.data[(tj * N + ti) * 4 + 1] > 0;
+    },
     // The others in the room, driven by twin-presence.js.
     remote: { set: remoteSet, pose: remotePose, remove: remoteRemove, clear: remoteClear },
     presenceChanged() { refreshPeersLine(); },

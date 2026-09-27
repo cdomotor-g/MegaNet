@@ -1203,6 +1203,16 @@ const HELP = {
       'Everything arrives over the network — the renderer on the first visit (~750 KB), then one '
       + 'raster and one image per patch. Whatever fails, the tab says which and draws what it did get; '
       + 'a ground that could not be read is never drawn flat.',
+      '<strong>The water is the station\'s flood levels, stood on the ground.</strong> It rises from '
+      + '0 m on the gauge to the highest level the record holds, is held there, let out, and rises '
+      + 'again: clear blue below minor, then green, yellow and red past minor, moderate and major, and '
+      + 'magenta through to dark blue past the AEP floods — the colour of the rarest level passed, so '
+      + 'it never goes back down. It goes where the river would take it, not everywhere low: a hollow '
+      + 'behind a bank stays dry until the bank is overtopped. It is one level surface through the '
+      + 'patch, and a real flood slopes downstream, so the far edges are a guide. ⏸ on the pill at the '
+      + 'stage\'s top left (or the line under it) stops the rise; a level on the line holds the water '
+      + 'there; <em>Hide the water</em> takes it away — each remembered. Classes on a gauge whose zero '
+      + 'is not surveyed to AHD are named in the notes and not drawn. Not in the .glb.',
       '<strong>A 📷 on the ground is where somebody stood with a camera</strong> — a post at chest '
       + 'height, the camera turned the way it faced and a pale wedge for each way a photo from there '
       + 'looked. Click it, pick it from the line under the stage, or walk up to it in the POV and '

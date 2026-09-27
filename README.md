@@ -89,6 +89,9 @@ MegaNet/
 ├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
 ├── digital-twin.js         ← DigitalTwin — Digital Twin tab: one station's ground in
 │                             3-D, a 2 m pole and a figure on it, a .glb for Blender
+├── flood-stages.js         ← FloodStages — a station's flood classes, AEP levels
+│                             and peaks on one ladder in AHD, the colour the twin's
+│                             water takes past each, and its rise
 ├── photo-meta.js           ← PhotoMeta — what a photo says about where it was taken:
 │                             EXIF/XMP in four containers, and the overlay a field
 │                             camera app printed on it, read by OCR (also the
@@ -3547,7 +3550,8 @@ under it, the aerial imagery draped over it, **the station as built** where
 it stands and a **1.75 m figure** beside it for scale. Orbit it, look
 straight down on it, or take the POV and walk about in it at eye height with
 the keys — up the ladder of a tower, too; click the ground for its height;
-and download the whole scene as a `.glb` that Blender opens with one import. It is `digital-twin.js`, the **Digital Twin**
+watch the station's flood levels rise over it as water; and download the whole scene as a `.glb` that Blender opens
+with one import. It is `digital-twin.js`, the **Digital Twin**
 tab under *Stations & networks*, and a 🧊 pill on the card of every station with a
 position.
 
@@ -3655,10 +3659,28 @@ same colouring, the same culled set, read off `state.mapLines` the way the
 from. On the tab, with no map to mirror, they are the pass-range and backbone
 relations as recorded, in the plain colours, and the notes say which.
 
+**The station's flood levels rise over the ground as water.** From 0 m on
+the gauge to the highest level the record holds — minor, moderate and major
+through the gauge zero (only one surveyed to AHD; a class on an assumed datum
+is named in the notes and not drawn), the AEP flood levels, and the peaks the
+river has reached once the HDB extract lands them as `flood_peaks` — sixteen
+seconds up, held, let out, and again. A clear blue below minor, then green,
+yellow and red, and magenta through to dark blue past the AEP floods: the
+colour of the rarest level passed, so where major sits above the 1% AEP level
+(44 of 115 stations) the water stays magenta past it rather than going back
+to red. It goes where the river would take it — a priority flood from the
+channel by the gauge, so a hollow behind a bank stays dry until the bank is
+overtopped — as one level surface, which a real flood is not: across a wide
+patch the far edges are a guide. A staff in the channel carries a ring at
+every level. ⏸ on the pill at the stage's top left, or on the line under it,
+stops the rise; a level on the line holds the water there; *Hide the water*
+takes it away; each is remembered, reduced motion gets still water, and none
+of it is in the `.glb` (`flood-stages.js`).
+
 `docs/digital-twin.md` has the measurements behind every claim above, the
 controls, the hosts a network has to allow, and the Blender workflow.
-`npm run twin` holds the geometry, the hand-over and the mirror — see
-**Testing** below.
+`npm run twin` holds the geometry, the hand-over and the mirror, and
+`npm run flood` the water — see **Testing** below.
 
 ### 22. Field Photos (Where Each Photo Was Taken, Shown There)
 
@@ -4025,7 +4047,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Fifty-one checks. The nineteen below are the ones a change to the front end
+Fifty-two checks. The twenty below are the ones a change to the front end
 meets first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |
@@ -4049,6 +4071,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run linkbudget` | the link budget card's two ends. Each is found by name, station number, ALERT address or address window — asserted against what the *Stations filter itself* returns for the same term, so the claim is that the card runs the shared matcher rather than a second copy of the rules. Then: the box keeping its caret through a paste, an end armed and filled from a pin click and from a row of the Stations list in its filtered state without selecting it, the three Clear buttons, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute — the same station at both ends, a zero-length path, a term nobody supplied, and a frequency box that cannot say whether it holds an override. Every one of those is a clean console |
 | `npm run twin` | the Digital Twin tab against a world the check makes — the State's elevation service answered with a tiled float GeoTIFF of a closed-form surface, so every mesh vertex is arithmetic: the request box grown by half a sample with the aspect snap switched off, each vertex at the surface's height at its own latitude and longitude, the Type 3 pole with its foot at the origin, the 1.75 m figure with its feet on the ground where it stands, exaggeration scaling the relief alone, the station as built (pole or tower from the record, the kit inside by telemetry, the door on approach, the ladder climbed and the deck at the top), the room (what the twin sends, a visitor played in through a fake Realtime server and drawn, walked, pointing, gone; the pointer's laser), the notes folded on a phone, the horizon (its innermost square the patch's edge vertex for vertex, each far vertex on its sheet's height at its own place less the Earth's curve, the far shell drawn first, the switch, the tiles gone), the `.glb` read back out of the binary with the horizon left out, each fallback by breaking one host, walk mode at eye height, and the renderer torn down with the tab |
 | `npm run photos` | a field photo read, placed, uploaded and shown — the reader against photos built byte by byte and the overlay parser against what field camera apps print and what OCR makes of it, then the app signed in against a fake project with the real OCR engine: eight files dropped at once, the upload's order and records, the same photo refused three ways with its bytes taken back down, the carousel by keyboard, Dropbox's PKCE link, the map's pins clicked with a real pointer and the twin's markers on the ground. Smoke sees a tab that says "sign in" |
+| `npm run flood` | the twin's flood water where the river would put it, in the colours of the levels it passes — the ladder, colours and cycle under Node against real station records (a class on an assumed-datum zero named and not drawn, a colour that never goes back from magenta to red past a major class set above the 1% AEP), then Gatton's levels stood on a valley the check makes: the channel wet at moderate, the floodplain at major, the hollow behind a bank dry until its crest is overtopped; every level passed in order in its colour; each frame of the rise where the cycle says for the moment it was drawn; the pause from the line and the pill, hiding it, the Stations map's line and on a phone its pill, reduced motion, and nothing of it in the `.glb` |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and
@@ -4066,7 +4089,7 @@ then clicks its way through the RF Changes and Interference Workbench controls,
 keyed by the handler each one names rather than by its label. See
 `test/lib/controls.mjs`.
 
-CI runs all fifty-one on any push touching a root `*.js`, `index.html`, `styles.css`,
+CI runs all fifty-two on any push touching a root `*.js`, `index.html`, `styles.css`,
 `stations.json`, `db/migrations/`, `test/` or the inspection workbook in
 `archive/`. The filter is a glob rather than a list of filenames
 because the app's script list grew with every milestone of the split — a named

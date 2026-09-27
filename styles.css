@@ -176,6 +176,19 @@
   --flood-minor:    #107c10;
   --flood-moderate: #806b00;
   --flood-major:    #b3261e;
+  /* The Digital Twin's flood water (flood-stages.js): the colour the water
+     takes past each level — clear blue below minor, then green, yellow, red,
+     and magenta through to a dark blue across the AEP floods, the ramp shared
+     out between however many a station has. Scene colours and legend
+     swatches, never text, so they are the saturated hues a flood map uses
+     rather than the text-safe ones above, and one set for both themes. */
+  --flood-water-below:     #3d8bfd;
+  --flood-water-minor:     #1fa64a;
+  --flood-water-moderate:  #f2c200;
+  --flood-water-major:     #e03131;
+  --flood-water-aep-first: #e020e0;
+  --flood-water-aep-last:  #15227a;
+  --flood-water-peak:      #ffffff;
   /* Side nav: expanded, and collapsed to an icon rail. The expanded width is
      set by the longest label, "Interference Workbench" — a nav that ellipsises
      its own tab names is worse than a wider one. */
@@ -12269,6 +12282,7 @@ code {
 #map-twin .map-twin-status { margin: 0; }
 #map-twin .map-twin-paths { margin: 0; }
 #map-twin .map-twin-photos { margin: 0; }
+#map-twin .map-twin-flood { margin: 0; }
 #map-twin .map-twin-peers { margin: 0; }
 
 /* The notes, folded: a one-line count in the warning colour that opens as a
@@ -12311,6 +12325,7 @@ code {
 #map-twin .map-twin-status,
 #map-twin .map-twin-paths,
 #map-twin .map-twin-photos,
+#map-twin .map-twin-flood,
 #map-twin .map-twin-peers,
 #map-twin .map-twin-attrib {
   white-space: nowrap;
@@ -12360,6 +12375,9 @@ code {
 @media (max-width: 700px) {
   .map-twin-label { display: none; }
   .map-twin-head { padding-inline: 0 4rem; }
+  /* A phone's map has no row to spare for the water's line: the pill on the
+     stage reads it and pauses it, and the tab has the levels in full. */
+  #map-twin .map-twin-flood { display: none; }
 }
 
 /* Who else is here (twin-presence.js), on the tab as under the map. */
@@ -12384,6 +12402,68 @@ code {
 .twin-photos { margin: var(--sp-1) 0 0; }
 .twin-photos-lead { color: var(--muted); }
 .twin-photo { font-weight: 600; }
+
+/* The flood levels as words: pause or play the rise, where the water is now,
+   and every level as a button that holds the water there, each with the
+   colour the water takes past it — the legend and the controls in one line. */
+.twin-flood { margin: var(--sp-1) 0 0; }
+.twin-flood-lead { color: var(--muted); }
+.twin-flood-play { font-weight: 600; }
+.twin-flood-now { font-variant-numeric: tabular-nums; }
+.twin-flood-level { white-space: nowrap; }
+.twin-flood-sw {
+  display: inline-block;
+  width: .8em;
+  height: .8em;
+  margin-right: .3em;
+  vertical-align: -.05em;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: var(--sw, var(--flood-water-below));
+}
+.twin-flood-set {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.twin-flood-set legend { padding: 0 var(--sp-1); font-weight: 600; }
+
+/* The water on the stage, top left (the compass has the right): its colour,
+   ⏸ or ▶, and how high. The off switch within reach wherever the twin is. */
+.twin-flood-pill {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  max-width: calc(100% - 4.4rem);
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  margin: 0;
+  padding: .2rem .6rem;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.twin-flood-pill[hidden] { display: none; }
+.twin-flood-pill .twin-flood-sw { margin-right: 0; flex: 0 0 auto; }
+.twin-flood-pill-icon { flex: 0 0 auto; }
+.twin-flood-pill-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.twin-flood-pill:hover { background: var(--panel); }
+@media (pointer: coarse) {
+  /* EPIC #107's 44 px floor: on a phone's map this is the water's only
+     control. */
+  .twin-flood-pill { min-height: 2.75rem; padding-inline: .8rem; }
+}
 
 /* Standing at a photo spot in the POV: what Enter opens, over the stage above
    the HUD. A real button, so a pointer and a keyboard get there too. */

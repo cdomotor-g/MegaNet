@@ -660,6 +660,22 @@ jobs:
         working-directory: test
         run: npm run photos
 
+      # The twin's flood water (flood-stages.js and its drawing in
+      # digital-twin.js). `twin` holds the ground the water stands on and says
+      # nothing about where the water goes: a class hung from an assumed
+      # datum, a hollow behind a bank that fills because it is low rather than
+      # because the river reaches it, a colour that goes back from magenta to
+      # red past a major class set above the 1% AEP — each is a twin that
+      # draws, with a clean console. The ladder, colours and cycle are held
+      # first under Node against real station records; then the real Gatton
+      # levels are stood on a valley the check makes (a channel, a floodplain,
+      # a hollow inside a bank), so where the water should be is arithmetic.
+      # The rise is read against its own clock, not the wall's: SwiftShader
+      # draws a handful of frames a second. Skips without WebGL2, like twin.
+      - name: Flood water in the twin — the levels, where the water goes, the rise and its off switch
+        working-directory: test
+        run: npm run flood
+
       # The two navigators under and beside the Arrow chart. Their edge handles
       # were ungrabbable for a reason no check here could see: the drawing and
       # the hit-test each converted client coordinates to viewBox coordinates

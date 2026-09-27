@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-27** (revision 100 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-27** (revision 101 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -393,6 +393,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
+- **#203** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 101, blocked** — historical flood peaks into the station record. The twin's flood water (revision 101) already reads them as `flood_peaks` on the station — `[{ date, height_m }]` on the gauge through an AHD zero, or `[{ date, level_m_ahd }]` — a ring on the staff each, the rise up to the highest, never colouring the water, and `npm run flood` holds that contract. What is missing is the data: a table, an importer in `tools/ingest/` and `stations_doc()` emitting the field, `0033` being the pattern for all three. **Blocked on the HDB extract that carries the peaks, which is failing** — the owner's, since it needs HDB access. Writing `stations.json` alone is undone within a week (revision 99); the field has to come out of the database.
 - **#202** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 100** — HEIC photos in Chrome and Firefox. iPhones save HEIC; Safari converts on upload and the Dropbox sync decodes it in Node, but the Field Photos tab in any other browser cannot draw one and refuses it with how to get a JPEG instead. A WebAssembly decoder loaded only for a HEIC, pinned and served from the harness at that version exactly as the OCR engine is.
 - **#201** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 100** — place a field photo by clicking the map: *Pick on the map* from the place editor, and a photo's own pin dragged to move it, the way a station's is. The database needs nothing — `update_field_photo()` already takes a move and re-files an unplaced photo by distance.
 - **#190** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 93** — MapLibre 5.24.0 is the last UMD build, and the 3-D view pins it. **6.x ships ESM only**, so a plain `<script src>` cannot load it and the app is on a branch that stops getting fixes at a moment nobody picks. High not for the diff but for the decision: this is the first real pressure on the classic-script contract #129 argued for at length. Four options are on the issue; `await import(url)` inside a classic script looks right — it needs no bundler and `map-3d.js` already loads the library lazily from its own function, which is exactly where it would go — and it wants checking rather than assuming, in particular what `file://` does with a module script. **Gates nothing; gated by nothing.**
@@ -495,6 +496,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Five AI rows, and six `[Human]` issues.
 >
+> **Revision 101 opened #203, and closes nothing** — `[Sonnet5/Med]`, the historical flood peaks into the station record, out of the Digital Twin's flood water shipping from a session request. The twin reads the peaks already; the database has none, because **the HDB extract that would carry them is failing**. So #203 is the first agent row on the board that is *blocked* rather than merely unpicked: nothing in it can start until an extract file exists. The Sonnet5 Med row goes from five to six. The extract itself is not filed — it needs HDB access, and whether to file it as `[Human]` is with the owner.
+>
 > **Revision 100 opened #200, #201 and #202, and closes none of them** — three `[Sonnet5/Med]` follow-ups out of the field photos shipping from a session request: the photo pins in the 3-D view (#200, under EPIC #186), placing a photo by clicking the map (#201) and HEIC in the browsers that cannot draw one (#202). The Sonnet5 Med row goes from two to five. Two steps for a person came out of it as well — apply `0035` and the second bucket to the live project, and link a Dropbox folder — and are **not filed yet**: whether to file them as `[Human]` issues is with the owner, and the first may be done from an agent session over the Supabase connection, as #149 did for `0010`.
 
 > **Revision 99 opened and closed nothing** — it is #198's backfill landing in the data: 2,330 stations gained a modelled AHD height and a new `elevation_source` column saying where it came from, in the file and in the database. The allocation below is unchanged. It leaves one thing for somebody to decide rather than filing it: `station_json` filters on `deleted_at` alone, so `stations_doc()` hands out the two rows the document does not own (`bateson_test`, `elpro_test`). 0022 gave the *importer* a `document_managed` guard and never gave the *view* one. The file now carries them, which is a decision taken here and reversible; teaching the view to filter would stop the app seeing rows 0026's rig work may expect.
@@ -530,7 +533,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Sonnet5
 | Effort | Issues |
 |---|---|
-| Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters and drawings in 3-D) · **#200** (field photo pins in 3-D) · **#201** (place a field photo on the map) · **#202** (HEIC in Chrome and Firefox) |
+| Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters and drawings in 3-D) · **#200** (field photo pins in 3-D) · **#201** (place a field photo on the map) · **#202** (HEIC in Chrome and Firefox) · **#203** (historical flood peaks into the station record — *blocked on the HDB extract*) |
 
 ### AI agent — Haiku4.5
 | Effort | Issues |
@@ -598,6 +601,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 10. #66 (CORS check) has no blockers — ready now; gates only future/unfiled ARRO API work.
 10d. **#186's children (#187, #188), #189 and #190 have no blockers and gate nothing** — all four fell out of the 3-D view shipping at `d7509fc` and none of them is in front of anything. The one real sequencing note is negative and is constraint 2's: **#187 and #188 both edit `map-3d.js`, so they run one at a time.** #189 is a one-line change in `map-controls.js` and collides with neither. #190 is a decision rather than a change and should be made *before* either child grows the file further, because the answer could move which build the module loads.
 10e. **#200, #201 and #202 have no blockers and gate nothing** — all three fell out of the field photos shipping at revision 100. Constraint 2 decides the order and nothing else does: **#200 edits `map-3d.js`, so it queues behind or ahead of #187 and #188, one at a time**; #201 and #202 both edit `field-photos.js` (and #201 `map-photos.js`, which #200 also touches for its accessor), so each of those pairs is one at a time too. #202 is the only one of the three with a third-party choice in it — which decoder, at what size and under what licence — and is the natural one to pick up first.
+10f. **#203 is blocked, and not by anything on this board**: it waits on the HDB extract of historical flood peaks, which is failing and needs a person with HDB access. It gates nothing — the twin's flood water ships without peaks and draws them the day the field arrives. When the extract works, #203 is a migration (`0036` or whatever is next), so it takes the next number at the time it is picked up, and it touches `stations_doc()`, which every station migration restates — one at a time with any other migration in flight.
 10c. #145 (apply `0009`, create the bucket) has no blockers — ready now. **It gates nothing on this board**, which is worth stating plainly so it is not mistaken for a blocker on #116/#117/#123/#126: those four were unblocked by the *migration being written*, not by it being applied, and all four are code and schema-design work that can proceed against the file. What is actually waiting on it is the Export tab reading green, `tools/check_inspections.sql` being runnable against the real database, and — for Part B only — #116 being able to upload a photo at the end of a form.
 10. ~~**#115 (inspection schema) is the widest gate in the repo**~~ — **done at `68baffc`.** It was the widest gate and it is discharged: #116, #117, #123 and #126 are unblocked in one go, which makes four of the board's five next-pickable items come out of one epic. What it leaves behind is a constraint rather than a dependency — the record tables are editors-only, so #118 and #128 render behind sign-in.
 11. ~~#116 and #117 can run in parallel now~~ — **both are closed, and the parallelism claim was never tested.** It would have held: different form families, different tables, different save functions, shared lookup tables neither writes. What actually happened was better for #117 than the parallel would have been — the tab, the CSS section, the three-state pick-list, the draft path, the 409 contract and the section-pruning rule all existed to copy, and the fixture reader in `test/` did too. **Two tabs, two issues, four shared edits each** (`TABS`, `HELP`, a `state` block, one `renderMain()` line) — see constraint 3, which now states that as a shape rather than a single data point.
@@ -627,12 +631,78 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 - **P3:** ~~#118~~ — **closed**; ~~#119 (epic) → #120/#121~~ — **all closed**; ~~#150~~, ~~#162~~, ~~#163~~, ~~#151~~, ~~#159~~, ~~#161~~, ~~#128~~, ~~#127~~ — **all closed**; #200, as a child of EPIC #186 (P3)
 - **Unrated:** ~~#160~~ — **closed at revision 47** (sequencing item 23).
 - **P4:** #66
-- Unprioritised until reviewed: #201 and #202 (the field photos' two follow-ups — the feature works without either, and each closes a way in that today ends in "type the coordinates" or "use Safari"); #166 (the ELPRO trial — ~~#167~~ closed, so what is left is a credential, a card and a phone call; worth doing before it is worth a P-number, because the whole 115E-2 question stays theoretical until one unit publishes); #156 (a decision menu, not work — it gates nothing); #158 (three dashboard settings — it gates nothing either, but it is the only thing standing between a non-`@bom.gov.au` address and a working sign-in, so it is worth doing before it is worth prioritising)
+- Unprioritised until reviewed: #203 (the flood peaks — blocked on the HDB extract, so its priority is the extract's); #201 and #202 (the field photos' two follow-ups — the feature works without either, and each closes a way in that today ends in "type the coordinates" or "use Safari"); #166 (the ELPRO trial — ~~#167~~ closed, so what is left is a credential, a card and a phone call; worth doing before it is worth a P-number, because the whole 115E-2 question stays theoretical until one unit publishes); #156 (a decision menu, not work — it gates nothing); #158 (three dashboard settings — it gates nothing either, but it is the only thing standing between a non-`@bom.gov.au` address and a working sign-in, so it is worth doing before it is worth prioritising)
 - Unstated on ~~#101~~ (**closed**) /#107 and their children — ~~#108~~, ~~#109~~, ~~#137~~, ~~#141~~ and ~~#138~~ **closed** — and on ~~#99~~ (**closed**) — treat as normal priority, sequenced by the dependency chain above. The near-term-regardless-of-P-number pairing (#130 and #131, two live crashes) is now **both closed**.
 
 ---
 
 ## What changed
+
+### Revision 101 — 2026-09-27: the twin floods — a station's levels as water over its ground, rising, in the colours of the levels it passes
+
+Not from an issue: a session request. The ask was a flood height simulation
+in the Digital Twin's modes, using the station's minor, moderate and major
+classes, its AEP levels and its peak heights where there are any. The water
+was to sit in the channel and beyond, up to the levels recorded, animated in a
+rising cycle from 0 m to the highest AEP level. It was to be a transparent
+blue up to minor, then green, yellow, red, magenta and dark blue, with a way to
+turn the animation off. All of it shipped in one push. There are no peaks yet:
+the database holds none, because the HDB extract that would carry them is
+failing.
+
+**The levels live on two datums, and three stations in ten cannot have their
+classes put on the ground.** The flood classes are heights *on the gauge*;
+the AEP levels are metres AHD; the twin's ground is AHD. So a class is placed
+through the gauge zero in force, and only a zero surveyed to AHD. Of the 1,093
+stations with classes, 769 have one; 196 have a zero on an assumed, a State or
+an unknown datum and 127 no surveyed zero at all, and a class hung from either
+would be drawn as confidently as it was wrong. Those stations get their AEP
+water where they have it (already AHD) and a note naming the classes and why
+they are not drawn — which makes the twin one more place a gauge zero surveyed
+to AHD would pay for itself. `flood-stages.js` holds the ladder, pure, and reaches
+across to `FloodVelocity.pickRow` so the card and the twin read one AEP row.
+
+**The colour cannot be "the last level passed"**, because the levels
+interleave: of the 115 stations with a major class, an AHD zero and a 1% AEP
+level, **44 have major above the 1% AEP**. By height, their water would turn
+magenta and then go back to red. The colour is instead the furthest level
+passed in rank order — the classes, then the AEP floods from frequent to rare
+— so it says how rare a flood the water has passed and never says less as it
+rises. A peak is a ring on the staff and never colours the water. The AEP
+ramp runs magenta to dark blue, shared out over however many levels a station
+has (446 of the 538 with AEP levels have all four).
+
+**Water goes where the river would take it, not everywhere low.** Every sample
+carries the level at which it joins the channel by the gauge (a priority
+flood), so a hollow behind a bank stays dry until the bank is overtopped, and
+the water is one masked level plane. **The check found the model's real limit
+before a user could**: its own valley's bank, 4 m wide at the crest, leaked
+40 cm under its top, because on 2 m samples a diagonal step passes beside a
+narrow crest instead of over it. That is true of any levee narrower than a
+few samples (2 m at 400 m, 8 m at 1600 m), so `docs/digital-twin.md` now says
+so where a user reads it, and the valley's bank is flat-topped. The other
+stated limit is the level surface itself: a real flood slopes downstream.
+
+**Two things the checks forced into the design.** The rise under SwiftShader
+draws about four frames a second, so a check that watched the wall clock was
+flaky by construction; `npm run flood` reads the animation's own clock and
+asserts each frame's water against the cycle for the moment it was drawn, and
+proves the levels' order and colours on the slider, a step at a time. And
+`npm run twin` caught the flood line costing the Stations map's head a row on
+a phone — the stage fell to 199 px of a 416 px map — so the water got a pill
+on the stage (colour, ⏸/▶, how high), which is its off switch everywhere and
+its only control on a phone's map, where the line stands down.
+
+The checks: `npm run flood` is new (76 assertions — the ladder under Node,
+then Gatton's real levels on a valley the check makes, including a mask read
+through the plane's own UVs that a flipped texture fails; 52 checks in
+`npm run all` and in CI now). `twin`, `photos`, `tabs`, `smoke` and `help`
+pass with the water on.
+
+**Opened: #203** `[Sonnet5/Med]`, the historical flood peaks into the station
+record — blocked on the HDB extract. **Not filed, pending the owner:** the
+extract itself, which needs HDB access. Revision 100's two unfiled steps
+still stand.
 
 ### Revision 100 — 2026-09-27: a photo taken in the field lands where it was taken — on the map, in the twin, and in a tab of its own
 

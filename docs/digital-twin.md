@@ -4,11 +4,13 @@ One station's patch of ground in three dimensions: the real relief under it
 from the best public elevation model there is, the aerial imagery draped over
 it, a **2 m × 300 mm pole** where the station stands and a **1.75 m figure**
 beside it for scale. Orbit it, look straight down on it, or walk about in it
-at eye height; click the ground for its height; and download the whole scene
-as a `.glb` that Blender opens in one step.
+at eye height; click the ground for its height; watch the station's flood
+levels rise over it as water; and download the whole scene as a `.glb` that
+Blender opens in one step.
 
 It is `digital-twin.js`, the **Digital Twin** tab under *Stations & networks*,
-and a 🧊 pill on the card of every station with a position. `npm run twin` holds it (see the end).
+and a 🧊 pill on the card of every station with a position. `npm run twin` holds it, and `npm run flood` its
+flood water (see the end).
 
 ---
 
@@ -308,10 +310,12 @@ below the control corners (`#map-twin`, one step above `#map3d`'s window in
 `styles.css`); Leaflet's own drag and wheel are held off under it, for
 `map-3d.js`'s reason, and the station card stays above both. Its head is one
 row that never shrinks — the words come off its buttons below `sm`, as they
-do off the banner's — and the status, the paths and the credit line are one
-line each with the whole text as their tooltip, so a map 340 px tall on a
-phone still gives the stage a picture's worth of height and nothing spills
-over the credit line under the map. The twin's scene,
+do off the banner's — and the status, the paths, the flood water and the
+credit line are one line each with the whole text as their tooltip, so a map
+340 px tall on a phone still gives the stage a picture's worth of height and
+nothing spills over the credit line under the map. Below `sm` the flood
+water's line stands down altogether — there is no row to spare — and the pill
+on the stage is its control. The twin's scene,
 controls and teardown are `digital-twin.js`'s; `map-twin.js` decides *when*
 and gives it a host. **Open the tab →** on the overlay opens the Digital Twin
 tab on the same station, for the settings, the Ground truth panel and the
@@ -428,6 +432,115 @@ camera, looking the way it looked. The photos are asked for by the patch's
 box, only for a signed-in editor; signed out, the line says to sign in and
 nothing is drawn. None of it goes in the `.glb`.
 
+## Flood water
+
+The station's flood levels, stood on the ground as water. It rises from 0 m
+on the gauge to the highest level the record holds — **sixteen seconds up,
+whatever the range**, so a creek that floods 3 m and a river that floods 16 m
+take the same time to watch — is held there for three, let out in one and a
+half, and rises again. `flood-stages.js` holds the ladder, the colours and the
+cycle (pure: a station record in, numbers and words out); `digital-twin.js`
+draws them.
+
+**The colours** are the level the water has passed: a clear blue below minor,
+green past minor, yellow past moderate, red past major, and past the AEP
+floods magenta through to a dark blue at the rarest — magenta and dark blue
+when a station has two AEP levels, the ramp between them shared out when it
+has three or four (446 of the 538 stations with AEP levels have all four). The
+colour is that of the **furthest level passed in that order** — the classes,
+then the AEP floods from the most frequent to the rarest — not of the last one
+passed by height, because the two interleave more often than not: of the 115
+stations with a major class, an AHD gauge zero and a 1% AEP level, 44 have
+major *above* the 1% AEP level. There the water turns magenta before it
+reaches major and stays magenta past it, rather than going back to red. The
+colour says how rare a flood the water has passed, and it never says less as
+the water rises. The tokens are `--flood-water-*` in `styles.css`.
+
+**The levels**, all on one ladder in metres AHD:
+
+- **The flood classes** (minor, moderate, major) are heights *on the gauge*,
+  so they are put on the ground through the gauge zero in force — and only a
+  zero surveyed to AHD. Of the 1,093 stations with classes, 769 have one;
+  196 have a zero on an assumed, a State or an unknown datum, and 127 no
+  surveyed zero at all. A class hung from a zero that is not AHD would be
+  drawn as confidently as it was wrong, so it is named in the notes (*"…its
+  zero is on the assumed datum rather than AHD, so they cannot be put on the
+  ground: minor 7 m, moderate 10 m, major 15 m"*) and not drawn.
+- **The AEP flood levels** — the row the station card reads
+  (`FloodVelocity.pickRow`), already in AHD, so they stand whatever the zero.
+- **The peaks the river has reached**, when there are any. None are in the
+  database yet: the HDB extract that would carry them is failing. The twin
+  reads them the moment the station record does, as `flood_peaks`:
+
+  ```json
+  "flood_peaks": [
+    { "date": "2011-01-10", "height_m": 18.92 },
+    { "date": "1974-01-26", "level_m_ahd": 105.1 }
+  ]
+  ```
+
+  `height_m` is on the gauge (placed through an AHD zero, like a class);
+  `level_m_ahd` is used as it is. Each is a ring on the staff, the highest
+  labelled *Highest recorded (date)*, and the rise goes up to it when it is the
+  highest level there is. A peak never colours the water: it is history, not a
+  class.
+
+**Where 0 m is.** The gauge zero, when it is AHD and sits at the channel the
+ground shows — no more than 30 m below the lowest ground by the gauge (a
+dam's headwater gauge often reads AHD straight off a zero of 0) and no more
+than 10 m above it. Otherwise the lowest ground within 60 m of the station,
+and the notes say which and why. A storage's zero is never its bed.
+
+**Where the water goes.** Not everywhere low. Every sample of the ground
+carries the lowest level at which it joins the channel by the gauge — the
+least, over every path from the channel to it, of the highest ground on the
+path (a priority flood: Dijkstra with *max* for *plus*, once per ground). At a
+level, a sample is under water when that is below the level. So a hollow
+behind a bank stays dry until the bank is overtopped, and a dam in the next
+gully is not flooded by a river it is not joined to. The water itself is one
+plane at the level, masked to those samples and cut by the ground in the depth
+buffer, so its edge is the true contour wherever the ground makes it.
+
+**The water is only as good as the ground's sampling**, and a bank is where
+that shows. The ground is 201 samples a side: 2 m apart at the default 400 m
+patch, 8 m at 1600 m. A bank narrower than a few samples is drawn lower than
+it is — a step between two samples on a diagonal can pass beside its crest
+rather than over it — so water the real bank holds back can cross it here.
+The check found this on its own valley first: a bank 4 m wide at the crest
+leaked 40 cm under its top at the 2 m spacing, and had to be made
+flat-topped to hold. A levee in the twin that fills when it should not is
+worth looking at on a smaller patch before it is believed.
+
+**The one simplification worth saying out loud: a level surface through the
+whole patch.** A real flood slopes downstream — the AEP sheets give the slope,
+a metre in 600 at Gatton — so across a 1.6 km patch the far edges are a
+guide, not a map. The line's tooltip says so.
+
+**The staff** is a white post in the channel from 0 m to the top, with a ring
+at every level in its colour — the gauge board the water is read against. The
+exaggeration slider moves the water and the rings with the ground.
+
+**Turning it off.** Three places, each remembered in the browser (`mn-twin`):
+
+- **The pill** on the stage, top left: the water's colour, ⏸ or ▶, and how
+  high — *10.0 m · moderate*. Pauses and plays the rise wherever the twin is.
+  On a phone's Stations map it is the only control: the line above the stage
+  has no row to spare there, so it stands down.
+- **The line** under the stage (in the Stations map, above it): *🌊 Flood
+  levels:* ⏸ *Pause the rise* / ▶ *Play the rise*, the reading (*water 10.0 m
+  on the gauge, 97.54 m AHD — past moderate*), every level as a button that
+  holds the water there, and *Hide the water*.
+- **The Scene panel's *Flood water*:** shown or not, animated or not, and a
+  slider for the level — moving it holds the water where it is put.
+
+Paused, the water stays where it was caught; a browser that asks for reduced
+motion gets still water at the top until ▶ is pressed. While it rises the
+scene is redrawn up to 30 times a second — it otherwise draws only when
+something moves — and paused it draws nothing at all.
+
+It is a simulation, not the site: **not in the `.glb`**. Editors and visitors
+alike see it; the levels are the station card's, and those are public.
+
 ## The Ground truth panel
 
 Side by side: the station's recorded height (surveyed, or modelled with its
@@ -529,3 +642,21 @@ sheet alone and a note), the `.glb`'s chunks and positions read back out of
 the binary with the horizon left out, each fallback by breaking one host,
 walk mode at eye height, and the renderer going with the tab. It needs WebGL2, which Playwright's Chromium
 has through SwiftShader, and skips rather than fails without it.
+
+`npm run flood` holds the water. `flood-stages.js` first, under Node, against
+real station records: the classes through the zero in force and only an AHD
+one, the AEP row the card reads, the peaks, the colours and the one that never
+goes back down, where 0 m is and why, and the cycle. Then the real Gatton
+levels — minor 7, moderate 10, major 15 m on a zero of 87.54 m AHD, four AEP
+levels from 102.69 to 103.75 m AHD — stood on a valley the check makes the
+same way `twin` makes its ground: a channel with its bed at 89 m, a floodplain
+at 98 m, a hollow 96 m deep inside a bank whose crest is 103 m, and rising
+ground to the east. So where the water should be is arithmetic: below
+moderate only the channel is wet, at major the floodplain is and the hollow is
+not, past the bank's crest the hollow fills too. Every level is passed in
+order in its colour on the slider; the rise is read against its own clock,
+not the wall's — SwiftShader draws a handful of frames a second, so what is
+asserted is that each frame puts the water where the cycle says for the
+moment it was drawn; and the pause, the pill, hiding it, the Stations map's
+line (and on a phone its pill), reduced motion, an assumed-datum zero, and
+nothing of it in the `.glb`.
