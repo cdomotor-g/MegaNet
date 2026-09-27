@@ -32705,8 +32705,8 @@
       "id": "gatton",
       "name": "Gatton",
       "station_number": "40444",
-      "lat": -27.555,
-      "lon": 152.275,
+      "lat": -27.554471,
+      "lon": 152.274671,
       "elevation_ahd": 107.6,
       "roles": [
         "field"
@@ -77688,8 +77688,8 @@
       "id": "spicers_peak_al",
       "name": "Spicers Peak AL",
       "station_number": "541140",
-      "lat": -28.1133,
-      "lon": 152.3722,
+      "lat": -28.109386,
+      "lon": 152.375607,
       "elevation_ahd": 1146.3,
       "roles": [
         "field"
@@ -77699,7 +77699,8 @@
         "balonne_condamine"
       ],
       "alert_ids": {
-        "rainfall": 5756
+        "rainfall": 5756,
+        "battery": 5757
       },
       "satcom": {
         "enabled": false,
