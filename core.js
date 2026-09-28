@@ -253,11 +253,14 @@ const HELP = {
            + 'top-right corner: it clears the filters, the selection, every drawing and every card. '
            + '<strong>⛶ Full screen</strong> gives the map the whole window except the side panel, '
            + 'which stays beside it with the tools in it; Escape brings the page back. At or below '
-           + '1,100 px the cards are under the map in one long page and the side panel keeps the '
-           + 'tools. On a phone the strip is a rail down the right-hand edge, beside the map rather '
-           + 'than on it, with ❔ and the map\'s controls in it and the cards under the map; a panel '
-           + 'opens as a drawer beside the rail, and pressing its button again, tapping the dimmed '
-           + 'page or pressing Escape puts it away. The <strong>Filters</strong> card drives the map and the list '
+           + '1,100 px, down to a phone\'s width, the cards are under the map in one long page and '
+           + 'the side panel keeps the tools. On a phone the map fills the screen under the banner '
+           + 'and the side panel is put away behind <strong>⋮</strong> at the top right: press it and '
+           + 'the strip comes out as a rail down the right-hand edge, beside the map rather than on '
+           + 'it, with ❔, 📋, 〽️ and the map\'s controls in it, and press it again to put the rail '
+           + 'away. A pane opens as a drawer beside the rail — the cards and the path tools too — '
+           + 'and pressing its button again, tapping the dimmed page or pressing Escape puts it '
+           + 'away. The <strong>Filters</strong> card drives the map and the list '
            + 'at once, and is built from whatever <code>stations.json</code> holds — every option '
            + 'carries the number of stations behind it, and nothing is offered that no station uses. '
            + 'It collapses, and its summary line says what the filters are doing while it is shut. '
@@ -437,7 +440,9 @@ const HELP = {
       + 'filling the height of the window and the cards scrolling on their own — the single '
       + 'column put the map\'s own answer below the fold, so reading it cost you the map. At or '
       + 'below 1,100 px they are under the map in one long page, because two 400 px columns are '
-      + 'two things too narrow to read rather than two things in view. The side panel\'s width is '
+      + 'two things too narrow to read rather than two things in view. On a phone they are in the '
+      + 'side panel again — 📋 and 〽️ in the rail that ⋮ brings out, each a drawer over the map — '
+      + 'so that the map can have the whole screen. The side panel\'s width is '
       + 'yours: drag its left edge, or focus it and use the arrow keys, and it is remembered. The '
       + 'station list in the side panel carries five columns rather than ten — name, station '
       + 'number, roles, AlertID and <strong>SLS catchment</strong> — because ten of them in a '
@@ -631,8 +636,9 @@ const HELP = {
         'Open <strong>Draw &amp; measure</strong> from the ✏️ in the side panel\'s strip and pick '
         + '<em>Line</em>. The cursor becomes a crosshair and clicks pass through the pins to the '
         + 'map underneath, and the panel stays open beside the map while you work. (On a phone the '
-        + 'pencil is in the map\'s top-right corner, its panel closes again when you leave it, and '
-        + 'the pin in its corner keeps it open.)',
+        + '✏️ is in the rail that ⋮ at the top right brings out, and its panel is a drawer over the '
+        + 'map: pick <em>Line</em>, then tap the dimmed map beside the drawer to put it away and '
+        + 'draw — the tool stays armed.)',
         'Click near one station, then near the other, and double-click (or <em>Finish</em>) to end '
         + 'the line. Within about 15 px of a pin the click <strong>snaps</strong> to that '
         + 'station\'s exact coordinates — the ring in the drawing is what says the next click will.',
@@ -2411,15 +2417,19 @@ const state = {
   // "open" would land on a pane whose whole height is eight blocks of tick
   // boxes, with the list they filter below the fold. That is not what the pane
   // is for. So the landing state there is shut; pressing Filters still opens
-  // it, and still writes the preference, which is honoured on every visit at
-  // or below `lg`, where the cards are under the map in one long page.
+  // it, and still writes the preference, which is honoured on every visit
+  // between `xs` and `lg`, where the cards are under the map in one long page.
+  // A phone lands shut for the same reason as a wide screen: its cards are a
+  // pane of the side panel too, a drawer over the map, and eight blocks of
+  // tick boxes are the whole of a drawer's height there.
   // Deliberately not a write: this reads the stored value and overrides it for
   // one page load, so nobody's setting is destroyed by having opened the tab
-  // on a wide screen once. The media query is stationsSplitActive()'s, written
-  // out here because app.js has not loaded yet.
+  // on a wide screen once. The media queries are stationsSplitActive()'s,
+  // written out here because app.js has not loaded yet.
   filtersOpen:    (localStorage.getItem('mn-filters') || 'closed') === 'open'
                   && !(typeof window !== 'undefined' && window.matchMedia
-                       && !window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).matches),
+                       && (!window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).matches
+                           || window.matchMedia(`(max-width: ${BREAKPOINTS.xs}px)`).matches)),
   // The station list card on the same tab, and remembered for the same reason.
   // It is the tallest card on the page — a scroller capped at most of the
   // viewport — so shutting it is how the map, the path tools and the editor
@@ -2470,8 +2480,9 @@ const state = {
                   || (localStorage.getItem('mn-help') || 'expanded') === 'expanded',
   // Which pane, remembered: 'help', 'stations', or 'map-<panel id>' for one of
   // the Stations map's panels. A pane that does not exist where you are — the
-  // Stations cards on any other tab or on a phone, a map panel on a tab with no
-  // Stations map — leaves the side panel shut *there* without this being touched, so
+  // Stations cards on any other tab or between `xs` and `lg`, where they are
+  // under the map, a map panel on a tab with no Stations map — leaves the side
+  // panel shut *there* without this being touched, so
   // coming back to the tab that has it opens it again. That is also what keeps
   // help from opening itself: on a fresh visit this says 'stations', and only
   // one tab has those.
@@ -2481,6 +2492,27 @@ const state = {
   // — never clamped in storage, so a window that was narrow for a while gives
   // the wider figure back when it is wide again.
   dockW:          Number(localStorage.getItem('mn-dock-w')) || DOCK_DEFAULT_W,
+  // Two more things about the side panel, both a phone's alone (below `xs`),
+  // and both there because the Stations map is the whole of a phone's screen:
+  //
+  //   dockRail    whether the rail of the side panel's buttons stands down the
+  //               right-hand edge of the Stations map, taking its width, or is
+  //               put away behind ⋮ at the right-hand end of the banner
+  //               (toggleDockRail, app.js). The operator's, under
+  //               'mn-dock-rail'; put away on a first visit, because the map is
+  //               what a phone was opened to look at.
+  //   dockDrawer  whether one of its panes is open over the page as a drawer.
+  //               Never restored. dockOpen above is the side panel being open
+  //               on a pane, written at every width and read at every width,
+  //               and read on a phone it laid the Stations cards over the map
+  //               on arrival — and again on every turn of a phone from
+  //               landscape, where the cards are under the map, to portrait,
+  //               where they are one of the side panel's panes. So a drawer is
+  //               only ever one somebody opened on this screen (setDockTab),
+  //               or one they were working in as the window narrowed to a
+  //               phone's (dockPhoneCheck).
+  dockRail:       localStorage.getItem('mn-dock-rail') === 'shown',
+  dockDrawer:     false,
   // Draw & measure overlay (Stations map). Plain geometry only — the Leaflet
   // layers are rebuilt from it whenever the map is, so a tab switch doesn't
   // throw the sketch away. Deliberately not persisted: see MapDraw.

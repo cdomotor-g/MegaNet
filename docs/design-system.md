@@ -263,7 +263,7 @@ which is the only place the numbers are written down.
 | `lg` | 1100 | Side-by-side becomes stacked — `.layout`, `.map-layout`, Radio Path Maps, the Workbench, and the Stations cards leave the side panel for the page under the map |
 | `md` | 900 | **A tablet.** The nav auto-collapses to the icon rail, header buttons drop their labels, tables switch to automatic layout and scroll inside their wrapper |
 | `sm` | 700 | Two-column content folds to one — forms, pickers, optional table columns |
-| `xs` | 560 | **A phone.** The nav and the side panel's panes stop being columns and become drawers over the page. The side panel's strip stays a rail on the Stations tab, holding the map's controls beside the map rather than on it, with its panes as drawers from the rail; on every other tab it is a tab on the screen edge, with help its drawer |
+| `xs` | 560 | **A phone.** The nav and the side panel's panes stop being columns and become drawers over the page. On the Stations tab the map fills the screen under a one-row banner, the Stations cards are side panel panes again (as above `lg`), and the side panel's strip is a rail of 36 px buttons, holding the map's controls and the cards beside the map rather than on it, put away behind ⋮ at the banner's right-hand end until it is asked for, with its panes as drawers from it; on every other tab it is a tab on the screen edge, with help its drawer |
 | `xxs` | 380 | The smallest phone. The banner shrinks its title rather than pushing a button off the edge |
 
 They are in `core.js` and not in `styles.css` for two reasons. CSS custom
@@ -726,7 +726,8 @@ reset, built with `corner: true` so the side panel is never offered it, because
 a control about the map as a whole is looked for on the map. The
 corner icon and the 📌 are hidden in a pane: a pane already stays open, and a pin
 there would change nothing anyone could see. On a phone the strip is a rail
-beside the map and a pane is a drawer from it. The controls used to come back
+beside the map, which ⋮ in the banner brings out and puts away, and a pane is a
+drawer from it. The controls used to come back
 to the corner there, and a phone is where the corner costs most: 44 px touch
 targets in two columns over a quarter of a map the width of the screen. It used
 to be the pin that moved a panel into the side panel, one at a time; that made
@@ -945,8 +946,13 @@ comes back.
 ### Touch targets
 
 `(pointer: coarse)` bumps every text-entry control to 16 px and gives range
-sliders a 1.75 rem thumb. Header buttons are 2.4 rem square from `md` down and
-2.15 rem from `xxs`. A U-issue adding a touch control on a phone matches those.
+sliders a 1.75 rem thumb. Header buttons are 2.4 rem square from `md` down,
+2.25 rem from `xs` (where the Stations tab adds ⋮ to the row) and 2.1 rem from
+`xxs`. A U-issue adding a touch control on a phone matches those. A phone's
+side panel rail is 36 px buttons too — over the app-wide floor below, under
+EPIC #107's 44, and on purpose: it stands beside a map that is the whole
+screen, and a narrower rail whose column fits the screen's height was asked
+for over the larger target.
 
 **Two floors, and which one applies.** The app-wide floor is **2 rem / 32 px** —
 comfortably past WCAG 2.5.8 (AA, 24 px), and raising every button in nineteen

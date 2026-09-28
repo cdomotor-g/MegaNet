@@ -4654,6 +4654,12 @@ void main() {
     el.style.setProperty('--twin-heading', `${(-heading).toFixed(1)}deg`);
   }
 
+  // Whether the pointer this page is driven by is a finger: the hint's words
+  // follow it (syncModeUi).
+  function coarsePointer() {
+    return typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  }
+
   function syncModeUi() {
     const stage = document.getElementById('twin-stage');
     if (stage) stage.classList.toggle('is-walk', rig.mode === 'walk');
@@ -4672,10 +4678,32 @@ void main() {
     }
     syncPointUi();
     const hud = document.getElementById('twin-hud');
-    if (hud) hud.textContent = rig.mode === 'walk'
-      ? `POV at eye height: W A S D or the arrow keys move, drag to look, Shift to hurry, Space points, Esc to leave.${tw.model && tw.model.ladder ? ' Walk into the ladder to climb it.' : ''}${tw.photos && tw.photos.spots && tw.photos.spots.length ? ' Walk up to a 📷 and press Enter for its photos.' : ''}`
-      : (tw.hooks ? 'Drag to orbit, wheel to zoom, right-drag to pan; click the ground for its height, a 📷 for its photos. Wheel out past the edge, or Esc, for the map.'
-                  : 'Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height, a 📷 for the photos taken there.');
+    if (hud) {
+      // A touch screen's words on a touch screen: there is no wheel, no right
+      // button and no Escape on a phone, and the hint that named them was the
+      // most text on its screen. What a finger does is what attachControls()
+      // does with one or two pointers: one orbits (or looks, in the POV), two
+      // pinch to zoom and slide to pan (or walk).
+      const touch = coarsePointer();
+      const ladder = tw.model && tw.model.ladder ? ' Walk into the ladder to climb it.' : '';
+      const spots = tw.photos && tw.photos.spots && tw.photos.spots.length;
+      hud.textContent = rig.mode === 'walk'
+        ? (touch
+          ? `POV at eye height: drag to look, slide two fingers up to walk and down to step back, 👁 to leave.${ladder}${spots ? ' Tap a 📷 for its photos.' : ''}`
+          : `POV at eye height: W A S D or the arrow keys move, drag to look, Shift to hurry, Space points, Esc to leave.${ladder}${spots ? ' Walk up to a 📷 and press Enter for its photos.' : ''}`)
+        : tw.hooks
+          ? (touch ? 'Drag to orbit, pinch to zoom, two fingers to pan; tap the ground for its height, a 📷 for its photos. ← Map for the map.'
+                   : 'Drag to orbit, wheel to zoom, right-drag to pan; click the ground for its height, a 📷 for its photos. Wheel out past the edge, or Esc, for the map.')
+          : (touch ? 'Drag to orbit, pinch to zoom, two fingers to pan. Tap the ground for its height, a 📷 for the photos taken there.'
+                   : 'Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height, a 📷 for the photos taken there.');
+      // A finger on the scene fades the hint (attachControls): it has been
+      // read, and on a phone it is two lines across the foot of a stage the
+      // size of the map. A new mode brings it back, with that mode's words.
+      if (hud.dataset.mode !== rig.mode) {
+        hud.dataset.mode = rig.mode;
+        hud.classList.remove('is-quiet');
+      }
+    }
     layoutFloodScale();
     syncCanvasName();
     requestFrame();
@@ -4716,6 +4744,11 @@ void main() {
 
     on(cv, 'pointerdown', e => {
       if (e.button !== 0 && e.button !== 2) return;
+      // A finger doing what the hint says: the hint has been read (syncModeUi).
+      if (e.pointerType === 'touch') {
+        const hud = document.getElementById('twin-hud');
+        if (hud) hud.classList.add('is-quiet');
+      }
       try { cv.setPointerCapture(e.pointerId); } catch (_) {}
       rig.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, b: e.button, moved: false });
       // A press on the pin being moved takes hold of it, instead of the

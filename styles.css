@@ -865,6 +865,36 @@ header p {
   background: rgba(255, 255, 255, .3);
 }
 
+/* ⋮, ☰'s opposite number at the other end of the banner: the side panel's
+   rail on a phone's Stations tab, which is put away behind it so that the map
+   has the screen (toggleDockRail, app.js). Dressed as ☰ is, so the two read
+   as a pair, and drawn only where app.js takes `hidden` off it — a phone's
+   width on the Stations tab. The mark is heavier than the text around it:
+   three dots at the banner's size are a smudge. */
+.hdr-side {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  width: 2.4rem;
+  height: 2.4rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  background: rgba(255, 255, 255, .14);
+  border-color: rgba(255, 255, 255, .35);
+  color: #fff;
+}
+
+.hdr-side[hidden] {
+  display: none;
+}
+
+.hdr-side.on {
+  background: rgba(255, 255, 255, .3);
+}
+
 #nav-backdrop,
 #help-backdrop {
   position: fixed;
@@ -7565,7 +7595,8 @@ body.mn-dock-dragging {
    panel shows is a drawer over the page from the right, exactly as the nav's
    becomes one from the left; app.js closes whichever was open when the other
    opens, and the backdrop and Escape put either away. The Stations cards are
-   never one of its panes here — they fold under the map below `lg`.
+   two of its panes here, 📋 and 〽️, as they are beside a desktop's map — not
+   under the map, where they are between `xs` and `lg`.
 
    What the strip is depends on what it is holding.
 
@@ -7580,24 +7611,32 @@ body.mn-dock-dragging {
    same tab on the drawer's edge, as the drawer's close button. Either way the
    main area never changes width, so no map needs re-measuring there.
 
-   On the Stations tab it holds the map's controls as well (app.js puts
-   has-map-tools on it), and there the rail is worth its width. Those controls
-   used to go back to the map's corner on a phone, and the corner is where they
-   cost the most: 44 px buttons down a 350 px map, in two columns because one
-   was taller than the map, covering a quarter of the thing the phone was
-   opened to look at. So they keep the rail they have on a desktop — the strip
-   down the right-hand edge, sticky under the banner, taking its width from the
-   page so the map ends where the rail begins and only ↺ stands on it, alone in
-   its top-right corner as at every width — and a pane opens as a drawer beside
-   the rail rather than beside the page. The rail stays lit over the backdrop
-   with it, so its buttons go on switching panes and the lit one puts its
-   drawer away again. */
+   On the Stations tab it holds the map's controls as well, and the Stations
+   cards (app.js puts has-map-tools on it), and there it is a rail. Those
+   controls used to go back to the map's corner on a phone, and the corner is
+   where they cost the most: 44 px buttons down a 350 px map, in two columns
+   because one was taller than the map, covering a quarter of the thing the
+   phone was opened to look at. So they keep the rail they have on a desktop —
+   the strip down the right-hand edge, sticky under the banner — but the rail
+   is put away behind ⋮ at the right-hand end of the banner until it is asked
+   for, because a rail standing there all the time was a seventh of the map.
+   Out (rail-pinned), it takes its width from the page, so the map ends where
+   the rail begins and only ↺ stands on the map, alone in its top-right corner
+   as at every width; and full screen puts it out whatever ⋮ says, because ⛶
+   is in it. A pane opens as a drawer beside the rail, and the rail comes out
+   with a drawer when it was away (rail-shown without rail-pinned) — over the
+   page beside it, taking no width, since the backdrop is over the map anyway —
+   lit over the backdrop, so its buttons go on switching panes and the lit one
+   puts its drawer away again. */
 @media (max-width: 560px) {
-  /* 44 px buttons and a hair either side of them. The desktop rail keeps room
-     for a scrollbar beside its buttons; a phone's scrollbar floats over what it
-     scrolls, and the rail hides its own (below), so none is kept here. */
+  /* 36 px buttons and a hair either side of them: a step under the desktop's
+     44, so the rail is less of a phone's map when it is out and its column of
+     a dozen fits a phone's height without scrolling — still half as big again
+     as the 24 px WCAG sets as a target's least. The desktop rail keeps room
+     for a scrollbar beside its buttons; a phone's scrollbar floats over what
+     it scrolls, and the rail hides its own (below), so none is kept here. */
   :root {
-    --mn-help-rail: 48px;
+    --mn-help-rail: 40px;
   }
 
   .dock-resize {
@@ -7664,10 +7703,18 @@ body.mn-dock-dragging {
   }
 
   /* ── The rail: the Stations tab ── */
-  /* The same width shut and open: a drawer takes nothing from the row, so
-     opening one moves no map. */
+  /* Put away, the panel takes no width at all and the map runs to the
+     screen's edge; out, it takes the rail's. Nothing between: a drawer takes
+     nothing from the row, so opening one moves no map. The border is the
+     rail's own (below), because the rail also stands over the page with no
+     panel width under it. */
   #help-panel.has-map-tools {
-    width: var(--mn-help-rail, 48px);
+    width: 0;
+    border-left: 0;
+  }
+
+  #help-panel.has-map-tools.rail-pinned {
+    width: var(--mn-help-rail, 40px);
   }
 
   /* The rail is sticky, as the desktop strip is, which makes it a stacking
@@ -7676,20 +7723,16 @@ body.mn-dock-dragging {
      drawer dims it with the page; open, it goes up to the drawers' 1200 over
      its own backdrop, lit with the drawer beside it. Above Leaflet's control
      corners (1000) either way, and clear of them: they are inside the map, and
-     the map ends where the rail begins.
+     the map ends where a rail that is out begins.
 
-     And the window's height rather than the window's less the banner's, so
-     that once the banner has scrolled away the rail and the drawer beside it
-     run to the foot of the screen — a phone scrolls the page under the map far
-     more than a laptop does, and a drawer ending a banner's height short of
-     the bottom, over a dimmed strip of page, reads as a drawer that did not
-     open all the way. At the top of the page that leaves the last --mn-chrome
-     px of both below the fold, which is the trap .nav-inner describes: a
-     scroller cannot scroll what is inside it into the part of its own box that
-     is off screen. So each ends with that much empty room (below), and
-     whatever was last in it can still be brought up above the fold. */
+     One screen tall below the banner, as the desktop's is. It was the whole
+     window's height, for a page that scrolled on under the map, and the page
+     does not: the map is the screen's height under the banner and the cards
+     are in the drawer (syncStationsSplitHeight, app.js). A column the
+     window's height would be the one thing making the page a banner's height
+     too tall — a scroll with nothing under it. */
   #help-panel.has-map-tools .dock-inner {
-    height: 100dvh;
+    height: calc(100dvh - var(--mn-chrome, 0px));
     z-index: 1100;
   }
 
@@ -7697,27 +7740,59 @@ body.mn-dock-dragging {
     z-index: 1200;
   }
 
+  /* The strip, at the panel's outer edge whatever width the panel has: the
+     rail's when it is out, where it fills the panel, and none when it has come
+     out with a drawer, where it stands over the page beside the screen's edge.
+     Put away, it is not drawn. */
   #help-panel.has-map-tools .dock-strip {
-    padding-bottom: calc(var(--sp-2) + var(--mn-chrome, 0px));
+    display: none;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: var(--mn-help-rail, 40px);
+    gap: 2px;
+    padding: var(--sp-1) 0 var(--sp-2);
+    border-left: 1px solid var(--border);
     scrollbar-width: none;
   }
 
-  #help-panel.has-map-tools .dock-pane::after {
-    content: '';
-    display: block;
-    height: var(--mn-chrome, 0px);
+  #help-panel.has-map-tools.rail-shown .dock-strip {
+    display: flex;
   }
 
-  /* The drawer: the rail's height and top — under the banner at the top of the
-     page, and at the window's top once the banner has scrolled away — on the
-     rail's inner edge, and wide enough for Map display's rows while leaving a
-     finger's width of the page beside it, dimmed, to tap it shut on. */
+  /* 36 px, and the glyphs a step down with them. The groups keep their
+     hairlines, closer in. */
+  #help-panel.has-map-tools .dock-tab,
+  #help-panel.has-map-tools .dock-strip .mn-mapctl-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: .95rem;
+  }
+
+  #help-panel.has-map-tools .dock-tab.help-toggle .dock-ico {
+    font-size: 1.05rem;
+  }
+
+  #help-panel.has-map-tools .dock-group {
+    gap: 2px;
+  }
+
+  #help-panel.has-map-tools .dock-group + .dock-group::before {
+    margin: 3px 0;
+  }
+
+  /* The drawer: the rail's height and top, on the rail's inner edge — a rail
+     that is out fills the panel, and one out beside the drawer stands over
+     the page, and in both the rail's inner edge is its width in from the
+     screen's — wide enough for Map display's rows while leaving a finger's
+     width of the page beside it, dimmed, to tap it shut on. */
   #help-panel.has-map-tools .dock-panes {
     position: absolute;
     top: 0;
     bottom: 0;
-    right: 100%;
-    width: min(24rem, calc(100vw - var(--mn-help-rail, 48px) - 2.75rem));
+    right: var(--mn-help-rail, 40px);
+    width: min(24rem, calc(100vw - var(--mn-help-rail, 40px) - 2.75rem));
     background: var(--panel);
     border-left: 1px solid var(--border);
     box-shadow: -6px 0 24px rgba(0, 0, 0, .28);
@@ -7725,6 +7800,46 @@ body.mn-dock-dragging {
 
   #help-panel.has-map-tools.collapsed .dock-panes {
     display: none;
+  }
+
+  /* ── The Stations map, the whole screen under the banner ──
+     Edge to edge: no page gutter round it, no panel frame, no rounded corner
+     — a map that is the screen does not want a margin inside the screen. Its
+     height is the screen's, measured (syncStationsSplitHeight, app.js); the
+     cards that used to follow it down the page are in the side panel. */
+  .layout.map-layout {
+    padding: 0;
+  }
+
+  .stn-split > .map-panel {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .stn-split > .map-panel #leaflet-map {
+    border-radius: 0;
+  }
+
+  /* The credit line, one line: four of them under a phone's map was the most
+     text on the screen. The start of it stays — Leaflet, and the first of
+     the services — and a tap on it lays the rest out in full, as does focus
+     reaching one of its links (mapAttributionBelow, map-controls.js). */
+  .mn-map-attrib {
+    padding: .15rem .5rem;
+    cursor: pointer;
+  }
+
+  .mn-map-attrib .leaflet-control-attribution {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mn-map-attrib.is-open .leaflet-control-attribution,
+  .mn-map-attrib:focus-within .leaflet-control-attribution {
+    white-space: normal;
   }
 }
 
@@ -7840,13 +7955,20 @@ body:has(.map-panel.is-full) .dock-inner {
 }
 
 /* A phone keeps its rail beside the full-screen map the same way — the map's
-   tools are in it there too, and --mn-side-w is the rail's width alone,
-   because a pane is a drawer over the map rather than a column beside it. The
+   tools are in it there too, ⛶ among them, so full screen puts the rail out
+   whether or not ⋮ had (app.js, dockRailPinned) — and --mn-side-w is the
+   rail's width alone, because a pane is a drawer over the map rather than a
+   column beside it. The window's whole height, as above: the rail's phone
+   rule is one screen *below the banner*, and the banner is under the map. The
    drawer's backdrop is 1150, which is under the map, so while a drawer is open
    it is lifted over the map and the side panel over it: a tap on the sliver of
    map beside the drawer puts the drawer away, as it does over the page, rather
    than landing on a map the drawer is covering most of. */
 @media (max-width: 560px) {
+  body:has(.map-panel.is-full) #help-panel.has-map-tools .dock-inner {
+    height: 100dvh;
+  }
+
   body:has(.map-panel.is-full) #help-backdrop {
     z-index: 1901;
   }
@@ -11500,9 +11622,13 @@ code {
      the three wrapped rows (≈175 px, a quarter of the screen) it was. */
   header {
     align-items: center;
-    gap: .5rem;
-    padding: .5rem .6rem;
+    gap: .4rem;
+    padding: .4rem .5rem;
   }
+
+  /* The name and the count take whatever the buttons leave, and give it up
+     before a button does. */
+  .header-id { flex: 1 1 auto; }
 
   header h1 {
     margin: 0;
@@ -11512,18 +11638,40 @@ code {
     text-overflow: ellipsis;
   }
 
-  .header-sub { font-size: .72rem; }
+  /* One line, whatever it says. "4873 stations · 91 repeaters · from the
+     datastore" wrapped to four under the name, which made the banner the
+     height of four lines and took them from the map; the start of it is the
+     part that says the file loaded, and the rest is its tooltip's. */
+  .header-sub {
+    font-size: .72rem;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+
+  .header-stats {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   /* The tagline is the only line here that never changes, so it is the one
      that goes. The station count stays and loses its separator with it. */
   .header-tag { display: none; }
   .header-stats:not(:empty)::before { content: none; }
 
-  /* Four square buttons plus the ☰ and the title fit a 390 px row exactly once
-     nothing is allowed to wrap. */
+  /* Five square buttons, ⋮ on the Stations tab, the ☰ and the title fit a
+     390 px row once nothing is allowed to wrap and the buttons are a step
+     smaller than a tablet's. */
   .header-actions {
-    gap: .3rem;
+    gap: .25rem;
     flex-wrap: nowrap;
+  }
+
+  .hdr-btn,
+  .hdr-nav,
+  .hdr-side {
+    width: 2.25rem;
+    height: 2.25rem;
   }
 
   .layout,
@@ -11565,8 +11713,10 @@ code {
 @media (max-width: 380px) {
   header h1 { font-size: .95rem; }
   .hdr-btn,
-  .hdr-nav { width: 2.15rem; height: 2.15rem; }
+  .hdr-nav,
+  .hdr-side { width: 2.1rem; height: 2.1rem; }
   .hdr-ico { font-size: 1.05rem; }
+  .header-actions { gap: .2rem; }
 }
 
 
@@ -12259,6 +12409,13 @@ code {
   background: color-mix(in srgb, var(--panel) 82%, transparent);
   border-radius: var(--r-sm);
   pointer-events: none;
+  transition: opacity .4s ease;
+}
+
+/* Read: a finger has done what it says (digital-twin.js). Faded rather than
+   taken out, so the flood scale, which stops above it, stays where it is. */
+.twin-hud.is-quiet {
+  opacity: 0;
 }
 
 /* What the stage says while there is nothing to draw: no station, no ground,
@@ -12543,6 +12700,10 @@ code {
 
 .map-twin-bar .map-twin-actions { flex-wrap: nowrap; }
 
+/* The way out is two words on one line: wrapped, "←" over "Map" made the bar
+   a line taller than its buttons. */
+.map-twin-back { white-space: nowrap; }
+
 .map-twin-title {
   flex: 1 1 auto;
   min-width: 0;
@@ -12566,6 +12727,11 @@ code {
   #map-twin .map-twin-flood { display: none; }
   #map-twin .map-twin-site { display: none; }
   #map-twin .map-twin-wide { display: none; }
+  /* Icons alone need a button's height but not its width: half the page's
+     gutter either side of each, and a tighter run of them, leave the name of
+     the station a few letters more than one. */
+  .map-twin-bar button { padding-inline: .5rem; }
+  .map-twin-bar .map-twin-actions { gap: .25rem; }
 }
 
 /* Borrowing a nearby station's flood levels (digital-twin.js, "borrowing

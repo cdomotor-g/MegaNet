@@ -888,7 +888,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Limit link/path length*)
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
-- Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape, which every narrower window gets, has room for
+- Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
 - **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub and nearest station, repeater and survey mark
 - **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
 - Elevation shading over any base map, with an opacity slider
@@ -905,9 +905,9 @@ Each entry in the `stations` array represents one node in the network. A node ca
   (**Draw & measure**, **Polar radio coverage**, **Repeater site finder**, **What is here**), the **3-D view**, its
   settings (🎚️) and its camera, and how much screen the map gets (⛶ full screen). A panel opens as a pane of
   the side panel from its button in the strip; a button does its one thing.
-  The one control left on the map is ↺ reset, alone in its top-right corner at every width. On a phone the strip
-  is a rail down the right-hand edge, beside the map rather than on it, and a panel opens from it as a drawer over
-  the page
+  The one control left on the map is ↺ reset, alone in its top-right corner at every width. On a phone the map
+  fills the screen, and the strip is a rail down the right-hand edge that ⋮ in the banner brings out, beside the
+  map rather than on it; a panel opens from it as a drawer over the page, and so do the station cards
 
 **Reading the map.** Every pin carries a white ring so it separates from the
 base map and from its neighbours; ACMA transmitter squares carry the same ring.
@@ -1103,7 +1103,8 @@ when a corner is taller than its map, the groups that do not fit wrap, whole,
 into a second column over the map rather than hanging off the bottom edge. The
 Stations map's column is not on the map, at any width: it stands in the side
 panel's strip, in the same groups and the same order with the same hairlines
-and the same ARIA names (§20) — on a phone, a rail beside the map. That is
+and the same ARIA names (§20) — on a phone, a rail beside the map that ⋮ in
+the banner brings out. That is
 where it went last, and the phone is why. Below 560 px it used to come back to
 the corner, where at 52 dvh with 44 px touch targets it was two columns of
 buttons over a quarter of a map the width of the screen. The one button left
@@ -1200,8 +1201,9 @@ Above 1,100 px the cards are in the side panel, and the filter card is the first
 thing in that pane — so a stored "open" would land on a pane whose whole height
 is eight blocks of tick boxes, with the list they filter below the fold, which
 is not what the pane is for. Pressing **Filters** still opens it and still
-writes the preference, which is honoured on every visit at or below 1,100 px,
-where the cards are under the map in one long page; the override is read-only
+writes the preference, which is honoured on every visit between a phone's width
+and 1,100 px, where the cards are under the map in one long page (a phone lands
+shut too: its cards are a drawer, and the tick boxes would be all of it); the override is read-only
 and lasts one page load, so nobody's setting is destroyed by having opened the
 tab on a wide screen once.
 
@@ -1239,9 +1241,10 @@ live in that strip, and a full-screen map that had covered them could only be
 looked at. The map's edge follows the side panel's as a pane opens, the panel
 shuts or its handle is dragged, re-measured each time; Tab walks the map and the
 side panel and nothing under them; leaving the tab ends it. On a phone that is
-the rail alone — the map takes the rest of the screen, and a panel opened from
-the rail is a drawer over it, which a tap on the sliver of map beside it puts
-away. Press ⛶ again, or Escape, to put the page back;
+the rail alone — out for as long as full screen lasts, even if ⋮ had put it
+away, since ⛶ is in it — the map takes the rest of the screen, and a panel
+opened from the rail is a drawer over it, which a tap on the sliver of map
+beside it puts away. Press ⛶ again, or Escape, to put the page back;
 Escape defers to any dialog open over the map, and the bug reporter still
 opens on top. It is deliberately not a modal, though "a modal map" is how the
 ask arrives: the shared dialog shell wipes its content on every exit, which
@@ -1256,7 +1259,9 @@ filters, the station list, the path tools, the details card — in the side pane
 on the right (§20), the map at the height of the viewport and the cards a pane
 that scrolls on its own. That is the whole point of it: the map stays in view
 while the list beside it is read. At or below 1,100 px the same tab is one long
-page with the cards under the map, and the width is the only thing that chooses
+page with the cards under the map — down to a phone's width, where the map fills
+the screen and the cards are the side panel's again, as drawers over it — and
+the width is the only thing that chooses
 between the two. Until the side panel it was three
 columns inside `<main>` — the map, a divider that dragged and a column of cards —
 beside a help rail that was a second right-hand column; the divider is the side
@@ -1550,8 +1555,8 @@ sampling.
 > panel, and a second copy of the switch in the shared picker would be two
 > controls for one layer. Say so if you want it back on those maps.
 
-**What is here.** The **ℹ️** button in the side panel's strip (in the map's corner
-column on a phone) arms a pick: click
+**What is here.** The **ℹ️** button in the side panel's strip (on a phone, in the
+rail that ⋮ brings out) arms a pick: click
 anywhere and a card in the map's bottom corner says what the app already knows about
 that point — ground height, land cover, wind region, drainage basin, maintenance
 hub, and the nearest station, repeater and survey mark with the distance and
@@ -1904,8 +1909,9 @@ obstruction.
 
 **Draw & measure.** A sketching layer over the network map, opened from ✏️ in
 the side panel's strip as a pane beside the map, which stays open while you are
-actually drawing — on a phone, from the pencil icon in the map's top-right
-corner, and pinnable open there. It is for the picture
+actually drawing — on a phone, from ✏️ in the rail that ⋮ brings out, as a
+drawer: pick a tool and tap the dimmed map beside it to draw, the tool still
+armed. It is for the picture
 that goes into an email or an incident note: **pins**, **lines**, **circles**,
 **rectangles** and free **text annotations**. Every shape can be drawn by
 clicking on the map — click the circle's centre then its radius, click opposite
@@ -3500,21 +3506,33 @@ settled rather than during the slide. Where it differs:
   map gets the width. Any other button opens it on that pane.
 - **Under 560 px a pane is a drawer** from the right, over the page, mutually
   exclusive with the nav's, with a backdrop that a tap puts it away on, and
-  Escape. What it opens from depends on the tab:
-  - **On the Stations tab the strip is still a rail** down the right-hand edge,
-    48 px wide, sticky under the banner and taking its width from the page — so
-    the map ends where the rail begins and only ↺, in its top-right corner,
-    stands on it. It holds ❔ and every other one of the map's controls, in the
-    same groups and order as on a desktop; a panel's drawer opens on the rail's
-    inner edge, and the rail stays
-    lit above the backdrop, so its buttons go on switching panes and the lit one
-    puts its drawer away. The rail and its drawer run to the foot of the screen
-    once the banner has scrolled away, and the last button can be scrolled up
-    above the fold at the top of the page. The Stations cards stay under the
-    map (they fold there below 1,100 px). Until this the map's controls went
-    back to its corner on a phone, as flyouts with pins — two columns of 44 px
-    buttons over a quarter of a map the width of the screen, which is the
-    complaint that moved them.
+  Escape — and only ever one somebody opened on that screen: nothing stored
+  opens one on arrival, and turning a phone from landscape to portrait opens
+  none, unless the operator was typing in the cards under the map, which then
+  come with them as 📋's drawer, caret and all. What it opens from depends on
+  the tab:
+  - **On the Stations tab the map is the screen.** It runs edge to edge from
+    the banner's foot to a one-line credit at the screen's (tap the credit for
+    the rest of it), and the page under it does not scroll: the Stations cards
+    are in the side panel, 📋 and 〽️, as beside a desktop's map. The strip is a
+    rail down the right-hand edge, put away behind **⋮** at the right-hand end
+    of the banner until it is asked for. ⋮ brings it out — 40 px wide, its
+    buttons 36 px, sticky under the banner and taking its width from the page,
+    so the map ends where the rail begins and only ↺, in its top-right corner,
+    stands on it — and puts it away again, and which it was is remembered as
+    `mn-dock-rail`. It holds ❔, 📋, 〽️ and every other one of the map's
+    controls, in the same groups and order as on a desktop; a pane's drawer
+    opens on the rail's inner edge, and the rail stays lit above the backdrop,
+    so its buttons go on switching panes and the lit one puts its drawer away.
+    A drawer opened while the rail is away — *Station details*, a radio path
+    clicked on the map, a line finished — brings the rail out with it, over the
+    page beside the drawer rather than taking the map's width, and takes it
+    away again, focus to ⋮. Full screen brings the rail out too, because ⛶ is
+    in it. Until this the rail stood beside the map all the time, 48 px of a
+    390 px screen, with the cards under the map and the banner's station count
+    wrapped to four lines above it: a map a third of the screen. Before that the
+    map's controls went back to its corner on a phone, as flyouts with pins —
+    two columns of 44 px buttons over a quarter of the map.
   - **Everywhere else it is the help rail exactly**: the strip holds only ❔
     there, and rather than a rail for one button it is a tab fixed on the
     screen edge, with help the drawer that tab rides on — the nav could move ☰
@@ -3535,26 +3553,29 @@ settled rather than during the slide. Where it differs:
 the elevation profile, the link budget, *Repeaters listening*, the blast radius
 and the station editor are one wrapper (`#stations-cards`), emitted under the
 map by the tab's render and *moved* — never re-rendered — into the side panel's
-Stations pane while the window is wider than 1,100 px. The radio
+Stations pane while the window is wider than 1,100 px, or a phone's, where
+the pane is a drawer over a map that fills the screen. The radio
 path card, the elevation profile and the link budget are a wrapper of their own
 inside it (`#stations-path-cards`), and
 beside the map that goes to a pane of its own, 〽️ *Path tools*, under 📋: they
 answer a question asked of the map rather than of the list, and they are the
 cards the map sends people to. Under the map it goes back into the column
 between the list and *Repeaters listening*, where the render emitted it. `#stations-main.is-split` then
-means "the cards are beside the map", and the map fills the height of the window
-on its own. At or below 1,100 px they fold under it without the Leaflet map
-being rebuilt, and come back beside it when the window is wide again — the
-width is the one thing that decides. Every card is re-rendered in place by its own id, so
+means "the cards are in the side panel", and the map fills the height of the
+window on its own — a phone's included, where it is edge to edge under the
+banner. At or below 1,100 px, down to a phone's width, they fold under it
+without the Leaflet map being rebuilt, and come back to the side panel when
+the window is wide again, or a phone's — the width is the one thing that
+decides. Every card is re-rendered in place by its own id, so
 none of them knows it has moved; leaving the tab takes the wrapper out of the
 side panel (a registered tab teardown), because a great deal of the app reads
 "no `#stations-table-wrap`" as "not on the Stations tab". Everything that jumps
 to a card — *Show in the list*, *Station details*, the radio path card's links,
 *Link budget for this path*, *Finish line*, the site finder's *Profile the worst
 path* — opens the side panel on the pane holding that card first (`dockReveal`),
-because a scroll to an element in a hidden pane does nothing at all; and on a
-phone, where those cards are under the map, it puts away the drawer the press
-came from, which would otherwise be over the card it scrolled to. The elevation profile is always a card now, and with no line drawn it says
+because a scroll to an element in a hidden pane does nothing at all — on a
+phone that pane is a drawer, which takes the place of whichever drawer the
+press came from, and brings the rail out beside it if ⋮ had put it away. The elevation profile is always a card now, and with no line drawn it says
 how to get one.
 
 **The radio path card.** Clicking a radio path on the map — a field link or a

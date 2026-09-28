@@ -541,10 +541,41 @@ function mapAttributionBelow(map) {
     strip = document.createElement('div');
     strip.className = 'mn-map-attrib';
     after.parentNode.insertBefore(strip, after.nextSibling);
+    strip.addEventListener('click', mapAttributionTap);
+    strip.addEventListener('focusin', mapAttributionResized);
+    strip.addEventListener('focusout', mapAttributionResized);
   }
   strip.textContent = '';
   strip.appendChild(box);
   return strip;
+}
+
+// On a phone the credit line is one line with an ellipsis (styles.css), and a
+// tap on it lays the whole of it out — or folds it back. A tap on one of its
+// links while it is cut short opens it rather than following a link the eye
+// could only half read; once it is open the links are links. Anywhere the line
+// is not cut short — every window wider than a phone, where it wraps — a tap
+// does nothing but what the link under it does.
+function mapAttributionTap(e) {
+  const strip = e.currentTarget;
+  const line = strip.querySelector('.leaflet-control-attribution');
+  const open = strip.classList.contains('is-open');
+  if (!open && !(line && line.scrollWidth > line.clientWidth + 1)) return;
+  if (open && e.target.closest && e.target.closest('a')) return;
+  e.preventDefault();
+  strip.classList.toggle('is-open', !open);
+  mapAttributionResized();
+}
+
+// The line laid out in full, or folded back — by a tap, or by focus reaching
+// one of its links (styles.css) — is a line of a different height, and on a
+// phone's Stations tab it shares a column of fixed height with the map, so the
+// map's foot moves with it. Leaflet only watches the window, and a map left
+// measured at its old height takes every tap half the difference away from
+// where it was aimed. Everywhere else the map's size does not change, and
+// Leaflet's own check makes this nothing.
+function mapAttributionResized() {
+  if (typeof invalidateMapSizes === 'function') invalidateMapSizes(0);
 }
 
 // ── The on-map panel ─────────────────────────────────────────────────────────

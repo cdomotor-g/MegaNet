@@ -56,10 +56,15 @@
   // nothing after that told it otherwise — a phone turned on its side (390 px
   // to 844, and back) left the Stations map 56 px out, clicks landing that far
   // from where they were aimed.
+  //
+  // The Stations cards move on this crossing too: a phone's are in the side
+  // panel, as a drawer over the map, and a tablet's are under it
+  // (stationsSplitActive, app.js) — the fold below, at the other end.
   window.matchMedia(`(max-width: ${BREAKPOINTS.xs}px)`).addEventListener('change', () => {
     renderTabs();
     if (state.map) MapChrome.redock(state.map);
     renderHelp();
+    stationsLayoutChanged();
     invalidateMapSizes(NAV_TRANSITION_MS + 40);
   });
   // Crossing `lg` folds the Stations cards back under the map and unfolds them
