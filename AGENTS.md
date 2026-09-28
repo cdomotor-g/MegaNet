@@ -59,8 +59,9 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   - `elevation_source` says whether a height is surveyed or modelled (Elvis DEM);
   - a station with `proposed: true` is **proposed, not yet built** — where one is
     meant to go, with a `station_type` and `proposed_year` and usually no Bureau
-    number (the dossier's `identity` and first lines say so); never report it
-    as a station on the ground. Search rows do not carry the flag yet;
+    number (the dossier's `identity` and first lines say so, and search rows
+    and the dossier's `nearby_stations` carry the flag); never report it as a
+    station on the ground;
   - health and readings are only what reached MegaNet's own ingest — most
     stations report through the Bureau's systems, so "not recorded" there says
     nothing about whether a station works;

@@ -456,7 +456,7 @@ const TYPE_TERMS = {
 const COMPACT_SELECT = [
   'id', 'name', 'station_number', 'lat', 'lon', 'elevation_ahd', 'elevation_source', 'roles',
   'radio_network_ids', 'catchment_ids', 'hub_id', 'basin', 'lga', 'stream', 'awrc_number',
-  'location_types', 'alert_ids', 'satcom', 'enabled',
+  'location_types', 'alert_ids', 'satcom', 'enabled', 'proposed', 'station_type', 'proposed_year',
   'sensor(type,alert_id)', 'station_flood_class(ord)', 'station_aep_level(ord)',
   'station_crossing(ord)', 'station_gauge_survey(ord)', 'station_flood_effect(ord)',
 ].join(',');
@@ -520,6 +520,12 @@ function compactRow(r, { sls, health, catchments, from } = {}) {
     radio_network_ids: r.radio_network_ids || [],
     awrc_number: r.awrc_number || null,
     enabled: r.enabled !== false,
+    // Only proposed — where a station is meant to go, not yet built or
+    // numbered — and what kind it is or is to be, and the year it is proposed
+    // for (0039). False, null and null on a station that never was a proposal.
+    proposed: r.proposed === true,
+    station_type: r.station_type || null,
+    proposed_year: num(r.proposed_year),
     telemetry: {
       alert_ids: r.alert_ids || {},
       sensor_types: uniq(sensors.map(s => s.type).filter(Boolean)),
@@ -1501,7 +1507,7 @@ async function nearbySection(rc, doc, id) {
   for (const span of [0.25, 1, 3]) {
     const dLon = span / Math.max(0.01, Math.cos(lat * Math.PI / 180));
     const { rows } = await rc.up.select('station', [
-      ['select', 'id,name,station_number,lat,lon,roles,location_types,alert_ids,stream'], ['deleted_at', 'is.null'],
+      ['select', 'id,name,station_number,lat,lon,roles,location_types,alert_ids,stream,proposed'], ['deleted_at', 'is.null'],
       ['lat', `gte.${round(lat - span, 6)}`], ['lat', `lte.${round(lat + span, 6)}`],
       ['lon', `gte.${round(lon - dLon, 6)}`], ['lon', `lte.${round(lon + dLon, 6)}`], ['limit', 1000]]);
     found = rows.filter(r => r.id !== id && num(r.lat) != null && num(r.lon) != null);
@@ -1513,8 +1519,10 @@ async function nearbySection(rc, doc, id) {
     .slice(0, 5)
     .map(({ r, d }) => {
       const b = bearingDeg(lat, lon, num(r.lat), num(r.lon));
+      // A proposed neighbour (0039) is where one is meant to go, and says so.
       return { id: r.id, name: r.name, station_number: r.station_number || null, distance_km: round(d, 2),
-        bearing_deg: Math.round(b), direction: compass(b), kinds: stationKinds(r), roles: r.roles || [] };
+        bearing_deg: Math.round(b), direction: compass(b), kinds: stationKinds(r), roles: r.roles || [],
+        proposed: r.proposed === true };
     });
   return nearest.length
     ? { status: 'ok', stations: nearest, note: 'Great-circle distance and initial bearing from this station.', source: 'meganet.station' }
@@ -2423,7 +2431,7 @@ export const MCP_TOOLS = Object.freeze([
   {
     name: 'search_stations',
     title: 'Search stations',
-    description: 'Find stations by name words, Bureau or AWRC number, or ALERT address, optionally filtered by catchment, basin, LGA, hub, radio network, role, kind (rain/river/repeater/base) or SLS gauge type. Returns compact rows (id, name, number, position, kinds, SLS gauge type, flood-level flags) ranked by relevance. Pass a row\'s id to get_station_dossier.',
+    description: 'Find stations by name words, Bureau or AWRC number, or ALERT address, optionally filtered by catchment, basin, LGA, hub, radio network, role, kind (rain/river/repeater/base) or SLS gauge type. Returns compact rows (id, name, number, position, kinds, whether it is only proposed, SLS gauge type, flood-level flags) ranked by relevance. Pass a row\'s id to get_station_dossier.',
     inputSchema: { type: 'object', properties: {
       q: { type: 'string', maxLength: LIMITS.qMaxLength, description: 'Name words, a Bureau station number, an AWRC number or an ALERT address.' },
       ...listFilters, limit: limitArg(LIMITS.listMax, LIMITS.listDefault), offset: offsetArg,

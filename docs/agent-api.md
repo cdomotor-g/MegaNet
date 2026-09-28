@@ -317,6 +317,7 @@ curl -s 'https://floodwarning.net/api/v1/stations?near=-18.51,146.0&radius_km=10
       "catchments": [{ "id": "herbert", "name": "Herbert" }],
       "basin": "Herbert River", "stream": "HERBERT RIVER", "lga": "Hinchinbrook Shire", "hub_id": "cairns",
       "radio_network_ids": [], "awrc_number": "116914", "enabled": true,
+      "proposed": false, "station_type": null, "proposed_year": null,
       "telemetry": { "alert_ids": { "rainfall": 6039 }, "sensor_types": ["Rainfall", "Rainfall Increment", "Water Level", "Battery"],
                      "satcom": false, "last_seen_at": null, "last_reading_at": null },
       "sls": { "gauge_type": "Automatic", "data_type": "Rainfall/River", "priority": "High", "owner": "Hinchinbrook Shire Council", "jurisdiction": "QLD" },
@@ -368,8 +369,10 @@ with no Bureau number (0039) — carries `"proposed": true` in its record, with
 `station_type` (`auto_water_level`, `auto_rain_gauge`, `manual_water_level` or
 `manual_rain_gauge`) and `proposed_year`. An established station has no
 `proposed` key; one that was proposed keeps its type and year. The compact rows
-of `GET /api/v1/stations` do not carry the three yet, so check `station` (or the
-dossier's `identity`) before reporting a station as one on the ground.
+of `GET /api/v1/stations` carry all three too — `false`, `null` and `null` on a
+station that never was a proposal — and a dossier's `nearby_stations` marks a
+proposed neighbour with `"proposed": true`. Check them before reporting a
+station as one on the ground.
 
 ### `GET /api/v1/stations/{id}/dossier`
 
@@ -389,7 +392,7 @@ never silently missing, and "not recorded" never means zero.
 | `bureau_listings` | which of the Bureau's Queensland station indexes list it (FloodWarn rainfall, daily rainfall, river height) |
 | `flood_levels` | as [`/flood-levels`](#get-apiv1stationsidflood-levels) |
 | `inspections` | how many visits, first and last, and the numbers the last three recorded (battery and solar volts, SWR, RSSI, fade margins, gas) |
-| `nearby_stations` | the five nearest live stations: distance, bearing, kinds |
+| `nearby_stations` | the five nearest live stations: distance, bearing, kinds, and `proposed` where one is only proposed |
 | `sources`, `links`, `disclaimer`, `generated_at` | provenance and where to go next |
 
 ```sh

@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-28** (revision 109 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-28** (revision 110 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -503,7 +503,9 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Four AI rows, and six `[Human]` issues.
 >
-> **Revision 109 opens and closes nothing** — two session requests in one commit: a **📍 pill in the Stations map's top row** that brings back a station card you closed and drops down the stations looked at this session, latest first, each a way back to it (`station-trail.js`; in the twin it stands beside the flood scale), and **proposed stations** — a name, a type (an automatic or manual water level station, an automatic or manual rain gauge), a year and a place, no station number — which anybody who may edit may propose, while adding a station outright and establishing a proposal become an administrator's (`0039`). The allocation below is unchanged. Three steps came out of it, listed at the foot of the revision entry and unfiled pending the owner: **a first administrator, before `0039`** (revision 104's step, which now gates adding stations: the live project has none), **`0039` to the live project**, without which the editor refuses to send a proposal (the live database is at 38), and **then the agent API's compact rows carrying the three columns**, which cannot be asked for before `0039` is there.
+> **Revision 110 opens and closes nothing** — it is revision 109's three steps, done from the session that wrote them at the owner's choice ("do them 3 yourself"): **a first administrator** (the owner's account, the only `admin` of the project's two users — revision 104's step too), **`0039` is live** (fetched by the database from the repository at `6ef3ffe` and run only when its SHA-256 matched; the project went from 38 to 39, and `tools/check_proposed_stations.sql` passed 40 of 40 against production, rolled back), and **the agent API's search rows and a dossier's `nearby_stations` say which stations are proposed**. The allocation below is unchanged. Revision 104's list, less its first two steps, stands.
+>
+> **Revision 109 opens and closes nothing** — two session requests in one commit: a **📍 pill in the Stations map's top row** that brings back a station card you closed and drops down the stations looked at this session, latest first, each a way back to it (`station-trail.js`; in the twin it stands beside the flood scale), and **proposed stations** — a name, a type (an automatic or manual water level station, an automatic or manual rain gauge), a year and a place, no station number — which anybody who may edit may propose, while adding a station outright and establishing a proposal become an administrator's (`0039`). The allocation below is unchanged. Three steps came out of it, listed at the foot of the revision entry: ~~**a first administrator, before `0039`**~~, ~~**`0039` to the live project**~~ and ~~**then the agent API's compact rows carrying the three columns**~~ — **all three done at revision 110**.
 >
 > **Revision 108 opens and closes nothing** — the field photo viewer gets a compass (a wedge per photo taken at the spot, clicked to bring one up, overlapping ones boxed in gold), a ± in red when a fix is looser than 7 m, a spot's photos in compass order, and a map to move a photo's pin on — from a session request. **#201 is half done by it** (the viewer's place editor; the queue's and the Stations map's own pin are left) and stays open at `[Sonnet5/Med]`, so the allocation below is unchanged. One step for a person came out of it — **the ± of the Solocator photos already stored, read off their pictures from the viewer, a spot at a time** — listed at the foot of the revision entry and unfiled pending the owner.
 >
@@ -662,6 +664,56 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 110 — 2026-09-28: a first administrator, `0039` is live, and the agent API's rows say which stations are proposed
+
+Revision 109's three steps for the owner, done from the session that wrote
+them at the owner's choice ("do them 3 yourself"), in that order. **Opens and
+closes nothing.**
+
+**A first administrator.** The live project had two `meganet.app_user` rows
+and neither was `admin`, so with `0039` live nobody could have added a station
+outright or established a proposal from the browser. The owner's account was
+made one — `update meganet.app_user set role = 'admin'` for the owner's
+address, one row, on the editors list — and is now the project's only
+administrator. It is revision 104's second step as well, so photo review's
+approvals have somebody to make them.
+
+**`0039` is live.** Applied the way `0036` to `0038` were, recorded in the
+project's migration history as `0039_proposed_stations`: one `do` block, in
+which the database checked it was at 38, fetched
+`db/migrations/0039_proposed_stations.sql` from the repository at `6ef3ffe`,
+ran it only when its SHA-256 matched the committed file's (`3c889133…c3df`,
+97,793 bytes), and checked that it read 39 afterwards; the file's own
+did-it-take block passed inside the same transaction. Afterwards: the four
+station types, both constraints, `station_type` readable by the public roles
+and writable by neither (an anonymous insert through the Data API is refused
+with 401), `save_station()` asking for an administrator, 4,873 live stations
+with none proposed, and no station document gaining a key. Then
+`tools/check_proposed_stations.sql`, fetched the same way at `6ef3ffe` and
+matched (`9d70be75…09df`), was run against production inside one `do` block
+that raised its verdict and so rolled back: **40 of 40**, and nothing it
+wrote survived — no `_check_` station, user or editors-list entry. The only
+triggers on `auth.users` are the project's own two, so signing its three
+people up had nothing outside the transaction to set off. The security advisor
+lists what it listed before the apply. The Data source panel no longer reads
+*schema mismatch*.
+
+**The agent API's rows.** With the columns there, `COMPACT_SELECT` and
+`compactRow` carry `proposed`, `station_type` and `proposed_year` — `false`,
+`null` and `null` on a station that never was a proposal — and a dossier's
+`nearby_stations` marks a proposed neighbour with `proposed: true`, since a
+report listing the nearest stations must not list a proposal as one on the
+ground. `search_stations`' description says so, and docs/agent-api.md and
+AGENTS.md drop the caveat that search rows did not carry the flag. The test
+stub's station table gains the three columns, as the live one has: `npm run
+agentapi` grows from 247 to 250 (a proposal's search row, an established
+station's, and a proposed neighbour in a dossier).
+
+**What is left for a person.** Nothing from revision 109. Revision 104's list,
+less its first two steps, stands: Cloudflare Access's bypass for the API,
+linking Drive and Dropbox, and the decisions blocking #204 and #206. All
+unfiled pending the owner.
+
 ### Revision 109 — 2026-09-28: the stations you looked at, a pill away; and a station can be proposed
 
 From one session request with two asks, in one commit. It opens and closes
@@ -706,8 +758,8 @@ db-checks job. `npm run agentapi` grows by four (247). The whole db-checks job
 was run from zero against a local Postgres 16 with `0039` in the chain and
 passes.
 
-**Not filed, pending the owner:**
-- **A first administrator, before `0039`.** Revision 104's step, and it now
+**Not filed, pending the owner** — ~~all three~~ **done at revision 110**:
+- ~~**A first administrator, before `0039`.**~~ Revision 104's step, and it now
   gates more than photo review: the live project has no administrator (two
   `app_user` rows, neither `admin` — a read-only count at this revision), and
   with `0039` live and none, nobody adds a station outright or establishes a
@@ -715,11 +767,11 @@ passes.
   propose. One `update meganet.app_user set role = 'admin' where lower(email) =
   lower('…')` in the SQL Editor for the owner's address (docs/field-photos.md,
   *Administrators*), then `0039`.
-- **`0039` to the live project.** Until it is there the editor will not send a
+- ~~**`0039` to the live project.**~~ Until it is there the editor will not send a
   proposal — it reads the schema whoami() reports and says so — and the Data
   source panel reads *schema mismatch* (the app expects 39). Apply as `0036`–`0038`
   were; it has no data step.
-- **Then the agent API's compact rows.** `COMPACT_SELECT` names station columns,
+- ~~**Then the agent API's compact rows.**~~ `COMPACT_SELECT` names station columns,
   and a worker deployed before `0039` asking for `proposed` would have every
   search refused — so the three go into it, and into `compactRow`, once the
   migration is live. Until then an agent sees a proposal as one in `station`

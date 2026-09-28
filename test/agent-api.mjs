@@ -45,7 +45,7 @@ const iso = t => new Date(t).toISOString();
 const day = t => iso(t).slice(0, 10);
 
 const COLUMNS = Object.fromEntries(Object.entries({
-  station: 'id ord name station_number lat lon elevation_ahd elevation_source roles radio_network_ids catchment_ids alert_ids satcom rm_system_id enabled notes legacy_unit_id site lga basin location_types hub_id owner awrc_number stream urbs_label tbrg_bucket_size inspection_config_key alert2_station_id deleted_at updated_at updated_by',
+  station: 'id ord name station_number lat lon elevation_ahd elevation_source roles radio_network_ids catchment_ids alert_ids satcom rm_system_id enabled notes legacy_unit_id site lga basin location_types hub_id owner awrc_number stream urbs_label tbrg_bucket_size inspection_config_key alert2_station_id proposed station_type proposed_year deleted_at updated_at updated_by',
   station_json: 'id ord updated_at doc',
   sensor: 'station_id sensor_id type ord alert_id device_id alert2_sensor_id updated_at updated_by',
   repeater: 'station_id acma_licence rx_mhz tx_mhz notes delay_ms updated_at updated_by',
@@ -99,7 +99,8 @@ DOC.stations.forEach((s, ord) => {
     location_types: s.location_types ?? null, hub_id: s.hub_id ?? null, owner: s.owner ?? null,
     awrc_number: s.awrc_number ?? null, stream: s.stream ?? null, urbs_label: s.urbs_label ?? null,
     tbrg_bucket_size: s.TBRGbucketSize ?? null, inspection_config_key: s.inspection_config_key ?? null,
-    alert2_station_id: s.alert2_station_id ?? null, deleted_at: null, updated_at: stationUpdated, updated_by: null,
+    alert2_station_id: s.alert2_station_id ?? null, proposed: s.proposed === true, station_type: s.station_type ?? null,
+    proposed_year: s.proposed_year ?? null, deleted_at: null, updated_at: stationUpdated, updated_by: null,
   });
   T.station_json.push({ id: s.id, ord, updated_at: stationUpdated, doc: s });
   (s.sensors || []).forEach((x, i) => T.sensor.push({ station_id: s.id, sensor_id: x.sensor_id, type: x.type, ord: i,
@@ -135,16 +136,16 @@ const deletedTwin = { ...T.station[0], id: 'zz_deleted_twin', name: `${T.station
 T.station.push(deletedTwin);
 
 // A proposed station (0039): where one is meant to go, with no number yet. Its
-// record says so; the station table has no columns for it in this stub, as the
-// live one has none before 0039 is applied — which is why the compact rows do
-// not carry it yet.
+// record says so, and so do its columns, which the compact rows and a
+// dossier's nearby list read.
 const PROPOSED = { id: 'zz_proposed_gauge', name: 'Proposed Creek Gauge', station_number: '', lat: -27.57, lon: 152.39,
   elevation_ahd: null, roles: ['field'], radio_network_ids: [], catchment_ids: [], alert_ids: {},
   satcom: { enabled: false, provider: '', terminal_id: '' }, rm_system_id: 1, enabled: true, notes: '',
   proposed: true, station_type: 'auto_rain_gauge', proposed_year: 2027 };
 T.station.push({ ...T.station[0], id: PROPOSED.id, name: PROPOSED.name, station_number: '', lat: PROPOSED.lat, lon: PROPOSED.lon,
   catchment_ids: [], alert_ids: {}, site: null, lga: null, basin: null, location_types: null, hub_id: null, owner: null,
-  awrc_number: null, stream: null, urbs_label: null, legacy_unit_id: null, elevation_ahd: null, elevation_source: null });
+  awrc_number: null, stream: null, urbs_label: null, legacy_unit_id: null, elevation_ahd: null, elevation_source: null,
+  proposed: true, station_type: PROPOSED.station_type, proposed_year: PROPOSED.proposed_year });
 T.station_json.push({ id: PROPOSED.id, ord: T.station_json.length, updated_at: stationUpdated, doc: PROPOSED });
 
 // The SLS, merged per (document, bureau number) and joined to the live stations
@@ -598,6 +599,31 @@ let dossier;
   const est = dossier.identity;
   check('an established station is not proposed and has neither', est.proposed === false && est.station_type === null
     && est.proposed_year === null, JSON.stringify({ proposed: est.proposed, station_type: est.station_type }));
+
+  // The compact rows carry it too, now the columns are there (0039 is live):
+  // found by a search, a proposal says what it is; an established row says not.
+  const found = await get(`/api/v1/stations?q=${encodeURIComponent('Proposed Creek')}`);
+  const row = found.json && (found.json.stations || []).find(x => x.id === PROPOSED.id);
+  check('a search row for a proposal says so, with its type and its year', found.status === 200 && row
+    && row.proposed === true && row.station_type === 'auto_rain_gauge' && row.proposed_year === 2027, JSON.stringify(row));
+  const plain = await get(`/api/v1/stations?q=${encodeURIComponent(RICH.name)}`);
+  const prow = plain.json && (plain.json.stations || []).find(x => x.id === RICH.id);
+  check('…and an established station\'s row is not proposed and has neither', plain.status === 200 && prow
+    && prow.proposed === false && prow.station_type === null && prow.proposed_year === null, JSON.stringify(prow && {
+      proposed: prow.proposed, station_type: prow.station_type, proposed_year: prow.proposed_year }));
+
+  // A dossier's nearby list marks a proposed neighbour: a station with the
+  // proposal among its nearest (within four, for a margin on ties).
+  const placed = T.station.filter(x => !x.deleted_at && x.lat != null && x.lon != null);
+  const nearestTo = (lat, lon, not) => placed.filter(x => x.id !== not)
+    .map(x => ({ id: x.id, d: haversine(lat, lon, x.lat, x.lon) })).sort((a, b) => a.d - b.d);
+  const host = nearestTo(PROPOSED.lat, PROPOSED.lon, PROPOSED.id).slice(0, 20).map(c => placed.find(x => x.id === c.id))
+    .find(x => nearestTo(x.lat, x.lon, x.id).slice(0, 4).some(c => c.id === PROPOSED.id));
+  const near = host && await get(`/api/v1/stations/${host.id}/dossier`);
+  const hood = (near && near.json && near.json.nearby_stations && near.json.nearby_stations.stations) || [];
+  const mark = hood.find(x => x.id === PROPOSED.id);
+  check('a dossier\'s nearby list marks a proposed neighbour, and only that one', !!host && mark && mark.proposed === true
+    && hood.filter(x => x.id !== PROPOSED.id).every(x => x.proposed === false), JSON.stringify({ host: host && host.id, hood }));
 }
 
 {
