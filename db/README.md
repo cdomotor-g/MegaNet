@@ -1564,6 +1564,11 @@ loaders and the syncs are untouched; `delete_station()` is left as it was, so
 an editor withdraws a proposal by deleting it. An established station keeps
 its type and its proposed year, as the record of what was proposed.
 
+So a project needs an administrator before `0039`: with none, nobody adds a
+station outright or establishes a proposal from the browser, and every editor
+can only propose. Making one is a line of SQL — `docs/field-photos.md`,
+*Administrators*.
+
 In the document the three are optional keys, as `owner` is: `proposed` only
 where it is true, and the other two absent where null — so the stations in
 `stations.json` gain nothing, and an editor that knows nothing of proposals

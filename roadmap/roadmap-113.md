@@ -503,7 +503,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Four AI rows, and six `[Human]` issues.
 >
-> **Revision 109 opens and closes nothing** — two session requests in one commit: a **📍 pill in the Stations map's top row** that brings back a station card you closed and drops down the stations looked at this session, latest first, each a way back to it (`station-trail.js`; in the twin it stands beside the flood scale), and **proposed stations** — a name, a type (an automatic or manual water level station, an automatic or manual rain gauge), a year and a place, no station number — which anybody who may edit may propose, while adding a station outright and establishing a proposal become an administrator's (`0039`). The allocation below is unchanged. Two steps came out of it, listed at the foot of the revision entry and unfiled pending the owner: **`0039` to the live project**, without which the editor refuses to send a proposal (the live database is at 38), and **then the agent API's compact rows carrying the three columns**, which cannot be asked for before `0039` is there.
+> **Revision 109 opens and closes nothing** — two session requests in one commit: a **📍 pill in the Stations map's top row** that brings back a station card you closed and drops down the stations looked at this session, latest first, each a way back to it (`station-trail.js`; in the twin it stands beside the flood scale), and **proposed stations** — a name, a type (an automatic or manual water level station, an automatic or manual rain gauge), a year and a place, no station number — which anybody who may edit may propose, while adding a station outright and establishing a proposal become an administrator's (`0039`). The allocation below is unchanged. Three steps came out of it, listed at the foot of the revision entry and unfiled pending the owner: **a first administrator, before `0039`** (revision 104's step, which now gates adding stations: the live project has none), **`0039` to the live project**, without which the editor refuses to send a proposal (the live database is at 38), and **then the agent API's compact rows carrying the three columns**, which cannot be asked for before `0039` is there.
 >
 > **Revision 108 opens and closes nothing** — the field photo viewer gets a compass (a wedge per photo taken at the spot, clicked to bring one up, overlapping ones boxed in gold), a ± in red when a fix is looser than 7 m, a spot's photos in compass order, and a map to move a photo's pin on — from a session request. **#201 is half done by it** (the viewer's place editor; the queue's and the Stations map's own pin are left) and stays open at `[Sonnet5/Med]`, so the allocation below is unchanged. One step for a person came out of it — **the ± of the Solocator photos already stored, read off their pictures from the viewer, a spot at a time** — listed at the foot of the revision entry and unfiled pending the owner.
 >
@@ -707,6 +707,14 @@ was run from zero against a local Postgres 16 with `0039` in the chain and
 passes.
 
 **Not filed, pending the owner:**
+- **A first administrator, before `0039`.** Revision 104's step, and it now
+  gates more than photo review: the live project has no administrator (two
+  `app_user` rows, neither `admin` — a read-only count at this revision), and
+  with `0039` live and none, nobody adds a station outright or establishes a
+  proposal from the browser; every editor, the owner included, could only
+  propose. One `update meganet.app_user set role = 'admin' where lower(email) =
+  lower('…')` in the SQL Editor for the owner's address (docs/field-photos.md,
+  *Administrators*), then `0039`.
 - **`0039` to the live project.** Until it is there the editor will not send a
   proposal — it reads the schema whoami() reports and says so — and the Data
   source panel reads *schema mismatch* (the app expects 39). Apply as `0036`–`0038`
